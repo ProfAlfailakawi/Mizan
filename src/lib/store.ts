@@ -23,7 +23,7 @@ import {
   IncidentRecord,
   SimulationResult,
   AppealRecord,
-  IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel
+  IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel, TimeMachineScenarioRecord, QuorumActionRecord, QuorumActionType, InvariantCheckResult, InvariantViolationRecord, ScientificEvidenceNode, ScientificEvidenceEdge, PublicResultRootRecord, PublicResultProofRecord, LocalMeshSessionRecord, FederationAttestationRecord, MizanProtocolPackageRecord, FlightRecorderEntry, IntegrityEnvelopeRecord, ChaosDrillRecord, AccessibilityProfileRecord, CommitteeElasticityRecommendation, JourneyPassRecord
 } from '../types';
 import {
   SEED_ORGANIZATION,
@@ -44,6 +44,9 @@ import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEna
 import { newId, sha256 } from './crypto';
 import { generateFairDraw } from './fairdraw';
 import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
+import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
+import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
+import { can } from './permissions';
 
 interface AppStoreState {
   currentUser: User;
@@ -87,6 +90,22 @@ interface AppStoreState {
   questionGovernance: QuestionGovernanceRecord[];
   aiCapabilityValidations: AICapabilityValidationRecord[];
   operatingCostModel: OperatingCostModel;
+  timeMachineScenarios: TimeMachineScenarioRecord[];
+  quorumActions: QuorumActionRecord[];
+  invariantViolations: InvariantViolationRecord[];
+  evidenceNodes: ScientificEvidenceNode[];
+  evidenceEdges: ScientificEvidenceEdge[];
+  publicResultRoots: PublicResultRootRecord[];
+  publicResultProofs: PublicResultProofRecord[];
+  localMeshSessions: LocalMeshSessionRecord[];
+  federationAttestations: FederationAttestationRecord[];
+  protocolPackages: MizanProtocolPackageRecord[];
+  flightRecorderEntries: FlightRecorderEntry[];
+  integrityEnvelopes: IntegrityEnvelopeRecord[];
+  chaosDrills: ChaosDrillRecord[];
+  accessibilityProfiles: AccessibilityProfileRecord[];
+  elasticityRecommendations: CommitteeElasticityRecommendation[];
+  journeyPasses: JourneyPassRecord[];
   
   // Active JudgeOS Session State
   activeSession: {
@@ -122,7 +141,7 @@ function getInitialState(): AppStoreState {
       parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
       parsed.travelRecords = parsed.travelRecords || []; parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
       parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
-      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.questionGovernance=parsed.questionGovernance||DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2};
+      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.questionGovernance=parsed.questionGovernance||DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[];
       return parsed;
     }
   } catch {
@@ -158,6 +177,7 @@ function getInitialState(): AppStoreState {
       {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
     ],
     travelRecords: [], consents: [], importJobs: [], shadowRuns: [], participantPassport: [], judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: [], remoteChecks: [], audioRecordings: [], featureFlags: [], quranSourceManifests: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
+    timeMachineScenarios:[], quorumActions:[], invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:[], protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[],
     activeSession: {
       sessionId: 'sess-active-001',
       participant: SEED_PARTICIPANTS[0], // Bilal Ahmad (A-104)
@@ -195,6 +215,8 @@ function getInitialState(): AppStoreState {
 }
 
 let globalState = getInitialState();
+let browserMeshAdapter: MeshTransportAdapter | null = null;
+const productionMode = import.meta.env.PROD === true;
 
 function activeRuleSetForCategory(categoryId?: string) {
   const category = categoryId ? globalState.competition.categories.find(c => c.id === categoryId) : undefined;
@@ -234,7 +256,7 @@ function syncToFirestore() {
         appeals: globalState.appeals,
         emergencyFrozen: globalState.emergencyFrozen,
         sealApprovals: globalState.sealApprovals,
-        notifications: globalState.notifications, devices: globalState.devices, travelRecords: globalState.travelRecords, consents: globalState.consents, shadowRuns: globalState.shadowRuns, audioRecordings: globalState.audioRecordings.map(r=>({...r,localObjectUrl:undefined})),
+        notifications: globalState.notifications, devices: globalState.devices, travelRecords: globalState.travelRecords, consents: globalState.consents, shadowRuns: globalState.shadowRuns, audioRecordings: globalState.audioRecordings.map(r=>({...r,localObjectUrl:undefined})), importJobs:globalState.importJobs, timeMachineScenarios:globalState.timeMachineScenarios, quorumActions:globalState.quorumActions, invariantViolations:globalState.invariantViolations, evidenceNodes:globalState.evidenceNodes, evidenceEdges:globalState.evidenceEdges, publicResultRoots:globalState.publicResultRoots, publicResultProofs:globalState.publicResultProofs, localMeshSessions:globalState.localMeshSessions, federationAttestations:globalState.federationAttestations, protocolPackages:globalState.protocolPackages, flightRecorderEntries:globalState.flightRecorderEntries, integrityEnvelopes:globalState.integrityEnvelopes, chaosDrills:globalState.chaosDrills, accessibilityProfiles:globalState.accessibilityProfiles, elasticityRecommendations:globalState.elasticityRecommendations, journeyPasses:globalState.journeyPasses,
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (err) {
@@ -370,8 +392,9 @@ export function useAppStore() {
 
   const toggleOffline = () => {
     const wasOffline=globalState.isOffline; globalState.isOffline = !globalState.isOffline;
+    if(!wasOffline&&globalState.isOffline&&!globalState.localMeshSessions.some(m=>m.competitionId===globalState.competition.id&&['forming','active'].includes(m.status))) startLocalMesh();
     notify();
-    if(wasOffline&&!globalState.isOffline){void drainOfflineEvents(async()=>{syncToFirestore();return true;}).catch(()=>{});}
+    if(wasOffline&&!globalState.isOffline){void drainOfflineEvents(async()=>{syncToFirestore();return true;}).catch(()=>{});const mesh=globalState.localMeshSessions.find(m=>m.competitionId===globalState.competition.id&&m.status!=='closed');if(mesh)reconcileLocalMesh(mesh.id);}
   };
 
   const appendParticipantNotifications=(participant:Participant,templateKey:string)=>{
@@ -387,30 +410,28 @@ export function useAppStore() {
   const createIncident = (type: IncidentRecord['type'], title:string, description:string, severity:IncidentRecord['severity']='moderate') => { const x:IncidentRecord={id:newId('inc'),competitionId:globalState.competition.id,type,severity,title,description,reportedBy:globalState.currentUser.name,reportedAt:new Date().toISOString(),status:'active'};globalState.incidents=[x,...globalState.incidents];notify();return x;};
   const resolveIncident = (id:string) => { globalState.incidents=globalState.incidents.map(i=>i.id===id?{...i,status:'resolved',resolvedAt:new Date().toISOString()}:i);notify(); };
 
-  const toggleEmergencyFreeze = () => {
-    globalState.emergencyFrozen = !globalState.emergencyFrozen;
-    const log: AuditEvent = {
-      id: `aud-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      organizationId: globalState.competition.organizationId,
-      competitionId: globalState.competition.id,
-      actorId: globalState.currentUser.id,
-      actorName: globalState.currentUser.name,
-      actorRole: globalState.currentUser.role,
-      action: globalState.emergencyFrozen ? 'EMERGENCY_FREEZE_ACTIVATED' : 'EMERGENCY_FREEZE_RESUMED',
-      entityType: 'Competition',
-      entityId: globalState.competition.id,
-      humanSummaryArabic: globalState.emergencyFrozen
-        ? 'تفعيل وضع الطوارئ وتجميد استدعاء الجلسات مؤقتاً'
-        : 'إلغاء تجميد الطوارئ واستئناف مسار التشغيل الآلي',
-      humanSummaryEnglish: globalState.emergencyFrozen
-        ? 'Activated Emergency Protocol: Frozen new session dispatches'
-        : 'Deactivated Emergency Protocol: Operations safely resumed',
-      currentStateHash: `PENDING:${newId('audit')}`
-    };
-    globalState.auditLogs = [log, ...globalState.auditLogs];
+  const setEmergencyMode = (active:boolean, reason:string) => {
+    const allowed=['comp_admin','ops_manager','org_admin'];
+    if(!allowed.includes(globalState.currentUser.role)) return {ok:false,error:'Not authorized'};
+    const clean=reason.trim();
+    if(clean.length<3) return {ok:false,error:'Reason required'};
+    if(globalState.emergencyFrozen===active) return {ok:true,unchanged:true};
+    globalState.emergencyFrozen=active;
+    const now=new Date().toISOString();
+    if(active){
+      const incident:IncidentRecord={id:newId('inc'),competitionId:globalState.competition.id,type:'venue',severity:'critical',title:'Emergency mode',description:clean,reportedBy:globalState.currentUser.name,reportedAt:now,status:'active'};
+      globalState.incidents=[incident,...globalState.incidents];
+    } else {
+      const incident=globalState.incidents.find(i=>i.competitionId===globalState.competition.id&&i.title==='Emergency mode'&&i.status!=='resolved');
+      if(incident){globalState.incidents=globalState.incidents.map(i=>i.id===incident.id?{...i,status:'resolved',resolvedAt:now,description:`${i.description}\nResume: ${clean}`}:i);}
+    }
+    const log:AuditEvent={id:newId('aud'),timestamp:now,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:active?'EMERGENCY_FREEZE_ACTIVATED':'EMERGENCY_FREEZE_RESUMED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:active?`تفعيل وضع الطوارئ: ${clean}`:`استئناف آمن بعد الطوارئ: ${clean}`,humanSummaryEnglish:active?`Emergency mode activated: ${clean}`:`Emergency mode safely resumed: ${clean}`,currentStateHash:`emergency:${active?'on':'off'}:${now}`};
+    globalState.auditLogs=[log,...globalState.auditLogs];
     notify();
+    return {ok:true};
   };
+  // Compatibility alias. New UI requires an explicit reason through setEmergencyMode.
+  const toggleEmergencyFreeze = (reason?:string) => setEmergencyMode(!globalState.emergencyFrozen, reason||'');
 
   const committeeHasHardConflict = (committee: Committee, participant: Participant) => {
     const panelJudges = globalState.judges.filter(j => committee.judgeIds.includes(j.id) || committee.judgeIds.includes(j.userId));
@@ -613,6 +634,12 @@ export function useAppStore() {
         const sorted = [...scoreInputs].sort((a,b)=>a-b); scoreInputs = sorted.slice(1,-1);
       }
       const finalScore = Number((scoreInputs.reduce((a,b)=>a+b,0)/Math.max(1,scoreInputs.length)).toFixed(2));
+      const sealedExisting=globalState.results.find(r=>r.competitionId===globalState.competition.id&&r.participantId===participant.id&&['sealed','published'].includes(r.status));
+      if(sealedExisting){
+        recordInvariantBlock('sealed_results_immutable','judge_panel_recalculation','Result',sealedExisting.id,'A later judge panel attempted to recalculate an already sealed/published result',{sealedScore:sealedExisting.finalScore,newPanelScore:finalScore,sessionId:submission.sessionId});
+        if(!globalState.reviewCases.some(r=>r.participantId===participant.id&&r.reason==='sealed_result_protection'&&r.status==='pending'))globalState.reviewCases=[{id:newId('review'),competitionId:globalState.competition.id,sessionId:submission.sessionId,participantId:participant.id,participantCode:participant.code,committeeId:globalState.activeSession.committee?.id||'',reason:'sealed_result_protection',severity:'high',timestampSec:globalState.activeSession.durationSeconds,details:`Protected sealed result ${sealedExisting.id}; new panel score ${finalScore} retained only as evidence.`,status:'pending'},...globalState.reviewCases];
+        notify();return;
+      }
       const pIndex = globalState.participants.findIndex(p => p.id === participant.id);
       if (pIndex !== -1) globalState.participants[pIndex] = { ...globalState.participants[pIndex], status:'tested', statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested',timestamp:new Date().toISOString(),actor:'Panel completion'}] };
       globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
@@ -686,21 +713,15 @@ export function useAppStore() {
     const allowedRoles: Role[] = ['head_judge', 'comp_admin', 'org_admin'];
     if (!allowedRoles.includes(globalState.currentUser.role)) return { sealed: false, reason: 'not_authorized', approvals: globalState.sealApprovals.length };
 
+    let sealQuorum:QuorumActionRecord|undefined;
     if (policy.results.requireDualApprovalToSeal) {
-      if (!globalState.sealApprovals.some(a => a.actorId === globalState.currentUser.id)) {
-        globalState.sealApprovals = [...globalState.sealApprovals, {
-          actorId: globalState.currentUser.id, actorRole: globalState.currentUser.role, actorName: globalState.currentUser.name, timestamp: new Date().toISOString()
-        }];
-        globalState.auditLogs = [{
-          id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id,
-          actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'RESULT_SEAL_APPROVAL_ADDED',
-          entityType:'Competition', entityId:globalState.competition.id, humanSummaryArabic:'إضافة اعتماد مستقل لختم النتائج؛ لا يتم الختم حتى اكتمال الاعتمادات المطلوبة.',
-          humanSummaryEnglish:'Added an independent result-seal approval; sealing waits for the configured approval requirement.', currentStateHash:`PENDING:${newId('audit')}`
-        }, ...globalState.auditLogs];
-      }
-      const distinctActors = new Set(globalState.sealApprovals.map(a => a.actorId)).size;
-      if (distinctActors < 2) { notify(); return { sealed:false, reason:'second_approval_required', approvals:distinctActors }; }
+      sealQuorum=ensureQuorumAction('results_seal',globalState.competition.id,[['head_judge'],['comp_admin','org_admin']]);
+      const approval=approveQuorumAction(sealQuorum.id);
+      sealQuorum=globalState.quorumActions.find(q=>q.id===sealQuorum!.id);
+      if(!approval.ok||sealQuorum?.status!=='ready'){notify();return {sealed:false,reason:'independent_quorum_required',approvals:sealQuorum?.approvals.length||0};}
     }
+    const invariantRows=await runInvariantChecks();const blocking=invariantRows.filter(r=>r.status==='violation');
+    if(blocking.length){recordInvariantBlock(blocking[0].key,'seal_results','Competition',globalState.competition.id,blocking.map(x=>x.titleEnglish).join('; '));return {sealed:false,reason:'integrity_invariant',approvals:sealQuorum?.approvals.length||0};}
 
     const sealedAt = new Date().toISOString();
     const competitionResults = globalState.results.filter(r => r.competitionId === globalState.competition.id);
@@ -728,11 +749,14 @@ export function useAppStore() {
       humanSummaryEnglish: `Results sealed under this competition policy with SHA-256 ${checksum.slice(0,12)}…`,
       currentStateHash: `SHA256:${checksum}`
     }, ...globalState.auditLogs];
+    if(sealQuorum)executeQuorumAction(sealQuorum.id);
+    for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) await createIntegrityEnvelope(rr.participantId);
     notify();
     return { sealed:true, approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size, checksum };
   };
 
   const publishResults = () => {
+    if(globalState.currentUser.role==='super_admin'||!can(globalState.currentUser.role,'result.publish'))return false;
     const competitionResults=globalState.results.filter(r=>r.competitionId===globalState.competition.id);
     if(!competitionResults.length || competitionResults.some(r=>r.status!=='sealed' && r.status!=='published')) return false;
     globalState.results=globalState.results.map(r=>r.competitionId===globalState.competition.id?({...r,status:'published'}):r);
@@ -1059,14 +1083,27 @@ export function useAppStore() {
     const existing = globalState.notifications.find(n => n.idempotencyKey === idempotencyKey && ['queued','sent'].includes(n.status));
     if (existing) return existing;
     const provider = globalState.integrations.find(i => i.kind === channel && i.enabled && i.status === 'configured');
-    const item: NotificationRecord = { id:newId('ntf'), competitionId:globalState.competition.id, participantId, channel, templateKey, locale, recipient, status: channel==='in_app' ? 'sent' : provider ? 'queued' : 'failed', attempts: channel==='in_app'?1:0, createdAt:new Date().toISOString(), sentAt:channel==='in_app'?new Date().toISOString():undefined, error:channel==='in_app'||provider?undefined:'Provider not configured', idempotencyKey };
+    const consentKinds=globalState.consents.filter(c=>c.participantId===participantId&&c.accepted).map(c=>c.kind); const consentSatisfied=!participantId||channel==='in_app'||consentKinds.includes('privacy'); const item: NotificationRecord = { id:newId('ntf'), competitionId:globalState.competition.id, participantId, channel, templateKey, locale, recipient, status: channel==='in_app' ? 'sent' : provider&&consentSatisfied ? 'queued' : 'failed', attempts: channel==='in_app'?1:0, createdAt:new Date().toISOString(), sentAt:channel==='in_app'?new Date().toISOString():undefined, error:channel==='in_app'||(provider&&consentSatisfied)?undefined:!consentSatisfied?'Consent required':'Provider not configured', consentRequired:channel!=='in_app', consentSatisfied, fallbackChannel:channel==='whatsapp'?'sms':channel==='sms'?'email':'in_app', idempotencyKey };
     globalState.notifications=[item,...globalState.notifications]; notify(); return item;
   };
-  const retryNotification = (id:string) => { const i=globalState.notifications.findIndex(n=>n.id===id); if(i<0)return; const n=globalState.notifications[i]; const provider=globalState.integrations.find(x=>x.kind===n.channel&&x.enabled&&x.status==='configured'); globalState.notifications[i]={...n,status:provider?'queued':'failed',attempts:n.attempts+1,error:provider?undefined:'Provider not configured'}; notify(); };
-  const configureIntegration = (kind: IntegrationConfig['kind'], name:string, enabled=true, endpoint?:string) => { const existing=globalState.integrations.findIndex(i=>i.kind===kind); const item:IntegrationConfig={id:existing>=0?globalState.integrations[existing].id:newId('int'),organizationId:globalState.competition.organizationId,kind,name,enabled,status:endpoint||kind==='storage'?'configured':'not_configured',endpoint,lastCheckedAt:new Date().toISOString()}; if(existing>=0)globalState.integrations[existing]=item;else globalState.integrations=[item,...globalState.integrations]; notify(); return item; };
+  const retryNotification = (id:string) => { const i=globalState.notifications.findIndex(n=>n.id===id); if(i<0)return; const n=globalState.notifications[i]; const provider=globalState.integrations.find(x=>x.kind===n.channel&&x.enabled&&x.status==='configured'); const attempts=n.attempts+1; const backoffMinutes=Math.min(60,Math.max(1,2**Math.min(attempts,6))); const next=new Date(Date.now()+backoffMinutes*60000).toISOString(); globalState.notifications[i]={...n,status:provider?'queued':'failed',attempts,error:provider?undefined:'Provider not configured',nextRetryAt:provider?undefined:next}; globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'NOTIFICATION_RETRY',entityType:'Notification',entityId:id,humanSummaryArabic:`إعادة محاولة إشعار؛ المحاولة ${attempts}`,humanSummaryEnglish:`Notification retry attempt ${attempts}`,currentStateHash:`retry:${attempts}`},...globalState.auditLogs]; notify(); };
+  const configureIntegration = (kind: IntegrationConfig['kind'], name:string, enabled=true, endpoint?:string) => {
+    const existing=globalState.integrations.findIndex(i=>i.kind===kind);
+    const cleanEndpoint=endpoint?.trim();
+    const looksPlaceholder=!cleanEndpoint||cleanEndpoint.startsWith('internal://')||cleanEndpoint.includes('example.')||cleanEndpoint.includes('localhost');
+    // Registering an adapter is not proof that a credentialed provider is live.
+    // Development/UI configuration therefore stays NOT_CONFIGURED until a deployed backend health check promotes it.
+    const previous=existing>=0?globalState.integrations[existing]:undefined;
+    const item:IntegrationConfig={id:previous?.id||newId('int'),organizationId:globalState.competition.organizationId,kind,name,enabled,status:previous?.status==='configured'&&!looksPlaceholder?'configured':'not_configured',endpoint:looksPlaceholder?undefined:cleanEndpoint,lastCheckedAt:new Date().toISOString()};
+    if(existing>=0)globalState.integrations[existing]=item;else globalState.integrations=[item,...globalState.integrations];
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'INTEGRATION_ADAPTER_CONFIGURED',entityType:'Integration',entityId:item.id,humanSummaryArabic:`تهيئة محول ${name} دون ادعاء اتصال مزود خارجي`,humanSummaryEnglish:`Configured ${name} adapter without claiming external provider connectivity`,currentStateHash:`integration:${item.id}:${item.status}`},...globalState.auditLogs];
+    notify(); return item;
+  };
   const addWebhook = (event:string, endpoint:string) => { const item:WebhookSubscription={id:newId('wh'),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,event,endpoint,enabled:true,secretRef:`secret://webhooks/${newId('ref')}`}; globalState.webhooks=[item,...globalState.webhooks]; notify(); return item; };
-  const registerDevice = (name:string,type:DeviceRecord['type'],zone?:string) => { const d:DeviceRecord={id:newId('dev'),competitionId:globalState.competition.id,name,type,zone,status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'};globalState.devices=[d,...globalState.devices];notify();return d; };
-  const updateDeviceStatus=(id:string,status:DeviceRecord['status'])=>{globalState.devices=globalState.devices.map(d=>d.id===id?{...d,status,lastSeenAt:new Date().toISOString()}:d);notify();};
+  const registerDevice = (name:string,type:DeviceRecord['type'],zone?:string,role?:DeviceRecord['role']) => { const now=new Date().toISOString(); const d:DeviceRecord={id:newId('dev'),competitionId:globalState.competition.id,name,type,role,zone,status:'online',connection:'online',lastSeenAt:now,lastSyncAt:now,softwareVersion:'1.0.0',sessionExpiresAt:new Date(Date.now()+12*60*60*1000).toISOString()};globalState.devices=[d,...globalState.devices];notify();return d; };
+  const updateDeviceStatus=(id:string,status:DeviceRecord['status'])=>{globalState.devices=globalState.devices.map(d=>d.id===id?{...d,status,connection:status==='offline'?'offline':d.connection,lastSeenAt:new Date().toISOString()}:d);notify();};
+  const updateDevice=(id:string,patch:Partial<DeviceRecord>)=>{globalState.devices=globalState.devices.map(d=>d.id===id?{...d,...patch,lastSeenAt:new Date().toISOString()}:d);globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'DEVICE_UPDATED',entityType:'Device',entityId:id,humanSummaryArabic:'تحديث دور أو إعداد جهاز تشغيلي',humanSummaryEnglish:'Operational device role/settings updated',currentStateHash:`device:${id}:${Date.now()}`},...globalState.auditLogs];notify();};
+  const revokeDevice=(id:string)=>updateDevice(id,{status:'revoked',revokedAt:new Date().toISOString()});
   const upsertTravelRecord=(participantId:string,patch:Partial<DelegationTravelRecord>)=>{const i=globalState.travelRecords.findIndex(r=>r.participantId===participantId&&r.competitionId===globalState.competition.id);const base:DelegationTravelRecord=i>=0?globalState.travelRecords[i]:{id:newId('travel'),competitionId:globalState.competition.id,delegationId:globalState.participants.find(p=>p.id===participantId)?.delegationId||'direct',participantId,transportStatus:'pending',companionCount:0};const next={...base,...patch};if(i>=0)globalState.travelRecords[i]=next;else globalState.travelRecords=[next,...globalState.travelRecords];notify();return next;};
   const recordConsent=(participantId:string,kind:ConsentRecord['kind'],version:string,accepted=true,guardianName?:string)=>{const c:ConsentRecord={id:newId('consent'),participantId,competitionId:globalState.competition.id,kind,version,accepted,acceptedAt:new Date().toISOString(),guardianName};globalState.consents=[c,...globalState.consents];notify();return c;};
   const createImportJob=(entity:ImportJobRecord['entity'],fileName:string,totalRows:number,invalidRows=0)=>{const j:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity,fileName,status:invalidRows?'validated':'imported',totalRows,validRows:Math.max(0,totalRows-invalidRows),invalidRows,mapping:{},errors:invalidRows?[{row:2,message:'Validation required before import'}]:[],createdAt:new Date().toISOString()};globalState.importJobs=[j,...globalState.importJobs];notify();return j;};
@@ -1172,6 +1209,156 @@ export function useAppStore() {
   };
 
 
+  // ---- MIZAN Trust 8 --------------------------------------------------------------------
+  const auditTrustAction=(action:string,entityType:string,entityId:string,ar:string,en:string)=>{
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action,entityType,entityId,humanSummaryArabic:ar,humanSummaryEnglish:en,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+  };
+
+  const recordInvariantBlock=(invariantKey:string,operation:string,entityType:string,entityId:string,reason:string,evidence?:Record<string,unknown>)=>{
+    const item:InvariantViolationRecord={id:newId('inv'),competitionId:globalState.competition.id,invariantKey,operation,entityType,entityId,actorId:globalState.currentUser.id,actorRole:globalState.currentUser.role,reason,blockedAt:new Date().toISOString(),evidence};
+    globalState.invariantViolations=[item,...globalState.invariantViolations];
+    auditTrustAction('INVARIANT_BLOCKED_OPERATION',entityType,entityId,`منع محرك النزاهة عملية ${operation}: ${reason}`,`Integrity invariant blocked ${operation}: ${reason}`);
+    notify();return item;
+  };
+
+  const runInvariantChecks=async():Promise<InvariantCheckResult[]>=>{
+    const policy=getCompetitionPolicy(globalState.competition); const rows:InvariantCheckResult[]=[];
+    rows.push({key:'ai_never_scores',titleArabic:'الذكاء الاصطناعي لا يحكم',titleEnglish:'AI never scores',status:policy.judging.aiCanAffectScore===false?'pass':'violation',evidence:[`aiCanAffectScore=${String(policy.judging.aiCanAffectScore)}`]});
+    const sealed=globalState.results.filter(r=>r.competitionId===globalState.competition.id&&['sealed','published'].includes(r.status));
+    let sealOk=true;
+    for(const r of sealed){const at=r.sealMetadata?.sealedAt;const expected=r.sealMetadata?.cryptographicChecksum;if(!at||!expected){sealOk=false;break;}const set=globalState.results.filter(x=>x.competitionId===globalState.competition.id&&['sealed','published'].includes(x.status));const payload=JSON.stringify(set.map(x=>({id:x.id,participantId:x.participantId,score:x.finalScore,rank:x.rank,categoryId:x.categoryId})).sort((a,b)=>a.id.localeCompare(b.id)))+globalState.competition.ruleSet.version+at;const h=`SHA256:${await sha256(payload)}`;if(h!==expected){sealOk=false;break;}}
+    rows.push({key:'sealed_results_immutable',titleArabic:'النتيجة المختومة ثابتة',titleEnglish:'Sealed results immutable',status:sealOk?'pass':'violation',evidence:[sealed.length?`${sealed.length} sealed/published result(s) checked`:'No sealed results yet']});
+    const independent=policy.judging.independentUntilLock!==false;
+    rows.push({key:'judge_independence',titleArabic:'استقلال المحكم',titleEnglish:'Judge independence',status:independent?'pass':'violation',evidence:[`independentUntilLock=${String(policy.judging.independentUntilLock)}`]});
+    const tenantLeaks=[...globalState.participants,...globalState.results].filter((x:any)=>x.competitionId===globalState.competition.id&&x.organizationId&&x.organizationId!==globalState.competition.organizationId);
+    rows.push({key:'tenant_isolation',titleArabic:'عزل الجهة',titleEnglish:'Tenant isolation',status:tenantLeaks.length?'violation':'pass',evidence:[`${tenantLeaks.length} scoped mismatch(es)`]});
+    const competitionLeaks=globalState.results.filter(r=>r.competitionId!==globalState.competition.id&&globalState.participants.some(p=>p.id===r.participantId&&p.competitionId===globalState.competition.id));
+    rows.push({key:'competition_isolation',titleArabic:'عزل المسابقة',titleEnglish:'Competition isolation',status:competitionLeaks.length?'violation':'pass',evidence:[`${competitionLeaks.length} cross-competition result link(s)`]});
+    const invalidCerts=globalState.certificates.filter(c=>c.competitionId===globalState.competition.id&&!globalState.results.some(r=>r.participantId===c.participantId&&['sealed','published'].includes(r.status)));
+    rows.push({key:'certificate_requires_seal',titleArabic:'الشهادة بعد الختم',titleEnglish:'Certificate requires seal',status:invalidCerts.length?'violation':'pass',evidence:[`${invalidCerts.length} certificate(s) without sealed result`]});
+    const live=['live','results_sealed','results_published','completed'].includes(globalState.competition.status);const approvedSource=globalState.quranSourceManifests.some(q=>q.organizationId===globalState.competition.organizationId&&q.status==='approved');
+    rows.push({key:'certified_quran_source',titleArabic:'مصدر قرآني معتمد',titleEnglish:'Approved Quran source',status:!live||approvedSource?'pass':productionMode?'violation':'warning',evidence:[live?(approvedSource?'Approved source present':productionMode?'Production/live state without approved source':'Development fixture: source approval still required before production'):'Not live yet']});
+    return rows;
+  };
+
+  const runTimeMachine=(input:{baseTimestamp:string;committeeDelta:number;arrivalRatePerHour:number;absentJudgeIds:string[];networkMode:'normal'|'local_mesh'|'offline'})=>{
+    const baseMs=new Date(input.baseTimestamp).getTime(); if(!Number.isFinite(baseMs))return null;
+    const statusAt=(p:Participant)=>{const history=[...(p.statusHistory||[])].filter(h=>new Date(h.timestamp).getTime()<=baseMs).sort((a,b)=>new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime());return history.at(-1)?.status||p.status};
+    const inScope=globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&!['rejected','tested','certified'].includes(statusAt(p))).length;
+    const activeBase=globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline').length||1;
+    const absentPanels=Math.min(activeBase,new Set(input.absentJudgeIds).size); const basePanels=Math.max(1,activeBase-absentPanels);const altPanels=Math.max(1,basePanels+input.committeeDelta);
+    const durations=globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.averageSessionMinutes>0).map(c=>c.averageSessionMinutes);const avg=durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:Math.max(3,globalState.competition.ruleSet.questionDurationMinutes);
+    const sim=(panels:number,network:'normal'|'local_mesh'|'offline')=>{const degradation=network==='normal'?1:network==='local_mesh'?1.05:1.12;const capacity=Math.max(.1,panels*(60/(avg*degradation)));const pressure=Math.max(0,input.arrivalRatePerHour-capacity);const averageWaitMinutes=Math.max(1,Math.round((pressure/Math.max(1,capacity))*60+avg*.45));const finishM=Math.ceil((inScope/Math.max(.1,capacity))*60);const finish=new Date(baseMs+finishM*60000);return {committees:panels,participantsInScope:inScope,averageWaitMinutes,projectedFinishTime:`${String(finish.getHours()).padStart(2,'0')}:${String(finish.getMinutes()).padStart(2,'0')}`,maxWaitMinutes:Math.max(averageWaitMinutes,Math.round(averageWaitMinutes*1.75))};};
+    const baseline=sim(basePanels,'normal'),alternative=sim(altPanels,input.networkMode);const item:TimeMachineScenarioRecord={id:newId('tm'),competitionId:globalState.competition.id,baseTimestamp:new Date(baseMs).toISOString(),label:`${altPanels} panels · ${input.arrivalRatePerHour}/h`,nonOfficial:true,assumptions:input,baseline,alternative,delta:{averageWaitMinutes:alternative.averageWaitMinutes-baseline.averageWaitMinutes,finishMinutes:finishMinutes(alternative.projectedFinishTime)-finishMinutes(baseline.projectedFinishTime)},createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name};globalState.timeMachineScenarios=[item,...globalState.timeMachineScenarios];auditTrustAction('TIME_MACHINE_SIMULATED','Competition',globalState.competition.id,'تشغيل مستقبل بديل غير رسمي دون تعديل التاريخ','Ran a NON-OFFICIAL alternate future without mutating history');notify();return item;
+  };
+
+  const ensureQuorumAction=(action:QuorumActionType,entityId:string,groups?:Role[][])=>{let q=globalState.quorumActions.find(x=>x.competitionId===globalState.competition.id&&x.action===action&&x.entityId===entityId&&!['executed','cancelled'].includes(x.status));if(q)return q;const required=groups||[['head_judge'],['comp_admin','org_admin']];q={id:newId('quorum'),competitionId:globalState.competition.id,action,entityId,requiredRoleGroups:required,distinctActorsRequired:true,approvals:[],status:'pending',requestedAt:new Date().toISOString(),requestedBy:globalState.currentUser.id};globalState.quorumActions=[q,...globalState.quorumActions];auditTrustAction('QUORUM_REQUESTED','QuorumAction',q.id,'إنشاء إجراء يتطلب سلطتين مستقلتين','Created an action requiring independent authorities');notify();return q;};
+  const approveQuorumAction=(id:string)=>{const q=globalState.quorumActions.find(x=>x.id===id);if(!q)return {ok:false,reason:'not_found'};if(q.status==='executed'||q.status==='cancelled')return {ok:false,reason:q.status};if(!q.requiredRoleGroups.flat().includes(globalState.currentUser.role))return {ok:false,reason:'role_not_required'};if(q.approvals.some(a=>a.actorId===globalState.currentUser.id))return {ok:true,status:q.status};const approvals=[...q.approvals,{actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,approvedAt:new Date().toISOString()}];const next={...q,approvals,status:quorumSatisfied({...q,approvals})?'ready' as const:'pending' as const};globalState.quorumActions=globalState.quorumActions.map(x=>x.id===id?next:x);if(q.action==='results_seal')globalState.sealApprovals=approvals.map(a=>({actorId:a.actorId,actorRole:a.actorRole,actorName:a.actorName,timestamp:a.approvedAt}));auditTrustAction('QUORUM_APPROVED','QuorumAction',id,'تسجيل اعتماد مستقل ضمن النصاب','Recorded an independent quorum approval');notify();return {ok:true,status:next.status};};
+  const executeQuorumAction=(id:string)=>{const q=globalState.quorumActions.find(x=>x.id===id);if(!q||q.status!=='ready')return false;const allowed=q.action==='ceremony_reveal'?['broadcast_operator','comp_admin','org_admin']:['head_judge','comp_admin','org_admin'];if(!allowed.includes(globalState.currentUser.role))return false;globalState.quorumActions=globalState.quorumActions.map(x=>x.id===id?{...x,status:'executed',executedAt:new Date().toISOString(),executedBy:globalState.currentUser.id}:x);auditTrustAction('QUORUM_EXECUTED','QuorumAction',id,'تنفيذ الإجراء بعد اكتمال النصاب','Executed action after quorum was satisfied');notify();return true;};
+  const requestCeremonyReveal=async()=>{if(!globalState.results.some(r=>r.competitionId===globalState.competition.id&&['sealed','published'].includes(r.status)))return null;return ensureQuorumAction('ceremony_reveal',globalState.competition.id,[['head_judge'],['comp_admin','org_admin']]);};
+  const ceremonyRevealAuthorized=()=>globalState.quorumActions.some(q=>q.competitionId===globalState.competition.id&&q.action==='ceremony_reveal'&&q.entityId===globalState.competition.id&&q.status==='executed');
+
+  const rebuildEvidenceGraph=async()=>{const now=new Date().toISOString();const nodes:ScientificEvidenceNode[]=[];const edges:ScientificEvidenceEdge[]=[];const add=(n:Omit<ScientificEvidenceNode,'id'|'competitionId'|'createdAt'>)=>{const x={id:`evn:${n.type}:${n.entityRef}`,competitionId:globalState.competition.id,createdAt:now,...n};nodes.push(x);return x};const link=(from:ScientificEvidenceNode,to:ScientificEvidenceNode,relation:string)=>edges.push({id:newId('eve'),competitionId:globalState.competition.id,fromNodeId:from.id,toNodeId:to.id,relation});
+    const policyNode=add({type:'competition_policy',label:'Competition Policy',status:globalState.competition.status,version:getCompetitionPolicy(globalState.competition).version,checksum:await hashCanonical(getCompetitionPolicy(globalState.competition)),authority:'Competition Governance',entityRef:globalState.competition.id});const ruleNode=add({type:'rule_set',label:globalState.competition.ruleSet.name,status:globalState.competition.ruleSet.frozenAt?'frozen':'active',version:globalState.competition.ruleSet.version,checksum:await hashCanonical(globalState.competition.ruleSet),authority:'Scientific Governance',entityRef:globalState.competition.ruleSet.id});link(policyNode,ruleNode,'uses_rule_set');
+    for(const q of globalState.quranSourceManifests.filter(x=>x.organizationId===globalState.competition.organizationId)){const n=add({type:'quran_source',label:`${q.riwaya} · ${q.edition}`,status:q.status,version:q.version,checksum:q.checksumSha256,authority:q.sourceAuthority,entityRef:q.id});link(policyNode,n,'governed_by_source');}
+    for(const q of globalState.questionGovernance.filter(x=>x.competitionId===globalState.competition.id)){const n=add({type:'question',label:q.questionId,status:q.status,version:String(q.expertDifficulty),authority:q.reviewedBy,entityRef:q.questionId});link(ruleNode,n,'governs_question');const src=nodes.find(x=>x.entityRef===q.sourceManifestId);if(src)link(n,src,'derived_from');}
+    for(const a of globalState.aiCapabilityValidations.filter(x=>x.organizationId===globalState.competition.organizationId)){const n=add({type:'ai_capability',label:`${a.capability} · ${a.modelName}`,status:a.status,version:a.modelVersion,authority:a.approvedBy.join(', '),entityRef:a.id});link(policyNode,n,'permits_capability');}
+    for(const log of globalState.auditLogs.filter(x=>x.competitionId===globalState.competition.id&&x.action.includes('FAIRDRAW'))){const n=add({type:'fairdraw',label:'FairDraw commitment',status:'recorded',version:globalState.competition.ruleSet.version,checksum:log.currentStateHash,authority:log.actorName,entityRef:log.id});link(ruleNode,n,'generated_under');}
+    for(const r of globalState.results.filter(x=>x.competitionId===globalState.competition.id)){const n=add({type:'result',label:r.participantCode,status:r.status,version:globalState.competition.ruleSet.version,checksum:r.sealMetadata?.cryptographicChecksum,authority:r.sealMetadata?.sealedBy,entityRef:r.id});link(n,ruleNode,'calculated_under');for(const c of globalState.certificates.filter(c=>c.participantId===r.participantId&&c.competitionId===globalState.competition.id)){const cn=add({type:'certificate',label:c.certificateNumber,status:c.isAuthentic?'authentic':'revoked',checksum:await hashCanonical({id:c.id,token:c.verificationToken}),authority:c.signatories.map(s=>s.name).join(', '),entityRef:c.id});link(cn,n,'certifies_result');}}
+    for(const q of globalState.quorumActions.filter(x=>x.competitionId===globalState.competition.id)){const n=add({type:'quorum',label:q.action,status:q.status,authority:q.approvals.map(a=>a.actorName).join(' + '),entityRef:q.id});link(n,policyNode,'authorized_under');}
+    globalState.evidenceNodes=[...nodes,...globalState.evidenceNodes.filter(x=>x.competitionId!==globalState.competition.id)];globalState.evidenceEdges=[...edges,...globalState.evidenceEdges.filter(x=>x.competitionId!==globalState.competition.id)];auditTrustAction('EVIDENCE_GRAPH_REBUILT','Competition',globalState.competition.id,'إعادة بناء رسم الأدلة العلمية والتشغيلية','Rebuilt scientific and operational evidence graph');notify();return {nodes,edges};
+  };
+  const traceEvidence=(nodeId:string)=>{const nodes=new Map(globalState.evidenceNodes.filter(n=>n.competitionId===globalState.competition.id).map(n=>[n.id,n]));const visited=new Set<string>();const ordered:ScientificEvidenceNode[]=[];const walk=(id:string)=>{if(visited.has(id))return;visited.add(id);const n=nodes.get(id);if(n)ordered.push(n);globalState.evidenceEdges.filter(e=>e.competitionId===globalState.competition.id&&e.fromNodeId===id).forEach(e=>walk(e.toNodeId));};walk(nodeId);return {nodes:ordered,edges:globalState.evidenceEdges.filter(e=>visited.has(e.fromNodeId)&&visited.has(e.toNodeId))};};
+
+  const buildPublicResultRoot=async()=>{const results=globalState.results.filter(r=>r.competitionId===globalState.competition.id&&['sealed','published'].includes(r.status)).sort((a,b)=>a.id.localeCompare(b.id));if(!results.length)return null;const salts=await Promise.all(results.map(r=>sha256(`${r.id}:${r.sealMetadata?.sealedAt||''}:${newId('salt')}`)));const materials=results.map((r,i)=>canonicalStringify({v:'mizan-merkle-v1',disclosed:{participantCode:r.participantCode,categoryId:r.categoryId,finalScore:r.finalScore,rank:r.rank,status:r.status},salt:salts[i]}));const tree=await buildMerkleTree(materials);const root:PublicResultRootRecord={id:newId('root'),competitionId:globalState.competition.id,merkleRoot:tree.root,leaves:results.map((r,i)=>({index:i,resultId:r.id,participantCode:r.participantCode,leafHash:tree.levels[0][i]})),resultCount:results.length,createdAt:new Date().toISOString(),algorithm:'SHA-256'};const proofs:PublicResultProofRecord[]=results.map((r,i)=>({id:newId('proof'),competitionId:globalState.competition.id,resultId:r.id,verificationVersion:'mizan-merkle-v1',merkleRoot:tree.root,leafIndex:i,disclosed:{participantCode:r.participantCode,categoryId:r.categoryId,finalScore:r.finalScore,rank:r.rank,status:r.status},disclosureSalt:salts[i],proof:merkleProofForIndex(tree.levels,i),createdAt:new Date().toISOString()}));globalState.publicResultRoots=[root,...globalState.publicResultRoots.filter(x=>x.competitionId!==globalState.competition.id)];globalState.publicResultProofs=[...proofs,...globalState.publicResultProofs.filter(x=>x.competitionId!==globalState.competition.id)];auditTrustAction('PUBLIC_RESULT_ROOT_COMMITTED','ResultSet',root.id,'إنشاء التزام Merkle لمجموعة النتائج المختومة','Committed a Merkle root for the sealed result set');notify();return root;};
+  const getPublicResultProof=(resultId:string)=>globalState.publicResultProofs.find(p=>p.competitionId===globalState.competition.id&&p.resultId===resultId)||null;
+  const verifyPublicResultProof=async(p:PublicResultProofRecord)=>verifyMerkleProof(canonicalStringify({v:'mizan-merkle-v1',disclosed:p.disclosed,salt:p.disclosureSalt}),p.proof,p.merkleRoot);
+
+  const ingestMeshEnvelope=(wire:MeshWireEnvelope)=>{const mesh=globalState.localMeshSessions.find(x=>x.id===wire.sessionId&&x.competitionId===wire.competitionId);if(!mesh||mesh.events.some(e=>e.id===wire.event.id))return false;const existing=mesh.events.find(e=>e.originDeviceId===wire.event.originDeviceId&&e.sequence===wire.event.sequence);const semantic=wire.event.conflictKey?mesh.events.filter(e=>e.conflictKey===wire.event.conflictKey&&e.payloadHash!==wire.event.payloadHash):[];const conflicts=[...mesh.conflicts,...(existing?[{id:newId('mesh_conflict'),eventIds:[existing.id,wire.event.id],reason:`Duplicate sequence ${wire.event.originDeviceId}:${wire.event.sequence}`,status:'open' as const}]:[]),...(semantic.length?[{id:newId('mesh_conflict'),eventIds:[...semantic.map(e=>e.id),wire.event.id],reason:`Conflicting payloads for ${wire.event.conflictKey}`,status:'open' as const}]:[])];globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===mesh.id?{...x,status:'active',events:[...x.events,{...wire.event,transport:'browser_broadcast'}],conflicts,nodes:x.nodes.map(n=>n.deviceId===wire.event.originDeviceId?{...n,status:'joined',lastSeenAt:new Date().toISOString(),sequence:Math.max(n.sequence,wire.event.sequence)}:n)}:x);notify();return true;};
+  const startLocalMesh=()=>{const joined=globalState.devices.filter(d=>d.competitionId===globalState.competition.id&&!['revoked','disabled'].includes(d.status)).map(d=>({deviceId:d.id,name:d.name,role:d.role,status:'joined' as const,lastSeenAt:d.lastSeenAt,sequence:0}));const coordinator=globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.type==='edge_server'&&d.status==='online')||globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.role==='Operations'&&d.status==='online')||globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.status==='online');const item:LocalMeshSessionRecord={id:newId('mesh'),competitionId:globalState.competition.id,status:joined.length?'active':'forming',coordinatorDeviceId:coordinator?.id,nodes:joined,events:[],conflicts:[],startedAt:new Date().toISOString(),transportMode:'journal_only',transportStatus:'disabled'};browserMeshAdapter?.close();browserMeshAdapter=null;const allowed=!productionMode||import.meta.env.VITE_ENABLE_BROWSER_MESH_ADAPTER==='true';if(allowed){browserMeshAdapter=createBrowserBroadcastMesh({competitionId:item.competitionId,sessionId:item.id,onEnvelope:ingestMeshEnvelope});item.transportMode=browserMeshAdapter.available?'browser_broadcast':'journal_only';item.transportStatus=browserMeshAdapter.available?'connected':'unavailable';}globalState.localMeshSessions=[item,...globalState.localMeshSessions];auditTrustAction('LOCAL_MESH_STARTED','LocalMesh',item.id,item.transportMode==='browser_broadcast'?'بدء Mesh عبر BroadcastChannel لنوافذ نفس الأصل':'بدء دفتر Mesh؛ النقل بين أجهزة مستقلة يحتاج Edge موثوق',item.transportMode==='browser_broadcast'?'Started same-origin BroadcastChannel mesh':'Started mesh journal; independent devices require trusted Edge transport');notify();return item;};
+  const appendLocalMeshEvent=async(sessionId:string,type:string,payload:Record<string,unknown>,originDeviceId?:string,conflictKey?:string)=>{const mesh=globalState.localMeshSessions.find(x=>x.id===sessionId&&x.competitionId===globalState.competition.id);if(!mesh||!['active','forming'].includes(mesh.status))return null;const origin=originDeviceId||mesh.coordinatorDeviceId||mesh.nodes[0]?.deviceId||'local';const node=mesh.nodes.find(n=>n.deviceId===origin);const sequence=(node?.sequence||0)+1;const payloadHash=await hashCanonical(payload);const event={id:newId('mesh_evt'),competitionId:globalState.competition.id,originDeviceId:origin,sequence,type,payloadHash,payload,createdAt:new Date().toISOString(),acknowledgedBy:mesh.nodes.filter(n=>n.status==='joined').map(n=>n.deviceId),conflictKey,transport:'local' as const};const same=conflictKey?mesh.events.filter(e=>e.conflictKey===conflictKey&&e.payloadHash!==payloadHash):[];const conflicts=[...mesh.conflicts,...(same.length?[{id:newId('mesh_conflict'),eventIds:[...same.map(e=>e.id),event.id],reason:`Conflicting payloads for ${conflictKey}`,status:'open' as const}]:[])];globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===sessionId?{...x,status:'active',nodes:x.nodes.map(n=>n.deviceId===origin?{...n,sequence,lastSeenAt:new Date().toISOString()}:n),events:[...x.events,event],conflicts}:x);if(browserMeshAdapter?.available&&mesh.transportMode==='browser_broadcast')browserMeshAdapter.publish({version:'mizan-mesh-wire-v1',competitionId:globalState.competition.id,sessionId,sentAt:new Date().toISOString(),event});auditTrustAction('LOCAL_MESH_EVENT_APPENDED','LocalMesh',sessionId,`حفظ حدث Mesh ${type} بتسلسل ${sequence}`,`Recorded mesh event ${type} sequence ${sequence}`);notify();return event;};
+  const reconcileLocalMesh=(sessionId:string)=>{const mesh=globalState.localMeshSessions.find(x=>x.id===sessionId);if(!mesh)return null;const keys=new Set<string>();const duplicates:string[]=[];for(const e of mesh.events){const k=`${e.originDeviceId}:${e.sequence}`;if(keys.has(k))duplicates.push(e.id);else keys.add(k)}const open=mesh.conflicts.filter(c=>c.status==='open');const status:LocalMeshSessionRecord['status']=!globalState.isOffline&&!open.length?'closed':'reconciling';globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===sessionId?{...x,status,reconciledAt:new Date().toISOString()}:x);auditTrustAction('LOCAL_MESH_RECONCILED','LocalMesh',sessionId,`مصالحة Mesh: ${open.length} تعارض مفتوح`,`Mesh reconciled: ${open.length} open conflict(s)`);notify();return {status,duplicates,openConflicts:open.length,events:mesh.events.length};};
+  const resolveLocalMeshConflict=(sessionId:string,conflictId:string,resolution:string)=>{if(!resolution.trim())return false;globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===sessionId?{...x,conflicts:x.conflicts.map(c=>c.id===conflictId?{...c,status:'resolved',resolution}:c)}:x);auditTrustAction('LOCAL_MESH_CONFLICT_RESOLVED','LocalMesh',sessionId,'حل تعارض Mesh مع حفظ القرار','Resolved mesh conflict with an auditable decision');notify();return true;};
+
+  const issueFederationAttestation=async(input:{subjectRef:string;subjectKind:'participant'|'delegation';issuer:string;claim:FederationAttestationRecord['claim'];value:string;expiresInDays?:number})=>{if(!input.issuer.trim()||!input.subjectRef.trim())return null;const issued=new Date();const expiresAt=input.expiresInDays?new Date(issued.getTime()+input.expiresInDays*86400000).toISOString():undefined;const evidenceDigest=await hashCanonical({organizationId:globalState.competition.organizationId,subjectRef:input.subjectRef,claim:input.claim,value:input.value,issuedAt:issued.toISOString(),expiresAt});const sig=await sha256(`MIZAN-FEDERATION-DEVELOPMENT:${evidenceDigest}:${input.issuer}`);const item:FederationAttestationRecord={id:newId('attest'),organizationId:globalState.competition.organizationId,subjectRef:input.subjectRef,subjectKind:input.subjectKind,issuer:input.issuer,claim:input.claim,value:input.value,issuedAt:issued.toISOString(),expiresAt,status:'valid',evidenceDigest,signatureRef:`development://sha256/${sig}`,privacyMode:'claim_only'};globalState.federationAttestations=[item,...globalState.federationAttestations];auditTrustAction('FEDERATION_ATTESTATION_ISSUED','FederationAttestation',item.id,'إصدار إثبات claim-only بتوقيع تطوير معلن','Issued claim-only attestation with explicitly development-only signature');notify();return item;};
+  const verifyFederationAttestation=async(id:string)=>{const a=globalState.federationAttestations.find(x=>x.id===id);if(!a)return {valid:false,reason:'not_found'};if(a.status!=='valid')return {valid:false,reason:a.status};if(a.expiresAt&&new Date(a.expiresAt).getTime()<Date.now())return {valid:false,reason:'expired'};const digest=await hashCanonical({organizationId:a.organizationId,subjectRef:a.subjectRef,claim:a.claim,value:a.value,issuedAt:a.issuedAt,expiresAt:a.expiresAt});if(digest!==a.evidenceDigest)return {valid:false,reason:'digest_mismatch'};return {valid:true,trust:a.signatureRef.startsWith('development://')?'development_adapter':'external_signature_reference'};};
+  const revokeFederationAttestation=(id:string)=>{globalState.federationAttestations=globalState.federationAttestations.map(a=>a.id===id?{...a,status:'revoked'}:a);auditTrustAction('FEDERATION_ATTESTATION_REVOKED','FederationAttestation',id,'إلغاء إثبات اتحادي','Revoked federation attestation');notify();};
+
+
+  const getQueueEstimate=(participantId:string)=>{
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);if(!p||p.status!=='in_queue')return null;const c=globalState.committees.find(x=>x.id===p.assignedCommitteeId);if(!c)return null;const queue=globalState.participants.filter(x=>x.status==='in_queue'&&x.assignedCommitteeId===c.id).sort((a,b)=>(a.queueNumber||999999)-(b.queueNumber||999999));const index=Math.max(0,queue.findIndex(x=>x.id===p.id));const avg=Math.max(2,c.averageSessionMinutes||globalState.competition.ruleSet.questionDurationMinutes||8);const activeCarry=c.status==='testing'?avg*.55:0;const pauseCarry=c.status==='paused'?avg:0;const estimatedWaitMinutes=Math.max(1,Math.round(index*avg+activeCarry+pauseCarry));const expectedTurnAt=new Date(Date.now()+estimatedWaitMinutes*60000).toISOString();return {ahead:index,estimatedWaitMinutes,expectedTurnAt,committeeId:c.id,committeeCode:c.code,basis:{currentCompetitionAverageMinutes:avg,activeSession:c.status==='testing',paused:c.status==='paused',queueSize:queue.length},confidence:index<=2?'medium' as const:'low' as const};
+  };
+
+  // ---- MIZAN Beyond 8 ------------------------------------------------------------------
+  const buildFlightRecorder=async()=>{
+    const rows:{timestamp:string;stream:FlightRecorderEntry['stream'];sourceType:string;sourceId:string;ar:string;en:string}[]=[];
+    for(const a of globalState.auditLogs.filter(x=>x.competitionId===globalState.competition.id))rows.push({timestamp:a.timestamp,stream:'trust',sourceType:'audit',sourceId:a.id,ar:a.humanSummaryArabic,en:a.humanSummaryEnglish});
+    for(const i of globalState.incidents.filter(x=>x.competitionId===globalState.competition.id))rows.push({timestamp:i.reportedAt,stream:'incidents',sourceType:'incident',sourceId:i.id,ar:`${i.title} · ${i.status}`,en:`${i.title} · ${i.status}`});
+    for(const a of globalState.aiObservations.filter(x=>x.competitionId===globalState.competition.id)){const rc=globalState.reviewCases.find(r=>r.sessionId===a.sessionId);const p=rc?globalState.participants.find(x=>x.id===rc.participantId):undefined;const start=p?.statusHistory?.find(h=>h.status==='in_session')?.timestamp;if(start){const timestamp=new Date(new Date(start).getTime()+a.timestampSeconds*1000).toISOString();rows.push({timestamp,stream:'ai',sourceType:'ai_observation',sourceId:a.id,ar:`إشارة AI: ${a.type} · ${a.confidence}`,en:`AI observation: ${a.type} · ${a.confidence}`});}}
+    for(const r of globalState.results.filter(x=>x.competitionId===globalState.competition.id)){const t=r.sealMetadata?.sealedAt||new Date().toISOString();rows.push({timestamp:t,stream:'results',sourceType:'result',sourceId:r.id,ar:`نتيجة ${r.participantCode} · ${r.status}`,en:`Result ${r.participantCode} · ${r.status}`});}
+    for(const a of globalState.appeals.filter(x=>x.competitionId===globalState.competition.id))rows.push({timestamp:a.createdAt,stream:'appeals',sourceType:'appeal',sourceId:a.id,ar:`اعتراض ${a.participantCode} · ${a.status}`,en:`Appeal ${a.participantCode} · ${a.status}`});
+    for(const d of globalState.devices.filter(x=>x.competitionId===globalState.competition.id))rows.push({timestamp:d.lastSeenAt,stream:'devices',sourceType:'device',sourceId:d.id,ar:`${d.name} · ${d.status}`,en:`${d.name} · ${d.status}`});
+    for(const p of globalState.participants.filter(x=>x.competitionId===globalState.competition.id))for(const h of p.statusHistory||[])rows.push({timestamp:h.timestamp,stream:'operations',sourceType:'participant_state',sourceId:p.id,ar:`${p.code} · ${h.status}`,en:`${p.code} · ${h.status}`});
+    const entries:FlightRecorderEntry[]=[];
+    for(const row of rows.sort((a,b)=>a.timestamp.localeCompare(b.timestamp))){const checksum=await hashCanonical({competitionId:globalState.competition.id,...row});entries.push({id:newId('flight'),competitionId:globalState.competition.id,timestamp:row.timestamp,stream:row.stream,sourceType:row.sourceType,sourceId:row.sourceId,summaryArabic:row.ar,summaryEnglish:row.en,checksum});}
+    globalState.flightRecorderEntries=[...entries,...globalState.flightRecorderEntries.filter(x=>x.competitionId!==globalState.competition.id)];
+    auditTrustAction('FLIGHT_RECORDER_REBUILT','Competition',globalState.competition.id,`إعادة بناء مسجل الرحلة: ${entries.length} حدثًا`,`Rebuilt flight recorder: ${entries.length} event(s)`);notify();return entries;
+  };
+
+  const createIntegrityEnvelope=async(participantId:string)=>{
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);if(!p)return null;
+    const result=globalState.results.find(x=>x.participantId===participantId&&x.competitionId===globalState.competition.id);
+    const submissions=globalState.judgeSubmissions.filter(x=>x.participantId===participantId);
+    const judgeSubmissionHashes=await Promise.all(submissions.map(x=>hashCanonical({judgeId:x.judgeId,participantId:x.participantId,totalScore:x.totalScore,criterionScores:x.criterionScores,submittedAt:x.submittedAt})));
+    const audio=globalState.audioRecordings.find(x=>x.participantId===participantId&&x.competitionId===globalState.competition.id&&x.status==='completed');
+    const receipt=getFairnessReceipt(participantId); const fairDrawHash=receipt?await hashCanonical(receipt):undefined;
+    const auditHead=globalState.auditLogs.filter(x=>x.competitionId===globalState.competition.id).sort((a,b)=>b.timestamp.localeCompare(a.timestamp))[0]?.currentStateHash;
+    const core={competitionId:globalState.competition.id,participantId:p.id,sessionId:submissions[0]?.sessionId,resultId:result?.id,policyVersion:getCompetitionPolicy(globalState.competition).version,ruleVersion:globalState.competition.ruleSet.version,fairDrawHash,judgeSubmissionHashes,recordingChecksum:audio?.checksum,auditHead,resultSealHash:result?.sealMetadata?.cryptographicChecksum,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name,status:'sealed' as const};
+    const envelopeHash=await hashCanonical(core);const item:IntegrityEnvelopeRecord={id:newId('envelope'),...core,envelopeHash};globalState.integrityEnvelopes=[item,...globalState.integrityEnvelopes];
+    auditTrustAction('INTEGRITY_ENVELOPE_SEALED','Participant',p.id,'إغلاق ظرف النزاهة وربط أدلة الجلسة والنتيجة','Sealed integrity envelope binding session and result evidence');notify();return item;
+  };
+  const verifyIntegrityEnvelope=async(item:IntegrityEnvelopeRecord)=>{const core={competitionId:item.competitionId,participantId:item.participantId,sessionId:item.sessionId,resultId:item.resultId,policyVersion:item.policyVersion,ruleVersion:item.ruleVersion,fairDrawHash:item.fairDrawHash,judgeSubmissionHashes:item.judgeSubmissionHashes,recordingChecksum:item.recordingChecksum,auditHead:item.auditHead,resultSealHash:item.resultSealHash,createdAt:item.createdAt,createdBy:item.createdBy,status:item.status};return {valid:(await hashCanonical(core))===item.envelopeHash};};
+
+  const runChaosDrill=()=>{
+    const sim=runSimulation(Math.max(1,globalState.committees.filter(c=>c.status!=='offline').length),Math.max(45,globalState.participants.length));
+    const readyJudges=globalState.judges.filter(j=>j.isReady).length;const activeCommittees=globalState.committees.filter(c=>c.status!=='offline').length;const edge=globalState.devices.some(d=>d.type==='edge_server'&&d.status==='online');const audio=globalState.committees.some(c=>c.audioInputOk);const spareDevice=globalState.devices.filter(d=>d.status==='online').length>activeCommittees;
+    const scenarios:ChaosDrillRecord['scenarios']=[
+      {id:newId('chaos_case'),type:'network',titleArabic:'انقطاع الشبكة',titleEnglish:'Network loss',expectedSafeguard:'offline event journal + reconciliation',passed:true,evidence:'Core queue/judging events have local idempotent continuity paths.'},
+      {id:newId('chaos_case'),type:'judge_absence',titleArabic:'غياب محكم',titleEnglish:'Judge absence',expectedSafeguard:'qualified reassignment',passed:readyJudges>activeCommittees,evidence:`readyJudges=${readyJudges}; activeCommittees=${activeCommittees}`},
+      {id:newId('chaos_case'),type:'device',titleArabic:'تعطل جهاز',titleEnglish:'Device failure',expectedSafeguard:'one-tap reassignment / BYOD',passed:spareDevice||getCompetitionPolicy(globalState.competition).operations.gateStationMode==='bring_your_own_device',evidence:`spareDevice=${spareDevice}; byod=${getCompetitionPolicy(globalState.competition).operations.gateStationMode==='bring_your_own_device'}`},
+      {id:newId('chaos_case'),type:'audio',titleArabic:'خلل الصوت',titleEnglish:'Audio issue',expectedSafeguard:'human judging continues; recording may degrade',passed:audio,evidence:`committeeWithAudioOk=${audio}`},
+      {id:newId('chaos_case'),type:'queue_spike',titleArabic:'قفزة الطابور',titleEnglish:'Queue spike',expectedSafeguard:'adaptive routing + capacity recommendation',passed:sim.maxWaitMinutes<=90,evidence:`simulatedMaxWait=${sim.maxWaitMinutes}m`},
+      {id:newId('chaos_case'),type:'power',titleArabic:'فقد الخادم السحابي',titleEnglish:'Cloud host loss',expectedSafeguard:'trusted local edge when configured',passed:edge,evidence:`onlineEdge=${edge}`},
+      {id:newId('chaos_case'),type:'committee',titleArabic:'تعطل لجنة',titleEnglish:'Committee unavailable',expectedSafeguard:'elastic reassignment with human approval',passed:activeCommittees>1,evidence:`activeCommittees=${activeCommittees}`}
+    ];
+    const readinessScore=Math.round((scenarios.filter(x=>x.passed).length/scenarios.length)*100);const item:ChaosDrillRecord={id:newId('chaos'),competitionId:globalState.competition.id,nonOfficial:true,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name,scenarios,readinessScore,status:'completed'};globalState.chaosDrills=[item,...globalState.chaosDrills];auditTrustAction('CHAOS_DRILL_COMPLETED','Competition',globalState.competition.id,`اختبار فشل اصطناعي غير رسمي: ${readinessScore}%`,`NON-OFFICIAL chaos drill completed: ${readinessScore}%`);notify();return item;
+  };
+
+  const ensureAccessibilityProfile=()=>{
+    const existing=globalState.accessibilityProfiles.find(x=>x.userId===globalState.currentUser.id&&x.competitionId===globalState.competition.id);if(existing)return existing;
+    const reduce=typeof window!=='undefined'&&typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;const contrast=typeof window!=='undefined'&&typeof window.matchMedia==='function'&&window.matchMedia('(prefers-contrast: more)').matches;
+    const item:AccessibilityProfileRecord={id:newId('a11y'),userId:globalState.currentUser.id,competitionId:globalState.competition.id,source:'system_preference',textScale:'normal',touchScale:'normal',contrast:contrast?'high':'system',motion:reduce?'reduced':'system',audioCues:false,updatedAt:new Date().toISOString()};globalState.accessibilityProfiles=[item,...globalState.accessibilityProfiles];notify();return item;
+  };
+  const updateAccessibilityProfile=(patch:Partial<Pick<AccessibilityProfileRecord,'textScale'|'touchScale'|'contrast'|'motion'|'audioCues'>>)=>{const current=ensureAccessibilityProfile();const next={...current,...patch,source:'user' as const,updatedAt:new Date().toISOString()};globalState.accessibilityProfiles=globalState.accessibilityProfiles.map(x=>x.id===current.id?next:x);if(typeof document!=='undefined'){document.documentElement.dataset.mizanText=next.textScale;document.documentElement.dataset.mizanTouch=next.touchScale;document.documentElement.dataset.mizanContrast=next.contrast;document.documentElement.dataset.mizanMotion=next.motion;}notify();return next;};
+
+  const recommendCommitteeElasticity=()=>{
+    const active=globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline');if(active.length<2)return null;
+    const load=(c:Committee)=>globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===c.id).length*Math.max(1,c.averageSessionMinutes);
+    const source=[...active].sort((a,b)=>load(b)-load(a))[0],target=[...active].sort((a,b)=>load(a)-load(b))[0];if(!source||!target||source.id===target.id||load(source)<=load(target)+Math.max(5,source.averageSessionMinutes))return null;
+    const candidates=globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===source.id&&compatibleCommitteesFor(p).some(c=>c.id===target.id)).slice(0,3);if(!candidates.length)return null;
+    const item:CommitteeElasticityRecommendation={id:newId('elastic'),competitionId:globalState.competition.id,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:candidates.map(p=>p.id),reasonArabic:`${source.code} أعلى حملًا؛ نقل ${candidates.length} حالات مؤهلة إلى ${target.code}.`,reasonEnglish:`${source.code} is carrying more load; move ${candidates.length} eligible case(s) to ${target.code}.`,constraintsChecked:['category','committee availability','declared hard conflicts','current load','average session duration'],status:'proposed'};globalState.elasticityRecommendations=[item,...globalState.elasticityRecommendations];auditTrustAction('ELASTICITY_RECOMMENDATION_CREATED','Committee',source.id,'اقتراح موازنة لجان دون تنفيذ تلقائي','Created committee elasticity recommendation without automatic execution');notify();return item;
+  };
+  const decideCommitteeElasticity=(id:string,approve:boolean)=>{const item=globalState.elasticityRecommendations.find(x=>x.id===id&&x.competitionId===globalState.competition.id);if(!item||item.status!=='proposed')return false;if(!['comp_admin','ops_manager','head_judge'].includes(globalState.currentUser.role))return false;if(approve&&item.targetCommitteeId){for(const pid of item.participantIds){const p=globalState.participants.find(x=>x.id===pid);if(!p||!compatibleCommitteesFor(p).some(c=>c.id===item.targetCommitteeId))continue;p.assignedCommitteeId=item.targetCommitteeId;p.statusHistory=[...(p.statusHistory||[]),{status:'in_queue',timestamp:new Date().toISOString(),actor:`Elasticity approval · ${globalState.currentUser.name}`}];}}
+    globalState.elasticityRecommendations=globalState.elasticityRecommendations.map(x=>x.id===id?{...x,status:approve?'approved':'dismissed',approvedAt:approve?new Date().toISOString():undefined,approvedBy:approve?globalState.currentUser.name:undefined}:x);auditTrustAction(approve?'ELASTICITY_APPROVED':'ELASTICITY_DISMISSED','CommitteeElasticity',id,approve?'اعتماد موازنة اللجان يدويًا':'رفض اقتراح موازنة اللجان',approve?'Approved committee elasticity recommendation':'Dismissed committee elasticity recommendation');notify();return true;};
+
+  const issueJourneyPass=async(participantId:string)=>{const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);if(!p)return null;const existing=globalState.journeyPasses.find(x=>x.participantId===p.id&&x.status==='active');if(existing)return existing;const payload=`MZ1|${p.code}`;const checksum=await sha256(`${globalState.competition.id}|${p.id}|${payload}`);const item:JourneyPassRecord={id:newId('pass'),competitionId:globalState.competition.id,participantId:p.id,participantCode:p.code,version:'MZ1',payload,checksum,issuedAt:new Date().toISOString(),status:'active'};globalState.journeyPasses=[item,...globalState.journeyPasses];auditTrustAction('JOURNEY_PASS_ISSUED','Participant',p.id,'إصدار رمز رحلة واحد للمشارك','Issued one journey pass for the participant');notify();return item;};
+  const revokeJourneyPass=(id:string)=>{globalState.journeyPasses=globalState.journeyPasses.map(x=>x.id===id?{...x,status:'revoked'}:x);auditTrustAction('JOURNEY_PASS_REVOKED','JourneyPass',id,'إلغاء رمز الرحلة','Revoked journey pass');notify();};
+
+  const generateMizanProtocolPackage=async()=>{if(!globalState.evidenceNodes.some(n=>n.competitionId===globalState.competition.id))await rebuildEvidenceGraph();let root=globalState.publicResultRoots.find(r=>r.competitionId===globalState.competition.id);if(!root&&globalState.results.some(r=>r.competitionId===globalState.competition.id&&['sealed','published'].includes(r.status)))root=await buildPublicResultRoot()||undefined;const genomeHash=await hashCanonical(globalState.competition);const graphNodes=globalState.evidenceNodes.filter(n=>n.competitionId===globalState.competition.id).map(n=>({id:n.id,type:n.type,status:n.status,version:n.version,checksum:n.checksum,authority:n.authority})).sort((a,b)=>a.id.localeCompare(b.id));const graphEdges=globalState.evidenceEdges.filter(e=>e.competitionId===globalState.competition.id).map(e=>({from:e.fromNodeId,to:e.toNodeId,relation:e.relation})).sort((a,b)=>`${a.from}:${a.to}`.localeCompare(`${b.from}:${b.to}`));const evidenceGraphHash=await hashCanonical({nodes:graphNodes,edges:graphEdges});const manifest={competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,edition:globalState.competition.edition,policyVersion:getCompetitionPolicy(globalState.competition).version,ruleVersion:globalState.competition.ruleSet.version,status:globalState.competition.status,nonSecret:true as const};const core={protocolVersion:'MIZAN-PROTOCOL-1.0' as const,generatedAt:new Date().toISOString(),generatedBy:globalState.currentUser.name,genomeHash,resultRoot:root?.merkleRoot,auditHead:globalState.auditLogs.find(a=>a.competitionId===globalState.competition.id)?.currentStateHash,quranSourceHashes:globalState.quranSourceManifests.filter(q=>q.organizationId===globalState.competition.organizationId&&q.status==='approved').map(q=>q.checksumSha256),integrityEnvelopeHashes:globalState.integrityEnvelopes.filter(x=>x.competitionId===globalState.competition.id).map(x=>x.envelopeHash),evidenceGraphHash,manifest};const packageHash=await hashCanonical(core);const item:MizanProtocolPackageRecord={id:newId('protocol'),competitionId:globalState.competition.id,...core,packageHash,verificationStatus:'self_verified'};const verifyHash=await hashCanonical(core);item.verificationStatus=verifyHash===packageHash?'self_verified':'verification_failed';globalState.protocolPackages=[item,...globalState.protocolPackages];auditTrustAction('MIZAN_PROTOCOL_PACKAGE_GENERATED','MizanProtocolPackage',item.id,'إنشاء حزمة MIZAN Protocol مستقلة','Generated a portable MIZAN Protocol package');notify();return item;};
+  const verifyMizanProtocolPackage=async(item:MizanProtocolPackageRecord)=>{const core:any={protocolVersion:item.protocolVersion,generatedAt:item.generatedAt,generatedBy:item.generatedBy,genomeHash:item.genomeHash,resultRoot:item.resultRoot,auditHead:item.auditHead,quranSourceHashes:item.quranSourceHashes,integrityEnvelopeHashes:item.integrityEnvelopeHashes,manifest:item.manifest};if(item.evidenceGraphHash)core.evidenceGraphHash=item.evidenceGraphHash;const computed=await hashCanonical(core);return {valid:computed===item.packageHash,computedHash:computed};};
+  const exportMizanProtocolPackage=(id:string)=>{const p=globalState.protocolPackages.find(x=>x.id===id);return p?JSON.stringify(p,null,2):null;};
+
+
   const scopedState = {
     ...state,
     participants: state.participants.filter(x=>x.competitionId===state.competition.id),
@@ -1193,6 +1380,22 @@ export function useAppStore() {
     trainingRuns: state.trainingRuns.filter(x=>x.competitionId===state.competition.id),
     remoteChecks: state.remoteChecks.filter(x=>x.competitionId===state.competition.id),
     audioRecordings: state.audioRecordings.filter(x=>x.competitionId===state.competition.id),
+    timeMachineScenarios: state.timeMachineScenarios.filter(x=>x.competitionId===state.competition.id),
+    quorumActions: state.quorumActions.filter(x=>x.competitionId===state.competition.id),
+    invariantViolations: state.invariantViolations.filter(x=>x.competitionId===state.competition.id),
+    evidenceNodes: state.evidenceNodes.filter(x=>x.competitionId===state.competition.id),
+    evidenceEdges: state.evidenceEdges.filter(x=>x.competitionId===state.competition.id),
+    publicResultRoots: state.publicResultRoots.filter(x=>x.competitionId===state.competition.id),
+    publicResultProofs: state.publicResultProofs.filter(x=>x.competitionId===state.competition.id),
+    localMeshSessions: state.localMeshSessions.filter(x=>x.competitionId===state.competition.id),
+    federationAttestations: state.federationAttestations.filter(x=>x.organizationId===state.competition.organizationId),
+    protocolPackages: state.protocolPackages.filter(x=>x.competitionId===state.competition.id),
+    flightRecorderEntries: state.flightRecorderEntries.filter(x=>x.competitionId===state.competition.id),
+    integrityEnvelopes: state.integrityEnvelopes.filter(x=>x.competitionId===state.competition.id),
+    chaosDrills: state.chaosDrills.filter(x=>x.competitionId===state.competition.id),
+    accessibilityProfiles: state.accessibilityProfiles.filter(x=>x.competitionId===state.competition.id),
+    elasticityRecommendations: state.elasticityRecommendations.filter(x=>x.competitionId===state.competition.id),
+    journeyPasses: state.journeyPasses.filter(x=>x.competitionId===state.competition.id),
   };
 
   return {
@@ -1201,7 +1404,7 @@ export function useAppStore() {
     switchRole,
     applyAuthenticatedIdentity,
     toggleOffline,
-    toggleEmergencyFreeze,
+    toggleEmergencyFreeze, setEmergencyMode,
     createIncident, resolveIncident,
     checkInParticipant,
     recordAIObservation, reconcileIntegrityForSession, registerAudioRecording,
@@ -1233,8 +1436,15 @@ export function useAppStore() {
     updateCommittee,
     publishCompetition,
     startSessionForParticipant,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot,
+    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
-    runSimulation
+    runSimulation,
+    runTimeMachine, runInvariantChecks, recordInvariantBlock,
+    ensureQuorumAction, approveQuorumAction, executeQuorumAction, requestCeremonyReveal, ceremonyRevealAuthorized,
+    rebuildEvidenceGraph, traceEvidence, buildPublicResultRoot, getPublicResultProof, verifyPublicResultProof,
+    startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
+    issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
+    generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
+    getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, issueJourneyPass, revokeJourneyPass
   };
 }

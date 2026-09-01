@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "mizan-quran-competition-operating-system",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,7 +11,9 @@
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "check": "npm run lint && npm run test && npm run build"
+    "check": "npm run secret-scan && npm run source-audit && npm run lint && npm run test && npm run build",
+    "secret-scan": "node scripts/scan-secrets.mjs",
+    "source-audit": "node scripts/source-audit.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -31,3 +31,11 @@ Late arrival, missing QR, committee change, audio issue, judge absence, retest, 
 
 ## Competition-owned workflow rule
 There is no universal MIZAN competition procedure. Each competition owns a versioned `CompetitionPolicy` covering registration, eligibility, workflow automation, operations, question selection, judging, results, appeals, certificates and privacy. Category-level RuleSets can further vary judging criteria and panel rules inside the same competition.
+
+## Readiness and trust workflows
+
+**Preflight:** derive current checks → READY/WARNING/BLOCKER → route fixable operational issues to the appropriate existing surface → scientific certification remains a human authority action → release only after blockers are resolved or handled through an authorized audited production policy.
+
+**Emergency:** authorized actor → explicit reason → pause new calls/routing → preserve active judging work → create incident + audit → resolve condition → explicit reason → safe resume + incident resolution + audit.
+
+**Official result trust:** independent judge locks → configured aggregation → review exceptions → quorum where required → invariant checks → seal → integrity envelope → optional Merkle public commitment → MIZAN Protocol export.

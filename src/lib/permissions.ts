@@ -1,7 +1,7 @@
 import { Permission, Role } from '../types';
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  super_admin: ['platform.manage','organization.manage','competition.create','competition.configure','competition.publish','participant.read','participant.edit','participant.checkin','committee.manage','judge.manage','judging.review','result.calculate','result.seal','result.publish','appeal.review','certificate.issue','audit.read','quran.manage','operations.manage','broadcast.manage'],
+  super_admin: ['platform.manage','organization.manage','competition.create','competition.configure','participant.read','audit.read'],
   org_admin: ['organization.manage','competition.create','competition.configure','competition.publish','participant.read','participant.edit','committee.manage','judge.manage','result.seal','result.publish','certificate.issue','audit.read','operations.manage'],
   comp_admin: ['competition.configure','competition.publish','participant.read','participant.edit','participant.checkin','committee.manage','judge.manage','result.calculate','result.seal','result.publish','certificate.issue','audit.read','operations.manage'],
   scientific_admin: ['competition.configure','judge.manage','judging.review','result.calculate','appeal.review','audit.read','quran.manage'],

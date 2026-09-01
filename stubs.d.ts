@@ -18,6 +18,7 @@ declare module 'lucide-react' {
  export const Cable: any;
  export const CalendarClock: any;
  export const CalendarDays: any;
+ export const Camera: any;
  export const Check: any;
  export const CheckCircle2: any;
  export const ChevronDown: any;
@@ -77,6 +78,7 @@ declare module 'lucide-react' {
  export const Trash2: any;
  export const UserRound: any;
  export const UsersRound: any;
+ export const Upload: any;
  export const Volume2: any;
  export const WalletCards: any;
  export const WandSparkles: any;
@@ -85,6 +87,11 @@ declare module 'lucide-react' {
  export const WifiOff: any;
  export const X: any;
  export const XCircle: any;
+ export const Binary: any;
+ export const Braces: any;
+ export const FileKey2: any;
+ export const GitBranch: any;
+ export const TriangleAlert: any;
 }
 declare module 'firebase/app' { export const initializeApp:any; export const getApps:any; export const getApp:any; }
 declare module 'firebase/firestore' { export const getFirestore:any; export const doc:any; export const setDoc:any; export const onSnapshot:any; }
@@ -102,3 +109,5 @@ interface ImportMeta { env:any }
 declare module 'crypto' { const crypto:any; export default crypto; }
 declare module 'node:test' { const test:any; export default test; }
 declare module 'node:assert/strict' { const assert:any; export default assert; }
+
+declare module 'fs' { const fs:any; export default fs; }

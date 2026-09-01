@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity, Award, BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3, FileCheck2,
   Fingerprint, Gavel, LayoutDashboard, ListChecks, LockKeyhole, Network, Plus, QrCode, RadioTower,
@@ -21,6 +21,7 @@ export const CompetitionOverview: React.FC = () => {
  const store=useAppStore(); const {competition,participants,committees,reviewCases,results,certificates,auditLogs,appeals,language}=store; const ar=isAr(language);
  const policy=getCompetitionPolicy(competition); const readiness=store.getCompetitionReadiness();
  const [view,setView]=useState<MainView>('overview'); const [section,setSection]=useState<PolicySection>('identity'); const [query,setQuery]=useState(''); const [simCount,setSimCount]=useState(Math.max(1,committees.length));
+ useEffect(()=>{const open=()=>setView('design');window.addEventListener('mizan:open-competition-dna',open as EventListener);return()=>window.removeEventListener('mizan:open-competition-dna',open as EventListener)},[]);
  const sim=useMemo(()=>store.runSimulation(simCount,30),[simCount,participants.length,committees.length,competition.ruleSet.questionDurationMinutes]);
  const filtered=participants.filter(p=>`${p.code} ${p.fullName} ${p.fullNameArabic} ${p.country}`.toLowerCase().includes(query.toLowerCase()));
  const attention=[...readiness.map(i=>({id:i.id,title:ar?i.ar:i.en,kind:'setup'})),...reviewCases.filter(r=>r.status==='pending').slice(0,3).map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...store.incidents.filter(i=>i.status!=='resolved').slice(0,2).map(i=>({id:i.id,title:i.title,kind:'incident'}))];

@@ -5,6 +5,7 @@ import {
   UsersRound, Globe2, Plus, BadgeCheck
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { Pictogram } from '../design-system/Pictogram';
 import { Role } from '../../types';
 
 const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:string; icon:React.ComponentType<{className?:string}>; group:'core'|'governance'|'support'}> = [
@@ -36,16 +37,15 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
   ];
   return <div className="min-h-screen bg-[#F7F5EF] text-[#171b18] font-arabic">
     <div className="max-w-[1380px] mx-auto px-5 sm:px-8 py-8 sm:py-12">
-      <section className="relative overflow-hidden rounded-[32px] border border-[#DEDCD4] bg-[#FFFEFB] px-6 py-8 sm:px-10 sm:py-11">
-        <div className="absolute -top-24 -end-20 w-72 h-72 rounded-full bg-[#E9EFEA] blur-3xl opacity-80 pointer-events-none"/>
+      <section className="rounded-[30px] border border-[#DEDCD4] bg-[#FFFEFB] px-6 py-8 sm:px-10 sm:py-10">
         <div className="relative max-w-3xl">
           <div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-[#5F6B64]"><Sparkles className="w-3.5 h-3.5"/> MIZAN EXPERIENCE</div>
           <h1 className="mt-4 text-3xl sm:text-5xl font-black tracking-[-.03em] leading-[1.06]">{ar?'جرّب ميزان كما يراه كل شخص':'See MIZAN through every role'}</h1>
-          <p className="mt-4 text-sm sm:text-base leading-7 text-[#68716B] max-w-2xl">{ar?'كل مستخدم يرى شاشة واحدة لعمله فقط. اختر التجربة التي تريدها — لا توجد لوحة واحدة مزدحمة تحاول فعل كل شيء.':'Each person sees only what they need. Choose a journey—MIZAN never forces everyone into one crowded dashboard.'}</p>
+          <p className="mt-3 text-sm text-[#68716B]">{ar?'دور واحد. مهمة واحدة. شاشة واحدة.':'One role. One job. One screen.'}</p>
           <div className="mt-7 flex flex-wrap gap-2">
             <button onClick={()=>{window.location.hash='#competition'}} className="inline-flex items-center gap-2 rounded-xl bg-[#214C40] px-4 py-2.5 text-xs font-black text-white"><Globe2 className="w-4 h-4"/>{ar?'صفحة المسابقة العامة':'Public competition'}</button>
             <button onClick={()=>{window.location.hash='#register'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><Plus className="w-4 h-4"/>{ar?'التسجيل':'Registration'}</button>
-            <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'التحقق من شهادة':'Verify certificate'}</button>
+            <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'شهادة':'Certificate'}</button><button onClick={()=>{window.location.hash='#trust-verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><ShieldCheck className="w-4 h-4"/>{ar?'إثبات':'Trust proof'}</button>
           </div>
         </div>
         <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#79817C]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{ar?competition.nameArabic:competition.name}</span></div>
@@ -54,10 +54,10 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
       {groups.map(([items,title,subtitle])=><section key={title} className="mt-10">
         <div className="flex items-end justify-between gap-4 mb-4"><div><h2 className="text-lg font-black">{title}</h2><p className="text-xs text-[#7B827D] mt-1">{subtitle}</p></div></div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {items.map(item=>{const Icon=item.icon;return <button key={item.role} onClick={()=>onEnterRole(item.role)} className="group min-h-[150px] text-start rounded-[22px] border border-[#DFDED7] bg-[#FFFEFB] p-5 transition hover:-translate-y-0.5 hover:border-[#BFCAC3] hover:shadow-[0_14px_35px_rgba(33,76,64,.07)] focus:outline-none focus:ring-2 focus:ring-[#214C40]/30">
-            <div className="flex items-start justify-between gap-3"><span className="w-10 h-10 rounded-xl bg-[#EDF1ED] text-[#214C40] grid place-items-center group-hover:bg-[#214C40] group-hover:text-white transition"><Icon className="w-4.5 h-4.5"/></span><ArrowLeft className={`w-4 h-4 text-[#A3A9A5] opacity-0 group-hover:opacity-100 transition ${ar?'':'rotate-180'}`}/></div>
+          {items.map(item=>{const Icon=item.icon;return <button key={item.role} onClick={()=>onEnterRole(item.role)} className="group min-h-[138px] text-start rounded-[22px] border border-[#DFDED7] bg-[#FFFEFB] p-5 transition hover:border-[#AEBEB5] focus:outline-none focus:ring-2 focus:ring-[#214C40]/30">
+            <div className="flex items-start justify-between gap-3"><Pictogram icon={Icon} size="sm"/><ArrowLeft className={`w-4 h-4 text-[#A3A9A5] opacity-0 group-hover:opacity-100 transition ${ar?'':'rotate-180'}`}/></div>
             <div className="mt-5 font-black text-sm">{ar?item.ar:item.en}</div>
-            <div className="mt-1.5 text-[11px] leading-5 text-[#79817C]">{ar?item.noteAr:item.noteEn}</div>
+            <div className="mt-1.5 text-[10px] leading-5 text-[#79817C] line-clamp-1">{ar?item.noteAr:item.noteEn}</div>
           </button>})}
         </div>
       </section>)}

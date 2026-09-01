@@ -325,7 +325,7 @@ export interface ReviewCase {
   participantId: string;
   participantCode: string;
   committeeId: string;
-  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier';
+  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier' | 'sealed_result_protection';
   severity: 'high' | 'medium' | 'low';
   timestampSec: number;
   details: string;
@@ -660,12 +660,12 @@ export type Permission =
 // ---- Enterprise completion layer ---------------------------------------------------------
 export type IntegrationKind = 'email' | 'sms' | 'whatsapp' | 'identity' | 'storage' | 'broadcast' | 'payments' | 'webhook';
 export interface IntegrationConfig { id:string; organizationId:string; kind:IntegrationKind; name:string; enabled:boolean; status:'not_configured'|'configured'|'degraded'; secretRef?:string; endpoint?:string; lastCheckedAt?:string; }
-export interface NotificationRecord { id:string; competitionId:string; participantId?:string; channel:'in_app'|'email'|'sms'|'whatsapp'|'push'; templateKey:string; locale:string; recipient:string; status:'queued'|'sent'|'failed'|'cancelled'; attempts:number; createdAt:string; sentAt?:string; error?:string; idempotencyKey:string; }
+export interface NotificationRecord { id:string; competitionId:string; participantId?:string; channel:'in_app'|'email'|'sms'|'whatsapp'|'push'; templateKey:string; locale:string; recipient:string; status:'scheduled'|'queued'|'sent'|'failed'|'cancelled'; attempts:number; createdAt:string; scheduledFor?:string; nextRetryAt?:string; sentAt?:string; error?:string; providerResponse?:string; fallbackChannel?:'in_app'|'email'|'sms'|'whatsapp'|'push'; consentRequired?:boolean; consentSatisfied?:boolean; idempotencyKey:string; }
 export interface WebhookSubscription { id:string; organizationId:string; competitionId?:string; event:string; endpoint:string; enabled:boolean; secretRef:string; lastDeliveryStatus?:'success'|'failed'; }
-export interface DeviceRecord { id:string; competitionId:string; name:string; type:'kiosk'|'judge_tablet'|'edge_server'|'display'|'printer'|'audio'; zone?:string; committeeId?:string; status:'online'|'offline'|'degraded'; lastSeenAt:string; softwareVersion:string; batteryPercent?:number; }
+export interface DeviceRecord { id:string; competitionId:string; name:string; type:'kiosk'|'judge_tablet'|'edge_server'|'display'|'printer'|'audio'; role?:'Gate'|'Kiosk'|'JudgeOS'|'Head Judge'|'Operations'|'Waiting Display'|'Committee Display'|'Exception Host'|'Ceremony'|'Broadcast'|'Edge'; zone?:string; committeeId?:string; status:'online'|'offline'|'degraded'|'disabled'|'revoked'; connection?:'online'|'offline'|'local'; lastSeenAt:string; lastSyncAt?:string; softwareVersion:string; sessionExpiresAt?:string; batteryPercent?:number; revokedAt?:string; }
 export interface DelegationTravelRecord { id:string; competitionId:string; delegationId:string; participantId?:string; flightNumber?:string; arrivalAirport?:string; arrivalAt?:string; hotel?:string; room?:string; transportStatus:'not_required'|'pending'|'scheduled'|'completed'; companionCount:number; notes?:string; }
 export interface ConsentRecord { id:string; participantId:string; competitionId:string; kind:'terms'|'privacy'|'audio_recording'|'ai_processing'|'guardian'; version:string; accepted:boolean; acceptedAt:string; guardianName?:string; }
-export interface ImportJobRecord { id:string; competitionId:string; entity:'participants'|'judges'|'categories'|'committees'; fileName:string; status:'mapping'|'validated'|'imported'|'failed'; totalRows:number; validRows:number; invalidRows:number; mapping:Record<string,string>; errors:{row:number;message:string}[]; createdAt:string; }
+export interface ImportJobRecord { id:string; competitionId:string; entity:'participants'|'judges'|'delegations'|'categories'|'committees'|'historical_results'; fileName:string; status:'mapping'|'validated'|'dry_run'|'imported'|'failed'|'rolled_back'; totalRows:number; validRows:number; invalidRows:number; duplicateRows?:number; columns?:string[]; mapping:Record<string,string>; errors:{row:number;message:string}[]; warnings?:{row:number;message:string}[]; rollbackToken?:string; importedIds?:string[]; createdAt:string; completedAt?:string; }
 export interface ShadowRun { id:string; competitionId:string; mode:'record'|'analyze'|'simulate'|'compare'; status:'draft'|'running'|'completed'; startedAt?:string; completedAt?:string; observations:{type:string;severity:'info'|'medium'|'high';summary:string}[]; }
 export interface ParticipantPassportEntry { id:string; participantId:string; competitionId:string; competitionName:string; categoryName:string; year:string; result?:string; certificateNumber?:string; verified:boolean; }
 export interface JudgePassportEntry { id:string; judgeId:string; competitionId:string; competitionName:string; role:string; riwayat:string[]; calibrationScore?:number; completedSessions:number; verified:boolean; }
@@ -701,4 +701,109 @@ export interface AudioRecordingRecord {
   checksum?: string;
   quality: 'unknown' | 'good' | 'degraded';
   retentionDays: number;
+}
+
+
+// ---- MIZAN Trust 8 -----------------------------------------------------------------------
+// Portable governance primitives. These records are tenant/competition scoped and are designed
+// to remain useful even when optional AI, broadcast or cloud integrations are unavailable.
+
+export interface TimeMachineScenarioRecord {
+  id:string; competitionId:string; baseTimestamp:string; label:string; nonOfficial:true;
+  assumptions:{committeeDelta:number;arrivalRatePerHour:number;absentJudgeIds:string[];networkMode:'normal'|'local_mesh'|'offline'};
+  baseline:{committees:number;participantsInScope:number;averageWaitMinutes:number;projectedFinishTime:string;maxWaitMinutes:number};
+  alternative:{committees:number;participantsInScope:number;averageWaitMinutes:number;projectedFinishTime:string;maxWaitMinutes:number};
+  delta:{averageWaitMinutes:number;finishMinutes:number}; createdAt:string; createdBy:string;
+}
+
+export type QuorumActionType='results_seal'|'ceremony_reveal'|'policy_publish'|'emergency_override';
+export interface QuorumApproval { actorId:string;actorName:string;actorRole:Role;approvedAt:string; }
+export interface QuorumActionRecord {
+  id:string; competitionId:string; action:QuorumActionType; entityId:string;
+  requiredRoleGroups:Role[][]; distinctActorsRequired:boolean; approvals:QuorumApproval[];
+  status:'pending'|'ready'|'executed'|'cancelled'; requestedAt:string; requestedBy:string; executedAt?:string; executedBy?:string;
+}
+
+export interface InvariantCheckResult {
+  key:string; titleArabic:string; titleEnglish:string; status:'pass'|'warning'|'violation'; evidence:string[];
+}
+export interface InvariantViolationRecord {
+  id:string; competitionId:string; invariantKey:string; operation:string; entityType:string; entityId:string;
+  actorId:string;actorRole:Role;reason:string;blockedAt:string;evidence?:Record<string,unknown>;
+}
+
+export type ScientificEvidenceNodeType='competition_policy'|'rule_set'|'quran_source'|'question'|'fairdraw'|'ai_capability'|'calibration'|'result'|'certificate'|'quorum';
+export interface ScientificEvidenceNode {
+  id:string;competitionId:string;type:ScientificEvidenceNodeType;label:string;status:string;version?:string;checksum?:string;authority?:string;entityRef:string;createdAt:string;
+}
+export interface ScientificEvidenceEdge { id:string;competitionId:string;fromNodeId:string;toNodeId:string;relation:string; }
+
+export interface PublicMerkleLeaf { index:number;resultId:string;participantCode:string;leafHash:string; }
+export interface PublicResultProofRecord {
+  id:string;competitionId:string;resultId:string;verificationVersion:'mizan-merkle-v1';merkleRoot:string;leafIndex:number;
+  disclosed:{participantCode:string;categoryId:string;finalScore:number;rank:number;status:string}; disclosureSalt:string;
+  proof:{position:'left'|'right';hash:string}[];createdAt:string;
+}
+export interface PublicResultRootRecord { id:string;competitionId:string;merkleRoot:string;leaves:PublicMerkleLeaf[];resultCount:number;createdAt:string;algorithm:'SHA-256'; }
+
+export interface LocalMeshNodeRecord { deviceId:string;name:string;role?:DeviceRecord['role'];status:'joined'|'stale'|'left';lastSeenAt:string;sequence:number; }
+export interface LocalMeshEventRecord {
+  id:string;competitionId:string;originDeviceId:string;sequence:number;type:string;payloadHash:string;payload?:Record<string,unknown>;createdAt:string;
+  acknowledgedBy:string[];conflictKey?:string;transport?:'local'|'browser_broadcast'|'edge_relay';
+}
+export interface LocalMeshSessionRecord {
+  id:string;competitionId:string;status:'forming'|'active'|'reconciling'|'closed';coordinatorDeviceId?:string;nodes:LocalMeshNodeRecord[];events:LocalMeshEventRecord[];
+  conflicts:{id:string;eventIds:string[];reason:string;status:'open'|'resolved';resolution?:string}[];startedAt:string;reconciledAt?:string;
+  transportMode?:'journal_only'|'browser_broadcast'|'edge_relay';transportStatus?:'connected'|'unavailable'|'disabled';
+}
+
+export type FederationClaimType='identity_verified'|'age_verified'|'delegation_authorized'|'guardian_consent_verified'|'travel_document_verified'|'organization_nomination';
+export interface FederationAttestationRecord {
+  id:string;organizationId:string;subjectRef:string;subjectKind:'participant'|'delegation';issuer:string;claim:FederationClaimType;value:string;
+  issuedAt:string;expiresAt?:string;status:'valid'|'revoked';evidenceDigest:string;signatureRef:string;privacyMode:'claim_only';
+}
+
+export interface MizanProtocolPackageRecord {
+  id:string;competitionId:string;protocolVersion:'MIZAN-PROTOCOL-1.0';generatedAt:string;generatedBy:string;genomeHash:string;resultRoot?:string;auditHead?:string;
+  quranSourceHashes:string[];integrityEnvelopeHashes:string[];evidenceGraphHash?:string;
+  manifest:{competitionId:string;organizationId:string;edition:string;policyVersion:string;ruleVersion:string;status:CompetitionStatus;nonSecret:true};
+  packageHash:string;verificationStatus:'self_verified'|'verification_failed';
+}
+
+// ---- MIZAN Beyond 8 ----------------------------------------------------------------------
+// Advanced operational intelligence remains progressive-disclosure only. None of these
+// records can mutate an official result without the normal permission/quorum paths.
+export interface FlightRecorderEntry {
+  id:string; competitionId:string; timestamp:string;
+  stream:'operations'|'judging'|'devices'|'incidents'|'ai'|'results'|'appeals'|'trust';
+  sourceType:string; sourceId:string; summaryArabic:string; summaryEnglish:string; checksum:string;
+}
+export interface IntegrityEnvelopeRecord {
+  id:string; competitionId:string; participantId:string; sessionId?:string; resultId?:string;
+  policyVersion:string; ruleVersion:string; fairDrawHash?:string; judgeSubmissionHashes:string[];
+  recordingChecksum?:string; auditHead?:string; resultSealHash?:string; createdAt:string; createdBy:string;
+  envelopeHash:string; status:'sealed';
+}
+export interface ChaosDrillScenario {
+  id:string; type:'network'|'judge_absence'|'device'|'audio'|'queue_spike'|'power'|'committee';
+  titleArabic:string; titleEnglish:string; expectedSafeguard:string; passed:boolean; evidence:string;
+}
+export interface ChaosDrillRecord {
+  id:string; competitionId:string; nonOfficial:true; createdAt:string; createdBy:string;
+  scenarios:ChaosDrillScenario[]; readinessScore:number; status:'completed';
+}
+export interface AccessibilityProfileRecord {
+  id:string; userId:string; competitionId:string; source:'system_preference'|'user';
+  textScale:'normal'|'large'; touchScale:'normal'|'xl'; contrast:'system'|'high'; motion:'system'|'reduced'; audioCues:boolean;
+  updatedAt:string;
+}
+export interface CommitteeElasticityRecommendation {
+  id:string; competitionId:string; createdAt:string; createdBy:string;
+  sourceCommitteeId?:string; targetCommitteeId?:string; participantIds:string[];
+  reasonArabic:string; reasonEnglish:string; constraintsChecked:string[];
+  status:'proposed'|'approved'|'dismissed'; approvedAt?:string; approvedBy?:string;
+}
+export interface JourneyPassRecord {
+  id:string; competitionId:string; participantId:string; participantCode:string; version:'MZ1';
+  payload:string; checksum:string; issuedAt:string; status:'active'|'revoked';
 }

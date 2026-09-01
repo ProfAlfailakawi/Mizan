@@ -51,3 +51,65 @@ export function buildDeploymentPlan(competition:Competition, profile:DeploymentP
     ]
   };
 }
+
+export interface VenueInventory {
+  laptops:number;
+  desktops:number;
+  tablets:number;
+  tvs:number;
+  printers:number;
+  usbScanners:number;
+  edgeMiniPcs:number;
+  wifi:boolean;
+  participantByod:boolean;
+}
+
+export interface VenueAssignment {
+  id:string;
+  role:'Gate'|'JudgeOS'|'Operations'|'Waiting Display'|'Head Judge'|'Exception Host'|'Ceremony'|'Broadcast'|'Edge';
+  source:string;
+  status:'AVAILABLE'|'REQUIRED'|'OPTIONAL'|'RECOMMENDED';
+}
+
+export interface VenueComposition {
+  assignments:VenueAssignment[];
+  missingRequired:number;
+  recommendedAdditional:number;
+  summaryAr:string;
+  summaryEn:string;
+  checklistAr:string[];
+  checklistEn:string[];
+}
+
+/** Deterministic venue composition. It never invents prices or savings. */
+export function composeVenue(competition:Competition, inventory:VenueInventory):VenueComposition {
+  const policy=getCompetitionPolicy(competition);
+  const pool:string[]=[];
+  for(let i=1;i<=inventory.laptops;i++) pool.push(`Laptop ${i}`);
+  for(let i=1;i<=inventory.desktops;i++) pool.push(`Desktop ${i}`);
+  for(let i=1;i<=inventory.tablets;i++) pool.push(`Tablet ${i}`);
+  const take=()=>pool.shift();
+  const assignments:VenueAssignment[]=[];
+  const add=(role:VenueAssignment['role'], source:string|undefined, status:VenueAssignment['status'])=>assignments.push({id:`${role}-${assignments.length+1}`,role,source:source||'Additional device required',status:source?status:'REQUIRED'});
+  add('Gate',take(),'AVAILABLE');
+  add('Operations',take(),'AVAILABLE');
+  const activePanels=Math.max(1, Math.min(competition.categories.length, 8));
+  for(let i=0;i<activePanels;i++) add('JudgeOS',take(),'AVAILABLE');
+  if(pool.length) add('Head Judge',take(),'AVAILABLE'); else add('Head Judge',undefined,'RECOMMENDED');
+  if(pool.length) add('Exception Host',take(),'OPTIONAL');
+  for(let i=1;i<=inventory.tvs;i++) assignments.push({id:`tv-${i}`,role:i===1?'Waiting Display':i===2?'Ceremony':'Broadcast',source:`TV ${i}`,status:i===1?'AVAILABLE':'OPTIONAL'});
+  if(policy.operations.offlineContinuity){
+    const edge=inventory.edgeMiniPcs>0?'Mini PC 1':pool.shift();
+    add('Edge',edge,edge?'AVAILABLE':'RECOMMENDED');
+  }
+  const missingRequired=assignments.filter(a=>a.status==='REQUIRED'&&a.source==='Additional device required').length;
+  const recommendedAdditional=assignments.filter(a=>a.status==='RECOMMENDED'&&a.source==='Additional device required').length;
+  const enough=missingRequired===0;
+  return {
+    assignments,missingRequired,recommendedAdditional,
+    summaryAr: enough ? (recommendedAdditional?`لا توجد أجهزة إلزامية إضافية. ${recommendedAdditional} جهاز إضافي موصى به.`:'لا توجد أجهزة إضافية مطلوبة.') : `${missingRequired} جهاز إضافي مطلوب للتشغيل المحدد.`,
+    summaryEn: enough ? (recommendedAdditional?`No additional mandatory hardware. ${recommendedAdditional} additional device recommended.`:'No additional hardware required.') : `${missingRequired} additional device(s) required for this deployment.`,
+    checklistAr:['تسمية كل جهاز وموقعه','فتح رابط الدور بملء الشاشة','اختبار الشبكة والعمل دون اتصال','اختبار الصوت قبل أول جلسة','تثبيت مسار استثناء بشري واحد'],
+    checklistEn:['Name every device and location','Open the assigned role in fullscreen','Test network and offline continuity','Test audio before the first session','Keep one human exception path']
+  };
+}

@@ -19,9 +19,11 @@ import { AuditorConsole, DelegationPortal, ExceptionDesk, OrganizationHome, Scie
 import { ExperienceHub } from './components/public/ExperienceHub';
 import { DemoReturn } from './components/public/DemoReturn';
 import { WaitingBoard } from './components/public/WaitingBoard';
+import { TrustVerification } from './components/public/TrustVerification';
 
 export default function App() {
- const {currentUser,applyAuthenticatedIdentity,switchRole}=useAppStore();
+ const {currentUser,applyAuthenticatedIdentity,switchRole,accessibilityProfiles,ensureAccessibilityProfile}=useAppStore();
+ useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true'; const [signedIn,setSignedIn]=useState(!requireAuth); const [authReady,setAuthReady]=useState(!requireAuth); const [accessError,setAccessError]=useState('');
  useEffect(()=>{if(!requireAuth)return; return onAuthStateChanged(auth,async u=>{if(!u){setSignedIn(false);setAuthReady(true);return;}try{const token=await getIdTokenResult(u,true);const role=String(token.claims.role||'') as Role;const organizationId=String(token.claims.org_id||'');const allowed:Role[]=['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent'];if(!allowed.includes(role)||!organizationId){setAccessError('ACCOUNT_CLAIMS_REQUIRED');setSignedIn(false);setAuthReady(true);return;}applyAuthenticatedIdentity({id:u.uid,email:u.email||'',name:u.displayName||u.email||u.uid,role,organizationId,competitionId:token.claims.competition_id?String(token.claims.competition_id):undefined});setAccessError('');setSignedIn(true);}catch{setAccessError('IDENTITY_TOKEN_ERROR');setSignedIn(false);}finally{setAuthReady(true)}})},[requireAuth]);
  const demoMode=!requireAuth;
@@ -32,10 +34,11 @@ export default function App() {
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md text-center"><div className="mizan-kicker">ACCESS GOVERNANCE</div><h1 className="text-xl font-black mt-2">الحساب غير مفوض / Account not provisioned</h1><p className="text-xs text-[#737a75] mt-3">The identity is valid, but MIZAN requires tenant-scoped org_id and role claims.</p><button onClick={()=>signOut(auth)} className="mt-5 text-xs font-bold text-[#214C40]">Sign out</button></div></div>;
  if(requireAuth&&!signedIn) return <AuthPortal/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
+ if(hash.startsWith('#trust-verify')) return <><TrustVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
  if(hash.startsWith('#competition')) return <><CompetitionLanding/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
  if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><CertificateVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
- if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
+ if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
@@ -61,6 +64,7 @@ export default function App() {
   <main>{roleView()}</main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
   {kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} 
+  {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>}
   {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>} 
  </div>
 }

@@ -28,3 +28,18 @@ The acceptance matrix includes:
 - result seal and appeal mutation guards
 
 Judge event undo is append-preserving (`reversed=true`), and locked submissions cannot be edited through JudgeOS.
+
+## Final local verification — 2026-09-02
+
+Actually executed in this environment:
+- `npx --yes tsc --noEmit` — PASS.
+- `node scripts/scan-secrets.mjs` — PASS.
+- `node scripts/source-audit.mjs` — PASS.
+- Direct synthetic Rule Simulator check — PASS.
+- Current QR implementation was previously validated by rasterizing a generated QR and decoding it with OpenCV (`MZ1|A-104`) — PASS.
+
+Attempted but not claimed as passed:
+- `npx --yes tsx --test tests/*.test.ts` — timed out because `tsx`/project dependencies are not installed locally and package retrieval is unavailable/too slow in this environment.
+- Full `npm run build`, browser E2E, cross-device Edge testing and 2,000-participant load testing therefore remain release-environment checks.
+
+Never convert an unexecuted test into a PASS in project status.

@@ -1,11 +1,10 @@
 {
   "projectId": "mizan-f2ce3",
-  "appId": "1:993698501419:web:47a25e46ccbacccb17ab6e",
-  "apiKey": "AIzaSyAU13efq58hCJirGDyu9dZf8lzRatbhwcY",
-  "authDomain": "mizan-f2ce3.firebaseapp.com",
+  "appId": "",
+  "authDomain": "",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "mizan-f2ce3.firebasestorage.app",
-  "messagingSenderId": "993698501419",
+  "storageBucket": "",
+  "messagingSenderId": "",
   "measurementId": "",
   "recaptchaSiteKey": ""
 }
