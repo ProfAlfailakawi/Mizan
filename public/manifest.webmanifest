@@ -1,0 +1,11 @@
+{
+  "name": "MIZAN",
+  "short_name": "MIZAN",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5EF",
+  "theme_color": "#214C40",
+  "lang": "ar",
+  "dir": "rtl",
+  "description": "Quran Competition Operating System"
+}

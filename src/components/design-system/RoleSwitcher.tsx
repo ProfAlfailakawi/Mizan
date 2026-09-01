@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ChevronDown, Crown, Gavel, Headphones, RadioTower, ScanLine, ShieldCheck, UserRound, UsersRound, Building2, Microscope, FileSearch } from 'lucide-react';
+import { ChevronDown, Crown, Gavel, Headphones, RadioTower, ScanLine, ShieldCheck, UserRound, UsersRound, Building2, Microscope, FileSearch, LifeBuoy, Baby } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Role } from '../../types';
 
 const ROLE_META: Record<Role, { ar:string; en:string; icon: React.ComponentType<{className?:string}> }> = {
-  super_admin:{ar:'سوبر أدمن',en:'Super Admin',icon:Crown}, org_admin:{ar:'مدير الجهة',en:'Organization Admin',icon:Building2}, comp_admin:{ar:'مدير المسابقة',en:'Competition Admin',icon:ShieldCheck}, scientific_admin:{ar:'الإدارة العلمية',en:'Scientific Admin',icon:Microscope}, head_judge:{ar:'رئيس التحكيم',en:'Head Judge',icon:Gavel}, judge:{ar:'محكم',en:'Judge',icon:Headphones}, ops_manager:{ar:'مدير التشغيل',en:'Operations',icon:RadioTower}, exception_host:{ar:'مكتب الاستثناء',en:'Exception Desk',icon:ScanLine}, delegation_manager:{ar:'مندوب الوفد',en:'Delegation',icon:UsersRound}, participant:{ar:'متسابق',en:'Participant',icon:UserRound}, broadcast_operator:{ar:'البث والحفل',en:'Broadcast',icon:RadioTower}, auditor:{ar:'مدقق',en:'Auditor',icon:FileSearch}
+  super_admin:{ar:'سوبر أدمن',en:'Super Admin',icon:Crown}, org_admin:{ar:'مدير الجهة',en:'Organization Admin',icon:Building2}, comp_admin:{ar:'مدير المسابقة',en:'Competition Admin',icon:ShieldCheck}, scientific_admin:{ar:'الإدارة العلمية',en:'Scientific Admin',icon:Microscope}, head_judge:{ar:'رئيس التحكيم',en:'Head Judge',icon:Gavel}, judge:{ar:'محكم',en:'Judge',icon:Headphones}, ops_manager:{ar:'مدير التشغيل',en:'Operations',icon:RadioTower}, exception_host:{ar:'مكتب الاستثناء',en:'Exception Desk',icon:ScanLine}, delegation_manager:{ar:'مندوب الوفد',en:'Delegation',icon:UsersRound}, participant:{ar:'متسابق',en:'Participant',icon:UserRound}, broadcast_operator:{ar:'البث والحفل',en:'Broadcast',icon:RadioTower}, auditor:{ar:'مدقق',en:'Auditor',icon:FileSearch}, guardian:{ar:'ولي الأمر',en:'Guardian',icon:Baby}, support_agent:{ar:'الدعم',en:'Support',icon:LifeBuoy}
 };
 
 export const RoleSwitcher: React.FC = () => {

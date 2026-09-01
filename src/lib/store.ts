@@ -4,6 +4,8 @@ import { db, auth } from './firebase';
 import {
   User,
   Role,
+  Organization,
+  OrganizationBrand,
   Competition,
   Category,
   Participant,
@@ -11,6 +13,7 @@ import {
   JudgeProfile,
   ResultRecord,
   ReviewCase,
+  AIObservation,
   Certificate,
   AuditEvent,
   JudgeEvent,
@@ -19,7 +22,8 @@ import {
   QuestionSelection,
   IncidentRecord,
   SimulationResult,
-  AppealRecord
+  AppealRecord,
+  IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel
 } from '../types';
 import {
   SEED_ORGANIZATION,
@@ -35,13 +39,16 @@ import {
   SEED_INCIDENTS
 } from './seed-data';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
-import { SupportedLanguage } from './i18n';
+import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
 import { generateFairDraw } from './fairdraw';
+import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 
 interface AppStoreState {
   currentUser: User;
+  organization: Organization;
+  organizations: Organization[];
   language: SupportedLanguage;
   competition: Competition;
   competitions: Competition[];
@@ -50,6 +57,7 @@ interface AppStoreState {
   judges: JudgeProfile[];
   results: ResultRecord[];
   reviewCases: ReviewCase[];
+  aiObservations: AIObservation[];
   judgeSubmissions: JudgeSubmission[];
   certificates: Certificate[];
   auditLogs: AuditEvent[];
@@ -58,6 +66,27 @@ interface AppStoreState {
   isOffline: boolean;
   emergencyFrozen: boolean;
   sealApprovals: { actorId: string; actorRole: Role; actorName: string; timestamp: string }[];
+  integrations: IntegrationConfig[];
+  notifications: NotificationRecord[];
+  webhooks: WebhookSubscription[];
+  devices: DeviceRecord[];
+  travelRecords: DelegationTravelRecord[];
+  consents: ConsentRecord[];
+  importJobs: ImportJobRecord[];
+  shadowRuns: ShadowRun[];
+  participantPassport: ParticipantPassportEntry[];
+  judgePassport: JudgePassportEntry[];
+  trainingRuns: TrainingRun[];
+  backups: BackupRecord[];
+  retentionJobs: RetentionJob[];
+  supportSessions: SupportSession[];
+  remoteChecks: RemoteSessionCheck[];
+  audioRecordings: AudioRecordingRecord[];
+  featureFlags: FeatureFlagRecord[];
+  quranSourceManifests: QuranSourceManifestRecord[];
+  questionGovernance: QuestionGovernanceRecord[];
+  aiCapabilityValidations: AICapabilityValidationRecord[];
+  operatingCostModel: OperatingCostModel;
   
   // Active JudgeOS Session State
   activeSession: {
@@ -81,10 +110,19 @@ function getInitialState(): AppStoreState {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as AppStoreState;
+      parsed.organization = parsed.organization || SEED_ORGANIZATION;
+      parsed.organizations = parsed.organizations?.length ? parsed.organizations : [parsed.organization];
       parsed.competition = { ...parsed.competition, policy: getCompetitionPolicy(parsed.competition), ruleSets: parsed.competition.ruleSets || [parsed.competition.ruleSet] };
       parsed.competitions = parsed.competitions?.length ? parsed.competitions.map(c => ({ ...c, policy: getCompetitionPolicy(c), ruleSets: c.ruleSets || [c.ruleSet] })) : [parsed.competition];
+      // Legacy local demo data is migrated into the active competition scope so no record can leak across competitions.
+      parsed.reviewCases = (parsed.reviewCases || []).map(r => ({ ...r, competitionId: r.competitionId || parsed.competition.id }));
+      parsed.aiObservations = (parsed.aiObservations || []).map(o => ({ ...o, competitionId: o.competitionId || parsed.competition.id }));
       parsed.appeals = parsed.appeals || [];
       parsed.sealApprovals = parsed.sealApprovals || [];
+      parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
+      parsed.travelRecords = parsed.travelRecords || []; parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
+      parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
+      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.questionGovernance=parsed.questionGovernance||DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2};
       return parsed;
     }
   } catch {
@@ -95,6 +133,8 @@ function getInitialState(): AppStoreState {
 
   return {
     currentUser: defaultUser,
+    organization: SEED_ORGANIZATION,
+    organizations: [SEED_ORGANIZATION],
     language: 'ar',
     competition: { ...SEED_COMPETITION, policy: getCompetitionPolicy(SEED_COMPETITION), ruleSets: SEED_COMPETITION.ruleSets || [SEED_COMPETITION.ruleSet] },
     competitions: [{ ...SEED_COMPETITION, policy: getCompetitionPolicy(SEED_COMPETITION), ruleSets: SEED_COMPETITION.ruleSets || [SEED_COMPETITION.ruleSet] }],
@@ -103,6 +143,7 @@ function getInitialState(): AppStoreState {
     judges: SEED_JUDGES,
     results: SEED_RESULTS,
     reviewCases: SEED_REVIEW_CASES,
+    aiObservations: [],
     judgeSubmissions: [],
     certificates: [SEED_CERTIFICATE],
     auditLogs: SEED_AUDIT_LOGS,
@@ -111,6 +152,12 @@ function getInitialState(): AppStoreState {
     isOffline: false,
     emergencyFrozen: false,
     sealApprovals: [],
+    integrations: [], notifications: [], webhooks: [],
+    devices: [
+      {id:'dev-kiosk-1',competitionId:SEED_COMPETITION.id,name:'Gate Kiosk 01',type:'kiosk',zone:'Gate',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'},
+      {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
+    ],
+    travelRecords: [], consents: [], importJobs: [], shadowRuns: [], participantPassport: [], judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: [], remoteChecks: [], audioRecordings: [], featureFlags: [], quranSourceManifests: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
     activeSession: {
       sessionId: 'sess-active-001',
       participant: SEED_PARTICIPANTS[0], // Bilal Ahmad (A-104)
@@ -158,8 +205,16 @@ const listeners = new Set<() => void>();
 
 let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
+async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
+  if(globalState.isOffline||!auth.currentUser)return;
+  try{
+    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...data,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
+  }catch(err){console.warn(`Scoped persistence paused for ${collectionName}/${id}:`,err);}
+}
+
 function syncToFirestore() {
   if (globalState.isOffline || !auth.currentUser) return;
+  if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
   if (firestoreSyncTimeout) clearTimeout(firestoreSyncTimeout);
   firestoreSyncTimeout = setTimeout(async () => {
     try {
@@ -171,6 +226,7 @@ function syncToFirestore() {
         judges: globalState.judges,
         results: globalState.results,
         reviewCases: globalState.reviewCases,
+        aiObservations: globalState.aiObservations,
         judgeSubmissions: globalState.judgeSubmissions,
         certificates: globalState.certificates,
         auditLogs: globalState.auditLogs,
@@ -178,6 +234,7 @@ function syncToFirestore() {
         appeals: globalState.appeals,
         emergencyFrozen: globalState.emergencyFrozen,
         sealApprovals: globalState.sealApprovals,
+        notifications: globalState.notifications, devices: globalState.devices, travelRecords: globalState.travelRecords, consents: globalState.consents, shadowRuns: globalState.shadowRuns, audioRecordings: globalState.audioRecordings.map(r=>({...r,localObjectUrl:undefined})),
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (err) {
@@ -186,7 +243,24 @@ function syncToFirestore() {
   }, 1000);
 }
 
+let auditHashing=false;
+async function finalizeAuditChain(){
+  if(auditHashing)return; auditHashing=true;
+  try{
+    const chronological=[...globalState.auditLogs].reverse(); let previous='GENESIS'; const changed:AuditEvent[]=[];
+    for(const ev of chronological){
+      const material=JSON.stringify({previous,id:ev.id,timestamp:ev.timestamp,organizationId:ev.organizationId,competitionId:ev.competitionId,actorId:ev.actorId,actorRole:ev.actorRole,action:ev.action,entityType:ev.entityType,entityId:ev.entityId,summary:ev.humanSummaryEnglish});
+      const hash=await sha256(material); if(ev.previousStateHash!==previous||ev.currentStateHash!==hash) changed.push(ev); ev.previousStateHash=previous; ev.currentStateHash=hash; previous=hash;
+    }
+    for(const ev of changed.slice(-12)) void persistScopedDocument('audit',ev.id,ev as unknown as Record<string,unknown>);
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(globalState));}catch{}
+    listeners.forEach(l=>l());
+    syncToFirestore();
+  } finally { auditHashing=false; }
+}
+
 function notify() {
+  if(globalState.isOffline){void enqueueOfflineEvent({id:newId('offline'),type:'STATE_SYNC',competitionId:globalState.competition.id,createdAt:new Date().toISOString(),payload:{competitionId:globalState.competition.id}}).catch(()=>{});}
   const existing = globalState.competitions?.findIndex(c => c.id === globalState.competition.id) ?? -1;
   if (!globalState.competitions) globalState.competitions = [globalState.competition];
   else if (existing >= 0) globalState.competitions = globalState.competitions.map(c => c.id === globalState.competition.id ? globalState.competition : c);
@@ -196,6 +270,7 @@ function notify() {
   } catch {}
   listeners.forEach((l) => l());
   syncToFirestore();
+  void finalizeAuditChain();
 }
 
 export function useAppStore() {
@@ -227,10 +302,9 @@ export function useAppStore() {
               globalState.certificates = data.certificates;
               changed = true;
             }
-            if (data.reviewCases && Array.isArray(data.reviewCases)) {
-              globalState.reviewCases = data.reviewCases;
-              changed = true;
-            }
+            if (data.reviewCases && Array.isArray(data.reviewCases)) { globalState.reviewCases = data.reviewCases; changed = true; }
+            if (data.aiObservations && Array.isArray(data.aiObservations)) { globalState.aiObservations = data.aiObservations; changed = true; }
+            if (data.audioRecordings && Array.isArray(data.audioRecordings)) { globalState.audioRecordings = data.audioRecordings; changed = true; }
             if (data.judgeSubmissions && Array.isArray(data.judgeSubmissions)) {
               globalState.judgeSubmissions = data.judgeSubmissions;
               changed = true;
@@ -267,7 +341,13 @@ export function useAppStore() {
   const setLanguage = (lang: SupportedLanguage) => {
     globalState.language = lang;
     document.documentElement.lang = lang;
-    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.dir = LANGUAGE_META[lang].dir;
+    notify();
+  };
+
+  const applyAuthenticatedIdentity = (identity:{id:string;email:string;name:string;role:Role;organizationId:string;competitionId?:string}) => {
+    globalState.currentUser={id:identity.id,email:identity.email,name:identity.name,nameArabic:identity.name,role:identity.role,organizationId:identity.organizationId,competitionId:identity.competitionId};
+    if(identity.competitionId){const target=globalState.competitions.find(c=>c.id===identity.competitionId&&c.organizationId===identity.organizationId);if(target)globalState.competition=target;}
     notify();
   };
 
@@ -289,9 +369,23 @@ export function useAppStore() {
   };
 
   const toggleOffline = () => {
-    globalState.isOffline = !globalState.isOffline;
+    const wasOffline=globalState.isOffline; globalState.isOffline = !globalState.isOffline;
     notify();
+    if(wasOffline&&!globalState.isOffline){void drainOfflineEvents(async()=>{syncToFirestore();return true;}).catch(()=>{});}
   };
+
+  const appendParticipantNotifications=(participant:Participant,templateKey:string)=>{
+    const now=new Date().toISOString(); const channels:NotificationRecord['channel'][]=['in_app'];
+    for(const kind of ['email','sms','whatsapp','push'] as const){if(globalState.integrations.some(i=>i.kind===kind&&i.enabled&&i.status==='configured'))channels.push(kind)}
+    for(const channel of channels){const recipient=channel==='email'?participant.email:channel==='sms'||channel==='whatsapp'?participant.phone:participant.id;if(!recipient)continue;const key=`${globalState.competition.id}:${participant.id}:${channel}:${templateKey}`;if(globalState.notifications.some(n=>n.idempotencyKey===key&&n.status!=='cancelled'))continue;globalState.notifications.unshift({id:newId('ntf'),competitionId:globalState.competition.id,participantId:participant.id,channel,templateKey,locale:globalState.language,recipient,status:channel==='in_app'?'sent':'queued',attempts:channel==='in_app'?1:0,createdAt:now,sentAt:channel==='in_app'?now:undefined,idempotencyKey:key});}
+  };
+
+  const refreshQueueNotifications=()=>{
+    for(const c of globalState.committees){const q=globalState.participants.filter(p=>p.assignedCommitteeId===c.id&&p.status==='in_queue').sort((a,b)=>(a.queueNumber||9999)-(b.queueNumber||9999)); if(q[0])appendParticipantNotifications(q[0],'queue.next'); if(q[1])appendParticipantNotifications(q[1],'queue.prepare');}
+  };
+
+  const createIncident = (type: IncidentRecord['type'], title:string, description:string, severity:IncidentRecord['severity']='moderate') => { const x:IncidentRecord={id:newId('inc'),competitionId:globalState.competition.id,type,severity,title,description,reportedBy:globalState.currentUser.name,reportedAt:new Date().toISOString(),status:'active'};globalState.incidents=[x,...globalState.incidents];notify();return x;};
+  const resolveIncident = (id:string) => { globalState.incidents=globalState.incidents.map(i=>i.id===id?{...i,status:'resolved',resolvedAt:new Date().toISOString()}:i);notify(); };
 
   const toggleEmergencyFreeze = () => {
     globalState.emergencyFrozen = !globalState.emergencyFrozen;
@@ -318,6 +412,18 @@ export function useAppStore() {
     notify();
   };
 
+  const committeeHasHardConflict = (committee: Committee, participant: Participant) => {
+    const panelJudges = globalState.judges.filter(j => committee.judgeIds.includes(j.id) || committee.judgeIds.includes(j.userId));
+    return panelJudges.some(j => j.conflictsDeclared.some(c => c.hardConflict && (c.participantId === participant.id || (!!c.institution && !!participant.institution && c.institution.trim().toLowerCase() === participant.institution.trim().toLowerCase()))));
+  };
+
+  const compatibleCommitteesFor = (participant: Participant) => globalState.committees.filter(c =>
+    c.competitionId === participant.competitionId &&
+    c.status !== 'offline' &&
+    c.assignedCategories.includes(participant.categoryId) &&
+    !committeeHasHardConflict(c, participant)
+  );
+
   // Check-In Kiosk & Exceptions
   const checkInParticipant = (participantIdOrCode: string, method: 'kiosk_qr' | 'mobile_self' | 'exception_host' = 'kiosk_qr') => {
     const pIndex = globalState.participants.findIndex(
@@ -326,18 +432,19 @@ export function useAppStore() {
 
     if (pIndex !== -1) {
       const p = globalState.participants[pIndex];
+      if (p.competitionId !== globalState.competition.id) return null;
       const updated: Participant = {
         ...p,
         status: 'in_queue',
         checkedInAt: new Date().toISOString(),
         checkInMethod: method,
-        queueNumber: globalState.participants.filter((x) => x.status === 'in_queue').length + 1,
+        queueNumber: globalState.participants.filter((x) => x.competitionId === globalState.competition.id && x.status === 'in_queue').length + 1,
         assignedCommitteeId: p.assignedCommitteeId || (() => {
-          const compatible = globalState.committees.filter((c) => c.assignedCategories.includes(p.categoryId) && c.status !== 'offline');
-          const pool = compatible.length ? compatible : globalState.committees.filter((c) => c.status !== 'offline');
+          const compatible = compatibleCommitteesFor(p);
+          const pool = compatible.length ? compatible : globalState.committees.filter((c) => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, p));
           return [...pool].sort((a, b) => {
-            const aLoad = globalState.participants.filter(x => x.assignedCommitteeId === a.id && x.status === 'in_queue').length;
-            const bLoad = globalState.participants.filter(x => x.assignedCommitteeId === b.id && x.status === 'in_queue').length;
+            const aLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === a.id && x.status === 'in_queue').length;
+            const bLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === b.id && x.status === 'in_queue').length;
             return aLoad - bLoad || a.averageSessionMinutes - b.averageSessionMinutes;
           })[0]?.id;
         })(),
@@ -357,6 +464,7 @@ export function useAppStore() {
       };
 
       globalState.participants[pIndex] = updated;
+      void persistScopedDocument('checkins',p.id,{participantId:p.id,participantCode:p.code,method,checkedInAt:updated.checkedInAt,assignedCommitteeId:updated.assignedCommitteeId,queueNumber:updated.queueNumber});
 
       const log: AuditEvent = {
         id: `aud-${Date.now()}`,
@@ -374,10 +482,46 @@ export function useAppStore() {
         currentStateHash: `PENDING:${newId('audit')}`
       };
       globalState.auditLogs = [log, ...globalState.auditLogs];
+      appendParticipantNotifications(updated,'participant.checked_in');
+      refreshQueueNotifications();
       notify();
       return updated;
     }
     return null;
+  };
+
+  const recordAIObservation = (input: Omit<AIObservation,'id'|'competitionId'>) => {
+    const policy=getCompetitionPolicy(globalState.competition);
+    if(!policy.judging.silentAiGuardian||!policy.privacy.allowAiProcessing) return null;
+    const observation:AIObservation={...input,id:newId('aiobs'),competitionId:globalState.competition.id};
+    globalState.aiObservations=[observation,...globalState.aiObservations];
+    notify(); return observation;
+  };
+
+  const reconcileIntegrityForSession = (sessionId:string) => {
+    const policy=getCompetitionPolicy(globalState.competition); if(!policy.judging.silentAiGuardian)return [] as ReviewCase[];
+    const observations=globalState.aiObservations.filter(o=>o.sessionId===sessionId&&o.confidence==='high');
+    const human=globalState.activeSession.sessionId===sessionId?globalState.activeSession.events.filter(e=>!e.reversed):[];
+    const participant=globalState.activeSession.participant; const committee=globalState.activeSession.committee; if(!participant)return [] as ReviewCase[];
+    const created:ReviewCase[]=[];
+    for(const o of observations){
+      const matched=human.some(e=>Math.abs(e.relativeSeconds-o.timestampSeconds)<=4);
+      if(!matched&&!globalState.reviewCases.some(r=>r.sessionId===sessionId&&Math.abs(r.timestampSec-o.timestampSeconds)<=2)){
+        const reason=o.type==='audio_noise_clipping'?'audio_dropout':'ai_high_confidence_alert';
+        const c:ReviewCase={id:newId('review'),competitionId:globalState.competition.id,sessionId,participantId:participant.id,participantCode:participant.code,committeeId:committee?.id||'',reason,severity:reason==='audio_dropout'?'high':'medium',timestampSec:o.timestampSeconds,details:`AI integrity observation (${o.type}) requires human review; no score was changed.`,audioClipUrl:o.audioClipUrl,status:'pending'};
+        globalState.reviewCases=[c,...globalState.reviewCases];created.push(c);
+      }
+    }
+    if(created.length)notify(); return created;
+  };
+
+  const registerAudioRecording = async (record: Omit<AudioRecordingRecord,'id'|'competitionId'|'retentionDays'|'checksum'> & {checksumSource?:string}) => {
+    const checksum=record.checksumSource?await sha256(record.checksumSource):undefined;
+    const item:AudioRecordingRecord={id:newId('audio'),competitionId:globalState.competition.id,retentionDays:getCompetitionPolicy(globalState.competition).privacy.audioRetentionDays,checksum,...record};
+    delete (item as any).checksumSource;
+    const idx=globalState.audioRecordings.findIndex(r=>r.sessionId===record.sessionId);
+    if(idx>=0)globalState.audioRecordings[idx]=item;else globalState.audioRecordings=[item,...globalState.audioRecordings];
+    notify();return item;
   };
 
   // JudgeOS Actions
@@ -400,6 +544,7 @@ export function useAppStore() {
     };
 
     globalState.activeSession.events = [...globalState.activeSession.events, newEvent];
+    void persistScopedDocument('judge_events',newEvent.id,newEvent as unknown as Record<string,unknown>);
     notify();
   };
 
@@ -453,10 +598,12 @@ export function useAppStore() {
     const scoredValue = scoredCriteria.reduce((sum,c)=>sum+(criterionScores[c.id] ?? c.maxScore),0);
     const judgeScore = Number(((scoredValue / scoredMax) * baseScore).toFixed(2));
     const submission: JudgeSubmission = {
+      participantId: globalState.activeSession.participant?.id,
       judgeId: globalState.currentUser.id, judgeName: globalState.currentUser.name, sessionId: globalState.activeSession.sessionId,
       criterionScores, totalScore: judgeScore, eventsCount: globalState.activeSession.events.length, submittedAt: new Date().toISOString(), locked: true
     };
     globalState.judgeSubmissions = [...globalState.judgeSubmissions.filter(s => !(s.sessionId === submission.sessionId && s.judgeId === submission.judgeId)), submission];
+    void persistScopedDocument('judge_submissions',`${submission.sessionId}_${submission.judgeId}`,submission as unknown as Record<string,unknown>);
 
     const sessionSubs = globalState.judgeSubmissions.filter(s => s.sessionId === submission.sessionId && s.locked);
     const participant = globalState.activeSession.participant;
@@ -468,15 +615,19 @@ export function useAppStore() {
       const finalScore = Number((scoreInputs.reduce((a,b)=>a+b,0)/Math.max(1,scoreInputs.length)).toFixed(2));
       const pIndex = globalState.participants.findIndex(p => p.id === participant.id);
       if (pIndex !== -1) globalState.participants[pIndex] = { ...globalState.participants[pIndex], status:'tested', statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested',timestamp:new Date().toISOString(),actor:'Panel completion'}] };
+      globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
+      refreshQueueNotifications();
       const category = globalState.competition.categories.find(c=>c.id===participant.categoryId);
       const existing = globalState.results.findIndex(r => r.participantId === participant.id && r.status !== 'published');
       const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||participant.categoryId, finalScore, rank:0, status:'calculated' };
       if(existing>=0) globalState.results[existing]=result; else globalState.results=[...globalState.results,result];
       const ranked=globalState.results.filter(r=>r.categoryId===participant.categoryId).sort((a,b)=>b.finalScore-a.finalScore); ranked.forEach((r,i)=>{const x=globalState.results.findIndex(z=>z.id===r.id);if(x>=0)globalState.results[x]={...globalState.results[x],rank:i+1}});
       const spread=Math.max(...sessionSubs.map(s=>s.totalScore))-Math.min(...sessionSubs.map(s=>s.totalScore));
-      if(spread>=5 && !globalState.reviewCases.some(r=>r.sessionId===submission.sessionId && r.status==='pending')) globalState.reviewCases=[{ id:newId('review'), sessionId:submission.sessionId, participantId:participant.id, participantCode:participant.code, committeeId:globalState.activeSession.committee?.id||'', reason:'judge_variance', severity:spread>=10?'high':'medium', timestampSec:globalState.activeSession.durationSeconds, details:`Panel spread ${spread.toFixed(2)} points`, status:'pending' },...globalState.reviewCases];
+      if(spread>=5 && !globalState.reviewCases.some(r=>r.sessionId===submission.sessionId && r.status==='pending')) globalState.reviewCases=[{ id:newId('review'), competitionId:globalState.competition.id, sessionId:submission.sessionId, participantId:participant.id, participantCode:participant.code, committeeId:globalState.activeSession.committee?.id||'', reason:'judge_variance', severity:spread>=10?'high':'medium', timestampSec:globalState.activeSession.durationSeconds, details:`Panel spread ${spread.toFixed(2)} points`, status:'pending' },...globalState.reviewCases];
     }
+    if(participant && sessionSubs.length >= sessionRuleSet.judgesCountPerPanel) reconcileIntegrityForSession(submission.sessionId);
     globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'JUDGE_SUBMISSION_LOCKED', entityType:'JudgeSubmission', entityId:`${submission.sessionId}:${submission.judgeId}`, humanSummaryArabic:`قفل تقييم المحكم للمتسابق ${participant?.code||''} دون إظهار تقييم بقية اللجنة`, humanSummaryEnglish:`Judge submission locked for ${participant?.code||''} independently of the rest of the panel`, currentStateHash:`PENDING:${newId('audit')}` },...globalState.auditLogs];
+    if(judgeProfile){ const existingPass=globalState.judgePassport.findIndex(x=>x.judgeId===judgeProfile.id&&x.competitionId===globalState.competition.id); const pass:JudgePassportEntry={id:existingPass>=0?globalState.judgePassport[existingPass].id:newId('jp'),judgeId:judgeProfile.id,competitionId:globalState.competition.id,competitionName:globalState.competition.name,role:judgeProfile.specialty,riwayat:judgeProfile.certifiedRiwayat,calibrationScore:judgeProfile.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===judgeProfile.userId).length,verified:judgeProfile.isReady}; if(existingPass>=0)globalState.judgePassport[existingPass]=pass;else globalState.judgePassport=[pass,...globalState.judgePassport]; }
     notify();
   };
 
@@ -524,6 +675,7 @@ export function useAppStore() {
         currentStateHash: `PENDING:${newId('audit')}`
       };
       globalState.auditLogs = [log, ...globalState.auditLogs];
+      void persistScopedDocument('reviews',caseId,globalState.reviewCases[cIndex] as unknown as Record<string,unknown>);
       notify();
     }
   };
@@ -551,10 +703,12 @@ export function useAppStore() {
     }
 
     const sealedAt = new Date().toISOString();
-    const payload = JSON.stringify(globalState.results.map(r => ({ id:r.id, participantId:r.participantId, score:r.finalScore, rank:r.rank, categoryId:r.categoryId })).sort((a,b)=>a.id.localeCompare(b.id))) + globalState.competition.ruleSet.version + sealedAt;
+    const competitionResults = globalState.results.filter(r => r.competitionId === globalState.competition.id);
+    if (!competitionResults.length) return { sealed:false, reason:'no_results', approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size };
+    const payload = JSON.stringify(competitionResults.map(r => ({ id:r.id, participantId:r.participantId, score:r.finalScore, rank:r.rank, categoryId:r.categoryId })).sort((a,b)=>a.id.localeCompare(b.id))) + globalState.competition.ruleSet.version + sealedAt;
     const checksum = await sha256(payload);
     const approverNames = globalState.sealApprovals.map(a=>a.actorName);
-    globalState.results = globalState.results.map((res) => ({
+    globalState.results = globalState.results.map((res) => res.competitionId !== globalState.competition.id ? res : ({
       ...res,
       status: 'sealed',
       sealMetadata: {
@@ -565,6 +719,7 @@ export function useAppStore() {
       }
     }));
     globalState.competition = { ...globalState.competition, status: 'results_sealed' };
+    for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) void persistScopedDocument('results',rr.id,rr as unknown as Record<string,unknown>);
     globalState.auditLogs = [{
       id: newId('aud'), timestamp: sealedAt, organizationId: globalState.competition.organizationId, competitionId: globalState.competition.id,
       actorId: globalState.currentUser.id, actorName: globalState.currentUser.name, actorRole: globalState.currentUser.role,
@@ -578,16 +733,19 @@ export function useAppStore() {
   };
 
   const publishResults = () => {
-    if(!globalState.results.length || globalState.results.some(r=>r.status!=='sealed' && r.status!=='published')) return false;
-    globalState.results=globalState.results.map(r=>({...r,status:'published'}));
+    const competitionResults=globalState.results.filter(r=>r.competitionId===globalState.competition.id);
+    if(!competitionResults.length || competitionResults.some(r=>r.status!=='sealed' && r.status!=='published')) return false;
+    globalState.results=globalState.results.map(r=>r.competitionId===globalState.competition.id?({...r,status:'published'}):r);
+    for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) void persistScopedDocument('results',rr.id,rr as unknown as Record<string,unknown>);
     globalState.competition={...globalState.competition,status:'results_published'};
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'RESULTS_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:'نشر النتائج وفق سياسة الإظهار الخاصة بالمسابقة.',humanSummaryEnglish:'Published results under this competition visibility policy.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    for(const r of competitionResults){ const p=globalState.participants.find(x=>x.id===r.participantId&&x.competitionId===globalState.competition.id); if(p) appendParticipantNotifications(p,'result.published'); }
     notify(); return true;
   };
 
   const completeCompetition = () => {
-    const unresolvedReviews=globalState.reviewCases.some(r=>r.status==='pending');
-    const unresolvedAppeals=globalState.appeals.some(a=>a.status==='submitted'||a.status==='under_review');
+    const unresolvedReviews=globalState.reviewCases.some(r=>r.competitionId===globalState.competition.id&&r.status==='pending');
+    const unresolvedAppeals=globalState.appeals.some(a=>a.competitionId===globalState.competition.id&&(a.status==='submitted'||a.status==='under_review'));
     if(unresolvedReviews||unresolvedAppeals) return false;
     globalState.competition={...globalState.competition,status:'completed'};
     notify(); return true;
@@ -595,7 +753,7 @@ export function useAppStore() {
 
   // Issue a certificate only under the active competition's own certificate policy.
   const generateCertificate = async (resultId: string) => {
-    const res = globalState.results.find((r) => r.id === resultId);
+    const res = globalState.results.find((r) => r.id === resultId && r.competitionId === globalState.competition.id);
     if (!res) return null;
     const policy = getCompetitionPolicy(globalState.competition);
     const cp = policy.certificates;
@@ -632,12 +790,15 @@ export function useAppStore() {
     globalState.certificates = [newCert, ...globalState.certificates];
     const pIdx = globalState.participants.findIndex(p=>p.id===res.participantId);
     if (pIdx >= 0) globalState.participants[pIdx] = { ...globalState.participants[pIdx], status:'certified', statusHistory:[...globalState.participants[pIdx].statusHistory,{status:'certified',timestamp:new Date().toISOString(),actor:'Certificate engine'}] };
+    const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
+    void persistScopedDocument('certificates',newCert.id,newCert as unknown as Record<string,unknown>);
     globalState.auditLogs = [{
       id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id,
       actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'CERTIFICATE_ISSUED',
       entityType:'Certificate', entityId:newCert.id, humanSummaryArabic:`إصدار شهادة ${certNumber} وفق سياسة الشهادات الخاصة بالمسابقة`,
       humanSummaryEnglish:`Issued certificate ${certNumber} under this competition's certificate policy`, currentStateHash:`SHA256:${verificationToken}`
     }, ...globalState.auditLogs];
+    const certParticipant=globalState.participants.find(x=>x.id===res.participantId); if(certParticipant)appendParticipantNotifications(certParticipant,'certificate.ready');
     notify();
     return newCert;
   };
@@ -645,7 +806,8 @@ export function useAppStore() {
   // Register New Participant
   const registerParticipant = (newP: Omit<Participant, 'id' | 'code' | 'status' | 'statusHistory' | 'createdAt'>) => {
     const policy = getCompetitionPolicy(globalState.competition);
-    const code = `A-${String(100 + globalState.participants.length + 1).padStart(3,'0')}`;
+    const competitionCount=globalState.participants.filter(p=>p.competitionId===globalState.competition.id).length;
+    const code = `A-${String(100 + competitionCount + 1).padStart(3,'0')}`;
     const participant: Participant = {
       ...newP,
       id: newId('part'),
@@ -655,13 +817,15 @@ export function useAppStore() {
       createdAt: new Date().toISOString()
     };
     globalState.participants = [...globalState.participants, participant];
+    void persistScopedDocument('participants',participant.id,participant as unknown as Record<string,unknown>);
+    appendParticipantNotifications(participant,'registration.received');
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const age = Math.floor((Date.now() - new Date(participant.dateOfBirth).getTime()) / 31557600000);
     const ageEligible = (!category?.minAge || age >= category.minAge) && (!category?.maxAge || age <= category.maxAge);
     const shouldAutoApprove = policy.registration.autoApproveEligible && ageEligible;
     if (shouldAutoApprove) {
       const idx = globalState.participants.findIndex(p => p.id === participant.id);
-      const slotMinute = 10 + ((globalState.participants.length * 10) % 50);
+      const slotMinute = 10 + (((competitionCount+1) * 10) % 50);
       globalState.participants[idx] = {
         ...globalState.participants[idx], status: 'approved', arrivalSlot: `09:${String(slotMinute).padStart(2,'0')}–09:${String(Math.min(59,slotMinute+20)).padStart(2,'0')}`,
         statusHistory: [...globalState.participants[idx].statusHistory, { status: 'approved', timestamp: new Date().toISOString(), actor: 'Eligibility Engine', reason: 'Objective eligibility rules passed' }]
@@ -683,12 +847,14 @@ export function useAppStore() {
     const idx = globalState.participants.findIndex(p=>p.id===participantId);
     if(idx<0) return null;
     const current=globalState.participants[idx];
-    const slotIndex=globalState.participants.filter(p=>p.status==='approved' && p.arrivalSlot).length;
+    const slotIndex=globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status==='approved' && p.arrivalSlot).length;
     const startMinutes=8*60+30+slotIndex*10;
     const h=Math.floor(startMinutes/60); const m=startMinutes%60; const end=startMinutes+20;
     const arrivalSlot=decision==='approved' ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}–${String(Math.floor(end/60)).padStart(2,'0')}:${String(end%60).padStart(2,'0')}` : current.arrivalSlot;
     const next: Participant={...current,status:decision,arrivalSlot,statusHistory:[...current.statusHistory,{status:decision,timestamp:new Date().toISOString(),actor:globalState.currentUser.name,reason:reason||undefined}]};
     globalState.participants[idx]=next;
+    void persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>);
+    appendParticipantNotifications(next,decision==='approved'?'participant.approved':'participant.rejected');
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:decision==='approved'?'PARTICIPANT_APPROVED':'PARTICIPANT_REJECTED',entityType:'Participant',entityId:participantId,humanSummaryArabic:`${decision==='approved'?'اعتماد':'رفض'} طلب ${current.code} وفق سياسة المسابقة`,humanSummaryEnglish:`${decision==='approved'?'Approved':'Rejected'} ${current.code} under the competition policy`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return next;
   };
@@ -727,12 +893,47 @@ export function useAppStore() {
     notify(); return true;
   };
 
+  const updateOrganizationBrand = (patch: Partial<OrganizationBrand>) => { globalState.organization={...globalState.organization,brand:{...globalState.organization.brand,...patch}}; notify(); };
+
   const selectCompetition = (competitionId: string) => {
     const target = globalState.competitions.find(c => c.id === competitionId);
     if (!target) return false;
     globalState.competition = { ...target, policy: getCompetitionPolicy(target), ruleSets: target.ruleSets || [target.ruleSet] };
     notify(); return true;
   };
+
+  const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {
+    if (globalState.currentUser.role !== 'super_admin') return null;
+    const org:Organization={id:newId('org'),name:nameEnglish,nameArabic,code:(code||nameEnglish.slice(0,4)).toUpperCase(),brand:{name:nameEnglish,nameArabic,primaryColor:'#214C40',accentColor:'#2F6555',certificateTheme:'quiet_authority'},plan:'enterprise',dataResidency:'configurable',status:'active',createdAt:new Date().toISOString()};
+    globalState.organizations=[org,...globalState.organizations];
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:org.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'ORGANIZATION_PROVISIONED',entityType:'Organization',entityId:org.id,humanSummaryArabic:`إنشاء جهة جديدة: ${nameArabic}`,humanSummaryEnglish:`Provisioned organization: ${nameEnglish}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs]; notify(); return org;
+  };
+
+  const setFeatureFlag=(key:string,enabled:boolean,organizationId?:string)=>{
+    if(globalState.currentUser.role!=='super_admin'&&globalState.currentUser.role!=='org_admin') return false;
+    const scope=organizationId||globalState.organization.id; const i=globalState.featureFlags.findIndex(f=>f.key===key&&f.organizationId===scope); const item:FeatureFlagRecord={id:i>=0?globalState.featureFlags[i].id:newId('flag'),organizationId:scope,key,enabled,environment:(import.meta.env.MODE==='production'?'production':'development'),updatedAt:new Date().toISOString()}; if(i>=0)globalState.featureFlags[i]=item; else globalState.featureFlags=[item,...globalState.featureFlags]; notify(); return true;
+  };
+
+  const registerQuranSourceManifest=(input:Omit<QuranSourceManifestRecord,'id'|'organizationId'|'status'|'createdAt'>)=>{
+    if(!['scientific_admin','org_admin','super_admin'].includes(globalState.currentUser.role))return null;
+    const rec:QuranSourceManifestRecord={id:newId('qsrc'),organizationId:globalState.organization.id,status:'draft',createdAt:new Date().toISOString(),...input}; globalState.quranSourceManifests=[rec,...globalState.quranSourceManifests]; notify(); return rec;
+  };
+  const advanceQuranSource=(id:string,status:'reviewed'|'approved'|'retired')=>{
+    if(!['scientific_admin','org_admin'].includes(globalState.currentUser.role))return false; const i=globalState.quranSourceManifests.findIndex(x=>x.id===id);if(i<0)return false; const x=globalState.quranSourceManifests[i]; if(status==='approved'&&(!x.checksumSha256||x.reviewerNames.length<2))return false; globalState.quranSourceManifests[i]={...x,status,approvedAt:status==='approved'?new Date().toISOString():x.approvedAt}; notify();return true;
+  };
+  const updateQuestionGovernance=(questionId:string,patch:Partial<QuestionGovernanceRecord>)=>{
+    if(!['scientific_admin','org_admin'].includes(globalState.currentUser.role))return false; const i=globalState.questionGovernance.findIndex(x=>x.questionId===questionId&&x.competitionId===globalState.competition.id); const current=i>=0?globalState.questionGovernance[i]:{questionId,competitionId:globalState.competition.id,expertDifficulty:3,status:'draft' as const,updatedAt:new Date().toISOString()}; const next={...current,...patch,updatedAt:new Date().toISOString(),reviewedBy:globalState.currentUser.name}; if(next.status==='approved'&&!next.sourceManifestId)return false; if(i>=0)globalState.questionGovernance[i]=next;else globalState.questionGovernance=[next,...globalState.questionGovernance]; notify();return true;
+  };
+  const registerAiValidation=(input:Omit<AICapabilityValidationRecord,'id'|'organizationId'|'status'|'approvedBy'|'updatedAt'>)=>{
+    if(!['scientific_admin','org_admin'].includes(globalState.currentUser.role))return null; const rec:AICapabilityValidationRecord={id:newId('aival'),organizationId:globalState.organization.id,status:'validated',approvedBy:[globalState.currentUser.id],updatedAt:new Date().toISOString(),...input}; globalState.aiCapabilityValidations=[rec,...globalState.aiCapabilityValidations];notify();return rec;
+  };
+  const approveAiCapability=(id:string)=>{
+    if(!['scientific_admin','org_admin'].includes(globalState.currentUser.role))return false; const i=globalState.aiCapabilityValidations.findIndex(x=>x.id===id);if(i<0)return false; const r=globalState.aiCapabilityValidations[i]; const approvedBy=[...new Set([...r.approvedBy,globalState.currentUser.id])]; const evidenceReady=r.datasetSize>=100&&r.falsePositiveRate!==undefined&&r.falseNegativeRate!==undefined&&!!r.evidenceRef; globalState.aiCapabilityValidations[i]={...r,approvedBy,status:evidenceReady&&approvedBy.length>=2?'certified':'validated',updatedAt:new Date().toISOString()};notify();return true;
+  };
+  const updateOperatingCostModel=(patch:Partial<OperatingCostModel>)=>{globalState.operatingCostModel={...globalState.operatingCostModel,...patch};notify();};
+  const getOperatingSavings=()=>{const m=globalState.operatingCostModel; const baselineHours=m.baselineStaff*m.hoursPerDay*m.days; const mizanHours=m.mizanStaff*m.hoursPerDay*m.days; const savedHours=Math.max(0,baselineHours-mizanHours); return {baselineHours,mizanHours,savedHours,estimatedMoney:m.hourlyCost!==undefined?savedHours*m.hourlyCost:undefined,currency:m.currency};};
+
+
 
   const createCompetition = (nameArabic: string, nameEnglish: string, templateId = 'international-hifz') => {
     const base: Competition = {
@@ -755,17 +956,21 @@ export function useAppStore() {
 
   const updateCompetitionPolicy = (updater: (policy: ReturnType<typeof getCompetitionPolicy>) => ReturnType<typeof getCompetitionPolicy>) => {
     const current = getCompetitionPolicy(globalState.competition);
+    if (current.frozenAt) return false;
     const next = updater(JSON.parse(JSON.stringify(current)));
     next.version = current.version === next.version ? `${current.version.split('.')[0]}.${Number(current.version.split('.')[1] || 0) + 1}.0` : next.version;
     next.updatedAt = new Date().toISOString();
     globalState.competition = { ...globalState.competition, policy: next };
     notify();
+    return true;
   };
 
   const updateRuleSet = (patch: Partial<Competition['ruleSet']>) => {
+    if (globalState.competition.ruleSet.frozenAt || getCompetitionPolicy(globalState.competition).frozenAt) return false;
     const next = { ...globalState.competition.ruleSet, ...patch, version: `${globalState.competition.ruleSet.version}-rev` };
     globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, ...(globalState.competition.ruleSets || []).filter(r => r.id !== next.id)] };
     notify();
+    return true;
   };
 
   const getCompetitionReadiness = () => getReadinessIssues(globalState.competition);
@@ -819,8 +1024,19 @@ export function useAppStore() {
   const startSessionForParticipant = async (participantId: string) => {
     const participant = globalState.participants.find(p => p.id === participantId);
     if (!participant) return false;
-    const committee = globalState.committees.find(c => c.id === participant.assignedCommitteeId) || globalState.committees.find(c => c.assignedCategories.includes(participant.categoryId)) || globalState.committees[0];
+    const assigned = globalState.committees.find(c => c.id === participant.assignedCommitteeId && !committeeHasHardConflict(c, participant));
+    const committee = assigned || compatibleCommitteesFor(participant)[0];
+    if (!committee) {
+      createIncident('conflict_routing', 'No conflict-free committee', `Participant ${participant.code} needs a manual conflict-safe committee assignment.`, 'critical');
+      return false;
+    }
     const policy = getCompetitionPolicy(globalState.competition);
+    if (!policy.frozenAt) {
+      const now = new Date().toISOString();
+      const frozenPolicy = { ...policy, frozenAt: now, updatedAt: now };
+      const frozenRuleSet = { ...globalState.competition.ruleSet, frozenAt: now };
+      globalState.competition = { ...globalState.competition, policy: frozenPolicy, ruleSet: frozenRuleSet, ruleSets: [frozenRuleSet, ...(globalState.competition.ruleSets || []).filter(r => r.id !== frozenRuleSet.id)] };
+    }
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     try {
       const selection = await generateFairDraw({ pool: DEVELOPMENT_QUESTION_BANK, participant, policy, maxJuz: category?.juzCount });
@@ -828,6 +1044,8 @@ export function useAppStore() {
         sessionId:newId('sess'), participant, committee, questionSelection:selection, currentQuestionIndex:0, isReciting:true, durationSeconds:0, events:[], isLocked:false, audioLevel:76
       };
       const idx=globalState.participants.findIndex(p=>p.id===participantId); if(idx>=0) globalState.participants[idx]={...globalState.participants[idx],status:'in_session'};
+      globalState.committees=globalState.committees.map(c=>c.id===committee.id?{...c,status:'testing',currentParticipantId:participantId}:c);
+      refreshQueueNotifications();
       globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'FAIRDRAW_COMMITTED', entityType:'QuestionSelection', entityId:selection.questionSetId, humanSummaryArabic:`اعتماد حزمة أسئلة ${participant.code} ضمن قيود FairDraw`, humanSummaryEnglish:`Committed ${participant.code} question set under FairDraw constraints`, currentStateHash:selection.seedCommitmentHash }, ...globalState.auditLogs];
       notify(); return true;
     } catch (error) {
@@ -836,9 +1054,88 @@ export function useAppStore() {
   };
 
   // Digital Twin / capacity estimate. Every value is derived from the current competition inputs or declared assumptions.
+  const queueNotification = (channel: NotificationRecord['channel'], recipient: string, templateKey: string, participantId?: string, locale = globalState.language) => {
+    const idempotencyKey = `${globalState.competition.id}:${participantId||recipient}:${channel}:${templateKey}`;
+    const existing = globalState.notifications.find(n => n.idempotencyKey === idempotencyKey && ['queued','sent'].includes(n.status));
+    if (existing) return existing;
+    const provider = globalState.integrations.find(i => i.kind === channel && i.enabled && i.status === 'configured');
+    const item: NotificationRecord = { id:newId('ntf'), competitionId:globalState.competition.id, participantId, channel, templateKey, locale, recipient, status: channel==='in_app' ? 'sent' : provider ? 'queued' : 'failed', attempts: channel==='in_app'?1:0, createdAt:new Date().toISOString(), sentAt:channel==='in_app'?new Date().toISOString():undefined, error:channel==='in_app'||provider?undefined:'Provider not configured', idempotencyKey };
+    globalState.notifications=[item,...globalState.notifications]; notify(); return item;
+  };
+  const retryNotification = (id:string) => { const i=globalState.notifications.findIndex(n=>n.id===id); if(i<0)return; const n=globalState.notifications[i]; const provider=globalState.integrations.find(x=>x.kind===n.channel&&x.enabled&&x.status==='configured'); globalState.notifications[i]={...n,status:provider?'queued':'failed',attempts:n.attempts+1,error:provider?undefined:'Provider not configured'}; notify(); };
+  const configureIntegration = (kind: IntegrationConfig['kind'], name:string, enabled=true, endpoint?:string) => { const existing=globalState.integrations.findIndex(i=>i.kind===kind); const item:IntegrationConfig={id:existing>=0?globalState.integrations[existing].id:newId('int'),organizationId:globalState.competition.organizationId,kind,name,enabled,status:endpoint||kind==='storage'?'configured':'not_configured',endpoint,lastCheckedAt:new Date().toISOString()}; if(existing>=0)globalState.integrations[existing]=item;else globalState.integrations=[item,...globalState.integrations]; notify(); return item; };
+  const addWebhook = (event:string, endpoint:string) => { const item:WebhookSubscription={id:newId('wh'),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,event,endpoint,enabled:true,secretRef:`secret://webhooks/${newId('ref')}`}; globalState.webhooks=[item,...globalState.webhooks]; notify(); return item; };
+  const registerDevice = (name:string,type:DeviceRecord['type'],zone?:string) => { const d:DeviceRecord={id:newId('dev'),competitionId:globalState.competition.id,name,type,zone,status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'};globalState.devices=[d,...globalState.devices];notify();return d; };
+  const updateDeviceStatus=(id:string,status:DeviceRecord['status'])=>{globalState.devices=globalState.devices.map(d=>d.id===id?{...d,status,lastSeenAt:new Date().toISOString()}:d);notify();};
+  const upsertTravelRecord=(participantId:string,patch:Partial<DelegationTravelRecord>)=>{const i=globalState.travelRecords.findIndex(r=>r.participantId===participantId&&r.competitionId===globalState.competition.id);const base:DelegationTravelRecord=i>=0?globalState.travelRecords[i]:{id:newId('travel'),competitionId:globalState.competition.id,delegationId:globalState.participants.find(p=>p.id===participantId)?.delegationId||'direct',participantId,transportStatus:'pending',companionCount:0};const next={...base,...patch};if(i>=0)globalState.travelRecords[i]=next;else globalState.travelRecords=[next,...globalState.travelRecords];notify();return next;};
+  const recordConsent=(participantId:string,kind:ConsentRecord['kind'],version:string,accepted=true,guardianName?:string)=>{const c:ConsentRecord={id:newId('consent'),participantId,competitionId:globalState.competition.id,kind,version,accepted,acceptedAt:new Date().toISOString(),guardianName};globalState.consents=[c,...globalState.consents];notify();return c;};
+  const createImportJob=(entity:ImportJobRecord['entity'],fileName:string,totalRows:number,invalidRows=0)=>{const j:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity,fileName,status:invalidRows?'validated':'imported',totalRows,validRows:Math.max(0,totalRows-invalidRows),invalidRows,mapping:{},errors:invalidRows?[{row:2,message:'Validation required before import'}]:[],createdAt:new Date().toISOString()};globalState.importJobs=[j,...globalState.importJobs];notify();return j;};
+  const importParticipantsCsv=(fileName:string,csv:string)=>{
+    const lines=csv.replace(/\r/g,'').split('\n').filter(Boolean); if(!lines.length) return createImportJob('participants',fileName,0,0);
+    const parse=(line:string)=>{const out:string[]=[];let cur='';let quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='\"'){if(quoted&&line[i+1]==='\"'){cur+='\"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){out.push(cur.trim());cur='';}else cur+=ch;}out.push(cur.trim());return out;};
+    const headers=parse(lines[0]).map(h=>h.trim()); const required=['fullName','email','dateOfBirth','categoryId']; const missing=required.filter(h=>!headers.includes(h));
+    const errors:{row:number;message:string}[]=[]; const staged:Participant[]=[];
+    if(missing.length) errors.push({row:1,message:`Missing columns: ${missing.join(', ')}`});
+    if(!missing.length) for(let i=1;i<lines.length;i++){const cells=parse(lines[i]);const row=Object.fromEntries(headers.map((h,idx)=>[h,cells[idx]||''])) as Record<string,string>; if(!row.fullName||!row.email||!row.dateOfBirth||!row.categoryId){errors.push({row:i+1,message:'Missing required participant fields'});continue;} const cat=globalState.competition.categories.find(c=>c.id===row.categoryId||c.code===row.categoryId); if(!cat){errors.push({row:i+1,message:`Unknown category: ${row.categoryId}`});continue;} const code=`A-${String(100+globalState.participants.length+staged.length+1).padStart(3,'0')}`; staged.push({id:newId('part'),code,competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,fullName:row.fullName,fullNameArabic:row.fullNameArabic||row.fullName,email:row.email,phone:row.phone||'',country:row.country||'',nationality:row.nationality||row.country||'',nationalIdOrPassport:row.identity||'',dateOfBirth:row.dateOfBirth,gender:row.gender==='female'?'female':'male',categoryId:cat.id,riwaya:row.riwaya||cat.riwaya,institution:row.institution||'',status:'under_review',statusHistory:[{status:'submitted',timestamp:new Date().toISOString(),actor:'CSV import'},{status:'under_review',timestamp:new Date().toISOString(),actor:'Import validator'}],createdAt:new Date().toISOString()});}
+    const job:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity:'participants',fileName,status:errors.length?'validated':'imported',totalRows:Math.max(0,lines.length-1),validRows:staged.length,invalidRows:errors.filter(e=>e.row>1).length,mapping:Object.fromEntries(headers.map(h=>[h,h])),errors,createdAt:new Date().toISOString()};
+    globalState.importJobs=[job,...globalState.importJobs]; if(!errors.length){globalState.participants=[...globalState.participants,...staged];}
+    notify(); return job;
+  };
+  const startShadowRun=(mode:ShadowRun['mode'])=>{const s:ShadowRun={id:newId('shadow'),competitionId:globalState.competition.id,mode,status:'running',startedAt:new Date().toISOString(),observations:[]};globalState.shadowRuns=[s,...globalState.shadowRuns];notify();return s;};
+  const completeShadowRun=(id:string)=>{globalState.shadowRuns=globalState.shadowRuns.map(s=>s.id===id?{...s,status:'completed',completedAt:new Date().toISOString(),observations:[{type:'queue',severity:'medium',summary:'Peak queue can be reduced by dynamic arrival slots.'},{type:'judging',severity:'info',summary:'Independent locking preserved across the shadow comparison.'},{type:'automation',severity:'info',summary:'Routine reception steps are eligible for self-service.'}]}:s);notify();};
+  const addParticipantPassportEntry=(participantId:string)=>{const p=globalState.participants.find(x=>x.id===participantId);if(!p)return;const r=globalState.results.find(x=>x.participantId===participantId);const c=globalState.certificates.find(x=>x.participantId===participantId);const cat=globalState.competition.categories.find(x=>x.id===p.categoryId);const e:ParticipantPassportEntry={id:newId('pp'),participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:cat?.name||'',year:globalState.competition.startDate.slice(0,4),result:r?`${r.rank} / ${r.finalScore}`:undefined,certificateNumber:c?.certificateNumber,verified:!!c};globalState.participantPassport=[e,...globalState.participantPassport.filter(x=>!(x.participantId===participantId&&x.competitionId===globalState.competition.id))];notify();return e;};
+  const addJudgePassportEntry=(judgeId:string)=>{const j=globalState.judges.find(x=>x.id===judgeId||x.userId===judgeId);if(!j)return;const e:JudgePassportEntry={id:newId('jp'),judgeId:j.id,competitionId:globalState.competition.id,competitionName:globalState.competition.name,role:j.specialty,riwayat:j.certifiedRiwayat,calibrationScore:j.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===j.userId).length,verified:j.isReady};globalState.judgePassport=[e,...globalState.judgePassport.filter(x=>!(x.judgeId===j.id&&x.competitionId===globalState.competition.id))];notify();return e;};
+  const completeJudgeCalibration=(judgeId:string,score:number)=>{
+    const bounded=Math.max(0,Math.min(100,score));
+    globalState.judges=globalState.judges.map(j=>(j.id===judgeId||j.userId===judgeId)?{...j,calibrationScore:bounded,isReady:bounded>=85}:j);
+    const j=globalState.judges.find(x=>x.id===judgeId||x.userId===judgeId);
+    if(j) addJudgePassportEntry(j.id);
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'JUDGE_CALIBRATION_COMPLETED',entityType:'JudgeProfile',entityId:j?.id||judgeId,humanSummaryArabic:`إكمال معايرة المحكم بنتيجة ${bounded}%`,humanSummaryEnglish:`Judge calibration completed at ${bounded}%`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs]; notify(); return j;
+  };
+
+  const createTrainingRun=(type:TrainingRun['type'])=>{const t:TrainingRun={id:newId('train'),competitionId:globalState.competition.id,type,status:'ready'};globalState.trainingRuns=[t,...globalState.trainingRuns];notify();return t;};
+  const completeTrainingRun=(id:string,score=100)=>{globalState.trainingRuns=globalState.trainingRuns.map(t=>t.id===id?{...t,status:'completed',startedAt:t.startedAt||new Date().toISOString(),score}:t);notify();};
+  const createBackup=async()=>{const payload=JSON.stringify({competition:globalState.competition,participants:globalState.participants,results:globalState.results,audit:globalState.auditLogs});const b:BackupRecord={id:newId('backup'),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,createdAt:new Date().toISOString(),scope:'competition',checksum:await sha256(payload),status:'ready',sizeLabel:`${Math.max(1,Math.round(payload.length/1024))} KB`};globalState.backups=[b,...globalState.backups];notify();return b;};
+  const scheduleRetention=(dataType:RetentionJob['dataType'],days:number,action:RetentionJob['action'])=>{const d=new Date();d.setDate(d.getDate()+days);const r:RetentionJob={id:newId('ret'),competitionId:globalState.competition.id,dataType,scheduledFor:d.toISOString(),action,status:'scheduled'};globalState.retentionJobs=[r,...globalState.retentionJobs];notify();return r;};
+  const requestSupportSession=(reason:string)=>{const d=new Date();d.setHours(d.getHours()+1);const x:SupportSession={id:newId('support'),organizationId:globalState.competition.organizationId,requestedBy:globalState.currentUser.id,reason,status:'requested',createdAt:new Date().toISOString(),expiresAt:d.toISOString()};globalState.supportSessions=[x,...globalState.supportSessions];notify();return x;};
+  const approveSupportSession=(id:string)=>{globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'approved',approvedBy:globalState.currentUser.id}:s);notify();};
+  const runRemoteCheck=(participantId:string)=>{const mediaReady=typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia; const online=typeof navigator==='undefined'?true:navigator.onLine; const r:RemoteSessionCheck={id:newId('remote'),participantId,competitionId:globalState.competition.id,identity:'pending',device:mediaReady?'passed':'failed',environment:'review',networkQuality:online?'good':'poor',recordingReady:mediaReady,suspiciousSignals:[]};globalState.remoteChecks=[r,...globalState.remoteChecks.filter(x=>x.participantId!==participantId)];notify();return r;};
+  const cloneCompetition=(nameArabic?:string,nameEnglish?:string)=>{const base=JSON.parse(JSON.stringify(globalState.competition)) as Competition;base.id=newId('comp');base.nameArabic=nameArabic||`${base.nameArabic} — نسخة`;base.name=nameEnglish||`${base.name} — Copy`;base.status='draft';base.totalRegistered=0;base.totalApproved=0;base.totalAttended=0;base.policy={...getCompetitionPolicy(base),updatedAt:new Date().toISOString(),frozenAt:undefined};base.categories=base.categories.map(c=>({...c,id:newId('cat'),competitionId:base.id}));globalState.competitions=[base,...globalState.competitions];globalState.competition=base;notify();return base;};
+  const exportCompetitionSnapshot=()=>JSON.stringify({version:1,exportedAt:new Date().toISOString(),organizationId:globalState.competition.organizationId,competition:globalState.competition,participants:globalState.participants.filter(p=>p.competitionId===globalState.competition.id),committees:globalState.committees.filter(c=>c.competitionId===globalState.competition.id),results:globalState.results.filter(r=>r.competitionId===globalState.competition.id),certificates:globalState.certificates.filter(c=>c.competitionId===globalState.competition.id),auditLogs:globalState.auditLogs.filter(a=>a.competitionId===globalState.competition.id)},null,2);
+
+  const optimizeArrivalSlots = () => {
+    const approved = globalState.participants.filter(p => p.competitionId===globalState.competition.id && ['approved','scheduled'].includes(p.status));
+    const panels = Math.max(1, globalState.committees.filter(c => c.competitionId===globalState.competition.id&&c.status !== 'offline').length);
+    const avg = globalState.committees.filter(c => c.competitionId===globalState.competition.id&&c.status !== 'offline').reduce((a,c)=>a+c.averageSessionMinutes,0) / panels || 10;
+    const perWave = Math.max(1, Math.floor(panels * (30 / Math.max(4, avg))));
+    const day = new Date(globalState.competition.startDate || Date.now());
+    day.setHours(8,0,0,0);
+    const changed:Participant[]=[];
+    globalState.participants = globalState.participants.map(p => {
+      const idx = approved.findIndex(x=>x.id===p.id); if (idx < 0) return p;
+      const wave = Math.floor(idx / perWave); const start = new Date(day.getTime()+wave*30*60*1000); const end = new Date(start.getTime()+20*60*1000);
+      const fmt=(d:Date)=>`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; const arrivalSlot=`${fmt(start)}–${fmt(end)}`; const next={...p,arrivalSlot}; if(p.arrivalSlot!==arrivalSlot)changed.push(next); return next;
+    });
+    changed.forEach(p=>appendParticipantNotifications(p,'arrival.updated'));
+    notify();
+    return { scheduled: approved.length, perWave, averageSessionMinutes: Math.round(avg*10)/10 };
+  };
+
+  const getFairnessReceipt = (participantId:string) => {
+    const p=globalState.participants.find(x=>x.id===participantId); const r=globalState.results.find(x=>x.participantId===participantId); const sub=globalState.judgeSubmissions.filter(x=>x.participantId===participantId); const cert=globalState.certificates.find(x=>x.participantId===participantId);
+    if(!p) return null;
+    return { receiptVersion:1, participantCode:p.code, competitionId:globalState.competition.id, policyVersion:getCompetitionPolicy(globalState.competition).version, ruleSetVersion:globalState.competition.ruleSet.version, independentJudgeSubmissions:sub.length, resultStatus:r?.status||'not_calculated', resultSealHash:r?.sealMetadata?.cryptographicChecksum, certificateId:cert?.id, generatedAt:new Date().toISOString() };
+  };
+
+  const getIntegrityAnalytics = () => {
+    const byJudge=globalState.judges.map(j=>{const subs=globalState.judgeSubmissions.filter(s=>s.judgeId===j.userId); const avg=subs.length?subs.reduce((a,s)=>a+s.totalScore,0)/subs.length:0; return {judgeId:j.id,name:j.name,sessions:subs.length,averageScore:Math.round(avg*100)/100,calibrationScore:j.calibrationScore,isReady:j.isReady};});
+    const scored=byJudge.filter(j=>j.sessions>0); const panelAvg=scored.length?scored.reduce((a,j)=>a+j.averageScore,0)/scored.length:0;
+    return byJudge.map(j=>({...j,deviationFromPanel:Math.round((j.averageScore-panelAvg)*100)/100,attention:j.sessions>=3&&Math.abs(j.averageScore-panelAvg)>=8}));
+  };
+
   const runSimulation = (committeesCount: number, arrivalThroughputPerHr: number): SimulationResult => {
-    const totalP = Math.max(1, globalState.participants.filter(p=>p.status!=='rejected').length || globalState.competition.totalApproved || 1);
-    const activeCommitteeDurations = globalState.committees.filter(c=>c.status!=='offline').map(c=>c.averageSessionMinutes).filter(n=>Number.isFinite(n)&&n>0);
+    const totalP = Math.max(1, globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected').length || globalState.competition.totalApproved || 1);
+    const activeCommitteeDurations = globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline').map(c=>c.averageSessionMinutes).filter(n=>Number.isFinite(n)&&n>0);
     const configuredMinutes = globalState.competition.ruleSet.questionDurationMinutes * Math.max(1, getCompetitionPolicy(globalState.competition).questions.questionsPerParticipant);
     const avgSessionMins = activeCommitteeDurations.length
       ? activeCommitteeDurations.reduce((a,b)=>a+b,0)/activeCommitteeDurations.length
@@ -854,7 +1151,7 @@ export function useAppStore() {
 
     const arrivalPressure = Math.max(0, arrivalThroughputPerHr - capacityPerHour);
     const averageWaitMinutes = Math.max(2, Math.round((arrivalPressure / Math.max(1,capacityPerHour))*60 + avgSessionMins*.45));
-    const sortedPanels=[...globalState.committees].filter(c=>c.status!=='offline').sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes);
+    const sortedPanels=[...globalState.committees].filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline').sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes);
     const bottleneck=sortedPanels[0];
     const suggestedPanels=Math.max(1,Math.ceil(arrivalThroughputPerHr/(60/avgSessionMins)));
     const delta=Math.max(0,suggestedPanels-safePanels);
@@ -875,13 +1172,39 @@ export function useAppStore() {
   };
 
 
-  return {
+  const scopedState = {
     ...state,
+    participants: state.participants.filter(x=>x.competitionId===state.competition.id),
+    committees: state.committees.filter(x=>x.competitionId===state.competition.id),
+    results: state.results.filter(x=>x.competitionId===state.competition.id),
+    reviewCases: state.reviewCases.filter(x=>x.competitionId===state.competition.id),
+    aiObservations: state.aiObservations.filter(x=>x.competitionId===state.competition.id),
+    certificates: state.certificates.filter(x=>x.competitionId===state.competition.id),
+    auditLogs: state.auditLogs.filter(x=>x.competitionId===state.competition.id),
+    incidents: state.incidents.filter(x=>x.competitionId===state.competition.id),
+    appeals: state.appeals.filter(x=>x.competitionId===state.competition.id),
+    notifications: state.notifications.filter(x=>x.competitionId===state.competition.id),
+    webhooks: state.webhooks.filter(x=>!x.competitionId||x.competitionId===state.competition.id),
+    devices: state.devices.filter(x=>x.competitionId===state.competition.id),
+    travelRecords: state.travelRecords.filter(x=>x.competitionId===state.competition.id),
+    consents: state.consents.filter(x=>x.competitionId===state.competition.id),
+    importJobs: state.importJobs.filter(x=>x.competitionId===state.competition.id),
+    shadowRuns: state.shadowRuns.filter(x=>x.competitionId===state.competition.id),
+    trainingRuns: state.trainingRuns.filter(x=>x.competitionId===state.competition.id),
+    remoteChecks: state.remoteChecks.filter(x=>x.competitionId===state.competition.id),
+    audioRecordings: state.audioRecordings.filter(x=>x.competitionId===state.competition.id),
+  };
+
+  return {
+    ...scopedState,
     setLanguage,
     switchRole,
+    applyAuthenticatedIdentity,
     toggleOffline,
     toggleEmergencyFreeze,
+    createIncident, resolveIncident,
     checkInParticipant,
+    recordAIObservation, reconcileIntegrityForSession, registerAudioRecording,
     recordJudgeEvent,
     undoLastJudgeEvent,
     lockAndSubmitAssessment,
@@ -894,6 +1217,7 @@ export function useAppStore() {
     registerParticipant,
     reviewParticipant,
     selectCompetition,
+    updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, advanceQuranSource, updateQuestionGovernance, registerAiValidation, approveAiCapability, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
     submitAppeal,
     resolveAppeal,
@@ -909,6 +1233,8 @@ export function useAppStore() {
     updateCommittee,
     publishCompetition,
     startSessionForParticipant,
+    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot,
+    optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation
   };
 }

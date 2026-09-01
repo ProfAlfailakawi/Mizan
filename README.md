@@ -39,3 +39,6 @@ See `PROJECT_STATUS.md` for the exact boundary between implemented code and depl
 
 ## Product rule: no global competition law
 MIZAN provides configurable infrastructure, not one hard-coded competition format. Every competition has its own versioned policy and may differ in registration, eligibility, categories, question selection, panel structure, judge specialization, scoring, tie-breaks, appeals, result visibility, certificates, privacy and automation.
+
+### Demo / review entry
+When `VITE_REQUIRE_AUTH` is not `true`, MIZAN now opens into the **Experience Hub** rather than assuming Competition Admin. This is intentional for product review: choose Participant, JudgeOS, Head Judge, Command Center, Competition Admin, Delegation, Scientific Governance, Auditor, Support, Ceremony, Gate Kiosk, public competition, registration, or certificate verification. In authenticated production mode this gallery is not used; claims route each account to its permitted role.

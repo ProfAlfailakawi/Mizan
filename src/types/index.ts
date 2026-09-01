@@ -10,7 +10,9 @@ export type Role =
   | 'delegation_manager'
   | 'participant'
   | 'broadcast_operator'
-  | 'auditor';
+  | 'auditor'
+  | 'guardian'
+  | 'support_agent';
 
 export interface User {
   id: string;
@@ -34,6 +36,10 @@ export interface OrganizationBrand {
   accentColor: string;
   headerBackground?: string;
   subdomain?: string;
+  customDomain?: string;
+  emailSenderName?: string;
+  emailSenderAddress?: string;
+  certificateTheme?: 'quiet_authority'|'institutional'|'ceremonial';
 }
 
 export interface Organization {
@@ -48,6 +54,15 @@ export interface Organization {
   createdAt: string;
 }
 
+
+export interface FeatureFlagRecord {
+  id: string;
+  organizationId?: string;
+  key: string;
+  enabled: boolean;
+  environment: 'development'|'staging'|'production';
+  updatedAt: string;
+}
 export type AutomationLevel = 'assisted' | 'automated' | 'autopilot';
 
 export type CompetitionStatus =
@@ -276,6 +291,7 @@ export interface JudgeEvent {
 }
 
 export interface JudgeSubmission {
+  participantId?: string;
   judgeId: string;
   judgeName: string;
   sessionId: string;
@@ -288,6 +304,7 @@ export interface JudgeSubmission {
 
 export interface AIObservation {
   id: string;
+  competitionId: string;
   sessionId: string;
   timestampSeconds: number;
   type: 'omission' | 'insertion' | 'substitution' | 'repetition' | 'hesitation_pause' | 'audio_noise_clipping';
@@ -303,6 +320,7 @@ export interface AIObservation {
 
 export interface ReviewCase {
   id: string;
+  competitionId: string;
   sessionId: string;
   participantId: string;
   participantCode: string;
@@ -437,7 +455,7 @@ export interface SimulationResult {
 export interface IncidentRecord {
   id: string;
   competitionId: string;
-  type: 'power' | 'network' | 'audio_mic' | 'device' | 'judge_absence' | 'participant_emergency';
+  type: 'power' | 'network' | 'audio_mic' | 'device' | 'judge_absence' | 'participant_emergency' | 'conflict_routing' | 'security' | 'venue';
   severity: 'critical' | 'moderate' | 'low';
   title: string;
   description: string;
@@ -533,6 +551,10 @@ export interface WorkflowStagePolicy {
 }
 
 export interface OperationsPolicy {
+  deploymentProfile: 'lean' | 'balanced' | 'premium';
+  gateStationMode: 'computer_only' | 'touch_kiosk' | 'bring_your_own_device';
+  ticketMode: 'digital_only' | 'screen_number' | 'print_optional';
+  hardwareStrategy: 'reuse_existing' | 'mixed' | 'dedicated';
   selfCheckIn: boolean;
   kioskCheckIn: boolean;
   exceptionDesk: boolean;
@@ -634,3 +656,49 @@ export type Permission =
   | 'quran.manage'
   | 'operations.manage'
   | 'broadcast.manage';
+
+// ---- Enterprise completion layer ---------------------------------------------------------
+export type IntegrationKind = 'email' | 'sms' | 'whatsapp' | 'identity' | 'storage' | 'broadcast' | 'payments' | 'webhook';
+export interface IntegrationConfig { id:string; organizationId:string; kind:IntegrationKind; name:string; enabled:boolean; status:'not_configured'|'configured'|'degraded'; secretRef?:string; endpoint?:string; lastCheckedAt?:string; }
+export interface NotificationRecord { id:string; competitionId:string; participantId?:string; channel:'in_app'|'email'|'sms'|'whatsapp'|'push'; templateKey:string; locale:string; recipient:string; status:'queued'|'sent'|'failed'|'cancelled'; attempts:number; createdAt:string; sentAt?:string; error?:string; idempotencyKey:string; }
+export interface WebhookSubscription { id:string; organizationId:string; competitionId?:string; event:string; endpoint:string; enabled:boolean; secretRef:string; lastDeliveryStatus?:'success'|'failed'; }
+export interface DeviceRecord { id:string; competitionId:string; name:string; type:'kiosk'|'judge_tablet'|'edge_server'|'display'|'printer'|'audio'; zone?:string; committeeId?:string; status:'online'|'offline'|'degraded'; lastSeenAt:string; softwareVersion:string; batteryPercent?:number; }
+export interface DelegationTravelRecord { id:string; competitionId:string; delegationId:string; participantId?:string; flightNumber?:string; arrivalAirport?:string; arrivalAt?:string; hotel?:string; room?:string; transportStatus:'not_required'|'pending'|'scheduled'|'completed'; companionCount:number; notes?:string; }
+export interface ConsentRecord { id:string; participantId:string; competitionId:string; kind:'terms'|'privacy'|'audio_recording'|'ai_processing'|'guardian'; version:string; accepted:boolean; acceptedAt:string; guardianName?:string; }
+export interface ImportJobRecord { id:string; competitionId:string; entity:'participants'|'judges'|'categories'|'committees'; fileName:string; status:'mapping'|'validated'|'imported'|'failed'; totalRows:number; validRows:number; invalidRows:number; mapping:Record<string,string>; errors:{row:number;message:string}[]; createdAt:string; }
+export interface ShadowRun { id:string; competitionId:string; mode:'record'|'analyze'|'simulate'|'compare'; status:'draft'|'running'|'completed'; startedAt?:string; completedAt?:string; observations:{type:string;severity:'info'|'medium'|'high';summary:string}[]; }
+export interface ParticipantPassportEntry { id:string; participantId:string; competitionId:string; competitionName:string; categoryName:string; year:string; result?:string; certificateNumber?:string; verified:boolean; }
+export interface JudgePassportEntry { id:string; judgeId:string; competitionId:string; competitionName:string; role:string; riwayat:string[]; calibrationScore?:number; completedSessions:number; verified:boolean; }
+export interface TrainingRun { id:string; competitionId:string; type:'judge_practice'|'operations_dry_run'|'sandbox'; status:'ready'|'running'|'completed'; startedAt?:string; score?:number; notes?:string; }
+export interface BackupRecord { id:string; organizationId:string; competitionId?:string; createdAt:string; scope:'competition'|'organization'; checksum:string; status:'ready'|'failed'; sizeLabel:string; }
+export interface RetentionJob { id:string; competitionId:string; dataType:'audio'|'documents'|'audit'|'participant_pii'; scheduledFor:string; action:'delete'|'anonymize'|'retain'; status:'scheduled'|'completed'|'cancelled'; }
+export interface SupportSession { id:string; organizationId:string; requestedBy:string; approvedBy?:string; reason:string; status:'requested'|'approved'|'active'|'ended'|'rejected'; createdAt:string; expiresAt:string; }
+export interface RemoteSessionCheck { id:string; participantId:string; competitionId:string; identity:'pending'|'verified'|'failed'; device:'pending'|'passed'|'failed'; environment:'pending'|'passed'|'review'; networkQuality:'good'|'fair'|'poor'; recordingReady:boolean; suspiciousSignals:string[]; }
+
+
+export interface QuranSourceManifestRecord {
+  id:string; organizationId:string; riwaya:string; edition:string; version:string; checksumSha256:string; sourceAuthority:string; reviewerNames:string[]; status:'draft'|'reviewed'|'approved'|'retired'; createdAt:string; approvedAt?:string;
+}
+export interface QuestionGovernanceRecord {
+  questionId:string; competitionId:string; sourceManifestId?:string; expertDifficulty:number; historicalDifficulty?:number; status:'fixture'|'draft'|'reviewed'|'approved'|'retired'; reviewedBy?:string; updatedAt:string;
+}
+export interface AICapabilityValidationRecord {
+  id:string; organizationId:string; riwaya:string; capability:'word_alignment'|'memorization_watch'|'tajweed_phoneme'|'audio_quality'; modelName:string; modelVersion:string; datasetName:string; datasetSize:number; falsePositiveRate?:number; falseNegativeRate?:number; status:'draft'|'validated'|'certified'|'suspended'; evidenceRef?:string; approvedBy:string[]; updatedAt:string;
+}
+export interface OperatingCostModel { baselineStaff:number; mizanStaff:number; hoursPerDay:number; days:number; hourlyCost?:number; currency?:string; }
+export interface AudioRecordingRecord {
+  id: string;
+  competitionId: string;
+  sessionId: string;
+  participantId: string;
+  status: 'recording' | 'completed' | 'failed';
+  mimeType: string;
+  startedAt: string;
+  stoppedAt?: string;
+  sizeBytes?: number;
+  localObjectUrl?: string;
+  storageRef?: string;
+  checksum?: string;
+  quality: 'unknown' | 'good' | 'degraded';
+  retentionDays: number;
+}

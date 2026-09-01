@@ -63,6 +63,10 @@ export const BASE_POLICY: CompetitionPolicy = {
     promptMode: 'configurable'
   },
   operations: {
+    deploymentProfile: 'lean',
+    gateStationMode: 'computer_only',
+    ticketMode: 'screen_number',
+    hardwareStrategy: 'reuse_existing',
     selfCheckIn: true,
     kioskCheckIn: true,
     exceptionDesk: true,

@@ -12,7 +12,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   delegation_manager: ['participant.read','participant.edit'],
   participant: [],
   broadcast_operator: ['broadcast.manage'],
-  auditor: ['participant.read','audit.read']
+  auditor: ['participant.read','audit.read'],
+  guardian: ['participant.read'],
+  support_agent: ['audit.read']
 };
 
 export function can(role: Role, permission: Permission) {

@@ -465,6 +465,7 @@ export const SEED_PARTICIPANTS: Participant[] = [
 export const SEED_REVIEW_CASES: ReviewCase[] = [
   {
     id: 'rev-01',
+    competitionId: SEED_COMPETITION.id,
     sessionId: 'sess-part-104-q1',
     participantId: 'part-104',
     participantCode: 'A-104',
@@ -478,6 +479,7 @@ export const SEED_REVIEW_CASES: ReviewCase[] = [
   },
   {
     id: 'rev-02',
+    competitionId: SEED_COMPETITION.id,
     sessionId: 'sess-part-102-q2',
     participantId: 'part-102',
     participantCode: 'A-102',
