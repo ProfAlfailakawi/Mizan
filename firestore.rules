@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function sameOrg(orgId) { return signedIn() && request.auth.token.org_id == orgId; }
+    function roleIs(roles) { return signedIn() && request.auth.token.role in roles; }
+    function orgAdmin(orgId) { return sameOrg(orgId) && roleIs(['super_admin','org_admin','comp_admin']); }
+
+    // Organization and competition configuration is tenant-scoped.
+    match /organizations/{orgId} {
+      allow read: if sameOrg(orgId);
+      allow write: if sameOrg(orgId) && roleIs(['super_admin','org_admin']);
+
+      match /competitions/{competitionId} {
+        allow read: if sameOrg(orgId);
+        allow create, update: if orgAdmin(orgId);
+        allow delete: if sameOrg(orgId) && roleIs(['super_admin','org_admin']);
+
+        match /judge_events/{eventId} {
+          allow read: if sameOrg(orgId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
+          allow create: if sameOrg(orgId) && roleIs(['judge']);
+          allow update, delete: if false; // reversal is a new audit event, never mutation.
+        }
+
+        match /checkins/{participantId} {
+          allow read: if sameOrg(orgId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','exception_host']);
+          allow create, update: if sameOrg(orgId) && roleIs(['comp_admin','ops_manager','exception_host']);
+          allow delete: if false;
+        }
+
+        match /audit/{eventId} {
+          allow read: if sameOrg(orgId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
+          allow create: if sameOrg(orgId);
+          allow update, delete: if false;
+        }
+      }
+    }
+
+    // No public wildcard access. Certificate verification should be exposed through
+    // a dedicated minimal public verification document/API, never the competition store.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

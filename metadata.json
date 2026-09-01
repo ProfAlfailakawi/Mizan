@@ -1,0 +1,6 @@
+{
+  "name": "MIZAN — Quran Competition Operating System",
+  "description": "The Autonomous Operating System & Global Infrastructure for Quran Competitions.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-arabic: "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+    --font-quran: "Amiri Quran", "Amiri", serif;
+    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+
+    --canvas: #f7f5ef;
+    --surface: #fffefb;
+    --surface-soft: #f1efe8;
+    --ink: #171b18;
+    --muted: #6d746f;
+    --line: #dfded7;
+    --emerald: #214c40;
+    --emerald-2: #2f6555;
+    --emerald-soft: #e7eee9;
+    --amber: #9b7542;
+    --amber-soft: #f2eadc;
+    --danger: #a34d43;
+    --danger-soft: #f4e6e3;
+    --blue: #496477;
+    --blue-soft: #e8eef1;
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 26px;
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--canvas); }
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    font-family: var(--font-arabic);
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 10% -10%, rgba(33,76,64,.055), transparent 28rem),
+      var(--canvas);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  [dir="ltr"] body { font-family: var(--font-sans); }
+  button, a, [role="button"] { cursor: pointer; }
+  input, textarea, select { cursor: text; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(47,101,85,.22);
+    outline-offset: 2px;
+  }
+  ::selection { background: #dce7e1; }
+}
+
+.font-quran { font-family: var(--font-quran); }
+.font-arabic { font-family: var(--font-arabic); }
+.font-sans-en { font-family: var(--font-sans); }
+
+.mizan-surface {
+  background: rgba(255,254,251,.96);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 0 rgba(23,27,24,.02), 0 8px 30px rgba(23,27,24,.025);
+}
+.mizan-surface-soft {
+  background: var(--surface-soft);
+  border: 1px solid rgba(223,222,215,.85);
+  border-radius: var(--radius-md);
+}
+.mizan-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mizan-title { color: var(--ink); letter-spacing: -.025em; }
+.mizan-muted { color: var(--muted); }
+.mizan-divider { border-color: var(--line); }
+
+.bg-islamic-subtle {
+  background-color: #16241f;
+  background-image:
+    linear-gradient(30deg, rgba(255,255,255,.018) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.018) 87.5%, rgba(255,255,255,.018)),
+    linear-gradient(150deg, rgba(255,255,255,.018) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,.018) 87.5%, rgba(255,255,255,.018));
+  background-size: 56px 98px;
+}
+
+.bg-pattern-light { background: var(--canvas); }
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbc9c1; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #aaa89f; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media print {
+  body { background: white !important; color: black !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}

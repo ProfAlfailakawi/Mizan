@@ -1,0 +1,24 @@
+import { Permission, Role } from '../types';
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  super_admin: ['platform.manage','organization.manage','competition.create','competition.configure','competition.publish','participant.read','participant.edit','participant.checkin','committee.manage','judge.manage','judging.review','result.calculate','result.seal','result.publish','appeal.review','certificate.issue','audit.read','quran.manage','operations.manage','broadcast.manage'],
+  org_admin: ['organization.manage','competition.create','competition.configure','competition.publish','participant.read','participant.edit','committee.manage','judge.manage','result.seal','result.publish','certificate.issue','audit.read','operations.manage'],
+  comp_admin: ['competition.configure','competition.publish','participant.read','participant.edit','participant.checkin','committee.manage','judge.manage','result.calculate','result.seal','result.publish','certificate.issue','audit.read','operations.manage'],
+  scientific_admin: ['competition.configure','judge.manage','judging.review','result.calculate','appeal.review','audit.read','quran.manage'],
+  head_judge: ['participant.read','judging.review','result.calculate','appeal.review','audit.read'],
+  judge: ['participant.read','judging.submit'],
+  ops_manager: ['participant.read','participant.checkin','committee.manage','operations.manage'],
+  exception_host: ['participant.read','participant.checkin','participant.edit'],
+  delegation_manager: ['participant.read','participant.edit'],
+  participant: [],
+  broadcast_operator: ['broadcast.manage'],
+  auditor: ['participant.read','audit.read']
+};
+
+export function can(role: Role, permission: Permission) {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export function permissionsFor(role: Role) {
+  return ROLE_PERMISSIONS[role] ?? [];
+}
