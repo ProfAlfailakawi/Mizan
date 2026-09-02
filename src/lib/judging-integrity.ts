@@ -192,3 +192,18 @@ export function buildParticipantFairnessEvidence(input:{
   privacyNote:'Participant-specific operational evidence only; no other participant scores or judge scores are disclosed.'
  };
 }
+
+export function passageTransitionPlan(input:{
+  isLastQuestion:boolean;
+  ar:boolean;
+  cue?:{enabled?:boolean;phraseArabic?:string;phraseEnglish?:string;autoAdvanceDelayMs?:number;audioUrl?:string};
+}){
+  const cue=input.cue;
+  return {
+    enabled:cue?.enabled!==false,
+    phrase:input.ar?(cue?.phraseArabic||'حسبك، جزاك الله خيرًا'):(cue?.phraseEnglish||'Thank you. Please stop here.'),
+    delayMs:Math.max(0,Math.min(10_000,cue?.autoAdvanceDelayMs??700)),
+    audioUrl:cue?.audioUrl&&/^https:\/\//i.test(cue.audioUrl)?cue.audioUrl:'',
+    autoAdvance:!input.isLastQuestion,
+  };
+}

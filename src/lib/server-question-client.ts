@@ -16,6 +16,7 @@ export interface SecureQuestionRuntimeState {
   poolSnapshotHash:string;
   constraintHash:string;
   questionCount:number;
+  diversityMetrics?:{eligibleUniqueStartLoci:number;previousParticipants:number;reusedLoci:number;pageOpeningCount:number;midPageCount:number;globalUniqueCoverageGuaranteed:boolean;requiredUniqueLociForFullField?:number};
   emergencyReplacement:{
     state:'NONE'|'AUTHORIZED'|'PENDING_PANEL_QUORUM'|'CONSUMED'|'EXPIRED'|'REVOKED';
     authorizationId?:string;
@@ -59,6 +60,8 @@ export interface SecureQuestionPlaintext {
   lineEnd?:number;
   officialSurfaceAuthority?:string;
   officialSurfaceMode?:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR'|'OFFICIAL_PAGE_IMAGE';
+  startLocusClass?:'SURAH_OPENING'|'PAGE_OPENING'|'MID_PAGE'|'LATE_PAGE'|'UNKNOWN';
+  startLocusAssurance?:'SCIENTIFICALLY_APPROVED'|'CURATED_QUESTION_POOL'|'QURAN_AYAH_BOUNDARY';
   expectedTextArabic:string;
   openingAyahArabic?:string;
 }
@@ -95,7 +98,11 @@ export async function findSecureRuntimeForParticipant(competitionId:string,parti
 export async function getSecureRuntimeStatus(sessionId:string){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/status`);return body.runtime as SecureQuestionRuntimeState}
 export async function confirmSecureParticipantPresence(sessionId:string,method='manual_visual_confirmation'){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/presence`,{method:'POST',body:JSON.stringify({method})});return body.runtime as SecureQuestionRuntimeState}
 export async function approveSecureQuestion(sessionId:string,questionIndex:number){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/questions/${questionIndex}/approve`,{method:'POST',body:'{}'});return body.runtime as SecureQuestionRuntimeState}
-export async function revealSecureQuestion(sessionId:string,questionIndex:number){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/questions/${questionIndex}/reveal`);return {payload:body.payload as SecureQuestionPlaintext,commitmentHash:String(body.commitmentHash||''),releasedAt:String(body.releasedAt||'')}}
+export async function revealSecureQuestion(sessionId:string,questionIndex:number){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/questions/${questionIndex}/reveal`);return {payload:body.payload as SecureQuestionPlaintext,commitmentHash:String(body.commitmentHash||''),releasedAt:String(body.releasedAt||''),exposureReceipt:body.exposureReceipt as {judgeId:string;exposedAt:string;canaryId?:string;canaryToken?:string}|undefined}}
 export async function approveEmergencyQuestionReplacement(sessionId:string,questionIndex:number){return api(`/api/question-runtime/${encodeURIComponent(sessionId)}/questions/${questionIndex}/emergency-replacement/approve`,{method:'POST',body:'{}'}) as Promise<SecureQuestionRuntimeState&{replacementReady:boolean;approved:number;required:number}>}
 export async function authorizeEmergencyQuestionReplacement(sessionId:string,reason:string,minutes=10){const expiresAt=new Date(Date.now()+Math.max(2,Math.min(30,minutes))*60_000).toISOString();const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/emergency-replacement/authorize`,{method:'POST',body:JSON.stringify({reason,expiresAt})});return body.runtime as SecureQuestionRuntimeState}
 export async function revokeEmergencyQuestionReplacement(sessionId:string){const body=await api(`/api/question-runtime/${encodeURIComponent(sessionId)}/emergency-replacement/revoke`,{method:'POST',body:'{}'});return body.runtime as SecureQuestionRuntimeState}
+
+export async function getQuestionCustodyCorridor(sessionId:string){return api(`/api/question-runtime/${encodeURIComponent(sessionId)}/custody-corridor`) as Promise<import('../types').QuestionCustodyCorridorSnapshot>}
+export async function getQuestionExposureRadius(sessionId:string){return api(`/api/question-runtime/${encodeURIComponent(sessionId)}/exposure-radius`) as Promise<import('../types').ExposureRadiusSnapshot>}
+export async function traceQuestionCanary(tokenValue:string){return api('/api/question-runtime/canary/trace',{method:'POST',body:JSON.stringify({token:tokenValue})}) as Promise<{verified:boolean;sessionId:string;questionIndex:number;judgeId:string;canaryId:string;exposedAt:string}>}

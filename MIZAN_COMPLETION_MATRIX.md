@@ -145,3 +145,23 @@ The **software architecture and a large portion of the executable integrity logi
 | MGIP evidence spine | ✅ | 13 evidence controls, READY/REVIEW/BLOCKED and protocol hash. |
 | MGIP external international recognition | △ | MIZAN-proposed protocol; no external standards-body recognition is claimed. |
 | Automated official Tajweed judging across all readings | △ | Architecture exists, but capability-specific scientific model evidence is still required. |
+
+## Round 9 — Eight visible-integrity capabilities + diversified judging journey
+
+| Capability | Status | Evidence / guardrail |
+|---|---|---|
+| Mushaf Focus Lens | ✅ | Side-only line indicator on official page; never changes Quran glyphs |
+| Zero-Knowledge Question Corridor | ✅ | No plaintext field in operations corridor |
+| Witness Mode | ✅ | Independent witnesses; initiator cannot witness own action; tenant/competition bound |
+| Exposure Radius | ✅ | Exact unique reveal-recipient count + unexpected-recipient detection |
+| Cold Vault Appliance | ✅ | AES-256-GCM package; secrets/private/master keys rejected |
+| Integrity Cinema | ✅ | Privacy-safe evidence timeline derived from audit/black-box events |
+| MIZAN Certified Venue | ✅ | Acoustic/device/software/Edge/source/recovery baseline + seal/change detection |
+| Question Leakage Canary | ✅ | Per-reveal HMAC canary outside Quran text/audio and traceable to exposure receipt |
+| First ayah automatic playback | ✅ logic / △ audio assets | Idempotent; only exact-reading APPROVED_REFERENCE audio. Actual official bytes/timings must exist in the deployed vault |
+| “حسبك…” then next passage | ✅ | Explicit transition plan; auto-advance only when a next passage exists |
+| Exact question start boundary | ✅ | Server rejects starts absent from certified Quran source |
+| Mid/late-page diversity | ✅ | Least-used start-locus allocation with opening-position bias reduction |
+| 100 participants receive different questions | ✅ when capacity exists | Tested 100 × 3 = 300 unique starts; impossible guarantees are never shown when pool capacity is smaller |
+| Automatic source-derived pool generation | ✅ | Generates candidates from certified Quran ayah boundaries for selected ajza' |
+| Expert-only start-locus mode | ✅ | Runtime can require SCIENTIFICALLY_APPROVED start loci when competition policy needs stricter ibtida governance |

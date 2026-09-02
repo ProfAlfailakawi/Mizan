@@ -145,3 +145,26 @@ MGIP remains a MIZAN-proposed protocol profile; this implementation does not cla
 - Secret scan: PASS.
 
 The final ZIP is separately reconstructed over the prior delivered baseline and the same checks are rerun before delivery.
+
+## Round 9 — Judging Experience + Visible Integrity
+
+Implemented on top of the previous KFGQPC Official Library + MGIP patch:
+
+- Mushaf Focus Lens on official page assets, with a side marker only and no Quran glyph modification.
+- Zero-Knowledge Question Corridor.
+- Witness Mode for high-risk exceptions.
+- Question Exposure Radius.
+- Cold Vault encrypted Edge package with secret-material rejection.
+- Privacy-safe Integrity Cinema.
+- MIZAN Certified Venue baseline/seal and change detection.
+- Per-reveal Question Leakage Canary and trace workflow.
+- Automatic opening-ayah playback is idempotent per session/question/reference and uses only APPROVED_REFERENCE audio matching qiraah/rawi/tariq and exact ayah timing.
+- Passage transition plan defaults to “حسبك، جزاك الله خيرًا”, then auto-advances only when another question exists.
+- Server FairDraw diversity ledger allocates least-used start loci across the entire competition/reading pool.
+- A production question start must exist as an exact ayah boundary in the certified Quran source.
+- Server-side pool generator can build candidate start loci directly from a certified Quran package for selected ajza'. It never invents a start inside an ayah.
+- Mid-page and late-page starts are preferred over repeated page/surah openings when other fairness constraints permit.
+- Full-field uniqueness is claimed only when unique start capacity >= participants × questions. A direct 100-participant × 3-question test achieved 300/300 unique start loci and 100/100 unique question sets.
+- Emergency one-question replacement now also uses the diversity ledger and avoids already-used/retired questions.
+
+Verification for this round is recorded in the delivery response after the patch itself is reconstructed over the previous baseline and re-tested.
