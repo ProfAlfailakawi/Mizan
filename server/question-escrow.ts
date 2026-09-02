@@ -30,7 +30,7 @@ interface EscrowQuestionRecord {
   exposureReceipts:{judgeId:string;exposedAt:string}[];
 }
 export interface EscrowSessionRecord {
-  version:1;
+  version:1|2;
   organizationId:string;
   competitionId:string;
   sessionId:string;
@@ -44,6 +44,7 @@ export interface EscrowSessionRecord {
   createdAt:string;
   participantPresence?:{verifiedAt:string;verifiedByJudgeId:string;participantPassId?:string};
   questions:EscrowQuestionRecord[];
+  replacementHistory?:{questionIndex:number;replacedAt:string;reason:string;authorizedBy:string;retiredQuestion:EscrowQuestionRecord;newQuestionId:string;newCommitmentHash:string}[];
   revokedAt?:string;
   revocationReason?:string;
 }
@@ -51,10 +52,11 @@ export interface EscrowSessionRecord {
 export interface EscrowActor { uid:string; role:string; organizationId:string; competitionId?:string; }
 
 const canonical=(value:unknown):string=>{
+  if(value===undefined)return 'null';
   if(value===null||typeof value!=='object')return JSON.stringify(value);
-  if(Array.isArray(value))return `[${value.map(canonical).join(',')}]`;
+  if(Array.isArray(value))return `[${value.map(v=>v===undefined?'null':canonical(v)).join(',')}]`;
   const obj=value as Record<string,unknown>;
-  return `{${Object.keys(obj).sort().map(k=>`${JSON.stringify(k)}:${canonical(obj[k])}`).join(',')}}`;
+  return `{${Object.keys(obj).filter(k=>obj[k]!==undefined).sort().map(k=>`${JSON.stringify(k)}:${canonical(obj[k])}`).join(',')}}`;
 };
 const sha256=(v:string|Buffer)=>crypto.createHash('sha256').update(v).digest('hex');
 const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
@@ -113,13 +115,23 @@ export class QuestionEscrowRepository {
     if(fs.existsSync(this.file(input.sessionId)))throw new Error('ESCROW_SESSION_EXISTS');
     const base={organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId};
     const questions=input.questions.map(item=>{const commitmentHash=sha256(canonical(item.payload));return {index:item.index,questionId:item.questionId,commitmentHash,encrypted:this.encrypt(item.payload,{...base,questionIndex:item.index,questionId:item.questionId,commitmentHash}),approvals:[],exposureReceipts:[]} as EscrowQuestionRecord});
-    const record:EscrowSessionRecord={version:1,...base,committeeId:input.committeeId,requiredJudgeIds:judges,approvalMode:input.approvalMode,minimumApprovals:input.minimumApprovals,expiresAt:input.expiresAt,state:'ACTIVE',createdAt:new Date().toISOString(),questions};this.write(record);return this.publicState(record);
+    const record:EscrowSessionRecord={version:2,...base,committeeId:input.committeeId,requiredJudgeIds:judges,approvalMode:input.approvalMode,minimumApprovals:input.minimumApprovals,expiresAt:input.expiresAt,state:'ACTIVE',createdAt:new Date().toISOString(),questions,replacementHistory:[]};this.write(record);return this.publicState(record);
   }
-  publicState(recordOrId:EscrowSessionRecord|string){const r=typeof recordOrId==='string'?this.read(recordOrId):recordOrId;return {version:r.version,organizationId:r.organizationId,competitionId:r.competitionId,sessionId:r.sessionId,participantId:r.participantId,committeeId:r.committeeId,state:r.state,expiresAt:r.expiresAt,presenceVerified:!!r.participantPresence,questions:r.questions.map(q=>({index:q.index,commitmentHash:q.commitmentHash,approved:q.approvals.length,required:quorumRequired(r),released:!!q.releasedAt,releasedAt:q.releasedAt,exposureCount:q.exposureReceipts.length}))};}
+  publicState(recordOrId:EscrowSessionRecord|string){const r=typeof recordOrId==='string'?this.read(recordOrId):recordOrId;return {version:r.version,organizationId:r.organizationId,competitionId:r.competitionId,sessionId:r.sessionId,participantId:r.participantId,committeeId:r.committeeId,state:r.state,expiresAt:r.expiresAt,presenceVerified:!!r.participantPresence,questions:r.questions.map(q=>({index:q.index,commitmentHash:q.commitmentHash,approved:q.approvals.length,required:quorumRequired(r),released:!!q.releasedAt,releasedAt:q.releasedAt,exposureCount:q.exposureReceipts.length})),replacementCount:(r.replacementHistory||[]).length};}
   verifyActor(record:EscrowSessionRecord,actor:EscrowActor){if(actor.organizationId!==record.organizationId)throw new Error('ESCROW_ORGANIZATION_MISMATCH');if(actor.competitionId&&actor.competitionId!==record.competitionId)throw new Error('ESCROW_COMPETITION_MISMATCH');if(actor.role!=='judge'||!record.requiredJudgeIds.includes(actor.uid))throw new Error('ESCROW_ASSIGNED_JUDGE_REQUIRED');}
   confirmPresence(sessionId:string,actor:EscrowActor,participantId:string,participantPassId?:string){const r=this.read(sessionId);this.verifyActor(r,actor);if(r.state!=='ACTIVE')throw new Error(`ESCROW_${r.state}`);if(participantId!==r.participantId)throw new Error('ESCROW_PARTICIPANT_MISMATCH');r.participantPresence={verifiedAt:new Date().toISOString(),verifiedByJudgeId:actor.uid,participantPassId};this.write(r);return this.publicState(r);}
   approve(sessionId:string,questionIndex:number,actor:EscrowActor){const r=this.read(sessionId);this.verifyActor(r,actor);const q=r.questions.find(x=>x.index===questionIndex);if(!q)throw new Error('ESCROW_QUESTION_NOT_FOUND');if(!r.participantPresence)throw new Error('ESCROW_PARTICIPANT_NOT_PRESENT');if(!q.approvals.some(a=>a.judgeId===actor.uid))q.approvals.push({judgeId:actor.uid,approvedAt:new Date().toISOString()});const ready=escrowQuestionReady(r,questionIndex);if(ready.ready&&!q.releasedAt)q.releasedAt=new Date().toISOString();this.write(r);return {...this.publicState(r),ready};}
   reveal(sessionId:string,questionIndex:number,actor:EscrowActor){const r=this.read(sessionId);this.verifyActor(r,actor);const q=r.questions.find(x=>x.index===questionIndex);if(!q)throw new Error('ESCROW_QUESTION_NOT_FOUND');const ready=escrowQuestionReady(r,questionIndex);if(!ready.ready||!q.releasedAt)throw new Error(`ESCROW_NOT_RELEASED:${ready.reason}`);const payload=this.decrypt(q,r);q.exposureReceipts.push({judgeId:actor.uid,exposedAt:new Date().toISOString()});this.write(r);return {payload,commitmentHash:q.commitmentHash,releasedAt:q.releasedAt,exposureReceipt:{judgeId:actor.uid,exposedAt:q.exposureReceipts[q.exposureReceipts.length-1].exposedAt}};}
+
+  replaceQuestion(sessionId:string,input:{questionIndex:number;questionId:string;payload:Record<string,unknown>;reason:string;authorizedBy:string}){
+    const r=this.read(sessionId);if(r.state!=='ACTIVE')throw new Error(`ESCROW_${r.state}`);if((r.replacementHistory||[]).length>=1)throw new Error('ESCROW_REPLACEMENT_LIMIT_REACHED');
+    const position=r.questions.findIndex(x=>x.index===input.questionIndex);if(position<0)throw new Error('ESCROW_QUESTION_NOT_FOUND');const current=r.questions[position];
+    if(!current.releasedAt)throw new Error('ESCROW_REPLACEMENT_REQUIRES_STARTED_QUESTION');
+    const commitmentHash=sha256(canonical(input.payload));const meta={organizationId:r.organizationId,competitionId:r.competitionId,sessionId:r.sessionId,participantId:r.participantId,questionIndex:input.questionIndex,questionId:input.questionId,commitmentHash};
+    const next:EscrowQuestionRecord={index:input.questionIndex,questionId:input.questionId,commitmentHash,encrypted:this.encrypt(input.payload,meta),approvals:[],exposureReceipts:[]};
+    r.replacementHistory=r.replacementHistory||[];r.replacementHistory.push({questionIndex:input.questionIndex,replacedAt:new Date().toISOString(),reason:input.reason||'Emergency replacement',authorizedBy:input.authorizedBy,retiredQuestion:current,newQuestionId:input.questionId,newCommitmentHash:commitmentHash});r.questions[position]=next;this.write(r);return this.publicState(r);
+  }
+  internalRecord(sessionId:string){return this.read(sessionId)}
   status(sessionId:string,actor:EscrowActor){const r=this.read(sessionId);this.verifyActor(r,actor);return this.publicState(r);}
   revoke(sessionId:string,reason:string){const r=this.read(sessionId);if(r.state!=='ACTIVE')return this.publicState(r);r.state='REVOKED';r.revokedAt=new Date().toISOString();r.revocationReason=reason||'Administrative revocation';this.write(r);return this.publicState(r);}
 }

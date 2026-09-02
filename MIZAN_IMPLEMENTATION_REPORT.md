@@ -96,3 +96,12 @@ This patch deliberately does **not** invent:
 - or a claim that a zero-human official Quran competition is scientifically certified today.
 
 Missing scientific evidence remains PENDING/BETA/UNSUPPORTED. Human judging remains operational and authoritative.
+
+## 2026-09-02 — Official-source + Secure Question Runtime + MGIP pass
+- KFGQPC is configured as MIZAN PRIMARY_OFFICIAL_AUTHORITY and its six published Quran developer packages are OFFICIALLY CERTIFIED in the catalog.
+- KFGQPC official packages use DIRECT_AFTER_OFFICIAL_CHECKSUM_AND_STRUCTURE: exact published checksum + structural validation makes an ingested official package operationally CERTIFIED. Other sources retain their own scientific approval policy.
+- Added KFGQPC broader developer asset catalog: printing vector Mushaf, smart-device Hafs, Tafseer Muyassar, Ghareeb and Tajweed Muyassar.
+- Production Secure Question Runtime performs FairDraw, Quran passage resolution and encrypted provisioning on the server. JudgeOS receives plaintext only after presence + configured judge quorum.
+- Emergency replacement is limited to one already-started question, requires authorized governance decision plus panel quorum, retires the original question immutably and prevents a second replacement.
+- Added/merged MGIP-1.0 modules: Competition Black Box, Fairness Constitutional Court, Acoustic Venue Passport, Recitation Digital Twin, Mutashabihat Trap Map, Multi-Riwayah Smart Routing, Appeal Capsule, Blind Anchor Calibration, Integrity Entropy Radar, Scientific Circuit Breaker and MIZAN Integrity Passport.
+- Verification run: TypeScript noEmit PASS; tests 87/87 PASS; source audit PASS (97 files); secret scan PASS.

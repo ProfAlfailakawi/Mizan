@@ -5,6 +5,8 @@ export interface MizanRuntimeHealth {
   certificateSigningConfigured:boolean;
   trustSigningConfigured:boolean;
   edgeRelayConfigured:boolean;
+  serverQuranSourceVaultConfigured:boolean;
+  secureQuestionRuntimeConfigured:boolean;
   checkedAt:string;
   source:'server'|'unavailable';
 }
@@ -18,6 +20,8 @@ export function normalizeRuntimeHealth(input:unknown):MizanRuntimeHealth{
     certificateSigningConfigured:x.certificateSigningConfigured===true,
     trustSigningConfigured:x.trustSigningConfigured===true,
     edgeRelayConfigured:x.edgeRelayConfigured===true,
+    serverQuranSourceVaultConfigured:x.serverQuranSourceVaultConfigured===true,
+    secureQuestionRuntimeConfigured:x.secureQuestionRuntimeConfigured===true,
     checkedAt:new Date().toISOString(),
     source:x.status==='ok'?'server':'unavailable'
   };
@@ -32,5 +36,5 @@ export async function fetchRuntimeHealth(signal?:AbortSignal):Promise<MizanRunti
 }
 
 export function questionEscrowAssuranceFromHealth(health:MizanRuntimeHealth|undefined){
-  return health?.questionEscrowConfigured?'production_server_escrow' as const:'operational_panel_gate' as const;
+  return health?.secureQuestionRuntimeConfigured?'production_server_escrow' as const:'operational_panel_gate' as const;
 }

@@ -5,17 +5,19 @@ import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { Pictogram } from '../design-system/Pictogram';
 import { RealQRCode, makeMizanPassPayload } from '../design-system/RealQRCode';
+import { EmergencyQuestionAuthorization } from './EmergencyQuestionAuthorization';
+import { IntegrityProtocolLab } from './IntegrityProtocolLab';
 
-type Tool='mission'|'flight'|'twin'|'chaos'|'envelope'|'access'|'elasticity'|'pass';
+type Tool='mission'|'integrity'|'flight'|'twin'|'chaos'|'envelope'|'access'|'elasticity'|'pass';
 const tools:[Tool,any,string,string][]=[
- ['mission',Gauge,'التحكم','Mission'],['flight',Clock3,'المسجل','Recorder'],['twin',Activity,'التوأم','Twin'],['chaos',WandSparkles,'الاختبار','Chaos'],
+ ['mission',Gauge,'التحكم','Mission'],['integrity',ShieldCheck,'النزاهة','Integrity'],['flight',Clock3,'المسجل','Recorder'],['twin',Activity,'التوأم','Twin'],['chaos',WandSparkles,'الاختبار','Chaos'],
  ['envelope',Fingerprint,'الظرف','Envelope'],['access',BadgeCheck,'الوصول','Access'],['elasticity',UsersRound,'اللجان','Elasticity'],['pass',QrCode,'الرحلة','One Pass']
 ];
 
 export const BeyondLab:React.FC=()=>{
  const s=useAppStore();const ar=s.language==='ar';const [tool,setTool]=useState<Tool>('mission');
  return <div className="space-y-4"><div className="flex gap-2 overflow-x-auto pb-1">{tools.map(([id,Icon,a,e])=><button key={id} onClick={()=>setTool(id)} className={`shrink-0 min-h-11 px-3 rounded-xl border inline-flex items-center gap-2 text-xs font-black ${tool===id?'bg-[#202924] text-white border-[#202924]':'bg-white border-[#dedcd5] text-[#606862]'}`}><Icon className="w-4 h-4"/>{ar?a:e}</button>)}</div>
- {tool==='mission'&&<Mission s={s} ar={ar}/>} {tool==='flight'&&<Flight s={s} ar={ar}/>} {tool==='twin'&&<Twin s={s} ar={ar}/>} {tool==='chaos'&&<Chaos s={s} ar={ar}/>} {tool==='envelope'&&<Envelope s={s} ar={ar}/>} {tool==='access'&&<Access s={s} ar={ar}/>} {tool==='elasticity'&&<Elasticity s={s} ar={ar}/>} {tool==='pass'&&<OnePass s={s} ar={ar}/>}</div>
+ {tool==='mission'&&<div className="space-y-4"><Mission s={s} ar={ar}/><EmergencyQuestionAuthorization/></div>} {tool==='integrity'&&<IntegrityProtocolLab/>} {tool==='flight'&&<Flight s={s} ar={ar}/>} {tool==='twin'&&<Twin s={s} ar={ar}/>} {tool==='chaos'&&<Chaos s={s} ar={ar}/>} {tool==='envelope'&&<Envelope s={s} ar={ar}/>} {tool==='access'&&<Access s={s} ar={ar}/>} {tool==='elasticity'&&<Elasticity s={s} ar={ar}/>} {tool==='pass'&&<OnePass s={s} ar={ar}/>}</div>
 }
 
 const Mission=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{const activeIncidents=s.incidents.filter(i=>i.status!=='resolved').length,failed=s.notifications.filter(n=>n.status==='failed').length,offline=s.devices.filter(d=>d.status==='offline'||d.status==='degraded').length,pendingReview=s.reviewCases.filter(r=>r.status==='pending').length;const exceptions=activeIncidents+failed+offline+pendingReview;return <section className="mizan-surface p-6 sm:p-8"><div className="flex items-center gap-4"><Pictogram icon={ShieldCheck} size="lg" tone={exceptions?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز قيادة ميزان':'MIZAN MISSION CONTROL'}</div><h2 className="text-2xl sm:text-3xl font-black mt-1">{exceptions?(ar?`${exceptions} حالات تحتاج قرارًا`:`${exceptions} exceptions need a decision`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h2></div></div>{!exceptions&&<p className="text-sm text-[#717873] mt-5">{ar?'لا تدخل مطلوب.':'No intervention required.'}</p>}{exceptions>0&&<div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5"><Mini n={activeIncidents} t={ar?'حوادث':'Incidents'}/><Mini n={pendingReview} t={ar?'مراجعة':'Review'}/><Mini n={failed} t={ar?'إشعارات':'Notify'}/><Mini n={offline} t={ar?'أجهزة':'Devices'}/></div>}</section>};
