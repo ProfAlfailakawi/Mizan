@@ -6,6 +6,7 @@ import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
 import { EmergencyControl } from '../design-system/EmergencyControl';
 import { ClarityGuide } from '../design-system/ClarityGuide';
+import { MizanLogo } from '../design-system/MizanLogo';
 
 interface HeaderProps { onOpenKiosk?:()=>void; onOpenCeremony?:()=>void; onOpenExperienceHome?:()=>void; }
 
@@ -16,11 +17,8 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0">
-      <div className="w-11 h-11 rounded-xl bg-[#214C40] text-white grid place-items-center font-black">م</div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2"><span className="font-extrabold tracking-tight">MIZAN</span><span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/></div>
-        <div className="text-[10px] text-[#737a75] truncate max-w-[240px]">{language==='ar'?competition.nameArabic:competition.name}</div>
-      </div>
+      <MizanLogo language={language} compact/>
+      <div className="min-w-0 hidden sm:block"><div className="flex items-center gap-2"><span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/><span className="text-[10px] text-[#737a75] truncate max-w-[260px]">{language==='ar'?competition.nameArabic:competition.name}</span></div></div>
     </div>
     <div className="flex items-center gap-1">
       {onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'كل التجارب':'All experiences'} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></button>}

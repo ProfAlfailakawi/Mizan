@@ -129,7 +129,7 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
   ar: {
     appName: 'ميزان',
     tagline: 'البنية التحتية ونظام التشغيل الذاتي لمسابقات القرآن الكريم',
-    heroSubtitle: 'أحضر المحكّمين.. واترك تشغيل المسابقة لـ MIZAN',
+    heroSubtitle: 'أحضر المحكّمين.. واترك تشغيل المسابقة لميزان',
 
     search: 'بحث...',
     filter: 'تصفية',
@@ -200,7 +200,7 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
 
     judgeOSHeader: 'منصة التحكيم المباشر',
     startSession: 'بدء الجلسة',
-    drawQuestions: 'سحب أسئلة الاختبار (FairDraw)',
+    drawQuestions: 'سحب أسئلة الاختبار بالسحب العادل',
     bismillahPrompt: 'بسم الله الرحمن الرحيم',
     activeRecitation: 'التلاوة جارية الآن',
     mistakeButton: 'خطأ جلي (-0.5)',
@@ -224,7 +224,7 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
     varianceNote: 'ملاحظة التدقيق العلمي',
     appealsTitle: 'طلبات الاعتراض العلمي',
 
-    sealResults: 'ختم النتائج تشفيرياً (Dual Approval)',
+    sealResults: 'ختم النتائج تشفيريًا باعتماد مزدوج',
     dualApprovalReq: 'يتطلب اعتماد رئيس اللجنة ومدير المسابقة',
     publishLeaderboard: 'نشر النتائج العامة',
     generateCertificates: 'إصدار الشهادات الرقمية الموقعة',
@@ -237,8 +237,8 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
     secondPlace: 'المركز الثاني',
     thirdPlace: 'المركز الثالث',
 
-    askMizan: 'اسأل مساعد MIZAN التشغيلي',
-    digitalTwinSim: 'محاكاة التوأم الرقمي (Digital Twin)',
+    askMizan: 'اسأل مساعد ميزان التشغيلي',
+    digitalTwinSim: 'محاكاة التوأم الرقمي',
     capacityForecast: 'توقعات الطاقة الاستيعابية والانتظار'
   },
   en: {

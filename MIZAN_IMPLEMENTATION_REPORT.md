@@ -168,3 +168,18 @@ Implemented on top of the previous KFGQPC Official Library + MGIP patch:
 - Emergency one-question replacement now also uses the diversity ledger and avoids already-used/retired questions.
 
 Verification for this round is recorded in the delivery response after the patch itself is reconstructed over the previous baseline and re-tested.
+
+## 2026-09-02 — Arabic-first brand/onboarding + Witness/Cold-Vault hardening
+
+- Arabic is now the true primary product surface when Arabic is selected, including qiraat/imam/rawi names, system statuses, public verification, scientific-library details, ceremony labels and dynamic values from older stored records.
+- Added a conservative Arabic Surface Guard as a safety net for known legacy/domain strings. It skips hashes, code, technical proof blocks and user input.
+- Added a dedicated Arabic UI audit script with 17 regression checks.
+- Replaced the old brand treatment with the new soft MIZAN identity: abstract book/knowledge + balance axis, Arabic wordmark first, restrained emerald/ivory/muted-gold palette.
+- Added three-step onboarding with progressive disclosure and role/competition context.
+- Confirmed Mushaf Focus Lens runs on the real JudgeOS official-Mushaf surface and never alters Quran glyphs.
+- Confirmed Operations uses the real server custody corridor and cannot access question plaintext.
+- Strengthened Witness Mode following separation-of-duties principles: initiator cannot witness, duplicate witness blocked, optional role diversity, tenant/competition binding, hash-chained attestations and evidence hash verification.
+- Strengthened Cold Vault: AES-256-GCM, external transfer key, minimum-continuity-only content, secret/high-risk data rejection, payload/package hashes and signed-by-hash test-restore receipts.
+- Fixed an integrity bug found by regression testing: absent optional `evidenceRef` is now omitted canonically before witness hashing, preventing false hash mismatch after JSON persistence.
+- Verification executed after fixes: Arabic UI audit 17/17; TypeScript PASS; tests 104/104 PASS; source audit PASS; secret scan PASS.
+- `npm run build` was attempted but could not start because Vite/dependencies are not installed in the supplied runtime. No build success is claimed.

@@ -43,6 +43,6 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
      </div>
     :<div className="rounded-[32px] border border-white/12 bg-white/[.055] p-8 text-center"><span className="w-16 h-16 rounded-full bg-[#dbe7df] text-[#214C40] grid place-items-center mx-auto"><Check className="w-8 h-8"/></span><div className="mizan-kicker !text-white/45 mt-6">{done.code}</div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?`أهلًا ${done.fullNameArabic}`:`Welcome ${done.fullName}`}</h1><div className="mt-5 rounded-[26px] bg-[#f8f6ef] text-[#17352c] p-2 overflow-hidden"><TearOffQueueTicket number={done.originalQueueNumber||done.queueNumber||1} committee={committee?.code} ar={ar} compact/></div><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-black/10 p-4"><div className="text-[10px] text-white/40">{ar?'أمامك':'Ahead'}</div><div className="text-3xl font-black mt-1">{Math.max(0,(done.queueNumber||1)-1)}</div></div><div className="rounded-2xl bg-black/10 p-4"><div className="text-[10px] text-white/40">{ar?'اللجنة':'Committee'}</div><div className="text-lg font-black mt-2">{committee?.code||'—'}</div></div></div></div>}
    </div>
-   <div className="text-center text-[10px] text-white/25">MIZAN · Quiet automation</div>
+   <div className="text-center text-[10px] text-white/25">{ar?'ميزان · تشغيل هادئ':'MIZAN · Quiet automation'}</div>
  </div>
 }

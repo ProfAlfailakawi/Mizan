@@ -150,3 +150,9 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 .mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
 .mizan-ticket-meta{font-size:10px;font-weight:800;color:#5f6862;margin-top:12px}
 .mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}
+
+/* Brand refresh — soft authority */
+.onboarding-chip{display:inline-flex;align-items:center;border:1px solid #e5e0d4;background:rgba(255,255,255,.58);border-radius:999px;padding:.48rem .75rem;box-shadow:0 8px 28px rgba(27,53,44,.035)}
+.mizan-brand-halo{background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.98),rgba(244,240,230,.78) 55%,rgba(239,234,220,.76));}
+html[lang="ar"] .font-sans-en{font-family:var(--font-arabic)!important}
+html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}

@@ -39,7 +39,7 @@ export const CertificateVerification: React.FC = () => {
   return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
     <section className="mizan-surface p-6 sm:p-8 text-center">
       <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
-      <div className="mizan-kicker mt-5">MIZAN VERIFY</div>
+      <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
       <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar?'تحقق مستقل من الشهادة':'Certificate verification'}</h1>
       <p className="text-xs text-[#747b76] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p>
       {policy.certificates.publicVerification&&<div className="max-w-md mx-auto flex gap-2 mt-6">

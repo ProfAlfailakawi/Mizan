@@ -23,7 +23,7 @@ export const RoleSwitcher: React.FC = () => {
       <ChevronDown className={`w-3.5 h-3.5 text-[#7b817d] transition ${open?'rotate-180':''}`}/>
     </button>
     {open&&<>
-      <button className="fixed inset-0 z-40 cursor-default" onClick={()=>setOpen(false)} aria-label="close" />
+      <button className="fixed inset-0 z-40 cursor-default" onClick={()=>setOpen(false)} aria-label={language==='ar'?'إغلاق':'Close'} />
       <div className="absolute end-0 top-full mt-2 z-50 w-72 bg-[#FFFEFB] border border-[#DFDED7] rounded-2xl shadow-lg p-2">
         <div className="px-3 py-2 text-[11px] font-bold text-[#7b817d]">{language==='ar'?'معاينة الأدوار — وضع التطوير':'Role preview — development'}</div>
         <div className="grid grid-cols-2 gap-1">

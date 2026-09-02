@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BadgeCheck, Clock3, Gauge, Mic2, RadioTower, Server, UsersRound, WifiOff, Sparkles, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
@@ -6,10 +6,14 @@ import { Button } from '../design-system/Button';
 import { Pictogram } from '../design-system/Pictogram';
 import { QueueJustice } from './QueueJustice';
 import { ContinuityRecovery } from './ContinuityRecovery';
+import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
+import type { QuestionCustodyCorridorSnapshot } from '../../types';
 
 export const CommandCenter: React.FC = () => {
  const s=useAppStore(); const {language,participants,committees,incidents,isOffline,reviewCases,notifications,devices,runSimulation}=s; const ar=language==='ar';
  const [expanded,setExpanded]=useState(false); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
+ const [corridor,setCorridor]=useState<QuestionCustodyCorridorSnapshot|null>(null);
+ useEffect(()=>{let live=true;const id=s.activeSession.secureRuntimeSessionId;if(!id){setCorridor(null);return}const load=()=>void fetchCustodyCorridor(id).then(x=>live&&setCorridor(x)).catch(()=>live&&setCorridor(null));load();const timer=window.setInterval(load,5000);return()=>{live=false;window.clearInterval(timer)}},[s.activeSession.secureRuntimeSessionId]);
  const waiting=participants.filter(p=>p.status==='in_queue').length; const testing=participants.filter(p=>p.status==='in_session').length; const done=participants.filter(p=>p.status==='tested'||p.status==='certified').length;
  const sim=useMemo(()=>runSimulation(committees.length,30),[committees.length,participants.length]);
  const alerts=[...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,title:i.title,kind:'incident'})),...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,title:d.name,kind:'device'}))];
@@ -20,6 +24,8 @@ export const CommandCenter: React.FC = () => {
   {alerts.length>0&&<section className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'الحالات الاستثنائية':'EXCEPTIONS'}</div><div className="mt-2 divide-y divide-[#e5e3dc]">{alerts.slice(0,8).map(x=><div key={`${x.kind}-${x.id}`} className="py-3 flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-[#9B7542]"/><div className="text-sm font-bold flex-1">{x.title}</div><Badge variant="neutral">{x.kind}</Badge></div>)}</div></section>}
 
   <ContinuityRecovery/>
+
+  {s.activeSession.secureRuntimeSessionId&&<section className="mizan-surface px-5 py-4"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="text-[10px] font-black text-[#7A817C]">{ar?'عهدة السؤال':'QUESTION CUSTODY'}</div><div className="text-sm font-black mt-1">{ar?'التشغيل يرى الحالة فقط — لا يرى نص السؤال':'Operations see state only — never question plaintext'}</div></div><Badge variant={corridor?.plaintextIncluded===false?'emerald':'amber'}>{ar?'النص غير متاح للتشغيل':'NO PLAINTEXT'}</Badge></div><div className="mt-4 flex gap-2 overflow-x-auto">{(corridor?.questions||[]).map(q=><div key={q.questionIndex} className="min-w-[150px] rounded-2xl bg-[#F5F2EA] px-4 py-3"><div className="text-[9px] text-[#898E89]">{ar?`السؤال ${q.questionIndex+1}`:`Question ${q.questionIndex+1}`}</div><div className="mt-1 text-xs font-black">{ar?(q.state==='SEALED'?'مختوم':q.state==='PRESENCE_VERIFIED'?'الحضور مثبت':q.state==='QUORUM_PENDING'?'بانتظار النصاب':'تم الكشف'):q.state}</div><div className="mt-2 text-[9px] text-[#737B76]">{q.approved}/{q.required} {ar?'موافقات':'approvals'}</div></div>)}{!corridor&&<div className="text-[10px] text-[#868D88] py-2">{ar?'جاري قراءة حالة العهدة من الخادم…':'Reading server custody state…'}</div>}</div></section>}
 
   {waiting>=3&&<section className="mizan-surface p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div className="flex items-center gap-3"><Pictogram icon={UsersRound} size="sm"/><div><div className="font-black text-sm">{ar?'موازنة اللجان':'Committee balance'}</div><div className="text-[11px] text-[#777e79] mt-1">{elastic?(ar?elastic.reasonArabic:elastic.reasonEnglish):(ar?'تحليل مؤهل ومحكوم بالتعارضات.':'Constraint-aware load analysis.')}</div></div></div>{elastic?.status==='proposed'?<div className="flex gap-2"><Button size="sm" onClick={()=>s.decideCommitteeElasticity(elastic.id,true)}>{ar?'اعتماد':'Approve'}</Button><Button size="sm" variant="outline" onClick={()=>s.decideCommitteeElasticity(elastic.id,false)}>{ar?'رفض':'Dismiss'}</Button></div>:<Button size="sm" variant="outline" onClick={()=>s.recommendCommitteeElasticity()}>{ar?'حلل':'Analyze'}</Button>}</section>}
 
@@ -36,6 +42,6 @@ export const CommandCenter: React.FC = () => {
  </div>
 }
 const Metric=({icon:Icon,value,label}:{icon:React.ComponentType<{className?:string}>;value:number;label:string})=><div className="mizan-surface p-4"><Icon className="w-4 h-4 text-[#2F6555]"/><div className="text-3xl font-black mt-4">{value}</div><div className="text-[11px] text-[#777e79] mt-1">{label}</div></div>;
-const Health=({icon:Icon,label,ok,note}:{icon:React.ComponentType<{className?:string}>;label:string;ok:boolean;note?:string})=><div className="rounded-xl bg-[#f1efe9] p-3 flex items-center gap-3"><span className={`w-8 h-8 rounded-lg grid place-items-center ${ok?'bg-[#E7EEE9] text-[#214C40]':'bg-[#F4E6E3] text-[#A34D43]'}`}><Icon className="w-4 h-4"/></span><div><div className="text-xs font-bold">{label}</div><div className="text-[10px] text-[#7b827d] mt-0.5">{note||(ok?'OK':'Attention')}</div></div></div>;
+const Health=({icon:Icon,label,ok,note}:{icon:React.ComponentType<{className?:string}>;label:string;ok:boolean;note?:string})=><div className="rounded-xl bg-[#f1efe9] p-3 flex items-center gap-3"><span className={`w-8 h-8 rounded-lg grid place-items-center ${ok?'bg-[#E7EEE9] text-[#214C40]':'bg-[#F4E6E3] text-[#A34D43]'}`}><Icon className="w-4 h-4"/></span><div><div className="text-xs font-bold">{label}</div><div className="text-[10px] text-[#7b827d] mt-0.5">{note||(ok?'جاهز':'يحتاج انتباه')}</div></div></div>;
 
 const Pulse=({n,t}:{n:number;t:string})=><div className="rounded-xl bg-[#f1efe9] p-2 sm:p-3 text-center min-w-0"><div className="text-xl sm:text-2xl font-black tabular-nums">{n}</div><div className="text-[9px] sm:text-[10px] text-[#777e79] truncate mt-1">{t}</div></div>;

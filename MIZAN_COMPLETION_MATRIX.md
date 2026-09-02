@@ -165,3 +165,23 @@ The **software architecture and a large portion of the executable integrity logi
 | 100 participants receive different questions | ✅ when capacity exists | Tested 100 × 3 = 300 unique starts; impossible guarantees are never shown when pool capacity is smaller |
 | Automatic source-derived pool generation | ✅ | Generates candidates from certified Quran ayah boundaries for selected ajza' |
 | Expert-only start-locus mode | ✅ | Runtime can require SCIENTIFICALLY_APPROVED start loci when competition policy needs stricter ibtida governance |
+
+## Round 10 — Arabic-First Product + Soft Brand + Onboarding + Witness/Cold-Vault Hardening
+
+| Capability | Status | Evidence / boundary |
+|---|---|---|
+| Arabic mode is Arabic across core product surfaces | ✅ | Imam/rawi labels, operational states, verification, scientific library, ceremony and dynamic legacy tokens localized; technical hashes/identifiers remain unchanged |
+| Arabic regression safety net | ✅ | `ArabicInterfaceGuard` + executable `arabic-ui-audit` prevent known legacy/dynamic English leakage |
+| Qiraat/Riwayat selection redesign | ✅ | Ten imams + twenty rawi presented with Arabic hierarchy and quiet selected states |
+| Soft MIZAN identity | ✅ | New vector-like mark/wordmark system; Arabic wordmark primary; no heavy scale, mosque/crescent cliché or loud ornament |
+| Onboarding | ✅ | Three calm steps: setup, question custody, competition readiness; shown once with skip/return behavior |
+| Mushaf Focus Lens in JudgeOS | ✅ | Actual official Mushaf surface gets a side-only focus marker; Quran glyphs are never recolored/modified |
+| Zero-Knowledge Question Corridor in Operations | ✅ | Operations polls server custody state but receives no question plaintext |
+| Witness Mode hardening | ✅ | NIST-aligned separation of duties, no self-witness, optional role diversity, hash-chained attestations, scoped evidence hash |
+| Cold Vault hardening | ✅ | AES-256-GCM, external transfer key, minimum-continuity content policy, high-risk/secret rejection, restore preview + hashed test-restore receipt |
+| Public verifier Arabic UX | ✅ | Verification verdicts and metadata labels localized instead of leaking English result strings |
+| Arabic UI automated checks | ✅ | 17/17 Arabic surface checks passed |
+| Dependency-independent executable tests | ✅ | 104/104 passed after this round |
+| TypeScript | ✅ | `tsc --noEmit` passed |
+| Source/secret audits | ✅ | Both passed after the round |
+| Production Vite build | ○ | Not claimed: project dependencies are not installed in this execution environment (`vite: not found`) |
