@@ -128,3 +128,20 @@ Legend:
 ## Definition-of-done conclusion
 
 The **software architecture and a large portion of the executable integrity logic are implemented**. The project is **not “absolute perfection”** in the scientific or production sense because correctness for every Quran reading and full autonomous Tajweed judging cannot be created by code alone. The remaining boundaries are intentionally visible: authoritative source assets, certified audio/model/dataset evidence, full server-side question provisioning/client escrow integration, production cryptographic/key infrastructure, distributed backend hardening, and dependency-backed build/E2E verification.
+
+## Round 8 — KFGQPC Official Library + Official Mushaf Surface + MGIP visual evidence spine
+
+| Capability | Status | Evidence / boundary |
+|---|---|---|
+| KFGQPC points 1–14 + 16 unified library | ✅ | One official-authority library with 15 requested capabilities. |
+| Official Mushaf page surface in JudgeOS | ✅ / deployment asset | Uses mounted official page bytes only; otherwise exact official text + page/line anchors. Never fabricates a page. |
+| Smart-device Uthmanic text surface | ✅ | Structured, exact source context retained. |
+| Six official developer reading packages | ✅ | Reading-isolated, official package identities retained. |
+| Tafseer / Ghareeb / Tajweed reference layers | ✅ | Reference provenance implemented; no automatic scoring/certification inheritance. |
+| Official Quran font runtime | ✅ / deployment asset | Self-hosted endpoint; activates only when actual approved font bytes are mounted. |
+| Desktop publishing provenance | ✅ | SHA-256 manifest binds source/version/purpose/page. |
+| Publication-image provenance | ✅ | Visual evidence cannot replace structured Quran source. |
+| Official audio catalog | ✅ / content availability | Exact reading/reciter scope required; no TTS or cross-reading fallback. |
+| MGIP evidence spine | ✅ | 13 evidence controls, READY/REVIEW/BLOCKED and protocol hash. |
+| MGIP external international recognition | △ | MIZAN-proposed protocol; no external standards-body recognition is claimed. |
+| Automated official Tajweed judging across all readings | △ | Architecture exists, but capability-specific scientific model evidence is still required. |

@@ -9,7 +9,10 @@ export type KfgqpcDeveloperAssetKind =
   | 'QURAN_UNICODE_PACKAGE'
   | 'TAFSEER_DATA'
   | 'GHAREEB_DATA'
-  | 'TAJWEED_BOOK_DATA';
+  | 'TAJWEED_BOOK_DATA'
+  | 'OFFICIAL_QURAN_FONT'
+  | 'DESKTOP_PUBLISHING'
+  | 'PUBLICATION_IMAGE_SERVICE';
 
 export interface KfgqpcDeveloperAsset {
   id:string;
@@ -19,7 +22,7 @@ export interface KfgqpcDeveloperAsset {
   authority:'King Fahd Glorious Quran Printing Complex';
   authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف';
   officialCertification:'CERTIFIED';
-  officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/';
+  officialReference:string;
   narrations?:readonly string[];
   formats:readonly string[];
   fileSizeLabel?:string;
@@ -96,6 +99,16 @@ export const KFGQPC_DEVELOPER_ASSETS:readonly KfgqpcDeveloperAsset[]=[
     md5:'7E22381EEDB152EE7ED6488F2395C6CD',
     sha1:'055A908C6EC7F06912C33BD00920406C665CC5F9',
     notes:['Word-level Quranic terms with explanatory text.']
+  },
+
+  {
+    id:'kfgqpc-computer-fonts',kind:'OFFICIAL_QURAN_FONT',titleArabic:'الخطوط الحاسوبية الرسمية',titleEnglish:'Official Quran computer fonts',authority:'King Fahd Glorious Quran Printing Complex',authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',officialCertification:'CERTIFIED',officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',formats:['Computer font packages'],notes:['Use only within the exact source/riwayah scope published by KFGQPC. MIZAN must not visually substitute one reading font for another.']
+  },
+  {
+    id:'kfgqpc-desktop-publishing',kind:'DESKTOP_PUBLISHING',titleArabic:'النشر الحاسوبي لمصحف المدينة',titleEnglish:'Madinah Mushaf desktop publishing',authority:'King Fahd Glorious Quran Printing Complex',authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',officialCertification:'CERTIFIED',officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',formats:['Desktop publishing assets/tools'],notes:['Approved source path for official print/export workflows; every generated artifact must retain source/version provenance.']
+  },
+  {
+    id:'kfgqpc-publication-images',kind:'PUBLICATION_IMAGE_SERVICE',titleArabic:'صور إصدارات المجمع',titleEnglish:'Images of KFGQPC publications',authority:'King Fahd Glorious Quran Printing Complex',authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',officialCertification:'CERTIFIED',officialReference:'https://qurancomplex.gov.sa/en/techquran/techquran-apps/techquran-apps-publishios/',formats:['Official publication image service'],notes:['Visual reference only. Structured Quran text/package remains the scientific source used by FairDraw and question resolution.']
   },
   {
     id:'kfgqpc-tajweed-muyassar',

@@ -10,17 +10,18 @@ import {Button} from '../design-system/Button';
 import {MizanPictogram,type MizanPictogramKind} from '../design-system/MizanPictogram';
 import { capabilityLabel } from '../../lib/ui-language';
 import { auth } from '../../lib/firebase';
+import {OfficialQuranLibrary} from './OfficialQuranLibrary';
 
-type Tab='vault'|'qiraat'|'audio'|'ai'|'data'|'questions';
+type Tab='library'|'vault'|'qiraat'|'audio'|'ai'|'data'|'questions';
 export const ScientificGovernance:React.FC=()=>{
- const s=useAppStore(),ar=s.language==='ar';const [tab,setTab]=useState<Tab>('vault');
+ const s=useAppStore(),ar=s.language==='ar';const [tab,setTab]=useState<Tab>('library');
  const certified=s.quranSourceManifests.filter(x=>x.certificationState==='CERTIFIED'||x.status==='approved').length;
  const pending=s.quranSourceManifests.filter(x=>x.certificationState==='PENDING_REVIEW').length;
- const tabs:[Tab,React.ComponentType<{className?:string}>,string][]=[['vault',ShieldCheck,ar?'المصادر':'Sources'],['qiraat',GitBranch,ar?'القراءات':'Qiraat'],['audio',AudioLines,ar?'الصوت المرجعي':'Reference audio'],['ai',Microscope,ar?'قدرات الذكاء الاصطناعي':'AI capabilities'],['data',Database,ar?'الأدلة':'Evidence'],['questions',FileCheck2,ar?'الأسئلة':'Questions']];
+ const tabs:[Tab,React.ComponentType<{className?:string}>,string][]=[['library',Database,ar?'مكتبة المجمع':'KFGQPC Library'],['vault',ShieldCheck,ar?'خزنة المصادر':'Source Vault'],['qiraat',GitBranch,ar?'القراءات':'Qiraat'],['audio',AudioLines,ar?'الصوت المرجعي':'Reference audio'],['ai',Microscope,ar?'قدرات الذكاء الاصطناعي':'AI capabilities'],['data',Database,ar?'الأدلة':'Evidence'],['questions',FileCheck2,ar?'الأسئلة':'Questions']];
  return <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-7 space-y-5">
   <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4"><div className="flex items-start gap-4"><MizanPictogram kind="scientific-approval" size="lg" tone={pending?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'الحوكمة العلمية':'MIZAN SCIENTIFIC CORE'}</div><h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1">{ar?'المصدر قبل البرمجيات':'Source before software'}</h1><p className="text-xs text-[#747b76] mt-2 max-w-2xl">{ar?'كل حرف رسمي يعود إلى مصدر ثابت ونسخة وهاش وموافقة علمية. وكل قدرة AI تُعتمد لنطاقها فقط.':'Every official character resolves to an immutable source, version, hash and scientific approval. Every AI capability is scoped independently.'}</p></div></div><div className="flex items-end gap-5"><Metric n={certified} label={ar?'معتمد':'CERTIFIED'}/><Metric n={pending} label={ar?'للمراجعة':'REVIEW'}/></div></header>
   <nav className="flex gap-2 overflow-x-auto">{tabs.map(([id,Icon,label])=><button key={id} onClick={()=>setTab(id)} className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black border ${tab===id?'bg-[#214C40] text-white border-[#214C40]':'bg-white border-[#dedcd5] text-[#616a64]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav>
-  {tab==='vault'&&<Vault/>}{tab==='qiraat'&&<Qiraat/>}{tab==='audio'&&<ReferenceAudio/>}{tab==='ai'&&<AIRegistry/>}{tab==='data'&&<Evidence/>}{tab==='questions'&&<Questions/>}
+  {tab==='library'&&<OfficialQuranLibrary/>}{tab==='vault'&&<Vault/>}{tab==='qiraat'&&<Qiraat/>}{tab==='audio'&&<ReferenceAudio/>}{tab==='ai'&&<AIRegistry/>}{tab==='data'&&<Evidence/>}{tab==='questions'&&<Questions/>}
  </div>
 }
 

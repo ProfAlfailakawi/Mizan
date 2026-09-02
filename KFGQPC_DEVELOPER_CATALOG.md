@@ -28,3 +28,27 @@ Developer formats listed by KFGQPC include Excel, CSV, HTML5, SQL, XML, JSON, TX
 ## Important distinction: page images vs Quran text data
 
 KFGQPC provides more than the verse text used by MIZAN. The printing/digital Mushaf assets preserve page composition and visual layout at publication quality; the Unicode developer packages provide structured verse text and metadata for software. MIZAN uses the structured source for scientifically traceable passage resolution and may use official page/vector assets as a visual reference layer, but does not substitute a screenshot/page image for structured source provenance.
+
+## MIZAN operational implementation — points 1–14 and 16
+
+MIZAN now exposes the requested official capabilities through a single KFGQPC Official Library rather than separate administrative records.
+
+| Point | Capability | MIZAN implementation |
+|---:|---|---|
+| 1 | Official Madinah Mushaf vector/page master | Server-mounted official page surface; JudgeOS uses it only after lawful question reveal. |
+| 2 | Smart-device Uthmanic text | Exact structured Quran surface with page/line anchors; never mislabelled as a printed-page replica. |
+| 3 | Hafs developer package | Official source package for exact server FairDraw/passage resolution. |
+| 4 | Warsh developer package | Separate official source; no Hafs fallback. |
+| 5 | Shu'bah developer package | Separate official source. |
+| 6 | Qalun developer package | Separate official source. |
+| 7 | Al-Duri 'an Abi Amr | Separate official source and explicitly isolated from Al-Duri 'an Al-Kisa'i. |
+| 8 | Al-Susi 'an Abi Amr | Separate official source. |
+| 9 | Tafseer Muyassar | Official explanatory/learning reference; not an automatic scoring source. |
+| 10 | Ghareeb al-Quran | Word-level contextual reference and Digital Twin enrichment. |
+| 11 | Tajweed Muyassar | Official rule-reference provenance; does not automatically certify an AI detector. |
+| 12 | Official Quran fonts | Optional server-mounted font surface, exact-source scoped. |
+| 13 | Desktop publishing | Provenance-bound publishing/emergency-booklet manifest workflow. |
+| 14 | Publication images | Official visual-reference surface; structured Quran source remains authoritative for FairDraw. |
+| 16 | Official audio Mushafs | Exact-reading/reciter audio catalog for opening prompt, calibration and scientific alignment. |
+
+Scientific acceptance and operational asset readiness are intentionally separate. A KFGQPC capability can be officially accepted while a specific deployment still reports `LOCAL_BYTES_REQUIRED` because the relevant vector/font/image/audio binary has not yet been mounted on that server.

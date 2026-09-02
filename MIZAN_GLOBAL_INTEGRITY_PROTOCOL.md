@@ -17,3 +17,23 @@ Evidence layers:
 12. Public event proof: MIZAN Integrity Passport.
 
 Principle: the protocol proves what happened and which approved sources/rules governed it; it does not claim that technology replaces human religious or judging authority.
+
+## Evidence spine and visual operating model
+
+The protocol is now executable as a compact MIZAN status spine rather than only a document. Each control resolves to `READY`, `REVIEW` or `BLOCKED`, and the complete assessment is canonically hashed.
+
+Required foundational controls:
+- certified Quran source provenance;
+- immutable competition policy version;
+- verified FairDraw evidence;
+- server-held question custody;
+- participant presence and configured judge quorum before reveal;
+- independent locked human judgments;
+- Competition Black Box evidence;
+- result seal;
+- portable certificate/result proof;
+- advisory-only AI boundary.
+
+Lifecycle/conditional evidence such as a recovery checkpoint, appeal capsule or already-issued Integrity Passport can remain in `REVIEW` when the corresponding incident/lifecycle event has not occurred; their absence does not falsely block an otherwise valid competition.
+
+The public/administrative visual rule is Quiet Authority: one vertical evidence story, one state per control and one protocol hash — no security-dashboard clutter.

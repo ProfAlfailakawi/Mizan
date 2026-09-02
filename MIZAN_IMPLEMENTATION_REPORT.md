@@ -105,3 +105,43 @@ Missing scientific evidence remains PENDING/BETA/UNSUPPORTED. Human judging rema
 - Emergency replacement is limited to one already-started question, requires authorized governance decision plus panel quorum, retires the original question immutably and prevents a second replacement.
 - Added/merged MGIP-1.0 modules: Competition Black Box, Fairness Constitutional Court, Acoustic Venue Passport, Recitation Digital Twin, Mutashabihat Trap Map, Multi-Riwayah Smart Routing, Appeal Capsule, Blind Anchor Calibration, Integrity Entropy Radar, Scientific Circuit Breaker and MIZAN Integrity Passport.
 - Verification run: TypeScript noEmit PASS; tests 87/87 PASS; source audit PASS (97 files); secret scan PASS.
+
+## 2026-09-02 — KFGQPC Official Library + Official Mushaf Surface + MGIP Evidence Spine pass
+
+This pass turns the previously catalogued KFGQPC developer/publication capabilities into one coherent MIZAN product surface rather than a collection of disconnected metadata entries.
+
+### Implemented KFGQPC capabilities (requested points 1–14 and 16)
+
+- A unified `MIZAN-KFGQPC-OFFICIAL-LIBRARY-1` registry exposes exactly points 1–14 and 16 under one PRIMARY_OFFICIAL_AUTHORITY while keeping scientific acceptance separate from whether local binary/service assets are mounted on a particular deployment.
+- Official Madinah Mushaf vector/page masters can be mounted on the server and rendered by JudgeOS after question reveal. MIZAN never fabricates a Mushaf page when the official visual asset is absent.
+- Official Uthmanic smart-device text remains the structured fallback surface, with page/line anchors carried from the exact server-resolved Quran source.
+- Hafs, Warsh, Shu'bah, Qalun, Al-Duri 'an Abi Amr and Al-Susi 'an Abi Amr stay reading-isolated and resolve only from their exact accepted package.
+- Tafseer Muyassar, Ghareeb al-Quran and Tajweed Muyassar are represented as official scientific/reference capabilities with explicit non-scoring/non-AI-certification guardrails.
+- Official Quran fonts can be self-hosted by the deployment and loaded only when the server actually exposes the mounted asset. Font files are not embedded in this patch.
+- Desktop-publishing/publication-image workflows can produce a provenance manifest binding competition, official authority, source package/hash, purpose and optional page to a SHA-256 integrity commitment.
+- Official audio remains reading/reciter scoped; Quran TTS and cross-riwayah fallback remain prohibited.
+
+### JudgeOS: Official Mushaf Surface
+
+After the server-held question is lawfully revealed, JudgeOS now attempts the strongest available official visual mode in this order:
+
+1. mounted KFGQPC official page asset for the exact package/page;
+2. exact official Uthmanic text rendered with a mounted KFGQPC font when available;
+3. exact official Uthmanic text with page/line anchors.
+
+The UI explicitly states which surface is being used. Missing visual binaries never become a fake "official page".
+
+### MGIP evidence spine
+
+`MGIP-1.0` now has a computed evidence spine covering source provenance, policy, FairDraw, server question custody, participant presence/quorum, independent judge locks, continuity, Competition Black Box, result seal, portable proof, appeal evidence, AI boundary and Integrity Passport. The protocol produces `READY`, `READY_WITH_REVIEW` or `BLOCKED` plus a canonical protocol hash.
+
+MGIP remains a MIZAN-proposed protocol profile; this implementation does not claim recognition as an external international standard.
+
+### Verification actually executed after this pass
+
+- TypeScript: `tsc --noEmit` — PASS.
+- Executable tests: **93/93 PASS, 0 failed**.
+- Source audit: PASS.
+- Secret scan: PASS.
+
+The final ZIP is separately reconstructed over the prior delivered baseline and the same checks are rerun before delivery.

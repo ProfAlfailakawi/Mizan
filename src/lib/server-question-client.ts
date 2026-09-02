@@ -54,6 +54,11 @@ export interface SecureQuestionPlaintext {
   tariq?:string;
   quranSourcePackageId:string;
   quranSourcePackageHash:string;
+  pageNumber?:number;
+  lineStart?:number;
+  lineEnd?:number;
+  officialSurfaceAuthority?:string;
+  officialSurfaceMode?:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR'|'OFFICIAL_PAGE_IMAGE';
   expectedTextArabic:string;
   openingAyahArabic?:string;
 }
