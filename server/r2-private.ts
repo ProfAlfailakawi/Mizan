@@ -136,13 +136,15 @@ export class R2PrivateClient {
     return out;
   }
 
-  async health(expected='MIZAN R2 OK'){
-    const key='delivery/quran-data/health.txt';
+  async health(){
+    const key='delivery/_mizan/catalog.json';
     try{
       await this.listObjects('delivery/',undefined,1);
-      const r=await this.getObject(key);if(!r)return {state:'UNAVAILABLE' as const,reason:'HEALTH_OBJECT_MISSING'};
-      const body=(await r.text()).trim();
-      return body===expected?{state:'READY' as const}:{state:'UNAVAILABLE' as const,reason:'HEALTH_OBJECT_MISMATCH'};
+      const r=await this.getObject(key);if(!r)return {state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_MISSING'};
+      const body=await r.json() as {schemaVersion?:string;state?:string};
+      return body?.schemaVersion==='MIZAN-R2-CATALOG-1'&&body?.state==='READY'
+        ?{state:'READY' as const}
+        :{state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_NOT_READY'};
     }catch{return {state:'UNAVAILABLE' as const,reason:'R2_READ_FAILED'}}
   }
 }

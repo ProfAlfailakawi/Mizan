@@ -39,10 +39,10 @@ test('actual storage report separates delivery classes and rejects projected saf
   const objects=[
     {key:'delivery/audio/hafs/a.mp3',size:100},
     {key:'delivery/mushaf-pages/madinah/v1/001.webp',size:200},
-    {key:'delivery/quran-data/health.txt',size:12},
+    {key:'delivery/_mizan/catalog.json',size:12},
     {key:'delivery/fonts/hafs/v13/primary.ttf',size:50}
   ];
-  const r=kfgqpcActualStorageReport(objects,{} as NodeJS.ProcessEnv);assert.equal(r.totalBytes,362);assert.equal(r.audioBytes,100);assert.equal(r.mushafPagesBytes,200);assert.equal(r.quranDataBytes,12);assert.equal(r.fontsBytes,50);
+  const r=kfgqpcActualStorageReport(objects,{} as NodeJS.ProcessEnv);assert.equal(r.totalBytes,362);assert.equal(r.audioBytes,100);assert.equal(r.mushafPagesBytes,200);assert.equal(r.quranDataBytes,0);assert.equal(r.fontsBytes,50);assert.equal(r.otherBytes,12);
   assert.throws(()=>assertUploadFitsBudget([{key:'delivery/audio/x',size:KFGQPC_R2_DEFAULT_SAFETY_LIMIT_BYTES-10}],20,{} as NodeJS.ProcessEnv),/R2_SAFETY_LIMIT_EXCEEDED/);
 });
 
@@ -71,4 +71,19 @@ test('frontend source contains no R2 credential contract or private R2 hostname'
   const root=path.resolve(process.cwd(),'src');if(!fs.existsSync(root))return;
   const files=(function walk(dir:string):string[]{return fs.readdirSync(dir).flatMap(name=>{const p=path.join(dir,name),s=fs.statSync(p);return s.isDirectory()?walk(p):/\.(?:ts|tsx|js|jsx)$/.test(name)?[p]:[]})})(root);
   for(const file of files){const text=fs.readFileSync(file,'utf8');assert.equal(text.includes('R2_SECRET_ACCESS_KEY'),false,`${file} leaks server R2 secret contract`);assert.equal(text.includes('.r2.cloudflarestorage.com'),false,`${file} leaks private R2 origin`);assert.equal(text.includes('VITE_R2_'),false,`${file} defines forbidden frontend R2 variables`)}
+});
+
+test('READY catalog is fail-closed and treats Warsh/Duri audio statuses explicitly',async()=>{
+  const {buildReadyDeliveryCatalog,KFGQPC_REQUIRED_DELIVERY_DATASETS}=await import('../server/kfgqpc-ingest-core');
+  const base=KFGQPC_REQUIRED_DELIVERY_DATASETS.map((id:string)=>({id,status:'VERIFIED' as const,r2Prefix:`delivery/${id}`}));
+  const storage={totalBytes:100,audioBytes:10,mushafPagesBytes:10,quranDataBytes:70,fontsBytes:10,otherBytes:0,remainingFromFreeTierBytes:1000,remainingFromSafetyLimitBytes:900,percentageUsed:.01,safetyPercentageUsed:.02,objectCount:20,withinFreeTier:true,withinSafetyLimit:true};
+  const datasets=[...base,{id:'audio-warsh',status:'OFFICIAL_AUDIO_UNAVAILABLE' as const,r2Prefix:'delivery/audio/warsh'},{id:'audio-duri',status:'UNVERIFIED' as const,r2Prefix:'delivery/audio/duri'}];
+  const catalog=buildReadyDeliveryCatalog({datasets,storage});assert.equal(catalog.state,'READY');assert.deepEqual(catalog.unavailableAudio,['audio-warsh']);assert.deepEqual(catalog.unverifiedAudio,['audio-duri']);
+  assert.throws(()=>buildReadyDeliveryCatalog({datasets:datasets.filter(x=>x.id!=='hafs'),storage}),/R2_DELIVERY_CATALOG_INCOMPLETE:hafs/);
+});
+
+test('R2 readiness is bound to permanent READY catalog, not disposable health.txt',async()=>{
+  const original=globalThis.fetch;let requested='';
+  globalThis.fetch=async(input:any,init:any)=>{requested=String(input);if(String(init?.method)==='GET'&&requested.includes('list-type=2'))return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>',{status:200});return new Response(JSON.stringify({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY'}),{status:200,headers:{'content-type':'application/json'}})};
+  try{const client=new R2PrivateClient({endpoint:'https://acct.r2.cloudflarestorage.com',bucket:'mizan-quran-assets',accessKeyId:'A',secretAccessKey:'B'});const result=await client.health();assert.equal(result.state,'READY');assert.match(requested,/delivery\/_mizan\/catalog.json/)}finally{globalThis.fetch=original}
 });

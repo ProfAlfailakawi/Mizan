@@ -19,7 +19,6 @@ delivery/
     qalun/ali-al-hudhaifi/v1/NNN/NNN.mp3
     susi/uthman-al-siddiqi/v1/NNN/NNN.mp3
   quran-data/
-    health.txt
     hafs/v13/
     warsh/v6/
     shubah/v4/
@@ -65,17 +64,13 @@ The server maintains a small ephemeral `/tmp` cache for immutable R2 delivery ob
 
 The authenticated KFGQPC delivery-status endpoint now reports only safe state values such as `READY`, `CHECKING`, `UNAVAILABLE`, or `NOT_CONFIGURED`.
 
-Private-R2 readiness checks both bucket listing and:
+Private-R2 readiness checks both the private bucket and the permanent control-plane catalog:
 
 ```text
-delivery/quran-data/health.txt
+delivery/_mizan/catalog.json
 ```
 
-Expected content:
-
-```text
-MIZAN R2 OK
-```
+The catalog is published only after every required dataset is VERIFIED, the 604-page surface is complete, the four selected audio packages are verified, the storage safety ceiling is satisfied, Warsh audio is explicitly marked `OFFICIAL_AUDIO_UNAVAILABLE`, and Al-Duri audio remains `UNVERIFIED` until its official package discrepancy is resolved. No disposable `health.txt` object is required.
 
 No credential, secret, authorization header, or private object URL is returned.
 
@@ -90,7 +85,7 @@ npx tsx scripts/kfgqpc-ingest.ts --upload --resume --only hafs --root .mizan-ing
 npx tsx scripts/kfgqpc-ingest.ts --report --root .mizan-ingest
 ```
 
-The uploader reads credentials only from environment variables, creates `health.txt`, rejects checksum mismatches, refuses unverified datasets, rejects immutable-key conflicts, and enforces the configured storage safety ceiling before upload.
+The uploader reads credentials only from environment variables, rejects checksum mismatches, refuses unverified datasets, rejects immutable-key conflicts, enforces the configured storage safety ceiling, and publishes the permanent READY catalog only after a complete successful ingest.
 
 ## Scientific guardrails
 
@@ -100,3 +95,14 @@ The uploader reads credentials only from environment variables, creates `health.
 - Al-Duri audio remains blocked until the inconsistent official ayah-package listing is independently validated against the actual downloadable package.
 - KFGQPC historically confirms a Warsh recording, but MIZAN does not expose Warsh delivery audio until a current downloadable official ayah package and exact mapping are verified.
 - Optimized Mushaf pages are derivatives of verified official masters; the Quran is never reconstructed with OCR or retyped over page images.
+
+
+## One-shot production ingest
+
+For a full production push, stage all verified source archives and delivery payloads under `.mizan-ingest/`, then run exactly one full ingest command:
+
+```bash
+npx tsx scripts/kfgqpc-ingest.ts --upload --resume --report --root .mizan-ingest
+```
+
+The command is fail-closed: if even one required dataset is missing, unverified, quarantined, malformed, or would exceed the safety ceiling, MIZAN does not publish the READY catalog. Individual Quran/media objects remain immutable; `delivery/_mizan/catalog.json` is the only mutable readiness pointer and is accompanied by a timestamped immutable catalog snapshot.

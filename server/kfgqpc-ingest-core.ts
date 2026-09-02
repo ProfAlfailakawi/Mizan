@@ -66,3 +66,52 @@ export function buildPackageManifest(input:Omit<KfgqpcPackageManifest,'schemaVer
   assertOfficialKfgqpcUrl(input.sourceUrl);
   return {schemaVersion:'MIZAN-KFGQPC-MANIFEST-1',sourceAuthority:'King Fahd Glorious Quran Printing Complex',ingestedAt:new Date().toISOString(),...input};
 }
+
+export interface KfgqpcDeliveryCatalogDataset {
+  id:string;
+  status:KfgqpcIngestStatus;
+  r2Prefix:string;
+  fileCount?:number;
+  totalBytes?:number;
+  sha256?:string;
+  reading?:string;
+  rawi?:string;
+  reciter?:string;
+  note?:string;
+}
+export interface KfgqpcDeliveryCatalog {
+  schemaVersion:'MIZAN-R2-CATALOG-1';
+  authority:'King Fahd Glorious Quran Printing Complex';
+  generatedAt:string;
+  state:'READY';
+  datasets:KfgqpcDeliveryCatalogDataset[];
+  storage:KfgqpcActualStorageReport;
+  unavailableAudio:string[];
+  unverifiedAudio:string[];
+}
+
+export const KFGQPC_REQUIRED_DELIVERY_DATASETS=[
+  'hafs','warsh','shubah','qalun','duri-data','susi-data','tafsir','ghareeb','tajweed','mushaf-pages',
+  'audio-hafs','audio-shubah','audio-qalun','audio-susi'
+] as const;
+
+export function buildReadyDeliveryCatalog(input:{datasets:KfgqpcDeliveryCatalogDataset[];storage:KfgqpcActualStorageReport}){
+  const byId=new Map(input.datasets.map(x=>[x.id,x]));
+  const missing=KFGQPC_REQUIRED_DELIVERY_DATASETS.filter(id=>byId.get(id)?.status!=='VERIFIED');
+  if(missing.length)throw new Error(`R2_DELIVERY_CATALOG_INCOMPLETE:${missing.join(',')}`);
+  if(!input.storage.withinSafetyLimit||!input.storage.withinFreeTier)throw new Error('R2_DELIVERY_CATALOG_STORAGE_LIMIT');
+  const warsh=byId.get('audio-warsh');
+  const duri=byId.get('audio-duri');
+  if(warsh?.status!=='OFFICIAL_AUDIO_UNAVAILABLE')throw new Error('R2_WARSH_AUDIO_STATUS_INVALID');
+  if(duri?.status!=='UNVERIFIED')throw new Error('R2_DURI_AUDIO_STATUS_INVALID');
+  return {
+    schemaVersion:'MIZAN-R2-CATALOG-1' as const,
+    authority:'King Fahd Glorious Quran Printing Complex' as const,
+    generatedAt:new Date().toISOString(),
+    state:'READY' as const,
+    datasets:input.datasets,
+    storage:input.storage,
+    unavailableAudio:['audio-warsh'],
+    unverifiedAudio:['audio-duri']
+  };
+}

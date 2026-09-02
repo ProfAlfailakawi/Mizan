@@ -3,14 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {R2PrivateClient,r2ConfigFromEnv} from '../server/r2-private';
-import {assertOfficialKfgqpcUrl,assertUploadFitsBudget,buildPackageManifest,hashDirectory,listFilesRecursive,storageReport,validateMushafDeliveryPages,verifyFileChecksums,type KfgqpcChecksumExpectation,type KfgqpcIngestStatus} from '../server/kfgqpc-ingest-core';
+import {assertOfficialKfgqpcUrl,assertUploadFitsBudget,buildPackageManifest,buildReadyDeliveryCatalog,hashDirectory,listFilesRecursive,storageReport,validateMushafDeliveryPages,verifyFileChecksums,type KfgqpcChecksumExpectation,type KfgqpcIngestStatus,type KfgqpcDeliveryCatalogDataset} from '../server/kfgqpc-ingest-core';
 
 const OFFICIAL_DEV='https://qurancomplex.gov.sa/en/techquran/dev/';
 const OFFICIAL_AUDIO='https://qurancomplex.gov.sa/category/kfgqpc-quran-audio/recite/';
 
-type DatasetSpec={id:string;r2Prefix:string;sourceUrl:string;packageVersion?:string;reading?:string;rawi?:string;reciter?:string;officialChecksum?:KfgqpcChecksumExpectation;kind:'DATA'|'MUSHAF'|'AUDIO'|'FONT'|'HEALTH';blocked?:boolean;blockedStatus?:KfgqpcIngestStatus;note?:string};
+type DatasetSpec={id:string;r2Prefix:string;sourceUrl:string;packageVersion?:string;reading?:string;rawi?:string;reciter?:string;officialChecksum?:KfgqpcChecksumExpectation;kind:'DATA'|'MUSHAF'|'AUDIO'|'FONT';blocked?:boolean;blockedStatus?:KfgqpcIngestStatus;note?:string};
 const DATASETS:Record<string,DatasetSpec>={
-  health:{id:'health',r2Prefix:'delivery/quran-data',sourceUrl:OFFICIAL_DEV,kind:'HEALTH'},
   hafs:{id:'hafs',r2Prefix:'delivery/quran-data/hafs/v13',sourceUrl:OFFICIAL_DEV,packageVersion:'13.0',reading:'حفص عن عاصم',officialChecksum:{md5:'CF6841AEA5B1D1FD70D032B43FF08278',sha1:'36EA5AB0D7EA1702F17FF43F9B50924CCCD77EBF'},kind:'DATA'},
   warsh:{id:'warsh',r2Prefix:'delivery/quran-data/warsh/v6',sourceUrl:OFFICIAL_DEV,packageVersion:'6.0',reading:'ورش عن نافع',officialChecksum:{md5:'4701E8BBF053098220CF2CF4CDA206A1',sha1:'44ECEA8FEB23817FDC01A8EE2162A6A0CF08CAE7'},kind:'DATA'},
   shubah:{id:'shubah',r2Prefix:'delivery/quran-data/shubah/v4',sourceUrl:OFFICIAL_DEV,packageVersion:'4.0',reading:'شعبة عن عاصم',officialChecksum:{md5:'5CDA29121BF0D7234E039002E1FBF600',sha1:'8D66BDF0CAB96DC7D1032792C19F77980CA6682A'},kind:'DATA'},
@@ -32,7 +31,7 @@ const DATASETS:Record<string,DatasetSpec>={
 const args=process.argv.slice(2);const has=(x:string)=>args.includes(x);const value=(x:string)=>{const i=args.indexOf(x);return i>=0?args[i+1]:undefined};
 const root=path.resolve(value('--root')||'.mizan-ingest');const only=value('--only');const doUpload=has('--upload'),doVerify=has('--verify')||doUpload,doReport=has('--report'),resume=has('--resume'),dryRun=has('--dry-run')||(!doUpload&&!doReport&&!doVerify);
 const reportDir=path.join(root,'reports');fs.mkdirSync(reportDir,{recursive:true});
-const selected=only?[DATASETS[only]].filter(Boolean):Object.values(DATASETS).filter(x=>!x.blocked&&x.kind!=='HEALTH');if(only&&!DATASETS[only])throw new Error(`UNKNOWN_DATASET:${only}`);
+const selected=only?[DATASETS[only]].filter(Boolean):Object.values(DATASETS);if(only&&!DATASETS[only])throw new Error(`UNKNOWN_DATASET:${only}`);
 
 const mediaType=(file:string)=>file.endsWith('.webp')?'image/webp':file.endsWith('.avif')?'image/avif':file.endsWith('.png')?'image/png':file.endsWith('.mp3')?'audio/mpeg':file.endsWith('.m4a')?'audio/mp4':file.endsWith('.woff2')?'font/woff2':file.endsWith('.woff')?'font/woff':file.endsWith('.ttf')?'font/ttf':file.endsWith('.json')?'application/json':file.endsWith('.txt')?'text/plain; charset=utf-8':'application/octet-stream';
 const fileSha=(file:string)=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -44,7 +43,6 @@ function readSourceMeta(dir:string,spec:DatasetSpec){
   return {...meta,sourceUrl};
 }
 function verifyDataset(spec:DatasetSpec){
-  if(spec.kind==='HEALTH')return {spec,status:'VERIFIED' as KfgqpcIngestStatus,health:true};
   if(spec.blocked)return {spec,status:spec.blockedStatus||'UNVERIFIED' as KfgqpcIngestStatus,reason:spec.note};
   const dir=path.join(root,spec.id),payload=path.join(dir,'payload');if(!fs.existsSync(payload))return {spec,status:'UNVERIFIED' as KfgqpcIngestStatus,reason:'PAYLOAD_MISSING'};
   const meta=readSourceMeta(dir,spec);let computed:any=undefined,status:KfgqpcIngestStatus='VERIFIED';const notes:string[]=[];
@@ -58,7 +56,6 @@ function verifyDataset(spec:DatasetSpec){
   fs.writeFileSync(path.join(reportDir,`${spec.id}.manifest.json`),JSON.stringify(manifest,null,2)+'\n');return {spec,status,manifest,payload,files:d.files,notes};
 }
 
-async function uploadHealth(r2:R2PrivateClient){const body='MIZAN R2 OK\n',sha=crypto.createHash('sha256').update(body).digest('hex'),key='delivery/quran-data/health.txt';const head=await r2.headObject(key);if(head?.sha256===sha)return {key,status:'SKIPPED'};if(head&&!resume)throw new Error('R2_IMMUTABLE_KEY_CONFLICT:health.txt');if(!dryRun)await r2.putObject(key,body,'text/plain; charset=utf-8',{sha256:sha});return {key,status:dryRun?'DRY_RUN':'UPLOADED'};}
 async function uploadVerified(r2:R2PrivateClient,result:ReturnType<typeof verifyDataset>){
   if(!('manifest'in result)||result.status!=='VERIFIED')throw new Error(`DATASET_NOT_VERIFIED:${result.spec.id}:${result.status}`);
   let objects=await r2.listAllObjects('delivery/');const uploaded:any[]=[];
@@ -71,11 +68,34 @@ async function uploadVerified(r2:R2PrivateClient,result:ReturnType<typeof verify
   return uploaded;
 }
 
+function catalogDataset(result:ReturnType<typeof verifyDataset>):KfgqpcDeliveryCatalogDataset{
+  if('manifest'in result)return {id:result.spec.id,status:result.status,r2Prefix:result.spec.r2Prefix,fileCount:result.manifest.fileCount,totalBytes:result.manifest.totalBytes,sha256:result.manifest.sha256,reading:result.spec.reading,rawi:result.spec.rawi,reciter:result.spec.reciter,note:result.notes.join('; ')||undefined};
+  return {id:result.spec.id,status:result.status,r2Prefix:result.spec.r2Prefix,reading:result.spec.reading,rawi:result.spec.rawi,reciter:result.spec.reciter,note:result.reason};
+}
+
+async function publishReadyCatalog(r2:R2PrivateClient,results:ReturnType<typeof verifyDataset>[]){
+  const objects=await r2.listAllObjects('delivery/');
+  const report=storageReport(objects);
+  const catalog=buildReadyDeliveryCatalog({datasets:results.map(catalogDataset),storage:report});
+  const body=JSON.stringify(catalog,null,2)+'\n';const sha=crypto.createHash('sha256').update(body).digest('hex');
+  const versionKey=`delivery/_mizan/catalog-${catalog.generatedAt.replace(/[:.]/g,'-')}.json`;
+  if(!dryRun){await r2.putObject(versionKey,body,'application/json',{sha256:sha});await r2.putObject('delivery/_mizan/catalog.json',body,'application/json',{sha256:sha})}
+  fs.writeFileSync(path.join(reportDir,'delivery-catalog.json'),body);
+  return {catalog,versionKey,status:dryRun?'DRY_RUN':'PUBLISHED'};
+}
+
 async function main(){
   const results=selected.map(verifyDataset);for(const r of results)console.log(JSON.stringify({dataset:r.spec.id,status:r.status,notes:'notes'in r?r.notes:[r.reason].filter(Boolean)}));
   if(dryRun&&!doReport){console.log(JSON.stringify({mode:'DRY_RUN',root,selected:selected.map(x=>x.id)}));return}
   const cfg=r2ConfigFromEnv();if((doUpload||doReport)&&!cfg)throw new Error('R2_PRIVATE_ENV_NOT_CONFIGURED');const r2=cfg?new R2PrivateClient(cfg):null;
-  if(doUpload&&r2){await uploadHealth(r2);for(const r of results)if(r.spec.kind!=='HEALTH')await uploadVerified(r2,r)}
+  if(doUpload&&r2){
+    if(only){const r=results[0];if(r.spec.blocked)throw new Error(`DATASET_BLOCKED:${r.spec.id}:${r.status}`);await uploadVerified(r2,r)}
+    else{
+      const unready=results.filter(r=>!r.spec.blocked&&r.status!=='VERIFIED');if(unready.length)throw new Error(`FULL_INGEST_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+      for(const r of results)if(!r.spec.blocked)await uploadVerified(r2,r);
+      const published=await publishReadyCatalog(r2,results);console.log(JSON.stringify({deliveryCatalog:published.status,versionKey:published.versionKey}));
+    }
+  }
   if(doReport&&r2){const objects=await r2.listAllObjects('delivery/'),report=storageReport(objects);fs.writeFileSync(path.join(reportDir,'r2-storage-report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({storageReport:report}))}
 }
 main().catch(err=>{console.error(err instanceof Error?err.message:'INGEST_FAILED');process.exitCode=1});
