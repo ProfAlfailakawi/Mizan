@@ -122,7 +122,8 @@ export interface Category {
   name: string;
   nameArabic: string;
   description: string;
-  riwaya: string; // e.g. Hafs, Warsh, Qalun, Al-Duri
+  riwaya: string; // legacy display string; scientific logic resolves exact canonical reading contexts.
+  readingContexts?: { qiraahId:string; rawiId:string; tariqIds?:string[]; allowedWujuh?:string[] }[];
   memorizationScope: string; // e.g. "Full Quran", "20 Juz", "10 Juz", "5 Juz"
   juzCount: number;
   minAge?: number;
@@ -271,6 +272,7 @@ export interface QuestionSelection {
   seedCommitmentHash: string;
   fairnessToleranceDelta: number;
   generatedAt: string;
+  algorithmVersion?:string; poolVersion?:string; poolSnapshotHash?:string; ruleVersion?:string; constraintHash?:string; publicCommitmentHash?:string; seedReveal?:string; quranSourceManifestId?:string; quranSourceVersion?:string; quranSourcePackageHash?:string; sourceMode?:'CERTIFIED_SOURCE'|'DEVELOPMENT_FIXTURE'; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string;
 }
 
 export type JudgeEventType = string;
@@ -316,6 +318,11 @@ export interface AIObservation {
   reviewClipEndSec: number;
   audioClipUrl?: string;
   flaggedForReview: boolean;
+  participantId?:string; capability?:AICapability; model?:string; modelVersion?:string; modelHash?:string;
+  qiraah?:string; rawi?:string; tariq?:string; wajh?:string; expectedQuranPosition?:string; observedEvidence?:string|Record<string,unknown>;
+  calibratedConfidence?:number; capabilityCertificationState?:AICertificationState; capabilityCertificationVersion?:string;
+  benchmarkReference?:string; modelEvidence?:string|Record<string,unknown>; humanReviewState?:'pending'|'confirmed'|'dismissed'|'ambiguous'; humanReviewer?:string; humanDecision?:string;
+  audioStart?:number; audioEnd?:number; phonemeSchemaVersion?:string;
 }
 
 export interface ReviewCase {
@@ -418,6 +425,8 @@ export interface Certificate {
   verificationUrl: string;
   isAuthentic: boolean;
   qrPayload: string;
+  resultId?:string; certificateVersion?:string; resultSealReference?:string; merkleProofId?:string; issuerSignature?:string; issuedTimestamp?:string;
+  revocationState?:'ACTIVE'|'REVOKED'; revocationReason?:string; proofPackageHash?:string;
 }
 
 export interface AuditEvent {
@@ -455,7 +464,7 @@ export interface SimulationResult {
 export interface IncidentRecord {
   id: string;
   competitionId: string;
-  type: 'power' | 'network' | 'audio_mic' | 'device' | 'judge_absence' | 'participant_emergency' | 'conflict_routing' | 'security' | 'venue';
+  type: 'power' | 'network' | 'audio_mic' | 'device' | 'judge_absence' | 'participant_emergency' | 'conflict_routing' | 'security' | 'venue' | 'quran_source_discrepancy' | 'source_hash_mismatch' | 'wrong_riwayah_mapping' | 'variant_locus_error' | 'ai_false_positive_cluster' | 'ai_false_negative_cluster' | 'model_regression' | 'dataset_contamination' | 'annotation_defect' | 'certification_scope_violation';
   severity: 'critical' | 'moderate' | 'low';
   title: string;
   description: string;
@@ -564,6 +573,9 @@ export interface OperationsPolicy {
   offlineContinuity: boolean;
   lateArrivalGraceMinutes: number;
   badgeMode: 'digital' | 'print' | 'both' | 'none';
+  fatigueGuardEnabled?: boolean;
+  fatigueTargetMinutes?: number;
+  fatigueRecommendedBreakMinutes?: number;
 }
 
 export interface ResultPolicy {
@@ -607,6 +619,8 @@ export interface PrivacyPolicy {
   allowAnonymousBenchmarking: boolean;
 }
 
+export type CompetitionAIPolicyMode='AI_DISABLED'|'AI_AUDIO_QUALITY_ONLY'|'AI_ALIGNMENT_ONLY'|'AI_MEMORIZATION_ADVISORY'|'AI_CERTIFIED_CAPABILITIES_ONLY'|'AI_RESEARCH_SHADOW_MODE';
+export interface CompetitionAIPolicy { mode:CompetitionAIPolicyMode; enabledCapabilities?:Partial<Record<AICapability,boolean>>; requireCertifiedScope:boolean; revealOnlyAfterJudgeLock:boolean; }
 export interface CompetitionPolicy {
   version: string;
   templateId?: string;
@@ -618,6 +632,7 @@ export interface CompetitionPolicy {
   appeals: AppealPolicy;
   certificates: CertificatePolicy;
   privacy: PrivacyPolicy;
+  aiPolicy: CompetitionAIPolicy;
   workflow: WorkflowStagePolicy[];
   terminology?: Record<string, { ar: string; en: string }>;
   updatedAt: string;
@@ -664,7 +679,7 @@ export interface NotificationRecord { id:string; competitionId:string; participa
 export interface WebhookSubscription { id:string; organizationId:string; competitionId?:string; event:string; endpoint:string; enabled:boolean; secretRef:string; lastDeliveryStatus?:'success'|'failed'; }
 export interface DeviceRecord { id:string; competitionId:string; name:string; type:'kiosk'|'judge_tablet'|'edge_server'|'display'|'printer'|'audio'; role?:'Gate'|'Kiosk'|'JudgeOS'|'Head Judge'|'Operations'|'Waiting Display'|'Committee Display'|'Exception Host'|'Ceremony'|'Broadcast'|'Edge'; zone?:string; committeeId?:string; status:'online'|'offline'|'degraded'|'disabled'|'revoked'; connection?:'online'|'offline'|'local'; lastSeenAt:string; lastSyncAt?:string; softwareVersion:string; sessionExpiresAt?:string; batteryPercent?:number; revokedAt?:string; }
 export interface DelegationTravelRecord { id:string; competitionId:string; delegationId:string; participantId?:string; flightNumber?:string; arrivalAirport?:string; arrivalAt?:string; hotel?:string; room?:string; transportStatus:'not_required'|'pending'|'scheduled'|'completed'; companionCount:number; notes?:string; }
-export interface ConsentRecord { id:string; participantId:string; competitionId:string; kind:'terms'|'privacy'|'audio_recording'|'ai_processing'|'guardian'; version:string; accepted:boolean; acceptedAt:string; guardianName?:string; }
+export interface ConsentRecord { id:string; participantId:string; competitionId:string; kind:'terms'|'privacy'|'audio_recording'|'ai_processing'|'guardian'|'human_review'|'ai_inference'|'ai_validation'|'ai_training'|'scientific_research'|'external_dataset_publication'; version:string; accepted:boolean; acceptedAt:string; guardianName?:string; }
 export interface ImportJobRecord { id:string; competitionId:string; entity:'participants'|'judges'|'delegations'|'categories'|'committees'|'historical_results'; fileName:string; status:'mapping'|'validated'|'dry_run'|'imported'|'failed'|'rolled_back'; totalRows:number; validRows:number; invalidRows:number; duplicateRows?:number; columns?:string[]; mapping:Record<string,string>; errors:{row:number;message:string}[]; warnings?:{row:number;message:string}[]; rollbackToken?:string; importedIds?:string[]; createdAt:string; completedAt?:string; }
 export interface ShadowRun { id:string; competitionId:string; mode:'record'|'analyze'|'simulate'|'compare'; status:'draft'|'running'|'completed'; startedAt?:string; completedAt?:string; observations:{type:string;severity:'info'|'medium'|'high';summary:string}[]; }
 export interface ParticipantPassportEntry { id:string; participantId:string; competitionId:string; competitionName:string; categoryName:string; year:string; result?:string; certificateNumber?:string; verified:boolean; }
@@ -676,14 +691,43 @@ export interface SupportSession { id:string; organizationId:string; requestedBy:
 export interface RemoteSessionCheck { id:string; participantId:string; competitionId:string; identity:'pending'|'verified'|'failed'; device:'pending'|'passed'|'failed'; environment:'pending'|'passed'|'review'; networkQuality:'good'|'fair'|'poor'; recordingReady:boolean; suspiciousSignals:string[]; }
 
 
+export type QuranSourceCertificationState='DEVELOPMENT'|'PENDING_REVIEW'|'CERTIFIED'|'REVOKED';
+export interface QuranScientificReview {
+  reviewerId:string; reviewerName:string; reviewerRole?:string; decision:'approve'|'reject'; comments?:string; packageHash:string; reviewedAt:string;
+}
 export interface QuranSourceManifestRecord {
-  id:string; organizationId:string; riwaya:string; edition:string; version:string; checksumSha256:string; sourceAuthority:string; reviewerNames:string[]; status:'draft'|'reviewed'|'approved'|'retired'; createdAt:string; approvedAt?:string;
+  id:string; organizationId:string;
+  // Legacy compatibility fields remain mapped to the scientific state; no parallel source model is created.
+  riwaya:string; edition:string; version:string; checksumSha256:string; sourceAuthority:string; reviewerNames:string[]; status:'draft'|'reviewed'|'approved'|'retired'; createdAt:string; approvedAt?:string;
+  sourcePublication?:string; sourceEdition?:string; sourceVersion?:string; publicationDate?:string;
+  qiraah?:string; imam?:string; rawi?:string; tariq?:string; wajh?:string;
+  rasmSystem?:string; dabtSystem?:string; ayahNumberingConvention?:string; surahNumberingConvention?:string; waqfConvention?:string;
+  sourceFiles?:{name:string;format:string;sha256:string;sizeBytes?:number}[]; packageHash?:string; checksumAlgorithm?:'SHA-256'; expectedChecksumSha256?:string; checksumVerificationState?:'MATCH'|'MISMATCH'|'NOT_PROVIDED'; contentHash?:string; structuralValidation?:{surahCount:number;ayahCount:number;surahCountValid:boolean;ayahCountProfile?:string;ayahCountValid?:boolean;errors:string[]};
+  sourceReference?:string; licenseProvenance?:string; ingestionTimestamp?:string; ingestedBy?:string;
+  scientificReviews?:QuranScientificReview[]; scientificReviewNotes?:string; approvalVersion?:string; approvedBy?:string[];
+  certificationState?:QuranSourceCertificationState; revocationState?:'ACTIVE'|'REVOKED'; revocationReason?:string; supersededBy?:string;
+  historicalUsageReferences?:string[]; usageRestrictions?:string[]; immutable?:boolean; pendingScientificSource?:boolean;
 }
 export interface QuestionGovernanceRecord {
   questionId:string; competitionId:string; sourceManifestId?:string; expertDifficulty:number; historicalDifficulty?:number; status:'fixture'|'draft'|'reviewed'|'approved'|'retired'; reviewedBy?:string; updatedAt:string;
 }
+export type AICapability =
+  |'audio_quality'|'speech_non_speech'|'surah_alignment'|'ayah_alignment'|'word_alignment'|'quran_position'
+  |'memorization_watch'|'omission'|'insertion'|'substitution'|'repetition'|'restart'|'jump'|'hesitation'|'similar_verse_transition'
+  |'tajweed_phoneme'|'phoneme_recognition'|'phoneme_substitution'|'phoneme_deletion'|'phoneme_insertion'
+  |'makhraj'|'sifat'|'gemination'|'madd'|'madd_duration'|'ghunnah'|'ghunnah_duration'|'ikhfa'|'idgham'|'iqlab'|'izhar'
+  |'qalqalah'|'tafkhim'|'tarqiq'|'hamzah_behavior'|'waqf_pause_detection'|'waqf_classification'|'ibtida'|'pause_duration';
+export type AICertificationState='RESEARCH'|'BETA'|'PENDING_VALIDATION'|'CERTIFIED'|'SUSPENDED'|'REVOKED'|'UNSUPPORTED';
 export interface AICapabilityValidationRecord {
-  id:string; organizationId:string; riwaya:string; capability:'word_alignment'|'memorization_watch'|'tajweed_phoneme'|'audio_quality'; modelName:string; modelVersion:string; datasetName:string; datasetSize:number; falsePositiveRate?:number; falseNegativeRate?:number; status:'draft'|'validated'|'certified'|'suspended'; evidenceRef?:string; approvedBy:string[]; updatedAt:string;
+  id:string; organizationId:string; riwaya:string; capability:AICapability; modelName:string; modelVersion:string; datasetName:string; datasetSize:number;
+  falsePositiveRate?:number; falseNegativeRate?:number; status:'draft'|'validated'|'certified'|'suspended'; evidenceRef?:string; approvedBy:string[]; updatedAt:string;
+  provider?:string; modelHash?:string; qiraah?:string; rawi?:string; tariq?:string; wajh?:string; datasetVersion?:string; benchmark?:string; benchmarkVersion?:string; benchmarkReference?:string;
+  phonemeErrorRate?:number; precision?:number; recall?:number; f1?:number; falseAcceptanceRate?:number; falseRejectionRate?:number; diagnosticErrorRate?:number;
+  calibrationError?:number; calibrationReference?:string; recommendedReviewThreshold?:number;
+  speakerPopulation?:string; ageRange?:string; genderCoverage?:string; nativeNonNativeCoverage?:string; accentCoverage?:string;
+  audioEnvironment?:string; noiseRange?:string; deviceClass?:string; samplingRequirements?:string;
+  evaluationDate?:string; scientificBoard?:string; approvalVersion?:string; reviewDate?:string; certificationState?:AICertificationState; validationStage?:'RESEARCH'|'LAB_VALIDATION'|'SHADOW_MODE'|'SCIENTIFIC_REVIEW'|'LIMITED_BETA'|'CERTIFIED'; shadowEvidenceRef?:string;
+  scopeNotes?:string; reproducibility?:{codeVersion?:string;datasetSplit?:string;seed?:string;evaluationScriptVersion?:string;metricDefinitionsVersion?:string;environment?:string};
 }
 export interface OperatingCostModel { baselineStaff:number; mizanStaff:number; hoursPerDay:number; days:number; hourlyCost?:number; currency?:string; }
 export interface AudioRecordingRecord {
@@ -720,8 +764,8 @@ export type QuorumActionType='results_seal'|'ceremony_reveal'|'policy_publish'|'
 export interface QuorumApproval { actorId:string;actorName:string;actorRole:Role;approvedAt:string; }
 export interface QuorumActionRecord {
   id:string; competitionId:string; action:QuorumActionType; entityId:string;
-  requiredRoleGroups:Role[][]; distinctActorsRequired:boolean; approvals:QuorumApproval[];
-  status:'pending'|'ready'|'executed'|'cancelled'; requestedAt:string; requestedBy:string; executedAt?:string; executedBy?:string;
+  requiredRoleGroups:Role[][]; distinctActorsRequired:boolean; approvals:QuorumApproval[]; minimumApprovals?:number; authorizedRoles?:Role[];
+  status:'pending'|'ready'|'executed'|'cancelled'; requestedAt:string; requestedBy:string; executedAt?:string; executedBy?:string; approvalExpiresAt?:string; revokedApprovalActorIds?:string[]; cryptographicAssurance?:'development_adapter'|'production_threshold'; publicCommitmentHash?:string;
 }
 
 export interface InvariantCheckResult {
@@ -757,10 +801,10 @@ export interface LocalMeshSessionRecord {
   transportMode?:'journal_only'|'browser_broadcast'|'edge_relay';transportStatus?:'connected'|'unavailable'|'disabled';
 }
 
-export type FederationClaimType='identity_verified'|'age_verified'|'delegation_authorized'|'guardian_consent_verified'|'travel_document_verified'|'organization_nomination';
+export type FederationClaimType='identity_verified'|'age_verified'|'delegation_authorized'|'guardian_consent_verified'|'travel_document_verified'|'organization_nomination'|'judge_credential_valid'|'participant_nomination_valid'|'certificate_authentic';
 export interface FederationAttestationRecord {
   id:string;organizationId:string;subjectRef:string;subjectKind:'participant'|'delegation';issuer:string;claim:FederationClaimType;value:string;
-  issuedAt:string;expiresAt?:string;status:'valid'|'revoked';evidenceDigest:string;signatureRef:string;privacyMode:'claim_only';
+  issuedAt:string;expiresAt?:string;status:'valid'|'revoked';evidenceDigest:string;signatureRef:string;privacyMode:'claim_only'; scope?:string; revocationEndpoint?:string; evidencePolicy?:string; privacyClassification?:'public_claim'|'restricted_claim'; issuerKeyId?:string; signatureAlgorithm?:string;
 }
 
 export interface MizanProtocolPackageRecord {
@@ -805,5 +849,39 @@ export interface CommitteeElasticityRecommendation {
 }
 export interface JourneyPassRecord {
   id:string; competitionId:string; participantId:string; participantCode:string; version:'MZ1';
-  payload:string; checksum:string; issuedAt:string; status:'active'|'revoked';
+  payload:string; checksum:string; issuedAt:string; status:'active'|'revoked'; validFrom?:string; expiresAt?:string; credentialId?:string; issuer?:string; categoryEntitlement?:string; signature?:string; signatureAlgorithm?:string; issuerPublicKeyJwk?:JsonWebKey; signatureAssurance?:'development_per_credential'|'production_issuer_key'; revocationVersion?:number; usedAt?:string;
 }
+
+
+// ---- Scientific foundation + Next Generation merge records -------------------------------
+export interface QuranSourceContentRecord { id:string;organizationId:string;sourceManifestId:string;packageHash:string;contentHash:string;sourceFileHash:string;sourceFormat:string;verseCount:number;surahCount:number;rows:{surah:number;ayah:number;text:string}[];importedAt:string;immutable:boolean; }
+export interface QiraatGraphNode {
+  qiraahId:string; qiraah:string; imam:string; rawiId:string; rawi:string; tariqIds:string[]; allowedWujuh:string[]; canonical:boolean; sourceStatus:'AVAILABLE_CANDIDATE'|'PENDING_SCIENTIFIC_SOURCE'; sourceManifestId?:string;
+}
+export interface VariantLocusRecord { id:string;surah:number;ayah:number;wordPosition?:number;baseReading?:string;alternateReading?:string;qiraah:string;rawi:string;tariq?:string;allowedWajh?:string;pronunciationEvidenceRef?:string;rasmEvidenceRef?:string;scientificNote?:string;version:string;approvalState:'DEVELOPMENT'|'PENDING_REVIEW'|'CERTIFIED'|'REVOKED'; }
+export interface QuranReferenceAudioRecord { id:string;organizationId:string;reciter:string;qiraah:string;rawi:string;tariq?:string;surah:number;ayahStart:number;ayahEnd:number;recordingSource:string;recordingDate?:string;audioFormat:string;sampleRate?:number;channels?:number;fileHash:string;approvalState:'REFERENCE'|'PENDING_REVIEW'|'APPROVED_REFERENCE'|'REVOKED';reviewer?:string;usageScope:string[];licenseProvenance?:string; }
+export interface QuranCrossCheckRecord { id:string;organizationId:string;sourceManifestId:string;sourcePackageHash:string;referenceAuthority:string;referenceVersion?:string;referenceHash?:string;status:'MATCH'|'DIFFERENCE'|'UNVERIFIED';differenceCount:number;differences:{surah:number;ayah:number;level:'TEXT'|'CHARACTER'|'DIACRITIC'|'WAQF_MARKER'|'UNVERIFIED';left:string;right:string;offset?:number}[];createdAt:string;createdBy:string; }
+export interface QuranPhonemeEvidenceRecord { schemaVersion:string; phoneme:string; allophone?:string; gemination?:boolean; durationMs?:number; madd?:{kind?:string;durationMs?:number;relativeUnits?:number}; nasalization?:boolean; emphasis?:boolean; voicing?:string; articulationContext?:string; pauseBehavior?:string; readingSpecificRealization?:string; boundaryConfidence?:number; }
+export interface ScientificAdjudicationCaseRecord { id:string;organizationId:string;datasetId:string;capability:AICapability;sampleRef:string;expertLabels:{reviewerId:string;label:string;reasoningCode?:string;createdAt:string}[];status:'OPEN'|'ADJUDICATED';finalGoldLabel?:string;adjudicatedBy?:string;adjudicatedAt?:string; }
+export interface ScientificImpactReportRecord { id:string;organizationId:string;kind:'QURAN_SOURCE_REVOCATION'|'AI_CAPABILITY_SUSPENSION'|'MODEL_CHANGE'|'DATASET_REVOCATION';entityId:string;reason:string;futureUseBlocked:boolean;affectedCompetitionIds:string[];affectedHistoricalRecordIds:string[];createdAt:string;createdBy:string; }
+export interface ScientificDatasetRecord { id:string;organizationId:string;name:string;version:string;purpose:string;source:string;license?:string;consent:string[];recordingProvenance:string;qiraah:string;rawi:string;tariq?:string;speakerCount:number;utteranceCount:number;hours:number;ageDistribution?:string;genderCoverage?:string;nativeNonNativeDistribution?:string;accentDistribution?:string;deviceDistribution?:string;environmentDistribution?:string;annotationSchema:string;annotationVersion:string;annotators:string[];annotatorQualifications:string[];blindAnnotation:boolean;interRaterAgreement?:number;adjudicationMethod?:string;goldLabelMethod?:string;trainSplit:string;validationSplit:string;testSplit:string;speakerLeakageChecked:boolean;contentLeakageChecked:boolean;datasetHash:string;status:'RESEARCH'|'VALIDATION'|'APPROVED_BENCHMARK'|'REVOKED'; }
+export interface BenchmarkRunRecord { id:string;organizationId:string;modelName:string;modelVersion:string;capability:AICapability;qiraah:string;rawi:string;tariq?:string;datasetId:string;datasetVersion:string;benchmark:string;benchmarkVersion:string;ranAt:string;metrics:{phonemeErrorRate?:number;precision?:number;recall?:number;f1?:number;falseAcceptanceRate?:number;falseRejectionRate?:number;diagnosticErrorRate?:number;sensitivity?:number;specificity?:number;calibrationError?:number;expectedCalibrationError?:number};calibrationCurve?:{lower:number;upper:number;count:number;meanConfidence:number;observedAccuracy:number}[];groupMetrics?:Record<string,Record<string,number>>;confusionMatrix?:number[][];reproducibility:{codeVersion:string;split:string;seed:string;evaluationScriptVersion:string;metricDefinitionsVersion:string;environment?:string};status:'COMPLETED'|'INVALIDATED'; }
+export interface PolicyCompilerEvidence { id:string;sourceFileName:string;sourceType:'pdf'|'docx'|'text'|'form'|'genome';page?:number;lineStart?:number;lineEnd?:number;excerpt:string; }
+export interface PolicyCompilerRule { id:string;category:string;summary:string;genomePath:string;proposedValue:unknown;confidence:'HIGH'|'MEDIUM'|'LOW';state:'UNDERSTOOD'|'NEEDS_REVIEW'|'CONFLICT';evidenceIds:string[]; }
+export interface PolicyCompilationRecord { id:string;competitionId:string;sourceFileName:string;sourceType:'pdf'|'docx'|'text'|'form'|'genome';sourceHash:string;createdAt:string;createdBy:string;state:'EXTRACTED'|'DRAFT'|'REVIEWED'|'SIMULATED'|'PUBLISHED'|'REJECTED';rules:PolicyCompilerRule[];evidence:PolicyCompilerEvidence[];proposedPolicyVersion:string;humanApprovedBy?:string;simulatedAt?:string;simulationHash?:string;simulationSummary?:{blockers:number;reviews:number;infos:number};publishedAt?:string;publishedGenomeVersion?:string; }
+export interface ContradictionIssueRecord { id:string;competitionId:string;severity:'BLOCKER'|'REVIEW'|'INFO';kind:'logical'|'scientific'|'privacy'|'operational'|'resource'|'permission'|'publication'|'blind_judging'|'qiraah_ai'|'certificate';title:string;why:string;affectedWorkflow:string;evidence:string[];fixTarget:'competition_dna'|'scientific'|'field'|'trust'|'privacy'|'none'; }
+export interface CeremonyVaultRecord { id:string;competitionId:string;resultPackageHash:string;encryptedPayload?:string;encryptionAlgorithm?:string;keyManagement:'development_adapter'|'production_external_kms';quorumActionId:string;status:'SEALED'|'READY'|'REVEALED'|'REVOKED';createdAt:string;revealTimestamp?:string;publicCommitmentHash:string; }
+export interface DisasterPackRecord { id:string;competitionId:string;version:string;createdAt:string;createdBy:string;packageHash:string;encryptedPayload:string;encryptionMode:'development_adapter'|'production_kms';contentsManifest:string[];status:'EXPORTED'|'VERIFIED'|'RESTORE_TESTED'|'REVOKED';verifiedAt?:string;restoreTestedAt?:string; }
+export interface DeviceReassignmentRecord { id:string;competitionId:string;failedDeviceId:string;spareDeviceId:string;fromRole?:DeviceRecord['role'];toRole:DeviceRecord['role'];requiredCachedState:string[];status:'PROPOSED'|'APPROVED'|'DISMISSED'|'APPLIED'|'BLOCKED';reason:string;createdAt:string;decidedAt?:string;decidedBy?:string; }
+export interface JudgeFatigueRecommendationRecord { id:string;competitionId:string;committeeId:string;continuousMinutes:number;sessions:number;timeSinceBreakMinutes:number;recommendedBreakMinutes:number;policyTargetMinutes:number;message:string;status:'RECOMMENDED'|'APPROVED'|'DISMISSED'|'DISABLED';createdAt:string; }
+export interface FairDrawProofRecord {
+  id:string;competitionId:string;questionSetId:string;algorithmVersion:string;ruleVersion:string;poolVersion:string;poolSnapshotHash:string;constraintHash:string;seedCommitmentHash:string;publicCommitmentHash:string;secretSeed?:string;selectionIds:string[];status:'COMMITTED'|'REVEALED'|'VERIFIED';createdAt:string;revealedAt?:string;
+  participantReading?:string; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string; quranSourceManifestId?:string; quranSourcePackageHash?:string;
+  constraints?:{questionsPerParticipant:number;targetDifficulty:number;difficultyTolerance:number;diversity:CompetitionPolicy['questions']['diversity'];maxJuz?:number;excludedIds?:string[]};
+  eligiblePoolSnapshot?:{id:string;riwaya:string;surahNumber:number;startAyah:number;endAyah:number;juzNumber:number;difficultyRating:number;mutashabihatDensity:QuestionPoolItem['mutashabihatDensity'];tajweedComplexity:QuestionPoolItem['tajweedComplexity']}[];
+  verificationStatement?:string;
+}
+export interface FederationTrustRecord { id:string;organizationId:string;issuer:string;issuerKeyId?:string;trusted:boolean;claimScopes:FederationClaimType[];updatedAt:string;updatedBy:string; }
+export interface CompetitionBenchmarkRecord { id:string;competitionId:string;metric:string;value:number;basis:'OBSERVED'|'ESTIMATE'|'EXTERNAL_BENCHMARK';cohortSize:number;peerGroup?:string;minimumCohortSize:number;createdAt:string; }
+export interface RehearsalCheckRecord { id:string;name:string;status:'PASS'|'WARNING'|'FAIL';impact:string;evidence:string[];fix?:string; }
+export interface RehearsalRecord { id:string;competitionId:string;nonOfficial:true;startedAt:string;completedAt:string;createdBy:string;checks:RehearsalCheckRecord[];status:'PASS'|'PASS_WITH_WARNINGS'|'FAIL';reportHash:string;signedReport?:string; }

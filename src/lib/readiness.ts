@@ -1,15 +1,19 @@
-import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord} from '../types';
+import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
+import { sourceUsableForCompetition, certifiedCapabilityFor } from './scientific-core';
 
 export type PreflightStatus='ready'|'warning'|'blocker';
 export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'scientific'|'field'|'integrations'|'backup'|'none'}
 
-export function buildPreflight(input:{competition:Competition;policy:CompetitionPolicy;integrations:IntegrationConfig[];devices:DeviceRecord[];judges:JudgeProfile[];committees:Committee[];quranSources:QuranSourceManifestRecord[];backups:BackupRecord[];isOffline:boolean}){
- const {competition:c,policy:p,integrations,devices,judges,committees,quranSources,backups,isOffline}=input;
+export function buildPreflight(input:{competition:Competition;policy:CompetitionPolicy;integrations:IntegrationConfig[];devices:DeviceRecord[];judges:JudgeProfile[];committees:Committee[];quranSources:QuranSourceManifestRecord[];aiValidations?:AICapabilityValidationRecord[];backups:BackupRecord[];isOffline:boolean}){
+ const {competition:c,policy:p,integrations,devices,judges,committees,quranSources,aiValidations=[],backups,isOffline}=input;
  const live=c.status==='live';
  const configured=(kind:IntegrationConfig['kind'])=>integrations.some(i=>i.kind===kind&&i.enabled&&i.status==='configured');
  const check=(id:string,ok:boolean,warning:boolean,labelAr:string,labelEn:string,consequenceAr:string,consequenceEn:string,fix:PreflightCheck['fix']):PreflightCheck=>({id,labelAr,labelEn,consequenceAr,consequenceEn,status:ok?'ready':warning?'warning':'blocker',fix});
  const readyJudges=judges.filter(j=>j.isReady);
- const approvedSources=quranSources.filter(s=>s.status==='approved');
+ const categoriesWithSource=c.categories.filter(cat=>quranSources.some(source=>sourceUsableForCompetition(source,{riwaya:cat.riwaya}).ok)).length;
+ const exactQuranSourceReady=c.categories.length>0&&categoriesWithSource===c.categories.length;
+ const aiEnabled=p.aiPolicy?.mode&&p.aiPolicy.mode!=='AI_DISABLED';
+ const aiScopeOk=!aiEnabled||c.categories.every(cat=>!p.aiPolicy.enabledCapabilities.word_alignment||!!certifiedCapabilityFor(aiValidations,{capability:'word_alignment',riwaya:cat.riwaya}));
  const gateNeeded=p.operations.kioskCheckIn;
  const waitingRole=devices.some(d=>d.role==='Waiting Display'&&d.status!=='revoked'&&d.status!=='disabled');
  const gateRole=devices.some(d=>['Gate','Kiosk'].includes(d.role||'')&&d.status!=='revoked'&&d.status!=='disabled');
@@ -20,8 +24,9 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
   check('policy',!!p.version,false,'لائحة المسابقة','Competition policy','لا يمكن تشغيل مسابقة بلا نسخة قواعد محددة.','A competition cannot run without a defined policy version.','competition_dna'),
   check('registration',p.registration.fields.some(f=>f.visible&&f.required),!live,'التسجيل','Registration','قد تصل طلبات ناقصة أو غير قابلة للتحقق.','Registrations may arrive without required verifiable data.','competition_dna'),
   check('categories',c.categories.length>0,false,'الفئات','Categories','لا يمكن توجيه أو تحكيم المشاركين.','Participants cannot be routed or judged.','competition_dna'),
-  check('quran_source',approvedSources.length>0,!live,'مصدر القرآن','Quran source','البيانات التطويرية لا تُعامل كمصدر قرآني معتمد. يحتاج اعتماد السلطة العلمية.','Development fixtures must not masquerade as certified Quran data. Scientific authority approval is required.','none'),
+  check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','البيانات التطويرية لا تُعامل كمصدر قرآني معتمد. يحتاج اعتماد السلطة العلمية.','Development fixtures must not masquerade as certified Quran data. Scientific authority approval is required.','none'),
   check('fairdraw',p.questions.questionsPerParticipant>0&&p.questions.difficultyTolerance>=0,false,'FairDraw','FairDraw','السحب لا يملك قيودًا صالحة.','The draw has invalid fairness constraints.','competition_dna'),
+  check('ai_scope',aiScopeOk,true,'نطاق AI','AI scope','قدرة AI غير معتمدة لكل رواية مطلوبة؛ التحكيم البشري يبقى يعمل بالكامل.','An AI capability is not certified for every required reading; human judging remains fully operational.','scientific'),
   check('judging',c.ruleSet.criteria.length>0&&c.ruleSet.judgesCountPerPanel>0,false,'التحكيم','Judging','لا يمكن حساب نتيجة قابلة لإعادة الإنتاج.','A reproducible score cannot be calculated.','competition_dna'),
   check('judges',readyJudges.length>=Math.max(1,c.ruleSet.judgesCountPerPanel),!live,'المحكمون','Judges','عدد المحكمين الجاهزين أقل من الحد المطلوب للجنة.','Ready judges are below the panel requirement.','field'),
   check('committees',committees.some(x=>x.status!=='offline'),!live,'اللجان','Committees','لا توجد لجنة متاحة لاستقبال جلسة.','No committee is available to receive a session.','field'),

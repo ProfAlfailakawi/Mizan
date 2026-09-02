@@ -75,7 +75,10 @@ export const BASE_POLICY: CompetitionPolicy = {
     publicQueueUsesCodesOnly: true,
     offlineContinuity: true,
     lateArrivalGraceMinutes: 20,
-    badgeMode: 'digital'
+    badgeMode: 'digital',
+    fatigueGuardEnabled: true,
+    fatigueTargetMinutes: 105,
+    fatigueRecommendedBreakMinutes: 12
   },
   results: {
     visibility: 'ceremony_only',
@@ -112,6 +115,12 @@ export const BASE_POLICY: CompetitionPolicy = {
     displayParticipantNameOnPublicScreens: false,
     allowAiProcessing: true,
     allowAnonymousBenchmarking: false
+  },
+  aiPolicy: {
+    mode: 'AI_CERTIFIED_CAPABILITIES_ONLY',
+    enabledCapabilities: { audio_quality:true, word_alignment:true, memorization_watch:true },
+    requireCertifiedScope: true,
+    revealOnlyAfterJudgeLock: true
   },
   workflow: [
     { id: 'register', enabled: true, automated: true, requiresApproval: false },

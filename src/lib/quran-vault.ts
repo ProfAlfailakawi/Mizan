@@ -81,7 +81,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 147,
     juzNumber: 2,
     riwaya: 'Hafs',
-    expectedTextArabic: 'سَيَقُولُ السُّفَهَاءُ مِنَ النَّاسِ مَا وَلَّاهُمْ عَن قِبْلَتِهِمُ الَّتِي كَانُوا عَلَيْهَا ۚ قُل لِّلَّهِ الْمَشْرِقُ وَالْمَغْرِبُ ۚ يَهْدِي مَن يَشَاءُ إِلَىٰ صِرَاطٍ مُّسْتَقِيمٍ ۝ وَكَذَٰلِكَ جَعَلْنَاكُمْ أُمَّةً وَسَطًا لِّتَكُونُوا شُهَدَاءَ عَلَى النَّاسِ وَيَكُونَ الرَّسُولُ عَلَيْكُمْ شَهِيدًا ۗ',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 3,
     mutashabihatDensity: 'high',
     tajweedComplexity: 'intermediate',
@@ -96,7 +96,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 107,
     juzNumber: 4,
     riwaya: 'Hafs',
-    expectedTextArabic: 'يَا أَيُّهَا الَّذِينَ آمَنُوا اتَّقُوا اللَّهَ حَقَّ تُقَاتِهِ وَلَا تَمُوتُنَّ إِلَّا وَأَنتُم مُّسْلِمُونَ ۝ وَاعْتَصِمُوا بِحَبْلِ اللَّهِ جَمِيعًا وَلَا تَفَرَّقُوا ۚ وَاذْكُرُوا نِعْمَتَ اللَّهِ عَلَيْكُمْ إِذْ كُنتُمْ أَعْدَاءً فَأَلَّفَ بَيْنَ قُلُوبِكُمْ فَأَصْبَحْتُم بِنِعْمَتِهِ إِخْوَانًا',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 2,
     mutashabihatDensity: 'medium',
     tajweedComplexity: 'intermediate',
@@ -111,7 +111,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 63,
     juzNumber: 5,
     riwaya: 'Hafs',
-    expectedTextArabic: 'إِنَّ اللَّهَ يَأْمُرُكُمْ أَن تُؤَدُّوا الْأَمَانَاتِ إِلَىٰ أَهْلِهَا وَإِذَا حَكَمْتُم بَيْنَ النَّاسِ أَن تَحْكُمُوا بِالْعَدْلِ ۚ إِنَّ اللَّهَ نِعِمَّا يَعِظُكُم بِهِ ۗ إِنَّ اللَّهَ كَانَ سَمِيعًا بَصِيرًا ۝ يَا أَيُّهَا الَّذِينَ آمَنُوا أَطِيعُوا اللَّهَ وَأَطِيعُوا الرَّسُولَ وَأُولِي الْأَمْرِ مِنكُمْ',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 3,
     mutashabihatDensity: 'medium',
     tajweedComplexity: 'advanced',
@@ -126,7 +126,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 8,
     juzNumber: 15,
     riwaya: 'Hafs',
-    expectedTextArabic: 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ ۝ قَيِّمًا لِّيُنذِرَ بَأْسًا شَدِيدًا مِّن لَّدُنْهُ وَيُبَشِّرَ الْمُؤْمِنِينَ الَّذِينَ يَعْمَلُونَ الصَّالِحَاتِ أَنَّ لَهُمْ أَجْرًا حَسَنًا ۝ مَّاكِثِينَ فِيهِ أَبَدًا ۝ وَيُنذِرَ الَّذِينَ قَالُوا اتَّخَذَ اللَّهُ وَلَدًا',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 2,
     mutashabihatDensity: 'low',
     tajweedComplexity: 'intermediate',
@@ -141,7 +141,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 26,
     juzNumber: 12,
     riwaya: 'Hafs',
-    expectedTextArabic: 'وَقَالَ الَّذِي اشْتَرَاهُ مِن مِّصْرَ لِامْرَأَتِهِ أَكْرِمِي مَثْوَاهُ عَسَىٰ أَن يَنفَعَنَا أَوْ نَتَّخِذَهُ وَلَدًا ۚ وَكَذَٰلِكَ مَكَّنَّا لِيُوسُفَ فِي الْأَرْضِ وَلِنُعَلِّمَهُ مِن تَأْوِيلِ الْأَحَادِيثِ ۚ وَاللَّهُ غَالِبٌ عَلَىٰ أَمْرِهِ وَلَٰكِنَّ أَكْثَرَ النَّاسِ لَا يَعْلَمُونَ',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 4,
     mutashabihatDensity: 'high',
     tajweedComplexity: 'advanced',
@@ -156,7 +156,7 @@ export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
     endAyah: 38,
     juzNumber: 18,
     riwaya: 'Hafs',
-    expectedTextArabic: 'اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ ۚ مَثَلُ نُورِهِ كَمِشْكَاةٍ فِيهَا مِصْبَاحٌ ۖ الْمِصْبَاحُ فِي زُجَاجَةٍ ۖ الزُّجَاجَةُ كَأَنَّهَا كَوْكَبٌ دُرِّيٌّ يُوقَدُ مِن شَجَرَةٍ مُّبَارَكَةٍ زَيْتُونَةٍ لَّا شَرْقِيَّةٍ وَلَا غَرْبِيَّةٍ يَكَادُ زَيْتُهَا يُضِيءُ وَلَوْ لَمْ تَمْسَسْهُ نَارٌ ۚ نُّورٌ عَلَىٰ نُورٍ',
+    expectedTextArabic: 'DEVELOPMENT — resolve text from a certified Quran Source Vault package before any official use.',
     difficultyRating: 3,
     mutashabihatDensity: 'low',
     tajweedComplexity: 'advanced',
@@ -168,8 +168,3 @@ export function getSurahByNumber(num: number): SurahMeta | undefined {
   return SURAH_DIRECTORY.find((s) => s.number === num);
 }
 
-
-/** @deprecated Use QURAN_SOURCE_FIXTURES; these are not certified. */
-export const CERTIFIED_QURAN_SOURCES = QURAN_SOURCE_FIXTURES;
-/** @deprecated Development fixture only; production must load an approved vault corpus. */
-export const VERIFIED_QUESTION_BANK = DEVELOPMENT_QUESTION_BANK;

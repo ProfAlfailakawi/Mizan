@@ -24,8 +24,15 @@ export async function verifyMerkleProof(material:string,proof:{position:'left'|'
   let current=await sha256(material);for(const item of proof)current=await sha256(item.position==='left'?item.hash+current:current+item.hash);return current===root;
 }
 export function finishMinutes(clock:string){const [h,m]=clock.replace('+','').split(':').map(Number);return (Number.isFinite(h)?h:0)*60+(Number.isFinite(m)?m:0);}
-export function quorumSatisfied(q:Pick<QuorumActionRecord,'requiredRoleGroups'|'approvals'|'distinctActorsRequired'>){
-  const groups=q.requiredRoleGroups.every(group=>q.approvals.some(a=>group.includes(a.actorRole as Role)));
-  const distinct=!q.distinctActorsRequired||new Set(q.approvals.map(a=>a.actorId)).size>=q.requiredRoleGroups.length;
+export function quorumSatisfied(q:Pick<QuorumActionRecord,'requiredRoleGroups'|'approvals'|'distinctActorsRequired'|'minimumApprovals'|'authorizedRoles'>){
+  const activeApprovals=q.approvals;
+  if(q.minimumApprovals!==undefined){
+    const allowed=q.authorizedRoles?.length?q.authorizedRoles:q.requiredRoleGroups.flat();
+    const eligible=activeApprovals.filter(a=>allowed.includes(a.actorRole as Role));
+    const actorCount=new Set(eligible.map(a=>a.actorId)).size;
+    return actorCount>=q.minimumApprovals&&(!q.distinctActorsRequired||actorCount>=q.minimumApprovals);
+  }
+  const groups=q.requiredRoleGroups.every(group=>activeApprovals.some(a=>group.includes(a.actorRole as Role)));
+  const distinct=!q.distinctActorsRequired||new Set(activeApprovals.map(a=>a.actorId)).size>=q.requiredRoleGroups.length;
   return groups&&distinct;
 }

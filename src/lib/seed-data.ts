@@ -288,7 +288,7 @@ export const SEED_JUDGES: JudgeProfile[] = [
     title: 'Head of Scientific Jury & Ten Qiraat Scholar',
     country: 'Somalia / Qatar',
     specialty: 'all',
-    certifiedRiwayat: ['Hafs', 'Warsh', 'Qalun', 'Al-Duri', 'Al-Susi', 'Hamzah'],
+    certifiedRiwayat: ["Hafs 'an Asim", "Warsh 'an Nafi'", "Qalun 'an Nafi'", "Al-Duri 'an Abi Amr", "Al-Susi 'an Abi Amr", "Khalaf 'an Hamzah"],
     assignedCommitteeId: 'comm-1',
     conflictsDeclared: [],
     calibrationScore: 99.2,

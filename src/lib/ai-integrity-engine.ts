@@ -1,24 +1,78 @@
-import { AIObservation, AICapabilityValidationRecord } from '../types';
+import { AIObservation, AICapability, AICapabilityValidationRecord } from '../types';
+import { aiCapabilityState } from './scientific-core';
 
 export type IntegrityCapability='audio_quality'|'word_alignment'|'memorization_watch'|'tajweed_phoneme';
-export interface IntegritySignal {timestampSeconds:number;type:AIObservation['type'];confidence:number;expectedLocation:string;hypothesis:string;provider:string;modelVersion:string;}
+export interface IntegritySignal {
+  timestampSeconds:number;
+  type:AIObservation['type'];
+  confidence:number;
+  confidenceBand?:AIObservation['confidence'];
+  expectedLocation:string;
+  hypothesis:string;
+  provider:string;
+  modelVersion:string;
+  modelHash?:string;
+  capability?:AICapability;
+  qiraah?:string;
+  rawi?:string;
+  tariq?:string;
+  certificationVersion?:string;
+  benchmarkReference?:string;
+}
 export interface IntegrityProvider {id:string;capabilities:IntegrityCapability[];analyze(input:{sessionId:string;audioRef:string;expectedQuestionIds:string[];riwaya:string}):Promise<IntegritySignal[]>;}
 
+/** Exact capability/reading certification only. No hard-coded sample-size or accuracy threshold is allowed here. */
 export function certifiedFor(validations:AICapabilityValidationRecord[],riwaya:string,capability:IntegrityCapability){
- return validations.some(v=>v.riwaya===riwaya&&v.capability===capability&&v.status==='certified'&&v.approvedBy.length>=2&&v.datasetSize>=100&&v.falsePositiveRate!==undefined&&v.falseNegativeRate!==undefined&&!!v.evidenceRef);
+ return validations.some(v=>
+  v.riwaya===riwaya&&
+  v.capability===capability&&
+  aiCapabilityState(v)==='CERTIFIED'&&
+  !!v.approvalVersion&&
+  !!(v.benchmarkVersion||v.benchmarkReference||v.evidenceRef)
+ );
 }
 
+/**
+ * Preserve every provider observation independently. Cross-model agreement is only a derived review-priority signal;
+ * incompatible model probabilities are never averaged into artificial confidence.
+ */
 export function reconcileProviderSignals(sessionId:string,signals:IntegritySignal[],windowSec=2,competitionId="unscoped"):AIObservation[]{
- const used=new Set<number>(); const out:AIObservation[]=[];
- for(let i=0;i<signals.length;i++){
-  if(used.has(i))continue; const a=signals[i]; const group=[a]; used.add(i);
-  for(let j=i+1;j<signals.length;j++){if(used.has(j))continue;const b=signals[j];if(a.type===b.type&&Math.abs(a.timestampSeconds-b.timestampSeconds)<=windowSec&&a.provider!==b.provider){group.push(b);used.add(j)}}
-  const independentProviders=new Set(group.map(x=>x.provider)).size;
-  const raw=group.reduce((sum,x)=>sum+x.confidence,0)/group.length;
-  const confidence:AIObservation['confidence']=independentProviders>=2&&raw>=.8?'high':raw>=.65?'medium':'low';
-  out.push({id:`ai-${sessionId}-${i}`,competitionId,sessionId,timestampSeconds:Math.round(group.reduce((s,x)=>s+x.timestampSeconds,0)/group.length),type:a.type,confidence,expectedLocation:a.expectedLocation,detectedHypothesis:group.map(x=>x.hypothesis).join(' | '),modelIdentifier:group.map(x=>`${x.provider}:${x.modelVersion}`).join('+'),reviewClipStartSec:Math.max(0,a.timestampSeconds-4),reviewClipEndSec:a.timestampSeconds+4,flaggedForReview:confidence==='high'});
- }
- return out;
+ return signals.map((signal,index)=>{
+  const corroborating=signals.filter((other,j)=>
+    j!==index&&other.provider!==signal.provider&&other.type===signal.type&&
+    Math.abs(other.timestampSeconds-signal.timestampSeconds)<=windowSec&&
+    other.expectedLocation===signal.expectedLocation
+  );
+  const independentProviders=new Set([signal.provider,...corroborating.map(x=>x.provider)]).size;
+  const modelIdentifier=`${signal.provider}:${signal.modelVersion}`;
+  return {
+    id:`ai-${sessionId}-${index}`,
+    competitionId,
+    sessionId,
+    timestampSeconds:Math.round(signal.timestampSeconds),
+    type:signal.type,
+    capability:signal.capability,
+    model:modelIdentifier,
+    modelVersion:signal.modelVersion,
+    modelHash:signal.modelHash,
+    qiraah:signal.qiraah,
+    rawi:signal.rawi,
+    tariq:signal.tariq,
+    confidence:signal.confidenceBand||'low',
+    expectedLocation:signal.expectedLocation,
+    expectedQuranPosition:signal.expectedLocation,
+    observedEvidence:{hypothesis:signal.hypothesis,rawModelConfidence:signal.confidence,independentCorroboration:independentProviders,corroboratingProviders:corroborating.map(x=>x.provider)},
+    detectedHypothesis:independentProviders>=2?`${signal.hypothesis} · corroborated by ${independentProviders} independent providers`:signal.hypothesis,
+    modelIdentifier,
+    capabilityCertificationVersion:signal.certificationVersion,
+    benchmarkReference:signal.benchmarkReference,
+    modelEvidence:{provider:signal.provider,modelVersion:signal.modelVersion,rawConfidence:signal.confidence},
+    reviewClipStartSec:Math.max(0,signal.timestampSeconds-4),
+    reviewClipEndSec:signal.timestampSeconds+4,
+    flaggedForReview:independentProviders>=2,
+    humanReviewState:'pending'
+  };
+ });
 }
 
 /** Architectural invariant: AI output can only create review observations. */
