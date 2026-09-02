@@ -24,6 +24,11 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      # Preserve the private R2 contract on every deployment without exposing secret values to Cloud Build.
+      - '--update-env-vars'
+      - 'R2_ENDPOINT=https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com,R2_BUCKET=mizan-quran-assets'
+      - '--update-secrets'
+      - 'R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest'
 
 images:
   - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'

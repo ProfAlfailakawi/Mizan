@@ -1,57 +1,102 @@
-# MIZAN · KFGQPC delivery architecture
+# MIZAN · KFGQPC private R2 delivery architecture
 
-MIZAN keeps Quran source authority separate from web delivery.
+MIZAN keeps Quran source authority separate from web delivery. The Cloudflare R2 bucket is **private** and is accessed only by the MIZAN server through the R2 S3-compatible API.
 
-## Free-tier rule
+## Production contract
 
-Cloudflare R2 Standard is treated as a **delivery cache/object store**, not the archival master vault. The original KFGQPC print/vector masters stay in an offline archive (encrypted workstation/external disk plus backup). R2 contains only browser-ready assets.
-
-Planned object layout:
+Bucket: `mizan-quran-assets`
 
 ```text
-mushaf/
-  kfgqpc-hafs-madinah/
-    pages/1.webp ... 604.webp
-    manifest.json
-audio/
-  hafs-muaiqly/ayah/{surah}/{ayah}.mp3
-  shubah-hudhaifi/ayah/{surah}/{ayah}.mp3
-  qalun-hudhaifi/ayah/{surah}/{ayah}.mp3
-  susi-siddiqi/ayah/{surah}/{ayah}.mp3
-fonts/
-  primary.woff2
-quran-data/
-  ... verified developer packages ...
+delivery/
+  mushaf-pages/
+    madinah/
+      v1/
+        001.webp ... 604.webp
+        manifest.json
+  audio/
+    hafs/maher-al-muaiqly/v1/NNN/NNN.mp3
+    shubah/ali-al-hudhaifi/v1/NNN/NNN.mp3
+    qalun/ali-al-hudhaifi/v1/NNN/NNN.mp3
+    susi/uthman-al-siddiqi/v1/NNN/NNN.mp3
+  quran-data/
+    health.txt
+    hafs/v13/
+    warsh/v6/
+    shubah/v4/
+    qalun/v5/
+    duri-abi-amr/v3/
+    susi-abi-amr/v3/
+    tafsir-muyassar/v1/
+    ghareeb-muyassar/v1/
+    tajweed-muyassar/v1/
+  fonts/
+    hafs/v13/primary.ttf
+    warsh/v6/primary.ttf
+    shubah/v4/primary.ttf
+    qalun/v5/primary.ttf
+    duri-abi-amr/v3/primary.ttf
+    susi-abi-amr/v3/primary.ttf
 ```
 
-Do not upload duplicate Hafs reciters during the free-tier phase. Do not upload Al-Duri or Warsh audio until the exact official downloadable package and ayah mapping have been verified.
+`NNN/NNN` is zero-padded surah/ayah. MIZAN does not define a generic cross-reading audio key. Each accepted audio ID maps to exactly one narration/reciter prefix.
 
-## Environment
+## Server-only environment
 
 ```bash
-MIZAN_KFGQPC_R2_DELIVERY_BASE_URL=https://quran-assets.example.com
-# Optional only when the delivery origin is protected by a bearer-aware gateway:
-MIZAN_KFGQPC_R2_BEARER_TOKEN=
-
-# Local/venue fallback cache paths remain supported:
-MIZAN_KFGQPC_PAGE_IMAGE_ROOT=/var/lib/mizan/kfgqpc/pages
-MIZAN_KFGQPC_AUDIO_ROOT=/var/lib/mizan/kfgqpc/audio
-MIZAN_KFGQPC_FONT_ROOT=/var/lib/mizan/kfgqpc/fonts
+R2_ACCESS_KEY_ID=                  # Secret Manager reference in Cloud Run
+R2_SECRET_ACCESS_KEY=              # Secret Manager reference in Cloud Run
+R2_ENDPOINT=https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com
+R2_BUCKET=mizan-quran-assets
+R2_REGION=auto
+MIZAN_R2_SAFETY_LIMIT_BYTES=9663676416
 ```
 
-The browser does not need the R2 origin URL. JudgeOS requests same-origin MIZAN API routes, and the server resolves local cache first, then R2. This keeps the CSP small, allows venue/offline fallback, and lets the R2 hostname change without rebuilding the frontend.
+Never use `VITE_R2_*`. The browser requests same-origin MIZAN API routes. The R2 endpoint, access key and secret are not required by React and are not returned by delivery status.
 
-## Storage budget
+## Delivery order
 
-The executable budget in `server/kfgqpc-delivery.ts` reserves roughly:
+1. Verified venue/local cache when configured.
+2. Private R2 S3 object.
+3. No fabricated fallback.
 
-- 724.25 MB — Hafs, Maher Al-Muaiqly
-- 722 MB — Shu'bah, Ali Al-Hudhaifi
-- 760.66 MB — Qalun, Ali Al-Hudhaifi
-- 3.25 GB — Al-Susi, Uthman Al-Siddiqi
-- 83 MB — Quran developer/scientific data allowance
-- 180 MB — optimized Madinah Mushaf web pages + manifest allowance
+The server maintains a small ephemeral `/tmp` cache for immutable R2 delivery objects. This keeps the existing Express `sendFile` path efficient and allows normal HTTP range behavior for cached audio without exposing the R2 origin.
 
-This intentionally leaves several GB of the 10 GB-month Standard free tier uncommitted for verified additions, cache/version headroom, Al-Duri after validation, or a future Warsh audio package.
+## Health/readiness
 
-The 180 MB page figure is a **delivery engineering allowance**, not the size of the official KFGQPC vector master. The official developer platform describes the print Mushaf as high-quality vector files; MIZAN preserves those master bytes offline and publishes only verified web derivatives.
+The authenticated KFGQPC delivery-status endpoint now reports only safe state values such as `READY`, `CHECKING`, `UNAVAILABLE`, or `NOT_CONFIGURED`.
+
+Private-R2 readiness checks both bucket listing and:
+
+```text
+delivery/quran-data/health.txt
+```
+
+Expected content:
+
+```text
+MIZAN R2 OK
+```
+
+No credential, secret, authorization header, or private object URL is returned.
+
+## Ingestion
+
+Use:
+
+```bash
+npx tsx scripts/kfgqpc-ingest.ts --dry-run --only hafs --root .mizan-ingest
+npx tsx scripts/kfgqpc-ingest.ts --verify --only hafs --root .mizan-ingest
+npx tsx scripts/kfgqpc-ingest.ts --upload --resume --only hafs --root .mizan-ingest
+npx tsx scripts/kfgqpc-ingest.ts --report --root .mizan-ingest
+```
+
+The uploader reads credentials only from environment variables, creates `health.txt`, rejects checksum mismatches, refuses unverified datasets, rejects immutable-key conflicts, and enforces the configured storage safety ceiling before upload.
+
+## Scientific guardrails
+
+- Original KFGQPC vector/print masters remain offline archival assets and are not counted in R2 delivery storage.
+- No Quran TTS.
+- No Hafs audio fallback for Warsh, Qalun, Shu'bah, Al-Susi, or Al-Duri.
+- Al-Duri audio remains blocked until the inconsistent official ayah-package listing is independently validated against the actual downloadable package.
+- KFGQPC historically confirms a Warsh recording, but MIZAN does not expose Warsh delivery audio until a current downloadable official ayah package and exact mapping are verified.
+- Optimized Mushaf pages are derivatives of verified official masters; the Quran is never reconstructed with OCR or retyped over page images.
