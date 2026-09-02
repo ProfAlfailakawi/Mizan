@@ -5,8 +5,11 @@ steps:
     args:
       - '-ceu'
       - |
+        apt-get update -qq
+        apt-get install -y --no-install-recommends unzip ca-certificates >/dev/null
         npm install --ignore-scripts --no-audit --no-fund
         npx tsx scripts/kfgqpc-init-stage.ts .mizan-ingest
+        npx tsx scripts/kfgqpc-acquire.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --dry-run --root .mizan-ingest
 options:
