@@ -1,0 +1,79 @@
+import React, { useEffect, useState } from 'react';
+import { getIdTokenResult, onAuthStateChanged, signOut } from 'firebase/auth';
+import { useAppStore } from './lib/store';
+import { Header } from './components/layout/Header';
+import { CompetitionOverview } from './components/admin/CompetitionOverview';
+import { JudgeOS } from './components/judge/JudgeOS';
+import { HeadJudgeInbox } from './components/head-judge/HeadJudgeInbox';
+import { CommandCenter } from './components/operations/CommandCenter';
+import { ParticipantDashboard } from './components/participant/ParticipantDashboard';
+import { KioskMode } from './components/gate/KioskMode';
+import { CeremonyView } from './components/public/CeremonyView';
+import { CertificateVerification } from './components/public/CertificateVerification';
+import { RegistrationFlow } from './components/public/RegistrationFlow';
+import { CompetitionLanding } from './components/public/CompetitionLanding';
+import { AuthPortal } from './components/auth/AuthPortal';
+import { auth } from './lib/firebase';
+import { Role } from './types';
+import { AuditorConsole, DelegationPortal, ExceptionDesk, OrganizationHome, ScientificStudio, SuperAdminConsole, GuardianPortal, SupportConsole } from './components/admin/RolePortals';
+import { ExperienceHub } from './components/public/ExperienceHub';
+import { DemoReturn } from './components/public/DemoReturn';
+import { WaitingBoard } from './components/public/WaitingBoard';
+import { TrustVerification } from './components/public/TrustVerification';
+import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
+import { MizanLogo } from './components/design-system/MizanLogo';
+import { SplashExperience } from './components/public/SplashExperience';
+
+export default function App() {
+ const {currentUser,applyAuthenticatedIdentity,switchRole,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
+ useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
+ useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
+ const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true'; const [signedIn,setSignedIn]=useState(!requireAuth); const [authReady,setAuthReady]=useState(!requireAuth); const [accessError,setAccessError]=useState(''); const [activationToken,setActivationToken]=useState(''); const [activationMessage,setActivationMessage]=useState('');
+ useEffect(()=>{if(!requireAuth)return; return onAuthStateChanged(auth,async u=>{if(!u){setSignedIn(false);setAuthReady(true);return;}try{const token=await getIdTokenResult(u,true);const allowed:Role[]=['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent'];let role=String(token.claims.role||'') as Role;let organizationId=String(token.claims.org_id||'');let competitionId=token.claims.competition_id?String(token.claims.competition_id):undefined;let serverManaged=false;try{let deviceId=localStorage.getItem('mizan_device_identity');if(!deviceId){deviceId=crypto.randomUUID();localStorage.setItem('mizan_device_identity',deviceId)}const me=await fetch('/api/identity/me',{headers:{authorization:`Bearer ${token.token}`,'x-mizan-device-id':deviceId,'x-mizan-device-name':navigator.userAgent.slice(0,120)}});const body=await me.json().catch(()=>({}));if(me.status===409&&body.code==='PRIVILEGED_SESSION_CONFLICT'){setAccessError('PRIVILEGED_SESSION_CONFLICT');setSignedIn(false);setAuthReady(true);return;}if(me.ok&&body.identity){role=String(body.identity.role||'') as Role;organizationId=String(body.identity.organizationId||'');competitionId=body.identity.competitionId?String(body.identity.competitionId):undefined;serverManaged=!!body.managed;}else if(me.status===404&&!role){setAccessError('ACCOUNT_NOT_PROVISIONED');setSignedIn(false);setAuthReady(true);return;}}catch{/* Identity governance endpoint is optional for legacy deployments; signed Firebase claims remain supported. */}if(!allowed.includes(role)||!organizationId){setAccessError('ACCOUNT_CLAIMS_REQUIRED');setSignedIn(false);setAuthReady(true);return;}const sensitive:Role[]=['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'];const firebaseClaim=token.claims.firebase as Record<string,unknown>|undefined;const secondFactor=!!firebaseClaim?.sign_in_second_factor;const mfaRequired=import.meta.env.VITE_REQUIRE_MFA_FOR_SENSITIVE!=='false';if(mfaRequired&&sensitive.includes(role)&&!secondFactor){setAccessError('MFA_REQUIRED');setSignedIn(false);setAuthReady(true);return;}applyAuthenticatedIdentity({id:u.uid,email:u.email||'',name:u.displayName||u.email||u.uid,role,organizationId,competitionId,mfaEnabled:secondFactor,identityAssurance:serverManaged?'firebase_managed':'firebase'});setAccessError('');setSignedIn(true);}catch{setAccessError('IDENTITY_TOKEN_ERROR');setSignedIn(false);}finally{setAuthReady(true)}})},[requireAuth]);
+ const activateAccount=async()=>{const u=auth.currentUser;if(!u||!activationToken.trim())return;setActivationMessage('');try{const token=await u.getIdToken(true);const r=await fetch('/api/identity/activate',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({activationToken:activationToken.trim()})});const body=await r.json().catch(()=>({}));if(!r.ok){setActivationMessage(String(body.code||'ACTIVATION_FAILED'));return;}setActivationMessage('ACTIVATED');setActivationToken('');window.location.reload();}catch{setActivationMessage('ACTIVATION_FAILED')}};
+ const demoMode=!requireAuth;
+ const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash);
+ const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
+ const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
+ const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hash,setHash]=useState(window.location.hash);
+ useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
+ if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
+ if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#737a75]"><MizanLogo language="ar" compact/></div>;
+ if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md text-center"><div className="flex justify-center mb-4"><MizanLogo language={currentUser?.id? 'ar':'ar'} compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق بخطوتين لهذا الدور':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#737a75] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'لأن هذا الحساب يستطيع التأثير في مسابقة عالية الحساسية، لا يسمح ميزان بالدخول الأحادي. فعّل المصادقة متعددة العوامل لدى موفر الهوية ثم أعد تسجيل الدخول.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. اطلب من مدير المسابقة إغلاق الجلسة القديمة إذا كان الجهاز السابق مفقودًا أو متعطلًا.':'الهوية صحيحة، لكن الحساب يحتاج دعوة وصلاحية محددة داخل المؤسسة قبل الدخول.'}</p>{accessError==='ACCOUNT_NOT_PROVISIONED'&&<div className="mt-5 text-start"><label className="text-[10px] font-black text-[#707873]">رمز التفعيل لمرة واحدة</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="رمز التفعيل"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">ربط هذا الحساب بالدعوة</button>{activationMessage&&<div className="mt-2 text-[10px] text-center text-[#7b827d]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':'تعذر إكمال التفعيل'}</div>}</div>}<div className="text-[10px] text-[#8a908c] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div><button onClick={()=>signOut(auth)} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button></div></div>;
+ if(requireAuth&&!signedIn) return <AuthPortal/>;
+ if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
+ const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
+ if(hash.startsWith('#trust-verify')) return <><TrustVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
+ if(hash.startsWith('#competition')) return <><CompetitionLanding/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
+ if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><CertificateVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
+ if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
+ if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
+ const roleView = () => {
+  switch(currentUser.role){
+   case 'super_admin': return <SuperAdminConsole/>;
+   case 'org_admin': return <OrganizationHome/>;
+   case 'comp_admin': return <CompetitionOverview/>;
+   case 'scientific_admin': return <ScientificStudio/>;
+   case 'head_judge': return <HeadJudgeInbox/>;
+   case 'judge': return <JudgeOS/>;
+   case 'ops_manager': return <CommandCenter/>;
+   case 'exception_host': return <ExceptionDesk/>;
+   case 'delegation_manager': return <DelegationPortal/>;
+   case 'participant': return <ParticipantDashboard/>;
+   case 'broadcast_operator': return <CeremonyView/>;
+   case 'auditor': return <AuditorConsole/>;
+   case 'guardian': return <GuardianPortal/>;
+   case 'support_agent': return <SupportConsole/>;
+   default: return <CompetitionOverview/>;
+  }
+ };
+ const isBroadcast=currentUser.role==='broadcast_operator';
+ return <div className="min-h-screen text-[#171b18] font-arabic">
+  {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>} 
+  <main>{roleView()}</main>
+  {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
+  {kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} 
+  {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>}
+  {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>} 
+ </div>
+}

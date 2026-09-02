@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "site": "mizan-f2ce3",
+    "public": "firebase-hosting",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "mizan",
+          "region": "me-central1"
+        }
+      }
+    ]
+  }
+}

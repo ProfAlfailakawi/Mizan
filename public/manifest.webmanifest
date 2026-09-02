@@ -1,0 +1,11 @@
+{
+  "name": "ميزان — نظام تشغيل المسابقات القرآنية",
+  "short_name": "ميزان",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5EF",
+  "theme_color": "#214C40",
+  "lang": "ar",
+  "dir": "rtl",
+  "description": "منصة متقدمة لتحكيم وتشغيل المسابقات القرآنية بنزاهة وهدوء."
+}

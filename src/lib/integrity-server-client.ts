@@ -1,0 +1,11 @@
+import {auth} from './firebase';
+import type {ExposureRadiusSnapshot,QuestionCustodyCorridorSnapshot,WitnessModeRecord} from '../types';
+async function token(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
+async function api(path:string,init:RequestInit={}){const bearer=await token();const r=await fetch(path,{...init,headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json',...(init.headers||{})},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body}
+export async function fetchCustodyCorridor(sessionId:string){return api(`/api/question-runtime/${encodeURIComponent(sessionId)}/custody-corridor`) as Promise<QuestionCustodyCorridorSnapshot>}
+export async function fetchExposureRadius(sessionId:string){return api(`/api/question-runtime/${encodeURIComponent(sessionId)}/exposure-radius`) as Promise<ExposureRadiusSnapshot>}
+export async function traceExposureCanary(canaryToken:string){return api('/api/question-runtime/canary/trace',{method:'POST',body:JSON.stringify({token:canaryToken})}) as Promise<{verified:boolean;sessionId:string;questionIndex:number;judgeId:string;canaryId:string;exposedAt:string}>}
+export async function createWitnessAction(input:{actionType:WitnessModeRecord['actionType'];targetRef:string;reason:string;minutes?:number;requiredWitnesses?:number}){const expiresAt=new Date(Date.now()+Math.max(2,Math.min(60,input.minutes||15))*60_000).toISOString();return api('/api/integrity/witness-actions',{method:'POST',body:JSON.stringify({...input,expiresAt})}) as Promise<WitnessModeRecord>}
+export async function attestWitnessAction(id:string){return api(`/api/integrity/witness-actions/${encodeURIComponent(id)}/attest`,{method:'POST',body:'{}'}) as Promise<WitnessModeRecord>}
+export async function getWitnessAction(id:string){return api(`/api/integrity/witness-actions/${encodeURIComponent(id)}`) as Promise<WitnessModeRecord>}
+export async function fetchIntegrityRuntimeCapabilities(){const r=await fetch('/api/capabilities',{cache:'no-store'});if(!r.ok)return {};const body=await r.json();return body?.externalDependencies||{} as Record<string,boolean>}

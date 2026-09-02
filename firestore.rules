@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function sameOrg(orgId) { return signedIn() && request.auth.token.org_id == orgId; }
+    function roleIs(roles) { return signedIn() && request.auth.token.role in roles; }
+    function compScope(competitionId) { return !('competition_id' in request.auth.token) || request.auth.token.competition_id == competitionId; }
+    function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
+    function admin(orgId,competitionId) { return scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']); }
+
+    match /organizations/{orgId} {
+      allow read: if sameOrg(orgId);
+      allow create, update: if sameOrg(orgId) && roleIs(['super_admin','org_admin']);
+      allow delete: if sameOrg(orgId) && roleIs(['super_admin']);
+
+      match /competitions/{competitionId} {
+        allow read: if scoped(orgId,competitionId);
+        allow create, update: if admin(orgId,competitionId);
+        allow delete: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin']);
+
+        match /participants/{participantId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','ops_manager','exception_host','delegation_manager','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','exception_host','delegation_manager']);
+          allow delete: if false;
+        }
+        match /judge_events/{eventId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
+          allow create: if scoped(orgId,competitionId) && roleIs(['judge']);
+          allow update, delete: if false;
+        }
+        match /judge_submissions/{submissionId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']) || (scoped(orgId,competitionId) && roleIs(['judge']) && resource.data.judgeId == request.auth.uid);
+          allow create: if scoped(orgId,competitionId) && roleIs(['judge']) && request.resource.data.judgeId == request.auth.uid;
+          allow update, delete: if false;
+        }
+        match /checkins/{participantId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','exception_host']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['comp_admin','ops_manager','exception_host']);
+          allow delete: if false;
+        }
+        match /reviews/{reviewId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['head_judge','scientific_admin']);
+          allow delete: if false;
+        }
+        match /results/{resultId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow delete: if false;
+        }
+        match /certificates/{certificateId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','auditor']);
+          allow create: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
+          allow update, delete: if false;
+        }
+        match /audit/{eventId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
+          allow create: if scoped(orgId,competitionId);
+          allow update, delete: if false;
+        }
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
