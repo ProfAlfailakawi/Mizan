@@ -5,7 +5,7 @@ steps:
     args:
       - '-ceu'
       - |
-        npm ci --ignore-scripts
+        npm install --ignore-scripts --no-audit --no-fund
         npx tsx scripts/kfgqpc-init-stage.ts .mizan-ingest
         npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --dry-run --root .mizan-ingest
