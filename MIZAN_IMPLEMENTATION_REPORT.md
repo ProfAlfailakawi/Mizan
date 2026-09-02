@@ -183,3 +183,10 @@ Verification for this round is recorded in the delivery response after the patch
 - Fixed an integrity bug found by regression testing: absent optional `evidenceRef` is now omitted canonically before witness hashing, preventing false hash mismatch after JSON persistence.
 - Verification executed after fixes: Arabic UI audit 17/17; TypeScript PASS; tests 104/104 PASS; source audit PASS; secret scan PASS.
 - `npm run build` was attempted but could not start because Vite/dependencies are not installed in the supplied runtime. No build success is claimed.
+
+## Round 11 — Premium launch splash
+- Added a local, web-optimized MIZAN splash asset (`public/brand/mizan-splash.webp`) using the approved soft brand direction.
+- Added `SplashExperience` as the first visual state on normal app entry, before onboarding/auth surfaces.
+- Direct verification/deep-link routes skip the splash to avoid delaying public proof/certificate access.
+- Splash is intentionally short, has a restrained arrival/fade transition, and respects `prefers-reduced-motion`.
+- The splash asset is preloaded and kept under 150 KB for fast venue startup.
