@@ -102,7 +102,7 @@ export const SEED_RULESET: RuleSet = {
   id: 'rule-int-canon-2027',
   version: '2.4.0-canonical',
   name: 'Standard International Quran Competition Scoring Protocol',
-  judgesCountPerPanel: 3,
+  judgesCountPerPanel: 1,
   dropExtremes: false,
   criteria: [
     {
@@ -237,7 +237,7 @@ export const SEED_COMMITTEES: Committee[] = [
     venueHall: 'Auditorium Hall A',
     assignedCategories: ['cat-full-quran'],
     headJudgeId: 'usr-head-judge-1',
-    judgeIds: ['usr-judge-1', 'usr-judge-2', 'usr-judge-3'],
+    judgeIds: ['usr-judge-1'],
     status: 'testing',
     currentParticipantId: 'part-104',
     completedCount: 28,
@@ -253,13 +253,13 @@ export const SEED_COMMITTEES: Committee[] = [
     code: 'C2',
     venueHall: 'Recitation Hall B',
     assignedCategories: ['cat-20-juz'],
-    headJudgeId: 'usr-head-judge-2',
-    judgeIds: ['usr-judge-4', 'usr-judge-5', 'usr-judge-6'],
-    status: 'ready',
+    headJudgeId: '',
+    judgeIds: [],
+    status: 'offline',
     completedCount: 34,
     averageSessionMinutes: 8.1,
     audioInputOk: true,
-    devicesConnected: 4
+    devicesConnected: 0
   },
   {
     id: 'comm-3',
@@ -269,57 +269,29 @@ export const SEED_COMMITTEES: Committee[] = [
     code: 'C3',
     venueHall: 'Recitation Hall C',
     assignedCategories: ['cat-10-juz'],
-    headJudgeId: 'usr-head-judge-3',
-    judgeIds: ['usr-judge-7', 'usr-judge-8', 'usr-judge-9'],
-    status: 'ready',
+    headJudgeId: '',
+    judgeIds: [],
+    status: 'offline',
     completedCount: 40,
     averageSessionMinutes: 6.8,
     audioInputOk: true,
-    devicesConnected: 4
+    devicesConnected: 0
   }
 ];
 
 export const SEED_JUDGES: JudgeProfile[] = [
   {
     id: 'judge-prof-1',
-    userId: 'usr-head-judge-1',
-    name: 'MIZAN Demo Head Judge',
-    nameArabic: 'رئيس التحكيم التجريبي',
-    title: 'Head of Scientific Jury & Ten Qiraat Scholar',
-    country: 'Somalia / Qatar',
-    specialty: 'all',
-    certifiedRiwayat: ["Hafs 'an Asim", "Warsh 'an Nafi'", "Qalun 'an Nafi'", "Al-Duri 'an Abi Amr", "Al-Susi 'an Abi Amr", "Khalaf 'an Hamzah"],
-    assignedCommitteeId: 'comm-1',
-    conflictsDeclared: [],
-    calibrationScore: 99.2,
-    isReady: true
-  },
-  {
-    id: 'judge-prof-2',
     userId: 'usr-judge-1',
     name: 'MIZAN Demo Judge 1',
     nameArabic: 'المحكم التجريبي ١',
-    title: 'Former Grand Sheikh of Egyptian Reciters',
-    country: 'Egypt',
-    specialty: 'memorization',
+    title: 'Demo Quran Competition Judge',
+    country: 'Demo',
+    specialty: 'all',
     certifiedRiwayat: ['Hafs', 'Warsh', 'Qalun'],
     assignedCommitteeId: 'comm-1',
     conflictsDeclared: [],
     calibrationScore: 98.4,
-    isReady: true
-  },
-  {
-    id: 'judge-prof-3',
-    userId: 'usr-judge-2',
-    name: 'Sheikh Ibrahim Al-Akhdar',
-    nameArabic: 'فضيلة الشيخ إبراهيم الأخضر',
-    title: 'Sheikh of Reciters at Prophet Mosque (Madinah)',
-    country: 'Saudi Arabia',
-    specialty: 'tajweed',
-    certifiedRiwayat: ['Hafs', 'Warsh'],
-    assignedCommitteeId: 'comm-1',
-    conflictsDeclared: [],
-    calibrationScore: 97.9,
     isReady: true
   }
 ];
