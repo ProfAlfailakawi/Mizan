@@ -190,3 +190,14 @@ Verification for this round is recorded in the delivery response after the patch
 - Direct verification/deep-link routes skip the splash to avoid delaying public proof/certificate access.
 - Splash is intentionally short, has a restrained arrival/fade transition, and respects `prefers-reduced-motion`.
 - The splash asset is preloaded and kept under 150 KB for fast venue startup.
+
+## Round 12 — Lean KFGQPC asset delivery / R2 free-tier architecture
+
+- Added a same-origin KFGQPC delivery repository with **local venue cache first, Cloudflare R2 second**.
+- Official Mushaf page delivery now supports AVIF/WebP/PNG/SVG from local cache or R2 without exposing the R2 hostname to JudgeOS.
+- Added public delivery routes for approved Quran fonts and ayah-scoped audio assets.
+- Added an authenticated delivery-status endpoint and a compact storage-budget surface in the Official Quran Library.
+- Added an executable 10 GB-month budget. It includes the selected official audio packages, Quran developer/scientific data, and a 180 MB optimized Mushaf-page delivery allowance while deliberately excluding heavyweight original/vector masters from R2.
+- Original KFGQPC masters remain offline archival assets; the website bundle contains no Quran page/audio binaries.
+- Added `KFGQPC_R2_DELIVERY.md` with the R2 object layout and environment contract.
+- Demo single-judge data remains demo-only; official competition quorum behavior was not changed.
