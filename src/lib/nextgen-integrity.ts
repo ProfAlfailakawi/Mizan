@@ -5,7 +5,7 @@ import { newId, sha256 } from './crypto';
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
 const b64=(bytes:Uint8Array)=>{let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
-const unb64=(s:string)=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const raw=atob(s);return Uint8Array.from(raw,c=>c.charCodeAt(0))};
+const unb64=(s:string)=>{const canonicalInput=String(s||'').trim().replace(/=+$/,'');if(!canonicalInput||!/^[A-Za-z0-9_-]+$/.test(canonicalInput))throw new Error('INVALID_BASE64URL');let padded=canonicalInput.replace(/-/g,'+').replace(/_/g,'/');while(padded.length%4)padded+='=';const raw=atob(padded);const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));if(b64(bytes)!==canonicalInput)throw new Error('NON_CANONICAL_BASE64URL');return bytes};
 
 export async function generateSigningKeyPair(){return crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify'])}
 export async function exportPublicJwk(publicKey:CryptoKey){return crypto.subtle.exportKey('jwk',publicKey)}
@@ -18,7 +18,7 @@ export async function issueSignedPass(payload:CompactPassPayload,privateKey:Cryp
 }
 export async function verifySignedPass(compact:string,publicKey:CryptoKey,input:{competition:string;now?:Date;revokedCredentialIds?:Set<string>;usedCredentialIds?:Set<string>;singleUse?:boolean}){
  const [body,sig]=compact.split('.');if(!body||!sig)return {valid:false,reason:'MALFORMED'} as const;
- const signatureOk=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,unb64(sig),encoder.encode(body));if(!signatureOk)return {valid:false,reason:'INVALID_SIGNATURE'} as const;
+ let signatureBytes:Uint8Array;try{signatureBytes=unb64(sig)}catch{return {valid:false,reason:'INVALID_SIGNATURE'} as const} const signatureOk=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,signatureBytes,encoder.encode(body));if(!signatureOk)return {valid:false,reason:'INVALID_SIGNATURE'} as const;
  let payload:CompactPassPayload;try{payload=JSON.parse(decoder.decode(unb64(body)))}catch{return {valid:false,reason:'MALFORMED_PAYLOAD'} as const}
  if(payload.v!=='MZP1'||payload.competition!==input.competition)return {valid:false,reason:'WRONG_COMPETITION',payload} as const;
  const now=(input.now||new Date()).getTime();if(now<Date.parse(payload.validFrom))return {valid:false,reason:'NOT_YET_VALID',payload} as const;if(now>Date.parse(payload.expiry))return {valid:false,reason:'EXPIRED',payload} as const;

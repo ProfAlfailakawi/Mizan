@@ -60,7 +60,10 @@ export const BASE_POLICY: CompetitionPolicy = {
     difficultyTolerance: 0.75,
     avoidRepeatWithinRound: true,
     diversity: { acrossJuz: true, acrossSurah: true, mutashabihatBalance: true },
-    promptMode: 'configurable'
+    promptMode: 'configurable',
+    secureReveal: { requireParticipantPresence:true, judgeApprovalMode:'all_assigned' },
+    openingPrompt: { mode:'approved_reference_audio', autoplay:true, usageScope:'opening_prompt', preferredReciter:'' },
+    transitionCue: { enabled:true, phraseArabic:'حسبك، جزاك الله خيرًا', phraseEnglish:'Thank you. Please stop here.', autoAdvanceDelayMs:900, audioUrl:'' }
   },
   operations: {
     deploymentProfile: 'lean',

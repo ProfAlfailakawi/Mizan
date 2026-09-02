@@ -133,3 +133,20 @@ html[data-mizan-motion="reduced"] *,
 html[data-mizan-motion="reduced"] *::before,
 html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
 @media (prefers-contrast: more) { :root { --muted:#4f5651; --line:#c8c8c0; } }
+
+/* MIZAN queue ticket — inspired by a physical take-a-number motion, not a copy of any product UI. */
+.mizan-ticket-machine{position:relative;width:min(100%,270px);height:250px;margin-inline:auto;padding-top:38px;overflow:hidden}
+.mizan-ticket-dispenser{position:absolute;z-index:4;inset:0 12px auto;height:72px;border-radius:20px 20px 14px 14px;background:#202924;border:1px solid rgba(255,255,255,.07);box-shadow:0 8px 22px rgba(22,36,31,.12)}
+.mizan-ticket-dispenser::after{content:"";position:absolute;left:10%;right:10%;bottom:10px;height:7px;border-radius:99px;background:#0f1512}
+.mizan-ticket-dispenser span:first-child{position:absolute;width:9px;height:9px;border-radius:99px;background:#6f9c8b;right:20px;top:17px;opacity:.7}
+.mizan-ticket-dispenser span:last-child{position:absolute;width:44px;height:3px;border-radius:99px;background:#74867d;left:20px;top:20px;opacity:.4}
+.mizan-ticket-paper{position:absolute;z-index:2;left:50%;top:42px;width:190px;height:165px;transform:translate(-50%,-95px);opacity:.12;background:#fffefb;border:1px solid #d9d6cc;border-radius:4px 4px 22px 22px;box-shadow:0 10px 24px rgba(23,27,24,.08);transition:transform .8s cubic-bezier(.2,.8,.2,1),opacity .35s ease;padding:32px 18px 18px;text-align:center}
+.mizan-ticket-paper::before,.mizan-ticket-paper::after{content:"";position:absolute;top:18px;width:18px;height:18px;border-radius:99px;background:var(--canvas)}
+.mizan-ticket-paper::before{left:-9px}.mizan-ticket-paper::after{right:-9px}
+.mizan-ticket-issued{transform:translate(-50%,22px);opacity:1}
+.mizan-ticket-cut{position:absolute;top:13px;left:22px;right:22px;border-top:1px dashed #bbb8ae;color:#8a908c;height:15px;display:flex;justify-content:flex-end;align-items:flex-start}
+.mizan-ticket-cut svg{transform:translateY(-7px);background:#fffefb}
+.mizan-ticket-label{font-size:9px;font-weight:900;letter-spacing:.12em;color:#777e79}
+.mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
+.mizan-ticket-meta{font-size:10px;font-weight:800;color:#5f6862;margin-top:12px}
+.mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}

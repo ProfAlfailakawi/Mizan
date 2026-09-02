@@ -209,6 +209,9 @@ export interface Participant {
   checkInMethod?: 'kiosk_qr' | 'mobile_self' | 'exception_host';
   assignedCommitteeId?: string;
   queueNumber?: number;
+  originalQueueNumber?: number;
+  queueOrderKey?: number;
+  queueTransferCount?: number;
   specialNeeds?: boolean;
   photoUrl?: string;
   documents?: { type: string; url: string; verified: boolean }[];
@@ -302,6 +305,10 @@ export interface JudgeSubmission {
   eventsCount: number;
   submittedAt: string;
   locked: boolean;
+  independenceCommitmentHash?: string;
+  independenceCommittedAt?: string;
+  independenceCommitmentVersion?: 'MIZAN-JUDGE-INDEPENDENCE-v1';
+  independenceCommitmentAssurance?: 'client_sha256_commitment'|'server_signed_receipt';
 }
 
 export interface AIObservation {
@@ -550,6 +557,9 @@ export interface QuestionPolicy {
   avoidRepeatWithinRound: boolean;
   diversity: { acrossJuz: boolean; acrossSurah: boolean; mutashabihatBalance: boolean };
   promptMode: 'judge' | 'certified_audio' | 'visual' | 'configurable';
+  secureReveal?: { requireParticipantPresence:boolean; judgeApprovalMode:'all_assigned'|'minimum'; minimumApprovals?:number };
+  openingPrompt?: { mode:'approved_reference_audio'|'judge'; autoplay:boolean; usageScope:string; preferredReciter?:string };
+  transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; audioUrl?:string };
 }
 
 export interface WorkflowStagePolicy {
@@ -859,7 +869,7 @@ export interface QiraatGraphNode {
   qiraahId:string; qiraah:string; imam:string; rawiId:string; rawi:string; tariqIds:string[]; allowedWujuh:string[]; canonical:boolean; sourceStatus:'AVAILABLE_CANDIDATE'|'PENDING_SCIENTIFIC_SOURCE'; sourceManifestId?:string;
 }
 export interface VariantLocusRecord { id:string;surah:number;ayah:number;wordPosition?:number;baseReading?:string;alternateReading?:string;qiraah:string;rawi:string;tariq?:string;allowedWajh?:string;pronunciationEvidenceRef?:string;rasmEvidenceRef?:string;scientificNote?:string;version:string;approvalState:'DEVELOPMENT'|'PENDING_REVIEW'|'CERTIFIED'|'REVOKED'; }
-export interface QuranReferenceAudioRecord { id:string;organizationId:string;reciter:string;qiraah:string;rawi:string;tariq?:string;surah:number;ayahStart:number;ayahEnd:number;recordingSource:string;recordingDate?:string;audioFormat:string;sampleRate?:number;channels?:number;fileHash:string;approvalState:'REFERENCE'|'PENDING_REVIEW'|'APPROVED_REFERENCE'|'REVOKED';reviewer?:string;usageScope:string[];licenseProvenance?:string; }
+export interface QuranReferenceAudioRecord { id:string;organizationId:string;reciter:string;qiraah:string;rawi:string;tariq?:string;surah:number;ayahStart:number;ayahEnd:number;recordingSource:string;recordingDate?:string;audioFormat:string;sampleRate?:number;channels?:number;fileHash:string;audioUrl?:string;ayahTimings?:{ayah:number;startMs:number;endMs:number}[];approvalState:'REFERENCE'|'PENDING_REVIEW'|'APPROVED_REFERENCE'|'REVOKED';reviewer?:string;usageScope:string[];licenseProvenance?:string; }
 export interface QuranCrossCheckRecord { id:string;organizationId:string;sourceManifestId:string;sourcePackageHash:string;referenceAuthority:string;referenceVersion?:string;referenceHash?:string;status:'MATCH'|'DIFFERENCE'|'UNVERIFIED';differenceCount:number;differences:{surah:number;ayah:number;level:'TEXT'|'CHARACTER'|'DIACRITIC'|'WAQF_MARKER'|'UNVERIFIED';left:string;right:string;offset?:number}[];createdAt:string;createdBy:string; }
 export interface QuranPhonemeEvidenceRecord { schemaVersion:string; phoneme:string; allophone?:string; gemination?:boolean; durationMs?:number; madd?:{kind?:string;durationMs?:number;relativeUnits?:number}; nasalization?:boolean; emphasis?:boolean; voicing?:string; articulationContext?:string; pauseBehavior?:string; readingSpecificRealization?:string; boundaryConfidence?:number; }
 export interface ScientificAdjudicationCaseRecord { id:string;organizationId:string;datasetId:string;capability:AICapability;sampleRef:string;expertLabels:{reviewerId:string;label:string;reasoningCode?:string;createdAt:string}[];status:'OPEN'|'ADJUDICATED';finalGoldLabel?:string;adjudicatedBy?:string;adjudicatedAt?:string; }
@@ -885,3 +895,17 @@ export interface FederationTrustRecord { id:string;organizationId:string;issuer:
 export interface CompetitionBenchmarkRecord { id:string;competitionId:string;metric:string;value:number;basis:'OBSERVED'|'ESTIMATE'|'EXTERNAL_BENCHMARK';cohortSize:number;peerGroup?:string;minimumCohortSize:number;createdAt:string; }
 export interface RehearsalCheckRecord { id:string;name:string;status:'PASS'|'WARNING'|'FAIL';impact:string;evidence:string[];fix?:string; }
 export interface RehearsalRecord { id:string;competitionId:string;nonOfficial:true;startedAt:string;completedAt:string;createdBy:string;checks:RehearsalCheckRecord[];status:'PASS'|'PASS_WITH_WARNINGS'|'FAIL';reportHash:string;signedReport?:string; }
+
+export interface QuestionRevealGateRecord {
+  id:string;competitionId:string;sessionId:string;participantId:string;committeeId:string;questionIndex:number;
+  participantPresence:{verified:boolean;verifiedAt?:string;verifiedBy?:string;method?:'participant_pass'|'manual_visual_confirmation'};
+  requiredJudgeIds:string[];approvals:{judgeId:string;judgeName:string;approvedAt:string}[];
+  status:'SEALED'|'READY'|'REVEALED'|'CANCELLED';createdAt:string;revealedAt?:string;
+  questionCommitmentHash:string;quranSourcePackageHash?:string;
+  revealAssurance:'development_client_gate'|'operational_panel_gate'|'production_server_escrow';
+}
+export interface QueueTransferRecord {
+  id:string;competitionId:string;sourceCommitteeId:string;targetCommitteeId:string;participantIds:string[];
+  mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';reason:string;requestedAt:string;requestedBy:string;
+  status:'APPLIED'|'REJECTED';changes:{participantId:string;previousOrderKey:number;nextOrderKey:number;originalQueueNumber?:number}[];
+}

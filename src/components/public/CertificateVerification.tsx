@@ -48,7 +48,7 @@ export const CertificateVerification: React.FC = () => {
       </div>}
     </section>
 
-    {submittedCode && verification==='NOT_FOUND' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'NOT FOUND · غير موجودة':'NOT FOUND'}</h2><p className="text-xs text-[#777e79] mt-1">{ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}</p></section>}
+    {submittedCode && verification==='NOT_FOUND' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'غير موجودة':'NOT FOUND'}</h2><p className="text-xs text-[#777e79] mt-1">{ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}</p></section>}
 
     {activeCert && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">
       <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
@@ -64,7 +64,7 @@ export const CertificateVerification: React.FC = () => {
             {policy.certificates.showRank&&activeCert.rank&&<Row label={ar?'الترتيب':'Rank'} value={`#${activeCert.rank}`}/>} 
             <Row label={ar?'تاريخ الإصدار':'Issued'} value={activeCert.issueDate}/>
           </div>
-          <p className="mt-5 text-[10px] text-[#7b817d]">{ar?'تم التحقق من حزمة الشهادة، مرجع ختم النتيجة، وإثبات Merkle.':'Certificate package, result-seal reference, and Merkle inclusion proof verified.'}</p>
+          <p className="mt-5 text-[10px] text-[#7b817d]">{ar?'تم التحقق من حزمة الشهادة وختم النتيجة وإثبات الإدراج المشفّر.':'Certificate package, result-seal reference, and Merkle inclusion proof verified.'}</p>
           <Button className="mt-7" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[#777e79] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
       </div>
