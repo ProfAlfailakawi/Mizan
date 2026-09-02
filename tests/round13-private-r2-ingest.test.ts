@@ -22,8 +22,9 @@ test('audio mapping is exact and has no cross-riwayah fallback',()=>{
   assert.equal(kfgqpcAudioKeys('kfgqpc-audio-shubah-hudhaifi',1,1)[0],'delivery/audio/shubah/ali-al-hudhaifi/v1/001/001.mp3');
   assert.equal(kfgqpcAudioKeys('kfgqpc-audio-qalun-hudhaifi',1,1)[0],'delivery/audio/qalun/ali-al-hudhaifi/v1/001/001.mp3');
   assert.equal(kfgqpcAudioKeys('kfgqpc-audio-susi-siddiqi',1,1)[0],'delivery/audio/susi/uthman-al-siddiqi/v1/001/001.mp3');
-  assert.deepEqual(kfgqpcAudioKeys('warsh',1,1),[]);
-  assert.deepEqual(kfgqpcAudioKeys('kfgqpc-audio-duri-abi-amr-juhani',1,1),[],'Al-Duri remains blocked pending package validation');
+  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-warsh-dawsari',1,1)[0],'delivery/audio/warsh/ibrahim-al-dawsari/v1/001/001.mp3');
+  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-duri-juhani',1,1)[0],'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1/001/001.mp3');
+  assert.deepEqual(kfgqpcAudioKeys('warsh',1,1),[],'generic Warsh alias is deliberately unsupported');
   assert.deepEqual(kfgqpcAudioKeys('hafs',1,1),[],'generic Hafs alias is deliberately unsupported');
 });
 
@@ -86,4 +87,14 @@ test('R2 readiness is bound to permanent READY catalog, not disposable health.tx
   const original=globalThis.fetch;let requested='';
   globalThis.fetch=async(input:any,init:any)=>{requested=String(input);if(String(init?.method)==='GET'&&requested.includes('list-type=2'))return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>',{status:200});return new Response(JSON.stringify({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY'}),{status:200,headers:{'content-type':'application/json'}})};
   try{const client=new R2PrivateClient({endpoint:'https://acct.r2.cloudflarestorage.com',bucket:'mizan-quran-assets',accessKeyId:'A',secretAccessKey:'B'});const result=await client.health();assert.equal(result.state,'READY');assert.match(requested,/delivery\/_mizan\/catalog.json/)}finally{globalThis.fetch=original}
+});
+
+
+test('Warsh/Duri discovery policy is fail-closed on official evidence',async()=>{
+  const {classifyDuriCandidate,classifyWarshCatalog,extractOfficialLinks}=await import('../server/kfgqpc-audio-source-policy');
+  assert.equal(classifyWarshCatalog('<html>حفص شعبة قالون السوسي الدوري</html>').state,'OFFICIAL_AUDIO_UNAVAILABLE');
+  assert.equal(classifyWarshCatalog('<html>رواية ورش</html>').state,'UNVERIFIED');
+  assert.equal(classifyDuriCandidate({url:'https://qurancomplex.gov.sa/files/duri-ayat.zip',text:'تحميل آيات',contentLength:1_540_000}).ok,false);
+  assert.equal(classifyDuriCandidate({url:'https://qurancomplex.gov.sa/files/duri-ayat.zip',text:'تحميل آيات',contentLength:900_000_000}).ok,true);
+  assert.deepEqual(extractOfficialLinks('<a href="https://evil.example/duri.zip">آيات</a>','https://qurancomplex.gov.sa/'),[]);
 });

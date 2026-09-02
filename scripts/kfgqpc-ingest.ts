@@ -24,8 +24,8 @@ const DATASETS:Record<string,DatasetSpec>={
   'audio-shubah':{id:'audio-shubah',r2Prefix:'delivery/audio/shubah/ali-al-hudhaifi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'شعبة عن عاصم',rawi:'شعبة',reciter:'الشيخ علي الحذيفي',kind:'AUDIO'},
   'audio-qalun':{id:'audio-qalun',r2Prefix:'delivery/audio/qalun/ali-al-hudhaifi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'قالون عن نافع',rawi:'قالون',reciter:'الشيخ علي الحذيفي',kind:'AUDIO'},
   'audio-susi':{id:'audio-susi',r2Prefix:'delivery/audio/susi/uthman-al-siddiqi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'السوسي عن أبي عمرو',rawi:'السوسي',reciter:'د. عثمان الصديقي',kind:'AUDIO'},
-  'audio-duri':{id:'audio-duri',r2Prefix:'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',sourceUrl:OFFICIAL_AUDIO,reading:'الدوري عن أبي عمرو',rawi:'الدوري',reciter:'د. عبدالله بن عواد الجهني',kind:'AUDIO',blocked:true,blockedStatus:'UNVERIFIED',note:'Official ayah-package listing is inconsistent; MIZAN blocks ingestion until the actual official package is independently validated.'},
-  'audio-warsh':{id:'audio-warsh',r2Prefix:'delivery/audio/warsh/ibrahim-al-dawsari/v1',sourceUrl:OFFICIAL_AUDIO,reading:'ورش عن نافع',rawi:'ورش',reciter:'د. إبراهيم بن سعيد الدوسري',kind:'AUDIO',blocked:true,blockedStatus:'OFFICIAL_AUDIO_UNAVAILABLE',note:'KFGQPC confirms a Warsh recording historically, but the current downloadable audio catalog inspected by MIZAN does not expose a verified ayah package/mapping.'}
+  'audio-duri':{id:'audio-duri',r2Prefix:'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',sourceUrl:'https://qurancomplex.gov.sa/sounds-douri-juhani/',reading:'الدوري عن أبي عمرو',rawi:'الدوري',reciter:'د. عبدالله بن عواد الجهني',kind:'AUDIO'},
+  'audio-warsh':{id:'audio-warsh',r2Prefix:'delivery/audio/warsh/ibrahim-al-dawsari/v1',sourceUrl:'https://qc-dev.qurancomplex.gov.sa/quran-audios/',reading:'ورش عن نافع',rawi:'ورش',reciter:'د. إبراهيم بن سعيد الدوسري',kind:'AUDIO'}
 };
 
 const args=process.argv.slice(2);const has=(x:string)=>args.includes(x);const value=(x:string)=>{const i=args.indexOf(x);return i>=0?args[i+1]:undefined};
@@ -43,14 +43,15 @@ function readSourceMeta(dir:string,spec:DatasetSpec){
   return {...meta,sourceUrl};
 }
 function verifyDataset(spec:DatasetSpec){
-  if(spec.blocked)return {spec,status:spec.blockedStatus||'UNVERIFIED' as KfgqpcIngestStatus,reason:spec.note};
   const dir=path.join(root,spec.id),payload=path.join(dir,'payload');if(!fs.existsSync(payload))return {spec,status:'UNVERIFIED' as KfgqpcIngestStatus,reason:'PAYLOAD_MISSING'};
   const meta=readSourceMeta(dir,spec);let computed:any=undefined,status:KfgqpcIngestStatus='VERIFIED';const notes:string[]=[];
   if(spec.officialChecksum){const sourceArchive=meta.sourceArchive?path.resolve(dir,String(meta.sourceArchive)):'';if(!sourceArchive||!fs.existsSync(sourceArchive)){status='UNVERIFIED';notes.push('Official-checksum source archive is missing.')}else{computed=verifyFileChecksums(sourceArchive,spec.officialChecksum);if(computed.status==='QUARANTINED'){status='QUARANTINED';notes.push(`Checksum mismatch: ${computed.mismatches.join(', ')}`)}}}
   if(spec.kind==='MUSHAF'){const pages=validateMushafDeliveryPages(payload);if(!pages.valid){status='QUARANTINED';notes.push(`Mushaf delivery must contain exactly pages 001..604; missing=${pages.missing.join(',')}`)}}
   if(spec.kind==='AUDIO'){
     const files=listFilesRecursive(payload);const invalid=files.filter(f=>!/\/(?:\d{3})\/(?:\d{3})\.(?:mp3|m4a)$/i.test(f.replace(/\\/g,'/')));if(!files.length||invalid.length){status='QUARANTINED';notes.push(`Audio payload path contract invalid for ${invalid.length||'all'} file(s). Expected NNN/NNN.mp3|m4a.`)}
-    if(!meta.directOfficialDownloadVerified){status='UNVERIFIED';notes.push('Audio without a published official checksum requires source.json directOfficialDownloadVerified=true after direct KFGQPC acquisition verification.')}
+    if(spec.id==='audio-warsh'&&!meta.currentOfficialAyahPackageVerified){status='OFFICIAL_AUDIO_UNAVAILABLE';notes.push('Current KFGQPC downloadable catalog does not expose a verified Warsh ayah package. Historical recording evidence alone is not sufficient.')}
+    else if(spec.id==='audio-duri'&&!(meta.directOfficialDownloadVerified&&meta.currentOfficialAyahPackageVerified&&meta.listingSizeAnomalyResolved)){status='UNVERIFIED';notes.push('Al-Duri requires a direct official ayah package, content validation, and explicit resolution of the implausible 1.54 MB listing before upload.')}
+    else if(!meta.directOfficialDownloadVerified){status='UNVERIFIED';notes.push('Audio without a published official checksum requires source.json directOfficialDownloadVerified=true after direct KFGQPC acquisition verification.')}
   }
   const d=hashDirectory(payload);const manifest=buildPackageManifest({sourceUrl:meta.sourceUrl,downloadedAt:meta.downloadedAt,packageName:String(meta.packageName||spec.id),packageVersion:String(meta.packageVersion||spec.packageVersion||''),reading:spec.reading,rawi:spec.rawi,reciter:spec.reciter,fileCount:d.fileCount,totalBytes:d.totalBytes,officialChecksum:spec.officialChecksum,computedChecksum:computed,sha256:d.sha256,r2Prefix:spec.r2Prefix,status,notes});
   fs.writeFileSync(path.join(reportDir,`${spec.id}.manifest.json`),JSON.stringify(manifest,null,2)+'\n');return {spec,status,manifest,payload,files:d.files,notes};
@@ -89,10 +90,11 @@ async function main(){
   if(dryRun&&!doReport){console.log(JSON.stringify({mode:'DRY_RUN',root,selected:selected.map(x=>x.id)}));return}
   const cfg=r2ConfigFromEnv();if((doUpload||doReport)&&!cfg)throw new Error('R2_PRIVATE_ENV_NOT_CONFIGURED');const r2=cfg?new R2PrivateClient(cfg):null;
   if(doUpload&&r2){
-    if(only){const r=results[0];if(r.spec.blocked)throw new Error(`DATASET_BLOCKED:${r.spec.id}:${r.status}`);await uploadVerified(r2,r)}
+    if(only){const r=results[0];await uploadVerified(r2,r)}
     else{
-      const unready=results.filter(r=>!r.spec.blocked&&r.status!=='VERIFIED');if(unready.length)throw new Error(`FULL_INGEST_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
-      for(const r of results)if(!r.spec.blocked)await uploadVerified(r2,r);
+      const unready=results.filter(r=>!['audio-warsh','audio-duri'].includes(r.spec.id)&&r.status!=='VERIFIED');if(unready.length)throw new Error(`FULL_INGEST_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+      const invalidOptional=results.filter(r=>r.spec.id==='audio-warsh'&&!['VERIFIED','OFFICIAL_AUDIO_UNAVAILABLE'].includes(r.status)||r.spec.id==='audio-duri'&&!['VERIFIED','UNVERIFIED'].includes(r.status));if(invalidOptional.length)throw new Error(`OPTIONAL_AUDIO_STATE_INVALID:${invalidOptional.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+      for(const r of results)if(r.status==='VERIFIED')await uploadVerified(r2,r);
       const published=await publishReadyCatalog(r2,results);console.log(JSON.stringify({deliveryCatalog:published.status,versionKey:published.versionKey}));
     }
   }

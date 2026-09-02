@@ -64,7 +64,11 @@ const AUDIO_PREFIX:Record<string,string>={
   'kfgqpc-audio-qalun-hudhaifi':'delivery/audio/qalun/ali-al-hudhaifi/v1',
   'qalun-hudhaifi':'delivery/audio/qalun/ali-al-hudhaifi/v1',
   'kfgqpc-audio-susi-siddiqi':'delivery/audio/susi/uthman-al-siddiqi/v1',
-  'susi-siddiqi':'delivery/audio/susi/uthman-al-siddiqi/v1'
+  'susi-siddiqi':'delivery/audio/susi/uthman-al-siddiqi/v1',
+  'kfgqpc-audio-duri-juhani':'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',
+  'duri-juhani':'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',
+  'kfgqpc-audio-warsh-dawsari':'delivery/audio/warsh/ibrahim-al-dawsari/v1',
+  'warsh-dawsari':'delivery/audio/warsh/ibrahim-al-dawsari/v1'
 };
 const FONT_PREFIX:Record<string,string>={
   'kfgqpc-hafs-uthmanic-v13':'delivery/fonts/hafs/v13/primary',

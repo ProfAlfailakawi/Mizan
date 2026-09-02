@@ -30,3 +30,13 @@ Primary developer authority: https://qurancomplex.gov.sa/en/techquran/dev/
 Current audio authority: https://qc-dev.qurancomplex.gov.sa/quran-audios/
 
 No substitution across readings is allowed.
+
+## 2026-09-03 — Warsh and Al-Duri audio closure
+
+- Current official KFGQPC downloadable audio catalog (`https://qc-dev.qurancomplex.gov.sa/quran-audios/`) lists Al-Duri by Dr. Abdullah bin Awad Al-Juhani, but does not list Warsh as a current downloadable audio entry.
+- KFGQPC institutional material confirms the historical Warsh recording by Dr. Ibrahim bin Saeed Al-Dawsari. Historical existence is not treated as current downloadable-package availability.
+- The official Al-Duri listing reports an implausible `1.54 MB` whole-Ayah package while the whole-Surah package is approximately `1.51 GB`. MIZAN therefore refuses to trust the displayed Ayah size or auto-publish it.
+- `scripts/kfgqpc-audio-discovery.ts` re-checks the current official catalog and Al-Duri detail page at execution time. It accepts only HTTPS URLs on `qurancomplex.gov.sa` subdomains and rejects an Al-Duri Ayah candidate below 100 MiB.
+- Warsh remains `OFFICIAL_AUDIO_UNAVAILABLE` unless a current official downloadable Ayah package is actually exposed and separately verified.
+- Al-Duri remains `UNVERIFIED` until a direct official Ayah package is identified, its real archive/content structure is validated, and the size anomaly is explicitly resolved.
+- No Hafs or other narration is ever substituted for Warsh or Al-Duri.

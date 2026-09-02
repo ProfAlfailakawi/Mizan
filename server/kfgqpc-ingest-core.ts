@@ -102,8 +102,8 @@ export function buildReadyDeliveryCatalog(input:{datasets:KfgqpcDeliveryCatalogD
   if(!input.storage.withinSafetyLimit||!input.storage.withinFreeTier)throw new Error('R2_DELIVERY_CATALOG_STORAGE_LIMIT');
   const warsh=byId.get('audio-warsh');
   const duri=byId.get('audio-duri');
-  if(warsh?.status!=='OFFICIAL_AUDIO_UNAVAILABLE')throw new Error('R2_WARSH_AUDIO_STATUS_INVALID');
-  if(duri?.status!=='UNVERIFIED')throw new Error('R2_DURI_AUDIO_STATUS_INVALID');
+  if(warsh&&!['OFFICIAL_AUDIO_UNAVAILABLE','VERIFIED'].includes(warsh.status))throw new Error('R2_WARSH_AUDIO_STATUS_INVALID');
+  if(duri&&!['UNVERIFIED','VERIFIED'].includes(duri.status))throw new Error('R2_DURI_AUDIO_STATUS_INVALID');
   return {
     schemaVersion:'MIZAN-R2-CATALOG-1' as const,
     authority:'King Fahd Glorious Quran Printing Complex' as const,
@@ -111,7 +111,7 @@ export function buildReadyDeliveryCatalog(input:{datasets:KfgqpcDeliveryCatalogD
     state:'READY' as const,
     datasets:input.datasets,
     storage:input.storage,
-    unavailableAudio:['audio-warsh'],
-    unverifiedAudio:['audio-duri']
+    unavailableAudio:warsh?.status==='OFFICIAL_AUDIO_UNAVAILABLE'?['audio-warsh']:[],
+    unverifiedAudio:duri?.status==='UNVERIFIED'?['audio-duri']:[]
   };
 }

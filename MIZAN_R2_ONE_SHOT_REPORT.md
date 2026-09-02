@@ -1,20 +1,28 @@
-# MIZAN R2 one-shot completion patch
+# MIZAN R2 — final cloud-only source closure
 
-This patch converts R2 readiness from the disposable `health.txt` probe to the permanent fail-closed delivery catalog `delivery/_mizan/catalog.json`.
+Date: 2026-09-03
 
-The READY catalog is published only after all required verified datasets have been uploaded and measured below the configured safety ceiling. Required verified datasets are the six Uthmanic developer packages, Tafseer Muyassar, Ghareeb, Tajweed, exactly 604 Madinah delivery pages, and the four selected official audio sets (Hafs/Maher Al-Muaiqly, Shu'bah/Ali Al-Hudhaifi, Qalun/Ali Al-Hudhaifi, Al-Susi/Uthman Al-Siddiqi). Warsh audio is explicitly `OFFICIAL_AUDIO_UNAVAILABLE`; Al-Duri audio remains `UNVERIFIED` pending independent resolution of the official size discrepancy.
+This patch keeps all heavy Quran delivery bytes out of GitHub and the Cloud Run image. R2 remains the private delivery store.
 
-The full-ingest command is intentionally atomic at the readiness level: any missing, malformed, checksum-mismatched, quarantined, or over-budget required dataset prevents READY publication. Quran/media objects remain immutable and are resumed only when their stored SHA-256 matches exactly. A timestamped catalog snapshot is written before the mutable READY pointer.
+## Warsh
+KFGQPC institutional material confirms a Warsh recording by Dr. Ibrahim bin Saeed Al-Dawsari, but the current downloadable audio catalog checked for this patch does not expose Warsh as a current downloadable entry. MIZAN therefore keeps Warsh audio at `OFFICIAL_AUDIO_UNAVAILABLE`. The new discovery code can upgrade the evidence state only when the current official catalog itself exposes a direct candidate; historical evidence alone cannot do so.
 
-No R2 credentials, private object URL, or secret values are added to frontend source. No deployment or upload was performed while producing this patch.
+## Al-Duri
+KFGQPC currently lists Dr. Abdullah bin Awad Al-Juhani for Al-Duri. The official listing has a size inconsistency: the whole-Ayah package is displayed as 1.54 MB while the whole-Surah package is roughly 1.51 GB. MIZAN rejects an Ayah-package candidate below 100 MiB and requires direct-official provenance plus explicit anomaly resolution before Al-Duri can become `VERIFIED`.
 
-Validation performed locally on the patch:
+## Code completed
+- `scripts/kfgqpc-audio-discovery.ts` — live official-source discovery/report.
+- `server/kfgqpc-audio-source-policy.ts` — official-host filtering and fail-closed Warsh/Duri classification.
+- `server/kfgqpc-delivery.ts` — exact future verified key mappings for Warsh/Duri; no generic aliases or cross-reading fallback.
+- `scripts/kfgqpc-ingest.ts` — dynamic Warsh/Duri states instead of permanent hard-coded blocking.
+- `scripts/kfgqpc-init-stage.ts` — includes Warsh/Duri staging metadata.
+- `server/kfgqpc-ingest-core.ts` — READY catalog accepts optional Warsh/Duri upgrade to VERIFIED while retaining fail-closed fallback states.
+- `cloudbuild-assets.yaml` — cloud monitoring/source-audit build only; no heavy asset upload.
 
-- TypeScript check: PASS.
-- Private R2 / ingest regression suite: 11 passed, 0 failed.
-- Mushaf range and exact 604-page validation: PASS.
-- Exact audio mapping / no cross-riwayah fallback: PASS.
-- Checksum quarantine: PASS.
-- Storage safety overflow rejection: PASS.
-- Permanent READY catalog fail-closed behavior: PASS.
-- R2 readiness bound to `delivery/_mizan/catalog.json`: PASS.
+## Verification actually executed
+- TypeScript check for modified server/scripts: PASS.
+- Patch unit tests: 12 passed, 0 failed.
+- Tests cover exact Warsh/Duri R2 mappings, generic-alias rejection, official-host-only source links, Warsh current-catalog absence classification, and rejection of the implausible 1.54 MB Al-Duri candidate.
+
+## Not claimed
+No current official downloadable Warsh Ayah archive was found, so none is fabricated or substituted. No Al-Duri package is declared verified until its actual official bytes and archive structure pass validation. No Quran/audio binaries were uploaded by the assistant.
