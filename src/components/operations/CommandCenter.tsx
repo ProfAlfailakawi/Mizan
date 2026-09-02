@@ -5,6 +5,7 @@ import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { Pictogram } from '../design-system/Pictogram';
 import { QueueJustice } from './QueueJustice';
+import { ContinuityRecovery } from './ContinuityRecovery';
 
 export const CommandCenter: React.FC = () => {
  const s=useAppStore(); const {language,participants,committees,incidents,isOffline,reviewCases,notifications,devices,runSimulation}=s; const ar=language==='ar';
@@ -17,6 +18,8 @@ export const CommandCenter: React.FC = () => {
   <section className="mizan-surface p-6 sm:p-8"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5"><div className="flex items-center gap-4"><Pictogram icon={alerts.length?AlertTriangle:BadgeCheck} size="lg" tone={alerts.length?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز العمليات':'MIZAN COMMAND'}</div><h1 className="text-2xl sm:text-4xl font-black mt-1">{alerts.length?(ar?`${alerts.length} حالات تحتاجك`:`${alerts.length} exceptions need you`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h1><p className="text-xs text-[#747b76] mt-2">{alerts.length?(ar?'الروتين يعمل وحده. ركّز هنا.':'Routine is automated. Focus here.'):(ar?'لا تدخل مطلوب.':'No intervention required.')}</p></div></div><Button variant="outline" onClick={()=>setExpanded(v=>!v)} icon={<ChevronDown className={`w-4 h-4 transition ${expanded?'rotate-180':''}`}/>}>{ar?'التدفق':'Flow'}</Button></div></section>
 
   {alerts.length>0&&<section className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'الحالات الاستثنائية':'EXCEPTIONS'}</div><div className="mt-2 divide-y divide-[#e5e3dc]">{alerts.slice(0,8).map(x=><div key={`${x.kind}-${x.id}`} className="py-3 flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-[#9B7542]"/><div className="text-sm font-bold flex-1">{x.title}</div><Badge variant="neutral">{x.kind}</Badge></div>)}</div></section>}
+
+  <ContinuityRecovery/>
 
   {waiting>=3&&<section className="mizan-surface p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div className="flex items-center gap-3"><Pictogram icon={UsersRound} size="sm"/><div><div className="font-black text-sm">{ar?'موازنة اللجان':'Committee balance'}</div><div className="text-[11px] text-[#777e79] mt-1">{elastic?(ar?elastic.reasonArabic:elastic.reasonEnglish):(ar?'تحليل مؤهل ومحكوم بالتعارضات.':'Constraint-aware load analysis.')}</div></div></div>{elastic?.status==='proposed'?<div className="flex gap-2"><Button size="sm" onClick={()=>s.decideCommitteeElasticity(elastic.id,true)}>{ar?'اعتماد':'Approve'}</Button><Button size="sm" variant="outline" onClick={()=>s.decideCommitteeElasticity(elastic.id,false)}>{ar?'رفض':'Dismiss'}</Button></div>:<Button size="sm" variant="outline" onClick={()=>s.recommendCommitteeElasticity()}>{ar?'حلل':'Analyze'}</Button>}</section>}
 

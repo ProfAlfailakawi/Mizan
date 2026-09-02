@@ -26,6 +26,9 @@ export interface User {
   phone?: string;
   country?: string;
   mfaEnabled?: boolean;
+  accountStatus?: 'invited'|'active'|'suspended'|'revoked';
+  lastAuthenticatedAt?: string;
+  identityAssurance?: 'demo'|'firebase'|'firebase_managed'|'federated_sso';
 }
 
 export interface OrganizationBrand {
@@ -386,10 +389,13 @@ export interface ResultRecord {
   status: 'calculated' | 'quality_checked' | 'approved' | 'sealed' | 'published';
   sealMetadata?: {
     sealedBy: string;
+    sealedById?: string;
     sealedAt: string;
     cryptographicChecksum: string;
     dualApprovalBy?: string;
   };
+  publishedById?: string;
+  publishedAt?: string;
   awardTitle?: 'First Place' | 'Second Place' | 'Third Place' | 'Honorable Mention' | 'Qualified';
   awardTitleArabic?: 'المركز الأول' | 'المركز الثاني' | 'المركز الثالث' | 'تقدير امتياز' | 'مؤهل';
 }
@@ -453,6 +459,13 @@ export interface AuditEvent {
   currentStateHash: string;
   ipAddress?: string;
   deviceInfo?: string;
+  requestId?: string;
+  sessionId?: string;
+  authenticationMethod?: 'password'|'mfa'|'sso'|'demo'|'unknown';
+  authenticationAssurance?: 'single_factor'|'mfa'|'federated'|'demo';
+  reason?: string;
+  sequence?: number;
+  assurance?: 'client_hash_chain'|'server_hash_chain'|'external_worm';
 }
 
 export interface SimulationResult {
@@ -680,7 +693,14 @@ export type Permission =
   | 'audit.read'
   | 'quran.manage'
   | 'operations.manage'
-  | 'broadcast.manage';
+  | 'broadcast.manage'
+  | 'identity.invite'
+  | 'identity.approve'
+  | 'identity.suspend'
+  | 'identity.audit'
+  | 'participant.pass.reissue'
+  | 'session.recover'
+  | 'continuity.override';
 
 // ---- Enterprise completion layer ---------------------------------------------------------
 export type IntegrationKind = 'email' | 'sms' | 'whatsapp' | 'identity' | 'storage' | 'broadcast' | 'payments' | 'webhook';
@@ -860,8 +880,24 @@ export interface CommitteeElasticityRecommendation {
 export interface JourneyPassRecord {
   id:string; competitionId:string; participantId:string; participantCode:string; version:'MZ1';
   payload:string; checksum:string; issuedAt:string; status:'active'|'revoked'; validFrom?:string; expiresAt?:string; credentialId?:string; issuer?:string; categoryEntitlement?:string; signature?:string; signatureAlgorithm?:string; issuerPublicKeyJwk?:JsonWebKey; signatureAssurance?:'development_per_credential'|'production_issuer_key'; revocationVersion?:number; usedAt?:string;
+  lineageId?:string; generation?:number; reissuedFromId?:string; revokedAt?:string; revocationReason?:string;
 }
 
+
+
+// ---- Identity, credential recovery, and continuity governance --------------------------------
+export type IdentityAccountStatus='INVITED'|'ACTIVE'|'SUSPENDED'|'REVOKED';
+export interface IdentityAccountRecord { id:string;firebaseUid?:string;email:string;displayName:string;organizationId:string;status:IdentityAccountStatus;createdAt:string;createdBy:string;activatedAt?:string;suspendedAt?:string;revokedAt?:string;lastAuthenticatedAt?:string;mfaRequired:boolean;identityAssurance:'PENDING'|'FIREBASE'|'FEDERATED_SSO'|'DEMO'; }
+export interface RoleGrantRecord { id:string;accountId:string;role:Role;organizationId:string;competitionId?:string;committeeId?:string;status:'PENDING_APPROVAL'|'ACTIVE'|'SUSPENDED'|'REVOKED'|'EXPIRED';requestedAt:string;requestedBy:string;approvedAt?:string;approvedBy?:string;validFrom?:string;expiresAt?:string;reason:string;dualApprovalRequired:boolean; }
+export interface IdentityInvitationRecord { id:string;email:string;displayName:string;organizationId:string;requestedRole:Role;competitionId?:string;committeeId?:string;status:'PENDING_APPROVAL'|'READY'|'ACCEPTED'|'EXPIRED'|'REVOKED';createdAt:string;createdBy:string;approvedAt?:string;approvedBy?:string;expiresAt:string;activationTokenHash?:string;acceptedAt?:string;accountId?:string; }
+export interface AuthSessionRecord { id:string;accountId:string;firebaseUid?:string;organizationId:string;competitionId?:string;role:Role;deviceId:string;deviceName?:string;openedAt:string;lastSeenAt:string;expiresAt:string;status:'ACTIVE'|'ENDED'|'REVOKED'|'CONFLICT_BLOCKED';authenticationAssurance:'SINGLE_FACTOR'|'MFA'|'FEDERATED'|'DEMO';ipHint?:string; }
+export interface PassReissueRecord { id:string;competitionId:string;participantId:string;oldCredentialIds:string[];newCredentialId:string;lineageId:string;generation:number;reason:'LOST'|'DAMAGED'|'SECURITY'|'NAME_CORRECTION'|'OTHER';identityVerification:'PHOTO_ID'|'PASSPORT'|'PARTICIPANT_PROFILE'|'DELEGATION_CONFIRMATION'|'MANUAL_EXCEPTION';requestedAt:string;requestedBy:string;status:'ISSUED'|'CANCELLED';revocationEpoch:number; }
+export interface ParticipantCredentialLineageRecord { id:string;competitionId:string;participantId:string;lineageId:string;latestGeneration:number;latestCredentialId:string;revocationEpoch:number;updatedAt:string;updatedBy:string; }
+export type SessionContinuityPhase='BEFORE_REVEAL'|'REVEALED_NOT_STARTED'|'RECITING'|'BETWEEN_QUESTIONS'|'JUDGES_LOCKING'|'PANEL_LOCKED'|'COMPLETED';
+export interface SessionCheckpointRecord { id:string;competitionId:string;sessionId:string;participantId:string;committeeId:string;phase:SessionContinuityPhase;questionIndex:number;questionCommitmentHash?:string;questionRevealed:boolean;durationSeconds:number;eventIds:string[];lockedJudgeIds:string[];sequence:number;createdAt:string;createdBy:string;checkpointHash:string;previousCheckpointHash?:string;assurance:'client_hash_chain'|'edge_persisted'|'server_persisted'; }
+export interface ContinuityIncidentRecord { id:string;competitionId:string;sessionId:string;participantId:string;type:'POWER_LOSS'|'NETWORK_LOSS'|'DEVICE_FAILURE'|'BROWSER_CRASH'|'AUDIO_FAILURE'|'VENUE_EVACUATION'|'UNKNOWN';occurredAt:string;reportedBy:string;lastCheckpointId?:string;status:'OPEN'|'RECOVERING'|'RESOLVED'|'ESCALATED';notes?:string; }
+export interface SessionRecoveryRecord { id:string;competitionId:string;sessionId:string;participantId:string;incidentId:string;checkpointId?:string;decision:'RESUME_SAME_SESSION_SAME_QUESTION'|'RESUME_SAME_SESSION_NEXT_QUESTION'|'RESTORE_LOCKED_PANEL'|'HEAD_JUDGE_ADJUDICATION'|'FULL_RETEST_LAST_RESORT';reason:string;preserveRevealedQuestion:boolean;preserveLockedJudgeSubmissions:boolean;createdAt:string;createdBy:string;approvedByHeadJudge?:string;secondApprovedBy?:string;retestSessionId?:string;originalSessionPreserved?:boolean;status:'PROPOSED'|'APPLIED'|'REJECTED'; }
+export interface AuditLedgerSealRecord { id:string;competitionId:string;createdAt:string;createdBy:string;eventCount:number;headHash:string;firstEventId?:string;lastEventId?:string;assurance:'client_hash_chain'|'server_hash_chain'|'external_worm';verificationState:'VERIFIED'|'FAILED'; }
 
 // ---- Scientific foundation + Next Generation merge records -------------------------------
 export interface QuranSourceContentRecord { id:string;organizationId:string;sourceManifestId:string;packageHash:string;contentHash:string;sourceFileHash:string;sourceFormat:string;verseCount:number;surahCount:number;rows:{surah:number;ayah:number;text:string}[];importedAt:string;immutable:boolean; }

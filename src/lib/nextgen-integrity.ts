@@ -11,18 +11,19 @@ export async function generateSigningKeyPair(){return crypto.subtle.generateKey(
 export async function exportPublicJwk(publicKey:CryptoKey){return crypto.subtle.exportKey('jwk',publicKey)}
 export async function importPublicJwk(jwk:JsonWebKey){return crypto.subtle.importKey('jwk',jwk,{name:'ECDSA',namedCurve:'P-256'},true,['verify'])}
 
-export interface CompactPassPayload {v:'MZP1';competition:string;participantToken:string;categoryEntitlement:string;validFrom:string;expiry:string;credentialId:string;issuer:string}
+export interface CompactPassPayload {v:'MZP1';competition:string;participantToken:string;categoryEntitlement:string;validFrom:string;expiry:string;credentialId:string;issuer:string;lineageId?:string;generation?:number}
 export async function issueSignedPass(payload:CompactPassPayload,privateKey:CryptoKey){
  const body=b64(encoder.encode(canonicalStringify(payload))); const signature=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},privateKey,encoder.encode(body)));
  return `${body}.${b64(signature)}`;
 }
-export async function verifySignedPass(compact:string,publicKey:CryptoKey,input:{competition:string;now?:Date;revokedCredentialIds?:Set<string>;usedCredentialIds?:Set<string>;singleUse?:boolean}){
+export async function verifySignedPass(compact:string,publicKey:CryptoKey,input:{competition:string;now?:Date;revokedCredentialIds?:Set<string>;usedCredentialIds?:Set<string>;singleUse?:boolean;latestGenerationByLineage?:Map<string,number>}){
  const [body,sig]=compact.split('.');if(!body||!sig)return {valid:false,reason:'MALFORMED'} as const;
  let signatureBytes:Uint8Array;try{signatureBytes=unb64(sig)}catch{return {valid:false,reason:'INVALID_SIGNATURE'} as const} const signatureOk=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,signatureBytes,encoder.encode(body));if(!signatureOk)return {valid:false,reason:'INVALID_SIGNATURE'} as const;
  let payload:CompactPassPayload;try{payload=JSON.parse(decoder.decode(unb64(body)))}catch{return {valid:false,reason:'MALFORMED_PAYLOAD'} as const}
  if(payload.v!=='MZP1'||payload.competition!==input.competition)return {valid:false,reason:'WRONG_COMPETITION',payload} as const;
  const now=(input.now||new Date()).getTime();if(now<Date.parse(payload.validFrom))return {valid:false,reason:'NOT_YET_VALID',payload} as const;if(now>Date.parse(payload.expiry))return {valid:false,reason:'EXPIRED',payload} as const;
  if(input.revokedCredentialIds?.has(payload.credentialId))return {valid:false,reason:'REVOKED',payload} as const;
+ if(payload.lineageId&&payload.generation!==undefined&&input.latestGenerationByLineage){const latest=input.latestGenerationByLineage.get(payload.lineageId);if(latest!==undefined&&payload.generation<latest)return {valid:false,reason:'SUPERSEDED',payload} as const;if(latest!==undefined&&payload.generation>latest)return {valid:false,reason:'REVOCATION_CACHE_STALE',payload} as const;}
  if(input.singleUse&&input.usedCredentialIds?.has(payload.credentialId))return {valid:false,reason:'ALREADY_USED',payload} as const;
  return {valid:true,payload,assurance:'ECDSA_P256_SHA256'} as const;
 }
@@ -106,5 +107,5 @@ export async function runRehearsal(input:{competitionId:string;createdBy:string;
 export function rehearsalIsolation<T extends {competitionId:string}>(records:T[],rehearsalCompetitionId:string,officialCompetitionId:string){return records.filter(r=>r.competitionId===officialCompetitionId&&r.competitionId!==rehearsalCompetitionId)}
 
 export async function compactCredentialToJourneyRecord(input:{compact:string;payload:CompactPassPayload;participantId:string;participantCode:string}){
- return {id:newId('pass'),competitionId:input.payload.competition,participantId:input.participantId,participantCode:input.participantCode,version:'MZ1',payload:input.compact,checksum:await sha256(input.compact),issuedAt:new Date().toISOString(),status:'active',validFrom:input.payload.validFrom,expiresAt:input.payload.expiry,credentialId:input.payload.credentialId,issuer:input.payload.issuer,categoryEntitlement:input.payload.categoryEntitlement,signature:input.compact.split('.')[1],signatureAlgorithm:'ECDSA-P256-SHA256'} satisfies JourneyPassRecord;
+ return {id:newId('pass'),competitionId:input.payload.competition,participantId:input.participantId,participantCode:input.participantCode,version:'MZ1',payload:input.compact,checksum:await sha256(input.compact),issuedAt:new Date().toISOString(),status:'active',validFrom:input.payload.validFrom,expiresAt:input.payload.expiry,credentialId:input.payload.credentialId,issuer:input.payload.issuer,categoryEntitlement:input.payload.categoryEntitlement,lineageId:input.payload.lineageId,generation:input.payload.generation,signature:input.compact.split('.')[1],signatureAlgorithm:'ECDSA-P256-SHA256'} satisfies JourneyPassRecord;
 }

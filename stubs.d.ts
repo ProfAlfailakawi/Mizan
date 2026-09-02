@@ -1,5 +1,5 @@
 
-declare namespace React { type ReactNode=any; type FC<P={}>=any; type ComponentType<P={}>=any; type MouseEvent<T=any>=any; type KeyboardEvent<T=any>=any; type ButtonHTMLAttributes<T=any>=any; }
+declare namespace React { type ReactNode=any; type FC<P={}>=any; type ComponentType<P={}>=any; type MouseEvent<T=any>=any; type KeyboardEvent<T=any>=any; type ChangeEvent<T=any>=any; type ButtonHTMLAttributes<T=any>=any; }
 declare namespace JSX { interface IntrinsicAttributes { key?: any } interface IntrinsicElements { [elemName:string]: any } }
 declare module 'react' { const React:any; export default React; export const StrictMode:any; export function useState<T=any>(initial?:T|(()=>T)):[T,(value:any)=>void]; export function useEffect(fn:any,deps?:any[]):void; export function useMemo<T=any>(fn:()=>T,deps:any[]):T; export function useRef<T=any>(initial?:T):{current:T}; export function useCallback<T extends (...args:any[])=>any>(fn:T,deps:any[]):T; export type FC<P={}>=any; }
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
@@ -92,6 +92,24 @@ declare module 'lucide-react' {
  export const FileKey2: any;
  export const GitBranch: any;
  export const TriangleAlert: any;
+ export const RefreshCcw: any;
+ export const ArrowRightLeft: any;
+ export const ArrowLeftRight: any;
+ export const UserPlus: any;
+ export const Laptop2: any;
+ export const ScanSearch: any;
+ export const PlayCircle: any;
+ export const Database: any;
+ export const AudioLines: any;
+ export const CircleHelp: any;
+ export const Ticket: any;
+ export const Scissors: any;
+ export const UserCheck: any;
+ export const Square: any;
+ export const BatteryWarning: any;
+ export const ShieldAlert: any;
+ export const MonitorX: any;
+ export const Siren: any;
 }
 declare module 'firebase/app' { export const initializeApp:any; export const getApps:any; export const getApp:any; }
 declare module 'firebase/firestore' { export const getFirestore:any; export const doc:any; export const setDoc:any; export const onSnapshot:any; }
@@ -103,7 +121,7 @@ declare module '@tailwindcss/vite' { const x:any; export default x; }
 declare module '@vitejs/plugin-react' { const x:any; export default x; }
 declare module '@google/genai' { export const GoogleGenAI:any; }
 declare module 'motion' { export const motion:any; }
-declare var process:any; declare var __dirname:string; declare var Buffer:any;
+declare var process:any; declare var __dirname:string; type Buffer=any; declare var Buffer:any;
 interface ImportMeta { env:any }
 
 declare module 'crypto' { const crypto:any; export default crypto; }
@@ -111,3 +129,7 @@ declare module 'node:test' { const test:any; export default test; }
 declare module 'node:assert/strict' { const assert:any; export default assert; }
 
 declare module 'fs' { const fs:any; export default fs; }
+
+declare module 'node:fs' { const fs:any; export default fs; }
+declare module 'node:os' { const os:any; export default os; }
+declare module 'node:path' { const path:any; export default path; }

@@ -9,6 +9,7 @@ import { TrustProtocolLab } from './TrustProtocolLab';
 import { BeyondLab } from './BeyondLab';
 import { EmergencyControl } from '../design-system/EmergencyControl';
 import { ReadinessLab } from './ReadinessLab';
+import { IdentityGovernance } from './IdentityGovernance';
 
 type Section='integrations'|'operations'|'international'|'shadow'|'governance'|'trust'|'beyond';
 const isAr=(l:string)=>l==='ar';
@@ -23,7 +24,7 @@ export const EnterpriseWorkspace:React.FC=()=>{
   {section==='operations'&&<Field s={s} ar={ar} online={online}/>} 
   {section==='international'&&<International s={s} ar={ar}/>} 
   {section==='shadow'&&<Shadow s={s} ar={ar}/>} 
-  {section==='governance'&&<div className="space-y-4"><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/><Governance s={s} ar={ar}/></div>} 
+  {section==='governance'&&<div className="space-y-4"><IdentityGovernance/><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/><Governance s={s} ar={ar}/></div>} 
   {section==='trust'&&<TrustProtocolLab/>} 
   {section==='beyond'&&<BeyondLab/>} 
  </div>

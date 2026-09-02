@@ -81,15 +81,28 @@ export function planQueueTransfer(input:{
   return {ok:true as const,changes,selectedIds:selected.map(p=>p.id),targetOrder:simulated.map(x=>x.id)};
 }
 
+export type QueueTransferImpactResult =
+  | { ok:false; reason:string }
+  | {
+      ok:true;
+      changes:{participantId:string;fromCommitteeId:string;toCommitteeId:string;previousOrderKey:number;nextOrderKey:number;originalQueueNumber?:number}[];
+      selectedIds:string[];
+      targetOrder:string[];
+      priorityInversions:number;
+      selectedLostPriorityPositions:{participantId:string;positions:number}[];
+      totalLostPriorityPositions:number;
+      priorityPreserved:boolean;
+    };
+
 export function queueTransferImpact(input:{
   participants:Participant[];
   sourceCommitteeId:string;
   targetCommitteeId:string;
   participantIds?:string[];
   mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';
-}){
+}):QueueTransferImpactResult{
   const plan=planQueueTransfer(input);
-  if(!plan.ok)return plan;
+  if(plan.ok!==true)return {ok:false,reason:plan.reason};
   const ids=new Set(plan.targetOrder);
   const targetRows=input.participants.filter(p=>ids.has(p.id));
   const original=new Map(targetRows.map(p=>[p.id,p.originalQueueNumber??p.queueNumber??queueOrderValue(p)]));
@@ -97,7 +110,7 @@ export function queueTransferImpact(input:{
   for(let i=0;i<plan.targetOrder.length;i++)for(let j=i+1;j<plan.targetOrder.length;j++){const a=original.get(plan.targetOrder[i])??Number.MAX_SAFE_INTEGER,b=original.get(plan.targetOrder[j])??Number.MAX_SAFE_INTEGER;if(a>b)inversions++;}
   const selected=new Set(plan.selectedIds);
   const lostPriority=plan.selectedIds.map(id=>{const own=original.get(id)??Number.MAX_SAFE_INTEGER;const pos=plan.targetOrder.indexOf(id);const ahead=plan.targetOrder.slice(0,pos).filter(other=>!selected.has(other)&&(original.get(other)??Number.MAX_SAFE_INTEGER)>own).length;return {participantId:id,positions:ahead};});
-  return {ok:true as const,...plan,priorityInversions:inversions,selectedLostPriorityPositions:lostPriority,totalLostPriorityPositions:lostPriority.reduce((a,x)=>a+x.positions,0),priorityPreserved:inversions===0};
+  return {ok:true,changes:plan.changes,selectedIds:plan.selectedIds,targetOrder:plan.targetOrder,priorityInversions:inversions,selectedLostPriorityPositions:lostPriority,totalLostPriorityPositions:lostPriority.reduce((a,x)=>a+x.positions,0),priorityPreserved:inversions===0};
 }
 
 export function recommendBalancedQueueMove(input:{participants:Participant[];sourceCommittee:Committee;targetCommittee:Committee;maxMove?:number;isCompatible:(participant:Participant,target:Committee)=>boolean}){
