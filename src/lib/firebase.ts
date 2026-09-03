@@ -1,6 +1,24 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import config from '../../firebase-applet-config.json';
+import rawConfig from '../../firebase-applet-config.json';
+
+/*
+ * firebase-applet-config.json is intentionally committed empty ({}) so that no project
+ * identifiers live in the repository — the real values arrive through VITE_* environment
+ * variables at build time. TypeScript, however, infers the type from the file's actual
+ * contents, so every `config.<field>` read was an error and `npm run check` had been
+ * permanently red. Describing the shape once restores the gate and changes no runtime
+ * value: each field stays optional, exactly as the empty file implies.
+ */
+type AppletConfig = Partial<{
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+  firestoreDatabaseId: string;
+}>;
+const config: AppletConfig = rawConfig;
 
 const env=import.meta.env as Record<string,string|undefined>;
 const authRequired=env.VITE_REQUIRE_AUTH==='true';

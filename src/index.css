@@ -546,3 +546,99 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 .mizan-venue-panel{ background:var(--venue-surface); border:1px solid var(--venue-line); border-radius:var(--radius-md); }
 .mizan-venue-muted{ color:var(--venue-muted); }
 .mizan-venue-faint{ color:var(--venue-faint); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JudgeOS scoring surface
+   All five scoring actions used to render identically — the same emerald chip,
+   border and background — so the costliest mark (a memorisation error) looked
+   exactly like the cheapest, and the penalty that drives the decision was the
+   smallest text on the card. They also carried hover-only affordances on
+   hardware that has no hover.
+
+   Two orthogonal facts now get two orthogonal encodings:
+     hue    = which criterion is being marked (stable, learnable by position)
+     weight = what it costs (the penalty, promoted to the loudest figure)
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* grid-auto-rows:1fr keeps every card the same height across rows: the severity tiers
+   change the penalty's font size, which otherwise made one row 3px taller than another. */
+.mizan-judge-grid{ display:grid; gap:.75rem; margin-top:1rem; grid-template-columns:repeat(2,1fr); grid-auto-rows:1fr; }
+@media (min-width:640px){ .mizan-judge-grid[data-cols="4"]{ grid-template-columns:repeat(4,1fr) } }
+@media (min-width:640px){ .mizan-judge-grid[data-cols="3"]{ grid-template-columns:repeat(3,1fr) } }
+
+.mizan-judge-action{
+  position:relative; isolation:isolate; overflow:hidden;
+  min-height:112px; border-radius:20px; padding:.9rem 1rem;
+  text-align:start; display:flex; flex-direction:column; justify-content:space-between;
+  background:var(--surface); border:1px solid var(--ja-line, var(--line));
+  box-shadow:var(--shadow-1);
+  transition:box-shadow .16s ease, transform .12s var(--ease-brand), border-color .16s ease;
+}
+/* A judge marks with a thumb on a tablet, so the pressed state — not hover — is the
+   affordance that has to be unmistakable. */
+.mizan-judge-action:active{ transform:scale(.985); box-shadow:none; }
+@media (hover:hover){ .mizan-judge-action:hover{ border-color:var(--ja-edge); box-shadow:var(--shadow-3); } }
+.mizan-judge-action:focus-visible{ outline:3px solid var(--ja-ring); outline-offset:2px; }
+
+/* Left/leading spine carries the hue at a glance, even in peripheral vision. */
+/* The spine carries two readings at once: hue says which criterion, and thickness says
+   how much it costs. That second channel matters because most default actions share the
+   memorisation criterion — hue alone would render four of six cards identical. */
+.mizan-judge-action::before{
+  content:""; position:absolute; inset-block:0; inset-inline-start:0;
+  background:var(--ja-ink);
+  width:var(--ja-weight, 3px); opacity:var(--ja-weight-o, .55);
+}
+.mizan-judge-action[data-weight="high"]{ --ja-weight:7px; --ja-weight-o:1 }
+.mizan-judge-action[data-weight="mid"] { --ja-weight:5px; --ja-weight-o:.8 }
+.mizan-judge-action[data-weight="low"] { --ja-weight:3px; --ja-weight-o:.5 }
+/* Highest-cost marks also carry the most visual weight in their figure. */
+.mizan-judge-action[data-weight="high"] .mizan-judge-cost{ font-size:calc(22px * var(--mizan-text-scale)) }
+.mizan-judge-action[data-weight="low"]  .mizan-judge-cost{ font-size:calc(17px * var(--mizan-text-scale)); opacity:.8 }
+.mizan-judge-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; }
+.mizan-judge-icon{
+  width:38px; height:38px; border-radius:12px; display:grid; place-items:center; flex:0 0 auto;
+  background:var(--ja-soft); color:var(--ja-ink);
+}
+.mizan-judge-key{
+  font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:600;
+  color:var(--muted); border:1px solid var(--line); border-radius:7px; padding:.18rem .38rem;
+  line-height:1;
+}
+.mizan-judge-label{ margin-top:.7rem; font-size:calc(15px * var(--mizan-text-scale)); font-weight:700; color:var(--ink); line-height:1.35; }
+/* The penalty is the decision-relevant number, so it reads as the figure it is. */
+.mizan-judge-cost{
+  margin-top:.15rem; font-size:calc(19px * var(--mizan-text-scale)); font-weight:800;
+  color:var(--ja-ink); font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1;
+}
+.mizan-judge-cost small{ font-size:calc(10px * var(--mizan-text-scale)); font-weight:600; color:var(--muted); margin-inline-start:.3rem; letter-spacing:0; }
+
+/* Count of marks already logged this session — absent at zero, so a clean sheet
+   stays clean and the surface only speaks when it has something to say. */
+.mizan-judge-count{
+  min-width:26px; height:26px; padding-inline:.4rem; border-radius:999px;
+  display:inline-grid; place-items:center; flex:0 0 auto;
+  background:var(--ja-ink); color:#fff;
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:800; font-variant-numeric:tabular-nums;
+}
+/* Confirmation pulse: a tap in a noisy hall must be visibly acknowledged, or judges
+   double-tap and the score is wrong. */
+.mizan-judge-action[data-flash="true"]{ animation:mzJudgeMark .5s var(--ease-brand); }
+.mizan-judge-action[data-flash="true"] .mizan-judge-count{ animation:mzPop .4s var(--ease-brand); }
+@keyframes mzJudgeMark{
+  0%{ box-shadow:0 0 0 0 var(--ja-ring) }
+  35%{ box-shadow:0 0 0 6px var(--ja-ring) }
+  100%{ box-shadow:0 0 0 0 rgba(0,0,0,0) }
+}
+
+/* Criterion palette, drawn from the existing system tones so JudgeOS stays in family. */
+.ja-memorization{ --ja-ink:#a34d43; --ja-soft:#f4e6e3; --ja-line:#e8cfca; --ja-edge:#c98f86; --ja-ring:rgba(163,77,67,.24) }
+.ja-tajweed     { --ja-ink:#214c40; --ja-soft:#e7eee9; --ja-line:#cbdad2; --ja-edge:#8fab9f; --ja-ring:rgba(33,76,64,.22) }
+.ja-waqf_ibtida { --ja-ink:#496477; --ja-soft:#e8eef1; --ja-line:#d5e0e5; --ja-edge:#93aab7; --ja-ring:rgba(73,100,119,.22) }
+.ja-performance { --ja-ink:#89673a; --ja-soft:#f2eadc; --ja-line:#e4d5bd; --ja-edge:#c0a274; --ja-ring:rgba(137,103,58,.22) }
+.ja-custom      { --ja-ink:#59615c; --ja-soft:#efeee9; --ja-line:#deddd7; --ja-edge:#a8aeaa; --ja-ring:rgba(89,97,92,.2) }
+
+@media (prefers-reduced-motion: reduce){
+  .mizan-judge-action[data-flash="true"],
+  .mizan-judge-action[data-flash="true"] .mizan-judge-count{ animation:none }
+}
+html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }

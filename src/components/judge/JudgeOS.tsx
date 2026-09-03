@@ -11,6 +11,11 @@ import { Badge } from '../design-system/Badge';
 import { QuranIntelligenceDock } from './QuranIntelligenceDock';
 import { fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetchQuranReadingGuard, fetchQuranSessionEvidence, postQuranHumanMarker, quranReadingIdForPackage, resetQuranAlignment, submitQuranAlignmentChunk, type QuranAlignmentResult, type QuranPassageIntelligence, type QuranReadingGuard, type QuranReadingId, type QuranSessionEvidence } from '../../lib/quran-intelligence';
 
+// Arabic counts do not pluralise the way English does: 1 takes the singular, 2 takes the
+// dual, 3-10 take the plural, and 11+ return to the singular. "4 مرة" is simply wrong.
+const marksAr=(n:number)=> n===1?'مرة واحدة' : n===2?'مرتين' : n<=10?`${n} مرات` : `${n} مرة`;
+// Criterion names were only ever available in English, inside an Arabic-first surface.
+const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
 const iconFor=(kind?:string)=> kind==='error'?AlertTriangle:kind==='open'?CornerDownLeft:kind==='repeat'?RotateCcw:kind==='tajweed'?Sparkles:kind==='stop'?CircleDot:AlertTriangle;
 
 export const JudgeOS: React.FC = () => {
@@ -29,6 +34,10 @@ export const JudgeOS: React.FC = () => {
  const [audioState,setAudioState]=useState<'not_ready'|'requesting'|'ready'|'failed'>(policy.judging.requireAudioRecording?'not_ready':'ready');
  const [openingAudioState,setOpeningAudioState]=useState<'idle'|'playing'|'unavailable'|'failed'>('idle');
  const [quranIntelligence,setQuranIntelligence]=useState<QuranPassageIntelligence|null>(null); const [alignmentResult,setAlignmentResult]=useState<QuranAlignmentResult|null>(null); const [alignmentConfigured,setAlignmentConfigured]=useState(false); const [shadowMicActive,setShadowMicActive]=useState(false); const [tajweedEducation,setTajweedEducation]=useState(false); const [sessionEvidence,setSessionEvidence]=useState<QuranSessionEvidence|null>(null); const [readingGuard,setReadingGuard]=useState<QuranReadingGuard|null>(null);
+ // Confirming a mark: a tap in a noisy hall needs visible acknowledgement, and a
+ // screen-reader user needs the same fact spoken. Both are driven from here.
+ const [markedAction,setMarkedAction]=useState<string|null>(null);
+ const [markAnnounce,setMarkAnnounce]=useState('');
  const recorderRef=useRef<MediaRecorder|null>(null); const streamRef=useRef<MediaStream|null>(null); const chunksRef=useRef<Blob[]>([]); const audioStartedAt=useRef<string>(''); const promptAudioRef=useRef<HTMLAudioElement|null>(null); const transitionAudioRef=useRef<HTMLAudioElement|null>(null); const openingPlayedKeyRef=useRef('');
  const alignmentContextRef=useRef<{sessionId:string;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}|null>(null); const alignmentBusyRef=useRef(false);
  useEffect(()=>{setDirectScores(Object.fromEntries(visibleCriteria.map(c=>[c.id,c.maxScore])))},[activeSession.sessionId,ruleSet.id,judge?.id]);
@@ -46,7 +55,21 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>()=>{void resetQuranAlignment(activeSession.sessionId).catch(()=>{})},[activeSession.sessionId]);
  const refreshSessionEvidence=()=>void fetchQuranSessionEvidence(activeSession.sessionId).then(setSessionEvidence).catch(()=>{});
  const sendAlignmentChunk=(blob:Blob)=>{const context=alignmentContextRef.current;if(!context||alignmentBusyRef.current||!blob.size)return;alignmentBusyRef.current=true;void submitQuranAlignmentChunk({blob,...context}).then(x=>{setAlignmentResult(x);refreshSessionEvidence()}).catch(()=>{}).finally(()=>{alignmentBusyRef.current=false})};
- const recordJudgeEventWithEvidence=(eventType:any)=>{recordJudgeEvent(eventType);if(alignmentConfigured)void postQuranHumanMarker(activeSession.sessionId,String(eventType)).then(setSessionEvidence).catch(()=>{})};
+ // Marks already logged for one action, from the same source the evidence timeline
+ // uses, so the two can never disagree. Reversed marks are excluded, as elsewhere.
+ const countFor=(eventType:any)=>activeSession.events.filter(e=>!e.reversed&&e.type===eventType).length;
+ const recordJudgeEventWithEvidence=(eventType:any,action?:{id:string;shortArabic:string;shortEnglish:string;penalty:number})=>{
+  // Read the tally *before* recording: recordJudgeEvent mutates the store synchronously,
+  // so counting afterwards and adding one announced a number one too high.
+  const tally=countFor(eventType)+1;
+  recordJudgeEvent(eventType);
+  if(action){
+   setMarkedAction(action.id);
+   window.setTimeout(()=>setMarkedAction(cur=>cur===action.id?null:cur),520);
+   const label=ar?action.shortArabic:action.shortEnglish;
+   setMarkAnnounce(ar?`سُجِّل ${label}. ${marksAr(tally)}. الخصم ${action.penalty}.`:`${label} recorded. ${tally} time${tally===1?'':'s'}. Penalty ${action.penalty}.`);
+  }
+  if(alignmentConfigured)void postQuranHumanMarker(activeSession.sessionId,String(eventType)).then(setSessionEvidence).catch(()=>{})};
  const prepareAudio=async()=>{ if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();recorder.ondataavailable=e=>{if(e.data.size){if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;setShadowMicActive(false);resolve()};recorder.stop()})};
  const submitAndLock=async()=>{if(policy.judging.requireAudioRecording&&audioState!=='ready')return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
@@ -97,7 +120,38 @@ export const JudgeOS: React.FC = () => {
    {questionRevealed&&q&&<div className="py-3 sm:py-5"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/><QuranIntelligenceDock ar={ar} data={quranIntelligence} tracking={alignmentResult} alignmentConfigured={alignmentConfigured} educationMode={tajweedEducation} onEducationMode={setTajweedEducation} sessionEvidence={sessionEvidence} readingGuard={readingGuard} replayAvailable={!!sessionRecording?.localObjectUrl} onReplay={replayEvidence}/><div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">{openingReference?<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio()} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?`تلاوة أول آية — ${openingReference.reciter}`:`First ayah — ${openingReference.reciter}`)}</Button>:<Badge variant="amber">{ar?'لا يوجد صوت مرجعي معتمد مطابق لهذه القراءة':'No approved reading-matched opening audio'}</Badge>}<Badge variant={certifiedPosition?'emerald':'neutral'}>{certifiedPosition?(ar?'تتبّع نهاية الموضع معتمد للنطاق':'Certified passage-end signal available'):(ar?'إنهاء الموضع يدوي':'Manual passage end')}</Badge>{secureMode&&q&&'startLocusAssurance'in q&&<Badge variant="emerald">{ar?`بداية آية موثقة · ${q.startLocusClass==='MID_PAGE'?'منتصف الصفحة':q.startLocusClass==='LATE_PAGE'?'آخر الصفحة':q.startLocusClass==='PAGE_OPENING'?'بداية الصفحة':q.startLocusClass==='SURAH_OPENING'?'بداية السورة':'موضع متنوع'}`:`Verified ayah start · ${q.startLocusClass||'varied locus'}`}</Badge>}{alignmentConfigured&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي — ظل':'Start live tracking — shadow')}</Button>}{alignmentConfigured&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل — ظل':'LIVE TRACKING · SHADOW'}</Badge>}</div><div className="mt-3 text-[10px] text-[#666a67]">{ar?'الصوت القرآني لا يُنشأ آليًا؛ يُشغّل فقط من خزنة المراجع الصوتية المعتمدة.':'Quran audio is never synthesized here; only approved reference audio may play.'}</div></div>}
 
    {questionRevealed&&!activeSession.isLocked&&(!policy.judging.requireAudioRecording||audioState==='ready')?activeSession.questionPhase==='TRANSITION'?<div className="rounded-2xl bg-[#eef2ef] p-7 text-center"><Square className="w-6 h-6 mx-auto text-[#214C40]"/><div className="font-black mt-3">{isLastQuestion?(ar?'انتهى آخر موضع. اعتمد تقييمك عندما تكون جاهزًا.':'Final passage ended. Submit when ready.'):(ar?'تم إيقاف الموضع. جاري الانتقال…':'Passage stopped. Preparing transition…')}</div>{isLastQuestion&&<Button className="mt-4" onClick={submitAndLock} icon={<Check className="w-4 h-4"/>}>{ar?'اعتماد وقفل':'Submit & lock'}</Button>}</div>:<>
-    {policy.judging.scoreEntryMode!=='direct_score'&&<div className={`grid gap-3 mt-4 ${judgeActions.length<=4?'grid-cols-2 sm:grid-cols-4':'grid-cols-2 sm:grid-cols-3'}`}>{judgeActions.map(a=>{const Icon=iconFor(a.icon);return <button key={a.id} onClick={()=>recordJudgeEventWithEvidence(a.eventType)} className="group min-h-24 rounded-2xl border border-[#deddd6] bg-[#fffefb] hover:border-[#bfc9c3] hover:bg-[#f7faf8] transition px-4 py-4 text-start active:scale-[.99]"><div className="flex items-start justify-between"><span className="w-9 h-9 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><Icon className="w-4 h-4"/></span>{a.shortcut&&<kbd className="text-[10px] text-[#696f6b] border border-[#dfded7] rounded-md px-1.5 py-1">{a.shortcut}</kbd>}</div><div className="mt-3 text-base font-black">{ar?a.shortArabic:a.shortEnglish}</div><div className="text-[10px] text-[#656b66] mt-1">−{a.penalty}</div></button>})}</div>}
+    {policy.judging.scoreEntryMode!=='direct_score'&&<>
+     <div className="mizan-judge-grid" data-cols={judgeActions.length<=4?'4':'3'} role="group" aria-label={ar?'أدوات تسجيل الملاحظات':'Scoring actions'}>{judgeActions.map(a=>{
+      const Icon=iconFor(a.icon);
+      const tally=countFor(a.eventType);
+      const label=ar?a.shortArabic:a.shortEnglish;
+      const criterionName=ar?CRITERION_AR[a.criterion]:a.criterion;
+      return <button
+        key={a.id}
+        onClick={()=>recordJudgeEventWithEvidence(a.eventType,a)}
+        data-flash={markedAction===a.id||undefined}
+        className={`mizan-judge-action ja-${a.criterion}`}
+        data-weight={a.penalty>=1?'high':a.penalty>=0.5?'mid':'low'}
+        aria-label={ar
+          ?`${label} — ${criterionName} — خصم ${a.penalty}${tally?` — سُجِّل ${marksAr(tally)}`:''}`
+          :`${label} — ${a.criterion} — penalty ${a.penalty}${tally?` — logged ${tally} time${tally===1?'':'s'}`:''}`}
+      >
+        <span className="mizan-judge-head">
+          <span className="mizan-judge-icon"><Icon className="w-[18px] h-[18px]"/></span>
+          <span className="flex items-center gap-1.5">
+            {tally>0&&<span className="mizan-judge-count">{tally}</span>}
+            {a.shortcut&&<kbd className="mizan-judge-key">{a.shortcut}</kbd>}
+          </span>
+        </span>
+        <span>
+          <span className="mizan-judge-label block">{label}</span>
+          <span className="mizan-judge-cost block">−{a.penalty}</span>
+        </span>
+      </button>})}
+     </div>
+     {/* Spoken confirmation of the mark, so the surface is not visual-only. */}
+     <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>
+    </>}
     {directMode&&<div className="mt-5 border-t border-[#e5e3dc] pt-5"><div className="text-[11px] font-black text-[#636864] mb-3">{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div><div className="grid sm:grid-cols-2 gap-3">{visibleCriteria.map(c=><label key={c.id} className="rounded-2xl border border-[#deddd6] bg-[#fffefb] p-4 flex items-center justify-between gap-4"><span><span className="block text-sm font-black">{ar?c.nameArabic:c.name}</span><span className="text-[10px] text-[#656b66]">{ar?'من':'of'} {c.maxScore}</span></span><input aria-label={ar?c.nameArabic:c.name} type="number" min="0" max={c.maxScore} step={policy.judging.directScoreStep||.25} value={directScores[c.id]??c.maxScore} onChange={e=>setDirectScores(v=>({...v,[c.id]:Math.min(c.maxScore,Math.max(0,Number(e.target.value)))}))} className="w-24 rounded-xl border border-[#d9d7d0] bg-white px-3 py-2 text-center text-xl font-black"/></label>)}</div><div className="text-[10px] text-[#686d6a] mt-2">{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div></div>}
     <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#e5e3dc] pt-5"><div className="flex items-center gap-2"><button onClick={undoLastJudgeEvent} disabled={!activeSession.events.length} className="w-10 h-10 rounded-xl grid place-items-center border border-[#deddd6] text-[#626a65] hover:bg-[#f1efe9] disabled:opacity-30" title={ar?'تراجع Z':'Undo Z'}><RotateCcw className="w-4 h-4"/></button><span className="text-xs text-[#646965]">{activeSession.events.length} {ar?'ملاحظات':'events'} · −{deductions.toFixed(2)}</span></div><div className="flex gap-2"><Button variant="outline" onClick={speakTransition} icon={<Square className="w-4 h-4"/>}>{isLastQuestion?(ar?'إنهاء آخر موضع':'End final passage'):(ar?'إنهاء الموضع':'End passage')}</Button></div></div>
    </>:activeSession.isLocked?<div className="rounded-2xl bg-[#E7EEE9] text-[#214C40] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-full bg-white grid place-items-center"><Check className="w-5 h-5"/></span><div><div className="font-black">{ar?'تم اعتماد تقييمك':'Assessment locked'}</div><div className="text-xs mt-1 opacity-80">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>{reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}</div></div>{nextQueued&&<Button onClick={()=>startSessionForParticipant(nextQueued.id)}>{ar?'المتسابق التالي':'Next participant'}</Button>}</div>:null}
