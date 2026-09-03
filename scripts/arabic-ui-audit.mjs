@@ -25,9 +25,9 @@ ok('Authentication has Arabic-first labels',auth.includes("ar?'البريد ال
 const trust=read('src/components/public/TrustVerification.tsx');
 ok('Public verifier is language-aware',trust.includes("const ar=language==='ar'")&&trust.includes('تم التحقق من النتيجة'));
 const onboarding=read('src/components/public/OnboardingExperience.tsx');
-ok('Onboarding has three Arabic steps',onboarding.includes('أهلًا بك في ميزان')&&onboarding.includes('السؤال يبقى سرًا حتى اللحظة الصحيحة')&&onboarding.includes('كل ما يحتاجه يوم المسابقة'));
+ok('Onboarding has four Arabic steps',onboarding.includes('أهلًا بك في ميزان')&&onboarding.includes('السؤال مختوم حتى اللحظة الصحيحة')&&onboarding.includes('دور واحد. مهمة واحدة. شاشة واحدة')&&onboarding.includes('كل نتيجة تحمل دليلها معها'));
 const logo=read('src/components/design-system/MizanLogo.tsx');
-ok('Arabic brand wordmark is ميزان',logo.includes("ar?'ميزان':'MIZAN'"));
+ok('Arabic brand wordmark is ميزان',/ar\s*\?\s*'ميزان'\s*:\s*'MIZAN'/.test(logo));
 const html=read('index.html');
 ok('Document defaults to Arabic RTL',html.includes('<html lang="ar" dir="rtl">'));
 ok('Arabic metadata title',html.includes('<title>ميزان —'));

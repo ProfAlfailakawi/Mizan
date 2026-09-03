@@ -2,9 +2,11 @@
 
 @layer base {
   :root {
+    /* Kept in sync with the Google Fonts request in index.html. */
     --font-arabic: "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+    --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
     --font-quran: "Amiri Quran", "Amiri", serif;
-    --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
     --canvas: #f7f5ef;
     --surface: #fffefb;
@@ -24,6 +26,19 @@
     --radius-sm: 12px;
     --radius-md: 18px;
     --radius-lg: 26px;
+
+    /* Brand accents used by the mark, the splash and the onboarding scenes. */
+    --gold: #b98b4e;
+    --gold-light: #e8cb93;
+    --ink-deep: #123f35;
+
+    /* One elevation ramp instead of ad-hoc per-component shadows. */
+    --shadow-1: 0 1px 2px rgba(23,27,24,.04);
+    --shadow-2: 0 1px 0 rgba(23,27,24,.018), 0 6px 22px rgba(23,27,24,.022);
+    --shadow-3: 0 2px 4px rgba(23,27,24,.03), 0 18px 46px rgba(23,45,38,.055);
+    --shadow-4: 0 30px 80px rgba(23,45,38,.09);
+
+    --ease-brand: cubic-bezier(.22,.75,.22,1);
   }
 
   * { box-sizing: border-box; }
@@ -53,12 +68,13 @@
 .font-quran { font-family: var(--font-quran); }
 .font-arabic { font-family: var(--font-arabic); }
 .font-sans-en { font-family: var(--font-sans); }
+.font-display { font-family: var(--font-display); font-feature-settings: "ss01"; }
 
 .mizan-surface {
   background: rgba(255,254,251,.96);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 0 rgba(23,27,24,.018), 0 6px 22px rgba(23,27,24,.022);
+  box-shadow: var(--shadow-2);
 }
 .mizan-surface-soft {
   background: var(--surface-soft);
@@ -178,27 +194,303 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 html[lang="ar"] .font-sans-en{font-family:var(--font-arabic)!important}
 html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 
-/* MIZAN launch splash — soft brand arrival, zero UI clutter. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MIZAN brand system — mark, wordmark, motion
+   The mark is geometry only (MizanLogo.tsx); every movement lives here so the
+   splash and the onboarding scenes can choreograph the same parts differently.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mizan-logo { display:inline-flex; align-items:center; gap:.7rem; }
+.mizan-logo.is-stacked { flex-direction:column; gap:1.1rem; text-align:center; }
+.mizan-mark { display:block; flex:0 0 auto; }
+
+.mizan-wordmark { display:flex; flex-direction:column; gap:.34rem; line-height:1; }
+.is-stacked .mizan-wordmark, .mizan-wordmark.is-stacked { align-items:center; gap:.55rem; }
+.mizan-wordmark-name {
+  font-family:var(--font-display); font-weight:700; letter-spacing:-.03em;
+  font-size:clamp(24px,2.4vw,30px); color:var(--ink-deep); line-height:1.05;
+}
+.is-compact .mizan-wordmark-name { font-size:19px; }
+.is-stacked .mizan-wordmark-name { font-size:clamp(40px,7vw,62px); letter-spacing:-.045em; }
+.mizan-wordmark.is-inverse .mizan-wordmark-name { color:#f5f0e4; }
+
+/* The gold rule + letterspaced Latin, as in the approved lockup. */
+.mizan-wordmark-rule { display:flex; align-items:center; gap:.42rem; }
+.is-stacked .mizan-wordmark-rule { gap:.7rem; }
+.mizan-wordmark-rule i {
+  display:block; height:1px; width:14px; flex:0 0 auto;
+  background:linear-gradient(90deg,transparent,var(--gold));
+}
+.mizan-wordmark-rule i:last-of-type { background:linear-gradient(270deg,transparent,var(--gold)); }
+.is-stacked .mizan-wordmark-rule i { width:clamp(26px,5vw,52px); }
+.mizan-wordmark-rule b {
+  font-family:var(--font-sans); font-weight:600; font-style:normal;
+  font-size:calc(9px * var(--mizan-text-scale)); letter-spacing:.42em; text-indent:.42em;
+  color:var(--gold); white-space:nowrap;
+}
+.is-stacked .mizan-wordmark-rule b { font-size:calc(12px * var(--mizan-text-scale)); }
+.is-compact .mizan-wordmark-rule { display:none; }
+.mizan-wordmark.is-inverse .mizan-wordmark-rule b { color:var(--gold-light); }
+.mizan-wordmark.is-inverse .mizan-wordmark-rule i { background:linear-gradient(90deg,transparent,var(--gold-light)); }
+.mizan-wordmark.is-inverse .mizan-wordmark-rule i:last-of-type { background:linear-gradient(270deg,transparent,var(--gold-light)); }
+.mizan-wordmark-tagline {
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:500; color:#6f7a73; letter-spacing:.01em;
+}
+.mizan-wordmark.is-inverse .mizan-wordmark-tagline { color:rgba(245,240,228,.62); }
+
+/* ── Brand motion primitives ─────────────────────────────────────────────── */
+@keyframes mzDraw   { from { stroke-dashoffset:100 } to { stroke-dashoffset:0 } }
+@keyframes mzUnfold { from { opacity:0; transform:rotate(var(--mz-fold,10deg)) translateY(6px) }
+                      to   { opacity:1; transform:none } }
+@keyframes mzRise   { from { opacity:0; transform:translateY(14px) scaleY(.72) }
+                      to   { opacity:1; transform:none } }
+@keyframes mzPop    { 0% { opacity:0; transform:scale(.2) } 62% { opacity:1; transform:scale(1.14) } 100% { transform:scale(1) } }
+@keyframes mzDrop   { from { opacity:0; transform:translateY(-13px) rotate(-24deg) } to { opacity:1; transform:none } }
+@keyframes mzLift   { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:none } }
+@keyframes mzBreathe{ 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
+@keyframes mzHalo   { 0%,100% { opacity:.34; transform:scale(1) } 50% { opacity:.6; transform:scale(1.045) } }
+@keyframes mzSheen  { 0% { transform:translateX(-120%) } 100% { transform:translateX(120%) } }
+@keyframes mzTrack  { from { transform:scaleX(0) } to { transform:scaleX(1) } }
+
+/* Animated mark: parts assemble in the order the brand is read —
+   arch, book, qalam, orb, finial. */
+.mizan-mark.is-animated .mz-arch   { stroke-dasharray:100; animation:mzDraw .92s var(--ease-brand) .05s both }
+.mizan-mark.is-animated .mz-page-l,
+.mizan-mark.is-animated .mz-cover-l{ transform-origin:60px 96px; --mz-fold:9deg; animation:mzUnfold .6s var(--ease-brand) .5s both }
+.mizan-mark.is-animated .mz-page-r,
+.mizan-mark.is-animated .mz-cover-r{ transform-origin:60px 96px; --mz-fold:-9deg; animation:mzUnfold .6s var(--ease-brand) .56s both }
+.mizan-mark.is-animated .mz-qalam  { transform-origin:60px 101px; animation:mzRise .62s var(--ease-brand) .74s both }
+.mizan-mark.is-animated .mz-orb    { transform-origin:60px 42px; animation:mzPop .5s var(--ease-brand) .96s both }
+.mizan-mark.is-animated .mz-finial { transform-origin:60px 16px; animation:mzDrop .5s var(--ease-brand) 1.06s both }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Launch splash — fully vector. The previous splash letterboxed a 941×1672
+   raster poster into every viewport (visible seams on any landscape screen)
+   and burned its Arabic subtitle into the pixels, typos included.
+   ═══════════════════════════════════════════════════════════════════════════ */
 .mizan-splash{
-  position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;
-  background:#f8f2e8;opacity:1;transition:opacity .26s ease,filter .26s ease;
-  isolation:isolate;
+  position:fixed; inset:0; z-index:9999; display:grid; place-items:center; overflow:hidden;
+  background:var(--canvas); isolation:isolate;
+  opacity:1; transition:opacity .34s ease, filter .34s ease;
 }
-.mizan-splash::before,.mizan-splash::after{
-  content:"";position:absolute;pointer-events:none;border-radius:999px;filter:blur(18px);opacity:.38;z-index:-1;
+.mizan-splash-leaving{ opacity:0; filter:blur(2px); }
+
+/* Ambient light: a warm horizon behind the mark, plus two slow drifting veils. */
+.mizan-splash-field{ position:absolute; inset:0; z-index:-1; pointer-events:none; }
+.mizan-splash-field::before,.mizan-splash-field::after{
+  content:""; position:absolute; border-radius:999px; filter:blur(28px);
 }
-.mizan-splash::before{width:min(72vw,760px);height:min(72vw,760px);top:-30%;right:-18%;background:radial-gradient(circle,rgba(255,255,255,.92),rgba(255,255,255,0) 68%)}
-.mizan-splash::after{width:min(65vw,680px);height:min(65vw,680px);bottom:-34%;left:-16%;background:radial-gradient(circle,rgba(235,225,206,.82),rgba(235,225,206,0) 70%)}
-.mizan-splash-glow{position:absolute;inset:0;background:radial-gradient(circle at 50% 49%,rgba(255,255,255,.5),transparent 36%);pointer-events:none}
-.mizan-splash-art{
-  display:block;width:min(100vw,630px);height:min(100vh,1120px);object-fit:contain;object-position:center;
-  filter:saturate(.96) contrast(.99);transform:scale(.986);opacity:0;animation:mizanSplashArrival .72s cubic-bezier(.22,.75,.22,1) .06s forwards;
-  user-select:none;-webkit-user-drag:none;
+.mizan-splash-field::before{
+  width:min(86vw,900px); aspect-ratio:1; top:-28%; inset-inline-end:-16%;
+  background:radial-gradient(circle,rgba(255,255,255,.95),rgba(255,255,255,0) 66%);
+  animation:mzHalo 9s ease-in-out infinite;
 }
-.mizan-splash-hairline{position:absolute;left:50%;bottom:max(28px,env(safe-area-inset-bottom));width:42px;height:1px;transform:translateX(-50%);overflow:hidden;border-radius:999px;background:rgba(23,76,64,.13)}
-.mizan-splash-hairline span{display:block;width:100%;height:100%;background:#8e7046;transform:translateX(-100%);animation:mizanSplashLine 1.25s cubic-bezier(.3,.7,.25,1) .12s forwards}
-.mizan-splash-leaving{opacity:0;filter:blur(1px)}
-@keyframes mizanSplashArrival{0%{opacity:0;transform:scale(.968) translateY(7px)}100%{opacity:1;transform:scale(1) translateY(0)}}
-@keyframes mizanSplashLine{0%{transform:translateX(-100%)}70%{transform:translateX(-12%)}100%{transform:translateX(0)}}
-@media (min-width:900px){.mizan-splash-art{width:min(44vw,570px);height:min(96vh,1015px)}}
-@media (prefers-reduced-motion: reduce){.mizan-splash-art{opacity:1;transform:none;animation:none}.mizan-splash-hairline span{transform:none;animation:none}.mizan-splash{transition:none}}
+.mizan-splash-field::after{
+  width:min(78vw,820px); aspect-ratio:1; bottom:-32%; inset-inline-start:-14%;
+  background:radial-gradient(circle,rgba(233,222,199,.8),rgba(233,222,199,0) 68%);
+  animation:mzHalo 11s ease-in-out infinite reverse;
+}
+.mizan-splash-halo{
+  position:absolute; width:min(74vmin,560px); aspect-ratio:1; border-radius:999px; z-index:-1;
+  background:radial-gradient(circle,rgba(255,255,255,.92),rgba(255,255,255,.22) 52%,transparent 70%);
+  animation:mzHalo 6.5s ease-in-out infinite;
+}
+
+.mizan-splash-stage{
+  position:relative; display:flex; flex-direction:column; align-items:center;
+  gap:clamp(1.4rem,4vh,2.6rem); padding:2rem 1.5rem;
+}
+.mizan-splash-mark{
+  width:clamp(132px,26vmin,208px); height:auto;
+  filter:drop-shadow(0 22px 44px rgba(18,63,53,.13));
+  animation:mzBreathe 6s ease-in-out 1.5s infinite;
+}
+.mizan-splash-word{ animation:mzLift .72s var(--ease-brand) 1.16s both; }
+.mizan-splash-word .mizan-wordmark-rule{ animation:mzLift .6s var(--ease-brand) 1.34s both; }
+.mizan-splash-word .mizan-wordmark-tagline{ animation:mzLift .6s var(--ease-brand) 1.46s both; }
+
+/* Progress hairline — the only chrome on the screen. */
+.mizan-splash-track{
+  position:absolute; left:50%; bottom:max(30px,env(safe-area-inset-bottom));
+  transform:translateX(-50%); width:56px; height:2px; border-radius:999px;
+  background:rgba(18,63,53,.1); overflow:hidden;
+}
+.mizan-splash-track span{
+  display:block; width:100%; height:100%; border-radius:999px; transform-origin:left center;
+  background:linear-gradient(90deg,var(--gold-light),var(--gold));
+  animation:mzTrack 2s cubic-bezier(.3,.7,.25,1) .1s both;
+}
+[dir="rtl"] .mizan-splash-track span{ transform-origin:right center; }
+
+@media (prefers-reduced-motion: reduce){
+  .mizan-splash,.mizan-splash *{ animation:none !important; transition:none !important; }
+  .mizan-mark.is-animated .mz-arch{ stroke-dasharray:none; }
+  .mizan-splash-track span{ transform:none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Onboarding
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mzo-root{
+  position:fixed; inset:0; z-index:120; overflow-y:auto; overflow-x:hidden; color:#16211d;
+  background:
+    radial-gradient(1100px 620px at 78% -8%, #fffdf7 0%, rgba(255,253,247,0) 62%),
+    radial-gradient(900px 560px at 6% 104%, #f2ecdd 0%, rgba(242,236,221,0) 60%),
+    var(--canvas);
+}
+[dir="ltr"] .mzo-root{
+  background:
+    radial-gradient(1100px 620px at 22% -8%, #fffdf7 0%, rgba(255,253,247,0) 62%),
+    radial-gradient(900px 560px at 94% 104%, #f2ecdd 0%, rgba(242,236,221,0) 60%),
+    var(--canvas);
+}
+.mzo-shell{ min-height:100%; display:flex; flex-direction:column; max-width:1320px; margin-inline:auto;
+  padding:clamp(1rem,2.4vh,1.6rem) clamp(1.1rem,4vw,3rem) clamp(1rem,2.4vh,1.5rem); }
+.mzo-body{ flex:1; min-height:0; display:grid; align-items:center; gap:clamp(1.5rem,4vw,4.5rem);
+  grid-template-columns:1fr; padding-block:clamp(1rem,3vh,2.5rem); }
+@media (min-width:1024px){ .mzo-body{ grid-template-columns:1.02fr .98fr; } }
+
+.mzo-eyebrow{ display:inline-flex; align-items:center; gap:.5rem;
+  font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:#8a6d43; }
+.mzo-eyebrow::before{ content:""; width:18px; height:1px; background:linear-gradient(90deg,var(--gold),transparent); }
+[dir="ltr"] .mzo-eyebrow::before{ background:linear-gradient(90deg,var(--gold),transparent); }
+.mzo-title{
+  font-family:var(--font-display); font-weight:700; letter-spacing:-.04em;
+  font-size:clamp(30px,4.6vw,54px); line-height:1.36; color:#10281f; margin:.7rem 0 0;
+  text-wrap:balance;
+}
+.mzo-lede{ margin:1rem 0 0; max-width:34rem; font-size:clamp(13px,1.05vw,15px); line-height:1.95; color:#616b65; }
+.mzo-detail{ margin-top:1.5rem; }
+
+/* Text column cross-fade between steps. */
+.mzo-copy > *{ animation:mzLift .5s var(--ease-brand) both; }
+.mzo-copy > *:nth-child(1){ animation-delay:.02s } .mzo-copy > *:nth-child(2){ animation-delay:.08s }
+.mzo-copy > *:nth-child(3){ animation-delay:.14s } .mzo-copy > *:nth-child(4){ animation-delay:.2s }
+
+.mzo-chip{ display:inline-flex; align-items:center; gap:.45rem; border:1px solid #e6e0d2;
+  background:rgba(255,255,255,.72); border-radius:999px; padding:.5rem .82rem;
+  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; color:#4d5a53; box-shadow:var(--shadow-1); }
+.mzo-chip svg{ color:var(--emerald-2); }
+
+.mzo-step{ display:flex; gap:.7rem; align-items:flex-start; border:1px solid #e6e1d4;
+  background:rgba(255,255,255,.62); border-radius:16px; padding:.8rem .9rem; }
+.mzo-step-n{ font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:700;
+  letter-spacing:.1em; color:var(--gold); padding-top:2px; }
+.mzo-step-t{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:#465349; line-height:1.6; }
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+.mzo-cta{ min-width:186px; height:50px; border-radius:16px; background:var(--emerald);
+  color:#fff; font-size:14px; font-weight:600; display:inline-flex; align-items:center; justify-content:center;
+  gap:.55rem; box-shadow:0 12px 30px rgba(23,75,63,.18); transition:transform .18s var(--ease-brand), box-shadow .18s ease, background .18s ease; }
+.mzo-cta:hover{ background:#1a3f35; transform:translateY(-1px); box-shadow:0 16px 36px rgba(23,75,63,.22); }
+.mzo-cta:active{ transform:translateY(0); }
+.mzo-ghost{ height:50px; border-radius:16px; padding-inline:1.1rem; font-size:14px; font-weight:600;
+  color:#5b635e; display:inline-flex; align-items:center; gap:.5rem; transition:background .18s ease; }
+.mzo-ghost:hover{ background:rgba(255,255,255,.72); }
+
+.mzo-foot{ display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+.mzo-rail{ display:flex; align-items:center; gap:.4rem; }
+.mzo-rail button{ min-height:0; height:4px; border-radius:999px; background:#dcd8cc; width:22px;
+  position:relative; transition:width .4s var(--ease-brand), background .3s ease; }
+.mzo-rail button::before{ content:""; position:absolute; inset:-12px 0; }
+.mzo-rail button[data-state="done"]{ background:#b2c3ba; }
+.mzo-rail button[data-state="active"]{ width:56px; background:#dcd8cc; }
+.mzo-rail button[data-state="active"]::after{
+  content:""; position:absolute; inset:0; border-radius:999px; transform-origin:left center; overflow:hidden;
+  background:linear-gradient(90deg,var(--emerald-2),var(--emerald));
+  animation:mzTrack 7s linear both;
+}
+[dir="rtl"] .mzo-rail button[data-state="active"]::after{ transform-origin:right center; }
+
+/* ── Scenes ──────────────────────────────────────────────────────────────── */
+.mzo-scene{
+  position:relative; width:100%; max-width:min(560px,80vh); aspect-ratio:1; margin-inline:auto;
+  border-radius:clamp(28px,4vw,44px); overflow:hidden; isolation:isolate;
+  border:1px solid rgba(255,255,255,.9);
+  background:linear-gradient(160deg,rgba(255,255,255,.96),rgba(246,241,230,.7) 58%,rgba(238,232,218,.78));
+  box-shadow:var(--shadow-4);
+  animation:mzLift .6s var(--ease-brand) both;
+}
+.mzo-scene::before{
+  content:""; position:absolute; inset:0; opacity:.5;
+  background-image:radial-gradient(circle at 1px 1px, rgba(18,63,53,.11) 1px, transparent 0);
+  background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(circle at 50% 46%, #000 18%, transparent 72%);
+  mask-image:radial-gradient(circle at 50% 46%, #000 18%, transparent 72%);
+}
+/* A slow sheen so the scene never reads as a flat plate. */
+.mzo-scene::after{
+  content:""; position:absolute; inset:-40% -60%; pointer-events:none; z-index:1;
+  background:linear-gradient(74deg,transparent 42%,rgba(255,255,255,.45) 50%,transparent 58%);
+  animation:mzSheen 9s ease-in-out 1.6s infinite;
+}
+.mzo-stage{ position:absolute; inset:0; z-index:2; display:grid; place-items:center; }
+
+/* Concentric orbit rings shared by the scenes. */
+.mzo-ring{ position:absolute; border-radius:999px; border:1px solid rgba(18,63,53,.09); }
+.mzo-ring-1{ inset:12%; } .mzo-ring-2{ inset:23%; border-color:rgba(18,63,53,.07); } .mzo-ring-3{ inset:34%; border-style:dashed; border-color:rgba(184,139,78,.2); }
+
+.mzo-disc{ position:relative; width:68%; aspect-ratio:1; border-radius:999px; display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 32%,#fff,rgba(255,255,255,.72) 58%,rgba(246,241,231,.6));
+  border:1px solid rgba(255,255,255,.96);
+  box-shadow:0 24px 64px rgba(24,58,48,.1), inset 0 0 0 1px rgba(18,63,53,.045); }
+
+.mzo-orbit{ position:absolute; inset:0; animation:mzSpin 34s linear infinite; }
+@keyframes mzSpin{ to { transform:rotate(360deg) } }
+.mzo-orbit > *{ position:absolute; animation:mzSpin 34s linear infinite reverse; }
+
+/* Sealed-question scene */
+/* A sealed document with the stamp hanging off its corner reads far more clearly
+   than a wax disc centred on a blank card. */
+.mzo-seal{ position:relative; width:72%; aspect-ratio:1.28; border-radius:20px; background:#fffefa;
+  border:1px solid #dcd4c0; box-shadow:0 18px 40px rgba(38,44,38,.13); }
+.mzo-seal-lines{ position:absolute; inset:17% 12% auto; display:grid; gap:10px; }
+.mzo-seal-lines i{ display:block; height:7px; border-radius:99px; background:#ece6d8; }
+.mzo-seal-lines i:nth-child(1){ width:58% } .mzo-seal-lines i:nth-child(3){ width:82% }
+.mzo-seal-lines i:nth-child(4){ width:44% }
+.mzo-seal-wax{ position:absolute; bottom:-22px; inset-inline-end:-20px;
+  z-index:2; width:70px; height:70px; border-radius:999px;
+  display:grid; place-items:center; color:#fff;
+  background:radial-gradient(circle at 36% 30%,#2f6a58,#14453a);
+  box-shadow:0 12px 26px rgba(18,63,53,.28), inset 0 0 0 3px rgba(255,255,255,.14);
+  animation:mzPop .6s var(--ease-brand) .5s both; }
+.mzo-seal-wax::after{ content:""; position:absolute; inset:-9px; border-radius:999px;
+  border:1px dashed rgba(184,139,78,.5); animation:mzSpin 22s linear infinite; }
+
+/* Role scene */
+.mzo-grid{ position:relative; z-index:3; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:74%; }
+.mzo-tile{ aspect-ratio:1; border-radius:18px; display:grid; place-items:center; gap:5px;
+  background:rgba(255,255,255,.6); border:1px solid rgba(255,255,255,.9);
+  color:#95a09a; transition:all .5s var(--ease-brand); }
+.mzo-tile[data-on="true"]{ background:var(--emerald); border-color:var(--emerald); color:#fff;
+  transform:scale(1.07); box-shadow:0 16px 34px rgba(23,75,63,.24); }
+
+/* Proof scene */
+.mzo-proof{ position:relative; z-index:3; width:76%; border-radius:22px; background:#fffdf7;
+  border:1px solid #e6e0d0; box-shadow:0 22px 52px rgba(38,44,38,.1); padding:1.15rem 1.15rem 1rem; }
+.mzo-proof-row{ display:flex; align-items:center; gap:.55rem; padding:.55rem 0; }
+.mzo-proof-row + .mzo-proof-row{ border-top:1px solid #efe9db; }
+.mzo-proof-hash{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:calc(10px * var(--mizan-text-scale)); color:#8b938d; letter-spacing:.02em; }
+.mzo-proof-tick{ width:22px; height:22px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
+  background:var(--emerald-soft); color:var(--emerald); animation:mzPop .45s var(--ease-brand) both; }
+.mzo-proof-row:nth-child(1) .mzo-proof-tick{ animation-delay:.5s }
+.mzo-proof-row:nth-child(2) .mzo-proof-tick{ animation-delay:.72s }
+.mzo-proof-row:nth-child(3) .mzo-proof-tick{ animation-delay:.94s }
+.mzo-proof-seal{ margin-top:.7rem; border-radius:14px; background:var(--emerald); color:#fff;
+  display:flex; align-items:center; justify-content:center; gap:.5rem; padding:.6rem;
+  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600;
+  animation:mzLift .5s var(--ease-brand) 1.1s both; }
+
+.mzo-float{ position:absolute; z-index:3; animation:mzBreathe 7s ease-in-out infinite; }
+.mzo-float:nth-of-type(2){ animation-delay:-2.3s } .mzo-float:nth-of-type(3){ animation-delay:-4.6s }
+
+@media (max-width:1023px){
+  .mzo-scene{ max-width:min(430px,42vh); }
+  .mzo-body{ padding-block:1rem; }
+}
+@media (prefers-reduced-motion: reduce){
+  .mzo-root *{ animation:none !important; }
+  .mzo-scene::after{ display:none; }
+}

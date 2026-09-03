@@ -1,10 +1,11 @@
 
-declare namespace React { type ReactNode=any; type FC<P={}>=any; type ComponentType<P={}>=any; type MouseEvent<T=any>=any; type KeyboardEvent<T=any>=any; type ChangeEvent<T=any>=any; type ButtonHTMLAttributes<T=any>=any; }
+declare namespace React { type ReactNode=any; type FC<P={}>=any; type ComponentType<P={}>=any; type MouseEvent<T=any>=any; type KeyboardEvent<T=any>=any; type TouchEvent<T=any>=any; type ChangeEvent<T=any>=any; type ButtonHTMLAttributes<T=any>=any; }
 declare namespace JSX { interface IntrinsicAttributes { key?: any } interface IntrinsicElements { [elemName:string]: any } }
-declare module 'react' { const React:any; export default React; export const StrictMode:any; export function useState<T=any>(initial?:T|(()=>T)):[T,(value:any)=>void]; export function useEffect(fn:any,deps?:any[]):void; export function useMemo<T=any>(fn:()=>T,deps:any[]):T; export function useRef<T=any>(initial?:T):{current:T}; export function useCallback<T extends (...args:any[])=>any>(fn:T,deps:any[]):T; export type FC<P={}>=any; }
+declare module 'react' { const React:any; export default React; export const StrictMode:any; export function useState<T=any>(initial?:T|(()=>T)):[T,(value:any)=>void]; export function useEffect(fn:any,deps?:any[]):void; export function useMemo<T=any>(fn:()=>T,deps:any[]):T; export function useRef<T=any>(initial?:T):{current:T}; export function useCallback<T extends (...args:any[])=>any>(fn:T,deps:any[]):T; export const Suspense:any; export function lazy(loader:()=>Promise<any>):any; export type FC<P={}>=any; }
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
+ export const Lock: any;
  export const BookOpen: any;
  export const Pause: any;
  export const TrendingDown: any;

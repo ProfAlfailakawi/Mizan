@@ -22,7 +22,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  const PrevIcon=ar?ChevronRight:ChevronLeft; const NextIcon=ar?ChevronLeft:ChevronRight;
 
  return <div className="fixed inset-0 z-50 bg-[#101a16] text-white overflow-hidden flex flex-col p-5 sm:p-8">
-   <header className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="rounded-xl bg-white/95 px-2 py-1"><MizanLogo language={language} compact showWordmark={false}/></span><div><div className="text-[10px] font-black tracking-[.18em] text-white/40">{ar?'حفل ميزان':'MIZAN CEREMONY'}</div><div className="text-sm font-bold mt-1">{ar?competition.nameArabic:competition.name}</div></div></div>{onClose&&<button onClick={onClose} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/55" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</header>
+   <header className="flex items-center justify-between"><div className="flex items-center gap-3"><MizanLogo language={language} tone="inverse" compact showWordmark={false}/><div><div className="text-[10px] font-black tracking-[.18em] text-white/40">{ar?'حفل ميزان':'MIZAN CEREMONY'}</div><div className="text-sm font-bold mt-1">{ar?competition.nameArabic:competition.name}</div></div></div>{onClose&&<button onClick={onClose} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/55" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</header>
 
    <main className="flex-1 grid place-items-center px-3"><div className="w-full max-w-5xl text-center">
     {!authorized?<div className="max-w-xl mx-auto">

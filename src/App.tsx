@@ -1,34 +1,112 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
-import { CompetitionOverview } from './components/admin/CompetitionOverview';
-import { JudgeOS } from './components/judge/JudgeOS';
-import { HeadJudgeInbox } from './components/head-judge/HeadJudgeInbox';
-import { CommandCenter } from './components/operations/CommandCenter';
-import { ParticipantDashboard } from './components/participant/ParticipantDashboard';
-import { KioskMode } from './components/gate/KioskMode';
-import { CeremonyView } from './components/public/CeremonyView';
-import { CertificateVerification } from './components/public/CertificateVerification';
-import { RegistrationFlow } from './components/public/RegistrationFlow';
-import { CompetitionLanding } from './components/public/CompetitionLanding';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { auth } from './lib/firebase';
-import { AuditorConsole, DelegationPortal, ExceptionDesk, OrganizationHome, ScientificStudio, SuperAdminConsole, GuardianPortal, SupportConsole } from './components/admin/RolePortals';
-import { ExperienceHub } from './components/public/ExperienceHub';
 import { DemoReturn } from './components/public/DemoReturn';
-import { WaitingBoard } from './components/public/WaitingBoard';
-import { TrustVerification } from './components/public/TrustVerification';
 import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience } from './components/public/SplashExperience';
-import { HallRecitationMap } from './components/public/HallRecitationMap';
+
+/*
+ * Route-level code splitting.
+ *
+ * Every role portal and venue screen used to sit in a single 871 kB entry chunk, so a judge
+ * downloaded the platform-admin console, the deployment studio and the ceremony renderer
+ * before their own first screen painted.
+ *
+ * These loaders are declared once and used twice: React.lazy consumes them for the split,
+ * and warmViews() replays them on idle. That second pass is not an optimisation — it is the
+ * reason the split is safe. MIZAN promises competition-day continuity when the venue drops
+ * offline, and the service worker can only serve a chunk it has already seen. Splitting
+ * without warming would mean a screen nobody opened while online simply fails at the venue.
+ */
+const VIEWS = {
+  experienceHub: () => import('./components/public/ExperienceHub'),
+  rolePortals: () => import('./components/admin/RolePortals'),
+  competitionOverview: () => import('./components/admin/CompetitionOverview'),
+  judgeOS: () => import('./components/judge/JudgeOS'),
+  headJudgeInbox: () => import('./components/head-judge/HeadJudgeInbox'),
+  commandCenter: () => import('./components/operations/CommandCenter'),
+  participantDashboard: () => import('./components/participant/ParticipantDashboard'),
+  kioskMode: () => import('./components/gate/KioskMode'),
+  ceremonyView: () => import('./components/public/CeremonyView'),
+  waitingBoard: () => import('./components/public/WaitingBoard'),
+  hallRecitationMap: () => import('./components/public/HallRecitationMap'),
+  certificateVerification: () => import('./components/public/CertificateVerification'),
+  registrationFlow: () => import('./components/public/RegistrationFlow'),
+  competitionLanding: () => import('./components/public/CompetitionLanding'),
+  trustVerification: () => import('./components/public/TrustVerification'),
+};
+
+const pick = (loader: () => Promise<any>, name: string) =>
+  lazy(() => loader().then((m: any) => ({ default: m[name] })));
+
+const ExperienceHub = pick(VIEWS.experienceHub, 'ExperienceHub');
+const CompetitionOverview = pick(VIEWS.competitionOverview, 'CompetitionOverview');
+const JudgeOS = pick(VIEWS.judgeOS, 'JudgeOS');
+const HeadJudgeInbox = pick(VIEWS.headJudgeInbox, 'HeadJudgeInbox');
+const CommandCenter = pick(VIEWS.commandCenter, 'CommandCenter');
+const ParticipantDashboard = pick(VIEWS.participantDashboard, 'ParticipantDashboard');
+const KioskMode = pick(VIEWS.kioskMode, 'KioskMode');
+const CeremonyView = pick(VIEWS.ceremonyView, 'CeremonyView');
+const WaitingBoard = pick(VIEWS.waitingBoard, 'WaitingBoard');
+const HallRecitationMap = pick(VIEWS.hallRecitationMap, 'HallRecitationMap');
+const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
+const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
+const CompetitionLanding = pick(VIEWS.competitionLanding, 'CompetitionLanding');
+const TrustVerification = pick(VIEWS.trustVerification, 'TrustVerification');
+const SuperAdminConsole = pick(VIEWS.rolePortals, 'SuperAdminConsole');
+const OrganizationHome = pick(VIEWS.rolePortals, 'OrganizationHome');
+const ScientificStudio = pick(VIEWS.rolePortals, 'ScientificStudio');
+const ExceptionDesk = pick(VIEWS.rolePortals, 'ExceptionDesk');
+const DelegationPortal = pick(VIEWS.rolePortals, 'DelegationPortal');
+const AuditorConsole = pick(VIEWS.rolePortals, 'AuditorConsole');
+const GuardianPortal = pick(VIEWS.rolePortals, 'GuardianPortal');
+const SupportConsole = pick(VIEWS.rolePortals, 'SupportConsole');
+
+let warmed = false;
+/* Pull every remaining view into the service-worker cache once the first screen is
+   interactive, so going offline later never strands an unopened role.
+   The delay is deliberate: requestIdleCallback alone fires while the entry chunks are
+   still arriving on a slow venue link, and 26 background requests would then compete
+   with the screen the reader is actually waiting for. Wait until the splash has handed
+   over, then use idle time. */
+const WARM_AFTER_MS = 3000;
+function warmViews() {
+  if (warmed || typeof window === 'undefined') return;
+  const conn = (navigator as any).connection;
+  // Never spend a metered or 2G connection on screens the reader has not asked for.
+  if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType || '')) return;
+  if (!navigator.onLine) { window.addEventListener('online', () => warmViews(), { once: true }); return; }
+  warmed = true;
+  const run = () => { for (const load of Object.values(VIEWS)) void load().catch(() => { warmed = false; }); };
+  const idle = (window as any).requestIdleCallback;
+  window.setTimeout(() => { if (idle) idle(run, { timeout: 4000 }); else run(); }, WARM_AFTER_MS);
+}
+
+const ViewFallback: React.FC = () => (
+  <div className="min-h-screen grid place-items-center bg-[#f7f5ef]" role="status" aria-live="polite">
+    <MizanLogo language="ar" compact/>
+    <span className="sr-only">جارٍ التحميل</span>
+  </div>
+);
+const OverlayFallback: React.FC = () => (
+  <div className="fixed inset-0 z-50 grid place-items-center bg-[#16241f]" role="status" aria-live="polite">
+    <MizanLogo language="ar" tone="inverse" compact/>
+    <span className="sr-only">جارٍ التحميل</span>
+  </div>
+);
+const Page: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<ViewFallback/>}>{children}</Suspense>;
+const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
 
 export default function App() {
  const {currentUser,switchRole,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
+ useEffect(()=>{warmViews()},[]);
  const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationMessage,activateAccount}=useMizanAuth(requireAuth);
  const demoMode=!requireAuth;
@@ -43,11 +121,11 @@ export default function App() {
  if(requireAuth&&!signedIn) return <AuthPortal/>;
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
- if(hash.startsWith('#trust-verify')) return <><TrustVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- if(hash.startsWith('#competition')) return <><CompetitionLanding/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><CertificateVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
- if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
- if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>} {hallMap&&<HallRecitationMap onClose={()=>setHallMap(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
+ if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
+ if(hash.startsWith('#competition')) return <><Page><CompetitionLanding/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
+ if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
+ if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
+ if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/></Page>{kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>} {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>} {hallMap&&<Overlay><HallRecitationMap onClose={()=>setHallMap(false)}/></Overlay>} {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}</>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
@@ -69,11 +147,11 @@ export default function App() {
  };
  const isBroadcast=currentUser.role==='broadcast_operator';
  return <div className="min-h-screen text-[#171b18] font-arabic">
-  {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>} 
-  <main>{roleView()}</main>
+  {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
+  <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
-  {kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} 
-  {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>}
-  {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>} 
+  {kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>}
+  {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>}
+  {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}
  </div>
 }
