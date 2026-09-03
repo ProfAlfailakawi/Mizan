@@ -17,6 +17,12 @@ import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-bui
 import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
+import { AlignmentSessionManager } from './server/alignment/session';
+import { createAlignmentRouter } from './server/alignment/api';
+import { devHafsPassage } from './server/alignment/canonical';
+import { ReferenceTemplateBackend } from './server/alignment/acoustic/reference-template';
+import { synthReference } from './server/alignment/benchmark/synth';
+import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
@@ -44,8 +50,34 @@ async function startServer() {
   });
   app.use(express.json({ limit: '1mb' }));
 
+  // Per-instance fixed-window rate limiter.
+  // HONEST SCOPE: this counter lives in this process's memory. On a horizontally scaled
+  // deployment (e.g. Cloud Run with N instances) each instance keeps its own window, so the
+  // effective ceiling is N * RATE_LIMIT_MAX and the limiter is a fair-use guard, not a hard
+  // global quota. A true global quota requires a shared store (Redis/Memorystore) or the
+  // platform's own edge rate limiting. To make that explicit and swappable, the window state
+  // goes through a single hook: set MIZAN_RATE_LIMIT_BACKEND=external and front MIZAN with the
+  // platform limiter, or replace `hitRateWindow` with a shared-store implementation.
+  const rateWindowMs=Number(process.env.RATE_LIMIT_WINDOW_MS||60_000);
+  const rateMax=Number(process.env.RATE_LIMIT_MAX||180);
+  const rateLimiterIsGlobal=process.env.MIZAN_RATE_LIMIT_BACKEND==='external';
   const buckets=new Map<string,{count:number;resetAt:number}>();
-  app.use('/api',(req,res,next)=>{const key=String(req.ip||'unknown');const now=Date.now();const current=buckets.get(key);if(!current||current.resetAt<now){buckets.set(key,{count:1,resetAt:now+60_000});return next()}current.count++;if(current.count>180)return res.status(429).json({code:'RATE_LIMITED'});next()});
+  const hitRateWindow=(key:string,now:number)=>{const current=buckets.get(key);if(!current||current.resetAt<now){const fresh={count:1,resetAt:now+rateWindowMs};buckets.set(key,fresh);return fresh}current.count++;return current};
+  // Opportunistic sweep so the map cannot grow unbounded across long-lived instances.
+  let lastRateSweep=Date.now();
+  app.use('/api',(req,res,next)=>{
+    if(rateLimiterIsGlobal)return next();
+    const key=String(req.ip||'unknown');const now=Date.now();
+    if(now-lastRateSweep>rateWindowMs){for(const [k,v] of buckets)if(v.resetAt<now)buckets.delete(k);lastRateSweep=now}
+    const window=hitRateWindow(key,now);
+    const remaining=Math.max(0,rateMax-window.count);
+    res.setHeader('X-RateLimit-Limit',String(rateMax));
+    res.setHeader('X-RateLimit-Remaining',String(remaining));
+    res.setHeader('X-RateLimit-Reset',String(Math.ceil(window.resetAt/1000)));
+    res.setHeader('X-RateLimit-Scope','per-instance');
+    if(window.count>rateMax){res.setHeader('Retry-After',String(Math.max(1,Math.ceil((window.resetAt-now)/1000))));return res.status(429).json({code:'RATE_LIMITED'})}
+    next();
+  });
 
   const requireEnterpriseKey:RequestHandler=(req,res,next)=>{const configured=process.env.MIZAN_ENTERPRISE_API_KEY;if(!configured)return res.status(503).json({code:'ENTERPRISE_API_NOT_CONFIGURED'});const supplied=String(req.headers['x-mizan-api-key']||'');if(!safeEqual(supplied,configured))return res.status(401).json({code:'UNAUTHORIZED'});next()};
 
@@ -188,6 +220,26 @@ async function startServer() {
   app.post('/api/enterprise/notifications/dispatch',requireEnterpriseKey,async(req,res)=>{const channel=String(req.body?.channel||'');if(!['email','sms','whatsapp','push'].includes(channel))return res.status(400).json({code:'UNSUPPORTED_CHANNEL'});const endpoint=providerUrl(channel);if(!endpoint)return res.status(503).json({code:'PROVIDER_NOT_CONNECTED',channel});try{const token=providerToken(channel);const upstream=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify({recipient:req.body?.recipient,templateKey:req.body?.templateKey,locale:req.body?.locale,payload:req.body?.payload||{},idempotencyKey:req.body?.idempotencyKey})});if(!upstream.ok)return res.status(502).json({code:'PROVIDER_REJECTED',channel,status:upstream.status});res.status(202).json({accepted:true,channel})}catch{return res.status(502).json({code:'PROVIDER_UNAVAILABLE',channel})}});
 
   app.post('/api/enterprise/webhooks/test',requireEnterpriseKey,async(req,res)=>{const endpoint=String(req.body?.endpoint||'');if(!/^https:\/\//i.test(endpoint))return res.status(400).json({code:'HTTPS_ENDPOINT_REQUIRED'});const allow=(process.env.MIZAN_WEBHOOK_ALLOW_HOSTS||'').split(',').map(x=>x.trim()).filter(Boolean);let url:URL;try{url=new URL(endpoint)}catch{return res.status(400).json({code:'INVALID_ENDPOINT'})}if(!allow.includes(url.hostname))return res.status(403).json({code:'WEBHOOK_HOST_NOT_ALLOWLISTED'});const secret=process.env.MIZAN_WEBHOOK_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'WEBHOOK_SIGNING_NOT_CONFIGURED'});const event={id:crypto.randomUUID(),type:'mizan.test',createdAt:new Date().toISOString()};const raw=JSON.stringify(event);const signature=crypto.createHmac('sha256',secret).update(raw).digest('hex');try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-mizan-signature':signature},body:raw});res.status(r.ok?202:502).json({accepted:r.ok,status:r.status})}catch{return res.status(502).json({code:'WEBHOOK_UNAVAILABLE'})}});
+
+  // Streaming Quran forced-alignment engine (HTTP chunked transport). Advisory / SHADOW_ONLY.
+  // Canonical text is resolved from the certified vault in production; here the dev provider serves
+  // the labelled development passage. The acoustic reference is FAIL-CLOSED by default: it aligns
+  // only when a reference is genuinely available. Set MIZAN_ALIGNMENT_DEV_SYNTH=true to enable a
+  // clearly-synthetic dev reference for local end-to-end trials (never in production).
+  const alignmentDevSynth=process.env.MIZAN_ALIGNMENT_DEV_SYNTH==='true';
+  const alignmentManager=new AlignmentSessionManager(
+    {getPassage:(spec)=>{try{return spec.readingId==='hafs'?devHafsPassage(spec.startAyah,spec.endAyah):null}catch{return null}}},
+    {getBackend:(spec,passage,cfg)=>{
+      if(!alignmentDevSynth)return null; // fail-closed: no real reference ingested
+      const ref=synthReference(passage,280,0.01);
+      const frameLen=Math.round((cfg.frameMs*16000)/1000),hopLen=Math.round((cfg.hopMs*16000)/1000);
+      return ReferenceTemplateBackend.build({reading:spec.readingId,pcm:ref.pcm,sampleRate:16000,wordBoundariesMs:ref.wordBoundariesMs,frameLen,hopLen,melBands:cfg.melBands,mfccCount:cfg.mfccCount,useDeltas:cfg.useDeltas});
+    }},
+    ALIGN_CONFIG,
+  );
+  const alignmentAuth=firebaseProjectId?requireFirebaseRoles(['judge','head_judge','comp_admin','org_admin']):undefined;
+  app.use('/api/align',createAlignmentRouter({manager:alignmentManager,auth:alignmentAuth,mode:'SHADOW_ONLY',devCanonicalHash:alignmentDevSynth?((spec)=>{try{return devHafsPassage(spec.startAyah,spec.endAyah).canonicalTextHash}catch{return undefined}}):undefined}));
+  setInterval(()=>alignmentManager.reap(10*60_000),60_000).unref?.();
 
   if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath,{maxAge:'1h',etag:true,immutable:false}));app.get('*',(_req,res)=>res.sendFile(path.join(distPath,'index.html')))}
   app.listen(PORT,'0.0.0.0',()=>console.log(`MIZAN running on :${PORT}`));

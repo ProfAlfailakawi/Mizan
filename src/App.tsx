@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getIdTokenResult, onAuthStateChanged, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
+import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
 import { CompetitionOverview } from './components/admin/CompetitionOverview';
 import { JudgeOS } from './components/judge/JudgeOS';
@@ -14,7 +15,6 @@ import { RegistrationFlow } from './components/public/RegistrationFlow';
 import { CompetitionLanding } from './components/public/CompetitionLanding';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { auth } from './lib/firebase';
-import { Role } from './types';
 import { AuditorConsole, DelegationPortal, ExceptionDesk, OrganizationHome, ScientificStudio, SuperAdminConsole, GuardianPortal, SupportConsole } from './components/admin/RolePortals';
 import { ExperienceHub } from './components/public/ExperienceHub';
 import { DemoReturn } from './components/public/DemoReturn';
@@ -23,19 +23,19 @@ import { TrustVerification } from './components/public/TrustVerification';
 import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience } from './components/public/SplashExperience';
+import { HallRecitationMap } from './components/public/HallRecitationMap';
 
 export default function App() {
- const {currentUser,applyAuthenticatedIdentity,switchRole,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
+ const {currentUser,switchRole,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
- const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true'; const [signedIn,setSignedIn]=useState(!requireAuth); const [authReady,setAuthReady]=useState(!requireAuth); const [accessError,setAccessError]=useState(''); const [activationToken,setActivationToken]=useState(''); const [activationMessage,setActivationMessage]=useState('');
- useEffect(()=>{if(!requireAuth)return; return onAuthStateChanged(auth,async u=>{if(!u){setSignedIn(false);setAuthReady(true);return;}try{const token=await getIdTokenResult(u,true);const allowed:Role[]=['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent'];let role=String(token.claims.role||'') as Role;let organizationId=String(token.claims.org_id||'');let competitionId=token.claims.competition_id?String(token.claims.competition_id):undefined;let serverManaged=false;try{let deviceId=localStorage.getItem('mizan_device_identity');if(!deviceId){deviceId=crypto.randomUUID();localStorage.setItem('mizan_device_identity',deviceId)}const me=await fetch('/api/identity/me',{headers:{authorization:`Bearer ${token.token}`,'x-mizan-device-id':deviceId,'x-mizan-device-name':navigator.userAgent.slice(0,120)}});const body=await me.json().catch(()=>({}));if(me.status===409&&body.code==='PRIVILEGED_SESSION_CONFLICT'){setAccessError('PRIVILEGED_SESSION_CONFLICT');setSignedIn(false);setAuthReady(true);return;}if(me.ok&&body.identity){role=String(body.identity.role||'') as Role;organizationId=String(body.identity.organizationId||'');competitionId=body.identity.competitionId?String(body.identity.competitionId):undefined;serverManaged=!!body.managed;}else if(me.status===404&&!role){setAccessError('ACCOUNT_NOT_PROVISIONED');setSignedIn(false);setAuthReady(true);return;}}catch{/* Identity governance endpoint is optional for legacy deployments; signed Firebase claims remain supported. */}if(!allowed.includes(role)||!organizationId){setAccessError('ACCOUNT_CLAIMS_REQUIRED');setSignedIn(false);setAuthReady(true);return;}const sensitive:Role[]=['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'];const firebaseClaim=token.claims.firebase as Record<string,unknown>|undefined;const secondFactor=!!firebaseClaim?.sign_in_second_factor;const mfaRequired=import.meta.env.VITE_REQUIRE_MFA_FOR_SENSITIVE!=='false';if(mfaRequired&&sensitive.includes(role)&&!secondFactor){setAccessError('MFA_REQUIRED');setSignedIn(false);setAuthReady(true);return;}applyAuthenticatedIdentity({id:u.uid,email:u.email||'',name:u.displayName||u.email||u.uid,role,organizationId,competitionId,mfaEnabled:secondFactor,identityAssurance:serverManaged?'firebase_managed':'firebase'});setAccessError('');setSignedIn(true);}catch{setAccessError('IDENTITY_TOKEN_ERROR');setSignedIn(false);}finally{setAuthReady(true)}})},[requireAuth]);
- const activateAccount=async()=>{const u=auth.currentUser;if(!u||!activationToken.trim())return;setActivationMessage('');try{const token=await u.getIdToken(true);const r=await fetch('/api/identity/activate',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({activationToken:activationToken.trim()})});const body=await r.json().catch(()=>({}));if(!r.ok){setActivationMessage(String(body.code||'ACTIVATION_FAILED'));return;}setActivationMessage('ACTIVATED');setActivationToken('');window.location.reload();}catch{setActivationMessage('ACTIVATION_FAILED')}};
+ const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true';
+ const {signedIn,authReady,accessError,activationToken,setActivationToken,activationMessage,activateAccount}=useMizanAuth(requireAuth);
  const demoMode=!requireAuth;
  const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash);
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
- const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hash,setHash]=useState(window.location.hash);
+ const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#737a75]"><MizanLogo language="ar" compact/></div>;
@@ -47,7 +47,7 @@ export default function App() {
  if(hash.startsWith('#competition')) return <><CompetitionLanding/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
  if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><CertificateVerification/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
- if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
+ if(demoMode&&experienceHome) return <><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/>{kiosk&&<KioskMode onClose={()=>setKiosk(false)}/>} {waitingBoard&&<WaitingBoard onClose={()=>setWaitingBoard(false)}/>} {hallMap&&<HallRecitationMap onClose={()=>setHallMap(false)}/>} {ceremony&&<CeremonyView onClose={()=>setCeremony(false)}/>}</>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;

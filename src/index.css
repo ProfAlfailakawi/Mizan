@@ -121,8 +121,29 @@
 .mizan-proof-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;overflow-wrap:anywhere; }
 @media (max-width:639px){ .mizan-surface{border-radius:20px}.mizan-hero{border-radius:22px}.mizan-panel{border-radius:17px} }
 
-/* Invisible Accessibility — applied from system preference or a user-selected profile. */
-html[data-mizan-text="large"] { font-size: 112.5%; }
+/* Invisible Accessibility — applied from system preference or a user-selected profile.
+   The tension we resolve here: MIZAN offers a full text-size preference, yet most
+   micro-labels were authored as fixed px (text-[10px]/[11px]/[9px] utilities and a few
+   named classes). Fixed px ignores both the reader's preference and a sane legibility
+   floor. We introduce --mizan-text-scale so the smallest UI type (a) never renders below
+   a readable minimum and (b) actually grows when the reader asks for larger text. */
+:root { --mizan-text-scale: 1; }
+html[data-mizan-text="large"] { --mizan-text-scale: 1.16; }
+html[data-mizan-text="xl"]    { --mizan-text-scale: 1.32; }
+
+/* Legibility floor for the pervasive micro-typography. !important is intentional:
+   it overrides the Tailwind arbitrary-size utilities regardless of layer order, and it
+   is the accessibility baseline rather than a per-component style choice. */
+.text-\[9px\]  { font-size: calc(10.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
+.text-\[10px\] { font-size: calc(11.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
+.text-\[11px\] { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
+.mizan-kicker, .mizan-ticket-label { font-size: calc(11.5px * var(--mizan-text-scale)); }
+.mizan-field-label { font-size: calc(11px * var(--mizan-text-scale)); }
+.mizan-proof-code  { font-size: calc(12px * var(--mizan-text-scale)); }
+/* Full-bleed dark venue screens (Waiting Hall / Ceremony) are read from meters away —
+   give their micro-labels an extra push so they stay legible across a hall. */
+.bg-\[\#11211b\] .text-\[10px\], .bg-\[\#11211b\] .text-\[11px\] { font-size: calc(13px * var(--mizan-text-scale)) !important; }
+
 html[data-mizan-touch="xl"] button,
 html[data-mizan-touch="xl"] input,
 html[data-mizan-touch="xl"] select,

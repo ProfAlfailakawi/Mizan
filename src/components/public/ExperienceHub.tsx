@@ -2,7 +2,7 @@ import React from 'react';
 import {
   ArrowLeft, Award, Baby, Building2, Crown, FileSearch, Gavel, Headphones,
   LifeBuoy, Microscope, RadioTower, ScanLine, ShieldCheck, Sparkles, UserRound,
-  UsersRound, Globe2, Plus, BadgeCheck
+  UsersRound, Globe2, Plus, BadgeCheck, BookOpen
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Pictogram } from '../design-system/Pictogram';
@@ -25,9 +25,9 @@ const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:strin
   {role:'broadcast_operator',ar:'البث والحفل',en:'Broadcast',noteAr:'واجهة العرض والنتائج المسرحية',noteEn:'Ceremony and broadcast',icon:Award,group:'support'},
 ];
 
-interface Props { onEnterRole:(role:Role)=>void; onOpenKiosk:()=>void; onOpenCeremony:()=>void; onOpenWaiting:()=>void; }
+interface Props { onEnterRole:(role:Role)=>void; onOpenKiosk:()=>void; onOpenCeremony:()=>void; onOpenWaiting:()=>void; onOpenHall?:()=>void; }
 
-export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCeremony,onOpenWaiting})=>{
+export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCeremony,onOpenWaiting,onOpenHall})=>{
   const {competition,language}=useAppStore();
   const ar=language==='ar';
   const groups:[typeof ROLES,string,string][]=[
@@ -66,7 +66,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
         <div><div className="text-sm font-black">{ar?'واجهات يوم المسابقة':'Venue experiences'}</div><div className="text-xs text-[#7A817D] mt-1">{ar?'تُفتح بكامل الشاشة أثناء الحدث':'Full-screen modes used on-site'}</div></div>
         <div className="flex gap-2">
           <button onClick={onOpenKiosk} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><ScanLine className="w-4 h-4"/>{ar?'بوابة الحضور':'Gate kiosk'}</button>
-          <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button><button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>
+          <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button>{onOpenHall&&<button onClick={onOpenHall} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><BookOpen className="w-4 h-4"/>{ar?'خريطة تلاوة القاعة':'Hall recitation'}</button>}<button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>
         </div>
       </section>
     </div>

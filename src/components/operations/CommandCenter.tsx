@@ -7,6 +7,7 @@ import { Pictogram } from '../design-system/Pictogram';
 import { QueueJustice } from './QueueJustice';
 import { ContinuityRecovery } from './ContinuityRecovery';
 import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
+import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
 
 export const CommandCenter: React.FC = () => {
@@ -38,6 +39,7 @@ export const CommandCenter: React.FC = () => {
    </div>
    <section className="mizan-surface p-5 sm:p-6"><div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'ملخص التشغيل':'MIZAN Insight'}</h2></div><div className="flex gap-2 overflow-x-auto mt-4">{([['why-delay',ar?'التأخير':'Delay'],['who-missing',ar?'الغياب':'Missing'],['system',ar?'النظام':'System'],['certs',ar?'الإشعارات':'Notify']] as const).map(([id,label])=><button key={id} onClick={()=>setInsight(id)} className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold border ${insight===id?'bg-[#214C40] text-white border-[#214C40]':'bg-white border-[#dedcd5] text-[#68716b]'}`}>{label}</button>)}</div><div className="mt-4 rounded-2xl bg-[#f3f1eb] p-4 text-sm font-semibold leading-7">{insight==='why-delay'?(ar?`أبطأ لجنة: ${[...committees].sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes)[0]?.code||'—'} · ${[...committees].sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes)[0]?.averageSessionMinutes||0} د.`:`Slowest: ${[...committees].sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes)[0]?.code||'—'} · ${[...committees].sort((a,b)=>b.averageSessionMinutes-a.averageSessionMinutes)[0]?.averageSessionMinutes||0}m.`):insight==='who-missing'?(ar?`${participants.filter(p=>!p.checkedInAt&&['approved','submitted','under_review'].includes(p.status)).length} لم يصلوا.`:`${participants.filter(p=>!p.checkedInAt&&['approved','submitted','under_review'].includes(p.status)).length} have not arrived.`):insight==='system'?(ar?`${devices.filter(d=>d.status==='online').length}/${devices.length} أجهزة · ${isOffline?'محلي':'متصل'}.`:`${devices.filter(d=>d.status==='online').length}/${devices.length} devices · ${isOffline?'local':'connected'}.`):(ar?`${notifications.filter(n=>n.status==='failed').length} متعثر.`:`${notifications.filter(n=>n.status==='failed').length} failed.`)}</div></section>
    <QueueJustice/>
+   <GlobalSynchronizedRound/>
   </>}
  </div>
 }

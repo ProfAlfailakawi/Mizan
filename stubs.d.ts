@@ -5,6 +5,13 @@ declare module 'react' { const React:any; export default React; export const Str
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
+ export const BookOpen: any;
+ export const Pause: any;
+ export const TrendingDown: any;
+ export const Coffee: any;
+ export const Waypoints: any;
+ export const Link2: any;
+ export const Share2: any;
  export const Activity: any;
  export const AlertTriangle: any;
  export const ArrowLeft: any;
