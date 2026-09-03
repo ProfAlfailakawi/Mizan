@@ -58,6 +58,8 @@ export interface SecureQuestionPlaintext {
   pageNumber?:number;
   lineStart?:number;
   lineEnd?:number;
+  pageLoci?:{page:number;lineStart:number;lineEnd:number;lineCount:number}[];
+  locationAssurance?:'KFGQPC_OFFICIAL_METADATA';
   officialSurfaceAuthority?:string;
   officialSurfaceMode?:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR'|'OFFICIAL_PAGE_IMAGE';
   startLocusClass?:'SURAH_OPENING'|'PAGE_OPENING'|'MID_PAGE'|'LATE_PAGE'|'UNKNOWN';

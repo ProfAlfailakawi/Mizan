@@ -10,6 +10,7 @@ export type KfgqpcDeveloperAssetKind =
   | 'TAFSEER_DATA'
   | 'GHAREEB_DATA'
   | 'TAJWEED_BOOK_DATA'
+  | 'WAQF_REFERENCE'
   | 'OFFICIAL_QURAN_FONT'
   | 'DESKTOP_PUBLISHING'
   | 'PUBLICATION_IMAGE_SERVICE';
@@ -109,6 +110,18 @@ export const KFGQPC_DEVELOPER_ASSETS:readonly KfgqpcDeveloperAsset[]=[
   },
   {
     id:'kfgqpc-publication-images',kind:'PUBLICATION_IMAGE_SERVICE',titleArabic:'صور إصدارات المجمع',titleEnglish:'Images of KFGQPC publications',authority:'King Fahd Glorious Quran Printing Complex',authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',officialCertification:'CERTIFIED',officialReference:'https://qurancomplex.gov.sa/en/techquran/techquran-apps/techquran-apps-publishios/',formats:['Official publication image service'],notes:['Visual reference only. Structured Quran text/package remains the scientific source used by FairDraw and question resolution.']
+  },
+  {
+    id:'kfgqpc-waqf-reference',
+    kind:'WAQF_REFERENCE',
+    titleArabic:'قواعد الوقف وعلاماته وتطبيقاته',
+    titleEnglish:'Rules of Quranic pauses, symbols and applications',
+    authority:'King Fahd Glorious Quran Printing Complex',
+    authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',
+    officialCertification:'CERTIFIED',
+    officialReference:'https://qurancomplex.gov.sa/en/kfgqpc/kfq-structure/',
+    formats:['Official reference/publication material'],
+    notes:['Official scientific reference discovery only. MIZAN does not claim a structured word-indexed waqf dataset until such data are imported with exact provenance.']
   },
   {
     id:'kfgqpc-tajweed-muyassar',
