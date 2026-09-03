@@ -14,7 +14,8 @@
     "check": "npm run secret-scan && npm run source-audit && npm run lint && npm run test && npm run build",
     "secret-scan": "node scripts/scan-secrets.mjs",
     "source-audit": "node scripts/source-audit.mjs",
-    "arabic-ui-audit": "node scripts/arabic-ui-audit.mjs"
+    "arabic-ui-audit": "node scripts/arabic-ui-audit.mjs",
+    "waqf:derive": "tsx scripts/kfgqpc-waqf-derive.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",

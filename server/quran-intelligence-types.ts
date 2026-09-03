@@ -61,23 +61,47 @@ export interface QuranVectorArtifact{
   layers:QuranVectorLayer[];
 }
 
+export interface WaqfSymbolDefinition{
+  symbol:string;
+  codePoint:string;
+  labelArabic:string;
+  officialMeaning:string;
+  category:'WAQF_LAZIM'|'NO_STOP'|'WAQF_JAIZ'|'WASL_PREFERRED'|'WAQF_PREFERRED'|'MUANAQAH'|'SAKTAH'|string;
+  source?:string;
+  sourceVersion?:string;
+  assurance?:QuranAssurance;
+  evidenceId?:string;
+}
 export interface WaqfOccurrence{
   reading:QuranReadingId;
   surah:number;
   ayah:number;
+  /** Never inferred by the official-text deriver; populate only if an official word mapping exists. */
   wordIndex?:number;
   afterToken?:string;
   symbol:string;
+  displayLabel?:string;
+  sourceSymbol?:string;
+  symbolCodePoint?:string;
   officialMeaning:string;
   category:string;
   source:string;
   version:string;
   assurance:QuranAssurance;
   evidenceId:string;
+  sourceTextSha256?:string;
+  sourceUtf16Offset?:number;
+  sourceCodePointOffset?:number;
+  derivation?:'OFFICIAL_QURAN_TEXT_CODEPOINT'|'OFFICIAL_STRUCTURED_DATASET'|'HUMAN_VERIFIED_WITH_EVIDENCE';
 }
 export interface WaqfDataset{
-  version:'MIZAN-KFGQPC-WAQF-1';
+  version:'MIZAN-KFGQPC-WAQF-1'|'MIZAN-KFGQPC-WAQF-2';
   reading:QuranReadingId;
+  sourcePackageId?:string;
+  sourceDataSha256?:string;
+  symbolRegistryVersion?:string;
+  symbolDefinitions?:WaqfSymbolDefinition[];
+  coverage?:{verseCountScanned:number;versesWithWaqf:number;occurrenceCount:number;bySymbol:Record<string,number>};
   provenance:QuranDatasetProvenance;
   occurrences:WaqfOccurrence[];
 }

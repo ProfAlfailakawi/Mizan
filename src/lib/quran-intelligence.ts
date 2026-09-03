@@ -3,7 +3,7 @@ import {auth} from './firebase';
 export type QuranReadingId='hafs'|'warsh'|'shubah'|'qaloun'|'douri-abu-amr'|'sousi-abu-amr';
 export type AlignmentState='LOCKED'|'PROBABLE'|'UNCERTAIN'|'LOST'|'REACQUIRING'|'REACQUIRED';
 export interface QuranPageLocus{page:number;lineStart:number;lineEnd:number;lineCount?:number}
-export interface WaqfOccurrence{reading:QuranReadingId;surah:number;ayah:number;wordIndex?:number;afterToken?:string;symbol:string;officialMeaning:string;category:string;source:string;version:string;assurance:string;evidenceId:string}
+export interface WaqfOccurrence{reading:QuranReadingId;surah:number;ayah:number;wordIndex?:number;afterToken?:string;symbol:string;displayLabel?:string;sourceSymbol?:string;symbolCodePoint?:string;officialMeaning:string;category:string;source:string;version:string;assurance:string;evidenceId:string;sourceTextSha256?:string;sourceUtf16Offset?:number;sourceCodePointOffset?:number;derivation?:string}
 export interface TajweedRule{id:string;version:string;nameArabic:string;nameEnglish?:string;category:string;summaryArabic:string;evidenceIds:string[]}
 export interface TajweedOccurrence{id:string;reading:QuranReadingId;surah:number;ayah:number;wordIndex?:number;ruleId:string;evidenceIds:string[];assurance:string;humanReviewed:boolean}
 export interface QuranPassageIntelligence{
@@ -17,6 +17,7 @@ export interface QuranAlignmentResult{
   visualLocation?:{page:number;lineStart:number;lineEnd:number;loci?:QuranPageLocus[];assurance:string}|null;
   wordVector?:{page:number;sourceLayerId:string;line?:number;normalizedBBox?:{x:number;y:number;width:number;height:number};resolution:string}|null;
   waqfEvidence?:WaqfOccurrence[];
+  waqfAyahContext?:WaqfOccurrence[];
   backendEvidence?:{modelVersion:string;acousticQuality?:number};
 }
 
