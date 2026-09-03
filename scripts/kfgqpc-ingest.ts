@@ -85,15 +85,22 @@ async function publishReadyCatalog(r2:R2PrivateClient,results:ReturnType<typeof 
   return {catalog,versionKey,status:dryRun?'DRY_RUN':'PUBLISHED'};
 }
 
+function assertResultsReady(results:ReturnType<typeof verifyDataset>[]){
+  const unready=results.filter(r=>!['audio-warsh','audio-duri'].includes(r.spec.id)&&r.status!=='VERIFIED');
+  if(unready.length)throw new Error(`VERIFY_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+  const invalidOptional=results.filter(r=>(r.spec.id==='audio-warsh'&&!['VERIFIED','OFFICIAL_AUDIO_UNAVAILABLE'].includes(r.status))||(r.spec.id==='audio-duri'&&!['VERIFIED','UNVERIFIED'].includes(r.status)));
+  if(invalidOptional.length)throw new Error(`OPTIONAL_AUDIO_STATE_INVALID:${invalidOptional.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+}
+
 async function main(){
   const results=selected.map(verifyDataset);for(const r of results)console.log(JSON.stringify({dataset:r.spec.id,status:r.status,notes:'notes'in r?r.notes:[r.reason].filter(Boolean)}));
   if(dryRun&&!doReport){console.log(JSON.stringify({mode:'DRY_RUN',root,selected:selected.map(x=>x.id)}));return}
+  if(doVerify&&!doUpload&&!doReport){assertResultsReady(results);console.log(JSON.stringify({mode:'VERIFY',status:'READY',selected:selected.map(x=>x.id)}));return}
   const cfg=r2ConfigFromEnv();if((doUpload||doReport)&&!cfg)throw new Error('R2_PRIVATE_ENV_NOT_CONFIGURED');const r2=cfg?new R2PrivateClient(cfg):null;
   if(doUpload&&r2){
     if(only){const r=results[0];await uploadVerified(r2,r)}
     else{
-      const unready=results.filter(r=>!['audio-warsh','audio-duri'].includes(r.spec.id)&&r.status!=='VERIFIED');if(unready.length)throw new Error(`FULL_INGEST_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
-      const invalidOptional=results.filter(r=>r.spec.id==='audio-warsh'&&!['VERIFIED','OFFICIAL_AUDIO_UNAVAILABLE'].includes(r.status)||r.spec.id==='audio-duri'&&!['VERIFIED','UNVERIFIED'].includes(r.status));if(invalidOptional.length)throw new Error(`OPTIONAL_AUDIO_STATE_INVALID:${invalidOptional.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+      assertResultsReady(results);
       for(const r of results)if(r.status==='VERIFIED')await uploadVerified(r2,r);
       const published=await publishReadyCatalog(r2,results);console.log(JSON.stringify({deliveryCatalog:published.status,versionKey:published.versionKey}));
     }

@@ -17,10 +17,11 @@ steps:
         npx tsx scripts/kfgqpc-acquire.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-heavy-acquire.ts --full --root .mizan-ingest
-        npx tsx scripts/kfgqpc-font-sync.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-font-sync.ts --require-all --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --verify --root .mizan-ingest
-        npx tsx scripts/kfgqpc-font-sync.ts --upload --root .mizan-ingest
+        npx tsx scripts/kfgqpc-font-sync.ts --upload --require-all --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --upload --resume --root .mizan-ingest
+        npx tsx scripts/kfgqpc-postflight.ts --root .mizan-ingest
 substitutions:
   _R2_ENDPOINT: 'https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com'
   _R2_BUCKET: 'mizan-quran-assets'

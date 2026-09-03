@@ -7,7 +7,7 @@ import {assertUploadFitsBudget} from '../server/kfgqpc-ingest-core';
 import {assertOfficialKfgqpcUrl} from '../server/kfgqpc-authority';
 
 const args=process.argv.slice(2);const has=(x:string)=>args.includes(x);const value=(x:string)=>{const i=args.indexOf(x);return i>=0?args[i+1]:undefined};
-const root=path.resolve(value('--root')||'.mizan-ingest');const upload=has('--upload');
+const root=path.resolve(value('--root')||'.mizan-ingest');const upload=has('--upload');const requireAll=has('--require-all');
 const map=[
  ['font-hafs','delivery/fonts/hafs/v13'],['font-warsh','delivery/fonts/warsh/v6'],['font-shubah','delivery/fonts/shubah/v4'],['font-qalun','delivery/fonts/qalun/v5'],['font-duri','delivery/fonts/duri-abi-amr/v3'],['font-susi','delivery/fonts/susi-abi-amr/v3']
 ] as const;
@@ -29,5 +29,6 @@ async function main(){
    const primaryKey=`${prefix}/primary${path.extname(primary).toLowerCase()}`;const uploaded=[await uploadOne(primary,primaryKey)];for(const file of files){const base=path.basename(file).replace(/[^a-zA-Z0-9._-]/g,'_'),key=`${prefix}/source/${base}`;uploaded.push(await uploadOne(file,key))}
    const manifest={schemaVersion:'MIZAN-KFGQPC-FONT-MANIFEST-1',authority:'King Fahd Glorious Quran Printing Complex',id,sourceUrl:meta.directUrl||meta.sourceUrl,r2Prefix:prefix,primaryKey,fileCount:files.length,files:uploaded,generatedAt:new Date().toISOString()};const body=JSON.stringify(manifest,null,2)+'\n';if(r2&&upload)await r2.putObject(`${prefix}/manifest.json`,body,'application/json',{sha256:sha(body)});results.push({id,status:'VERIFIED',r2Prefix:prefix,fileCount:files.length})}
  const report={protocol:'MIZAN-KFGQPC-FONT-SYNC-1',mode:upload?'UPLOAD':'DRY_RUN',results};fs.mkdirSync(path.join(root,'reports'),{recursive:true});fs.writeFileSync(path.join(root,'reports','font-sync.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+ if(requireAll){const failed=results.filter((x:any)=>x.status!=='VERIFIED');if(failed.length)throw new Error(`FONT_SET_NOT_READY:${failed.map((x:any)=>`${x.id}:${x.reason||x.status}`).join(',')}`)}
 }
 main().catch(e=>{console.error(e instanceof Error?e.message:'FONT_SYNC_FAILED');process.exitCode=1});

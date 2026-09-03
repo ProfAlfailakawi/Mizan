@@ -48,12 +48,13 @@ async function getText(url:string){
 function stripHtml(v:string){return v.replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;|&#160;/gi,' ').replace(/\s+/g,' ').trim()}
 function links(html:string,base:string){
   const out:{url:string;text:string;context:string}[]=[];const re=/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;let m:RegExpExecArray|null;
-  while((m=re.exec(html))){let url:string;try{url=resolveOfficialKfgqpcUrl(m[1],base)}catch{continue};const text=stripHtml(m[2]);const context=stripHtml(html.slice(Math.max(0,m.index-1800),Math.min(html.length,re.lastIndex+1800)));out.push({url,text,context})}
+  while((m=re.exec(html))){let url:string;try{url=resolveOfficialKfgqpcUrl(m[1],base)}catch{continue};const text=stripHtml(m[2]);const context=stripHtml(html.slice(Math.max(0,m.index-700),Math.min(html.length,re.lastIndex+700)));out.push({url,text,context})}
   return out;
 }
 function isDownloadLike(url:string,text:string){const s=`${url} ${text}`.toLowerCase();return /\.(?:zip|rar|7z)(?:$|\?)/i.test(url)||/download|تحميل|package|حزمة|آيات|ayat|pages|صفحات|font|خط/.test(s)}
 function scoreCandidate(t:Target,c:{url:string;text:string;context:string}){
-  let score=isDownloadLike(c.url,c.text)?8:0;const hay=`${c.text} ${c.context}`;for(const token of t.tokens)if(token.test(hay))score+=10; if(/\.(?:zip)(?:$|\?)/i.test(c.url))score+=5; if(/download\.qurancomplex|fonts\.qurancomplex|qc-dev\.qurancomplex/i.test(c.url))score+=2;return score;
+  const hay=`${c.text} ${c.context}`;const matched=t.tokens.filter(token=>token.test(hay)).length;if(matched!==t.tokens.length)return 0;
+  let score=isDownloadLike(c.url,c.text)?8:0;score+=matched*10;if(/\.(?:zip)(?:$|\?)/i.test(c.url))score+=5;if(/download\.qurancomplex|fonts\.qurancomplex|qc-dev\.qurancomplex/i.test(c.url))score+=2;return score;
 }
 async function discover(t:Target){
   const override=process.env[t.overrideEnv];if(override){assertOfficialKfgqpcUrl(override);return [{url:new URL(override).toString(),score:999,via:'ENV_OFFICIAL_OVERRIDE'}]}
@@ -63,7 +64,9 @@ async function discover(t:Target){
       if(depth<1&&score>=10&&!/\.(?:zip|rar|7z|mp3|m4a|ttf|otf|woff2?)(?:$|\?)/i.test(c.url)&&!seen.has(c.url))queue.push({url:c.url,depth:depth+1});
     }
   }
-  return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,8);
+  const ranked=[...found.values()].sort((a,b)=>b.score-a.score).slice(0,8);
+  if(ranked.length>1&&ranked[0].score===ranked[1].score&&ranked[0].url!==ranked[1].url)throw new Error(`AMBIGUOUS_OFFICIAL_CANDIDATES:${t.id}`);
+  return ranked;
 }
 
 async function download(url:string,file:string,maxBytes:number){
@@ -103,7 +106,7 @@ async function acquire(t:Target){
   const candidates=await discover(t);if(!full)return {id:t.id,kind:t.kind,status:candidates.length?'OFFICIAL_CANDIDATES_FOUND':'NO_OFFICIAL_CANDIDATE',candidates};
   const attempts:any[]=[];for(const c of candidates){const dir=path.join(root,t.id),archive=path.join(dir,'source.zip'),raw=path.join(dir,'.raw'),payload=path.join(dir,'payload');try{
       const got=await download(c.url,archive,t.maxBytes);extract(archive,raw);const validation=t.kind==='MUSHAF'?validateMushaf(raw,payload):t.kind==='AUDIO'?validateAudio(raw,payload):validateFonts(raw,payload);fs.rmSync(raw,{recursive:true,force:true});
-      updateSource(t,{sourceUrl:c.via==='ENV_OFFICIAL_OVERRIDE'?got.finalUrl:c.via,directUrl:got.finalUrl,downloadedAt:new Date().toISOString(),sourceArchive:'source.zip',directOfficialDownloadVerified:true,currentOfficialAyahPackageVerified:t.kind==='AUDIO'?true:undefined,officialAuthorityDomain:true,validation});
+      updateSource(t,{sourceUrl:c.via==='ENV_OFFICIAL_OVERRIDE'?got.finalUrl:c.via,directUrl:got.finalUrl,downloadedAt:new Date().toISOString(),sourceArchive:'source.zip',directOfficialDownloadVerified:true,currentOfficialAyahPackageVerified:t.kind==='AUDIO'?true:undefined,officialAuthorityDomain:true,identityTokens:t.tokens.map(x=>x.source),discoveryPage:c.via,validation});
       return {id:t.id,kind:t.kind,status:'ACQUIRED_VERIFIED_STRUCTURE',directUrl:got.finalUrl,bytes:got.bytes,validation,attempts};
     }catch(e){attempts.push({url:c.url,reason:e instanceof Error?e.message:'UNKNOWN'});fs.rmSync(path.join(root,t.id,'.raw'),{recursive:true,force:true})}}
   return {id:t.id,kind:t.kind,status:t.optional?'OPTIONAL_NOT_VERIFIED':'REQUIRED_NOT_ACQUIRED',attempts,candidates};
