@@ -1,6 +1,6 @@
 steps:
   - name: 'node:22-slim'
-    id: 'source-audit'
+    id: 'official-source-audit'
     entrypoint: 'bash'
     args:
       - '-ceu'
@@ -8,9 +8,12 @@ steps:
         apt-get update -qq
         apt-get install -y --no-install-recommends unzip ca-certificates >/dev/null
         npm install --ignore-scripts --no-audit --no-fund
+        npm test
         npx tsx scripts/kfgqpc-init-stage.ts .mizan-ingest
         npx tsx scripts/kfgqpc-acquire.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-heavy-acquire.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --dry-run --root .mizan-ingest
 options:
   logging: CLOUD_LOGGING_ONLY
+timeout: '1800s'

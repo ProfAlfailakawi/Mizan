@@ -1,0 +1,35 @@
+steps:
+  - name: 'node:22-slim'
+    id: 'acquire-verify-upload-kfgqpc-assets'
+    entrypoint: 'bash'
+    secretEnv: ['R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY']
+    env:
+      - 'R2_ENDPOINT=${_R2_ENDPOINT}'
+      - 'R2_BUCKET=${_R2_BUCKET}'
+    args:
+      - '-ceu'
+      - |
+        apt-get update -qq
+        apt-get install -y --no-install-recommends unzip ca-certificates >/dev/null
+        npm install --ignore-scripts --no-audit --no-fund
+        npm test
+        npx tsx scripts/kfgqpc-init-stage.ts .mizan-ingest
+        npx tsx scripts/kfgqpc-acquire.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-heavy-acquire.ts --full --root .mizan-ingest
+        npx tsx scripts/kfgqpc-font-sync.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-ingest.ts --verify --root .mizan-ingest
+        npx tsx scripts/kfgqpc-font-sync.ts --upload --root .mizan-ingest
+        npx tsx scripts/kfgqpc-ingest.ts --upload --resume --root .mizan-ingest
+substitutions:
+  _R2_ENDPOINT: 'https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com'
+  _R2_BUCKET: 'mizan-quran-assets'
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_ACCESS_KEY_ID/versions/latest'
+      env: 'R2_ACCESS_KEY_ID'
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_SECRET_ACCESS_KEY/versions/latest'
+      env: 'R2_SECRET_ACCESS_KEY'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: '7200s'
