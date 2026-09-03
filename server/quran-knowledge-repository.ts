@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {generatedArtifactDigest,officialKfgqpcUrl,quranReadingDefinition,validateDatasetProvenance} from './quran-intelligence-policy';
-import type {QuranReadingId,TajweedDataset,TajweedOccurrence,TajweedRule,WaqfDataset,WaqfOccurrence} from './quran-intelligence-types';
+import type {QuranReadingId,TajweedDataset,TajweedOccurrence,TajweedRule,WaqfDataset,WaqfOccurrence,WaqfScienceDataset,WaqfScienceRule,WaqfScienceApplication} from './quran-intelligence-types';
 
 const safe=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,100);
 const pos=(v:unknown)=>Number.isInteger(Number(v))&&Number(v)>0;
@@ -33,6 +33,15 @@ export function validateWaqfDataset(input:WaqfDataset):WaqfDataset{
   return input;
 }
 
+
+export function validateWaqfScienceDataset(input:WaqfScienceDataset):WaqfScienceDataset{
+  if(input.version!=='MIZAN-KFGQPC-WAQF-SCIENCE-1')throw new Error('WAQF_SCIENCE_VERSION_INVALID');assertReading(input.reading);validateDatasetProvenance(input.provenance);if(!input.taxonomyVersion.trim())throw new Error('WAQF_SCIENCE_TAXONOMY_REQUIRED');
+  const evidence=new Map(input.evidence.map(e=>[e.id,e]));if(evidence.size!==input.evidence.length)throw new Error('WAQF_SCIENCE_EVIDENCE_DUPLICATE');for(const e of input.evidence){if(!e.id.trim()||!e.locator.trim()||!e.sourceVersion.trim())throw new Error('WAQF_SCIENCE_EVIDENCE_INVALID');assertOfficialSource(e.source);assertAssurance(e.assurance)}
+  const rules=new Map<string,WaqfScienceRule>();for(const r of input.rules){if(rules.has(r.id))throw new Error('WAQF_SCIENCE_RULE_DUPLICATE');if(!r.id.trim()||!r.version.trim()||!r.nameArabic.trim()||!r.category.trim()||!r.summaryArabic.trim()||!r.evidenceIds.length)throw new Error('WAQF_SCIENCE_RULE_INVALID');for(const id of r.evidenceIds)if(!evidence.has(id))throw new Error(`WAQF_SCIENCE_RULE_EVIDENCE_MISSING:${id}`);rules.set(r.id,r)}
+  const seen=new Set<string>();for(const a of input.applications){if(seen.has(a.id))throw new Error('WAQF_SCIENCE_APPLICATION_DUPLICATE');seen.add(a.id);if(!a.id.trim()||a.reading!==input.reading||!pos(a.surah)||a.surah>114||!pos(a.ayah)||!rules.has(a.ruleId)||!a.evidenceIds.length)throw new Error('WAQF_SCIENCE_APPLICATION_INVALID');if(a.wordIndex!==undefined&&!pos(a.wordIndex))throw new Error('WAQF_SCIENCE_WORD_INDEX_INVALID');assertAssurance(a.assurance);for(const id of a.evidenceIds)if(!evidence.has(id))throw new Error(`WAQF_SCIENCE_APPLICATION_EVIDENCE_MISSING:${id}`);if(a.wordIndex!==undefined&&a.assurance==='HUMAN_VERIFIED_WITH_EVIDENCE'&&!a.humanReviewed)throw new Error('WAQF_SCIENCE_FINE_GRAINED_REQUIRES_HUMAN_REVIEW')}
+  if(input.provenance.status==='VERIFIED'&&generatedArtifactDigest(input)!==input.provenance.generatedArtifactSha256)throw new Error('WAQF_SCIENCE_GENERATED_HASH_MISMATCH');return input;
+}
+
 export function validateTajweedDataset(input:TajweedDataset):TajweedDataset{
   if(input.version!=='MIZAN-KFGQPC-TAJWEED-1')throw new Error('TAJWEED_DATASET_VERSION_INVALID');assertReading(input.reading);validateDatasetProvenance(input.provenance);if(!input.taxonomyVersion.trim())throw new Error('TAJWEED_TAXONOMY_VERSION_REQUIRED');
   const evidence=new Map(input.evidence.map(e=>[e.id,e]));if(evidence.size!==input.evidence.length)throw new Error('TAJWEED_EVIDENCE_DUPLICATE');for(const e of input.evidence){if(!e.id.trim()||!e.locator.trim()||!e.sourceVersion.trim())throw new Error('TAJWEED_EVIDENCE_INVALID');assertOfficialSource(e.source);assertAssurance(e.assurance)}
@@ -54,12 +63,17 @@ export class QuranKnowledgeRepository{
   constructor(private root:string){fs.mkdirSync(root,{recursive:true,mode:0o700})}
   private waqfFile(reading:QuranReadingId){return path.join(this.root,`waqf-${safe(reading)}.json`)}
   private tajweedFile(reading:QuranReadingId){return path.join(this.root,`tajweed-${safe(reading)}.json`)}
+  private waqfScienceFile(reading:QuranReadingId){return path.join(this.root,`waqf-science-${safe(reading)}.json`)}
   registerWaqf(input:WaqfDataset){const data=validateWaqfDataset(input);fs.writeFileSync(this.waqfFile(data.reading),JSON.stringify(data,null,2),{encoding:'utf8',mode:0o600});return this.waqfStatus(data.reading)}
   registerTajweed(input:TajweedDataset){const data=validateTajweedDataset(input);fs.writeFileSync(this.tajweedFile(data.reading),JSON.stringify(data,null,2),{encoding:'utf8',mode:0o600});return this.tajweedStatus(data.reading)}
+  registerWaqfScience(input:WaqfScienceDataset){const data=validateWaqfScienceDataset(input);fs.writeFileSync(this.waqfScienceFile(data.reading),JSON.stringify(data,null,2),{encoding:'utf8',mode:0o600});return this.waqfScienceStatus(data.reading)}
   loadWaqf(reading:QuranReadingId){const f=this.waqfFile(reading);if(!fs.existsSync(f))return null;return validateWaqfDataset(JSON.parse(fs.readFileSync(f,'utf8')) as WaqfDataset)}
   loadTajweed(reading:QuranReadingId){const f=this.tajweedFile(reading);if(!fs.existsSync(f))return null;return validateTajweedDataset(JSON.parse(fs.readFileSync(f,'utf8')) as TajweedDataset)}
+  loadWaqfScience(reading:QuranReadingId){const f=this.waqfScienceFile(reading);if(!fs.existsSync(f))return null;return validateWaqfScienceDataset(JSON.parse(fs.readFileSync(f,'utf8')) as WaqfScienceDataset)}
   waqfStatus(reading:QuranReadingId){const x=this.loadWaqf(reading);return x?{status:x.provenance.status,schemaVersion:x.version,occurrences:x.occurrences.length,sourceVersion:x.provenance.sourceVersion,sourcePackageId:x.sourcePackageId,symbolRegistryVersion:x.symbolRegistryVersion,coverage:x.coverage}:{status:'OFFICIAL_DATA_UNAVAILABLE' as const,occurrences:0}}
   tajweedStatus(reading:QuranReadingId){const x=this.loadTajweed(reading);return x?{status:x.provenance.status,rules:x.rules.length,occurrences:x.occurrences.length,taxonomyVersion:x.taxonomyVersion,sourceVersion:x.provenance.sourceVersion}:{status:'OFFICIAL_DATA_UNAVAILABLE' as const,rules:0,occurrences:0}}
+  waqfScienceStatus(reading:QuranReadingId){const x=this.loadWaqfScience(reading);return x?{status:x.provenance.status,rules:x.rules.length,applications:x.applications.length,taxonomyVersion:x.taxonomyVersion,sourceVersion:x.provenance.sourceVersion}:{status:'OFFICIAL_DATA_UNAVAILABLE' as const,rules:0,applications:0}}
   waqfForAyah(reading:QuranReadingId,surah:number,ayah:number):WaqfOccurrence[]{const x=this.loadWaqf(reading);if(!x||x.provenance.status!=='VERIFIED')return [];return x.occurrences.filter(o=>o.surah===surah&&o.ayah===ayah)}
+  waqfScienceForAyah(reading:QuranReadingId,surah:number,ayah:number){const x=this.loadWaqfScience(reading);if(!x||x.provenance.status!=='VERIFIED')return {rules:[] as WaqfScienceRule[],applications:[] as WaqfScienceApplication[]};const applications=x.applications.filter(a=>a.surah===surah&&a.ayah===ayah),ids=new Set(applications.map(a=>a.ruleId));return {applications,rules:x.rules.filter(r=>ids.has(r.id))}}
   tajweedForAyah(reading:QuranReadingId,surah:number,ayah:number){const x=this.loadTajweed(reading);if(!x||x.provenance.status!=='VERIFIED')return {rules:[] as TajweedRule[],occurrences:[] as TajweedOccurrence[]};const occurrences=x.occurrences.filter(o=>o.surah===surah&&o.ayah===ayah),ids=new Set(occurrences.map(o=>o.ruleId));return {occurrences,rules:x.rules.filter(r=>ids.has(r.id))}}
 }

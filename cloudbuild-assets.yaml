@@ -12,6 +12,7 @@ steps:
         export NODE_OPTIONS="--dns-result-order=ipv4first --require=$$PWD/scripts/kfgqpc-fetch-fallback.cjs"
         npx tsx scripts/kfgqpc-init-stage.ts .mizan-ingest
         npx tsx scripts/kfgqpc-acquire.ts --root .mizan-ingest
+        npx tsx scripts/kfgqpc-science-intake.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-audio-discovery.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-heavy-acquire.ts --root .mizan-ingest
         npx tsx scripts/kfgqpc-ingest.ts --dry-run --root .mizan-ingest

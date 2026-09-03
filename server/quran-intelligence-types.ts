@@ -106,6 +106,44 @@ export interface WaqfDataset{
   occurrences:WaqfOccurrence[];
 }
 
+
+export interface WaqfScienceEvidence{
+  id:string;
+  source:string;
+  sourceVersion:string;
+  locator:string;
+  assurance:QuranAssurance;
+}
+export interface WaqfScienceRule{
+  id:string;
+  version:string;
+  nameArabic:string;
+  category:string;
+  summaryArabic:string;
+  evidenceIds:string[];
+}
+export interface WaqfScienceApplication{
+  id:string;
+  reading:QuranReadingId;
+  surah:number;
+  ayah:number;
+  wordIndex?:number;
+  symbol?:string;
+  ruleId:string;
+  evidenceIds:string[];
+  assurance:QuranAssurance;
+  humanReviewed:boolean;
+}
+export interface WaqfScienceDataset{
+  version:'MIZAN-KFGQPC-WAQF-SCIENCE-1';
+  reading:QuranReadingId;
+  provenance:QuranDatasetProvenance;
+  taxonomyVersion:string;
+  rules:WaqfScienceRule[];
+  evidence:WaqfScienceEvidence[];
+  applications:WaqfScienceApplication[];
+}
+
 export interface TajweedEvidence{
   id:string;
   source:string;

@@ -7,7 +7,8 @@ import type {ServerQuranSourceRepository} from './quran-source-repository';
 import {QuranKnowledgeRepository} from './quran-knowledge-repository';
 import {deriveWaqfDatasetFromOfficialSource,verifyWaqfDatasetAgainstOfficialSource} from './kfgqpc-waqf-derive';
 import {QuranVectorRepository} from './quran-vector-repository';
-import type {QuranAcousticObservation,QuranAlignmentBenchmarkReport,QuranReadingId,QuranVectorArtifact,TajweedDataset,WaqfDataset} from './quran-intelligence-types';
+import {buildQuranReadingReadiness} from './quran-intelligence-readiness';
+import type {QuranAcousticObservation,QuranAlignmentBenchmarkReport,QuranReadingId,QuranVectorArtifact,TajweedDataset,WaqfDataset,WaqfScienceDataset} from './quran-intelligence-types';
 
 interface EngineEntry{engine:QuranStreamingAlignmentEngine;updatedAt:number}
 export interface QuranAlignmentBackendConfig{url?:string;bearerToken?:string}
@@ -25,19 +26,21 @@ export class QuranIntelligenceService{
     fs.mkdirSync(root,{recursive:true,mode:0o700});this.vector=new QuranVectorRepository(path.join(root,'vector'));this.knowledge=new QuranKnowledgeRepository(path.join(root,'knowledge'));this.benchmarks=new QuranAlignmentBenchmarkRepository(path.join(root,'benchmarks'));this.bootstrapOfficialWaqf();
   }
   capabilities(){return {protocol:'MIZAN-QURAN-INTELLIGENCE-1',authority:'KFGQPC',readings:QURAN_READINGS.map(r=>r.id),spatialMapping:true,vectorMetadata:true,waqfLayer:{enabled:true,mode:'AUTO_DERIVE_FROM_CERTIFIED_KFGQPC_AYA_TEXT',wordIndexPolicy:'NEVER_INFER'},tajweedLayer:true,streamingAlignment:{mode:'SHADOW_ONLY',backendConfigured:!!this.alignmentBackend.url,scoreAuthority:'HUMAN_ONLY',canAffectScore:false},storage:{masterOriginals:'OFFLINE_ONLY',heavyAssets:'PRIVATE_R2_OR_LOCAL_CACHE',frontendPrivateUrlAccess:false}}}
-  status(){return QURAN_READINGS.map(r=>{let spatial:'VERIFIED'|'UNVERIFIED'='UNVERIFIED';let coverage:unknown;try{coverage=this.quran.canonicalCoverage(r.packageId);spatial='VERIFIED';this.ensureOfficialWaqf(r.id)}catch{}return {reading:r.id,sourcePackage:r.packageId,spatial,coverage,vector:this.vector.status(r.id),waqf:{...this.knowledge.waqfStatus(r.id),derivationError:this.waqfDerivationErrors.get(r.id)},tajweed:this.knowledge.tajweedStatus(r.id),alignmentBenchmark:this.benchmarks.status(r.id)}})}
+  status(){return QURAN_READINGS.map(r=>{let spatial:'VERIFIED'|'UNVERIFIED'='UNVERIFIED';let coverage:unknown;try{coverage=this.quran.canonicalCoverage(r.packageId);spatial='VERIFIED';this.ensureOfficialWaqf(r.id)}catch{}return {reading:r.id,sourcePackage:r.packageId,spatial,coverage,vector:this.vector.status(r.id),waqf:{...this.knowledge.waqfStatus(r.id),derivationError:this.waqfDerivationErrors.get(r.id)},waqfScience:this.knowledge.waqfScienceStatus(r.id),tajweed:this.knowledge.tajweedStatus(r.id),alignmentBenchmark:this.benchmarks.status(r.id)}})}
+  readiness(){return QURAN_READINGS.map(r=>{let spatial:'VERIFIED'|'UNVERIFIED'='UNVERIFIED';try{this.quran.canonicalCoverage(r.packageId);spatial='VERIFIED';this.ensureOfficialWaqf(r.id)}catch{}const waqf=this.knowledge.waqfStatus(r.id),tajweed=this.knowledge.tajweedStatus(r.id),vector=this.vector.status(r.id),benchmark=this.benchmarks.status(r.id);const waqfScience=this.knowledge.waqfScienceStatus(r.id);return buildQuranReadingReadiness({reading:r.id,spatial,waqfStatus:String(waqf.status),waqfScienceStatus:String(waqfScience.status),tajweedStatus:String(tajweed.status),vectorStatus:String(vector.status),verifiedWordMappings:Number((vector as any).verifiedWordMappings||0),benchmarkStatus:String(benchmark.status),benchmarkPassed:Boolean((benchmark as any).passed),alignmentBackendConfigured:!!this.alignmentBackend.url})})}
   location(reading:string,surah:unknown,ayah:unknown){const id=readingId(reading),s=boundedInt(surah,1,114,'QURAN_SURAH_INVALID'),a=boundedInt(ayah,1,1000,'QURAN_AYAH_INVALID');return this.quran.canonicalLocation({reading:id,surah:s,ayah:a})}
   passage(input:{reading:string;surah:unknown;startAyah:unknown;endAyah:unknown}){
     const id=readingId(input.reading),def=quranReadingDefinition(id)!;const surah=boundedInt(input.surah,1,114,'QURAN_SURAH_INVALID'),startAyah=boundedInt(input.startAyah,1,1000,'QURAN_AYAH_INVALID'),endAyah=boundedInt(input.endAyah,startAyah,1000,'QURAN_AYAH_INVALID');
     this.ensureOfficialWaqf(id);const resolved=this.quran.resolvePassage({packageId:def.packageId,surah,startAyah,endAyah});const pageLoci=this.quran.resolvePassageLoci({packageId:def.packageId,surah,startAyah,endAyah});
-    const ayahs=resolved.verses.map(v=>{const loc=this.quran.canonicalLocation({reading:id,surah,ayah:v.aya_no});return {ayah:v.aya_no,location:loc,waqf:this.knowledge.waqfForAyah(id,surah,v.aya_no),tajweed:this.knowledge.tajweedForAyah(id,surah,v.aya_no)}});
-    return {reading:id,surah,startAyah,endAyah,pageLoci,ayahs,assurance:'KFGQPC_OFFICIAL_METADATA',sourcePackage:def.packageId,knowledge:{waqf:this.knowledge.waqfStatus(id),tajweed:this.knowledge.tajweedStatus(id),vector:this.vector.status(id)},alignmentBenchmark:this.benchmarks.status(id)};
+    const ayahs=resolved.verses.map(v=>{const loc=this.quran.canonicalLocation({reading:id,surah,ayah:v.aya_no});return {ayah:v.aya_no,location:loc,waqf:this.knowledge.waqfForAyah(id,surah,v.aya_no),waqfScience:this.knowledge.waqfScienceForAyah(id,surah,v.aya_no),tajweed:this.knowledge.tajweedForAyah(id,surah,v.aya_no)}});
+    return {reading:id,surah,startAyah,endAyah,pageLoci,ayahs,assurance:'KFGQPC_OFFICIAL_METADATA',sourcePackage:def.packageId,knowledge:{waqf:this.knowledge.waqfStatus(id),waqfScience:this.knowledge.waqfScienceStatus(id),tajweed:this.knowledge.tajweedStatus(id),vector:this.vector.status(id)},alignmentBenchmark:this.benchmarks.status(id)};
   }
   registerVector(x:QuranVectorArtifact){return this.vector.register(x)}
   registerWaqf(x:WaqfDataset){if(x.version==='MIZAN-KFGQPC-WAQF-2')verifyWaqfDatasetAgainstOfficialSource(x,this.quran);return this.knowledge.registerWaqf(x)}
   deriveOfficialWaqf(readingInput:string){const id=readingId(readingInput),dataset=deriveWaqfDatasetFromOfficialSource(this.quran,id);verifyWaqfDatasetAgainstOfficialSource(dataset,this.quran);const status=this.knowledge.registerWaqf(dataset);this.waqfDerivationErrors.delete(id);return {reading:id,status,datasetHash:dataset.provenance.generatedArtifactSha256,coverage:dataset.coverage}}
   deriveOfficialWaqfForPackage(packageId:string){const def=quranReadingDefinition(packageId);if(!def||def.packageId!==packageId)throw new Error('WAQF_SOURCE_PACKAGE_UNSUPPORTED');return this.deriveOfficialWaqf(def.id)}
   registerTajweed(x:TajweedDataset){return this.knowledge.registerTajweed(x)}
+  registerWaqfScience(x:WaqfScienceDataset){return this.knowledge.registerWaqfScience(x)}
   registerBenchmark(x:QuranAlignmentBenchmarkReport){return this.benchmarks.register(x)}
 
   private ensureOfficialWaqf(id:QuranReadingId){

@@ -8,9 +8,9 @@ export interface TajweedRule{id:string;version:string;nameArabic:string;nameEngl
 export interface TajweedOccurrence{id:string;reading:QuranReadingId;surah:number;ayah:number;wordIndex?:number;ruleId:string;evidenceIds:string[];assurance:string;humanReviewed:boolean}
 export interface QuranPassageIntelligence{
   reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;pageLoci:QuranPageLocus[];assurance:'KFGQPC_OFFICIAL_METADATA';sourcePackage:string;
-  knowledge:{waqf:{status:string;occurrences:number};tajweed:{status:string;rules:number;occurrences:number;taxonomyVersion?:string};vector:{status:string;layerCount:number;verifiedWordMappings:number;unresolvedWordLayers:number}};
+  knowledge:{waqf:{status:string;occurrences:number};waqfScience:{status:string;rules:number;applications:number;taxonomyVersion?:string};tajweed:{status:string;rules:number;occurrences:number;taxonomyVersion?:string};vector:{status:string;layerCount:number;verifiedWordMappings:number;unresolvedWordLayers:number}};
   alignmentBenchmark:{status:string;passed:boolean;failures:string[];measuredAt?:string};
-  ayahs:{ayah:number;location:{page:number;lineStart:number;lineEnd:number;assurance:string};waqf:WaqfOccurrence[];tajweed:{rules:TajweedRule[];occurrences:TajweedOccurrence[]}}[];
+  ayahs:{ayah:number;location:{page:number;lineStart:number;lineEnd:number;assurance:string};waqf:WaqfOccurrence[];waqfScience?:{rules:{id:string;nameArabic:string;summaryArabic:string}[];applications:{id:string;ruleId:string;wordIndex?:number}[]};tajweed:{rules:TajweedRule[];occurrences:TajweedOccurrence[]}}[];
 }
 export interface QuranAlignmentResult{
   timestamp:string;reading:QuranReadingId;surah?:number;ayah?:number;wordIndex?:number;phonemeIndex?:number;confidence:number;smoothedConfidence:number;alignmentState:AlignmentState;recoveryState:string;pointerMoved:boolean;scoreAuthority:'HUMAN_ONLY';scoreDelta:0;shadowMode:true;
