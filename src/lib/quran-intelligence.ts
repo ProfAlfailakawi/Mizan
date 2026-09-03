@@ -19,7 +19,12 @@ export interface QuranAlignmentResult{
   waqfEvidence?:WaqfOccurrence[];
   waqfAyahContext?:WaqfOccurrence[];
   backendEvidence?:{modelVersion:string;acousticQuality?:number};
+  sessionEvidence?:{eventCount:number;integritySha256:string};
 }
+export interface QuranTimelineEvent{id:string;sessionId:string;actorId:string;timestamp:string;offsetMs:number;kind:'ALIGNMENT'|'RECOVERY'|'HUMAN_MARKER'|'SESSION_RESET';reading?:QuranReadingId;surah?:number;ayah?:number;wordIndex?:number;alignmentState?:AlignmentState;recoveryState?:string;confidence?:number;acousticQuality?:number;humanEventType?:string;source:string;scoreAuthority:'HUMAN_ONLY'}
+export interface QuranSessionEvidence{protocol:'MIZAN-QURAN-SESSION-EVIDENCE-1';sessionId:string;actorId:string;startedAt:string;updatedAt:string;events:QuranTimelineEvent[];summary:{alignmentEvents:number;recoveryEvents:number;humanMarkers:number;lostEvents:number;reacquiredEvents:number};integrity:{sha256:string}}
+export interface QuranReadingGuard{reading:QuranReadingId;expectedSourcePackage:string;providedSourcePackage:string;status:'CLEAR'|'BLOCKED';conflicts:string[];crossReadingFallback:'FORBIDDEN'}
+export interface QuranIntelligenceHealth{protocol:'MIZAN-QURAN-HEALTH-1';authority:'KFGQPC';generatedAt:string;alignmentBackendConfigured:boolean;summary:{readyLayers:number;totalLayers:number;fullyReadyReadings:number};readings:{reading:QuranReadingId;sourcePackage:string;layers:Record<string,boolean>;ready:number;total:number;blocked:string[];provenance:Record<string,string|undefined>}[]}
 
 const PACKAGE_READING:Record<string,QuranReadingId>={
   'kfgqpc-hafs-uthmanic-v13':'hafs','kfgqpc-warsh-uthmanic-v6':'warsh','kfgqpc-shubah-uthmanic-v4':'shubah','kfgqpc-qaloun-uthmanic-v5':'qaloun','kfgqpc-douri-abu-amr-uthmanic-v3':'douri-abu-amr','kfgqpc-sousi-abu-amr-uthmanic-v3':'sousi-abu-amr'
@@ -34,3 +39,8 @@ export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:strin
   const r=await fetch(`/api/quran/alignment/shadow/audio?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult;
 }
 export async function resetQuranAlignment(sessionId:string){const token=await bearer();const r=await fetch('/api/quran/alignment/shadow/reset',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({sessionId}),cache:'no-store'});if(!r.ok)throw new Error('QURAN_ALIGNMENT_RESET_FAILED')}
+
+export async function fetchQuranSessionEvidence(sessionId:string){return getJson<QuranSessionEvidence>(`/api/quran/alignment/shadow/session/${encodeURIComponent(sessionId)}`)}
+export async function postQuranHumanMarker(sessionId:string,eventType:string){const token=await bearer();const r=await fetch(`/api/quran/alignment/shadow/session/${encodeURIComponent(sessionId)}/human-marker`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({eventType}),cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranSessionEvidence}
+export async function fetchQuranReadingGuard(reading:QuranReadingId,sourcePackageId:string){return getJson<QuranReadingGuard>(`/api/quran/intelligence/reading-guard/${encodeURIComponent(reading)}/${encodeURIComponent(sourcePackageId)}`)}
+export async function fetchQuranIntelligenceHealth(){return getJson<QuranIntelligenceHealth>('/api/quran/intelligence/health')}
