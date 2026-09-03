@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { auth, getFirestoreClient } from './firebase';
 import {
   User,
   Role,
@@ -115,7 +114,7 @@ function getInitialState(): AppStoreState {
     timeMachineScenarios:[], quorumActions:[], invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:[], protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:[], questionRevealGates:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:[], authSessions:[], passReissues:[], credentialLineages:[], sessionCheckpoints:[], continuityIncidents:[], sessionRecoveries:[], auditLedgerSeals:[], competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:[], smartRoutingDecisions:[], appealCapsules:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
     activeSession: {
       sessionId: 'sess-active-001',
-      participant: SEED_PARTICIPANTS[0], // Bilal Ahmad (A-104)
+      participant: SEED_PARTICIPANTS[0], // Bilal Yusuf (A-104)
       committee: SEED_COMMITTEES[0],
       questionSelection: {
         questionSetId: 'qset-104-fairdraw',
@@ -136,7 +135,7 @@ function getInitialState(): AppStoreState {
           sessionId: 'sess-active-001',
           questionIndex: 0,
           judgeId: 'usr-judge-1',
-          judgeName: 'Dr. Ahmad Isa Al-Masarawi',
+          judgeName: 'Dr. Kamal Isa Al-Masarawi',
           timestamp: new Date().toISOString(),
           relativeSeconds: 45,
           type: 'tajweed_minor',
@@ -167,6 +166,7 @@ let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
   if(globalState.isOffline||!auth.currentUser)return false;
   try{
+    const {db,doc,setDoc}=await getFirestoreClient();
     await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...data,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
     return true;
   }catch(err){console.warn(`Scoped persistence paused for ${collectionName}/${id}:`,err);return false;}
@@ -195,6 +195,7 @@ function syncToFirestore() {
   if (firestoreSyncTimeout) clearTimeout(firestoreSyncTimeout);
   firestoreSyncTimeout = setTimeout(async () => {
     try {
+      const { db, doc, setDoc } = await getFirestoreClient();
       const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
       await setDoc(docRef, {
         competition: globalState.competition,
@@ -259,8 +260,14 @@ export function useAppStore() {
 
     // Subscribe only after real Firebase authentication. Demo/local mode stays fully local.
     let unsubscribe: (() => void) | undefined;
+    // Firestore now arrives asynchronously, so the effect can be torn down before the
+    // client resolves. Without this flag we would attach a listener nobody owns and
+    // never unsubscribe it.
+    let cancelled = false;
     try {
       if (!auth.currentUser) return () => { listeners.delete(listener); };
+      void getFirestoreClient().then(({ db, doc, onSnapshot }) => {
+      if (cancelled) return;
       const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
       unsubscribe = onSnapshot(docRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -305,11 +312,15 @@ export function useAppStore() {
       }, (error) => {
         console.warn('Firestore live listener warning:', error);
       });
+      // A late unmount that raced the import still gets cleaned up here.
+      if (cancelled && unsubscribe) { unsubscribe(); unsubscribe = undefined; }
+      }).catch(e => { console.warn('Firestore initialization warning:', e); });
     } catch (e) {
       console.warn('Firestore initialization warning:', e);
     }
 
     return () => {
+      cancelled = true;
       listeners.delete(listener);
       if (unsubscribe) unsubscribe();
     };

@@ -14,10 +14,18 @@ export default defineConfig(() => {
           // and the three largest dependencies fetch in parallel instead of end to end.
           manualChunks(id: string) {
             if (!id.includes('node_modules')) return undefined;
-            // Firebase's packages import each other circularly, so they must stay in one
-            // chunk: splitting firestore out produced a real "cannot access before
-            // initialization" crash at runtime because the chunks initialised out of order.
-            if (id.includes('@firebase') || id.includes('/firebase/') || id.includes('/re2js/') || id.includes('/idb/')) return 'vendor-firebase';
+            // Firestore is reached only through a dynamic import (see lib/firebase.ts), so
+            // leave it unassigned and let Rollup give it its own on-demand chunk. Forcing
+            // it into vendor-firebase would drag 132 kB gzipped back into the first paint.
+            //
+            // An earlier attempt pinned it to a *separate eager* chunk instead, which
+            // crashed at runtime ("cannot access 'ch' before initialization") because
+            // Firebase's packages import each other circularly and the two eager chunks
+            // initialised out of order. Behind a dynamic import the ordering is no longer
+            // ambiguous: the core chunk is a dependency, so it is always ready first.
+            if (id.includes('@firebase/firestore') || id.includes('/firebase/firestore/') ||
+                id.includes('/re2js/') || id.includes('webchannel-wrapper')) return undefined;
+            if (id.includes('@firebase') || id.includes('/firebase/') || id.includes('/idb/')) return 'vendor-firebase';
             if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react';
             if (id.includes('lucide-react')) return 'vendor-icons';
             return undefined;

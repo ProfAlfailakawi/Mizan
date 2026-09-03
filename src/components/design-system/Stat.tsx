@@ -22,15 +22,15 @@ export const Stat: React.FC<StatProps> = ({
 }) => {
   return (
     <div className={`bg-white rounded-2xl border border-[#EAE4DC] p-5 shadow-xs ${className}`}>
-      <div className="flex items-center justify-between gap-3 text-[#7D7569] mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-[#7D7569]">{label}</span>
+      <div className="flex items-center justify-between gap-3 text-[#6c655b] mb-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[#6c655b]">{label}</span>
         {icon && <span className="text-[#6B705C] p-2 bg-[#FAF8F5] border border-[#EAE4DC] rounded-xl">{icon}</span>}
       </div>
       <div className="text-2xl sm:text-3xl font-bold tracking-tight text-[#4A4238]">
         {value}
       </div>
       {(subtext || trend) && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-[#7D7569]">
+        <div className="mt-2 flex items-center gap-2 text-xs text-[#6c655b]">
           {trend && (
             <span
               className={`font-semibold ${

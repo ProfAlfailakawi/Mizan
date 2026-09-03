@@ -89,8 +89,8 @@ export const SEED_USERS: User[] = [
   },
   {
     id: 'usr-part-1',
-    name: 'Bilal Ahmad Al-Sayed',
-    nameArabic: 'بلال أحمد السيد',
+    name: 'Bilal Yusuf Al-Sayed',
+    nameArabic: 'بلال يوسف السيد',
     email: 'bilal.sayed@gmail.com',
     role: 'participant',
     organizationId: 'org-gqa-global',
@@ -302,8 +302,8 @@ export const SEED_PARTICIPANTS: Participant[] = [
     code: 'A-104',
     competitionId: 'comp-dubai-2027',
     organizationId: 'org-gqa-global',
-    fullName: 'Bilal Ahmad Al-Sayed',
-    fullNameArabic: 'بلال أحمد السيد',
+    fullName: 'Bilal Yusuf Al-Sayed',
+    fullNameArabic: 'بلال يوسف السيد',
     email: 'bilal.sayed@gmail.com',
     phone: '+971501234567',
     country: 'Jordan (الأردن)',
@@ -570,8 +570,8 @@ export const SEED_AUDIT_LOGS: AuditEvent[] = [
     action: 'QUEUE_ROUTED',
     entityType: 'Participant',
     entityId: 'part-104',
-    humanSummaryArabic: 'توجيه المتسابق بلال أحمد (A-104) آلياً إلى اللجنة الأولى C1 دون تعارض مصالح',
-    humanSummaryEnglish: 'Auto-routed participant Bilal Ahmad (A-104) to Committee C1 with zero conflicts',
+    humanSummaryArabic: 'توجيه المتسابق بلال يوسف (A-104) آلياً إلى اللجنة الأولى C1 دون تعارض مصالح',
+    humanSummaryEnglish: 'Auto-routed participant Bilal Yusuf (A-104) to Committee C1 with zero conflicts',
     currentStateHash: 'DEMO:AUDIT-SEED-001'
   },
   {

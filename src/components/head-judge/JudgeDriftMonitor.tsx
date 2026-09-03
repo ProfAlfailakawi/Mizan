@@ -45,7 +45,7 @@ export const JudgeDriftMonitor: React.FC = () => {
           <div>
             <div className="mizan-kicker">{ar ? 'مراقبة انحراف المحكم' : 'JUDGE DRIFT'}</div>
             <h2 className="text-lg font-black mt-0.5">{ar ? 'عدّاد الإرهاق الصامت' : 'Silent fatigue monitor'}</h2>
-            <p className="text-[11px] text-[#777e79] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي — لا يمس أي درجة. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline — never a score change. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
+            <p className="text-[11px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي — لا يمس أي درجة. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline — never a score change. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
           </div>
         </div>
         <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
@@ -61,9 +61,9 @@ export const JudgeDriftMonitor: React.FC = () => {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-black truncate">{judgeName(s.judgeId)}</div>
-                  <div className="text-[10px] text-[#7d847f] mt-0.5">{ar ? 'اللجنة' : 'Committee'} {committeeFor(s.judgeId)} · {s.minutesObserved}{ar ? ' د' : 'm'}</div>
+                  <div className="text-[10px] text-[#666b67] mt-0.5">{ar ? 'اللجنة' : 'Committee'} {committeeFor(s.judgeId)} · {s.minutesObserved}{ar ? ' د' : 'm'}</div>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${s.direction === 'harsher' ? 'text-[#9a6a2f]' : s.direction === 'gentler' ? 'text-[#496477]' : 'text-[#5f6862]'}`}>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${s.direction === 'harsher' ? 'text-[#92642d]' : s.direction === 'gentler' ? 'text-[#496477]' : 'text-[#5f6862]'}`}>
                   {s.direction === 'harsher' ? <TrendingDown className="w-3.5 h-3.5 rotate-180" /> : <Activity className="w-3.5 h-3.5" />}
                   {s.deltaSigma > 0 ? '+' : ''}{s.deltaSigma}σ
                 </span>
@@ -71,7 +71,7 @@ export const JudgeDriftMonitor: React.FC = () => {
 
               <DriftSparkline events={judgeEvents} split={detail.baselineEvents} attention={s.attention} />
 
-              <div className="mt-3 flex items-center justify-between text-[10px] text-[#737a75]">
+              <div className="mt-3 flex items-center justify-between text-[10px] text-[#636864]">
                 <span>{ar ? 'الصباح' : 'AM'} <b className="text-[#333]">−{s.baselinePenaltyRate}</b></span>
                 <span>{ar ? 'الآن' : 'now'} <b className="text-[#333]">−{s.recentPenaltyRate}</b></span>
               </div>
@@ -88,7 +88,7 @@ export const JudgeDriftMonitor: React.FC = () => {
         })}
       </div>
 
-      <div className="mt-4 text-[10px] text-[#8a908c] leading-6">
+      <div className="mt-4 text-[10px] text-[#696f6b] leading-6">
         {ar ? 'إشارة مساندة لرئيس التحكيم فقط، ولا تظهر للمحكم ولا تغيّر درجة. المقارنة ذاتية (كل محكم مع نفسه) حتى لا تُلغى الفروق المشروعة في التحكيم. البيانات هنا مشتقة من مسار اليوم للعرض.' : 'Advisory to the Head Judge only — never shown to the judge, never a score change. The comparison is self-referential (each judge vs their own baseline) so legitimate judging differences are preserved. Data here is derived from the day timeline for preview.'}
       </div>
     </section>

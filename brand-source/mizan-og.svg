@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+ <defs>
+    <linearGradient id="a" x1="26" y1="30" x2="94" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#123F35"/><stop offset="1" stop-color="#2C6656"/>
+    </linearGradient>
+    <linearGradient id="g" x1="60" y1="30" x2="60" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8CB93"/><stop offset=".55" stop-color="#B98B4E"/><stop offset="1" stop-color="#E8CB93"/>
+    </linearGradient>
+    <linearGradient id="p" x1="60" y1="58" x2="78" y2="98" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF6"/><stop offset="1" stop-color="#F3E8D2"/>
+    </linearGradient>
+  
+  <linearGradient id="bgv" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#faf8f2"/><stop offset="1" stop-color="#eee9dc"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="600" cy="230" r="430" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  </radialGradient>
+ </defs>
+ <rect width="1200" height="630" fill="url(#bgv)"/>
+ <rect width="1200" height="630" fill="url(#glow)"/>
+ <g transform="translate(480 66) scale(2)">
+  
+  <g transform="translate(0 3)">
+    <path d="M60 2.5 64.6 8.6 60 14.7 55.4 8.6Z" fill="url(#g)"/>
+    <path d="M39.5 90C34.5 81.5 30.8 70.5 32.2 54 34 35 56.4 28 60 20c3.6 8 26 15 27.8 34 1.4 16.5-2.3 27.5-7.3 36"
+          fill="none" stroke="url(#a)" stroke-width="6.8" stroke-linecap="round" stroke-linejoin="miter" stroke-miterlimit="7"/>
+    <path d="M60 96c-12-8.5-26.5-11-40-9-.5 6 4 11.5 11.5 13.5 13.5 0 22.5 2 28.5 5.5Z" fill="url(#a)"/>
+    <path d="M60 96c12-8.5 26.5-11 40-9 .5 6-4 11.5-11.5 13.5-13.5 0-22.5 2-28.5 5.5Z" fill="url(#a)"/>
+    <path d="M60 71c-13.5-9.5-27-13.5-40-11.5 2 8.5 2 19 0 27.5 13.5-2 28 .5 40 9Z" fill="url(#p)" stroke="#D8B172" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M60 71c13.5-9.5 27-13.5 40-11.5-2 8.5-2 19 0 27.5-13.5-2-28 .5-40 9Z" fill="url(#p)" stroke="#D8B172" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M60 43c.85 0 1.35 2.2 1.5 9.4l.55 33.6c.08 6.2-.7 11.4-2.05 15.5-1.35-4.1-2.13-9.3-2.05-15.5l.55-33.6c.15-7.2.65-9.4 1.5-9.4Z" fill="url(#g)"/>
+    <circle cx="60" cy="39" r="5.4" fill="url(#g)"/>
+    <circle cx="58.3" cy="37.2" r="1.9" fill="#FFF6E4" opacity=".55"/>
+  </g>
+
+</g>
+ <g text-anchor="middle" font-family="Alexandria, 'IBM Plex Sans Arabic', system-ui, sans-serif">
+  <text x="600" y="446" font-size="82" font-weight="700" fill="#123f35" letter-spacing="-3">&#1605;&#1610;&#1586;&#1575;&#1606;</text>
+  <text x="600" y="492" font-size="18" font-weight="600" fill="#b98b4e" letter-spacing="9" font-family="Inter, system-ui, sans-serif">MIZAN</text>
+  <text x="600" y="548" font-size="25" font-weight="500" fill="#5d6862">&#1606;&#1592;&#1575;&#1605; &#1575;&#1604;&#1605;&#1587;&#1575;&#1576;&#1602;&#1575;&#1578; &#1575;&#1604;&#1602;&#1585;&#1570;&#1606;&#1610;&#1577;</text>
+ </g>
+ <line x1="452" y1="486" x2="528" y2="486" stroke="#b98b4e" stroke-width="1.5"/>
+ <line x1="672" y1="486" x2="748" y2="486" stroke="#b98b4e" stroke-width="1.5"/>
+</svg>

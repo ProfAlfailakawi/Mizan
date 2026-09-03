@@ -8,14 +8,16 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ children, variant='primary', size='md', icon, loading=false, className='', disabled, ...props }) => {
-  const base = 'inline-flex items-center justify-center rounded-xl font-semibold transition duration-150 select-none disabled:opacity-45 disabled:cursor-not-allowed active:translate-y-px';
+  // Radius, elevation and easing come from the token ramp in index.css rather than
+  // per-variant literals, so the whole system moves together.
+  const base = 'mizan-btn inline-flex items-center justify-center font-semibold select-none disabled:opacity-45 disabled:cursor-not-allowed active:translate-y-px';
   const variants = {
-    primary: 'bg-[#214C40] text-white hover:bg-[#193d34] shadow-[0_1px_0_rgba(0,0,0,.08)]',
-    secondary: 'bg-[#E7EEE9] text-[#214C40] hover:bg-[#dce7e1]',
-    outline: 'bg-[#FFFEFB] text-[#303733] border border-[#DFDED7] hover:bg-[#F7F5EF]',
-    danger: 'bg-[#A34D43] text-white hover:bg-[#8d4038]',
-    ghost: 'bg-transparent text-[#5c645f] hover:bg-[#efede7]',
-    gold: 'bg-[#9B7542] text-white hover:bg-[#846237]'
+    primary: 'mizan-btn-primary',
+    secondary: 'mizan-btn-secondary',
+    outline: 'mizan-btn-outline',
+    danger: 'mizan-btn-danger',
+    ghost: 'mizan-btn-ghost',
+    gold: 'mizan-btn-gold'
   };
   const sizes = { sm:'text-xs px-3 py-2 gap-1.5', md:'text-sm px-4 py-2.5 gap-2', lg:'text-sm px-5 py-3 gap-2.5', xl:'text-base px-6 py-3.5 gap-3' };
   return <button disabled={disabled || loading} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>

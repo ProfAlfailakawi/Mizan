@@ -1,7 +1,7 @@
 # MIZAN — Private R2 implementation report
 
 Date: 2026-09-02
-Baseline inspected: `ProfAlfailakawi/Mizan` main at commit `c694b7b26566395246bdfea990e6ecb9576ccc14`.
+Baseline inspected: repository `main` at commit `c694b7b26566395246bdfea990e6ecb9576ccc14`.
 
 ## Scope completed in this patch
 

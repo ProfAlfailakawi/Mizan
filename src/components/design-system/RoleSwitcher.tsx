@@ -18,14 +18,14 @@ export const RoleSwitcher: React.FC = () => {
       <span className="w-8 h-8 rounded-lg bg-[#E7EEE9] text-[#214C40] grid place-items-center"><Icon className="w-4 h-4"/></span>
       <span className="hidden sm:block text-start leading-tight">
         <span className="block text-xs font-bold text-[#303733] max-w-32 truncate">{language==='ar'?(currentUser.nameArabic||currentUser.name):currentUser.name}</span>
-        <span className="block text-[10px] text-[#7b817d]">{language==='ar'?meta.ar:meta.en}</span>
+        <span className="block text-[10px] text-[#666a67]">{language==='ar'?meta.ar:meta.en}</span>
       </span>
-      <ChevronDown className={`w-3.5 h-3.5 text-[#7b817d] transition ${open?'rotate-180':''}`}/>
+      <ChevronDown className={`w-3.5 h-3.5 text-[#666a67] transition ${open?'rotate-180':''}`}/>
     </button>
     {open&&<>
       <button className="fixed inset-0 z-40 cursor-default" onClick={()=>setOpen(false)} aria-label={language==='ar'?'إغلاق':'Close'} />
       <div className="absolute end-0 top-full mt-2 z-50 w-72 bg-[#FFFEFB] border border-[#DFDED7] rounded-2xl shadow-lg p-2">
-        <div className="px-3 py-2 text-[11px] font-bold text-[#7b817d]">{language==='ar'?'معاينة الأدوار — وضع التطوير':'Role preview — development'}</div>
+        <div className="px-3 py-2 text-[11px] font-bold text-[#666a67]">{language==='ar'?'معاينة الأدوار — وضع التطوير':'Role preview — development'}</div>
         <div className="grid grid-cols-2 gap-1">
           {(Object.keys(ROLE_META) as Role[]).map(role=>{ const m=ROLE_META[role]; const I=m.icon; const active=role===currentUser.role; return <button key={role} onClick={()=>{switchRole(role);setOpen(false)}} className={`min-h-16 rounded-xl p-2.5 text-start transition border ${active?'bg-[#214C40] text-white border-[#214C40]':'bg-white text-[#303733] border-transparent hover:bg-[#f3f1eb]'}`}>
             <I className={`w-4 h-4 mb-2 ${active?'text-white':'text-[#2F6555]'}`}/><span className="block text-[11px] font-bold">{language==='ar'?m.ar:m.en}</span>

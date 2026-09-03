@@ -82,21 +82,21 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
       {consent ? (
         <div className="mt-6 pt-5 border-t border-[#e5e3dc] grid sm:grid-cols-2 gap-3">
           <button onClick={() => setNotify((v) => !v)} className={`rounded-2xl border p-4 text-start transition ${notify ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:border-[#bcc7c1]'}`}>
-            <div className="flex items-center justify-between"><Bell className={`w-4 h-4 ${notify ? 'text-[#214C40]' : 'text-[#7d847f]'}`} />{notify && <Check className="w-4 h-4 text-[#214C40]" />}</div>
+            <div className="flex items-center justify-between"><Bell className={`w-4 h-4 ${notify ? 'text-[#214C40]' : 'text-[#666b67]'}`} />{notify && <Check className="w-4 h-4 text-[#214C40]" />}</div>
             <div className="text-sm font-black mt-3">{ar ? 'أشعرني لحظة دخوله' : 'Alert me at his turn'}</div>
-            <div className="text-[10px] text-[#7b827d] mt-1">{notify ? (ar ? 'سنرسل تنبيهًا عند الاستدعاء' : 'You will be alerted on call') : (ar ? 'دخول اللجنة وإعلان النتيجة' : 'Panel entry & result reveal')}</div>
+            <div className="text-[10px] text-[#656b66] mt-1">{notify ? (ar ? 'سنرسل تنبيهًا عند الاستدعاء' : 'You will be alerted on call') : (ar ? 'دخول اللجنة وإعلان النتيجة' : 'Panel entry & result reveal')}</div>
           </button>
           <button onClick={copy} className="rounded-2xl border border-[#dcdad2] bg-white p-4 text-start hover:border-[#bcc7c1] transition">
-            <div className="flex items-center justify-between"><Share2 className="w-4 h-4 text-[#7d847f]" />{copied && <span className="text-[10px] font-black text-[#214C40]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
+            <div className="flex items-center justify-between"><Share2 className="w-4 h-4 text-[#666b67]" />{copied && <span className="text-[10px] font-black text-[#214C40]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
             <div className="text-sm font-black mt-3">{ar ? 'رابط خاص للعائلة' : 'Private family link'}</div>
-            <div className="text-[10px] text-[#7b827d] mt-1">{ar ? 'عرض فقط — بلا بيانات حساسة' : 'View-only — no sensitive data'}</div>
+            <div className="text-[10px] text-[#656b66] mt-1">{ar ? 'عرض فقط — بلا بيانات حساسة' : 'View-only — no sensitive data'}</div>
           </button>
         </div>
       ) : (
-        <div className="mt-6 pt-5 border-t border-[#e5e3dc] flex items-center gap-2 text-[11px] text-[#8a908c]"><ShieldCheck className="w-4 h-4" />{ar ? 'المتابعة الحية والتنبيهات تُفعّل بعد موافقة ولي الأمر أعلاه.' : 'Live thread and alerts activate after guardian consent above.'}</div>
+        <div className="mt-6 pt-5 border-t border-[#e5e3dc] flex items-center gap-2 text-[11px] text-[#696f6b]"><ShieldCheck className="w-4 h-4" />{ar ? 'المتابعة الحية والتنبيهات تُفعّل بعد موافقة ولي الأمر أعلاه.' : 'Live thread and alerts activate after guardian consent above.'}</div>
       )}
 
-      <div className="mt-4 text-[10px] text-[#8a908c] leading-6">
+      <div className="mt-4 text-[10px] text-[#696f6b] leading-6">
         {ar ? 'يخص طفلك وحده وبعد موافقتك. لا يكشف الرابط بيانات متسابقين آخرين. البث الحي للحفل يتطلب تجهيز القاعة وموافقة صريحة، ولا يدّعي ميزان تشغيله قبل توفره فعليًا.' : "Scoped to your own child and gated by your consent. The link never exposes other participants. Live ceremony streaming needs venue setup and explicit consent; MIZAN never claims it works before it truly does."}
       </div>
     </div>

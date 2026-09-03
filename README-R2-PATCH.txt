@@ -1,5 +1,5 @@
 MIZAN PRIVATE R2 PATCH
-Baseline inspected: ProfAlfailakawi/Mizan main @ c694b7b26566395246bdfea990e6ecb9576ccc14
+Baseline inspected: repository main @ c694b7b26566395246bdfea990e6ecb9576ccc14
 
 This ZIP is an overlay patch. Extract it directly at the MIZAN repository root.
 There is no wrapper folder.

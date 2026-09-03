@@ -59,6 +59,9 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
   const {language} = useAppStore();
   const ar = language === 'ar';
   const [step, setStep] = useState(0);
+  // WCAG 2.2.2: moving content that starts automatically must be pausable. Hovering or
+  // focusing anywhere in the flow holds the step, so nobody loses a sentence mid-read.
+  const [held, setHeld] = useState(false);
   const slides = useMemo(() => (ar ? SLIDES_AR : SLIDES_EN), [ar]);
   const last = step === slides.length - 1;
 
@@ -68,12 +71,12 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
 
   // Auto-advance keeps the rail honest: the animated bar is the actual timer, not decor.
   useEffect(() => {
-    if (last) return;
+    if (last || held) return;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (reduced) return;
     const t = window.setTimeout(() => setStep(s => s + 1), AUTO_ADVANCE_MS);
     return () => window.clearTimeout(t);
-  }, [step, last]);
+  }, [step, last, held]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -105,7 +108,17 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
   const Back = ar ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="mzo-root font-arabic" dir={ar ? 'rtl' : 'ltr'} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div
+      className="mzo-root font-arabic"
+      dir={ar ? 'rtl' : 'ltr'}
+      data-held={held || undefined}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocusCapture={() => setHeld(true)}
+      onBlurCapture={() => setHeld(false)}
+    >
       <div className="mzo-shell">
         <header className="flex items-center justify-between gap-4">
           <MizanLogo language={language} compact />
@@ -150,7 +163,7 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
               />
             ))}
           </div>
-          <div className="text-[11px] text-[#8f958f]">
+          <div className="text-[11px] text-[#6a706a]">
             {ar ? `الخطوة ${step + 1} من ${slides.length}` : `Step ${step + 1} of ${slides.length}`}
           </div>
         </footer>

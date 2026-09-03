@@ -48,22 +48,22 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
             <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'شهادة':'Certificate'}</button><button onClick={()=>{window.location.hash='#trust-verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><ShieldCheck className="w-4 h-4"/>{ar?'تحقق من إثبات':'Trust proof'}</button>
           </div>
         </div>
-        <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#79817C]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{ar?competition.nameArabic:competition.name}</span></div>
+        <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#646a66]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{ar?competition.nameArabic:competition.name}</span></div>
       </section>
 
       {groups.map(([items,title,subtitle])=><section key={title} className="mt-10">
-        <div className="flex items-end justify-between gap-4 mb-4"><div><h2 className="text-lg font-black">{title}</h2><p className="text-xs text-[#7B827D] mt-1">{subtitle}</p></div></div>
+        <div className="flex items-end justify-between gap-4 mb-4"><div><h2 className="text-lg font-black">{title}</h2><p className="text-xs text-[#656b66] mt-1">{subtitle}</p></div></div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {items.map(item=>{const Icon=item.icon;return <button key={item.role} onClick={()=>onEnterRole(item.role)} className="group min-h-[138px] text-start rounded-[22px] border border-[#DFDED7] bg-[#FFFEFB] p-5 transition hover:border-[#AEBEB5] focus:outline-none focus:ring-2 focus:ring-[#214C40]/30">
             <div className="flex items-start justify-between gap-3"><Pictogram icon={Icon} size="sm"/><ArrowLeft className={`w-4 h-4 text-[#A3A9A5] opacity-0 group-hover:opacity-100 transition ${ar?'':'rotate-180'}`}/></div>
             <div className="mt-5 font-black text-sm">{ar?item.ar:item.en}</div>
-            <div className="mt-1.5 text-[10px] leading-5 text-[#79817C] line-clamp-1">{ar?item.noteAr:item.noteEn}</div>
+            <div className="mt-1.5 text-[10px] leading-5 text-[#646a66] line-clamp-1">{ar?item.noteAr:item.noteEn}</div>
           </button>})}
         </div>
       </section>)}
 
       <section className="mt-10 border-t border-[#DEDDD6] pt-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div><div className="text-sm font-black">{ar?'واجهات يوم المسابقة':'Venue experiences'}</div><div className="text-xs text-[#7A817D] mt-1">{ar?'تُفتح بكامل الشاشة أثناء الحدث':'Full-screen modes used on-site'}</div></div>
+        <div><div className="text-sm font-black">{ar?'واجهات يوم المسابقة':'Venue experiences'}</div><div className="text-xs text-[#656a67] mt-1">{ar?'تُفتح بكامل الشاشة أثناء الحدث':'Full-screen modes used on-site'}</div></div>
         <div className="flex gap-2">
           <button onClick={onOpenKiosk} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><ScanLine className="w-4 h-4"/>{ar?'بوابة الحضور':'Gate kiosk'}</button>
           <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button>{onOpenHall&&<button onClick={onOpenHall} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><BookOpen className="w-4 h-4"/>{ar?'خريطة تلاوة القاعة':'Hall recitation'}</button>}<button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>

@@ -12,7 +12,7 @@
     --surface: #fffefb;
     --surface-soft: #f1efe8;
     --ink: #171b18;
-    --muted: #6d746f;
+    --muted: #696f6b;
     --line: #dfded7;
     --emerald: #214c40;
     --emerald-2: #2f6555;
@@ -39,6 +39,18 @@
     --shadow-4: 0 30px 80px rgba(23,45,38,.09);
 
     --ease-brand: cubic-bezier(.22,.75,.22,1);
+
+    /* Dark venue palette. The Kiosk, Waiting Hall, Hall Map and Ceremony screens each
+       hand-picked their own near-identical darks (#16241f, #11211b, #0f1a16 …) with no
+       shared source of truth. These are that source. */
+    --venue: #16241f;
+    --venue-2: #11211b;
+    --venue-deep: #101a16;  /* stage black for the ceremony */
+    --venue-surface: rgba(255,255,255,.055);
+    --venue-line: rgba(255,255,255,.10);
+    --venue-ink: #f4f1e8;
+    --venue-muted: #a9b6ae;   /* 7.4:1 on --venue */
+    --venue-faint: #8b9a92;   /* 5.1:1 on --venue — the floor for readable venue text */
   }
 
   * { box-sizing: border-box; }
@@ -92,8 +104,6 @@
 .mizan-muted { color: var(--muted); }
 .mizan-divider { border-color: var(--line); }
 
-.bg-islamic-subtle { background-color:#16241f; background-image:none; }
-
 .bg-pattern-light { background: var(--canvas); }
 
 ::-webkit-scrollbar { width: 7px; height: 7px; }
@@ -119,7 +129,7 @@
 .mizan-panel { background:#fffefb; border:1px solid #e2e0d9; border-radius:20px; }
 .mizan-input { width:100%; min-height:44px; border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; }
 .mizan-input:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
-.mizan-field-label { display:block; color:#747c77; font-size:10px; font-weight:800; margin:0 0 6px; }
+.mizan-field-label { display:block; color:#686f6b; font-size:10px; font-weight:800; margin:0 0 6px; }
 .mizan-result-line { min-height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(223,222,215,.75); }
 .mizan-status-orb { width:7px;height:7px;border-radius:99px;background:#2f6555;display:inline-block; }
 .mizan-pictogram { position:relative; isolation:isolate; display:inline-grid; place-items:center; flex:0 0 auto; overflow:hidden; border:1px solid rgba(23,27,24,.07); }
@@ -156,9 +166,15 @@ html[data-mizan-text="xl"]    { --mizan-text-scale: 1.32; }
 .mizan-kicker, .mizan-ticket-label { font-size: calc(11.5px * var(--mizan-text-scale)); }
 .mizan-field-label { font-size: calc(11px * var(--mizan-text-scale)); }
 .mizan-proof-code  { font-size: calc(12px * var(--mizan-text-scale)); }
-/* Full-bleed dark venue screens (Waiting Hall / Ceremony) are read from meters away —
-   give their micro-labels an extra push so they stay legible across a hall. */
-.bg-\[\#11211b\] .text-\[10px\], .bg-\[\#11211b\] .text-\[11px\] { font-size: calc(13px * var(--mizan-text-scale)) !important; }
+/* Full-bleed dark venue screens (Gate / Waiting Hall / Hall Map / Ceremony) are read from
+   meters away — give their micro-labels an extra push so they stay legible across a hall.
+   This used to key off the bg-[#11211b] utility, which reached only two of the four
+   screens and broke the moment that literal moved into a token. */
+.mizan-venue .text-\[9px\],  .mizan-venue .text-\[10px\],  .mizan-venue .text-\[11px\],
+.mizan-venue-2 .text-\[9px\], .mizan-venue-2 .text-\[10px\], .mizan-venue-2 .text-\[11px\],
+.mizan-venue-deep .text-\[9px\], .mizan-venue-deep .text-\[10px\], .mizan-venue-deep .text-\[11px\] {
+  font-size: calc(13px * var(--mizan-text-scale)) !important;
+}
 
 html[data-mizan-touch="xl"] button,
 html[data-mizan-touch="xl"] input,
@@ -181,9 +197,9 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 .mizan-ticket-paper::before,.mizan-ticket-paper::after{content:"";position:absolute;top:18px;width:18px;height:18px;border-radius:99px;background:var(--canvas)}
 .mizan-ticket-paper::before{left:-9px}.mizan-ticket-paper::after{right:-9px}
 .mizan-ticket-issued{transform:translate(-50%,22px);opacity:1}
-.mizan-ticket-cut{position:absolute;top:13px;left:22px;right:22px;border-top:1px dashed #bbb8ae;color:#8a908c;height:15px;display:flex;justify-content:flex-end;align-items:flex-start}
+.mizan-ticket-cut{position:absolute;top:13px;left:22px;right:22px;border-top:1px dashed #bbb8ae;color:#696f6b;height:15px;display:flex;justify-content:flex-end;align-items:flex-start}
 .mizan-ticket-cut svg{transform:translateY(-7px);background:#fffefb}
-.mizan-ticket-label{font-size:9px;font-weight:900;letter-spacing:.12em;color:#777e79}
+.mizan-ticket-label{font-size:9px;font-weight:900;letter-spacing:.12em;color:#696f6b}
 .mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
 .mizan-ticket-meta{font-size:10px;font-weight:800;color:#5f6862;margin-top:12px}
 .mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}
@@ -235,7 +251,7 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 .mizan-wordmark.is-inverse .mizan-wordmark-rule i { background:linear-gradient(90deg,transparent,var(--gold-light)); }
 .mizan-wordmark.is-inverse .mizan-wordmark-rule i:last-of-type { background:linear-gradient(270deg,transparent,var(--gold-light)); }
 .mizan-wordmark-tagline {
-  font-size:calc(12px * var(--mizan-text-scale)); font-weight:500; color:#6f7a73; letter-spacing:.01em;
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:500; color:#66706a; letter-spacing:.01em;
 }
 .mizan-wordmark.is-inverse .mizan-wordmark-tagline { color:rgba(245,240,228,.62); }
 
@@ -352,7 +368,7 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 @media (min-width:1024px){ .mzo-body{ grid-template-columns:1.02fr .98fr; } }
 
 .mzo-eyebrow{ display:inline-flex; align-items:center; gap:.5rem;
-  font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:#8a6d43; }
+  font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:#856941; }
 .mzo-eyebrow::before{ content:""; width:18px; height:1px; background:linear-gradient(90deg,var(--gold),transparent); }
 [dir="ltr"] .mzo-eyebrow::before{ background:linear-gradient(90deg,var(--gold),transparent); }
 .mzo-title{
@@ -402,6 +418,8 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
   animation:mzTrack 7s linear both;
 }
 [dir="rtl"] .mzo-rail button[data-state="active"]::after{ transform-origin:right center; }
+/* The rail is the timer made visible; freeze it whenever the timer is held. */
+.mzo-root[data-held] .mzo-rail button[data-state="active"]::after{ animation-play-state:paused; }
 
 /* ── Scenes ──────────────────────────────────────────────────────────────── */
 .mzo-scene{
@@ -472,7 +490,7 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 .mzo-proof-row{ display:flex; align-items:center; gap:.55rem; padding:.55rem 0; }
 .mzo-proof-row + .mzo-proof-row{ border-top:1px solid #efe9db; }
 .mzo-proof-hash{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:calc(10px * var(--mizan-text-scale)); color:#8b938d; letter-spacing:.02em; }
+  font-size:calc(10px * var(--mizan-text-scale)); color:#686f6a; letter-spacing:.02em; }
 .mzo-proof-tick{ width:22px; height:22px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
   background:var(--emerald-soft); color:var(--emerald); animation:mzPop .45s var(--ease-brand) both; }
 .mzo-proof-row:nth-child(1) .mzo-proof-tick{ animation-delay:.5s }
@@ -494,3 +512,37 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
   .mzo-root *{ animation:none !important; }
   .mzo-scene::after{ display:none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design-system primitives
+   Button, Card and Pictogram each carried their own hard-coded shadows, radii
+   and hover colours, so a token change moved the app but not its controls.
+   These bind them to the one ramp.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mizan-btn{
+  border-radius:var(--radius-sm);
+  transition:background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s var(--ease-brand);
+}
+.mizan-btn-primary{ background:var(--emerald); color:#fff; box-shadow:var(--shadow-1); }
+.mizan-btn-primary:hover:not(:disabled){ background:#193d34; box-shadow:var(--shadow-2); }
+.mizan-btn-secondary{ background:var(--emerald-soft); color:var(--emerald); }
+.mizan-btn-secondary:hover:not(:disabled){ background:#dce7e1; }
+.mizan-btn-outline{ background:var(--surface); color:#303733; border:1px solid var(--line); }
+.mizan-btn-outline:hover:not(:disabled){ background:var(--canvas); border-color:#c9c8c0; }
+.mizan-btn-danger{ background:var(--danger); color:#fff; box-shadow:var(--shadow-1); }
+.mizan-btn-danger:hover:not(:disabled){ background:#8d4038; }
+.mizan-btn-ghost{ background:transparent; color:#5c645f; }
+.mizan-btn-ghost:hover:not(:disabled){ background:#efede7; }
+.mizan-btn-gold{ background:var(--amber); color:#fff; box-shadow:var(--shadow-1); }
+.mizan-btn-gold:hover:not(:disabled){ background:#846237; }
+
+.mizan-surface-hover{ transition:border-color .16s ease, box-shadow .16s ease, transform .16s var(--ease-brand); }
+.mizan-surface-hover:hover{ border-color:#c9c8c0; box-shadow:var(--shadow-3); transform:translateY(-1px); }
+
+/* Venue screens: one dark surface language instead of four hand-rolled ones. */
+.mizan-venue{ background:var(--venue); color:var(--venue-ink); }
+.mizan-venue-2{ background:var(--venue-2); color:var(--venue-ink); }
+.mizan-venue-deep{ background:var(--venue-deep); color:var(--venue-ink); }
+.mizan-venue-panel{ background:var(--venue-surface); border:1px solid var(--venue-line); border-radius:var(--radius-md); }
+.mizan-venue-muted{ color:var(--venue-muted); }
+.mizan-venue-faint{ color:var(--venue-faint); }

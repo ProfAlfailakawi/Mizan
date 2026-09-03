@@ -1,5 +1,4 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import config from '../../firebase-applet-config.json';
 
@@ -18,7 +17,40 @@ const firebaseConfig = {
 };
 
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const db = config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, config.firestoreDatabaseId)
-  : getFirestore(app);
 export const auth = getAuth(app);
+
+/*
+ * Firestore is loaded on demand, not at module scope.
+ *
+ * Every Firestore path in the app is already gated on `auth.currentUser`, so demo and
+ * local-only sessions never touch the cloud — yet the 132 kB (gzipped) Firestore client
+ * was still downloaded, parsed and initialised before the first screen painted. Deferring
+ * it removes that cost from everyone who is not signed in, and changes nothing for anyone
+ * who is: the first call still awaits a fully initialised client.
+ *
+ * The promise is cached, so getFirestoreClient() is idempotent and safe to call from any
+ * number of call sites and renders.
+ */
+type FirestoreClient = {
+  db: import('firebase/firestore').Firestore;
+  doc: typeof import('firebase/firestore')['doc'];
+  setDoc: typeof import('firebase/firestore')['setDoc'];
+  onSnapshot: typeof import('firebase/firestore')['onSnapshot'];
+};
+
+let firestoreClient: Promise<FirestoreClient> | null = null;
+
+export function getFirestoreClient(): Promise<FirestoreClient> {
+  if (!firestoreClient) {
+    firestoreClient = import('firebase/firestore')
+      .then(({ getFirestore, doc, setDoc, onSnapshot }) => ({
+        db: config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
+          ? getFirestore(app, config.firestoreDatabaseId)
+          : getFirestore(app),
+        doc, setDoc, onSnapshot,
+      }))
+      // A failed load must not poison every later attempt (a flaky venue link is normal).
+      .catch(err => { firestoreClient = null; throw err; });
+  }
+  return firestoreClient;
+}

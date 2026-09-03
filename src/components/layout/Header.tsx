@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0">
       <MizanLogo language={language} compact/>
-      <div className="min-w-0 hidden sm:block"><div className="flex items-center gap-2"><span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/><span className="text-[10px] text-[#737a75] truncate max-w-[260px]">{language==='ar'?competition.nameArabic:competition.name}</span></div></div>
+      <div className="min-w-0 hidden sm:block"><div className="flex items-center gap-2"><span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/><span className="text-[10px] text-[#636864] truncate max-w-[260px]">{language==='ar'?competition.nameArabic:competition.name}</span></div></div>
     </div>
     <div className="flex items-center gap-1">
       {onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'كل التجارب':'All experiences'} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></button>}
