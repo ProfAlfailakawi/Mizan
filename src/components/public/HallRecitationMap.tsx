@@ -40,7 +40,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
         </div>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.projectedFullDay ? (ar ? 'يوم مسابقة تمثيلي' : 'Projected day') : (ar ? 'حي · مجمّع' : 'Live · aggregate')}</span>
-          {onClose && <button onClick={onClose} className="w-10 h-10 rounded-xl hover:bg-white/10 grid place-items-center text-white/55"><X className="w-5 h-5" /></button>}
+          {onClose && <button onClick={onClose} className="w-11 h-11 rounded-xl hover:bg-white/10 grid place-items-center text-white/55"><X className="w-5 h-5" /></button>}
         </div>
       </header>
 

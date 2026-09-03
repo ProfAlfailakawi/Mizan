@@ -13,6 +13,22 @@ const AR_TOKENS:Record<string,string>={
   development_client_gate:'بوابة تطوير محلية', operational_panel_gate:'بوابة تشغيل اللجنة', production_server_escrow:'حجز خادمي آمن للسؤال',
   development_adapter:'محول تطوير', production_external_kms:'إدارة مفاتيح إنتاجية خارجية', development_per_credential:'توقيع تطويري لكل بطاقة', production_issuer_key:'مفتاح جهة إصدار إنتاجي',
   all_assigned:'كل المحكمين المكلّفين', minimum:'حد أدنى من المحكمين',
+
+  // Status values that reach the screen through <Badge> and status text but had no
+  // Arabic form, so an Arabic-first UI printed "medium", "under_review", "in_queue".
+  // Adding them here fixes every badge at once; an unmapped key still falls through
+  // to the raw value exactly as before.
+  low:'منخفضة', medium:'متوسطة', high:'عالية', critical:'حرجة', moderate:'متوسطة',
+  registered:'مسجّل', in_queue:'في الانتظار', in_session:'داخل اللجنة', tested:'أنهى الاختبار',
+  certified:'حاصل على شهادة', withdrawn:'منسحب', absent:'غائب',
+  submitted:'مُقدَّم', under_review:'قيد المراجعة', accepted:'مقبول',
+  confirmed:'مؤكَّد', dismissed:'مصروف', committee_escalation:'تصعيد إلى اللجنة',
+  investigating:'قيد الفحص', resolved:'مُعالَج', open:'مفتوح',
+  quality_checked:'فُحصت الجودة', recording:'قيد التسجيل',
+  draft:'مسودة', issued:'صادر', expired:'منتهٍ', cancelled:'ملغى', retired:'متقاعد',
+  running:'قيد التشغيل', executed:'نُفّذ', rolled_back:'تم التراجع', validated:'تم التحقق',
+  configured:'مُهيّأ', not_configured:'غير مُهيّأ', stale:'قديم', warning:'تنبيه', info:'معلومة',
+  joined:'انضم', left:'غادر', proposed:'مقترح', imported:'مستورد', dry_run:'تشغيل تجريبي',
 };
 
 const AR_CLAIMS:Record<FederationClaimType,string>={

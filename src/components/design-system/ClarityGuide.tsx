@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { CircleHelp, X, ShieldCheck, ScanSearch, Ticket, Gavel, Microscope, RadioTower, UserRound } from 'lucide-react';
 import type { Role } from '../../types';
 
@@ -53,13 +54,17 @@ const TERMS:Step[]=[
 ];
 
 export const ClarityGuide:React.FC<Props>=({open,onClose,role,ar})=>{
+ // Had the dialog role and label, but no Escape and no focus containment: a keyboard
+ // reader could tab out of the panel and lose the page behind the scrim.
+ const panelRef=useRef<HTMLElement|null>(null);
+ useDialogBehavior(open,onClose,panelRef as any);
  if(!open)return null;
  const guide=ROLE_GUIDE[role]||{titleAr:'دليل سريع',titleEn:'Quick guide',steps:TERMS.slice(0,3)};
  const roleIcon=role==='judge'?Gavel:role==='scientific_admin'?Microscope:role==='ops_manager'?RadioTower:role==='participant'?UserRound:ShieldCheck;
  const Icon=roleIcon;
  return <div className="fixed inset-0 z-[90] bg-[#171b18]/35 backdrop-blur-[2px]" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
-  <aside className={`absolute top-0 bottom-0 w-full max-w-md bg-[#FFFEFB] shadow-2xl p-5 sm:p-6 overflow-y-auto ${ar?'left-0 border-r':'right-0 border-l'} border-[#dedcd5]`} role="dialog" aria-modal="true" aria-label={ar?'دليل مبسط':'Plain-language guide'}>
-   <div className="flex items-start justify-between gap-4"><div className="flex gap-3"><span className="w-11 h-11 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><Icon className="w-5 h-5"/></span><div><div className="text-[10px] font-black tracking-[.15em] text-[#68716b]">{ar?'شرح مبسط':'PLAIN LANGUAGE'}</div><h2 className="text-xl font-black mt-1">{ar?guide.titleAr:guide.titleEn}</h2></div></div><button onClick={onClose} className="w-10 h-10 rounded-xl grid place-items-center hover:bg-[#efede7]" aria-label={ar?'إغلاق':'Close'}><X className="w-4 h-4"/></button></div>
+  <aside ref={panelRef as any} className={`absolute top-0 bottom-0 w-full max-w-md bg-[#FFFEFB] shadow-2xl p-5 sm:p-6 overflow-y-auto ${ar?'left-0 border-r':'right-0 border-l'} border-[#dedcd5]`} role="dialog" aria-modal="true" aria-label={ar?'دليل مبسط':'Plain-language guide'}>
+   <div className="flex items-start justify-between gap-4"><div className="flex gap-3"><span className="w-11 h-11 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><Icon className="w-5 h-5"/></span><div><div className="text-[10px] font-black tracking-[.15em] text-[#68716b]">{ar?'شرح مبسط':'PLAIN LANGUAGE'}</div><h2 className="text-xl font-black mt-1">{ar?guide.titleAr:guide.titleEn}</h2></div></div><button onClick={onClose} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-[#efede7]" aria-label={ar?'إغلاق':'Close'}><X className="w-4 h-4"/></button></div>
    <div className="mt-6 divide-y divide-[#e6e4dd]">{guide.steps.map((x,i)=><div key={`${x.titleEn}-${i}`} className="py-4 grid grid-cols-[30px_1fr] gap-3"><span className="w-7 h-7 rounded-lg bg-[#f0eee8] grid place-items-center text-[11px] font-black">{i+1}</span><div><div className="text-sm font-black">{ar?x.titleAr:x.titleEn}</div><div className="text-xs leading-6 text-[#616763] mt-1">{ar?x.noteAr:x.noteEn}</div></div></div>)}</div>
    <div className="mt-7 pt-5 border-t border-[#dedcd5]"><div className="flex items-center gap-2"><CircleHelp className="w-4 h-4 text-[#53615a]"/><div className="text-xs font-black">{ar?'مصطلحات قد تراها':'Terms you may see'}</div></div><div className="mt-3 space-y-2">{TERMS.map(x=><details key={x.titleEn} className="rounded-xl bg-[#f5f3ed] px-3 py-2.5"><summary className="cursor-pointer text-xs font-black list-none flex items-center justify-between gap-2"><span>{ar?x.titleAr:x.titleEn}</span><ScanSearch className="w-3.5 h-3.5 text-[#646a66]"/></summary><p className="text-[11px] leading-5 text-[#616763] mt-2">{ar?x.noteAr:x.noteEn}</p></details>)}</div></div>
    <div className="mt-6 rounded-2xl bg-[#E7EEE9] text-[#214C40] p-4 flex gap-3"><Ticket className="w-5 h-5 shrink-0"/><p className="text-xs leading-6 font-semibold">{ar?'إذا كان الخيار لا يغير مسار عملك، لا تحتاج إلى فهم تفاصيله المتقدمة. ميزان يعرض العمق عند الطلب فقط.':'If a capability does not change your job, you do not need its advanced details. MIZAN reveals depth only on demand.'}</p></div>

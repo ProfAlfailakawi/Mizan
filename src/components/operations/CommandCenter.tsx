@@ -10,6 +10,15 @@ import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
 import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
 
+// The alert kind was rendered raw, so an Arabic-first screen printed "review",
+// "incident" and "device" in English. It also carried no severity, so a hardware
+// blip and an open incident looked the same.
+const ALERT_KIND:Record<string,{ar:string;en:string}>={
+ incident:{ar:'حادثة',en:'Incident'},
+ review:{ar:'مراجعة',en:'Review'},
+ device:{ar:'جهاز',en:'Device'},
+};
+
 export const CommandCenter: React.FC = () => {
  const s=useAppStore(); const {language,participants,committees,incidents,isOffline,reviewCases,notifications,devices,runSimulation}=s; const ar=language==='ar';
  const [expanded,setExpanded]=useState(false); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
@@ -22,7 +31,7 @@ export const CommandCenter: React.FC = () => {
  return <div className="max-w-[1450px] mx-auto px-4 sm:px-6 py-7 space-y-4">
   <section className="mizan-surface p-6 sm:p-8"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5"><div className="flex items-center gap-4"><Pictogram icon={alerts.length?AlertTriangle:BadgeCheck} size="lg" tone={alerts.length?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز العمليات':'MIZAN COMMAND'}</div><h1 className="text-2xl sm:text-4xl font-black mt-1">{alerts.length?(ar?`${alerts.length} حالات تحتاجك`:`${alerts.length} exceptions need you`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h1><p className="text-xs text-[#636864] mt-2">{alerts.length?(ar?'الروتين يعمل وحده. ركّز هنا.':'Routine is automated. Focus here.'):(ar?'لا تدخل مطلوب.':'No intervention required.')}</p></div></div><Button variant="outline" onClick={()=>setExpanded(v=>!v)} icon={<ChevronDown className={`w-4 h-4 transition ${expanded?'rotate-180':''}`}/>}>{ar?'التدفق':'Flow'}</Button></div></section>
 
-  {alerts.length>0&&<section className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'الحالات الاستثنائية':'EXCEPTIONS'}</div><div className="mt-2 divide-y divide-[#e5e3dc]">{alerts.slice(0,8).map(x=><div key={`${x.kind}-${x.id}`} className="py-3 flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-[#9B7542]"/><div className="text-sm font-bold flex-1">{x.title}</div><Badge variant="neutral">{x.kind}</Badge></div>)}</div></section>}
+  {alerts.length>0&&<section className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'الحالات الاستثنائية':'EXCEPTIONS'}</div><div className="mt-2 divide-y divide-[#e5e3dc]">{alerts.slice(0,8).map(x=><div key={`${x.kind}-${x.id}`} className="py-3 flex items-center gap-3"><span className={`w-2 h-2 rounded-full shrink-0 ${x.kind==='incident'?'bg-[#A34D43]':x.kind==='device'?'bg-[#496477]':'bg-[#9B7542]'}`}/><div className="text-sm font-bold flex-1 min-w-0 truncate">{x.title}</div><Badge variant={x.kind==='incident'?'rose':x.kind==='device'?'blue':'amber'}>{ALERT_KIND[x.kind]?.[ar?'ar':'en']||x.kind}</Badge></div>)}</div></section>}
 
   <ContinuityRecovery/>
 

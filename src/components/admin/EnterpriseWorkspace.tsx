@@ -1,20 +1,61 @@
-import React, {useMemo, useState} from 'react';
+import React, {Suspense, lazy, useEffect, useMemo, useState} from 'react';
 import { Bell, Cable, DatabaseBackup, FileUp, Globe2, HardDrive, Plane, Radar, RadioTower, ShieldCheck, Stethoscope, UsersRound, Webhook, Wifi, Copy, Download, Play, RefreshCw, Plus, CheckCircle2, AlertTriangle, Fingerprint, WandSparkles } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
-import { DeploymentStudio } from './DeploymentStudio';
-import { DeviceCenter } from './DeviceCenter';
-import { TrustProtocolLab } from './TrustProtocolLab';
-import { BeyondLab } from './BeyondLab';
 import { EmergencyControl } from '../design-system/EmergencyControl';
-import { ReadinessLab } from './ReadinessLab';
-import { IdentityGovernance } from './IdentityGovernance';
+
+/*
+ * Only one section renders at a time, yet all seven panels were imported eagerly —
+ * roughly 79 kB of source that a competition admin downloaded before seeing the first
+ * one. They load on demand now.
+ *
+ * warmPanels() then pulls the rest during idle, for the same reason the route-level
+ * split does: MIZAN promises the app keeps working when the venue drops offline, and
+ * the service worker can only serve a chunk it has already seen.
+ */
+const PANELS = {
+  deploymentStudio: () => import('./DeploymentStudio'),
+  deviceCenter: () => import('./DeviceCenter'),
+  trustProtocolLab: () => import('./TrustProtocolLab'),
+  beyondLab: () => import('./BeyondLab'),
+  readinessLab: () => import('./ReadinessLab'),
+  identityGovernance: () => import('./IdentityGovernance'),
+};
+const panel = (loader: () => Promise<any>, name: string) =>
+  lazy(() => loader().then((m: any) => ({ default: m[name] })));
+
+const DeploymentStudio = panel(PANELS.deploymentStudio, 'DeploymentStudio');
+const DeviceCenter = panel(PANELS.deviceCenter, 'DeviceCenter');
+const TrustProtocolLab = panel(PANELS.trustProtocolLab, 'TrustProtocolLab');
+const BeyondLab = panel(PANELS.beyondLab, 'BeyondLab');
+const ReadinessLab = panel(PANELS.readinessLab, 'ReadinessLab');
+const IdentityGovernance = panel(PANELS.identityGovernance, 'IdentityGovernance');
+
+let panelsWarmed = false;
+function warmPanels(){
+  if (panelsWarmed || typeof window === 'undefined') return;
+  const conn = (navigator as any).connection;
+  if (conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType || '')) return;
+  if (!navigator.onLine) { window.addEventListener('online', () => warmPanels(), { once: true }); return; }
+  panelsWarmed = true;
+  const run = () => { for (const load of Object.values(PANELS)) void load().catch(() => { panelsWarmed = false; }); };
+  const idle = (window as any).requestIdleCallback;
+  window.setTimeout(() => { idle ? idle(run, { timeout: 4000 }) : run(); }, 2500);
+}
+
+const PanelFallback: React.FC = () => (
+  <div className="mizan-surface p-8 grid place-items-center min-h-40" role="status" aria-live="polite">
+    <span className="mizan-status-orb" />
+    <span className="sr-only">جارٍ التحميل</span>
+  </div>
+);
 
 type Section='integrations'|'operations'|'international'|'shadow'|'governance'|'trust'|'beyond';
 const isAr=(l:string)=>l==='ar';
 export const EnterpriseWorkspace:React.FC=()=>{
  const s=useAppStore(); const ar=isAr(s.language); const [section,setSection]=useState<Section>('integrations');
+ useEffect(()=>{warmPanels()},[]);
  const pending=s.notifications.filter(n=>n.status==='failed').length; const online=s.devices.filter(d=>d.status==='online').length;
  const sections:[Section,any,string][]=[['integrations',Cable,ar?'القنوات':'Channels'],['operations',RadioTower,ar?'البنية الميدانية':'Field'],['international',Plane,ar?'الدولي':'International'],['shadow',Radar,ar?'Shadow':'Shadow'],['governance',ShieldCheck,ar?'الحوكمة':'Governance'],['trust',Fingerprint,ar?'الثقة':'Trust 8'],['beyond',WandSparkles,ar?'ما بعد':'Beyond']];
  return <div className="space-y-4">
@@ -24,9 +65,9 @@ export const EnterpriseWorkspace:React.FC=()=>{
   {section==='operations'&&<Field s={s} ar={ar} online={online}/>} 
   {section==='international'&&<International s={s} ar={ar}/>} 
   {section==='shadow'&&<Shadow s={s} ar={ar}/>} 
-  {section==='governance'&&<div className="space-y-4"><IdentityGovernance/><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/><Governance s={s} ar={ar}/></div>} 
-  {section==='trust'&&<TrustProtocolLab/>} 
-  {section==='beyond'&&<BeyondLab/>} 
+  {section==='governance'&&<div className="space-y-4"><Suspense fallback={<PanelFallback/>}><IdentityGovernance/></Suspense><Suspense fallback={<PanelFallback/>}><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/></Suspense><Governance s={s} ar={ar}/></div>} 
+  {section==='trust'&&<Suspense fallback={<PanelFallback/>}><TrustProtocolLab/></Suspense>} 
+  {section==='beyond'&&<Suspense fallback={<PanelFallback/>}><BeyondLab/></Suspense>} 
  </div>
 }
 const Integrations=({s,ar,pending}:{s:ReturnType<typeof useAppStore>;ar:boolean;pending:number})=>{
@@ -36,7 +77,7 @@ const Integrations=({s,ar,pending}:{s:ReturnType<typeof useAppStore>;ar:boolean;
  <div className="mizan-surface p-5"><div className="flex items-center gap-2"><Webhook className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'تكاملات الويب':'Webhooks'}</h2></div><div className="mt-4 flex gap-2"><input value={endpoint} onChange={e=>setEndpoint(e.target.value)} placeholder="https://…" className="mizan-input min-w-0 flex-1"/><Button size="sm" disabled={!/^https:\/\//i.test(endpoint)} onClick={()=>{s.addWebhook('result.published',endpoint);setEndpoint('')}}>{ar?'إضافة':'Add'}</Button></div><div className="mt-4 space-y-2">{s.webhooks.slice(0,4).map(w=><div key={w.id} className="text-xs flex items-center justify-between gap-3"><span className="truncate">{w.event}</span><Badge variant="neutral">{w.enabled?(ar?'مفعّل':'ON'):(ar?'متوقف':'OFF')}</Badge></div>)}{!s.webhooks.length&&<Empty ar={ar}/>}</div></div></div>
  <div className="mizan-surface p-5"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Bell className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'مركز الإشعارات':'Notification Center'}</h2></div><span className="text-[10px] text-[#656b66]">{s.notifications.length}</span></div><div className="mt-4 divide-y divide-[#e6e4dd]">{s.notifications.slice(0,8).map(n=><div key={n.id} className="py-3 grid grid-cols-[auto_1fr_auto] gap-3 items-center"><span className={`w-2 h-2 rounded-full ${n.status==='sent'?'bg-[#2F6555]':n.status==='failed'?'bg-[#A34D43]':'bg-[#9B7542]'}`}/><div className="min-w-0"><div className="text-xs font-bold truncate">{n.templateKey}</div><div className="text-[10px] text-[#656b66] truncate">{n.channel} · {n.status}{n.error?` · ${n.error}`:''}</div></div>{n.status==='failed'&&<Button size="sm" variant="ghost" onClick={()=>s.retryNotification(n.id)}>{ar?'إعادة':'Retry'}</Button>}</div>)}{!s.notifications.length&&<Empty ar={ar}/>}</div></div></div>
 }
-const Field=({s,ar,online}:{s:ReturnType<typeof useAppStore>;ar:boolean;online:number})=><div className="space-y-4"><DeploymentStudio/><div className="grid xl:grid-cols-[1.35fr_.65fr] gap-4"><DeviceCenter/><div className="mizan-surface p-5 h-fit"><div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستمرارية':'Continuity'}</h2></div><div className="mt-4 space-y-3"><State ok={!s.isOffline} label={ar?'السحابة':'Cloud'}/><State ok={s.devices.some(d=>d.type==='edge_server'&&d.status==='online')} label="MIZAN Edge"/><State ok={!s.emergencyFrozen} label={ar?'التوجيه':'Dispatch'}/></div><div className="mt-4 grid gap-2"><Button size="sm" variant="outline" onClick={s.toggleOffline}>{s.isOffline?(ar?'استعادة الاتصال':'Reconnect'):(ar?'محاكاة انقطاع':'Simulate outage')}</Button><EmergencyControl/></div></div></div></div>
+const Field=({s,ar,online}:{s:ReturnType<typeof useAppStore>;ar:boolean;online:number})=><div className="space-y-4"><Suspense fallback={<PanelFallback/>}><DeploymentStudio/></Suspense><div className="grid xl:grid-cols-[1.35fr_.65fr] gap-4"><Suspense fallback={<PanelFallback/>}><DeviceCenter/></Suspense><div className="mizan-surface p-5 h-fit"><div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستمرارية':'Continuity'}</h2></div><div className="mt-4 space-y-3"><State ok={!s.isOffline} label={ar?'السحابة':'Cloud'}/><State ok={s.devices.some(d=>d.type==='edge_server'&&d.status==='online')} label="MIZAN Edge"/><State ok={!s.emergencyFrozen} label={ar?'التوجيه':'Dispatch'}/></div><div className="mt-4 grid gap-2"><Button size="sm" variant="outline" onClick={s.toggleOffline}>{s.isOffline?(ar?'استعادة الاتصال':'Reconnect'):(ar?'محاكاة انقطاع':'Simulate outage')}</Button><EmergencyControl/></div></div></div></div>
 const International=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{const [pid,setPid]=useState(s.participants[0]?.id||''); const travel=s.travelRecords.find(r=>r.participantId===pid);return <div className="grid xl:grid-cols-2 gap-4"><div className="mizan-surface p-5"><div className="flex items-center gap-2"><Plane className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'السفر والوفود':'Travel & delegations'}</h2></div><select value={pid} onChange={e=>setPid(e.target.value)} className="w-full mt-4 rounded-xl border border-[#ddd] px-3 py-2.5 text-sm">{s.participants.slice(0,20).map(p=><option key={p.id} value={p.id}>{p.code} · {ar?p.fullNameArabic:p.fullName}</option>)}</select><div className="grid grid-cols-2 gap-2 mt-3"><Button size="sm" variant="outline" onClick={()=>s.upsertTravelRecord(pid,{flightNumber:'MZ 417',arrivalAirport:'KWI',transportStatus:'scheduled'})}>{ar?'جدولة الوصول':'Schedule arrival'}</Button><Button size="sm" variant="outline" onClick={()=>s.runRemoteCheck(pid)}>{ar?'فحص تأهل عن بعد':'Remote check'}</Button></div>{travel&&<div className="rounded-xl bg-[#f3f1eb] p-3 mt-3 text-xs font-semibold">{travel.flightNumber} · {travel.arrivalAirport} · {travel.transportStatus}</div>}</div><div className="mizan-surface p-5"><div className="flex items-center gap-2"><FileUp className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستيراد':'Migration'}</h2></div><p className="text-xs text-[#636965] mt-2">{ar?'CSV حقيقي مع تحقق قبل إدخال أي سجل. إذا وُجد خطأ لا يتم الاستيراد.':'Real CSV validation before any record is committed. Errors stop the import.'}</p><label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#214C40] text-white px-3 py-2.5 text-xs font-bold"><FileUp className="w-4 h-4"/>{ar?'اختيار CSV':'Choose CSV'}<input type="file" accept=".csv,text/csv" className="sr-only" onChange={async e=>{const f=e.target.files?.[0];if(f){await s.importParticipantsCsv(f.name,await f.text());e.currentTarget.value=''}}}/></label>{s.importJobs[0]&&<div className="mt-4 grid grid-cols-3 gap-2"><Mini n={s.importJobs[0].totalRows} t={ar?'صف':'Rows'}/><Mini n={s.importJobs[0].validRows} t={ar?'صالح':'Valid'}/><Mini n={s.importJobs[0].invalidRows} t={ar?'مراجعة':'Review'}/></div>}{s.importJobs[0]?.errors?.length>0&&<div className="mt-3 rounded-xl bg-[#F4E6E3] text-[#89453d] p-3 text-[11px] font-semibold">{s.importJobs[0].errors.slice(0,3).map(e=><div key={`${e.row}-${e.message}`}>Row {e.row}: {e.message}</div>)}</div>}</div></div>}
 const Shadow=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{const run=s.shadowRuns[0];return <div className="mizan-surface p-5 sm:p-6"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'التحقق الصامت':'SHADOW MODE'}</div><h2 className="font-extrabold mt-1">{ar?'أثبت القيمة قبل الاستبدال':'Prove value before replacement'}</h2><p className="text-xs text-[#636965] mt-2 max-w-xl">{ar?'يعمل خلف النظام الحالي دون التأثير في النتيجة، ثم يقارن التشغيل والنزاهة والوقت.':'Run behind the legacy system without affecting scores, then compare operations and integrity.'}</p></div>{!run?<Button onClick={()=>s.startShadowRun('compare')} icon={<Play className="w-4 h-4"/>}>{ar?'بدء':'Start'}</Button>:run.status==='running'?<Button onClick={()=>s.completeShadowRun(run.id)} icon={<CheckCircle2 className="w-4 h-4"/>}>{ar?'إنهاء وتحليل':'Finish & analyze'}</Button>:<Badge variant="emerald">{ar?'اكتمل':'Complete'}</Badge>}</div>{run?.observations.length>0&&<div className="mt-5 grid md:grid-cols-3 gap-3">{run.observations.map((o,i)=><div key={i} className="rounded-xl bg-[#f4f2ec] p-4"><div className="text-[10px] font-black uppercase text-[#656b66]">{o.type}</div><div className="text-xs font-bold mt-2">{o.summary}</div></div>)}</div>}</div>}
 const Governance=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{const [reason,setReason]=useState('');return <div className="grid xl:grid-cols-3 gap-4"><div className="mizan-surface p-5"><DatabaseBackup className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold mt-3">{ar?'نسخة تحقق':'Verified backup'}</h2><p className="text-xs text-[#646965] mt-2">{s.backups[0]?.checksum.slice(0,16)|| (ar?'لا توجد بعد':'None yet')}</p><Button size="sm" className="mt-4" onClick={()=>s.createBackup()}>{ar?'إنشاء':'Create'}</Button></div><div className="mizan-surface p-5"><Copy className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold mt-3">{ar?'نسخ المسابقة':'Clone competition'}</h2><p className="text-xs text-[#646965] mt-2">{ar?'ينسخ القواعد والهوية، لا بيانات المشاركين.':'Copies policy and setup, never participants.'}</p><Button size="sm" variant="outline" className="mt-4" onClick={()=>s.cloneCompetition()}>{ar?'إنشاء نسخة Draft':'Create draft copy'}</Button></div><div className="mizan-surface p-5"><Download className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold mt-3">{ar?'تصدير موثّق':'Portable export'}</h2><Button size="sm" variant="outline" className="mt-4" onClick={()=>{const blob=new Blob([s.exportCompetitionSnapshot()],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='mizan-competition-export.json';a.click();URL.revokeObjectURL(a.href)}}>{ar?'تصدير JSON':'Export JSON'}</Button></div><div className="mizan-surface p-5 xl:col-span-3"><div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'جلسة دعم مراقبة':'Audited support session'}</h2></div><div className="mt-4 flex gap-2"><input value={reason} onChange={e=>setReason(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-[#ddd] px-3 py-2.5 text-sm" placeholder={ar?'سبب طلب الدعم':'Support reason'}/><Button size="sm" disabled={!reason.trim()} onClick={()=>{s.requestSupportSession(reason);setReason('')}}>{ar?'طلب':'Request'}</Button></div></div></div>}

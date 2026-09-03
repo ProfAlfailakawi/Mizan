@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import { BatteryWarning, BadgeCheck, RotateCcw, ShieldAlert, WifiOff, MonitorX, MicOff, Siren, LockKeyhole, TriangleAlert } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
@@ -11,7 +11,14 @@ const incidentLabel=(x:string,ar:boolean)=>({POWER_LOSS:ar?'انقطاع كهر�
 
 export const ContinuityRecovery:React.FC=()=>{
  const s=useAppStore();const ar=s.language==='ar';
- const [busy,setBusy]=useState('');const [msg,setMsg]=useState('');const [retestReason,setRetestReason]=useState('');const [approvalReason,setApprovalReason]=useState('');
+ const [busy,setBusy]=useState('');const [msg,setMsg]=useState('');
+ // Evacuation arms for a few seconds rather than opening a dialog: a modal in an
+ // actual emergency steals focus and costs time, while an unguarded tap is worse.
+ const [evacArmed,setEvacArmed]=useState(false);
+ const evacTimer=useRef<number|null>(null);
+ const armEvacuation=()=>{ setEvacArmed(true); if(evacTimer.current) window.clearTimeout(evacTimer.current);
+  evacTimer.current=window.setTimeout(()=>setEvacArmed(false),4000); };
+ useEffect(()=>()=>{ if(evacTimer.current) window.clearTimeout(evacTimer.current) },[]);const [retestReason,setRetestReason]=useState('');const [approvalReason,setApprovalReason]=useState('');
  const open=useMemo(()=>s.continuityIncidents.filter(x=>x.status!=='RESOLVED'),[s.continuityIncidents]);
  const latest=open[0];
  const proposals=latest?s.sessionRecoveries.filter(x=>x.incidentId===latest.id&&x.status==='PROPOSED'):[];
@@ -26,7 +33,27 @@ export const ContinuityRecovery:React.FC=()=>{
  const requestRetest=()=>{if(!latest||retestReason.trim().length<10)return;setBusy('retest-request');const r=s.requestFullRetestLastResort(latest.id,retestReason.trim());setBusy('');setMsg(r?(ar?'تم تسجيل اقتراح الإعادة الكاملة. لن تنفذ قبل موافقة سلطة ثانية مستقلة.':'Full retest proposed. It will not execute before independent second approval.'):(ar?'الإعادة الكاملة غير متاحة ما دام يوجد مسار استعادة موثوق.':'Full retest is unavailable while a trustworthy recovery path exists.'));if(r)setRetestReason('')};
  const approveRetest=async()=>{if(!retest||approvalReason.trim().length<10)return;setBusy('retest-approve');const r=await s.approveFullRetestLastResort(retest.id,approvalReason.trim());setBusy('');setMsg(r.ok?(ar?`بدأت محاولة جديدة ${r.retestSessionId}، وبقيت المحاولة الأصلية محفوظة بالكامل.`:`New attempt ${r.retestSessionId} started; the original attempt remains fully preserved.`):r.reason);if(r.ok)setApprovalReason('')};
  return <section className="mizan-surface p-5 sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mizan-kicker">{ar?'استمرارية الاختبار':'SESSION CONTINUITY'}</div><h2 className="font-black mt-1">{latest?(ar?'هناك جلسة تحتاج استعادة':'A session needs recovery'):(ar?'الانقطاع لا يعيد الاختبار':'Failure does not reset the participant')}</h2><p className="text-[11px] leading-6 text-[#636864] mt-2 max-w-2xl">{ar?'الكهرباء أو الشبكة أو تعطل الجهاز لا يمنح سؤالًا جديدًا تلقائيًا. السؤال المكشوف يبقى نفسه، وأحكام المحكمين المقفلة تبقى مقفلة. الإعادة الكاملة استثناء بموافقتين مستقلتين فقط.':'Power, network or device failure never grants a fresh question automatically. The revealed question and locked human judgments remain preserved. A full retest is an exceptional two-authority path only.'}</p></div><Badge variant={latest?'amber':'emerald'}>{latest?(ar?'استعادة':'Recovery'):(ar?'محمي':'Protected')}</Badge></div>
- {!latest&&s.activeSession.participant&&<div className="mt-4 flex flex-wrap gap-2">{([['POWER_LOSS',BatteryWarning,ar?'كهرباء':'Power'],['NETWORK_LOSS',WifiOff,ar?'شبكة':'Network'],['DEVICE_FAILURE',MonitorX,ar?'جهاز':'Device'],['AUDIO_FAILURE',MicOff,ar?'صوت':'Audio'],['VENUE_EVACUATION',Siren,ar?'إخلاء':'Evacuation']] as const).map(([type,Icon,label])=><Button key={type} size="sm" variant="outline" disabled={!!busy} onClick={()=>void report(type)} icon={<Icon className="w-4 h-4"/>}>{label}</Button>)}</div>}
+ {!latest&&s.activeSession.participant&&<div className="mt-5">
+  <div className="mizan-declare-hint mb-2">{ar?'سجّل انقطاعًا الآن — يُجمّد آخر حالة موثقة ولا يُعيد السؤال.':'Declare an interruption — freezes the last trusted state; never redraws the question.'}</div>
+  <div className="mizan-declare" role="group" aria-label={ar?'تسجيل انقطاع':'Declare an interruption'}>
+   {([['POWER_LOSS',BatteryWarning,ar?'كهرباء':'Power'],['NETWORK_LOSS',WifiOff,ar?'شبكة':'Network'],['DEVICE_FAILURE',MonitorX,ar?'جهاز':'Device'],['AUDIO_FAILURE',MicOff,ar?'صوت':'Audio']] as const).map(([type,Icon,label])=>
+    <button key={type} type="button" className="mizan-declare-btn" disabled={!!busy} onClick={()=>void report(type)}>
+     <Icon className="w-4 h-4"/>{label}
+    </button>)}
+   {/* Evacuation is hall-wide and costly to misfire, so it asks once. The other four
+       are protective and stay one tap, because in a real outage speed is the point. */}
+   <button
+     type="button"
+     className="mizan-declare-btn mizan-declare-critical"
+     data-confirming={evacArmed||undefined}
+     disabled={!!busy}
+     onClick={()=>{ if(evacArmed){ setEvacArmed(false); void report('VENUE_EVACUATION'); } else { armEvacuation(); } }}
+     aria-label={evacArmed?(ar?'تأكيد إخلاء القاعة':'Confirm venue evacuation'):(ar?'إخلاء القاعة — يتطلب تأكيدًا':'Venue evacuation — requires confirmation')}
+   >
+    <Siren className="w-4 h-4"/>{evacArmed?(ar?'اضغط للتأكيد':'Tap to confirm'):(ar?'إخلاء':'Evacuation')}
+   </button>
+  </div>
+ </div>}
  {latest&&<div className="mt-4 rounded-2xl border border-[#dedbd3] p-4"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#F2EADC] text-[#8a6537] grid place-items-center">{React.createElement(incidentIcon[latest.type],{className:'w-5 h-5'})}</span><div className="flex-1"><div className="text-sm font-black">{incidentLabel(latest.type,ar)}</div><div className="text-[10px] text-[#656b66] mt-1">{new Date(latest.occurredAt).toLocaleString(ar?'ar-KW':'en-US')} · {latest.sessionId}</div></div><Badge variant="amber">{latest.status}</Badge></div>
  {cp&&<div className="grid grid-cols-3 gap-2 mt-4"><Mini t={ar?'المرحلة':'Phase'} v={cp.phase}/><Mini t={ar?'السؤال':'Question'} v={String(cp.questionIndex+1)}/><Mini t={ar?'نقطة الحفظ':'Checkpoint'} v={`#${cp.sequence}`}/></div>}
  <div className="mt-4 flex flex-wrap gap-2">{!recovery&&!retest&&<Button size="sm" disabled={!!busy} onClick={()=>void plan()} icon={<RotateCcw className="w-4 h-4"/>}>{ar?'بناء خطة الاستعادة':'Plan recovery'}</Button>}{recovery&&!retest&&<><div className="flex-1 min-w-56 rounded-xl bg-[#E7EEE9] px-3 py-2"><div className="text-[10px] font-black text-[#214C40]">{ar?arDecision(recovery.decision):recovery.decision}</div><div className="text-[9px] text-[#556861] mt-1">{ar?'نفس المتسابق · لا سحب جديد · الأحكام المقفلة محفوظة':'Same participant · no redraw · locked submissions preserved'}</div></div><Button size="sm" disabled={!!busy||recovery.decision==='HEAD_JUDGE_ADJUDICATION'&&s.currentUser.role!=='head_judge'} onClick={()=>void apply()} icon={<BadgeCheck className="w-4 h-4"/>}>{ar?'استعادة':'Recover'}</Button></>}</div>

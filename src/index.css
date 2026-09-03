@@ -642,3 +642,136 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
   .mizan-judge-action[data-flash="true"] .mizan-judge-count{ animation:none }
 }
 html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared primitives — Badge, Stat, Modal, Command palette, Role menu
+   These six carried 81 hand-written hex values between them, and Modal and Stat
+   were still painted in the pre-redesign palette (#4A4238 / #EAE4DC / #CB997E)
+   that the rest of the app left behind. Binding them here means a token change
+   reaches every screen instead of stopping at the component boundary.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Badge ─────────────────────────────────────────────────────────────────── */
+.mizan-badge{
+  display:inline-flex; align-items:center; gap:.375rem; white-space:nowrap;
+  border-radius:999px; border:1px solid var(--bd-line); background:var(--bd-soft); color:var(--bd-ink);
+  font-weight:600;
+}
+.mizan-badge-sm{ font-size:calc(11px * var(--mizan-text-scale)); padding:.25rem .625rem; }
+.mizan-badge-md{ font-size:calc(12px * var(--mizan-text-scale)); padding:.375rem .75rem; gap:.5rem; }
+.mizan-badge-dot{ width:6px; height:6px; border-radius:999px; background:var(--bd-dot); flex:0 0 auto; }
+.bd-emerald{ --bd-soft:var(--emerald-soft); --bd-ink:var(--emerald);  --bd-line:#cbdad2; --bd-dot:var(--emerald-2) }
+.bd-amber  { --bd-soft:var(--amber-soft);   --bd-ink:#7d5e34;         --bd-line:#e4d5bd; --bd-dot:var(--amber) }
+.bd-blue   { --bd-soft:var(--blue-soft);    --bd-ink:var(--blue);     --bd-line:#d5e0e5; --bd-dot:var(--blue) }
+.bd-rose   { --bd-soft:var(--danger-soft);  --bd-ink:#8d4038;         --bd-line:#e8cfca; --bd-dot:var(--danger) }
+.bd-neutral{ --bd-soft:#efeee9;             --bd-ink:#5c635e;         --bd-line:#deddd7; --bd-dot:#6f7671 }
+
+/* ── Stat ──────────────────────────────────────────────────────────────────── */
+.mizan-stat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-1); }
+.mizan-stat-label{ font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:var(--muted); }
+.mizan-stat-icon{ padding:.5rem; border-radius:var(--radius-sm); background:var(--emerald-soft); color:var(--emerald); border:1px solid #cbdad2; display:inline-grid; place-items:center; }
+.mizan-stat-value{ font-size:clamp(24px,2.4vw,30px); font-weight:800; letter-spacing:-.03em; color:var(--ink); font-variant-numeric:tabular-nums; }
+.mizan-stat-foot{ margin-top:.5rem; display:flex; align-items:center; gap:.5rem; font-size:calc(12px * var(--mizan-text-scale)); color:var(--muted); }
+.mizan-stat-up{ font-weight:700; color:var(--emerald) }
+/* The negative trend used #CB997E — 2.50:1 on white. The one signal that says
+   something is going wrong was the least readable thing on the card. */
+.mizan-stat-down{ font-weight:700; color:var(--danger) }
+
+/* ── Modal / overlay ───────────────────────────────────────────────────────── */
+.mizan-overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  padding:1rem; overflow-y:auto; }
+@media (min-width:640px){ .mizan-overlay{ padding:1.5rem } }
+.mizan-overlay-scrim{ position:fixed; inset:0; background:rgba(18,32,27,.42); backdrop-filter:blur(2px); }
+.mizan-dialog{
+  position:relative; z-index:10; width:100%; background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-4); overflow:hidden;
+  animation:mzDialogIn .18s var(--ease-brand);
+}
+@keyframes mzDialogIn{ from{ opacity:0; transform:translateY(8px) scale(.985) } to{ opacity:1; transform:none } }
+.mizan-dialog-head{ display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1.1rem 1.4rem; border-bottom:1px solid var(--line); background:var(--surface-soft); }
+.mizan-dialog-title{ font-size:calc(17px * var(--mizan-text-scale)); font-weight:700; color:var(--ink); }
+.mizan-dialog-sub{ font-size:calc(12px * var(--mizan-text-scale)); color:var(--muted); margin-top:.15rem; }
+.mizan-dialog-close{ width:40px; height:40px; border-radius:999px; display:grid; place-items:center;
+  color:var(--muted); transition:background .15s ease, color .15s ease; }
+.mizan-dialog-close:hover{ background:#eceae3; color:var(--ink); }
+.mizan-dialog-body{ padding:1.4rem; }
+
+/* ── Command palette ───────────────────────────────────────────────────────── */
+.mizan-palette-row{ width:100%; border-radius:var(--radius-sm); padding:.75rem; text-align:start;
+  display:flex; align-items:center; gap:.75rem; transition:background .12s ease; }
+.mizan-palette-row:hover,
+.mizan-palette-row[data-active="true"]{ background:var(--surface-soft); }
+.mizan-palette-row[data-active="true"]{ box-shadow:inset 2px 0 0 var(--emerald); }
+.mizan-palette-key{ font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:600;
+  border:1px solid var(--line); border-radius:7px; padding:.2rem .4rem; color:var(--muted); }
+
+/* ── Role menu ─────────────────────────────────────────────────────────────── */
+.mizan-role-tile{ min-height:66px; border-radius:var(--radius-sm); padding:.65rem; text-align:start;
+  border:1px solid transparent; background:var(--surface); color:#303733; transition:background .14s ease, border-color .14s ease; }
+.mizan-role-tile:hover{ background:var(--surface-soft) }
+.mizan-role-tile[aria-current="true"]{ background:var(--emerald); color:#fff; border-color:var(--emerald) }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Operations — incident declaration
+   The five continuity controls rendered as plain outline chips, 12px, visually
+   identical to a filter. Four of them are protective (they freeze the last
+   trusted state, so speed matters and one tap is right). "Venue evacuation" is
+   different in kind — hall-wide and costly to misfire — and it sat one
+   accidental tap away with no confirmation and no distinguishing mark.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mizan-declare{ display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.mizan-declare-btn{
+  display:inline-flex; align-items:center; gap:.45rem; min-height:44px; padding:.5rem .85rem;
+  border-radius:var(--radius-sm); font-size:calc(12px * var(--mizan-text-scale)); font-weight:700;
+  background:var(--surface); color:#5d544a; border:1px solid #e2d9c8;
+  box-shadow:inset 2px 0 0 var(--amber);
+  transition:background .14s ease, border-color .14s ease;
+}
+.mizan-declare-btn:hover:not(:disabled){ background:#fbf7ef; border-color:#d4c5aa; }
+.mizan-declare-btn:disabled{ opacity:.45 }
+
+/* Evacuation reads as the different class of action it is, and asks once. */
+.mizan-declare-critical{
+  color:#8d4038; border-color:#e6cbc5; box-shadow:inset 2px 0 0 var(--danger);
+}
+.mizan-declare-critical:hover:not(:disabled){ background:#fdf4f2; border-color:#d9b3ab; }
+.mizan-declare-critical[data-confirming="true"]{
+  background:var(--danger); color:#fff; border-color:var(--danger); box-shadow:none;
+  animation:mzDeclarePulse 1.1s ease-in-out infinite;
+}
+@keyframes mzDeclarePulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(163,77,67,.34) } 50%{ box-shadow:0 0 0 5px rgba(163,77,67,0) } }
+.mizan-declare-hint{ font-size:calc(11px * var(--mizan-text-scale)); color:var(--muted); }
+@media (prefers-reduced-motion: reduce){ .mizan-declare-critical[data-confirming="true"]{ animation:none } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Participant journey stepper
+   Completed and current steps shared one emerald fill, so "done" and "you are
+   here" were indistinguishable — and the distinction was carried by colour
+   alone, which is exactly what WCAG 1.4.1 warns against. The current step now
+   also differs in ring, weight and label, and announces itself.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mizan-step{
+  width:36px; height:36px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:800;
+  background:#eeece6; color:#5f655f; border:1px solid transparent;
+}
+.mizan-step[data-state="done"]{ background:var(--emerald); color:#fff; }
+/* "You are here": filled, ringed and lifted — three signals, not one. */
+.mizan-step[data-state="current"]{
+  background:var(--emerald); color:#fff;
+  box-shadow:0 0 0 4px rgba(33,76,64,.16); transform:scale(1.06);
+}
+.mizan-step-label{ font-size:calc(10px * var(--mizan-text-scale)); color:var(--muted); text-align:center; }
+.mizan-step-label[data-state="current"]{ color:var(--emerald); font-weight:800; }
+.mizan-step-rule{ height:2px; flex:1; border-radius:999px; background:#dddcd5; }
+.mizan-step-rule[data-done="true"]{ background:var(--emerald-2); }
+
+/* The arrival code is the participant's identity in the hall — it is what the
+   board calls and what the gate scans. It was a 11px neutral chip. */
+.mizan-code{
+  display:inline-flex; align-items:baseline; gap:.5rem;
+  font-family:var(--font-sans); font-size:clamp(22px,3.4vw,28px); font-weight:800;
+  letter-spacing:.04em; color:var(--emerald); font-variant-numeric:tabular-nums;
+}
+.mizan-code small{ font-family:var(--font-arabic); font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); letter-spacing:0; }
