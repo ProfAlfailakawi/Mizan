@@ -36,6 +36,7 @@ const VIEWS = {
   waitingBoard: () => import('./components/public/WaitingBoard'),
   hallRecitationMap: () => import('./components/public/HallRecitationMap'),
   broadcastStage: () => import('./components/public/BroadcastStage'),
+  judgeIntelligenceLab: () => import('./components/public/JudgeIntelligenceLab'),
   certificateVerification: () => import('./components/public/CertificateVerification'),
   registrationFlow: () => import('./components/public/RegistrationFlow'),
   competitionLanding: () => import('./components/public/CompetitionLanding'),
@@ -56,6 +57,7 @@ const CeremonyView = pick(VIEWS.ceremonyView, 'CeremonyView');
 const WaitingBoard = pick(VIEWS.waitingBoard, 'WaitingBoard');
 const HallRecitationMap = pick(VIEWS.hallRecitationMap, 'HallRecitationMap');
 const BroadcastStage = pick(VIEWS.broadcastStage, 'BroadcastStage');
+const JudgeIntelligenceLab = pick(VIEWS.judgeIntelligenceLab, 'JudgeIntelligenceLab');
 const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
 const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
 const CompetitionLanding = pick(VIEWS.competitionLanding, 'CompetitionLanding');
@@ -115,7 +117,7 @@ export default function App() {
  const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash);
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
- const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [hash,setHash]=useState(window.location.hash);
+ const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
@@ -128,7 +130,8 @@ export default function App() {
  if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#broadcast')) return <><Overlay><BroadcastStage onClose={returnToExperience}/></Overlay></>;
- if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)}/></Page>{kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>} {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>} {hallMap&&<Overlay><HallRecitationMap onClose={()=>setHallMap(false)}/></Overlay>} {broadcast&&<Overlay><BroadcastStage onClose={()=>setBroadcast(false)}/></Overlay>} {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}</>;
+ if(hash.startsWith('#judge-intelligence')) return <><Overlay><JudgeIntelligenceLab onClose={returnToExperience}/></Overlay></>;
+ if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page>{kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>} {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>} {hallMap&&<Overlay><HallRecitationMap onClose={()=>setHallMap(false)}/></Overlay>} {broadcast&&<Overlay><BroadcastStage onClose={()=>setBroadcast(false)}/></Overlay>} {jiLab&&<Overlay><JudgeIntelligenceLab onClose={()=>setJiLab(false)}/></Overlay>} {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}</>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
@@ -156,6 +159,7 @@ export default function App() {
   {kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>}
   {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>}
   {broadcast&&<Overlay><BroadcastStage onClose={()=>setBroadcast(false)}/></Overlay>}
+  {jiLab&&<Overlay><JudgeIntelligenceLab onClose={()=>setJiLab(false)}/></Overlay>}
   {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}
  </div>
 }
