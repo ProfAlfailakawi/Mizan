@@ -1,32 +1,44 @@
-# ميزان · حزمة PWA (صفحة رئيسية + محرك البثّ الحجمي)
+# MIZAN
+## Autonomous Operating System for Quran Competitions
 
-حزمة ويب مستقلة، متجاوبة على الجوال، وقابلة للتثبيت كتطبيق (PWA) بالشعار المعتمد.
+MIZAN is an end-to-end competition operating system: online registration, eligibility, arrival, self check-in, queueing, committee routing, FairDraw, human judging, AI-assisted integrity review, results, appeals, ceremony reveal and certificates.
 
-## المحتوى
-- `index.html` — الصفحة الرئيسية (Hero + المنظومة السبع + المبادئ) بالعربية/الإنجليزية.
-- `broadcast.html` — محرك البثّ الحجمي (تتبّع الكلمة الحيّ، شرح الوقف، حارس الرواية).
-- `styles.css` — نظام التصميم للصفحة الرئيسية.
-- `broadcast.css` — تنسيق محرك البثّ (تصميم mobile-first متجاوب).
-- `home.js` — تبديل اللغة + تثبيت PWA + Service Worker.
-- `app.js` — منطق محرك البثّ.
-- `manifest.webmanifest` · `sw.js` — بيان التطبيق وعامل الخدمة (تشغيل بلا اتصال).
-- `icons/` — **الأيقونات المعتمدة** المنسوخة من `public/brand/` (الشعار المعتمد، لم يُصمَّم شيء من جديد).
+The key architectural rule is that **there is no universal competition rulebook in code**. Every competition has its own `CompetitionPolicy`, RuleSet, categories, judging actions, result policy, appeal policy, automation level and workflow.
 
-## التشغيل
-افتح المجلد على خادم ثابت بسيط (لأن الـ PWA وService Worker لا يعملان من `file://`):
+## Run locally
 ```bash
-cd هذا-المجلد
-python3 -m http.server 8080
-# ثم افتح http://localhost:8080
+npm install
+npm run dev
 ```
-أو ارفع محتويات المجلد إلى جذر الدومين مباشرة.
 
-## ما عُولج
-1. **الصفحة الرئيسية**: صفحة رئيسية أنيقة بديلة عن عرض البثّ المكشوف — البثّ صار صفحة داخلية.
-2. **الجوال**: تخطيط mobile-first متجاوب (لا تكدّس ولا تجاوز أفقي؛ يعمل من ٣٢٠px صعودًا).
-3. **أيقونة PWA**: استخدام الأيقونات المعتمدة (`mizan-icon-*` + `mizan-mark.svg`) بحجم 192/512/maskable + apple-touch — فتظهر عند «إضافة إلى الشاشة الرئيسية».
+Production build:
+```bash
+npm run build
+npm start
+```
 
-## أمانة للمبادئ
-- الشعار والأيقونات **معتمدة من المشروع** (`public/brand/`)، لم يُبتكر أيّ شعار.
-- المحاذاة الصوتية **وضع ظل (SHADOW)** ولا تمسّ أي درجة — القرار للمحكم.
-- نصّ المصحف وعلامات الوقف **توضيحية** في العرض؛ رسميًا تُحمَّل من حزمة مصدر معتمدة (KFGQPC).
+## Core domains
+- `src/lib/competition-config.ts` — competition-specific policies and starter templates.
+- `src/lib/fairdraw.ts` — constrained question selection and draw commitment.
+- `src/lib/store.ts` — executable local workflow state and Firebase-auth-gated sync.
+- `src/lib/permissions.ts` — granular RBAC map.
+- `src/lib/quran-vault.ts` — approved Quran source fixtures; LLM output is never a source of truth.
+- `src/components/judge/JudgeOS.tsx` — distraction-free, policy-driven judging.
+- `src/components/admin/CompetitionOverview.tsx` — Competition DNA and operational administration.
+
+## Product principles
+1. Complexity belongs to the system, not the user.
+2. Humans handle exceptions, not routine.
+3. Human judges decide; AI only recommends review.
+4. Data is entered once and follows the participant to the certificate.
+5. Each role sees only its job.
+6. Each competition defines its own rules.
+7. No external capability is presented as working until a real provider/certificate exists.
+
+See `PROJECT_STATUS.md` for the exact boundary between implemented code and deployment-time external dependencies.
+
+## Product rule: no global competition law
+MIZAN provides configurable infrastructure, not one hard-coded competition format. Every competition has its own versioned policy and may differ in registration, eligibility, categories, question selection, panel structure, judge specialization, scoring, tie-breaks, appeals, result visibility, certificates, privacy and automation.
+
+### Demo / review entry
+When `VITE_REQUIRE_AUTH` is not `true`, MIZAN now opens into the **Experience Hub** rather than assuming Competition Admin. This is intentional for product review: choose Participant, JudgeOS, Head Judge, Command Center, Competition Admin, Delegation, Scientific Governance, Auditor, Support, Ceremony, Gate Kiosk, public competition, registration, or certificate verification. In authenticated production mode this gallery is not used; claims route each account to its permitted role.
