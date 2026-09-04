@@ -1,25 +1,44 @@
-# ميزان · محرك البث الحجمي (Mizan Spatial Broadcast Engine)
+# MIZAN
+## Autonomous Operating System for Quran Competitions
 
-عرض بصري قائم بذاته للمقترح رقم ٦: تحويل شاشة البث من شريط اسم ودرجة إلى
-أكاديمية قرآنية حية.
+MIZAN is an end-to-end competition operating system: online registration, eligibility, arrival, self check-in, queueing, committee routing, FairDraw, human judging, AI-assisted integrity review, results, appeals, ceremony reveal and certificates.
 
-## التشغيل
-افتح `index.html` مباشرةً في المتصفح (بنقرة مزدوجة). لا يحتاج تثبيت ولا خادم.
-> ملاحظة: خطوط أميري القرآن تُحمَّل من Google Fonts، فاتصال الإنترنت يعطي أفضل شكل؛
-> وبدونه يعمل العرض بخط احتياطي.
+The key architectural rule is that **there is no universal competition rulebook in code**. Every competition has its own `CompetitionPolicy`, RuleSet, categories, judging actions, result policy, appeal policy, automation level and workflow.
 
-## ما يعرضه
-- **تتبع الكلمة الحيّة** على مصحف المدينة (توهّج ذهبي ينساب مع القارئ).
-- **شريط الوقف**: نوع علامة الوقف (تام / كافٍ / لازم) وسبب الوقف بلغة مبسطة.
-- **حارس الرواية (Riwayah Guard)**: يُظهر الرواية ويُنبّه عند خصوصية قراءة (مثال: «مَٰلِك» عند حفص).
-- **مؤشر المحاذاة**: نسبة الثقة وحالتها، مع زر «محاكاة فقد المحاذاة» ليُظهر كيف يختفي المؤشر بهدوء بدل أن يقفز خطأً على الهواء.
+## Run locally
+```bash
+npm install
+npm run dev
+```
 
-## الأزرار
-تشغيل/إيقاف (أو مسطرة المسافة) · إعادة · شريط تمرير الزمن · محاكاة فقد المحاذاة · تبديل اللغة ع/EN.
+Production build:
+```bash
+npm run build
+npm start
+```
 
-## أمانة للمبادئ
-- المحاذاة الصوتية **وضع ظل (SHADOW)** ولا تمس أي درجة — القرار للمحكم البشري.
-- النص وعلامات الوقف هنا **توضيحية**؛ في التشغيل الرسمي تُحمَّل من حزمة مصدر معتمدة (KFGQPC).
-- سورة الفاتحة استُخدمت كمحتوى توضيحي متحقَّق منه عالمياً، لا كمصدر رسمي داخل النظام.
+## Core domains
+- `src/lib/competition-config.ts` — competition-specific policies and starter templates.
+- `src/lib/fairdraw.ts` — constrained question selection and draw commitment.
+- `src/lib/store.ts` — executable local workflow state and Firebase-auth-gated sync.
+- `src/lib/permissions.ts` — granular RBAC map.
+- `src/lib/quran-vault.ts` — approved Quran source fixtures; LLM output is never a source of truth.
+- `src/components/judge/JudgeOS.tsx` — distraction-free, policy-driven judging.
+- `src/components/admin/CompetitionOverview.tsx` — Competition DNA and operational administration.
 
-ملفات مستقلة تماماً: `index.html` · `styles.css` · `app.js`.
+## Product principles
+1. Complexity belongs to the system, not the user.
+2. Humans handle exceptions, not routine.
+3. Human judges decide; AI only recommends review.
+4. Data is entered once and follows the participant to the certificate.
+5. Each role sees only its job.
+6. Each competition defines its own rules.
+7. No external capability is presented as working until a real provider/certificate exists.
+
+See `PROJECT_STATUS.md` for the exact boundary between implemented code and deployment-time external dependencies.
+
+## Product rule: no global competition law
+MIZAN provides configurable infrastructure, not one hard-coded competition format. Every competition has its own versioned policy and may differ in registration, eligibility, categories, question selection, panel structure, judge specialization, scoring, tie-breaks, appeals, result visibility, certificates, privacy and automation.
+
+### Demo / review entry
+When `VITE_REQUIRE_AUTH` is not `true`, MIZAN now opens into the **Experience Hub** rather than assuming Competition Admin. This is intentional for product review: choose Participant, JudgeOS, Head Judge, Command Center, Competition Admin, Delegation, Scientific Governance, Auditor, Support, Ceremony, Gate Kiosk, public competition, registration, or certificate verification. In authenticated production mode this gallery is not used; claims route each account to its permitted role.
