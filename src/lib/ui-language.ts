@@ -69,3 +69,60 @@ export function signatureAssuranceLabel(signatureRef:string,ar:boolean){
 export function claimPrivacyLabel(ar:boolean){return ar?'إثبات الصفة فقط — دون مشاركة الوثيقة':'Claim only — source document stays private'}
 
 export function capabilityLabel(value:AICapability,ar:boolean){return ar?(AR_CAPABILITIES[value]||value):value.replaceAll('_',' ')}
+
+/*
+ * Country values are stored bilingually in one string, e.g. "Jordan (الأردن)". Rendering
+ * them raw shows the Latin name inside an Arabic surface. Split by locale, and degrade
+ * gracefully for values with no parenthetical (e.g. "Demo").
+ */
+export function localizedCountry(raw: string | undefined, ar: boolean): string {
+  if (!raw) return '';
+  const m = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (!m) return raw;
+  return ar ? m[2].trim() : m[1].trim();
+}
+
+/*
+ * Arabic count-noun agreement. Modern Standard Arabic treats a counted noun differently
+ * by number: 1 → singular, 2 → dual, 3-10 → plural, 11+ → singular again. "1 حالات" and
+ * "2 حالات" are both wrong. Non-human plurals (3-10) take a feminine-singular verb, so the
+ * existing plural phrasing is correct there and only 1 and 2 need special forms.
+ */
+export function arCount(
+  n: number,
+  forms: { one: string; two: string; plural: (n: number) => string; many?: (n: number) => string },
+): string {
+  if (n === 1) return forms.one;
+  if (n === 2) return forms.two;
+  if (n >= 3 && n <= 10) return forms.plural(n);
+  return (forms.many || forms.plural)(n);
+}
+
+/*
+ * Server clients throw coded errors (e.g. "IDENTITY_REQUIRED"). Several consoles printed
+ * the raw code to the screen. In demo mode with no backend, the common ones are expected
+ * and benefit from a plain-language line; genuinely diagnostic codes fall through
+ * unchanged so support can still read them.
+ */
+const SERVER_ERROR_AR: Record<string, string> = {
+  IDENTITY_REQUIRED: 'هذه الخدمة تتطلب تسجيل الدخول والخادم المباشر (غير متاحة في وضع العرض).',
+  KFGQPC_LIBRARY_UNAVAILABLE: 'مكتبة المصدر الرسمي غير متاحة حاليًا.',
+  KFGQPC_DELIVERY_STATUS_UNAVAILABLE: 'حالة تسليم المصدر الرسمي غير متاحة حاليًا.',
+  SOURCE_NOT_CERTIFIED: 'المصدر غير معتمد علميًا بعد.',
+  SOURCE_NOT_FOUND: 'المصدر غير موجود.',
+  READING_NOT_RESOLVED: 'تعذّر تحديد القراءة.',
+  POLICY_HUMAN_APPROVAL_REQUIRED: 'يلزم اعتماد بشري لهذا الإجراء.',
+};
+const SERVER_ERROR_EN: Record<string, string> = {
+  IDENTITY_REQUIRED: 'This service requires sign-in and the live server (unavailable in demo).',
+  KFGQPC_LIBRARY_UNAVAILABLE: 'The official source library is currently unavailable.',
+  KFGQPC_DELIVERY_STATUS_UNAVAILABLE: 'Official source delivery status is currently unavailable.',
+  SOURCE_NOT_CERTIFIED: 'The source is not scientifically certified yet.',
+  SOURCE_NOT_FOUND: 'Source not found.',
+  READING_NOT_RESOLVED: 'The reading could not be resolved.',
+  POLICY_HUMAN_APPROVAL_REQUIRED: 'This action requires human approval.',
+};
+export function serverErrorLabel(code: string, ar: boolean): string {
+  const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;
+  return map[code] || code;
+}
