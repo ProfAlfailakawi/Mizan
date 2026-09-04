@@ -1,4 +1,7 @@
-export type SupportedLanguage = 'ar' | 'en' | 'id' | 'ms' | 'fr' | 'ur' | 'tr' | 'fa' | 'sw';
+// Only fully-translated locales are exposed. Arabic and English ship complete dictionaries;
+// additional locales must not be advertised until a real dictionary exists, otherwise the
+// switcher promises languages the app cannot deliver (it previously aliased 7 locales to English).
+export type SupportedLanguage = 'ar' | 'en';
 
 export interface TranslationDictionary {
   appName: string;
@@ -360,10 +363,9 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
 
 
 export const translations: Record<SupportedLanguage, TranslationDictionary> = {
-  ar: coreTranslations.ar, en: coreTranslations.en,
-  id: coreTranslations.en, ms: coreTranslations.en, fr: coreTranslations.en, ur: coreTranslations.en, tr: coreTranslations.en, fa: coreTranslations.en, sw: coreTranslations.en
+  ar: coreTranslations.ar, en: coreTranslations.en
 };
 
 export const LANGUAGE_META: Record<SupportedLanguage,{label:string;dir:'rtl'|'ltr';locale:string}> = {
- ar:{label:'العربية',dir:'rtl',locale:'ar-KW'}, en:{label:'English',dir:'ltr',locale:'en-US'}, id:{label:'Bahasa Indonesia',dir:'ltr',locale:'id-ID'}, ms:{label:'Bahasa Melayu',dir:'ltr',locale:'ms-MY'}, fr:{label:'Français',dir:'ltr',locale:'fr-FR'}, ur:{label:'اردو',dir:'rtl',locale:'ur-PK'}, tr:{label:'Türkçe',dir:'ltr',locale:'tr-TR'}, fa:{label:'فارسی',dir:'rtl',locale:'fa-IR'}, sw:{label:'Kiswahili',dir:'ltr',locale:'sw-KE'}
+ ar:{label:'العربية',dir:'rtl',locale:'ar-KW'}, en:{label:'English',dir:'ltr',locale:'en-US'}
 };

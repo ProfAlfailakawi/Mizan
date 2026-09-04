@@ -12,7 +12,8 @@ const DEFAULT_ACTIONS: JudgeActionDefinition[] = [
   { id: 'act-open', eventType: 'open_correction', labelArabic: 'فتح', labelEnglish: 'Open', shortArabic: 'فتح', shortEnglish: 'Open', criterion: 'memorization', penalty: 1, enabled: true, shortcut: '3', icon: 'open' },
   { id: 'act-repeat', eventType: 'repetition', labelArabic: 'تكرار', labelEnglish: 'Repeat', shortArabic: 'تكرار', shortEnglish: 'Repeat', criterion: 'memorization', penalty: 0.25, enabled: true, shortcut: '4', icon: 'repeat' },
   { id: 'act-tajweed', eventType: 'tajweed_minor', labelArabic: 'تجويد', labelEnglish: 'Tajweed', shortArabic: 'تجويد', shortEnglish: 'Tajweed', criterion: 'tajweed', penalty: 0.25, enabled: true, shortcut: '5', icon: 'tajweed' },
-  { id: 'act-stop', eventType: 'waqf_stop', labelArabic: 'وقف', labelEnglish: 'Stop', shortArabic: 'وقف', shortEnglish: 'Stop', criterion: 'waqf_ibtida', penalty: 0.5, enabled: true, shortcut: '6', icon: 'stop' }
+  // الوقف والابتداء يُخصم من معيار التجويد المعتمد؛ سابقًا كان يشير إلى معيار غير موجود فلا تُحتسب العقوبة.
+  { id: 'act-stop', eventType: 'waqf_stop', labelArabic: 'وقف', labelEnglish: 'Stop', shortArabic: 'وقف', shortEnglish: 'Stop', criterion: 'tajweed', penalty: 0.5, enabled: true, shortcut: '6', icon: 'stop' }
 ];
 
 export const BASE_POLICY: CompetitionPolicy = {

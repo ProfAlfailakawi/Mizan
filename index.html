@@ -27,7 +27,14 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#214C40" />
     <meta name="color-scheme" content="light" />
+    <!-- MIZAN brand favicon. The SVG is primary; PNG fallbacks (with explicit sizes) guarantee the
+         mosque mark shows on browsers with weak SVG-favicon support instead of falling back to any
+         other image. shortcut icon covers legacy /favicon.ico probing. -->
     <link rel="icon" href="/brand/mizan-mark.svg" type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/mizan-icon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/brand/mizan-icon-16.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/brand/mizan-icon-192.png" />
+    <link rel="shortcut icon" href="/brand/mizan-icon-32.png" />
     <link rel="apple-touch-icon" href="/brand/mizan-icon-180.png" />
   </head>
   <body class="bg-[#F7F5EF] text-[#171b18] antialiased min-h-screen">

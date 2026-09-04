@@ -4,7 +4,13 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function sameOrg(orgId) { return signedIn() && request.auth.token.org_id == orgId; }
     function roleIs(roles) { return signedIn() && request.auth.token.role in roles; }
-    function compScope(competitionId) { return !('competition_id' in request.auth.token) || request.auth.token.competition_id == competitionId; }
+    // Competition-bound roles (a judge) must carry a matching competition_id claim; a missing claim
+    // must NOT grant access to every competition in the org. Org-wide roles keep cross-competition scope.
+    function compScope(competitionId) {
+      return request.auth.token.role == 'judge'
+        ? (('competition_id' in request.auth.token) && request.auth.token.competition_id == competitionId)
+        : (!('competition_id' in request.auth.token) || request.auth.token.competition_id == competitionId);
+    }
     function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
     function admin(orgId,competitionId) { return scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']); }
 
@@ -55,7 +61,11 @@ service cloud.firestore {
         }
         match /audit/{eventId} {
           allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
-          allow create: if scoped(orgId,competitionId);
+          // Audit rows must be attributable: only provisioned roles may write, and the recorded actor
+          // must equal the authenticated caller so no one can forge another user's actions.
+          allow create: if scoped(orgId,competitionId)
+            && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
+            && request.resource.data.actorId == request.auth.uid;
           allow update, delete: if false;
         }
       }

@@ -308,6 +308,10 @@ export interface JudgeSubmission {
   eventsCount: number;
   submittedAt: string;
   locked: boolean;
+  /** Criterion ids this judge was actually responsible for scoring (specialized/hybrid panels). */
+  scoredCriterionIds?: string[];
+  /** Count of non-reversed penalty events in the session at lock time (used for tie-breaks). */
+  sessionPenaltyCount?: number;
   independenceCommitmentHash?: string;
   independenceCommittedAt?: string;
   independenceCommitmentVersion?: 'MIZAN-JUDGE-INDEPENDENCE-v1';
@@ -386,6 +390,10 @@ export interface ResultRecord {
   categoryName: string;
   finalScore: number;
   rank: number;
+  /** Aggregated per-criterion score (points) — retained for deterministic tie-breaking. */
+  criterionScores?: Record<string, number>;
+  /** Total non-reversed penalty events for the participant — used by the fewest_penalties tie-break. */
+  penaltyCount?: number;
   status: 'calculated' | 'quality_checked' | 'approved' | 'sealed' | 'published';
   sealMetadata?: {
     sealedBy: string;

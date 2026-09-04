@@ -11,6 +11,7 @@ import {
   Committee,
   JudgeProfile,
   ResultRecord,
+  RuleSet,
   ReviewCase,
   AIObservation,
   Certificate,
@@ -159,6 +160,43 @@ function activeRuleSetForCategory(categoryId?: string) {
   const requestedId = category?.ruleSetId;
   return (requestedId ? globalState.competition.ruleSets?.find(r => r.id === requestedId) : undefined) || globalState.competition.ruleSet;
 }
+// Deterministic tie-break comparator for equal final scores, honouring the RuleSet's ordered
+// tieBreakRules. Returns <0 if a should rank ahead of b. `additional_question` cannot be resolved
+// automatically (needs a re-test) and is treated as neutral here.
+function breakTie(a: ResultRecord, b: ResultRecord, rules: RuleSet['tieBreakRules'] = []): number {
+  for (const rule of rules) {
+    if (rule === 'memorization_priority') { const d = (b.criterionScores?.['memorization'] || 0) - (a.criterionScores?.['memorization'] || 0); if (Math.abs(d) > 1e-9) return d; }
+    else if (rule === 'tajweed_priority') { const d = (b.criterionScores?.['tajweed'] || 0) - (a.criterionScores?.['tajweed'] || 0); if (Math.abs(d) > 1e-9) return d; }
+    else if (rule === 'fewest_penalties') { const d = (a.penaltyCount || 0) - (b.penaltyCount || 0); if (d !== 0) return d; }
+  }
+  return 0;
+}
+
+// Non-lossy reconciliation of results arriving from the live server snapshot.
+// The previous "accept remote only if its array is at least as long as ours" rule could both drop
+// newer local records and let a stale remote copy overwrite a locally sealed/published result.
+// Instead we union by id and, when both sides hold the same result, keep the one whose status is
+// more advanced — sealed/published are authoritative and must never regress to 'calculated'.
+const RESULT_STATUS_RANK: Record<ResultRecord['status'], number> = { calculated: 0, quality_checked: 1, approved: 2, sealed: 3, published: 4 };
+function mergeResultsByAuthority(local: ResultRecord[], remote: ResultRecord[]): ResultRecord[] {
+  const byId = new Map<string, ResultRecord>();
+  for (const r of local) byId.set(r.id, r);
+  for (const r of remote) {
+    const current = byId.get(r.id);
+    if (!current) { byId.set(r.id, r); continue; }
+    byId.set(r.id, (RESULT_STATUS_RANK[r.status] ?? 0) >= (RESULT_STATUS_RANK[current.status] ?? 0) ? r : current);
+  }
+  return [...byId.values()];
+}
+// Union judge submissions by (sessionId, judgeId); a locked submission always wins over an unlocked one.
+function mergeJudgeSubmissions(local: JudgeSubmission[], remote: JudgeSubmission[]): JudgeSubmission[] {
+  const key = (s: JudgeSubmission) => `${s.sessionId}::${s.judgeId}`;
+  const byKey = new Map<string, JudgeSubmission>();
+  for (const s of local) byKey.set(key(s), s);
+  for (const s of remote) { const cur = byKey.get(key(s)); if (!cur || (s.locked && !cur.locked)) byKey.set(key(s), s); }
+  return [...byKey.values()];
+}
+
 const listeners = new Set<() => void>();
 
 let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -231,10 +269,26 @@ async function finalizeAuditChain(){
       const hash=await appendAuditHash(previous,ev); if(ev.previousStateHash!==previous||ev.currentStateHash!==hash) changed.push(ev); ev.previousStateHash=previous; ev.currentStateHash=hash; previous=hash;
     }
     for(const ev of changed.slice(-12)) void persistScopedDocument('audit',ev.id,ev as unknown as Record<string,unknown>);
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(globalState));}catch{}
+    persistLocalSnapshot();
     listeners.forEach(l=>l());
     syncToFirestore();
   } finally { auditHashing=false; }
+}
+
+// Central local-snapshot writer. A quota overflow or write failure must never be swallowed:
+// the participant scores would appear saved in the UI while nothing reached storage, and the
+// next refresh would silently roll back hours of work. Instead we record a surfaced error flag.
+function persistLocalSnapshot(): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+    if (globalState.persistenceError) globalState.persistenceError = null;
+    return true;
+  } catch (err) {
+    const quota = err instanceof DOMException && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+    globalState.persistenceError = { code: quota ? 'QUOTA_EXCEEDED' : 'WRITE_FAILED', message: err instanceof Error ? err.message : 'LOCAL_WRITE_FAILED', at: new Date().toISOString() };
+    console.error('MIZAN local snapshot write failed — data was NOT persisted locally:', err);
+    return false;
+  }
 }
 
 function notify() {
@@ -243,9 +297,7 @@ function notify() {
   if (!globalState.competitions) globalState.competitions = [globalState.competition];
   else if (existing >= 0) globalState.competitions = globalState.competitions.map(c => c.id === globalState.competition.id ? globalState.competition : c);
   else globalState.competitions = [globalState.competition, ...globalState.competitions];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
-  } catch {}
+  persistLocalSnapshot();
   listeners.forEach((l) => l());
   syncToFirestore();
   void finalizeAuditChain();
@@ -278,8 +330,8 @@ export function useAppStore() {
               globalState.emergencyFrozen = data.emergencyFrozen;
               changed = true;
             }
-            if (data.results && Array.isArray(data.results) && data.results.length >= globalState.results.length) {
-              globalState.results = data.results;
+            if (data.results && Array.isArray(data.results)) {
+              globalState.results = mergeResultsByAuthority(globalState.results, data.results as ResultRecord[]);
               changed = true;
             }
             if (data.certificates && Array.isArray(data.certificates)) {
@@ -290,7 +342,7 @@ export function useAppStore() {
             if (data.aiObservations && Array.isArray(data.aiObservations)) { globalState.aiObservations = data.aiObservations; changed = true; }
             if (data.audioRecordings && Array.isArray(data.audioRecordings)) { globalState.audioRecordings = data.audioRecordings; changed = true; }
             if (data.judgeSubmissions && Array.isArray(data.judgeSubmissions)) {
-              globalState.judgeSubmissions = data.judgeSubmissions;
+              globalState.judgeSubmissions = mergeJudgeSubmissions(globalState.judgeSubmissions, data.judgeSubmissions as JudgeSubmission[]);
               changed = true;
             }
             if (data.appeals && Array.isArray(data.appeals)) {
@@ -302,9 +354,7 @@ export function useAppStore() {
               changed = true;
             }
             if (changed) {
-              try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
-              } catch {}
+              persistLocalSnapshot();
               setState({ ...globalState });
             }
           }
@@ -613,7 +663,9 @@ export function useAppStore() {
     const submission: JudgeSubmission = {
       participantId: globalState.activeSession.participant?.id,
       judgeId: globalState.currentUser.id, judgeName: globalState.currentUser.name, sessionId: globalState.activeSession.sessionId,
-      criterionScores, totalScore: judgeScore, eventsCount: globalState.activeSession.events.length, submittedAt: new Date().toISOString(), locked: true
+      criterionScores, totalScore: judgeScore, eventsCount: globalState.activeSession.events.length, submittedAt: new Date().toISOString(), locked: true,
+      scoredCriterionIds: scoredCriteria.map(c => c.id),
+      sessionPenaltyCount: globalState.activeSession.events.filter(e => !e.reversed).length
     };
     globalState.judgeSubmissions = [...globalState.judgeSubmissions.filter(s => !(s.sessionId === submission.sessionId && s.judgeId === submission.judgeId)), submission];
     void persistScopedDocument('judge_submissions',`${submission.sessionId}_${submission.judgeId}`,submission as unknown as Record<string,unknown>);
@@ -637,26 +689,51 @@ export function useAppStore() {
     const sessionSubs = globalState.judgeSubmissions.filter(s => s.sessionId === submission.sessionId && s.locked);
     const participant = globalState.activeSession.participant;
     if (participant && sessionSubs.length >= sessionRuleSet.judgesCountPerPanel) {
-      let scoreInputs = sessionSubs.map(s => s.totalScore);
-      if (sessionRuleSet.dropExtremes && scoreInputs.length >= 3) {
-        const sorted = [...scoreInputs].sort((a,b)=>a-b); scoreInputs = sorted.slice(1,-1);
+      // Panel aggregation.
+      // Averaging each judge's self-normalised 0-100 score is ONLY valid when every judge scores
+      // the whole rubric (all_judges_all_criteria). For specialized/hybrid panels each judge scores
+      // only their own criteria, so the correct final score is the sum of every criterion's score
+      // taken from the judge(s) responsible for it — never the mean of up-projected partial scores.
+      const rsCriteria = sessionRuleSet.criteria;
+      const aggregatedCriterionScores: Record<string, number> = {};
+      let finalScore: number;
+      if (policy.judging.mode === 'all_judges_all_criteria') {
+        let scoreInputs = sessionSubs.map(s => s.totalScore);
+        if (sessionRuleSet.dropExtremes && scoreInputs.length >= 3) {
+          const sorted = [...scoreInputs].sort((a,b)=>a-b); scoreInputs = sorted.slice(1,-1);
+        }
+        finalScore = Number((scoreInputs.reduce((a,b)=>a+b,0)/Math.max(1,scoreInputs.length)).toFixed(2));
+        rsCriteria.forEach(c => { const vals = sessionSubs.map(s => s.criterionScores?.[c.id]).filter((v): v is number => typeof v === 'number'); aggregatedCriterionScores[c.id] = vals.length ? Number((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3)) : c.maxScore; });
+      } else {
+        rsCriteria.forEach(c => {
+          const responsible = sessionSubs.filter(s => (s.scoredCriterionIds || []).includes(c.id));
+          const contributors = responsible.length ? responsible : sessionSubs;
+          const vals = contributors.map(s => s.criterionScores?.[c.id]).filter((v): v is number => typeof v === 'number');
+          aggregatedCriterionScores[c.id] = vals.length ? Number((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3)) : c.maxScore;
+        });
+        finalScore = Number(Object.values(aggregatedCriterionScores).reduce((a,b)=>a+b,0).toFixed(2));
       }
-      const finalScore = Number((scoreInputs.reduce((a,b)=>a+b,0)/Math.max(1,scoreInputs.length)).toFixed(2));
+      const sessionPenaltyCount = Math.max(0, ...sessionSubs.map(s => s.sessionPenaltyCount || 0), globalState.activeSession.events.filter(e => !e.reversed).length);
       const sealedExisting=globalState.results.find(r=>r.competitionId===globalState.competition.id&&r.participantId===participant.id&&['sealed','published'].includes(r.status));
       if(sealedExisting){
         recordInvariantBlock('sealed_results_immutable','judge_panel_recalculation','Result',sealedExisting.id,'A later judge panel attempted to recalculate an already sealed/published result',{sealedScore:sealedExisting.finalScore,newPanelScore:finalScore,sessionId:submission.sessionId});
         if(!globalState.reviewCases.some(r=>r.participantId===participant.id&&r.reason==='sealed_result_protection'&&r.status==='pending'))globalState.reviewCases=[{id:newId('review'),competitionId:globalState.competition.id,sessionId:submission.sessionId,participantId:participant.id,participantCode:participant.code,committeeId:globalState.activeSession.committee?.id||'',reason:'sealed_result_protection',severity:'high',timestampSec:globalState.activeSession.durationSeconds,details:`Protected sealed result ${sealedExisting.id}; new panel score ${finalScore} retained only as evidence.`,status:'pending'},...globalState.reviewCases];
         notify();return;
       }
-      const pIndex = globalState.participants.findIndex(p => p.id === participant.id);
-      if (pIndex !== -1) globalState.participants[pIndex] = { ...globalState.participants[pIndex], status:'tested', statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested',timestamp:new Date().toISOString(),actor:'Panel completion'}] };
-      globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
-      refreshQueueNotifications();
       const category = globalState.competition.categories.find(c=>c.id===participant.categoryId);
-      const existing = globalState.results.findIndex(r => r.participantId === participant.id && r.status !== 'published');
-      const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||participant.categoryId, finalScore, rank:0, status:'calculated' };
+      const existing = globalState.results.findIndex(r => r.competitionId===globalState.competition.id && r.participantId === participant.id && r.status !== 'published');
+      // Throughput/status side effects run once — only on the first time a panel result is calculated
+      // for this participant, so a reserve/extra judge re-locking cannot double-count committee load.
+      if (existing < 0) {
+        const pIndex = globalState.participants.findIndex(p => p.id === participant.id);
+        if (pIndex !== -1) globalState.participants[pIndex] = { ...globalState.participants[pIndex], status:'tested', statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested',timestamp:new Date().toISOString(),actor:'Panel completion'}] };
+        globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
+        refreshQueueNotifications();
+      }
+      const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||participant.categoryId, finalScore, criterionScores:aggregatedCriterionScores, penaltyCount:sessionPenaltyCount, rank:0, status:'calculated' };
       if(existing>=0) globalState.results[existing]=result; else globalState.results=[...globalState.results,result];
-      const ranked=globalState.results.filter(r=>r.categoryId===participant.categoryId).sort((a,b)=>b.finalScore-a.finalScore); ranked.forEach((r,i)=>{const x=globalState.results.findIndex(z=>z.id===r.id);if(x>=0)globalState.results[x]={...globalState.results[x],rank:i+1}});
+      void persistScopedDocument('results',result.id,result as unknown as Record<string,unknown>);
+      const ranked=globalState.results.filter(r=>r.categoryId===participant.categoryId).sort((a,b)=>(b.finalScore-a.finalScore)||breakTie(a,b,sessionRuleSet.tieBreakRules)); ranked.forEach((r,i)=>{const x=globalState.results.findIndex(z=>z.id===r.id);if(x>=0)globalState.results[x]={...globalState.results[x],rank:i+1}});
       const spread=Math.max(...sessionSubs.map(s=>s.totalScore))-Math.min(...sessionSubs.map(s=>s.totalScore));
       if(spread>=5 && !globalState.reviewCases.some(r=>r.sessionId===submission.sessionId && r.status==='pending')) globalState.reviewCases=[{ id:newId('review'), competitionId:globalState.competition.id, sessionId:submission.sessionId, participantId:participant.id, participantCode:participant.code, committeeId:globalState.activeSession.committee?.id||'', reason:'judge_variance', severity:spread>=10?'high':'medium', timestampSec:globalState.activeSession.durationSeconds, details:`Panel spread ${spread.toFixed(2)} points`, status:'pending' },...globalState.reviewCases];
     }
@@ -931,10 +1008,10 @@ export function useAppStore() {
     const appliedDelta = accepted && policy.appeals.allowScoreChange ? Number(scoreAdjustmentDelta||0) : 0;
     globalState.appeals[idx] = { ...appeal, status: accepted ? 'accepted' : 'rejected', resolutionNotes: notes, resolvedBy: globalState.currentUser.name, resolvedAt: new Date().toISOString(), scoreAdjustmentDelta: appliedDelta };
     if(appliedDelta!==0){
-      const rIdx=globalState.results.findIndex(r=>r.participantId===appeal.participantId);
+      const rIdx=globalState.results.findIndex(r=>r.competitionId===globalState.competition.id&&r.participantId===appeal.participantId);
       if(rIdx>=0 && !['sealed','published'].includes(globalState.results[rIdx].status)){
         const r=globalState.results[rIdx]; globalState.results[rIdx]={...r,finalScore:Math.max(0,Number((r.finalScore+appliedDelta).toFixed(2)))};
-        const cat=r.categoryId; const ranked=globalState.results.filter(x=>x.categoryId===cat).sort((a,b)=>b.finalScore-a.finalScore); ranked.forEach((rr,i)=>{const x=globalState.results.findIndex(z=>z.id===rr.id);if(x>=0)globalState.results[x]={...globalState.results[x],rank:i+1}});
+        const cat=r.categoryId; const tieRules=activeRuleSetForCategory(r.categoryId).tieBreakRules; const ranked=globalState.results.filter(x=>x.categoryId===cat).sort((a,b)=>(b.finalScore-a.finalScore)||breakTie(a,b,tieRules)); ranked.forEach((rr,i)=>{const x=globalState.results.findIndex(z=>z.id===rr.id);if(x>=0)globalState.results[x]={...globalState.results[x],rank:i+1}});
       }
     }
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:accepted?'APPEAL_ACCEPTED':'APPEAL_REJECTED',entityType:'Appeal',entityId:appealId,humanSummaryArabic:`حسم اعتراض ${appeal.participantCode} بقرار بشري${appliedDelta?` وتعديل ${appliedDelta} نقطة`:''}`,humanSummaryEnglish:`Resolved ${appeal.participantCode} appeal by human decision${appliedDelta?` with ${appliedDelta} point adjustment`:''}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
@@ -1328,6 +1405,25 @@ export function useAppStore() {
   const runRemoteCheck=(participantId:string)=>{const mediaReady=typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia; const online=typeof navigator==='undefined'?true:navigator.onLine; const r:RemoteSessionCheck={id:newId('remote'),participantId,competitionId:globalState.competition.id,identity:'pending',device:mediaReady?'passed':'failed',environment:'review',networkQuality:online?'good':'poor',recordingReady:mediaReady,suspiciousSignals:[]};globalState.remoteChecks=[r,...globalState.remoteChecks.filter(x=>x.participantId!==participantId)];notify();return r;};
   const cloneCompetition=(nameArabic?:string,nameEnglish?:string)=>{const base=JSON.parse(JSON.stringify(globalState.competition)) as Competition;base.id=newId('comp');base.nameArabic=nameArabic||`${base.nameArabic} — نسخة`;base.name=nameEnglish||`${base.name} — Copy`;base.status='draft';base.totalRegistered=0;base.totalApproved=0;base.totalAttended=0;base.policy={...getCompetitionPolicy(base),updatedAt:new Date().toISOString(),frozenAt:undefined};base.categories=base.categories.map(c=>({...c,id:newId('cat'),competitionId:base.id}));globalState.competitions=[base,...globalState.competitions];globalState.competition=base;notify();return base;};
   const exportCompetitionSnapshot=()=>JSON.stringify({version:1,exportedAt:new Date().toISOString(),organizationId:globalState.competition.organizationId,competition:globalState.competition,participants:globalState.participants.filter(p=>p.competitionId===globalState.competition.id),committees:globalState.committees.filter(c=>c.competitionId===globalState.competition.id),results:globalState.results.filter(r=>r.competitionId===globalState.competition.id),certificates:globalState.certificates.filter(c=>c.competitionId===globalState.competition.id),auditLogs:globalState.auditLogs.filter(a=>a.competitionId===globalState.competition.id)},null,2);
+  // Restore/import counterpart to exportCompetitionSnapshot. Replaces the imported competition's
+  // scoped records (participants/committees/results/certificates/audit) so an exported snapshot is a
+  // genuinely restorable backup — the previous build could export but never import.
+  const restoreCompetitionSnapshot=(json:string):{ok:boolean;message:string;competitionId?:string}=>{
+    let snap:any; try{snap=JSON.parse(json)}catch{return{ok:false,message:'INVALID_JSON'}}
+    if(!snap||typeof snap!=='object'||!snap.competition||typeof snap.competition!=='object'||!snap.competition.id) return {ok:false,message:'INVALID_SNAPSHOT'};
+    const arr=<T,>(v:any):T[]=>Array.isArray(v)?v as T[]:[];
+    const comp={...snap.competition} as Competition; comp.policy=getCompetitionPolicy(comp); comp.ruleSets=comp.ruleSets||[comp.ruleSet];
+    const cid=comp.id;
+    globalState.competitions=[comp,...globalState.competitions.filter(c=>c.id!==cid)];
+    globalState.competition=comp;
+    globalState.participants=[...globalState.participants.filter(p=>p.competitionId!==cid),...arr<Participant>(snap.participants)];
+    globalState.committees=[...globalState.committees.filter(c=>c.competitionId!==cid),...arr<Committee>(snap.committees)];
+    globalState.results=[...globalState.results.filter(r=>r.competitionId!==cid),...arr<ResultRecord>(snap.results)];
+    globalState.certificates=[...globalState.certificates.filter(c=>c.competitionId!==cid),...arr<Certificate>(snap.certificates)];
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:comp.organizationId,competitionId:cid,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_SNAPSHOT_RESTORED',entityType:'Competition',entityId:cid,humanSummaryArabic:`استعادة نسخة المسابقة ${comp.nameArabic||comp.name}`,humanSummaryEnglish:`Restored competition snapshot ${comp.name}`,currentStateHash:`PENDING:${newId('audit')}`},...arr<AuditEvent>(snap.auditLogs),...globalState.auditLogs.filter(a=>a.competitionId!==cid)];
+    notify();
+    return {ok:true,message:'RESTORED',competitionId:cid};
+  };
 
   const optimizeArrivalSlots = () => {
     const approved = globalState.participants.filter(p => p.competitionId===globalState.competition.id && ['approved','scheduled'].includes(p.status));
@@ -1800,7 +1896,7 @@ export function useAppStore() {
     updateCommittee,
     publishCompetition,
     startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot,
+    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,

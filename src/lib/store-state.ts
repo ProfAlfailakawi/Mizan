@@ -75,6 +75,8 @@ export interface AppStoreState {
   // Runtime flags
   isOffline: boolean;
   emergencyFrozen: boolean;
+  /** Set when a local snapshot write fails (e.g. storage quota exceeded) so the UI can warn instead of losing data silently. */
+  persistenceError?: { code: 'QUOTA_EXCEEDED' | 'WRITE_FAILED'; message: string; at: string } | null;
   sealApprovals: { actorId: string; actorRole: Role; actorName: string; timestamp: string }[];
   // Platform / operations
   integrations: IntegrationConfig[];
