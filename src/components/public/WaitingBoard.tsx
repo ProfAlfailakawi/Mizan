@@ -1,15 +1,20 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { Clock3, RadioTower, UsersRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { queueOrderValue } from '../../lib/judging-integrity';
 
 export const WaitingBoard:React.FC<{onClose?:()=>void}>=({onClose})=>{
+ // Full-screen venue modes open over the app, but had no Escape and no dialog
+ // semantics: a keyboard or screen-reader user had no way back out.
+ const venueRef = useRef<HTMLDivElement|null>(null);
+ useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
  const {language,participants,committees,competition}=useAppStore(); const ar=language==='ar'; const [now,setNow]=useState(new Date());
  useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t)},[]);
  const waiting=useMemo(()=>participants.filter(p=>p.status==='in_queue').sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)),[participants]);
  const called=committees.map(c=>({committee:c,p:participants.find(p=>p.id===c.currentParticipantId)})).filter(x=>x.p);
  const next=waiting.slice(0,6);
- return <div className="fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto">
+ return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'شاشة الانتظار':'Waiting display'} className="fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto">
    <div className="min-h-screen p-5 sm:p-8 lg:p-10 flex flex-col">
     <header className="flex items-start justify-between gap-5"><div><div className="text-[10px] font-black tracking-[.2em] mizan-venue-muted">{ar?'الدور الآن':'MIZAN WAIT'}</div><h1 className="text-2xl sm:text-3xl font-black mt-1">{ar?'قاعة الانتظار':'Waiting Hall'}</h1><div className="text-xs mizan-venue-muted mt-1">{ar?competition.nameArabic:competition.name}</div></div><div className="flex items-center gap-3"><div className="text-end"><div className="text-xl font-black tabular-nums">{now.toLocaleTimeString(ar?'ar-KW':'en-GB',{hour:'2-digit',minute:'2-digit'})}</div><div className="text-[10px] mizan-venue-faint">{ar?'تحديث تلقائي':'Auto-updating'}</div></div>{onClose&&<button onClick={onClose} className="w-11 h-11 rounded-xl hover:bg-white/10 grid place-items-center text-white/55"><X className="w-5 h-5"/></button>}</div></header>
     <main className="my-auto py-10 grid xl:grid-cols-[1.25fr_.75fr] gap-5">

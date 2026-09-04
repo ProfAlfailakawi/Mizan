@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useRef,  useEffect, useMemo, useState  } from 'react';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { BookOpen, Sparkles, X, Radio } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { buildHallRecitation } from '../../lib/hall-recitation';
@@ -22,6 +23,10 @@ function pageColor(count: number, max: number): string {
 }
 
 export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose?: () => void }> = ({ variant = 'screen', onClose }) => {
+ // Full-screen venue modes open over the app, but had no Escape and no dialog
+ // semantics: a keyboard or screen-reader user had no way back out.
+ const venueRef = useRef<HTMLDivElement|null>(null);
+ useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
   const store = useAppStore();
   const ar = store.language === 'ar';
   const [, tick] = useState(0);
@@ -120,7 +125,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
   );
 
   if (variant === 'panel') return <div className="rounded-[30px] mizan-venue-2 text-white font-arabic overflow-hidden">{body}</div>;
-  return <div className="fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto">{body}</div>;
+  return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'خريطة تلاوة القاعة':'Hall recitation map'} className="fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto">{body}</div>;
 };
 
 const Stat: React.FC<{ n: string | number; t: string }> = ({ n, t }) => (

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { Camera, Check, Keyboard, QrCode, ScanLine, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
@@ -6,6 +7,10 @@ import { Participant } from '../../types';
 import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 
 export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
+ // Full-screen venue modes open over the app, but had no Escape and no dialog
+ // semantics: a keyboard or screen-reader user had no way back out.
+ const venueRef = useRef<HTMLDivElement|null>(null);
+ useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
  const {language,checkInParticipant,verifyOfflineJourneyPass,committees}=useAppStore(); const ar=language==='ar';
  const [code,setCode]=useState(''); const [done,setDone]=useState<Participant|null>(null); const [error,setError]=useState(false); const [errorReason,setErrorReason]=useState('');
  const [camera,setCamera]=useState<'idle'|'starting'|'active'|'unsupported'|'denied'>('idle');
@@ -28,7 +33,7 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  useEffect(()=>()=>stopCamera(),[]);
  useEffect(()=>{if(!done)return;const t=setTimeout(()=>{setDone(null);setCode('');setError(false)},4500);return()=>clearTimeout(t)},[done]);
  const committee=done?committees.find(c=>c.id===done.assignedCommitteeId):null;
- return <div className="fixed inset-0 z-50 mizan-venue text-white p-5 sm:p-8 flex flex-col">
+ return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'بوابة الحضور':'Gate kiosk'} className="fixed inset-0 z-50 mizan-venue text-white p-5 sm:p-8 flex flex-col">
    <div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-white/8 border border-white/10 grid place-items-center font-black text-[#dbe7df]">م</span><div><div className="font-black">MIZAN Gate</div><div className="text-[10px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
    <div className="my-auto max-w-lg w-full mx-auto">
     {!done?<div className="text-center">

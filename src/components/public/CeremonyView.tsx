@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useRef,  useMemo, useState  } from 'react';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { BadgeCheck, ChevronLeft, ChevronRight, Crown, KeyRound, LockKeyhole, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
@@ -8,6 +9,10 @@ import { MizanLogo } from '../design-system/MizanLogo';
 import { countryLabel } from '../../lib/arabic-labels';
 
 export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
+ // Full-screen venue modes open over the app, but had no Escape and no dialog
+ // semantics: a keyboard or screen-reader user had no way back out.
+ const venueRef = useRef<HTMLDivElement|null>(null);
+ useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
  const s=useAppStore(); const {language,results,competition,currentUser}=s; const ar=language==='ar'; const [stage,setStage]=useState(0); const [busy,setBusy]=useState(false);
  const winners=useMemo(()=>[3,2,1].map(rank=>results.find(r=>r.rank===rank&&['sealed','published'].includes(r.status))).filter(Boolean),[results]);
  const current=stage>0?winners[stage-1]:null;
@@ -21,7 +26,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  const request=async()=>{setBusy(true);try{await s.sealCeremonyVault()}finally{setBusy(false)}};
  const PrevIcon=ar?ChevronRight:ChevronLeft; const NextIcon=ar?ChevronLeft:ChevronRight;
 
- return <div className="fixed inset-0 z-50 mizan-venue-deep text-white overflow-hidden flex flex-col p-5 sm:p-8">
+ return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'وضع الحفل':'Ceremony mode'} className="fixed inset-0 z-50 mizan-venue-deep text-white overflow-hidden flex flex-col p-5 sm:p-8">
    <header className="flex items-center justify-between"><div className="flex items-center gap-3"><MizanLogo language={language} tone="inverse" compact showWordmark={false}/><div><div className="text-[10px] font-black tracking-[.18em] mizan-venue-muted">{ar?'حفل ميزان':'MIZAN CEREMONY'}</div><div className="text-sm font-bold mt-1">{ar?competition.nameArabic:competition.name}</div></div></div>{onClose&&<button onClick={onClose} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/55" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</header>
 
    <main className="flex-1 grid place-items-center px-3"><div className="w-full max-w-5xl text-center">
