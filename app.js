@@ -244,6 +244,7 @@ function applyLang(){
   $('#ltCat').textContent = t.cat;
   $('.lt-mizan').textContent = t.mizan;
   waqfKey=''; rgFlash.dataset.k='';
+  try { localStorage.setItem('mizan-lang', lang); } catch {}
   render();
 }
 
@@ -256,6 +257,7 @@ scrub.addEventListener('input', ()=>{ elapsed = (scrub.value/RESOLUTION)*TOTAL; 
 document.addEventListener('keydown', e=>{ if(e.code==='Space'){ e.preventDefault(); setPlaying(!playing); } });
 
 /* ---- boot ---- */
+try { const saved = localStorage.getItem('mizan-lang'); if (saved === 'en' || saved === 'ar') lang = saved; } catch {}
 buildMushaf();
 applyLang();
 render();

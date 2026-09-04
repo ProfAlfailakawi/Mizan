@@ -1,98 +1,183 @@
 <!doctype html>
-<html lang="ar" dir="rtl" data-theme="venue">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ميزان · محرك البث الحجمي</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ميزان · نظام تشغيل مسابقات القرآن</title>
+  <meta name="description" content="ميزان — نظام تشغيل مسابقات القرآن الكريم: بثّ حيّ، تحكيم عادل، ونزاهة قابلة للتحقّق." />
+  <meta name="theme-color" content="#16241f" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ميزان" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Alexandria:wght@500;600;700;800&family=Amiri+Quran&family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Top control rail (not part of the broadcast frame) -->
-  <div class="rail">
-    <div class="rail-brand">
-      <span class="mark" aria-hidden="true"></span>
-      <span class="rail-title" data-i18n="engine">محرك البث الحجمي</span>
-      <span class="rail-sub" data-i18n="shadow">SHADOW · لا يمس الدرجة</span>
+  <div class="aurora"></div>
+  <div class="grain"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <img class="logo" src="icons/logo.svg" alt="ميزان" width="40" height="40" />
+      <span class="name display">ميزان</span>
+      <span class="tag" data-lang-ar>نظام تشغيل المسابقات</span>
+      <span class="tag" data-lang-en>Competition OS</span>
     </div>
-    <div class="rail-controls">
-      <button id="btnPlay" class="ctl ctl-play" aria-label="play">
-        <svg viewBox="0 0 24 24" class="ic-play"><path d="M8 5v14l11-7z"/></svg>
-        <svg viewBox="0 0 24 24" class="ic-pause"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-      </button>
-      <button id="btnRestart" class="ctl" aria-label="restart">
-        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>
-      </button>
-      <input id="scrub" class="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="timeline" />
-      <button id="btnLost" class="ctl ctl-text" data-i18n="simLost">محاكاة فقد المحاذاة</button>
-      <button id="btnLang" class="ctl ctl-text" aria-label="language">EN</button>
+    <div class="topbar-actions">
+      <button id="btnLang" class="btn btn-sm btn-ghost" aria-label="language">EN</button>
+      <a class="btn btn-sm btn-gold" href="broadcast.html">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <span data-lang-ar>البثّ الحيّ</span><span data-lang-en>Live</span>
+      </a>
     </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <img class="hero-mark" src="icons/logo.svg" alt="" width="132" height="132" />
+    <span class="eyebrow" data-lang-ar>✦ نظام تشغيل متكامل لمسابقات القرآن الكريم</span>
+    <span class="eyebrow" data-lang-en>✦ An operating system for Qur'an competitions</span>
+    <h1>
+      <span data-lang-ar>حيث تلتقي <span class="accent">التلاوة</span> بالعدالة</span>
+      <span data-lang-en>Where <span class="accent">recitation</span> meets fairness</span>
+    </h1>
+    <p data-lang-ar>من التسجيل إلى الشهادة: قرعة قابلة للتحقّق، تحكيم بشري يحترم القارئ، وذكاء صامت لا يمسّ الدرجة — وبثّ حيّ يحوّل المسابقة إلى أكاديمية قرآنية للملايين.</p>
+    <p data-lang-en>From registration to certificate: a verifiable draw, human judging that respects the reciter, silent AI that never touches a score — and a live broadcast that turns the contest into a Qur'anic academy for millions.</p>
+    <div class="hero-cta">
+      <a class="btn btn-lg btn-gold" href="broadcast.html">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        <span data-lang-ar>جرّب محرك البثّ الحجمي</span><span data-lang-en>Try the Broadcast Engine</span>
+      </a>
+      <button class="btn btn-lg btn-ghost" id="btnInstall" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10m0 0l-4-4m4 4l4-4M5 21h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span data-lang-ar>ثبّت التطبيق</span><span data-lang-en>Install app</span>
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="n">٦٠٤</div><div class="l" data-lang-ar>صفحة مصحف مُتتبَّعة</div><div class="l" data-lang-en>Muṣḥaf pages tracked</div></div>
+      <div class="stat"><div class="n">٦</div><div class="l" data-lang-ar>روايات مدعومة</div><div class="l" data-lang-en>Readings supported</div></div>
+      <div class="stat"><div class="n">HUMAN</div><div class="l" data-lang-ar>القرار للمحكم دائمًا</div><div class="l" data-lang-en>Judge always decides</div></div>
+      <div class="stat"><div class="n">ZK</div><div class="l" data-lang-ar>قرعة قابلة للتحقّق</div><div class="l" data-lang-en>Verifiable FairDraw</div></div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="section-head">
+      <div class="kicker" data-lang-ar>المنظومة</div><div class="kicker" data-lang-en>The system</div>
+      <h2 data-lang-ar>سبع منصّات، غايةٌ واحدة</h2>
+      <h2 data-lang-en>Seven surfaces, one purpose</h2>
+      <p data-lang-ar>كل منصّة تحلّ مشكلة حقيقية في المسابقات — والشارة تُبيّن ما هو حيّ الآن وما هو قيد التطوير، بصدق.</p>
+      <p data-lang-en>Each surface solves a real competition problem — the badge shows honestly what is live now and what is in progress.</p>
+    </div>
+
+    <div class="grid">
+      <!-- flagship -->
+      <a class="card flagship" href="broadcast.html">
+        <div class="flagship-copy">
+          <div class="kicker"><span class="live-dot"></span><span data-lang-ar>حيّ الآن · العرض التفاعلي</span><span data-lang-en>Live now · interactive demo</span></div>
+          <h3 data-lang-ar>محرك البثّ الحجمي</h3>
+          <h3 data-lang-en>Spatial Broadcast Engine</h3>
+          <p data-lang-ar>تتبُّع الكلمة الحيّ على مصحف المدينة، شرح علامات الوقف بلغة مبسّطة، وحارس الرواية — يحوّل شريط الاسم والدرجة إلى أكاديمية قرآنية حيّة.</p>
+          <p data-lang-en>Live sub-word tracking on the Madinah Muṣḥaf, plain-language waqf explanations, and a Riwayah Guard — turning a name-and-score bar into a living Qur'anic academy.</p>
+          <span class="btn btn-sm btn-gold" style="align-self:flex-start">
+            <span data-lang-ar>افتح العرض ←</span><span data-lang-en>Open demo →</span>
+          </span>
+        </div>
+        <div class="flagship-visual">
+          <div class="verse">مَٰلِكِ يَوْمِ <span class="hl">ٱلدِّينِ</span></div>
+        </div>
+      </a>
+
+      <!-- other six -->
+      <div class="card">
+        <span class="chip chip-ready" data-lang-ar>مطبّق</span><span class="chip chip-ready" data-lang-en>Live</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg></div>
+        <h3 data-lang-ar>القرعة القابلة للتحقّق</h3><h3 data-lang-en>Verifiable FairDraw</h3>
+        <p data-lang-ar>التزام مُسبق ثم كشف: يُعيد أي شخص إنتاج القرعة والتحقّق منها دون هوية المتسابق ولا نصّ المصحف.</p>
+        <p data-lang-en>Commit-then-reveal: anyone can reproduce and verify the draw without the reciter's identity or the Muṣḥaf text.</p>
+      </div>
+
+      <div class="card">
+        <span class="chip chip-ready" data-lang-ar>مطبّق</span><span class="chip chip-ready" data-lang-en>Live</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z"/></svg></div>
+        <h3 data-lang-ar>الذكاء الصامت للنزاهة</h3><h3 data-lang-en>Silent integrity AI</h3>
+        <p data-lang-ar>مراقبٌ ثانٍ في وضع الظل: جودة الصوت والمحاذاة ومؤشّرات الانحراف — دون أن يخصم درجة أبدًا.</p>
+        <p data-lang-en>A shadow second observer: audio quality, alignment and drift signals — never deducting a score.</p>
+      </div>
+
+      <div class="card">
+        <span class="chip chip-ready" data-lang-ar>مطبّق</span><span class="chip chip-ready" data-lang-en>Live</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l3 8 4-16 3 8h4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3 data-lang-ar>خريطة تلاوة القاعة</h3><h3 data-lang-en>Hall recitation map</h3>
+        <p data-lang-ar>خريطة حرارية على صفحات المصحف الـ٦٠٤ وعدّاد ختمات — آمنة للخصوصية، بلا أي هوية.</p>
+        <p data-lang-en>A heat map over the 604 pages and a khatmah counter — privacy-safe, no identities.</p>
+      </div>
+
+      <div class="card">
+        <span class="chip chip-ready" data-lang-ar>مطبّق</span><span class="chip chip-ready" data-lang-en>Live</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.4"/></svg></div>
+        <h3 data-lang-ar>حارس انحراف المحكّم</h3><h3 data-lang-en>Judge-drift guard</h3>
+        <p data-lang-ar>ينبّه رئيس التحكيم حين يبتعد المحكّم عن معياره الصباحي — مقارنةً بنفسه، لا بزملائه.</p>
+        <p data-lang-en>Alerts the head judge when a judge drifts from their own morning baseline — against themselves, not peers.</p>
+      </div>
+
+      <div class="card">
+        <span class="chip chip-soon" data-lang-ar>قيد التطوير</span><span class="chip chip-soon" data-lang-en>In progress</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8" stroke-linejoin="round"/></svg></div>
+        <h3 data-lang-ar>رادار المتشابهات اللفظية</h3><h3 data-lang-en>Mutashābihāt radar</h3>
+        <p data-lang-ar>لوحة لرئيس التحكيم تُظهر المواضع المتشابهة عند تردّد المتسابق — من خريطة معتمدة مسبقًا.</p>
+        <p data-lang-en>A head-judge panel surfacing similar loci when a reciter hesitates — from a pre-approved map.</p>
+      </div>
+
+      <div class="card">
+        <span class="chip chip-soon" data-lang-ar>قيد التطوير</span><span class="chip chip-soon" data-lang-en>In progress</span>
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3c-4 4-6 7-6 10a6 6 0 0 0 12 0c0-3-2-6-6-10z"/></svg></div>
+        <h3 data-lang-ar>محراب الإحماء الصوتي</h3><h3 data-lang-en>Warm-up sanctuary</h3>
+        <p data-lang-ar>كبينة هادئة قبل الصعود: ثبات طبقة الصوت وإرشاد تنفّس — بموافقة، وبلا تسجيل يصل للجنة.</p>
+        <p data-lang-en>A calm pre-stage booth: pitch stability and breathing guidance — by consent, nothing recorded reaches the panel.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRINCIPLES -->
+  <section class="section" id="principles">
+    <div class="section-head">
+      <div class="kicker" data-lang-ar>الميثاق</div><div class="kicker" data-lang-en>The charter</div>
+      <h2 data-lang-ar>مبادئ غير قابلة للتفاوض</h2><h2 data-lang-en>Non-negotiable principles</h2>
+    </div>
+    <div class="principles">
+      <div class="principle"><div class="num">٠١</div><h4 data-lang-ar>الإنسان يحكم</h4><h4 data-lang-en>Humans judge</h4><p data-lang-ar>الذكاء يوصي بالمراجعة فقط؛ لا خصم آليّ للدرجات إطلاقًا.</p><p data-lang-en>AI only recommends review; never an automatic deduction.</p></div>
+      <div class="principle"><div class="num">٠٢</div><h4 data-lang-ar>المصدر معتمد</h4><h4 data-lang-en>Certified source</h4><p data-lang-ar>النصّ وعلامات الوقف من حزمة مصدر معتمدة (KFGQPC)، لا من مُخرَج نموذج.</p><p data-lang-en>Text and waqf marks from a certified (KFGQPC) package, never model output.</p></div>
+      <div class="principle"><div class="num">٠٣</div><h4 data-lang-ar>لكل مسابقة قانونها</h4><h4 data-lang-en>Each its own law</h4><p data-lang-ar>لا قانون مسابقة واحد في الكود؛ كل مسابقة سياستها الخاصة المُوثّقة.</p><p data-lang-en>No single hard-coded rulebook; every competition has its own versioned policy.</p></div>
+      <div class="principle"><div class="num">٠٤</div><h4 data-lang-ar>الخصوصية أولًا</h4><h4 data-lang-en>Privacy first</h4><p data-lang-ar>لا هويّات ولا درجات فرديّة ولا صوت خام في الطبقات العامة.</p><p data-lang-en>No identities, individual scores, or raw audio in public layers.</p></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="brand"><img class="logo" src="icons/logo.svg" alt="" width="34" height="34" /><span class="name display">ميزان</span></div>
+    <p data-lang-ar>ميزان · نظام تشغيل مسابقات القرآن الكريم — عرض تعريفي. المحاذاة الصوتية تعمل في وضع الظل ولا تغيّر أي درجة.</p>
+    <p data-lang-en>Mizan · Qur'an competition operating system — showcase. Audio alignment runs in shadow mode and changes no score.</p>
+  </footer>
+
+  <!-- PWA install bar -->
+  <div class="install-bar" id="installBar">
+    <img class="logo" src="icons/logo.svg" alt="" width="38" height="38" />
+    <div class="t">
+      <b data-lang-ar>ثبّت ميزان</b><b data-lang-en>Install Mizan</b>
+      <span class="s" data-lang-ar>أضِفه لشاشتك الرئيسية</span><span class="s" data-lang-en>Add it to your home screen</span>
+    </div>
+    <button class="btn btn-sm btn-gold" id="installGo"><span data-lang-ar>تثبيت</span><span data-lang-en>Install</span></button>
+    <button class="btn btn-sm btn-ghost" id="installNo" aria-label="dismiss">✕</button>
   </div>
 
-  <!-- Broadcast frame (what goes on air) -->
-  <main class="stage" id="stage">
-    <div class="stage-glow"></div>
-
-    <!-- Riwayah Guard, top-right of frame -->
-    <div class="riwayah-guard" id="riwayahGuard">
-      <span class="rg-dot"></span>
-      <div class="rg-body">
-        <span class="rg-label" data-i18n="riwayah">الرواية</span>
-        <strong class="rg-value" id="rgValue">حفص عن عاصم</strong>
-      </div>
-      <div class="rg-flash" id="rgFlash" hidden>
-        <span class="rg-flash-label" data-i18n="readingFeature">خصوصية الرواية</span>
-        <strong id="rgFlashText"></strong>
-      </div>
-    </div>
-
-    <!-- Confidence / alignment state, top-left of frame -->
-    <div class="align-meter" id="alignMeter">
-      <div class="am-head">
-        <span class="am-state" id="amState">مُقفَلة</span>
-        <span class="am-tag" data-i18n="humanOnly">القرار للمحكم</span>
-      </div>
-      <div class="am-bar"><span id="amFill"></span></div>
-    </div>
-
-    <!-- Passage header -->
-    <header class="passage-head">
-      <div class="ph-surah" id="phSurah">سورة الفاتحة</div>
-      <div class="ph-meta"><span id="phRange">الآيات ١ – ٧</span><span class="dot"></span><span data-i18n="madinah">مصحف المدينة · صفحة ١</span></div>
-    </header>
-
-    <!-- The living Mushaf line -->
-    <section class="mushaf" id="mushaf" aria-live="off"></section>
-
-    <!-- Waqf explanation ribbon -->
-    <div class="waqf-ribbon" id="waqfRibbon" hidden>
-      <div class="wr-glyph" id="wrGlyph">ۘ</div>
-      <div class="wr-text">
-        <span class="wr-kind" id="wrKind">وقف تام</span>
-        <span class="wr-desc" id="wrDesc">تمّ المعنى ولا تعلّق لما بعده بما قبله.</span>
-      </div>
-      <div class="wr-source" data-i18n="waqfSource">علامات الوقف · مصدر رسمي</div>
-    </div>
-
-    <!-- Lower third -->
-    <footer class="lower-third">
-      <div class="lt-left">
-        <div class="lt-name" id="ltName">المتسابق · رمز ٠٤٢</div>
-        <div class="lt-cat" id="ltCat">الفئة الأولى · الحفظ الكامل</div>
-      </div>
-      <div class="lt-right">
-        <span class="lt-live"><span class="lt-live-dot"></span><span data-i18n="live">بثّ مباشر</span></span>
-        <span class="lt-mizan">ميزان</span>
-      </div>
-    </footer>
-  </main>
-
-  <p class="note" data-i18n="note">
-    عرض توضيحي بيانياً. في التشغيل الرسمي يُحمَّل نصّ المصحف وعلامات الوقف من حزمة مصدر معتمدة (KFGQPC)، والمحاذاة الصوتية تعمل في وضع الظل ولا تغيّر أي درجة إطلاقاً.
-  </p>
-
-  <script src="app.js"></script>
+  <script src="home.js"></script>
 </body>
 </html>
