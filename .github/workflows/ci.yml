@@ -1,0 +1,45 @@
+name: فحص ميزان — لا نشر فوق فحص أحمر
+
+# مسابقة بنتائج ودرجات تحكيم: كل دفعة تُفحص قبل أن تصل الإنتاج.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizan-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      # npm ci يفشل إن خرج package-lock.json عن التزامن مع package.json،
+      # وهو ما حدث فعلاً في 4 سبتمبر 2026 (295 حزمة مفقودة من القفل)
+      # فتعذّر التثبيت من نسخة نظيفة. هذه الخطوة تمسك ذلك مبكراً.
+      - name: تثبيت من ملف القفل
+        run: npm ci
+
+      - name: فحص الأنواع
+        run: npm run lint
+
+      - name: الاختبارات
+        run: npm test
+
+      - name: تدقيق المصدر والأسرار
+        run: npm run source-audit
+
+      - name: البناء
+        run: npm run build
