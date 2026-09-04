@@ -4,5 +4,8 @@ dist/
 coverage/
 .DS_Store
 *.log
+*.tsbuildinfo
+server.cjs
+server.cjs.map
 .env*
 !.env.example
