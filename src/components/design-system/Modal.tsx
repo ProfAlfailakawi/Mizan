@@ -41,7 +41,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
         className={`mizan-dialog ${widthClasses[maxWidth]}`}
       >
         <div className="mizan-dialog-head">
-          <div>
+          <div className="min-w-0">
             <h3 id={titleId} className="mizan-dialog-title">{title}</h3>
             {subtitle && <p className="mizan-dialog-sub">{subtitle}</p>}
           </div>

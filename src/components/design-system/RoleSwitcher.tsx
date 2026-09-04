@@ -30,7 +30,7 @@ export const RoleSwitcher: React.FC = () => {
     </button>
     {open&&<>
       <button className="fixed inset-0 z-40 cursor-default" onClick={()=>setOpen(false)} aria-label={language==='ar'?'إغلاق':'Close'} />
-      <div role="menu" aria-label={language==='ar'?'الأدوار':'Roles'} className="absolute end-0 top-full mt-2 z-50 w-72 bg-[#FFFEFB] border border-[#DFDED7] rounded-2xl shadow-lg p-2">
+      <div role="menu" aria-label={language==='ar'?'الأدوار':'Roles'} className="absolute end-0 top-full mt-2 z-50 w-[min(18rem,calc(100vw-1.5rem))] bg-[#FFFEFB] border border-[#DFDED7] rounded-2xl shadow-lg p-2">
         <div className="px-3 py-2 text-[11px] font-bold text-[#666a67]">{language==='ar'?'معاينة الأدوار — وضع التطوير':'Role preview — development'}</div>
         <div className="grid grid-cols-2 gap-1">
           {(Object.keys(ROLE_META) as Role[]).map(role=>{ const m=ROLE_META[role]; const I=m.icon; const active=role===currentUser.role; return <button key={role} role="menuitem" aria-current={active} onClick={()=>{switchRole(role);setOpen(false)}} className="mizan-role-tile">

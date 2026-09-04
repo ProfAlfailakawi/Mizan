@@ -72,10 +72,10 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
         role="dialog"
         aria-modal="true"
         aria-label={ar ? 'بحث سريع' : 'Quick search'}
-        className="mx-auto max-w-xl mizan-surface overflow-hidden"
+        className="mx-auto max-w-xl mizan-surface overflow-hidden flex flex-col max-h-[85dvh]"
         onMouseDown={e => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 border-b border-[#e5e3dc] px-4">
+        <div className="flex items-center gap-3 border-b border-[#e5e3dc] px-4 shrink-0">
           <Search className="w-4 h-4 text-[#616a65]" aria-hidden="true" />
           <input
             autoFocus
@@ -95,7 +95,7 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
           </button>
         </div>
 
-        <div ref={listRef} id={listId} role="listbox" className="p-2 max-h-[420px] overflow-y-auto">
+        <div ref={listRef} id={listId} role="listbox" className="p-2 flex-1 min-h-0 max-h-[420px] overflow-y-auto">
           {!q ? (
             <div className="p-8 text-center text-xs text-[#686e69]">
               {ar ? 'اكتب للبحث. النتائج مقيدة بصلاحيات وسياق الجهة الحالية.' : 'Type to search. Results stay within the current tenant context.'}
