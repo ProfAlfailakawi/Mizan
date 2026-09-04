@@ -45,7 +45,7 @@ async function startServer() {
     res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy','camera=(self), geolocation=(), microphone=(self)'); res.setHeader('Cross-Origin-Opener-Policy','same-origin');
     if(isProd) res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
-    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     next();
   });
   app.use(express.json({ limit: '1mb' }));
