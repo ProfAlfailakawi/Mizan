@@ -18,13 +18,16 @@
     <meta property="og:locale" content="ar_AR" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://mizan.dr-alfailakawi.com/brand/mizan-og.jpg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- Families here must stay in sync with the --font-* tokens in src/index.css.
          Previously the page fetched Alexandria / Plus Jakarta Sans while the CSS asked for
          IBM Plex Sans Arabic / Inter, so every screen silently fell back to system-ui and the
-         downloaded faces were never painted. -->
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Alexandria:wght@500;600;700;800&family=Amiri:wght@400;700&family=Amiri+Quran&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+         downloaded faces were never painted.
+         The faces are served from our own origin now: no third-party DNS lookup, TLS
+         handshake and redirect before the first paint, and no reliance on the service
+         worker to keep type available offline. Regenerate public/fonts with the same
+         css2 URL if a family or weight changes. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/284d2adce0.woff2" crossorigin>
+    <link rel="stylesheet" href="/fonts/fonts.css">
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#214C40" />
     <meta name="color-scheme" content="light" />
