@@ -322,13 +322,25 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
   filter:drop-shadow(0 22px 44px rgba(18,63,53,.13));
   animation:mzBreathe 6s ease-in-out 1.5s infinite;
 }
+/* The wordmark, gold rule and tagline are webfont text loaded from Google Fonts with
+   font-display:swap, so on a cold first load they paint in a fallback face and then swap.
+   `swap` is right here — `optional` would leave the very first impression permanently in
+   a system face on any slow connection, which is worse for a brand moment than a swap —
+   but the swap must not move anything. Reserving each line's box on the em-independent
+   side (fixed line-height plus a min-height derived from it) means the substituted face
+   changes glyph shapes only; the lockup stays put. */
 .mizan-splash-word{ animation:mzLift .72s var(--ease-brand) 1.16s both; }
+.mizan-splash-word .mizan-wordmark-name{
+  line-height:1.05; min-height:calc(1.05em); font-synthesis-weight:none;
+}
+.mizan-splash-word .mizan-wordmark-rule{ min-height:1.4em; }
+.mizan-splash-word .mizan-wordmark-tagline{ line-height:1.6; min-height:1.6em; }
 .mizan-splash-word .mizan-wordmark-rule{ animation:mzLift .6s var(--ease-brand) 1.34s both; }
 .mizan-splash-word .mizan-wordmark-tagline{ animation:mzLift .6s var(--ease-brand) 1.46s both; }
 
 /* Progress hairline — the only chrome on the screen. */
 .mizan-splash-track{
-  position:absolute; left:50%; bottom:max(30px,env(safe-area-inset-bottom));
+  position:absolute; left:50%; bottom:calc(30px + env(safe-area-inset-bottom,0px));
   transform:translateX(-50%); width:56px; height:2px; border-radius:999px;
   background:rgba(18,63,53,.1); overflow:hidden;
 }
@@ -339,9 +351,21 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
 }
 [dir="rtl"] .mizan-splash-track span{ transform-origin:right center; }
 
+/* Reduced motion gets the *finished* lockup as a still title card — mark fully
+   assembled, wordmark, gold rule and tagline all present, hairline drawn full — held for
+   REDUCED_HOLD_MS (1400ms) in SplashExperience.tsx so it reads as a deliberate frame
+   rather than a flash. Nothing here may hide a part: every animation is cancelled, which
+   leaves each element at its natural (end) state. */
 @media (prefers-reduced-motion: reduce){
   .mizan-splash,.mizan-splash *{ animation:none !important; transition:none !important; }
-  .mizan-mark.is-animated .mz-arch{ stroke-dasharray:none; }
+  .mizan-mark.is-animated .mz-arch{ stroke-dasharray:none; stroke-dashoffset:0; }
+  .mizan-mark.is-animated .mz-page-l,.mizan-mark.is-animated .mz-cover-l,
+  .mizan-mark.is-animated .mz-page-r,.mizan-mark.is-animated .mz-cover-r,
+  .mizan-mark.is-animated .mz-qalam,.mizan-mark.is-animated .mz-orb,
+  .mizan-mark.is-animated .mz-finial{ opacity:1; transform:none; }
+  .mizan-splash-word,
+  .mizan-splash-word .mizan-wordmark-rule,
+  .mizan-splash-word .mizan-wordmark-tagline{ opacity:1; transform:none; }
   .mizan-splash-track span{ transform:none; }
 }
 
@@ -362,7 +386,10 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
     var(--canvas);
 }
 .mzo-shell{ min-height:100%; display:flex; flex-direction:column; max-width:1320px; margin-inline:auto;
-  padding:clamp(1rem,2.4vh,1.6rem) clamp(1.1rem,4vw,3rem) clamp(1rem,2.4vh,1.5rem); }
+  padding:calc(clamp(1rem,2.4vh,1.6rem) + env(safe-area-inset-top,0px))
+          calc(clamp(1.1rem,4vw,3rem) + env(safe-area-inset-right,0px))
+          calc(clamp(1rem,2.4vh,1.5rem) + env(safe-area-inset-bottom,0px))
+          calc(clamp(1.1rem,4vw,3rem) + env(safe-area-inset-left,0px)); }
 .mzo-body{ flex:1; min-height:0; display:grid; align-items:center; gap:clamp(1.5rem,4vw,4.5rem);
   grid-template-columns:1fr; padding-block:clamp(1rem,3vh,2.5rem); }
 @media (min-width:1024px){ .mzo-body{ grid-template-columns:1.02fr .98fr; } }
@@ -508,6 +535,24 @@ html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
   .mzo-scene{ max-width:min(430px,42vh); }
   .mzo-body{ padding-block:1rem; }
 }
+/* Manual-advance hint. Under prefers-reduced-motion the 7s auto-advance is disabled
+   outright (OnboardingExperience.tsx), so the rail no longer fills and the screen looks
+   stuck unless the user is told to press Next. The hint is static text and the CTA gets a
+   quiet gold ring; neither animates. */
+.mzo-hint{ display:none; align-items:center; gap:.4rem; margin-top:.85rem;
+  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; color:#856941; }
+.mzo-root[data-manual] .mzo-hint{ display:inline-flex; }
+.mzo-root[data-manual] .mzo-cta{ box-shadow:0 0 0 3px rgba(184,139,78,.28), 0 12px 30px rgba(23,75,63,.18); }
+/* The rail's fill is the auto-advance timer; with no timer it must not read as one. */
+.mzo-root[data-manual] .mzo-rail button[data-state="active"]{ background:var(--emerald); }
+.mzo-root[data-manual] .mzo-rail button[data-state="active"]::after{ content:none; }
+
+@media (max-width:400px){
+  .mzo-shell{ padding-inline:calc(1rem + env(safe-area-inset-left,0px)) calc(1rem + env(safe-area-inset-right,0px)); }
+  .mzo-foot{ gap:.6rem; }
+  .mzo-cta{ min-width:0; flex:1 1 auto; }
+}
+
 @media (prefers-reduced-motion: reduce){
   .mzo-root *{ animation:none !important; }
   .mzo-scene::after{ display:none; }

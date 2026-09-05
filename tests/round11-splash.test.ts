@@ -30,7 +30,9 @@ test('splash is pure vector: no image asset, no burned-in wordmark',()=>{
 test('splash mark animation is defined in CSS and respects reduced motion',()=>{
  const app=read('src/App.tsx');
  const css=read('src/index.css');
- assert.match(app,/useState\(\(\)=>!window\.location\.hash\)/);
+ // Deep links skip the splash; so does a repeat load in the same session — the 2.8s
+ // assembly is a first-impression, not a per-reload toll. See splashWasSeen().
+ assert.match(app,/useState\(\(\)=>!window\.location\.hash && !splashWasSeen\(\)\)/);
  assert.match(css,/\.mizan-mark\.is-animated \.mz-arch/,'mark parts are choreographed in CSS');
  assert.match(css,/@media \(prefers-reduced-motion: reduce\)\{\s*\.mizan-splash,\.mizan-splash \*/s);
 });
