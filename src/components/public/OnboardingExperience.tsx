@@ -62,6 +62,18 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
   // WCAG 2.2.2: moving content that starts automatically must be pausable. Hovering or
   // focusing anywhere in the flow holds the step, so nobody loses a sentence mid-read.
   const [held, setHeld] = useState(false);
+  // Auto-advance is switched off entirely under reduced motion, so the flow only moves
+  // when the user moves it. Nothing in the UI said so — the rail simply never filled and
+  // the screen read as stuck. Surface it: a static hint and a ringed Next control.
+  const [manual, setManual] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mq) return;
+    const sync = () => setManual(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
   const slides = useMemo(() => (ar ? SLIDES_AR : SLIDES_EN), [ar]);
   const last = step === slides.length - 1;
 
@@ -71,12 +83,10 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
 
   // Auto-advance keeps the rail honest: the animated bar is the actual timer, not decor.
   useEffect(() => {
-    if (last || held) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) return;
+    if (last || held || manual) return;
     const t = window.setTimeout(() => setStep(s => s + 1), AUTO_ADVANCE_MS);
     return () => window.clearTimeout(t);
-  }, [step, last, held]);
+  }, [step, last, held, manual]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -112,6 +122,7 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
       className="mzo-root font-arabic"
       dir={ar ? 'rtl' : 'ltr'}
       data-held={held || undefined}
+      data-manual={manual || undefined}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onMouseEnter={() => setHeld(true)}
@@ -143,6 +154,12 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
                 </button>
               )}
             </div>
+            {manual && !last && (
+              <p className="mzo-hint">
+                <Next className="w-3.5 h-3.5" />
+                {ar ? 'اضغط «التالي» للمتابعة' : 'Press Next to continue'}
+              </p>
+            )}
           </div>
 
           <div className="order-first lg:order-none">

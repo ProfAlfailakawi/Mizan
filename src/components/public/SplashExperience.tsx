@@ -16,14 +16,23 @@ import {MizanMark, MizanWordmark} from '../design-system/MizanLogo';
 
 const HOLD_MS = 2450;
 const EXIT_MS = 340;
-const REDUCED_HOLD_MS = 700;
-// After the splash has played once this session, staff reopening the tablet get a brief
-// courtesy frame instead of the full assembly. Long enough to read as intentional, short
-// enough not to be friction.
-const SEEN_HOLD_MS = 800;
+// Reduced motion gets a finished still frame, not a shortened one: it must be held long
+// enough to read as a deliberate title card rather than a flash between routes.
+const REDUCED_HOLD_MS = 1400;
 const SEEN_KEY = 'mizan_splash_seen';
 
-const wasSeen = (): boolean => {
+/**
+ * Has the splash already played in this browser session?
+ *
+ * App.tsx uses this to decide whether to mount the splash at all. A previous pass tried
+ * to serve repeat loads a shortened "courtesy frame" instead, but the assembly
+ * choreography runs on fixed CSS delays (orb .96s, finial 1.06s, wordmark 1.16s, gold
+ * rule 1.34s, tagline 1.46s) and nothing shortened those, so an 800ms hold tore the
+ * screen away mid-assembly — half a mark, no wordmark, no tagline. A brand moment
+ * already seen this session cannot be compressed; for a venue tool whose staff reopen
+ * the app all day it is pure delay, so repeat loads now go straight to the app.
+ */
+export const splashWasSeen = (): boolean => {
   try { return sessionStorage.getItem(SEEN_KEY) === '1'; } catch { return false; }
 };
 const markSeen = (): void => {
@@ -32,21 +41,15 @@ const markSeen = (): void => {
 
 export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
   const [leaving, setLeaving] = useState(false);
-  // Read once, during the first render, before the mount effect writes the flag back.
-  // This is what drives the CSS: the assembly choreography runs for ~2.8s, so a repeat
-  // load that holds for only 800ms must not *start* that choreography — it would be cut
-  // off with the orb and finial never placed and the wordmark still at opacity 0. The
-  // repeat path renders the finished lockup and simply fades it in and out.
-  const [instant] = useState<boolean>(() => wasSeen());
   const done = useRef(onDone);
   done.current = onDone;
 
   useEffect(() => {
     const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const exit = reduced ? 0 : EXIT_MS;
-    const hold = reduced ? REDUCED_HOLD_MS : instant ? SEEN_HOLD_MS : HOLD_MS;
+    const hold = reduced ? REDUCED_HOLD_MS : HOLD_MS;
 
-    // Mark seen as soon as the splash mounts, so any reload mid-sequence also gets the short frame.
+    // Mark seen as soon as the splash mounts, so a reload mid-sequence goes straight through.
     markSeen();
 
     const leave = window.setTimeout(() => setLeaving(true), hold);
@@ -62,14 +65,14 @@ export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
       window.clearTimeout(finish);
       window.removeEventListener('keydown', onKey);
     };
-  }, [instant]);
+  }, []);
 
   // Touch tablets have no keyboard, so a tap anywhere on the splash must also dismiss it.
   const skipOnPointer = () => { setLeaving(true); const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; window.setTimeout(() => done.current(), reduced ? 0 : EXIT_MS); };
 
   return (
     <div
-      className={`mizan-splash ${instant ? 'mizan-splash-instant' : ''} ${leaving ? 'mizan-splash-leaving' : ''}`}
+      className={`mizan-splash ${leaving ? 'mizan-splash-leaving' : ''}`}
       dir="rtl"
       role="status"
       aria-label="جاري فتح ميزان"

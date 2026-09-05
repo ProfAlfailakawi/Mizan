@@ -8,7 +8,7 @@ import { auth } from './lib/firebase';
 import { DemoReturn } from './components/public/DemoReturn';
 import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
 import { MizanLogo } from './components/design-system/MizanLogo';
-import { SplashExperience } from './components/public/SplashExperience';
+import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
 
 /*
  * Route-level code splitting.
@@ -114,7 +114,9 @@ export default function App() {
  const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationMessage,activateAccount}=useMizanAuth(requireAuth);
  const demoMode=!requireAuth;
- const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash);
+ // Deep links skip the splash, and so do repeat loads inside the same session: the
+ // assembly is a 2.8s first-impression, not a per-reload toll for staff reopening the app.
+ const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash && !splashWasSeen());
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
