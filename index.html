@@ -28,6 +28,14 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#214C40" />
     <meta name="color-scheme" content="light" />
+    <!-- Installed web-app behaviour. On iPadOS the venue tablet opens ميزان from the home
+         screen; without apple-mobile-web-app-capable it would launch inside Safari chrome
+         instead of full-screen standalone. mobile-web-app-capable is the modern equivalent
+         honoured by Chromium. The title is what iOS prints under the home-screen icon. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ميزان" />
     <!-- MIZAN brand favicon. The SVG is primary; PNG fallbacks (with explicit sizes) guarantee the
          mosque mark shows on browsers with weak SVG-favicon support instead of falling back to any
          other image. shortcut icon covers legacy /favicon.ico probing. -->
