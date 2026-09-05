@@ -1,7 +1,9 @@
 {
   "name": "ميزان — نظام تشغيل المسابقات القرآنية",
   "short_name": "ميزان",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#F7F5EF",
   "theme_color": "#214C40",
@@ -32,6 +34,23 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "التحقق من الشهادات",
+      "short_name": "تحقق",
+      "url": "/#verify"
+    },
+    {
+      "name": "التسجيل في المسابقة",
+      "short_name": "تسجيل",
+      "url": "/#register"
+    },
+    {
+      "name": "صفحة المسابقة",
+      "short_name": "المسابقة",
+      "url": "/#competition"
     }
   ]
 }
