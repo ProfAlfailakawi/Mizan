@@ -32,13 +32,19 @@ const markSeen = (): void => {
 
 export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
   const [leaving, setLeaving] = useState(false);
+  // Read once, during the first render, before the mount effect writes the flag back.
+  // This is what drives the CSS: the assembly choreography runs for ~2.8s, so a repeat
+  // load that holds for only 800ms must not *start* that choreography — it would be cut
+  // off with the orb and finial never placed and the wordmark still at opacity 0. The
+  // repeat path renders the finished lockup and simply fades it in and out.
+  const [instant] = useState<boolean>(() => wasSeen());
   const done = useRef(onDone);
   done.current = onDone;
 
   useEffect(() => {
     const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const exit = reduced ? 0 : EXIT_MS;
-    const hold = reduced ? REDUCED_HOLD_MS : wasSeen() ? SEEN_HOLD_MS : HOLD_MS;
+    const hold = reduced ? REDUCED_HOLD_MS : instant ? SEEN_HOLD_MS : HOLD_MS;
 
     // Mark seen as soon as the splash mounts, so any reload mid-sequence also gets the short frame.
     markSeen();
@@ -56,14 +62,14 @@ export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
       window.clearTimeout(finish);
       window.removeEventListener('keydown', onKey);
     };
-  }, []);
+  }, [instant]);
 
   // Touch tablets have no keyboard, so a tap anywhere on the splash must also dismiss it.
   const skipOnPointer = () => { setLeaving(true); const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; window.setTimeout(() => done.current(), reduced ? 0 : EXIT_MS); };
 
   return (
     <div
-      className={`mizan-splash ${leaving ? 'mizan-splash-leaving' : ''}`}
+      className={`mizan-splash ${instant ? 'mizan-splash-instant' : ''} ${leaving ? 'mizan-splash-leaving' : ''}`}
       dir="rtl"
       role="status"
       aria-label="جاري فتح ميزان"
