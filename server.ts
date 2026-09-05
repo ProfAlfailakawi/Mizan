@@ -37,7 +37,7 @@ const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
+  const PORT = 3000;
   const isProd = process.env.NODE_ENV === 'production';
   app.disable('x-powered-by'); app.set('trust proxy', 1);
   app.use((req,res,next)=>{

@@ -48,7 +48,7 @@ export default defineConfig(() => {
       // than failing the socket if the derived port is momentarily taken.
       hmr: process.env.DISABLE_HMR === 'true'
         ? false
-        : { port: Number(process.env.HMR_PORT || Number(process.env.PORT || 3000) + 21678), strictPort: false },
+        : { port: Number(process.env.HMR_PORT || 24678), strictPort: false },
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
