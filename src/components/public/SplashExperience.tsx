@@ -17,6 +17,18 @@ import {MizanMark, MizanWordmark} from '../design-system/MizanLogo';
 const HOLD_MS = 2450;
 const EXIT_MS = 340;
 const REDUCED_HOLD_MS = 700;
+// After the splash has played once this session, staff reopening the tablet get a brief
+// courtesy frame instead of the full assembly. Long enough to read as intentional, short
+// enough not to be friction.
+const SEEN_HOLD_MS = 800;
+const SEEN_KEY = 'mizan_splash_seen';
+
+const wasSeen = (): boolean => {
+  try { return sessionStorage.getItem(SEEN_KEY) === '1'; } catch { return false; }
+};
+const markSeen = (): void => {
+  try { sessionStorage.setItem(SEEN_KEY, '1'); } catch { /* private mode — replay full next time */ }
+};
 
 export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
   const [leaving, setLeaving] = useState(false);
@@ -25,8 +37,11 @@ export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
 
   useEffect(() => {
     const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const hold = reduced ? REDUCED_HOLD_MS : HOLD_MS;
     const exit = reduced ? 0 : EXIT_MS;
+    const hold = reduced ? REDUCED_HOLD_MS : wasSeen() ? SEEN_HOLD_MS : HOLD_MS;
+
+    // Mark seen as soon as the splash mounts, so any reload mid-sequence also gets the short frame.
+    markSeen();
 
     const leave = window.setTimeout(() => setLeaving(true), hold);
     const finish = window.setTimeout(() => done.current(), hold + exit);
@@ -43,12 +58,16 @@ export const SplashExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
     };
   }, []);
 
+  // Touch tablets have no keyboard, so a tap anywhere on the splash must also dismiss it.
+  const skipOnPointer = () => { setLeaving(true); const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; window.setTimeout(() => done.current(), reduced ? 0 : EXIT_MS); };
+
   return (
     <div
       className={`mizan-splash ${leaving ? 'mizan-splash-leaving' : ''}`}
       dir="rtl"
       role="status"
       aria-label="جاري فتح ميزان"
+      onPointerDown={skipOnPointer}
     >
       <div className="mizan-splash-field" aria-hidden="true" />
       <div className="mizan-splash-halo" aria-hidden="true" />
