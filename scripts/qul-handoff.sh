@@ -97,17 +97,25 @@ const [url, recording, out] = process.argv.slice(2);
 const mod = await import(path.join(process.cwd(), 'scripts/lib/audio-duration.mjs'));
 const results = {};
 let ok = 0, missing = 0, unreadable = 0;
-// عيّنة موزّعة على المصحف: الآية الأولى من كل سورة ثانية. الآية 1 موجودة في كل سورة يقينًا.
+/*
+ * العيّنة تتجنّب الآية الأولى عمدًا. التوقيتات المرجعية تُقاس على تسجيل السورة المتّصل، فالمدى
+ * قبل الآية الثانية يشمل **البسملة** التي لا يشملها ملفنا المقطوع — فتُقارَن مدّة بمدّة أخرى
+ * ويُظنّ التسجيل مختلفًا وهو هو. الآية الثالثة وسط التلاوة، والتراجع إلى ما قبلها للسور القصيرة.
+ */
 for (let surah = 1; surah <= 114; surah += 2) {
-  const key = `${surah}:1`;
-  try {
-    const r = await fetch(`${url}/api/public/kfgqpc/audio/${recording}/${surah}/1`, { cache: 'no-store' });
-    if (!r.ok) { missing++; continue }
-    const buf = Buffer.from(await r.arrayBuffer());
-    const ms = mod.mp3DurationMs(buf);
-    if (ms === null) { unreadable++; results[key] = null; continue }
-    results[key] = ms; ok++;
-  } catch { missing++ }
+  let recorded = false;
+  for (const ayah of [3, 2, 1]) {
+    try {
+      const r = await fetch(`${url}/api/public/kfgqpc/audio/${recording}/${surah}/${ayah}`, { cache: 'no-store' });
+      if (!r.ok) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ms = mod.mp3DurationMs(buf);
+      const key = `${surah}:${ayah}`;
+      if (ms === null) { unreadable++; results[key] = null; recorded = true; break }
+      results[key] = ms; ok++; recorded = true; break;
+    } catch { /* تُجرَّب الآية التالية */ }
+  }
+  if (!recorded) missing++;
 }
 fs.writeFileSync(out, JSON.stringify({ recording, serviceUrl: url, measured: ok, missing, unreadable, durationsMs: results }, null, 2));
 console.log(`  measured ${ok} · missing ${missing} · unreadable ${unreadable}`);
@@ -126,8 +134,19 @@ gcloud storage buckets update "gs://${BUCKET}" --project "${PROJECT}" --no-publi
 gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" --project "${PROJECT}" \
   --member=allUsers --role=roles/storage.objectViewer >/dev/null 2>&1 \
   || echo "  Could not grant public read — org policy may forbid it."
-gcloud storage cp "${WORK}"/* "gs://${BUCKET}/" --project "${PROJECT}" >/dev/null 2>&1 \
-  || { echo "  Upload failed." >&2; exit 1; }
+# الملفات وحدها: `${WORK}` يحوي مجلدات فكّ الضغط، و`cp` بلا `--recursive` يفشل عليها.
+# ولا يُكتم الخطأ: أُخفي رسالته هنا مرة، فصار الفشل بلا سبب — وهو أسوأ من الفشل.
+mapfile -t FILES < <(find "${WORK}" -maxdepth 1 -type f \( -name '*.json' -o -name '*.txt' \) | sort)
+if [ "${#FILES[@]}" -eq 0 ]; then
+  echo "  Nothing to upload — no schema dumps or durations were produced." >&2
+  exit 1
+fi
+echo "  Uploading ${#FILES[@]} file(s)…"
+if ! gcloud storage cp "${FILES[@]}" "gs://${BUCKET}/" --project "${PROJECT}"; then
+  echo "" >&2
+  echo "  Upload failed — the error above is the reason." >&2
+  exit 1
+fi
 
 echo ""
 echo "Uploaded:"
