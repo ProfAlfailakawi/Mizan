@@ -401,6 +401,17 @@ export interface ResultRecord {
     sealedAt: string;
     cryptographicChecksum: string;
     dualApprovalBy?: string;
+    /**
+     * ما الذي يسند هذا الختم فعلًا. الحقل موجود ليُقرأ لا ليُزيَّن: ختمٌ مُوقَّع بمفتاح خادمي
+     * وختمٌ ببصمة محلّية ليسا سواءً، وجمعهما تحت كلمة «مختوم» يُخفي الفرق الذي يهمّ.
+     */
+    assurance?: 'SERVER_SIGNED' | 'SERVER_DIGEST';
+    /** بصمة الختم كما أصدرها الخادم، ومعها توقيعه حين يكون مفتاحه مهيّأً. */
+    serverSealSha256?: string;
+    signatureKeyId?: string;
+    /** الدرجة التي ألّفها الخادم من الإرسالات الخام، لا التي حسبها المتصفح. */
+    serverComposedScore?: number;
+    contributingJudges?: number;
   };
   publishedById?: string;
   publishedAt?: string;

@@ -16,6 +16,16 @@ import { computePanelScore, panelPenaltyCount, breakTie, type ScoringCriterion, 
  * مختومة بقيمة مختلفة دون أن يقول إنها تغيّرت.
  */
 
+/**
+ * موقّع الخادم. البصمة تُثبت أن الرقم لم يتغيّر بعد ختمه، والتوقيع وحده يُثبت **من ختمه**:
+ * فمن يملك المدخلات يعيد إنتاج البصمة لأي نتائج يختارها، ولا يعيد إنتاج التوقيع بلا المفتاح.
+ */
+export interface SealSigner {
+  keyId: string;
+  publicKeySpki: string;
+  sign(material: string): string;
+}
+
 export interface SealRequest {
   competitionId: string;
   participantId: string;
@@ -31,6 +41,8 @@ export interface SealRequest {
   /** ختم سابق لنفس المشارك، إن وُجد: يُقارَن ولا يُدهس. */
   previousSealSha256?: string;
   previousFinalScore?: number;
+  /** غائب حين لا يُهيَّأ مفتاح خادمي: يُختم بالبصمة ويُعلَن ذلك صراحةً بدل ادّعاء توقيع. */
+  signer?: SealSigner;
 }
 
 export interface SealedResult {
@@ -50,6 +62,9 @@ export interface SealedResult {
   inputsSha256: string;
   sealSha256: string;
   algorithm: string;
+  /** ما الذي يسنده هذا الختم فعلًا. يدخل البصمة نفسها، فلا يُخفَّض بعد الختم دون كشف. */
+  assurance: 'SIGNED_ED25519' | 'DIGEST_ONLY';
+  signature?: { algorithm: 'Ed25519'; keyId: string; publicKeySpki: string; value: string };
   /** يتغيّر عن ختم سابق؟ يُقال صراحةً بدل أن يُستبدل بصمت. */
   supersedes?: { previousSealSha256: string; previousFinalScore: number; delta: number };
 }
@@ -103,13 +118,19 @@ export function sealResult(req: SealRequest): SealOutcome {
     attestation, sealedBy: req.sealedBy, sealedAt: new Date().toISOString(),
     inputsSha256,
     algorithm: 'SHA-256(canonical(submissions, criteria, mode)) → panel score → sealed digest',
+    assurance: (req.signer ? 'SIGNED_ED25519' : 'DIGEST_ONLY') as 'SIGNED_ED25519' | 'DIGEST_ONLY',
   };
 
   const supersedes = req.previousSealSha256 && typeof req.previousFinalScore === 'number'
     ? { previousSealSha256: req.previousSealSha256, previousFinalScore: req.previousFinalScore, delta: Number((panel.finalScore - req.previousFinalScore).toFixed(4)) }
     : undefined;
 
-  const sealed: SealedResult = { ...body, supersedes, sealSha256: sha256(canonical({ ...body, supersedes })) };
+  const sealSha256 = sha256(canonical({ ...body, supersedes }));
+  // يوقَّع الملخّص لا الجسم: الملخّص يغطّي كل حقل بالفعل، فيبقى التحقّق خطوتين مستقلّتين واضحتين.
+  const signature = req.signer
+    ? { algorithm: 'Ed25519' as const, keyId: req.signer.keyId, publicKeySpki: req.signer.publicKeySpki, value: req.signer.sign(sealSha256) }
+    : undefined;
+  const sealed: SealedResult = { ...body, supersedes, sealSha256, signature };
   return { ok: true, sealed };
 }
 
@@ -121,8 +142,28 @@ export function rankSealedResults(results: SealedResult[], tieBreakRules: readon
     a.participantId.localeCompare(b.participantId));
 }
 
-/** إعادة التحقق من ختم: من يملك مدخلاته يعيد إنتاج بصمته. */
+/**
+ * إعادة التحقق من ختم: من يملك مدخلاته يعيد إنتاج بصمته.
+ * التوقيع خارج البصمة عمدًا — البصمة تغطّي المحتوى، والتوقيع يغطّي البصمة.
+ */
 export function verifySeal(sealed: SealedResult): boolean {
-  const { sealSha256, ...body } = sealed;
+  const { sealSha256, signature: _signature, ...body } = sealed;
   return sha256(canonical(body)) === sealSha256;
+}
+
+/**
+ * التحقّق من نسب الختم إلى مفتاح الخادم. مُنفصل عن `verifySeal` لأن الإجابتين مختلفتان:
+ * الأولى «هل تغيّر المحتوى؟» والثانية «هل ختمه من يملك المفتاح؟».
+ * ختمٌ يدّعي التوقيع بلا توقيع يُرفض؛ وختمٌ لا يدّعيه يُقال عنه إنه غير موقّع، لا إنه باطل.
+ */
+export function verifySealSignature(
+  sealed: SealedResult,
+  verify: (material: string, signature: string, keyId: string) => boolean,
+): { state: 'SIGNED' | 'UNSIGNED' | 'INVALID_SIGNATURE' | 'SIGNATURE_MISSING' } {
+  if (sealed.assurance !== 'SIGNED_ED25519') return { state: 'UNSIGNED' };
+  if (!sealed.signature?.value) return { state: 'SIGNATURE_MISSING' };
+  try {
+    return verify(sealed.sealSha256, sealed.signature.value, sealed.signature.keyId)
+      ? { state: 'SIGNED' } : { state: 'INVALID_SIGNATURE' };
+  } catch { return { state: 'INVALID_SIGNATURE' } }
 }

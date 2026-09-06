@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
+import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { auth, getFirestoreClient } from './firebase';
@@ -859,39 +860,109 @@ export function useAppStore() {
     }
   };
 
-  // Cryptographic sealing. A configured dual-approval policy requires two distinct authorized actors.
+  /*
+   * ختم النتائج.
+   *
+   * كان الختم يقع هنا بالكامل: المتصفح يجمع النتائج، ويحسب بصمة SHA-256، ويكتبها في الحالة.
+   * وهذه بصمة لا توقيع — من يملك النتائج يعيد إنتاجها لأي أرقام يختارها — والحالة كلها في
+   * `localStorage`. أي أن الختم كان يوثّق التسلسل للمراجعة ولا يمنع التلاعب.
+   *
+   * صار الخادم هو الذي **يؤلّف** الرقم من إرسالات المحكمين الخام ويختمه، ويوقّعه بمفتاحه حين
+   * يكون مهيّأً. وما يُكتب هنا هو ما أعاده الخادم لا ما حسبه المتصفح.
+   *
+   * وحين لا تُتاح سلطة الخادم، **لا يقع ختم**. هذا رفضٌ مقصود: كنّا نُنتج عندها بصمةً محلّية
+   * تُسمّى ختمًا وليست منه، فيُورَث اطمئنانٌ لا سند له. والامتناع الصريح أصدق من ختم أجوف.
+   */
   const sealResults = async () => {
     const policy = getCompetitionPolicy(globalState.competition);
     const allowedRoles: Role[] = ['head_judge', 'comp_admin', 'org_admin'];
     if (!allowedRoles.includes(globalState.currentUser.role)) return { sealed: false, reason: 'not_authorized', approvals: globalState.sealApprovals.length };
 
+    /*
+     * بوابة النصاب انتقلت إلى الخادم. الفرق ليس شكليًا: الموافق هنا هو الهوية المُصدَّقة للطلب،
+     * فلا يستطيع جهازٌ واحد أن يكتب موافقتين باسمين. والحالة المحلية تُحدَّث لتعكس ما قرّره
+     * الخادم — لا لتقرّر بدله.
+     */
     let sealQuorum:QuorumActionRecord|undefined;
+    let serverQuorumApprovals=0;
     if (policy.results.requireDualApprovalToSeal) {
-      sealQuorum=ensureQuorumAction('results_seal',globalState.competition.id,[['head_judge'],['comp_admin','org_admin']]);
-      const approval=approveQuorumAction(sealQuorum.id);
-      sealQuorum=globalState.quorumActions.find(q=>q.id===sealQuorum!.id);
-      if(!approval.ok||sealQuorum?.status!=='ready'){notify();return {sealed:false,reason:'independent_quorum_required',approvals:sealQuorum?.approvals.length||0};}
+      const requested=await requestQuorum({competitionId:globalState.competition.id,action:'results_seal',entityId:globalState.competition.id,requiredRoleGroups:[['head_judge'],['comp_admin','org_admin']]});
+      if(!succeeded(requested)){notify();return {sealed:false,reason:'server_authority_required' as const,failure:requested.failure,message:authorityFailureText(requested.failure,true),approvals:0};}
+      const approved=await approveQuorum(requested.value.id);
+      // موافقةٌ سبق تسجيلها ليست خطأً: يبقى المعوَّل حالةَ الإجراء لا نتيجة هذا النداء.
+      const state=succeeded(approved)?approved.value:requested.value;
+      serverQuorumApprovals=state.approvals.length;
+      sealQuorum=globalState.quorumActions.find(q=>q.action==='results_seal'&&q.entityId===globalState.competition.id);
+      if(state.status!=='ready'){
+        globalState.sealApprovals=state.approvals.map(a=>({actorId:a.actorId,actorRole:a.actorRole as Role,actorName:a.actorId,timestamp:a.approvedAt}));
+        notify();
+        return {sealed:false,reason:'independent_quorum_required' as const,approvals:serverQuorumApprovals};
+      }
     }
     const invariantRows=await runInvariantChecks();const blocking=invariantRows.filter(r=>r.status==='violation');
-    if(blocking.length){recordInvariantBlock(blocking[0].key,'seal_results','Competition',globalState.competition.id,blocking.map(x=>x.titleEnglish).join('; '));return {sealed:false,reason:'integrity_invariant',approvals:sealQuorum?.approvals.length||0};}
+    if(blocking.length){recordInvariantBlock(blocking[0].key,'seal_results','Competition',globalState.competition.id,blocking.map(x=>x.titleEnglish).join('; '));return {sealed:false,reason:'integrity_invariant',approvals:serverQuorumApprovals};}
 
     const sealedAt = new Date().toISOString();
     const competitionResults = globalState.results.filter(r => r.competitionId === globalState.competition.id);
     if (!competitionResults.length) return { sealed:false, reason:'no_results', approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size };
-    const payload = JSON.stringify(competitionResults.map(r => ({ id:r.id, participantId:r.participantId, score:r.finalScore, rank:r.rank, categoryId:r.categoryId })).sort((a,b)=>a.id.localeCompare(b.id))) + globalState.competition.ruleSet.version + sealedAt;
-    const checksum = await sha256(payload);
-    const approverNames = globalState.sealApprovals.map(a=>a.actorName);
-    globalState.results = globalState.results.map((res) => res.competitionId !== globalState.competition.id ? res : ({
-      ...res,
-      status: 'sealed',
-      sealMetadata: {
-        sealedBy: globalState.currentUser.name,
-        sealedById: globalState.currentUser.id,
-        sealedAt,
-        cryptographicChecksum: `SHA256:${checksum}`,
-        dualApprovalBy: policy.results.requireDualApprovalToSeal ? approverNames.join(' + ') : undefined
+
+    /*
+     * كل نتيجة تُختم على حدة من إرسالات محكميها الخام. لا تُرسَل الدرجة المحسوبة هنا إطلاقًا؛
+     * الخادم يؤلّفها بنفسه، فلا يوجد رقم يمكن لهذا الجهاز أن يمليه.
+     */
+    const ruleSet = globalState.competition.ruleSet;
+    const seals = new Map<string, SealedResultView>();
+    for (const res of competitionResults) {
+      const submissions = globalState.judgeSubmissions.filter(x => x.participantId === res.participantId && x.locked);
+      const sessionId = submissions[0]?.sessionId || '';
+      const outcome = await sealResultOnServer({
+        competitionId: globalState.competition.id, participantId: res.participantId, sessionId,
+        categoryId: res.categoryId,
+        submissions, criteria: ruleSet.criteria,
+        mode: policy.judging.mode, dropExtremes: ruleSet.dropExtremes,
+        sessionEventCount: 0,
+        previousSealSha256: res.sealMetadata?.serverSealSha256,
+        previousFinalScore: res.sealMetadata?.serverSealSha256 ? res.finalScore : undefined,
+      });
+      // فحص بوجود الحقل لا بالراية: التضييق على راية منطقية لا يعمل خارج الوضع الصارم.
+      if ('failure' in outcome) {
+        // امتناعٌ صريح: لا يُختم بعضٌ ويُترك بعض، ولا تُلفَّق بصمة محلّية لسدّ الفراغ.
+        auditTrustAction('RESULT_SEAL_AUTHORITY_UNAVAILABLE','Competition',globalState.competition.id,
+          `تعذّر ختم النتائج على الخادم (${outcome.failure}); لم يُختم شيء`,
+          `Server sealing unavailable (${outcome.failure}); nothing was sealed`);
+        notify();
+        return { sealed:false, reason:'server_authority_required' as const, failure:outcome.failure,
+          message:authorityFailureText(outcome.failure,true), approvals:serverQuorumApprovals };
       }
-    }));
+      seals.set(res.id, outcome.value);
+    }
+
+    const approverNames = globalState.sealApprovals.map(a=>a.actorName);
+    globalState.results = globalState.results.map((res) => {
+      const seal = seals.get(res.id);
+      if (res.competitionId !== globalState.competition.id || !seal) return res;
+      return {
+        ...res,
+        // الدرجة المعتمدة هي التي ألّفها الخادم، لا التي بقيت في هذا الجهاز.
+        finalScore: seal.finalScore,
+        criterionScores: seal.criterionScores || res.criterionScores,
+        penaltyCount: typeof seal.penaltyCount === 'number' ? seal.penaltyCount : res.penaltyCount,
+        status: 'sealed' as const,
+        sealMetadata: {
+          sealedBy: globalState.currentUser.name,
+          sealedById: globalState.currentUser.id,
+          sealedAt: seal.sealedAt || sealedAt,
+          cryptographicChecksum: `SHA256:${seal.sealSha256}`,
+          dualApprovalBy: policy.results.requireDualApprovalToSeal ? approverNames.join(' + ') : undefined,
+          assurance: seal.assurance === 'SIGNED_ED25519' ? 'SERVER_SIGNED' as const : 'SERVER_DIGEST' as const,
+          serverSealSha256: seal.sealSha256,
+          signatureKeyId: seal.signature?.keyId,
+          serverComposedScore: seal.finalScore,
+          contributingJudges: seal.contributingJudges,
+        },
+      };
+    });
+    const checksum = competitionResults.map(r => seals.get(r.id)?.sealSha256 || '').join('').slice(0, 64) || await sha256(sealedAt);
     globalState.competition = { ...globalState.competition, status: 'results_sealed' };
     for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) void persistScopedDocument('results',rr.id,rr as unknown as Record<string,unknown>);
     globalState.auditLogs = [{
