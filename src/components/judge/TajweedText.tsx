@@ -53,6 +53,41 @@ export const TajweedAyah:React.FC<{text:string;spans?:TajweedSpan[];enabled:bool
   : <span key={i}>{p.text}</span>)}</>;
 };
 
+/*
+ * الآية مقطّعة إلى كلمات، فتُظلَّل الكلمة الجارية أثناء التلاوة المرجعية.
+ *
+ * التلوين والتظليل بُعدان متعامدان: أحكام التجويد إزاحاتٌ على نص الآية كلها، والتظليل يقع على
+ * كلمة. فتُشرَّح الأحكام إلى إحداثيات كل كلمة ثم تُلوَّن داخلها، فلا يضيع حكم على حدود كلمة
+ * ولا يُلوَّن حرف مرتين.
+ */
+export const TajweedAyahWords:React.FC<{text:string;spans?:TajweedSpan[];enabled:boolean;words:{index:number;start:number;end:number}[];activeWord:number}>=({text,spans,enabled,words,activeWord})=>{
+ const pieces=useMemo(()=>{
+  const out:{key:string;text:string;word:number}[]=[];let cursor=0;
+  for(const w of words){
+   if(w.start>cursor)out.push({key:`gap${cursor}`,text:text.slice(cursor,w.start),word:-1});
+   out.push({key:`w${w.index}`,text:text.slice(w.start,w.end),word:w.index});
+   cursor=w.end;
+  }
+  if(cursor<text.length)out.push({key:`tail${cursor}`,text:text.slice(cursor),word:-1});
+  return out;
+ },[text,words]);
+ // أحكام كل كلمة بإحداثيات محلية، حتى يبقى اللون على حرفه بعد التقطيع.
+ const localSpans=useMemo(()=>{
+  const map=new Map<number,TajweedSpan[]>();if(!enabled||!spans?.length)return map;
+  for(const w of words){
+   const inside=spans.filter(s=>s.end>w.start&&s.start<w.end)
+    .map(s=>({rule:s.rule,start:Math.max(0,s.start-w.start),end:Math.min(w.end-w.start,s.end-w.start)}));
+   if(inside.length)map.set(w.index,inside);
+  }
+  return map;
+ },[spans,words,enabled]);
+ return <>{pieces.map(p=>p.word<0
+  ? <span key={p.key}>{p.text}</span>
+  : <span key={p.key} className={p.word===activeWord?'rounded-md bg-[#dCe9e1] shadow-[0_0_0_1px_#bcd6c9] transition-colors duration-150':'transition-colors duration-150'}>
+     <TajweedAyah text={p.text} spans={localSpans.get(p.word)} enabled={enabled}/>
+    </span>)}</>;
+};
+
 export const TajweedLegend:React.FC<{spans:TajweedSpan[];ar:boolean}>=({spans,ar})=>{
  const present=useMemo(()=>{const s=new Set(spans.map(x=>x.rule));return LEGEND_ORDER.filter(r=>s.has(r))},[spans]);
  if(!present.length)return null;
