@@ -24,3 +24,16 @@ export async function fetchJudgeCalibration(observations:CalibrationObservation[
   return {judges:Array.isArray(body?.calibration?.judges)?body.calibration.judges:[],scenario:Array.isArray(body?.rankScenario)?body.rankScenario:[]};
  }catch{return null}
 }
+
+/*
+ * قياس موثوقية التحكيم بالإعماء.
+ *
+ * يُرسَل الحكمان المستقلّان ويُعاد الفرق بينهما. الخادم لا يكتب شيئًا؛ والمخرج تقرير للإدارة
+ * العلمية. تعذّر القياس يُعيد null فتغيب اللوحة بدل أن تعرض رقمًا لا سند له.
+ */
+export interface ReliabilityReport{pairs:number;agreementRate:number;toleranceUsed:number;meanAbsoluteDifference:number;maxAbsoluteDifference:number;sufficientSample:boolean;widestCriterion?:{criterionId:string;meanAbsoluteDifference:number};outliers:{sessionId:string;participantId:string;difference:number}[];note:string}
+export async function measureJudgingReliability(body:{assignments:unknown[];originals:unknown[];reviews:unknown[];criteria:unknown[];tolerance?:number}):Promise<ReliabilityReport|null>{
+ try{const user=auth.currentUser;if(!user)return null;
+  const token=await user.getIdToken();
+  const r=await fetch('/api/judging/blind-rescoring/measure',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify(body)});
+  if(!r.ok)return null;return await r.json() as ReliabilityReport}catch{return null}}
