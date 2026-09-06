@@ -19,6 +19,9 @@ import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
+import { MutashabihatEngine } from './server/quran-mutashabihat';
+import { DifficultyEngine } from './server/quran-difficulty';
+import { calibrateJudges, normalizedRankScenario, type JudgeScoreObservation } from './server/judge-calibration';
 import { AlignmentSessionManager } from './server/alignment/session';
 import { createAlignmentRouter } from './server/alignment/api';
 import { devHafsPassage } from './server/alignment/canonical';
@@ -165,8 +168,75 @@ async function startServer() {
         anchor:req.query.anchor?String(req.query.anchor) as any:undefined,ayahCount:num(req.query.ayahCount),
         juz:num(req.query.juz),surah:num(req.query.surah),minAyahCount:num(req.query.min),maxAyahCount:num(req.query.max)});
       if(!out)return res.status(404).json({code:'FAIRDRAW_SOURCE_NOT_DELIVERED'});
-      res.setHeader('Cache-Control','no-store');return res.json(out)}
+      // Attach the measured cognitive load of the drawn passage so panels can see — and later
+      // equalise — how heavy a draw actually is, instead of assuming randomness means fairness.
+      let difficulty:unknown=undefined;
+      try{const a=await analysisFor(readingId);if(a)difficulty=a.difficulty.vector(out.passage.surah,out.passage.startAyah,out.passage.endAyah)}catch{}
+      res.setHeader('Cache-Control','no-store');return res.json({...out,difficulty})}
     catch{return res.status(502).json({code:'FAIRDRAW_FAILED'})}});
+
+  /*
+   * Mutashabihat radar + difficulty vector.
+   *
+   * Both are derived from the delivery text of the requested reading and are cached per reading
+   * (the index build is O(words) and would otherwise repeat on every request). They are analysis
+   * surfaces for the head judge and the draw: they never mark an error and never touch a score.
+   */
+  const analysisCache=new Map<string,{mutashabihat:MutashabihatEngine;difficulty:DifficultyEngine;names:Map<number,string>}>();
+  const analysisFor=async(readingId:string)=>{
+    const cached=analysisCache.get(readingId);if(cached)return cached;
+    const rows=await kfgqpcDelivery.quranData(readingId);if(!rows)return null;
+    const mutashabihat=new MutashabihatEngine(rows);
+    const difficulty=new DifficultyEngine(rows,mutashabihat);
+    const names=new Map<number,string>();for(const r of rows){const s=Number(r.sora);if(!names.has(s)&&r.sora_name_ar)names.set(s,String(r.sora_name_ar))}
+    const entry={mutashabihat,difficulty,names};analysisCache.set(readingId,entry);return entry;
+  };
+
+  app.get('/api/public/kfgqpc/mutashabihat/:readingId/:surah/:ayah',async(req,res)=>{
+    const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);
+    try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
+      const matches=a.mutashabihat.similarPhrasesForAyah(surah,ayah).map(m=>({...m,occurrences:m.occurrences.map(o=>({...o,surahNameArabic:a.names.get(o.surah)}))}));
+      res.setHeader('Cache-Control','public, max-age=3600');
+      return res.json({reading:readingId,surah,ayah,matches,note:'وقائع نصية معدودة من حزمة الرواية نفسها؛ لا نِسَب احتمالية ولا حكم على المتسابق.'})}
+    catch{return res.status(502).json({code:'MUTASHABIHAT_FAILED'})}});
+
+  app.get('/api/public/kfgqpc/divergence/:readingId/:surah/:startAyah/:endAyah',async(req,res)=>{
+    const readingId=safeSegment(String(req.params.readingId||''));
+    const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
+    try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
+      const points=a.mutashabihat.divergencePoints(surah,startAyah,endAyah,{nameOf:(s)=>a.names.get(s)});
+      res.setHeader('Cache-Control','public, max-age=3600');
+      return res.json({reading:readingId,surah,startAyah,endAyah,points,note:'مفترقات نصية حقيقية تُعرض قبل بلوغها؛ تنبيه لرئيس التحكيم لا رصد خطأ.'})}
+    catch{return res.status(502).json({code:'DIVERGENCE_FAILED'})}});
+
+  app.get('/api/public/kfgqpc/difficulty/:readingId/:surah/:startAyah/:endAyah',async(req,res)=>{
+    const readingId=safeSegment(String(req.params.readingId||''));
+    const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
+    try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
+      res.setHeader('Cache-Control','public, max-age=3600');
+      return res.json({reading:readingId,surah,startAyah,endAyah,vector:a.difficulty.vector(surah,startAyah,endAyah)})}
+    catch{return res.status(502).json({code:'DIFFICULTY_FAILED'})}});
+
+  /*
+   * Judge calibration — advisory only.
+   *
+   * Head-judge scoped: it reports how far each judge sits from their peers on the same
+   * participants, shrunk toward "balanced" so a judge with few sessions is never labelled from a
+   * thin sample. It returns a comparison scenario alongside the real ranking; it never rewrites a
+   * human score and never re-ranks results on its own.
+   */
+  app.post('/api/judging/calibration',requireGovernanceRoles(['head_judge','comp_admin','org_admin','auditor','scientific_admin']),(req,res)=>{
+    const raw=Array.isArray(req.body?.observations)?req.body.observations:[];
+    if(!raw.length)return res.status(400).json({code:'OBSERVATIONS_REQUIRED'});
+    const observations:JudgeScoreObservation[]=raw.slice(0,20000).map((o:any)=>({judgeId:String(o.judgeId||''),judgeName:o.judgeName?String(o.judgeName):undefined,
+      sessionId:String(o.sessionId||''),participantId:String(o.participantId||''),criterionId:o.criterionId?String(o.criterionId):undefined,
+      score:Number(o.score),submittedAtMs:o.submittedAtMs?Number(o.submittedAtMs):undefined,participantCountry:o.participantCountry?String(o.participantCountry):undefined}))
+      .filter((o:JudgeScoreObservation)=>o.judgeId&&o.participantId&&Number.isFinite(o.score));
+    if(!observations.length)return res.status(400).json({code:'OBSERVATIONS_INVALID'});
+    const calibration=calibrateJudges(observations);
+    res.setHeader('Cache-Control','no-store');
+    return res.json({calibration,rankScenario:normalizedRankScenario(observations,calibration)});
+  });
 
   app.post('/api/enterprise/science/quran/kfgqpc/ingest',requireEnterpriseKey,(req,res)=>{if(!serverQuranSources)return res.status(503).json({code:'SERVER_QURAN_SOURCE_VAULT_NOT_CONFIGURED'});try{const manifest=serverQuranSources.ingestOfficial({packageId:String(req.body?.packageId||''),bundlePath:String(req.body?.bundlePath||''),dataPath:String(req.body?.dataPath||''),ingestedBy:String(req.body?.ingestedBy||'enterprise-import')});let waqf:unknown=null;try{waqf=quranIntelligence?.deriveOfficialWaqfForPackage(manifest.packageId)||null}catch(waqfErr){waqf={status:'DERIVATION_FAILED',code:waqfErr instanceof Error?waqfErr.message:'WAQF_DERIVATION_FAILED'}}res.status(201).json({ingested:true,manifest,waqf})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'QURAN_SOURCE_INGEST_FAILED'})}});
   app.post('/api/science/quran/kfgqpc/:packageId/approve',requireGovernanceRoles(['scientific_admin']),(req,res)=>{if(!serverQuranSources)return res.status(503).json({code:'SERVER_QURAN_SOURCE_VAULT_NOT_CONFIGURED'});try{return res.json({manifest:serverQuranSources.approve(String(req.params.packageId),(req as any).mizanIdentity.uid)})}catch(err){return res.status(409).json({code:err instanceof Error?err.message:'QURAN_SOURCE_APPROVAL_FAILED'})}});

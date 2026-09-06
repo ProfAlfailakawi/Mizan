@@ -44,6 +44,31 @@ export async function drawFairPassage(reading='hafs',options:{seed?:string;ancho
  try{const r=await fetch(`/api/public/kfgqpc/fairdraw/${encodeURIComponent(reading)}${q.toString()?`?${q}`:''}`,{cache:'no-store'});
   if(!r.ok)return null;return await r.json()}catch{return null}}
 
+/*
+ * Mutashabihat radar and the pre-emptive divergence tree.
+ *
+ * Both return counted text facts from the same reading's package — where a phrase genuinely
+ * recurs, and where a shared phrase forks into a different next word. No probability is attached
+ * to a reciter, because none is measured.
+ */
+export interface MutashabihatOccurrence{surah:number;ayah:number;wordIndex:number;page?:number;surahNameArabic?:string}
+export interface MutashabihatMatch{phrase:string;wordCount:number;totalOccurrences:number;occurrences:MutashabihatOccurrence[]}
+export interface DivergenceBranch{at:MutashabihatOccurrence;nextWord:string;surahNameArabic?:string}
+export interface DivergencePoint{surah:number;ayah:number;wordIndex:number;sharedPhrase:string;sharedWordCount:number;expectedWord:string;branches:DivergenceBranch[]}
+export interface DifficultyVector{mutashabihat:number;rareWords:number;endingSimilarity:number;waqfSensitivity:number;score:number}
+
+export async function fetchMutashabihat(reading:string,surah:number,ayah:number):Promise<MutashabihatMatch[]>{
+ try{const r=await fetch(`/api/public/kfgqpc/mutashabihat/${encodeURIComponent(reading)}/${surah}/${ayah}`,{cache:'force-cache'});
+  if(!r.ok)return [];const b=await r.json();return Array.isArray(b.matches)?b.matches:[]}catch{return []}}
+
+export async function fetchDivergencePoints(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DivergencePoint[]>{
+ try{const r=await fetch(`/api/public/kfgqpc/divergence/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
+  if(!r.ok)return [];const b=await r.json();return Array.isArray(b.points)?b.points:[]}catch{return []}}
+
+export async function fetchDifficulty(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DifficultyVector|null>{
+ try{const r=await fetch(`/api/public/kfgqpc/difficulty/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
+  if(!r.ok)return null;const b=await r.json();return b.vector||null}catch{return null}}
+
 export async function loadKfgqpcOfficialQuranFont(fontId='primary'):Promise<boolean>{try{if(typeof FontFace==='undefined'||typeof document==='undefined')return false;const name='MIZAN KFGQPC Official';const face=new FontFace(name,`url(/api/public/kfgqpc/font/${encodeURIComponent(fontId)})`);const loaded=await face.load();document.fonts.add(loaded);return document.fonts.check(`16px \"${name}\"`)}catch{return false}}
 
 const USE_AR:Record<string,string>={
