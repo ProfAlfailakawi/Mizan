@@ -18,7 +18,7 @@ import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-bui
 import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
-import { generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
+import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
 import { calibrateJudges, normalizedRankScenario, type JudgeScoreObservation } from './server/judge-calibration';
@@ -150,6 +150,15 @@ async function startServer() {
 
   app.get('/api/public/kfgqpc/font/:fontId',async(req,res)=>{try{const asset=await kfgqpcDelivery.font(safeSegment(String(req.params.fontId||'primary')));if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).end()}catch{return res.status(502).end()}});
   app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
+  /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
+     فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */
+  app.get('/api/public/kfgqpc/mushaf-layout/:page',async(req,res)=>{const page=Number(req.params.page);
+    if(!Number.isInteger(page)||page<1||page>604)return res.status(400).json({code:'MUSHAF_PAGE_INVALID'});
+    try{const layout=await kfgqpcDelivery.mushafLayout(page);
+      if(!layout)return res.status(204).end();
+      res.setHeader('Cache-Control','public, max-age=86400, immutable');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
+      return res.json(layout)}catch{return res.status(502).json({code:'MUSHAF_LAYOUT_DELIVERY_FAILED'})}});
+
   // Delivery-layer Quran text + generative FairDraw.
   // These read ONLY the requested reading's delivery package (no cross-riwayah fallback) and are
   // explicitly labelled DELIVERY_OPEN_MIRROR: they support display and drawing, and never replace
@@ -182,6 +191,21 @@ async function startServer() {
       try{const a=await analysisFor(readingId);if(a)difficulty=a.difficulty.vector(out.passage.surah,out.passage.startAyah,out.passage.endAyah)}catch{}
       res.setHeader('Cache-Control','no-store');return res.json({...out,difficulty})}
     catch{return res.status(502).json({code:'FAIRDRAW_FAILED'})}});
+
+  /* السحب المتوازن لدفعة متسابقين: مقطع مختلف لكل واحد بصعوبة متكافئة مقيسة.
+     الإسناد ذاته سرٌّ تشغيلي (يكشف مقطع كل متسابق)، فهو خلف أدوار السحب لا عام. */
+  app.post('/api/quran/fairdraw/balanced',requireGovernanceRoles(['comp_admin','org_admin','head_judge','scientific_admin']),async(req,res)=>{
+    const readingId=safeSegment(String(req.body?.reading||'hafs'));
+    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
+    try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
+      const out=await balancedFairDraw(kfgqpcDelivery,a.difficulty,{reading:readingId,
+        contestants:Number(req.body?.contestants),seed:req.body?.seed?String(req.body.seed):undefined,
+        anchor:req.body?.anchor?String(req.body.anchor) as any:undefined,ayahCount:num(req.body?.ayahCount),
+        juz:num(req.body?.juz),surah:num(req.body?.surah),minAyahCount:num(req.body?.min),maxAyahCount:num(req.body?.max),
+        oversample:num(req.body?.oversample),toleranceRatio:Number.isFinite(Number(req.body?.tolerance))?Number(req.body.tolerance):undefined});
+      if(!out)return res.status(422).json({code:'FAIRDRAW_BALANCED_POOL_INSUFFICIENT'});
+      res.setHeader('Cache-Control','no-store');return res.json(out)}
+    catch{return res.status(502).json({code:'FAIRDRAW_BALANCED_FAILED'})}});
 
   /*
    * Mutashabihat radar + difficulty vector.

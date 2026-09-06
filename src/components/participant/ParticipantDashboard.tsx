@@ -8,12 +8,15 @@ import { Button } from '../design-system/Button';
 import { RegistrationFlow } from '../public/RegistrationFlow';
 import { RealQRCode, makeMizanPassPayload } from '../design-system/RealQRCode';
 import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
+import { PracticeStudio } from './PracticeStudio';
+import { deliveryReadingKeyFor } from '../judge/OfficialMushafSurface';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
 const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Approve'},{ar:'الحضور',en:'Arrive'},{ar:'الاختبار',en:'Recite'},{ar:'الشهادة',en:'Certificate'}];
 
 export const ParticipantDashboard: React.FC = () => {
  const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant}=store; const ar=language==='ar';
+ const [pSurah,setPSurah]=useState(1); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
  const [showRegistration,setShowRegistration]=useState(false); const [showAppeal,setShowAppeal]=useState(false); const [appealText,setAppealText]=useState(''); const [showCert,setShowCert]=useState(false);
  const participant=participants.find(p=>p.email===currentUser.email)||participants[0];
  const policy=getCompetitionPolicy(competition);
@@ -26,8 +29,25 @@ export const ParticipantDashboard: React.FC = () => {
  const resultVisible=policy.results.visibility==='immediate'||policy.results.visibility==='private_only'||result?.status==='published'||result?.status==='sealed';
  const passPayload=makeMizanPassPayload(participant.code);
  const queueEstimate=store.getQueueEstimate(participant.id);
+ // التدرّب يكون على رواية المتسابق نفسها؛ رواية بلا حزمة تسليم لا تفتح الاستوديو أصلًا.
+ const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
  return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
   <section className="mizan-surface p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="mizan-code">{participant.code}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?participant.fullNameArabic:participant.fullName}</h1><p className="text-xs text-[#646965] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(participant.status,ar)}</Badge></div><div className="mt-7 flex items-center gap-1.5" role="list" aria-label={ar?'مراحل رحلتك':'Your journey'}>{[1,2,3,4,5].map(n=>{const state=n<step?'done':n===step?'current':'upcoming';return <React.Fragment key={n}><span role="listitem" aria-current={state==='current'?'step':undefined} aria-label={`${STEP_LABELS[n-1][ar?'ar':'en']} — ${ar?(state==='done'?'مكتملة':state==='current'?'أنت هنا':'لاحقًا'):(state==='done'?'done':state==='current'?'you are here':'upcoming')}`} className="mizan-step" data-state={state}>{state==='done'?<Check className="w-4 h-4"/>:n}</span>{n<5&&<span className="mizan-step-rule" data-done={n<step||undefined} aria-hidden="true"/>}</React.Fragment>})}</div><div className="mt-2 grid grid-cols-5" aria-hidden="true">{STEP_LABELS.map((l,i)=><span key={l.en} className="mizan-step-label" data-state={i+1===step?'current':undefined}>{ar?l.ar:l.en}</span>)}</div></section>
+  {practiceReading&&['approved','checked_in','in_queue'].includes(participant.status)&&<section className="space-y-3">
+   <div className="flex flex-wrap items-end justify-between gap-3">
+    <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
+     <h2 className="text-lg font-black mt-1">{ar?'تدرّب على المصحف نفسه':'Practise on the same Mushaf'}</h2></div>
+    <div className="flex items-end gap-2">
+     <label className="text-[9px] font-black text-[#59615c]">{ar?'السورة':'Surah'}
+      <input type="number" min={1} max={114} value={pSurah} onChange={e=>setPSurah(Math.max(1,Math.min(114,Number(e.target.value)||1)))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+     <label className="text-[9px] font-black text-[#59615c]">{ar?'من آية':'From ayah'}
+      <input type="number" min={1} value={pStart} onChange={e=>setPStart(Math.max(1,Number(e.target.value)||1))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+     <label className="text-[9px] font-black text-[#59615c]">{ar?'عدد الآيات':'Ayat'}
+      <input type="number" min={1} max={20} value={pCount} onChange={e=>setPCount(Math.max(1,Math.min(20,Number(e.target.value)||1)))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+    </div>
+   </div>
+   <PracticeStudio reading={practiceReading} surah={pSurah} startAyah={pStart} endAyah={pStart+pCount-1} ar={ar}/>
+  </section>}
 
   {participant.status==='approved'&&<section className="mizan-surface p-6 sm:p-8 text-center"><div className="w-12 h-12 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><QrCode className="w-6 h-6"/></div><h2 className="text-xl font-black mt-4">{ar?'بطاقتك جاهزة':'Your pass is ready'}</h2><div className="mt-5 w-44 h-44 border-8 border-white outline outline-1 outline-[#deddd6] bg-white rounded-2xl mx-auto grid place-items-center overflow-hidden"><RealQRCode value={passPayload} size={160} label={ar?'رمز دخول ميزان':'MIZAN entry pass'}/></div><div className="mt-3 text-[10px] font-mono text-[#656a66]">{participant.code}</div><div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-[#626a65]"><span className="flex items-center gap-1.5"><CalendarClock className="w-4 h-4"/>{participant.arrivalSlot||'09:10–09:30'}</span><span className="flex items-center gap-1.5"><MapPin className="w-4 h-4"/>{competition.venueName}</span></div>{policy.operations.selfCheckIn&&<Button className="mt-6" onClick={()=>checkInParticipant(participant.id,'mobile_self')}>{ar?'أنا وصلت':'I’m here'}</Button>}</section>}
 

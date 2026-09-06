@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import {R2PrivateClient,r2ConfigFromEnv,type R2ObjectInfo} from './r2-private';
+import {normalizeMushafLayout,type MushafPageLayout} from './mushaf-layout';
 
 export type KfgqpcDeliveryKind='mushaf-page'|'audio-ayah'|'font';
 export type KfgqpcDeliverySource='LOCAL'|'R2'|'NONE';
@@ -191,6 +192,23 @@ export class KfgqpcDeliveryRepository{
     if(!Array.isArray(rows)||!rows.length)return null;
     this.quranDataCache.set(readingId,rows as any[]);
     return rows as any[];
+  }
+
+  /**
+   * طبقة تخطيط الكلمة لصفحة رسمية — إثراء بصري للعدسة، لا مرجع علمي.
+   * تُقرأ من التسليم، وإلا من منفذ المحتوى المفتوح، وتُطبَّع بصرامة أو تُرجع null.
+   */
+  private layoutCache=new Map<number,MushafPageLayout|null>();
+  async mushafLayout(page:number):Promise<MushafPageLayout|null>{
+    if(!Number.isInteger(page)||page<1||page>604)return null;
+    if(this.layoutCache.has(page))return this.layoutCache.get(page)!;
+    const file=`page-${pad3(page)}.json`;
+    let asset:{file:string;type:string;source:string}|null=await this.remotePrivate([`delivery/quran-data/mushaf-layout/v1/${file}`]);
+    if(!asset&&openDeliveryEnabled())asset=await this.openFetch(`https://raw.githubusercontent.com/zonetecde/mushaf-layout/main/mushaf/${file}`,`open:layout:${page}`,'application/json');
+    let layout:MushafPageLayout|null=null;
+    if(asset){try{layout=normalizeMushafLayout(JSON.parse(fs.readFileSync(asset.file,'utf8')),page)}catch{layout=null}}
+    this.layoutCache.set(page,layout);
+    return layout;
   }
 
   /** Resolve an exact (surah, startAyah..endAyah) passage with its official page/line loci. */
