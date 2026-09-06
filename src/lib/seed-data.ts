@@ -802,7 +802,8 @@ export const SEED_REVIEW_CASES: ReviewCase[] = [
     reason: 'judge_variance',
     severity: 'medium',
     timestampSec: 142,
-    details: 'Judge 1 flagged mistake (-0.5) at 02:22 while Judge 2 flagged Tajweed note (-0.25). AI Silent Guardian detected potential hesitation restart.',
+    // نصّ إنجليزي داخل فقرة عربية تُبعثره خوارزمية الاتجاه فيخرج غير مقروء. العرض بالعربية.
+    details: 'رصد المحكم الأول خطأ حفظ (-0.5) عند الدقيقة 02:22، ورصد المحكم الثاني ملاحظة تجويد (-0.25). ونبّه الحارس الصامت إلى احتمال تردّد وإعادة.',
     audioClipUrl: 'https://cdn.mizan.org/audio/clips/clip-104-142.mp3',
     status: 'pending'
   },

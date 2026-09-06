@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
+import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
+import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { auth, getFirestoreClient } from './firebase';
 import {
   User,
@@ -61,11 +63,14 @@ import { buildDisasterPack, generateEncryptionKey, encryptJson, privacySafeBench
 
 import { AppStoreState, STORAGE_KEY } from './store-state';
 
-function getInitialState(): AppStoreState {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved) as AppStoreState;
+/*
+ * ترقية حالة محفوظة إلى الشكل الحالي: تُضاف الحقول المستحدثة ويُنسب كل سجل لمسابقته.
+ * الحسابات والأدوار لا تُزرع في نشرٍ حقيقي — مصدرها حوكمة الهوية الخادمية وحدها.
+ */
+function hydrateSavedState(parsed: AppStoreState): AppStoreState {
+  const launch = isLaunchDeployment();
+  // يسبق الترقية: وإلا لملأ احتياطُ الحسابات المزروعة الفراغَ قبل أن يصل الحارس.
+  if (launch) { parsed.identityAccounts = parsed.identityAccounts ?? []; parsed.roleGrants = parsed.roleGrants ?? []; }
       parsed.organization = parsed.organization || SEED_ORGANIZATION;
       parsed.organizations = parsed.organizations?.length ? parsed.organizations : [parsed.organization];
       parsed.competition = { ...parsed.competition, policy: getCompetitionPolicy(parsed.competition), ruleSets: parsed.competition.ruleSets || [parsed.competition.ruleSet] };
@@ -79,11 +84,10 @@ function getInitialState(): AppStoreState {
       parsed.travelRecords = parsed.travelRecords || []; parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
       parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
       parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||[]; parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})); parsed.roleGrants=parsed.roleGrants||SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})); parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||[]; parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
-      return parsed;
-    }
-  } catch {
-    // fallback to initial seed
-  }
+  return parsed;
+}
+
+function seededInitialState(): AppStoreState {
 
   const defaultUser = SEED_USERS.find((u) => u.role === 'comp_admin') || SEED_USERS[0];
 
@@ -153,6 +157,31 @@ function getInitialState(): AppStoreState {
   };
 }
 
+/*
+ * الحالة الابتدائية.
+ *
+ * في نشرٍ حقيقي لا تُزرع بيانات عرض إطلاقًا، ولا تُحيا حالةٌ محفوظة تعود لبيانات العرض: متصفّح
+ * جرّب النسخة التجريبية ثم وُجّه إلى الإنتاج كان سيستعيد المتسابقين المخترعين من تخزينه المحلي.
+ */
+function getInitialState(): AppStoreState {
+  const launch = isLaunchDeployment();
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as AppStoreState;
+      if (launch && isDemoResidue(parsed?.organization?.id, SEED_ORGANIZATION.id)) {
+        localStorage.removeItem(STORAGE_KEY);
+      } else {
+        return hydrateSavedState(parsed);
+      }
+    }
+  } catch {
+    // fallback below
+  }
+  const seeded = seededInitialState();
+  return launch ? toLaunchState(seeded) : seeded;
+}
+
 let globalState = getInitialState();
 let browserMeshAdapter: MeshTransportAdapter | null = null;
 const productionMode = import.meta.env.PROD === true;
@@ -194,17 +223,73 @@ function mergeJudgeSubmissions(local: JudgeSubmission[], remote: JudgeSubmission
   return [...byKey.values()];
 }
 
+/*
+ * دمج غير مُفقِد بالمعرّف: السحابة تُضيف ما لا نملكه وتحدّث ما نملكه، ولا تحذف سجلًا محليًا
+ * لم يصل الخادم بعد (جهاز كان بلا شبكة). الحذف عملية صريحة لا أثرٌ جانبي لمزامنة.
+ */
+function mergeById<T extends { id: string }>(local: T[], remote: T[]): T[] {
+  const byId = new Map<string, T>(local.map((x) => [x.id, x]));
+  for (const row of remote) if (row && typeof row.id === 'string') byId.set(row.id, { ...(byId.get(row.id) || {} as T), ...row });
+  return [...byId.values()];
+}
+
 const listeners = new Set<() => void>();
 
 let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 
+/*
+ * كتابة مستند واحد في مجموعة المسابقة الفرعية.
+ *
+ * الدور يُفحص قبل الشبكة: لا معنى لإرسال كتابة سترفضها قواعد فايرستور، والرفض الصامت كان
+ * يجعل عمل المحكّم يبدو محفوظًا وهو ليس كذلك. وأي فشل يُرفَع إلى حالة ظاهرة لا إلى سجلّ الطرفية.
+ */
 async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
   if(globalState.isOffline||!auth.currentUser)return false;
+  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
+  if(exceedsSafeDocumentSize(data)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE',`${collectionName}/${id}`);return false;}
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
     await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...data,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
+    if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
     return true;
-  }catch(err){console.warn(`Scoped persistence paused for ${collectionName}/${id}:`,err);return false;}
+  }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
+}
+
+/*
+ * فشل المزامنة السحابية كان يُبتلع في console.warn، فتتوقّف المزامنة في منتصف مسابقة ولا يعلم
+ * أحد. صار يُرفع إلى حالة يعرضها شريطٌ للمشغّل: عطلٌ مسموع خيرٌ من عطلٍ مكتوم.
+ */
+function reportCloudError(code:CloudSyncErrorCode,scope:string){
+  const message=code==='CLOUD_PAYLOAD_TOO_LARGE'?`حمولة ${scope} أكبر من حدّ المستند؛ لم تُرفع.`
+    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية لا تسمح بكتابة ${scope}.`
+    :`تعذّرت مزامنة ${scope} مع السحابة.`;
+  globalState.persistenceError={code,message,at:new Date().toISOString()};
+  notify();
+}
+function clearCloudError(){globalState.persistenceError=null;notify();}
+
+/*
+ * لحاق: يرفع ما يملكه هذا الدور ولم يصل الخادم بعد (جهاز عاد من انقطاع).
+ * الأسماء والمعرّفات هي نفسها التي تكتبها مواضع الفعل، فلا يتولّد مستند مكرّر للسجل الواحد.
+ */
+async function persistOwnedRecords(){
+  const role=globalState.currentUser.role,compId=globalState.competition.id;
+  const mine=<T extends {competitionId?:string}>(rows:T[])=>rows.filter(r=>!r.competitionId||r.competitionId===compId);
+  if(canWriteSyncedCollection(role,'judge_submissions'))
+    for(const x of mine(globalState.judgeSubmissions as any[]))
+      await persistScopedDocument('judge_submissions',`${x.sessionId}_${x.judgeId}`,x);
+  if(canWriteSyncedCollection(role,'results'))
+    for(const x of mine(globalState.results as any[])) await persistScopedDocument('results',x.id,x);
+  if(canWriteSyncedCollection(role,'participants'))
+    for(const x of mine(globalState.participants as any[])) await persistScopedDocument('participants',x.id,x);
+  if(canWriteSyncedCollection(role,'committees'))
+    for(const x of mine(globalState.committees as any[])) await persistScopedDocument('committees',x.id,x);
+  if(canWriteSyncedCollection(role,'appeals'))
+    for(const x of mine(globalState.appeals as any[])) await persistScopedDocument('appeals',x.id,x);
+  if(canWriteSyncedCollection(role,'certificates'))
+    for(const x of mine(globalState.certificates as any[])) await persistScopedDocument('certificates',x.id,x);
+  if(canWriteSyncedCollection(role,'reviews'))
+    for(const x of mine(globalState.reviewCases as any[])) await persistScopedDocument('reviews',x.id,x);
 }
 
 
@@ -224,34 +309,39 @@ async function flushServerAuditOutbox(){
 function mirrorAuditEventToServer(ev:AuditEvent){if(!auth.currentUser)return;const row:ServerAuditMirror={eventId:ev.id,organizationId:ev.organizationId,competitionId:ev.competitionId,action:ev.action,entityType:ev.entityType,entityId:ev.entityId,reason:ev.reason,humanSummaryEnglish:ev.humanSummaryEnglish,clientTimestamp:ev.timestamp,sessionId:ev.sessionId,authenticationAssurance:ev.authenticationAssurance};const rows=readServerAuditOutbox();if(!rows.some(x=>x.eventId===row.eventId)){rows.push(row);writeServerAuditOutbox(rows)}void flushServerAuditOutbox();}
 if(typeof window!=='undefined'&&!(window as any).__mizanAuditOnlineHook){(window as any).__mizanAuditOnlineHook=true;window.addEventListener('online',()=>void flushServerAuditOutbox())}
 
+/*
+ * المزامنة السحابية.
+ *
+ * كانت تكتب الحالة كاملة — مشاركون ونتائج وسجلّ تدقيق وعشرات المجموعات — حقولًا في **وثيقة
+ * واحدة**، ومن جهاز الإدارة وحده. فمخرجات المحكّم لا تصل أحدًا، ووثيقةٌ بهذا الحجم تتجاوز حدّ
+ * فايرستور في يومٍ حقيقي فتتوقّف المزامنة بصمت.
+ *
+ * الآن: وثيقة المسابقة تحمل إعدادها فقط (صغيرة وثابتة، تكتبها الإدارة)، وكل سجل يُكتب مستندًا
+ * مستقلًا في مجموعته الفرعية بيد الدور الذي يملكه. فيصل عمل المحكّم إلى الخادم، ويختفي سقف
+ * الوثيقة الواحدة.
+ */
 function syncToFirestore() {
   if (globalState.isOffline || !auth.currentUser) return;
-  if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
   if (firestoreSyncTimeout) clearTimeout(firestoreSyncTimeout);
   firestoreSyncTimeout = setTimeout(async () => {
+    // كل دور يرفع ما يملكه؛ لم يعد جهاز الإدارة نقطة العبور الوحيدة.
+    await persistOwnedRecords();
+    if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
     try {
       const { db, doc, setDoc } = await getFirestoreClient();
       const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
-      await setDoc(docRef, {
+      // إعداد المسابقة وحده. السجلات تعيش في مجموعاتها الفرعية.
+      const configuration = {
         competition: globalState.competition,
-        participants: globalState.participants,
-        committees: globalState.committees,
         judges: globalState.judges,
-        results: globalState.results,
-        reviewCases: globalState.reviewCases,
-        aiObservations: globalState.aiObservations,
-        judgeSubmissions: globalState.judgeSubmissions,
-        certificates: globalState.certificates,
-        auditLogs: globalState.auditLogs,
-        incidents: globalState.incidents,
-        appeals: globalState.appeals,
         emergencyFrozen: globalState.emergencyFrozen,
-        sealApprovals: globalState.sealApprovals,
-        notifications: globalState.notifications, devices: globalState.devices, travelRecords: globalState.travelRecords, consents: globalState.consents, shadowRuns: globalState.shadowRuns, audioRecordings: globalState.audioRecordings.map(r=>({...r,localObjectUrl:undefined})), importJobs:globalState.importJobs, timeMachineScenarios:globalState.timeMachineScenarios, quorumActions:globalState.quorumActions, invariantViolations:globalState.invariantViolations, evidenceNodes:globalState.evidenceNodes, evidenceEdges:globalState.evidenceEdges, publicResultRoots:globalState.publicResultRoots, publicResultProofs:globalState.publicResultProofs, localMeshSessions:globalState.localMeshSessions, federationAttestations:globalState.federationAttestations, protocolPackages:globalState.protocolPackages, flightRecorderEntries:globalState.flightRecorderEntries, integrityEnvelopes:globalState.integrityEnvelopes, chaosDrills:globalState.chaosDrills, accessibilityProfiles:globalState.accessibilityProfiles, elasticityRecommendations:globalState.elasticityRecommendations, journeyPasses:globalState.journeyPasses, policyCompilations:globalState.policyCompilations, contradictionIssues:globalState.contradictionIssues, disasterPacks:globalState.disasterPacks, deviceReassignments:globalState.deviceReassignments, fatigueRecommendations:globalState.fatigueRecommendations, competitionBenchmarks:globalState.competitionBenchmarks, rehearsals:globalState.rehearsals, scientificDatasets:globalState.scientificDatasets, benchmarkRuns:globalState.benchmarkRuns, variantLoci:globalState.variantLoci, quranReferenceAudio:globalState.quranReferenceAudio, quranCrossChecks:globalState.quranCrossChecks, scientificAdjudications:globalState.scientificAdjudications, scientificImpactReports:globalState.scientificImpactReports, federationTrust:globalState.federationTrust, ceremonyVaults:globalState.ceremonyVaults, fairDrawProofs:globalState.fairDrawProofs, questionRevealGates:globalState.questionRevealGates, queueTransfers:globalState.queueTransfers, identityAccounts:globalState.identityAccounts, roleGrants:globalState.roleGrants, identityInvitations:globalState.identityInvitations, authSessions:globalState.authSessions, passReissues:globalState.passReissues, credentialLineages:globalState.credentialLineages, sessionCheckpoints:globalState.sessionCheckpoints, continuityIncidents:globalState.continuityIncidents, sessionRecoveries:globalState.sessionRecoveries, auditLedgerSeals:globalState.auditLedgerSeals,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+        updatedAt: new Date().toISOString(),
+      };
+      if (exceedsSafeDocumentSize(configuration)) { reportCloudError('CLOUD_PAYLOAD_TOO_LARGE', 'competition'); return; }
+      await setDoc(docRef, configuration, { merge: true });
+      if (globalState.persistenceError && globalState.persistenceError.code.startsWith('CLOUD_')) clearCloudError();
     } catch (err) {
-      console.warn('Firestore cloud sync paused (local cache active):', err);
+      reportCloudError(classifyCloudError(err), 'competition');
     }
   }, 1000);
 }
@@ -307,60 +397,51 @@ export function useAppStore() {
     const listener = () => setState({ ...globalState });
     listeners.add(listener);
 
-    // Subscribe only after real Firebase authentication. Demo/local mode stays fully local.
-    let unsubscribe: (() => void) | undefined;
-    // Firestore now arrives asynchronously, so the effect can be torn down before the
-    // client resolves. Without this flag we would attach a listener nobody owns and
-    // never unsubscribe it.
+    /*
+     * الاشتراك بعد مصادقة حقيقية فقط؛ وضع العرض المحلي يبقى محليًا بالكامل.
+     *
+     * كان الاستماع على وثيقة المسابقة وحدها يقرأ مصفوفاتٍ لم تعد تُكتب فيها. صار لكل مجموعة
+     * فرعية مستمعٌ خاص، فيصل عمل كل جهاز إلى بقية الأجهزة: درجات المحكّم إلى رئيس اللجنة،
+     * وتسجيل المشارك إلى الإدارة.
+     */
+    const unsubscribers: (() => void)[] = [];
     let cancelled = false;
     try {
       if (!auth.currentUser) return () => { listeners.delete(listener); };
-      void getFirestoreClient().then(({ db, doc, onSnapshot }) => {
+      void getFirestoreClient().then((fs) => {
       if (cancelled) return;
-      const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
-      unsubscribe = onSnapshot(docRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          if (data) {
-            let changed = false;
-            if (data.emergencyFrozen !== undefined && data.emergencyFrozen !== globalState.emergencyFrozen) {
-              globalState.emergencyFrozen = data.emergencyFrozen;
-              changed = true;
-            }
-            if (data.results && Array.isArray(data.results)) {
-              globalState.results = mergeResultsByAuthority(globalState.results, data.results as ResultRecord[]);
-              changed = true;
-            }
-            if (data.certificates && Array.isArray(data.certificates)) {
-              globalState.certificates = data.certificates;
-              changed = true;
-            }
-            if (data.reviewCases && Array.isArray(data.reviewCases)) { globalState.reviewCases = data.reviewCases; changed = true; }
-            if (data.aiObservations && Array.isArray(data.aiObservations)) { globalState.aiObservations = data.aiObservations; changed = true; }
-            if (data.audioRecordings && Array.isArray(data.audioRecordings)) { globalState.audioRecordings = data.audioRecordings; changed = true; }
-            if (data.judgeSubmissions && Array.isArray(data.judgeSubmissions)) {
-              globalState.judgeSubmissions = mergeJudgeSubmissions(globalState.judgeSubmissions, data.judgeSubmissions as JudgeSubmission[]);
-              changed = true;
-            }
-            if (data.appeals && Array.isArray(data.appeals)) {
-              globalState.appeals = data.appeals;
-              changed = true;
-            }
-            if (data.sealApprovals && Array.isArray(data.sealApprovals)) {
-              globalState.sealApprovals = data.sealApprovals;
-              changed = true;
-            }
-            if (changed) {
-              persistLocalSnapshot();
-              setState({ ...globalState });
-            }
-          }
-        }
-      }, (error) => {
-        console.warn('Firestore live listener warning:', error);
-      });
+      const { db, doc, onSnapshot, collection: collectionFn } = fs;
+      const orgId = globalState.competition.organizationId, compId = globalState.competition.id;
+
+      // 1) إعداد المسابقة من وثيقتها.
+      unsubscribers.push(onSnapshot(doc(db, 'organizations', orgId, 'competitions', compId), (snapshot: any) => {
+        if (!snapshot.exists()) return;
+        const data = snapshot.data(); if (!data) return;
+        let changed = false;
+        if (data.emergencyFrozen !== undefined && data.emergencyFrozen !== globalState.emergencyFrozen) { globalState.emergencyFrozen = data.emergencyFrozen; changed = true; }
+        if (data.competition) { globalState.competition = { ...globalState.competition, ...data.competition, policy: getCompetitionPolicy({ ...globalState.competition, ...data.competition }) }; changed = true; }
+        if (Array.isArray(data.judges)) { globalState.judges = data.judges; changed = true; }
+        if (changed) notify();
+      }));
+
+      // 2) السجلات من مجموعاتها الفرعية. الدمج بالسلطة يبقى: المختوم لا يتراجع.
+      if (typeof collectionFn === 'function') {
+        const watch = (name: string, apply: (rows: any[]) => void) => {
+          unsubscribers.push(onSnapshot(collectionFn(db, 'organizations', orgId, 'competitions', compId, name), (snap: any) => {
+            const rows: any[] = []; snap.forEach((d: any) => rows.push(d.data()));
+            apply(rows); notify();
+          }));
+        };
+        watch('results', rows => { globalState.results = mergeResultsByAuthority(globalState.results, rows as ResultRecord[]); });
+        watch('judge_submissions', rows => { globalState.judgeSubmissions = mergeJudgeSubmissions(globalState.judgeSubmissions, rows as JudgeSubmission[]); });
+        watch('participants', rows => { globalState.participants = mergeById(globalState.participants, rows); });
+        watch('committees', rows => { globalState.committees = mergeById(globalState.committees, rows); });
+        watch('certificates', rows => { globalState.certificates = mergeById(globalState.certificates, rows); });
+        watch('reviews', rows => { globalState.reviewCases = mergeById(globalState.reviewCases, rows); });
+        watch('appeals', rows => { globalState.appeals = mergeById(globalState.appeals, rows); });
+      }
       // A late unmount that raced the import still gets cleaned up here.
-      if (cancelled && unsubscribe) { unsubscribe(); unsubscribe = undefined; }
+      if (cancelled) { unsubscribers.forEach(u => u()); unsubscribers.length = 0; }
       }).catch(e => { console.warn('Firestore initialization warning:', e); });
     } catch (e) {
       console.warn('Firestore initialization warning:', e);
@@ -369,7 +450,7 @@ export function useAppStore() {
     return () => {
       cancelled = true;
       listeners.delete(listener);
-      if (unsubscribe) unsubscribe();
+      unsubscribers.forEach(u => u());
     };
   }, []);
 

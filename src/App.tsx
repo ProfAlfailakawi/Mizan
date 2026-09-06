@@ -1,4 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { PersistenceAlert } from './components/design-system/PersistenceAlert';
+import { VenueLockButton, VenueUnlockGuard, useVenueLockState } from './components/design-system/VenueLockControl';
 import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
@@ -103,7 +105,52 @@ const OverlayFallback: React.FC = () => (
     <span className="sr-only">جارٍ التحميل</span>
   </div>
 );
-const Page: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<ViewFallback/>}>{children}</Suspense>;
+// كل شاشة تحمل شريط عطل الحفظ: التنبيه الذي يظهر في شاشة واحدة لا يُرى حين يقع العطل في غيرها.
+/* شاشة الدور غير المُسنَد: تقول الحقيقة ولا تمنح صلاحية. */
+const NoRoleConsole: React.FC = () => (
+  <div className="min-h-[60vh] grid place-items-center p-6">
+    <div className="mizan-surface p-8 max-w-md text-center">
+      <div className="mizan-kicker">حوكمة الوصول</div>
+      <h1 className="text-xl font-black mt-2">لا توجد شاشة لهذا الدور</h1>
+      <p className="text-xs text-[#636864] mt-3 leading-6">الحساب موثّق، لكن دوره غير مرتبط بواجهة تشغيلية في هذا الإصدار. راجع مدير المؤسسة لإسناد دور معروف.</p>
+    </div>
+  </div>
+);
+
+
+/*
+ * أسطح القاعة تحت القفل.
+ *
+ * حين يكون الجهاز مقفولًا لا تُمرَّر `onClose` إلى الشاشة إطلاقًا: فلا زرّ إغلاق ولا Escape
+ * ولا دور dialog — لأن السطح حينها ليس نافذةً فوق التطبيق بل هو الجهاز كله. وهذا يستعمل
+ * التصميم القائم (شاشة بلا onClose = سطح دائم) بدل أن يضيف حارسًا يمكن تجاوزه.
+ */
+const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',hallMap:'خريطة القاعة',broadcast:'شاشة البث',jiLab:'مختبر ذكاء التحكيم',ceremony:'شاشة الحفل'};
+const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean;broadcast:boolean;jiLab:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,hallMap,broadcast,jiLab,ceremony,close})=>{
+ const {language}=useAppStore(); const ar=language==='ar';
+ const {lock,apply}=useVenueLockState();
+ const active=kiosk?'kiosk':waitingBoard?'waitingBoard':hallMap?'hallMap':broadcast?'broadcast':jiLab?'jiLab':ceremony?'ceremony':'';
+ if(!active) return null;
+ const locked=!!lock;
+ // مقفول ⇒ بلا مخرج. مفتوح ⇒ يغلق كالمعتاد.
+ const exit=locked?undefined:close[active];
+ const surface=VENUE_LABEL[active]||active;
+ return <>
+  <Overlay>
+   {kiosk&&<KioskMode onClose={exit}/>}
+   {waitingBoard&&<WaitingBoard onClose={exit}/>}
+   {hallMap&&<HallRecitationMap onClose={exit}/>}
+   {broadcast&&<BroadcastStage onClose={exit}/>}
+   {jiLab&&<JudgeIntelligenceLab onClose={exit}/>}
+   {ceremony&&<CeremonyView onClose={exit}/>}
+  </Overlay>
+  {locked
+   ? <VenueUnlockGuard lock={lock!} ar={ar} onUnlocked={()=>apply(null)}/>
+   : <div className="fixed bottom-4 inset-x-0 z-[80] flex justify-center pointer-events-none"><div className="pointer-events-auto"><VenueLockButton surface={surface} ar={ar} onLocked={apply}/></div></div>}
+ </>;
+};
+
+const Page: React.FC<{children: React.ReactNode}> = ({children}) => <><PersistenceAlert/><Suspense fallback={<ViewFallback/>}>{children}</Suspense></>;
 const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
 
 export default function App() {
@@ -133,7 +180,7 @@ export default function App() {
  if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#broadcast')) return <><Overlay><BroadcastStage onClose={returnToExperience}/></Overlay></>;
  if(hash.startsWith('#judge-intelligence')) return <><Overlay><JudgeIntelligenceLab onClose={returnToExperience}/></Overlay></>;
- if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page>{kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>} {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>} {hallMap&&<Overlay><HallRecitationMap onClose={()=>setHallMap(false)}/></Overlay>} {broadcast&&<Overlay><BroadcastStage onClose={()=>setBroadcast(false)}/></Overlay>} {jiLab&&<Overlay><JudgeIntelligenceLab onClose={()=>setJiLab(false)}/></Overlay>} {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}</>;
+ if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/></>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
@@ -150,7 +197,9 @@ export default function App() {
    case 'auditor': return <AuditorConsole/>;
    case 'guardian': return <GuardianPortal/>;
    case 'support_agent': return <SupportConsole/>;
-   default: return <CompetitionOverview/>;
+   /* دور لا نعرفه لا يُمنح شاشة الإدارة. الافتراضي كان يُسقط أي دور غير مُعالَج على
+      لوحة إدارة المسابقة — امتيازٌ بالصمت. الفشل هنا مغلق: لا شاشة حتى يُسنَد دور معروف. */
+   default: return <NoRoleConsole/>;
   }
  };
  const isBroadcast=currentUser.role==='broadcast_operator';
@@ -158,10 +207,6 @@ export default function App() {
   {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
-  {kiosk&&<Overlay><KioskMode onClose={()=>setKiosk(false)}/></Overlay>}
-  {waitingBoard&&<Overlay><WaitingBoard onClose={()=>setWaitingBoard(false)}/></Overlay>}
-  {broadcast&&<Overlay><BroadcastStage onClose={()=>setBroadcast(false)}/></Overlay>}
-  {jiLab&&<Overlay><JudgeIntelligenceLab onClose={()=>setJiLab(false)}/></Overlay>}
-  {ceremony&&<Overlay><CeremonyView onClose={()=>setCeremony(false)}/></Overlay>}
+  <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/>
  </div>
 }
