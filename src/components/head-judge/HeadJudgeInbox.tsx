@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Bot, Check, FileCheck2, Gavel, Headphones, LockKeyhole, ShieldCheck, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -9,6 +9,8 @@ import { ContinuityRecovery } from '../operations/ContinuityRecovery';
 
 import { EmergencyQuestionAuthorization } from '../admin/EmergencyQuestionAuthorization';
 import { JudgeDriftMonitor } from './JudgeDriftMonitor';
+import { JudgeCalibrationPanel, type JudgeCalibrationRow, type RankScenarioRow } from './JudgeCalibrationPanel';
+import { fetchJudgeCalibration } from '../../lib/judge-calibration-client';
 type Tab='reviews'|'appeals';
 // Severity was printed raw — "medium", "low" — inside an Arabic triage list, and
 // only two of the three levels were ever distinguished by tone.
@@ -26,9 +28,22 @@ export const HeadJudgeInbox: React.FC = () => {
  const approvals=new Set(sealApprovals.map(a=>a.actorId)).size; const guardian=store.getIntegrityAnalytics(); const guardianAttention=guardian.filter(x=>x.attention);
  const canSeal=reviewCases.every(r=>r.status!=='pending')&&appeals.every(a=>a.status!=='submitted'&&a.status!=='under_review')&&store.results.length>0;
  const alreadyApproved=sealApprovals.some(a=>a.actorId===store.currentUser.id);
+ /* Calibration compares each judge with the peers who scored the same participant, so a
+    difference in ruler shows up as a difference in ruler rather than as a difference between
+    participants. The maths runs server-side behind the head-judge role — the panel simply stays
+    hidden for anyone not entitled to see it. Advisory only: nothing here edits a score. */
+ const [calibration,setCalibration]=useState<{judges:JudgeCalibrationRow[];scenario:RankScenarioRow[]}>({judges:[],scenario:[]});
+ useEffect(()=>{let live=true;
+  const observations=store.judgeSubmissions.flatMap(sub=>Object.entries(sub.criterionScores||{}).map(([criterionId,score])=>({
+   judgeId:sub.judgeId,judgeName:sub.judgeName,sessionId:sub.sessionId,participantId:sub.participantId||sub.sessionId,criterionId,score:Number(score),
+  }))).filter(o=>Number.isFinite(o.score));
+  if(observations.length<6){setCalibration({judges:[],scenario:[]});return}
+  void fetchJudgeCalibration(observations).then(r=>{if(live&&r)setCalibration(r)});
+  return()=>{live=false}},[store.judgeSubmissions]);
  return <div className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-5">
   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div><div className="mizan-kicker">{ar?'رئيس التحكيم':'HEAD JUDGE'}</div><h1 className="text-3xl sm:text-4xl font-black mt-1">{ar?'القرار البشري في الحالات المهمة':'Human decision where it matters'}</h1><p className="text-sm text-[#636864] mt-2">{ar?'لا تراجع الطبيعي. النظام يجلب لك الاختلاف، الاعتراض، واعتماد الختم فقط.':'Routine stays out of the way; you receive discrepancies, appeals and seal approval only.'}</p></div><div className="flex gap-2"><Badge variant={pending.length?'amber':'emerald'}>{pending.length} {ar?'مراجعة':'reviews'}</Badge><Badge variant={pendingAppeals.length?'amber':'neutral'}>{pendingAppeals.length} {ar?'اعتراض':'appeals'}</Badge></div></div>
   {store.continuityIncidents.some(x=>x.status!=='RESOLVED')&&<ContinuityRecovery/>}
+  <JudgeCalibrationPanel judges={calibration.judges} scenario={calibration.scenario} ar={ar}/>
   <EmergencyQuestionAuthorization/>
   {guardianAttention.length>0&&<div className="mizan-surface p-4 flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#F2EADC] text-[#7d5e34] grid place-items-center"><ShieldCheck className="w-5 h-5"/></span><div className="flex-1"><div className="text-sm font-black">{ar?'مراجعة مساندة · اختلاف يحتاج انتباه':'Judge Guardian · variance needs attention'}</div><div className="text-[10px] text-[#656b66] mt-1">{guardianAttention.map(x=>`${x.name}: ${x.deviationFromPanel>0?'+':''}${x.deviationFromPanel}`).join(' · ')}</div></div><Badge variant="amber">{guardianAttention.length}</Badge></div>}
   <div className="mizan-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><LockKeyhole className="w-5 h-5"/></span><div><div className="text-sm font-black">{ar?'اعتماد ختم النتائج':'Result seal approval'}</div><div className="text-[11px] text-[#646965] mt-1">{policy.results.requireDualApprovalToSeal?(ar?`${approvals}/2 اعتمادات مستقلة`:`${approvals}/2 independent approvals`):(ar?'لا تتطلب هذه المسابقة اعتمادًا مزدوجًا':'Dual approval is disabled for this competition')}</div></div></div><Button size="sm" variant={alreadyApproved?'secondary':'outline'} disabled={!canSeal||alreadyApproved} onClick={()=>store.sealResults()} icon={alreadyApproved?<BadgeCheck className="w-4 h-4"/>:<LockKeyhole className="w-4 h-4"/>}>{alreadyApproved?(ar?'تم اعتمادي':'Approved'):(ar?'أعتمد الختم':'Approve seal')}</Button></div>

@@ -1,0 +1,26 @@
+import {auth} from './firebase';
+import type {JudgeCalibrationRow,RankScenarioRow} from '../components/head-judge/JudgeCalibrationPanel';
+
+/*
+ * عميل ميزان اتزان المحكمين.
+ *
+ * الحساب يجري على الخادم خلف صلاحية رئيس التحكيم، لا في المتصفح. والسبب ليس ثقل الحساب — فهو
+ * يسير — بل أن مقارنة المحكمين ببعضهم معلومة حسّاسة لا ينبغي أن يراها كل من فتح الصفحة، ولا أن
+ * تُشتق في جهاز يمكن العبث به. وإن لم يكن للحساب هذه الصلاحية عاد الطلب فارغًا فتختفي اللوحة
+ * بهدوء، بلا رسالة خطأ تُقلق من لا شأن له بها.
+ */
+
+export interface CalibrationObservation{
+ judgeId:string;judgeName?:string;sessionId:string;participantId:string;criterionId?:string;score:number;
+}
+
+export async function fetchJudgeCalibration(observations:CalibrationObservation[]):Promise<{judges:JudgeCalibrationRow[];scenario:RankScenarioRow[]}|null>{
+ try{
+  const user=auth.currentUser;if(!user)return null;
+  const token=await user.getIdToken();
+  const r=await fetch('/api/judging/calibration',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},cache:'no-store',body:JSON.stringify({observations})});
+  if(!r.ok)return null;
+  const body=await r.json();
+  return {judges:Array.isArray(body?.calibration?.judges)?body.calibration.judges:[],scenario:Array.isArray(body?.rankScenario)?body.rankScenario:[]};
+ }catch{return null}
+}

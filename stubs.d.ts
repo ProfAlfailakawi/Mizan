@@ -6,6 +6,7 @@ declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
  export const Highlighter: any;
+ export const Scale: any;
  export const Gauge: any;
  export const GitBranch: any;
  export const ChevronDown: any;
