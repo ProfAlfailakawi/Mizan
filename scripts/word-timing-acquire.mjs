@@ -42,6 +42,23 @@ const arg = (name, fallback) => {
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 const layoutDir = arg('--layout', '');
+/*
+ * أيّ القرّاء يُبتلع؟ ليس كل ما تنشره الحزمة يخصّ ميزان. والافتراض هنا **الاستبعاد لا الشمول**:
+ * توقيتٌ لقارئ لا نخدم تسجيله حِملٌ بلا فائدة، وفرصةٌ لأن يُربط يومًا بتسجيل ليس له.
+ *
+ *   --reciters a,b   يبتلع المذكورين وحدهم (مطابقة جزئية غير حسّاسة لحالة الأحرف)
+ *   --exclude  a,b   يستبعد المذكورين، ويُضاف إليهم المستبعَدون افتراضًا أدناه
+ */
+const listArg = (name) => String(arg(name, '')).split(',').map((x) => x.trim()).filter(Boolean);
+const onlyReciters = listArg('--reciters');
+/* السديس: ليس ضمن تسجيلات ميزان، وملفه في الحزمة هو الوحيد الذي نُشر ملوّثًا. */
+const DEFAULT_EXCLUDED = ['Abdurrahmaan_As-Sudais'];
+const excluded = [...DEFAULT_EXCLUDED, ...listArg('--exclude')];
+const wanted = (reciter) => {
+  if (excluded.some((x) => reciter.toLowerCase().includes(x.toLowerCase()))) return false;
+  if (!onlyReciters.length) return true;
+  return onlyReciters.some((x) => reciter.toLowerCase().includes(x.toLowerCase()));
+};
 const outDir = arg('--out', path.join(process.cwd(), '.mizan-data', 'word-timings'));
 const zipPath = arg('--zip', '');
 
@@ -125,7 +142,10 @@ function main() {
   fs.mkdirSync(outDir, { recursive: true });
   const summary = [];
 
+  const skipped = [];
   for (const [name, sha] of declared) {
+    const reciterName = name.replace(/\.json$/, '');
+    if (!wanted(reciterName)) { skipped.push(reciterName); continue }
     const file = path.join(work, name);
     const bytes = fs.readFileSync(file);
     const actual = crypto.createHash('sha1').update(bytes).digest('hex');
@@ -181,7 +201,11 @@ function main() {
 
   fs.rmSync(work, { recursive: true, force: true });
 
-  if (!summary.length) { console.error('No reciter passed verification.'); process.exit(1) }
+  if (skipped.length) {
+    console.log('');
+    console.log(`Skipped ${skipped.length} reciter(s) not requested for MIZAN: ${skipped.join(', ')}`);
+  }
+  if (!summary.length) { console.error('No reciter passed verification. Check --reciters against the package contents.'); process.exit(1) }
   const worst = summary.reduce((a, b) => (Number(a.pct) < Number(b.pct) ? a : b));
   console.log('');
   console.log(`${summary.length} reciters ingested. Lowest coverage: ${worst.reciter} at ${worst.pct}%.`);

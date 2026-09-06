@@ -1,0 +1,117 @@
+# تهيئة سلطة النزاهة على Cloud Run — يُشغَّل مرة واحدة.
+#
+# الختم يمتنع ما لم تكن هذه التهيئة قائمة، وهذا مقصود: بصمةٌ يحسبها المتصفح تُسمّى ختمًا
+# وليست منه. وهذا الملف يجمع الخطوات الخمس في أمر واحد حتى لا تُنفَّذ نصفها.
+#
+# التشغيل المُوصى به — المفتاح لا يمرّ بسجلّات البناء إطلاقًا:
+#   node scripts/setup-integrity-authority.mjs > key.txt
+#   sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' key.txt > private.pem
+#   gcloud secrets create MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM --data-file=private.pem
+#   shred -u private.pem key.txt
+#   gcloud builds submit --no-source --config cloudbuild-integrity.yaml
+#
+# ولماذا يُنشأ السرّ يدويًا؟ لأن تمريره كـsubstitution يضعه في تاريخ البناء وسجلّاته، فيبقى
+# مقروءًا لكل من يملك حقّ قراءة البناءات. والمفتاح الذي يُقرأ لا يعود مفتاحًا.
+#
+# ما يفعله: يُنشئ حاوية تخزين دائمة لحالة السلطة، ويخزّن مفتاح التوقيع في Secret Manager،
+# ويمنح حساب الخدمة حقّ قراءته، ثم يربط الاثنين بالخدمة.
+#
+# لماذا حاوية تخزين ولا يكفي قرص الحاوية؟ لأن قرص Cloud Run لكل نسخة ويُمحى مع إعادة التشغيل:
+# موافقة نصاب تُسجَّل على نسخة ولا تراها الأخرى، وبذرةٌ التُزم بها تضيع قبل كشفها. والخادم
+# يرفض التفعيل على مسار كهذا بدل أن يُنتج ختمًا يسنده دليل زائل.
+
+substitutions:
+  _SERVICE: 'mizan'
+  _REGION: 'me-central1'
+  _BUCKET: 'mizan-integrity-authority'
+  _SECRET: 'MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM'
+  _SIGNING_KEY_PEM: ''
+
+steps:
+  - id: 'guard'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-euc'
+      - |
+        # لا سرّ قائم ولا مفتاح مُمرَّر ⇒ لا متابعة: ستُركَّب سلطة بلا توقيع.
+        if gcloud secrets describe "${_SECRET}" >/dev/null 2>&1; then
+          echo "Secret ${_SECRET} already exists; the key will not pass through this build."
+          exit 0
+        fi
+        if ! printf '%s' "${_SIGNING_KEY_PEM}" | grep -q 'BEGIN PRIVATE KEY'; then
+          echo "Refusing: secret ${_SECRET} does not exist and no key was supplied."
+          echo "Create it first, so the key never enters build logs:"
+          echo "  node scripts/setup-integrity-authority.mjs > key.txt"
+          echo "  sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' key.txt > private.pem"
+          echo "  gcloud secrets create ${_SECRET} --data-file=private.pem && shred -u private.pem key.txt"
+          exit 1
+        fi
+        echo "WARNING: supplying the key as a substitution records it in this build's history."
+        echo "Prefer creating the secret first. Continuing because it was passed explicitly." 
+
+  - id: 'durable-storage'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-euc'
+      - |
+        # إنشاء متكرّر بلا ضرر: الوجود المسبق ليس فشلًا.
+        gcloud storage buckets describe "gs://${_BUCKET}" >/dev/null 2>&1 \
+          || gcloud storage buckets create "gs://${_BUCKET}" --location="${_REGION}" --uniform-bucket-level-access
+        # حالة النزاهة ليست للعامة تحت أي ظرف.
+        gcloud storage buckets update "gs://${_BUCKET}" --public-access-prevention
+
+  - id: 'signing-key'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-euc'
+      - |
+        if ! gcloud secrets describe "${_SECRET}" >/dev/null 2>&1; then
+          gcloud secrets create "${_SECRET}" --replication-policy=automatic
+          printf '%s' "${_SIGNING_KEY_PEM}" | gcloud secrets versions add "${_SECRET}" --data-file=-
+        fi
+        # السرّ القائم لا يُدهس: تدوير المفتاح قرار يُتخذ عمدًا، لا أثرٌ جانبي لإعادة تهيئة.
+        SA="$$(gcloud run services describe "${_SERVICE}" --region "${_REGION}" --format='value(spec.template.spec.serviceAccountName)')"
+        if [ -z "$$SA" ]; then
+          SA="$$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
+        fi
+        echo "Granting secret access to $$SA"
+        gcloud secrets add-iam-policy-binding "${_SECRET}" \
+          --member="serviceAccount:$$SA" --role=roles/secretmanager.secretAccessor >/dev/null
+        gcloud storage buckets add-iam-policy-binding "gs://${_BUCKET}" \
+          --member="serviceAccount:$$SA" --role=roles/storage.objectAdmin >/dev/null
+
+  - id: 'bind-service'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-euc'
+      - |
+        gcloud run services update "${_SERVICE}" --region "${_REGION}" \
+          --add-volume=name=authority,type=cloud-storage,bucket="${_BUCKET}" \
+          --add-volume-mount=volume=authority,mount-path=/mnt/authority \
+          --update-env-vars=MIZAN_INTEGRITY_AUTHORITY_DIR=/mnt/authority,MIZAN_INTEGRITY_AUTHORITY_DURABLE=true \
+          --update-secrets=MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM="${_SECRET}:latest"
+        URL="$$(gcloud run services describe "${_SERVICE}" --region "${_REGION}" --format='value(status.url)')"
+        echo "Verifying $$URL/api/health"
+        # التحقّق جزء من التهيئة لا خطوة لاحقة تُنسى.
+        for i in 1 2 3 4 5 6; do
+          BODY="$$(curl -sS --max-time 20 "$$URL/api/health" || true)"
+          case "$$BODY" in
+            *'"integrityAuthorityStatus":"ENABLED"'*)
+              case "$$BODY" in
+                *'"trustSigningConfigured":true'*)
+                  echo "Integrity authority ENABLED and signing key loaded."; exit 0 ;;
+              esac
+              echo "Authority enabled but the signing key is not loaded yet."; ;;
+          esac
+          sleep 10
+        done
+        echo "Setup applied, but /api/health did not report an enabled, signing-capable authority."
+        echo "Last response: $$BODY"
+        exit 1
+
+options:
+  logging: CLOUD_LOGGING_ONLY

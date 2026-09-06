@@ -59,3 +59,30 @@ test('write permission is proven, not assumed from metadata',()=>{
   else{assert.equal(v.durable,false);assert.equal((v as {code:string}).code,'NOT_WRITABLE')}
   fs.chmodSync(dir,0o700);
 });
+
+/*
+ * وحدة مركّبة على تخزين سحابي ليست قرصًا: rename فيها قد لا يُدعم. الحالة لا يصحّ أن تُفقد
+ * لهذا السبب، ولا أن يُنزل عن الذرّية بصمت.
+ */
+import {IntegrityAuthorityRepository} from '../server/integrity-authority';
+
+test('state still persists when the mount refuses an atomic rename',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mizan-fuse-'));
+  const realRename=fs.renameSync;
+  const warnings:string[]=[];
+  const realWarn=console.warn;
+  (fs as {renameSync:typeof fs.renameSync}).renameSync=()=>{throw new Error('ENOSYS: rename not supported')};
+  console.warn=(...a:unknown[])=>{warnings.push(a.join(' '))};
+  try{
+    const repo=new IntegrityAuthorityRepository(dir);
+    const actor={uid:'u1',role:'head_judge' as const,organizationId:'org1',competitionId:'c1'};
+    const out=repo.requestQuorum(actor,{competitionId:'c1',action:'results_seal',entityId:'c1',requiredRoleGroups:[['head_judge'],['comp_admin']]});
+    assert.ok('record' in out);
+    // والحالة تُقرأ بعد إعادة الفتح: لم تُفقد لأن الوحدة ليست قرصًا.
+    assert.equal(new IntegrityAuthorityRepository(dir).listQuorum(actor,'c1').length,1);
+    assert.ok(warnings.some(w=>/atomic rename unavailable/.test(w)),'the loss of atomicity is stated, not swallowed');
+  } finally {
+    (fs as {renameSync:typeof fs.renameSync}).renameSync=realRename;
+    console.warn=realWarn;
+  }
+});

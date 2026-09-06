@@ -41,8 +41,11 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       # Preserve the private R2 contract on every deployment without exposing secret values to Cloud Build.
+      # سلطة النزاهة تُهيَّأ مرة بـcloudbuild-integrity.yaml؛ وهذه الأسطر تُبقيها قائمة بعد كل
+      # نشر. `--update-*` لا يمسّ ما لا يُذكر، فوحدة التخزين المركّبة والمفتاح يبقيان.
+      # وقبل التهيئة يشير المسار إلى ما ليس مركّبًا، فيمتنع الختم صراحةً ويُقال سببه في السجل.
       - '--update-env-vars'
-      - 'R2_ENDPOINT=https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com,R2_BUCKET=mizan-quran-assets'
+      - 'R2_ENDPOINT=https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com,R2_BUCKET=mizan-quran-assets,MIZAN_INTEGRITY_AUTHORITY_DIR=/mnt/authority,MIZAN_INTEGRITY_AUTHORITY_DURABLE=true'
       - '--update-secrets'
       - 'R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest'
 
