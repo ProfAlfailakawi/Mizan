@@ -76,7 +76,9 @@ export interface AppStoreState {
   isOffline: boolean;
   emergencyFrozen: boolean;
   /** Set when a local snapshot write fails (e.g. storage quota exceeded) so the UI can warn instead of losing data silently. */
-  persistenceError?: { code: 'QUOTA_EXCEEDED' | 'WRITE_FAILED'; message: string; at: string } | null;
+  /* عطل حفظ ظاهر للمشغّل: محليًا (حصة التخزين) أو سحابيًا (صلاحية، حجم، فشل كتابة).
+     العطل الصامت في منتصف مسابقة أسوأ من العطل نفسه. */
+  persistenceError?: { code: 'QUOTA_EXCEEDED' | 'WRITE_FAILED' | 'CLOUD_WRITE_FAILED' | 'CLOUD_PAYLOAD_TOO_LARGE' | 'CLOUD_PERMISSION_DENIED'; message: string; at: string } | null;
   sealApprovals: { actorId: string; actorRole: Role; actorName: string; timestamp: string }[];
   // Platform / operations
   integrations: IntegrationConfig[];

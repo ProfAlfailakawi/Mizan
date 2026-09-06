@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { PersistenceAlert } from './components/design-system/PersistenceAlert';
 import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
@@ -103,7 +104,8 @@ const OverlayFallback: React.FC = () => (
     <span className="sr-only">جارٍ التحميل</span>
   </div>
 );
-const Page: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<ViewFallback/>}>{children}</Suspense>;
+// كل شاشة تحمل شريط عطل الحفظ: التنبيه الذي يظهر في شاشة واحدة لا يُرى حين يقع العطل في غيرها.
+const Page: React.FC<{children: React.ReactNode}> = ({children}) => <><PersistenceAlert/><Suspense fallback={<ViewFallback/>}>{children}</Suspense></>;
 const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
 
 export default function App() {

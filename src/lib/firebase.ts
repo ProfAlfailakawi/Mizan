@@ -54,6 +54,7 @@ type FirestoreClient = {
   doc: typeof import('firebase/firestore')['doc'];
   setDoc: typeof import('firebase/firestore')['setDoc'];
   onSnapshot: typeof import('firebase/firestore')['onSnapshot'];
+  collection: typeof import('firebase/firestore')['collection'];
 };
 
 let firestoreClient: Promise<FirestoreClient> | null = null;
@@ -61,11 +62,11 @@ let firestoreClient: Promise<FirestoreClient> | null = null;
 export function getFirestoreClient(): Promise<FirestoreClient> {
   if (!firestoreClient) {
     firestoreClient = import('firebase/firestore')
-      .then(({ getFirestore, doc, setDoc, onSnapshot }) => ({
+      .then(({ getFirestore, doc, setDoc, onSnapshot, collection }) => ({
         db: config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
           ? getFirestore(app, config.firestoreDatabaseId)
           : getFirestore(app),
-        doc, setDoc, onSnapshot,
+        doc, setDoc, onSnapshot, collection,
       }))
       // A failed load must not poison every later attempt (a flaky venue link is normal).
       .catch(err => { firestoreClient = null; throw err; });

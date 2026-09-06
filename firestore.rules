@@ -25,7 +25,8 @@ service cloud.firestore {
         allow delete: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin']);
 
         match /participants/{participantId} {
-          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','ops_manager','exception_host','delegation_manager','auditor']);
+          // A judge must see the contestant in front of them; reading is not authoring.
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
           allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','exception_host','delegation_manager']);
           allow delete: if false;
         }
@@ -50,7 +51,7 @@ service cloud.firestore {
           allow delete: if false;
         }
         match /results/{resultId} {
-          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
           allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }
@@ -58,6 +59,29 @@ service cloud.firestore {
           allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','auditor']);
           allow create: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
           allow update, delete: if false;
+        }
+        match /committees/{committeeId} {
+          // Panel composition is operational structure: administrators author it, the panel reads it.
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
+          allow delete: if false;
+        }
+        match /appeals/{appealId} {
+          // A contestant may raise and read their own appeal; the panel and administration see all.
+          allow read: if scoped(orgId,competitionId) && (roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor','support_agent']) || (roleIs(['participant','guardian']) && resource.data.participantId == request.auth.uid));
+          allow create: if scoped(orgId,competitionId) && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent']) || (roleIs(['participant','guardian']) && request.resource.data.participantId == request.auth.uid));
+          allow update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow delete: if false;
+        }
+        match /session_checkpoints/{checkpointId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager']);
+          allow delete: if false;
+        }
+        match /quran_sources/{sourceId} {
+          allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
+          allow create, update: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin']);
+          allow delete: if false;
         }
         match /audit/{eventId} {
           allow read: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
