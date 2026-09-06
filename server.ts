@@ -20,6 +20,7 @@ import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { attestResult } from './server/result-attestation';
+import { sealResult, verifySeal } from './server/result-sealing';
 import { measureAgreement, planBlindRescoring } from './server/blind-rescoring';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
@@ -313,6 +314,45 @@ async function startServer() {
       res.setHeader('Cache-Control','no-store');
       return res.status(attestation.verdict==='DISAGREES'?409:200).json(attestation);
     }catch{return res.status(400).json({code:'RESULT_ATTESTATION_FAILED'})}});
+
+  /*
+   * ختم النتيجة: الخادم يؤلّف الرقم من إرسالات المحكمين ثم يختمه. لا يقبل درجةً من العميل
+   * أصلًا، فلا مجال لأن يُختم رقم لم يُحسب هنا.
+   */
+  app.post('/api/results/seal',requireGovernanceRoles(['comp_admin','org_admin','head_judge','scientific_admin']),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;const body=req.body||{};
+    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n:undefined};
+    try{
+      const outcome=sealResult({
+        competitionId:String(body.competitionId||actor.competitionId||''),
+        participantId:String(body.participantId||''),
+        sessionId:String(body.sessionId||''),
+        categoryId:body.categoryId?String(body.categoryId):undefined,
+        submissions:Array.isArray(body.submissions)?body.submissions.slice(0,64):[],
+        criteria:Array.isArray(body.criteria)?body.criteria.slice(0,64):[],
+        mode:String(body.mode||'all_judges_all_criteria'),
+        dropExtremes:!!body.dropExtremes,
+        sessionEventCount:num(body.sessionEventCount)||0,
+        // الخاتم هو الهوية المُصدَّقة للطلب، لا اسمًا يرسله العميل عن نفسه.
+        sealedBy:String(actor.uid||actor.email||''),
+        previousSealSha256:body.previousSealSha256?String(body.previousSealSha256):undefined,
+        previousFinalScore:num(body.previousFinalScore),
+      });
+      res.setHeader('Cache-Control','no-store');
+      // فحص بوجود الحقل لا بالراية: التضييق على راية منطقية لا يعمل خارج الوضع الصارم.
+      if(!('sealed' in outcome))return res.status(422).json({code:outcome.code,message:outcome.message});
+      const {sealed}=outcome;
+      serverAuditLedger?.append(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:sealed.competitionId,action:'RESULT_SEALED',entityType:'Result',entityId:sealed.participantId,reason:`Sealed ${sealed.finalScore} from ${sealed.contributingJudges} judges · ${sealed.sealSha256.slice(0,12)}${sealed.supersedes?` · supersedes ${sealed.supersedes.previousSealSha256.slice(0,12)} (Δ${sealed.supersedes.delta})`:''}`,requestId:String(req.headers['x-request-id']||'')});
+      return res.status(201).json(sealed);
+    }catch{return res.status(400).json({code:'RESULT_SEALING_FAILED'})}});
+
+  /* التحقّق مفتوح لكل دور حاكم: من يشكّ في ختم يعيد حسابه هنا بلا وساطة. */
+  app.post('/api/results/seal/verify',requireGovernanceRoles(['comp_admin','org_admin','head_judge','auditor','scientific_admin']),(req,res)=>{
+    const sealed=req.body?.sealed;
+    if(!sealed||typeof sealed!=='object')return res.status(400).json({code:'SEAL_REQUIRED'});
+    res.setHeader('Cache-Control','no-store');
+    try{const intact=verifySeal(sealed);return res.status(intact?200:409).json({intact,sealSha256:String(sealed.sealSha256||'')})}
+    catch{return res.status(400).json({code:'SEAL_VERIFICATION_FAILED'})}});
 
   app.post('/api/judging/calibration',requireGovernanceRoles(['head_judge','comp_admin','org_admin','auditor','scientific_admin']),(req,res)=>{
     const raw=Array.isArray(req.body?.observations)?req.body.observations:[];
