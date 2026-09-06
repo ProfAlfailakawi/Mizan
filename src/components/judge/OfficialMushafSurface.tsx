@@ -141,7 +141,7 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
 /* رواية MIZAN ← معرّف التلاوة المرجعية المرتبط بها. حفص يُغطّى بالكامل (٦٢٣٦ آية) عبر تسجيل
    المعيقلي؛ تُضاف الروايات الأخرى هنا حين تُقتنى تلاوتها. لا بديل بين الروايات. */
 const AUDIO_ID_BY_READING:Record<string,string>={hafs:'hafs-muaiqly'};
-const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:number;text?:string}[];ar:boolean;onActive?:(state:{ayah:number;word:number}|null)=>void}>=({reading,ayat,ar,onActive})=>{
+export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:number;text?:string}[];ar:boolean;onActive?:(state:{ayah:number;word:number}|null)=>void}>=({reading,ayat,ar,onActive})=>{
  const audioId=AUDIO_ID_BY_READING[reading];
  const [index,setIndex]=useState(0);const [playing,setPlaying]=useState(false);const [available,setAvailable]=useState<boolean|null>(null);
  const [posMs,setPosMs]=useState(0);const [durMs,setDurMs]=useState(0);
