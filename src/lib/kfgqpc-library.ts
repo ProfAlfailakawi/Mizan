@@ -36,9 +36,22 @@ export interface DeliveryPassage{reading:string;surah:number;startAyah:number;en
 export interface FairDrawDraw{protocol:string;reading:string;anchorType:'SURAH_START'|'JUZ_START'|'PAGE_START'|'AYAH_START';anchorNote:string;seed:string;algorithm:string;candidateCount:number;selectedIndex:number;ayahCount:number;reproducible:boolean;verifyHint:string}
 export interface FairDrawResult{passage:DeliveryPassage;draw:FairDrawDraw}
 
+/*
+ * A delivery request with an empty reading collapses to a path Express cannot match, so it falls
+ * through to the SPA route and comes back as index.html with status 200 — JSON parsing then fails
+ * and the surface silently shows nothing. Refuse the empty reading up front, and require the
+ * response to actually be JSON, so a routing mistake surfaces as no data rather than as a blank
+ * Mushaf nobody can explain.
+ */
+async function deliveryJson<T>(url:string,init?:RequestInit):Promise<T|null>{
+ try{const r=await fetch(url,init);
+  if(!r.ok)return null;
+  if(!(r.headers.get('content-type')||'').includes('application/json'))return null;
+  return await r.json() as T}catch{return null}}
+
 export async function fetchDeliveryPassage(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DeliveryPassage|null>{
- try{const r=await fetch(`/api/public/kfgqpc/passage/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
-  if(!r.ok)return null;return await r.json()}catch{return null}}
+ if(!reading)return null;
+ return deliveryJson<DeliveryPassage>(`/api/public/kfgqpc/passage/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});}
 
 export async function drawFairPassage(reading='hafs',options:{seed?:string;anchor?:string;juz?:number;surah?:number;min?:number;max?:number;ayahCount?:number}={}):Promise<FairDrawResult|null>{
  const q=new URLSearchParams();for(const [k,v] of Object.entries(options))if(v!==undefined&&v!==null&&v!=='')q.set(k,String(v));
@@ -59,16 +72,19 @@ export interface DivergencePoint{surah:number;ayah:number;wordIndex:number;share
 export interface DifficultyVector{mutashabihat:number;rareWords:number;endingSimilarity:number;waqfSensitivity:number;score:number}
 
 export async function fetchMutashabihat(reading:string,surah:number,ayah:number):Promise<MutashabihatMatch[]>{
- try{const r=await fetch(`/api/public/kfgqpc/mutashabihat/${encodeURIComponent(reading)}/${surah}/${ayah}`,{cache:'force-cache'});
-  if(!r.ok)return [];const b=await r.json();return Array.isArray(b.matches)?b.matches:[]}catch{return []}}
+ if(!reading)return [];
+ const b=await deliveryJson<{matches?:MutashabihatMatch[]}>(`/api/public/kfgqpc/mutashabihat/${encodeURIComponent(reading)}/${surah}/${ayah}`,{cache:'force-cache'});
+ return Array.isArray(b?.matches)?b!.matches!:[]}
 
 export async function fetchDivergencePoints(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DivergencePoint[]>{
- try{const r=await fetch(`/api/public/kfgqpc/divergence/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
-  if(!r.ok)return [];const b=await r.json();return Array.isArray(b.points)?b.points:[]}catch{return []}}
+ if(!reading)return [];
+ const b=await deliveryJson<{points?:DivergencePoint[]}>(`/api/public/kfgqpc/divergence/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
+ return Array.isArray(b?.points)?b!.points!:[]}
 
 export async function fetchDifficulty(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DifficultyVector|null>{
- try{const r=await fetch(`/api/public/kfgqpc/difficulty/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
-  if(!r.ok)return null;const b=await r.json();return b.vector||null}catch{return null}}
+ if(!reading)return null;
+ const b=await deliveryJson<{vector?:DifficultyVector}>(`/api/public/kfgqpc/difficulty/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
+ return b?.vector||null}
 
 export async function loadKfgqpcOfficialQuranFont(fontId='primary'):Promise<boolean>{try{if(typeof FontFace==='undefined'||typeof document==='undefined')return false;const name='MIZAN KFGQPC Official';const face=new FontFace(name,`url(/api/public/kfgqpc/font/${encodeURIComponent(fontId)})`);const loaded=await face.load();document.fonts.add(loaded);return document.fonts.check(`16px \"${name}\"`)}catch{return false}}
 

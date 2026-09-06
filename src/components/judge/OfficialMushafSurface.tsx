@@ -11,6 +11,26 @@ import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
 /* Canonical rawi id (scientific-core) → delivery reading key. Only narrations with an ingested
    delivery package appear here; anything else resolves to no delivery surface. */
 const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr'};
+
+/*
+ * Narration name → delivery key, for the six narrations MIZAN actually delivers.
+ *
+ * The canonical graph resolves a reading only when the display string maps to exactly one
+ * transmission, and it refuses to choose when it does not — which is right for scientific
+ * decisions. But addressing a delivery package is not a scientific decision, and when the graph
+ * declines, the Mushaf surface was left with no text at all. This table is an explicit, auditable
+ * list of the names we ship packages for; it never invents a narration, and a name outside it
+ * still yields no delivery surface.
+ */
+const DELIVERY_READING_BY_NAME:Record<string,string>={
+ hafs:'hafs','حفص':'hafs','hafsanasim':'hafs',
+ warsh:'warsh','ورش':'warsh',
+ shubah:'shubah','شعبة':'shubah',
+ qalun:'qalun',qaloun:'qalun','قالون':'qalun',
+ duri:'duri-abi-amr','aldurianabiamr':'duri-abi-amr','الدوري':'duri-abi-amr',
+ susi:'susi-abi-amr',soosi:'susi-abi-amr','alsusi':'susi-abi-amr','السوسي':'susi-abi-amr',
+};
+const readingNameKey=(v?:string)=>v?v.toLowerCase().replace(/['`’\-\s_]/g,'').replace(/[ًٌٍَُِّْ]/g,''):'';
 /* Delivery package id per reading — used only to address the delivery surface (pages/fonts). */
 const PACKAGE_BY_READING:Record<string,string>={hafs:'kfgqpc-hafs-uthmanic-v13',warsh:'kfgqpc-warsh-uthmanic-v6',shubah:'kfgqpc-shubah-uthmanic-v4',qalun:'kfgqpc-qaloun-uthmanic-v5','duri-abi-amr':'kfgqpc-douri-abu-amr-uthmanic-v3','susi-abi-amr':'kfgqpc-sousi-abu-amr-uthmanic-v3'};
 
@@ -46,7 +66,7 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
   */
  // Canonical rawi id → delivery reading key. Unknown/ambiguous readings fall back to no delivery
  // resolution rather than guessing a narration.
- const readingKey=DELIVERY_READING_BY_RAWI[reading?.rawiId||'']||'';
+ const readingKey=DELIVERY_READING_BY_RAWI[reading?.rawiId||'']||DELIVERY_READING_BY_NAME[readingNameKey(rawiText)]||'';
  const [delivery,setDelivery]=useState<DeliveryPassage|null>(null);
  useEffect(()=>{let live=true;setDelivery(null);
   if(!q.startAyah||!q.endAyah)return;
