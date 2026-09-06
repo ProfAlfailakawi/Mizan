@@ -126,8 +126,19 @@ gcloud storage buckets update "gs://${BUCKET}" --project "${PROJECT}" --no-publi
 gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" --project "${PROJECT}" \
   --member=allUsers --role=roles/storage.objectViewer >/dev/null 2>&1 \
   || echo "  Could not grant public read — org policy may forbid it."
-gcloud storage cp "${WORK}"/* "gs://${BUCKET}/" --project "${PROJECT}" >/dev/null 2>&1 \
-  || { echo "  Upload failed." >&2; exit 1; }
+# الملفات وحدها: `${WORK}` يحوي مجلدات فكّ الضغط، و`cp` بلا `--recursive` يفشل عليها.
+# ولا يُكتم الخطأ: أُخفي رسالته هنا مرة، فصار الفشل بلا سبب — وهو أسوأ من الفشل.
+mapfile -t FILES < <(find "${WORK}" -maxdepth 1 -type f \( -name '*.json' -o -name '*.txt' \) | sort)
+if [ "${#FILES[@]}" -eq 0 ]; then
+  echo "  Nothing to upload — no schema dumps or durations were produced." >&2
+  exit 1
+fi
+echo "  Uploading ${#FILES[@]} file(s)…"
+if ! gcloud storage cp "${FILES[@]}" "gs://${BUCKET}/" --project "${PROJECT}"; then
+  echo "" >&2
+  echo "  Upload failed — the error above is the reason." >&2
+  exit 1
+fi
 
 echo ""
 echo "Uploaded:"
