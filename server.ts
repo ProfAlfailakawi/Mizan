@@ -352,7 +352,25 @@ async function startServer() {
   app.use('/api/align',createAlignmentRouter({manager:alignmentManager,auth:alignmentAuth,mode:'SHADOW_ONLY',devCanonicalHash:alignmentDevSynth?((spec)=>{try{return devHafsPassage(spec.startAyah,spec.endAyah).canonicalTextHash}catch{return undefined}}):undefined}));
   setInterval(()=>alignmentManager.reap(10*60_000),60_000).unref?.();
 
-  if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath,{maxAge:'1h',etag:true,immutable:false}));
+  if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');
+    /*
+     * Caching contract for a hashed build.
+     *
+     * Serving index.html with a one-hour max-age let the CDN in front of MIZAN keep an old app
+     * shell alive after a deploy. That shell names chunks by content hash, and those hashes are
+     * gone from the new revision — so visitors were handed a stale page pointing at files that no
+     * longer exist. That, not the browser, is what left the site blank after a release.
+     *
+     * The shell must therefore always be revalidated, while the hashed assets it names can be
+     * cached indefinitely: their names change whenever their bytes change, so a stale copy is
+     * impossible by construction.
+     */
+    const isHashedAsset=(p:string)=>/[.-][A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|avif|svg)$/.test(p);
+    app.use(express.static(distPath,{etag:true,setHeaders(res,filePath){
+      if(filePath.endsWith('.html')||filePath.endsWith('sw.js')) res.setHeader('Cache-Control','no-cache, must-revalidate');
+      else if(isHashedAsset(filePath)) res.setHeader('Cache-Control','public, max-age=31536000, immutable');
+      else res.setHeader('Cache-Control','public, max-age=3600');
+    }}));
     /*
      * SPA fallback — but never for a build asset.
      *
@@ -366,6 +384,8 @@ async function startServer() {
     const ASSET_LIKE=/^\/assets\/|\.(?:js|mjs|css|map|json|png|jpe?g|webp|avif|svg|ico|woff2?|ttf|mp3|m4a|txt|webmanifest)$/i;
     app.get('*',(req,res)=>{
       if(ASSET_LIKE.test(req.path))return res.status(404).type('text/plain').send('Not Found');
+      // The shell is never cached: a stale one names chunks that a later deploy has removed.
+      res.setHeader('Cache-Control','no-cache, must-revalidate');
       res.sendFile(path.join(distPath,'index.html'));
     })}
   app.listen(PORT,'0.0.0.0',()=>console.log(`MIZAN running on :${PORT}`));

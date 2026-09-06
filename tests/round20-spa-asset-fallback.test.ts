@@ -45,6 +45,14 @@ test('the fallback returns 404 rather than the shell for an asset', () => {
   assert.match(serverSource, /ASSET_LIKE\.test\(req\.path\)[\s\S]{0,120}status\(404\)/, 'an asset miss must answer 404');
 });
 
+test('the app shell is never cached, so a deploy cannot strand a CDN copy', () => {
+  // A cached shell names content-hashed chunks that the next deploy removes. Revalidating the
+  // shell is what makes a release safe; the hashed assets it names may be cached forever.
+  assert.match(serverSource, /\.html'\)\|\|filePath\.endsWith\('sw\.js'\)\)\s*res\.setHeader\('Cache-Control','no-cache/, 'index.html and the service worker must revalidate');
+  assert.match(serverSource, /isHashedAsset\(filePath\)\)\s*res\.setHeader\('Cache-Control','public, max-age=31536000, immutable'\)/, 'hashed assets may be cached immutably');
+  assert.match(serverSource, /no-cache, must-revalidate'\);\s*\n\s*res\.sendFile/, 'the SPA fallback must also send a no-cache shell');
+});
+
 test('stale-shell recovery reloads once and never loops', () => {
   assert.match(recoverySource, /sessionStorage\.getItem\(FLAG\)[\s\S]{0,60}return/, 'a second failure must not reload again');
   assert.match(recoverySource, /caches\.delete/, 'recovery must clear caches holding the old shell');
