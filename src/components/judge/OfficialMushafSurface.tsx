@@ -24,11 +24,16 @@ export function surahNumberFromName(en?:string,ar?:string):number|undefined{
 const SURAH_AR=['الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه','الأنبياء','الحج','المؤمنون','النور','الفرقان','الشعراء','النمل','القصص','العنكبوت','الروم','لقمان','السجدة','الأحزاب','سبأ','فاطر','يس','الصافات','ص','الزمر','غافر','فصلت','الشورى','الزخرف','الدخان','الجاثية','الأحقاف','محمد','الفتح','الحجرات','ق','الذاريات','الطور','النجم','القمر','الرحمن','الواقعة','الحديد','المجادلة','الحشر','الممتحنة','الصف','الجمعة','المنافقون','التغابن','الطلاق','التحريم','الملك','القلم','الحاقة','المعارج','نوح','الجن','المزمل','المدثر','القيامة','الإنسان','المرسلات','النبأ','النازعات','عبس','التكوير','الانفطار','المطففين','الانشقاق','البروج','الطارق','الأعلى','الغاشية','الفجر','البلد','الشمس','الليل','الضحى','الشرح','التين','العلق','القدر','البينة','الزلزلة','العاديات','القارعة','التكاثر','العصر','الهمزة','الفيل','قريش','الماعون','الكوثر','الكافرون','النصر','المسد','الإخلاص','الفلق','الناس'];
 
 export interface MushafSurfaceQuestion{
- expectedTextArabic:string;surahNameArabic?:string;surahNameEnglish?:string;startAyah:number;endAyah:number;quranSourcePackageId?:string;quranSourcePackageHash?:string;pageNumber?:number;lineStart?:number;lineEnd?:number;pageLoci?:QuranPageLocus[];locationAssurance?:string;officialSurfaceAuthority?:string;officialSurfaceMode?:string;rawi?:string;qiraah?:string;tariq?:string
+ expectedTextArabic:string;surahNameArabic?:string;surahNameEnglish?:string;surahNumber?:number;startAyah:number;endAyah:number;quranSourcePackageId?:string;quranSourcePackageHash?:string;pageNumber?:number;lineStart?:number;lineEnd?:number;pageLoci?:QuranPageLocus[];locationAssurance?:string;officialSurfaceAuthority?:string;officialSurfaceMode?:string;rawi?:string;
+ /** Legacy display string carried by the question pool (e.g. "Hafs"); resolved to a canonical rawi. */
+ riwaya?:string;qiraah?:string;tariq?:string
 }
 
 export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:boolean;tracking?:QuranAlignmentResult|null}>=({question:q,ar,tracking})=>{
- const reading=resolveReading({qiraah:q.qiraah,rawi:q.rawi,riwaya:q.rawi});const readingText=reading?`${qiraahLabel(reading,ar)} · ${rawiLabel(reading,ar)}${q.tariq?` · ${tariqLabel(q.tariq,ar)}`:''}`:[q.rawi,q.qiraah,q.tariq].filter(Boolean).join(' · ');
+ // The question pool carries the narration as the legacy `riwaya` display string, while secure
+ // questions carry `rawi`. Reading either keeps the surface working for both without guessing.
+ const rawiText=q.rawi||q.riwaya;
+ const reading=resolveReading({qiraah:q.qiraah,rawi:rawiText,riwaya:rawiText});const readingText=reading?`${qiraahLabel(reading,ar)} · ${rawiLabel(reading,ar)}${q.tariq?` · ${tariqLabel(q.tariq,ar)}`:''}`:[rawiText,q.qiraah,q.tariq].filter(Boolean).join(' · ');
  /*
   * Delivery-layer resolution.
   *
@@ -44,10 +49,10 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
  const [delivery,setDelivery]=useState<DeliveryPassage|null>(null);
  useEffect(()=>{let live=true;setDelivery(null);
   if(!q.startAyah||!q.endAyah)return;
-  const surah=(q as any).surahNumber??surahNumberFromName(q.surahNameEnglish,q.surahNameArabic);
+  const surah=q.surahNumber??surahNumberFromName(q.surahNameEnglish,q.surahNameArabic);
   if(!surah)return;
   void fetchDeliveryPassage(readingKey,surah,q.startAyah,q.endAyah).then(p=>{if(live)setDelivery(p)});
-  return()=>{live=false}},[readingKey,(q as any).surahNumber,q.surahNameEnglish,q.startAyah,q.endAyah]);
+  return()=>{live=false}},[readingKey,q.surahNumber,q.surahNameEnglish,q.startAyah,q.endAyah]);
 
  const loci=useMemo<QuranPageLocus[]>(()=>{
   if(q.pageLoci?.length)return q.pageLoci;
