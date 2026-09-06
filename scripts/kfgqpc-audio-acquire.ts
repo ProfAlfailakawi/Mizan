@@ -17,8 +17,20 @@ import path from 'node:path';
 // عدد آيات كل سورة (1..114) — المرجع القياسي
 const AYAT = [7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,40,46,42,29,19,36,25,22,17,19,26,30,20,15,21,11,8,8,19,5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6];
 
+/*
+ * قرّاء الروايات، بنفس المسارات المحجوزة في طبقة التسليم وبنفس القرّاء الذين يعلنهم كتالوج
+ * الصوت الرسمي. الاقتناء يبقى صريحًا: يُطلب قارئٌ بعينه بـ`--only`، ولا يُقتنى شيء ضمنًا.
+ *
+ * `everyayah` هنا مجلّد المصدر المفتوح لكل قارئ. ما لم يُثبَت مجلّده بعد يبقى فارغًا، فيرفض
+ * السكربت اقتناءه بدل أن يجلب تلاوة رواية أخرى — لا بديل بين الروايات بحال.
+ */
 const RECITERS: Record<string, { everyayah: string; prefix: string; readingArabic: string; reciterArabic: string }> = {
-  'hafs-muaiqly': { everyayah: 'Maher_AlMuaiqly_64kbps', prefix: 'delivery/audio/hafs/maher-al-muaiqly/v1', readingArabic: 'حفص عن عاصم', reciterArabic: 'الشيخ ماهر المعيقلي' },
+  'hafs-muaiqly':    { everyayah: 'Maher_AlMuaiqly_64kbps', prefix: 'delivery/audio/hafs/maher-al-muaiqly/v1',           readingArabic: 'حفص عن عاصم',        reciterArabic: 'الشيخ ماهر المعيقلي' },
+  'shubah-hudhaifi': { everyayah: '',                       prefix: 'delivery/audio/shubah/ali-al-hudhaifi/v1',          readingArabic: 'شعبة عن عاصم',       reciterArabic: 'الشيخ علي الحذيفي' },
+  'qalun-hudhaifi':  { everyayah: '',                       prefix: 'delivery/audio/qalun/ali-al-hudhaifi/v1',           readingArabic: 'قالون عن نافع',      reciterArabic: 'الشيخ علي الحذيفي' },
+  'susi-siddiqi':    { everyayah: '',                       prefix: 'delivery/audio/susi/uthman-al-siddiqi/v1',          readingArabic: 'السوسي عن أبي عمرو', reciterArabic: 'الشيخ عثمان الصديقي' },
+  'duri-juhani':     { everyayah: '',                       prefix: 'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1', readingArabic: 'الدوري عن أبي عمرو', reciterArabic: 'الشيخ عبدالله الجهني' },
+  'warsh-dawsari':   { everyayah: '',                       prefix: 'delivery/audio/warsh/ibrahim-al-dawsari/v1',        readingArabic: 'ورش عن نافع',        reciterArabic: 'الشيخ إبراهيم الدوسري' },
 };
 
 const args = process.argv.slice(2);
@@ -26,6 +38,7 @@ const val = (k: string) => { const i = args.indexOf(k); return i >= 0 ? args[i +
 const outRoot = path.resolve(val('--out') || '.mizan-delivery');
 const only = val('--only') || 'hafs-muaiqly';
 const spec = RECITERS[only];
+if (spec && !spec.everyayah) { console.error(`SOURCE_FOLDER_NOT_ESTABLISHED:${only} — أضف مجلّد المصدر المفتوح لهذا القارئ قبل الاقتناء؛ لا يُجلب صوت رواية أخرى بديلًا.`); process.exit(1); }
 if (!spec) { console.error(`UNKNOWN_RECITER:${only}. متاح: ${Object.keys(RECITERS).join(', ')}`); process.exit(1); }
 
 const pad3 = (n: number) => String(n).padStart(3, '0');

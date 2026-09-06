@@ -147,9 +147,23 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
  * surface for the panel — it is never a scoring input, and there is no cross-riwayah fallback:
  * a reading with no ingested recitation simply renders nothing.
  */
-/* رواية MIZAN ← معرّف التلاوة المرجعية المرتبط بها. حفص يُغطّى بالكامل (٦٢٣٦ آية) عبر تسجيل
-   المعيقلي؛ تُضاف الروايات الأخرى هنا حين تُقتنى تلاوتها. لا بديل بين الروايات. */
-const AUDIO_ID_BY_READING:Record<string,string>={hafs:'hafs-muaiqly'};
+/*
+ * الرواية ← معرّف تلاوتها المرجعية.
+ *
+ * لكل رواية قارئها الذي يوافق روايتها — لا بديل بين الروايات بحال. والمسارات هنا هي نفسها
+ * المحجوزة في طبقة التسليم، فالمعرّف يصل إلى مكان معلوم لا مُخترَع.
+ *
+ * إدراج رواية هنا لا يَعِد بصوتها: المشغّل يفحص التوفّر أولًا (HEAD) ولا يظهر إن لم تُقتنَ
+ * تلاوتها بعد. فالمُدرَج يعمل حين تصل، ولا يُظهر زرًّا معطّلًا قبلها.
+ */
+const AUDIO_ID_BY_READING:Record<string,string>={
+ hafs:'hafs-muaiqly',
+ shubah:'shubah-hudhaifi',
+ qalun:'qalun-hudhaifi',
+ 'susi-abi-amr':'susi-siddiqi',
+ 'duri-abi-amr':'duri-juhani',
+ warsh:'warsh-dawsari',
+};
 export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:number;text?:string}[];ar:boolean;onActive?:(state:{ayah:number;word:number}|null)=>void}>=({reading,ayat,ar,onActive})=>{
  const audioId=AUDIO_ID_BY_READING[reading];
  const [index,setIndex]=useState(0);const [playing,setPlaying]=useState(false);const [available,setAvailable]=useState<boolean|null>(null);

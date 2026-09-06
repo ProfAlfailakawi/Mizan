@@ -24,11 +24,19 @@ test('codes that a passer-by would try first are refused',()=>{
 
 test('the code is never stored, only a salted digest of it',async()=>{
   const lock=await createVenueLock('4819','بوابة الحضور');
-  const serialized=JSON.stringify(lock);
-  assert.ok(!serialized.includes('4819'),'the code itself must not appear anywhere in the stored lock');
+  /*
+   * الخاصية المقصودة أن النص الصريح غير مستعاد من المخزون — لا أن سلسلة الأرقام غائبة عن
+   * ستٍّ وتسعين خانة عشوائية. البحث عن «4819» داخل ملح وبصمة عشوائيين يفشل بالصدفة نحو مرة
+   * في الألف، واختبارٌ أمنيّ يرتجف يُفقد الثقة في الحارس نفسه. فالفحص هنا حتميّ.
+   */
+  for(const [k,v] of Object.entries(lock)) assert.notEqual(v,'4819',`${k} must not hold the code itself`);
   assert.match(lock.pinHash,/^[0-9a-f]{64}$/);
   assert.match(lock.salt,/^[0-9a-f]{32}$/);
+  assert.notEqual(lock.pinHash,lock.salt);
   assert.equal(lock.surface,'بوابة الحضور');
+  // بصمة رمزٍ آخر بنفس الملح تختلف، فالبصمة تعتمد الرمز فعلًا ولا تكون قيمة ثابتة.
+  const other=await createVenueLock('7301','بوابة الحضور');
+  assert.notEqual(other.pinHash,lock.pinHash);
 });
 
 test('two devices locked with the same code do not share a digest',async()=>{
