@@ -162,7 +162,11 @@ async function startServer() {
       // Tajweed is derived from each ayah's own text, so the marks land on the very letters in
       // front of the reciter rather than on offsets computed against a different text.
       const withTajweed={...passage,ayat:passage.ayat.map(a=>({...a,tajweed:deriveAyahTajweed(a.text)})),tajweedScopeNote:TAJWEED_SCOPE_NOTE};
-      res.setHeader('Cache-Control','public, max-age=3600');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
+      /* The Quran text never changes, but the shape of this payload can — tajweed was added to it
+         after clients had already cached an hour-long copy, so the new layer stayed invisible to
+         anyone who had opened the passage before. A short window with revalidation keeps the
+         bandwidth saving while letting a schema change reach a judge on their next request. */
+      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
       return res.json(withTajweed)}catch{return res.status(502).json({code:'OFFICIAL_PASSAGE_DELIVERY_FAILED'})}});
 
   app.get('/api/public/kfgqpc/fairdraw/:readingId',async(req,res)=>{
@@ -200,7 +204,7 @@ async function startServer() {
     const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);
     try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
       const matches=a.mutashabihat.similarPhrasesForAyah(surah,ayah).map(m=>({...m,occurrences:m.occurrences.map(o=>({...o,surahNameArabic:a.names.get(o.surah)}))}));
-      res.setHeader('Cache-Control','public, max-age=3600');
+      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');
       return res.json({reading:readingId,surah,ayah,matches,note:'وقائع نصية معدودة من حزمة الرواية نفسها؛ لا نِسَب احتمالية ولا حكم على المتسابق.'})}
     catch{return res.status(502).json({code:'MUTASHABIHAT_FAILED'})}});
 
@@ -209,7 +213,7 @@ async function startServer() {
     const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
     try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
       const points=a.mutashabihat.divergencePoints(surah,startAyah,endAyah,{nameOf:(s)=>a.names.get(s)});
-      res.setHeader('Cache-Control','public, max-age=3600');
+      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');
       return res.json({reading:readingId,surah,startAyah,endAyah,points,note:'مفترقات نصية حقيقية تُعرض قبل بلوغها؛ تنبيه لرئيس التحكيم لا رصد خطأ.'})}
     catch{return res.status(502).json({code:'DIVERGENCE_FAILED'})}});
 
@@ -217,7 +221,7 @@ async function startServer() {
     const readingId=safeSegment(String(req.params.readingId||''));
     const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
     try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
-      res.setHeader('Cache-Control','public, max-age=3600');
+      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');
       return res.json({reading:readingId,surah,startAyah,endAyah,vector:a.difficulty.vector(surah,startAyah,endAyah)})}
     catch{return res.status(502).json({code:'DIFFICULTY_FAILED'})}});
 
