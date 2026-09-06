@@ -347,7 +347,7 @@ export const JudgeIntelligenceLab: React.FC<{ onClose?: () => void }> = ({ onClo
             <div className="font-black text-[16px]">{ar ? 'مختبر ذكاء التحكيم' : 'Judge Intelligence Lab'}</div>
             <div className="text-[11px]" style={{ color: GOLD }}>{ar ? 'استشاري · لا يمسّ الدرجة · القرار للمحكم' : 'Advisory · never scores · the judge decides'}</div>
           </div>
-          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-9 w-9 place-items-center rounded-[11px]" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
+          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-11 w-11 place-items-center rounded-[11px]" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
         </header>
 
         <div className="mb-4 flex flex-wrap gap-2">

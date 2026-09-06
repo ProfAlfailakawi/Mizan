@@ -1,4 +1,5 @@
 import React, { useRef,  useMemo, useState  } from 'react';
+import { Ratio } from '../design-system/Ratio';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { BadgeCheck, ChevronLeft, ChevronRight, Crown, KeyRound, LockKeyhole, RotateCcw, ShieldCheck, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -34,7 +35,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
       <Pictogram icon={LockKeyhole} size="lg" tone="ink" className="mx-auto [&>*]:!bg-white/[.06] [&>*]:!text-[#d8e4dd]"/>
       <div className="text-[10px] font-black tracking-[.22em] text-[#b9cfc4] mt-6">{ar?'خزنة الحفل':'CEREMONY VAULT'}</div>
       <h1 className="text-3xl sm:text-5xl font-black mt-4 tracking-tight">{ar?'مختومة':'SEALED'}</h1>
-      <div className="text-5xl font-black tabular-nums mt-6">{reveal?.approvals.length||0} / {reveal?.authorizedRoles?.length||3}</div>
+      <div className="text-5xl font-black tabular-nums mt-6"><Ratio value={reveal?.approvals.length||0} of={reveal?.authorizedRoles?.length||3}/></div>
       <div className="text-[10px] mizan-venue-muted mt-1">{ar?`${reveal?.minimumApprovals||2} موافقات مستقلة مطلوبة`:`${reveal?.minimumApprovals||2} independent approvals required`}</div>
       <div className="mt-6 grid grid-cols-3 gap-2 text-start">
         <Approval ok={!!reveal?.approvals.some(a=>a.actorRole==='scientific_admin')} label={ar?'علمي':'Scientific'}/>

@@ -7,6 +7,15 @@ const AR_TOKENS:Record<string,string>={
   MATCH:'مطابق', DIFFERENCE:'اختلاف', UNVERIFIED:'غير متحقق', EXPORTED:'مُصدّر', VERIFIED:'متحقق', FAILED:'فشل', RESTORE_TESTED:'اختبار الاستعادة ناجح',
   'LOCAL BENCHMARK ONLY':'مقارنة محلية فقط', 'SOURCE CANDIDATE':'مصدر مرشح', 'PENDING SOURCE':'المصدر العلمي معلّق',
   REQUIRED:'مطلوب', RECOMMENDED:'موصى به', OPTIONAL:'اختياري',
+  /* حالة المسابقة ومستوى الأتمتة كانا يُعرضان بالرمز الإنجليزي الخام داخل شاشة عربية:
+     «live» و«autopilot» فوق عنوان المسابقة. المصطلح التشغيلي يبقى في البيانات، والعرض بالعربية. */
+  live:'قائمة الآن', upcoming:'قادمة', archived:'مؤرشفة',
+  autopilot:'تشغيل ذاتي', assisted:'مساعَد', manual:'يدوي', supervised:'تحت إشراف',
+  /* أدوار الفاعلين في دفتر التدقيق. */
+  super_admin:'إدارة المنصة', org_admin:'مدير الجهة', comp_admin:'مدير المسابقة', scientific_admin:'الإدارة العلمية',
+  head_judge:'رئيس التحكيم', judge:'محكم', ops_manager:'مدير التشغيل', exception_host:'مكتب الاستثناء',
+  delegation_manager:'مندوب الوفد', participant:'متسابق', broadcast_operator:'البث والحفل', auditor:'مدقق',
+  guardian:'ولي الأمر', support_agent:'الدعم',
   fixture:'بيانات تطوير', approved:'معتمد', reviewed:'تمت المراجعة', pending:'معلّق', active:'نشط', offline:'غير متصل', online:'متصل', valid:'ساري', revoked:'ملغى', requested:'بانتظار الموافقة', ended:'منتهٍ', rejected:'مرفوض',
   forming:'قيد التشكيل', reconciling:'قيد المصالحة', closed:'مغلق', connected:'متصل', unavailable:'غير متاح', disabled:'معطّل', degraded:'متدهور', sent:'أُرسل', queued:'في قائمة الإرسال', failed:'فشل',
   not_required:'غير مطلوب', scheduled:'مجدول', completed:'مكتمل', ready:'جاهزة', testing:'تستقبل متسابقًا', paused:'متوقفة مؤقتًا', calculated:'محسوبة', sealed:'مختومة', published:'منشورة', immediate:'فوري', after_committee:'بعد انتهاء اللجنة', after_round:'بعد انتهاء الجولة', ceremony_only:'في الحفل فقط', private_only:'خاص فقط',
@@ -60,6 +69,35 @@ export function uiToken(value:string|undefined|null, ar:boolean){
   if(value===undefined||value===null||value==='')return '—';
   return ar?(AR_TOKENS[value]||value):value.replaceAll('_',' ');
 }
+
+/*
+ * أفعال دفتر التدقيق.
+ *
+ * كانت تُعرض بالرمز الخام (QUEUE_ROUTED، RESULT_SEALED) في شاشة عربية، فيقرأ المدقّق رموزًا
+ * لا جملًا. الرمز يبقى في السجل نفسه — فهو المرجع الثابت — والعرض بالعربية. وما لا نعرف له
+ * ترجمة يُعرض مقروءًا (شرطات سفلية تصير مسافات) بدل أن يُخفى.
+ */
+const AR_AUDIT_ACTIONS:Record<string,string>={
+  QUEUE_ROUTED:'توجيه إلى لجنة', RESULT_SEALED:'ختم نتيجة', RESULT_PUBLISHED:'نشر نتيجة',
+  FAIRDRAW_GENERATED:'توليد قرعة', FAIRDRAW_PROOF_PUBLISHED:'نشر إثبات القرعة',
+  RESULT_ATTESTED:'شهادة الخادم على نتيجة', CERTIFICATE_ISSUED:'إصدار شهادة', CERTIFICATE_REVOKED:'إلغاء شهادة',
+  COMPETITION_PUBLISHED:'فتح التسجيل', PARTICIPANT_CHECKED_IN:'تسجيل حضور',
+  JUDGE_SUBMISSION_LOCKED:'قفل تقييم محكم', QUESTION_REVEALED:'كشف سؤال',
+  AUDIT_LEDGER_SEALED:'ختم سجل التدقيق', SCIENTIFIC_DATASET_REGISTERED:'تسجيل حزمة علمية',
+  LOCAL_MESH_STARTED:'بدء الشبكة المحلية', LOCAL_MESH_RECONCILED:'مصالحة الشبكة المحلية',
+  FEDERATION_ATTESTATION_ISSUED:'إصدار إثبات اتحادي', OPERATIONAL_REHEARSAL_COMPLETED:'إكمال بروفة تشغيلية',
+};
+export function auditActionLabel(value:string|undefined|null, ar:boolean){
+  if(!value)return '—';
+  if(!ar)return value.replaceAll('_',' ').toLowerCase();
+  return AR_AUDIT_ACTIONS[value] || value.replaceAll('_',' ');
+}
+/** اسم الدور بالعربية، ويقبل الأدوار غير المعروفة دون أن يُظهر رمزًا خامًا. */
+export function roleLabel(value:string|undefined|null, ar:boolean){
+  if(!value)return '—';
+  return ar?(AR_TOKENS[value]||value.replaceAll('_',' ')):value.replaceAll('_',' ');
+}
+
 export function federationClaimLabel(value:FederationClaimType,ar:boolean){return ar?AR_CLAIMS[value]:EN_CLAIMS[value]}
 export function featureLabel(value:string,ar:boolean){return ar?(AR_FEATURES[value]||value):(EN_FEATURES[value]||value.replaceAll('_',' '))}
 export function signatureAssuranceLabel(signatureRef:string,ar:boolean){

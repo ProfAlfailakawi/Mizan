@@ -64,7 +64,8 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
   <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]">
    <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'إعادة تشغيل التلاوة':'RECITATION REPLAY'}</div>
     <div className="text-[9px] text-[#646965] truncate">{ar?'الصوت والموضع وحالة التتبّع معًا — عرض أدلة لا درجة':'Audio, position and tracking together — evidence only, never scored'}</div></div>
-   <span className="shrink-0 text-[10px] font-black tabular-nums text-[#59615c]">{mmss(posMs)} / {mmss(durMs)}</span>
+   {/* الزمن يُعزل اتجاهه: «0:04 / 1:20» داخل فقرة عربية ينقلب فيصير الموضع مدةً والمدة موضعًا. */}
+   <span dir="ltr" className="shrink-0 text-[10px] font-black tabular-nums text-[#59615c]">{mmss(posMs)} / {mmss(durMs)}</span>
   </div>
 
   {/* الموضع في المصحف عند هذه اللحظة */}
