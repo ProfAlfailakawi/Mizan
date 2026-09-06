@@ -348,7 +348,22 @@ async function startServer() {
   app.use('/api/align',createAlignmentRouter({manager:alignmentManager,auth:alignmentAuth,mode:'SHADOW_ONLY',devCanonicalHash:alignmentDevSynth?((spec)=>{try{return devHafsPassage(spec.startAyah,spec.endAyah).canonicalTextHash}catch{return undefined}}):undefined}));
   setInterval(()=>alignmentManager.reap(10*60_000),60_000).unref?.();
 
-  if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath,{maxAge:'1h',etag:true,immutable:false}));app.get('*',(_req,res)=>res.sendFile(path.join(distPath,'index.html')))}
+  if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');app.use(express.static(distPath,{maxAge:'1h',etag:true,immutable:false}));
+    /*
+     * SPA fallback — but never for a build asset.
+     *
+     * Serving index.html for a missing /assets/*.js is what turns a routine deploy into a white
+     * screen: a client still holding the previous app shell (browser cache or service worker) asks
+     * for a hashed chunk that no longer exists, receives HTML with status 200, and the module
+     * loader rejects it on MIME type with no way to recover. A 404 keeps that honest — the fetch
+     * fails as a missing file, the service worker refuses to cache it, and the shell can reload
+     * itself onto the current build.
+     */
+    const ASSET_LIKE=/^\/assets\/|\.(?:js|mjs|css|map|json|png|jpe?g|webp|avif|svg|ico|woff2?|ttf|mp3|m4a|txt|webmanifest)$/i;
+    app.get('*',(req,res)=>{
+      if(ASSET_LIKE.test(req.path))return res.status(404).type('text/plain').send('Not Found');
+      res.sendFile(path.join(distPath,'index.html'));
+    })}
   app.listen(PORT,'0.0.0.0',()=>console.log(`MIZAN running on :${PORT}`));
 }
 startServer().catch(err=>{console.error(err);process.exit(1)});
