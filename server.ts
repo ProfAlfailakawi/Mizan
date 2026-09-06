@@ -20,7 +20,8 @@ import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { attestResult } from './server/result-attestation';
-import { sealResult, verifySeal } from './server/result-sealing';
+import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
+import { IntegrityAuthorityRepository } from './server/integrity-authority';
 import { measureAgreement, planBlindRescoring } from './server/blind-rescoring';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
@@ -92,6 +93,7 @@ async function startServer() {
 
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
+  const integrityAuthorityDir=process.env.MIZAN_INTEGRITY_AUTHORITY_DIR||'';let integrityAuthority:IntegrityAuthorityRepository|null=null;try{if(integrityAuthorityDir)integrityAuthority=new IntegrityAuthorityRepository(integrityAuthorityDir)}catch(err){console.error('Integrity authority disabled:',err)}
   const auditLedgerDir=process.env.MIZAN_AUDIT_LEDGER_DIR||'';let serverAuditLedger:ServerAuditLedgerRepository|null=null;try{if(auditLedgerDir)serverAuditLedger=new ServerAuditLedgerRepository(auditLedgerDir)}catch(err){console.error('Server audit ledger disabled:',err)}
   const identityFromBase=(base:{uid:string;email?:string;raw:Record<string,unknown>}):ServerIdentity|null=>{const managed=identityGovernance?.identityForUid(base.uid);if(managed)return {uid:base.uid,email:base.email,role:managed.grant.role,organizationId:managed.grant.organizationId,competitionId:managed.grant.competitionId};const role=String(base.raw.role||'') as GovernanceRole;const organizationId=String(base.raw.org_id||'');if(!role||!organizationId)return null;return {uid:base.uid,email:base.email,role,organizationId,competitionId:base.raw.competition_id?String(base.raw.competition_id):undefined}};
   const sensitiveIdentityRoles=new Set<string>(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
@@ -115,8 +117,8 @@ async function startServer() {
   const secureQuestionRuntimeConfigured=!!secureQuestionRuntime&&questionEscrowConfigured;
   const escrowFailure=(res:any,err:unknown)=>{const message=err instanceof Error?err.message:'ESCROW_FAILED';const forbidden=/MISMATCH|ASSIGNED_JUDGE|NOT_ALLOWED/.test(message);const missing=/NOT_FOUND/.test(message);const conflict=/NOT_RELEASED|PARTICIPANT_NOT_PRESENT|EXISTS|REVOKED|EXPIRED/.test(message);return res.status(forbidden?403:missing?404:conflict?409:400).json({code:message.split(':')[0]})};
 
-  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
-  app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,witnessMode:!!witnessMode,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
+  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
+  app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Named-account identity governance. MIZAN stores no passwords; a verified Firebase identity is bound once to a scoped MIZAN invitation.
   app.get('/api/identity/me',requireFirebaseBase,(req,res)=>{const base=(req as any).firebaseBase as {uid:string;email?:string;raw:Record<string,unknown>};const managed=identityGovernance?.identityForUid(base.uid)||null;const identity=identityFromBase(base);if(!identity)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});if(!mfaSatisfied(base,identity.role))return res.status(403).json({code:'MFA_REQUIRED'});let session:any=undefined;if(identityGovernance&&managed){const deviceId=String(req.headers['x-mizan-device-id']||'');if(deviceId){try{session=identityGovernance.openSession(identity,deviceId,String(req.headers['x-mizan-device-name']||''),firebaseSecondFactorPresent(base.raw)?'MFA':'SINGLE_FACTOR')}catch(err){const code=err instanceof Error?err.message:'SESSION_FAILED';if(code==='PRIVILEGED_SESSION_CONFLICT')return res.status(409).json({code});return res.status(400).json({code})}}}res.json({identity,session,managed:!!managed});});
@@ -322,6 +324,7 @@ async function startServer() {
   app.post('/api/results/seal',requireGovernanceRoles(['comp_admin','org_admin','head_judge','scientific_admin']),(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const body=req.body||{};
     const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n:undefined};
+    const sealSigner=trustSigner();
     try{
       const outcome=sealResult({
         competitionId:String(body.competitionId||actor.competitionId||''),
@@ -337,6 +340,8 @@ async function startServer() {
         sealedBy:String(actor.uid||actor.email||''),
         previousSealSha256:body.previousSealSha256?String(body.previousSealSha256):undefined,
         previousFinalScore:num(body.previousFinalScore),
+        // مفتاح خادمي حين يكون مهيّأً. غيابه لا يمنع الختم لكنه يُعلَن في `assurance` بدل ادّعاء توقيع.
+        signer:sealSigner?{keyId:sealSigner.keyId,publicKeySpki:sealSigner.spki,sign:(material:string)=>crypto.sign(null,Buffer.from(material),sealSigner.privateKey).toString('base64url')}:undefined,
       });
       res.setHeader('Cache-Control','no-store');
       // فحص بوجود الحقل لا بالراية: التضييق على راية منطقية لا يعمل خارج الوضع الصارم.
@@ -351,8 +356,94 @@ async function startServer() {
     const sealed=req.body?.sealed;
     if(!sealed||typeof sealed!=='object')return res.status(400).json({code:'SEAL_REQUIRED'});
     res.setHeader('Cache-Control','no-store');
-    try{const intact=verifySeal(sealed);return res.status(intact?200:409).json({intact,sealSha256:String(sealed.sealSha256||'')})}
+    try{
+      const intact=verifySeal(sealed);
+      // سؤالان مختلفان يُجابان معًا: هل تغيّر المحتوى، ومن يسند هذا الختم.
+      const signer=trustSigner();
+      const signature=verifySealSignature(sealed,(material,value,keyId)=>{
+        if(!signer||(keyId&&keyId!==signer.keyId))return false;
+        return crypto.verify(null,Buffer.from(material),signer.publicKey,Buffer.from(value,'base64url'));
+      });
+      return res.status(intact&&signature.state!=='INVALID_SIGNATURE'&&signature.state!=='SIGNATURE_MISSING'?200:409)
+        .json({intact,signature:signature.state,sealSha256:String(sealed.sealSha256||'')});
+    }
     catch{return res.status(400).json({code:'SEAL_VERIFICATION_FAILED'})}});
+
+  /*
+   * النصاب وقرعة FairDraw: كانا في المتصفح، فكان الحارس والمَحروس في يد واحدة. هنا الفاعل هو
+   * الهوية المُصدَّقة للطلب، والحالة دائمة، والسجل ملحق-فقط.
+   */
+  // نوع الاستجابة يأتي من كعب express في هذا المستودع، وهو any؛ لا نخترع نوعًا أدقّ مما يوفّره.
+  type AuthorityRes=Parameters<RequestHandler>[1] extends never?never:any;
+  const authorityRequired=(res:AuthorityRes)=>{res.status(503).json({code:'INTEGRITY_AUTHORITY_NOT_CONFIGURED',message:'سلطة النزاهة الخادمية غير مهيّأة؛ لا يُعتدّ بنصاب أو قرعة يُحسبان في المتصفح.'});return null};
+  const authorityFailed=(res:AuthorityRes,code:string)=>res.status(500).json({code});
+
+  app.get('/api/integrity/quorum',requireGovernanceRoles(['head_judge','comp_admin','org_admin','scientific_admin','broadcast_operator','auditor']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{res.setHeader('Cache-Control','no-store');return res.json({actions:integrityAuthority.listQuorum(actor,String(req.query.competitionId||actor.competitionId||''))})}
+    catch{return authorityFailed(res,'QUORUM_LIST_FAILED')}});
+
+  app.post('/api/integrity/quorum/request',requireGovernanceRoles(['head_judge','comp_admin','org_admin','scientific_admin']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
+    const groups=Array.isArray(b.requiredRoleGroups)?b.requiredRoleGroups.slice(0,8).map((g:unknown)=>Array.isArray(g)?g.slice(0,8).map(String):[]).filter((g:string[])=>g.length):[];
+    try{
+      const outcome=integrityAuthority.requestQuorum(actor,{
+        competitionId:String(b.competitionId||actor.competitionId||''),
+        action:String(b.action||''),entityId:String(b.entityId||''),
+        requiredRoleGroups:groups,
+        minimumApprovals:Number.isFinite(Number(b.minimumApprovals))?Number(b.minimumApprovals):undefined});
+      res.setHeader('Cache-Control','no-store');
+      return 'record' in outcome?res.status(201).json(outcome.record):res.status(409).json({code:outcome.code});
+    }catch{return authorityFailed(res,'QUORUM_REQUEST_FAILED')}});
+
+  app.post('/api/integrity/quorum/:id/approve',requireGovernanceRoles(['head_judge','comp_admin','org_admin','scientific_admin','broadcast_operator']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{const outcome=integrityAuthority.approveQuorum(actor,String(req.params.id));
+      res.setHeader('Cache-Control','no-store');
+      return 'record' in outcome?res.json(outcome.record):res.status(409).json({code:outcome.code});
+    }catch{return authorityFailed(res,'QUORUM_APPROVE_FAILED')}});
+
+  app.post('/api/integrity/quorum/:id/execute',requireGovernanceRoles(['head_judge','comp_admin','org_admin','scientific_admin','broadcast_operator']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{const outcome=integrityAuthority.executeQuorum(actor,String(req.params.id));
+      res.setHeader('Cache-Control','no-store');
+      return 'record' in outcome?res.json(outcome.record):res.status(409).json({code:outcome.code});
+    }catch{return authorityFailed(res,'QUORUM_EXECUTE_FAILED')}});
+
+  /* الالتزام يُرجع البصمة ولا يُرجع البذرة — ليست في المُخرَج أصلًا، فلا تُطلب ولا تُسرَّب. */
+  app.post('/api/integrity/fairdraw/commit',requireGovernanceRoles(['comp_admin','org_admin','scientific_admin','head_judge']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
+    const participantId=String(b.participantId||'');const constraintHash=String(b.constraintHash||'');
+    if(!participantId||!constraintHash)return res.status(400).json({code:'COMMIT_FIELDS_REQUIRED'});
+    try{res.setHeader('Cache-Control','no-store');
+      return res.status(201).json(integrityAuthority.commitFairDraw(actor,{competitionId:String(b.competitionId||actor.competitionId||''),participantId,constraintHash}));
+    }catch{return authorityFailed(res,'FAIRDRAW_COMMIT_FAILED')}});
+
+  app.get('/api/integrity/fairdraw/commitments',requireGovernanceRoles(['comp_admin','org_admin','scientific_admin','head_judge','auditor']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{res.setHeader('Cache-Control','no-store');return res.json({commitments:integrityAuthority.listCommitments(actor,String(req.query.competitionId||actor.competitionId||''))})}
+    catch{return authorityFailed(res,'FAIRDRAW_LIST_FAILED')}});
+
+  app.post('/api/integrity/fairdraw/:id/reveal',requireGovernanceRoles(['comp_admin','org_admin','scientific_admin','head_judge']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{
+      const outcome=integrityAuthority.revealFairDraw(actor,String(req.params.id),req.body?.constraintHash?String(req.body.constraintHash):undefined);
+      res.setHeader('Cache-Control','no-store');
+      return 'seed' in outcome?res.json(outcome):res.status(409).json({code:outcome.code});
+    }catch{return authorityFailed(res,'FAIRDRAW_REVEAL_FAILED')}});
+
+  app.get('/api/integrity/authority-audit',requireGovernanceRoles(['auditor','org_admin','comp_admin','scientific_admin']),(req,res)=>{
+    if(!integrityAuthority)return authorityRequired(res);
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    try{res.setHeader('Cache-Control','no-store');return res.json(integrityAuthority.readAudit(actor.organizationId))}
+    catch{return authorityFailed(res,'AUTHORITY_AUDIT_FAILED')}});
 
   app.post('/api/judging/calibration',requireGovernanceRoles(['head_judge','comp_admin','org_admin','auditor','scientific_admin']),(req,res)=>{
     const raw=Array.isArray(req.body?.observations)?req.body.observations:[];

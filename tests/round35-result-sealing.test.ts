@@ -87,3 +87,45 @@ test('ranking sealed results is deterministic and never depends on arrival order
   // a و c متساويان تمامًا؛ الترتيب بينهما يجب أن يكون ثابتًا لا عشوائيًا.
   assert.deepEqual(rankSealedResults([c,a,b]).map(r=>r.participantId),ranked.map(r=>r.participantId));
 });
+
+/*
+ * البصمة تُثبت أن المحتوى لم يتغيّر. وحده التوقيع يُثبت **من ختم**: فمن يملك المدخلات يعيد
+ * إنتاج البصمة لأي نتائج يختارها، ولا يعيد إنتاج التوقيع بلا المفتاح الخادمي.
+ */
+import crypto from 'crypto';
+import {verifySealSignature} from '../server/result-sealing';
+
+const KEYS=crypto.generateKeyPairSync('ed25519');
+const SIGNER={keyId:'ed25519:test',publicKeySpki:KEYS.publicKey.export({format:'der',type:'spki'}).toString('base64url'),
+  sign:(material:string)=>crypto.sign(null,Buffer.from(material),KEYS.privateKey).toString('base64url')};
+const verifier=(material:string,signature:string)=>crypto.verify(null,Buffer.from(material),KEYS.publicKey,Buffer.from(signature,'base64url'));
+
+test('a seal made with a server key is signed, and the signature verifies',()=>{
+  const sealed=ok(sealResult({...base,submissions:SUBS,signer:SIGNER}));
+  assert.equal(sealed.assurance,'SIGNED_ED25519');
+  assert.equal(sealed.signature?.keyId,'ed25519:test');
+  assert.deepEqual(verifySealSignature(sealed,verifier),{state:'SIGNED'});
+  assert.ok(verifySeal(sealed),'the digest still covers the content');
+  assert.ok(verifySeal(JSON.parse(JSON.stringify(sealed))),'and still does after transport');
+});
+
+test('with no server key the seal says it is a digest, and never claims a signature',()=>{
+  const sealed=ok(sealResult({...base,submissions:SUBS}));
+  assert.equal(sealed.assurance,'DIGEST_ONLY');
+  assert.equal(sealed.signature,undefined);
+  assert.deepEqual(verifySealSignature(sealed,verifier),{state:'UNSIGNED'},'unsigned is reported as unsigned, not as invalid');
+});
+
+test('a forged score cannot be re-signed, and a stripped signature is not silently accepted',()=>{
+  const sealed=ok(sealResult({...base,submissions:SUBS,signer:SIGNER}));
+  // من يملك الإرسالات يعيد بناء الجسم والبصمة — لكن التوقيع القديم لا يغطّي البصمة الجديدة.
+  const forged={...sealed,finalScore:sealed.finalScore+5};
+  const {sealSha256:_drop,signature:_sig,...body}=forged;
+  const reforged={...forged,sealSha256:crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex')};
+  assert.notEqual(verifySealSignature(reforged as typeof sealed,verifier).state,'SIGNED');
+  assert.equal(verifySealSignature({...sealed,signature:undefined},verifier).state,'SIGNATURE_MISSING',
+    'a seal that claims Ed25519 must produce one');
+  const otherKey=crypto.generateKeyPairSync('ed25519');
+  const wrong=(m:string,s:string)=>crypto.verify(null,Buffer.from(m),otherKey.publicKey,Buffer.from(s,'base64url'));
+  assert.equal(verifySealSignature(sealed,wrong).state,'INVALID_SIGNATURE','another key does not vouch for this seal');
+});
