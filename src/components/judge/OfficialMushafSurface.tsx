@@ -5,7 +5,7 @@ import type {QuranAlignmentResult,QuranPageLocus} from '../../lib/quran-intellig
 import {Badge} from '../design-system/Badge';
 import {DivergenceRadar} from './DivergenceRadar';
 import {TajweedAyah,TajweedAyahWords,TajweedLegend} from './TajweedText';
-import {proportionalWordTimings,splitAyahWords,wordAtTime} from '../../lib/word-timing';
+import {measuredWordTimings,splitAyahWords,wordAtTime,type MeasuredSegment} from '../../lib/word-timing';
 import {resolveReading} from '../../lib/scientific-core';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
 
@@ -180,8 +180,23 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  useEffect(()=>{const el=elRef.current;if(!el||!playing)return;let raf=0;
   const tick=()=>{setPosMs(el.currentTime*1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick);
   return()=>cancelAnimationFrame(raf)},[playing,index]);
- // نموذج التوقيت مبنيّ على نص الآية ومدّتها الحقيقية بعد تحميل الوسائط.
- const timing=useMemo(()=>proportionalWordTimings(ayat[index]?.text||'',durMs),[ayat,index,durMs]);
+ /*
+  * مقاطع مقيسة لهذا **التسجيل** إن وُجدت. تُطلب بمعرّف التسجيل لا باسم القارئ، لأن التوقيت
+  * يخصّ تسجيلًا بعينه؛ و404 هي الحال الطبيعي فتبقى العدسة على التقدير الموسوم.
+  */
+ const [segments,setSegments]=useState<MeasuredSegment[]|undefined>(undefined);
+ const current=ayat[index];
+ useEffect(()=>{
+  setSegments(undefined);
+  if(!audioId||!current)return;let live=true;
+  void fetch(`/api/public/kfgqpc/word-timings/${audioId}/${current.surah}/${current.ayah}`,{cache:'force-cache'})
+   .then(r=>r.ok?r.json():null)
+   .then(b=>{if(live&&Array.isArray(b?.segments))setSegments(b.segments as MeasuredSegment[])})
+   .catch(()=>{/* غياب التوقيت المقيس ليس خطأً يُعرض؛ التقدير يعمل */});
+  return()=>{live=false}},[audioId,current&&`${current.surah}:${current.ayah}`]);
+ // نموذج التوقيت: مقيسٌ حين يُثبت أنه لهذه الآية ولهذا التسجيل، وإلا تقديرٌ موسوم.
+ const timing=useMemo(()=>measuredWordTimings(current?.text||'',durMs,segments).model,[current,durMs,segments]);
+ const measured=timing.assurance==='MEASURED_ALIGNED';
  const word=playing?wordAtTime(timing,posMs):-1;
  // تُبلِّغ السطحَ بالآية والكلمة الجاريتين؛ ويُخلى التظليل عند التوقّف أو إخفاء المشغّل.
  useEffect(()=>{onActive?.(playing&&ayat[index]?{ayah:ayat[index].ayah,word}:null)},[playing,index,ayat,word,onActive]);
@@ -197,8 +212,9 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
     <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'تلاوة مرجعية رسمية':'Official reference recitation'}</div>
      <div className="text-[9px] text-[#656a66] truncate">{ar?`آية ${ayat[index]?.ayah} من ${ayat.length}`:`Ayah ${ayat[index]?.ayah} of ${ayat.length}`} · {ar?'مرجع فقط — لا يدخل في الدرجة':'reference only — never scored'}</div></div>
    </div>
-   {/* التظليل على مستوى الكلمة تقديرٌ موزّع بالوزن النطقي، لا مقاطع زمنية مقيسة — يُقال كما هو. */}
-   {playing&&timing.words.length>0&&<span className="shrink-0 rounded-lg bg-[#efe7d8] text-[#6f5733] px-2 py-1 text-[8px] font-black">{ar?'تتبّع الكلمة تقديري':'Word tracking estimated'}</span>}
+   {/* الوسم يقول أيّ الحالين قائم: قياسٌ لهذا التسجيل، أم توزيعٌ تقديري بالوزن النطقي. */}
+   {playing&&timing.words.length>0&&<span className={`shrink-0 rounded-lg px-2 py-1 text-[8px] font-black ${measured?'bg-[#E7EEE9] text-[#214C40]':'bg-[#efe7d8] text-[#6f5733]'}`}>
+    {measured?(ar?'تتبّع الكلمة مقيس':'Word tracking measured'):(ar?'تتبّع الكلمة تقديري':'Word tracking estimated')}</span>}
   </div>
   <div className="mt-2.5 h-[3px] rounded-full bg-[#e3ded1] overflow-hidden"><div className="h-full bg-[#214C40] transition-[width] duration-100" style={{width:`${progress*100}%`}}/></div>
   <audio ref={elRef} src={src} onEnded={onEnded} preload="none"
