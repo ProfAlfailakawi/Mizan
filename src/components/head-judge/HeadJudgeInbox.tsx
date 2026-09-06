@@ -10,7 +10,8 @@ import { ContinuityRecovery } from '../operations/ContinuityRecovery';
 import { EmergencyQuestionAuthorization } from '../admin/EmergencyQuestionAuthorization';
 import { JudgeDriftMonitor } from './JudgeDriftMonitor';
 import { JudgeCalibrationPanel, type JudgeCalibrationRow, type RankScenarioRow } from './JudgeCalibrationPanel';
-import { fetchJudgeCalibration } from '../../lib/judge-calibration-client';
+import { fetchJudgeCalibration, measureJudgingReliability, type ReliabilityReport } from '../../lib/judge-calibration-client';
+import { ReliabilityPanel } from './ReliabilityPanel';
 type Tab='reviews'|'appeals'|'panel'|'seal';
 // Severity was printed raw — "medium", "low" — inside an Arabic triage list, and
 // only two of the three levels were ever distinguished by tone.
@@ -33,12 +34,32 @@ export const HeadJudgeInbox: React.FC = () => {
     participants. The maths runs server-side behind the head-judge role — the panel simply stays
     hidden for anyone not entitled to see it. Advisory only: nothing here edits a score. */
  const [calibration,setCalibration]=useState<{judges:JudgeCalibrationRow[];scenario:RankScenarioRow[]}>({judges:[],scenario:[]});
+ const [reliability,setReliability]=useState<ReliabilityReport|null>(null);
  useEffect(()=>{let live=true;
   const observations=store.judgeSubmissions.flatMap(sub=>Object.entries(sub.criterionScores||{}).map(([criterionId,score])=>({
    judgeId:sub.judgeId,judgeName:sub.judgeName,sessionId:sub.sessionId,participantId:sub.participantId||sub.sessionId,criterionId,score:Number(score),
   }))).filter(o=>Number.isFinite(o.score));
   if(observations.length<6){setCalibration({judges:[],scenario:[]});return}
   void fetchJudgeCalibration(observations).then(r=>{if(live&&r)setCalibration(r)});
+  return()=>{live=false}},[store.judgeSubmissions]);
+
+ /*
+  * موثوقية التحكيم تُقاس من حكمين مستقلّين على الجلسة نفسها. لا يُفتعل زوجٌ حين لا يوجد:
+  * جلسة حكمها محكّم واحد لا تُنتج قياسًا، واللوحة تغيب بدل أن تعرض رقمًا بلا سند.
+  */
+ useEffect(()=>{let live=true;
+  const byId=new Map<string,typeof store.judgeSubmissions>();
+  for(const x of store.judgeSubmissions){const k=x.sessionId;byId.set(k,[...(byId.get(k)||[]),x])}
+  const assignments:any[]=[],originals:any[]=[],reviews:any[]=[];
+  for(const [sessionId,subs] of byId){
+   if(subs.length<2)continue;
+   const [first,second]=[...subs].sort((a,b)=>String(a.submittedAt||'').localeCompare(String(b.submittedAt||'')));
+   assignments.push({sessionId,participantId:first.participantId||'',reviewerId:second.judgeId,originalJudgeId:first.judgeId,assignedAt:''});
+   originals.push({sessionId,participantId:first.participantId||'',judgeId:first.judgeId,submittedAt:first.submittedAt||'',totalScore:first.totalScore,criterionScores:first.criterionScores});
+   reviews.push({sessionId,participantId:second.participantId||'',judgeId:second.judgeId,submittedAt:second.submittedAt||'',totalScore:second.totalScore,criterionScores:second.criterionScores});
+  }
+  if(!assignments.length){setReliability(null);return}
+  void measureJudgingReliability({assignments,originals,reviews,criteria:(store.competition.ruleSet?.criteria||[]).map(c=>({id:c.id,maxScore:c.maxScore}))}).then(r=>{if(live)setReliability(r)});
   return()=>{live=false}},[store.judgeSubmissions]);
  return <div className="max-w-6xl mx-auto px-4 sm:px-6 py-7 space-y-5">
   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div><div className="mizan-kicker">{ar?'رئيس التحكيم':'HEAD JUDGE'}</div><h1 className="text-3xl sm:text-4xl font-black mt-1">{ar?'القرار البشري في الحالات المهمة':'Human decision where it matters'}</h1><p className="text-sm text-[#636864] mt-2">{ar?'لا تراجع الطبيعي. النظام يجلب لك الاختلاف، الاعتراض، واعتماد الختم فقط.':'Routine stays out of the way; you receive discrepancies, appeals and seal approval only.'}</p></div><div className="flex gap-2"><Badge variant={pending.length?'amber':'emerald'}>{pending.length} {ar?'مراجعة':'reviews'}</Badge><Badge variant={pendingAppeals.length?'amber':'neutral'}>{pendingAppeals.length} {ar?'اعتراض':'appeals'}</Badge></div></div>
@@ -47,6 +68,7 @@ export const HeadJudgeInbox: React.FC = () => {
       صارت خلف تبويب واحد أعلى الشاشة، ويبقى بلاغ الاستمرارية وحده فوق التبويب لأنه حادث جارٍ. */}
   <div className="flex gap-1 border-b border-[#deddd6] overflow-x-auto"><TabButton active={tab==='reviews'} onClick={()=>setTab('reviews')} icon={Gavel} label={ar?'مراجعات التحكيم':'Judging reviews'} count={pending.length}/><TabButton active={tab==='appeals'} onClick={()=>setTab('appeals')} icon={FileCheck2} label={ar?'الاعتراضات':'Appeals'} count={pendingAppeals.length}/><TabButton active={tab==='panel'} onClick={()=>setTab('panel')} icon={Activity} label={ar?'حالة اللجنة':'Panel health'} count={0}/><TabButton active={tab==='seal'} onClick={()=>setTab('seal')} icon={LockKeyhole} label={ar?'الختم والطوارئ':'Seal & emergency'} count={0}/></div>
   {tab==='panel'&&<>
+  <ReliabilityPanel data={reliability} ar={ar}/>
   <JudgeCalibrationPanel judges={calibration.judges} scenario={calibration.scenario} ar={ar}/>
   <JudgeDriftMonitor/>
   </>}

@@ -50,6 +50,45 @@ test('wordAtTime finds the spoken word and reports none outside the ayah',()=>{
 
 /* المُطبِّع يقرأ ملفات تخطيط مفتوحة المصدر مختلفة الأشكال. الشرط: يتعرّف أو يرفض — لا يخمّن. */
 
+/*
+ * الشكل الحقيقي لملفات التخطيط المفتوحة، مأخوذ من ملف صفحة فعلي: صفحة فيها أسطر، وكل سطر فيه
+ * كلمات تحمل "سورة:آية:كلمة" — **بلا أي إحداثيات**. التصميم الدفاعي كان صحيحًا في رفض التخمين،
+ * لكنه كان سيرفض المصدر الوحيد المتاح؛ فصار يقرأ منه دقّة السطر.
+ */
+test('the real line-indexed layout is read, and yields line precision without inventing coordinates',()=>{
+  const raw={page:2,lines:[
+    {line:1,type:'surah-header',text:'سورة البقرة',surah:'002'},
+    {line:2,type:'basmala',qpcV2:'ﭑﭒﭓ'},
+    {line:3,type:'text',verseRange:'2:1-2:2',words:[
+      {location:'2:1:1',word:'الٓمٓ ١'},
+      {location:'2:2:1',word:'ذَٰلِكَ'}]},
+    {line:4,type:'text',verseRange:'2:2-2:3',words:[{location:'2:2:2',word:'ٱلْكِتَـٰبُ'}]},
+  ]};
+  const layout=normalizeMushafLayout(raw,2);
+  assert.ok(layout);
+  assert.equal(layout!.scale,'LINE_ONLY');
+  assert.equal(layout!.words.length,3);
+  const w=findLayoutWord(layout,2,2,0);
+  assert.ok(w);
+  assert.equal(w!.line,3,'the word is placed on its printed line');
+  assert.equal(w!.bbox,undefined,'no coordinates are invented where the source has none');
+  assert.equal(findLayoutWord(layout,2,2,1)!.line,4,'the next word moves the lens down a line');
+});
+
+test('page line count comes from the file, not a fixed fifteen',()=>{
+  // الصفحتان الافتتاحيتان ثماني أسطر لا خمس عشرة؛ تثبيت العدد كان يزيح العدسة عنهما.
+  const short={page:2,lines:[{line:3,type:'text',words:[{location:'2:1:1',word:'الٓمٓ'}]},{line:8,type:'text',words:[{location:'2:5:1',word:'أُو۟لَـٰٓئِكَ'}]}]};
+  assert.equal(normalizeMushafLayout(short,2)!.lineCount,8);
+  const full={page:200,lines:Array.from({length:15},(_,i)=>({line:i+1,type:'text',words:[{location:`2:${i+1}:1`,word:'كلمة'}]}))};
+  assert.equal(normalizeMushafLayout(full,200)!.lineCount,15);
+});
+
+test('a line-indexed file with no usable word locations is still refused',()=>{
+  assert.equal(normalizeMushafLayout({page:1,lines:[{line:1,type:'surah-header',text:'سورة'}]},1),null);
+  assert.equal(normalizeMushafLayout({page:1,lines:[{line:1,type:'text',words:[{word:'بلا موضع'}]}]},1),null);
+  assert.equal(normalizeMushafLayout({page:1,lines:[{line:1,type:'text',words:[{location:'999:1:1',word:'سورة لا توجد'}]}]},1),null);
+});
+
 test('layout normalizer reads pixel boxes against declared page size',()=>{
   const raw={width:1000,height:1600,lines:[{line:2,words:[
     {surah:1,ayah:2,word:1,x:500,y:320,width:200,height:60},
@@ -59,7 +98,7 @@ test('layout normalizer reads pixel boxes against declared page size',()=>{
   assert.equal(layout!.words.length,2);
   const first=findLayoutWord(layout,1,2,0);
   assert.ok(first,'word numbering is rebased to zero to match the text split');
-  assert.equal(first!.bbox.x,0.5);assert.equal(first!.bbox.width,0.2);
+  assert.equal(first!.bbox!.x,0.5);assert.equal(first!.bbox!.width,0.2);
   assert.equal(first!.line,2);
 });
 
@@ -68,7 +107,7 @@ test('layout normalizer accepts already-normalized and corner-style boxes',()=>{
   const layout=normalizeMushafLayout(raw,3);
   assert.ok(layout);assert.equal(layout!.scale,'NORMALIZED');
   const w=findLayoutWord(layout,2,5,0);
-  assert.ok(w);assert.ok(Math.abs(w!.bbox.width-0.2)<1e-9);
+  assert.ok(w);assert.ok(Math.abs(w!.bbox!.width-0.2)<1e-9);
 });
 
 test('layout normalizer refuses shapes it cannot map, so the line lens stays',()=>{
