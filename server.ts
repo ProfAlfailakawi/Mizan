@@ -18,7 +18,7 @@ import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-bui
 import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
-import { generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
+import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
 import { calibrateJudges, normalizedRankScenario, type JudgeScoreObservation } from './server/judge-calibration';
@@ -191,6 +191,21 @@ async function startServer() {
       try{const a=await analysisFor(readingId);if(a)difficulty=a.difficulty.vector(out.passage.surah,out.passage.startAyah,out.passage.endAyah)}catch{}
       res.setHeader('Cache-Control','no-store');return res.json({...out,difficulty})}
     catch{return res.status(502).json({code:'FAIRDRAW_FAILED'})}});
+
+  /* السحب المتوازن لدفعة متسابقين: مقطع مختلف لكل واحد بصعوبة متكافئة مقيسة.
+     الإسناد ذاته سرٌّ تشغيلي (يكشف مقطع كل متسابق)، فهو خلف أدوار السحب لا عام. */
+  app.post('/api/quran/fairdraw/balanced',requireGovernanceRoles(['comp_admin','org_admin','head_judge','scientific_admin']),async(req,res)=>{
+    const readingId=safeSegment(String(req.body?.reading||'hafs'));
+    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
+    try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
+      const out=await balancedFairDraw(kfgqpcDelivery,a.difficulty,{reading:readingId,
+        contestants:Number(req.body?.contestants),seed:req.body?.seed?String(req.body.seed):undefined,
+        anchor:req.body?.anchor?String(req.body.anchor) as any:undefined,ayahCount:num(req.body?.ayahCount),
+        juz:num(req.body?.juz),surah:num(req.body?.surah),minAyahCount:num(req.body?.min),maxAyahCount:num(req.body?.max),
+        oversample:num(req.body?.oversample),toleranceRatio:Number.isFinite(Number(req.body?.tolerance))?Number(req.body.tolerance):undefined});
+      if(!out)return res.status(422).json({code:'FAIRDRAW_BALANCED_POOL_INSUFFICIENT'});
+      res.setHeader('Cache-Control','no-store');return res.json(out)}
+    catch{return res.status(502).json({code:'FAIRDRAW_BALANCED_FAILED'})}});
 
   /*
    * Mutashabihat radar + difficulty vector.

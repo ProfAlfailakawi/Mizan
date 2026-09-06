@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { KfgqpcDeliveryRepository, KfgqpcDeliveryPassage } from './kfgqpc-delivery';
+import { DEFAULT_DIFFICULTY_WEIGHTS, balancePacks, type DifficultyEngine, type DifficultyVector, type DifficultyWeights } from './quran-difficulty';
 
 /**
  * MIZAN — FairDraw توليدي (بلا بنك أسئلة)
@@ -91,6 +92,115 @@ function eligibleAnchors(rows: any[], anchor: FairDrawAnchor, filter: { juz?: nu
     seen.add(k); out.push(r);
   }
   return out;
+}
+
+/*
+ * السحب المتوازن: مقطع مختلف لكل متسابق، وصعوبة متكافئة بينهم.
+ *
+ * السحب الحتمي وحده عادلٌ في **الإجراء** لا في **العبء**: بذرة نزيهة قد تعطي متسابقًا صفحةً
+ * مكتظّة بالمتشابهات وآخرَ سردًا مستقيمًا، فيتساوى الإجراء وتختلف المهمّة. هذه الدالة تسحب
+ * مجموعة مرشّحين بنفس البذرة، تقيس متجّه صعوبة كلٍّ منها، ثم تختار الطقم الأقلّ تباينًا.
+ *
+ * وتبقى العدالة **مُثبَتة لا مُدّعاة**: يُعاد `spreadRatio` و`achieved` مقيسين، فإن لم يتحقّق
+ * التكافؤ ضمن السماحية قيل ذلك صراحةً ولم يُدّعَ. والنتيجة كلها قابلة لإعادة الإنتاج بالبذرة.
+ */
+export interface BalancedFairDrawRequest extends FairDrawRequest {
+  /** عدد المقاطع المطلوبة — واحد لكل متسابق. */
+  contestants: number;
+  /** كم مرشّحًا يُسحب لكل مقطع مطلوب قبل الاختيار. أوسع ⇒ تكافؤ أدقّ. */
+  oversample?: number;
+  toleranceRatio?: number;
+}
+
+export interface BalancedFairDrawAssignment {
+  slot: number;
+  passage: KfgqpcDeliveryPassage;
+  difficulty: DifficultyVector;
+  anchorType: FairDrawAnchor;
+}
+
+export interface BalancedFairDrawResult {
+  protocol: 'MIZAN-FAIRDRAW-BALANCED-1';
+  reading: string;
+  seed: string;
+  contestants: number;
+  assignments: BalancedFairDrawAssignment[];
+  fairness: {
+    achieved: boolean;
+    spreadRatio: number;
+    tolerance: number;
+    candidatePool: number;
+    meanDifficulty: number;
+    minDifficulty: number;
+    maxDifficulty: number;
+    weights: DifficultyWeights;
+  };
+  algorithm: string;
+  reproducible: true;
+  verifyHint: string;
+}
+
+export async function balancedFairDraw(
+  delivery: KfgqpcDeliveryRepository,
+  difficulty: DifficultyEngine,
+  req: BalancedFairDrawRequest,
+): Promise<BalancedFairDrawResult | null> {
+  const contestants = Math.floor(req.contestants);
+  if (!Number.isFinite(contestants) || contestants < 1 || contestants > 500) return null;
+  const seed = req.seed && String(req.seed).length >= 8 ? String(req.seed) : crypto.randomUUID();
+  const oversample = Math.min(12, Math.max(2, Math.floor(req.oversample ?? 6)));
+  const poolTarget = Math.min(1500, contestants * oversample);
+
+  // مرشّحون حتميون: كل واحد سحبٌ كامل ببذرة فرعية مشتقّة، فالطقم كله يُعاد بنفس البذرة الأم.
+  const seen = new Set<string>();
+  const pool: { passage: KfgqpcDeliveryPassage; difficulty: DifficultyVector; anchorType: FairDrawAnchor }[] = [];
+  for (let i = 0; i < poolTarget * 3 && pool.length < poolTarget; i++) {
+    const one = await generativeFairDraw(delivery, { ...req, seed: `${seed}#${i}` });
+    if (!one) continue;
+    const p = one.passage;
+    const key = `${p.surah}:${p.startAyah}-${p.endAyah}`;
+    if (seen.has(key)) continue; // لا يُختبر متسابقان في المقطع نفسه
+    seen.add(key);
+    pool.push({ passage: p, difficulty: difficulty.vector(p.surah, p.startAyah, p.endAyah), anchorType: one.draw.anchorType });
+  }
+  if (pool.length < contestants) return null;
+
+  const balanced = balancePacks(
+    pool.map((c) => ({ items: [c], totalDifficulty: c.difficulty.score })),
+    contestants,
+    { toleranceRatio: req.toleranceRatio },
+  );
+  const chosen = balanced.packs.map((p) => p.items[0]);
+
+  /* ترتيب الإسناد يُخلط بالبذرة: لولا ذلك لخرج الطقم مرتّبًا تصاعديًا بالصعوبة، فيصير رقم
+     المتسابق نفسه إشارةً إلى نصيبه — وهو انحياز صامت. Fisher–Yates بمؤشّر مشتقّ من البذرة. */
+  const order = chosen.slice();
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = seededIndex(seed, `assign:${i}`, i + 1);
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+
+  const scores = chosen.map((c) => c.difficulty.score);
+  return {
+    protocol: 'MIZAN-FAIRDRAW-BALANCED-1',
+    reading: String(req.reading || 'hafs'),
+    seed,
+    contestants,
+    assignments: order.map((c, i) => ({ slot: i + 1, passage: c.passage, difficulty: c.difficulty, anchorType: c.anchorType })),
+    fairness: {
+      achieved: balanced.achieved,
+      spreadRatio: balanced.spreadRatio,
+      tolerance: balanced.tolerance,
+      candidatePool: pool.length,
+      meanDifficulty: scores.reduce((a, b) => a + b, 0) / scores.length,
+      minDifficulty: Math.min(...scores),
+      maxDifficulty: Math.max(...scores),
+      weights: DEFAULT_DIFFICULTY_WEIGHTS,
+    },
+    algorithm: 'HMAC-SHA256(seed#i) → candidate pool → difficulty vector → min-spread window → seeded assignment shuffle',
+    reproducible: true,
+    verifyHint: 'أعد السحب بنفس البذرة والرواية وعدد المتسابقين والقيود للحصول على الإسناد نفسه.',
+  };
 }
 
 export async function generativeFairDraw(delivery: KfgqpcDeliveryRepository, req: FairDrawRequest): Promise<FairDrawResult | null> {
