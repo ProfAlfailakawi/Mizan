@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
 import { auth, getFirestoreClient } from './firebase';
 import {
   User,
@@ -165,12 +166,7 @@ function activeRuleSetForCategory(categoryId?: string) {
 // tieBreakRules. Returns <0 if a should rank ahead of b. `additional_question` cannot be resolved
 // automatically (needs a re-test) and is treated as neutral here.
 function breakTie(a: ResultRecord, b: ResultRecord, rules: RuleSet['tieBreakRules'] = []): number {
-  for (const rule of rules) {
-    if (rule === 'memorization_priority') { const d = (b.criterionScores?.['memorization'] || 0) - (a.criterionScores?.['memorization'] || 0); if (Math.abs(d) > 1e-9) return d; }
-    else if (rule === 'tajweed_priority') { const d = (b.criterionScores?.['tajweed'] || 0) - (a.criterionScores?.['tajweed'] || 0); if (Math.abs(d) > 1e-9) return d; }
-    else if (rule === 'fewest_penalties') { const d = (a.penaltyCount || 0) - (b.penaltyCount || 0); if (d !== 0) return d; }
-  }
-  return 0;
+  return coreBreakTie(a, b, rules as readonly string[]);
 }
 
 // Non-lossy reconciliation of results arriving from the live server snapshot.
@@ -696,25 +692,10 @@ export function useAppStore() {
       // only their own criteria, so the correct final score is the sum of every criterion's score
       // taken from the judge(s) responsible for it — never the mean of up-projected partial scores.
       const rsCriteria = sessionRuleSet.criteria;
-      const aggregatedCriterionScores: Record<string, number> = {};
-      let finalScore: number;
-      if (policy.judging.mode === 'all_judges_all_criteria') {
-        let scoreInputs = sessionSubs.map(s => s.totalScore);
-        if (sessionRuleSet.dropExtremes && scoreInputs.length >= 3) {
-          const sorted = [...scoreInputs].sort((a,b)=>a-b); scoreInputs = sorted.slice(1,-1);
-        }
-        finalScore = Number((scoreInputs.reduce((a,b)=>a+b,0)/Math.max(1,scoreInputs.length)).toFixed(2));
-        rsCriteria.forEach(c => { const vals = sessionSubs.map(s => s.criterionScores?.[c.id]).filter((v): v is number => typeof v === 'number'); aggregatedCriterionScores[c.id] = vals.length ? Number((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3)) : c.maxScore; });
-      } else {
-        rsCriteria.forEach(c => {
-          const responsible = sessionSubs.filter(s => (s.scoredCriterionIds || []).includes(c.id));
-          const contributors = responsible.length ? responsible : sessionSubs;
-          const vals = contributors.map(s => s.criterionScores?.[c.id]).filter((v): v is number => typeof v === 'number');
-          aggregatedCriterionScores[c.id] = vals.length ? Number((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3)) : c.maxScore;
-        });
-        finalScore = Number(Object.values(aggregatedCriterionScores).reduce((a,b)=>a+b,0).toFixed(2));
-      }
-      const sessionPenaltyCount = Math.max(0, ...sessionSubs.map(s => s.sessionPenaltyCount || 0), globalState.activeSession.events.filter(e => !e.reversed).length);
+      const panel = computePanelScore({ submissions: sessionSubs, criteria: rsCriteria, mode: policy.judging.mode, dropExtremes: sessionRuleSet.dropExtremes });
+      const aggregatedCriterionScores = panel.criterionScores;
+      const finalScore = panel.finalScore;
+      const sessionPenaltyCount = panelPenaltyCount(sessionSubs, globalState.activeSession.events.filter(e => !e.reversed).length);
       const sealedExisting=globalState.results.find(r=>r.competitionId===globalState.competition.id&&r.participantId===participant.id&&['sealed','published'].includes(r.status));
       if(sealedExisting){
         recordInvariantBlock('sealed_results_immutable','judge_panel_recalculation','Result',sealedExisting.id,'A later judge panel attempted to recalculate an already sealed/published result',{sealedScore:sealedExisting.finalScore,newPanelScore:finalScore,sessionId:submission.sessionId});

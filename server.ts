@@ -19,6 +19,7 @@ import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
+import { attestResult } from './server/result-attestation';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
 import { calibrateJudges, normalizedRankScenario, type JudgeScoreObservation } from './server/judge-calibration';
@@ -257,6 +258,30 @@ async function startServer() {
    * thin sample. It returns a comparison scenario alongside the real ranking; it never rewrites a
    * human score and never re-ranks results on its own.
    */
+  /*
+   * شهادة الخادم على نتيجة: يعيد الاحتساب من إرسالات المحكمين الخام ويقارنه بالمُدّعى.
+   * لا يكتب نتيجة ولا يغيّرها — يشهد فقط، ويُسجَّل حكمه في سجلّ التدقيق الخادمي ليُراجَع لاحقًا.
+   */
+  app.post('/api/results/attest',requireGovernanceRoles(['comp_admin','org_admin','head_judge','auditor','scientific_admin']),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;const body=req.body||{};
+    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n:undefined};
+    try{
+      const attestation=attestResult({
+        competitionId:String(body.competitionId||actor.competitionId||''),
+        participantId:String(body.participantId||''),
+        resultId:body.resultId?String(body.resultId):undefined,
+        claim:{finalScore:Number(body.claim?.finalScore),criterionScores:body.claim?.criterionScores&&typeof body.claim.criterionScores==='object'?body.claim.criterionScores:undefined,penaltyCount:num(body.claim?.penaltyCount)},
+        submissions:Array.isArray(body.submissions)?body.submissions.slice(0,64):[],
+        criteria:Array.isArray(body.criteria)?body.criteria.slice(0,64):[],
+        mode:String(body.mode||'all_judges_all_criteria'),
+        dropExtremes:!!body.dropExtremes,
+        sessionEventCount:num(body.sessionEventCount)||0,
+      });
+      serverAuditLedger?.append(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:attestation.competitionId,action:'RESULT_ATTESTED',entityType:'Result',entityId:attestation.resultId||attestation.participantId,reason:`Server recomputation ${attestation.verdict}${attestation.reason?` (${attestation.reason})`:''}`,requestId:String(req.headers['x-request-id']||'')});
+      res.setHeader('Cache-Control','no-store');
+      return res.status(attestation.verdict==='DISAGREES'?409:200).json(attestation);
+    }catch{return res.status(400).json({code:'RESULT_ATTESTATION_FAILED'})}});
+
   app.post('/api/judging/calibration',requireGovernanceRoles(['head_judge','comp_admin','org_admin','auditor','scientific_admin']),(req,res)=>{
     const raw=Array.isArray(req.body?.observations)?req.body.observations:[];
     if(!raw.length)return res.status(400).json({code:'OBSERVATIONS_REQUIRED'});
