@@ -49,17 +49,23 @@ async function deliveryJson<T>(url:string,init?:RequestInit):Promise<T|null>{
   if(!(r.headers.get('content-type')||'').includes('application/json'))return null;
   return await r.json() as T}catch{return null}}
 
-export interface MushafLayoutWord{surah:number;ayah:number;wordIndex:number;line?:number;bbox:{x:number;y:number;width:number;height:number}}
-export interface MushafPageLayout{page:number;scale:string;words:MushafLayoutWord[]}
+export interface MushafLayoutWord{surah:number;ayah:number;wordIndex:number;line?:number;bbox?:{x:number;y:number;width:number;height:number}}
+export interface MushafPageLayout{page:number;scale:string;lineCount:number;words:MushafLayoutWord[]}
 /* تخطيط الكلمة طبقة إثراء: غيابه (204) حالة عادية تُعاد فيها null، ويبقى العرض على عدسة السطر. */
 export async function fetchMushafLayout(page:number):Promise<MushafPageLayout|null>{
  try{const r=await fetch(`/api/public/kfgqpc/mushaf-layout/${page}`,{cache:'default'});
   if(!r.ok||r.status===204)return null;return await r.json() as MushafPageLayout}catch{return null}}
 
-/** صندوق كلمة بعينها في تخطيط صفحة، أو null فتبقى عدسة السطر. */
-export function findLayoutWordBox(layout:MushafPageLayout|null,surah:number,ayah:number,wordIndex:number){
+/*
+ * موضع كلمة بعينها على الصفحة المطبوعة.
+ *
+ * ملفات التخطيط المفتوحة المتاحة لا تحمل إحداثيات — فحصتُ ملفًا حقيقيًا فلم أجد فيها x ولا y —
+ * لكنها تحمل رقم سطر كل كلمة بدقّة. فالمُعاد هنا صندوقٌ حين يوفّره المصدر، وسطرٌ حين لا يوفّره.
+ * والسطر ليس تنازلًا: العدسة تنتقل مع التلاوة سطرًا سطرًا بدل أن تغطّي المقطع كله.
+ */
+export function findLayoutWord(layout:MushafPageLayout|null,surah:number,ayah:number,wordIndex:number){
  if(!layout)return null;
- return layout.words.find(w=>w.surah===surah&&w.ayah===ayah&&w.wordIndex===wordIndex)?.bbox||null;}
+ return layout.words.find(w=>w.surah===surah&&w.ayah===ayah&&w.wordIndex===wordIndex)||null;}
 
 export async function fetchDeliveryPassage(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DeliveryPassage|null>{
  if(!reading)return null;

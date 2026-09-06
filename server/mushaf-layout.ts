@@ -15,11 +15,14 @@ export interface LayoutWord {
   surah: number; ayah: number;
   /** ترتيب الكلمة داخل الآية، صفريّ الأساس. */
   wordIndex: number;
+  /** رقم السطر على الصفحة المطبوعة. يكفي وحده لوضع العدسة على السطر الصحيح. */
   line?: number;
-  bbox: NormalizedBox;
+  /** صندوق الكلمة حين يوفّره المصدر. الملفات المفتوحة المتاحة لا تحمل إحداثيات. */
+  bbox?: NormalizedBox;
 }
-export type LayoutScale = 'DECLARED' | 'NORMALIZED' | 'INFERRED';
-export interface MushafPageLayout { page: number; scale: LayoutScale; words: LayoutWord[] }
+/** `LINE_ONLY`: المصدر يحدّد السطر ولا يحمل إحداثيات — دقّة سطر لا دقّة نقطة. */
+export type LayoutScale = 'DECLARED' | 'NORMALIZED' | 'INFERRED' | 'LINE_ONLY';
+export interface MushafPageLayout { page: number; scale: LayoutScale; lineCount: number; words: LayoutWord[] }
 
 const num = (v: unknown): number | undefined => {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
@@ -64,12 +67,45 @@ function collectWordNodes(raw: any, inheritedLine?: number, depth = 0): WordNode
   return Object.values(raw).flatMap((v) => collectWordNodes(v, line, depth + 1));
 }
 
+
+/*
+ * الشكل السائد في ملفات التخطيط المفتوحة: صفحة فيها أسطر، وكل سطر فيه كلمات، وكل كلمة تحمل
+ * موضعها النصّي "سورة:آية:كلمة" — **ولا تحمل إحداثيات**.
+ *
+ * فحصتُ ملفًا حقيقيًا: لا x ولا y ولا عرض ولا ارتفاع في الملف كله. فالطموح إلى مربّع حول الكلمة
+ * لا يسنده مصدر، والاختراع مرفوض. لكن رقم السطر موجود ودقيق، وهو يكفي لتتبّعٍ حقيقي: تنتقل
+ * العدسة إلى **سطر الكلمة الجارية** بدل أن تغطّي المقطع كله.
+ */
+function parseLineIndexedLayout(raw: any, page: number): MushafPageLayout | null {
+  const lines = raw?.lines;
+  if (!Array.isArray(lines) || !lines.length) return null;
+  const words: LayoutWord[] = [];
+  let lineCount = 0;
+  for (const line of lines) {
+    const lineNo = num(line?.line);
+    if (lineNo !== undefined) lineCount = Math.max(lineCount, lineNo);
+    if (!Array.isArray(line?.words)) continue;
+    for (const w of line.words) {
+      const parts = String(w?.location || '').split(':');
+      if (parts.length !== 3) continue;
+      const surah = num(parts[0]), ayah = num(parts[1]), wordNo = num(parts[2]);
+      if (surah === undefined || ayah === undefined || wordNo === undefined) continue;
+      if (!Number.isInteger(surah) || surah < 1 || surah > 114 || ayah < 1 || wordNo < 1) continue;
+      words.push({ surah, ayah, wordIndex: wordNo - 1, line: lineNo });
+    }
+  }
+  if (!words.length) return null;
+  return { page, scale: 'LINE_ONLY', lineCount: lineCount || 15, words };
+}
+
 /**
- * يحوّل ملف تخطيط صفحة إلى كلمات بإحداثيات نسبية 0..1.
+ * يحوّل ملف تخطيط صفحة إلى مواضع كلمات: بإحداثيات حين يوفّرها المصدر، وبالسطر حين لا يوفّرها.
  * يرجع null إذا لم يتيقّن من الشكل أو من مقياس الإحداثيات.
  */
 export function normalizeMushafLayout(raw: any, page: number): MushafPageLayout | null {
   if (!Number.isInteger(page) || page < 1 || page > 604) return null;
+  const lineIndexed = parseLineIndexedLayout(raw, page);
+  if (lineIndexed) return lineIndexed;
   const nodes = collectWordNodes(raw);
   if (!nodes.length) return null;
 
@@ -106,7 +142,8 @@ export function normalizeMushafLayout(raw: any, page: number): MushafPageLayout 
     });
   }
   if (!words.length) return null;
-  return { page, scale, words };
+  const lineCount = words.reduce((m, w) => Math.max(m, w.line || 0), 0) || 15;
+  return { page, scale, lineCount, words };
 }
 
 /** صندوق كلمة بعينها، أو null — الواجهة تعود حينها إلى عدسة السطر. */
