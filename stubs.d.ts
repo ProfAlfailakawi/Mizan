@@ -7,6 +7,7 @@ declare module 'react-dom/client' { export function createRoot(...args:any[]): a
 declare module 'lucide-react' {
  export const Highlighter: any;
  export const Scale: any;
+ export const Type: any;
  export const Gauge: any;
  export const GitBranch: any;
  export const ChevronDown: any;
