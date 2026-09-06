@@ -43,7 +43,7 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
       </div>
 
       {/* العيّنة الصغيرة لا تُعرض نسبةً مئوية: الرقم الكبير يُقرأ يقينًا. */}
-      <div className="grid gap-px bg-[#e8e5dd] sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px bg-[#e8e5dd] sm:grid-cols-4">
         <Cell label={ar ? 'أزواج مقيسة' : 'Pairs measured'} value={<span className="tabular-nums">{data.pairs}</span>} />
         <Cell
           label={ar ? `اتفاق ضمن ±${data.toleranceUsed}` : `Agreement within ±${data.toleranceUsed}`}
@@ -79,8 +79,9 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
               ))}
             </ul>
             {data.outliers.length > 6 && (
+              /* «و6/9 أخرى» تُقرأ كسرًا لا عددًا، والمقصود عدد المعروض من الجملة. تُقال كما هي. */
               <p className="mt-2 text-[10px] text-[#6b706c]">
-                {ar ? 'و' : 'and '}<Ratio value={data.outliers.length - 6} of={data.outliers.length} />{ar ? ' أخرى' : ' more'}
+                {ar ? 'معروضة ' : 'Showing '}<Ratio value={6} of={data.outliers.length} label={ar ? `معروضة 6 من ${data.outliers.length}` : `showing 6 of ${data.outliers.length}`} />
               </p>
             )}
           </div>
