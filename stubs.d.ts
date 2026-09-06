@@ -5,6 +5,10 @@ declare module 'react' { const React:any; export default React; export const Str
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
+ export const Highlighter: any;
+ export const Gauge: any;
+ export const GitBranch: any;
+ export const ChevronDown: any;
  export const Lock: any;
  export const BookOpen: any;
  export const Pause: any;

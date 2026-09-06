@@ -22,6 +22,7 @@ import { generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
 import { calibrateJudges, normalizedRankScenario, type JudgeScoreObservation } from './server/judge-calibration';
+import { deriveAyahTajweed, TAJWEED_SCOPE_NOTE } from './server/quran-tajweed';
 import { AlignmentSessionManager } from './server/alignment/session';
 import { createAlignmentRouter } from './server/alignment/api';
 import { devHafsPassage } from './server/alignment/canonical';
@@ -158,8 +159,11 @@ async function startServer() {
     const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
     try{const passage=await kfgqpcDelivery.passage(readingId,surah,startAyah,endAyah);
       if(!passage)return res.status(404).json({code:'OFFICIAL_PASSAGE_NOT_DELIVERED'});
+      // Tajweed is derived from each ayah's own text, so the marks land on the very letters in
+      // front of the reciter rather than on offsets computed against a different text.
+      const withTajweed={...passage,ayat:passage.ayat.map(a=>({...a,tajweed:deriveAyahTajweed(a.text)})),tajweedScopeNote:TAJWEED_SCOPE_NOTE};
       res.setHeader('Cache-Control','public, max-age=3600');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
-      return res.json(passage)}catch{return res.status(502).json({code:'OFFICIAL_PASSAGE_DELIVERY_FAILED'})}});
+      return res.json(withTajweed)}catch{return res.status(502).json({code:'OFFICIAL_PASSAGE_DELIVERY_FAILED'})}});
 
   app.get('/api/public/kfgqpc/fairdraw/:readingId',async(req,res)=>{
     const readingId=safeSegment(String(req.params.readingId||'hafs'));

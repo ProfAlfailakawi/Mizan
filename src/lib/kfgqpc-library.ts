@@ -30,8 +30,9 @@ export async function clearVenueQuranCache(){if(typeof caches!=='undefined')awai
  * show real Uthmanic text and real Mushaf pages instead of a development placeholder; they are
  * labelled DELIVERY_OPEN_MIRROR by the server and never claim certified Source Vault provenance.
  */
-export interface DeliveryAyah{surah:number;ayah:number;text:string;page:number;lineStart:number;lineEnd:number;juz:number;surahNameArabic?:string;surahNameEnglish?:string}
-export interface DeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:DeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:string;authority:string;note:string}}
+export interface TajweedSpan{rule:string;start:number;end:number}
+export interface DeliveryAyah{surah:number;ayah:number;text:string;page:number;lineStart:number;lineEnd:number;juz:number;surahNameArabic?:string;surahNameEnglish?:string;tajweed?:TajweedSpan[]}
+export interface DeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:DeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:string;authority:string;note:string};tajweedScopeNote?:string}
 export interface FairDrawDraw{protocol:string;reading:string;anchorType:'SURAH_START'|'JUZ_START'|'PAGE_START'|'AYAH_START';anchorNote:string;seed:string;algorithm:string;candidateCount:number;selectedIndex:number;ayahCount:number;reproducible:boolean;verifyHint:string}
 export interface FairDrawResult{passage:DeliveryPassage;draw:FairDrawDraw}
 
