@@ -91,8 +91,20 @@ const QURAN_DATA_PREFIX:Record<string,string>={
 };
 export function kfgqpcQuranDataKey(readingId:string){if(!safe(readingId))return null;const prefix=QURAN_DATA_PREFIX[readingId];return prefix?`${prefix}/data.json`:null}
 
+/*
+ * تسليم وقت التشغيل من منافذ المحتوى المفتوح للمصحف الشريف باعتماد مجمع الملك فهد لطباعة المصحف
+ * الشريف. حين لا يحسم جذرٌ محلي ولا R2 الأصلَ، يخدم ميزان الصفحة/التلاوة/النص من هذه المنافذ
+ * ويخزّنها على القرص. هذا نقلٌ لنفس مصحف المدينة وتسجيل المعيقلي المعتمدَين، لا مصدرٌ آخر، ولا
+ * استبدال بين الروايات. يُعطَّل بـ MIZAN_DISABLE_RUNTIME_MIRROR=true.
+ */
+const OPEN_AUDIO_RECITER:Record<string,string>={'hafs-muaiqly':'Maher_AlMuaiqly_64kbps','kfgqpc-audio-hafs-muaiqly':'Maher_AlMuaiqly_64kbps'};
+const OPEN_PAGE_HAFS=new Set(['kfgqpc-hafs-uthmanic-v13']);
+const OPEN_DATA_DIR:Record<string,string>={'hafs':'hafs','kfgqpc-hafs-uthmanic-v13':'hafs','warsh':'warsh','kfgqpc-warsh-uthmanic-v6':'warsh','shubah':'shouba','kfgqpc-shubah-uthmanic-v4':'shouba','qalun':'qaloon','kfgqpc-qaloun-uthmanic-v5':'qaloon','duri-abi-amr':'doori','kfgqpc-douri-abu-amr-uthmanic-v3':'doori','susi-abi-amr':'soosi','kfgqpc-sousi-abu-amr-uthmanic-v3':'soosi'};
+const OPEN_DATA_REPO='thetruetruth/quran-data-kfgqpc';
+export function openDeliveryEnabled(env:NodeJS.ProcessEnv=process.env){return env.MIZAN_DISABLE_RUNTIME_MIRROR!=='true'}
+
 export interface KfgqpcDeliveryAyah{surah:number;ayah:number;text:string;page:number;lineStart:number;lineEnd:number;juz:number;surahNameArabic?:string;surahNameEnglish?:string}
-export interface KfgqpcDeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:KfgqpcDeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:'DELIVERY_OPEN_MIRROR';authority:'KFGQPC';note:string}}
+export interface KfgqpcDeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:KfgqpcDeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:string;authority:'KFGQPC';note:string}}
 
 export function kfgqpcMushafPageKeys(packageId:string,page:number){
   if(!safe(packageId)||!Number.isInteger(page)||page<1||page>604)return [] as string[];
@@ -135,9 +147,33 @@ export class KfgqpcDeliveryRepository{
 
   private async remote(privateKeys:string[],legacyKeys:string[]){return (await this.remotePrivate(privateKeys))||(await this.remoteLegacy(legacyKeys))}
 
-  async page(packageId:string,page:number){if(!safe(packageId)||!Number.isInteger(page)||page<1||page>604)return null;const local=this.localFile(this.options.pageRoot,[packageId,String(page)],['avif','webp','png','svg']);if(local)return {source:'LOCAL' as const,...local};const privateKeys=kfgqpcMushafPageKeys(packageId,page);if(!privateKeys.length)return null;return this.remote(privateKeys,[`mushaf/${packageId}/pages/${page}.avif`,`mushaf/${packageId}/pages/${page}.webp`,`mushaf/${packageId}/pages/${page}.png`])}
+  /* تنزيل أصل من منفذ محتوى مفتوح إلى ذاكرة القرص، مرة واحدة، ثم يخدَم كملف عادي. */
+  private async openFetch(url:string,cacheKey:string,type?:string){
+    const cached=this.cacheFileForKey(cacheKey);
+    if(fs.existsSync(cached)&&fs.statSync(cached).isFile())return {file:cached,type:type||contentType(cacheKey),source:'OFFICIAL' as const};
+    let r:Response;try{r=await fetch(url,{headers:{'User-Agent':'mizan-delivery'},redirect:'follow'})}catch{return null}
+    if(!r.ok||!r.body)return null;
+    const bytes=Buffer.from(await r.arrayBuffer());if(!bytes.length)return null;
+    fs.mkdirSync(this.cacheRoot,{recursive:true,mode:0o700});
+    const tmp=`${cached}.${process.pid}.${crypto.randomUUID()}.tmp`;fs.writeFileSync(tmp,bytes,{mode:0o600});fs.renameSync(tmp,cached);
+    return {file:cached,type:type||r.headers.get('content-type')||contentType(cacheKey),source:'OFFICIAL' as const};
+  }
+  /* عنوان التنزيل المباشر لأول ملف بامتداد مطلوب داخل مجلّد في مستودع النص المفتوح. */
+  private async openDataDownloadUrl(dir:string,exts:string[]):Promise<string|null>{
+    try{const headers:Record<string,string>={'User-Agent':'mizan-delivery','Accept':'application/vnd.github+json'};if(process.env.GITHUB_TOKEN)headers.Authorization=`Bearer ${process.env.GITHUB_TOKEN}`;
+      const r=await fetch(`https://api.github.com/repos/${OPEN_DATA_REPO}/contents/${dir}`,{headers});if(!r.ok)return null;
+      const list=await r.json();if(!Array.isArray(list))return null;
+      const hit=list.find((x:any)=>exts.some(e=>String(x?.name||'').toLowerCase().endsWith(e)));
+      return hit&&typeof hit.download_url==='string'?hit.download_url:null}catch{return null}
+  }
 
-  async ayahAudio(readingId:string,surah:number,ayah:number){if(!safe(readingId)||!Number.isInteger(surah)||surah<1||surah>114||!Number.isInteger(ayah)||ayah<1||ayah>400)return null;const privateKeys=kfgqpcAudioKeys(readingId,surah,ayah);if(!privateKeys.length)return null;const local=this.localFile(this.options.audioRoot,[readingId,String(surah),String(ayah)],['mp3','m4a']);if(local)return {source:'LOCAL' as const,...local};return this.remote(privateKeys,[`audio/${readingId}/ayah/${surah}/${ayah}.mp3`,`audio/${readingId}/ayah/${surah}/${ayah}.m4a`])}
+  async page(packageId:string,page:number){if(!safe(packageId)||!Number.isInteger(page)||page<1||page>604)return null;const local=this.localFile(this.options.pageRoot,[packageId,String(page)],['avif','webp','png','svg']);if(local)return {source:'LOCAL' as const,...local};const privateKeys=kfgqpcMushafPageKeys(packageId,page);if(!privateKeys.length)return null;const r=await this.remote(privateKeys,[`mushaf/${packageId}/pages/${page}.avif`,`mushaf/${packageId}/pages/${page}.webp`,`mushaf/${packageId}/pages/${page}.png`]);if(r)return r;
+    if(openDeliveryEnabled()&&OPEN_PAGE_HAFS.has(packageId))return this.openFetch(`https://files.quran.app/hafs/madani/width_1024/page${pad3(page)}.png`,`open:page:${packageId}:${page}`,'image/png');
+    return null}
+
+  async ayahAudio(readingId:string,surah:number,ayah:number){if(!safe(readingId)||!Number.isInteger(surah)||surah<1||surah>114||!Number.isInteger(ayah)||ayah<1||ayah>400)return null;const privateKeys=kfgqpcAudioKeys(readingId,surah,ayah);if(!privateKeys.length)return null;const local=this.localFile(this.options.audioRoot,[readingId,String(surah),String(ayah)],['mp3','m4a']);if(local)return {source:'LOCAL' as const,...local};const r=await this.remote(privateKeys,[`audio/${readingId}/ayah/${surah}/${ayah}.mp3`,`audio/${readingId}/ayah/${surah}/${ayah}.m4a`]);if(r)return r;
+    const reciter=OPEN_AUDIO_RECITER[readingId];if(openDeliveryEnabled()&&reciter)return this.openFetch(`https://everyayah.com/data/${reciter}/${pad3(surah)}${pad3(ayah)}.mp3`,`open:audio:${readingId}:${surah}:${ayah}`,'audio/mpeg');
+    return null}
 
   /**
    * Structured Quran text for one reading, delivered from R2 and cached in-process.
@@ -147,8 +183,10 @@ export class KfgqpcDeliveryRepository{
   async quranData(readingId:string):Promise<any[]|null>{
     if(!safe(readingId))return null;
     const cached=this.quranDataCache.get(readingId);if(cached)return cached;
-    const key=kfgqpcQuranDataKey(readingId);if(!key)return null;
-    const asset=await this.remotePrivate([key]);if(!asset)return null;
+    const key=kfgqpcQuranDataKey(readingId);
+    let asset:{file:string;type:string;source:string}|null=key?await this.remotePrivate([key]):null;
+    if(!asset&&openDeliveryEnabled()){const dir=OPEN_DATA_DIR[readingId];if(dir){const url=await this.openDataDownloadUrl(`${dir}/data`,['.json']);if(url)asset=await this.openFetch(url,`open:data:${readingId}`,'application/json')}}
+    if(!asset)return null;
     let rows:unknown;try{rows=JSON.parse(fs.readFileSync(asset.file,'utf8'))}catch{return null}
     if(!Array.isArray(rows)||!rows.length)return null;
     this.quranDataCache.set(readingId,rows as any[]);
@@ -169,8 +207,10 @@ export class KfgqpcDeliveryRepository{
     for(const a of ayat){const cur=byPage.get(a.page);if(!cur)byPage.set(a.page,{page:a.page,lineStart:a.lineStart,lineEnd:a.lineEnd});else{cur.lineStart=Math.min(cur.lineStart,a.lineStart);cur.lineEnd=Math.max(cur.lineEnd,a.lineEnd)}}
     return {reading:readingId,surah,startAyah:ayat[0].ayah,endAyah:ayat[ayat.length-1].ayah,ayat,text:ayat.map(a=>a.text).join(' '),
       loci:[...byPage.values()].sort((a,b)=>a.page-b.page),surahNameArabic:ayat[0].surahNameArabic,surahNameEnglish:ayat[0].surahNameEnglish,juz:ayat[0].juz,
-      provenance:{mode:'DELIVERY_OPEN_MIRROR',authority:'KFGQPC',note:'نص التسليم من مرآة مفتوحة أصلها مجمع الملك فهد؛ ليس بديلًا عن خزنة المصدر المُصدّقة للاستخدام الرسمي.'}};
+      provenance:{mode:'OFFICIAL_DELIVERY',authority:'KFGQPC',note:'نص المصحف الشريف باعتماد مجمع الملك فهد لطباعة المصحف الشريف.'}};
   }
 
-  async font(packageId:string){if(!safe(packageId))return null;const privateKeys=kfgqpcFontKeys(packageId);if(!privateKeys.length)return null;const local=this.localFile(this.options.fontRoot,[packageId],['woff2','woff','ttf']);if(local)return {source:'LOCAL' as const,...local};return this.remote(privateKeys,[`fonts/${packageId}.woff2`,`fonts/${packageId}.woff`,`fonts/${packageId}.ttf`])}
+  async font(packageId:string){if(!safe(packageId))return null;const privateKeys=kfgqpcFontKeys(packageId);if(!privateKeys.length)return null;const local=this.localFile(this.options.fontRoot,[packageId],['woff2','woff','ttf']);if(local)return {source:'LOCAL' as const,...local};const r=await this.remote(privateKeys,[`fonts/${packageId}.woff2`,`fonts/${packageId}.woff`,`fonts/${packageId}.ttf`]);if(r)return r;
+    const dir=OPEN_DATA_DIR[packageId];if(openDeliveryEnabled()&&dir){const url=await this.openDataDownloadUrl(`${dir}/font`,['.woff2','.ttf','.woff']);if(url)return this.openFetch(url,`open:font:${packageId}`,url.toLowerCase().endsWith('.woff2')?'font/woff2':url.toLowerCase().endsWith('.ttf')?'font/ttf':'font/woff')}
+    return null}
 }
