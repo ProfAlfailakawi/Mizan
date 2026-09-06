@@ -39,6 +39,7 @@ import {
   SEED_INCIDENTS
 } from './seed-data';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
+import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
@@ -1273,7 +1274,14 @@ export function useAppStore() {
       createIncident('quran_source_discrepancy','Scientific Quran source blocker',`Official session blocked for ${participant.code}: exact certified source/content/question governance is unavailable for ${participant.riwaya}.`,'critical');
       return false;
     }
-    if(sourceMode==='DEVELOPMENT_FIXTURE')pool=DEVELOPMENT_QUESTION_BANK;
+    if(sourceMode==='DEVELOPMENT_FIXTURE'){
+      /* No certified vault mounted. Rather than drawing from a handful of fixtures whose text is a
+         placeholder sentence, generate the pool from the delivery Mushaf for this exact narration:
+         real passages, each starting on a real ayah boundary and carrying a difficulty measured
+         from the text. The fixture bank remains only for when delivery is unreachable too. */
+      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount});
+      pool=generated.length?generated:DEVELOPMENT_QUESTION_BANK;
+    }
     try {
       const selection = await generateFairDraw({ pool, participant, policy, maxJuz: category?.juzCount,poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT' });
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
