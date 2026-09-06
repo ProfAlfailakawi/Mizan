@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Printer, Search, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link2, Printer, Search, ShieldCheck } from 'lucide-react';
+import { RealQRCode } from '../design-system/RealQRCode';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Button } from '../design-system/Button';
@@ -20,14 +21,31 @@ export const CertificateVerification: React.FC = () => {
     ? certificates.find(c => c.certificateNumber.toLowerCase() === submittedCode.trim().toLowerCase())
     : undefined;
 
-  const verify = async () => {
-    const code=searchCode.trim();
+  const [chain,setChain]=useState<{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[]>([]);
+
+  const verifyCode = async (code:string) => {
     setSubmittedCode(code);
     const cert=certificates.find(c=>c.certificateNumber.toLowerCase()===code.toLowerCase());
-    if(!cert){setVerification('NOT_FOUND');return;}
+    if(!cert){setVerification('NOT_FOUND');setChain([]);return;}
     const result=await store.verifyCertificateEvidence(cert.id);
     setVerification(result.state);
+    setChain(store.certificateEvidenceChain(cert.id));
   };
+  const verify = () => void verifyCode(searchCode.trim());
+
+  /* مسح رمز الشهادة يفتح هذا العنوان ومعه الرقم، فيتحقّق فورًا بلا طباعة يدوية.
+     يعمل مرة واحدة عند الفتح، ولا يعيد الكتابة فوق بحث المستخدم بعدها. */
+  const autoRan=useRef(false);
+  useEffect(()=>{
+    if(autoRan.current)return;autoRan.current=true;
+    if(typeof window==='undefined')return;
+    const code=new URLSearchParams(window.location.search).get('cert');
+    if(!code||!policy.certificates.publicVerification)return;
+    setSearchCode(code);void verifyCode(code);
+  },[]);
+
+  const verifyUrl=(code:string)=>typeof window==='undefined'?code
+    :`${window.location.origin}${window.location.pathname}?cert=${encodeURIComponent(code)}`;
 
   const label:Record<VerificationState,{ar:string;en:string;variant:'emerald'|'rose'|'amber'|'neutral'}>={
     AUTHENTIC:{ar:'أصيلة',en:'AUTHENTIC',variant:'emerald'},
@@ -64,11 +82,41 @@ export const CertificateVerification: React.FC = () => {
             {policy.certificates.showRank&&activeCert.rank&&<Row label={ar?'الترتيب':'Rank'} value={`#${activeCert.rank}`}/>} 
             <Row label={ar?'تاريخ الإصدار':'Issued'} value={activeCert.issueDate}/>
           </div>
-          <p className="mt-5 text-[10px] text-[#666a67]">{ar?'تم التحقق من حزمة الشهادة وختم النتيجة وإثبات الإدراج المشفّر.':'Certificate package, result-seal reference, and Merkle inclusion proof verified.'}</p>
-          <Button className="mt-7" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
+          <EvidenceChain chain={chain} ar={ar}/>
+          <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-5">
+            <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(activeCert.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
+            <div className="text-center sm:text-start max-w-xs">
+              <div className="text-[10px] font-black text-[#3f4744]">{ar?'امسح الرمز للتحقق مباشرة':'Scan to verify directly'}</div>
+              <p className="text-[9px] leading-4 text-[#6b706c] mt-1.5">{ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}</p>
+              <Button className="mt-3" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
+            </div>
+          </div>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[#646965] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
       </div>
     </section>}
+  </div>;
+};
+
+/*
+ * الحلقات التي تقوم عليها الأصالة، معروضة لا موصوفة: من المصحف المعتمد إلى الشهادة.
+ * الحلقة الغائبة تُعرض غائبةً — إخفاؤها يجعل السلسلة تبدو أقوى مما هي.
+ */
+const EvidenceChain=({chain,ar}:{chain:{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[];ar:boolean})=>{
+  if(!chain.length)return null;
+  return <div className="mt-7 text-start max-w-lg mx-auto">
+    <div className="flex items-center gap-2 text-[9px] font-black tracking-[.14em] text-[#6b706c]"><Link2 className="w-3.5 h-3.5"/>{ar?'سلسلة الأدلة':'EVIDENCE CHAIN'}</div>
+    <ol className="mt-3 relative ps-5">
+      <span aria-hidden className="absolute start-[5px] top-2 bottom-2 w-px bg-[#dedcd4]"/>
+      {chain.map(l=><li key={l.id} className="relative py-2">
+        <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] ${l.present?'bg-[#2F6555]':'bg-[#c9c6bd]'}`}/>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[11px] font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
+          {!l.present&&<span className="text-[9px] text-[#8a8f8b]">{ar?'غير مرتبطة':'not linked'}</span>}
+        </div>
+        {l.hash&&<div className="font-mono text-[9px] text-[#727872] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
+      </li>)}
+    </ol>
+    <p className="text-[9px] leading-4 text-[#6b706c] mt-2">{ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}</p>
   </div>;
 };
 

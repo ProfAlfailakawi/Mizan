@@ -1583,6 +1583,31 @@ export function useAppStore() {
   const getPublicResultProof=(resultId:string)=>globalState.publicResultProofs.find(p=>p.competitionId===globalState.competition.id&&p.resultId===resultId)||null;
   const verifyPublicResultProof=async(p:PublicResultProofRecord)=>verifyMerkleProof(canonicalStringify({v:'mizan-merkle-v1',disclosed:p.disclosed,salt:p.disclosureSalt}),p.proof,p.merkleRoot);
   const verifyCertificateEvidence=async(certificateId:string)=>{const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);if(!cert)return {state:'NOT_FOUND' as const};if(cert.revocationState==='REVOKED'||!cert.isAuthentic)return {state:'REVOKED' as const};if(!cert.resultId||!cert.certificateVersion||!cert.resultSealReference||!cert.merkleProofId||!cert.issuedTimestamp||!cert.proofPackageHash)return {state:'INVALID_PROOF' as const,reason:'MISSING_PROOF_FIELDS'};const computed=await hashCanonical({certificateId:cert.id,resultId:cert.resultId,competitionId:cert.competitionId,certificateVersion:cert.certificateVersion,resultSealReference:cert.resultSealReference,merkleProofId:cert.merkleProofId,issuedTimestamp:cert.issuedTimestamp,revocationState:cert.revocationState||'ACTIVE'});if(computed!==cert.proofPackageHash)return {state:'INVALID_PROOF' as const,reason:'PACKAGE_HASH_MISMATCH'};const proof=globalState.publicResultProofs.find(p=>p.id===cert.merkleProofId&&p.resultId===cert.resultId&&p.competitionId===cert.competitionId);if(!proof||!(await verifyPublicResultProof(proof)))return {state:'INVALID_PROOF' as const,reason:'MERKLE_PROOF_INVALID'};const result=globalState.results.find(r=>r.id===cert.resultId&&r.competitionId===cert.competitionId);if(!result)return {state:'INVALID_PROOF' as const,reason:'RESULT_NOT_FOUND'};if(result.sealMetadata?.cryptographicChecksum&&result.sealMetadata.cryptographicChecksum!==cert.resultSealReference)return {state:'INVALID_PROOF' as const,reason:'RESULT_SEAL_MISMATCH'};return {state:'AUTHENTIC' as const,proofVersion:proof.verificationVersion,merkleRoot:proof.merkleRoot};};
+  /*
+   * سلسلة أدلة الشهادة — للعرض لا للحكم.
+   *
+   * `verifyCertificateEvidence` تبقى وحدها صاحبة الحكم بالأصالة. وهذه تُظهر **الحلقات** التي
+   * يقوم عليها ذلك الحكم: من حرف المصحف المعتمد إلى ختم النتيجة إلى جذر الإدراج إلى الشهادة.
+   * فالثقة تُرى ولا تُطلب: من يتحقّق يرى ما الذي رُبط بما، وأي حلقة غائبة تُقال غائبةً بصراحة.
+   * لا تكشف هذه الدالة أي بيانات شخصية — بصمات ومراجع فقط.
+   */
+  const certificateEvidenceChain=(certificateId:string)=>{
+    const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);
+    if(!cert)return [] as {id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[];
+    const result=globalState.results.find(r=>r.id===cert.resultId&&r.competitionId===cert.competitionId);
+    const proof=globalState.publicResultProofs.find(p=>p.id===cert.merkleProofId);
+    const blackBox=globalState.competitionBlackBoxes.find(b=>b.competitionId===cert.competitionId);
+    const source=globalState.quranSourceManifests.find(q=>q.certificationState==='CERTIFIED'&&q.revocationState!=='REVOKED');
+    const link=(id:string,labelArabic:string,labelEnglish:string,hash?:string)=>({id,labelArabic,labelEnglish,hash,present:!!hash});
+    return [
+      link('source','مصدر المصحف المعتمد','Certified Quran source',source?.packageHash),
+      link('blackbox','الصندوق الأسود للمسابقة','Competition black box',blackBox?.headHash),
+      link('seal','ختم النتيجة','Result seal',result?.sealMetadata?.cryptographicChecksum||cert.resultSealReference),
+      link('merkle','جذر إثبات الإدراج','Merkle inclusion root',proof?.merkleRoot),
+      link('certificate','حزمة الشهادة','Certificate package',cert.proofPackageHash),
+    ];
+  };
+
   const revokeCertificate=(certificateId:string,reason:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role)||!reason.trim())return false;const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);if(!cert)return false;globalState.certificates=globalState.certificates.map(c=>c.id===certificateId?{...c,isAuthentic:false,revocationState:'REVOKED',revocationReason:reason}:c);auditTrustAction('CERTIFICATE_REVOKED','Certificate',certificateId,`إلغاء الشهادة: ${reason}`,`Certificate revoked: ${reason}`);notify();return true;};
 
   const ingestMeshEnvelope=(wire:MeshWireEnvelope)=>{const mesh=globalState.localMeshSessions.find(x=>x.id===wire.sessionId&&x.competitionId===wire.competitionId);if(!mesh||mesh.events.some(e=>e.id===wire.event.id))return false;const existing=mesh.events.find(e=>e.originDeviceId===wire.event.originDeviceId&&e.sequence===wire.event.sequence);const semantic=wire.event.conflictKey?mesh.events.filter(e=>e.conflictKey===wire.event.conflictKey&&e.payloadHash!==wire.event.payloadHash):[];const conflicts=[...mesh.conflicts,...(existing?[{id:newId('mesh_conflict'),eventIds:[existing.id,wire.event.id],reason:`Duplicate sequence ${wire.event.originDeviceId}:${wire.event.sequence}`,status:'open' as const}]:[]),...(semantic.length?[{id:newId('mesh_conflict'),eventIds:[...semantic.map(e=>e.id),wire.event.id],reason:`Conflicting payloads for ${wire.event.conflictKey}`,status:'open' as const}]:[])];globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===mesh.id?{...x,status:'active',events:[...x.events,{...wire.event,transport:'browser_broadcast'}],conflicts,nodes:x.nodes.map(n=>n.deviceId===wire.event.originDeviceId?{...n,status:'joined',lastSeenAt:new Date().toISOString(),sequence:Math.max(n.sequence,wire.event.sequence)}:n)}:x);notify();return true;};
@@ -1909,7 +1934,7 @@ export function useAppStore() {
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,
     ensureQuorumAction, approveQuorumAction, revokeQuorumApproval, executeQuorumAction, requestCeremonyReveal, ceremonyRevealAuthorized,
-    rebuildEvidenceGraph, traceEvidence, buildPublicResultRoot, getPublicResultProof, verifyPublicResultProof, verifyCertificateEvidence, revokeCertificate,
+    rebuildEvidenceGraph, traceEvidence, buildPublicResultRoot, getPublicResultProof, verifyPublicResultProof, verifyCertificateEvidence, certificateEvidenceChain, revokeCertificate,
     startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
     issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
     generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
