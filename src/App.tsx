@@ -105,6 +105,17 @@ const OverlayFallback: React.FC = () => (
   </div>
 );
 // كل شاشة تحمل شريط عطل الحفظ: التنبيه الذي يظهر في شاشة واحدة لا يُرى حين يقع العطل في غيرها.
+/* شاشة الدور غير المُسنَد: تقول الحقيقة ولا تمنح صلاحية. */
+const NoRoleConsole: React.FC = () => (
+  <div className="min-h-[60vh] grid place-items-center p-6">
+    <div className="mizan-surface p-8 max-w-md text-center">
+      <div className="mizan-kicker">حوكمة الوصول</div>
+      <h1 className="text-xl font-black mt-2">لا توجد شاشة لهذا الدور</h1>
+      <p className="text-xs text-[#636864] mt-3 leading-6">الحساب موثّق، لكن دوره غير مرتبط بواجهة تشغيلية في هذا الإصدار. راجع مدير المؤسسة لإسناد دور معروف.</p>
+    </div>
+  </div>
+);
+
 const Page: React.FC<{children: React.ReactNode}> = ({children}) => <><PersistenceAlert/><Suspense fallback={<ViewFallback/>}>{children}</Suspense></>;
 const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
 
@@ -152,7 +163,9 @@ export default function App() {
    case 'auditor': return <AuditorConsole/>;
    case 'guardian': return <GuardianPortal/>;
    case 'support_agent': return <SupportConsole/>;
-   default: return <CompetitionOverview/>;
+   /* دور لا نعرفه لا يُمنح شاشة الإدارة. الافتراضي كان يُسقط أي دور غير مُعالَج على
+      لوحة إدارة المسابقة — امتيازٌ بالصمت. الفشل هنا مغلق: لا شاشة حتى يُسنَد دور معروف. */
+   default: return <NoRoleConsole/>;
   }
  };
  const isBroadcast=currentUser.role==='broadcast_operator';
