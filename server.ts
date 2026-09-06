@@ -22,6 +22,8 @@ import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-g
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
+import { assessAuthorityDurability } from './server/authority-durability';
+import { WordTimingStore } from './server/word-timing-store';
 import { measureAgreement, planBlindRescoring } from './server/blind-rescoring';
 import { MutashabihatEngine } from './server/quran-mutashabihat';
 import { DifficultyEngine } from './server/quran-difficulty';
@@ -93,7 +95,20 @@ async function startServer() {
 
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
-  const integrityAuthorityDir=process.env.MIZAN_INTEGRITY_AUTHORITY_DIR||'';let integrityAuthority:IntegrityAuthorityRepository|null=null;try{if(integrityAuthorityDir)integrityAuthority=new IntegrityAuthorityRepository(integrityAuthorityDir)}catch(err){console.error('Integrity authority disabled:',err)}
+  /*
+   * السلطة لا تُفعَّل على مسار غير دائم: موافقة نصاب تختفي، أو بذرة التُزم بها ولم تُكشف تضيع،
+   * وكلاهما يُنتج ختمًا يسنده دليل غير موجود. الامتناع يُقال في السجل بصراحة ليُعالَج.
+   */
+  const wordTimingsDir=process.env.MIZAN_WORD_TIMINGS_DIR||'';let wordTimings:WordTimingStore|null=null;try{if(wordTimingsDir)wordTimings=new WordTimingStore(wordTimingsDir)}catch(err){console.error('Word timings disabled:',err)}
+  const integrityAuthorityDir=process.env.MIZAN_INTEGRITY_AUTHORITY_DIR||'';
+  const authorityDurability=assessAuthorityDurability(integrityAuthorityDir);
+  let integrityAuthority:IntegrityAuthorityRepository|null=null;
+  if(authorityDurability.durable){
+    try{integrityAuthority=new IntegrityAuthorityRepository(authorityDurability.path);console.log(`Integrity authority enabled at ${authorityDurability.path} (${authorityDurability.note}).`)}
+    catch(err){console.error('Integrity authority disabled:',err)}
+  }else if('code' in authorityDurability&&authorityDurability.code!=='NOT_CONFIGURED'){
+    console.error(`Integrity authority refused: ${authorityDurability.message}`);
+  }
   const auditLedgerDir=process.env.MIZAN_AUDIT_LEDGER_DIR||'';let serverAuditLedger:ServerAuditLedgerRepository|null=null;try{if(auditLedgerDir)serverAuditLedger=new ServerAuditLedgerRepository(auditLedgerDir)}catch(err){console.error('Server audit ledger disabled:',err)}
   const identityFromBase=(base:{uid:string;email?:string;raw:Record<string,unknown>}):ServerIdentity|null=>{const managed=identityGovernance?.identityForUid(base.uid);if(managed)return {uid:base.uid,email:base.email,role:managed.grant.role,organizationId:managed.grant.organizationId,competitionId:managed.grant.competitionId};const role=String(base.raw.role||'') as GovernanceRole;const organizationId=String(base.raw.org_id||'');if(!role||!organizationId)return null;return {uid:base.uid,email:base.email,role,organizationId,competitionId:base.raw.competition_id?String(base.raw.competition_id):undefined}};
   const sensitiveIdentityRoles=new Set<string>(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
@@ -117,8 +132,8 @@ async function startServer() {
   const secureQuestionRuntimeConfigured=!!secureQuestionRuntime&&questionEscrowConfigured;
   const escrowFailure=(res:any,err:unknown)=>{const message=err instanceof Error?err.message:'ESCROW_FAILED';const forbidden=/MISMATCH|ASSIGNED_JUDGE|NOT_ALLOWED/.test(message);const missing=/NOT_FOUND/.test(message);const conflict=/NOT_RELEASED|PARTICIPANT_NOT_PRESENT|EXISTS|REVOKED|EXPIRED/.test(message);return res.status(forbidden?403:missing?404:conflict?409:400).json({code:message.split(':')[0]})};
 
-  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
-  app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
+  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
+  app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Named-account identity governance. MIZAN stores no passwords; a verified Firebase identity is bound once to a scoped MIZAN invitation.
   app.get('/api/identity/me',requireFirebaseBase,(req,res)=>{const base=(req as any).firebaseBase as {uid:string;email?:string;raw:Record<string,unknown>};const managed=identityGovernance?.identityForUid(base.uid)||null;const identity=identityFromBase(base);if(!identity)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});if(!mfaSatisfied(base,identity.role))return res.status(403).json({code:'MFA_REQUIRED'});let session:any=undefined;if(identityGovernance&&managed){const deviceId=String(req.headers['x-mizan-device-id']||'');if(deviceId){try{session=identityGovernance.openSession(identity,deviceId,String(req.headers['x-mizan-device-name']||''),firebaseSecondFactorPresent(base.raw)?'MFA':'SINGLE_FACTOR')}catch(err){const code=err instanceof Error?err.message:'SESSION_FAILED';if(code==='PRIVILEGED_SESSION_CONFLICT')return res.status(409).json({code});return res.status(400).json({code})}}}res.json({identity,session,managed:!!managed});});
@@ -154,6 +169,20 @@ async function startServer() {
       return res.status(404).json({code:'OFFICIAL_MUSHAF_PAGE_ASSET_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_MUSHAF_PAGE_DELIVERY_FAILED'})}});
 
   app.get('/api/public/kfgqpc/font/:fontId',async(req,res)=>{try{const asset=await kfgqpcDelivery.font(safeSegment(String(req.params.fontId||'primary')));if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).end()}catch{return res.status(502).end()}});
+  /*
+   * مقاطع الكلمة المقيسة لتسجيل بعينه. تُفهرَس بمعرّف التسجيل لا باسم القارئ، و404 هنا ليست
+   * عطلًا بل الحال الطبيعي: تعني أن هذا التسجيل لا توقيت مقيس له، فتبقى الواجهة على التقدير.
+   */
+  app.get('/api/public/kfgqpc/word-timings/:readingId/:surah/:ayah',(req,res)=>{
+    if(!wordTimings)return res.status(404).json({code:'WORD_TIMINGS_NOT_CONFIGURED'});
+    const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);
+    if(!Number.isInteger(surah)||!Number.isInteger(ayah))return res.status(400).json({code:'INVALID_AYAH_REFERENCE'});
+    const hit=wordTimings.segments(readingId,surah,ayah);
+    if(!hit)return res.status(404).json({code:'WORD_TIMINGS_NOT_AVAILABLE_FOR_RECORDING'});
+    res.setHeader('Cache-Control','public, max-age=86400, immutable');
+    return res.json({recordingId:readingId,surah,ayah,assurance:hit.meta.assurance,attribution:hit.meta.attribution,segments:hit.segments});
+  });
+
   app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
   /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
      فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */

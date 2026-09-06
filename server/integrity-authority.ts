@@ -111,11 +111,30 @@ export class IntegrityAuthorityRepository {
       return { version: 1, quorum: s.quorum || [], commitments: s.commitments || [], seeds: s.seeds || {} };
     } catch { throw new Error('INTEGRITY_AUTHORITY_CORRUPT') }
   }
+  /*
+   * الكتابة الذرّية بـrename هي الصواب على قرص POSIX. لكن الوحدة المُركَّبة على تخزين سحابي
+   * (GCS FUSE مثلًا) ليست قرصًا: rename فيها نسخٌ ثم حذف، وقد لا تُدعم أصلًا.
+   *
+   * فتُجرَّب الذرّية أولًا، وعند تعذّرها يُكتب في الموضع مباشرة. والنزول عن الذرّية يُقال في
+   * السجل ولا يُبتلع: نافذة التعرّض تصير كتابةً غير مكتملة عند انقطاع، وهذا يجب أن يُعرف.
+   */
   private write(s: State) {
+    const body = JSON.stringify(s, null, 2);
     const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(s, null, 2), { encoding: 'utf8', mode: 0o600 });
-    fs.renameSync(tmp, this.file);
+    try {
+      fs.writeFileSync(tmp, body, { encoding: 'utf8', mode: 0o600 });
+      fs.renameSync(tmp, this.file);
+      return;
+    } catch (err) {
+      try { fs.unlinkSync(tmp) } catch { /* لا شيء نظّفه */ }
+      if (!this.warnedNonAtomic) {
+        console.warn(`Integrity authority: atomic rename unavailable on ${path.dirname(this.file)} (${err instanceof Error ? err.message : 'unknown'}); writing in place. A crash mid-write can leave the state file truncated.`);
+        this.warnedNonAtomic = true;
+      }
+    }
+    fs.writeFileSync(this.file, body, { encoding: 'utf8', mode: 0o600 });
   }
+  private warnedNonAtomic = false;
 
   private auditFile(organizationId: string) { return path.join(this.dir, `integrity-audit-${safeSegment(organizationId)}.jsonl`) }
   /** سجل ملحق-فقط مسلسل بالبصمات: حذف سطر أو تعديله يكسر السلسلة عند التالي. */
