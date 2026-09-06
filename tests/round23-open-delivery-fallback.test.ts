@@ -25,12 +25,13 @@ test('open delivery serves the Hafs Mushaf page when neither local nor R2 resolv
   const repo=freshRepo();let calls=0;
   await withStubbedFetch({'https://files.quran.app/hafs/madani/width_1024/page002.png':()=>{calls++;return new Response(Buffer.from('PNGBYTES'),{status:200,headers:{'content-type':'image/png'}})}},async()=>{
     const asset=await repo.page('kfgqpc-hafs-uthmanic-v13',2);
-    assert.ok(asset,'page asset resolved');
-    assert.equal(asset!.source,'OFFICIAL');
-    assert.equal(fs.readFileSync(asset!.file,'utf8'),'PNGBYTES');
+    assert.ok(asset&&'file'in asset,'page asset resolved to a file');
+    assert.equal(asset.source,'OFFICIAL');
+    assert.equal(fs.readFileSync(asset.file,'utf8'),'PNGBYTES');
     // Second call is served from the on-disk cache without another network fetch.
     const again=await repo.page('kfgqpc-hafs-uthmanic-v13',2);
-    assert.equal(again!.file,asset!.file);
+    assert.ok(again&&'file'in again);
+    assert.equal(again.file,asset.file);
     assert.equal(calls,1,'cached, fetched once');
   });
 });
