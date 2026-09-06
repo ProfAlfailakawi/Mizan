@@ -57,8 +57,10 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>()=>{void resetQuranAlignment(activeSession.sessionId).catch(()=>{})},[activeSession.sessionId]);
  const refreshSessionEvidence=()=>void fetchQuranSessionEvidence(activeSession.sessionId).then(setSessionEvidence).catch(()=>{});
  const sendAlignmentChunk=(blob:Blob)=>{const context=alignmentContextRef.current;if(!context||alignmentBusyRef.current||!blob.size)return;alignmentBusyRef.current=true;void submitQuranAlignmentChunk({blob,...context}).then(x=>{setAlignmentResult(x);
-  // الإزاحة من بداية التسجيل؛ بلا تسجيل لا معنى لها فلا تُحفظ.
-  const at=Number.isFinite(recordingStartMs)?Date.parse(x.timestamp)-recordingStartMs:NaN;
+  /* الإزاحة من لحظة بدء المسجّل، تُقرأ من الـref لا من حالة مُلتقَطة: هذا المُعالِج يُسنَد مرة
+     واحدة عند تجهيز الصوت، فأي قيمة مُغلَقة عليه تبقى قيمة تلك اللحظة إلى آخر الجلسة. */
+  const startedAt=audioStartedAt.current;
+  const at=startedAt?Date.parse(x.timestamp)-Date.parse(startedAt):NaN;
   if(Number.isFinite(at)&&at>=0)setReplayTrail(t=>[...t,{offsetMs:at,ayah:x.ayah,wordIndex:x.wordIndex,alignmentState:x.alignmentState,confidence:x.smoothedConfidence??x.confidence,kind:'ALIGNMENT'}]);
   refreshSessionEvidence()}).catch(()=>{}).finally(()=>{alignmentBusyRef.current=false})};
  // Marks already logged for one action, from the same source the evidence timeline
@@ -94,7 +96,6 @@ export const JudgeOS: React.FC = () => {
  const replayEvidence=(offsetMs:number)=>{if(!sessionRecording?.localObjectUrl)return;const player=new Audio(sessionRecording.localObjectUrl);player.currentTime=Math.max(0,offsetMs/1000);void player.play().catch(()=>{})};
  /* أثر التتبّع كان يُستبدل عند كل مقطع فيضيع: تُحفظ الرصدات مع إزاحتها من بداية التسجيل حتى
     تستطيع إعادة التشغيل أن تُري لجنةَ المراجعة أين وقعت كل ملاحظة في النص. */
- const recordingStartMs=sessionRecording?.startedAt?Date.parse(sessionRecording.startedAt):NaN;
  const [replayTrail,setReplayTrail]=useState<ReplayMark[]>([]);
  useEffect(()=>{setReplayTrail([])},[activeSession.sessionId,activeSession.currentQuestionIndex]);
  /* نص المقطع لإعادة التشغيل يُجلب من نفس حزمة التسليم التي يعرضها سطح المصحف، فلا يتفرّع نصّان. */
