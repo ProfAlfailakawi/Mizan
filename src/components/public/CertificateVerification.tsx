@@ -111,9 +111,9 @@ const EvidenceChain=({chain,ar}:{chain:{id:string;labelArabic:string;labelEnglis
         <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] ${l.present?'bg-[#2F6555]':'bg-[#c9c6bd]'}`}/>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-[11px] font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
-          {!l.present&&<span className="text-[9px] text-[#8a8f8b]">{ar?'غير مرتبطة':'not linked'}</span>}
+          {!l.present&&<span className="text-[9px] text-[#646965]">{ar?'غير مرتبطة':'not linked'}</span>}
         </div>
-        {l.hash&&<div className="font-mono text-[9px] text-[#727872] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
+        {l.hash&&<div className="font-mono text-[9px] text-[#646965] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
       </li>)}
     </ol>
     <p className="text-[9px] leading-4 text-[#6b706c] mt-2">{ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}</p>
