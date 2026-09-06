@@ -18,7 +18,8 @@
     "waqf:derive": "tsx scripts/kfgqpc-waqf-derive.ts",
     "quran:science-intake": "tsx scripts/kfgqpc-science-intake.ts",
     "quran:readiness": "tsx scripts/quran-intelligence-readiness.ts",
-    "verify:pwa": "node scripts/verify-pwa.mjs"
+    "verify:pwa": "node scripts/verify-pwa.mjs",
+    "load:rehearsal": "tsx scripts/load-rehearsal.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",
