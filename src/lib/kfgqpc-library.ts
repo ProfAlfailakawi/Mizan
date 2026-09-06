@@ -7,9 +7,42 @@ async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY
 export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
 export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
 const VENUE_CACHE='mizan-quran-venue-v1';
-export async function fetchOfficialMushafPage(packageId:string,page:number):Promise<string|null>{const url=`/api/science/quran/kfgqpc/page/${encodeURIComponent(packageId)}/${page}`;try{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
+/*
+ * Official Mushaf page image.
+ *
+ * Order: signed-in governance route first (keeps venue-cache behaviour and per-role auditing),
+ * then the public delivery route so an unauthenticated venue/demo screen still renders the real
+ * printed page instead of falling back to plain text, then the offline venue cache.
+ */
+export async function fetchOfficialMushafPage(packageId:string,page:number):Promise<string|null>{
+ const url=`/api/science/quran/kfgqpc/page/${encodeURIComponent(packageId)}/${page}`;
+ const publicUrl=`/api/public/kfgqpc/page/${encodeURIComponent(packageId)}/${page}`;
+ try{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{const r=await fetch(publicUrl,{cache:'force-cache'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 export async function venueResilienceStatus(){if(typeof caches==='undefined')return {supported:false,cachedPages:0};try{const c=await caches.open(VENUE_CACHE),keys=await c.keys();return {supported:true,cachedPages:keys.filter(k=>new URL(k.url).pathname.includes('/api/science/quran/kfgqpc/page/')).length}}catch{return {supported:false,cachedPages:0}}}
 export async function clearVenueQuranCache(){if(typeof caches!=='undefined')await caches.delete(VENUE_CACHE)}
+
+/*
+ * Delivery-layer Quran text and generative FairDraw.
+ *
+ * These read the R2 delivery package for the requested reading only. They exist so JudgeOS can
+ * show real Uthmanic text and real Mushaf pages instead of a development placeholder; they are
+ * labelled DELIVERY_OPEN_MIRROR by the server and never claim certified Source Vault provenance.
+ */
+export interface DeliveryAyah{surah:number;ayah:number;text:string;page:number;lineStart:number;lineEnd:number;juz:number;surahNameArabic?:string;surahNameEnglish?:string}
+export interface DeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:DeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:string;authority:string;note:string}}
+export interface FairDrawDraw{protocol:string;reading:string;anchorType:'SURAH_START'|'JUZ_START'|'PAGE_START'|'AYAH_START';anchorNote:string;seed:string;algorithm:string;candidateCount:number;selectedIndex:number;ayahCount:number;reproducible:boolean;verifyHint:string}
+export interface FairDrawResult{passage:DeliveryPassage;draw:FairDrawDraw}
+
+export async function fetchDeliveryPassage(reading:string,surah:number,startAyah:number,endAyah:number):Promise<DeliveryPassage|null>{
+ try{const r=await fetch(`/api/public/kfgqpc/passage/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'force-cache'});
+  if(!r.ok)return null;return await r.json()}catch{return null}}
+
+export async function drawFairPassage(reading='hafs',options:{seed?:string;anchor?:string;juz?:number;surah?:number;min?:number;max?:number;ayahCount?:number}={}):Promise<FairDrawResult|null>{
+ const q=new URLSearchParams();for(const [k,v] of Object.entries(options))if(v!==undefined&&v!==null&&v!=='')q.set(k,String(v));
+ try{const r=await fetch(`/api/public/kfgqpc/fairdraw/${encodeURIComponent(reading)}${q.toString()?`?${q}`:''}`,{cache:'no-store'});
+  if(!r.ok)return null;return await r.json()}catch{return null}}
 
 export async function loadKfgqpcOfficialQuranFont(fontId='primary'):Promise<boolean>{try{if(typeof FontFace==='undefined'||typeof document==='undefined')return false;const name='MIZAN KFGQPC Official';const face=new FontFace(name,`url(/api/public/kfgqpc/font/${encodeURIComponent(fontId)})`);const loaded=await face.load();document.fonts.add(loaded);return document.fonts.check(`16px \"${name}\"`)}catch{return false}}
 

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import {generatedArtifactDigest,officialKfgqpcUrl,quranReadingDefinition,sha256} from '../server/quran-intelligence-policy';

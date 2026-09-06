@@ -1,0 +1,13 @@
+# رفع سياق Cloud Build: استبعد الثقيل وغير اللازم فقط.
+# لا تستبعد tests/ ولا scripts/ ولا server/ ولا src/ — البناء يشغّل npm test ويستدعي السكربتات.
+node_modules/
+dist/
+coverage/
+.git/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+.mizan-ingest/
+.mizan-data/

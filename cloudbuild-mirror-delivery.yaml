@@ -1,0 +1,33 @@
+steps:
+  - name: 'node:22-slim'
+    id: 'mirror-acquire-and-upload-to-r2'
+    entrypoint: 'bash'
+    secretEnv: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
+    env:
+      - 'R2_ENDPOINT=${_R2_ENDPOINT}'
+      - 'R2_BUCKET=${_R2_BUCKET}'
+      - 'R2_REGION=auto'
+      - 'MIZAN_R2_SAFETY_LIMIT_BYTES=9663676416'
+    args:
+      - '-ceu'
+      - |
+        apt-get update -qq
+        apt-get install -y --no-install-recommends ca-certificates >/dev/null
+        npm install --ignore-scripts --no-audit --no-fund
+        # اقتناء أصول التسليم الخفيفة داخل السحابة (المصادر مفتوحة وقابلة للوصول عكس موقع المجمع)
+        npx tsx scripts/kfgqpc-mirror-stage.ts --out .mizan-delivery      # نص + خطوط 6 روايات
+        npx tsx scripts/kfgqpc-pages-tafsir.ts --out .mizan-delivery      # 604 صفحة + التفسير الميسّر
+        # الرفع إلى Cloudflare R2 (immutable delivery، resume، ضمن سقف الأمان)
+        npx tsx scripts/kfgqpc-r2-upload.ts --root .mizan-delivery
+substitutions:
+  _R2_ENDPOINT: 'https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com'
+  _R2_BUCKET: 'mizan-quran-assets'
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_ACCESS_KEY_ID/versions/latest'
+      env: 'R2_ACCESS_KEY_ID'
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_SECRET_ACCESS_KEY/versions/latest'
+      env: 'R2_SECRET_ACCESS_KEY'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: '3600s'

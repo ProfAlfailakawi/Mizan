@@ -1,0 +1,39 @@
+steps:
+  - name: 'node:22-slim'
+    id: 'acquire-audio-layout-and-upload'
+    entrypoint: 'bash'
+    secretEnv: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
+    env:
+      - 'R2_ENDPOINT=${_R2_ENDPOINT}'
+      - 'R2_BUCKET=${_R2_BUCKET}'
+      - 'R2_REGION=auto'
+      - 'MIZAN_R2_SAFETY_LIMIT_BYTES=9663676416'
+    args:
+      - '-ceu'
+      - |
+        apt-get update -qq
+        apt-get install -y --no-install-recommends ca-certificates curl >/dev/null
+        npm install --ignore-scripts --no-audit --no-fund
+        # 1) صوت حفص/المعيقلي (6236 آية) من everyayah
+        npx tsx scripts/kfgqpc-audio-acquire.ts --out .mizan-delivery --only hafs-muaiqly
+        # 2) تخطيط الكلمة/الأسطر (604 صفحة) من zonetecde/mushaf-layout → طبقة إثراء
+        mkdir -p .mizan-delivery/delivery/quran-data/mushaf-layout/v1
+        for p in $(seq -w 1 604); do
+          curl -fsSL "https://raw.githubusercontent.com/zonetecde/mushaf-layout/main/mushaf/page-$(printf '%03d' $((10#$p))).json" \
+            -o ".mizan-delivery/delivery/quran-data/mushaf-layout/v1/page-$(printf '%03d' $((10#$p))).json" || echo "skip page $p"
+        done
+        # 3) رفع كل الجديد إلى R2 (resume: يتخطّى المرفوع مسبقًا)
+        npx tsx scripts/kfgqpc-r2-upload.ts --root .mizan-delivery
+substitutions:
+  _R2_ENDPOINT: 'https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com'
+  _R2_BUCKET: 'mizan-quran-assets'
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_ACCESS_KEY_ID/versions/latest'
+      env: 'R2_ACCESS_KEY_ID'
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_SECRET_ACCESS_KEY/versions/latest'
+      env: 'R2_SECRET_ACCESS_KEY'
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+timeout: '7200s'

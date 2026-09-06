@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mizan",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5178", "--strictPort"],
+      "port": 5178
+    },
+    {
+      "name": "mizan-build",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--port", "5179", "--strictPort"],
+      "port": 5179
+    }
+  ]
+}

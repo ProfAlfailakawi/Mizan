@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# MIZAN local asset staging (never committed)
+.mizan-ingest/
+.mizan-delivery/

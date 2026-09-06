@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type RequestHandler } from 'express';
 import path from 'path';
 import crypto from 'crypto';
@@ -17,6 +18,7 @@ import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-bui
 import { WitnessModeRepository } from './server/witness-mode';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
+import { generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { AlignmentSessionManager } from './server/alignment/session';
 import { createAlignmentRouter } from './server/alignment/api';
 import { devHafsPassage } from './server/alignment/canonical';
@@ -37,7 +39,7 @@ const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
   const isProd = process.env.NODE_ENV === 'production';
   app.disable('x-powered-by'); app.set('trust proxy', 1);
   app.use((req,res,next)=>{
@@ -134,8 +136,38 @@ async function startServer() {
   const sendKfgqpcAsset=async(res:any,asset:any,cacheControl:string)=>{if(!asset)return false;res.setHeader('Cache-Control',cacheControl);res.setHeader('X-MIZAN-Source-Authority','KFGQPC');res.setHeader('X-MIZAN-Delivery-Source',asset.source);res.type(asset.type||'application/octet-stream');if(asset.file){res.sendFile(asset.file);return true}if(asset.response){const bytes=Buffer.from(await asset.response.arrayBuffer());res.send(bytes);return true}return false};
   app.get('/api/science/quran/kfgqpc/delivery-status',requireGovernanceRoles(['scientific_admin','org_admin','comp_admin','head_judge','auditor']),(req,res)=>res.json(kfgqpcDelivery.status()));
   app.get('/api/science/quran/kfgqpc/page/:packageId/:page',requireGovernanceRoles(['scientific_admin','org_admin','comp_admin','head_judge','judge','auditor']),async(req,res)=>{const packageId=safeSegment(String(req.params.packageId||'')),page=Number(req.params.page);if(!Number.isInteger(page)||page<1||page>700)return res.status(400).json({code:'MUSHAF_PAGE_INVALID'});try{const asset=await kfgqpcDelivery.page(packageId,page);if(await sendKfgqpcAsset(res,asset,'private, max-age=3600'))return;return res.status(404).json({code:'OFFICIAL_MUSHAF_PAGE_ASSET_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_MUSHAF_PAGE_DELIVERY_FAILED'})}});
+  // Public Mushaf page surface. Consistent with the existing public font and public ayah-audio
+  // routes: the printed Madinah page is publicly published Quran content, not competition data.
+  // Question secrecy is enforced by the FairDraw/escrow reveal flow, not by hiding the Mushaf.
+  app.get('/api/public/kfgqpc/page/:packageId/:page',async(req,res)=>{const packageId=safeSegment(String(req.params.packageId||'')),page=Number(req.params.page);
+    if(!Number.isInteger(page)||page<1||page>604)return res.status(400).json({code:'MUSHAF_PAGE_INVALID'});
+    try{const asset=await kfgqpcDelivery.page(packageId,page);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;
+      return res.status(404).json({code:'OFFICIAL_MUSHAF_PAGE_ASSET_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_MUSHAF_PAGE_DELIVERY_FAILED'})}});
+
   app.get('/api/public/kfgqpc/font/:fontId',async(req,res)=>{try{const asset=await kfgqpcDelivery.font(safeSegment(String(req.params.fontId||'primary')));if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).end()}catch{return res.status(502).end()}});
   app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
+  // Delivery-layer Quran text + generative FairDraw.
+  // These read ONLY the requested reading's delivery package (no cross-riwayah fallback) and are
+  // explicitly labelled DELIVERY_OPEN_MIRROR: they support display and drawing, and never replace
+  // the certified Source Vault for official scoring provenance.
+  app.get('/api/public/kfgqpc/passage/:readingId/:surah/:startAyah/:endAyah',async(req,res)=>{
+    const readingId=safeSegment(String(req.params.readingId||''));
+    const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
+    try{const passage=await kfgqpcDelivery.passage(readingId,surah,startAyah,endAyah);
+      if(!passage)return res.status(404).json({code:'OFFICIAL_PASSAGE_NOT_DELIVERED'});
+      res.setHeader('Cache-Control','public, max-age=3600');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
+      return res.json(passage)}catch{return res.status(502).json({code:'OFFICIAL_PASSAGE_DELIVERY_FAILED'})}});
+
+  app.get('/api/public/kfgqpc/fairdraw/:readingId',async(req,res)=>{
+    const readingId=safeSegment(String(req.params.readingId||'hafs'));
+    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
+    try{const out=await generativeFairDraw(kfgqpcDelivery,{reading:readingId,seed:req.query.seed?String(req.query.seed):undefined,
+        anchor:req.query.anchor?String(req.query.anchor) as any:undefined,ayahCount:num(req.query.ayahCount),
+        juz:num(req.query.juz),surah:num(req.query.surah),minAyahCount:num(req.query.min),maxAyahCount:num(req.query.max)});
+      if(!out)return res.status(404).json({code:'FAIRDRAW_SOURCE_NOT_DELIVERED'});
+      res.setHeader('Cache-Control','no-store');return res.json(out)}
+    catch{return res.status(502).json({code:'FAIRDRAW_FAILED'})}});
+
   app.post('/api/enterprise/science/quran/kfgqpc/ingest',requireEnterpriseKey,(req,res)=>{if(!serverQuranSources)return res.status(503).json({code:'SERVER_QURAN_SOURCE_VAULT_NOT_CONFIGURED'});try{const manifest=serverQuranSources.ingestOfficial({packageId:String(req.body?.packageId||''),bundlePath:String(req.body?.bundlePath||''),dataPath:String(req.body?.dataPath||''),ingestedBy:String(req.body?.ingestedBy||'enterprise-import')});let waqf:unknown=null;try{waqf=quranIntelligence?.deriveOfficialWaqfForPackage(manifest.packageId)||null}catch(waqfErr){waqf={status:'DERIVATION_FAILED',code:waqfErr instanceof Error?waqfErr.message:'WAQF_DERIVATION_FAILED'}}res.status(201).json({ingested:true,manifest,waqf})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'QURAN_SOURCE_INGEST_FAILED'})}});
   app.post('/api/science/quran/kfgqpc/:packageId/approve',requireGovernanceRoles(['scientific_admin']),(req,res)=>{if(!serverQuranSources)return res.status(503).json({code:'SERVER_QURAN_SOURCE_VAULT_NOT_CONFIGURED'});try{return res.json({manifest:serverQuranSources.approve(String(req.params.packageId),(req as any).mizanIdentity.uid)})}catch(err){return res.status(409).json({code:err instanceof Error?err.message:'QURAN_SOURCE_APPROVAL_FAILED'})}});
   app.post('/api/science/quran/kfgqpc/:packageId/revoke',requireGovernanceRoles(['scientific_admin']),(req,res)=>{if(!serverQuranSources)return res.status(503).json({code:'SERVER_QURAN_SOURCE_VAULT_NOT_CONFIGURED'});try{return res.json({manifest:serverQuranSources.revoke(String(req.params.packageId),String(req.body?.reason||'Scientific revocation'))})}catch(err){return res.status(409).json({code:err instanceof Error?err.message:'QURAN_SOURCE_REVOCATION_FAILED'})}});

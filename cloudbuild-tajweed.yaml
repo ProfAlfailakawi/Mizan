@@ -1,0 +1,35 @@
+steps:
+  - name: 'node:22-slim'
+    id: 'acquire-tajweed-upload-and-republish-catalog'
+    entrypoint: 'bash'
+    secretEnv: ['R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']
+    env:
+      - 'R2_ENDPOINT=${_R2_ENDPOINT}'
+      - 'R2_BUCKET=${_R2_BUCKET}'
+      - 'R2_REGION=auto'
+      - 'MIZAN_R2_SAFETY_LIMIT_BYTES=9663676416'
+    args:
+      - '-ceu'
+      - |
+        apt-get update -qq
+        apt-get install -y --no-install-recommends ca-certificates curl >/dev/null
+        npm install --ignore-scripts --no-audit --no-fund
+        # تجويد حفص (فهرسة حرفية بالقواعد) من cpfair/quran-tajweed
+        mkdir -p .mizan-delivery/delivery/quran-data/tajweed-muyassar/v1
+        curl -fsSL "https://raw.githubusercontent.com/cpfair/quran-tajweed/master/output/tajweed.hafs.uthmani-pause-sajdah.json" \
+          -o ".mizan-delivery/delivery/quran-data/tajweed-muyassar/v1/data.json"
+        # رفع الجديد فقط (resume) ثم إعادة نشر الكتالوج بالجرد المحدّث
+        npx tsx scripts/kfgqpc-r2-upload.ts --root .mizan-delivery
+        npx tsx scripts/kfgqpc-catalog-publish.ts
+substitutions:
+  _R2_ENDPOINT: 'https://c5d74db879abf3d428e4abdd485d338a.r2.cloudflarestorage.com'
+  _R2_BUCKET: 'mizan-quran-assets'
+availableSecrets:
+  secretManager:
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_ACCESS_KEY_ID/versions/latest'
+      env: 'R2_ACCESS_KEY_ID'
+    - versionName: 'projects/$PROJECT_ID/secrets/R2_SECRET_ACCESS_KEY/versions/latest'
+      env: 'R2_SECRET_ACCESS_KEY'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: '900s'

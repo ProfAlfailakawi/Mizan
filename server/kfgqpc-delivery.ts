@@ -79,6 +79,21 @@ const FONT_PREFIX:Record<string,string>={
   'kfgqpc-sousi-abu-amr-uthmanic-v3':'delivery/fonts/susi-abi-amr/v3/primary'
 };
 
+// Structured Quran text delivered from R2. Reading-isolated: each id maps to exactly one
+// narration prefix, so a passage can never be resolved from another riwayah's package.
+const QURAN_DATA_PREFIX:Record<string,string>={
+  'hafs':'delivery/quran-data/hafs/v13','kfgqpc-hafs-uthmanic-v13':'delivery/quran-data/hafs/v13',
+  'warsh':'delivery/quran-data/warsh/v6','kfgqpc-warsh-uthmanic-v6':'delivery/quran-data/warsh/v6',
+  'shubah':'delivery/quran-data/shubah/v4','kfgqpc-shubah-uthmanic-v4':'delivery/quran-data/shubah/v4',
+  'qalun':'delivery/quran-data/qalun/v5','kfgqpc-qaloun-uthmanic-v5':'delivery/quran-data/qalun/v5',
+  'duri-abi-amr':'delivery/quran-data/duri-abi-amr/v3','kfgqpc-douri-abu-amr-uthmanic-v3':'delivery/quran-data/duri-abi-amr/v3',
+  'susi-abi-amr':'delivery/quran-data/susi-abi-amr/v3','kfgqpc-sousi-abu-amr-uthmanic-v3':'delivery/quran-data/susi-abi-amr/v3'
+};
+export function kfgqpcQuranDataKey(readingId:string){if(!safe(readingId))return null;const prefix=QURAN_DATA_PREFIX[readingId];return prefix?`${prefix}/data.json`:null}
+
+export interface KfgqpcDeliveryAyah{surah:number;ayah:number;text:string;page:number;lineStart:number;lineEnd:number;juz:number;surahNameArabic?:string;surahNameEnglish?:string}
+export interface KfgqpcDeliveryPassage{reading:string;surah:number;startAyah:number;endAyah:number;ayat:KfgqpcDeliveryAyah[];text:string;loci:{page:number;lineStart:number;lineEnd:number}[];surahNameArabic?:string;surahNameEnglish?:string;juz?:number;provenance:{mode:'DELIVERY_OPEN_MIRROR';authority:'KFGQPC';note:string}}
+
 export function kfgqpcMushafPageKeys(packageId:string,page:number){
   if(!safe(packageId)||!Number.isInteger(page)||page<1||page>604)return [] as string[];
   const prefix=MUSHAF_PAGE_PREFIX[packageId];if(!prefix)return [] as string[];
@@ -123,6 +138,39 @@ export class KfgqpcDeliveryRepository{
   async page(packageId:string,page:number){if(!safe(packageId)||!Number.isInteger(page)||page<1||page>604)return null;const local=this.localFile(this.options.pageRoot,[packageId,String(page)],['avif','webp','png','svg']);if(local)return {source:'LOCAL' as const,...local};const privateKeys=kfgqpcMushafPageKeys(packageId,page);if(!privateKeys.length)return null;return this.remote(privateKeys,[`mushaf/${packageId}/pages/${page}.avif`,`mushaf/${packageId}/pages/${page}.webp`,`mushaf/${packageId}/pages/${page}.png`])}
 
   async ayahAudio(readingId:string,surah:number,ayah:number){if(!safe(readingId)||!Number.isInteger(surah)||surah<1||surah>114||!Number.isInteger(ayah)||ayah<1||ayah>400)return null;const privateKeys=kfgqpcAudioKeys(readingId,surah,ayah);if(!privateKeys.length)return null;const local=this.localFile(this.options.audioRoot,[readingId,String(surah),String(ayah)],['mp3','m4a']);if(local)return {source:'LOCAL' as const,...local};return this.remote(privateKeys,[`audio/${readingId}/ayah/${surah}/${ayah}.mp3`,`audio/${readingId}/ayah/${surah}/${ayah}.m4a`])}
+
+  /**
+   * Structured Quran text for one reading, delivered from R2 and cached in-process.
+   * Reading-isolated by key: a missing package returns null rather than another riwayah.
+   */
+  private quranDataCache=new Map<string,any[]>();
+  async quranData(readingId:string):Promise<any[]|null>{
+    if(!safe(readingId))return null;
+    const cached=this.quranDataCache.get(readingId);if(cached)return cached;
+    const key=kfgqpcQuranDataKey(readingId);if(!key)return null;
+    const asset=await this.remotePrivate([key]);if(!asset)return null;
+    let rows:unknown;try{rows=JSON.parse(fs.readFileSync(asset.file,'utf8'))}catch{return null}
+    if(!Array.isArray(rows)||!rows.length)return null;
+    this.quranDataCache.set(readingId,rows as any[]);
+    return rows as any[];
+  }
+
+  /** Resolve an exact (surah, startAyah..endAyah) passage with its official page/line loci. */
+  async passage(readingId:string,surah:number,startAyah:number,endAyah:number):Promise<KfgqpcDeliveryPassage|null>{
+    if(!Number.isInteger(surah)||surah<1||surah>114)return null;
+    if(!Number.isInteger(startAyah)||startAyah<1||!Number.isInteger(endAyah)||endAyah<startAyah)return null;
+    const rows=await this.quranData(readingId);if(!rows)return null;
+    const sel=rows.filter(r=>Number(r.sora)===surah&&Number(r.aya_no)>=startAyah&&Number(r.aya_no)<=endAyah)
+      .sort((a,b)=>Number(a.aya_no)-Number(b.aya_no));
+    if(!sel.length)return null;
+    const ayat:KfgqpcDeliveryAyah[]=sel.map(r=>({surah:Number(r.sora),ayah:Number(r.aya_no),text:String(r.aya_text||''),page:Number(r.page),lineStart:Number(r.line_start),lineEnd:Number(r.line_end),juz:Number(r.jozz),surahNameArabic:r.sora_name_ar?String(r.sora_name_ar):undefined,surahNameEnglish:r.sora_name_en?String(r.sora_name_en):undefined}));
+    // Merge per-page line spans so JudgeOS can place one focus lens per official page.
+    const byPage=new Map<number,{page:number;lineStart:number;lineEnd:number}>();
+    for(const a of ayat){const cur=byPage.get(a.page);if(!cur)byPage.set(a.page,{page:a.page,lineStart:a.lineStart,lineEnd:a.lineEnd});else{cur.lineStart=Math.min(cur.lineStart,a.lineStart);cur.lineEnd=Math.max(cur.lineEnd,a.lineEnd)}}
+    return {reading:readingId,surah,startAyah:ayat[0].ayah,endAyah:ayat[ayat.length-1].ayah,ayat,text:ayat.map(a=>a.text).join(' '),
+      loci:[...byPage.values()].sort((a,b)=>a.page-b.page),surahNameArabic:ayat[0].surahNameArabic,surahNameEnglish:ayat[0].surahNameEnglish,juz:ayat[0].juz,
+      provenance:{mode:'DELIVERY_OPEN_MIRROR',authority:'KFGQPC',note:'نص التسليم من مرآة مفتوحة أصلها مجمع الملك فهد؛ ليس بديلًا عن خزنة المصدر المُصدّقة للاستخدام الرسمي.'}};
+  }
 
   async font(packageId:string){if(!safe(packageId))return null;const privateKeys=kfgqpcFontKeys(packageId);if(!privateKeys.length)return null;const local=this.localFile(this.options.fontRoot,[packageId],['woff2','woff','ttf']);if(local)return {source:'LOCAL' as const,...local};return this.remote(privateKeys,[`fonts/${packageId}.woff2`,`fonts/${packageId}.woff`,`fonts/${packageId}.ttf`])}
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import {R2PrivateClient,r2ConfigFromEnv} from '../server/r2-private';

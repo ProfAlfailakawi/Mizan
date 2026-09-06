@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import {classifyDuriCandidate,classifyWarshCatalog,extractOfficialLinks,looksLikeDownload,type OfficialAudioProbe} from '../server/kfgqpc-audio-source-policy';

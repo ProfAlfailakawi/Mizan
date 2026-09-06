@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import path from 'node:path';
 import {ServerQuranSourceRepository} from '../server/quran-source-repository';
 import {QuranKnowledgeRepository} from '../server/quran-knowledge-repository';
