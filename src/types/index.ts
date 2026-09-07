@@ -140,6 +140,10 @@ export interface Category {
   targetDurationMinutes: number;
   ruleSetId?: string;
   questionBlueprintId?: string;
+  /** عدد الأسئلة لكل متسابق في هذه الفئة (يتجاوز الإعداد العام). */
+  questionsCount?: number;
+  /** عدد الآيات في مقطع السؤال لهذه الفئة (يتحكم بطول المقطع ⇒ كم يظهر من المصحف). */
+  ayatPerQuestion?: number;
 }
 
 export interface Competition {
@@ -147,6 +151,10 @@ export interface Competition {
   organizationId: string;
   name: string;
   nameArabic: string;
+  /** علامة بيضاء على مستوى المسابقة (تتقدّم على علامة الجهة): اسم الشعار وشعاره. */
+  displayName?: string;
+  displayNameArabic?: string;
+  logoUrl?: string;
   edition: string;
   country: string;
   timezone: string;

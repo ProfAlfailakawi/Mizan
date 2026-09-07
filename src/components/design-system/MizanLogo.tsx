@@ -4,8 +4,15 @@ import { useAppStore } from '../../lib/store';
 /* الهوية البيضاء: اسم/شعار العلامة يأتي من إعدادات المؤسسة. غياب الاسم المخصّص يبقي "ميزان"،
    فلا يتغيّر العرض التجريبي، ويظهر اسم العميل في كل مكان بمجرد ضبطه. */
 export function useBrandName(): { ar: string; en: string; logoUrl?: string } {
-  const brand = useAppStore().organization?.brand;
-  return { ar: brand?.displayNameArabic || 'ميزان', en: brand?.displayName || 'MIZAN', logoUrl: brand?.logoUrl };
+  const s = useAppStore();
+  const brand = s.organization?.brand;
+  const comp = s.competition;
+  // المسابقة تتقدّم على الجهة، والجهة على الافتراضي «ميزان».
+  return {
+    ar: comp?.displayNameArabic || brand?.displayNameArabic || 'ميزان',
+    en: comp?.displayName || brand?.displayName || 'MIZAN',
+    logoUrl: comp?.logoUrl || brand?.logoUrl,
+  };
 }
 
 /*
