@@ -22,7 +22,8 @@ const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:strin
   {role:'exception_host',ar:'مكتب الاستثناءات',en:'Exception Desk',noteAr:'يتدخل فقط عندما يحتاج الإنسان',noteEn:'Human help only when needed',icon:ScanLine,group:'support'},
   {role:'guardian',ar:'ولي الأمر',en:'Guardian',noteAr:'الموافقات والمتابعة للقصّر',noteEn:'Consent and minor journey',icon:Baby,group:'support'},
   {role:'support_agent',ar:'الدعم',en:'Support',noteAr:'جلسات دعم مؤقتة ومدققة',noteEn:'Audited temporary support',icon:LifeBuoy,group:'support'},
-  {role:'broadcast_operator',ar:'البث والحفل',en:'Broadcast',noteAr:'واجهة العرض والنتائج المسرحية',noteEn:'Ceremony and broadcast',icon:Award,group:'support'},
+  // «البث والحفل» لا يظهر كبطاقة دور مستقلة: واجهاته (الحفل + محرك البث) تُفتح من صف
+  // «واجهات يوم المسابقة» أدناه، فلا يتكرر المدخل نفسه في مكانين.
 ];
 
 interface Props { onEnterRole:(role:Role)=>void; onOpenKiosk:()=>void; onOpenCeremony:()=>void; onOpenWaiting:()=>void; onOpenHall?:()=>void; onOpenBroadcast?:()=>void; onOpenLab?:()=>void; }
@@ -41,11 +42,10 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
         <div className="relative max-w-3xl">
           <div className="flex items-center gap-2 text-[10px] font-black tracking-[.18em] text-[#5F6B64]"><Sparkles className="w-3.5 h-3.5"/> {ar?'تجربة ميزان':'MIZAN EXPERIENCE'}</div>
           <h1 className="mt-4 text-3xl sm:text-5xl font-black tracking-[-.03em] leading-[1.06]">{ar?'جرّب ميزان كما يراه كل شخص':'See MIZAN through every role'}</h1>
-          <p className="mt-3 text-sm text-[#68716B]">{ar?'دور واحد. مهمة واحدة. شاشة واحدة.':'One role. One job. One screen.'}</p>
           <div className="mt-7 flex flex-wrap gap-2">
             <button onClick={()=>{window.location.hash='#competition'}} className="inline-flex items-center gap-2 rounded-xl bg-[#214C40] px-4 py-2.5 text-xs font-black text-white"><Globe2 className="w-4 h-4"/>{ar?'صفحة المسابقة العامة':'Public competition'}</button>
             <button onClick={()=>{window.location.hash='#register'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><Plus className="w-4 h-4"/>{ar?'التسجيل':'Registration'}</button>
-            <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'شهادة':'Certificate'}</button><button onClick={()=>{window.location.hash='#trust-verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><ShieldCheck className="w-4 h-4"/>{ar?'تحقق من إثبات':'Trust proof'}</button>
+            <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'التحقق من شهادة':'Certificate'}</button>
           </div>
         </div>
         <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#646a66]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{ar?competition.nameArabic:competition.name}</span></div>
@@ -64,7 +64,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
 
       <section className="mt-10 border-t border-[#DEDDD6] pt-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div><div className="text-sm font-black">{ar?'واجهات يوم المسابقة':'Venue experiences'}</div><div className="text-xs text-[#656a67] mt-1">{ar?'تُفتح بكامل الشاشة أثناء الحدث':'Full-screen modes used on-site'}</div></div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={onOpenKiosk} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><ScanLine className="w-4 h-4"/>{ar?'بوابة الحضور':'Gate kiosk'}</button>
           <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button>{onOpenHall&&<button onClick={onOpenHall} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><BookOpen className="w-4 h-4"/>{ar?'خريطة تلاوة القاعة':'Hall recitation'}</button>}{onOpenBroadcast&&<button onClick={onOpenBroadcast} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'محرك البثّ الحجمي':'Broadcast Engine'}</button>}{onOpenLab&&<button onClick={onOpenLab} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Microscope className="w-4 h-4"/>{ar?'مختبر ذكاء التحكيم':'Judge Intelligence'}</button>}<button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>
         </div>

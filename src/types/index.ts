@@ -590,6 +590,10 @@ export interface JudgingPolicy {
   calibrationRequired: boolean;
   reserveJudgeAllowed: boolean;
   directScoreStep?: number;
+  /* كل مسابقة تقرر: هل يرى المحكم مجموع الخصم الجاري؟ وهل يُسمح له بالتراجع عن آخر ملاحظة؟
+     غياب القيمة يعني السماح (توافق رجعي مع اللوائح القديمة). */
+  showRunningScoreToJudge?: boolean;
+  allowJudgeUndo?: boolean;
 }
 
 export interface QuestionPolicy {
@@ -946,7 +950,7 @@ export interface BenchmarkRunRecord { id:string;organizationId:string;modelName:
 export interface PolicyCompilerEvidence { id:string;sourceFileName:string;sourceType:'pdf'|'docx'|'text'|'form'|'genome';page?:number;lineStart?:number;lineEnd?:number;excerpt:string; }
 export interface PolicyCompilerRule { id:string;category:string;summary:string;genomePath:string;proposedValue:unknown;confidence:'HIGH'|'MEDIUM'|'LOW';state:'UNDERSTOOD'|'NEEDS_REVIEW'|'CONFLICT';evidenceIds:string[]; }
 export interface PolicyCompilationRecord { id:string;competitionId:string;sourceFileName:string;sourceType:'pdf'|'docx'|'text'|'form'|'genome';sourceHash:string;createdAt:string;createdBy:string;state:'EXTRACTED'|'DRAFT'|'REVIEWED'|'SIMULATED'|'PUBLISHED'|'REJECTED';rules:PolicyCompilerRule[];evidence:PolicyCompilerEvidence[];proposedPolicyVersion:string;humanApprovedBy?:string;simulatedAt?:string;simulationHash?:string;simulationSummary?:{blockers:number;reviews:number;infos:number};publishedAt?:string;publishedGenomeVersion?:string; }
-export interface ContradictionIssueRecord { id:string;competitionId:string;severity:'BLOCKER'|'REVIEW'|'INFO';kind:'logical'|'scientific'|'privacy'|'operational'|'resource'|'permission'|'publication'|'blind_judging'|'qiraah_ai'|'certificate';title:string;why:string;affectedWorkflow:string;evidence:string[];fixTarget:'competition_dna'|'scientific'|'field'|'trust'|'privacy'|'none'; }
+export interface ContradictionIssueRecord { id:string;competitionId:string;severity:'BLOCKER'|'REVIEW'|'INFO';kind:'logical'|'scientific'|'privacy'|'operational'|'resource'|'permission'|'publication'|'blind_judging'|'qiraah_ai'|'certificate';title:string;why:string;affectedWorkflow:string;titleAr?:string;whyAr?:string;flowAr?:string;evidence:string[];fixTarget:'competition_dna'|'scientific'|'field'|'trust'|'privacy'|'none'; }
 export interface CeremonyVaultRecord { id:string;competitionId:string;resultPackageHash:string;encryptedPayload?:string;encryptionAlgorithm?:string;keyManagement:'development_adapter'|'production_external_kms';quorumActionId:string;status:'SEALED'|'READY'|'REVEALED'|'REVOKED';createdAt:string;revealTimestamp?:string;publicCommitmentHash:string; }
 export interface DisasterPackRecord { id:string;competitionId:string;version:string;createdAt:string;createdBy:string;packageHash:string;encryptedPayload:string;encryptionMode:'development_adapter'|'production_kms';contentsManifest:string[];status:'EXPORTED'|'VERIFIED'|'RESTORE_TESTED'|'REVOKED';verifiedAt?:string;restoreTestedAt?:string; }
 export interface DeviceReassignmentRecord { id:string;competitionId:string;failedDeviceId:string;spareDeviceId:string;fromRole?:DeviceRecord['role'];toRole:DeviceRecord['role'];requiredCachedState:string[];status:'PROPOSED'|'APPROVED'|'DISMISSED'|'APPLIED'|'BLOCKED';reason:string;createdAt:string;decidedAt?:string;decidedBy?:string; }
