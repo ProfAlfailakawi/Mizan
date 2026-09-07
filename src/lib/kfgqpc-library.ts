@@ -20,6 +20,16 @@ export async function fetchOfficialMushafPage(packageId:string,page:number):Prom
  try{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{const r=await fetch(publicUrl,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
+/*
+ * صوت أول آية الرسمي من مصدر التسليم (Cloudflare R2) — ملف صوتي لآية واحدة.
+ * يُستعمل كبداية معتمدة للسؤال حين لا يوجد مرجع صوتي مُدخَل في المتجر. عام (بلا مصادقة)،
+ * ويُخزَّن في ذاكرة القاعة ليعمل دون إنترنت لاحقًا. يرجّع رابط blob أو null إن لم يُرفع الأصل.
+ */
+export async function fetchOfficialAyahAudio(readingId:string,surah:number,ayah:number):Promise<string|null>{
+ if(!readingId||!Number.isInteger(surah)||!Number.isInteger(ayah)||surah<1||ayah<1)return null;
+ const url=`/api/public/kfgqpc/audio/${encodeURIComponent(readingId)}/${surah}/${ayah}`;
+ try{const r=await fetch(url,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 export async function venueResilienceStatus(){if(typeof caches==='undefined')return {supported:false,cachedPages:0};try{const c=await caches.open(VENUE_CACHE),keys=await c.keys();return {supported:true,cachedPages:keys.filter(k=>new URL(k.url).pathname.includes('/api/science/quran/kfgqpc/page/')).length}}catch{return {supported:false,cachedPages:0}}}
 export async function clearVenueQuranCache(){if(typeof caches!=='undefined')await caches.delete(VENUE_CACHE)}
 
