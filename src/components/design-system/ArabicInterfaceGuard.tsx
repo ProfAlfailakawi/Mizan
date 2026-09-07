@@ -47,6 +47,8 @@ const OPS_EXACT:Record<string,string>={
   'Smart Queue Engine':'محرك الطابور الذكي','Cryptographic':'تشفيري','canonical':'قياسي','fallback':'بديل',
   'client_hash_chain':'سلسلة تجزئة موقّعة','WORM':'سجل لا يقبل التعديل','quiet_authority':'الطابع الرصين',
   'requested':'مطلوبة','active':'نشطة','Main Hall':'القاعة الرئيسية',
+  'UAE':'الإمارات','Head Judge':'رئيس التحكيم','Participant':'متسابق','Request':'طلب','Engine':'محرك','Demo':'عرض تجريبي',
+  'Judge':'محكم','Competition':'مسابقة','Organization':'جهة','Session':'جلسة','Result':'نتيجة','Certificate':'شهادة',
   'Grand Conference Recitation Auditorium':'قاعة التلاوة الكبرى',
   'International Quran Competition':'المسابقة الدولية للقرآن الكريم',
 };
