@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type RequestHandler } from 'express';
+import type { Response } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -37,7 +38,9 @@ import { synthReference } from './server/alignment/benchmark/synth';
 import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
-import { publicTenant, resolveTenant } from './server/tenant-registry';
+import { publicTenant, resolveTenant, resetTenantRegistry, tenantRegistry } from './server/tenant-registry';
+import { TenantStore } from './server/tenant-store';
+import type { TenantRecord } from './server/tenant-registry';
 import { decodePemFromEnv } from './server/pem';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
@@ -99,6 +102,10 @@ async function startServer() {
 
   const requireEnterpriseKey:RequestHandler=(req,res,next)=>{const configured=process.env.MIZAN_ENTERPRISE_API_KEY;if(!configured)return res.status(503).json({code:'ENTERPRISE_API_NOT_CONFIGURED'});const supplied=String(req.headers['x-mizan-api-key']||'');if(!safeEqual(supplied,configured))return res.status(401).json({code:'UNAUTHORIZED'});next()};
 
+  /* سجل الجهات: ملف يُحرَّر من لوحة التحكم بدل متغيّر بيئة يلزمه إعادة نشر.
+     غيابه يعني نشرًا بجهة واحدة، فتبقى الإدارة معطَّلة لا معطوبة. */
+  const tenantsFile=process.env.MIZAN_TENANTS_FILE||'';
+  let tenantStore:TenantStore|null=null;try{if(tenantsFile&&!process.env.MIZAN_TENANTS)tenantStore=new TenantStore(tenantsFile)}catch(err){console.error('Tenant store disabled:',err)}
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
   /*
@@ -147,7 +154,7 @@ async function startServer() {
   const currentBuildId=()=>{if(cachedBuildId)return cachedBuildId;try{cachedBuildId=String(JSON.parse(fs.readFileSync(path.join(process.cwd(),'dist','build-id.json'),'utf8')).build||'')}catch{cachedBuildId=''}if(!cachedBuildId)cachedBuildId=process.env.BUILD_ID||'dev';return cachedBuildId};
   app.get('/api/version',(_req,res)=>{res.setHeader('Cache-Control','no-store, no-cache, must-revalidate');res.json({build:currentBuildId()})});
 
-  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
+  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
   app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Named-account identity governance. MIZAN stores no passwords; a verified Firebase identity is bound once to a scoped MIZAN invitation.
@@ -211,6 +218,24 @@ async function startServer() {
     if(!tenant)return res.status(204).end();
     return res.json(publicTenant(tenant));
   });
+
+  /* إدارة الجهات من لوحة التحكم. MIZAN_TENANTS المضمّن في البيئة يجمّد السجل عمدًا،
+     فلا تُكتب تعديلات تضيع صامتةً عند إعادة النشر. */
+  const tenantAdmin=(res:Response)=>{
+    if(process.env.MIZAN_TENANTS){res.status(409).json({code:'TENANTS_PINNED_TO_ENV'});return null}
+    if(!tenantStore){res.status(503).json({code:'TENANT_STORE_NOT_CONFIGURED'});return null}
+    return tenantStore;
+  };
+  const tenantResult=(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]})=>{
+    if(outcome.ok===false)return res.status(400).json({code:'TENANT_REJECTED',errors:outcome.errors});
+    resetTenantRegistry();
+    return res.json({tenant:outcome.tenant});
+  };
+  app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
+  app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
+  app.patch('/api/enterprise/tenants/:orgId',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
+  app.post('/api/enterprise/tenants/:orgId/suspend',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.suspend(String(req.params.orgId)))});
+  app.post('/api/enterprise/tenants/:orgId/activate',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.activate(String(req.params.orgId)))});
 
   /* صوت «عبارة إنهاء الموضع» — عبارة غير قرآنية يقولها المحكم. تُولَّد عبر Gemini TTS وتُخزَّن.
      القرآن لا يمر من هنا إطلاقًا؛ تلاوته من المصدر المعتمد وحده. 503 عند غياب المفتاح فيتراجع
