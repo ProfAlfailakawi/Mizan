@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type RequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { Response } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
@@ -234,15 +235,11 @@ async function startServer() {
   /* نفس إدارة الجهات، لكن بهوية المالك لا بمفتاح المؤسسات: المفتاح سرّ خادمي لا يجوز
      أن يسكن متصفحًا. الدور super_admin وحده، ويُتحقق منه في الخادم لا في الواجهة. */
   /* حدّ أضيق من الحدّ العام لمسارات المالك: هي تعدّل نطاقات الجهات وتوقفها، فمحاولة
-     تخمين هوية أو إغراق بالتعديلات يجب أن تُخنق قبل أن تصل حدّ /api الفسيح. */
-  const ownerRateMax=Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30);
-  const ownerRateLimit:RequestHandler=(req,res,next)=>{
-    if(rateLimiterIsGlobal)return next();
-    const now=Date.now();
-    const window=hitRateWindow(`owner:${String(req.ip||'unknown')}`,now);
-    if(window.count>ownerRateMax){res.setHeader('Retry-After',String(Math.max(1,Math.ceil((window.resetAt-now)/1000))));return res.status(429).json({code:'RATE_LIMITED'})}
-    next();
-  };
+     تخمين هوية أو إغراق بالتعديلات يجب أن تُخنق قبل أن تصل حدّ /api الفسيح.
+     ويُترك للطبقة الخارجية متى أُسند التحديد إليها، كما يفعل الحدّ العام. */
+  const ownerRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const ownerOnly=requireFirebaseRoles(['super_admin']);
   app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/owner/tenants',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
