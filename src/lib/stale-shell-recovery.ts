@@ -47,6 +47,12 @@ export function markShellHealthy() {
 export function installStaleShellRecovery() {
   if (typeof window === 'undefined') return;
 
+  // Vite تُطلق هذا الحدث حين يفشل تحميل حزمة مُسبقة التحميل — أوضح إشارة إلى غلاف قديم.
+  window.addEventListener('vite:preloadError' as keyof WindowEventMap, ((e: Event) => {
+    e.preventDefault();
+    void recover();
+  }) as EventListener);
+
   window.addEventListener('error', (e) => {
     const target = e.target as HTMLElement | null;
     // فشل وسم <script>/<link> — أي أصل بُني في غلاف قديم
