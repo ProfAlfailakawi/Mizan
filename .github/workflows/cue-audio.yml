@@ -73,6 +73,11 @@ jobs:
           القرآن لا يُولَّد صوتيًا بحال؛ تلاوته من المصدر المعتمد وحده.
           MSG
           sed -i 's/^          //' /tmp/cue-body.txt
-          gh pr create --base main --head "$BRANCH" \
+          # بعض المؤسسات تمنع GitHub Actions من فتح طلبات الدمج. الفرع مدفوع على أي حال،
+          # فلا نُفشل التشغيل: نطبع رابط فتح الطلب يدويًا ونمضي.
+          if ! gh pr create --base main --head "$BRANCH" \
             --title "توليد مقاطع عبارة إنهاء الموضع" \
-            --body-file /tmp/cue-body.txt
+            --body-file /tmp/cue-body.txt; then
+            echo "::notice::تعذّر فتح طلب الدمج تلقائيًا. الفرع $BRANCH مدفوع؛ افتح الطلب من:"
+            echo "::notice::${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
+          fi
