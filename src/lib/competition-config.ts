@@ -51,7 +51,9 @@ export const BASE_POLICY: CompetitionPolicy = {
     reviewThreshold: 'balanced',
     calibrationRequired: true,
     reserveJudgeAllowed: true,
-    directScoreStep: 0.25
+    directScoreStep: 0.25,
+    showRunningScoreToJudge: true,
+    allowJudgeUndo: true
   },
   questions: {
     drawMode: 'fairdraw',

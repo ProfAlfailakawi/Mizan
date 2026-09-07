@@ -38,6 +38,19 @@ const AR_TOKENS:Record<string,string>={
   running:'قيد التشغيل', executed:'نُفّذ', rolled_back:'تم التراجع', validated:'تم التحقق',
   configured:'مُهيّأ', not_configured:'غير مُهيّأ', stale:'قديم', warning:'تنبيه', info:'معلومة',
   joined:'انضم', left:'غادر', proposed:'مقترح', imported:'مستورد', dry_run:'تشغيل تجريبي',
+  // تصنيفات إعادة المحاكاة/السجل، وأنواع القنوات، وأسباب الاعتراض وقواعد كسر التعادل، ورموز
+  // كانت تُعرض خامًا بالإنجليزية داخل شاشة عربية. أي مفتاح غير معروف يبقى كما هو دون كسر.
+  results:'النتائج', incidents:'الحوادث', operations:'العمليات', trust:'الثقة', devices:'الأجهزة',
+  storage:'التخزين', broadcast:'البث',
+  audio_interruption:'انقطاع الصوت', scoring_miscalculation:'خطأ في احتساب الدرجة', question_scope_dispute:'خلاف على نطاق السؤال', procedural_error:'خطأ إجرائي', identity_dispute:'خلاف على الهوية',
+  memorization_priority:'أولوية الحفظ', tajweed_priority:'أولوية التجويد', fewest_penalties:'الأقل أخطاءً', performance_priority:'أولوية الأداء', waqf_priority:'أولوية الوقف والابتداء', earliest_submission:'الأسبق تسليمًا',
+  ACTIVE:'نشط', TEXTUAL:'تطابق نصّي', EXPERT:'مستوى الخبير', SHADOW:'وضع العرض', BLOCKER:'مانع',
+  DRAFT:'مسودة', REVIEWED:'تمت المراجعة', SIMULATED:'بعد المحاكاة', PUBLISHED:'منشورة', CONFLICT:'تعارض', NEEDS_REVIEW:'تحتاج مراجعة', REVIEW:'مراجعة', NOT_RUN:'لم تُشغّل بعد', UNDERSTOOD:'مفهومة',
+  // باقة الجهة ومنطقة استضافة البيانات (كانت enterprise / eu-west-locked تُعرض خامًا).
+  enterprise:'مؤسسات', growth:'نمو', pilot:'تجريبية', standard:'قياسية', 'eu-west-locked':'أوروبا الغربية (مقفلة)', 'us-east':'شرق الولايات المتحدة', 'me-central':'الشرق الأوسط', configurable:'قابلة للضبط',
+  in_transit:'في الطريق', arrived:'وصل', delayed:'متأخر', boarding:'الصعود للطائرة',
+  integrity:'النزاهة', timing:'التوقيت', experience:'التجربة', performance:'الأداء',
+  OPEN:'مفتوح', INVESTIGATING:'قيد الفحص', RESOLVED:'مُعالَج', DETECTED:'مرصود', MITIGATED:'مُحتوى', CONSUMED:'مُستخدَم', NONE:'لا يوجد', AUTHORIZED:'مصرَّح', PENDING_PANEL_QUORUM:'بانتظار نصاب اللجنة',
 };
 
 const AR_CLAIMS:Record<FederationClaimType,string>={
@@ -191,7 +204,7 @@ export function deviceRoleLabel(value: string | undefined | null, ar: boolean): 
 }
 
 /* قنوات الإشعار. */
-const AR_CHANNEL: Record<string, string> = { in_app: 'داخل التطبيق', email: 'البريد', sms: 'رسالة نصية', whatsapp: 'واتساب', push: 'إشعار فوري' };
+const AR_CHANNEL: Record<string, string> = { in_app: 'داخل التطبيق', email: 'البريد', sms: 'رسالة نصية', whatsapp: 'واتساب', push: 'إشعار فوري', storage: 'التخزين', identity: 'التحقق من الهوية', broadcast: 'البث' };
 export function channelLabel(value: string, ar: boolean): string {
   return ar ? (AR_CHANNEL[value] || value) : value.replaceAll('_', ' ');
 }
@@ -206,4 +219,36 @@ const AR_NOTIFICATION_TEMPLATE: Record<string, string> = {
 export function notificationTemplateLabel(value: string, ar: boolean): string {
   if (!value) return '—';
   return ar ? (AR_NOTIFICATION_TEMPLATE[value] || value.replaceAll('_', ' ').replaceAll('.', ' · ')) : value.replaceAll('_', ' ');
+}
+
+/* عناوين فحوص البروفة التشغيلية بالعربية (كانت الأسماء والأثر تُعرض إنجليزية داخل شاشة عربية). */
+const AR_REHEARSAL: Record<string, { name: string; impact: string }> = {
+  'gate-scan': { name: 'مسح البوابة', impact: 'وصول المتسابق' },
+  'offline-pass': { name: 'التحقق من التصريح دون اتصال', impact: 'استمرارية البوابة دون اتصال' },
+  'participant-checkin': { name: 'تسجيل حضور المتسابق', impact: 'مسار الوصول' },
+  queue: { name: 'الطابور', impact: 'استمرارية الطابور' },
+  routing: { name: 'التوجيه', impact: 'توجيه المتسابقين' },
+  'judge-session': { name: 'جلسة التحكيم', impact: 'التحكيم البشري' },
+  'judge-lock': { name: 'قفل المحكم المستقل', impact: 'استقلال المحكم' },
+  'head-judge-review': { name: 'مراجعة رئيس التحكيم', impact: 'المراجعة البشرية المصعّدة' },
+  fairdraw: { name: 'السحب العادل', impact: 'اختيار السؤال' },
+  'network-interruption': { name: 'انقطاع الشبكة', impact: 'فقد الاتصال' },
+  'offline-continuation': { name: 'استمرار الحدث دون اتصال', impact: 'التشغيل دون اتصال' },
+  reconnect: { name: 'إعادة الاتصال', impact: 'استعادة الاتصال' },
+  'conflict-reconciliation': { name: 'تسوية التعارض', impact: 'دمج غير مكرَّر' },
+  'device-failure': { name: 'عطل جهاز', impact: 'استمرارية الأجهزة' },
+  'device-reassignment': { name: 'إعادة تعيين جهاز', impact: 'استمرارية الأدوار' },
+  'judge-absence': { name: 'غياب محكم', impact: 'استمرارية اللجنة' },
+  'committee-reassignment': { name: 'إعادة تعيين لجنة', impact: 'استمرارية التوجيه' },
+  'emergency-mode': { name: 'وضع الطوارئ', impact: 'استمرارية الطوارئ' },
+  'notification-failure': { name: 'فشل الإشعارات', impact: 'صمود التواصل' },
+  'ai-outage': { name: 'تعطّل الذكاء الاصطناعي', impact: 'استمرارية التحكيم البشري' },
+  'result-seal': { name: 'ختم النتيجة', impact: 'سلطة النتيجة' },
+  quorum: { name: 'النصاب', impact: 'تفويض متعدد السلطات' },
+  appeal: { name: 'الاعتراض', impact: 'مسار الاعتراض' },
+  'certificate-issuance': { name: 'إصدار الشهادة', impact: 'شهادة تحمل الإثبات' },
+};
+export function rehearsalCheckLabel(id: string, name: string, impact: string, ar: boolean): { name: string; impact: string } {
+  if (!ar) return { name, impact };
+  return AR_REHEARSAL[id] || { name, impact };
 }
