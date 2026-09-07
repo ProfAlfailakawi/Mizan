@@ -122,8 +122,7 @@ const ParityPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
           <span className="text-[11px]" style={{ color: '#8b9a92' }}>{ar ? 'أقصى فارق' : 'max gap'}: {(report.maxRelativeDelta * 100).toFixed(1)}%</span>
         </div>
         <div className="space-y-2">
-          {report.participants.map(p => {
-            const w = report.participants[report.participants.length - 1].totalEnergy || 1;
+          {(() => { const w = Math.max(1, ...report.participants.map(x => x.totalEnergy)); return report.participants.map(p => {
             return (
               <div key={p.participantId} className="flex items-center gap-3">
                 <span className="w-6 text-[12px] font-bold" style={{ color: GOLD }}>{p.participantId}</span>
@@ -133,7 +132,7 @@ const ParityPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
                 <span className="w-10 text-end text-[11px]" style={{ color: '#a9b6ae' }}>{p.totalEnergy}</span>
               </div>
             );
-          })}
+          }); })()}
         </div>
       </div>
     </div>

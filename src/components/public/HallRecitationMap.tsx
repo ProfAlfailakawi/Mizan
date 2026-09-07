@@ -92,7 +92,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
       {/* Per-juz ribbon */}
       <section className="mt-5 rounded-[24px] border border-white/10 bg-white/[.025] p-4 sm:p-5">
         <div className="text-[11px] font-black tracking-[.15em] mizan-venue-muted mb-3">{ar ? 'تغطية الأجزاء' : 'JUZ COVERAGE'}</div>
-        <div className="grid grid-cols-6 sm:grid-cols-10 lg:grid-cols-15 gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))' }}>
+        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))' }}>
           {agg.byJuz.map((j) => {
             const pct = j.coveredPages / 20.13;
             return (
