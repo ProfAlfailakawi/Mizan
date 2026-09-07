@@ -5,6 +5,7 @@ import {
   Clock, Globe, Mail, Check, Gauge,
 } from 'lucide-react';
 import { MizanMark } from '../design-system/MizanLogo';
+import { HERO_BAND, MOMENTS } from './photos';
 
 /*
  * الواجهة العامة لميزان — mizan.<domain>.
@@ -90,6 +91,49 @@ const ISOLATION = [
   { label: 'الاعتماد العلمي', value: 'سلطة المالك وحده', icon: ShieldCheck },
 ];
 
+/* ── صور البشر ──────────────────────────────────────────────────────
+ * تُعرَض فقط حين توجد صورٌ فعلًا (photos.ts). لا مربّعات فارغة ولا صورةٌ مكسورة:
+ * قسمٌ بلا محتوى يُخفى بالكامل بدل أن يَعِد بما ليس عندنا.
+ */
+const HeroBand: React.FC = () => {
+  const r = useReveal<HTMLElement>();
+  if (!HERO_BAND) return null;
+  return (
+    <section ref={r.ref} style={r.style} className="mt-4">
+      <div className="relative">
+        <img src={HERO_BAND.src} alt={HERO_BAND.alt} loading="lazy" className="w-full h-[clamp(280px,42vw,520px)] object-cover block" />
+        {HERO_BAND.caption && (
+          <div className="absolute inset-0 flex items-end" style={{ background: 'linear-gradient(to top, rgba(16,26,22,.78), rgba(16,26,22,.05) 55%)' }}>
+            <div className="mizan-page w-full !pb-8">
+              <div className="font-display text-[clamp(18px,3vw,30px)] font-black" style={{ color: 'var(--venue-ink)' }}>{HERO_BAND.caption}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const Moments: React.FC = () => {
+  if (!MOMENTS.length) return null;
+  return (
+    <Section>
+      <Kicker>لحظات</Kicker>
+      <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">القاعة، لا الشاشة</h2>
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {MOMENTS.map(m => (
+          <figure key={m.src} className="relative overflow-hidden rounded-[22px]" style={{ border: '1px solid var(--line)', boxShadow: 'var(--shadow-2)' }}>
+            <img src={m.src} alt={m.alt} loading="lazy" className="w-full aspect-[4/5] object-cover block" />
+            {m.caption && (
+              <figcaption className="absolute inset-x-0 bottom-0 p-4 text-[13px] font-black" style={{ color: 'var(--venue-ink)', background: 'linear-gradient(to top, rgba(16,26,22,.8), transparent)' }}>{m.caption}</figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+    </Section>
+  );
+};
+
 export const MarketingSite: React.FC = () => {
   useEffect(() => {
     document.title = 'ميزان — منصّة مسابقات القرآن الكريم';
@@ -160,6 +204,8 @@ export const MarketingSite: React.FC = () => {
         </div>
       </Section>
 
+      <HeroBand/>
+
       {/* ══ ٣) الرحلة: إنفوجرافيك خمس محطات ══ */}
       <Section id="kayf">
         <Kicker>الرحلة</Kicker>
@@ -210,6 +256,8 @@ export const MarketingSite: React.FC = () => {
           ))}
         </div>
       </Section>
+
+      <Moments/>
 
       {/* ══ ٥) النزاهة: القسم الداكن — قلب البيع ══ */}
       <section className="mt-4" style={{ background: 'var(--venue)', color: 'var(--venue-ink)' }}>
