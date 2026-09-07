@@ -171,7 +171,12 @@ function seededInitialState(): AppStoreState {
       questionSelection: {
         questionSetId: 'qset-104-fairdraw',
         participantId: 'part-104',
-        questions: [DEVELOPMENT_QUESTION_BANK[0], DEVELOPMENT_QUESTION_BANK[1], DEVELOPMENT_QUESTION_BANK[3]],
+        // ثلاثة أسئلة مختلفة ومقاطع قصيرة (٣ آيات) حتى لا تبدو مكررة ولا يتمدّد المقطع على وجهين في العرض.
+        questions: [
+          { ...DEVELOPMENT_QUESTION_BANK[0], endAyah: DEVELOPMENT_QUESTION_BANK[0].startAyah + 2 },
+          { ...DEVELOPMENT_QUESTION_BANK[1], endAyah: DEVELOPMENT_QUESTION_BANK[1].startAyah + 2 },
+          { ...DEVELOPMENT_QUESTION_BANK[3], endAyah: DEVELOPMENT_QUESTION_BANK[3].startAyah + 2 },
+        ],
         difficultyVectorScore: 2.33,
         seedCommitmentHash: 'DEMO:generated-at-runtime-in-live-sessions',
         fairnessToleranceDelta: 0.04,
