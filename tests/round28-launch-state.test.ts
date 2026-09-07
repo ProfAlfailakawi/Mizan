@@ -17,6 +17,7 @@ const seededLike=()=>({
   reviewCases:[{id:'r1'}],incidents:[{id:'i1'}],appeals:[{id:'a1'}],judgeSubmissions:[{id:'j1'}],
   aiObservations:[{id:'o1'}],audioRecordings:[{id:'rec1'}],notifications:[{id:'n1'}],sealApprovals:[{id:'s1'}],
   identityAccounts:[{id:'acct'}],roleGrants:[{id:'grant'}],identityInvitations:[{id:'inv'}],authSessions:[{id:'sess'}],
+  questionRevealGates:[{id:'g1'}],activeSession:{sessionId:'sess-active-001',participant:SEED_PARTICIPANTS[0],committee:SEED_COMMITTEES[0]},
   language:'ar',
 }) as any;
 
@@ -28,9 +29,12 @@ test('a real deployment is recognised only by mandatory authentication',()=>{
 
 test('launch state carries no invented person and no issued record',()=>{
   const launch=toLaunchState(seededLike());
-  for(const key of ['participants','committees','judges','results','certificates','reviewCases','auditLogs','incidents','appeals','judgeSubmissions','aiObservations','audioRecordings','notifications','sealApprovals','identityAccounts','roleGrants','identityInvitations','authSessions'] as const){
+  for(const key of ['participants','committees','judges','results','certificates','reviewCases','auditLogs','incidents','appeals','judgeSubmissions','aiObservations','audioRecordings','notifications','sealApprovals','identityAccounts','roleGrants','identityInvitations','authSessions','questionRevealGates'] as const){
     assert.deepEqual((launch as any)[key],[],`${key} must start empty in a real deployment`);
   }
+  // جلسة العرض لا تُورَّث لمحكم حقيقي: بلا متسابق ولا لجنة مخترعَين.
+  assert.equal(launch.activeSession.participant,null,'no seeded participant survives into a real deployment');
+  assert.equal(launch.activeSession.committee,null,'no seeded committee survives into a real deployment');
 });
 
 test('launch state keeps every field the screens expect',()=>{
