@@ -5,6 +5,7 @@ import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
+import { useIdleSignOut } from './lib/useIdleSignOut';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { auth } from './lib/firebase';
 import { DemoReturn } from './components/public/DemoReturn';
@@ -184,6 +185,7 @@ export default function App() {
  useEffect(()=>{warmViews()},[]);
  const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationMessage,activateAccount,takeoverSession}=useMizanAuth(requireAuth);
+ const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
  const demoMode=!requireAuth;
  // Deep links skip the splash, and so do repeat loads inside the same session: the
  // assembly is a 2.8s first-impression, not a per-reload toll for staff reopening the app.
@@ -237,6 +239,7 @@ export default function App() {
  };
  const isBroadcast=currentUser.role==='broadcast_operator';
  return <div className="min-h-screen text-[#171b18] font-arabic">
+  {idleWarnSeconds!==null&&<div className="fixed inset-x-0 top-0 z-[210] bg-[#8a4f45] text-white text-center text-xs font-black py-2 px-4">{language==='ar'?`ستُغلق الجلسة تلقائيًا خلال ${idleWarnSeconds} ثانية لعدم النشاط. حرّك الفأرة أو المس الشاشة للبقاء.`:`Signing out in ${idleWarnSeconds}s due to inactivity — move to stay.`}</div>}
   {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}

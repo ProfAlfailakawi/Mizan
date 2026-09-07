@@ -1,5 +1,7 @@
 import React,{useState} from 'react';
 import { Award, Radio, Wifi, WifiOff, Search, LayoutDashboard, CircleHelp } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import { useAppStore } from '../../lib/store';
 import { RoleSwitcher } from '../design-system/RoleSwitcher';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
@@ -14,6 +16,8 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
  const {language,competition,isOffline,toggleOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
  const canGate=['comp_admin','ops_manager','exception_host','super_admin'].includes(currentUser.role);
  const canCeremony=['comp_admin','broadcast_operator','super_admin'].includes(currentUser.role);
+ const production=(import.meta.env as Record<string,string|undefined>).VITE_REQUIRE_AUTH==='true';
+ const logout=()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())};
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0">
@@ -29,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
       <EmergencyControl iconOnly/>
       <LanguageSwitcher compact/>
       <RoleSwitcher/>
+      {production&&<button onClick={logout} className="h-11 px-3 rounded-xl hover:bg-[#F4E6E3] text-[#8a4f45] text-xs font-black">{language==='ar'?'خروج':'Sign out'}</button>}
     </div>
   </div>
   <CommandPalette open={searchOpen} onOpenChange={setSearchOpen}/><ClarityGuide open={helpOpen} onClose={()=>setHelpOpen(false)} role={currentUser.role} ar={language==='ar'}/>
