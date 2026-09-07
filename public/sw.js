@@ -1,4 +1,8 @@
-const CACHE='mizan-shell-v5';
+/* بصمة البناء تُطبع هنا عند البناء (scripts/build-stamp.mjs).
+   بايتات هذا الملف يجب أن تتغيّر مع كل إصدار، وإلا لم يرَ المتصفح تحديثًا أصلًا
+   ولم تعلم التبويبات المفتوحة بشيء. */
+const BUILD='__BUILD_ID__';
+const CACHE='mizan-shell-'+BUILD;
 /* The fonts are served from our own origin now, so they fall under the same-origin
    rule below and the separate cross-origin font cache is gone. Leaving it out of KEEP
    is deliberate: activate() drops any cache not listed, which reclaims what the old
@@ -11,6 +15,9 @@ const KEEP=[CACHE];
    which matters on a venue tablet that is never wiped. Whenever a fresh asset is cached,
    drop the superseded hashes of the same file. */
 const ASSET=/\/assets\/(.+)-[A-Za-z0-9_-]{8}\.(js|css)$/;
+/* الأصول المبصومة بهاش في اسمها هي وحدها التي تُقدَّم من الكاش مباشرة: اسمها يتغيّر مع
+   بايتاتها، فالنسخة القديمة مستحيلة بالبناء. كل ما عداها يمرّ على الشبكة أولًا. */
+const HASHED=/\/assets\/.+-[A-Za-z0-9_-]{8}\.[a-z0-9]+$|[.-][A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|avif|svg)$/;
 async function putAsset(cache,request,response){
  await cache.put(request,response);
  const current=new URL(request.url).pathname.match(ASSET);
@@ -27,7 +34,22 @@ self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promis
 
 self.addEventListener('fetch',e=>{
  const req=e.request;if(req.method!=='GET')return;
- if(req.mode==='navigate'){e.respondWith(fetch(req).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put('/index.html',copy));return r}).catch(()=>caches.match('/index.html')));return;}
+ /* طلبات التنقل (HTML) دائمًا من الشبكة وبـ cache:"no-store": الغلاف المخزّن يسمّي حزمًا
+    حذفها النشر التالي. الكاش احتياط لانقطاع الاتصال لا غير. */
+ if(req.mode==='navigate'){
+  e.respondWith(fetch(req.url,{cache:'no-store',credentials:'same-origin',redirect:'follow'})
+   .then(r=>{if(r&&r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put('/index.html',copy))}return r})
+   .catch(()=>caches.match('/index.html')));
+  return;
+ }
  const url=new URL(req.url);
- if(url.origin===location.origin)e.respondWith(caches.match(req).then(cached=>cached||fetch(req).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>putAsset(c,req,copy));}return r})));
+ if(url.origin!==location.origin)return;
+ // نقطة الإصدار لا تُخزَّن أبدًا: هي الحقيقة التي يُقارن بها.
+ if(url.pathname==='/api/version'){e.respondWith(fetch(req,{cache:'no-store'}));return;}
+ if(HASHED.test(url.pathname)){
+  e.respondWith(caches.match(req).then(cached=>cached||fetch(req).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>putAsset(c,req,copy))}return r})));
+  return;
+ }
+ // بقية أصول نفس الأصل: الشبكة أولًا، والكاش احتياطًا عند انقطاع الاتصال.
+ e.respondWith(fetch(req).then(r=>{if(r.ok&&url.pathname.indexOf('/api/')!==0){const copy=r.clone();caches.open(CACHE).then(c=>c.put(req,copy))}return r}).catch(()=>caches.match(req)));
 });
