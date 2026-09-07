@@ -1,0 +1,78 @@
+name: توليد مقاطع عبارة إنهاء الموضع
+
+# العبارة غير قرآنية («حسبك، جزاك الله خيرًا» وأخواتها) يقولها المحكم للمتسابق.
+# القرآن لا يُولَّد صوتيًا بحال؛ تلاوته من المصدر المعتمد وحده.
+#
+# يُشغَّل يدويًا فقط: المقاطع تُولَّد مرة واحدة ثم تبقى ملفات ثابتة في المستودع،
+# فلا نداء لأي خدمة أثناء المسابقة ولا حاجة لاتصال.
+#
+# المفتاح يبقى سرًّا داخل GitHub ولا يغادره: لا يُطبع ولا يُمرَّر إلا لخطوة التوليد.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: mizan-cue-audio
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      # اسم السرّ قد يكون GEMINI_API_KEY أو MIZAN_GEMINI_API_KEY؛ نقبل الاثنين
+      # حتى لا يفشل التشغيل لاختلاف تسمية.
+      - name: توليد المقاطع
+        env:
+          MIZAN_GEMINI_API_KEY: ${{ secrets.MIZAN_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$MIZAN_GEMINI_API_KEY" ]; then
+            echo "::error::لم يُضبط سرّ المفتاح. أضِف GEMINI_API_KEY أو MIZAN_GEMINI_API_KEY في أسرار المستودع."
+            exit 1
+          fi
+          node scripts/generate-cue-audio.mjs
+
+      - name: فتح طلب دمج بالمقاطع المولَّدة
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(git status --porcelain public/audio/cues)" ]; then
+            echo "لا جديد: المقاطع مطابقة لما في المستودع."
+            exit 0
+          fi
+          BRANCH="chore/cue-audio-$(date +%Y%m%d%H%M%S)"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add public/audio/cues
+          cat > /tmp/cue-commit.txt <<'MSG'
+          توليد مقاطع عبارة إنهاء الموضع
+
+          مقاطع صوتية لعبارات غير قرآنية يقولها المحكم عند نهاية الموضع، مولَّدة مرة
+          واحدة لتُشغَّل ملفات ثابتة بلا نداء لأي خدمة أثناء المسابقة.
+          MSG
+          sed -i 's/^          //' /tmp/cue-commit.txt
+          git commit -F /tmp/cue-commit.txt
+          git push -u origin "$BRANCH"
+          cat > /tmp/cue-body.txt <<'MSG'
+          مقاطع صوتية مولَّدة لعبارات إنهاء الموضع (غير قرآنية).
+
+          تُشغَّل ملفات ثابتة من public/audio/cues، فلا نداء لأي خدمة أثناء المسابقة
+          ولا حاجة لاتصال. ترتيب المقاطع يطابق ترتيب العبارات في
+          TRANSITION_PHRASES_AR، فيوافق الصوتُ النصَّ المعروض.
+
+          القرآن لا يُولَّد صوتيًا بحال؛ تلاوته من المصدر المعتمد وحده.
+          MSG
+          sed -i 's/^          //' /tmp/cue-body.txt
+          gh pr create --base main --head "$BRANCH" \
+            --title "توليد مقاطع عبارة إنهاء الموضع" \
+            --body-file /tmp/cue-body.txt
