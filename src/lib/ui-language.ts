@@ -150,6 +150,10 @@ const SERVER_ERROR_AR: Record<string, string> = {
   SOURCE_NOT_FOUND: 'المصدر غير موجود.',
   READING_NOT_RESOLVED: 'تعذّر تحديد القراءة.',
   POLICY_HUMAN_APPROVAL_REQUIRED: 'يلزم اعتماد بشري لهذا الإجراء.',
+  RUNTIME_NOT_FOUND: 'لا توجد جلسة سؤال خادمية لهذا المتسابق (غير متاحة في وضع العرض).',
+  AUTHORIZATION_FAILED: 'تعذّر منح الإذن.',
+  REVOKE_FAILED: 'تعذّر سحب الإذن.',
+  SECURE_RUNTIME_UNAVAILABLE: 'تعذّر الوصول إلى خادم الأسئلة الآمن (غير متاح في وضع العرض).',
 };
 const SERVER_ERROR_EN: Record<string, string> = {
   IDENTITY_REQUIRED: 'This service requires sign-in and the live server (unavailable in demo).',
@@ -159,6 +163,10 @@ const SERVER_ERROR_EN: Record<string, string> = {
   SOURCE_NOT_FOUND: 'Source not found.',
   READING_NOT_RESOLVED: 'The reading could not be resolved.',
   POLICY_HUMAN_APPROVAL_REQUIRED: 'This action requires human approval.',
+  RUNTIME_NOT_FOUND: 'No server-held question session for this participant (unavailable in demo).',
+  AUTHORIZATION_FAILED: 'Authorization failed.',
+  REVOKE_FAILED: 'Could not revoke authorization.',
+  SECURE_RUNTIME_UNAVAILABLE: 'The secure question server is unavailable (unavailable in demo).',
 };
 export function serverErrorLabel(code: string, ar: boolean): string {
   const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;
