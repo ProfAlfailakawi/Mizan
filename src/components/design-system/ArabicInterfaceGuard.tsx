@@ -57,7 +57,17 @@ const PHRASES:[RegExp,string][]=[
 ];
 
 const LOOKUP:Record<string,string>={...COUNTRY_EXACT,...ROLE_EXACT,...OPS_EXACT,...EXACT};
-function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=raw;for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
+
+/*
+ * كثير من هذه المصطلحات لا تصل نصًا مستقلًا بل داخل جملة ("الأردن · Jordan"، "محكم · org_admin").
+ * المطابقة على النص كاملًا تُخطئها، فنستبدل الكلمة داخل الجملة بحدود كلمات — الأطولُ أولًا حتى
+ * لا يبتلع مفتاحٌ قصير مفتاحًا أطول يحتويه.
+ */
+const escapeRe=(v:string)=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const TOKEN_KEYS=Object.keys(LOOKUP).filter(k=>/[A-Za-z]/.test(k)).sort((a,b)=>b.length-a.length);
+const TOKEN_RE=TOKEN_KEYS.length?new RegExp(`(?<![A-Za-z0-9_])(${TOKEN_KEYS.map(escapeRe).join('|')})(?![A-Za-z0-9_])`,'g'):null;
+const localizeTokens=(value:string)=>TOKEN_RE?value.replace(TOKEN_RE,m=>LOOKUP[m]??m):value;
+function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=localizeTokens(raw);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
 function ignored(el:Element|null){if(!el)return true;return !!el.closest('code,pre,kbd,samp,script,style,textarea,input,[data-no-localize="true"],.font-mono,.mizan-proof-code')}
 function translateNode(node:Node){if(node.nodeType===Node.TEXT_NODE){const parent=(node.parentElement||null);if(ignored(parent))return;const raw=node.nodeValue||'';const next=localizeText(raw);if(next!==raw)node.nodeValue=next;return}if(!(node instanceof Element)||ignored(node))return;for(const attr of ['aria-label','title','placeholder']){const raw=node.getAttribute(attr);if(!raw)continue;const next=localizeText(raw);if(next!==raw)node.setAttribute(attr,next)}for(const child of Array.from(node.childNodes))translateNode(child)}
 
