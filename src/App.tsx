@@ -13,6 +13,7 @@ import { OnboardingExperience, onboardingWasSeen } from './components/public/Onb
 import { fetchTenant } from './lib/tenant';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
+import { hostSurface } from './lib/host-surface';
 
 /*
  * Route-level code splitting.
@@ -45,6 +46,7 @@ const VIEWS = {
   registrationFlow: () => import('./components/public/RegistrationFlow'),
   competitionLanding: () => import('./components/public/CompetitionLanding'),
   trustVerification: () => import('./components/public/TrustVerification'),
+  marketingSite: () => import('./components/marketing/MarketingSite'),
 };
 
 const pick = (loader: () => Promise<any>, name: string) =>
@@ -66,6 +68,7 @@ const CertificateVerification = pick(VIEWS.certificateVerification, 'Certificate
 const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
 const CompetitionLanding = pick(VIEWS.competitionLanding, 'CompetitionLanding');
 const TrustVerification = pick(VIEWS.trustVerification, 'TrustVerification');
+const MarketingSite = pick(VIEWS.marketingSite, 'MarketingSite');
 const SuperAdminConsole = pick(VIEWS.rolePortals, 'SuperAdminConsole');
 const OrganizationHome = pick(VIEWS.rolePortals, 'OrganizationHome');
 const ScientificStudio = pick(VIEWS.rolePortals, 'ScientificStudio');
@@ -184,6 +187,9 @@ export default function App() {
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
  useEffect(()=>{warmViews()},[]);
  const requireAuth=import.meta.env.VITE_REQUIRE_AUTH==='true';
+ /* mizan.<domain> وجهٌ تسويقي عام: لا يمرّ ببداية العرض ولا ببوابة الدخول ولا بهوية جهة.
+    وفي وضع العرض (بلا مصادقة) يبقى التطبيق كما هو حتى لا ينقلب العرض المحلي صفحةَ بيع. */
+ const marketing=requireAuth&&hostSurface()==='marketing';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationMessage,activateAccount,takeoverSession}=useMizanAuth(requireAuth);
  const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
  const demoMode=!requireAuth;
@@ -203,6 +209,7 @@ export default function App() {
  const requestedComp=compParam(hash);
  const [compMissing,setCompMissing]=useState(false);
  useEffect(()=>{if(!requestedComp){setCompMissing(false);return;}setCompMissing(!selectCompetition(requestedComp));},[requestedComp]);
+ if(marketing) return <Suspense fallback={<ViewFallback/>}><MarketingSite/></Suspense>;
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md text-center"><div className="flex justify-center mb-4"><MizanLogo language={currentUser?.id? 'ar':'ar'} compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق بخطوتين لهذا الدور':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#636864] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'لأن هذا الحساب يستطيع التأثير في مسابقة عالية الحساسية، لا يسمح ميزان بالدخول الأحادي. فعّل المصادقة متعددة العوامل لدى موفر الهوية ثم أعد تسجيل الدخول.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. اطلب من مدير المسابقة إغلاق الجلسة القديمة إذا كان الجهاز السابق مفقودًا أو متعطلًا.':'الهوية صحيحة، لكن الحساب يحتاج دعوة وصلاحية محددة داخل المؤسسة قبل الدخول.'}</p>{accessError==='ACCOUNT_NOT_PROVISIONED'&&<div className="mt-5 text-start"><label className="text-[10px] font-black text-[#616763]">رمز التفعيل لمرة واحدة</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="رمز التفعيل"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">ربط هذا الحساب بالدعوة</button>{activationMessage&&<div className="mt-2 text-[10px] text-center text-[#656b66]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':'تعذر إكمال التفعيل'}</div>}</div>}<div className="text-[10px] text-[#696f6b] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div>{accessError==='PRIVILEGED_SESSION_CONFLICT'&&<button onClick={()=>{void takeoverSession()}} className="mt-6 w-full rounded-2xl bg-[#214C40] text-white text-sm font-black py-3">متابعة هنا وإغلاق الجلسة الأخرى</button>}<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button></div></div>;
