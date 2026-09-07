@@ -34,6 +34,10 @@ export interface User {
 export interface OrganizationBrand {
   name: string;
   nameArabic: string;
+  /** Short wordmark name shown in the header/splash lockup; falls back to MIZAN/ميزان.
+      This is the white-label switch: set it and the buyer's name replaces "ميزان". */
+  displayName?: string;
+  displayNameArabic?: string;
   logoUrl?: string;
   primaryColor: string;
   accentColor: string;
