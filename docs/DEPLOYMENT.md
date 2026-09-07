@@ -62,12 +62,32 @@ MIZAN_TENANTS=[{"orgId":"org-a","subdomain":"jamiat-a","displayNameArabic":"جه
                 "customDomains":["quran.jamiat-a.org"]}]
 ```
 
-- **نطاق فرعي:** `jamiat-a.<MIZAN_BASE_DOMAIN>` — يكفي سجل DNS واحد بنمط `*`.
+- **نطاق فرعي:** `jamiat-a.<MIZAN_BASE_DOMAIN>` — يكفي سجل DNS واحد بنمط `*`
+  **مرة واحدة**، ثم لا تحتاج أي عمل لدى مزوّد النطاق مهما أضفت من جهات.
 - **نطاق خاص:** توجّهه الجهة إلينا بسجل `CNAME`، ويلزمه شهادة TLS لكل نطاق
   (تُدار تلقائيًا لدى مزوّدات مثل Cloudflare أو Vercel).
 
 مضيف غير مسجَّل أو جهة موقوفة ⇒ **لا تُحلّ جهة**، وتبقى الهوية الافتراضية. ولا تُحلّ
 جهة من نطاق جهة أخرى.
+
+### إضافة جهة من لوحة التحكم
+
+اضبط `MIZAN_TENANTS_FILE` (ولا تضبط `MIZAN_TENANTS`) ليصير السجل قابلًا للتحرير
+أثناء التشغيل، فتُضاف الجهة بطلب واحد وتعمل **فورًا بلا إعادة نشر**:
+
+```bash
+curl -X POST https://<host>/api/enterprise/tenants \
+  -H "x-mizan-api-key: $MIZAN_ENTERPRISE_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"orgId":"jamiat-a","subdomain":"a","displayNameArabic":"جهة أ"}'
+```
+
+`PATCH /api/enterprise/tenants/<orgId>` للتعديل، و`…/suspend` و`…/activate` للإيقاف
+والتفعيل. الجهة **تُوقَف ولا تُحذف**: حذفها يفتح نطاقها لجهة أخرى فترث بيانات لا تخصّها.
+
+نطاق فرعي محجوز أو مأخوذ لجهة أخرى **يُرفض** — مضيف واحد يحلّ إلى جهتين يعني
+تسرّب بيانات بينهما. وضبط `MIZAN_TENANTS` في البيئة يجمّد السجل عمدًا، فلا تُكتب
+تعديلات تضيع صامتةً عند إعادة النشر.
 
 ## ٦) قبل أول مسابقة حقيقية
 
