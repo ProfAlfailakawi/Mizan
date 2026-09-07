@@ -195,8 +195,8 @@ export function buildParticipantFairnessEvidence(input:{
 
 /* عبارات إنهاء الموضع — تشكيلة مؤدبة بنفس المستوى حتى لا تتكرر عبارة واحدة طوال الجلسة.
    الفهرس 0 يبقى العبارة الافتراضية المعتمدة. المنظّم قد يضبط عبارته الخاصة فتُقدَّم عليها. */
-export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا'];
-export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.'];
+export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا','أحسنت، بارك الله فيك','كفى، وفقك الله','شكرًا لك، نتوقف هنا','أحسنت القراءة، جزاك الله خيرًا'];
+export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.','Well done, may God bless you.','That is enough. Thank you.','Thank you, we stop here.','Well recited. Thank you.'];
 export function passageTransitionPlan(input:{
   isLastQuestion:boolean;
   ar:boolean;

@@ -1,5 +1,6 @@
 import {useEffect} from 'react';
 import {useAppStore} from '../../lib/store';
+import {COUNTRIES} from '../../lib/countries';
 
 /*
  * Last-resort Arabic surface guard.
@@ -27,12 +28,36 @@ const EXACT:Record<string,string>={
   'Qiraat':'القراءات','Questions':'الأسئلة','Evidence':'الأدلة','Scientific Governance':'الحوكمة العلمية',
 };
 
+
+/* أسماء الدول تُشتق من مصدر واحد (قائمة الدول) فلا تتفرّع ترجمتان لبلد واحد. */
+const COUNTRY_EXACT:Record<string,string>=Object.fromEntries(COUNTRIES.map(c=>[c.en,c.ar]));
+
+/* الأدوار ومصطلحات تشغيلية كانت تصل خامًا من بيانات محفوظة أو رؤوس أقسام. */
+const ROLE_EXACT:Record<string,string>={
+  super_admin:'إدارة المنصة', org_admin:'مدير الجهة', comp_admin:'مدير المسابقة', scientific_admin:'الإدارة العلمية',
+  head_judge:'رئيس التحكيم', judge:'المحكم', ops_manager:'غرفة العمليات', exception_host:'مكتب الاستثناءات',
+  delegation_manager:'إدارة الوفد', participant:'المتسابق', broadcast_operator:'البث والحفل', auditor:'المدقق',
+  guardian:'ولي الأمر', support_agent:'الدعم',
+};
+
+const OPS_EXACT:Record<string,string>={
+  'MIZAN PLATFORM':'منصة ميزان','MIZAN EXCEPTION DESK':'مكتب الاستثناءات','MIZAN SUPPORT':'دعم ميزان',
+  'EXCEPTION DESK':'مكتب الاستثناءات','PLATFORM':'المنصة','SUPPORT':'الدعم',
+  'COMPETITION DNA':'هوية المسابقة','DNA':'هوية المسابقة',
+  'Smart Queue Engine':'محرك الطابور الذكي','Cryptographic':'تشفيري','canonical':'قياسي','fallback':'بديل',
+  'client_hash_chain':'سلسلة تجزئة موقّعة','WORM':'سجل لا يقبل التعديل','quiet_authority':'الطابع الرصين',
+  'requested':'مطلوبة','active':'نشطة','Main Hall':'القاعة الرئيسية',
+  'Grand Conference Recitation Auditorium':'قاعة التلاوة الكبرى',
+  'International Quran Competition':'المسابقة الدولية للقرآن الكريم',
+};
+
 const PHRASES:[RegExp,string][]=[
   [/\bMIZAN\b/g,'ميزان'],[/\bFairDraw\b/g,'السحب العادل'],[/\bAI\b/g,'الذكاء الاصطناعي'],
   [/\bQR\b/g,'رمز الاستجابة السريعة'],[/\bKiosk\b/gi,'بوابة الخدمة الذاتية'],[/\bCeremony\b/gi,'الحفل'],
 ];
 
-function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=EXACT[trimmed];if(exact)return raw.replace(trimmed,exact);let next=raw;for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
+const LOOKUP:Record<string,string>={...COUNTRY_EXACT,...ROLE_EXACT,...OPS_EXACT,...EXACT};
+function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=raw;for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
 function ignored(el:Element|null){if(!el)return true;return !!el.closest('code,pre,kbd,samp,script,style,textarea,input,[data-no-localize="true"],.font-mono,.mizan-proof-code')}
 function translateNode(node:Node){if(node.nodeType===Node.TEXT_NODE){const parent=(node.parentElement||null);if(ignored(parent))return;const raw=node.nodeValue||'';const next=localizeText(raw);if(next!==raw)node.nodeValue=next;return}if(!(node instanceof Element)||ignored(node))return;for(const attr of ['aria-label','title','placeholder']){const raw=node.getAttribute(attr);if(!raw)continue;const next=localizeText(raw);if(next!==raw)node.setAttribute(attr,next)}for(const child of Array.from(node.childNodes))translateNode(child)}
 

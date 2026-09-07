@@ -36,6 +36,7 @@ import { ReferenceTemplateBackend } from './server/alignment/acoustic/reference-
 import { synthReference } from './server/alignment/benchmark/synth';
 import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
+import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -186,6 +187,19 @@ async function startServer() {
   app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
   /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
      فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */
+  /* صوت «عبارة إنهاء الموضع» — عبارة غير قرآنية يقولها المحكم. تُولَّد عبر Gemini TTS وتُخزَّن.
+     القرآن لا يمر من هنا إطلاقًا؛ تلاوته من المصدر المعتمد وحده. 503 عند غياب المفتاح فيتراجع
+     العميل إلى تسجيل بشري إن وُجد، وإلا إلى صوت الجهاز. */
+  app.get('/api/public/cue-audio',async(req,res)=>{
+    const text=String(req.query.text||'');
+    if(!cueTextAllowed(text))return res.status(400).json({code:'CUE_TEXT_REJECTED'});
+    if(!cueTtsConfigured())return res.status(503).json({code:'CUE_TTS_NOT_CONFIGURED'});
+    const wav=await synthesizeCue(text);
+    if(!wav)return res.status(502).json({code:'CUE_TTS_FAILED'});
+    res.setHeader('content-type','audio/wav');
+    res.setHeader('cache-control','public, max-age=86400, immutable');
+    return res.end(wav);
+  });
   app.get('/api/public/kfgqpc/mushaf-layout/:page',async(req,res)=>{const page=Number(req.params.page);
     if(!Number.isInteger(page)||page<1||page>604)return res.status(400).json({code:'MUSHAF_PAGE_INVALID'});
     try{const layout=await kfgqpcDelivery.mushafLayout(page);
