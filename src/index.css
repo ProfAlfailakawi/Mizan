@@ -209,6 +209,12 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 .mizan-brand-halo{background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.98),rgba(244,240,230,.78) 55%,rgba(239,234,220,.76));}
 html[lang="ar"] .font-sans-en{font-family:var(--font-arabic)!important}
 html[lang="ar"] .mizan-kicker{letter-spacing:.02em;text-transform:none}
+/* الحروف العربية المقطّعة: خط العناوين Alexandria لاتيني الأساس ويُظهر العربية متقطّعة.
+   في الوضع العربي نُحوّل خط العناوين والشعار إلى خط عربي سليم (IBM Plex Sans Arabic)،
+   ونلغي مجموعة الميزات اللاتينية (ss01) التي لا تخدم العربية. الإنجليزية تبقى Alexandria. */
+html[lang="ar"]{ --font-display:"IBM Plex Sans Arabic","Noto Sans Arabic",system-ui,sans-serif; }
+html[lang="ar"] .font-display{ font-feature-settings:normal; }
+html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
