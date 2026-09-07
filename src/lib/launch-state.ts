@@ -94,6 +94,21 @@ export function toLaunchState(seeded: AppStoreState): AppStoreState {
     roleGrants: [],
     identityInvitations: [],
     authSessions: [],
+    // بيانات عرض إضافية لا يجوز أن تتسرّب إلى نشرٍ حقيقي (تُزرع للعرض فقط).
+    webhooks: [],
+    integrations: [],
+    supportSessions: [],
+    travelRecords: [],
+    federationAttestations: [],
+    participantPassport: [],
+    consents: [],
+    quorumActions: [],
+    featureFlags: [],
+    sessionCheckpoints: [],
+    continuityIncidents: [],
+    sessionRecoveries: [],
+    passReissues: [],
+    auditLedgerSeals: [],
     // لا جلسة تحكيم مزروعة ولا بوابات كشف في نشرٍ حقيقي: وإلا ورث محكمٌ حقيقي جلسة العرض
     // (متسابق ولجنة مخترعان) فتعطّلت موافقته على الكشف لعدم تطابق هويته مع محكمي تلك اللجنة.
     questionRevealGates: [],
