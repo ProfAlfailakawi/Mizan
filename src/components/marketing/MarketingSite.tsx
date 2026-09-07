@@ -198,7 +198,7 @@ export const MarketingSite: React.FC = () => {
       <Section>
         <div className="mizan-hero grid grid-cols-2 md:grid-cols-4 gap-y-8 py-8">
           <Stat value="١٤" label="دورًا بصلاحياتٍ مفصولة" />
-          <Stat value="٦" label="شاشات قاعة جاهزة" />
+          <Stat value="٨" label="قدرات ذكاءٍ محكومة" />
           <Stat value="٪١٠٠" label="قرارٍ مختوم في سجلٍّ متسلسل" />
           <Stat value="صفر" label="أوامر تكتبها لإطلاق جهة" />
         </div>
@@ -258,6 +258,64 @@ export const MarketingSite: React.FC = () => {
       </Section>
 
       <Moments/>
+
+      {/* ══ ٤٫٧) الذكاء الاصطناعي: قدراتٌ محكومة، لا وعودٌ عامة ══ */}
+      <section className="mt-4" style={{ background: 'var(--venue-2)', color: 'var(--venue-ink)' }}>
+        <Section className="!py-16">
+          <div className="max-w-[62ch]">
+            <Kicker tone="dark">الذكاء الاصطناعي</Kicker>
+            <h2 className="font-display text-[clamp(24px,3.8vw,40px)] font-black mt-3 leading-[1.22]">
+              ذكاءٌ يُشير،
+              <br />ولا يحكم.
+            </h2>
+            <p className="mt-5 text-[14px] leading-8" style={{ color: 'var(--venue-muted)' }}>
+              الدرجة بيد المحكّم وحده. والقدرة لا يُسمع لها قولٌ أصلًا قبل أن تُعتمد لتلك الرواية بعينها —
+              فلا اعتماد شامل، ولا حدّ قبولٍ يُخترع في الشيفرة.
+            </p>
+          </div>
+
+          {/* لقطاتٌ حقيقية من مختبر ذكاء التحكيم */}
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {[
+              { src: '/marketing/ai-radar.png', t: 'رادار المتشابهات', s: 'عند التردّد، يُظهر المواضع التي تجذب الذاكرة — من خريطةٍ معتمدةٍ سلفًا، لرئيس التحكيم وحده.' },
+              { src: '/marketing/ai-parity.png', t: 'تكافؤ القرعة', s: 'هل حمل المتسابقان العبء نفسه؟ يقيس مجموع الصعوبة والمتشابهات والتجويد، ويُنبّه عند الفارق.' },
+              { src: '/marketing/ai-mudood.png', t: 'محرك المدود', s: 'المدّ يُقاس بالحركات لا بالثواني: يقيسه بنبض القارئ نفسه، لا بساعةٍ مطلقة.' },
+            ].map(c => (
+              <figure key={c.src} className="rounded-[20px] overflow-hidden" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--venue-line)' }}>
+                <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="w-full block" />
+                <figcaption className="p-5" style={{ borderTop: '1px solid var(--venue-line)' }}>
+                  <div className="text-[14px] font-black">{c.t}</div>
+                  <div className="text-[12.5px] leading-6 mt-1.5" style={{ color: 'var(--venue-muted)' }}>{c.s}</div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+
+          {/* القدرات، كلٌّ تُعتمد وحدها */}
+          <div className="mt-10 flex flex-wrap gap-2.5">
+            {['محاذاة النص بالصوت', 'جودة الصوت', 'مراقبة الحفظ', 'تجويدٌ صوتي', 'نزاهة اللجنة', 'صعوبة الأسئلة', 'تنوّع بنك الأسئلة', 'صوت الانتقال'].map(c => (
+              <span key={c} className="rounded-full px-4 py-2 text-[12px] font-black" style={{ background: 'rgba(255,255,255,.05)', border: '1px solid var(--venue-line)', color: 'var(--venue-ink)' }}>{c}</span>
+            ))}
+          </div>
+
+          {/* الحارس: ما لا يفعله ميزان — وهو ما يبيعه */}
+          <div className="mt-10 grid gap-3 sm:grid-cols-3">
+            {[
+              { icon: ShieldCheck, t: 'لا يمسّ درجة', s: 'كل إشارةٍ استشارية. القرار للإنسان.' },
+              { icon: BadgeCheck, t: 'اعتمادٌ لكل رواية', s: 'قدرةٌ معتمدة في روايةٍ لا تنطق في غيرها.' },
+              { icon: Mic, t: 'لا تلاوة مصطنعة', s: 'ميزان لا يُولّد صوت القرآن — أبدًا.' },
+            ].map(g => (
+              <div key={g.t} className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--venue-line)' }}>
+                <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'rgba(185,139,78,.16)', color: 'var(--gold-light)' }}>
+                  <g.icon size={18} strokeWidth={2.1} />
+                </div>
+                <div className="mt-3.5 text-[14px] font-black">{g.t}</div>
+                <div className="text-[12.5px] leading-6 mt-1" style={{ color: 'var(--venue-muted)' }}>{g.s}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </section>
 
       {/* ══ ٥) النزاهة: القسم الداكن — قلب البيع ══ */}
       <section className="mt-4" style={{ background: 'var(--venue)', color: 'var(--venue-ink)' }}>
