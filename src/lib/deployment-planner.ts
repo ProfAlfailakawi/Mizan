@@ -61,7 +61,6 @@ export interface VenueInventory {
   usbScanners:number;
   edgeMiniPcs:number;
   wifi:boolean;
-  participantByod:boolean;
 }
 
 export interface VenueAssignment {
