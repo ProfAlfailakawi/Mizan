@@ -1248,10 +1248,24 @@ export function useAppStore() {
     void persistScopedDocument('quran_sources',id,globalState.quranSourceManifests[i] as unknown as Record<string,unknown>);
     auditTrustAction('QURAN_SOURCE_REVIEWED','QuranSource',id,'تسجيل مراجعة علمية مستقلة على hash محدد','Recorded independent scientific review against the exact package hash');notify();return {ok:true,packageHash};
   };
+  /* السلطة العلمية للجهة تعلن عدد مراجعيها. القرار مسجَّل، ولا يغيّر شيئًا في المصادر المعتمدة سلفًا. */
+  const setScientificReviewersRequired=(count:1|2)=>{
+    if(globalState.currentUser.role!=='scientific_admin')return false;
+    globalState.organization={...globalState.organization,scientificReviewersRequired:count};
+    auditTrustAction('SCIENTIFIC_REVIEWERS_POLICY_SET','Organization',globalState.organization.id,
+      count===1?'إعلان أن مراجعًا علميًا واحدًا هو السلطة العلمية المطلوبة للاعتماد':'إعلان اشتراط مراجعَين علميَّين مستقلَّين للاعتماد',
+      count===1?'Declared a single scientific reviewer as the required certifying authority':'Declared two independent scientific reviewers as required');
+    notify();return true;
+  };
   const certifyQuranSource=async(id:string)=>{
     if(globalState.currentUser.role!=='scientific_admin')return false;const i=globalState.quranSourceManifests.findIndex(x=>x.id===id);if(i<0)return false;const x=globalState.quranSourceManifests[i];
     const computed=await computeQuranPackageHash(x);if(!x.packageHash||computed!==x.packageHash)return false;
-    const gate=canPromoteQuranSource(x,true);if(!gate.allowed)return false;
+    /* عدد المراجعين المطلوب سياسةٌ معلنة للجهة (الافتراضي اثنان). واحدٌ يعني أن مراجعًا واحدًا
+       هو السلطة العلمية كاملةً — وهو خيار مسجَّل في الأثر، لا تجاوز صامت. */
+    const requireTwo=(globalState.organization.scientificReviewersRequired??2)!==1;
+    const gate=canPromoteQuranSource(x,requireTwo);
+    if(!gate.allowed){globalState.lastScientificCertificationError={sourceId:id,reviewers:gate.reviewers,required:requireTwo?2:1,errors:gate.errors};notify();return false;}
+    globalState.lastScientificCertificationError=undefined;
     globalState.quranSourceManifests[i]={...x,status:'approved',certificationState:'CERTIFIED',revocationState:'ACTIVE',immutable:true,approvedAt:new Date().toISOString(),approvedBy:[...new Set((x.scientificReviews||[]).filter(r=>r.decision==='approve').map(r=>r.reviewerId))],approvalVersion:x.approvalVersion||`SG-${new Date().getFullYear()}-${id.slice(-6)}`};globalState.quranSourceContents=globalState.quranSourceContents.map(c=>c.sourceManifestId===id?{...c,immutable:true}:c);
     void persistScopedDocument('quran_sources',id,globalState.quranSourceManifests[i] as unknown as Record<string,unknown>);
     auditTrustAction('QURAN_SOURCE_CERTIFIED','QuranSource',id,'اعتماد مصدر قرآني immutable بمراجعتين مستقلتين','Certified immutable Quran source after independent scientific approvals');notify();return true;
@@ -1463,7 +1477,15 @@ export function useAppStore() {
          placeholder sentence, generate the pool from the delivery Mushaf for this exact narration:
          real passages, each starting on a real ayah boundary and carrying a difficulty measured
          from the text. The fixture bank remains only for when delivery is unreachable too. */
-      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount});
+      /* مقدار الموضع من الوجه ⇒ مدى تقريبي لعدد الآيات. الوجه يظهر كاملًا على سطح المصحف،
+         والتظليل يقع على هذا المقدار وحده. تقريبي لأن أطوال الآيات تتفاوت بين السور. */
+      const portion=category?.pagePortion;
+      const portionSpan=portion==='quarter'?{minAyahCount:1,maxAyahCount:3}
+        :portion==='third'?{minAyahCount:2,maxAyahCount:4}
+        :portion==='half'?{minAyahCount:3,maxAyahCount:5}
+        :portion==='full'?{minAyahCount:6,maxAyahCount:9}
+        :{};
+      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount,...portionSpan});
       pool=generated.length?generated:DEVELOPMENT_QUESTION_BANK;
     }
     // إعدادات الفئة: طول المقطع (عدد الآيات) وعدد الأسئلة. تُطبَّق على المجمع قبل السحب فتبقى
@@ -2116,6 +2138,7 @@ export function useAppStore() {
     addCommittee,
     updateCommittee,
     publishCompetition,
+    setScientificReviewersRequired,
     startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
     queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, scheduleRetention, requestSupportSession, approveSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,

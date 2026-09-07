@@ -228,7 +228,7 @@ export const SEED_COMPETITION: Competition = {
   registrationEndDate: '2027-01-15',
   categories: SEED_CATEGORIES,
   ruleSet: SEED_RULESET,
-  venueName: 'Grand Conference & Recitation Auditorium (Main Hall)',
+  venueName: 'قاعة المؤتمرات والتلاوة الكبرى (القاعة الرئيسية)',
   venuesCount: 3,
   totalRegistered: 184,
   totalApproved: 142,
@@ -1145,8 +1145,8 @@ export const SEED_SUPPORT_SESSIONS: SupportSession[] = [
 
 // دعوات هوية بانتظار الاعتماد — تُظهر لوحة "الموافقات المعلّقة".
 export const SEED_IDENTITY_INVITATIONS: IdentityInvitationRecord[] = [
-  { id: 'inv-1', email: 'new.judge@awqaf.example', displayName: 'Sheikh Adnan Al-Rashidi', organizationId: 'org-gqa-global', requestedRole: 'judge', competitionId: 'comp-dubai-2027', committeeId: 'comm-2', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T10:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T10:00:00Z' },
-  { id: 'inv-2', email: 'panel.auditor@awqaf.example', displayName: 'Ms. Huda Al-Sabah', organizationId: 'org-gqa-global', requestedRole: 'auditor', competitionId: 'comp-dubai-2027', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T11:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T11:00:00Z' },
+  { id: 'inv-1', email: 'new.judge@awqaf.example', displayName: 'الشيخ عدنان الرشيدي', organizationId: 'org-gqa-global', requestedRole: 'judge', competitionId: 'comp-dubai-2027', committeeId: 'comm-2', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T10:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T10:00:00Z' },
+  { id: 'inv-2', email: 'panel.auditor@awqaf.example', displayName: 'الأستاذة هدى الصباح', organizationId: 'org-gqa-global', requestedRole: 'auditor', competitionId: 'comp-dubai-2027', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T11:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T11:00:00Z' },
 ];
 
 // سجلات سفر الوفود — تُظهر قائمة بوابة الوفود ومؤشّر الوصول.

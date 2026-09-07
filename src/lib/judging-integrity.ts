@@ -195,8 +195,8 @@ export function buildParticipantFairnessEvidence(input:{
 
 /* عبارات إنهاء الموضع — تشكيلة مؤدبة بنفس المستوى حتى لا تتكرر عبارة واحدة طوال الجلسة.
    الفهرس 0 يبقى العبارة الافتراضية المعتمدة. المنظّم قد يضبط عبارته الخاصة فتُقدَّم عليها. */
-export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا'];
-export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.'];
+export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا','أحسنت، بارك الله فيك','كفى، وفقك الله','شكرًا لك، نتوقف هنا','أحسنت القراءة، جزاك الله خيرًا'];
+export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.','Well done, may God bless you.','That is enough. Thank you.','Thank you, we stop here.','Well recited. Thank you.'];
 export function passageTransitionPlan(input:{
   isLastQuestion:boolean;
   ar:boolean;
@@ -206,8 +206,12 @@ export function passageTransitionPlan(input:{
   const cue=input.cue;
   const arr=input.ar?TRANSITION_PHRASES_AR:TRANSITION_PHRASES_EN;
   const idx=((input.variantSeed??0)%arr.length+arr.length)%arr.length;
+  // العبارة المستعملة ورقمها: الرقم يختار المقطع الصوتي المسجّل مسبقًا لنفس العبارة،
+  // فلا يُسمع صوتٌ يخالف النص المكتوب. العبارة المخصّصة من المنظّم لا مقطع لها.
+  const custom=input.ar?!!cue?.phraseArabic:!!cue?.phraseEnglish;
   return {
     enabled:cue?.enabled!==false,
+    variantIndex:custom?-1:idx,
     phrase:input.ar?(cue?.phraseArabic||arr[idx]):(cue?.phraseEnglish||arr[idx]),
     delayMs:Math.max(0,Math.min(10_000,cue?.autoAdvanceDelayMs??700)),
     audioUrl:cue?.audioUrl&&/^https:\/\//i.test(cue.audioUrl)?cue.audioUrl:'',
