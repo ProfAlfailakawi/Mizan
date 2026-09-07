@@ -38,6 +38,7 @@ import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
 import { publicTenant, resolveTenant } from './server/tenant-registry';
+import { decodePemFromEnv } from './server/pem';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -46,7 +47,10 @@ const signToken=(payload:Record<string,unknown>,secret:string)=>{const body=b64(
 const verifyToken=(token:string,secret:string)=>{const [body,sig]=token.split('.');if(!body||!sig)return null;const expected=crypto.createHmac('sha256',secret).update(body).digest('base64url');if(!safeEqual(sig,expected))return null;try{return JSON.parse(fromB64(body)) as Record<string,unknown>}catch{return null}};
 
 const canonicalStringify=(value:unknown):string=>{if(value===null||typeof value!=='object')return JSON.stringify(value);if(Array.isArray(value))return `[${value.map(canonicalStringify).join(',')}]`;const obj=value as Record<string,unknown>;return `{${Object.keys(obj).sort().map(k=>`${JSON.stringify(k)}:${canonicalStringify(obj[k])}`).join(',')}}`;};
-const trustSigner=()=>{const pem=process.env.MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM?.replace(/\n/g,'\n');if(!pem)return null;try{const privateKey=crypto.createPrivateKey(pem);const publicKey=crypto.createPublicKey(privateKey);const spki=publicKey.export({format:'der',type:'spki'}).toString('base64url');const keyId=process.env.MIZAN_TRUST_KEY_ID||`ed25519:${crypto.createHash('sha256').update(spki).digest('hex').slice(0,16)}`;return {privateKey,publicKey,spki,keyId}}catch{return null}};
+/* مفتاح PEM يصل من متغيّر بيئة: إمّا بأسطر حقيقية، أو — وهو الشائع في مديري الأسرار —
+   سطرًا واحدًا فيه \\n حرفية. كان الاستبدال يحوّل سطرًا جديدًا إلى سطر جديد (لا شيء)، فيفشل
+   بناء المفتاح في الحالة الثانية ويبقى توقيع الثقة معطّلًا بصمت. */
+const trustSigner=()=>{const pem=decodePemFromEnv(process.env.MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM);if(!pem)return null;try{const privateKey=crypto.createPrivateKey(pem);const publicKey=crypto.createPublicKey(privateKey);const spki=publicKey.export({format:'der',type:'spki'}).toString('base64url');const keyId=process.env.MIZAN_TRUST_KEY_ID||`ed25519:${crypto.createHash('sha256').update(spki).digest('hex').slice(0,16)}`;return {privateKey,publicKey,spki,keyId}}catch{return null}};
 const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
 
 async function startServer() {

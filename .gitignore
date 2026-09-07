@@ -10,3 +10,8 @@ coverage/
 # MIZAN local asset staging (never committed)
 .mizan-ingest/
 .mizan-delivery/
+
+# أسرار نشرٍ حقيقي — تُولَّد محليًا ولا تُرفع
+.env.production
+.mizan-data/
+.mizan-cue-audio/
