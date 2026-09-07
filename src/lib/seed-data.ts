@@ -217,7 +217,7 @@ export const SEED_COMPETITION: Competition = {
   organizationId: 'org-gqa-global',
   name: 'MIZAN Demo International Quran Competition 2027',
   nameArabic: 'مسابقة ميزان القرآنية الدولية التجريبية 2027',
-  edition: '14th International Edition',
+  edition: 'النسخة الدولية الرابعة عشرة',
   country: 'الإمارات العربية المتحدة (United Arab Emirates)',
   timezone: 'Asia/Dubai',
   status: 'live',
