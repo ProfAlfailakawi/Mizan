@@ -59,6 +59,9 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    /* حارس ضد أي تجاوز أفقي على الجوال: لا تنزلق الصفحة يمينًا/يسارًا مهما فاض عنصر داخلي.
+       العناصر العريضة (جداول/رسوم) تُمرَّر داخل حاويتها عبر overflow-x:auto. */
+    overflow-x: hidden;
     font-family: var(--font-arabic);
     color: var(--ink);
     background: var(--canvas);
@@ -733,7 +736,8 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
    plus safe-area padding box the dialog, the head stays pinned, and only the body
    scrolls — so the close button is always reachable. align-items:flex-start keeps a
    tall dialog anchored to the top rather than clipping symmetrically off both edges. */
-.mizan-overlay{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+/* أعلى من أسطح القاعة ملء الشاشة (z-index:120)، وإلا ظهر التنبيه/الحوار خلفها. */
+.mizan-overlay{ position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center;
   padding:1rem; padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));
   overflow-y:auto; }
 @media (max-width:639px){ .mizan-overlay{ align-items:flex-start } }

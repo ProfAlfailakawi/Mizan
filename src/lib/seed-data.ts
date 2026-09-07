@@ -836,7 +836,7 @@ export const SEED_REVIEW_CASES: ReviewCase[] = [
     reason: 'ai_high_confidence_alert',
     severity: 'low',
     timestampSec: 215,
-    details: 'AI Silent Guardian flagged subtle harakah vowel substitution (High Confidence 94%). Requires human review against the institution-approved Quran source before any decision.',
+    details: 'رصد المراقب الصامت استبدالًا دقيقًا في حركة (ثقة عالية ٩٤٪). يتطلب مراجعة بشرية مقابل المصدر القرآني المعتمد قبل أي قرار.',
     status: 'pending'
   }
 ];
