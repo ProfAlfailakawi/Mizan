@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
+import { toWesternDigits } from '../../lib/input-normalize';
 
 /*
  * الواجهة العامة لميزان — mizan.<domain>.
@@ -74,11 +75,11 @@ const CAPABILITIES: Array<{ icon: React.ElementType; title: string; line: string
 
 /* ── الرحلة: إنفوجرافيك من خمس محطات ──────────────────────────────── */
 const JOURNEY: Array<{ icon: React.ElementType; step: string; title: string; line: string }> = [
-  { icon: Building2, step: '٠١', title: 'الجهة', line: 'نطاقٌ خاص وهويةٌ خاصة في اليوم نفسه.' },
-  { icon: Users, step: '٠٢', title: 'التسجيل', line: 'رابطٌ واحد يفتح استمارة المسابقة وحدها.' },
-  { icon: BookOpen, step: '٠٣', title: 'الإعداد', line: 'مقررٌ ونصٌّ معتمد وأسئلةٌ موزونة.' },
-  { icon: Scale, step: '٠٤', title: 'التحكيم', line: 'لجانٌ متزامنة ودرجةٌ لحظية مختومة.' },
-  { icon: Trophy, step: '٠٥', title: 'النتائج', line: 'ترتيبٌ وشهاداتٌ وحفلٌ على الشاشة الكبيرة.' },
+  { icon: Building2, step: '01', title: 'الجهة', line: 'نطاقٌ خاص وهويةٌ خاصة في اليوم نفسه.' },
+  { icon: Users, step: '02', title: 'التسجيل', line: 'رابطٌ واحد يفتح استمارة المسابقة وحدها.' },
+  { icon: BookOpen, step: '03', title: 'الإعداد', line: 'مقررٌ ونصٌّ معتمد وأسئلةٌ موزونة.' },
+  { icon: Scale, step: '04', title: 'التحكيم', line: 'لجانٌ متزامنة ودرجةٌ لحظية مختومة.' },
+  { icon: Trophy, step: '05', title: 'النتائج', line: 'ترتيبٌ وشهاداتٌ وحفلٌ على الشاشة الكبيرة.' },
 ];
 
 /* ── طبقات العزل: كل جهة عالمٌ مغلق ───────────────────────────────── */
@@ -167,7 +168,7 @@ const ContactForm: React.FC = () => {
         <input className={field} style={fieldStyle} value={name} onChange={e => setName(e.target.value)} placeholder="اسمك" aria-label="اسمك" />
         <input className={field} style={fieldStyle} value={org} onChange={e => setOrg(e.target.value)} placeholder="اسم الجهة" aria-label="اسم الجهة" />
       </div>
-      <input className={field} style={fieldStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="رقم التواصل — اختياري" aria-label="رقم التواصل" inputMode="tel" />
+      <input className={field} style={fieldStyle} value={phone} onChange={e => setPhone(toWesternDigits(e.target.value))} placeholder="رقم التواصل — اختياري" aria-label="رقم التواصل" inputMode="tel" />
       <textarea className={field} style={{ ...fieldStyle, minHeight: 96, resize: 'vertical' }} value={note} onChange={e => setNote(e.target.value)} placeholder="موعد مسابقتك، أو سؤالك" aria-label="رسالتك" />
       <button onClick={send} disabled={!ready}
         className="mt-1 inline-flex items-center justify-center gap-2.5 rounded-2xl py-4 text-[14px] font-black transition"
@@ -244,10 +245,10 @@ export const MarketingSite: React.FC = () => {
       {/* ══ ٢) الأرقام: البرهان في سطر ══ */}
       <Section>
         <div className="mizan-hero grid grid-cols-2 md:grid-cols-4 gap-y-8 py-8">
-          <Stat value="١٤" label="دورًا بصلاحياتٍ مفصولة" />
-          <Stat value="٨" label="قدرات ذكاءٍ محكومة" />
-          <Stat value="٪١٠٠" label="قرارٍ مختوم في سجلٍّ متسلسل" />
-          <Stat value="صفر" label="أوامر تكتبها لإطلاق جهة" />
+          <Stat value="14" label="دورًا بصلاحياتٍ مفصولة" />
+          <Stat value="8" label="قدرات ذكاءٍ محكومة" />
+          <Stat value="100%" label="قرارٍ مختوم في سجلٍّ متسلسل" />
+          <Stat value="0" label="أوامر تكتبها لإطلاق جهة" />
         </div>
       </Section>
 
@@ -358,9 +359,9 @@ export const MarketingSite: React.FC = () => {
 
         {/* الخلاصة التي يفهمها المشتري: الفريق */}
         <div className="mt-6 rounded-[24px] p-7 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid #cddbd3' }}>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.5)' }}>٢٤</div>
+          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.5)' }}>24</div>
           <div className="text-[13px] font-black mizan-muted">فريق تشغيل اليوم الواحد</div>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--emerald)' }}>٦</div>
+          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--emerald)' }}>6</div>
         </div>
       </Section>
 
