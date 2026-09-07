@@ -11,6 +11,7 @@ import {
   Certificate,
   AuditEvent,
   IncidentRecord,
+  AppealRecord,
   User
 } from '../types';
 
@@ -819,6 +820,47 @@ export const SEED_REVIEW_CASES: ReviewCase[] = [
     timestampSec: 215,
     details: 'AI Silent Guardian flagged subtle harakah vowel substitution (High Confidence 94%). Requires human review against the institution-approved Quran source before any decision.',
     status: 'pending'
+  }
+];
+
+// اعتراضات ديمو: تُغذّي تبويب "الاعتراضات" لدى رئيس التحكيم حتى تظهر الشاشة بمحتوى واقعي في وضع العرض.
+export const SEED_APPEALS: AppealRecord[] = [
+  {
+    id: 'apl-01',
+    competitionId: SEED_COMPETITION.id,
+    participantId: 'part-104',
+    participantCode: 'A-104',
+    categoryName: 'الفرع الأول: حفظ القرآن الكريم كاملاً مع التجويد والقراءات',
+    grounds: 'scoring_miscalculation',
+    reasonText: 'يرى المتسابق أن خصم درجة الحفظ عند الدقيقة 02:22 احتُسب مرتين، ويطلب إعادة احتساب المجموع.',
+    status: 'submitted',
+    createdAt: '2027-02-11T10:05:00Z'
+  },
+  {
+    id: 'apl-02',
+    competitionId: SEED_COMPETITION.id,
+    participantId: 'part-105',
+    participantCode: 'A-105',
+    categoryName: 'الفرع الأول: حفظ القرآن الكريم كاملاً مع التجويد والقراءات',
+    grounds: 'audio_interruption',
+    reasonText: 'انقطع الصوت في القاعة لبضع ثوانٍ أثناء التلاوة، ويطلب المتسابق إعادة تقييم المقطع المتأثر.',
+    status: 'under_review',
+    createdAt: '2027-02-11T10:40:00Z'
+  },
+  {
+    id: 'apl-03',
+    competitionId: SEED_COMPETITION.id,
+    participantId: 'part-102',
+    participantCode: 'A-102',
+    categoryName: 'الفرع الثاني: حفظ عشرين جزءاً متتالية',
+    grounds: 'question_scope_dispute',
+    reasonText: 'يرى المتسابق أن السؤال خرج عن النطاق المقرر للفئة، ويطلب مراجعة أهلية السؤال.',
+    status: 'accepted',
+    resolutionNotes: 'بعد مراجعة نطاق الفئة تبيّن خروج السؤال عن الحدود المقررة، فأُعيد احتساب الدرجة.',
+    resolvedBy: 'رئيس لجنة التحكيم',
+    resolvedAt: '2027-02-11T11:15:00Z',
+    scoreAdjustmentDelta: 0.5,
+    createdAt: '2027-02-11T09:30:00Z'
   }
 ];
 

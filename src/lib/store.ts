@@ -40,7 +40,8 @@ import {
   SEED_RESULTS,
   SEED_CERTIFICATE,
   SEED_AUDIT_LOGS,
-  SEED_INCIDENTS
+  SEED_INCIDENTS,
+  SEED_APPEALS
 } from './seed-data';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
@@ -109,7 +110,7 @@ function seededInitialState(): AppStoreState {
     certificates: [SEED_CERTIFICATE],
     auditLogs: SEED_AUDIT_LOGS,
     incidents: SEED_INCIDENTS,
-    appeals: [],
+    appeals: SEED_APPEALS,
     isOffline: false,
     emergencyFrozen: false,
     sealApprovals: [],
