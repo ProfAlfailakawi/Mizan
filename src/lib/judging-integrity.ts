@@ -206,8 +206,12 @@ export function passageTransitionPlan(input:{
   const cue=input.cue;
   const arr=input.ar?TRANSITION_PHRASES_AR:TRANSITION_PHRASES_EN;
   const idx=((input.variantSeed??0)%arr.length+arr.length)%arr.length;
+  // العبارة المستعملة ورقمها: الرقم يختار المقطع الصوتي المسجّل مسبقًا لنفس العبارة،
+  // فلا يُسمع صوتٌ يخالف النص المكتوب. العبارة المخصّصة من المنظّم لا مقطع لها.
+  const custom=input.ar?!!cue?.phraseArabic:!!cue?.phraseEnglish;
   return {
     enabled:cue?.enabled!==false,
+    variantIndex:custom?-1:idx,
     phrase:input.ar?(cue?.phraseArabic||arr[idx]):(cue?.phraseEnglish||arr[idx]),
     delayMs:Math.max(0,Math.min(10_000,cue?.autoAdvanceDelayMs??700)),
     audioUrl:cue?.audioUrl&&/^https:\/\//i.test(cue.audioUrl)?cue.audioUrl:'',

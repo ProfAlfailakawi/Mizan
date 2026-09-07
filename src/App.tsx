@@ -9,6 +9,7 @@ import { AuthPortal } from './components/auth/AuthPortal';
 import { auth } from './lib/firebase';
 import { DemoReturn } from './components/public/DemoReturn';
 import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
+import { fetchTenant } from './lib/tenant';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
 
@@ -177,7 +178,7 @@ const CompetitionNotFound: React.FC = () => (
 );
 
 export default function App() {
- const {currentUser,switchRole,selectCompetition,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
+ const {currentUser,switchRole,selectCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand}=useAppStore();
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
  useEffect(()=>{warmViews()},[]);
@@ -191,6 +192,11 @@ export default function App() {
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
+ /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
+    وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
+ useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;
+  updateOrganizationBrand({displayName:t.displayName||undefined,displayNameArabic:t.displayNameArabic||undefined,logoUrl:t.logoUrl||undefined});});
+  return()=>c.abort()},[]);
  // رابط يحمل معرّف مسابقة ⇒ اجعلها المسابقة النشطة قبل عرض صفحتها. غياب المعرّف يبقي المسابقة الحالية.
  const requestedComp=compParam(hash);
  const [compMissing,setCompMissing]=useState(false);

@@ -148,7 +148,9 @@ export const JudgeOS: React.FC = () => {
  /* ترتيب مصادر عبارة الإيقاف: تسجيل بشري معتمد إن وُجد، ثم صوت مولَّد على الخادم لعبارة
     غير قرآنية، ثم نطق الجهاز كحل أخير. العبارة وحدها تُنطق — لا نص قرآني بحال. */
  const serverCue=()=>playCueUrl(`/api/public/cue-audio?text=${encodeURIComponent(transition.phrase)}`,speakFallback);
- if(transition.audioUrl)playCueUrl(transition.audioUrl,serverCue);else serverCue()};
+ // مقطع مسجّل مسبقًا لنفس العبارة (public/audio/cues) — الأسرع والأطبع، ويعمل دون اتصال.
+ const storedCue=()=>transition.variantIndex>=0?playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue):serverCue();
+ if(transition.audioUrl)playCueUrl(transition.audioUrl,storedCue);else storedCue()};
 
  // انتقال سلس في العرض: بعد السؤال الأول (الذي يعرض بوابة الكشف)، تُكشف الأسئلة التالية
  // تلقائيًا في وضع العرض حتى لا يعلق المحكم على شاشة «مختوم». الكشف الآمن الحقيقي غير متأثر.

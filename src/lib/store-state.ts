@@ -56,6 +56,8 @@ export interface AppStoreState {
   // Identity & tenancy
   currentUser: User;
   organization: Organization;
+  /** سبب رفض آخر محاولة اعتماد علمي — ليُقال للمستخدم بدل أن يبتلع الزرّ الرفض. */
+  lastScientificCertificationError?: { sourceId:string; reviewers:number; required:number; errors:string[] };
   organizations: Organization[];
   language: SupportedLanguage;
   competition: Competition;

@@ -37,6 +37,7 @@ import { synthReference } from './server/alignment/benchmark/synth';
 import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
+import { publicTenant, resolveTenant } from './server/tenant-registry';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -187,6 +188,17 @@ async function startServer() {
   app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
   /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
      فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */
+  /* الجهة صاحبة هذا النطاق. نشرٌ واحد يخدم الجميع، والمضيف هو ما يميّز الجهة، فتظهر هويتها
+     (اسمها وشعارها) لزوّار نطاقها. 204 يعني نشرًا بجهة واحدة ⇒ يبقى العرض على «ميزان». */
+  app.get('/api/public/tenant',(req,res)=>{
+    const host=String(req.headers['x-forwarded-host']||req.headers.host||'');
+    const tenant=resolveTenant(host);
+    res.setHeader('cache-control','no-store');
+    res.setHeader('vary','host, x-forwarded-host');
+    if(!tenant)return res.status(204).end();
+    return res.json(publicTenant(tenant));
+  });
+
   /* صوت «عبارة إنهاء الموضع» — عبارة غير قرآنية يقولها المحكم. تُولَّد عبر Gemini TTS وتُخزَّن.
      القرآن لا يمر من هنا إطلاقًا؛ تلاوته من المصدر المعتمد وحده. 503 عند غياب المفتاح فيتراجع
      العميل إلى تسجيل بشري إن وُجد، وإلا إلى صوت الجهاز. */
