@@ -48,7 +48,9 @@ const AR_TOKENS:Record<string,string>={
   DRAFT:'مسودة', REVIEWED:'تمت المراجعة', SIMULATED:'بعد المحاكاة', PUBLISHED:'منشورة', CONFLICT:'تعارض', NEEDS_REVIEW:'تحتاج مراجعة', REVIEW:'مراجعة', NOT_RUN:'لم تُشغّل بعد', UNDERSTOOD:'مفهومة',
   // باقة الجهة ومنطقة استضافة البيانات (كانت enterprise / eu-west-locked تُعرض خامًا).
   enterprise:'مؤسسات', growth:'نمو', pilot:'تجريبية', standard:'قياسية', 'eu-west-locked':'أوروبا الغربية (مقفلة)', 'us-east':'شرق الولايات المتحدة', 'me-central':'الشرق الأوسط', configurable:'قابلة للضبط',
-  in_transit:'في الطريق', arrived:'وصل', delayed:'متأخر', boarding:'الصعود للطائرة', in_app:'داخل التطبيق',
+  in_transit:'في الطريق', arrived:'وصل', delayed:'متأخر', boarding:'الصعود للطائرة',
+  integrity:'النزاهة', timing:'التوقيت', experience:'التجربة', performance:'الأداء',
+  OPEN:'مفتوح', INVESTIGATING:'قيد الفحص', RESOLVED:'مُعالَج', DETECTED:'مرصود', MITIGATED:'مُحتوى', CONSUMED:'مُستخدَم', NONE:'لا يوجد', AUTHORIZED:'مصرَّح', PENDING_PANEL_QUORUM:'بانتظار نصاب اللجنة',
 };
 
 const AR_CLAIMS:Record<FederationClaimType,string>={

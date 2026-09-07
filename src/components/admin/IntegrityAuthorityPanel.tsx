@@ -4,6 +4,7 @@ import {Badge} from '../design-system/Badge';
 import {Button} from '../design-system/Button';
 import {Ratio} from '../design-system/Ratio';
 import {EmptyState} from '../design-system/EmptyState';
+import {uiToken} from '../../lib/ui-language';
 import {
   approveQuorum, authorityFailureText, commitFairDraw, executeQuorum,
   listFairDrawCommitments, listQuorum, revealFairDraw, succeeded,
@@ -117,7 +118,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                           {mine && q.status !== 'executed' && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'اعتمدتُه' : 'You approved'}</span>
                           )}
-                          <Badge variant={statusTone(q.status)}>{q.status}</Badge>
+                          <Badge variant={statusTone(q.status)}>{uiToken(q.status,ar)}</Badge>
                         </div>
                       </div>
                       {q.status === 'ready' && q.requestedBy === currentUserId && (
