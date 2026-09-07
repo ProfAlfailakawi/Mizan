@@ -31,6 +31,17 @@ const CHUNK_KEY = 'app-update:chunk-recovered'; // حارس تعافي الحز�
 const POLL_MS = 120_000;                        // شبكة الأمان البطيئة: كل دقيقتين
 const BUSY_RETRY_MS = 4_000;                    // الصفحة مشغولة: نعيد المحاولة بعد أربع ثوانٍ
 const VERSION_URL = '/api/version';
+const GAVE_UP_KEY = 'app-update:gave-up';       // بصمة صعّدنا لها وفشلنا: لا تُعاد قبل مهلة
+const GAVE_UP_COOLDOWN_MS = 10 * 60_000;        // عشر دقائق قبل إعادة محاولة البصمة نفسها
+
+/** الأصل أصلُنا: من نطاقنا وتحت مسار الحزم المبصومة. */
+function isOwnAsset(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/assets/');
+  } catch { return false; }
+}
 
 /**
  * وضع الإنتاج. لا نكتب `import.meta.env.PROD` مباشرةً: بعض إعدادات tsconfig في هذه
@@ -212,14 +223,18 @@ function reconcileAfterReload(): boolean {
   if (!target) return false;
 
   if (target === BUILD_ID) {
-    // وصلنا: تُمسح العلامتان حتى يبقى المسار متاحًا للإصدار القادم.
+    // وصلنا: تُمسح العلامات حتى يبقى المسار متاحًا للإصدار القادم.
     dropLocal(TARGET_KEY);
     dropLocal(HARD_KEY);
+    dropLocal(GAVE_UP_KEY);
     return false;
   }
 
   if (readLocal(HARD_KEY)) {
-    // صعّدنا مرة ولم ننجح: نمسح العلامات ونكتفي بالمنارة الدورية — لا حلقة إعادة تحميل.
+    /* صعّدنا مرة ولم ننجح. مسحُ العلامات وحده كان يفتح الحلقة من جديد: المنارة تفحص
+       بعد الإقلاع مباشرة، تجد البصمة نفسها، فتعيد المحاولة ← تحميل ← تصعيد ← وهكذا.
+       نسجّل البصمة الفاشلة بمهلة، فلا تُعاد قبل انقضائها أو ظهور بصمة أخرى. */
+    writeLocal(GAVE_UP_KEY, `${target}|${Date.now()}`);
     dropLocal(TARGET_KEY);
     dropLocal(HARD_KEY);
     return false;
@@ -238,6 +253,12 @@ async function checkForUpdate(): Promise<void> {
   if (updating || document.hidden) return;
   const serverBuild = await fetchServerBuild();
   if (!serverBuild || serverBuild === BUILD_ID) return;
+  const gaveUp = readLocal(GAVE_UP_KEY);
+  if (gaveUp) {
+    const [failedBuild, at] = gaveUp.split('|');
+    if (failedBuild === serverBuild && Date.now() - Number(at || 0) < GAVE_UP_COOLDOWN_MS) return;
+    dropLocal(GAVE_UP_KEY); // بصمة أخرى أو مهلة انقضت: المسار مفتوح من جديد
+  }
   await applyUpdate(serverBuild);
 }
 
@@ -270,7 +291,13 @@ function installChunkRecovery(): void {
 
   window.addEventListener('error', (event) => {
     const target = event.target as HTMLElement | null;
-    if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) { void recoverFromStaleChunk(); return; }
+    /* فشل وسم لا يعني غلافًا قديمًا إلا إذا كان الأصل أصلَنا نحن. الوسطاء (Cloudflare
+       مثلًا) يحقنون سكربتات في الصفحة، وقد تحجبها سياسة الأمان — وسكربت غريب محجوب
+       يفشل عند كل إقلاع، فلو عددناه غلافًا قديمًا صنعنا حلقة إعادة تحميل لا تنتهي. */
+    if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+      if (isOwnAsset((target as HTMLScriptElement).src || (target as HTMLLinkElement).href)) void recoverFromStaleChunk();
+      return;
+    }
     if (event.message && looksLikeStaleChunk(event.message)) void recoverFromStaleChunk();
   }, true);
 

@@ -55,8 +55,18 @@ export function installStaleShellRecovery() {
 
   window.addEventListener('error', (e) => {
     const target = e.target as HTMLElement | null;
-    // فشل وسم <script>/<link> — أي أصل بُني في غلاف قديم
-    if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) { void recover(); return; }
+    /* فشل الوسم دليل غلاف قديم فقط حين يكون الأصل أصلَنا (نطاقنا وتحت ‎/assets/).
+       الوسطاء يحقنون سكربتات قد تحجبها سياسة الأمان، وسكربت غريب محجوب يفشل عند كل
+       إقلاع — فلو أعدنا التحميل له صنعنا دوّامة لا يوقفها العلم لأنه يُمسح عند كل
+       إقلاع ناجح. */
+    if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+      const url = (target as HTMLScriptElement).src || (target as HTMLLinkElement).href || '';
+      try {
+        const parsed = new URL(url, window.location.href);
+        if (parsed.origin === window.location.origin && parsed.pathname.startsWith('/assets/')) void recover();
+      } catch { /* عنوان غير قابل للتحليل — ليس أصلنا */ }
+      return;
+    }
     if (e.message && looksLikeStaleChunk(e.message)) void recover();
   }, true);
 
