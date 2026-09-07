@@ -12,6 +12,24 @@ import {
   AuditEvent,
   IncidentRecord,
   AppealRecord,
+  JudgeSubmission,
+  SessionCheckpointRecord,
+  ContinuityIncidentRecord,
+  SessionRecoveryRecord,
+  AuthSessionRecord,
+  PassReissueRecord,
+  AuditLedgerSealRecord,
+  NotificationRecord,
+  WebhookSubscription,
+  IntegrationConfig,
+  SupportSession,
+  IdentityInvitationRecord,
+  DelegationTravelRecord,
+  FederationAttestationRecord,
+  ParticipantPassportEntry,
+  ConsentRecord,
+  QuorumActionRecord,
+  FeatureFlagRecord,
   User
 } from '../types';
 
@@ -940,6 +958,7 @@ export const SEED_CERTIFICATE: Certificate = {
   organizationName: 'MIZAN Demo Competition Authority',
   organizationNameArabic: 'جهة ميزان التجريبية للمسابقات القرآنية',
   participantId: 'part-101',
+  resultId: 'res-1',
   participantName: 'Ibrahim Muhammad Al-Ansari',
   participantNameArabic: 'إبراهيم محمد الأنصاري',
   categoryName: 'Full Quran Memorization with Tajweed',
@@ -1019,4 +1038,150 @@ export const SEED_INCIDENTS: IncidentRecord[] = [
     resolvedAt: '2027-02-11T08:17:30Z',
     status: 'resolved'
   }
+];
+
+/*
+ * بيانات عرض إضافية (Demo only).
+ *
+ * تُغذّي الشاشات التي كانت تبدأ فارغة في وضع العرض حتى يستطيع مُقدِّم المنتج أن يرى كل ميزة
+ * بمحتوى واقعي. جميعها مقصورة على العرض؛ وضع الإطلاق الحقيقي يمسحها في toLaunchState.
+ */
+
+// أحكام محكمين مقفلة عبر أربع جلسات وثلاثة محكمين — تُشغّل لوحات الموثوقية والمعايرة لدى رئيس التحكيم.
+export const SEED_JUDGE_SUBMISSIONS: JudgeSubmission[] = (() => {
+  const judges = [
+    { id: 'usr-judge-1', name: 'Dr. Kamal Isa Al-Masarawi', mem: 68, taj: 24, perf: 5 },   // متساهل
+    { id: 'usr-judge-2', name: 'Dr. Sami Al-Tamimi',        mem: 65, taj: 22, perf: 4 },   // متوازن
+    { id: 'usr-judge-3', name: 'Dr. Layla Al-Nouri',        mem: 61, taj: 20, perf: 4 },   // متشدّد
+  ];
+  const sessions = [
+    { sessionId: 'sess-104', participantId: 'part-104', delta: 0 },
+    { sessionId: 'sess-105', participantId: 'part-105', delta: 1 },
+    { sessionId: 'sess-106', participantId: 'part-106', delta: -1 },
+    { sessionId: 'sess-107', participantId: 'part-107', delta: 2 }, // تباعد أوضح لإظهار صفّ خارج التفاوت
+  ];
+  const rows: JudgeSubmission[] = [];
+  sessions.forEach((s, si) => {
+    judges.forEach((j, ji) => {
+      const mem = Math.max(0, Math.min(70, j.mem - (s.delta * (ji === 2 ? 2 : 1))));
+      const taj = Math.max(0, Math.min(25, j.taj - s.delta));
+      const perf = Math.max(0, Math.min(5, j.perf));
+      rows.push({
+        judgeId: j.id,
+        judgeName: j.name,
+        participantId: s.participantId,
+        sessionId: s.sessionId,
+        criterionScores: { 'crit-memorization': mem, 'crit-tajweed': taj, 'crit-performance': perf },
+        totalScore: mem + taj + perf,
+        eventsCount: 2 + ji,
+        sessionPenaltyCount: 2 + ji,
+        submittedAt: new Date(Date.parse('2027-02-11T09:30:00Z') + (si * 3 + ji) * 60000).toISOString(),
+        locked: true,
+      });
+    });
+  });
+  return rows;
+})();
+
+// استمرارية الجلسة: نقاط حفظ + حادثة مُعالَجة + قرار تعافٍ مُطبَّق (بلا إنذار مفتوح يزعج العرض).
+export const SEED_SESSION_CHECKPOINTS: SessionCheckpointRecord[] = [
+  { id: 'ckpt-104-1', competitionId: 'comp-dubai-2027', sessionId: 'sess-active-001', participantId: 'part-104', committeeId: 'comm-1', phase: 'RECITING', questionIndex: 0, questionRevealed: true, durationSeconds: 90, eventIds: ['ev-1'], lockedJudgeIds: [], sequence: 1, createdAt: '2027-02-11T09:13:30Z', createdBy: 'usr-judge-1', checkpointHash: 'DEMO:CKPT-104-1', assurance: 'client_hash_chain' },
+  { id: 'ckpt-104-2', competitionId: 'comp-dubai-2027', sessionId: 'sess-active-001', participantId: 'part-104', committeeId: 'comm-1', phase: 'RECITING', questionIndex: 0, questionRevealed: true, durationSeconds: 142, eventIds: ['ev-1'], lockedJudgeIds: [], sequence: 2, createdAt: '2027-02-11T09:14:22Z', createdBy: 'usr-judge-1', checkpointHash: 'DEMO:CKPT-104-2', previousCheckpointHash: 'DEMO:CKPT-104-1', assurance: 'client_hash_chain' },
+];
+export const SEED_CONTINUITY_INCIDENTS: ContinuityIncidentRecord[] = [
+  { id: 'cont-inc-1', competitionId: 'comp-dubai-2027', sessionId: 'sess-active-001', participantId: 'part-104', type: 'NETWORK_LOSS', occurredAt: '2027-02-11T09:14:40Z', reportedBy: 'usr-ops-1', lastCheckpointId: 'ckpt-104-2', status: 'RESOLVED', notes: 'انقطاع شبكة قصير استُعيدت الجلسة بعده من آخر نقطة حفظ دون فقد أي حكم.' },
+];
+export const SEED_SESSION_RECOVERIES: SessionRecoveryRecord[] = [
+  { id: 'rec-1', competitionId: 'comp-dubai-2027', sessionId: 'sess-active-001', participantId: 'part-104', incidentId: 'cont-inc-1', checkpointId: 'ckpt-104-2', decision: 'RESUME_SAME_SESSION_SAME_QUESTION', reason: 'استئناف الجلسة من آخر نقطة حفظ بعد عودة الشبكة.', preserveRevealedQuestion: true, preserveLockedJudgeSubmissions: true, createdAt: '2027-02-11T09:15:10Z', createdBy: 'usr-head-judge-1', status: 'APPLIED' },
+];
+
+// جلسات دخول نشطة — تُظهر عدّاد الجلسات والشارات في حوكمة الهوية ولوحة المدقّق.
+export const SEED_AUTH_SESSIONS: AuthSessionRecord[] = [
+  { id: 'auths-1', accountId: 'acct-usr-comp-admin-1', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', role: 'comp_admin', deviceId: 'dev-edge-1', deviceName: 'MIZAN Edge Primary', openedAt: '2027-02-11T07:30:00Z', lastSeenAt: '2027-02-11T09:20:00Z', expiresAt: '2027-02-11T19:30:00Z', status: 'ACTIVE', authenticationAssurance: 'MFA' },
+  { id: 'auths-2', accountId: 'acct-usr-judge-1', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', role: 'judge', deviceId: 'dev-kiosk-1', deviceName: 'Committee Tablet C1', openedAt: '2027-02-11T08:40:00Z', lastSeenAt: '2027-02-11T09:22:00Z', expiresAt: '2027-02-11T18:40:00Z', status: 'ACTIVE', authenticationAssurance: 'MFA' },
+  { id: 'auths-3', accountId: 'acct-usr-head-judge-1', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', role: 'head_judge', deviceId: 'dev-edge-1', deviceName: 'Head Judge Station', openedAt: '2027-02-11T08:10:00Z', lastSeenAt: '2027-02-11T09:18:00Z', expiresAt: '2027-02-11T18:10:00Z', status: 'ACTIVE', authenticationAssurance: 'MFA' },
+];
+
+// إعادة إصدار بطاقات — تُظهر سجلّ المدقّق.
+export const SEED_PASS_REISSUES: PassReissueRecord[] = [
+  { id: 'reissue-1', competitionId: 'comp-dubai-2027', participantId: 'part-105', oldCredentialIds: ['cred-105-1'], newCredentialId: 'cred-105-2', lineageId: 'lin-105', generation: 2, reason: 'LOST', identityVerification: 'PARTICIPANT_PROFILE', requestedAt: '2027-02-11T08:05:00Z', requestedBy: 'usr-exception-1', status: 'ISSUED', revocationEpoch: 1 },
+  { id: 'reissue-2', competitionId: 'comp-dubai-2027', participantId: 'part-106', oldCredentialIds: ['cred-106-1'], newCredentialId: 'cred-106-2', lineageId: 'lin-106', generation: 2, reason: 'DAMAGED', identityVerification: 'PHOTO_ID', requestedAt: '2027-02-11T08:20:00Z', requestedBy: 'usr-exception-1', status: 'ISSUED', revocationEpoch: 1 },
+];
+
+// ختم دفتر التدقيق — يُظهر سطر البصمة في لوحة المدقّق.
+export const SEED_AUDIT_LEDGER_SEALS: AuditLedgerSealRecord[] = [
+  { id: 'seal-1', competitionId: 'comp-dubai-2027', createdAt: '2027-02-11T09:00:00Z', createdBy: 'usr-comp-admin-1', eventCount: 42, headHash: 'DEMO:AUDIT-HEAD-9F2C7A', firstEventId: 'aud-1', lastEventId: 'aud-42', assurance: 'client_hash_chain', verificationState: 'VERIFIED' },
+];
+
+// إشعارات — مزيج مُرسَل/فاشل لإظهار مركز الإشعارات وزرّ إعادة المحاولة.
+export const SEED_NOTIFICATIONS: NotificationRecord[] = [
+  { id: 'ntf-1', competitionId: 'comp-dubai-2027', participantId: 'part-104', channel: 'email', templateKey: 'registration_approved', locale: 'ar', recipient: 'bilal.sayed@gmail.com', status: 'sent', attempts: 1, createdAt: '2026-11-14T14:21:00Z', sentAt: '2026-11-14T14:21:05Z', idempotencyKey: 'comp-dubai-2027:part-104:email:registration_approved' },
+  { id: 'ntf-2', competitionId: 'comp-dubai-2027', participantId: 'part-105', channel: 'sms', templateKey: 'arrival_window', locale: 'ar', recipient: '+96599881122', status: 'sent', attempts: 1, createdAt: '2027-02-10T18:00:00Z', sentAt: '2027-02-10T18:00:03Z', idempotencyKey: 'comp-dubai-2027:part-105:sms:arrival_window' },
+  { id: 'ntf-3', competitionId: 'comp-dubai-2027', participantId: 'part-106', channel: 'whatsapp', templateKey: 'arrival_window', locale: 'ar', recipient: '+962790000000', status: 'failed', attempts: 3, createdAt: '2027-02-10T18:05:00Z', error: 'PROVIDER_TIMEOUT', idempotencyKey: 'comp-dubai-2027:part-106:whatsapp:arrival_window' },
+  { id: 'ntf-4', competitionId: 'comp-dubai-2027', participantId: 'part-104', channel: 'in_app', templateKey: 'result_ready', locale: 'ar', recipient: 'part-104', status: 'sent', attempts: 1, createdAt: '2027-02-12T12:00:00Z', sentAt: '2027-02-12T12:00:00Z', idempotencyKey: 'comp-dubai-2027:part-104:in_app:result_ready' },
+];
+
+// اشتراكات Webhook.
+export const SEED_WEBHOOKS: WebhookSubscription[] = [
+  { id: 'wh-1', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', event: 'participant.approved', endpoint: 'https://hooks.example.org/mizan/participant', enabled: true, secretRef: 'secret://wh-participant', lastDeliveryStatus: 'success' },
+  { id: 'wh-2', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', event: 'result.sealed', endpoint: 'https://hooks.example.org/mizan/results', enabled: true, secretRef: 'secret://wh-results', lastDeliveryStatus: 'failed' },
+];
+
+// قنوات التكامل — بعضها مُفعّل ليظهر "المزوّد يعمل".
+export const SEED_INTEGRATIONS: IntegrationConfig[] = [
+  { id: 'intg-email', organizationId: 'org-gqa-global', kind: 'email', name: 'Transactional Email', enabled: true, status: 'configured' },
+  { id: 'intg-sms', organizationId: 'org-gqa-global', kind: 'sms', name: 'SMS Gateway', enabled: true, status: 'configured' },
+  { id: 'intg-whatsapp', organizationId: 'org-gqa-global', kind: 'whatsapp', name: 'WhatsApp Business', enabled: true, status: 'degraded' },
+  { id: 'intg-storage', organizationId: 'org-gqa-global', kind: 'storage', name: 'Evidence Storage', enabled: true, status: 'configured' },
+  { id: 'intg-identity', organizationId: 'org-gqa-global', kind: 'identity', name: 'Identity Provider', enabled: true, status: 'configured' },
+  { id: 'intg-broadcast', organizationId: 'org-gqa-global', kind: 'broadcast', name: 'Ceremony Broadcast', enabled: false, status: 'not_configured' },
+];
+
+// جلسات دعم — تُظهر قائمة وحدة الدعم بدل شاشة فارغة.
+export const SEED_SUPPORT_SESSIONS: SupportSession[] = [
+  { id: 'sup-1', organizationId: 'org-gqa-global', requestedBy: 'usr-comp-admin-1', reason: 'مراجعة إعداد اللجان قبل اليوم الأول', status: 'requested', createdAt: '2027-02-10T15:00:00Z', expiresAt: '2027-02-10T17:00:00Z' },
+  { id: 'sup-2', organizationId: 'org-gqa-global', requestedBy: 'usr-ops-1', approvedBy: 'usr-org-admin-1', reason: 'تشخيص بطء مزامنة في القاعة B', status: 'active', createdAt: '2027-02-11T08:30:00Z', expiresAt: '2027-02-11T10:30:00Z' },
+];
+
+// دعوات هوية بانتظار الاعتماد — تُظهر لوحة "الموافقات المعلّقة".
+export const SEED_IDENTITY_INVITATIONS: IdentityInvitationRecord[] = [
+  { id: 'inv-1', email: 'new.judge@awqaf.example', displayName: 'Sheikh Adnan Al-Rashidi', organizationId: 'org-gqa-global', requestedRole: 'judge', competitionId: 'comp-dubai-2027', committeeId: 'comm-2', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T10:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T10:00:00Z' },
+  { id: 'inv-2', email: 'panel.auditor@awqaf.example', displayName: 'Ms. Huda Al-Sabah', organizationId: 'org-gqa-global', requestedRole: 'auditor', competitionId: 'comp-dubai-2027', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T11:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T11:00:00Z' },
+];
+
+// سجلات سفر الوفود — تُظهر قائمة بوابة الوفود ومؤشّر الوصول.
+export const SEED_TRAVEL_RECORDS: DelegationTravelRecord[] = [
+  { id: 'trv-1', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-105', flightNumber: 'KU671', arrivalAirport: 'DXB', arrivalAt: '2027-02-10T14:20:00Z', hotel: 'Grand Auditorium Hotel', room: '512', transportStatus: 'completed', companionCount: 1 },
+  { id: 'trv-2', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-106', flightNumber: 'RJ180', arrivalAirport: 'DXB', arrivalAt: '2027-02-10T16:45:00Z', hotel: 'Grand Auditorium Hotel', room: '514', transportStatus: 'scheduled', companionCount: 2 },
+  { id: 'trv-3', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-107', transportStatus: 'pending', companionCount: 0, notes: 'بانتظار تأكيد الرحلة.' },
+];
+
+// شهادات اتحادية (Federation) — ادعاءات موثّقة بلا كشف بيانات.
+export const SEED_FEDERATION_ATTESTATIONS: FederationAttestationRecord[] = [
+  { id: 'fed-1', organizationId: 'org-gqa-global', subjectRef: 'part-105', subjectKind: 'participant', issuer: 'Kuwait Awqaf Authority', claim: 'identity_verified', value: 'true', issuedAt: '2027-02-09T09:00:00Z', status: 'valid', evidenceDigest: 'DEMO:FED-EVID-105', signatureRef: 'sig://fed-105', privacyMode: 'claim_only' },
+  { id: 'fed-2', organizationId: 'org-gqa-global', subjectRef: 'part-106', subjectKind: 'participant', issuer: 'Jordan Ifta Department', claim: 'delegation_authorized', value: 'true', issuedAt: '2027-02-09T09:30:00Z', status: 'valid', evidenceDigest: 'DEMO:FED-EVID-106', signatureRef: 'sig://fed-106', privacyMode: 'claim_only' },
+];
+
+// جواز ميزان للمتسابق — سجلّ مشاركات سابقة يظهر في لوحة المتسابق.
+export const SEED_PARTICIPANT_PASSPORT: ParticipantPassportEntry[] = [
+  { id: 'pass-104-1', participantId: 'part-104', competitionId: 'comp-dubai-2025', competitionName: 'MIZAN International Quran Competition 2025', categoryName: 'حفظ عشرين جزءاً', year: '2025', result: 'المركز الثالث', certificateNumber: 'MZN-2025-B210-4471', verified: true },
+  { id: 'pass-104-2', participantId: 'part-104', competitionId: 'comp-dubai-2026', competitionName: 'MIZAN International Quran Competition 2026', categoryName: 'حفظ القرآن كاملاً', year: '2026', result: 'مشارك', certificateNumber: 'MZN-2026-A118-2290', verified: true },
+];
+
+// موافقة ولي الأمر للطفل المعروض في بوابة ولي الأمر.
+export const SEED_CONSENTS: ConsentRecord[] = [
+  { id: 'consent-104-guardian', participantId: 'part-104', competitionId: 'comp-dubai-2027', kind: 'guardian', version: '1.0', accepted: true, acceptedAt: '2026-11-12T09:05:00Z', guardianName: 'يوسف السيد' },
+];
+
+// إجراء نصاب مُنفَّذ لكشف الحفل — يتيح ظهور شاشة إعلان الفائزين في العرض بدل بوابة الختم.
+export const SEED_QUORUM_ACTIONS: QuorumActionRecord[] = [
+  { id: 'quorum-ceremony-1', competitionId: 'comp-dubai-2027', action: 'ceremony_reveal', entityId: 'comp-dubai-2027', requiredRoleGroups: [['scientific_admin'], ['comp_admin'], ['org_admin']], distinctActorsRequired: true, minimumApprovals: 2, authorizedRoles: ['scientific_admin', 'comp_admin', 'org_admin'], approvals: [ { actorId: 'usr-scientific-1', actorName: 'أ.د. عبدالله العلمي', actorRole: 'scientific_admin', approvedAt: '2027-02-14T18:00:00Z' }, { actorId: 'usr-comp-admin-1', actorName: 'مدير المسابقة التجريبي', actorRole: 'comp_admin', approvedAt: '2027-02-14T18:02:00Z' }, { actorId: 'usr-org-admin-1', actorName: 'أمين عام الجائزة', actorRole: 'org_admin', approvedAt: '2027-02-14T18:03:00Z' } ], status: 'executed', requestedAt: '2027-02-14T17:55:00Z', requestedBy: 'usr-comp-admin-1', executedAt: '2027-02-14T18:05:00Z', executedBy: 'usr-comp-admin-1', cryptographicAssurance: 'development_adapter', publicCommitmentHash: 'DEMO:CEREMONY-REVEAL-COMMIT' },
+];
+
+// أعلام ميزات مُفعّلة — تُظهر بعض الوحدات مُشغّلة في لوحة المشرف الأعلى.
+export const SEED_FEATURE_FLAGS: FeatureFlagRecord[] = [
+  { id: 'flag-ai', organizationId: 'org-gqa-global', key: 'ai_integrity', enabled: true, environment: 'development', updatedAt: '2027-02-01T00:00:00Z' },
+  { id: 'flag-broadcast', organizationId: 'org-gqa-global', key: 'broadcast', enabled: true, environment: 'development', updatedAt: '2027-02-01T00:00:00Z' },
+  { id: 'flag-hospitality', organizationId: 'org-gqa-global', key: 'hospitality', enabled: true, environment: 'development', updatedAt: '2027-02-01T00:00:00Z' },
+  { id: 'flag-remote', organizationId: 'org-gqa-global', key: 'remote_rounds', enabled: false, environment: 'development', updatedAt: '2027-02-01T00:00:00Z' },
 ];

@@ -18,6 +18,7 @@ const seededLike=()=>({
   aiObservations:[{id:'o1'}],audioRecordings:[{id:'rec1'}],notifications:[{id:'n1'}],sealApprovals:[{id:'s1'}],
   identityAccounts:[{id:'acct'}],roleGrants:[{id:'grant'}],identityInvitations:[{id:'inv'}],authSessions:[{id:'sess'}],
   questionRevealGates:[{id:'g1'}],activeSession:{sessionId:'sess-active-001',participant:SEED_PARTICIPANTS[0],committee:SEED_COMMITTEES[0]},
+  webhooks:[{id:'wh'}],integrations:[{id:'intg'}],supportSessions:[{id:'sup'}],travelRecords:[{id:'trv'}],federationAttestations:[{id:'fed'}],participantPassport:[{id:'pass'}],consents:[{id:'con'}],quorumActions:[{id:'q'}],featureFlags:[{id:'flag'}],sessionCheckpoints:[{id:'ck'}],continuityIncidents:[{id:'ci'}],sessionRecoveries:[{id:'sr'}],passReissues:[{id:'pr'}],auditLedgerSeals:[{id:'seal'}],
   language:'ar',
 }) as any;
 
@@ -29,7 +30,7 @@ test('a real deployment is recognised only by mandatory authentication',()=>{
 
 test('launch state carries no invented person and no issued record',()=>{
   const launch=toLaunchState(seededLike());
-  for(const key of ['participants','committees','judges','results','certificates','reviewCases','auditLogs','incidents','appeals','judgeSubmissions','aiObservations','audioRecordings','notifications','sealApprovals','identityAccounts','roleGrants','identityInvitations','authSessions','questionRevealGates'] as const){
+  for(const key of ['participants','committees','judges','results','certificates','reviewCases','auditLogs','incidents','appeals','judgeSubmissions','aiObservations','audioRecordings','notifications','sealApprovals','identityAccounts','roleGrants','identityInvitations','authSessions','questionRevealGates','webhooks','integrations','supportSessions','travelRecords','federationAttestations','participantPassport','consents','quorumActions','featureFlags','sessionCheckpoints','continuityIncidents','sessionRecoveries','passReissues','auditLedgerSeals'] as const){
     assert.deepEqual((launch as any)[key],[],`${key} must start empty in a real deployment`);
   }
   // جلسة العرض لا تُورَّث لمحكم حقيقي: بلا متسابق ولا لجنة مخترعَين.
