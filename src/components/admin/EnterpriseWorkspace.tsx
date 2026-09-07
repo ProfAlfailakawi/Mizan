@@ -58,17 +58,23 @@ export const EnterpriseWorkspace:React.FC=()=>{
  const s=useAppStore(); const ar=isAr(s.language); const [section,setSection]=useState<Section>('integrations');
  useEffect(()=>{warmPanels()},[]);
  const pending=s.notifications.filter(n=>n.status==='failed').length; const online=s.devices.filter(d=>d.status==='online').length;
- const sections:[Section,any,string][]=[['integrations',Cable,ar?'القنوات':'Channels'],['operations',RadioTower,ar?'البنية الميدانية':'Field'],['international',Plane,ar?'الدولي':'International'],['shadow',Radar,ar?'Shadow':'Shadow'],['governance',ShieldCheck,ar?'الحوكمة':'Governance'],['trust',Fingerprint,ar?'الثقة':'Trust 8'],['beyond',WandSparkles,ar?'ما بعد':'Beyond']];
+ // الأدوات العميقة (الثقة/ما بعد/Shadow) خاصة بمالك المنصة؛ لا تظهر لعملاء الجهات حتى لا تُعقّد
+ // واجهتهم بما لا يحتاجونه. غياب دور المالك ⇒ لا يظهر التبويب ولا يُعرض محتواه.
+ const platformOwner=s.currentUser.role==='super_admin';
+ const ownerOnly:Section[]=['shadow','trust','beyond'];
+ const allSections:[Section,any,string][]=[['integrations',Cable,ar?'القنوات':'Channels'],['operations',RadioTower,ar?'البنية الميدانية':'Field'],['international',Plane,ar?'الدولي':'International'],['shadow',Radar,ar?'Shadow':'Shadow'],['governance',ShieldCheck,ar?'الحوكمة':'Governance'],['trust',Fingerprint,ar?'الثقة':'Trust 8'],['beyond',WandSparkles,ar?'ما بعد':'Beyond']];
+ const sections=allSections.filter(([id])=>platformOwner||!ownerOnly.includes(id));
+ const activeSection=(!platformOwner&&ownerOnly.includes(section))?'integrations':section;
  return <div className="space-y-4">
   <div><div className="mizan-kicker">{ar?'طبقة المؤسسات':'ENTERPRISE LAYER'}</div><h1 className="text-2xl sm:text-3xl font-black mt-1">{ar?'القوة مخفية خلف البساطة':'Enterprise power, quietly contained'}</h1><p className="text-sm text-[#626864] mt-2 max-w-2xl">{ar?'تكاملات وتشغيل دولي واستمرارية وحوكمة، دون تلويث تجربة المستخدم اليومية.':'Integrations, international operations, continuity and governance stay out of the daily user flow.'}</p></div>
-  <div className="flex gap-2 overflow-x-auto">{sections.map(([id,Icon,label])=><button key={id} onClick={()=>setSection(id)} className={`shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold border ${section===id?'bg-[#214C40] text-white border-[#214C40]':'bg-white text-[#5f6862] border-[#dedcd5]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</div>
-  {section==='integrations'&&<Integrations s={s} ar={ar} pending={pending}/>} 
-  {section==='operations'&&<Field s={s} ar={ar} online={online}/>} 
-  {section==='international'&&<International s={s} ar={ar}/>} 
-  {section==='shadow'&&<Shadow s={s} ar={ar}/>} 
-  {section==='governance'&&<div className="space-y-4"><Suspense fallback={<PanelFallback/>}><IdentityGovernance/></Suspense><Suspense fallback={<PanelFallback/>}><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/></Suspense><Governance s={s} ar={ar}/></div>} 
-  {section==='trust'&&<Suspense fallback={<PanelFallback/>}><TrustProtocolLab/></Suspense>} 
-  {section==='beyond'&&<Suspense fallback={<PanelFallback/>}><BeyondLab/></Suspense>} 
+  <div className="flex gap-2 overflow-x-auto">{sections.map(([id,Icon,label])=><button key={id} onClick={()=>setSection(id)} className={`shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold border ${activeSection===id?'bg-[#214C40] text-white border-[#214C40]':'bg-white text-[#5f6862] border-[#dedcd5]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</div>
+  {activeSection==='integrations'&&<Integrations s={s} ar={ar} pending={pending}/>}
+  {activeSection==='operations'&&<Field s={s} ar={ar} online={online}/>}
+  {activeSection==='international'&&<International s={s} ar={ar}/>}
+  {activeSection==='shadow'&&<Shadow s={s} ar={ar}/>}
+  {activeSection==='governance'&&<div className="space-y-4"><Suspense fallback={<PanelFallback/>}><IdentityGovernance/></Suspense><Suspense fallback={<PanelFallback/>}><ReadinessLab onNavigate={t=>setSection(t==='field'?'operations':'integrations')}/></Suspense><Governance s={s} ar={ar}/></div>}
+  {activeSection==='trust'&&<Suspense fallback={<PanelFallback/>}><TrustProtocolLab/></Suspense>}
+  {activeSection==='beyond'&&<Suspense fallback={<PanelFallback/>}><BeyondLab/></Suspense>}
  </div>
 }
 const Integrations=({s,ar,pending}:{s:ReturnType<typeof useAppStore>;ar:boolean;pending:number})=>{

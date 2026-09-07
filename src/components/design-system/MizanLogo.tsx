@@ -1,4 +1,12 @@
 import React from 'react';
+import { useAppStore } from '../../lib/store';
+
+/* الهوية البيضاء: اسم/شعار العلامة يأتي من إعدادات المؤسسة. غياب الاسم المخصّص يبقي "ميزان"،
+   فلا يتغيّر العرض التجريبي، ويظهر اسم العميل في كل مكان بمجرد ضبطه. */
+export function useBrandName(): { ar: string; en: string; logoUrl?: string } {
+  const brand = useAppStore().organization?.brand;
+  return { ar: brand?.displayNameArabic || 'ميزان', en: brand?.displayName || 'MIZAN', logoUrl: brand?.logoUrl };
+}
 
 /*
  * MIZAN brand mark — vector translation of the approved lockup
@@ -156,16 +164,17 @@ export const MizanWordmark: React.FC<WordmarkProps> = ({
   className = '',
 }) => {
   const ar = language === 'ar';
+  const brand = useBrandName();
   return (
     <span className={`mizan-wordmark ${tone === 'inverse' ? 'is-inverse' : ''} ${compact ? 'is-compact' : ''} ${className}`}>
       <span className="mizan-wordmark-name" dir={ar ? 'rtl' : 'ltr'}>
-        {ar ? 'ميزان' : 'MIZAN'}
+        {ar ? brand.ar : brand.en}
       </span>
       {/* data-no-localize keeps ArabicInterfaceGuard from rewriting the Latin
-          half of the lockup into "ميزان" while the app is in Arabic. */}
+          half of the lockup while the app is in Arabic. */}
       {ar && (
         <span className="mizan-wordmark-rule" aria-hidden="true" data-no-localize="true">
-          <i /><b>MIZAN</b><i />
+          <i /><b>{brand.en}</b><i />
         </span>
       )}
       {tagline && <span className="mizan-wordmark-tagline">{tagline}</span>}
@@ -195,13 +204,17 @@ export const MizanLogo: React.FC<LogoProps> = ({
   tagline,
 }) => {
   const ar = language === 'ar';
+  const brand = useBrandName();
   const markSize = stacked ? 'w-24 h-24' : compact ? 'w-10 h-10' : 'w-14 h-14';
+  const markPx = stacked ? 96 : compact ? 40 : 56;
   return (
     <span
       className={`mizan-logo ${stacked ? 'is-stacked' : ''} ${className}`}
-      aria-label={ar ? 'ميزان' : 'MIZAN'}
+      aria-label={ar ? brand.ar : brand.en}
     >
-      <MizanMark className={markSize} tone={tone} decorative />
+      {brand.logoUrl
+        ? <img src={brand.logoUrl} alt={ar ? brand.ar : brand.en} width={markPx} height={markPx} className={`${markSize} object-contain`} />
+        : <MizanMark className={markSize} tone={tone} decorative />}
       {showWordmark && (
         <MizanWordmark language={language} tone={tone} compact={compact} tagline={tagline} />
       )}
