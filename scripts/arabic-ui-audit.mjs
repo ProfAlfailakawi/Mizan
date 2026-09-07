@@ -27,7 +27,9 @@ ok('Public verifier is language-aware',trust.includes("const ar=language==='ar'"
 const onboarding=read('src/components/public/OnboardingExperience.tsx');
 ok('Onboarding has four Arabic steps',onboarding.includes('أهلًا بك في ميزان')&&onboarding.includes('السؤال مختوم حتى اللحظة الصحيحة')&&onboarding.includes('دور واحد. مهمة واحدة. شاشة واحدة')&&onboarding.includes('كل نتيجة تحمل دليلها معها'));
 const logo=read('src/components/design-system/MizanLogo.tsx');
-ok('Arabic brand wordmark is ميزان',/ar\s*\?\s*'ميزان'\s*:\s*'MIZAN'/.test(logo));
+// White-label: the wordmark is brand-driven and defaults to ميزان/MIZAN when no
+// custom brand name is set (useBrandName). Assert the Arabic default is ميزان.
+ok('Arabic brand wordmark defaults to ميزان',/displayNameArabic\s*\|\|\s*'ميزان'/.test(logo)&&/ar\s*\?\s*brand\.ar\s*:\s*brand\.en/.test(logo));
 const html=read('index.html');
 ok('Document defaults to Arabic RTL',html.includes('<html lang="ar" dir="rtl">'));
 ok('Arabic metadata title',html.includes('<title>ميزان —'));
