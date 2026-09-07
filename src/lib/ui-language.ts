@@ -164,3 +164,38 @@ export function serverErrorLabel(code: string, ar: boolean): string {
   const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;
   return map[code] || code;
 }
+
+/* مستوى الأتمتة معروضًا بالعربية (كان يُعرض Assisted/Automated/Autopilot خامًا). */
+const AR_AUTOMATION: Record<string, string> = { assisted: 'مساعَد', automated: 'آلي', autopilot: 'تشغيل ذاتي' };
+export function automationLevelLabel(value: string, ar: boolean): string {
+  return ar ? (AR_AUTOMATION[value] || value) : value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/* أدوار الأجهزة في القاعة (كانت Gate/JudgeOS/Waiting Display… خامة داخل شاشة عربية). */
+const AR_DEVICE_ROLE: Record<string, string> = {
+  Gate: 'البوابة', Kiosk: 'كشك الحضور', JudgeOS: 'منصة المحكم', 'Head Judge': 'رئيس التحكيم',
+  Operations: 'التشغيل', 'Waiting Display': 'شاشة الانتظار', 'Committee Display': 'شاشة اللجنة',
+  'Exception Host': 'مكتب الاستثناء', Ceremony: 'شاشة الحفل', Broadcast: 'البث', Edge: 'الخادم الطرفي',
+};
+export function deviceRoleLabel(value: string | undefined | null, ar: boolean): string {
+  if (!value) return '—';
+  return ar ? (AR_DEVICE_ROLE[value] || value) : value;
+}
+
+/* قنوات الإشعار. */
+const AR_CHANNEL: Record<string, string> = { in_app: 'داخل التطبيق', email: 'البريد', sms: 'رسالة نصية', whatsapp: 'واتساب', push: 'إشعار فوري' };
+export function channelLabel(value: string, ar: boolean): string {
+  return ar ? (AR_CHANNEL[value] || value) : value.replaceAll('_', ' ');
+}
+
+/* قوالب الإشعارات: مفاتيح تقنية (result.published, arrival_window…) تُعرض بجملة عربية. */
+const AR_NOTIFICATION_TEMPLATE: Record<string, string> = {
+  registration_approved: 'اعتماد التسجيل', registration_received: 'استلام طلب التسجيل',
+  arrival_window: 'موعد الوصول', result_ready: 'النتيجة جاهزة', 'result.published': 'نشر النتيجة',
+  result_published: 'نشر النتيجة', certificate_ready: 'الشهادة جاهزة', committee_call: 'نداء اللجنة',
+  queue_update: 'تحديث الدور', reminder: 'تذكير',
+};
+export function notificationTemplateLabel(value: string, ar: boolean): string {
+  if (!value) return '—';
+  return ar ? (AR_NOTIFICATION_TEMPLATE[value] || value.replaceAll('_', ' ').replaceAll('.', ' · ')) : value.replaceAll('_', ' ');
+}
