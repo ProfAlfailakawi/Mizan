@@ -40,7 +40,8 @@ import {
   SEED_RESULTS,
   SEED_CERTIFICATE,
   SEED_AUDIT_LOGS,
-  SEED_INCIDENTS
+  SEED_INCIDENTS,
+  SEED_APPEALS
 } from './seed-data';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
@@ -88,6 +89,31 @@ function hydrateSavedState(parsed: AppStoreState): AppStoreState {
   return parsed;
 }
 
+/*
+ * بوابة كشف مزروعة للجلسة التجريبية النشطة.
+ *
+ * منظومة الكشف الآمن جعلت الجلسة تبدأ "مختومة"، فصار المحكم في وضع العرض يرى شاشة انتظار
+ * بدل أن يهبط مباشرة على سطح التحكيم للمتسابق أمامه كما كان قبلها. نزرع هنا بوابةً مكتملة
+ * (حضور مؤكَّد + موافقة المحكم المكلّف) للجلسة sess-active-001 حتى يظهر سطح التحكيم فورًا في
+ * العرض. البوابة خاصة بالعرض فقط؛ الجلسات الحقيقية تُنشئ بواباتها بنفسها، ووضع الإطلاق يمسحها.
+ */
+const SEED_ACTIVE_REVEAL_GATE: QuestionRevealGateRecord = {
+  id: 'qgate-active-001',
+  competitionId: SEED_COMPETITION.id,
+  sessionId: 'sess-active-001',
+  participantId: SEED_PARTICIPANTS[0].id,
+  committeeId: SEED_COMMITTEES[0].id,
+  questionIndex: 0,
+  participantPresence: { verified: true, verifiedAt: new Date().toISOString(), verifiedBy: 'usr-judge-1', method: 'manual_visual_confirmation' },
+  requiredJudgeIds: [...new Set(SEED_COMMITTEES[0].judgeIds)],
+  approvals: SEED_COMMITTEES[0].judgeIds.map(judgeId => ({ judgeId, judgeName: 'Dr. Kamal Isa Al-Masarawi', approvedAt: new Date().toISOString() })),
+  status: 'REVEALED',
+  createdAt: new Date().toISOString(),
+  revealedAt: new Date().toISOString(),
+  questionCommitmentHash: 'DEMO:active-session-reveal-gate',
+  revealAssurance: 'development_client_gate',
+};
+
 function seededInitialState(): AppStoreState {
 
   const defaultUser = SEED_USERS.find((u) => u.role === 'comp_admin') || SEED_USERS[0];
@@ -109,7 +135,7 @@ function seededInitialState(): AppStoreState {
     certificates: [SEED_CERTIFICATE],
     auditLogs: SEED_AUDIT_LOGS,
     incidents: SEED_INCIDENTS,
-    appeals: [],
+    appeals: SEED_APPEALS,
     isOffline: false,
     emergencyFrozen: false,
     sealApprovals: [],
@@ -119,7 +145,7 @@ function seededInitialState(): AppStoreState {
       {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
     ],
     travelRecords: [], consents: [], importJobs: [], shadowRuns: [], participantPassport: [], judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: [], remoteChecks: [], audioRecordings: [], featureFlags: [], quranSourceManifests: [], quranSourceContents: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
-    timeMachineScenarios:[], quorumActions:[], invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:[], protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:[], questionRevealGates:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:[], authSessions:[], passReissues:[], credentialLineages:[], sessionCheckpoints:[], continuityIncidents:[], sessionRecoveries:[], auditLedgerSeals:[], competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:[], smartRoutingDecisions:[], appealCapsules:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
+    timeMachineScenarios:[], quorumActions:[], invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:[], protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:[], questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:[], authSessions:[], passReissues:[], credentialLineages:[], sessionCheckpoints:[], continuityIncidents:[], sessionRecoveries:[], auditLedgerSeals:[], competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:[], smartRoutingDecisions:[], appealCapsules:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
     activeSession: {
       sessionId: 'sess-active-001',
       participant: SEED_PARTICIPANTS[0], // Bilal Yusuf (A-104)
@@ -153,7 +179,8 @@ function seededInitialState(): AppStoreState {
       ],
       isLocked: false,
       audioLevel: 78,
-      questionPhase: 'SEALED'
+      // كُشف السؤال في العرض عبر البوابة المزروعة، فتظهر منصة التحكيم مباشرة كما كانت قبل منظومة الكشف الآمن.
+      questionPhase: 'RECITING'
     }
   };
 }

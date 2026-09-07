@@ -94,6 +94,22 @@ export function toLaunchState(seeded: AppStoreState): AppStoreState {
     roleGrants: [],
     identityInvitations: [],
     authSessions: [],
+    // لا جلسة تحكيم مزروعة ولا بوابات كشف في نشرٍ حقيقي: وإلا ورث محكمٌ حقيقي جلسة العرض
+    // (متسابق ولجنة مخترعان) فتعطّلت موافقته على الكشف لعدم تطابق هويته مع محكمي تلك اللجنة.
+    questionRevealGates: [],
+    activeSession: {
+      ...seeded.activeSession,
+      sessionId: '',
+      participant: null,
+      committee: null,
+      questionSelection: null,
+      currentQuestionIndex: 0,
+      isReciting: false,
+      durationSeconds: 0,
+      events: [],
+      isLocked: false,
+      questionPhase: 'SEALED',
+    },
   };
 }
 
