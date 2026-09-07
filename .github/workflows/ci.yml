@@ -45,5 +45,8 @@ jobs:
       - name: تدقيق المصدر والأسرار
         run: npm run source-audit
 
+      - name: تدقيق الواجهة العربية
+        run: npm run arabic-ui-audit
+
       - name: البناء
         run: npm run build

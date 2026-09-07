@@ -1465,8 +1465,12 @@ export function useAppStore() {
       const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount});
       pool=generated.length?generated:DEVELOPMENT_QUESTION_BANK;
     }
+    // إعدادات الفئة: طول المقطع (عدد الآيات) وعدد الأسئلة. تُطبَّق على المجمع قبل السحب فتبقى
+    // متسقة مع إثبات FairDraw، ويتحكم بها المنظّم لكل مستوى.
+    if(category?.ayatPerQuestion&&category.ayatPerQuestion>0){const span=category.ayatPerQuestion;pool=pool.map(q=>({...q,endAyah:Math.max(q.startAyah,q.startAyah+span-1)}));}
+    const effPolicy=category?.questionsCount&&category.questionsCount>0?{...policy,questions:{...policy.questions,questionsPerParticipant:category.questionsCount}}:policy;
     try {
-      const selection = await generateFairDraw({ pool, participant, policy, maxJuz: category?.juzCount,poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT' });
+      const selection = await generateFairDraw({ pool, participant, policy:effPolicy, maxJuz: category?.juzCount,poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT' });
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
       const sessionId=newId('sess');
       const revealGates:QuestionRevealGateRecord[]=[];
