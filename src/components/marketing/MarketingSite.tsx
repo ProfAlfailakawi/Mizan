@@ -17,8 +17,6 @@ import { HERO_BAND, MOMENTS } from './photos';
  * وسطر واحد يشرحها. لا فقرات — من أراد التفصيل طلب العرض.
  */
 
-const CONTACT = 'mailto:info@dr-alfailakawi.com?subject=%D8%B7%D9%84%D8%A8%20%D8%B9%D8%B1%D8%B6%20%D9%85%D9%86%D8%B5%D8%A9%20%D9%85%D9%8A%D8%B2%D8%A7%D9%86';
-
 /* ظهورٌ عند التمرير — حركة واحدة مشتركة بدل مكتبة، وتُلغى لمن طلب تقليل الحركة. */
 function useReveal<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
@@ -134,6 +132,55 @@ const Moments: React.FC = () => {
   );
 };
 
+/* ── تواصل ──────────────────────────────────────────────────────────
+ * نموذجٌ يفتح رسالةً جاهزة في بريد الزائر بدل أن يُرسل إلى خادمٍ لا يستقبل.
+ * زرٌّ يَعِد بإرسالٍ لا يقع أسوأ من غياب الزر: هنا يرى المرسِل رسالته بعينه،
+ * ويصل الطلب إلى بريدنا فعلًا — بلا خادمٍ يُبنى ولا بريدٍ يضيع.
+ */
+const CONTACT_TO = 'info@dr-alfailakawi.com';
+
+const ContactForm: React.FC = () => {
+  const [name, setName] = useState('');
+  const [org, setOrg] = useState('');
+  const [phone, setPhone] = useState('');
+  const [note, setNote] = useState('');
+  const ready = name.trim().length > 1 && org.trim().length > 1;
+
+  const send = () => {
+    const subject = `طلب عرض منصّة ميزان — ${org.trim()}`;
+    const body = [
+      `الاسم: ${name.trim()}`,
+      `الجهة: ${org.trim()}`,
+      phone.trim() ? `الهاتف: ${phone.trim()}` : '',
+      '',
+      note.trim() || 'أرغب في عرضٍ تجريبي لمنصّة ميزان.',
+    ].filter(Boolean).join('\n');
+    window.location.href = `mailto:${CONTACT_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const field = 'w-full rounded-xl px-3.5 py-3 text-[13px] outline-none';
+  const fieldStyle = { background: 'rgba(255,255,255,.06)', border: '1px solid var(--venue-line)', color: 'var(--venue-ink)' } as React.CSSProperties;
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <input className={field} style={fieldStyle} value={name} onChange={e => setName(e.target.value)} placeholder="اسمك" aria-label="اسمك" />
+        <input className={field} style={fieldStyle} value={org} onChange={e => setOrg(e.target.value)} placeholder="اسم الجهة" aria-label="اسم الجهة" />
+      </div>
+      <input className={field} style={fieldStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="رقم التواصل — اختياري" aria-label="رقم التواصل" inputMode="tel" />
+      <textarea className={field} style={{ ...fieldStyle, minHeight: 96, resize: 'vertical' }} value={note} onChange={e => setNote(e.target.value)} placeholder="موعد مسابقتك، أو سؤالك" aria-label="رسالتك" />
+      <button onClick={send} disabled={!ready}
+        className="mt-1 inline-flex items-center justify-center gap-2.5 rounded-2xl py-4 text-[14px] font-black transition"
+        style={{ background: ready ? 'var(--gold-light)' : 'rgba(255,255,255,.10)', color: ready ? 'var(--ink-deep)' : 'var(--venue-faint)', cursor: ready ? 'pointer' : 'not-allowed' }}>
+        <Mail size={17} /> أرسل الطلب
+      </button>
+      <div className="text-[11px] text-center" style={{ color: 'var(--venue-faint)' }}>
+        أو راسلنا مباشرةً على <a href={`mailto:${CONTACT_TO}`} className="font-black" style={{ color: 'var(--gold-light)' }}>{CONTACT_TO}</a>
+      </div>
+    </div>
+  );
+};
+
 export const MarketingSite: React.FC = () => {
   useEffect(() => {
     document.title = 'ميزان — منصّة مسابقات القرآن الكريم';
@@ -155,7 +202,7 @@ export const MarketingSite: React.FC = () => {
                 <div className="text-[10px] font-bold mizan-muted mt-1">منصّة مسابقات القرآن</div>
               </div>
             </div>
-            <a href={CONTACT} className="rounded-xl px-4 h-10 grid place-items-center text-[12px] font-black text-white" style={{ background: 'var(--emerald)' }}>اطلب عرضًا</a>
+            <a href="#tawasul" className="rounded-xl px-4 h-10 grid place-items-center text-[12px] font-black text-white" style={{ background: 'var(--emerald)' }}>تواصل معنا</a>
           </div>
         </div>
       </header>
@@ -174,7 +221,7 @@ export const MarketingSite: React.FC = () => {
               منصّةٌ واحدة تُدير المسابقة من التسجيل إلى الحفل — بتحكيمٍ عادل، وسجلٍّ لا يُغيَّر، ونطاقٍ خاص لكل جهة.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
-              <a href={CONTACT} className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black text-white" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>اطلب عرضًا تجريبيًّا</a>
+              <a href="#tawasul" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black text-white" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>اطلب عرضًا تجريبيًّا</a>
               <a href="#kayf" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>كيف تعمل؟</a>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[11.5px] font-bold mizan-muted">
@@ -258,6 +305,64 @@ export const MarketingSite: React.FC = () => {
       </Section>
 
       <Moments/>
+
+      {/* ══ ٤٫٦) ما الذي يختفي من مسابقتك — قبل وبعد ══ */}
+      <Section>
+        <Kicker>ما الذي يختفي</Kicker>
+        <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">الورق، والطوابير، وليلة الفرز</h2>
+        <p className="mt-4 text-[13.5px] leading-7 mizan-muted max-w-[56ch]">
+          ليست ثلاث محطات — بل المسابقة كلها. من أول بطاقةٍ تُمسح إلى آخر شهادةٍ تُثبَت، لا ورقة واحدة.
+        </p>
+
+        {/* الجدول: قديمًا ← مع ميزان */}
+        <div className="mt-8 mizan-hero !p-0 overflow-hidden">
+          <div className="grid grid-cols-[1fr_1fr_1fr] text-[11px] font-black" style={{ background: 'var(--surface-soft)', borderBottom: '1px solid var(--line)' }}>
+            <div className="p-3.5 mizan-muted">المحطة</div>
+            <div className="p-3.5 mizan-muted">قديمًا</div>
+            <div className="p-3.5" style={{ color: 'var(--emerald)' }}>مع ميزان</div>
+          </div>
+          {[
+            { k: 'الاستقبال', a: 'كشفٌ ورقي وطابور', b: 'يمسح بطاقته فيدخل' },
+            { k: 'التسجيل', a: 'استمارةٌ ورقية وإدخالٌ يدوي', b: 'من جوّاله، في دقيقة' },
+            { k: 'التحكيم', a: 'ورقةُ درجاتٍ وقلم', b: 'شاشةُ المحكّم — والدرجة تُختم لحظتها' },
+            { k: 'الرصد والجمع', a: 'غرفةُ فرزٍ وآلةٌ حاسبة', b: 'المجموع لحظيٌّ ولا يُمَسّ' },
+            { k: 'النتائج', a: 'لجنةُ مراجعةٍ وليلةٌ طويلة', b: 'الترتيب جاهزٌ عند آخر تلاوة' },
+            { k: 'الشهادات', a: 'طباعةٌ وتوقيعٌ وإرسال', b: 'رقمٌ يُثبتها لأي جهةٍ تسأل' },
+          ].map((r, i) => (
+            <div key={r.k} className="grid grid-cols-[1fr_1fr_1fr] items-center" style={{ borderBottom: i < 5 ? '1px solid var(--line)' : 'none' }}>
+              <div className="p-3.5 text-[13px] font-black mizan-title">{r.k}</div>
+              <div className="p-3.5 text-[12.5px] leading-6" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.45)' }}>{r.a}</div>
+              <div className="p-3.5 text-[12.5px] leading-6 font-bold" style={{ color: 'var(--ink)' }}>
+                <Check size={14} className="inline-block ms-0 me-1.5" style={{ color: 'var(--emerald)' }} />{r.b}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* البرهان: الشاشات نفسها */}
+        <div className="mt-6 grid gap-5 md:grid-cols-3">
+          {[
+            { src: '/marketing/no-staff-gate.png', t: 'الاستقبال', s: 'حضورٌ ذاتي على جهاز القاعة.' },
+            { src: '/marketing/no-staff-register.png', t: 'التسجيل', s: 'استمارةُ هذه المسابقة وحدها.' },
+            { src: '/marketing/no-staff-certificate.png', t: 'الشهادة', s: 'إثباتٌ عام برقمٍ واحد.' },
+          ].map(c => (
+            <figure key={c.src} className="mizan-panel overflow-hidden mizan-surface-hover">
+              <img src={c.src} alt={c.t} loading="lazy" width={1400} height={800} className="w-full block" style={{ borderBottom: '1px solid var(--line)' }} />
+              <figcaption className="p-4">
+                <div className="text-[14px] font-black mizan-title">{c.t}</div>
+                <div className="mt-1 text-[12px] leading-5 mizan-muted">{c.s}</div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        {/* الخلاصة التي يفهمها المشتري: الفريق */}
+        <div className="mt-6 rounded-[24px] p-7 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid #cddbd3' }}>
+          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.5)' }}>٢٤</div>
+          <div className="text-[13px] font-black mizan-muted">فريق تشغيل اليوم الواحد</div>
+          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--emerald)' }}>٦</div>
+        </div>
+      </Section>
 
       {/* ══ ٤٫٧) الذكاء الاصطناعي: قدراتٌ محكومة، لا وعودٌ عامة ══ */}
       <section className="mt-4" style={{ background: 'var(--venue-2)', color: 'var(--venue-ink)' }}>
@@ -411,21 +516,26 @@ export const MarketingSite: React.FC = () => {
         </div>
       </Section>
 
-      {/* ══ ٨) الدعوة الأخيرة ══ */}
-      <Section className="!pb-6">
-        <div className="rounded-[28px] p-9 sm:p-12 text-center" style={{ background: 'linear-gradient(160deg, var(--ink-deep), var(--venue) 70%)', color: 'var(--venue-ink)', boxShadow: 'var(--shadow-4)' }}>
-          <div className="grid place-items-center"><MizanMark className="w-12 h-12" tone="inverse" decorative /></div>
-          <h2 className="font-display text-[clamp(24px,4vw,40px)] font-black mt-6 leading-[1.25]">جاهزون لمسابقتك القادمة</h2>
-          <p className="mt-4 text-[14px] leading-8 mx-auto max-w-[44ch]" style={{ color: 'var(--venue-muted)' }}>
-            أرسل اسم جهتك وموعد مسابقتك — ونُسلّمك نطاقك ولوحتك جاهزين.
-          </p>
-          <a href={CONTACT} className="mt-8 inline-flex items-center gap-2.5 rounded-2xl px-8 py-4 text-[14px] font-black" style={{ background: 'var(--gold-light)', color: 'var(--ink-deep)' }}>
-            <Mail size={17} /> اطلب عرضًا الآن
-          </a>
-          <div className="mt-8 flex flex-wrap justify-center gap-x-7 gap-y-3 text-[11.5px] font-bold" style={{ color: 'var(--venue-faint)' }}>
-            <span className="inline-flex items-center gap-1.5"><Gauge size={14} /> إطلاقٌ في اليوم نفسه</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} /> بياناتك ملكك</span>
-            <span className="inline-flex items-center gap-1.5"><Users size={14} /> بلا حدٍّ للمتسابقين</span>
+      {/* ══ ٨) تواصل معنا ══ */}
+      <Section id="tawasul" className="!pb-6">
+        <div className="rounded-[28px] p-8 sm:p-12" style={{ background: 'linear-gradient(160deg, var(--ink-deep), var(--venue) 70%)', color: 'var(--venue-ink)', boxShadow: 'var(--shadow-4)' }}>
+          <div className="grid lg:grid-cols-[1fr_1fr] gap-10 items-center">
+            <div>
+              <div className="grid place-items-start"><MizanMark className="w-12 h-12" tone="inverse" decorative /></div>
+              <h2 className="font-display text-[clamp(24px,4vw,40px)] font-black mt-6 leading-[1.25]">جاهزون لمسابقتك القادمة</h2>
+              <p className="mt-4 text-[14px] leading-8 max-w-[42ch]" style={{ color: 'var(--venue-muted)' }}>
+                اسم جهتك وموعد مسابقتك يكفيان — ونُسلّمك نطاقك ولوحتك جاهزين.
+              </p>
+              <div className="mt-7 grid gap-3 text-[12.5px] font-bold" style={{ color: 'var(--venue-faint)' }}>
+                <span className="inline-flex items-center gap-2"><Gauge size={15} /> إطلاقٌ في اليوم نفسه</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck size={15} /> بياناتك ملكك، معزولةً عن غيرك</span>
+                <span className="inline-flex items-center gap-2"><Users size={15} /> بلا حدٍّ لعدد المتسابقين</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-black tracking-[.18em] mb-4" style={{ color: 'var(--venue-faint)' }}>تواصل معنا</div>
+              <ContactForm />
+            </div>
           </div>
         </div>
       </Section>
@@ -433,7 +543,7 @@ export const MarketingSite: React.FC = () => {
       <footer className="mizan-page !pt-2 !pb-10">
         <div className="flex flex-wrap items-center justify-between gap-4 pt-6 text-[11.5px] font-bold mizan-muted" style={{ borderTop: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5"><MizanMark className="w-6 h-6" decorative /> ميزان — جميع الحقوق محفوظة</div>
-          <a href={CONTACT} className="font-black" style={{ color: 'var(--emerald)' }}>info@dr-alfailakawi.com</a>
+          <a href="#tawasul" className="font-black" style={{ color: 'var(--emerald)' }}>تواصل معنا</a>
         </div>
       </footer>
     </div>
