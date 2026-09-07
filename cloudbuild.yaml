@@ -20,6 +20,10 @@ steps:
       - 'VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}'
       - '--build-arg'
       - 'VITE_REQUIRE_AUTH=${_VITE_REQUIRE_AUTH}'
+      # حارس العامل الثاني يُخبز في الحزمة، فبقي true مهما ضُبط على الخادم — ولا سبيل
+      # لأول دخول قبل تسجيل عامل ثانٍ. يُمرَّر هنا، وافتراضه يبقى الاشتراط.
+      - '--build-arg'
+      - 'VITE_REQUIRE_MFA_FOR_SENSITIVE=${_VITE_REQUIRE_MFA_FOR_SENSITIVE}'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -59,6 +63,8 @@ substitutions:
   _VITE_FIREBASE_MESSAGING_SENDER_ID: '993698501419'
   _VITE_FIREBASE_APP_ID: '1:993698501419:web:47a25e46ccbacccb17ab6e'
   _VITE_REQUIRE_AUTH: 'false'
+  # يبقى الاشتراط افتراضًا؛ 'false' لأول دخول فقط، ثم يُعاد.
+  _VITE_REQUIRE_MFA_FOR_SENSITIVE: 'true'
 
 images:
   - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
