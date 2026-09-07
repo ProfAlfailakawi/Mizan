@@ -203,6 +203,27 @@ export function useMizanAuth(requireAuth: boolean) {
     }
   };
 
+  /* استيلاء المالك على جلسته من نطاق آخر: كل أصل متصفح معرّفُ جهاز مستقل، فالنطاقان
+     يبدوان جهازين. من يملك إبطال جلساته يُغلق الأخرى ويكمل هنا بدل طريق مسدود. */
+  const takeoverSession = async () => {
+    try {
+      const user = auth?.currentUser;
+      if (!user) { window.location.reload(); return; }
+      const token = await user.getIdToken();
+      const res = await fetch('/api/identity/session/takeover', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'x-mizan-device-id': deviceIdentity(),
+          'x-mizan-device-name': navigator.userAgent.slice(0, 120),
+        },
+      });
+      if (res.ok) { window.location.reload(); return; }
+      const body = await res.json().catch(() => ({} as Record<string, unknown>));
+      setAccessError(((body as { code?: string }).code as MizanAccessError) || 'PRIVILEGED_SESSION_CONFLICT');
+    } catch { /* تبقى الشاشة كما هي، فيعيد المحاولة */ }
+  };
+
   return {
     signedIn,
     authReady,
@@ -211,5 +232,6 @@ export function useMizanAuth(requireAuth: boolean) {
     setActivationToken,
     activationMessage,
     activateAccount,
+    takeoverSession,
   };
 }
