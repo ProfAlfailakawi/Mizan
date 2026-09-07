@@ -65,7 +65,9 @@ substitutions:
   _VITE_FIREBASE_APP_ID: '1:993698501419:web:47a25e46ccbacccb17ab6e'
   _VITE_REQUIRE_AUTH: 'true'
   # يبقى الاشتراط افتراضًا؛ 'false' لأول دخول فقط، ثم يُعاد.
-  _VITE_REQUIRE_MFA_FOR_SENSITIVE: 'true'
+  # مؤقّت أثناء الاختبارات والتجارب: العامل الثاني معطَّل ليُربط النشر التلقائي بلا
+  # قفل. يُعاد إلى 'true' قبل البيع — وهو الآمن. راجع docs/GO-LIVE.md.
+  _VITE_REQUIRE_MFA_FOR_SENSITIVE: 'false'
 
 images:
   - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
