@@ -231,6 +231,15 @@ async function startServer() {
     resetTenantRegistry();
     return res.json({tenant:outcome.tenant});
   };
+  /* نفس إدارة الجهات، لكن بهوية المالك لا بمفتاح المؤسسات: المفتاح سرّ خادمي لا يجوز
+     أن يسكن متصفحًا. الدور super_admin وحده، ويُتحقق منه في الخادم لا في الواجهة. */
+  const ownerOnly=requireFirebaseRoles(['super_admin']);
+  app.get('/api/owner/tenants',ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
+  app.post('/api/owner/tenants',ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
+  app.patch('/api/owner/tenants/:orgId',ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
+  app.post('/api/owner/tenants/:orgId/suspend',ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.suspend(String(req.params.orgId)))});
+  app.post('/api/owner/tenants/:orgId/activate',ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.activate(String(req.params.orgId)))});
+
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/enterprise/tenants/:orgId',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});

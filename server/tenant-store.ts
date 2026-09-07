@@ -64,6 +64,7 @@ export function normalizeTenant(candidate: TenantRecord): TenantRecord {
   if (candidate.displayName) record.displayName = String(candidate.displayName).trim();
   if (candidate.displayNameArabic) record.displayNameArabic = String(candidate.displayNameArabic).trim();
   if (candidate.logoUrl) record.logoUrl = String(candidate.logoUrl).trim();
+  if (candidate.note) record.note = String(candidate.note).trim().slice(0, 300);
   return record;
 }
 
