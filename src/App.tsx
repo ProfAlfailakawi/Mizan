@@ -153,8 +153,31 @@ const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean
 const Page: React.FC<{children: React.ReactNode}> = ({children}) => <><PersistenceAlert/><Suspense fallback={<ViewFallback/>}>{children}</Suspense></>;
 const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
 
+/*
+ * روابط المسابقة المخصصة.
+ *
+ * كل مسابقة تُشارَك برابط مباشر يحمل معرّفها: `#register?comp=<id>` أو `#competition?comp=<id>`.
+ * هكذا يرسل المنظّم رابط مسابقته وحدها، فيفتح المتسابق نموذج تلك المسابقة تحديدًا بدل
+ * الاعتماد على المسابقة النشطة في المتجر. بلا المعامل يبقى السلوك القديم (المسابقة النشطة).
+ */
+const compParam = (h: string): string | null => {
+  const i = h.indexOf('?');
+  if (i === -1) return null;
+  try { return new URLSearchParams(h.slice(i + 1)).get('comp'); } catch { return null; }
+};
+/* شاشة تظهر حين يحمل الرابط معرّف مسابقة غير موجودة: تقول الحقيقة بدل أن تُسقط الزائر على مسابقة أخرى. */
+const CompetitionNotFound: React.FC = () => (
+  <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5">
+    <div className="mizan-surface p-8 max-w-md text-center">
+      <div className="mizan-kicker">رابط المسابقة</div>
+      <h1 className="text-xl font-black mt-2">هذه المسابقة غير متاحة</h1>
+      <p className="text-xs text-[#636864] mt-3 leading-6">الرابط يشير إلى مسابقة غير موجودة أو أُغلق تسجيلها. تأكد من الرابط الذي شاركته جهة المسابقة.</p>
+    </div>
+  </div>
+);
+
 export default function App() {
- const {currentUser,switchRole,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
+ const {currentUser,switchRole,selectCompetition,accessibilityProfiles,ensureAccessibilityProfile,language}=useAppStore();
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
  useEffect(()=>{warmViews()},[]);
@@ -168,6 +191,10 @@ export default function App() {
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
+ // رابط يحمل معرّف مسابقة ⇒ اجعلها المسابقة النشطة قبل عرض صفحتها. غياب المعرّف يبقي المسابقة الحالية.
+ const requestedComp=compParam(hash);
+ const [compMissing,setCompMissing]=useState(false);
+ useEffect(()=>{if(!requestedComp){setCompMissing(false);return;}setCompMissing(!selectCompetition(requestedComp));},[requestedComp]);
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md text-center"><div className="flex justify-center mb-4"><MizanLogo language={currentUser?.id? 'ar':'ar'} compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق بخطوتين لهذا الدور':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#636864] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'لأن هذا الحساب يستطيع التأثير في مسابقة عالية الحساسية، لا يسمح ميزان بالدخول الأحادي. فعّل المصادقة متعددة العوامل لدى موفر الهوية ثم أعد تسجيل الدخول.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. اطلب من مدير المسابقة إغلاق الجلسة القديمة إذا كان الجهاز السابق مفقودًا أو متعطلًا.':'الهوية صحيحة، لكن الحساب يحتاج دعوة وصلاحية محددة داخل المؤسسة قبل الدخول.'}</p>{accessError==='ACCOUNT_NOT_PROVISIONED'&&<div className="mt-5 text-start"><label className="text-[10px] font-black text-[#616763]">رمز التفعيل لمرة واحدة</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="رمز التفعيل"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">ربط هذا الحساب بالدعوة</button>{activationMessage&&<div className="mt-2 text-[10px] text-center text-[#656b66]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':'تعذر إكمال التفعيل'}</div>}</div>}<div className="text-[10px] text-[#696f6b] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div><button onClick={()=>signOut(auth)} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button></div></div>;
@@ -175,9 +202,9 @@ export default function App() {
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
  if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- if(hash.startsWith('#competition')) return <><Page><CompetitionLanding/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
+ if(hash.startsWith('#competition')) return compMissing?<CompetitionNotFound/>:<><Page><CompetitionLanding/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
  if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
- if(hash.startsWith('#register')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
+ if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#broadcast')) return <><Overlay><BroadcastStage onClose={returnToExperience}/></Overlay></>;
  if(hash.startsWith('#judge-intelligence')) return <><Overlay><JudgeIntelligenceLab onClose={returnToExperience}/></Overlay></>;
  if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/></>;
