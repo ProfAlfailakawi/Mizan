@@ -21,6 +21,8 @@ export interface TenantRecord {
   subdomain?: string;
   /** نطاقات خاصة تُوجَّه إلى هذا النشر. */
   customDomains?: string[];
+  /** ملاحظة إدارية للمالك (حال الاشتراك مثلًا). لا تُعرض للزوّار. */
+  note?: string;
   status?: 'active' | 'suspended';
 }
 

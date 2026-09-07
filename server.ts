@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { type RequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { Response } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
@@ -231,6 +232,21 @@ async function startServer() {
     resetTenantRegistry();
     return res.json({tenant:outcome.tenant});
   };
+  /* نفس إدارة الجهات، لكن بهوية المالك لا بمفتاح المؤسسات: المفتاح سرّ خادمي لا يجوز
+     أن يسكن متصفحًا. الدور super_admin وحده، ويُتحقق منه في الخادم لا في الواجهة. */
+  /* حدّ أضيق من الحدّ العام لمسارات المالك: هي تعدّل نطاقات الجهات وتوقفها، فمحاولة
+     تخمين هوية أو إغراق بالتعديلات يجب أن تُخنق قبل أن تصل حدّ /api الفسيح.
+     ويُترك للطبقة الخارجية متى أُسند التحديد إليها، كما يفعل الحدّ العام. */
+  const ownerRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const ownerOnly=requireFirebaseRoles(['super_admin']);
+  app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
+  app.post('/api/owner/tenants',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
+  app.patch('/api/owner/tenants/:orgId',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
+  app.post('/api/owner/tenants/:orgId/suspend',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.suspend(String(req.params.orgId)))});
+  app.post('/api/owner/tenants/:orgId/activate',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.activate(String(req.params.orgId)))});
+
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/enterprise/tenants/:orgId',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
