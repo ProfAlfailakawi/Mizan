@@ -35,6 +35,17 @@ jobs:
         run: npm ci
       - name: تطبيق الإكمال النهائي
         run: python3 APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py
+      - name: حفظ تشخيص الدور المتقاعد
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          grep -Rsn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' scientific_admin src server server.ts tests > diagnostics/scientific-admin.txt || true
+      - name: رفع تشخيص الدور المتقاعد
+        uses: actions/upload-artifact@v4
+        with:
+          name: retired-role-diagnostics
+          path: diagnostics/scientific-admin.txt
+          retention-days: 1
       - name: تدقيق حذف الدور القديم من الأسطح النشطة
         shell: bash
         run: |
