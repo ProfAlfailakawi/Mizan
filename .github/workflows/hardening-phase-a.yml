@@ -48,8 +48,8 @@ jobs:
           PY
       - name: تطبيق إصلاحات الحفظ والصلاحيات والتجميد والتحقق
         run: python3 APPLY_HARDENING_PHASE_A_2026_09_08.py
-      - name: تصحيح اسم أيقونة التجميد المتوافقة مع lucide
-        run: sed -i 's/PauseCircle/CirclePause/g' src/components/admin/IdentityGovernance.tsx
+      - name: تصحيح أسماء أيقونات التجميد والاستئناف المتوافقة مع lucide
+        run: sed -i -e 's/PauseCircle/Pause/g' -e 's/CirclePause/Pause/g' -e 's/PlayCircle/Play/g' src/components/admin/IdentityGovernance.tsx
       - name: فحص الأنواع
         run: npm run lint
       - name: الاختبارات
