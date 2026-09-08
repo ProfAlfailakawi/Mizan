@@ -102,17 +102,20 @@ export function resolveTenant(host: string | undefined, tenants: TenantRecord[] 
 }
 
 /** الشكل الذي يراه المتصفح: هوية العرض فقط، دون تفاصيل السجل الأخرى. */
-export const publicTenant = (t: TenantRecord) => ({
-  orgId: t.orgId,
-  displayName: t.displayName || null,
-  displayNameArabic: t.displayNameArabic || null,
-  logoUrl: t.logoUrl || null,
-  slogan: t.slogan || null,
-  sloganArabic: t.sloganArabic || null,
-  websiteUrl: t.websiteUrl || null,
-  phoneNumber: t.phoneNumber || null,
-  supportEmail: t.supportEmail || null,
-  address: t.address || null,
-  addressArabic: t.addressArabic || null,
-  displayPlacements: t.displayPlacements || null,
-});
+export const publicTenant = (t: TenantRecord) => {
+  const res: Record<string, unknown> = {
+    orgId: t.orgId,
+    displayName: t.displayName || null,
+    displayNameArabic: t.displayNameArabic || null,
+    logoUrl: t.logoUrl || null,
+  };
+  if (t.slogan !== undefined) res.slogan = t.slogan;
+  if (t.sloganArabic !== undefined) res.sloganArabic = t.sloganArabic;
+  if (t.websiteUrl !== undefined) res.websiteUrl = t.websiteUrl;
+  if (t.phoneNumber !== undefined) res.phoneNumber = t.phoneNumber;
+  if (t.supportEmail !== undefined) res.supportEmail = t.supportEmail;
+  if (t.address !== undefined) res.address = t.address;
+  if (t.addressArabic !== undefined) res.addressArabic = t.addressArabic;
+  if (t.displayPlacements !== undefined) res.displayPlacements = t.displayPlacements;
+  return res;
+};

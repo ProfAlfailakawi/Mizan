@@ -21,9 +21,11 @@ export function useBrandInfo(): BrandInfo {
   const brand = s.organization?.brand;
   const comp = s.competition;
   const rawPlacements = brand?.displayPlacements || {};
+  const brandArabic = comp?.displayNameArabic || brand?.displayNameArabic || brand?.nameArabic;
+  const brandEnglish = comp?.displayName || brand?.displayName || brand?.name;
   return {
-    ar: comp?.displayNameArabic || brand?.displayNameArabic || brand?.nameArabic || 'ميزان',
-    en: comp?.displayName || brand?.displayName || brand?.name || 'MIZAN',
+    ar: brandArabic || brand?.displayNameArabic || 'ميزان',
+    en: brandEnglish || brand?.displayName || 'MIZAN',
     logoUrl: comp?.logoUrl || brand?.logoUrl,
     slogan: brand?.slogan,
     sloganArabic: brand?.sloganArabic,

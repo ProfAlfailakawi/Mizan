@@ -584,7 +584,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     className="max-h-16 max-w-full object-contain drop-shadow-sm"
                   />
                 ) : (
-                  <span className={`text-xs font-bold ${previewBg === 'dark' ? 'text-[#85928b]' : 'text-[#8b918d]'}`}>
+                  <span className={`text-xs font-bold ${previewBg === 'dark' ? 'text-[#d6ded9]' : 'text-[#656b66]'}`}>
                     {ar ? 'يظهر الشعار المفحوص هنا' : 'Verified logo appears here'}
                   </span>
                 )}
@@ -956,7 +956,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       )}
                     </div>
 
-                    <div className="text-[9px] text-[#858c87] pt-1">
+                    <div className="text-[9px] text-[#656b66] pt-1">
                       © {new Date().getFullYear()} {nameArabic || nameEnglish}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
                     </div>
                   </div>
@@ -992,7 +992,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     </div>
 
                     {placements.showOnCertificates && (
-                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[9px] text-[#807a72]">
+                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[9px] text-[#656b66]">
                         <span>{websiteUrl ? websiteUrl.replace(/^https?:\/\//i, '') : 'quran-verify.org'}</span>
                         <span className="font-mono">VERIFIED-HASH-SEAL</span>
                       </div>

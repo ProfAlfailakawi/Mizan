@@ -74,7 +74,7 @@ export const TenantFooter: React.FC = () => {
         </div>
 
         {/* سطر الحقوق والاعتماد */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-[#858c87]">
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-[#656b66]">
           <div>
             © {new Date().getFullYear()} {ar ? brand.ar : brand.en}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
           </div>
