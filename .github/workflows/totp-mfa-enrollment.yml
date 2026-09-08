@@ -39,6 +39,14 @@ jobs:
       - name: تطبيق تسجيل TOTP ومسار الدخول بالعامل الثاني
         run: python3 APPLY_TOTP_MFA_2026_09_08.py
 
+      # firebase/auth في الحزمة الجامعة المنشورة يعرّف مجموعة مصغّرة من الأنواع في هذا
+      # البناء، بينما @firebase/auth المثبت نفسه (1.13.5) هو مصدر Auth الفعلي ويصدّر
+      # TOTP/MFA وواجهات إعادة التحقق كاملة. كلا المسارين يستخدمان نسخة Auth نفسها.
+      - name: ربط واجهات MFA بمصدر Auth الكامل
+        shell: bash
+        run: |
+          sed -i "s#'firebase/auth'#'@firebase/auth'#g" src/components/auth/AuthPortal.tsx src/components/auth/TotpSecurity.tsx
+
       - name: فحص فرق المصدر
         run: git diff --check
 
