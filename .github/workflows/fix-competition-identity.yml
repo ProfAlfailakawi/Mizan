@@ -1,0 +1,100 @@
+name: إصلاح الهوية حسب المسابقة وتفعيل QR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'APPLY_COMPETITION_IDENTITY_2026_09_08.py'
+      - '.github/workflows/fix-competition-identity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mizan-competition-identity-fix
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: جلب المصدر
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: إعداد Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: تثبيت الاعتمادات
+        run: npm ci
+
+      - name: تطبيق تفعيل QR والعزل حسب المسابقة
+        run: python3 APPLY_COMPETITION_IDENTITY_2026_09_08.py
+
+      - name: فحص الأنواع
+        run: npm run lint
+
+      - name: الاختبارات
+        run: npm test
+
+      - name: تدقيق المصدر والأسرار
+        run: npm run source-audit
+
+      - name: تدقيق الواجهة العربية
+        run: npm run arabic-ui-audit
+
+      - name: البناء
+        run: npm run build
+
+      - name: حفظ الإصلاح في main
+        id: persist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGETS=(
+            "src/components/auth/AuthPortal.tsx"
+            "src/components/admin/RolePortals.tsx"
+            "src/components/admin/CompetitionOverview.tsx"
+            "src/App.tsx"
+            "src/components/admin/IdentityGovernance.tsx"
+            "server/identity-governance.ts"
+            "server.ts"
+            "tests/competition-scoped-identity-onboarding.test.ts"
+          )
+
+          git add -- "${TARGETS[@]}"
+          git rm -- APPLY_COMPETITION_IDENTITY_2026_09_08.py .github/workflows/fix-competition-identity.yml
+
+          if git diff --cached --quiet; then
+            echo "materialized=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin main
+          LOCAL_HEAD="$(git rev-parse HEAD)"
+          REMOTE_HEAD="$(git rev-parse origin/main)"
+          if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+            echo "main changed while checks were running; refusing stale push."
+            exit 1
+          fi
+
+          git config user.name "MIZAN CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "feat(identity): scope access per competition and finish QR onboarding"
+          git push origin HEAD:main
+          echo "materialized=1" >> "$GITHUB_OUTPUT"
+
+      - name: تشغيل CI على الإصلاح النهائي
+        if: steps.persist.outputs.materialized == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
