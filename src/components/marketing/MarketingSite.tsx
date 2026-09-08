@@ -236,7 +236,7 @@ export const MarketingSite: React.FC = () => {
           <div className="relative">
             <div className="absolute -inset-6 -z-10 rounded-[40px]" style={{ background: 'radial-gradient(60% 60% at 70% 30%, rgba(185,139,78,.16), transparent 70%)' }} />
             {/* لقطةٌ حقيقية من شاشة التحكيم — لا رسمٌ تخيّلي ولا وعدٌ مصوَّر. */}
-            <img src="/marketing/shot-hall-map.png" alt="خريطة تلاوة القاعة في ميزان: ما تُلي من المصحف صفحةً صفحة" loading="eager" width={1600} height={1000}
+            <img src="/marketing/hero-mushaf.png" alt="المصحف الرسمي في شاشة التحكيم: البقرة ١٤٢–١٤٤ بنص مجمع الملك فهد" loading="eager" width={945} height={1180}
               className="w-full rounded-[26px]" style={{ border: '1px solid var(--line)', boxShadow: 'var(--shadow-4)' }} />
           </div>
         </div>
@@ -289,8 +289,10 @@ export const MarketingSite: React.FC = () => {
       <Section>
         <Kicker>من داخل المنصّة</Kicker>
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">شاشاتٌ تعمل اليوم — لا وعود</h2>
-        <div className="mt-8 grid gap-5 lg:grid-cols-2">
+        <div className="mt-8 grid gap-5 sm:grid-cols-2">
           {[
+            { src: '/marketing/mushaf-tajweed.png', t: 'المصحف بأحكام التجويد', s: 'النص العثماني بنص مجمع الملك فهد، وطبقة تجويدٍ تُظهَر عند الحاجة.' },
+            { src: '/marketing/shot-hall-map.png', t: 'خريطة تلاوة القاعة', s: 'ما تُلي اليوم من المصحف، صفحةً صفحة، على الشاشة الكبيرة.' },
             { src: '/marketing/shot-ceremony.png', t: 'لحظة التتويج', s: 'إعلان النتائج على الشاشة الكبيرة — كشفٌ معتمد بالنصاب.' },
             { src: '/marketing/shot-delegation.png', t: 'بوابة الوفد', s: 'ترشيحٌ ووصولٌ وإثباتات — دون كشف بيانات التحكيم.' },
           ].map(g => (
