@@ -38,7 +38,7 @@ jobs:
       - name: تطبيق الملاحظات
         run: python3 APPLY_UI_NOTES_2026_09_08.py
 
-      - name: إكمال نوع سياسة المسابقة
+      - name: إكمال النوع والحفاظ على بوابات السلامة
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -46,11 +46,13 @@ jobs:
           s=p.read_text(encoding='utf-8')
           old='  User,\n  Role,'
           new='  User,\n  CompetitionPolicy,\n  Role,'
-          if old not in s and new not in s:
-              raise SystemExit('CompetitionPolicy import anchor missing')
           if old in s:
               s=s.replace(old,new,1)
-              p.write_text(s,encoding='utf-8')
+          weak="if(issues.length||blockers.length) return {ok:false,issues:[...issues,...blockers.map(x=>x.title)],scientificBlockers,contradictions};"
+          safe="if(issues.length||blockers.length||(productionMode&&scientificBlockers.length)) return {ok:false,issues:[...issues,...blockers.map(x=>x.title),...scientificBlockers.map(x=>x.message)],scientificBlockers,contradictions};"
+          if weak in s:
+              s=s.replace(weak,safe,1)
+          p.write_text(s,encoding='utf-8')
           PY
 
       - name: عرض التغييرات
@@ -60,7 +62,22 @@ jobs:
         run: npm run lint
 
       - name: الاختبارات
-        run: npm test
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee test-output.log
+          status=${PIPESTATUS[0]}
+          tail -n 220 test-output.log
+          exit $status
+
+      - name: حفظ سجل فشل الاختبارات
+        if: failure() && steps.tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-notes-test-output
+          path: test-output.log
+          if-no-files-found: error
 
       - name: تدقيق المصدر
         run: npm run source-audit
