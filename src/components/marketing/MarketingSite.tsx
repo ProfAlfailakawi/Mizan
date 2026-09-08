@@ -2,11 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck, Scale, Mic, WifiOff, QrCode, BadgeCheck, Users, Building2,
   Fingerprint, FileCheck2, Radio, Accessibility, Trophy, BookOpen, Layers,
-  Clock, Globe, Mail, Check, Gauge,
+  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity,
 } from 'lucide-react';
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
 import { toWesternDigits } from '../../lib/input-normalize';
+import {
+  LiveJudgingSimulator,
+  InteractiveEvolutionFlow,
+  SecurityAndArchitectureInfographic,
+} from './MarketingInfographics';
 
 /*
  * الواجهة العامة لميزان — mizan.<domain>.
@@ -250,6 +255,11 @@ export const MarketingSite: React.FC = () => {
           <Stat value="100%" label="قرارٍ مختوم في سجلٍّ متسلسل" />
           <Stat value="0" label="أوامر تكتبها لإطلاق جهة" />
         </div>
+
+        {/* إنفوجرافيك تفاعلي متحرك يحاكي التحكيم المباشر ونبض القاعة */}
+        <div className="mt-8">
+          <LiveJudgingSimulator />
+        </div>
       </Section>
 
       <HeroBand/>
@@ -313,41 +323,21 @@ export const MarketingSite: React.FC = () => {
 
       <Moments/>
 
-      {/* ══ ٤٫٦) ما الذي يختفي من مسابقتك — قبل وبعد ══ */}
+      {/* ══ ٤٫٦) ما الذي يختفي من مسابقتك — إنفوجرافيك مقارنة تفاعلي ══ */}
       <Section>
         <Kicker>ما الذي يختفي</Kicker>
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">الورق، والطوابير، وليلة الفرز</h2>
         <p className="mt-4 text-[13.5px] leading-7 mizan-muted max-w-[56ch]">
-          ليست ثلاث محطات — بل المسابقة كلها. من أول بطاقةٍ تُمسح إلى آخر شهادةٍ تُثبَت، لا ورقة واحدة.
+          ليست ثلاث محطات — بل المسابقة كلها. انقر فوق أي مرحلة لاستكشاف الفرق المباشر بالإنفوجرافيك.
         </p>
 
-        {/* الجدول: قديمًا ← مع ميزان */}
-        <div className="mt-8 mizan-hero !p-0 overflow-hidden">
-          <div className="grid grid-cols-[1fr_1fr_1fr] text-[11px] font-black" style={{ background: 'var(--surface-soft)', borderBottom: '1px solid var(--line)' }}>
-            <div className="p-3.5 mizan-muted">المحطة</div>
-            <div className="p-3.5 mizan-muted">قديمًا</div>
-            <div className="p-3.5" style={{ color: 'var(--emerald)' }}>مع ميزان</div>
-          </div>
-          {[
-            { k: 'الاستقبال', a: 'كشفٌ ورقي وطابور', b: 'يمسح بطاقته فيدخل' },
-            { k: 'التسجيل', a: 'استمارةٌ ورقية وإدخالٌ يدوي', b: 'من جوّاله، في دقيقة' },
-            { k: 'التحكيم', a: 'ورقةُ درجاتٍ وقلم', b: 'شاشةُ المحكّم — والدرجة تُختم لحظتها' },
-            { k: 'الرصد والجمع', a: 'غرفةُ فرزٍ وآلةٌ حاسبة', b: 'المجموع لحظيٌّ ولا يُمَسّ' },
-            { k: 'النتائج', a: 'لجنةُ مراجعةٍ وليلةٌ طويلة', b: 'الترتيب جاهزٌ عند آخر تلاوة' },
-            { k: 'الشهادات', a: 'طباعةٌ وتوقيعٌ وإرسال', b: 'رقمٌ يُثبتها لأي جهةٍ تسأل' },
-          ].map((r, i) => (
-            <div key={r.k} className="grid grid-cols-[1fr_1fr_1fr] items-center" style={{ borderBottom: i < 5 ? '1px solid var(--line)' : 'none' }}>
-              <div className="p-3.5 text-[13px] font-black mizan-title">{r.k}</div>
-              <div className="p-3.5 text-[12.5px] leading-6" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.45)' }}>{r.a}</div>
-              <div className="p-3.5 text-[12.5px] leading-6 font-bold" style={{ color: 'var(--ink)' }}>
-                <Check size={14} className="inline-block ms-0 me-1.5" style={{ color: 'var(--emerald)' }} />{r.b}
-              </div>
-            </div>
-          ))}
+        {/* إنفوجرافيك المحطات التفاعلي */}
+        <div className="mt-7">
+          <InteractiveEvolutionFlow />
         </div>
 
-        {/* البرهان: الشاشات نفسها */}
-        <div className="mt-6 grid gap-5 md:grid-cols-3">
+        {/* البرهان: الشاشات الحقيقية */}
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
           {[
             { src: '/marketing/no-staff-gate.png', t: 'الاستقبال', s: 'حضورٌ ذاتي على جهاز القاعة.' },
             { src: '/marketing/no-staff-register.png', t: 'التسجيل', s: 'استمارةُ هذه المسابقة وحدها.' },
@@ -467,39 +457,12 @@ export const MarketingSite: React.FC = () => {
         </Section>
       </section>
 
-      {/* ══ ٦) العزل بين الجهات: مخطط ══ */}
+      {/* ══ ٦) العزل بين الجهات: إنفوجرافيك المعمارية ══ */}
       <Section>
         <Kicker>لكل جهةٍ عالمها</Kicker>
-        <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">جهةٌ لا ترى جهةً أخرى — أبدًا</h2>
-        <div className="mt-8 grid lg:grid-cols-[1fr_1fr] gap-6 items-stretch">
-          <div className="mizan-hero flex flex-col justify-center gap-4">
-            {ISOLATION.map(r => (
-              <div key={r.label} className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl grid place-items-center shrink-0" style={{ background: 'var(--emerald-soft)', color: 'var(--emerald)' }}>
-                  <r.icon size={18} strokeWidth={2.1} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[10.5px] font-black mizan-muted">{r.label}</div>
-                  <div className="text-[13.5px] font-black mizan-title mt-0.5 truncate">{r.value}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* ثلاث جهات، ثلاثة نطاقات، منصّةٌ واحدة */}
-          <div className="mizan-hero">
-            <div className="text-[11px] font-black mizan-muted">منصّةٌ واحدة · نطاقاتٌ منفصلة</div>
-            <div className="mt-5 grid gap-2.5">
-              {['jiha-1', 'jiha-2', 'jiha-3'].map((t, i) => (
-                <div key={t} className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3" style={{ background: i === 0 ? 'var(--emerald-soft)' : 'var(--surface-soft)', border: '1px solid var(--line)' }}>
-                  <span className="mizan-proof-code font-black">{t}.dr-alfailakawi.com</span>
-                  <span className="mizan-status-orb" />
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 pt-4 flex items-center gap-2.5 text-[12px] font-bold mizan-muted" style={{ borderTop: '1px solid var(--line)' }}>
-              <Clock size={15} /> النطاق يُفعَّل في دقائق — وتوقيف الاشتراك يُغلقه فورًا.
-            </div>
-          </div>
+        <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">بيانات معزولة وسلسلة نزاهة مشفّرة</h2>
+        <div className="mt-8">
+          <SecurityAndArchitectureInfographic />
         </div>
       </Section>
 
