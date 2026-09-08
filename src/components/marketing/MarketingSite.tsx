@@ -296,9 +296,13 @@ export const MarketingSite: React.FC = () => {
             { src: '/marketing/shot-ceremony.png', t: 'لحظة التتويج', s: 'إعلان النتائج على الشاشة الكبيرة — كشفٌ معتمد بالنصاب.' },
             { src: '/marketing/shot-delegation.png', t: 'بوابة الوفد', s: 'ترشيحٌ ووصولٌ وإثباتات — دون كشف بيانات التحكيم.' },
           ].map(g => (
-            <figure key={g.src} className="mizan-panel overflow-hidden">
-              <img src={g.src} alt={g.t} loading="lazy" width={1600} height={1000} className="w-full block" />
-              <figcaption className="p-5" style={{ borderTop: '1px solid var(--line)' }}>
+            <figure key={g.src} className="mizan-panel overflow-hidden flex flex-col">
+              {/* إطارٌ موحّد الارتفاع: الصور تختلف نسبها (المصحف طولي والشاشات عرضية)،
+                  فتُحتوى داخل إطارٍ واحد بخلفية هادئة بلا قصٍّ — فيتساوى ارتفاع البطاقات. */}
+              <div className="h-56 sm:h-60 overflow-hidden flex items-center justify-center p-3" style={{ background: 'var(--surface-soft)', borderBottom: '1px solid var(--line)' }}>
+                <img src={g.src} alt={g.t} loading="lazy" className="h-full w-full object-contain rounded-md" />
+              </div>
+              <figcaption className="p-5 flex-1">
                 <div className="text-[14.5px] font-black mizan-title">{g.t}</div>
                 <div className="text-[12.5px] leading-6 mizan-muted mt-1">{g.s}</div>
               </figcaption>
