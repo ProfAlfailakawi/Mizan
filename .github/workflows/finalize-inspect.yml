@@ -1,4 +1,4 @@
-name: Capture final UX test diagnostics
+name: Apply and validate final MIZAN requirements
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  audit:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -17,24 +17,47 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.18.0
+          node-version: 22.20.0
           cache: npm
-      - name: Install
+      - name: Install exactly from lockfile
         run: npm ci
-      - name: Capture test output
+      - name: Apply source patch
+        run: python3 tools/finalize_requirements_2026_09_09.py
+      - name: Secret scan
+        run: npm run secret-scan
+      - name: Source audit
+        run: npm run source-audit
+      - name: TypeScript lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Arabic audit
+        run: npm run arabic:audit
+      - name: Production build
+        run: npm run build
+      - name: Dependency high-severity audit
+        run: npm audit --audit-level=high
+      - name: Guard final source contract
         shell: bash
         run: |
-          set +e
-          mkdir -p tmp
-          npm test > tmp/final-test-output.txt 2>&1
-          code=$?
-          echo "TEST_EXIT_CODE=$code" >> tmp/final-test-output.txt
-          exit 0
-      - name: Commit diagnostics
+          set -euo pipefail
+          ! grep -R "readAsDataURL\|new FileReader" src/components/admin/CompetitionOverview.tsx src/components/admin/TenantBrandStudio.tsx
+          ! grep -n "Participant initiates the question draw\|المتسابق يبدأ سحب سؤاله" src/components/admin/CompetitionOverview.tsx
+          grep -q "toAsciiDigits(raw)" src/components/design-system/ArabicInterfaceGuard.tsx
+          grep -q "uploadCompetitionLogo" src/components/admin/CompetitionOverview.tsx
+          grep -q "deleteCompetitionLogo" src/components/admin/CompetitionOverview.tsx
+          grep -q "BRAND_SCOPE_NOT_ALLOWED" server.ts
+          grep -q "async deleteObject" server/r2-private.ts
+      - name: Persist validated source on branch
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'MIZAN CI'
           git config user.email 'actions@users.noreply.github.com'
-          git add tmp/final-test-output.txt
-          git commit -m 'chore: capture failing test diagnostics' || exit 0
+          git add -A -- src server.ts server tests package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo 'No source changes to persist.'
+            exit 0
+          fi
+          git commit -m 'fix: complete final MIZAN UX security and operations requirements'
           git push origin HEAD
