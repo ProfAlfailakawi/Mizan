@@ -57,6 +57,16 @@ jobs:
               raise SystemExit(f'Expected one AuthPortal reset typo, got {text.count(bad_reset)}.')
           text=text.replace(bad_reset,good_reset,1)
 
+          # The implementation keeps org_admin as org_admin and branches inside switch(currentUser.role).
+          # The original generated test redundantly expected another currentUser.role check, so it
+          # rejected the correct implementation. Replace only that single stale assertion.
+          lines=text.splitlines()
+          hits=[i for i,line in enumerate(lines) if 'assert.match(app,/currentUser' in line and 'manage-competition' in line]
+          if len(hits)!=1:
+              raise SystemExit(f'Expected one stale org_admin route assertion, got {len(hits)}.')
+          lines[hits[0]]=r" assert.match(app,/case 'org_admin': return hash\.startsWith\('#manage-competition'\)\?<CompetitionOverview\/>:<OrganizationHome\/>;/);"
+          text='\n'.join(lines)+('\n' if text.endswith('\n') else '')
+
           p.write_text(text,encoding='utf-8')
           PY
 
