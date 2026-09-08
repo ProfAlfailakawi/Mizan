@@ -74,6 +74,9 @@ jobs:
             server.ts
             src/lib/store.ts
             src/lib/seed-data.ts
+            src/components/admin/RolePortals.tsx
+            src/components/layout/Header.tsx
+            src/App.tsx
             tests/user-notes-2026-09-08.test.ts
             tests/final-cleanup-phase-c.test.ts
           )
