@@ -1,4 +1,4 @@
-name: Final UX batch review materializer
+name: Final UX batch validation
 
 on:
   push:
@@ -6,35 +6,25 @@ on:
     paths: ['.github/workflows/final-ux-mfa-batch.yml']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  materialize:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          fetch-depth: 0
-      - name: Prepare materializer
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace('nxt,n=re.subn(pattern,repl,text,count=1,flags=flags)','nxt,n=re.subn(pattern,lambda _m: repl,text,count=1,flags=flags)',1)
-          s=s.replace("old=p.read_text(encoding='utf-8')","old=p.read_text(encoding='utf-8') if p.exists() else ''",1)
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Apply existing final batch
-        run: python3 APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py
-      - name: Persist generated source for inspection
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'MIZAN CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add src tests
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'chore: materialize final UX batch for inspection'
-          git push origin HEAD
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: lint + security source gates
+        run: npm run lint
+      - name: tests
+        run: npm test
+      - name: Arabic UI audit
+        run: npm run arabic:audit
+      - name: build
+        run: npm run build
+      - name: dependency audit
+        run: npm audit --audit-level=high
