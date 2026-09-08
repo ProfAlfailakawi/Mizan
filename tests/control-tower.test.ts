@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ControlTowerRepository, buildHealthSignals, correlateDiagnostics, diagnoseSignals, safetyForAction, stripSecrets } from '../server/control-tower';
+import { OpsTelemetryRepository } from '../server/ops-telemetry';
 
 const tmp=()=>fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','mizan-control-tower-'));
 const actor={uid:'owner-1',email:'owner@example.com',role:'super_admin' as const,organizationId:'__platform__'};
@@ -124,5 +125,47 @@ test('incident lifecycle merges duplicate active incidents and auto-heal records
     const run=repo.runAutoHeal(actor,diag);
     assert.equal(run.status,'AUTO_RESOLVED');
     assert.equal(run.steps.every(s=>s.status==='PASS'),true);
+  }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
+
+test('ops telemetry turns live heartbeats and jobs into real control tower metrics',()=>{
+  const dir=tmp();
+  try{
+    const telemetryRepo=new OpsTelemetryRepository(path.join(dir,'telemetry'));
+    telemetryRepo.recordHeartbeat({tenantId:'org1',competitionId:'comp1',subjectType:'user',subjectId:'judge-1',role:'judge'});
+    telemetryRepo.recordHeartbeat({tenantId:'org1',competitionId:'comp1',subjectType:'kiosk',subjectId:'kiosk-1',version:'1.2.3'});
+    telemetryRepo.recordLive({tenantId:'org1',competitionId:'comp1',state:'LIVE',participantsPresent:12,participantsTotal:20,activeJudgingSessions:2,queueDepth:3,committeesOnline:1});
+    telemetryRepo.recordJob({id:'job-1',tenantId:'org1',jobType:'certificates.generate',status:'RUNNING',leaseExpiresAt:new Date(Date.now()+60_000).toISOString()});
+    telemetryRepo.recordNotification({tenantId:'org1',competitionId:'comp1',channel:'sms',provider:'provider-a',status:'ACCEPTED'});
+    const telemetry=telemetryRepo.summary({providerConfigured:true});
+    const repo=new ControlTowerRepository(dir);
+    const snapshot=repo.buildSnapshot({actor,tenants:[{orgId:'org1',displayName:'Org 1',status:'active'} as any],runtime:{backendAvailable:true,buildIdKnown:true,firebaseProjectConfigured:true,serverAuditLedgerConfigured:true,serverQuranSourceVaultConfigured:true,enterpriseApiConfigured:true,edgeRelayConfigured:true,notificationProviderConfigured:true,backgroundJobsConfigured:true,liveCompetitionTelemetryConfigured:true,opsTelemetry:telemetry},identityGovernanceConfigured:true,tenantStoreConfigured:true});
+    assert.equal(snapshot.metrics.connectedUsers,1);
+    assert.equal(snapshot.metrics.connectedDevices,1);
+    assert.equal(snapshot.metrics.liveCompetitions,1);
+    assert.equal(snapshot.metrics.notificationFailureRate,0);
+    assert.equal(snapshot.platform.signals.find(s=>s.key==='background_jobs')?.state,'HEALTHY');
+    const tenant=repo.tenant360({tenantId:'org1',tenants:[{orgId:'org1',displayName:'Org 1',status:'active'} as any],diagnostics:snapshot.needsAttention,runtime:{serverQuranSourceVaultConfigured:true,firebaseProjectConfigured:true,buildIdKnown:true,opsTelemetry:telemetry}});
+    assert.equal(tenant.devices.online,1);
+    assert.equal(tenant.competitions.live,1);
+    const room=repo.warRoom({tenantId:'org1',competitionId:'comp1',runtime:{backendAvailable:true,edgeRelayConfigured:true,serverQuranSourceVaultConfigured:true,notificationProviderConfigured:true,opsTelemetry:telemetry}});
+    assert.equal(room.competitionStatus,'LIVE');
+    assert.equal(room.participants,12);
+  }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
+
+test('ops telemetry detects stale background jobs and notification failure rate',()=>{
+  const dir=tmp();
+  try{
+    const telemetryRepo=new OpsTelemetryRepository(dir);
+    telemetryRepo.recordJob({id:'stuck',tenantId:'org1',jobType:'notification.flush',status:'RUNNING',leaseExpiresAt:new Date(Date.now()-600_000).toISOString()});
+    telemetryRepo.recordNotification({tenantId:'org1',channel:'sms',provider:'provider-a',status:'FAILED',retryable:true,errorCode:'TIMEOUT'});
+    telemetryRepo.recordNotification({tenantId:'org1',channel:'sms',provider:'provider-a',status:'ACCEPTED'});
+    const telemetry=telemetryRepo.summary({providerConfigured:true});
+    assert.equal(telemetry.backgroundJobs.stuck,1);
+    assert.equal(telemetry.notifications.failureRate,0.5);
+    const signals=buildHealthSignals({tenants:[],runtime:{notificationProviderConfigured:true},identityGovernanceConfigured:true,tenantStoreConfigured:true,telemetry});
+    assert.equal(signals.find(s=>s.key==='notifications')?.state,'DEGRADED');
+    assert.equal(signals.find(s=>s.key==='background_jobs')?.state,'DEGRADED');
   }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });

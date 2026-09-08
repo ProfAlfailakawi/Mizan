@@ -145,6 +145,8 @@ export interface BreakGlassRequest{
   auditReference:string;
 }
 
+export interface ControlTowerTelemetrySummary{generatedAt:string;connectedUsers:number|null;connectedDevices:number|null;liveCompetitions:number|null;backgroundJobs:{configured:boolean;running:number;stuck:number;failed:number;lastUpdatedAt:string|null};notifications:{configured:boolean;providers:string[];attempts:number;failures:number;failureRate:number|null;lastRecordedAt:string|null};tenants:Record<string,{connectedUsers:number;connectedDevices:number;liveCompetitions:number;stuckJobs:number;failedNotifications:number}>;staleHeartbeats:{tenantId:string;competitionId?:string;subjectType:string;subjectId:string;lastSeenAt:string}[];live:{tenantId:string;competitionId:string;state:string;participantsPresent?:number;participantsTotal?:number;activeJudgingSessions?:number;queueDepth?:number;committeesOnline?:number;updatedAt:string}[];jobs:{id:string;tenantId?:string;competitionId?:string;jobType:string;status:string;updatedAt:string;leaseExpiresAt?:string}[]}
+
 export interface AutoHealRun{
   id:string;
   playbookId:string;
@@ -217,6 +219,7 @@ export function buildHealthSignals(input:{
   tenantStoreConfigured:boolean;
   supportSessions?:SupportSessionRecord[];
   incidents?:IncidentRecord[];
+  telemetry?:ControlTowerTelemetrySummary|null;
 }):HealthSignal[]{
   const checkedAt=now();
   const bool=(key:string,label:string,value:unknown,reason:string):HealthSignal=>({key,label,state:value===true?'HEALTHY':'UNKNOWN',source:'server-runtime',checkedAt,reason:value===true?undefined:reason});
@@ -228,9 +231,9 @@ export function buildHealthSignals(input:{
     bool('cloud_backend','Cloud/backend availability',input.runtime.backendAvailable,'Backend process answered health request'),
     bool('devices','Devices / edge',input.runtime.edgeRelayConfigured,'No edge relay configured'),
     bool('integrations','Integrations',input.runtime.enterpriseApiConfigured||input.runtime.quranAlignmentShadowConfigured,'No configured integration signal'),
-    bool('notifications','Notifications',input.runtime.notificationProviderConfigured,'No notification provider telemetry'),
-    bool('background_jobs','Background jobs',input.runtime.backgroundJobsConfigured,'No background job telemetry'),
-    bool('live_competitions','Live competitions',input.runtime.liveCompetitionTelemetryConfigured,'No live competition telemetry'),
+    {key:'notifications',label:'Notifications',state:input.runtime.notificationProviderConfigured===true?(input.telemetry?.notifications.failureRate!==null&&input.telemetry?.notifications.failureRate!==undefined&&input.telemetry.notifications.failureRate>0.15?'DEGRADED':'HEALTHY'):'UNKNOWN',source:'notification-provider',checkedAt,reason:input.runtime.notificationProviderConfigured===true?undefined:'No notification provider configured',evidence:input.telemetry?.notifications as any},
+    {key:'background_jobs',label:'Background jobs',state:input.telemetry?input.telemetry.backgroundJobs.stuck>0?'DEGRADED':'HEALTHY':'UNKNOWN',source:'ops-telemetry',checkedAt,reason:input.telemetry?undefined:'No background job telemetry',evidence:input.telemetry?.backgroundJobs as any},
+    {key:'live_competitions',label:'Live competitions',state:input.telemetry?input.telemetry.liveCompetitions===null?'UNKNOWN':'HEALTHY':'UNKNOWN',source:'ops-telemetry',checkedAt,reason:input.telemetry?'No live competitions reported in the active window':'No live competition telemetry',evidence:{liveCompetitions:input.telemetry?.liveCompetitions}},
     bool('offline_edge','Offline / edge',input.runtime.edgeRelayConfigured,'MIZAN_EDGE_DATA_DIR not configured'),
     bool('deployment_compatibility','Deployment compatibility',input.runtime.buildIdKnown,'Server build id unavailable'),
   ];
@@ -326,7 +329,8 @@ export class ControlTowerRepository{
   buildSnapshot(input:{actor:ServerIdentity;tenants:TenantRecord[];runtime:Record<string,unknown>;identityGovernanceConfigured:boolean;tenantStoreConfigured:boolean}){
     const incidents=this.listIncidents();
     const supportSessions=this.listSupport();
-    const signals=buildHealthSignals({...input,supportSessions,incidents});
+    const telemetry=(input.runtime.opsTelemetry||null) as ControlTowerTelemetrySummary|null;
+    const signals=buildHealthSignals({...input,supportSessions,incidents,telemetry});
     const diagnostics=correlateDiagnostics(diagnoseSignals(signals));
     const attention=diagnostics.filter(d=>['MIZAN_ACTION_REQUIRED','SECURITY_REVIEW'].includes(d.classification));
     const state=summarizeState(signals);
@@ -338,13 +342,13 @@ export class ControlTowerRepository{
       platform:{state,healthScore:score,scoreAvailable:score!==null,unknownSignals:signals.filter(s=>s.state==='UNKNOWN').length,signals},
       metrics:{
         activeTenants:input.tenants.filter(t=>t.status!=='suspended').length,
-        liveCompetitions:null,
-        connectedUsers:null,
-        connectedDevices:null,
+        liveCompetitions:telemetry?.liveCompetitions??null,
+        connectedUsers:telemetry?.connectedUsers??null,
+        connectedDevices:telemetry?.connectedDevices??null,
         activeIncidents:incidents.filter(i=>!['RESOLVED','CLOSED'].includes(i.status)).length,
         degradedTenants:new Set(signals.filter(s=>s.tenantId&&s.state==='DEGRADED').map(s=>s.tenantId)).size,
         authFailureSpike:null,
-        notificationFailureRate:null,
+        notificationFailureRate:telemetry?.notifications.failureRate??null,
         autoHealedToday:incidents.filter(i=>i.status==='RESOLVED'&&i.source==='AUTO_HEAL'&&Date.parse(i.resolvedAt||'')>Date.now()-86400_000).length,
         unresolvedProblems:diagnostics.filter(d=>d.classification!=='AUTO_RESOLVED').length,
         supportEscalations:supportSessions.filter(s=>['REQUESTED','ACTIVE'].includes(s.status)).length,
@@ -359,6 +363,7 @@ export class ControlTowerRepository{
       safeSnapshots:this.listSnapshots().slice(0,20),
       breakGlass:this.listBreakGlass().filter(x=>x.status==='REQUESTED'),
       autoHealRuns:this.listAutoHeal().slice(0,30),
+      telemetry,
       playbooks:AUTO_HEAL_PLAYBOOKS,
       summaryCadence:{daily:'owner summary contains unresolved owner/security items, auto-heal count, new incidents and tenant action backlog',weekly:'owner summary adds trend, noisy tenants, licensing posture and known-error drift'},
     };
@@ -369,14 +374,16 @@ export class ControlTowerRepository{
     const scopedDiagnostics=input.diagnostics.filter(d=>d.tenantId===input.tenantId);
     const scopedIncidents=this.listIncidents().filter(i=>i.tenantId===input.tenantId);
     const commercial=this.listCommercial().find(c=>c.tenantId===input.tenantId)||null;
-    const health=scopedDiagnostics.some(d=>d.classification==='MIZAN_ACTION_REQUIRED')?'DEGRADED':tenant.status==='suspended'?'DEGRADED':'UNKNOWN';
+    const telemetry=(input.runtime.opsTelemetry||null) as ControlTowerTelemetrySummary|null;
+    const tenantTelemetry=telemetry?.tenants?.[input.tenantId];
+    const health=scopedDiagnostics.some(d=>d.classification==='MIZAN_ACTION_REQUIRED')?'DEGRADED':tenant.status==='suspended'?'DEGRADED':tenantTelemetry?'HEALTHY':'UNKNOWN';
     return {
       tenant:{id:tenant.orgId,name:tenant.displayName||tenant.orgId,nameArabic:tenant.displayNameArabic||tenant.displayName||tenant.orgId,status:tenant.status||'active',domain:tenant.customDomains?.[0]||tenant.subdomain||null},
       health:{state:health,score:health==='DEGRADED'?72:null,reason:scopedDiagnostics[0]?.rootCause||'Telemetry unavailable'},
       commercial,
-      competitions:{total:null,live:null,health:'UNKNOWN'},
-      users:{total:null,admins:null,suspended:null,mfaPosture:'UNKNOWN',activePrivilegedSessions:null},
-      devices:{online:null,offline:null,compatibility:'UNKNOWN',version:'UNKNOWN'},
+      competitions:{total:tenantTelemetry?.liveCompetitions??null,live:tenantTelemetry?.liveCompetitions??null,health:tenantTelemetry?'HEALTHY':'UNKNOWN'},
+      users:{total:tenantTelemetry?.connectedUsers??null,admins:null,suspended:null,mfaPosture:'UNKNOWN',activePrivilegedSessions:tenantTelemetry?.connectedUsers??null},
+      devices:{online:tenantTelemetry?.connectedDevices??null,offline:telemetry?.staleHeartbeats.filter(h=>h.tenantId===input.tenantId&&h.subjectType!=='user').length??null,compatibility:'UNKNOWN',version:'FROM_HEARTBEATS'},
       integrations:{sms:'UNKNOWN',email:'UNKNOWN',whatsapp:'UNKNOWN',storage:input.runtime.serverQuranSourceVaultConfigured?'HEALTHY':'UNKNOWN',identity:input.runtime.firebaseProjectConfigured?'HEALTHY':'UNKNOWN',broadcast:'UNKNOWN'},
       support:{openTickets:this.listSupport().filter(s=>s.tenantId===input.tenantId&&['REQUESTED','ACTIVE'].includes(s.status)).length,readOnlyMirrorAvailable:true},
       incidents:scopedIncidents,
@@ -384,14 +391,17 @@ export class ControlTowerRepository{
       featureLicensing:commercial?.licensedModules||[],
       recentActivity:scopedIncidents.flatMap(i=>i.actions).slice(0,10),
       lastDeployCompatibility:input.runtime.buildIdKnown?'KNOWN':'UNKNOWN',
-      lastSync:'UNKNOWN',
+      lastSync:telemetry?.generatedAt||'UNKNOWN',
       backups:this.listSnapshots().filter(s=>s.tenantId===input.tenantId),
       securityPosture:{mfa:'UNKNOWN',supportSessionsReadOnly:true,breakGlassOpen:this.listBreakGlass().some(b=>b.tenantId===input.tenantId&&b.status==='REQUESTED')},
       quickActions:['war_room.open','health.open','users.open','devices.open','support.open','commercial.open','audit.open','rescue.open'],
     };
   }
   warRoom(input:{tenantId:string;competitionId:string;runtime:Record<string,unknown>}){
-    return {tenantId:input.tenantId,competitionId:input.competitionId,readOnly:true,banner:'READ-ONLY LIVE COMPETITION WAR ROOM',competitionStatus:'UNKNOWN',participants:null,queue:null,committees:null,activeJudgingSessions:null,devices:{online:null,offline:null},lastSync:'UNKNOWN',integrations:{notifications:'UNKNOWN',storage:input.runtime.serverQuranSourceVaultConfigured?'HEALTHY':'UNKNOWN'},continuity:{edge:input.runtime.edgeRelayConfigured?'HEALTHY':'UNKNOWN',cloud:input.runtime.backendAvailable?'HEALTHY':'UNKNOWN'},checkpoints:[],recentErrors:[],runtimeHealth:input.runtime,readiness:'UNKNOWN',recentAudit:[],redactions:['unrevealed question secrets','judge scores before release','internal judging secrets','cryptographic secrets']};
+    const telemetry=(input.runtime.opsTelemetry||null) as ControlTowerTelemetrySummary|null;
+    const live=telemetry?.live.find(x=>x.tenantId===input.tenantId&&x.competitionId===input.competitionId);
+    const tenantTelemetry=telemetry?.tenants?.[input.tenantId];
+    return {tenantId:input.tenantId,competitionId:input.competitionId,readOnly:true,banner:'READ-ONLY LIVE COMPETITION WAR ROOM',competitionStatus:live?.state||'UNKNOWN',participants:live?.participantsPresent??null,totalParticipants:live?.participantsTotal??null,queue:live?.queueDepth??null,committees:live?.committeesOnline??null,activeJudgingSessions:live?.activeJudgingSessions??null,devices:{online:tenantTelemetry?.connectedDevices??null,offline:telemetry?.staleHeartbeats.filter(h=>h.tenantId===input.tenantId&&h.subjectType!=='user').length??null},lastSync:live?.updatedAt||telemetry?.generatedAt||'UNKNOWN',integrations:{notifications:input.runtime.notificationProviderConfigured?'HEALTHY':'UNKNOWN',storage:input.runtime.serverQuranSourceVaultConfigured?'HEALTHY':'UNKNOWN'},continuity:{edge:input.runtime.edgeRelayConfigured?'HEALTHY':'UNKNOWN',cloud:input.runtime.backendAvailable?'HEALTHY':'UNKNOWN'},checkpoints:[],recentErrors:[...(tenantTelemetry?.stuckJobs?[`stuck_jobs:${tenantTelemetry.stuckJobs}`]:[]),...(tenantTelemetry?.failedNotifications?[`failed_notifications:${tenantTelemetry.failedNotifications}`]:[])],runtimeHealth:input.runtime,readiness:live?'LIVE_TELEMETRY_ACTIVE':'UNKNOWN',recentAudit:[],redactions:['unrevealed question secrets','judge scores before release','internal judging secrets','cryptographic secrets']};
   }
   liveMirror(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;role:string;reason:string}){
     if(input.reason.trim().length<8)throw new Error('MIRROR_REASON_REQUIRED');
