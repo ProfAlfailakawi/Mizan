@@ -24,39 +24,32 @@ jobs:
       - name: Apply source patch
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('tools/finalize_requirements_2026_09_09.py')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace("import { isTechnicalToken, localizeTechnicalToken } from '../../lib/ui-language';", "import {COUNTRIES} from '../../lib/countries';")
-          s=s.replace("import { isTechnicalToken, localizeTechnicalToken } from '../../lib/ui-language';\\nimport { toAsciiDigits } from '../../lib/input-validation';", "import {COUNTRIES} from '../../lib/countries';\\nimport {toAsciiDigits} from '../../lib/input-validation';")
-          s=s.replace("const localizeText = (raw: string) => {\\n  let out = raw;", "function localizeText(raw:string){const normalized=toAsciiDigits(raw);const trimmed=normalized.trim();if(!trimmed)return normalized;const exact=LOOKUP[trimmed];if(exact)return normalized.replace(trimmed,exact);let next=localizeTokens(normalized);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}")
-          s=s.replace("const localizeText = (raw: string) => {\\n  let out = toAsciiDigits(raw);", "function localizeText(raw:string){const normalized=toAsciiDigits(raw);const trimmed=normalized.trim();if(!trimmed)return normalized;const exact=LOOKUP[trimmed];if(exact)return normalized.replace(trimmed,exact);let next=localizeTokens(normalized);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}")
-          # The current guard is compressed to one function rather than the older multi-line helper.
-          old="function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=localizeTokens(raw);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}"
-          if old in s:
-              # Make the finalizer replace the actual current function.
-              s=s.replace("    \"const localizeText = (raw: string) => {\\n  let out = raw;\",\n    \"const localizeText = (raw: string) => {\\n  let out = toAsciiDigits(raw);\",", "    old,\n    \"function localizeText(raw:string){const normalized=toAsciiDigits(raw);const trimmed=normalized.trim();if(!trimmed)return normalized;const exact=LOOKUP[trimmed];if(exact)return normalized.replace(trimmed,exact);let next=localizeTokens(normalized);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}\",")
-          p.write_text(s,encoding='utf-8')
-          PY
-          # Apply direct guard normalization first; the one-shot patch then handles all other source files.
-          python3 - <<'PY'
-          from pathlib import Path
+          # Current Arabic guard: normalize every translated text node to Western digits.
           p=Path('src/components/design-system/ArabicInterfaceGuard.tsx');s=p.read_text(encoding='utf-8')
           if "from '../../lib/input-validation'" not in s:
               s=s.replace("import {COUNTRIES} from '../../lib/countries';","import {COUNTRIES} from '../../lib/countries';\nimport {toAsciiDigits} from '../../lib/input-validation';",1)
           old="function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=localizeTokens(raw);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}"
           new="function localizeText(raw:string){const normalized=toAsciiDigits(raw);const trimmed=normalized.trim();if(!trimmed)return normalized;const exact=LOOKUP[trimmed];if(exact)return normalized.replace(trimmed,exact);let next=localizeTokens(normalized);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}"
           if old in s:s=s.replace(old,new,1)
+          elif new not in s:raise SystemExit('ArabicInterfaceGuard current localizeText anchor missing')
           p.write_text(s,encoding='utf-8')
-          PY
-          # Remove the two obsolete Arabic-guard operations from the one-shot patch because they are applied above.
-          python3 - <<'PY'
-          from pathlib import Path
+
+          # Current header is compressed; support itself is universal while tenant-only operational controls remain scoped.
+          p=Path('src/components/layout/Header.tsx');s=p.read_text(encoding='utf-8')
+          old="      {!superAdmin&&<LiveSupportControl/>}"
+          new="      <LiveSupportControl/>"
+          if old in s:s=s.replace(old,new,1)
+          elif new not in s:raise SystemExit('Header current LiveSupportControl anchor missing')
+          p.write_text(s,encoding='utf-8')
+
+          # Remove obsolete guard/support transformations from the temporary finalizer; they are applied against current source above.
           p=Path('tools/finalize_requirements_2026_09_09.py');s=p.read_text(encoding='utf-8')
           a=s.index('# Western digits are normalized centrally')
-          b=s.index('# Live support is a universal',a)
-          s=s[:a]+"# Western digits are normalized centrally above by the workflow against the current guard.\n\n"+s[b:]
+          b=s.index('# System owns FairDraw initiation',a)
+          s=s[:a]+"# Western digits and universal support are applied directly by validation workflow.\n\n"+s[b:]
           p.write_text(s,encoding='utf-8')
           PY
           python3 tools/finalize_requirements_2026_09_09.py
@@ -80,11 +73,12 @@ jobs:
           set -euo pipefail
           ! grep -R "readAsDataURL\|new FileReader" src/components/admin/CompetitionOverview.tsx src/components/admin/TenantBrandStudio.tsx
           ! grep -n "Participant initiates the question draw\|المتسابق يبدأ سحب سؤاله" src/components/admin/CompetitionOverview.tsx
-          grep -q "toAsciiDigits(raw)\|toAsciiDigits(raw" src/components/design-system/ArabicInterfaceGuard.tsx
+          grep -q "toAsciiDigits(raw" src/components/design-system/ArabicInterfaceGuard.tsx
           grep -q "uploadCompetitionLogo" src/components/admin/CompetitionOverview.tsx
           grep -q "deleteCompetitionLogo" src/components/admin/CompetitionOverview.tsx
           grep -q "BRAND_SCOPE_NOT_ALLOWED" server.ts
           grep -q "async deleteObject" server/r2-private.ts
+          grep -q "<LiveSupportControl/>" src/components/layout/Header.tsx
       - name: Persist validated source on branch
         shell: bash
         run: |
