@@ -312,6 +312,50 @@ async function startServer() {
     const repo=controlTowerAdmin(res);if(!repo)return;
     try{return res.json(repo.rescue((req as any).mizanIdentity,{action:String(req.body?.action||''),tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reason:String(req.body?.reason||''),idempotencyKey:req.body?.idempotencyKey?String(req.body.idempotencyKey):undefined}))}catch(err){const code=err instanceof Error?err.message:'RESCUE_ACTION_FAILED';return res.status(code==='INTEGRITY_PROTECTED_ACTION'?403:400).json({code})}
   });
+  app.get('/api/owner/tenants/:orgId/360',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.tenant360({tenantId:String(req.params.orgId),tenants:tenantRegistry(),diagnostics:snapshot.needsAttention,runtime:ownerRuntime()}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'TENANT_360_FAILED'})}
+  });
+  app.get('/api/owner/war-room/:orgId/:competitionId',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.json(repo.warRoom({tenantId:String(req.params.orgId),competitionId:String(req.params.competitionId),runtime:ownerRuntime()}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'WAR_ROOM_FAILED'})}
+  });
+  app.post('/api/owner/live-mirror',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.status(201).json(repo.liveMirror((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,role:String(req.body?.role||''),reason:String(req.body?.reason||'')}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'LIVE_MIRROR_FAILED'})}
+  });
+  app.post('/api/owner/support-route',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.routeSupport((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reporterRole:String(req.body?.reporterRole||''),reason:String(req.body?.reason||''),diagnostics:snapshot.needsAttention}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUPPORT_ROUTE_FAILED'})}
+  });
+  app.post('/api/owner/incidents',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.status(201).json({incident:repo.updateIncident((req as any).mizanIdentity,{id:req.body?.id?String(req.body.id):undefined,tenantId:req.body?.tenantId?String(req.body.tenantId):undefined,competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,category:String(req.body?.category||''),severity:String(req.body?.severity||'LOW') as any,status:req.body?.status?String(req.body.status) as any:undefined,rootCause:req.body?.rootCause?String(req.body.rootCause):undefined,reason:String(req.body?.reason||'')})})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'INCIDENT_FAILED'})}
+  });
+  app.post('/api/owner/commercial',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.json({commercial:repo.upsertCommercial((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),plan:String(req.body?.plan||'TRIAL') as any,subscriptionStatus:String(req.body?.subscriptionStatus||'UNKNOWN') as any,contractRef:req.body?.contractRef?String(req.body.contractRef):undefined,renewalAt:req.body?.renewalAt?String(req.body.renewalAt):undefined,licensedModules:Array.isArray(req.body?.licensedModules)?req.body.licensedModules.map(String):[],limits:req.body?.limits&&typeof req.body.limits==='object'?req.body.limits:{},notes:req.body?.notes?String(req.body.notes):undefined})})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'COMMERCIAL_FAILED'})}
+  });
+  app.post('/api/owner/kill-switches',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.json({switch:repo.setKillSwitch((req as any).mizanIdentity,{key:String(req.body?.key||''),scope:String(req.body?.scope||'PLATFORM') as any,tenantId:req.body?.tenantId?String(req.body.tenantId):undefined,competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,enabled:req.body?.enabled===true,reason:String(req.body?.reason||''),expiresAt:req.body?.expiresAt?String(req.body.expiresAt):undefined})})}catch(err){const code=err instanceof Error?err.message:'KILL_SWITCH_FAILED';return res.status(code==='INTEGRITY_PROTECTED_ACTION'?403:400).json({code})}
+  });
+  app.post('/api/owner/snapshots',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.status(201).json({snapshot:repo.createSnapshot((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reason:String(req.body?.reason||''),state:req.body?.state})})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SNAPSHOT_FAILED'})}
+  });
+  app.post('/api/owner/rollback-preview',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.json(repo.rollbackPreview((req as any).mizanIdentity,{snapshotId:String(req.body?.snapshotId||''),reason:String(req.body?.reason||'')}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'ROLLBACK_PREVIEW_FAILED'})}
+  });
+  app.post('/api/owner/break-glass',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.status(201).json({request:repo.requestBreakGlass((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,protectedAction:String(req.body?.protectedAction||''),reason:String(req.body?.reason||'')})})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'BREAK_GLASS_FAILED'})}
+  });
+  app.get('/api/owner/summary/:period',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{const actor=(req as any).mizanIdentity as ServerIdentity;const snapshot=repo.buildSnapshot({actor,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.ownerSummary({period:String(req.params.period)==='weekly'?'weekly':'daily',snapshot}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUMMARY_FAILED'})}
+  });
   app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/owner/tenants',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/owner/tenants/:orgId',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});

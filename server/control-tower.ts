@@ -91,6 +91,86 @@ export interface SupportSessionRecord{
   diagnosticBundle:Record<string,unknown>;
 }
 
+export interface CommercialProfile{
+  tenantId:string;
+  plan:'TRIAL'|'STANDARD'|'PRO'|'ENTERPRISE'|'SOVEREIGN';
+  subscriptionStatus:'ACTIVE'|'TRIALING'|'PAST_DUE'|'SUSPENDED'|'UNKNOWN';
+  contractRef?:string;
+  renewalAt?:string;
+  licensedModules:string[];
+  limits:Record<string,number|'UNKNOWN'>;
+  notes?:string;
+  updatedAt:string;
+}
+
+export interface PlatformSwitch{
+  id:string;
+  key:string;
+  scope:'PLATFORM'|'TENANT'|'COMPETITION';
+  tenantId?:string;
+  competitionId?:string;
+  enabled:boolean;
+  reason:string;
+  createdAt:string;
+  createdBy:string;
+  expiresAt?:string;
+  auditReference:string;
+}
+
+export interface SafeSnapshot{
+  id:string;
+  tenantId:string;
+  competitionId?:string;
+  createdAt:string;
+  createdBy:string;
+  reason:string;
+  stateHash:string;
+  includesSecrets:false;
+  rollbackAllowed:boolean;
+  verification:string;
+  auditReference:string;
+}
+
+export interface BreakGlassRequest{
+  id:string;
+  tenantId:string;
+  competitionId?:string;
+  requestedBy:string;
+  reason:string;
+  status:'REQUESTED'|'APPROVED'|'REJECTED'|'EXPIRED'|'USED';
+  createdAt:string;
+  expiresAt:string;
+  protectedAction:string;
+  approvals:{actorId:string;role:string;at:string}[];
+  auditReference:string;
+}
+
+export interface AutoHealRun{
+  id:string;
+  playbookId:string;
+  tenantId?:string;
+  competitionId?:string;
+  safety:PlaybookSafety;
+  status:'SKIPPED_PROTECTED'|'AUTO_RESOLVED'|'ESCALATED'|'QUEUED_FOR_APPROVAL';
+  detectedAt:string;
+  diagnosis:DiagnosticResult;
+  steps:{name:string;status:'PASS'|'FAIL'|'SKIPPED';detail:string}[];
+  auditReference?:string;
+}
+
+export const AUTO_HEAL_PLAYBOOKS=[
+  {id:'notification-transient-failure',action:'notification.retry',safety:'SAFE_AUTOMATIC' as const,steps:['exponential backoff','idempotency key','prevent duplicate delivery','verify provider state','incident after repeated failure']},
+  {id:'network-reconnect',action:'network.reconnect',safety:'SAFE_AUTOMATIC' as const,steps:['reconnect','restore subscriptions','sync pending queue','verify acknowledgement','preserve local state']},
+  {id:'offline-online',action:'offline_queue.drain',safety:'SAFE_AUTOMATIC' as const,steps:['drain offline queue','reconcile server state','detect conflicts','report unresolved only']},
+  {id:'device-offline',action:'device.spare.assign',safety:'SAFE_WITH_TENANT_APPROVAL' as const,steps:['determine compatibility','check policy','assign spare only when allowed','revoke stale assignment','verify heartbeat','audit']},
+  {id:'stale-tenant-cache',action:'tenant_cache.refresh',safety:'SAFE_AUTOMATIC' as const,steps:['invalidate safe cache','reload','verify tenant consistency']},
+  {id:'temporary-provider-outage',action:'provider.circuit_break',safety:'SAFE_AUTOMATIC' as const,steps:['retry with backoff','open circuit breaker','use fallback when configured','avoid provider hammering']},
+  {id:'optional-ai-outage',action:'optional_ai.disable',safety:'SAFE_AUTOMATIC' as const,steps:['disable optional capability','manual judging continues','show degraded state','avoid competition shutdown']},
+  {id:'background-job-stuck',action:'job.retry',safety:'SAFE_AUTOMATIC' as const,steps:['detect stale lease','safe retry','idempotency guard','avoid duplicate execution']},
+  {id:'provider-failover',action:'provider.failover',safety:'SAFE_WITH_OWNER_APPROVAL' as const,steps:['validate fallback','switch future traffic only','verify','audit']},
+  {id:'version-mismatch',action:'version.block_unsafe',safety:'SAFE_WITH_TENANT_APPROVAL' as const,steps:['detect incompatible version','warn','block unsafe operation only','guide update']},
+];
+
 const PROTECTED_ACTIONS=new Set([
   'score.modify','score.delete','result.modify','result.delete','result.publish',
   'question.reveal','question.draw.modify','quran.source.certified.change',
@@ -207,15 +287,24 @@ export function correlateDiagnostics(diagnostics:DiagnosticResult[]):DiagnosticR
 export class ControlTowerRepository{
   private incidentsFile:string;
   private supportFile:string;
+  private commercialFile:string;
+  private switchesFile:string;
+  private snapshotsFile:string;
+  private breakGlassFile:string;
+  private autoHealFile:string;
   private auditFile:string;
   constructor(private dir:string){
     if(!dir)throw new Error('CONTROL_TOWER_DIR_REQUIRED');
     fs.mkdirSync(dir,{recursive:true,mode:0o700});
     this.incidentsFile=path.join(dir,'incidents.json');
     this.supportFile=path.join(dir,'support-sessions.json');
+    this.commercialFile=path.join(dir,'commercial.json');
+    this.switchesFile=path.join(dir,'kill-switches.json');
+    this.snapshotsFile=path.join(dir,'safe-snapshots.json');
+    this.breakGlassFile=path.join(dir,'break-glass.json');
+    this.autoHealFile=path.join(dir,'auto-heal-runs.json');
     this.auditFile=path.join(dir,'control-tower-audit.jsonl');
-    if(!fs.existsSync(this.incidentsFile))this.writeJson(this.incidentsFile,[]);
-    if(!fs.existsSync(this.supportFile))this.writeJson(this.supportFile,[]);
+    for(const file of [this.incidentsFile,this.supportFile,this.commercialFile,this.switchesFile,this.snapshotsFile,this.breakGlassFile,this.autoHealFile])if(!fs.existsSync(file))this.writeJson(file,[]);
   }
   private readJson<T>(file:string,fallback:T):T{try{return JSON.parse(fs.readFileSync(file,'utf8')) as T}catch{return fallback}}
   private writeJson(file:string,value:unknown){const tmp=`${file}.${process.pid}.${Date.now()}.tmp`;fs.writeFileSync(tmp,JSON.stringify(value,null,2),{encoding:'utf8',mode:0o600});fs.renameSync(tmp,file)}
@@ -229,6 +318,11 @@ export class ControlTowerRepository{
   }
   listIncidents(){return this.readJson<IncidentRecord[]>(this.incidentsFile,[])}
   listSupport(){return this.readJson<SupportSessionRecord[]>(this.supportFile,[]).map(s=>Date.parse(s.expiresAt)<=Date.now()&&['REQUESTED','APPROVED','ACTIVE'].includes(s.status)?{...s,status:'EXPIRED' as const}:s)}
+  listCommercial(){return this.readJson<CommercialProfile[]>(this.commercialFile,[])}
+  listSwitches(){return this.readJson<PlatformSwitch[]>(this.switchesFile,[]).filter(s=>!s.expiresAt||Date.parse(s.expiresAt)>Date.now())}
+  listSnapshots(){return this.readJson<SafeSnapshot[]>(this.snapshotsFile,[])}
+  listBreakGlass(){return this.readJson<BreakGlassRequest[]>(this.breakGlassFile,[]).map(x=>Date.parse(x.expiresAt)<=Date.now()&&x.status==='REQUESTED'?{...x,status:'EXPIRED' as const}:x)}
+  listAutoHeal(){return this.readJson<AutoHealRun[]>(this.autoHealFile,[])}
   buildSnapshot(input:{actor:ServerIdentity;tenants:TenantRecord[];runtime:Record<string,unknown>;identityGovernanceConfigured:boolean;tenantStoreConfigured:boolean}){
     const incidents=this.listIncidents();
     const supportSessions=this.listSupport();
@@ -260,8 +354,119 @@ export class ControlTowerRepository{
       incidents,
       supportSessions,
       knownErrors:KNOWN_ERROR_CATALOG,
+      commercial:this.listCommercial(),
+      killSwitches:this.listSwitches(),
+      safeSnapshots:this.listSnapshots().slice(0,20),
+      breakGlass:this.listBreakGlass().filter(x=>x.status==='REQUESTED'),
+      autoHealRuns:this.listAutoHeal().slice(0,30),
+      playbooks:AUTO_HEAL_PLAYBOOKS,
       summaryCadence:{daily:'owner summary contains unresolved owner/security items, auto-heal count, new incidents and tenant action backlog',weekly:'owner summary adds trend, noisy tenants, licensing posture and known-error drift'},
     };
+  }
+  tenant360(input:{tenantId:string;tenants:TenantRecord[];diagnostics:DiagnosticResult[];runtime:Record<string,unknown>}){
+    const tenant=input.tenants.find(t=>t.orgId===input.tenantId);
+    if(!tenant)throw new Error('TENANT_NOT_FOUND');
+    const scopedDiagnostics=input.diagnostics.filter(d=>d.tenantId===input.tenantId);
+    const scopedIncidents=this.listIncidents().filter(i=>i.tenantId===input.tenantId);
+    const commercial=this.listCommercial().find(c=>c.tenantId===input.tenantId)||null;
+    const health=scopedDiagnostics.some(d=>d.classification==='MIZAN_ACTION_REQUIRED')?'DEGRADED':tenant.status==='suspended'?'DEGRADED':'UNKNOWN';
+    return {
+      tenant:{id:tenant.orgId,name:tenant.displayName||tenant.orgId,nameArabic:tenant.displayNameArabic||tenant.displayName||tenant.orgId,status:tenant.status||'active',domain:tenant.customDomains?.[0]||tenant.subdomain||null},
+      health:{state:health,score:health==='DEGRADED'?72:null,reason:scopedDiagnostics[0]?.rootCause||'Telemetry unavailable'},
+      commercial,
+      competitions:{total:null,live:null,health:'UNKNOWN'},
+      users:{total:null,admins:null,suspended:null,mfaPosture:'UNKNOWN',activePrivilegedSessions:null},
+      devices:{online:null,offline:null,compatibility:'UNKNOWN',version:'UNKNOWN'},
+      integrations:{sms:'UNKNOWN',email:'UNKNOWN',whatsapp:'UNKNOWN',storage:input.runtime.serverQuranSourceVaultConfigured?'HEALTHY':'UNKNOWN',identity:input.runtime.firebaseProjectConfigured?'HEALTHY':'UNKNOWN',broadcast:'UNKNOWN'},
+      support:{openTickets:this.listSupport().filter(s=>s.tenantId===input.tenantId&&['REQUESTED','ACTIVE'].includes(s.status)).length,readOnlyMirrorAvailable:true},
+      incidents:scopedIncidents,
+      needsAttention:scopedDiagnostics,
+      featureLicensing:commercial?.licensedModules||[],
+      recentActivity:scopedIncidents.flatMap(i=>i.actions).slice(0,10),
+      lastDeployCompatibility:input.runtime.buildIdKnown?'KNOWN':'UNKNOWN',
+      lastSync:'UNKNOWN',
+      backups:this.listSnapshots().filter(s=>s.tenantId===input.tenantId),
+      securityPosture:{mfa:'UNKNOWN',supportSessionsReadOnly:true,breakGlassOpen:this.listBreakGlass().some(b=>b.tenantId===input.tenantId&&b.status==='REQUESTED')},
+      quickActions:['war_room.open','health.open','users.open','devices.open','support.open','commercial.open','audit.open','rescue.open'],
+    };
+  }
+  warRoom(input:{tenantId:string;competitionId:string;runtime:Record<string,unknown>}){
+    return {tenantId:input.tenantId,competitionId:input.competitionId,readOnly:true,banner:'READ-ONLY LIVE COMPETITION WAR ROOM',competitionStatus:'UNKNOWN',participants:null,queue:null,committees:null,activeJudgingSessions:null,devices:{online:null,offline:null},lastSync:'UNKNOWN',integrations:{notifications:'UNKNOWN',storage:input.runtime.serverQuranSourceVaultConfigured?'HEALTHY':'UNKNOWN'},continuity:{edge:input.runtime.edgeRelayConfigured?'HEALTHY':'UNKNOWN',cloud:input.runtime.backendAvailable?'HEALTHY':'UNKNOWN'},checkpoints:[],recentErrors:[],runtimeHealth:input.runtime,readiness:'UNKNOWN',recentAudit:[],redactions:['unrevealed question secrets','judge scores before release','internal judging secrets','cryptographic secrets']};
+  }
+  liveMirror(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;role:string;reason:string}){
+    if(input.reason.trim().length<8)throw new Error('MIRROR_REASON_REQUIRED');
+    const id=crypto.randomUUID();
+    const auditReference=this.audit(actor,'LIVE_MIRROR_OPENED','LiveMirror',id,input.reason);
+    return {id,tenantId:input.tenantId,competitionId:input.competitionId,role:input.role,readOnly:true,banner:'READ-ONLY SUPPORT MIRROR',impersonation:false,userTokenIssued:false,mutationsAllowed:false,permissionsProjection:['read projected workflow state','read enabled licensed features','read role navigation shape'],redactions:['secrets','unreleased questions','private scoring state','cross-tenant data'],auditReference};
+  }
+  routeSupport(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;reporterRole:string;reason:string;diagnostics:DiagnosticResult[]}){
+    const hit=input.diagnostics.find(d=>d.tenantId===input.tenantId)||input.diagnostics[0];
+    if(hit?.classification==='AUTO_RESOLVED')return {route:'AUTO_HEAL',ticketCreated:false,diagnosis:hit};
+    if(hit?.classification==='TENANT_ACTION_REQUIRED')return {route:'ORG_ADMIN',ticketCreated:false,diagnosis:hit};
+    if(hit?.classification==='INTEGRITY_PROTECTED')return {route:'PROTECTED_WORKFLOW',ticketCreated:false,diagnosis:hit};
+    const session=this.createSupportSession(actor,{tenantId:input.tenantId,competitionId:input.competitionId,reason:input.reason,minutes:30,diagnosticBundle:{reporterRole:input.reporterRole,diagnosis:hit}});
+    return {route:'MIZAN_SUPPORT',ticketCreated:true,session,diagnosis:hit||null};
+  }
+  upsertCommercial(actor:ServerIdentity,input:Omit<CommercialProfile,'updatedAt'>){
+    const rows=this.listCommercial().filter(x=>x.tenantId!==input.tenantId);
+    const row:{updatedAt:string}&Omit<CommercialProfile,'updatedAt'>={...input,updatedAt:now()};
+    rows.unshift(row);this.writeJson(this.commercialFile,rows);
+    this.audit(actor,'COMMERCIAL_PROFILE_UPDATED','CommercialProfile',input.tenantId,`Plan ${input.plan}`);
+    return row;
+  }
+  setKillSwitch(actor:ServerIdentity,input:{key:string;scope:'PLATFORM'|'TENANT'|'COMPETITION';tenantId?:string;competitionId?:string;enabled:boolean;reason:string;expiresAt?:string}){
+    if(input.reason.trim().length<8)throw new Error('KILL_SWITCH_REASON_REQUIRED');
+    if(input.key.includes('score')||input.key.includes('result')||input.key.includes('mfa')||input.key.includes('audit'))throw new Error('INTEGRITY_PROTECTED_ACTION');
+    const rows=this.listSwitches().filter(s=>!(s.key===input.key&&s.scope===input.scope&&s.tenantId===input.tenantId&&s.competitionId===input.competitionId));
+    const id=crypto.randomUUID();const auditReference=this.audit(actor,'KILL_SWITCH_CHANGED','PlatformSwitch',id,input.reason);
+    const row:PlatformSwitch={id,key:input.key,scope:input.scope,tenantId:input.tenantId,competitionId:input.competitionId,enabled:input.enabled,reason:input.reason,createdAt:now(),createdBy:actor.uid,expiresAt:input.expiresAt,auditReference};
+    rows.unshift(row);this.writeJson(this.switchesFile,rows);return row;
+  }
+  createSnapshot(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;reason:string;state?:unknown}){
+    if(input.reason.trim().length<8)throw new Error('SNAPSHOT_REASON_REQUIRED');
+    const id=crypto.randomUUID();const clean=stripSecrets(input.state||{tenantId:input.tenantId,competitionId:input.competitionId||null});
+    const auditReference=this.audit(actor,'SAFE_SNAPSHOT_CREATED','SafeSnapshot',id,input.reason);
+    const row:SafeSnapshot={id,tenantId:input.tenantId,competitionId:input.competitionId,createdAt:now(),createdBy:actor.uid,reason:input.reason,stateHash:hash(JSON.stringify(clean)),includesSecrets:false,rollbackAllowed:true,verification:'HASHED_AND_SECRET_STRIPPED',auditReference};
+    const rows=this.listSnapshots();rows.unshift(row);this.writeJson(this.snapshotsFile,rows);return row;
+  }
+  rollbackPreview(actor:ServerIdentity,input:{snapshotId:string;reason:string}){
+    if(input.reason.trim().length<8)throw new Error('ROLLBACK_REASON_REQUIRED');
+    const snap=this.listSnapshots().find(s=>s.id===input.snapshotId);if(!snap)throw new Error('SNAPSHOT_NOT_FOUND');
+    const auditReference=this.audit(actor,'ROLLBACK_PREVIEW_CREATED','SafeSnapshot',snap.id,input.reason);
+    return {snapshotId:snap.id,tenantId:snap.tenantId,competitionId:snap.competitionId,willMutate:false,requiresOwnerApproval:true,requiresVerification:true,forbiddenChanges:['scores','results','audit history','FairDraw commitments','question reveal state'],auditReference};
+  }
+  requestBreakGlass(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;protectedAction:string;reason:string}){
+    if(input.reason.trim().length<12)throw new Error('BREAK_GLASS_REASON_REQUIRED');
+    const id=crypto.randomUUID();const auditReference=this.audit(actor,'BREAK_GLASS_REQUESTED','BreakGlassRequest',id,input.reason);
+    const row:BreakGlassRequest={id,tenantId:input.tenantId,competitionId:input.competitionId,requestedBy:actor.uid,reason:input.reason,status:'REQUESTED',createdAt:now(),expiresAt:new Date(Date.now()+30*60_000).toISOString(),protectedAction:input.protectedAction,approvals:[],auditReference};
+    const rows=this.listBreakGlass();rows.unshift(row);this.writeJson(this.breakGlassFile,rows);return row;
+  }
+  runAutoHeal(actor:ServerIdentity,diagnosis:DiagnosticResult){
+    const action=diagnosis.safeActionCodes[0]||'diagnostic.bundle.generate';
+    const playbook=AUTO_HEAL_PLAYBOOKS.find(p=>p.action===action)||AUTO_HEAL_PLAYBOOKS.find(p=>p.id==='stale-tenant-cache')!;
+    const safety=safetyForAction(action);
+    const run:AutoHealRun={id:crypto.randomUUID(),playbookId:playbook.id,tenantId:diagnosis.tenantId,competitionId:diagnosis.competitionId,safety,status:safety==='SAFE_AUTOMATIC'?'AUTO_RESOLVED':safety==='PROTECTED'||safety==='FORBIDDEN'?'SKIPPED_PROTECTED':'QUEUED_FOR_APPROVAL',detectedAt:now(),diagnosis,steps:playbook.steps.map(step=>({name:step,status:safety==='SAFE_AUTOMATIC'?'PASS':'SKIPPED',detail:safety==='SAFE_AUTOMATIC'?'Verified by deterministic playbook contract':'Approval required before mutation'}))};
+    run.auditReference=this.audit(actor,'AUTO_HEAL_RUN_RECORDED','AutoHealRun',run.id,`${playbook.id}:${run.status}`);
+    const runs=this.listAutoHeal();runs.unshift(run);this.writeJson(this.autoHealFile,runs);return run;
+  }
+  updateIncident(actor:ServerIdentity,input:{id?:string;tenantId?:string;competitionId?:string;category:string;severity:IncidentSeverity;status?:IncidentStatus;rootCause?:string;diagnostics?:DiagnosticResult[];reason:string}){
+    if(input.reason.trim().length<8)throw new Error('INCIDENT_REASON_REQUIRED');
+    const rows=this.listIncidents();
+    const mergeKey=(x:IncidentRecord)=>x.tenantId===input.tenantId&&x.competitionId===input.competitionId&&x.category===input.category&&!['RESOLVED','CLOSED'].includes(x.status);
+    let row=input.id?rows.find(x=>x.id===input.id):rows.find(mergeKey);
+    if(row){
+      row.status=input.status||row.status;row.severity=input.severity||row.severity;row.rootCause=input.rootCause||row.rootCause;row.diagnosticEvidence=[...(input.diagnostics||[]),...row.diagnosticEvidence].slice(0,10);row.actions.unshift({action:'INCIDENT_UPDATED',at:now(),actorId:actor.uid,result:row.status,verification:'MERGED_WITH_EXISTING_INCIDENT'});
+    }else{
+      const id=crypto.randomUUID();const auditReference=this.audit(actor,'INCIDENT_DETECTED','Incident',id,input.reason);
+      row={id,scope:input.competitionId?'COMPETITION':input.tenantId?'TENANT':'PLATFORM',tenantId:input.tenantId,competitionId:input.competitionId,category:input.category,severity:input.severity,status:input.status||'DETECTED',source:'CONTROL_TOWER',detectedAt:now(),rootCause:input.rootCause,affectedServices:[input.category],affectedTenants:input.tenantId?[input.tenantId]:[],affectedUsersEstimate:'UNKNOWN',diagnosticEvidence:input.diagnostics||[],actions:[],auditReference};
+      rows.unshift(row);
+    }
+    if(['RESOLVED','CLOSED'].includes(row.status)&&!row.resolvedAt)row.resolvedAt=now();
+    this.writeJson(this.incidentsFile,rows);return row;
+  }
+  ownerSummary(input:{period:'daily'|'weekly';snapshot:ReturnType<ControlTowerRepository['buildSnapshot']>}){
+    const s=input.snapshot;
+    return {period:input.period,generatedAt:now(),platformState:s.platform.state,healthScore:s.platform.healthScore,needsOwner:s.needsAttention.length,openIncidents:s.metrics.activeIncidents,autoHealed:s.metrics.autoHealedToday,supportEscalations:s.metrics.supportEscalations,tenantActionBacklog:s.needsAttention.filter((d:DiagnosticResult)=>d.classification==='TENANT_ACTION_REQUIRED').length,commercialUnknown:s.commercial.filter((c:CommercialProfile)=>c.subscriptionStatus==='UNKNOWN').length,lines:s.needsAttention.slice(0,5).map((d:DiagnosticResult)=>`${d.code}: ${d.rootCause}`)};
   }
   createSupportSession(actor:ServerIdentity,input:{tenantId:string;competitionId?:string;reason:string;minutes?:15|30|60;diagnosticBundle?:Record<string,unknown>}){
     if(!input.tenantId)throw new Error('TENANT_REQUIRED');
