@@ -50,3 +50,14 @@ test('QR onboarding creates the invited Firebase account and organization admin 
  assert.match(app,/case 'org_admin': return hash\.startsWith\('#manage-competition'\)\?<CompetitionOverview\/>:<OrganizationHome\/>;/);
  assert.match(server,/\/api\/identity\/grants\/:id/);
 });
+
+
+test("organization home keeps every competition's staff controls beneath that competition",()=>{
+ const org=fs.readFileSync('src/components/admin/RolePortals.tsx','utf8');
+ assert.match(org,/فريق وصلاحيات المسابقة/);
+ assert.match(org,/IdentityGovernance competitionId=\{c\.id\}/);
+ assert.match(org,/accessCompetitionId===c\.id/);
+ assert.match(org,/موظفو هذه المسابقة مستقلون عن موظفي أي مسابقة أخرى/);
+ assert.doesNotMatch(org,/صلاحيات حسب المسابقة/);
+ assert.doesNotMatch(org,/إدارة الجهة والصلاحيات/);
+});
