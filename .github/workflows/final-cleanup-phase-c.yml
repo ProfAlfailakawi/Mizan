@@ -35,6 +35,37 @@ jobs:
         run: npm ci
       - name: تطبيق الإكمال النهائي
         run: python3 APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py
+      - name: تنظيف كل الأسطح النشطة المتبقية
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          def rw(path, pairs):
+              p=Path(path); s=p.read_text(encoding='utf-8')
+              for old,new in pairs: s=s.replace(old,new)
+              p.write_text(s,encoding='utf-8')
+
+          rw('src/lib/arabic-labels.ts', [("scientific_admin:'المسؤول العلمي',", '')])
+          rw('src/lib/cloud-sync.ts', [
+              ("reviews: ['head_judge', 'scientific_admin'],", "reviews: ['head_judge'],"),
+              (", 'scientific_admin', 'auditor'", ", 'auditor'"),
+              ("quran_sources: [...ADMIN, 'scientific_admin'],", "quran_sources: ['super_admin'],"),
+          ])
+          rw('src/components/admin/IntegrityProtocolLab.tsx', [
+              ("approve:s.currentUser.role==='scientific_admin'", "approve:s.currentUser.role==='super_admin'"),
+              ("const allowed=s.currentUser.role==='scientific_admin';", "const allowed=s.currentUser.role==='super_admin';"),
+              ("هذه الوظيفة للمسؤول العلمي فقط.", "هذه الوظيفة لمدير المنصة فقط."),
+              ("Scientific-admin authority is required.", "Platform administrator authority is required."),
+          ])
+          rw('src/components/public/CeremonyView.tsx', [
+              ("['broadcast_operator','comp_admin','org_admin','scientific_admin'].includes(currentUser.role)", "['head_judge','comp_admin','org_admin'].includes(currentUser.role)"),
+              ("a=>a.actorRole==='scientific_admin'", "a=>a.actorRole==='head_judge'"),
+              ("label={ar?'علمي':'Scientific'}", "label={ar?'رئيس التحكيم':'Head Judge'}"),
+          ])
+          rw('src/components/design-system/ArabicInterfaceGuard.tsx', [(" scientific_admin:'الإدارة العلمية',", '')])
+          rw('tests/trust-protocol.test.ts', [("scientific_admin", "head_judge")])
+          PY
       - name: حفظ تشخيص الدور المتقاعد
         shell: bash
         run: |
