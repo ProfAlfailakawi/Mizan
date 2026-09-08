@@ -237,7 +237,7 @@ export default function App() {
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
-   case 'org_admin': return <OrganizationHome/>;
+   case 'org_admin': return hash.startsWith('#manage-competition')?<CompetitionOverview/>:<OrganizationHome/>;
    case 'comp_admin': return <CompetitionOverview/>;
    case 'head_judge': return <HeadJudgeInbox/>;
    case 'judge': return <JudgeOS/>;

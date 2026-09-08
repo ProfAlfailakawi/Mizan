@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity, Award, BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3, FileCheck2,
   Fingerprint, Gavel, LayoutDashboard, ListChecks, LockKeyhole, Network, Plus, QrCode, RadioTower,
-  Search, Settings2, ShieldCheck, Sparkles, Trash2, UsersRound
+  ArrowRight, Search, Settings2, ShieldCheck, Sparkles, Trash2, UsersRound
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -11,12 +11,13 @@ import { Button } from '../design-system/Button';
 import { Ratio } from '../design-system/Ratio';
 import { Badge } from '../design-system/Badge';
 import { EnterpriseWorkspace } from './EnterpriseWorkspace';
+import { IdentityGovernance } from './IdentityGovernance';
 import { uiToken, localizedCountry, automationLevelLabel } from '../../lib/ui-language';
 import { ContinuityRecovery } from '../operations/ContinuityRecovery';
 import { RealQRCode } from '../design-system/RealQRCode';
 
 const isAr=(language:string)=>language==='ar';
-type MainView='overview'|'design'|'participants'|'operations'|'results'|'enterprise';
+type MainView='overview'|'design'|'participants'|'operations'|'results'|'access'|'enterprise';
 type PolicySection='identity'|'registration'|'workflow'|'operations'|'questions'|'judging'|'appeals'|'results'|'certificate'|'privacy';
 
 type Store=ReturnType<typeof useAppStore>;
@@ -30,16 +31,19 @@ export const CompetitionOverview: React.FC = () => {
  const filtered=participants.filter(p=>`${p.code} ${p.fullName} ${p.fullNameArabic} ${localizedCountry(p.country,ar)}`.toLowerCase().includes(query.toLowerCase()));
  const attention=[...readiness.map(i=>({id:i.id,title:ar?i.ar:i.en,kind:'setup'})),...reviewCases.filter(r=>r.status==='pending').slice(0,3).map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...store.incidents.filter(i=>i.status!=='resolved').slice(0,2).map(i=>({id:i.id,title:i.title,kind:'incident'}))];
  const patchPolicy=(mutate:(p:CompetitionPolicy)=>void)=>store.updateCompetitionPolicy(p=>{mutate(p);return p});
- const nav=[{id:'overview' as const,icon:LayoutDashboard,ar:'اليوم',en:'Overview'},{id:'design' as const,icon:Settings2,ar:'DNA المسابقة',en:'Competition DNA'},{id:'participants' as const,icon:UsersRound,ar:'المشاركون',en:'Participants'},{id:'operations' as const,icon:RadioTower,ar:'التشغيل',en:'Operations'},{id:'results' as const,icon:Award,ar:'النتائج',en:'Results'},{id:'enterprise' as const,icon:ShieldCheck,ar:'المؤسسة',en:'Enterprise'}];
+ const orgManager=store.currentUser.role==='org_admin'; const leaveCompetition=()=>{window.location.hash='';};
+ const nav=[{id:'overview' as const,icon:LayoutDashboard,ar:'اليوم',en:'Overview'},{id:'design' as const,icon:Settings2,ar:'DNA المسابقة',en:'Competition DNA'},{id:'participants' as const,icon:UsersRound,ar:'المشاركون',en:'Participants'},{id:'operations' as const,icon:RadioTower,ar:'التشغيل',en:'Operations'},{id:'results' as const,icon:Award,ar:'النتائج',en:'Results'},{id:'access' as const,icon:ShieldCheck,ar:'الهوية والصلاحيات',en:'Identity & access'},{id:'enterprise' as const,icon:ShieldCheck,ar:'المؤسسة',en:'Enterprise'}];
  return <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-5 sm:py-7"><div className="flex gap-6">
   <aside className="hidden lg:block w-52 shrink-0 pt-1"><div className="sticky top-24 space-y-1"><div className="px-3 mb-4"><div className="text-[10px] font-black tracking-[.16em] text-[#666a67]">{competition.edition}</div><div className="mt-1 text-sm font-extrabold text-[#303733] line-clamp-2">{ar?competition.nameArabic:competition.name}</div></div>{nav.map(n=><NavButton key={n.id} active={view===n.id} onClick={()=>setView(n.id)} icon={n.icon} label={ar?n.ar:n.en}/>)}</div></aside>
   <main className="min-w-0 flex-1">
+   {orgManager&&<div className="mb-4"><Button size="sm" variant="ghost" onClick={leaveCompetition} icon={<ArrowRight className="w-4 h-4"/>}>{ar?'العودة إلى إعدادات الجهة':'Back to organization settings'}</Button></div>}
    <div className="lg:hidden flex gap-1 overflow-x-auto pb-4 mb-4 border-b border-[#dfded7]">{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold ${view===n.id?'bg-[#214C40] text-white':'bg-white border border-[#dfded7] text-[#626a65]'}`}><n.icon className="w-4 h-4"/>{ar?n.ar:n.en}</button>)}</div>
    {view==='overview'&&<Overview store={store} ar={ar} attention={attention} readiness={readiness} onConfigure={()=>setView('design')}/>} 
    {view==='design'&&<CompetitionDNA store={store} ar={ar} policy={policy} section={section} setSection={setSection} patchPolicy={patchPolicy}/>} 
    {view==='participants'&&<ParticipantsView store={store} ar={ar} query={query} setQuery={setQuery} filtered={filtered}/>} 
    {view==='operations'&&<OperationsView store={store} ar={ar} sim={sim} simCount={simCount} setSimCount={setSimCount} attention={attention}/>} 
    {view==='results'&&<ResultsView store={store} ar={ar}/>} 
+   {view==='access'&&<IdentityGovernance competitionId={competition.id}/>} 
    {view==='enterprise'&&<EnterpriseWorkspace/>} 
   </main>
  </div></div>;
