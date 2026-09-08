@@ -36,18 +36,27 @@ jobs:
       - name: تثبيت الاعتمادات
         run: npm ci
 
-      - name: إصلاح حارس تحويل identityForUid في الـmaterializer
+      - name: تصحيح materializer قبل التطبيق
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('APPLY_COMPETITION_IDENTITY_2026_09_08.py')
           text=p.read_text(encoding='utf-8')
-          old='old_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", t.find("identityForUid(uid:string,competitionId?:string)"))'
-          new='sig=t.find("  identityForUid(uid:string,competitionId?:string){")\nnew_close=t.find("\\n  }",sig)+4\nold_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", new_close)'
-          if old not in text:
-              raise SystemExit('Expected materializer guard anchor not found; refusing partial repair.')
-          p.write_text(text.replace(old,new,1),encoding='utf-8')
+
+          old_guard='old_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", t.find("identityForUid(uid:string,competitionId?:string)"))'
+          new_guard='sig=t.find("  identityForUid(uid:string,competitionId?:string){")\nnew_close=t.find("\\n  }",sig)+4\nold_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", new_close)'
+          if old_guard not in text:
+              raise SystemExit('Expected identity materializer guard anchor not found; refusing partial repair.')
+          text=text.replace(old_guard,new_guard,1)
+
+          bad_reset="finally{setBusy(false}};"
+          good_reset="finally{setBusy(false)}};"
+          if text.count(bad_reset)!=1:
+              raise SystemExit(f'Expected one AuthPortal reset typo, got {text.count(bad_reset)}.')
+          text=text.replace(bad_reset,good_reset,1)
+
+          p.write_text(text,encoding='utf-8')
           PY
 
       - name: تطبيق تفعيل QR والعزل حسب المسابقة
