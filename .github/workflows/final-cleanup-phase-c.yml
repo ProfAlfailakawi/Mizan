@@ -53,6 +53,7 @@ jobs:
           rw('tests/trust-protocol.test.ts', [("scientific_admin", "head_judge")])
           rw('src/lib/store.ts', [("if(!globalState.currentUser.role==='org_admin')", "if(globalState.currentUser.role!=='org_admin')")])
           rw('tests/competition-scoped-identity-onboarding.test.ts', [("العودة إلى إعدادات الجهة", "العودة إلى مسابقات الجهة")])
+          p=Path('src/components/admin/RolePortals.tsx'); text=p.read_text(encoding='utf-8'); had_newline=text.endswith('\n'); text='\n'.join(line.rstrip() for line in text.splitlines()); p.write_text(text+('\n' if had_newline else ''),encoding='utf-8')
           PY
       - name: حفظ تشخيص الدور المتقاعد
         run: |
