@@ -163,7 +163,7 @@ export const LiveJudgingSimulator: React.FC = () => {
               style={{ width: isPlaying ? (activeToken === 3 ? '92%' : '75%') : '50%' }}
             />
           </div>
-          <div className="text-[10px] text-[#8B9A92] mt-1 text-center font-mono">2.1s · بالنبض</div>
+          <div className="text-[10px] text-[#656b66] mt-1 text-center font-mono">2.1s · بالنبض</div>
         </div>
 
         {/* مؤشر توافق المحكمين */}
@@ -275,12 +275,12 @@ export const InteractiveEvolutionFlow: React.FC = () => {
             <span className="text-[11px] font-bold text-[#A34D43] bg-[#F4E6E3] px-3 py-1 rounded-full flex items-center gap-1">
               <AlertTriangle size={13} /> في المسابقات السابقة
             </span>
-            <span className="text-[11px] text-[#8B9A92] line-through">طريقة ورقية</span>
+            <span className="text-[11px] text-[#656b66] line-through">طريقة ورقية</span>
           </div>
 
           <div className="my-3">
             <h3 className="text-base font-black text-[#696F6B] line-through">{curr.traditional.badge}</h3>
-            <p className="text-xs text-[#8B9A92] mt-2 leading-6">{curr.traditional.detail}</p>
+            <p className="text-xs text-[#656b66] mt-2 leading-6">{curr.traditional.detail}</p>
           </div>
 
           <div className="mt-4 pt-3 border-t border-[#E5E0D8] text-[11px] text-[#A34D43] font-bold flex items-center gap-1.5">
@@ -392,7 +392,7 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
               <div className="text-base font-black text-[#F4F1E8]">{org.name}</div>
               <div className="text-xs text-[#A9B6AE] mt-2">{org.db}</div>
 
-              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[#8B9A92]">
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[#656b66]">
                 <span>عزل كامل ١٠٠٪</span>
                 <span className="font-mono">Zero Cross-Access</span>
               </div>
@@ -412,7 +412,7 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-[#2F6555]/30 text-[#E8CB93] grid place-items-center mb-2">
                 <s.icon size={18} />
               </div>
-              <div className="text-[10px] font-mono text-[#8B9A92]">{s.step}</div>
+              <div className="text-[10px] font-mono text-[#656b66]">{s.step}</div>
               <div className="text-sm font-black text-[#F4F1E8] mt-1">{s.title}</div>
               <div className="text-[11px] text-[#A9B6AE] mt-1">{s.desc}</div>
               {idx < 3 && (
