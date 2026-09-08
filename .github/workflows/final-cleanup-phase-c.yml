@@ -79,9 +79,14 @@ jobs:
             src/types/index.ts
             src/lib/permissions.ts
             src/lib/useMizanAuth.ts
+            src/lib/arabic-labels.ts
+            src/lib/cloud-sync.ts
             src/components/admin/CompetitionOverview.tsx
             src/components/admin/IdentityGovernance.tsx
+            src/components/admin/IntegrityProtocolLab.tsx
             src/components/design-system/RoleSwitcher.tsx
+            src/components/design-system/ArabicInterfaceGuard.tsx
+            src/components/public/CeremonyView.tsx
             src/lib/ui-language.ts
             server/identity-governance.ts
             server.ts
@@ -91,6 +96,7 @@ jobs:
             src/components/layout/Header.tsx
             src/App.tsx
             tests/user-notes-2026-09-08.test.ts
+            tests/trust-protocol.test.ts
             tests/final-cleanup-phase-c.test.ts
           )
           git add -- "${TARGETS[@]}"
