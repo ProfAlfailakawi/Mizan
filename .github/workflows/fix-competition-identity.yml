@@ -36,6 +36,20 @@ jobs:
       - name: تثبيت الاعتمادات
         run: npm ci
 
+      - name: إصلاح حارس تحويل identityForUid في الـmaterializer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('APPLY_COMPETITION_IDENTITY_2026_09_08.py')
+          text=p.read_text(encoding='utf-8')
+          old='old_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", t.find("identityForUid(uid:string,competitionId?:string)"))'
+          new='sig=t.find("  identityForUid(uid:string,competitionId?:string){")\nnew_close=t.find("\\n  }",sig)+4\nold_tail_start=t.find("\\n    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find", new_close)'
+          if old not in text:
+              raise SystemExit('Expected materializer guard anchor not found; refusing partial repair.')
+          p.write_text(text.replace(old,new,1),encoding='utf-8')
+          PY
+
       - name: تطبيق تفعيل QR والعزل حسب المسابقة
         run: python3 APPLY_COMPETITION_IDENTITY_2026_09_08.py
 
