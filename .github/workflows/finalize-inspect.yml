@@ -1,4 +1,4 @@
-name: Materialize final UX batch for review
+name: Capture final UX implementation audit
 
 on:
   push:
@@ -9,32 +9,41 @@ permissions:
   contents: write
 
 jobs:
-  materialize:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Prepare materializer
+      - name: Capture implementation references
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace('nxt,n=re.subn(pattern,repl,text,count=1,flags=flags)','nxt,n=re.subn(pattern,lambda _m: repl,text,count=1,flags=flags)',1)
-          s=s.replace("old=p.read_text(encoding='utf-8')","old=p.read_text(encoding='utf-8') if p.exists() else ''",1)
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Apply existing batch to source
-        run: python3 APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py
-      - name: Persist materialized source for inspection
+          set +e
+          {
+            echo '=== HEAD ==='; git rev-parse HEAD
+            echo '=== FEATURE FLAGS ==='
+            for k in ai_integrity shadow_mode hospitality remote_rounds broadcast benchmark; do
+              echo "--- $k ---"
+              grep -RIn --exclude-dir=node_modules --exclude='APPLY_*' --exclude='*.lock' "$k" src server.ts server tests 2>/dev/null | head -80
+            done
+            echo '=== SUPPORT ==='
+            grep -RIn --exclude-dir=node_modules 'LiveSupportControl\|الدعم المباشر' src | head -80
+            echo '=== QR ==='
+            grep -n 'reissue-qr\|RealQRCode\|ACTIVATED\|PENDING' src/components/admin/IdentityGovernance.tsx | head -120
+            echo '=== DRAW ==='
+            grep -n 'participantInitiatedDraw\|startSessionForParticipant\|generateFairDraw' src/lib/store.ts src/lib/competition-config.ts src/components/admin/CompetitionOverview.tsx src/components/public/RegistrationFlow.tsx | head -160
+            echo '=== COMMITTEE STATUS ==='
+            grep -n 'حالة اللجنة\|updateCommittee\|status.*ready\|status.*testing\|status.*paused\|status.*offline' src/components/admin/CompetitionOverview.tsx src/lib/store.ts | head -160
+            echo '=== LOGO ==='
+            grep -n 'uploadLogo\|handleFileUpload\|readAsDataURL\|logoUrl' src/components/admin/CompetitionOverview.tsx src/components/admin/TenantBrandStudio.tsx server.ts server/r2-private.ts | head -200
+            echo '=== DIGITS ==='
+            grep -RIn --exclude-dir=node_modules 'toWesternDigits\|toAsciiDigits\|u-nu-latn\|٠\|١\|٢\|٣\|٤\|٥\|٦\|٧\|٨\|٩' src tests | head -240
+          } > tmp/final-ux-audit.txt
+      - name: Commit audit report
         shell: bash
         run: |
-          set -euo pipefail
           git config user.name 'MIZAN CI'
           git config user.email 'actions@users.noreply.github.com'
-          git add src tests || true
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'chore: materialize final UX batch for inspection'
+          git add tmp/final-ux-audit.txt
+          git commit -m 'chore: capture final UX implementation audit' || exit 0
           git push origin HEAD
