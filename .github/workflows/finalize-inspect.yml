@@ -1,4 +1,4 @@
-name: Capture final UX implementation audit
+name: Capture final UX test diagnostics
 
 on:
   push:
@@ -15,35 +15,26 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Capture implementation references
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Capture test output
         shell: bash
         run: |
           set +e
-          {
-            echo '=== HEAD ==='; git rev-parse HEAD
-            echo '=== FEATURE FLAGS ==='
-            for k in ai_integrity shadow_mode hospitality remote_rounds broadcast benchmark; do
-              echo "--- $k ---"
-              grep -RIn --exclude-dir=node_modules --exclude='APPLY_*' --exclude='*.lock' "$k" src server.ts server tests 2>/dev/null | head -80
-            done
-            echo '=== SUPPORT ==='
-            grep -RIn --exclude-dir=node_modules 'LiveSupportControl\|الدعم المباشر' src | head -80
-            echo '=== QR ==='
-            grep -n 'reissue-qr\|RealQRCode\|ACTIVATED\|PENDING' src/components/admin/IdentityGovernance.tsx | head -120
-            echo '=== DRAW ==='
-            grep -n 'participantInitiatedDraw\|startSessionForParticipant\|generateFairDraw' src/lib/store.ts src/lib/competition-config.ts src/components/admin/CompetitionOverview.tsx src/components/public/RegistrationFlow.tsx | head -160
-            echo '=== COMMITTEE STATUS ==='
-            grep -n 'حالة اللجنة\|updateCommittee\|status.*ready\|status.*testing\|status.*paused\|status.*offline' src/components/admin/CompetitionOverview.tsx src/lib/store.ts | head -160
-            echo '=== LOGO ==='
-            grep -n 'uploadLogo\|handleFileUpload\|readAsDataURL\|logoUrl' src/components/admin/CompetitionOverview.tsx src/components/admin/TenantBrandStudio.tsx server.ts server/r2-private.ts | head -200
-            echo '=== DIGITS ==='
-            grep -RIn --exclude-dir=node_modules 'toWesternDigits\|toAsciiDigits\|u-nu-latn\|٠\|١\|٢\|٣\|٤\|٥\|٦\|٧\|٨\|٩' src tests | head -240
-          } > tmp/final-ux-audit.txt
-      - name: Commit audit report
+          mkdir -p tmp
+          npm test > tmp/final-test-output.txt 2>&1
+          code=$?
+          echo "TEST_EXIT_CODE=$code" >> tmp/final-test-output.txt
+          exit 0
+      - name: Commit diagnostics
         shell: bash
         run: |
           git config user.name 'MIZAN CI'
           git config user.email 'actions@users.noreply.github.com'
-          git add tmp/final-ux-audit.txt
-          git commit -m 'chore: capture final UX implementation audit' || exit 0
+          git add tmp/final-test-output.txt
+          git commit -m 'chore: capture failing test diagnostics' || exit 0
           git push origin HEAD
