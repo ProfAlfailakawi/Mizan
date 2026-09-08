@@ -33,6 +33,19 @@ jobs:
           cache: npm
       - name: تثبيت الاعتمادات
         run: npm ci
+      - name: تصحيح محرك الاستبدال في materializer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('APPLY_HARDENING_PHASE_A_2026_09_08.py')
+          t=p.read_text(encoding='utf-8')
+          old='out,n=re.subn(pattern,repl,text,count=count,flags=flags)'
+          new='out,n=re.subn(pattern,lambda _m: repl,text,count=count,flags=flags)'
+          if old not in t:
+              raise SystemExit('materializer sub helper anchor missing')
+          p.write_text(t.replace(old,new,1),encoding='utf-8')
+          PY
       - name: تطبيق إصلاحات الحفظ والصلاحيات والتجميد والتحقق
         run: python3 APPLY_HARDENING_PHASE_A_2026_09_08.py
       - name: فحص الأنواع
