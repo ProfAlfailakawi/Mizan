@@ -1,0 +1,113 @@
+name: تثبيت ملاحظات ميزان فعلياً في المصدر
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/materialize-mizan-notes.yml'
+      - 'MIZAN_MATERIALIZE_NOW.txt'
+      - 'APPLY_ALL_MIZAN_NOTES.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mizan-materialize-notes
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: جلب المصدر
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: إعداد Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: تثبيت الاعتمادات
+        run: npm ci
+
+      - name: تطبيق جميع ملاحظات 2026-09-08 على الملفات الفعلية
+        run: python3 APPLY_ALL_MIZAN_NOTES.py
+
+      - name: عرض الملفات التي ستتغير
+        run: git status --short
+
+      # لا نحفظ أي تعديل في main قبل أن يمر المشروع كاملاً.
+      - name: فحص الأنواع
+        run: npm run lint
+
+      - name: الاختبارات
+        run: npm test
+
+      - name: تدقيق المصدر والأسرار
+        run: npm run source-audit
+
+      - name: تدقيق الواجهة العربية
+        run: npm run arabic-ui-audit
+
+      - name: البناء
+        run: npm run build
+
+      - name: حفظ التعديلات الفعلية في main
+        id: persist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # لا نسمح للـworkflow بحفظ ملفات build أو أي تغييرات جانبية.
+          TARGETS=(
+            "src/components/admin/IdentityGovernance.tsx"
+            "src/components/admin/CompetitionOverview.tsx"
+            "src/components/admin/TenantBrandStudio.tsx"
+            "src/components/admin/TenantConsole.tsx"
+            "src/components/admin/RolePortals.tsx"
+            "src/App.tsx"
+            "server.ts"
+            "src/lib/store.ts"
+            "src/components/public/ExperienceHub.tsx"
+            "src/lib/ui-language.ts"
+          )
+
+          git add -- "${TARGETS[@]}"
+
+          if git diff --cached --quiet; then
+            echo "materialized=0" >> "$GITHUB_OUTPUT"
+            echo "لا توجد تغييرات غير محفوظة؛ الملفات مطبقة مسبقاً."
+            exit 0
+          fi
+
+          # Fail closed إذا تحرك main أثناء الفحص.
+          git fetch origin main
+          LOCAL_HEAD="$(git rev-parse HEAD)"
+          REMOTE_HEAD="$(git rev-parse origin/main)"
+          if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+            echo "main تغير أثناء الفحص؛ لن يتم دفع commit مبني على نسخة قديمة."
+            exit 1
+          fi
+
+          git config user.name "MIZAN CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix: materialize all 2026-09-08 MIZAN notes"
+          git push origin HEAD:main
+
+          echo "materialized=1" >> "$GITHUB_OUTPUT"
+
+      # Pushes التي تتم بـGITHUB_TOKEN لا تشغّل workflow آخر تلقائياً.
+      # لذلك نطلب فحص ci.yml صراحة على الـHEAD الجديد.
+      - name: تشغيل فحص ميزان على الـcommit الجديد
+        if: steps.persist.outputs.materialized == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
