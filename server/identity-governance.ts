@@ -124,7 +124,9 @@ export class IdentityGovernanceRepository{
   previewInvitation(token:string){
     const s=this.read();this.cleanup(s);this.write(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
     if(!inv)throw new Error('ACTIVATION_TOKEN_INVALID');
-    return {email:inv.email,displayName:inv.displayName,requestedRole:inv.requestedRole,organizationId:inv.organizationId,competitionId:inv.competitionId,expiresAt:inv.expiresAt};
+    const account=s.accounts.find(a=>a.organizationId===inv.organizationId&&normalizeEmail(a.email)===inv.email&&a.status==='ACTIVE');
+    const existingAccount=!!account&&s.grants.some(g=>g.accountId===account.id&&g.organizationId===inv.organizationId&&g.competitionId===inv.competitionId&&g.role===inv.requestedRole&&g.status==='ACTIVE');
+    return {email:inv.email,displayName:inv.displayName,requestedRole:inv.requestedRole,organizationId:inv.organizationId,competitionId:inv.competitionId,expiresAt:inv.expiresAt,existingAccount};
   }
 
   /** Compatibility only: turns a pre-upgrade PENDING_APPROVAL invitation into a normal READY invitation. */
@@ -146,7 +148,8 @@ export class IdentityGovernanceRepository{
     if(existingByUid&&existingByEmail&&existingByUid.id!==existingByEmail.id)throw new Error('IDENTITY_BINDING_CONFLICT');
     if(existingByUid&&existingByUid.organizationId!==inv.organizationId)throw new Error('CROSS_TENANT_IDENTITY_BLOCKED');
     const account=existingByUid||existingByEmail;
-    if(account&&s.grants.some(g=>g.accountId===account.id&&g.status==='ACTIVE'&&g.competitionId===inv.competitionId))throw new Error('IDENTITY_ALREADY_BOUND_TO_COMPETITION');
+    const existingGrant=account&&s.grants.find(g=>g.accountId===account.id&&g.status==='ACTIVE'&&g.competitionId===inv.competitionId&&g.role===inv.requestedRole);
+    if(existingGrant){inv.status='ACTIVATED';delete inv.activationTokenHash;this.write(s);this.appendAudit({uid:base.uid,role:existingGrant.role,organizationId:existingGrant.organizationId},'IDENTITY_QR_REISSUE_ACTIVATED','Grant',existingGrant.id,'Reissued one-time QR confirmed the existing competition grant');return {account,grant:existingGrant,reissued:true};}
     const now=new Date().toISOString();
     const resolvedAccount:Account=account||{id:crypto.randomUUID(),uid:base.uid,organizationId:inv.organizationId,email:inv.email,displayName:inv.displayName,status:'ACTIVE',createdAt:now,activatedFromInvitationId:inv.id};
     if(!account)s.accounts.unshift(resolvedAccount);
@@ -173,6 +176,20 @@ export class IdentityGovernanceRepository{
     if(account.uid===actor.uid)throw new Error('SELF_ACCOUNT_CHANGE_NOT_ALLOWED');
     if(actor.role!=='super_admin'&&this.isSuperAdminAccount(s,account.id))throw new Error('SUPER_ADMIN_PROTECTED');
     return {grant,account};
+  }
+
+  resumeGrant(actor:ServerIdentity,grantId:string,reason:string){
+    if(!['super_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('RESUME_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('RESUME_REASON_REQUIRED');
+    const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);if(grant.status!=='SUSPENDED')throw new Error('GRANT_NOT_SUSPENDED');grant.status='ACTIVE';this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_RESUMED','Grant',grant.id,reason);return {grant};
+  }
+
+  reissueQr(actor:ServerIdentity,grantId:string){
+    if(!['super_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('QR_REISSUE_NOT_ALLOWED');
+    const s=this.read();this.cleanup(s);const {grant,account}=this.scopedGrant(actor,s,grantId);if(grant.status!=='ACTIVE')throw new Error('GRANT_NOT_ACTIVE');
+    for(const inv of s.invitations)if(inv.organizationId===grant.organizationId&&inv.competitionId===grant.competitionId&&inv.email===normalizeEmail(account.email)&&inv.status==='READY'){inv.status='REVOKED';delete inv.activationTokenHash;}
+    const rawToken=crypto.randomBytes(24).toString('base64url');const now=new Date();
+    const invitation:Invitation={id:crypto.randomUUID(),organizationId:grant.organizationId,competitionId:grant.competitionId,committeeId:grant.committeeId,email:normalizeEmail(account.email),displayName:account.displayName,requestedRole:grant.role,reason:'Reissued activation QR for existing authorized user',status:'READY',createdAt:now.toISOString(),createdBy:actor.uid,expiresAt:new Date(now.getTime()+48*3600_000).toISOString(),activationTokenHash:hash(rawToken)};
+    s.invitations.unshift(invitation);this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_QR_REISSUED','Grant',grant.id,'Previous pending activation QR invalidated; new one-time QR issued');return {invitation:{...invitation,activationTokenHash:undefined},activationToken:rawToken};
   }
 
   suspendGrant(actor:ServerIdentity,grantId:string,reason:string){

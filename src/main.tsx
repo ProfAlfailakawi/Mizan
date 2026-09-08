@@ -5,10 +5,12 @@ import './index.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
 import {installAppUpdate} from './lib/app-update';
+import {installInputNormalization} from './lib/input-validation';
 
 // Must run before the first lazy route resolves, so a chunk minted by a previous deploy can
 // recover instead of leaving a venue screen blank.
 installStaleShellRecovery();
+installInputNormalization();
 
 // التحديث الذاتي الصامت: منارة الإصدار، ثم التحديث، ثم التصعيد إلى مسح كامل عند اللزوم.
 // تعافي الحزم المفقودة يبقى في وحدته أعلاه، فلا يُركَّب مرتين.

@@ -180,6 +180,8 @@ const CompetitionNotFound: React.FC = () => (
   </div>
 );
 
+const TenantSuspendedScreen:React.FC<{language:string}>=({language})=>{const ar=language==='ar';return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5" dir={ar?'rtl':'ltr'}><div className="mizan-surface max-w-lg p-8 sm:p-10 text-center"><div className="flex justify-center"><MizanLogo language={ar?'ar':'en'} compact/></div><div className="mizan-kicker mt-6">{ar?'حالة الجهة':'ORGANIZATION STATUS'}</div><h1 className="text-2xl font-black mt-2">{ar?'تم إيقاف وصول هذه الجهة مؤقتًا':'Organization access is temporarily suspended'}</h1><p className="text-sm text-[#636864] leading-7 mt-4">{ar?'بيانات الجهة ومسابقاتها محفوظة بالكامل، لكن الوصول التشغيلي متوقف حاليًا. يرجى التواصل مع إدارة المنصة.':'All organization data remains محفوظة; operational access is temporarily unavailable. Please contact the platform administrator.'}</p></div></div>};
+
 export default function App() {
  const {currentUser,switchRole,selectCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand}=useAppStore();
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
@@ -197,11 +199,12 @@ export default function App() {
  const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash && !splashWasSeen());
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
+ const [tenantSuspended,setTenantSuspended]=useState(false);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
     وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
- useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;
+ useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;setTenantSuspended(t.status==='suspended');if(t.status==='suspended')return;
   updateOrganizationBrand({
     displayName:t.displayName||undefined,
     displayNameArabic:t.displayNameArabic||undefined,
@@ -221,6 +224,7 @@ export default function App() {
  const [compMissing,setCompMissing]=useState(false);
  useEffect(()=>{if(!requestedComp){setCompMissing(false);return;}setCompMissing(!selectCompetition(requestedComp));},[requestedComp]);
  if(marketing) return <Suspense fallback={<ViewFallback/>}><MarketingSite/></Suspense>;
+ if(tenantSuspended) return <TenantSuspendedScreen language={language}/>;
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md text-center"><div className="flex justify-center mb-4"><MizanLogo language="ar" compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق إضافي لهذا الحساب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#636864] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'هذه الحماية مطلوبة لحساب مالك المنصة، أو لأن الجهة فعّلت التحقق بخطوتين لفريقها. أكمل العامل الثاني ثم أعد تسجيل الدخول.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. يمكن لصاحب الصلاحية إغلاق الجلسة القديمة ثم المتابعة بأمان.':'الهوية صحيحة، لكن الحساب يحتاج دعوة وصلاحية محددة داخل الجهة قبل الدخول.'}</p>{accessError==='ACCOUNT_NOT_PROVISIONED'&&<div className="mt-5 text-start">{activationFromQr?<div className="rounded-2xl bg-[#E7EEE9] text-[#214C40] p-4 text-xs font-bold leading-6 text-center">{activationMessage==='ACTIVATING'?'تمت قراءة QR — جارٍ ربط الحساب بالدعوة…':'تمت قراءة QR التفعيل. سيُربط الحساب تلقائيًا بالبريد المدعو.'}</div>:<><label className="text-[10px] font-black text-[#616763]">رمز التفعيل الاحتياطي</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="ألصق الرمز فقط إذا تعذر مسح QR"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">تفعيل الحساب</button></>}{activationMessage&&activationMessage!=='ACTIVATING'&&<div className="mt-2 text-[10px] text-center text-[#656b66]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':activationMessage}</div>}</div>}<div className="text-[10px] text-[#696f6b] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div>{accessError==='PRIVILEGED_SESSION_CONFLICT'&&<button onClick={()=>{void takeoverSession()}} className="mt-6 w-full rounded-2xl bg-[#214C40] text-white text-sm font-black py-3">متابعة هنا وإغلاق الجلسة الأخرى</button>}<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button></div></div>;

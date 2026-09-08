@@ -50,6 +50,7 @@ export interface TenantRecord {
   /** ملاحظة إدارية للمالك (حال الاشتراك مثلًا). لا تُعرض للزوّار. */
   note?: string;
   status?: 'active' | 'suspended';
+  certificateTheme?: 'quiet_authority'|'institutional'|'ceremonial';
 }
 
 const normalizeHost = (raw: string) =>
@@ -81,30 +82,30 @@ export const baseDomain = () => normalizeHost(process.env.MIZAN_BASE_DOMAIN || '
  * يعيد الجهة صاحبة هذا المضيف، أو null.
  * النطاق الخاص يُقدَّم على النطاق الفرعي: الجهة التي طلبت نطاقها تتوقعه هو الحاكم.
  */
-export function resolveTenant(host: string | undefined, tenants: TenantRecord[] = tenantRegistry()): TenantRecord | null {
+export function resolveTenantAny(host: string | undefined, tenants: TenantRecord[] = tenantRegistry()): TenantRecord | null {
   const h = normalizeHost(host || '');
   if (!h) return null;
-  const active = tenants.filter(t => t.status !== 'suspended');
-
-  const custom = active.find(t => (t.customDomains || []).some(d => normalizeHost(d) === h));
+  const custom = tenants.find(t => (t.customDomains || []).some(d => normalizeHost(d) === h));
   if (custom) return custom;
-
   const base = baseDomain();
   if (base && h !== base && h.endsWith(`.${base}`)) {
     const label = h.slice(0, -(base.length + 1));
-    // نطاق فرعي واحد فقط؛ "a.b.mizan.app" ليس جهة "a".
-    if (label && !label.includes('.')) {
-      const byLabel = active.find(t => normalizeHost(t.subdomain || '') === label);
-      if (byLabel) return byLabel;
-    }
+    if (label && !label.includes('.')) return tenants.find(t => normalizeHost(t.subdomain || '') === label) || null;
   }
   return null;
 }
+
+export function resolveTenant(host: string | undefined, tenants: TenantRecord[] = tenantRegistry()): TenantRecord | null {
+  const tenant=resolveTenantAny(host,tenants);return tenant?.status==='suspended'?null:tenant;
+}
+
+export const tenantByOrganizationId=(orgId:string,tenants:TenantRecord[]=tenantRegistry())=>tenants.find(t=>t.orgId===orgId)||null;
 
 /** الشكل الذي يراه المتصفح: هوية العرض فقط، دون تفاصيل السجل الأخرى. */
 export const publicTenant = (t: TenantRecord) => {
   const res: Record<string, unknown> = {
     orgId: t.orgId,
+    status: t.status === 'suspended' ? 'suspended' : 'active',
     displayName: t.displayName || null,
     displayNameArabic: t.displayNameArabic || null,
     logoUrl: t.logoUrl || null,
@@ -117,5 +118,6 @@ export const publicTenant = (t: TenantRecord) => {
   if (t.address !== undefined) res.address = t.address;
   if (t.addressArabic !== undefined) res.addressArabic = t.addressArabic;
   if (t.displayPlacements !== undefined) res.displayPlacements = t.displayPlacements;
+  if (t.certificateTheme !== undefined) res.certificateTheme = t.certificateTheme;
   return res;
 };

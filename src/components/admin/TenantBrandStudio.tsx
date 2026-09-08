@@ -26,6 +26,7 @@ import { Badge } from '../design-system/Badge';
 import { useAppStore } from '../../lib/store';
 import { auth } from '../../lib/firebase';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
+import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits} from '../../lib/input-validation';
 
 interface TenantBrandStudioProps {
   initialBrand?: OrganizationBrand;
@@ -101,6 +102,16 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
+
+  // Production always hydrates from the server record, even on admin.dr-* where host-based branding cannot identify the tenant.
+  useEffect(() => {
+    const user=auth?.currentUser;if(!user)return;let live=true;
+    void user.getIdToken().then(token=>fetch(`/api/tenant/brand${orgId?`?orgId=${encodeURIComponent(orgId)}`:''}`,{headers:{authorization:`Bearer ${token}`}})).then(async res=>({ok:res.ok,body:await res.json().catch(()=>({}))})).then(({ok,body})=>{
+      if(!live||!ok||!body?.tenant)return;const b=body.tenant;
+      setNameArabic(b.displayNameArabic||'');setNameEnglish(b.displayName||'');setSloganArabic(b.sloganArabic||'');setSloganEnglish(b.slogan||'');setLogoUrl(b.logoUrl||'');setWebsiteUrl(b.websiteUrl||'');setPhoneNumber(b.phoneNumber||'');setSupportEmail(b.supportEmail||'');setAddressArabic(b.addressArabic||'');setAddressEnglish(b.address||'');setCertificateTheme(b.certificateTheme||'quiet_authority');
+      const p=b.displayPlacements||{};setPlacements({showHeaderLogo:p.showHeaderLogo!==false,showHeaderSlogan:Boolean(p.showHeaderSlogan),showHeaderContact:Boolean(p.showHeaderContact),showFooterContact:p.showFooterContact!==false,showFooterAddress:p.showFooterAddress!==false,showFooterWebsite:p.showFooterWebsite!==false,showOnCertificates:p.showOnCertificates!==false,showOnVenueScreens:p.showOnVenueScreens!==false,showOnPublicPortal:p.showOnPublicPortal!==false});
+    }).catch(()=>{});return()=>{live=false};
+  }, [orgId]);
 
   // فحص استباقي ذكي لصلاحية الصورة وأبعادها
   const testLogo = useCallback((url: string) => {
@@ -272,98 +283,33 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
   // التحقق من صحة المدخلات
   const validationErrors = useMemo(() => {
-    const errs: string[] = [];
-    if (logoUrl.trim() && probe.status === 'broken') {
-      errs.push(ar ? 'الشعار مكسور أو لا يمكن فتحه' : 'Logo is broken or inaccessible');
-    }
-    if (websiteUrl.trim() && !/^https?:\/\//i.test(websiteUrl.trim())) {
-      errs.push(ar ? 'رابط الموقع يجب أن يبدأ بـ https:// أو http://' : 'Website must start with https:// or http://');
-    }
-    if (supportEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail.trim())) {
-      errs.push(ar ? 'صيغة البريد الإلكتروني غير صحيحة' : 'Invalid email format');
-    }
-    if (phoneNumber.trim() && !/^\+?[0-9\s\-().]{6,25}$/.test(phoneNumber.trim())) {
-      errs.push(ar ? 'رقم الهاتف غير صالح' : 'Invalid phone number format');
-    }
+    const errs:string[]=[];
+    if(logoUrl.trim()&&probe.status==='broken')errs.push(ar?'الشعار مكسور أو لا يمكن فتحه':'Logo is broken or inaccessible');
+    if(nameArabic.trim()&&!isArabicText(nameArabic))errs.push(ar?'الاسم العربي يجب أن يكتب بالعربية':'Arabic name must use Arabic letters');
+    if(nameEnglish.trim()&&!isLatinText(nameEnglish))errs.push(ar?'الاسم الإنجليزي يجب أن يكتب بالإنجليزية':'English name must use Latin letters');
+    if(sloganArabic.trim()&&!isArabicText(sloganArabic))errs.push(ar?'السلوجن العربي يجب أن يكتب بالعربية':'Arabic slogan must use Arabic letters');
+    if(sloganEnglish.trim()&&!isLatinText(sloganEnglish))errs.push(ar?'السلوجن الإنجليزي يجب أن يكتب بالإنجليزية':'English slogan must use Latin letters');
+    if(websiteUrl.trim()&&!isWebsiteUrl(websiteUrl))errs.push(ar?'اكتب موقعًا صحيحًا مثل dr-alfailakawi.com':'Enter a valid website');
+    if(supportEmail.trim()&&!isEmail(supportEmail))errs.push(ar?'صيغة البريد الإلكتروني غير صحيحة':'Invalid email format');
+    if(phoneNumber.trim()&&!isPhone(phoneNumber))errs.push(ar?'رقم الهاتف غير صالح':'Invalid phone number');
+    if(addressArabic.trim()&&!isArabicText(addressArabic))errs.push(ar?'العنوان العربي يجب أن يكتب بالعربية':'Arabic address must use Arabic letters');
+    if(addressEnglish.trim()&&!isLatinText(addressEnglish))errs.push(ar?'العنوان الإنجليزي يجب أن يكتب بالإنجليزية':'English address must use Latin letters');
     return errs;
-  }, [logoUrl, probe.status, websiteUrl, supportEmail, phoneNumber, ar]);
+  }, [logoUrl,probe.status,nameArabic,nameEnglish,sloganArabic,sloganEnglish,websiteUrl,supportEmail,phoneNumber,addressArabic,addressEnglish,ar]);
 
   const canSave = validationErrors.length === 0 && !saving;
 
   // حفظ الهوية
   const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
-    setServerError('');
-    setSaveSuccess(false);
-
-    const updatedBrand: OrganizationBrand = {
-      ...(effectiveBrand || {
-        name: '',
-        nameArabic: '',
-        primaryColor: '#0d1e18',
-        accentColor: '#10b981',
-      }),
-      name: nameEnglish.trim() || effectiveBrand?.name || '',
-      nameArabic: nameArabic.trim() || effectiveBrand?.nameArabic || '',
-      displayName: nameEnglish.trim() || undefined,
-      displayNameArabic: nameArabic.trim() || undefined,
-      logoUrl: logoUrl.trim() || undefined,
-      slogan: sloganEnglish.trim() || undefined,
-      sloganArabic: sloganArabic.trim() || undefined,
-      websiteUrl: websiteUrl.trim() || undefined,
-      phoneNumber: phoneNumber.trim() || undefined,
-      supportEmail: supportEmail.trim() || undefined,
-      address: addressEnglish.trim() || undefined,
-      addressArabic: addressArabic.trim() || undefined,
-      certificateTheme,
-      displayPlacements: placements,
-    };
-
-    try {
-      // 1. التحديث المحلي الفوري في المتجر
-      store.updateOrganizationBrand(updatedBrand);
-
-      // 2. المزامنة مع الخادم إذا توفرت هوية مسجلة
-      const user = auth?.currentUser;
-      if (user) {
-        const token = await user.getIdToken();
-        const res = await fetch('/api/tenant/brand', {
-          method: 'PATCH',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            orgId: orgId || store.organization?.id,
-            displayName: updatedBrand.displayName,
-            displayNameArabic: updatedBrand.displayNameArabic,
-            logoUrl: updatedBrand.logoUrl,
-            slogan: updatedBrand.slogan,
-            sloganArabic: updatedBrand.sloganArabic,
-            websiteUrl: updatedBrand.websiteUrl,
-            phoneNumber: updatedBrand.phoneNumber,
-            supportEmail: updatedBrand.supportEmail,
-            address: updatedBrand.address,
-            addressArabic: updatedBrand.addressArabic,
-            displayPlacements: updatedBrand.displayPlacements,
-          }),
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          console.warn('Server brand sync note:', body);
-        }
-      }
-
-      setSaveSuccess(true);
-      if (onSaved) onSaved(updatedBrand);
-      setTimeout(() => setSaveSuccess(false), 4000);
-    } catch (err) {
-      setServerError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
+    if(!canSave)return;setSaving(true);setServerError('');setSaveSuccess(false);
+    const normalizedWebsite=websiteUrl.trim()?normalizeWebsiteUrl(websiteUrl):'';
+    const updatedBrand:OrganizationBrand={...(effectiveBrand||{name:'',nameArabic:'',primaryColor:'#0d1e18',accentColor:'#10b981'}),name:normalizeLatinText(nameEnglish).trim()||effectiveBrand?.name||'',nameArabic:normalizeArabicText(nameArabic).trim()||effectiveBrand?.nameArabic||'',displayName:normalizeLatinText(nameEnglish).trim()||undefined,displayNameArabic:normalizeArabicText(nameArabic).trim()||undefined,logoUrl:logoUrl.trim()||undefined,slogan:normalizeLatinText(sloganEnglish).trim()||undefined,sloganArabic:normalizeArabicText(sloganArabic).trim()||undefined,websiteUrl:normalizedWebsite||undefined,phoneNumber:phoneNumber.trim()?normalizePhone(phoneNumber):undefined,supportEmail:supportEmail.trim()?normalizeEmail(supportEmail):undefined,address:normalizeLatinText(addressEnglish).trim()||undefined,addressArabic:normalizeArabicText(addressArabic).trim()||undefined,certificateTheme,displayPlacements:placements};
+    try{
+      const user=auth?.currentUser;
+      if(user){const token=await user.getIdToken();const res=await fetch('/api/tenant/brand',{method:'PATCH',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify({orgId:orgId||store.organization?.id,displayName:updatedBrand.displayName,displayNameArabic:updatedBrand.displayNameArabic,logoUrl:updatedBrand.logoUrl,slogan:updatedBrand.slogan,sloganArabic:updatedBrand.sloganArabic,websiteUrl:updatedBrand.websiteUrl,phoneNumber:updatedBrand.phoneNumber,supportEmail:updatedBrand.supportEmail,address:updatedBrand.address,addressArabic:updatedBrand.addressArabic,certificateTheme:updatedBrand.certificateTheme,displayPlacements:updatedBrand.displayPlacements})});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String((body.errors||[]).join(' · ')||body.code||'BRAND_SAVE_FAILED'));const b=body.tenant||{};const authoritative:OrganizationBrand={...updatedBrand,displayName:b.displayName,displayNameArabic:b.displayNameArabic,logoUrl:b.logoUrl,slogan:b.slogan,sloganArabic:b.sloganArabic,websiteUrl:b.websiteUrl,phoneNumber:b.phoneNumber,supportEmail:b.supportEmail,address:b.address,addressArabic:b.addressArabic,certificateTheme:b.certificateTheme||certificateTheme,displayPlacements:b.displayPlacements||placements};if(!orgId||orgId===store.organization?.id)store.updateOrganizationBrand(authoritative);onSaved?.(authoritative);setWebsiteUrl(authoritative.websiteUrl||'');setPhoneNumber(authoritative.phoneNumber||'');setSupportEmail(authoritative.supportEmail||'');}
+      else{store.updateOrganizationBrand(updatedBrand);onSaved?.(updatedBrand)}
+      setSaveSuccess(true);setTimeout(()=>setSaveSuccess(false),4000);
+    }catch(err){setServerError(ar?`لم يُحفظ شيء: ${(err as Error).message}`:(err as Error).message)}finally{setSaving(false)}
   };
 
   return (
@@ -557,8 +503,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'اسم الجهة بالعربية' : 'Arabic Name'}</span>
                 <input
                   type="text"
+                  lang="ar" data-mizan-kind="arabic"
                   value={nameArabic}
-                  onChange={e => setNameArabic(e.target.value)}
+                  onChange={e => setNameArabic(normalizeArabicText(e.target.value))}
                   placeholder={ar ? 'وزارة الأوقاف والشؤون الإسلامية' : 'Awqaf Authority'}
                   className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                 />
@@ -568,8 +515,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الاسم بالإنجليزية (اللاتيني)' : 'English / Latin Name'}</span>
                 <input
                   type="text"
+                  lang="en" data-mizan-kind="latin"
                   value={nameEnglish}
-                  onChange={e => setNameEnglish(e.target.value)}
+                  onChange={e => setNameEnglish(normalizeLatinText(e.target.value))}
                   placeholder="Ministry of Awqaf & Islamic Affairs"
                   className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                 />
@@ -579,8 +527,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الشعار اللفظي (السلوجن بالعربية)' : 'Arabic Slogan / Tagline'}</span>
                 <input
                   type="text"
+                  lang="ar" data-mizan-kind="arabic"
                   value={sloganArabic}
-                  onChange={e => setSloganArabic(e.target.value)}
+                  onChange={e => setSloganArabic(normalizeArabicText(e.target.value))}
                   placeholder={ar ? 'خيركم من تعلم القرآن وعلمه' : 'Striving for Quranic Excellence'}
                   className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                 />
@@ -590,8 +539,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'السلوجن بالإنجليزية' : 'English Slogan'}</span>
                 <input
                   type="text"
+                  lang="en" data-mizan-kind="latin"
                   value={sloganEnglish}
-                  onChange={e => setSloganEnglish(e.target.value)}
+                  onChange={e => setSloganEnglish(normalizeLatinText(e.target.value))}
                   placeholder="Excellence in Quranic Adjudication"
                   className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                 />
@@ -603,8 +553,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <Globe className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
                   <input
                     type="url"
+                    dir="ltr"
                     value={websiteUrl}
-                    onChange={e => setWebsiteUrl(e.target.value)}
+                    onChange={e => setWebsiteUrl(toAsciiDigits(e.target.value))}
                     placeholder="https://quran.gov.kw"
                     className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                   />
@@ -618,7 +569,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <input
                     type="tel"
                     value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
+                    onChange={e => setPhoneNumber(normalizePhone(e.target.value))}
                     placeholder="+965 22000000"
                     dir="ltr"
                     className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
@@ -632,8 +583,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <Mail className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
                   <input
                     type="email"
+                    dir="ltr"
                     value={supportEmail}
-                    onChange={e => setSupportEmail(e.target.value)}
+                    onChange={e => setSupportEmail(normalizeEmail(e.target.value))}
                     placeholder="support@quran.gov.kw"
                     className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                   />
@@ -646,8 +598,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <MapPin className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
                   <input
                     type="text"
+                    lang="ar" data-mizan-kind="arabic"
                     value={addressArabic}
-                    onChange={e => setAddressArabic(e.target.value)}
+                    onChange={e => setAddressArabic(normalizeArabicText(e.target.value))}
                     placeholder={ar ? 'دولة الكويت - العاصمة - برج الأوقاف' : 'Kuwait City, State of Kuwait'}
                     className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
                   />

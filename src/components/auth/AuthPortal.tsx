@@ -7,7 +7,7 @@ import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { MizanLogo } from '../design-system/MizanLogo';
 
-type InvitationPreview={email:string;displayName:string;requestedRole:string;organizationId:string;competitionId?:string;expiresAt:string};
+type InvitationPreview={email:string;displayName:string;requestedRole:string;organizationId:string;competitionId?:string;expiresAt:string;existingAccount?:boolean};
 
 export const AuthPortal:React.FC=()=>{
  const {language}=useAppStore();const ar=language==='ar';
@@ -39,7 +39,7 @@ export const AuthPortal:React.FC=()=>{
   let live=true;
   void fetch('/api/identity/invitation/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({activationToken})})
    .then(async r=>({ok:r.ok,body:await r.json().catch(()=>({}))}))
-   .then(({ok,body})=>{if(!live)return;if(!ok){setMessage(ar?'رابط التفعيل غير صالح أو انتهت صلاحيته. اطلب QR جديدًا من مدير المسابقة.':'Activation link is invalid or expired. Ask the competition manager for a new QR.');return;}setPreview(body.invitation as InvitationPreview);setEmail(String(body.invitation?.email||''));})
+   .then(({ok,body})=>{if(!live)return;if(!ok){setMessage(ar?'رابط التفعيل غير صالح أو انتهت صلاحيته. اطلب QR جديدًا من مدير المسابقة.':'Activation link is invalid or expired. Ask the competition manager for a new QR.');return;}setPreview(body.invitation as InvitationPreview);setEmail(String(body.invitation?.email||''));setExistingMode(Boolean(body.invitation?.existingAccount));})
    .catch(()=>{if(live)setMessage(ar?'تعذر التحقق من دعوة التفعيل. أعد المحاولة.':'Could not verify the activation invitation.');})
    .finally(()=>{if(live)setPreviewLoading(false)});
   return()=>{live=false};

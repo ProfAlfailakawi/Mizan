@@ -38,6 +38,6 @@ test('unknown, bare, nested and suspended hosts resolve to no tenant', () => {
 
 test('the public shape exposes branding only', () => {
   const view = publicTenant(TENANTS[0]);
-  assert.deepEqual(Object.keys(view).sort(), ['displayName', 'displayNameArabic', 'logoUrl', 'orgId']);
+  assert.deepEqual(Object.keys(view).sort(), ['displayName', 'displayNameArabic', 'logoUrl', 'orgId', 'status']);
   assert.equal((view as Record<string, unknown>).customDomains, undefined);
 });
