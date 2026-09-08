@@ -37,7 +37,18 @@ jobs:
         run: npm ci
 
       - name: إصلاح استبدال regex داخل أداة الحزمة
-        run: sed -i 's/re.subn(pattern,repl,text,count=1,flags=flags)/re.subn(pattern,lambda _m: repl,text,count=1,flags=flags)/' APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py')
+          s=p.read_text(encoding='utf-8')
+          old='nxt,n=re.subn(pattern,repl,text,count=1,flags=flags)'
+          new='nxt,n=re.subn(pattern,lambda _m: repl,text,count=1,flags=flags)'
+          if old not in s and new not in s:
+              raise SystemExit('sub_once anchor missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
 
       - name: تطبيق الحزمة
         run: python3 APPLY_MIZAN_FINAL_UX_MFA_2026_09_08.py
