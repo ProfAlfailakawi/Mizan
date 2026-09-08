@@ -70,6 +70,16 @@ jobs:
           grep -q 'doesNotMatch(comp,/IdentityGovernance' tests/competition-scoped-identity-onboarding.test.ts
           grep -q 'doesNotMatch(id,/reissue-qr/' tests/product-hardening-phase-a.test.ts
           test -f src/lib/brand-assets.ts
+      - name: Persist candidate source before validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'MIZAN CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A -- src server.ts server tests package.json package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: complete final MIZAN UX security and operations requirements'
+          git push origin HEAD
       - name: Secret scan
         run: npm run secret-scan
       - name: Source audit
@@ -97,13 +107,3 @@ jobs:
           grep -q "async deleteObject" server/r2-private.ts
           grep -q "<LiveSupportControl/>" src/components/layout/Header.tsx
           grep -q "SEED_FEATURE_FLAGS: FeatureFlagRecord\[\] = \[\]" src/lib/seed-data.ts
-      - name: Persist validated source on branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'MIZAN CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A -- src server.ts server tests package.json package-lock.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'fix: complete final MIZAN UX security and operations requirements'
-          git push origin HEAD
