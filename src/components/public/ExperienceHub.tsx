@@ -15,7 +15,6 @@ const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:strin
   {role:'ops_manager',ar:'غرفة العمليات',en:'Command Center',noteAr:'صحة المسابقة وحركة اللجان',noteEn:'Live competition health',icon:RadioTower,group:'core'},
   {role:'comp_admin',ar:'مدير المسابقة',en:'Competition Admin',noteAr:'بناء وسياسات وتشغيل المسابقة',noteEn:'Build, govern and run',icon:ShieldCheck,group:'core'},
   {role:'delegation_manager',ar:'إدارة الوفد',en:'Delegation',noteAr:'الترشيحات والسفر والمتابعة',noteEn:'Nomination and travel',icon:UsersRound,group:'core'},
-  {role:'scientific_admin',ar:'الإدارة العلمية',en:'Scientific Governance',noteAr:'المصادر والقواعد واعتماد الذكاء',noteEn:'Sources, rules and AI certification',icon:Microscope,group:'governance'},
   {role:'org_admin',ar:'مدير الجهة',en:'Organization',noteAr:'المسابقات والهوية والتكاملات',noteEn:'Portfolio and integrations',icon:Building2,group:'governance'},
   {role:'super_admin',ar:'إدارة المنصة',en:'Platform Admin',noteAr:'المؤسسات والتراخيص وصحة المنصة',noteEn:'Tenants and platform health',icon:Crown,group:'governance'},
   {role:'auditor',ar:'المدقق',en:'Auditor',noteAr:'سجل غير قابل للتعديل وتتبع القرارات',noteEn:'Immutable decision trail',icon:FileSearch,group:'governance'},
@@ -33,7 +32,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
   const ar=language==='ar';
   const groups:[typeof ROLES,string,string][]=[
     [ROLES.filter(r=>r.group==='core'),ar?'التجارب الأساسية':'Core journeys',ar?'ما يراه أغلب مستخدمي المسابقة':'The operational heart of MIZAN'],
-    [ROLES.filter(r=>r.group==='governance'),ar?'الحوكمة والثقة':'Governance & trust',ar?'السياسات، العلم، التدقيق والمنصة':'Policy, science, audit and platform'],
+    [ROLES.filter(r=>r.group==='governance'),ar?'الحوكمة والثقة':'Governance & trust',ar?'السياسات، التدقيق والمنصة':'Policy, audit and platform'],
     [ROLES.filter(r=>r.group==='support'),ar?'التجارب المساندة':'Supporting journeys',ar?'الاستثناءات، الحفل، ولي الأمر والدعم':'Exceptions, ceremony, guardians and support'],
   ];
   return <div className="min-h-screen bg-[#F7F5EF] text-[#171b18] font-arabic">

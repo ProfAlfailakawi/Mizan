@@ -1302,18 +1302,21 @@ export function useAppStore() {
 
 
 
-  const createCompetition = (nameArabic: string, nameEnglish: string, templateId = 'international-hifz') => {
+  const createCompetition = (nameArabic: string, nameEnglish: string) => {
     const base: Competition = {
-      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish, nameArabic, edition:'New Edition', status:'draft',
+      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish, nameArabic, edition:'', status:'draft',
       startDate:'', endDate:'', registrationStartDate:'', registrationEndDate:'', totalRegistered:0, totalApproved:0, totalAttended:0, currentDay:0,
-      categories: globalState.competition.categories.map(c => ({...c,id:newId('cat'),competitionId:''})),
-      readinessChecklist:{datesConfigured:false,categoriesConfigured:true,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
+      categories: [],
+      readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
     };
-    base.categories = base.categories.map(c => ({...c,competitionId:base.id}));
-    const configured = applyCompetitionTemplate(base, templateId);
-    globalState.competitions = [configured, ...globalState.competitions];
-    globalState.competition = configured;
-    notify(); return configured;
+    // New competitions start as the buyer's empty configuration, not one of MIZAN's demo templates.
+    base.displayName=undefined;base.displayNameArabic=undefined;base.logoUrl=undefined;
+    base.country='';base.timezone='';base.venueName='';base.venuesCount=0;base.totalDays=0;
+    base.ruleSet={...base.ruleSet,id:newId('ruleset'),name:'',criteria:[],frozenAt:undefined};base.ruleSets=[base.ruleSet];
+    delete (base as any).policy;
+    globalState.competitions = [base, ...globalState.competitions];
+    globalState.competition = base;
+    notify(); return base;
   };
 
   const applyTemplate = (templateId: string) => {

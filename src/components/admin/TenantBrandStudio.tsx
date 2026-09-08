@@ -44,29 +44,6 @@ interface ImageProbeResult {
   message: string;
 }
 
-// شعارات متجهة آمنة عالية الجودة مسبقة التجهيز تتيح للجهة التجربة الفورية
-const PRESET_LOGOS = [
-  {
-    id: 'quran-society',
-    name: 'جمعية القرآن الكريم الرسمية',
-    nameEn: 'Quranic Society Emblem',
-    // SVG Data URI with green geometric Islamic motif
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="%23214C40" stroke="%23c5a880" stroke-width="3"/><path d="M50 20 L58 36 L76 38 L62 50 L66 68 L50 58 L34 68 L38 50 L24 38 L42 36 Z" fill="%23c5a880"/><circle cx="50" cy="50" r="10" fill="%23214C40"/></svg>',
-  },
-  {
-    id: 'golden-qalam',
-    name: 'شعار القلم والمصحف الذهبي',
-    nameEn: 'Golden Pen & Mushaf',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230D1E18"/><path d="M25 68 C35 60 45 60 50 64 C55 60 65 60 75 68 L75 38 C65 32 55 32 50 36 C45 32 35 32 25 38 Z" fill="%23DFD0B8" stroke="%239B7542" stroke-width="2"/><path d="M50 24 L53 38 L50 64 L47 38 Z" fill="%23C29B38"/></svg>',
-  },
-  {
-    id: 'mihrab-arch',
-    name: 'ختم المحراب الأندلسي',
-    nameEn: 'Andalusian Mihrab Arch',
-    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 85 L20 45 C20 25 35 15 50 15 C65 15 80 25 80 45 L80 85 Z" fill="%232F6555" stroke="%23D3BC8D" stroke-width="3"/><circle cx="50" cy="45" r="14" fill="%23FAF9F5"/><path d="M50 35 L53 45 L63 45 L55 51 L58 61 L50 55 L42 61 L45 51 L37 45 L47 45 Z" fill="%239B7542"/></svg>',
-  },
-];
-
 export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
   initialBrand,
   orgId,
@@ -322,13 +299,13 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
     const updatedBrand: OrganizationBrand = {
       ...(effectiveBrand || {
-        name: nameEnglish || 'Organization',
-        nameArabic: nameArabic || 'الجهة المنظمة',
+        name: '',
+        nameArabic: '',
         primaryColor: '#0d1e18',
         accentColor: '#10b981',
       }),
-      name: nameEnglish || effectiveBrand?.name || 'Organization',
-      nameArabic: nameArabic || effectiveBrand?.nameArabic || 'الجهة المنظمة',
+      name: nameEnglish.trim() || effectiveBrand?.name || '',
+      nameArabic: nameArabic.trim() || effectiveBrand?.nameArabic || '',
       displayName: nameEnglish.trim() || undefined,
       displayNameArabic: nameArabic.trim() || undefined,
       logoUrl: logoUrl.trim() || undefined,
@@ -511,30 +488,6 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* شعارات تجريبية سريعة بنقرة واحدة */}
-            <div>
-              <span className="block text-[11px] font-bold text-[#656b66] mb-1.5">
-                {ar ? 'أو اختر أحد الشعارات النموذجية فائقة النقاء للتجربة الفورية:' : 'Or pick an ultra-clear preset emblem for immediate testing:'}
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {PRESET_LOGOS.map(preset => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setLogoUrl(preset.url)}
-                    className={`flex items-center gap-2 p-2 rounded-xl border text-start text-xs font-bold transition ${
-                      logoUrl === preset.url
-                        ? 'border-[#214C40] bg-[#EBF2EE] text-[#214C40]'
-                        : 'border-[#E0DED7] bg-[#FAF9F5] hover:bg-white text-[#4a504c]'
-                    }`}
-                  >
-                    <img src={preset.url} alt={preset.name} className="w-6 h-6 object-contain shrink-0" />
-                    <span className="truncate text-[11px]">{ar ? preset.name : preset.nameEn}</span>
-                  </button>
-                ))}
               </div>
             </div>
 

@@ -142,7 +142,7 @@ export const TenantConsole: React.FC = () => {
             className="w-full rounded-xl border border-[#e0ded7] bg-white px-3 py-2 text-xs" />
         </label>)}
         <div className="sm:col-span-2 flex items-center justify-between gap-3">
-          <span className="text-[10px] text-[#656b66]">
+          <span className="min-w-0 text-[10px] text-[#656b66] break-all [overflow-wrap:anywhere]">
             {baseDomain && form.subdomain ? `${form.subdomain}.${baseDomain}` : (ar ? 'العنوان يظهر هنا بعد كتابة النطاق الفرعي.' : 'The address appears once a subdomain is typed.')}
           </span>
           <Button size="sm" onClick={() => void submit()} disabled={busy === 'add' || !form.orgId.trim()}>{busy === 'add' ? '…' : (ar ? 'إضافة' : 'Add')}</Button>
@@ -161,8 +161,8 @@ export const TenantConsole: React.FC = () => {
                     <span className="font-black text-sm truncate">{t.displayNameArabic || t.displayName || t.orgId}</span>
                     <Badge variant={suspended ? 'neutral' : 'emerald'}>{suspended ? (ar ? 'موقوفة' : 'Suspended') : (ar ? 'نشطة' : 'Active')}</Badge>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[#656b66]">
-                    <Globe2 className="w-3.5 h-3.5" />{hostOf(t)}
+                  <div className="mt-1 flex min-w-0 items-start gap-1.5 text-[11px] text-[#656b66]">
+                    <Globe2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /><span dir="ltr" className="min-w-0 break-all [overflow-wrap:anywhere] text-start">{hostOf(t)}</span>
                   </div>
                   {t.note && <div className="mt-1 text-[10px] text-[#656b66]">{t.note}</div>}
                 </div>
