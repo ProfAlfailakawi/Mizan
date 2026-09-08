@@ -1,0 +1,85 @@
+name: تطبيق ملاحظات واجهة ميزان 2026-09-08
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'MIZAN_UI_NOTES_TRIGGER.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mizan-ui-notes-2026-09-08
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: جلب المصدر
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: إعداد Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: تثبيت الاعتمادات
+        run: npm ci
+
+      - name: تطبيق الملاحظات
+        run: python3 APPLY_UI_NOTES_2026_09_08.py
+
+      - name: عرض التغييرات
+        run: git status --short
+
+      - name: فحص TypeScript
+        run: npm run lint
+
+      - name: الاختبارات
+        run: npm test
+
+      - name: تدقيق المصدر
+        run: npm run source-audit
+
+      - name: تدقيق العربية
+        run: npm run arabic-ui-audit
+
+      - name: فحص الأسرار
+        run: npm run secret-scan
+
+      - name: البناء
+        run: npm run build
+
+      - name: حفظ التعديلات النظيفة إلى main
+        id: persist
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A -- src tests
+          git rm -f -- APPLY_UI_NOTES_2026_09_08.py .github/workflows/apply-ui-notes-2026-09-08.yml MIZAN_UI_NOTES_TRIGGER.txt
+          git fetch origin main
+          LOCAL_HEAD="$(git rev-parse HEAD)"
+          REMOTE_HEAD="$(git rev-parse origin/main)"
+          if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+            echo "main changed during validation; refusing stale push"
+            exit 1
+          fi
+          git config user.name "MIZAN CI"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix(ui): apply competition setup and operations notes"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: تشغيل CI النهائي
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
