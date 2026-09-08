@@ -109,7 +109,7 @@ export const JudgeOS: React.FC = () => {
  const nextQueued=committeeQueue[0];
  const deductions=activeSession.events.filter(e=>!e.reversed).reduce((s,e)=>s+e.penalty,0);
  const displayName=policy.judging.identityVisibility==='code_only' ? participant?.code : ar?participant?.fullNameArabic:participant?.fullName;
- const judgeActions=actions.filter(a=> policy.judging.mode==='all_judges_all_criteria' || !judge || judge.specialty==='all' || a.criterion===judge.specialty || a.criterion==='custom');
+ const judgeActions=actions.filter(a=>{const criterion=ruleSet.criteria.find(c=>c.id===a.criterion);return policy.judging.mode==='all_judges_all_criteria'||!judge||judge.specialty==='all'||a.criterion==='custom'||!criterion||criterion.assignedJudgeType==='all'||criterion.assignedJudgeType===judge.specialty});
  const directMode=policy.judging.scoreEntryMode==='direct_score'||policy.judging.scoreEntryMode==='hybrid';
  // كل مسابقة حسب سياستها: إظهار مجموع الخصم الجاري للمحكم، والسماح بالتراجع عن آخر ملاحظة.
  const showRunningScore=policy.judging.showRunningScoreToJudge!==false;
@@ -154,16 +154,15 @@ export const JudgeOS: React.FC = () => {
  const approveReplacement=async()=>{if(!secureMode||!activeSession.secureRuntimeSessionId)return;setReplacementBusy(true);try{const result=await approveEmergencyQuestionReplacement(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(result);if(result.replacementReady){setSecureQuestion(null);setMyRevealApproved(false);setOpeningAudioState('idle')}setSecureError('')}catch(e){setSecureError(e instanceof Error?e.message:'QUESTION_REPLACEMENT_FAILED')}finally{setReplacementBusy(false)}};
  const speakTransition=()=>{if(!store.finishCurrentQuestionSegment())return;const transition=passageTransitionPlan({isLastQuestion,ar,cue:policy.questions.transitionCue,variantSeed:activeSession.currentQuestionIndex});const proceed=()=>{if(transition.autoAdvance)nextQuestion()};const afterCue=()=>window.setTimeout(proceed,transition.delayMs);if(!transition.enabled){afterCue();return;}let fallbackUsed=false;const speakFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if(typeof window!=='undefined'&&'speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(transition.phrase);u.lang=ar?'ar-SA':'en-US';
   /* صوت المتصفح الافتراضي يبدو آليًا؛ نختار أقرب صوت عربي طبيعي متاح (Natural/Enhanced/Premium)
-     ونضبط السرعة والنبرة لنبرة ألطف. الحل النهائي الأرقى هو تشغيل تسجيل معتمد عبر audioUrl. */
+     ونضبط السرعة والنبرة لنبرة ألطف. هذا fallback فقط بعد فشل صوت ميزان المطابق. */
   try{const voices=window.speechSynthesis.getVoices()||[];const want=ar?'ar':'en';const pool=voices.filter(v=>v.lang?.toLowerCase().startsWith(want));const best=pool.find(v=>/natural|enhanced|premium|neural/i.test(v.name))||pool[0];if(best)u.voice=best;}catch{}
   u.rate=.9;u.pitch=1;u.onend=afterCue;u.onerror=afterCue;window.speechSynthesis.speak(u);}else afterCue()};
  const playCueUrl=(url:string,onFail:()=>void)=>{if(typeof Audio==='undefined'){onFail();return}try{transitionAudioRef.current?.pause();const player=new Audio(url);transitionAudioRef.current=player;player.onended=afterCue;player.onerror=onFail;void player.play().catch(onFail)}catch{onFail()}};
- /* ترتيب مصادر عبارة الإيقاف: تسجيل بشري معتمد إن وُجد، ثم صوت مولَّد على الخادم لعبارة
-    غير قرآنية، ثم نطق الجهاز كحل أخير. العبارة وحدها تُنطق — لا نص قرآني بحال. */
+ /* مصادر عبارة الإيقاف مملوكة لميزان ومطابقة للنص المختار: مقطع مدمج، ثم صوت الخادم
+    لنفس العبارة غير القرآنية، ثم نطق الجهاز. لا رفع تسجيل يدوي ولا نص قرآني في TTS. */
  const serverCue=()=>playCueUrl(`/api/public/cue-audio?text=${encodeURIComponent(transition.phrase)}`,speakFallback);
- // مقطع مسجّل مسبقًا لنفس العبارة (public/audio/cues) — الأسرع والأطبع، ويعمل دون اتصال.
- const storedCue=()=>transition.variantIndex>=0?playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue):serverCue();
- if(transition.audioUrl)playCueUrl(transition.audioUrl,storedCue);else storedCue()};
+ const storedCue=()=>playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue);
+ storedCue()};
 
  // انتقال سلس في العرض: بعد السؤال الأول (الذي يعرض بوابة الكشف)، تُكشف الأسئلة التالية
  // تلقائيًا في وضع العرض حتى لا يعلق المحكم على شاشة «مختوم». الكشف الآمن الحقيقي غير متأثر.
@@ -205,7 +204,7 @@ export const JudgeOS: React.FC = () => {
       const Icon=iconFor(a.icon);
       const tally=countFor(a.eventType);
       const label=ar?a.shortArabic:a.shortEnglish;
-      const criterionName=ar?CRITERION_AR[a.criterion]:a.criterion;
+      const criterion=ruleSet.criteria.find(c=>c.id===a.criterion);const criterionName=criterion?(ar?criterion.nameArabic:criterion.name):(ar?(CRITERION_AR[a.criterion]||a.criterion):a.criterion);
       return <button
         key={a.id}
         onClick={()=>recordJudgeEventWithEvidence(a.eventType,a)}

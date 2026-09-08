@@ -66,7 +66,7 @@ export const BASE_POLICY: CompetitionPolicy = {
     promptMode: 'configurable',
     secureReveal: { requireParticipantPresence:true, judgeApprovalMode:'all_assigned' },
     openingPrompt: { mode:'approved_reference_audio', autoplay:true, usageScope:'opening_prompt', preferredReciter:'' },
-    transitionCue: { enabled:true, phraseArabic:'حسبك، جزاك الله خيرًا', phraseEnglish:'Thank you. Please stop here.', autoAdvanceDelayMs:900, audioUrl:'' }
+    transitionCue: { enabled:true, phraseArabic:'', phraseEnglish:'', selectedPhraseIndexes:[0], autoAdvanceDelayMs:900 }
   },
   operations: {
     deploymentProfile: 'lean',
@@ -170,65 +170,7 @@ const makeRule = (overrides?: Partial<RuleSet>): RuleSet => ({
   ...overrides
 });
 
-export const COMPETITION_TEMPLATES: CompetitionTemplate[] = [
-  {
-    id: 'international-hifz',
-    nameArabic: 'دولية — حفظ متقدم',
-    nameEnglish: 'International Hifz',
-    descriptionArabic: 'تحكيم مستقل، FairDraw، مراجعة نزاهة، وإعلان مرن للنتائج.',
-    descriptionEnglish: 'Independent judging, FairDraw, integrity review and controlled result reveal.',
-    policy: clone(BASE_POLICY),
-    ruleSets: [makeRule()]
-  },
-  {
-    id: 'youth-local',
-    nameArabic: 'ناشئة — محلية',
-    nameEnglish: 'Youth Local',
-    descriptionArabic: 'تسجيل مبسط، ولي أمر، سؤالان، وتشغيل ذاتي سريع.',
-    descriptionEnglish: 'Simplified guardian registration, two questions and fast autonomous flow.',
-    policy: (() => {
-      const p = clone(BASE_POLICY);
-      p.templateId = 'youth-local';
-      p.registration.mode = 'public';
-      p.registration.requireGuardianForMinors = true;
-      p.questions.questionsPerParticipant = 2;
-      p.questions.targetDifficulty = 2.4;
-      p.results.visibility = 'after_round';
-      p.appeals.windowHours = 6;
-      p.privacy.audioRetentionDays = 30;
-      return p;
-    })(),
-    ruleSets: [makeRule({ id: 'rules-youth', questionsPerParticipant: 2, questionDurationMinutes: 5, minimumPassingScore: 70 })]
-  },
-  {
-    id: 'recitation-performance',
-    nameArabic: 'تلاوة وحسن أداء',
-    nameEnglish: 'Recitation & Performance',
-    descriptionArabic: 'تحكيم متخصص في التجويد والأداء مع درجات مباشرة أو هجينة.',
-    descriptionEnglish: 'Specialized tajweed/performance judging with hybrid score entry.',
-    policy: (() => {
-      const p = clone(BASE_POLICY);
-      p.templateId = 'recitation-performance';
-      p.judging.mode = 'specialized_judges';
-      p.judging.scoreEntryMode = 'hybrid';
-      p.judging.actions = p.judging.actions.filter(a => ['tajweed_minor', 'waqf_stop'].includes(a.eventType));
-      p.questions.questionsPerParticipant = 1;
-      p.questions.drawMode = 'manual_approved';
-      p.questions.participantInitiatedDraw = false;
-      p.results.visibility = 'immediate';
-      return p;
-    })(),
-    ruleSets: [makeRule({
-      id: 'rules-recitation',
-      judgesCountPerPanel: 5,
-      questionsPerParticipant: 1,
-      criteria: [
-        { id: 'tajweed', name: 'Tajweed', nameArabic: 'التجويد', maxScore: 40, weight: .4, assignedJudgeType: 'tajweed' },
-        { id: 'performance', name: 'Performance', nameArabic: 'حسن الأداء والصوت', maxScore: 60, weight: .6, assignedJudgeType: 'performance' }
-      ]
-    })]
-  }
-];
+export const COMPETITION_TEMPLATES: CompetitionTemplate[] = [];
 
 function mergePolicy<T>(base: T, override: Partial<T> | undefined): T {
   if (!override) return clone(base);
@@ -268,7 +210,12 @@ export function applyTemplate(competition: Competition, templateId: string): Com
 }
 
 export function getEnabledJudgeActions(competition: Competition) {
-  return getCompetitionPolicy(competition).judging.actions.filter(a => a.enabled);
+  const criteria=competition.ruleSet.criteria||[];
+  return getCompetitionPolicy(competition).judging.actions.filter(a=>a.enabled).map(a=>{
+    if(a.criterion==='custom'||criteria.some(c=>c.id===a.criterion))return a;
+    const match=criteria.find(c=>c.assignedJudgeType===a.criterion||c.id===`crit-${a.criterion}`||c.id.endsWith(`-${a.criterion}`));
+    return match?{...a,criterion:match.id}:a;
+  });
 }
 
 export function getReadinessIssues(competition: Competition): { id: string; ar: string; en: string }[] {

@@ -900,7 +900,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     {placements.showOnCertificates && (
                       <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[9px] text-[#656b66]">
                         <span>{websiteUrl ? websiteUrl.replace(/^https?:\/\//i, '') : 'quran-verify.org'}</span>
-                        <span className="font-mono">VERIFIED-HASH-SEAL</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-[#214C40]"><ShieldCheck className="w-3 h-3"/>{ar?'قابلة للتحقق':'Verifiable'}</span>
                       </div>
                     )}
                   </div>

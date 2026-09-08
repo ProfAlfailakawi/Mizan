@@ -348,7 +348,8 @@ export interface JudgeEvent {
   timestamp: string; // ISO
   relativeSeconds: number;
   type: JudgeEventType;
-  criterion: 'memorization' | 'tajweed' | 'waqf_ibtida' | 'performance';
+  /** Criterion id from the competition's RuleSet. Kept open so each competition owns its scoring schema. */
+  criterion: string;
   penalty: number;
   reversed?: boolean;
   notes?: string;
@@ -611,7 +612,8 @@ export interface JudgeActionDefinition {
   labelEnglish: string;
   shortArabic: string;
   shortEnglish: string;
-  criterion: 'memorization' | 'tajweed' | 'waqf_ibtida' | 'performance' | 'custom';
+  /** RuleSet criterion id, or `custom` for an action not tied to score criteria. */
+  criterion: string;
   penalty: number;
   enabled: boolean;
   shortcut?: string;
@@ -651,7 +653,7 @@ export interface QuestionPolicy {
   promptMode: 'judge' | 'certified_audio' | 'visual' | 'configurable';
   secureReveal?: { requireParticipantPresence:boolean; judgeApprovalMode:'all_assigned'|'minimum'; minimumApprovals?:number };
   openingPrompt?: { mode:'approved_reference_audio'|'judge'; autoplay:boolean; usageScope:string; preferredReciter?:string };
-  transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; audioUrl?:string };
+  transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; selectedPhraseIndexes?:number[]; /** legacy read-only field; no longer exposed or played */ audioUrl?:string };
 }
 
 export interface WorkflowStagePolicy {
