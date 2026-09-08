@@ -35,7 +35,7 @@ jobs:
         run: npm ci
       - name: تطبيق الإكمال النهائي
         run: python3 APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py
-      - name: تنظيف كل الأسطح النشطة المتبقية
+      - name: تنظيف كل الأسطح النشطة المتبقية وإصلاح العقود المتأثرة
         shell: bash
         run: |
           set -euo pipefail
@@ -51,6 +51,8 @@ jobs:
           rw('src/components/public/CeremonyView.tsx', [("['broadcast_operator','comp_admin','org_admin','scientific_admin'].includes(currentUser.role)", "['head_judge','comp_admin','org_admin'].includes(currentUser.role)"),("a=>a.actorRole==='scientific_admin'", "a=>a.actorRole==='head_judge'"),("label={ar?'علمي':'Scientific'}", "label={ar?'رئيس التحكيم':'Head Judge'}")])
           rw('src/components/design-system/ArabicInterfaceGuard.tsx', [(" scientific_admin:'الإدارة العلمية',", '')])
           rw('tests/trust-protocol.test.ts', [("scientific_admin", "head_judge")])
+          rw('src/lib/store.ts', [("if(!globalState.currentUser.role==='org_admin')", "if(globalState.currentUser.role!=='org_admin')")])
+          rw('tests/competition-scoped-identity-onboarding.test.ts', [("العودة إلى إعدادات الجهة", "العودة إلى مسابقات الجهة")])
           PY
       - name: حفظ تشخيص الدور المتقاعد
         run: |
@@ -145,6 +147,7 @@ jobs:
             src/App.tsx
             tests/user-notes-2026-09-08.test.ts
             tests/trust-protocol.test.ts
+            tests/competition-scoped-identity-onboarding.test.ts
             tests/final-cleanup-phase-c.test.ts
           )
           git add -- "${TARGETS[@]}"
