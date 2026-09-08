@@ -17,14 +17,21 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
-ARG VITE_FIREBASE_API_KEY=""
-ARG VITE_FIREBASE_AUTH_DOMAIN=""
-ARG VITE_FIREBASE_PROJECT_ID=""
-ARG VITE_FIREBASE_STORAGE_BUCKET=""
-ARG VITE_FIREBASE_MESSAGING_SENDER_ID=""
-ARG VITE_FIREBASE_APP_ID=""
-ARG VITE_REQUIRE_AUTH="false"
-ARG VITE_REQUIRE_MFA_FOR_SENSITIVE="true"
+# الافتراض إنتاجٌ آمن، لا عرضٌ تجريبي. سببه واقعة حقيقية: زناد نشرٍ يبني عبر Dockerfile
+# مباشرة (لا عبر cloudbuild.yaml) لا تصله متغيّرات ذلك الملف، فكان يأخذ الافتراض القديم
+# "false" فيُخرج وضع العرض على النطاقات الحيّة كلها. القيم أدناه علنية (معرّفات Firebase
+# للويب، تحميها قيود النطاق لا الإخفاء، وهي مكرّرة في cloudbuild.yaml) فبَقاؤها هنا آمن،
+# ويجعل أي بناءٍ — بأي طريقة — يُنتج نسخة إنتاج صحيحة. لبناء عرضٍ بلا مصادقة مرّر
+# VITE_REQUIRE_AUTH=false صراحةً.
+ARG VITE_FIREBASE_API_KEY="AIzaSyAU13efq58hCJirGDyu9dZf8lzRatbhwcY"
+ARG VITE_FIREBASE_AUTH_DOMAIN="mizan-f2ce3.firebaseapp.com"
+ARG VITE_FIREBASE_PROJECT_ID="mizan-f2ce3"
+ARG VITE_FIREBASE_STORAGE_BUCKET="mizan-f2ce3.firebasestorage.app"
+ARG VITE_FIREBASE_MESSAGING_SENDER_ID="993698501419"
+ARG VITE_FIREBASE_APP_ID="1:993698501419:web:47a25e46ccbacccb17ab6e"
+ARG VITE_REQUIRE_AUTH="true"
+# مؤقّت أثناء الاختبارات: العامل الثاني غير مشترَط. يُعاد إلى "true" قبل البيع.
+ARG VITE_REQUIRE_MFA_FOR_SENSITIVE="false"
 ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_FIREBASE_AUTH_DOMAIN=$VITE_FIREBASE_AUTH_DOMAIN \
     VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID \
