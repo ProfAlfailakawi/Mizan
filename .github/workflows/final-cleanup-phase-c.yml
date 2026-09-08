@@ -55,6 +55,8 @@ jobs:
         run: npm run source-audit
       - name: تدقيق العربية
         run: npm run arabic-ui-audit
+      - name: فحص الأسرار
+        run: npm run secret-scan
       - name: البناء
         run: npm run build
       - name: حفظ الملفات الفعلية في main
