@@ -476,7 +476,8 @@ export class ControlTowerRepository{
     const expiresAt=new Date(Date.now()+(input.minutes||30)*60_000).toISOString();
     const id=crypto.randomUUID();
     const auditReference=this.audit(actor,'SUPPORT_SESSION_REQUESTED','SupportSession',id,input.reason);
-    const session:SupportSessionRecord={id,tenantId:input.tenantId,competitionId:input.competitionId,requestedBy:actor.uid,reason:input.reason.trim(),status:'REQUESTED',createdAt,expiresAt,permissions:['mirror.read','diagnostics.read'],scope:input.competitionId?'competition':'tenant',readOnly:true,actionsAllowed:['diagnostic.bundle.generate'],auditReference,diagnosticBundle:stripSecrets(input.diagnosticBundle||{})};
+    const diagnosticBundle=stripSecrets(input.diagnosticBundle||{}) as Record<string,unknown>;
+    const session:SupportSessionRecord={id,tenantId:input.tenantId,competitionId:input.competitionId,requestedBy:actor.uid,reason:input.reason.trim(),status:'REQUESTED',createdAt,expiresAt,permissions:['mirror.read','diagnostics.read'],scope:input.competitionId?'competition':'tenant',readOnly:true,actionsAllowed:['diagnostic.bundle.generate'],auditReference,diagnosticBundle};
     sessions.unshift(session);this.writeJson(this.supportFile,sessions);return session;
   }
   rescue(actor:ServerIdentity,input:{action:string;tenantId:string;competitionId?:string;reason:string;idempotencyKey?:string}){
