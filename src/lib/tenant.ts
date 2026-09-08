@@ -6,11 +6,21 @@
  *
  * 204 يعني نشرًا بجهة واحدة، فتبقى الهوية الافتراضية — وهو ما يجب أن يحدث في العرض التجريبي.
  */
+import type { BrandDisplayPlacements } from '../types';
+
 export interface PublicTenant {
   orgId: string;
   displayName: string | null;
   displayNameArabic: string | null;
   logoUrl: string | null;
+  slogan?: string | null;
+  sloganArabic?: string | null;
+  websiteUrl?: string | null;
+  phoneNumber?: string | null;
+  supportEmail?: string | null;
+  address?: string | null;
+  addressArabic?: string | null;
+  displayPlacements?: BrandDisplayPlacements | null;
 }
 
 export async function fetchTenant(signal?: AbortSignal): Promise<PublicTenant | null> {

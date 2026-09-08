@@ -256,6 +256,18 @@ async function startServer() {
   app.post('/api/owner/tenants/:orgId/suspend',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.suspend(String(req.params.orgId)))});
   app.post('/api/owner/tenants/:orgId/activate',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.activate(String(req.params.orgId)))});
 
+  /* تحديث الهوية البيضاء وإعدادات الشعار والعرض للجهة المشترية (org_admin أو super_admin) */
+  const brandAdmins = requireFirebaseRoles(['super_admin', 'org_admin']);
+  app.patch('/api/tenant/brand', ownerRateLimit, brandAdmins, (req, res) => {
+    const store = tenantAdmin(res);
+    if (!store) return;
+    const actor = (req as any).mizanIdentity;
+    const isSuper = actor?.role === 'super_admin';
+    const orgId = isSuper && req.body?.orgId ? String(req.body.orgId) : actor?.organizationId;
+    if (!orgId) return res.status(400).json({ code: 'ORG_ID_REQUIRED' });
+    return tenantResult(res, store.update(orgId, req.body || {}));
+  });
+
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/enterprise/tenants/:orgId',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});

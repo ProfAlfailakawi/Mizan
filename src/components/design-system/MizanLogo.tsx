@@ -1,17 +1,59 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '../../lib/store';
+import type { BrandDisplayPlacements } from '../../types';
+
+export interface BrandInfo {
+  ar: string;
+  en: string;
+  logoUrl?: string;
+  slogan?: string;
+  sloganArabic?: string;
+  websiteUrl?: string;
+  phoneNumber?: string;
+  supportEmail?: string;
+  address?: string;
+  addressArabic?: string;
+  placements: Required<BrandDisplayPlacements>;
+}
+
+export function useBrandInfo(): BrandInfo {
+  const s = useAppStore();
+  const brand = s.organization?.brand;
+  const comp = s.competition;
+  const rawPlacements = brand?.displayPlacements || {};
+  return {
+    ar: comp?.displayNameArabic || brand?.displayNameArabic || brand?.nameArabic || 'ميزان',
+    en: comp?.displayName || brand?.displayName || brand?.name || 'MIZAN',
+    logoUrl: comp?.logoUrl || brand?.logoUrl,
+    slogan: brand?.slogan,
+    sloganArabic: brand?.sloganArabic,
+    websiteUrl: brand?.websiteUrl,
+    phoneNumber: brand?.phoneNumber,
+    supportEmail: brand?.supportEmail,
+    address: brand?.address,
+    addressArabic: brand?.addressArabic,
+    placements: {
+      showHeaderLogo: rawPlacements.showHeaderLogo !== false,
+      showHeaderSlogan: Boolean(rawPlacements.showHeaderSlogan),
+      showHeaderContact: Boolean(rawPlacements.showHeaderContact),
+      showFooterContact: rawPlacements.showFooterContact !== false,
+      showFooterAddress: rawPlacements.showFooterAddress !== false,
+      showFooterWebsite: rawPlacements.showFooterWebsite !== false,
+      showOnCertificates: rawPlacements.showOnCertificates !== false,
+      showOnVenueScreens: rawPlacements.showOnVenueScreens !== false,
+      showOnPublicPortal: rawPlacements.showOnPublicPortal !== false,
+    },
+  };
+}
 
 /* الهوية البيضاء: اسم/شعار العلامة يأتي من إعدادات المؤسسة. غياب الاسم المخصّص يبقي "ميزان"،
    فلا يتغيّر العرض التجريبي، ويظهر اسم العميل في كل مكان بمجرد ضبطه. */
 export function useBrandName(): { ar: string; en: string; logoUrl?: string } {
-  const s = useAppStore();
-  const brand = s.organization?.brand;
-  const comp = s.competition;
-  // المسابقة تتقدّم على الجهة، والجهة على الافتراضي «ميزان».
+  const info = useBrandInfo();
   return {
-    ar: comp?.displayNameArabic || brand?.displayNameArabic || 'ميزان',
-    en: comp?.displayName || brand?.displayName || 'MIZAN',
-    logoUrl: comp?.logoUrl || brand?.logoUrl,
+    ar: info.ar,
+    en: info.en,
+    logoUrl: info.logoUrl,
   };
 }
 
@@ -211,19 +253,36 @@ export const MizanLogo: React.FC<LogoProps> = ({
   tagline,
 }) => {
   const ar = language === 'ar';
-  const brand = useBrandName();
+  const brandInfo = useBrandInfo();
+  const [imgFailed, setImgFailed] = useState(false);
   const markSize = stacked ? 'w-24 h-24' : compact ? 'w-10 h-10' : 'w-14 h-14';
   const markPx = stacked ? 96 : compact ? 40 : 56;
+
+  // إظهار الشعار وفق مصفوفة العرض وحالة سلامة الصورة
+  const showMark = brandInfo.placements.showHeaderLogo !== false;
+  const computedTagline = tagline || (brandInfo.placements.showHeaderSlogan ? (ar ? brandInfo.sloganArabic : brandInfo.slogan) : undefined);
+
   return (
     <span
       className={`mizan-logo ${stacked ? 'is-stacked' : ''} ${className}`}
-      aria-label={ar ? brand.ar : brand.en}
+      aria-label={ar ? brandInfo.ar : brandInfo.en}
     >
-      {brand.logoUrl
-        ? <img src={brand.logoUrl} alt={ar ? brand.ar : brand.en} width={markPx} height={markPx} className={`${markSize} object-contain`} />
-        : <MizanMark className={markSize} tone={tone} decorative />}
+      {showMark && (
+        brandInfo.logoUrl && !imgFailed ? (
+          <img
+            src={brandInfo.logoUrl}
+            alt={ar ? brandInfo.ar : brandInfo.en}
+            width={markPx}
+            height={markPx}
+            onError={() => setImgFailed(true)}
+            className={`${markSize} object-contain`}
+          />
+        ) : (
+          <MizanMark className={markSize} tone={tone} decorative />
+        )
+      )}
       {showWordmark && (
-        <MizanWordmark language={language} tone={tone} compact={compact} tagline={tagline} />
+        <MizanWordmark language={language} tone={tone} compact={compact} tagline={computedTagline} />
       )}
     </span>
   );

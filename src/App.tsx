@@ -203,7 +203,19 @@ export default function App() {
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
     وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
  useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;
-  updateOrganizationBrand({displayName:t.displayName||undefined,displayNameArabic:t.displayNameArabic||undefined,logoUrl:t.logoUrl||undefined});});
+  updateOrganizationBrand({
+    displayName:t.displayName||undefined,
+    displayNameArabic:t.displayNameArabic||undefined,
+    logoUrl:t.logoUrl||undefined,
+    slogan:t.slogan||undefined,
+    sloganArabic:t.sloganArabic||undefined,
+    websiteUrl:t.websiteUrl||undefined,
+    phoneNumber:t.phoneNumber||undefined,
+    supportEmail:t.supportEmail||undefined,
+    address:t.address||undefined,
+    addressArabic:t.addressArabic||undefined,
+    displayPlacements:t.displayPlacements||undefined,
+  });});
   return()=>c.abort()},[]);
  // رابط يحمل معرّف مسابقة ⇒ اجعلها المسابقة النشطة قبل عرض صفحتها. غياب المعرّف يبقي المسابقة الحالية.
  const requestedComp=compParam(hash);

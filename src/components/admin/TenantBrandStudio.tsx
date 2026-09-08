@@ -1,0 +1,1053 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  Building2,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Globe,
+  Headphones,
+  Mail,
+  MapPin,
+  ScanSearch,
+  Settings2,
+  Sparkles,
+  ShieldCheck,
+  FileUp,
+  Camera,
+  Award,
+  Layers,
+  FileCheck2,
+  RotateCcw,
+  Check,
+  CircleHelp,
+} from 'lucide-react';
+import { Button } from '../design-system/Button';
+import { Badge } from '../design-system/Badge';
+import { useAppStore } from '../../lib/store';
+import { auth } from '../../lib/firebase';
+import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
+
+interface TenantBrandStudioProps {
+  initialBrand?: OrganizationBrand;
+  orgId?: string;
+  onSaved?: (updated: OrganizationBrand) => void;
+  compact?: boolean;
+}
+
+interface ImageProbeResult {
+  status: 'idle' | 'probing' | 'valid' | 'broken';
+  width: number;
+  height: number;
+  aspectRatio: number;
+  isSvg: boolean;
+  clarityTier: 'ultra' | 'high' | 'acceptable' | 'low';
+  message: string;
+}
+
+// شعارات متجهة آمنة عالية الجودة مسبقة التجهيز تتيح للجهة التجربة الفورية
+const PRESET_LOGOS = [
+  {
+    id: 'quran-society',
+    name: 'جمعية القرآن الكريم الرسمية',
+    nameEn: 'Quranic Society Emblem',
+    // SVG Data URI with green geometric Islamic motif
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="%23214C40" stroke="%23c5a880" stroke-width="3"/><path d="M50 20 L58 36 L76 38 L62 50 L66 68 L50 58 L34 68 L38 50 L24 38 L42 36 Z" fill="%23c5a880"/><circle cx="50" cy="50" r="10" fill="%23214C40"/></svg>',
+  },
+  {
+    id: 'golden-qalam',
+    name: 'شعار القلم والمصحف الذهبي',
+    nameEn: 'Golden Pen & Mushaf',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%230D1E18"/><path d="M25 68 C35 60 45 60 50 64 C55 60 65 60 75 68 L75 38 C65 32 55 32 50 36 C45 32 35 32 25 38 Z" fill="%23DFD0B8" stroke="%239B7542" stroke-width="2"/><path d="M50 24 L53 38 L50 64 L47 38 Z" fill="%23C29B38"/></svg>',
+  },
+  {
+    id: 'mihrab-arch',
+    name: 'ختم المحراب الأندلسي',
+    nameEn: 'Andalusian Mihrab Arch',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20 85 L20 45 C20 25 35 15 50 15 C65 15 80 25 80 45 L80 85 Z" fill="%232F6555" stroke="%23D3BC8D" stroke-width="3"/><circle cx="50" cy="45" r="14" fill="%23FAF9F5"/><path d="M50 35 L53 45 L63 45 L55 51 L58 61 L50 55 L42 61 L45 51 L37 45 L47 45 Z" fill="%239B7542"/></svg>',
+  },
+];
+
+export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
+  initialBrand,
+  orgId,
+  onSaved,
+}) => {
+  const store = useAppStore();
+  const ar = store.language === 'ar';
+  const effectiveBrand = initialBrand || store.organization?.brand;
+
+  // حالة النموذج
+  const [nameArabic, setNameArabic] = useState(effectiveBrand?.displayNameArabic || effectiveBrand?.nameArabic || '');
+  const [nameEnglish, setNameEnglish] = useState(effectiveBrand?.displayName || effectiveBrand?.name || '');
+  const [sloganArabic, setSloganArabic] = useState(effectiveBrand?.sloganArabic || '');
+  const [sloganEnglish, setSloganEnglish] = useState(effectiveBrand?.slogan || '');
+  const [logoUrl, setLogoUrl] = useState(effectiveBrand?.logoUrl || '');
+  const [websiteUrl, setWebsiteUrl] = useState(effectiveBrand?.websiteUrl || '');
+  const [phoneNumber, setPhoneNumber] = useState(effectiveBrand?.phoneNumber || '');
+  const [supportEmail, setSupportEmail] = useState(effectiveBrand?.supportEmail || '');
+  const [addressArabic, setAddressArabic] = useState(effectiveBrand?.addressArabic || '');
+  const [addressEnglish, setAddressEnglish] = useState(effectiveBrand?.address || '');
+  const [certificateTheme, setCertificateTheme] = useState<'quiet_authority' | 'institutional' | 'ceremonial'>(
+    effectiveBrand?.certificateTheme || 'quiet_authority'
+  );
+
+  // مصفوفة مواضع الظهور
+  const initialPlacements = effectiveBrand?.displayPlacements || {};
+  const [placements, setPlacements] = useState<Required<BrandDisplayPlacements>>({
+    showHeaderLogo: initialPlacements.showHeaderLogo !== false,
+    showHeaderSlogan: Boolean(initialPlacements.showHeaderSlogan),
+    showHeaderContact: Boolean(initialPlacements.showHeaderContact),
+    showFooterContact: initialPlacements.showFooterContact !== false,
+    showFooterAddress: initialPlacements.showFooterAddress !== false,
+    showFooterWebsite: initialPlacements.showFooterWebsite !== false,
+    showOnCertificates: initialPlacements.showOnCertificates !== false,
+    showOnVenueScreens: initialPlacements.showOnVenueScreens !== false,
+    showOnPublicPortal: initialPlacements.showOnPublicPortal !== false,
+  });
+
+  // فحص الشعار وحالته
+  const [probe, setProbe] = useState<ImageProbeResult>({
+    status: 'idle',
+    width: 0,
+    height: 0,
+    aspectRatio: 1,
+    isSvg: false,
+    clarityTier: 'acceptable',
+    message: '',
+  });
+
+  // وضع معاينة الخلفية للشعار
+  const [previewBg, setPreviewBg] = useState<'light' | 'dark' | 'parchment' | 'checker'>('light');
+  // تبويب محاكي الأسطح
+  const [previewSurface, setPreviewSurface] = useState<'header' | 'footer' | 'certificate' | 'public'>('header');
+
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [serverError, setServerError] = useState('');
+
+  // فحص استباقي ذكي لصلاحية الصورة وأبعادها
+  const testLogo = useCallback((url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setProbe({
+        status: 'idle',
+        width: 0,
+        height: 0,
+        aspectRatio: 1,
+        isSvg: false,
+        clarityTier: 'acceptable',
+        message: ar ? 'لم يُحدد رابط شعار بعد.' : 'No logo URL specified.',
+      });
+      return;
+    }
+
+    const isSvg = trimmed.includes('data:image/svg+xml') || /\.svg($|\?)/i.test(trimmed);
+    const isHttps = /^https:\/\//i.test(trimmed);
+    const isDataUri = /^data:image\//i.test(trimmed);
+
+    if (!isHttps && !isDataUri) {
+      setProbe({
+        status: 'broken',
+        width: 0,
+        height: 0,
+        aspectRatio: 1,
+        isSvg: false,
+        clarityTier: 'low',
+        message: ar
+          ? 'تنبيه أمان: يجب أن يبدأ الرابط بـ https:// أو يكون بصيغة data:image لتفادي حجب المتصفح.'
+          : 'Security warning: URL must start with https:// or be a data:image URI.',
+      });
+      return;
+    }
+
+    setProbe(prev => ({ ...prev, status: 'probing', message: ar ? 'جارٍ فحص الشعار وتحليل نقائه…' : 'Probing logo clarity…' }));
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    const timer = setTimeout(() => {
+      setProbe({
+        status: 'broken',
+        width: 0,
+        height: 0,
+        aspectRatio: 1,
+        isSvg,
+        clarityTier: 'low',
+        message: ar
+          ? 'استغرق تحميل الشعار وقتًا طويلاً، تأكد من استجابة الخادم وتوفر الرابط للعامة.'
+          : 'Image load timed out. Ensure the server is responsive and public.',
+      });
+    }, 6000);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      const w = img.naturalWidth || 100;
+      const h = img.naturalHeight || 100;
+      const ratio = w / (h || 1);
+
+      let clarity: ImageProbeResult['clarityTier'] = 'acceptable';
+      let msg = '';
+
+      if (isSvg) {
+        clarity = 'ultra';
+        msg = ar
+          ? 'شعار متجهي فائق النقاء (SVG): دقة متناهية لا تتأثر بالتكبير على الشاشات والشهادات.'
+          : 'Ultra-clarity Vector (SVG): Infinite resolution for large displays and print.';
+      } else if (w >= 256 || h >= 256) {
+        clarity = 'high';
+        msg = ar
+          ? `دقة عالية ممتازة (${w}×${h} بكسل): مثالية للطباعة والشاشات الكبيرة.`
+          : `High resolution (${w}x${h}px): Pristine for print and hall displays.`;
+      } else if (w >= 96 && h >= 96) {
+        clarity = 'acceptable';
+        msg = ar
+          ? `دقة مقبولة (${w}×${h} بكسل): مناسبة للترويسة الرقمية.`
+          : `Acceptable resolution (${w}x${h}px): Suitable for web headers.`;
+      } else {
+        clarity = 'low';
+        msg = ar
+          ? `تنبيه: دقة الشعار صغيرة (${w}×${h} بكسل). قد يظهر مشوشًا عند الطباعة.`
+          : `Warning: Small resolution (${w}x${h}px). May appear blurry when printed.`;
+      }
+
+      if (ratio > 4.5 || ratio < 0.25) {
+        msg += ar
+          ? ' (تنبيه أبعاد: الشعار مستطيل جدًا، يُفضل نسبة بين 1:1 و 3:1)'
+          : ' (Aspect warning: highly elongated, 1:1 to 3:1 recommended)';
+      }
+
+      setProbe({
+        status: 'valid',
+        width: w,
+        height: h,
+        aspectRatio: ratio,
+        isSvg,
+        clarityTier: clarity,
+        message: msg,
+      });
+    };
+
+    img.onerror = () => {
+      clearTimeout(timer);
+      setProbe({
+        status: 'broken',
+        width: 0,
+        height: 0,
+        aspectRatio: 1,
+        isSvg,
+        clarityTier: 'low',
+        message: ar
+          ? 'الرابط لا يفتح صورة صالحة أو الوصول إليه محجوب (خطأ 404 أو قيود CORS).'
+          : 'Image failed to load or is blocked (404 or CORS issue).',
+      });
+    };
+
+    img.src = trimmed;
+  }, [ar]);
+
+  // فحص أولي عند الإقلاع أو تغيير الرابط
+  useEffect(() => {
+    testLogo(logoUrl);
+  }, [logoUrl, testLogo]);
+
+  // رفع ملف شعار محلي وتحويله إلى Data URI آمن
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert(ar ? 'يرجى اختيار ملف صورة صالح (PNG, SVG, JPG, WebP)' : 'Please select a valid image file');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert(ar ? 'حجم الملف كبير (الحد الأقصى 2 ميجابايت للشفافية السريعة)' : 'File too large (max 2MB)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUri = String(reader.result || '');
+      setLogoUrl(dataUri);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // قياس مؤشر جاهزية وجودة الهوية المؤسسية (0 - 100)
+  const healthScore = useMemo(() => {
+    let score = 0;
+    // شعار مفحوص وسليم
+    if (probe.status === 'valid') {
+      if (probe.clarityTier === 'ultra' || probe.clarityTier === 'high') score += 40;
+      else if (probe.clarityTier === 'acceptable') score += 30;
+      else score += 20;
+    }
+    // أسماء وسلوجن
+    if (nameArabic.trim().length >= 3) score += 15;
+    if (sloganArabic.trim().length >= 4) score += 10;
+    // بيانات تواصل صالحة
+    if (websiteUrl.trim() && /^https?:\/\//i.test(websiteUrl.trim())) score += 15;
+    if (phoneNumber.trim()) score += 10;
+    if (supportEmail.trim() && supportEmail.includes('@')) score += 10;
+
+    return Math.min(score, 100);
+  }, [probe, nameArabic, sloganArabic, websiteUrl, phoneNumber, supportEmail]);
+
+  // التحقق من صحة المدخلات
+  const validationErrors = useMemo(() => {
+    const errs: string[] = [];
+    if (logoUrl.trim() && probe.status === 'broken') {
+      errs.push(ar ? 'الشعار مكسور أو لا يمكن فتحه' : 'Logo is broken or inaccessible');
+    }
+    if (websiteUrl.trim() && !/^https?:\/\//i.test(websiteUrl.trim())) {
+      errs.push(ar ? 'رابط الموقع يجب أن يبدأ بـ https:// أو http://' : 'Website must start with https:// or http://');
+    }
+    if (supportEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail.trim())) {
+      errs.push(ar ? 'صيغة البريد الإلكتروني غير صحيحة' : 'Invalid email format');
+    }
+    if (phoneNumber.trim() && !/^\+?[0-9\s\-().]{6,25}$/.test(phoneNumber.trim())) {
+      errs.push(ar ? 'رقم الهاتف غير صالح' : 'Invalid phone number format');
+    }
+    return errs;
+  }, [logoUrl, probe.status, websiteUrl, supportEmail, phoneNumber, ar]);
+
+  const canSave = validationErrors.length === 0 && !saving;
+
+  // حفظ الهوية
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setServerError('');
+    setSaveSuccess(false);
+
+    const updatedBrand: OrganizationBrand = {
+      ...(effectiveBrand || {
+        name: nameEnglish || 'Organization',
+        nameArabic: nameArabic || 'الجهة المنظمة',
+        primaryColor: '#0d1e18',
+        accentColor: '#10b981',
+      }),
+      name: nameEnglish || effectiveBrand?.name || 'Organization',
+      nameArabic: nameArabic || effectiveBrand?.nameArabic || 'الجهة المنظمة',
+      displayName: nameEnglish.trim() || undefined,
+      displayNameArabic: nameArabic.trim() || undefined,
+      logoUrl: logoUrl.trim() || undefined,
+      slogan: sloganEnglish.trim() || undefined,
+      sloganArabic: sloganArabic.trim() || undefined,
+      websiteUrl: websiteUrl.trim() || undefined,
+      phoneNumber: phoneNumber.trim() || undefined,
+      supportEmail: supportEmail.trim() || undefined,
+      address: addressEnglish.trim() || undefined,
+      addressArabic: addressArabic.trim() || undefined,
+      certificateTheme,
+      displayPlacements: placements,
+    };
+
+    try {
+      // 1. التحديث المحلي الفوري في المتجر
+      store.updateOrganizationBrand(updatedBrand);
+
+      // 2. المزامنة مع الخادم إذا توفرت هوية مسجلة
+      const user = auth?.currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/tenant/brand', {
+          method: 'PATCH',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            orgId: orgId || store.organization?.id,
+            displayName: updatedBrand.displayName,
+            displayNameArabic: updatedBrand.displayNameArabic,
+            logoUrl: updatedBrand.logoUrl,
+            slogan: updatedBrand.slogan,
+            sloganArabic: updatedBrand.sloganArabic,
+            websiteUrl: updatedBrand.websiteUrl,
+            phoneNumber: updatedBrand.phoneNumber,
+            supportEmail: updatedBrand.supportEmail,
+            address: updatedBrand.address,
+            addressArabic: updatedBrand.addressArabic,
+            displayPlacements: updatedBrand.displayPlacements,
+          }),
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          console.warn('Server brand sync note:', body);
+        }
+      }
+
+      setSaveSuccess(true);
+      if (onSaved) onSaved(updatedBrand);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err) {
+      setServerError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* الترويسة وبطاقة النقاء */}
+      <div className="rounded-2xl border border-[#DFDED7] bg-white p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]">
+                <Sparkles className="w-5 h-5" />
+              </span>
+              <div>
+                <div className="mizan-kicker">{ar ? 'الهوية البيضاء وضبط العلامة' : 'WHITE-LABEL BRAND KIT'}</div>
+                <h2 className="text-base sm:text-lg font-extrabold text-[#171b18]">
+                  {ar ? 'تخصيص هوية الجهة وشعارها وأماكن الظهور' : 'Tenant Branding & Display Placement Engine'}
+                </h2>
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-[#636864] leading-relaxed max-w-2xl">
+              {ar
+                ? 'خصص شعار الجهة واسمها وسلوجنها وبيانات التواصل، وتحكم بدقة في أي واجهات تظهر فيها، مع فحص ذكي يضمن نقاء الشعار ويمنع رفع الروابط المكسورة.'
+                : 'Configure your logo, name, slogan and contacts, precisely control where each appears across the system, backed by an intelligent validator preventing broken assets.'}
+            </p>
+          </div>
+
+          {/* عداد جودة الهوية */}
+          <div className="rounded-2xl bg-[#F7F5EF] border border-[#E0DED7] p-3 text-center sm:min-w-[170px] shrink-0">
+            <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider">
+              {ar ? 'مؤشر اكتمال الهوية' : 'Brand Health Score'}
+            </div>
+            <div className="mt-1 flex items-center justify-center gap-2">
+              <span className="text-2xl font-black text-[#214C40]">{healthScore}%</span>
+              <Badge variant={healthScore >= 80 ? 'emerald' : healthScore >= 50 ? 'amber' : 'neutral'} dot={false}>
+                {healthScore >= 80 ? (ar ? 'ممتاز' : 'Optimal') : healthScore >= 50 ? (ar ? 'جيد' : 'Good') : (ar ? 'بحاجة إكمال' : 'Incomplete')}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {/* رسائل التنبيه أو النجاح */}
+        {saveSuccess && (
+          <div className="mt-4 rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{ar ? 'تم حفظ الهوية المؤسسية ومصفوفة مواضع الظهور بنجاح، وسرَت التغييرات على كافة الشاشات.' : 'Brand identity and display matrix saved successfully.'}</span>
+          </div>
+        )}
+        {serverError && (
+          <div className="mt-4 rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]">
+            <XCircle className="w-4 h-4 shrink-0" />
+            <span>{serverError}</span>
+          </div>
+        )}
+      </div>
+
+      {/* القسم الرئيسي: الإعدادات على اليمين والمعاينة الحية على اليسار */}
+      <div className="grid lg:grid-cols-12 gap-6">
+        {/* عمود إعدادات الشعار والبيانات ومواضع الظهور */}
+        <div className="lg:col-span-7 space-y-5">
+          {/* 1. مختبر الشعار وفحص النقاء */}
+          <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-[#2F6555]" />
+                <h3 className="font-extrabold text-sm">{ar ? 'شعار الجهة واختبار النقاء' : 'Logo & Clarity Inspector'}</h3>
+              </div>
+              <Badge
+                variant={probe.status === 'valid' ? 'emerald' : probe.status === 'broken' ? 'rose' : 'neutral'}
+              >
+                {probe.status === 'valid' ? (ar ? 'شعار صالح ومفحوص' : 'Verified') : probe.status === 'broken' ? (ar ? 'شعار غير صالح' : 'Broken') : (ar ? 'بانتظار الفحص' : 'Pending')}
+              </Badge>
+            </div>
+
+            {/* إدخال الرابط أو الرفع المباشر */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-[#4a504c]">
+                {ar ? 'رابط الشعار المباشر (HTTPS)' : 'Direct Logo URL (HTTPS)'}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  placeholder="https://example.org/brand/logo.svg"
+                  className="flex-1 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-mono text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                />
+                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DFDED7] bg-white hover:bg-[#FAF9F5] text-xs font-bold text-[#4a504c] shrink-0 transition">
+                  <FileUp className="w-3.5 h-3.5 text-[#2F6555]" />
+                  <span>{ar ? 'رفع ملف' : 'Upload'}</span>
+                  <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                </label>
+              </div>
+
+              {/* بطاقة تقييم حالة الشعار الفورية */}
+              <div className={`rounded-xl p-3 text-xs leading-5 border ${
+                probe.status === 'valid'
+                  ? probe.clarityTier === 'low'
+                    ? 'bg-[#FDF9F0] border-[#F2E0BA] text-[#8F6517]'
+                    : 'bg-[#F2F8F4] border-[#CCE5D6] text-[#1E5D38]'
+                  : probe.status === 'broken'
+                  ? 'bg-[#FDF2F0] border-[#F1C4BD] text-[#A34D43]'
+                  : 'bg-[#FAF9F5] border-[#E8E6DF] text-[#656b66]'
+              }`}>
+                <div className="flex items-start gap-2">
+                  {probe.status === 'valid' ? (
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                  ) : probe.status === 'broken' ? (
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                  ) : (
+                    <CircleHelp className="w-4 h-4 mt-0.5 shrink-0" />
+                  )}
+                  <div>
+                    <span className="font-bold">{probe.message || (ar ? 'أدخل رابط شعار لفحصه آليًا.' : 'Enter a logo URL to probe.')}</span>
+                    {probe.status === 'valid' && (
+                      <div className="mt-1 text-[11px] opacity-90">
+                        {ar ? 'الأبعاد المقروءة: ' : 'Detected size: '}
+                        <span className="font-mono font-bold" dir="ltr">{probe.width} × {probe.height} px</span>
+                        {' · '}
+                        {ar ? 'نسبة العرض للارتفاع: ' : 'Ratio: '}
+                        <span className="font-mono font-bold" dir="ltr">{probe.aspectRatio.toFixed(2)}:1</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* شعارات تجريبية سريعة بنقرة واحدة */}
+            <div>
+              <span className="block text-[11px] font-bold text-[#656b66] mb-1.5">
+                {ar ? 'أو اختر أحد الشعارات النموذجية فائقة النقاء للتجربة الفورية:' : 'Or pick an ultra-clear preset emblem for immediate testing:'}
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {PRESET_LOGOS.map(preset => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setLogoUrl(preset.url)}
+                    className={`flex items-center gap-2 p-2 rounded-xl border text-start text-xs font-bold transition ${
+                      logoUrl === preset.url
+                        ? 'border-[#214C40] bg-[#EBF2EE] text-[#214C40]'
+                        : 'border-[#E0DED7] bg-[#FAF9F5] hover:bg-white text-[#4a504c]'
+                    }`}
+                  >
+                    <img src={preset.url} alt={preset.name} className="w-6 h-6 object-contain shrink-0" />
+                    <span className="truncate text-[11px]">{ar ? preset.name : preset.nameEn}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* معاينة تباين الشعار وخلفياته */}
+            <div className="pt-2 border-t border-[#EAE8E1]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-[#656b66]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
+                <div className="flex gap-1 text-[10px] font-bold">
+                  {([
+                    ['light', ar ? 'فاتح' : 'Light'],
+                    ['dark', ar ? 'داكن' : 'Dark'],
+                    ['parchment', ar ? 'شهادة' : 'Parchment'],
+                    ['checker', ar ? 'شفاف' : 'Grid'],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setPreviewBg(mode)}
+                      className={`px-2 py-0.5 rounded-lg border transition ${
+                        previewBg === mode
+                          ? 'border-[#214C40] bg-[#214C40] text-white'
+                          : 'border-[#DFDED7] bg-white text-[#656b66] hover:bg-[#FAF9F5]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* صندوق عرض الشعار وفق الخلفية المختارة */}
+              <div
+                className={`h-24 rounded-xl border border-[#DFDED7] grid place-items-center transition-all p-3 ${
+                  previewBg === 'light'
+                    ? 'bg-[#F7F5EF]'
+                    : previewBg === 'dark'
+                    ? 'bg-[#0D1E18]'
+                    : previewBg === 'parchment'
+                    ? 'bg-[#FFFDF8]'
+                    : 'bg-[radial-gradient(#ddd_1px,transparent_1px)] [background-size:12px_12px] bg-white'
+                }`}
+              >
+                {logoUrl && probe.status !== 'broken' ? (
+                  <img
+                    src={logoUrl}
+                    alt={nameArabic || 'Logo'}
+                    className="max-h-16 max-w-full object-contain drop-shadow-sm"
+                  />
+                ) : (
+                  <span className={`text-xs font-bold ${previewBg === 'dark' ? 'text-[#85928b]' : 'text-[#8b918d]'}`}>
+                    {ar ? 'يظهر الشعار المفحوص هنا' : 'Verified logo appears here'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* 2. بيانات الاسم والسلوجن ومعلومات الاتصال */}
+          <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-[#2F6555]" />
+              <h3 className="font-extrabold text-sm">{ar ? 'المعلومات المؤسسية والتواصل' : 'Organization Details & Contact'}</h3>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'اسم الجهة بالعربية' : 'Arabic Name'}</span>
+                <input
+                  type="text"
+                  value={nameArabic}
+                  onChange={e => setNameArabic(e.target.value)}
+                  placeholder={ar ? 'وزارة الأوقاف والشؤون الإسلامية' : 'Awqaf Authority'}
+                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الاسم بالإنجليزية (اللاتيني)' : 'English / Latin Name'}</span>
+                <input
+                  type="text"
+                  value={nameEnglish}
+                  onChange={e => setNameEnglish(e.target.value)}
+                  placeholder="Ministry of Awqaf & Islamic Affairs"
+                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الشعار اللفظي (السلوجن بالعربية)' : 'Arabic Slogan / Tagline'}</span>
+                <input
+                  type="text"
+                  value={sloganArabic}
+                  onChange={e => setSloganArabic(e.target.value)}
+                  placeholder={ar ? 'خيركم من تعلم القرآن وعلمه' : 'Striving for Quranic Excellence'}
+                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'السلوجن بالإنجليزية' : 'English Slogan'}</span>
+                <input
+                  type="text"
+                  value={sloganEnglish}
+                  onChange={e => setSloganEnglish(e.target.value)}
+                  placeholder="Excellence in Quranic Adjudication"
+                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الموقع الإلكتروني الرسمي' : 'Official Website URL'}</span>
+                <div className="relative">
+                  <Globe className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
+                  <input
+                    type="url"
+                    value={websiteUrl}
+                    onChange={e => setWebsiteUrl(e.target.value)}
+                    placeholder="https://quran.gov.kw"
+                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'أرقام التواصل / الهاتف' : 'Official Phone / WhatsApp'}</span>
+                <div className="relative">
+                  <Headphones className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    placeholder="+965 22000000"
+                    dir="ltr"
+                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'البريد الإلكتروني الرسمي للاستفسارات' : 'Support / Inquiries Email'}</span>
+                <div className="relative">
+                  <Mail className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
+                  <input
+                    type="email"
+                    value={supportEmail}
+                    onChange={e => setSupportEmail(e.target.value)}
+                    placeholder="support@quran.gov.kw"
+                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'العنوان الجغرافي / المقر' : 'Official Headquarters / Location'}</span>
+                <div className="relative">
+                  <MapPin className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
+                  <input
+                    type="text"
+                    value={addressArabic}
+                    onChange={e => setAddressArabic(e.target.value)}
+                    placeholder={ar ? 'دولة الكويت - العاصمة - برج الأوقاف' : 'Kuwait City, State of Kuwait'}
+                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  />
+                </div>
+              </label>
+            </div>
+          </section>
+
+          {/* 3. مصفوفة التحكم بأماكن ظهور كل عنصر (الميزة المحورية التي طلبها العميل) */}
+          <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-[#2F6555]" />
+                <h3 className="font-extrabold text-sm">{ar ? 'مصفوفة خيارات ومواضع العرض' : 'Display Placements Matrix'}</h3>
+              </div>
+              <span className="text-[11px] text-[#656b66]">
+                {ar ? 'أين يظهر كل عنصر في واجهات النظام؟' : 'Control visibility per surface'}
+              </span>
+            </div>
+
+            <p className="text-xs text-[#636864] leading-relaxed">
+              {ar
+                ? 'حدد بدقة الأماكن التي ترغب بظهور الشعار والسلوجن والعنوان ورقم الهاتف والموقع فيها:'
+                : 'Configure toggle visibility across headers, footers, certificates, and hall screens:'}
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              {/* مجموعة الترويسة */}
+              <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
+                <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
+                  <ScanSearch className="w-3.5 h-3.5" />
+                  <span>{ar ? 'الترويسة العلوية (Top Header)' : 'Top Header'}</span>
+                </div>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار الشعار الرسمي' : 'Show Brand Logo'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showHeaderLogo}
+                    onChange={e => setPlacements(p => ({ ...p, showHeaderLogo: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار الشعار اللفظي (السلوجن)' : 'Show Slogan / Tagline'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showHeaderSlogan}
+                    onChange={e => setPlacements(p => ({ ...p, showHeaderSlogan: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار وسيلة تواصل سريعة (الهاتف)' : 'Show Quick Contact Pill'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showHeaderContact}
+                    onChange={e => setPlacements(p => ({ ...p, showHeaderContact: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+              </div>
+
+              {/* مجموعة التذييل */}
+              <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
+                <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{ar ? 'تذييل الصفحات العام (Global Footer)' : 'Global Footer'}</span>
+                </div>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار أرقام التواصل والدعم' : 'Show Phone & Support Email'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showFooterContact}
+                    onChange={e => setPlacements(p => ({ ...p, showFooterContact: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار العنوان والمقر الجغرافي' : 'Show Address / HQ Location'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showFooterAddress}
+                    onChange={e => setPlacements(p => ({ ...p, showFooterAddress: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'إظهار رابط الموقع الإلكتروني' : 'Show Official Website Link'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showFooterWebsite}
+                    onChange={e => setPlacements(p => ({ ...p, showFooterWebsite: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+              </div>
+
+              {/* الشهادات وشاشات القاعات */}
+              <div className="sm:col-span-2 p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] grid sm:grid-cols-3 gap-3">
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'الشهادات والوثائق المعتمدة' : 'Certificates & Exports'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showOnCertificates}
+                    onChange={e => setPlacements(p => ({ ...p, showOnCertificates: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'شاشات القاعة والمسرح' : 'Venue & Hall Screens'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showOnVenueScreens}
+                    onChange={e => setPlacements(p => ({ ...p, showOnVenueScreens: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
+                  <span className="text-[#4a504c]">{ar ? 'بوابة التسجيل والصفحات العامة' : 'Registration & Public Portal'}</span>
+                  <input
+                    type="checkbox"
+                    checked={placements.showOnPublicPortal}
+                    onChange={e => setPlacements(p => ({ ...p, showOnPublicPortal: e.target.checked }))}
+                    className="w-4 h-4 accent-[#214C40] rounded"
+                  />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          {/* أزرار الحفظ والإجراءات */}
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="text-xs text-[#A34D43] font-bold">
+              {validationErrors.length > 0 && validationErrors.join(' · ')}
+            </div>
+            <Button
+              onClick={handleSave}
+              disabled={!canSave}
+              icon={saving ? undefined : saveSuccess ? <Check className="w-4 h-4" /> : <FileCheck2 className="w-4 h-4" />}
+            >
+              {saving ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : saveSuccess ? (ar ? 'تم الحفظ بنجاح' : 'Saved') : (ar ? 'حفظ إعدادات الهوية ومواضع العرض' : 'Save Brand Settings')}
+            </Button>
+          </div>
+        </div>
+
+        {/* عمود المحاكي والمعاينة الحية التفاعلية */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="sticky top-20 rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ScanSearch className="w-4 h-4 text-[#2F6555]" />
+                <h3 className="font-extrabold text-sm">{ar ? 'المعاينة الحية الفورية' : 'Live Multi-Surface Simulator'}</h3>
+              </div>
+              <Badge variant="neutral" dot={false}>
+                {ar ? 'تحديث فوري' : 'Reactive'}
+              </Badge>
+            </div>
+
+            {/* أزرار اختيار السطح المطلوب معاينته */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-[#F7F5EF] rounded-xl text-[11px] font-bold">
+              {([
+                ['header', ar ? 'الترويسة' : 'Header'],
+                ['footer', ar ? 'التذييل' : 'Footer'],
+                ['certificate', ar ? 'الشهادة' : 'Certificate'],
+                ['public', ar ? 'التسجيل' : 'Portal'],
+              ] as const).map(([surface, label]) => (
+                <button
+                  key={surface}
+                  type="button"
+                  onClick={() => setPreviewSurface(surface)}
+                  className={`py-1.5 px-2 rounded-lg transition text-center ${
+                    previewSurface === surface
+                      ? 'bg-white text-[#214C40] shadow-sm font-extrabold'
+                      : 'text-[#656b66] hover:text-[#171b18]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* صندوق المحاكاة الفعلي */}
+            <div className="rounded-xl border border-[#DFDED7] overflow-hidden bg-[#FAF9F5] min-h-[300px] flex flex-col justify-center">
+              {/* 1. معاينة الترويسة */}
+              {previewSurface === 'header' && (
+                <div className="p-4 space-y-3">
+                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                    {ar ? 'محاكاة الترويسة العلوية للنظام' : 'Header Simulation'}
+                  </div>
+                  <div className="border border-[#DFDED7] bg-[#F7F5EF] rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {placements.showHeaderLogo && logoUrl && probe.status !== 'broken' ? (
+                        <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-[#214C40] text-white font-bold grid place-items-center text-xs">
+                          م
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-xs text-[#171b18] truncate">
+                          {nameArabic || nameEnglish || (ar ? 'اسم الجهة' : 'Organization Name')}
+                        </div>
+                        {placements.showHeaderSlogan && sloganArabic && (
+                          <div className="text-[10px] text-[#2F6555] font-medium truncate">
+                            {sloganArabic}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {placements.showHeaderContact && (phoneNumber || supportEmail) && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[#214C40] flex items-center gap-1" dir="ltr">
+                          <Headphones className="w-2.5 h-2.5" />
+                          <span>{phoneNumber || supportEmail}</span>
+                        </span>
+                      )}
+                      <div className="w-5 h-5 rounded-full bg-[#DFDED7]" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[#656b66] text-center">
+                    {ar ? 'تظهر الترويسة بهذا التنسيق لجميع المحكمين والمسؤولين والزوّار.' : 'This layout appears for all staff and attendees.'}
+                  </p>
+                </div>
+              )}
+
+              {/* 2. معاينة التذييل */}
+              {previewSurface === 'footer' && (
+                <div className="p-4 space-y-3">
+                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                    {ar ? 'محاكاة تذييل الصفحات العام' : 'Footer Simulation'}
+                  </div>
+                  <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-3 shadow-xs text-[11px]">
+                    <div className="flex items-center gap-2 border-b border-[#EAE8E1] pb-2">
+                      {logoUrl && probe.status !== 'broken' && (
+                        <img src={logoUrl} alt="Logo" className="w-6 h-6 object-contain" />
+                      )}
+                      <span className="font-black text-xs text-[#171b18]">{nameArabic || nameEnglish}</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#4a504c] text-[10px]">
+                      {placements.showFooterWebsite && websiteUrl && (
+                        <div className="flex items-center gap-1 text-[#214C40]">
+                          <Globe className="w-3 h-3" />
+                          <span>{websiteUrl.replace(/^https?:\/\//i, '')}</span>
+                        </div>
+                      )}
+                      {placements.showFooterContact && phoneNumber && (
+                        <div className="flex items-center gap-1">
+                          <Headphones className="w-3 h-3 text-[#2F6555]" />
+                          <span dir="ltr">{phoneNumber}</span>
+                        </div>
+                      )}
+                      {placements.showFooterAddress && addressArabic && (
+                        <div className="flex items-center gap-1 text-[#656b66]">
+                          <MapPin className="w-3 h-3 text-[#9B7542]" />
+                          <span>{addressArabic}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-[9px] text-[#858c87] pt-1">
+                      © {new Date().getFullYear()} {nameArabic || nameEnglish}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. معاينة الشهادة الرسمية */}
+              {previewSurface === 'certificate' && (
+                <div className="p-4 space-y-3">
+                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                    {ar ? 'محاكاة الشهادة والوثائق المطبوعة' : 'Certificate Stamp Preview'}
+                  </div>
+                  <div className="border border-[#D4C5B0] bg-[#FFFDF8] rounded-xl p-4 text-center space-y-2.5 shadow-xs relative">
+                    <div className="w-12 h-12 mx-auto rounded-full border border-[#D4C5B0] p-1 grid place-items-center bg-white shadow-xs">
+                      {logoUrl && probe.status !== 'broken' ? (
+                        <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      ) : (
+                        <Award className="w-6 h-6 text-[#9B7542]" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-[#9B7542] uppercase tracking-widest">
+                        {ar ? 'شهادة إتقان قرآنية معتمدة' : 'Official Certificate'}
+                      </div>
+                      <div className="text-xs font-black text-[#171b18] mt-0.5">
+                        {nameArabic || nameEnglish || 'الجهة المانحة للشهادة'}
+                      </div>
+                      {sloganArabic && (
+                        <div className="text-[9px] text-[#6b726d] italic mt-0.5">
+                          «{sloganArabic}»
+                        </div>
+                      )}
+                    </div>
+
+                    {placements.showOnCertificates && (
+                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[9px] text-[#807a72]">
+                        <span>{websiteUrl ? websiteUrl.replace(/^https?:\/\//i, '') : 'quran-verify.org'}</span>
+                        <span className="font-mono">VERIFIED-HASH-SEAL</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. معاينة البوابة العامة والتسجيل */}
+              {previewSurface === 'public' && (
+                <div className="p-4 space-y-3">
+                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                    {ar ? 'محاكاة بوابة التسجيل والجمهور' : 'Public Registration Card'}
+                  </div>
+                  <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-2.5 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      {logoUrl && probe.status !== 'broken' ? (
+                        <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg border border-[#E8E6DF] p-1" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-[#214C40] text-white font-bold grid place-items-center text-sm">
+                          م
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-black text-xs text-[#171b18]">{nameArabic || nameEnglish}</div>
+                        <div className="text-[10px] text-[#656b66]">{sloganArabic || (ar ? 'البوابة الرسمية للمتسابقين والجمهور' : 'Official Public Portal')}</div>
+                      </div>
+                    </div>
+
+                    {placements.showOnPublicPortal && (
+                      <div className="p-2 rounded-lg bg-[#F7F5EF] text-[10px] text-[#4a504c] space-y-1">
+                        {websiteUrl && <div className="truncate"><span className="text-[#656b66]">{ar ? 'الموقع: ' : 'Web: '}</span>{websiteUrl}</div>}
+                        {phoneNumber && <div><span className="text-[#656b66]">{ar ? 'الهاتف: ' : 'Phone: '}</span><span dir="ltr">{phoneNumber}</span></div>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* شروط وضوابط النقاء لضمان عدم رفع ملف مكسور */}
+            <div className="rounded-xl border border-[#DFDED7] bg-[#FAF9F5] p-3 space-y-1.5 text-[11px] text-[#656b66]">
+              <div className="flex items-center gap-1.5 font-bold text-[#214C40]">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{ar ? 'شروط اعتماد الشعار للنظام:' : 'Brand Asset Quality Criteria:'}</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[10px] leading-relaxed">
+                <li>{ar ? 'صيغة متجهة (SVG) أو صورة مفرغة (PNG) بخلفية شفافة.' : 'Vector (SVG) or transparent PNG is highly recommended.'}</li>
+                <li>{ar ? 'دقة موصى بها لا تقل عن 200×200 بكسل لضمان وضوح الطباعة.' : 'Minimum 200x200px recommended for print clarity.'}</li>
+                <li>{ar ? 'رابط آمن يبدأ بـ HTTPS لتفادي تحذيرات الأمان في المتصفحات.' : 'Secure HTTPS protocol required to prevent browser mixed-content.'}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

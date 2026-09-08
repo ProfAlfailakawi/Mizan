@@ -6,16 +6,27 @@
  * نفسها، ويُتحقق من الدور في الخادم لا هنا: إخفاء زر ليس منعًا.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, Globe2, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { Building2, Globe2, Plus, RefreshCw, ShieldCheck, XCircle, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { auth } from '../../lib/firebase';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
+import { TenantBrandStudio } from './TenantBrandStudio';
+import type { OrganizationBrand } from '../../types';
 
 interface TenantRow {
   orgId: string;
   displayNameArabic?: string;
   displayName?: string;
+  logoUrl?: string;
+  slogan?: string;
+  sloganArabic?: string;
+  websiteUrl?: string;
+  phoneNumber?: string;
+  supportEmail?: string;
+  address?: string;
+  addressArabic?: string;
+  displayPlacements?: any;
   subdomain?: string;
   customDomains?: string[];
   note?: string;
@@ -57,6 +68,7 @@ export const TenantConsole: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ orgId: '', displayNameArabic: '', subdomain: '', note: '' });
   const [busy, setBusy] = useState('');
+  const [editingBrandOrgId, setEditingBrandOrgId] = useState<string | null>(null);
 
   const call = useCallback(async (path: string, init?: RequestInit) => {
     const user = auth?.currentUser;
@@ -154,12 +166,40 @@ export const TenantConsole: React.FC = () => {
                   </div>
                   {t.note && <div className="mt-1 text-[10px] text-[#656b66]">{t.note}</div>}
                 </div>
-                <Button size="sm" variant="outline"
-                  icon={suspended ? <ShieldCheck className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                  disabled={busy === t.orgId}
-                  onClick={() => void act(`/api/owner/tenants/${encodeURIComponent(t.orgId)}/${suspended ? 'activate' : 'suspend'}`, { method: 'POST' }, t.orgId)}>
-                  {busy === t.orgId ? '…' : suspended ? (ar ? 'إعادة التفعيل' : 'Activate') : (ar ? 'إيقاف' : 'Suspend')}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline"
+                    icon={<Sparkles className="w-4 h-4 text-[#2F6555]" />}
+                    onClick={() => setEditingBrandOrgId(curr => curr === t.orgId ? null : t.orgId)}>
+                    {editingBrandOrgId === t.orgId ? (ar ? 'إغلاق الهوية' : 'Close brand') : (ar ? 'تخصيص الهوية والشعار' : 'Brand kit')}
+                  </Button>
+                  <Button size="sm" variant="outline"
+                    icon={suspended ? <ShieldCheck className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    disabled={busy === t.orgId}
+                    onClick={() => void act(`/api/owner/tenants/${encodeURIComponent(t.orgId)}/${suspended ? 'activate' : 'suspend'}`, { method: 'POST' }, t.orgId)}>
+                    {busy === t.orgId ? '…' : suspended ? (ar ? 'إعادة التفعيل' : 'Activate') : (ar ? 'إيقاف' : 'Suspend')}
+                  </Button>
+                </div>
+                {editingBrandOrgId === t.orgId && (
+                  <div className="w-full mt-3 pt-3 border-t border-[#e5e3dc]">
+                    <TenantBrandStudio
+                      orgId={t.orgId}
+                      initialBrand={{
+                        displayName: t.displayName,
+                        displayNameArabic: t.displayNameArabic,
+                        logoUrl: t.logoUrl,
+                        slogan: t.slogan,
+                        sloganArabic: t.sloganArabic,
+                        websiteUrl: t.websiteUrl,
+                        phoneNumber: t.phoneNumber,
+                        supportEmail: t.supportEmail,
+                        address: t.address,
+                        addressArabic: t.addressArabic,
+                        displayPlacements: t.displayPlacements,
+                      }}
+                      onSaved={() => void load()}
+                    />
+                  </div>
+                )}
               </div>;
             })}
       </div>

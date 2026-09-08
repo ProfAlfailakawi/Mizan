@@ -31,6 +31,18 @@ export interface User {
   identityAssurance?: 'demo'|'firebase'|'firebase_managed'|'federated_sso';
 }
 
+export interface BrandDisplayPlacements {
+  showHeaderLogo?: boolean;
+  showHeaderSlogan?: boolean;
+  showHeaderContact?: boolean;
+  showFooterContact?: boolean;
+  showFooterAddress?: boolean;
+  showFooterWebsite?: boolean;
+  showOnCertificates?: boolean;
+  showOnVenueScreens?: boolean;
+  showOnPublicPortal?: boolean;
+}
+
 export interface OrganizationBrand {
   name: string;
   nameArabic: string;
@@ -47,6 +59,20 @@ export interface OrganizationBrand {
   emailSenderName?: string;
   emailSenderAddress?: string;
   certificateTheme?: 'quiet_authority'|'institutional'|'ceremonial';
+  /** الشعار اللفظي أو رسالة الهوية */
+  slogan?: string;
+  sloganArabic?: string;
+  /** الموقع الإلكتروني الرسمي للجهة */
+  websiteUrl?: string;
+  /** أرقام التواصل والدعم الرسمي */
+  phoneNumber?: string;
+  /** البريد الإلكتروني الرسمي للاستفسارات والدعم */
+  supportEmail?: string;
+  /** المقر والعنوان الجغرافي */
+  address?: string;
+  addressArabic?: string;
+  /** مصفوفة خيارات التحكم بأماكن ظهور عناصر الهوية في واجهات النظام */
+  displayPlacements?: BrandDisplayPlacements;
 }
 
 export interface Organization {

@@ -10,6 +10,18 @@
  */
 import fs from 'fs';
 
+export interface TenantBrandPlacements {
+  showHeaderLogo?: boolean;
+  showHeaderSlogan?: boolean;
+  showHeaderContact?: boolean;
+  showFooterContact?: boolean;
+  showFooterAddress?: boolean;
+  showFooterWebsite?: boolean;
+  showOnCertificates?: boolean;
+  showOnVenueScreens?: boolean;
+  showOnPublicPortal?: boolean;
+}
+
 export interface TenantRecord {
   /** معرّف الجهة كما هو في تخزين البيانات: organizations/<orgId>/… */
   orgId: string;
@@ -17,6 +29,20 @@ export interface TenantRecord {
   displayName?: string;
   displayNameArabic?: string;
   logoUrl?: string;
+  /** الشعار اللفظي أو السلوجن */
+  slogan?: string;
+  sloganArabic?: string;
+  /** الموقع الإلكتروني الرسمي للجهة */
+  websiteUrl?: string;
+  /** أرقام التواصل والدعم الرسمي */
+  phoneNumber?: string;
+  /** البريد الإلكتروني الرسمي للاستفسارات والدعم */
+  supportEmail?: string;
+  /** المقر والعنوان الجغرافي */
+  address?: string;
+  addressArabic?: string;
+  /** خيارات ظهور عناصر الهوية */
+  displayPlacements?: TenantBrandPlacements;
   /** النطاق الفرعي تحت النطاق الأساسي، دون نقاط. */
   subdomain?: string;
   /** نطاقات خاصة تُوجَّه إلى هذا النشر. */
@@ -81,4 +107,12 @@ export const publicTenant = (t: TenantRecord) => ({
   displayName: t.displayName || null,
   displayNameArabic: t.displayNameArabic || null,
   logoUrl: t.logoUrl || null,
+  slogan: t.slogan || null,
+  sloganArabic: t.sloganArabic || null,
+  websiteUrl: t.websiteUrl || null,
+  phoneNumber: t.phoneNumber || null,
+  supportEmail: t.supportEmail || null,
+  address: t.address || null,
+  addressArabic: t.addressArabic || null,
+  displayPlacements: t.displayPlacements || null,
 });

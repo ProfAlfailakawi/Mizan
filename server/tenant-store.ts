@@ -48,6 +48,41 @@ export function validateTenant(candidate: TenantRecord, others: TenantRecord[]):
 
   if (!sub && domains.length === 0) errors.push('HOST_REQUIRED');
   if (candidate.status && candidate.status !== 'active' && candidate.status !== 'suspended') errors.push('STATUS_INVALID');
+
+  // فحص شروط الشعار لتفادي الروابط المكسورة أو غير الآمنة
+  if (candidate.logoUrl) {
+    const rawLogo = String(candidate.logoUrl).trim();
+    const isSafeHttps = /^https:\/\/[^\s$.?#].[^\s]*$/i.test(rawLogo);
+    const isSafeDataUri = /^data:image\/(?:png|jpeg|jpg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(rawLogo);
+    if (!isSafeHttps && !isSafeDataUri) {
+      errors.push('LOGO_URL_INVALID');
+    }
+  }
+
+  // فحص رابط الموقع الإلكتروني
+  if (candidate.websiteUrl) {
+    const rawWeb = String(candidate.websiteUrl).trim();
+    if (!/^https?:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d+)?(?:\/.*)?$/i.test(rawWeb)) {
+      errors.push('WEBSITE_URL_INVALID');
+    }
+  }
+
+  // فحص رقم الهاتف
+  if (candidate.phoneNumber) {
+    const rawPhone = String(candidate.phoneNumber).trim();
+    if (!/^\+?[0-9\s\-().]{6,25}$/.test(rawPhone)) {
+      errors.push('PHONE_NUMBER_INVALID');
+    }
+  }
+
+  // فحص البريد الإلكتروني الرسمي
+  if (candidate.supportEmail) {
+    const rawEmail = String(candidate.supportEmail).trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+      errors.push('EMAIL_INVALID');
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 
@@ -61,9 +96,29 @@ export function normalizeTenant(candidate: TenantRecord): TenantRecord {
   const sub = norm(candidate.subdomain);
   if (sub) record.subdomain = sub;
   if (domains.length) record.customDomains = [...new Set(domains)];
-  if (candidate.displayName) record.displayName = String(candidate.displayName).trim();
-  if (candidate.displayNameArabic) record.displayNameArabic = String(candidate.displayNameArabic).trim();
+  if (candidate.displayName) record.displayName = String(candidate.displayName).trim().slice(0, 100);
+  if (candidate.displayNameArabic) record.displayNameArabic = String(candidate.displayNameArabic).trim().slice(0, 100);
   if (candidate.logoUrl) record.logoUrl = String(candidate.logoUrl).trim();
+  if (candidate.slogan) record.slogan = String(candidate.slogan).trim().slice(0, 200);
+  if (candidate.sloganArabic) record.sloganArabic = String(candidate.sloganArabic).trim().slice(0, 200);
+  if (candidate.websiteUrl) record.websiteUrl = String(candidate.websiteUrl).trim();
+  if (candidate.phoneNumber) record.phoneNumber = String(candidate.phoneNumber).trim();
+  if (candidate.supportEmail) record.supportEmail = String(candidate.supportEmail).trim().toLowerCase();
+  if (candidate.address) record.address = String(candidate.address).trim().slice(0, 300);
+  if (candidate.addressArabic) record.addressArabic = String(candidate.addressArabic).trim().slice(0, 300);
+  if (candidate.displayPlacements && typeof candidate.displayPlacements === 'object') {
+    record.displayPlacements = {
+      showHeaderLogo: candidate.displayPlacements.showHeaderLogo !== false,
+      showHeaderSlogan: Boolean(candidate.displayPlacements.showHeaderSlogan),
+      showHeaderContact: Boolean(candidate.displayPlacements.showHeaderContact),
+      showFooterContact: candidate.displayPlacements.showFooterContact !== false,
+      showFooterAddress: candidate.displayPlacements.showFooterAddress !== false,
+      showFooterWebsite: candidate.displayPlacements.showFooterWebsite !== false,
+      showOnCertificates: candidate.displayPlacements.showOnCertificates !== false,
+      showOnVenueScreens: candidate.displayPlacements.showOnVenueScreens !== false,
+      showOnPublicPortal: candidate.displayPlacements.showOnPublicPortal !== false,
+    };
+  }
   if (candidate.note) record.note = String(candidate.note).trim().slice(0, 300);
   return record;
 }
