@@ -106,7 +106,9 @@ jobs:
           )
 
           git add -- "${TARGETS[@]}"
-          git rm -- APPLY_COMPETITION_IDENTITY_2026_09_08.py .github/workflows/fix-competition-identity.yml
+          # The materializer is deliberately patched in the runner before execution, so force-remove
+          # the temporary one-shot files after all checks pass instead of failing on that local edit.
+          git rm -f -- APPLY_COMPETITION_IDENTITY_2026_09_08.py .github/workflows/fix-competition-identity.yml
 
           if git diff --cached --quiet; then
             echo "materialized=0" >> "$GITHUB_OUTPUT"
