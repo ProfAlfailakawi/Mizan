@@ -9,7 +9,7 @@ const iconFor=(id:string)=>({gate:HardDrive,scanner:QrCode,ticket:WalletCards,ju
 export const DeploymentStudio:React.FC=()=>{
   const s=useAppStore(); const ar=s.language==='ar'; const p=s.competition.policy!; const profile=p.operations.deploymentProfile;
   const plan=useMemo(()=>buildDeploymentPlan(s.competition,profile),[s.competition,profile]);
-  const [inventory,setInventory]=useState<VenueInventory>({laptops:6,desktops:0,tablets:2,tvs:3,printers:1,usbScanners:0,edgeMiniPcs:0,wifi:true});
+  const [inventory,setInventory]=useState<VenueInventory>({laptops:0,desktops:0,tablets:0,tvs:0,printers:0,usbScanners:0,edgeMiniPcs:0,wifi:false});
   const composition=useMemo(()=>composeVenue(s.competition,inventory),[s.competition,inventory]);
   const choose=(v:DeploymentProfile)=>s.updateCompetitionPolicy(pol=>({...pol,operations:{...pol.operations,deploymentProfile:v,hardwareStrategy:v==='lean'?'reuse_existing':v==='balanced'?'mixed':'dedicated',gateStationMode:v==='lean'?'computer_only':'touch_kiosk',ticketMode:v==='premium'?'print_optional':'screen_number'}}));
   const profiles:[DeploymentProfile,string,string][]=[['lean',ar?'اقتصادي':'Lean',ar?'استخدم الموجود أولًا':'Reuse first'],['balanced',ar?'متوازن':'Balanced',ar?'راحة أعلى بلا هدر':'Comfort without waste'],['premium',ar?'موسّع':'Premium',ar?'احتياط أكبر':'Higher redundancy']];

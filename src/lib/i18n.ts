@@ -367,5 +367,5 @@ export const translations: Record<SupportedLanguage, TranslationDictionary> = {
 };
 
 export const LANGUAGE_META: Record<SupportedLanguage,{label:string;dir:'rtl'|'ltr';locale:string}> = {
- ar:{label:'العربية',dir:'rtl',locale:'ar-KW'}, en:{label:'English',dir:'ltr',locale:'en-US'}
+ ar:{label:'العربية',dir:'rtl',locale:'ar-KW-u-nu-latn'}, en:{label:'English',dir:'ltr',locale:'en-US'}
 };

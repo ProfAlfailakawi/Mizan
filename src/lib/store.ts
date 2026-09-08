@@ -1311,11 +1311,12 @@ export function useAppStore() {
 
   const createCompetition = (nameArabic: string, nameEnglish: string) => {
     const base: Competition = {
-      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish, nameArabic, edition:'', status:'draft',
-      startDate:'', endDate:'', registrationStartDate:'', registrationEndDate:'', totalRegistered:0, totalApproved:0, totalAttended:0, currentDay:0,
+      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish, nameArabic, displayName:undefined, displayNameArabic:undefined, logoUrl:undefined, edition:'', status:'draft',
+      country:'', timezone:'', venueName:'', venuesCount:0, automationLevel:'assisted', startDate:'', endDate:'', registrationStartDate:'', registrationEndDate:'', totalRegistered:0, totalApproved:0, totalAttended:0, currentDay:0,
       categories: [],
       readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
     };
+    base.policy={...getCompetitionPolicy({...base,policy:undefined} as Competition),updatedAt:new Date().toISOString(),frozenAt:undefined};
     // New competitions start as the buyer's empty configuration, not one of MIZAN's demo templates.
     base.displayName=undefined;base.displayNameArabic=undefined;base.logoUrl=undefined;
     base.country='';base.timezone='';base.venueName='';base.venuesCount=0;base.totalDays=0;
@@ -1357,12 +1358,13 @@ export function useAppStore() {
     notify();
   };
 
-  const addCategory = () => {
+  const addCategory = (input: Partial<Category> = {}) => {
     const id = newId('cat');
     const category: Category = {
       id, competitionId: globalState.competition.id, code:`CAT-${globalState.competition.categories.length+1}`,
-      name:'New category', nameArabic:'فئة جديدة', description:'', riwaya:'', memorizationScope:'Custom', juzCount:30,
-      genderConstraint:'all', targetParticipants:100, targetDurationMinutes:8, ruleSetId:globalState.competition.ruleSet.id
+      name:input.name?.trim()||'', nameArabic:input.nameArabic?.trim()||'', description:input.description||'', riwaya:input.riwaya||'', memorizationScope:input.memorizationScope||'', juzCount:Math.max(0,input.juzCount||0),
+      genderConstraint:input.genderConstraint||'all', targetParticipants:Math.max(0,input.targetParticipants||0), targetDurationMinutes:Math.max(0,input.targetDurationMinutes||0), ruleSetId:input.ruleSetId||globalState.competition.ruleSet.id,
+      minAge:input.minAge,maxAge:input.maxAge,questionsCount:input.questionsCount,ayatPerQuestion:input.ayatPerQuestion,pagePortion:input.pagePortion
     };
     globalState.competition = { ...globalState.competition, categories:[...globalState.competition.categories, category] };
     notify(); return category;
@@ -1403,24 +1405,10 @@ export function useAppStore() {
 
   const publishCompetition = () => {
     const issues=getReadinessIssues(globalState.competition);
-    const contradictions=detectContradictions({competition:globalState.competition,quranSources:globalState.quranSourceManifests,aiValidations:globalState.aiCapabilityValidations,availableQualifiedJudges:globalState.judges.filter(j=>j.isReady).length,committeeCount:globalState.committees.filter(c=>c.status!=='offline').length});
-    const scientific=scientificSourcesForCompetition();
-    const scientificBlockers=scientific.flatMap(({category,reading,source,content})=>{
-      const out:{code:string;message:string;categoryId:string}[]=[];
-      if(!reading)out.push({code:'CANONICAL_READING_MAPPING_REQUIRED',message:`${category.name}: reading is not mapped to the canonical qiraat graph.`,categoryId:category.id});
-      if(!source)out.push({code:'CERTIFIED_QURAN_SOURCE_REQUIRED',message:`${category.name}: no exact certified Quran source for ${category.riwaya}.`,categoryId:category.id});
-      if(source&&!content)out.push({code:'CERTIFIED_QURAN_CONTENT_REQUIRED',message:`${category.name}: certified source content is not available for exact package ${source.packageHash||source.id}.`,categoryId:category.id});
-      return out;
-    });
-    const blockers=contradictions.filter(x=>x.severity==='BLOCKER');
-    const secureRevealRequiresServerEscrow=getCompetitionPolicy(globalState.competition).questions.secureReveal?.requireParticipantPresence!==false;
-    if(productionMode&&secureRevealRequiresServerEscrow)scientificBlockers.push({code:'SERVER_QUESTION_ESCROW_REQUIRED',message:'Secure question reveal is configured, but this build only provides an operational panel gate. Production requires server-held question plaintext until participant presence and judge quorum.',categoryId:'competition'});
-    // In production, a competition cannot open as official without exact source content. Development remains usable but visibly non-official.
-    if(issues.length||blockers.length||(productionMode&&scientificBlockers.length)) return {ok:false,issues:[...issues,...blockers.map(x=>x.title),...scientificBlockers.map(x=>x.message)],scientificBlockers,contradictions};
-    globalState.contradictionIssues=contradictions;
+    if(issues.length)return {ok:false,issues:issues.map(x=>globalState.language==='ar'?x.ar:x.en),scientificBlockers:[],contradictions:[]};
     globalState.competition={...globalState.competition,status:'registration_open'};
-    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
-    notify(); return {ok:true,issues:[],scientificBlockers,contradictions};
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_REGISTRATION_OPENED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:'فتح التسجيل بعد اكتمال إعدادات التسجيل الأساسية.',humanSummaryEnglish:'Opened registration after core registration setup was complete.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    notify();return {ok:true,issues:[],scientificBlockers:[],contradictions:[]};
   };
 
   const sourceResolvedQuestionPool = (participant:Participant, source:QuranSourceManifestRecord, content:QuranSourceContentRecord) => {

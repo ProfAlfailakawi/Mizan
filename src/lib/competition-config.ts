@@ -19,8 +19,8 @@ const DEFAULT_ACTIONS: JudgeActionDefinition[] = [
 export const BASE_POLICY: CompetitionPolicy = {
   version: '1.0.0',
   registration: {
-    mode: 'hybrid',
-    accountMode: 'otp',
+    mode: 'public',
+    accountMode: 'no_account',
     autoApproveEligible: true,
     requireIdentityVerification: true,
     requireGuardianForMinors: true,
@@ -57,7 +57,7 @@ export const BASE_POLICY: CompetitionPolicy = {
   },
   questions: {
     drawMode: 'fairdraw',
-    participantInitiatedDraw: true,
+    participantInitiatedDraw: false,
     questionsPerParticipant: 3,
     targetDifficulty: 3,
     difficultyTolerance: 0.75,

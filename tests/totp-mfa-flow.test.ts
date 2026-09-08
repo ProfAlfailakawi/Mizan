@@ -17,11 +17,11 @@ test('QR encoder keeps compact passes and supports local TOTP otpauth payloads',
 test('owner can enroll TOTP from the MFA-required bootstrap without external QR services',()=>{
  const security=source('src/components/auth/TotpSecurity.tsx');
  const app=source('src/App.tsx');
- assert.match(security,/multiFactor\(user\)\.getSession\(\)/);
+ assert.match(security,/multiFactor\(active\)\.getSession\(\)/);
  assert.match(security,/TotpMultiFactorGenerator\.generateSecret/);
  assert.match(security,/assertionForEnrollment/);
  assert.match(security,/reauthenticateWithCredential/);
- assert.match(security,/generateQrCodeUrl\(user\.email\|\|user\.uid,'MIZAN'\)/);
+ assert.match(security,/generateQrCodeUrl\(active\.email\|\|active\.uid,'MIZAN'\)/);
  assert.match(security,/<RealQRCode value=\{uri\}/);
  assert.doesNotMatch(security,/api\.qrserver|chart\.google|quickchart/i);
  assert.match(app,/accessError==='MFA_REQUIRED'.*<TotpSecurity bootstrap\/>/s);
