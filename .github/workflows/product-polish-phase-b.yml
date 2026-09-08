@@ -1,0 +1,81 @@
+name: صقل منتج ميزان — المرحلة B
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'APPLY_PRODUCT_POLISH_PHASE_B_2026_09_08.py'
+      - '.github/workflows/product-polish-phase-b.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mizan-product-polish-phase-b
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: جلب المصدر
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: إعداد Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت الاعتمادات
+        run: npm ci
+      - name: تطبيق صقل المنتج والواجهات والسياسات
+        run: python3 APPLY_PRODUCT_POLISH_PHASE_B_2026_09_08.py
+      - name: فحص الأنواع
+        run: npm run lint
+      - name: الاختبارات
+        run: npm test
+      - name: تدقيق المصدر والأسرار
+        run: npm run source-audit
+      - name: تدقيق العربية
+        run: npm run arabic-ui-audit
+      - name: البناء
+        run: npm run build
+      - name: حفظ الملفات الفعلية في main
+        id: persist
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGETS=(
+            src/types/index.ts
+            src/lib/competition-config.ts
+            src/lib/judging-integrity.ts
+            src/components/admin/CompetitionOverview.tsx
+            src/components/judge/JudgeOS.tsx
+            src/components/admin/EnterpriseWorkspace.tsx
+            src/lib/store.ts
+            src/components/admin/RolePortals.tsx
+            src/components/admin/TenantBrandStudio.tsx
+            tests/product-polish-phase-b.test.ts
+          )
+          git add -- "${TARGETS[@]}"
+          git rm -f -- APPLY_PRODUCT_POLISH_PHASE_B_2026_09_08.py .github/workflows/product-polish-phase-b.yml
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo 'main changed while checks were running; refusing stale push.'
+            exit 1
+          fi
+          git config user.name 'MIZAN CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'feat: polish competition design integrations certificates and editions'
+          git push origin HEAD:main
+          echo 'materialized=1' >> "$GITHUB_OUTPUT"
+      - name: تشغيل الفحص النهائي
+        if: steps.persist.outputs.materialized == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
