@@ -18,7 +18,7 @@ import { RealQRCode } from '../design-system/RealQRCode';
 const errorCode=(error:unknown)=>String((error as {code?:string})?.code||'');
 
 export const TotpSecurity:React.FC<{bootstrap?:boolean}>=({bootstrap=false})=>{
- const {language}=useAppStore();const ar=language==='ar';const user=auth.currentUser;
+ const {language}=useAppStore();const ar=language==='ar';const user=auth.currentUser;const active=user;
  const [password,setPassword]=useState('');const [code,setCode]=useState('');const [secret,setSecret]=useState<TotpSecret|null>(null);const [uri,setUri]=useState('');
  const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const [enrolledNow,setEnrolledNow]=useState(false);const [refreshKey,setRefreshKey]=useState(0);
  const factors=user?multiFactor(user).enrolledFactors:[];const totpFactor=factors.find(f=>f.factorId===TotpMultiFactorGenerator.FACTOR_ID);const alreadyEnrolled=Boolean(totpFactor||enrolledNow);
@@ -38,7 +38,7 @@ export const TotpSecurity:React.FC<{bootstrap?:boolean}>=({bootstrap=false})=>{
    setSecret(generated);setUri(qr);setPassword('');setMessage('');
   }catch(e){setMessage(errorCode(e)?explain(e):(ar?'لا توجد طريقة إعادة تحقق مدعومة لهذا الحساب.':'No supported reauthentication method is available for this account.'))}finally{setBusy(false)}};
 
- const confirm=async()=>{if(!user||!secret)return;const clean=code.replace(/\s+/g,'');if(!/^\d{6}$/.test(clean)){setMessage(ar?'اكتب رمز Authenticator المكوّن من 6 أرقام.':'Enter the 6-digit Authenticator code.');return}setBusy(true);setMessage('');try{const assertion=TotpMultiFactorGenerator.assertionForEnrollment(secret,clean);await multiFactor(user).enroll(assertion,'MIZAN Authenticator');await user.reload();setEnrolledNow(true);setSecret(null);setUri('');setCode('');setMessage(ar?'تم ربط Google Authenticator بحسابك بنجاح.':'Google Authenticator is now linked to your account.');}catch(e){setMessage(explain(e))}finally{setBusy(false)}};
+ const confirm=async()=>{if(!user||!secret)return;const clean=code.replace(/\s+/g,'');if(!/^\d{6}$/.test(clean)){setMessage(ar?'اكتب رمز Authenticator المكوّن من 6 أرقام.':'Enter the 6-digit Authenticator code.');return}setBusy(true);setMessage('');try{const assertion=TotpMultiFactorGenerator.assertionForEnrollment(secret,clean);await multiFactor(active).enroll(assertion,'MIZAN Authenticator');await user.reload();setEnrolledNow(true);setSecret(null);setUri('');setCode('');setMessage(ar?'تم ربط Google Authenticator بحسابك بنجاح.':'Google Authenticator is now linked to your account.');}catch(e){setMessage(explain(e))}finally{setBusy(false)}};
  const copySecret=async()=>{if(!secret)return;try{await navigator.clipboard.writeText(secret.secretKey);setMessage(ar?'تم نسخ المفتاح الاحتياطي.':'Backup key copied.');}catch{setMessage(ar?'تعذر النسخ تلقائيًا. انسخ المفتاح يدويًا.':'Automatic copy failed. Copy the key manually.')}};
  const freshSignIn=()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())};
 

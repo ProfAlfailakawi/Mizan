@@ -25,6 +25,7 @@ import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { useAppStore } from '../../lib/store';
 import { auth } from '../../lib/firebase';
+import { uploadOrganizationLogo } from '../../lib/brand-assets';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
 import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits} from '../../lib/input-validation';
 
@@ -131,9 +132,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
     const isSvg = trimmed.includes('data:image/svg+xml') || /\.svg($|\?)/i.test(trimmed);
     const isHttps = /^https:\/\//i.test(trimmed);
-    const isDataUri = /^data:image\//i.test(trimmed);
+    const isManagedAsset = /^\/api\/public\/brand-assets\//i.test(trimmed);
 
-    if (!isHttps && !isDataUri) {
+    if (!isHttps && !isManagedAsset) {
       setProbe({
         status: 'broken',
         width: 0,
@@ -142,8 +143,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
         isSvg: false,
         clarityTier: 'low',
         message: ar
-          ? 'تنبيه أمان: يجب أن يبدأ الرابط بـ https:// أو يكون بصيغة data:image لتفادي حجب المتصفح.'
-          : 'Security warning: URL must start with https:// or be a data:image URI.',
+          ? 'تنبيه أمان: استخدم رابط https:// أو شعارًا مرفوعًا إلى تخزين ميزان.'
+          : 'Security warning: use an https:// URL or a logo uploaded to MIZAN storage.',
       });
       return;
     }
@@ -238,27 +239,15 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
     testLogo(logoUrl);
   }, [logoUrl, testLogo]);
 
-  // رفع ملف شعار محلي وتحويله إلى Data URI آمن
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      alert(ar ? 'يرجى اختيار ملف صورة صالح (PNG, SVG, JPG, WebP)' : 'Please select a valid image file');
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      alert(ar ? 'حجم الملف كبير (الحد الأقصى 2 ميجابايت للشفافية السريعة)' : 'File too large (max 2MB)');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUri = String(reader.result || '');
-      setLogoUrl(dataUri);
-    };
-    reader.readAsDataURL(file);
+  // رفع ملف الشعار إلى التخزين الفعلي؛ لا تدخل bytes الشعار في سجل الجهة.
+  const [uploadingLogo,setUploadingLogo]=useState(false);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file=e.target.files?.[0];e.currentTarget.value='';if(!file||uploadingLogo)return;
+    const targetOrgId=orgId||store.organization?.id;if(!targetOrgId){setServerError(ar?'تعذر تحديد الجهة.':'Organization scope is unavailable.');return}
+    setUploadingLogo(true);setServerError('');
+    try{setLogoUrl(await uploadOrganizationLogo(targetOrgId,file))}
+    catch(err){const code=err instanceof Error?err.message:'';setServerError(code==='LOGO_TOO_LARGE'?(ar?'حجم الشعار يجب ألا يتجاوز 2MB.':'Logo must be 2MB or smaller.'):(ar?'اختر PNG أو JPG/JPEG أو WebP أو SVG صالحًا.':'Choose a valid PNG, JPG/JPEG, WebP or SVG.'))}
+    finally{setUploadingLogo(false)}
   };
 
   // قياس مؤشر جاهزية وجودة الهوية المؤسسية (0 - 100)

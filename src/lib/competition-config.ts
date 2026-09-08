@@ -19,8 +19,8 @@ const DEFAULT_ACTIONS: JudgeActionDefinition[] = [
 export const BASE_POLICY: CompetitionPolicy = {
   version: '1.0.0',
   registration: {
-    mode: 'hybrid',
-    accountMode: 'otp',
+    mode: 'public',
+    accountMode: 'no_account',
     autoApproveEligible: true,
     requireIdentityVerification: true,
     requireGuardianForMinors: true,
@@ -57,7 +57,7 @@ export const BASE_POLICY: CompetitionPolicy = {
   },
   questions: {
     drawMode: 'fairdraw',
-    participantInitiatedDraw: true,
+    participantInitiatedDraw: false,
     questionsPerParticipant: 3,
     targetDifficulty: 3,
     difficultyTolerance: 0.75,
@@ -191,7 +191,9 @@ function mergePolicy<T>(base: T, override: Partial<T> | undefined): T {
 }
 
 export function getCompetitionPolicy(competition: Competition): CompetitionPolicy {
-  return mergePolicy(BASE_POLICY, competition.policy);
+  const policy=mergePolicy(BASE_POLICY, competition.policy);
+  policy.questions.participantInitiatedDraw=false;
+  return policy;
 }
 
 export function applyTemplate(competition: Competition, templateId: string): Competition {

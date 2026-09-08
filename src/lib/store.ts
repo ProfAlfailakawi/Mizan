@@ -1357,12 +1357,13 @@ export function useAppStore() {
     notify();
   };
 
-  const addCategory = () => {
+  const addCategory = (initial?: Partial<Category>) => {
     const id = newId('cat');
     const category: Category = {
       id, competitionId: globalState.competition.id, code:`CAT-${globalState.competition.categories.length+1}`,
       name:'New category', nameArabic:'فئة جديدة', description:'', riwaya:'', memorizationScope:'Custom', juzCount:30,
-      genderConstraint:'all', targetParticipants:100, targetDurationMinutes:8, ruleSetId:globalState.competition.ruleSet.id
+      genderConstraint:'all', targetParticipants:100, targetDurationMinutes:8, ruleSetId:globalState.competition.ruleSet.id,
+      ...(initial || {})
     };
     globalState.competition = { ...globalState.competition, categories:[...globalState.competition.categories, category] };
     notify(); return category;
@@ -1960,6 +1961,7 @@ export function useAppStore() {
     const lineage:ParticipantCredentialLineageRecord={id:`lineage-record:${globalState.competition.id}:${p.id}`,competitionId:globalState.competition.id,participantId:p.id,lineageId,latestGeneration:generation,latestCredentialId:credentialId,revocationEpoch,updatedAt:now.toISOString(),updatedBy:globalState.currentUser.id};globalState.credentialLineages=[lineage,...globalState.credentialLineages.filter(x=>x.participantId!==p.id||x.competitionId!==globalState.competition.id)];
     const rec:PassReissueRecord={id:newId('pass-reissue'),competitionId:globalState.competition.id,participantId:p.id,oldCredentialIds:oldIds,newCredentialId:credentialId,lineageId,generation,reason,identityVerification,requestedAt:now.toISOString(),requestedBy:globalState.currentUser.id,status:'ISSUED',revocationEpoch};globalState.passReissues=[rec,...globalState.passReissues];auditTrustAction('JOURNEY_PASS_REISSUED','Participant',p.id,`إعادة إصدار QR بعد تحقق الهوية؛ إلغاء ${oldIds.length} اعتماد سابق ورفع جيل البطاقة إلى ${generation}`,`Reissued participant QR after identity verification; revoked ${oldIds.length} prior credential(s) and advanced generation to ${generation}`);notify();return {ok:true,pass:fresh,reissue:rec} as const;
   };
+  const reissueQrBundle=async(participantId:string,identityVerification:PassReissueRecord['identityVerification']='PHOTO_ID',reason:PassReissueRecord['reason']='DAMAGED',notes='')=>reissueJourneyPass(participantId,identityVerification,reason,notes);
 
   const compileCompetitionPolicy=async(fileName:string,sourceType:PolicyCompilationRecord['sourceType'],text:string)=>{
     if(!['comp_admin','org_admin'].includes(globalState.currentUser.role)||!text.trim())return null;
@@ -2169,6 +2171,6 @@ export function useAppStore() {
     startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
     issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
     generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
-    getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
+    getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, reissueQrBundle, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
   };
 }
