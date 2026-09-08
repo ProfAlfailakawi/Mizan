@@ -2,22 +2,26 @@
   "project": "MIZAN",
   "baseline_commit": "b8e4e1918202a7bc73ac7a5b4690a27c50a0af83",
   "also_repairs_incomplete_commit": "b2f5ed09d59058fe834dfac93f61abb2e603a80a",
+  "current_failing_ci_head": "736f0bebaad0442e156f118d4a67bdbc14936280",
   "generated_date": "2026-09-08",
-  "package_kind": "corrected-modified-files-plus-transactional-large-file-patcher",
+  "package_kind": "modified-files-plus-transactional-large-file-patcher",
   "full_repository_included": false,
   "wrapper_directory_in_zip": false,
   "git_push_performed": false,
+  "deployment_performed": false,
   "ci_failure_review": {
-    "job_id": 101987788804,
+    "workflow_run": 167,
+    "job_id": 101995042550,
     "tests": 465,
-    "passed": 461,
-    "failed": 4
+    "passed": 464,
+    "failed": 1,
+    "failure": "large-file notes were not applied before commit; CompetitionOverview.tsx missing w-14 text-center"
   },
   "files": [
     {
       "path": "APPLY_ALL_MIZAN_NOTES.py",
-      "bytes": 24122,
-      "sha256": "672f7928999fa95439f34f9f7c35d6bb3f4fa28655fa357c5ddb899767565b77"
+      "bytes": 24288,
+      "sha256": "4c04f6387edfeb70589c399b895dbcc5e06614c933fc4d2dcf5dbc16274bb893"
     },
     {
       "path": "APPLY_AND_CHECK.sh",
@@ -26,8 +30,8 @@
     },
     {
       "path": "MIZAN_ALL_NOTES_README.md",
-      "bytes": 4488,
-      "sha256": "ee2a474aba3d61dceba73eff01387b53cddc840fae0ba80d4594ff801eed1011"
+      "bytes": 3777,
+      "sha256": "2d20f0204794626a6782ca171ad913156e6494e0615c503ce7ee4f674e416953"
     },
     {
       "path": "server/identity-governance.ts",
@@ -97,9 +101,8 @@
   ],
   "verification": {
     "python_patcher_compile": "PASS",
-    "identity_accessibility_44px": "PASS",
-    "stale_owner_test_updated": "PASS",
-    "retired_role_count_test_updated": "PASS",
+    "shell_syntax": "PASS",
+    "zip_root_layout": "PASS",
     "large_file_patcher_required_before_commit": true,
     "full_npm_check": "RUN_ON_FULL_REPOSITORY_WITH_APPLY_AND_CHECK.sh"
   }

@@ -5,6 +5,8 @@ Supported starting points:
 - baseline b8e4e1918202a7bc73ac7a5b4690a27c50a0af83
 - the incomplete follow-up b2f5ed09d59058fe834dfac93f61abb2e603a80a where the
   replacement files were committed but this large-file patcher had not been executed.
+- current failing CI head 736f0bebaad0442e156f118d4a67bdbc14936280 where the
+  replacement files/tests are present but the large-file patcher still was not executed.
 
 Run from the repository root *after* extracting this ZIP there. The script plans every
 large-file change in memory, verifies postconditions, and only then writes the set.
