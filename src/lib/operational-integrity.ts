@@ -2,19 +2,19 @@ import type { AuditEvent, AuthSessionRecord, IdentityInvitationRecord, JourneyPa
 import { hashCanonical } from './trust-protocol';
 import { newId, sha256 } from './crypto';
 
-const SENSITIVE_ROLES=new Set<Role>(['org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
 const GRANT_MATRIX:Partial<Record<Role,Role[]>>={
   super_admin:['org_admin','support_agent'],
-  org_admin:['comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','guardian','support_agent'],
+  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','guardian','support_agent'],
   comp_admin:['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','guardian'],
 };
 export function canGrantRole(actorRole:Role,targetRole:Role){return GRANT_MATRIX[actorRole]?.includes(targetRole)??false}
-export function roleGrantRequiresDualApproval(role:Role){return SENSITIVE_ROLES.has(role)}
+/* Account provisioning follows the delegated authority chain (owner -> tenant admin -> scoped staff).
+   Independent approval remains for critical competition decisions, not routine account creation. */
+export function roleGrantRequiresDualApproval(_role:Role){return false}
 export function validateRoleGrant(input:{actorRole:Role;targetRole:Role;actorId:string;approverId?:string;organizationId:string;targetOrganizationId:string}){
  if(input.organizationId!==input.targetOrganizationId)return {ok:false,reason:'CROSS_TENANT_GRANT_BLOCKED'} as const;
  if(!canGrantRole(input.actorRole,input.targetRole))return {ok:false,reason:'ROLE_GRANT_NOT_ALLOWED'} as const;
- if(roleGrantRequiresDualApproval(input.targetRole)&&input.approverId===input.actorId)return {ok:false,reason:'SELF_APPROVAL_BLOCKED'} as const;
- return {ok:true,dualApprovalRequired:roleGrantRequiresDualApproval(input.targetRole)} as const;
+ return {ok:true,dualApprovalRequired:false} as const;
 }
 export async function invitationTokenHash(token:string){return sha256(`MIZAN-IDENTITY-INVITE-v1:${token.trim()}`)}
 export function normalizedIdentityEmail(email:string){return email.trim().toLowerCase()}
@@ -25,7 +25,7 @@ export function invitationUsable(invite:IdentityInvitationRecord,now=new Date())
  return {ok:true} as const;
 }
 export function detectConcurrentPrivilegedSession(input:{role:Role;newDeviceId:string;sessions:AuthSessionRecord[];now?:Date}){
- if(!['judge','head_judge','scientific_admin','comp_admin','org_admin'].includes(input.role))return {blocked:false} as const;
+ if(!['judge','head_judge','comp_admin','org_admin'].includes(input.role))return {blocked:false} as const;
  const now=(input.now||new Date()).getTime();const active=input.sessions.find(s=>s.status==='ACTIVE'&&s.role===input.role&&s.deviceId!==input.newDeviceId&&Date.parse(s.expiresAt)>now);
  return active?{blocked:true,reason:'CONCURRENT_PRIVILEGED_SESSION',conflictingSessionId:active.id} as const:{blocked:false} as const;
 }

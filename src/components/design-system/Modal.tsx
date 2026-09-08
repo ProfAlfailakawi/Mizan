@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { X } from 'lucide-react';
 
@@ -16,21 +17,21 @@ const widthClasses = {
   xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl',
 };
 
-/*
- * Modal was a plain <div> stack: no dialog role, no aria-modal, no label tying the
- * heading to the dialog, and nothing stopping Tab from walking out of it into the page
- * behind. It also still used the pre-redesign palette. Focus handling now comes from the
- * shared hook so every overlay in MIZAN behaves the same way.
+/**
+ * Global overlays must live outside transformed/backdrop-filtered layout ancestors.
+ * Header is sticky and backdrop-blurred; a fixed dialog rendered under it can therefore
+ * be clipped to the header's containing block. Portalling to document.body restores a
+ * true viewport overlay for Emergency, confirmations and every shared MIZAN modal.
  */
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, children, maxWidth = 'lg' }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const titleId = React.useId();
   useDialogBehavior(isOpen, onClose, dialogRef);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
-    <div className="mizan-overlay">
+  return createPortal(
+    <div className="mizan-overlay" style={{zIndex:240}}>
       <div className="mizan-overlay-scrim" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}
@@ -51,6 +52,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, subtitle, 
         </div>
         <div className="mizan-dialog-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

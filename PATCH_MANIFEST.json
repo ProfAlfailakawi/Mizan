@@ -1,0 +1,83 @@
+{
+  "project": "MIZAN",
+  "baseline_commit": "b8e4e1918202a7bc73ac7a5b4690a27c50a0af83",
+  "generated_date": "2026-09-08",
+  "package_kind": "modified-files-plus-transactional-large-file-patcher",
+  "full_repository_included": false,
+  "wrapper_directory_in_zip": false,
+  "git_push_performed": false,
+  "files": [
+    {
+      "path": "APPLY_ALL_MIZAN_NOTES.py",
+      "bytes": 23560,
+      "sha256": "5bfb6900983e318855a07e8e12198bb46b95df43a24acec695a5a15c8bc32b2c"
+    },
+    {
+      "path": "MIZAN_ALL_NOTES_README.md",
+      "bytes": 12425,
+      "sha256": "11f2fdff29056db6b65ecf82666b4092f119d4afb9760efa3633fb74434f3702"
+    },
+    {
+      "path": "server/identity-governance.ts",
+      "bytes": 21099,
+      "sha256": "f947b79f6cd7976e3de31da90dd6a9ed1098fa6d270f027168ac47a0b30f3b69"
+    },
+    {
+      "path": "src/components/admin/IdentityGovernance.tsx",
+      "bytes": 18461,
+      "sha256": "966ef4cda6d881b2b9b3787ffb0e5370b5bc3ade8f4f806d9378233e9f3ffc17"
+    },
+    {
+      "path": "src/components/design-system/ClarityGuide.tsx",
+      "bytes": 11537,
+      "sha256": "6e86b312e0057508397b5258f3fd894ac04a1576f3c93536e14c3db07e0be4e8"
+    },
+    {
+      "path": "src/components/design-system/CommandPalette.tsx",
+      "bytes": 6502,
+      "sha256": "ae04187def06b03718ba17de20258e85c4d2b9651825085c9134a318a8824f54"
+    },
+    {
+      "path": "src/components/design-system/Modal.tsx",
+      "bytes": 2069,
+      "sha256": "a4a7b64e720aa5bd9fbe4a91413109123f7528329eab2d6b38c99f4412b4569c"
+    },
+    {
+      "path": "src/components/design-system/RoleSwitcher.tsx",
+      "bytes": 4411,
+      "sha256": "e895dfc484f455b4c6e9782ccc28094ee3fb32a43f941a05230f8ee31177ff82"
+    },
+    {
+      "path": "src/lib/operational-integrity.ts",
+      "bytes": 10350,
+      "sha256": "a78d50f452b1dd5947dbc5c605426ef945834a0499cd37fc73aeef04e194e2d6"
+    },
+    {
+      "path": "src/lib/permissions.ts",
+      "bytes": 2138,
+      "sha256": "d7db6a2442e144cd7ee5a9b10bf815a4b20f977e4fe5953ded4fa1ad7a8460ac"
+    },
+    {
+      "path": "src/lib/useMizanAuth.ts",
+      "bytes": 8964,
+      "sha256": "a6048fdf84bc7b8612a9abde28a284d15b9afe2515714b44762221a7dc5dc77a"
+    },
+    {
+      "path": "tests/operational-continuity-identity.test.ts",
+      "bytes": 8945,
+      "sha256": "f63cdcf10915de851362a7d272a1483df646cbe8dbe4aac4bdf27338b547a09a"
+    },
+    {
+      "path": "tests/user-notes-2026-09-08.test.ts",
+      "bytes": 9168,
+      "sha256": "aa77171545e826a0de18a99afa9de4314c266899323741f4fbec14cbc87a3061"
+    }
+  ],
+  "verification": {
+    "python_patcher_compile": "PASS",
+    "patcher_anchor_smoke": "PASS",
+    "patcher_idempotency_smoke": "PASS",
+    "identity_governance_runtime_smoke": "PASS",
+    "full_npm_check": "NOT_RUN_PATCH_BUNDLE_DOES_NOT_INCLUDE_FULL_REPO_OR_NODE_MODULES"
+  }
+}

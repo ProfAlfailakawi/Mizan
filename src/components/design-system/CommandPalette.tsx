@@ -1,14 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Award, Search, UserRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 
 type Result = { id: string; kind: string; title: string; meta: string };
 
-/*
- * The palette opened with ⌘K but could only be driven with a mouse from there: no arrow
- * keys, no Enter, no active row. A command palette that needs the mouse is just a search
- * box in a hurry. It now has full keyboard flow, combobox semantics, and focus return.
- */
 export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boolean) => void }> = ({ open: controlled, onOpenChange }) => {
   const s = useAppStore();
   const ar = s.language === 'ar';
@@ -32,7 +28,6 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
     ].slice(0, 9);
   }, [q, s.participants, s.competitions, s.certificates, ar]);
 
-  // A new query invalidates the old cursor position.
   useEffect(() => { setCursor(0); }, [q]);
 
   const choose = (r?: Result) => {
@@ -54,7 +49,6 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
     return () => window.removeEventListener('keydown', fn);
   }, [open, results, cursor]);
 
-  // Keep the active row in view when arrowing past the visible window.
   useEffect(() => {
     listRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [cursor]);
@@ -64,10 +58,10 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
     else { restoreTo.current?.focus?.(); }
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-[rgba(18,32,27,.28)] p-4 sm:p-12" onMouseDown={() => setOpen(false)}>
+  return createPortal(
+    <div className="fixed inset-0 z-[220] bg-[rgba(18,32,27,.28)] p-4 sm:p-12" onMouseDown={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"
@@ -123,12 +117,9 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
             <div className="p-8 text-center text-xs text-[#686e69]">{ar ? 'لا نتائج' : 'No results'}</div>
           )}
         </div>
-
-        {/* Result count spoken on change, so the list is not mouse-and-eye only. */}
-        <div className="sr-only" role="status" aria-live="polite">
-          {q ? (ar ? `${results.length} نتيجة` : `${results.length} results`) : ''}
-        </div>
+        <div className="sr-only" role="status" aria-live="polite">{q ? (ar ? `${results.length} نتيجة` : `${results.length} results`) : ''}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
