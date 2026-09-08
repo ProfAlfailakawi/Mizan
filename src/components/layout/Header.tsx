@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
       </div>
     </div>
     <div className="flex items-center gap-1">
-      {!superAdmin&&<LiveSupportControl/>}
+      <LiveSupportControl/>
       {!superAdmin&&onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'كل التجارب':'All experiences'} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></button>}
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button><button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>
       {!superAdmin&&onOpenKiosk&&canGate&&<button onClick={onOpenKiosk} className="hidden lg:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بوابة الحضور':'Gate'} aria-label={language==='ar'?'بوابة الحضور':'Gate'}><Radio className="w-4 h-4"/></button>}

@@ -115,6 +115,13 @@ export class R2PrivateClient {
     return {etag:r.headers.get('etag')||undefined};
   }
 
+  async deleteObject(key:string){
+    const r=await this.request('DELETE',key);
+    if(r.status===404)return {deleted:false};
+    if(!r.ok)throw new R2RequestError(r.status,'DELETE');
+    return {deleted:true};
+  }
+
   async listObjects(prefix='',continuationToken?:string,maxKeys=1000):Promise<R2ListResult>{
     const r=await this.request('GET','',{query:{'list-type':'2',prefix,'max-keys':Math.max(1,Math.min(1000,maxKeys)),'continuation-token':continuationToken}});
     if(!r.ok)throw new R2RequestError(r.status,'LIST');

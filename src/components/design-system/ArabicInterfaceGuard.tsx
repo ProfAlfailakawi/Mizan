@@ -1,6 +1,7 @@
 import {useEffect} from 'react';
 import {useAppStore} from '../../lib/store';
 import {COUNTRIES} from '../../lib/countries';
+import {toAsciiDigits} from '../../lib/input-validation';
 
 /*
  * Last-resort Arabic surface guard.
@@ -69,7 +70,7 @@ const escapeRe=(v:string)=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const TOKEN_KEYS=Object.keys(LOOKUP).filter(k=>/[A-Za-z]/.test(k)).sort((a,b)=>b.length-a.length);
 const TOKEN_RE=TOKEN_KEYS.length?new RegExp(`(?<![A-Za-z0-9_])(${TOKEN_KEYS.map(escapeRe).join('|')})(?![A-Za-z0-9_])`,'g'):null;
 const localizeTokens=(value:string)=>TOKEN_RE?value.replace(TOKEN_RE,m=>LOOKUP[m]??m):value;
-function localizeText(raw:string){const trimmed=raw.trim();if(!trimmed)return raw;const exact=LOOKUP[trimmed];if(exact)return raw.replace(trimmed,exact);let next=localizeTokens(raw);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
+function localizeText(raw:string){const normalized=toAsciiDigits(raw);const trimmed=normalized.trim();if(!trimmed)return normalized;const exact=LOOKUP[trimmed];if(exact)return normalized.replace(trimmed,exact);let next=localizeTokens(normalized);for(const [pattern,value] of PHRASES)next=next.replace(pattern,value);return next}
 function ignored(el:Element|null){if(!el)return true;return !!el.closest('code,pre,kbd,samp,script,style,textarea,input,[data-no-localize="true"],.font-mono,.mizan-proof-code')}
 function translateNode(node:Node){if(node.nodeType===Node.TEXT_NODE){const parent=(node.parentElement||null);if(ignored(parent))return;const raw=node.nodeValue||'';const next=localizeText(raw);if(next!==raw)node.nodeValue=next;return}if(!(node instanceof Element)||ignored(node))return;for(const attr of ['aria-label','title','placeholder']){const raw=node.getAttribute(attr);if(!raw)continue;const next=localizeText(raw);if(next!==raw)node.setAttribute(attr,next)}for(const child of Array.from(node.childNodes))translateNode(child)}
 
