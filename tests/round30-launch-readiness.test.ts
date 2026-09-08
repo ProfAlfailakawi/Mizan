@@ -24,8 +24,10 @@ const allowedRoles = (() => {
   return [...block.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
 })();
 
-test('every role admitted into a session has a screen of its own',()=>{
-  assert.ok(allowedRoles.length >= 14, `expected the full role set, found ${allowedRoles.length}`);
+test('every active role admitted into a session has a screen of its own',()=>{
+  // بعد تقاعد scientific_admin أصبح سجل الأدوار التنفيذي 13 دورًا، وليس 14.
+  assert.equal(allowedRoles.length, 13, `expected the active 13-role set, found ${allowedRoles.length}`);
+  assert.equal(allowedRoles.includes('scientific_admin'), false, 'retired scientific_admin must not be admitted into a session');
   const missing = allowedRoles.filter(r => !app.includes(`case '${r}':`));
   assert.deepEqual(missing, [], 'a provisioned account for these roles would fall through to the default view');
 });

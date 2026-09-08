@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Apply the MIZAN 2026-09-08 user-notes patch on top of baseline b8e4e1.
+"""Apply the complete MIZAN 2026-09-08 notes patch safely.
 
-This script intentionally edits only files that are too large to duplicate in the patch ZIP.
-The ZIP also contains complete replacement copies for the smaller changed files.
+Supported starting points:
+- baseline b8e4e1918202a7bc73ac7a5b4690a27c50a0af83
+- the incomplete follow-up b2f5ed09d59058fe834dfac93f61abb2e603a80a where the
+  replacement files were committed but this large-file patcher had not been executed.
 
-Run from the repository root *after* extracting the ZIP there.
-The script plans every change in memory and writes nothing unless every required baseline
-anchor is found, so a mismatched checkout cannot leave a half-patched large-file set.
+Run from the repository root *after* extracting this ZIP there. The script plans every
+large-file change in memory, verifies postconditions, and only then writes the set.
 """
 from __future__ import annotations
 
@@ -42,6 +43,15 @@ def remove_between(text: str, start: str, end: str, rel: str, label: str, *, kee
         raise RuntimeError(f"{rel}: end anchor not found for {label}.")
     return text[:i] + (text[j:] if keep_end else text[j + len(end):])
 
+
+
+def patch_identity_governance_ui(text: str) -> str:
+    rel='src/components/admin/IdentityGovernance.tsx'
+    # Accessibility baseline: every interactive icon target is at least 44x44px.
+    text=text.replace('w-10 h-10','w-11 h-11')
+    if 'w-10 h-10' in text:
+        raise RuntimeError(f'{rel}: undersized 40px interactive target remains.')
+    return text
 
 def patch_competition_overview(text: str) -> str:
     rel = 'src/components/admin/CompetitionOverview.tsx'
@@ -217,6 +227,7 @@ def patch_ui_language(text: str) -> str:
 
 
 PATCHERS={
+    'src/components/admin/IdentityGovernance.tsx':patch_identity_governance_ui,
     'src/components/admin/CompetitionOverview.tsx':patch_competition_overview,
     'src/components/admin/TenantBrandStudio.tsx':patch_tenant_brand,
     'src/components/admin/TenantConsole.tsx':patch_tenant_console,
@@ -246,6 +257,7 @@ try:
     }
     # First entries in each list are positive except explicit banned tokens handled below.
     positives=[
+      ('src/components/admin/IdentityGovernance.tsx','w-11 h-11'),
       ('src/components/admin/CompetitionOverview.tsx','w-14 text-center'),
       ('src/components/admin/TenantConsole.tsx','[overflow-wrap:anywhere] text-start">{hostOf(t)}'),
       ('src/components/admin/RolePortals.tsx','font-mono break-all [overflow-wrap:anywhere]'),
@@ -259,6 +271,7 @@ try:
     for rel,needle in positives:
         if needle not in planned[rel]: raise RuntimeError(f'{rel}: postcondition missing: {needle}')
     banned=[
+      ('src/components/admin/IdentityGovernance.tsx','w-10 h-10'),
       ('src/components/admin/CompetitionOverview.tsx','COMPETITION_TEMPLATES.map'),
       ('src/components/admin/TenantBrandStudio.tsx','PRESET_LOGOS.map'),
       ('src/components/admin/RolePortals.tsx','ScientificStudio'),
