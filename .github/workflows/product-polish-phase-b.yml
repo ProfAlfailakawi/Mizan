@@ -35,6 +35,66 @@ jobs:
         run: npm ci
       - name: تطبيق صقل المنتج والواجهات والسياسات
         run: python3 APPLY_PRODUCT_POLISH_PHASE_B_2026_09_08.py
+      - name: إصلاح عقود المرحلة B قبل الفحص
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p=Path(path); t=p.read_text(encoding='utf-8')
+              if t.count(old)!=1:
+                  raise SystemExit(f'{path}: {label}: expected 1, got {t.count(old)}')
+              p.write_text(t.replace(old,new,1),encoding='utf-8')
+
+          # Starter templates are intentionally gone: prove per-instance policy isolation directly.
+          p=Path('tests/competition-config.test.ts'); t=p.read_text(encoding='utf-8')
+          t=t.replace("import { BASE_POLICY, applyTemplate, getCompetitionPolicy } from '../src/lib/competition-config';","import { BASE_POLICY, getCompetitionPolicy } from '../src/lib/competition-config';")
+          old="""test('competition policy belongs to the competition instance', () => {
+            const a=applyTemplate({...SEED_COMPETITION,id:'a'},'international-hifz');
+            const b=applyTemplate({...SEED_COMPETITION,id:'b'},'youth-local');
+            assert.notEqual(getCompetitionPolicy(a).questions.questionsPerParticipant,getCompetitionPolicy(b).questions.questionsPerParticipant);
+            assert.equal(BASE_POLICY.judging.aiCanAffectScore,false);
+          });"""
+          new="""test('competition policy belongs to the competition instance', () => {
+            const a={...SEED_COMPETITION,id:'a',policy:getCompetitionPolicy(SEED_COMPETITION)};
+            const aPolicy=getCompetitionPolicy(a);
+            const b={...SEED_COMPETITION,id:'b',policy:{...aPolicy,questions:{...aPolicy.questions,questionsPerParticipant:aPolicy.questions.questionsPerParticipant+2}}};
+            assert.equal(getCompetitionPolicy(a).questions.questionsPerParticipant,aPolicy.questions.questionsPerParticipant);
+            assert.equal(getCompetitionPolicy(b).questions.questionsPerParticipant,aPolicy.questions.questionsPerParticipant+2);
+            assert.equal(BASE_POLICY.judging.aiCanAffectScore,false);
+          });"""
+          if old not in t: raise SystemExit('competition-config legacy template assertion anchor missing')
+          p.write_text(t.replace(old,new,1),encoding='utf-8')
+
+          # Accessibility and contrast: keep the Quiet Authority palette but meet the checks.
+          p=Path('src/components/admin/CompetitionOverview.tsx'); t=p.read_text(encoding='utf-8')
+          for old_color in ('#858984','#777d78','#7c817d'):
+              t=t.replace(old_color,'#656b66')
+          if 'w-10 h-10' not in t: raise SystemExit('CompetitionOverview touch-target anchor missing')
+          t=t.replace('w-10 h-10','w-11 h-11')
+          p.write_text(t,encoding='utf-8')
+
+          p=Path('src/components/admin/EnterpriseWorkspace.tsx'); t=p.read_text(encoding='utf-8')
+          t=t.replace('#777d78','#656b66')
+          t=t.replace('لا Webhooks ولا شاشة مطور. اختر القناة، اكتب اسم المزود وعنوان خدمته الآمن، واحفظها من داخل ميزان. مفاتيح المزود الحساسة لا تُكتب في المتصفح.','لا شاشة مطور ولا إعدادات تقنية منفصلة. اختر القناة، اكتب اسم المزود وعنوان خدمته الآمن، واحفظها من داخل ميزان. مفاتيح المزود الحساسة لا تُكتب في المتصفح.')
+          t=t.replace('No webhook console or developer surface. Choose a channel, enter the provider and secure service URL, and manage it from MIZAN. Provider secrets are never entered in the browser.','No separate developer console or technical surface. Choose a channel, enter the provider and secure service URL, and manage it from MIZAN. Provider secrets are never entered in the browser.')
+          t=t.replace("cfg?(ar?'يحتاج إكمال الربط':'Setup incomplete')","cfg?(ar?'محفوظ — بانتظار تحقق الخادم':'Saved — awaiting server verification')")
+          p.write_text(t,encoding='utf-8')
+
+          # Saving non-secret metadata is not evidence that a provider is live.
+          replace_once('src/lib/store.ts',"status:enabled&&safeEndpoint?'configured':'not_configured'","status:previous?.status==='configured'&&enabled&&safeEndpoint?'configured':'not_configured'",'provider status stays health-authoritative')
+
+          # Preserve full tenant domains without restoring a second tenant-management surface.
+          p=Path('src/components/admin/RolePortals.tsx'); t=p.read_text(encoding='utf-8')
+          if '[overflow-wrap:anywhere]' not in t:
+              anchor='   <TenantConsole/>'
+              domain="""   {(store.organization.subdomain||store.organization.customDomains?.length)&&<div className=\"mizan-surface px-4 py-3 text-[10px] text-[#59615c] font-mono break-all [overflow-wrap:anywhere]\" dir=\"ltr\" data-no-localize=\"true\">{[store.organization.subdomain,...(store.organization.customDomains||[])].filter(Boolean).join(' · ')}</div>}
+             <TenantConsole/>"""
+              if anchor not in t: raise SystemExit('RolePortals TenantConsole anchor missing')
+              t=t.replace(anchor,domain,1)
+          p.write_text(t,encoding='utf-8')
+          PY
       - name: فحص الأنواع
         run: npm run lint
       - name: الاختبارات
@@ -60,6 +120,7 @@ jobs:
             src/lib/store.ts
             src/components/admin/RolePortals.tsx
             src/components/admin/TenantBrandStudio.tsx
+            tests/competition-config.test.ts
             tests/product-polish-phase-b.test.ts
           )
           git add -- "${TARGETS[@]}"
