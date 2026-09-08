@@ -44,6 +44,7 @@ import { TenantStore } from './server/tenant-store';
 import type { TenantRecord } from './server/tenant-registry';
 import { decodePemFromEnv } from './server/pem';
 import { R2PrivateClient, r2ConfigFromEnv } from './server/r2-private';
+import { ControlTowerRepository } from './server/control-tower';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -161,6 +162,8 @@ async function startServer() {
   const coldVaultDir=process.env.MIZAN_COLD_VAULT_DIR||'';let coldVault:ColdVaultRepository|null=null;try{if(coldVaultDir)coldVault=new ColdVaultRepository(coldVaultDir)}catch(err){console.error('Cold vault disabled:',err)}
   const questionEscrowConfigured=!!questionEscrow&&!!process.env.MIZAN_PASS_SIGNING_SECRET&&!!firebaseProjectId;
   const secureQuestionRuntimeConfigured=!!secureQuestionRuntime&&questionEscrowConfigured;
+  const controlTowerDir=process.env.MIZAN_CONTROL_TOWER_DIR||'';
+  let controlTower:ControlTowerRepository|null=null;try{if(controlTowerDir)controlTower=new ControlTowerRepository(controlTowerDir)}catch(err){console.error('Control Tower disabled:',err)}
   const escrowFailure=(res:any,err:unknown)=>{const message=err instanceof Error?err.message:'ESCROW_FAILED';const forbidden=/MISMATCH|ASSIGNED_JUDGE|NOT_ALLOWED/.test(message);const missing=/NOT_FOUND/.test(message);const conflict=/NOT_RELEASED|PARTICIPANT_NOT_PRESENT|EXISTS|REVOKED|EXPIRED/.test(message);return res.status(forbidden?403:missing?404:conflict?409:400).json({code:message.split(':')[0]})};
 
   /*
@@ -172,7 +175,7 @@ async function startServer() {
   const currentBuildId=()=>{if(cachedBuildId)return cachedBuildId;try{cachedBuildId=String(JSON.parse(fs.readFileSync(path.join(process.cwd(),'dist','build-id.json'),'utf8')).build||'')}catch{cachedBuildId=''}if(!cachedBuildId)cachedBuildId=process.env.BUILD_ID||'dev';return cachedBuildId};
   app.get('/api/version',(_req,res)=>{res.setHeader('Cache-Control','no-store, no-cache, must-revalidate');res.json({build:currentBuildId()})});
 
-  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
+  app.get('/api/health',(_req,res)=>res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured:!!process.env.MIZAN_NOTIFICATION_PROVIDER,backgroundJobsConfigured:!!process.env.MIZAN_BACKGROUND_JOBS_DIR,liveCompetitionTelemetryConfigured:!!process.env.MIZAN_LIVE_TELEMETRY_DIR,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()}));
   app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Organization/competition logos use the already-configured private R2 bucket. Only the bytes are public; writes remain Firebase-authorized and tenant-scoped.
@@ -291,6 +294,24 @@ async function startServer() {
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const ownerOnly=requireFirebaseRoles(['super_admin']);
+  const ownerRuntime=()=>({backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,notificationProviderConfigured:!!process.env.MIZAN_NOTIFICATION_PROVIDER,backgroundJobsConfigured:!!process.env.MIZAN_BACKGROUND_JOBS_DIR,liveCompetitionTelemetryConfigured:!!process.env.MIZAN_LIVE_TELEMETRY_DIR});
+  const controlTowerAdmin=(res:Response)=>{
+    if(!controlTower){res.status(503).json({code:'CONTROL_TOWER_NOT_CONFIGURED'});return null}
+    return controlTower;
+  };
+  app.get('/api/owner/control-tower',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    return res.json(repo.buildSnapshot({actor,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS}));
+  });
+  app.post('/api/owner/support-sessions',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.status(201).json({session:repo.createSupportSession((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reason:String(req.body?.reason||''),minutes:[15,30,60].includes(Number(req.body?.minutes))?Number(req.body.minutes) as 15|30|60:30,diagnosticBundle:req.body?.diagnosticBundle})})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUPPORT_SESSION_FAILED'})}
+  });
+  app.post('/api/owner/rescue-actions',ownerRateLimit,ownerOnly,(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    try{return res.json(repo.rescue((req as any).mizanIdentity,{action:String(req.body?.action||''),tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reason:String(req.body?.reason||''),idempotencyKey:req.body?.idempotencyKey?String(req.body.idempotencyKey):undefined}))}catch(err){const code=err instanceof Error?err.message:'RESCUE_ACTION_FAILED';return res.status(code==='INTEGRITY_PROTECTED_ACTION'?403:400).json({code})}
+  });
   app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/owner/tenants',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/owner/tenants/:orgId',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
