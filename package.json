@@ -15,6 +15,7 @@
     "secret-scan": "node scripts/scan-secrets.mjs",
     "source-audit": "node scripts/source-audit.mjs",
     "arabic-ui-audit": "node scripts/arabic-ui-audit.mjs",
+    "arabic:audit": "npm run arabic-ui-audit",
     "waqf:derive": "tsx scripts/kfgqpc-waqf-derive.ts",
     "quran:science-intake": "tsx scripts/kfgqpc-science-intake.ts",
     "quran:readiness": "tsx scripts/quran-intelligence-readiness.ts",
