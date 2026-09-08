@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import { createUserWithEmailAndPassword, deleteUser, sendPasswordResetEmail, signInWithEmailAndPassword, type User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, sendPasswordResetEmail, signInWithEmailAndPassword, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from '@firebase/auth';
 import { KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
@@ -16,6 +16,7 @@ export const AuthPortal:React.FC=()=>{
  const [existingMode,setExistingMode]=useState(false);
  const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [confirmPassword,setConfirmPassword]=useState('');
  const [busy,setBusy]=useState(false); const [message,setMessage]=useState('');
+ const [mfaResolver,setMfaResolver]=useState<MultiFactorResolver|null>(null); const [mfaCode,setMfaCode]=useState('');
 
  const AUTH_AR:Record<string,string>={
   'auth/invalid-credential':'بيانات الدخول غير صحيحة.',
@@ -63,6 +64,9 @@ export const AuthPortal:React.FC=()=>{
   }catch(e:unknown){
    const code=String((e as {code?:string;message?:string})?.code||'');
    const raw=String((e as Error)?.message||'');
+   if(code==='auth/multi-factor-auth-required'){
+    try{const resolver=getMultiFactorResolver(auth,e as Parameters<typeof getMultiFactorResolver>[1]);if(!resolver.hints.some(h=>h.factorId===TotpMultiFactorGenerator.FACTOR_ID)){setMessage(ar?'الحساب يتطلب عامل تحقق غير مدعوم في هذه الشاشة.':'This account requires an unsupported second factor.');return;}setMfaResolver(resolver);setMfaCode('');setPassword('');setMessage('');return;}catch{setMessage(ar?'تعذر بدء التحقق بخطوتين. أعد المحاولة.':'Could not start two-step verification. Try again.');return;}
+   }
    setMessage(ar?(AUTH_AR[code]||(raw.includes('ACTIVATION_')?`تعذر تفعيل الدعوة (${raw.split(':').pop()}).`:`تعذّر تسجيل الدخول (${code||'سبب غير معروف'}).`)):(code||raw||'Sign-in failed'));
   }finally{setBusy(false)}
  };
@@ -84,7 +88,11 @@ export const AuthPortal:React.FC=()=>{
   }finally{setBusy(false)}
  };
 
+ const finishMfaSignIn=async()=>{if(!mfaResolver)return;const clean=mfaCode.replace(/\s+/g,'');if(!/^\d{6}$/.test(clean)){setMessage(ar?'اكتب رمز Authenticator المكوّن من 6 أرقام.':'Enter the 6-digit Authenticator code.');return;}const hint=mfaResolver.hints.find(h=>h.factorId===TotpMultiFactorGenerator.FACTOR_ID);if(!hint){setMessage(ar?'عامل Authenticator غير موجود لهذا الحساب.':'No Authenticator factor is enrolled on this account.');return;}setBusy(true);setMessage('');try{const assertion=TotpMultiFactorGenerator.assertionForSignIn(hint.uid,clean);const cred=await mfaResolver.resolveSignIn(assertion);setMfaResolver(null);setMfaCode('');if(activationToken)await finishActivation(cred.user);}catch(e:unknown){const code=String((e as {code?:string})?.code||'');setMessage(code==='auth/invalid-verification-code'?(ar?'الرمز غير صحيح أو انتهت مدته. جرّب الرمز الحالي في التطبيق.':'The code is invalid or expired. Use the current code from your app.'):(ar?`تعذر إكمال التحقق (${code||'خطأ غير معروف'}).`:`Could not complete verification (${code||'unknown error'}).`));}finally{setBusy(false)}};
+
  const reset=async()=>{if(!email)return setMessage(ar?'أدخل البريد الإلكتروني أولًا':'Enter your email first');setBusy(true);try{await sendPasswordResetEmail(auth,email);setMessage(ar?'تم إرسال رابط استعادة كلمة المرور':'Reset link sent');}catch{setMessage(ar?'تعذر إرسال رابط الاستعادة':'Could not send reset link');}finally{setBusy(false)}};
+
+ if(mfaResolver)return <div className="min-h-screen bg-[#F8F5ED] grid place-items-center p-5" dir={ar?'rtl':'ltr'}><div className="w-full max-w-md"><div className="text-center"><div className="flex justify-center"><MizanLogo language={language}/></div><div className="mizan-kicker mt-7">{ar?'تحقق بخطوتين':'TWO-STEP VERIFICATION'}</div><h1 className="text-3xl font-black mt-2 text-[#17352D]">{ar?'رمز Authenticator':'Authenticator code'}</h1><p className="text-xs text-[#636864] mt-2 leading-6">{ar?'افتح Google Authenticator واكتب الرمز الحالي المكوّن من 6 أرقام.':'Open Google Authenticator and enter the current 6-digit code.'}</p></div><div className="mizan-surface p-6 mt-7"><label className="block"><span className="text-[10px] font-black text-[#646965]">{ar?'رمز التحقق':'Verification code'}</span><div className="relative mt-2"><KeyRound className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#6a6f6c]"/><input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e=>e.key==='Enter'&&void finishMfaSignIn()} className="w-full rounded-xl border border-[#ddd] ps-10 pe-3 py-3 text-center tracking-[0.3em] font-black" dir="ltr"/></div></label>{message&&<div className="mt-4 rounded-xl bg-[#f3f1eb] px-3 py-2.5 text-xs font-semibold">{message}</div>}<Button className="w-full mt-5" disabled={busy||mfaCode.length!==6} onClick={()=>void finishMfaSignIn()} icon={<ShieldCheck className="w-4 h-4"/>}>{busy?'…':ar?'تحقق وادخل':'Verify & sign in'}</Button><button type="button" onClick={()=>{setMfaResolver(null);setMfaCode('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{ar?'العودة لتسجيل الدخول':'Back to sign in'}</button></div></div></div>;
 
  const activating=Boolean(activationToken&&preview);
  const title=activating?(ar?'فعّل حسابك':'Activate your account'):(ar?'تسجيل الدخول':'Sign in');

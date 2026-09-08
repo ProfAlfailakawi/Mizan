@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
 
-// Small dependency-free QR Model 2 encoder for short MIZAN pass payloads.
-// It emits Version 4 / Error Correction L / byte mode (up to 78 UTF-8 bytes).
-// The implementation follows ISO/IEC 18004 layout, BCH format information and
-// Reed-Solomon ECC over GF(256). It is intentionally scoped to operational pass IDs.
+// Dependency-free QR Model 2 encoder for MIZAN operational payloads.
+// Version 4-L remains the compact default (78 UTF-8 bytes). Version 6-L is selected
+// automatically for longer local-only payloads such as TOTP otpauth URIs (134 bytes).
+// No QR payload ever leaves the browser.
 
-const VERSION=4;
-const SIZE=33;
-const DATA_CODEWORDS=80;
-const ECC_CODEWORDS=20;
+type QrConfig={version:4|6;size:number;dataCodewords:number;eccPerBlock:number;blockDataLengths:number[];alignmentCenters:number[];maxUtf8Bytes:number};
+const CONFIGS:QrConfig[]=[
+ {version:4,size:33,dataCodewords:80,eccPerBlock:20,blockDataLengths:[80],alignmentCenters:[6,26],maxUtf8Bytes:78},
+ {version:6,size:41,dataCodewords:136,eccPerBlock:18,blockDataLengths:[68,68],alignmentCenters:[6,34],maxUtf8Bytes:134},
+];
 const FORMAT_XOR=0x5412;
 const FORMAT_POLY=0x537;
 
@@ -22,18 +23,29 @@ function reedSolomon(data:number[],degree:number){const gen=generatorPolynomial(
 function bitLength(n:number){let d=0;while(n){d++;n>>>=1;}return d;}
 function bchFormat(data:number){let d=data<<10;while(bitLength(d)-bitLength(FORMAT_POLY)>=0)d^=FORMAT_POLY<<(bitLength(d)-bitLength(FORMAT_POLY));return ((data<<10)|d)^FORMAT_XOR;}
 
-function encodeData(text:string){const bytes=Array.from(new TextEncoder().encode(text));if(bytes.length>78)throw new Error('MIZAN pass payload exceeds QR v4-L capacity');const bits:number[]=[];const push=(value:number,count:number)=>{for(let i=count-1;i>=0;i--)bits.push((value>>>i)&1)};push(0b0100,4);push(bytes.length,8);bytes.forEach(b=>push(b,8));const maxBits=DATA_CODEWORDS*8;for(let i=0;i<4&&bits.length<maxBits;i++)bits.push(0);while(bits.length%8)bits.push(0);const out:number[]=[];for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|(bits[i+j]||0);out.push(b);}let pad=true;while(out.length<DATA_CODEWORDS){out.push(pad?0xec:0x11);pad=!pad;}return [...out,...reedSolomon(out,ECC_CODEWORDS)];}
+function configFor(text:string){const byteLength=new TextEncoder().encode(text).length;const config=CONFIGS.find(c=>byteLength<=c.maxUtf8Bytes);if(!config)throw new Error(`MIZAN QR payload exceeds ${CONFIGS.at(-1)!.maxUtf8Bytes} UTF-8 byte capacity`);return config;}
+
+function encodeData(text:string,config:QrConfig){
+ const bytes=Array.from(new TextEncoder().encode(text));const bits:number[]=[];const push=(value:number,count:number)=>{for(let i=count-1;i>=0;i--)bits.push((value>>>i)&1)};
+ push(0b0100,4);push(bytes.length,8);bytes.forEach(b=>push(b,8));const maxBits=config.dataCodewords*8;for(let i=0;i<4&&bits.length<maxBits;i++)bits.push(0);while(bits.length%8)bits.push(0);
+ const data:number[]=[];for(let i=0;i<bits.length;i+=8){let b=0;for(let j=0;j<8;j++)b=(b<<1)|(bits[i+j]||0);data.push(b);}let pad=true;while(data.length<config.dataCodewords){data.push(pad?0xec:0x11);pad=!pad;}
+ const blocks:number[][]=[];let offset=0;for(const length of config.blockDataLengths){blocks.push(data.slice(offset,offset+length));offset+=length;}if(offset!==data.length)throw new Error('MIZAN QR block configuration mismatch');
+ const ecc=blocks.map(block=>reedSolomon(block,config.eccPerBlock));const stream:number[]=[];const longest=Math.max(...blocks.map(b=>b.length));
+ for(let i=0;i<longest;i++)for(const block of blocks)if(i<block.length)stream.push(block[i]);
+ for(let i=0;i<config.eccPerBlock;i++)for(const block of ecc)stream.push(block[i]);
+ return stream;
+}
 
 type Cell=boolean|null;
 function mask0(row:number,col:number){return (row+col)%2===0;}
 export function createQrMatrix(text:string){
- const modules:Cell[][]=Array.from({length:SIZE},()=>Array<Cell>(SIZE).fill(null));
+ const config=configFor(text);const SIZE=config.size;const modules:Cell[][]=Array.from({length:SIZE},()=>Array<Cell>(SIZE).fill(null));
  const finder=(row:number,col:number)=>{for(let r=-1;r<=7;r++)for(let c=-1;c<=7;c++){const rr=row+r,cc=col+c;if(rr<0||rr>=SIZE||cc<0||cc>=SIZE)continue;const dark=r>=0&&r<=6&&c>=0&&c<=6&&(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4));modules[rr][cc]=dark;}};
  finder(0,0);finder(SIZE-7,0);finder(0,SIZE-7);
  for(let r=8;r<SIZE-8;r++)if(modules[r][6]===null)modules[r][6]=r%2===0;
  for(let c=8;c<SIZE-8;c++)if(modules[6][c]===null)modules[6][c]=c%2===0;
  const alignment=(row:number,col:number)=>{if(modules[row][col]!==null)return;for(let r=-2;r<=2;r++)for(let c=-2;c<=2;c++)modules[row+r][col+c]=Math.max(Math.abs(r),Math.abs(c))!==1;};
- alignment(26,26);
+ for(const row of config.alignmentCenters)for(const col of config.alignmentCenters)alignment(row,col);
  // Reserve and write 15-bit format information: EC level L (01), mask 0.
  const format=bchFormat((0b01<<3)|0);
  for(let i=0;i<15;i++){
@@ -42,13 +54,13 @@ export function createQrMatrix(text:string){
   if(i<8)modules[8][SIZE-i-1]=dark;else if(i<9)modules[8][15-i]=dark;else modules[8][15-i-1]=dark;
  }
  modules[SIZE-8][8]=true;
- const stream=encodeData(text);let byteIndex=0,bitIndex=7,row=SIZE-1,inc=-1;
+ const stream=encodeData(text,config);let byteIndex=0,bitIndex=7,row=SIZE-1,inc=-1;
  for(let col=SIZE-1;col>0;col-=2){if(col===6)col--;while(true){for(let c=0;c<2;c++){const cc=col-c;if(modules[row][cc]!==null)continue;let dark=false;if(byteIndex<stream.length)dark=((stream[byteIndex]>>>bitIndex)&1)===1;if(mask0(row,cc))dark=!dark;modules[row][cc]=dark;bitIndex--;if(bitIndex<0){byteIndex++;bitIndex=7;}}row+=inc;if(row<0||row>=SIZE){row-=inc;inc=-inc;break;}}}
  return modules.map(r=>r.map(v=>Boolean(v)));
 }
 
 export const RealQRCode:React.FC<{value:string;size?:number;label?:string;className?:string}>=({value,size=160,label='رمز مرور ميزان',className=''})=>{
- const matrix=useMemo(()=>createQrMatrix(value),[value]);const quiet=4;const total=SIZE+quiet*2;const path=useMemo(()=>{const parts:string[]=[];matrix.forEach((row,r)=>row.forEach((dark,c)=>{if(dark)parts.push(`M${c+quiet} ${r+quiet}h1v1h-1z`)}));return parts.join('');},[matrix]);
+ const matrix=useMemo(()=>createQrMatrix(value),[value]);const quiet=4;const total=matrix.length+quiet*2;const path=useMemo(()=>{const parts:string[]=[];matrix.forEach((row,r)=>row.forEach((dark,c)=>{if(dark)parts.push(`M${c+quiet} ${r+quiet}h1v1h-1z`)}));return parts.join('');},[matrix]);
  return <svg className={className} width={size} height={size} viewBox={`0 0 ${total} ${total}`} role="img" aria-label={label} shapeRendering="crispEdges"><rect width={total} height={total} fill="#fffefb"/><path d={path} fill="#17221e"/></svg>;
 };
 

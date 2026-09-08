@@ -11,6 +11,7 @@ import { ScientificGovernance } from './ScientificGovernance';
 import { TenantConsole } from './TenantConsole';
 import { TenantBrandStudio } from './TenantBrandStudio';
 import { IdentityGovernance } from './IdentityGovernance';
+import { TotpSecurityCard } from '../auth/TotpSecurity';
 import { RealQRCode } from '../design-system/RealQRCode';
 import { claimPrivacyLabel, featureLabel, federationClaimLabel, signatureAssuranceLabel, uiToken, localizedCountry, auditActionLabel, roleLabel } from '../../lib/ui-language';
 import { ContinuityRecovery } from '../operations/ContinuityRecovery';
@@ -27,6 +28,7 @@ export const SuperAdminConsole: React.FC = () => {
    </div>
    {(store.organization.subdomain||store.organization.customDomains?.length)&&<div className="mizan-surface px-4 py-3 text-[10px] text-[#59615c] font-mono break-all [overflow-wrap:anywhere]" dir="ltr" data-no-localize="true">{[store.organization.subdomain,...(store.organization.customDomains||[])].filter(Boolean).join(' · ')}</div>}
    <TenantConsole/>
+   <TotpSecurityCard/>
    <details className="mizan-surface p-5 sm:p-6"><summary className="cursor-pointer select-none list-none flex items-center justify-between gap-3"><div><div className="mizan-kicker">{ar?'الاعتماد العلمي':'SCIENTIFIC CERTIFICATION'}</div><h2 className="font-extrabold mt-1">{ar?'اعتماد المصدر القرآني':'Quran source certification'}</h2></div><span className="text-[11px] font-black text-[#656b66]">{ar?'سلطتك وحدك':'yours alone'}</span></summary><div className="mt-4"><ScientificGovernance/></div></details>
    <div className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'حوكمة الوحدات':'MODULE GOVERNANCE'}</div><div className="mt-4 grid sm:grid-cols-3 gap-2">{modules.map(key=>{const f=featureFlags.find(x=>x.organizationId===store.organization.id&&x.key===key);return <button key={key} onClick={()=>store.setFeatureFlag(key,!f?.enabled)} className={`rounded-xl border p-3 text-start ${f?.enabled?'bg-[#E7EEE9] border-[#cddbd3]':'bg-white border-[#e0ded7]'}`}><div className="text-xs font-black">{featureLabel(key,ar)}</div><div className="text-[10px] text-[#656b66] mt-1">{f?.enabled?(ar?'مفعّل':'Enabled'):(ar?'غير مفعّل':'Disabled')}</div></button>})}</div></div>
    <div className="mizan-surface p-5 sm:p-6"><div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'حوكمة السوبر أدمن':'Super Admin governance'}</h2></div><div className="mt-4 grid sm:grid-cols-3 gap-3 text-xs"><Guard text={ar?'لا تعديل سري للنتائج':'No silent result edits'}/><Guard text={ar?'كل دخول حساس مدقق':'Sensitive access audited'}/><Guard text={ar?'اعتماد المصدر موثق':'Source approval is auditable'}/></div><div className="mt-4 text-[10px] text-[#656b66]">{ar?`المسابقة الحالية: ${competition.nameArabic} · ${participants.length} مشارك`:`Current competition: ${competition.name} · ${participants.length} participants`}</div></div>
