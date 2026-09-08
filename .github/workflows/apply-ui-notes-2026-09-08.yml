@@ -38,6 +38,21 @@ jobs:
       - name: تطبيق الملاحظات
         run: python3 APPLY_UI_NOTES_2026_09_08.py
 
+      - name: إكمال نوع سياسة المسابقة
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/lib/store.ts')
+          s=p.read_text(encoding='utf-8')
+          old='  User,\n  Role,'
+          new='  User,\n  CompetitionPolicy,\n  Role,'
+          if old not in s and new not in s:
+              raise SystemExit('CompetitionPolicy import anchor missing')
+          if old in s:
+              s=s.replace(old,new,1)
+              p.write_text(s,encoding='utf-8')
+          PY
+
       - name: عرض التغييرات
         run: git status --short
 
