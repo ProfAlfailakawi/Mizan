@@ -4,7 +4,7 @@ import { auth } from './firebase';
 import { useAppStore } from './store';
 import { Role } from '../types';
 
-/** Roles MIZAN will admit. `scientific_admin` is intentionally retired. */
+/** Roles MIZAN will admit. Unknown or retired claims fail closed. */
 const ALLOWED_ROLES: Role[] = [
   'super_admin', 'org_admin', 'comp_admin', 'head_judge', 'judge',
   'ops_manager', 'exception_host', 'delegation_manager', 'participant', 'broadcast_operator',
@@ -125,7 +125,7 @@ export function useMizanAuth(requireAuth: boolean) {
         const { role, organizationId, competitionId, serverManaged } = resolved.identity;
 
         if (!ALLOWED_ROLES.includes(role) || !organizationId) {
-          // Includes retired scientific_admin claims: they must be reassigned, never silently remapped.
+          // Unknown or retired claims must be reassigned; they are never silently remapped.
           setAccessError('ACCOUNT_CLAIMS_REQUIRED'); setSignedIn(false); setAuthReady(true); return;
         }
 

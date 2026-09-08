@@ -23,7 +23,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  const approved=reveal?.approvals.some(a=>a.actorId===currentUser.id);
  const allowedRoles=reveal?.authorizedRoles||reveal?.requiredRoleGroups.flat()||[];
  const canApprove=allowedRoles.includes(currentUser.role)&&currentUser.role!=='super_admin'&&!approved&&reveal?.status!=='executed';
- const canExecute=reveal?.status==='ready'&&['broadcast_operator','comp_admin','org_admin','scientific_admin'].includes(currentUser.role)&&currentUser.role!=='super_admin';
+ const canExecute=reveal?.status==='ready'&&['head_judge','comp_admin','org_admin'].includes(currentUser.role)&&currentUser.role!=='super_admin';
  const request=async()=>{setBusy(true);try{await s.sealCeremonyVault()}finally{setBusy(false)}};
  const PrevIcon=ar?ChevronRight:ChevronLeft; const NextIcon=ar?ChevronLeft:ChevronRight;
 
@@ -38,7 +38,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
       <div className="text-5xl font-black tabular-nums mt-6"><Ratio value={reveal?.approvals.length||0} of={reveal?.authorizedRoles?.length||3}/></div>
       <div className="text-[10px] mizan-venue-muted mt-1">{ar?`${reveal?.minimumApprovals||2} موافقات مستقلة مطلوبة`:`${reveal?.minimumApprovals||2} independent approvals required`}</div>
       <div className="mt-6 grid grid-cols-3 gap-2 text-start">
-        <Approval ok={!!reveal?.approvals.some(a=>a.actorRole==='scientific_admin')} label={ar?'علمي':'Scientific'}/>
+        <Approval ok={!!reveal?.approvals.some(a=>a.actorRole==='head_judge')} label={ar?'رئيس التحكيم':'Head Judge'}/>
         <Approval ok={!!reveal?.approvals.some(a=>a.actorRole==='comp_admin')} label={ar?'المسابقة':'Competition'}/>
         <Approval ok={!!reveal?.approvals.some(a=>a.actorRole==='org_admin')} label={ar?'الجهة':'Organization'}/>
       </div>

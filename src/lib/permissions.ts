@@ -1,6 +1,5 @@
 import { Permission, Role } from '../types';
 
-/** scientific_admin is a retired legacy role and intentionally receives no active permissions. */
 const ROLE_PERMISSIONS: Partial<Record<Role, Permission[]>> = {
   super_admin: ['platform.manage','organization.manage','competition.create','competition.configure','participant.read','audit.read','identity.invite','identity.approve','identity.suspend','identity.audit'],
   org_admin: ['organization.manage','competition.create','competition.configure','competition.publish','participant.read','participant.edit','committee.manage','judge.manage','result.seal','result.publish','certificate.issue','audit.read','operations.manage','identity.invite','identity.approve','identity.suspend','identity.audit','participant.pass.reissue','session.recover','continuity.override'],

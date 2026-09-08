@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { IdentityGovernanceRepository } from '../server/identity-governance';
+import { IdentityGovernanceRepository, type GovernanceRole } from '../server/identity-governance';
 import { fullRetestApprovalAllowed } from '../src/lib/operational-integrity';
 
 const orgAdmin=(uid:string,organizationId='org-1',competitionId='comp-1')=>({uid,email:`${uid}@example.org`,role:'org_admin' as const,organizationId,competitionId});
@@ -69,7 +69,8 @@ test('remove user is audit-preserving soft deletion and revokes access',()=>with
 }));
 
 test('retired scientific admin cannot be provisioned as a new role',()=>withRepo(repo=>{
- assert.throws(()=>repo.createInvitation(orgAdmin('admin'),{email:'legacy@example.org',displayName:'Legacy role',requestedRole:'scientific_admin',competitionId:'comp-1',reason:'Legacy role attempt'}),/ROLE_RETIRED/);
+ const retiredRole='scientific_admin' as unknown as GovernanceRole; // intentional pre-upgrade/forged legacy input
+ assert.throws(()=>repo.createInvitation(orgAdmin('admin'),{email:'legacy@example.org',displayName:'Legacy role',requestedRole:retiredRole,competitionId:'comp-1',reason:'Legacy role attempt'}),/ROLE_RETIRED/);
 }));
 
 test('routine provisioning is direct while exceptional full retest still requires independent authority',()=>{

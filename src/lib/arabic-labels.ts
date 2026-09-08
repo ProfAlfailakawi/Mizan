@@ -8,7 +8,7 @@ const RAWI_AR:Record<string,string>={
 };
 const TARIQ_AR:Record<string,string>={'al-azraq':'طريق الأزرق','al-asbahani':'طريق الأصبهاني',pending:'يُحدد عند اعتماد الطريق'};
 const COUNTRY_AR:Record<string,string>={Kuwait:'الكويت','Saudi Arabia':'المملكة العربية السعودية',Qatar:'قطر',Bahrain:'البحرين',Oman:'عُمان','United Arab Emirates':'الإمارات العربية المتحدة',Egypt:'مصر',Jordan:'الأردن',Morocco:'المغرب',Algeria:'الجزائر',Tunisia:'تونس',Turkey:'تركيا',Indonesia:'إندونيسيا',Malaysia:'ماليزيا',Pakistan:'باكستان'};
-const ROLE_AR:Record<string,string>={super_admin:'مدير المنصة',org_admin:'مدير المؤسسة',comp_admin:'مدير المسابقة',scientific_admin:'المسؤول العلمي',head_judge:'رئيس التحكيم',judge:'المحكم',ops_manager:'مدير العمليات',operations:'العمليات',exception_host:'مكتب الاستثناءات',delegation_manager:'إدارة الوفد',participant:'المتسابق',broadcast_operator:'البث والحفل',auditor:'المدقق',guardian:'ولي الأمر',support_agent:'الدعم'};
+const ROLE_AR:Record<string,string>={super_admin:'مدير المنصة',org_admin:'مدير المؤسسة',comp_admin:'مدير المسابقة',head_judge:'رئيس التحكيم',judge:'المحكم',ops_manager:'مدير العمليات',operations:'العمليات',exception_host:'مكتب الاستثناءات',delegation_manager:'إدارة الوفد',participant:'المتسابق',broadcast_operator:'البث والحفل',auditor:'المدقق',guardian:'ولي الأمر',support_agent:'الدعم'};
 
 export function qiraahLabel(node:Pick<QiraatGraphNode,'qiraahId'|'qiraah'>,ar:boolean){return ar?(QIRAAH_AR[node.qiraahId]||node.qiraah):node.qiraah}
 export function rawiLabel(node:Pick<QiraatGraphNode,'rawiId'|'rawi'>,ar:boolean){return ar?(RAWI_AR[node.rawiId]||node.rawi):node.rawi}

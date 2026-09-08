@@ -34,7 +34,7 @@ const COUNTRY_EXACT:Record<string,string>=Object.fromEntries(COUNTRIES.map(c=>[c
 
 /* الأدوار ومصطلحات تشغيلية كانت تصل خامًا من بيانات محفوظة أو رؤوس أقسام. */
 const ROLE_EXACT:Record<string,string>={
-  super_admin:'إدارة المنصة', org_admin:'مدير الجهة', comp_admin:'مدير المسابقة', scientific_admin:'الإدارة العلمية',
+  super_admin:'إدارة المنصة', org_admin:'مدير الجهة', comp_admin:'مدير المسابقة',
   head_judge:'رئيس التحكيم', judge:'المحكم', ops_manager:'غرفة العمليات', exception_host:'مكتب الاستثناءات',
   delegation_manager:'إدارة الوفد', participant:'المتسابق', broadcast_operator:'البث والحفل', auditor:'المدقق',
   guardian:'ولي الأمر', support_agent:'الدعم',

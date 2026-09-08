@@ -4,7 +4,7 @@ import { VenueLockButton, VenueUnlockGuard, useVenueLockState } from './componen
 import { signOut } from 'firebase/auth';
 import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
-import { Header } from './components/layout/Header';
+import { Header, LiveSupportControl } from './components/layout/Header';
 import { useIdleSignOut } from './lib/useIdleSignOut';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { auth } from './lib/firebase';
@@ -262,6 +262,8 @@ export default function App() {
  return <div className="min-h-screen text-[#171b18] font-arabic">
   {idleWarnSeconds!==null&&<div className="fixed inset-x-0 top-0 z-[210] bg-[#8a4f45] text-white text-center text-xs font-black py-2 px-4">{language==='ar'?`ستُغلق الجلسة تلقائيًا خلال ${idleWarnSeconds} ثانية لعدم النشاط. حرّك الفأرة أو المس الشاشة للبقاء.`:`Signing out in ${idleWarnSeconds}s due to inactivity — move to stay.`}</div>}
   {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
+  {!isBroadcast&&<div className="lg:hidden"><LiveSupportControl floating/></div>}
+  {isBroadcast&&<LiveSupportControl floating/>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/>

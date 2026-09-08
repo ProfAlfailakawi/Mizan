@@ -114,6 +114,14 @@ export const SEED_USERS: User[] = [
     role: 'participant',
     organizationId: 'org-gqa-global',
     competitionId: 'comp-dubai-2027'
+  },
+  {
+    id: 'usr-org-admin-1',
+    name: 'MIZAN Demo Organization Admin',
+    nameArabic: 'أمين عام الجائزة',
+    email: 'organization.admin@award.gov',
+    role: 'org_admin',
+    organizationId: 'org-gqa-global'
   }
 ];
 
@@ -998,9 +1006,9 @@ export const SEED_AUDIT_LOGS: AuditEvent[] = [
     timestamp: '2027-02-11T09:12:30Z',
     organizationId: 'org-gqa-global',
     competitionId: 'comp-dubai-2027',
-    actorId: 'sys-fairdraw',
-    actorName: 'FairDraw Cryptographic Engine',
-    actorRole: 'scientific_admin',
+    actorId: 'usr-head-judge-1',
+    actorName: 'رئيس التحكيم التجريبي',
+    actorRole: 'head_judge',
     action: 'FAIRDRAW_GENERATED',
     entityType: 'TestSession',
     entityId: 'sess-part-104',
@@ -1175,7 +1183,7 @@ export const SEED_CONSENTS: ConsentRecord[] = [
 
 // إجراء نصاب مُنفَّذ لكشف الحفل — يتيح ظهور شاشة إعلان الفائزين في العرض بدل بوابة الختم.
 export const SEED_QUORUM_ACTIONS: QuorumActionRecord[] = [
-  { id: 'quorum-ceremony-1', competitionId: 'comp-dubai-2027', action: 'ceremony_reveal', entityId: 'comp-dubai-2027', requiredRoleGroups: [['scientific_admin'], ['comp_admin'], ['org_admin']], distinctActorsRequired: true, minimumApprovals: 2, authorizedRoles: ['scientific_admin', 'comp_admin', 'org_admin'], approvals: [ { actorId: 'usr-scientific-1', actorName: 'أ.د. عبدالله العلمي', actorRole: 'scientific_admin', approvedAt: '2027-02-14T18:00:00Z' }, { actorId: 'usr-comp-admin-1', actorName: 'مدير المسابقة التجريبي', actorRole: 'comp_admin', approvedAt: '2027-02-14T18:02:00Z' }, { actorId: 'usr-org-admin-1', actorName: 'أمين عام الجائزة', actorRole: 'org_admin', approvedAt: '2027-02-14T18:03:00Z' } ], status: 'executed', requestedAt: '2027-02-14T17:55:00Z', requestedBy: 'usr-comp-admin-1', executedAt: '2027-02-14T18:05:00Z', executedBy: 'usr-comp-admin-1', cryptographicAssurance: 'development_adapter', publicCommitmentHash: 'DEMO:CEREMONY-REVEAL-COMMIT' },
+  { id: 'quorum-ceremony-1', competitionId: 'comp-dubai-2027', action: 'ceremony_reveal', entityId: 'comp-dubai-2027', requiredRoleGroups: [['head_judge'], ['comp_admin'], ['org_admin']], distinctActorsRequired: true, minimumApprovals: 2, authorizedRoles: ['head_judge', 'comp_admin', 'org_admin'], approvals: [ { actorId: 'usr-head-judge-1', actorName: 'رئيس التحكيم التجريبي', actorRole: 'head_judge', approvedAt: '2027-02-14T18:00:00Z' }, { actorId: 'usr-comp-admin-1', actorName: 'مدير المسابقة التجريبي', actorRole: 'comp_admin', approvedAt: '2027-02-14T18:02:00Z' }, { actorId: 'usr-org-admin-1', actorName: 'أمين عام الجائزة', actorRole: 'org_admin', approvedAt: '2027-02-14T18:03:00Z' } ], status: 'executed', requestedAt: '2027-02-14T17:55:00Z', requestedBy: 'usr-comp-admin-1', executedAt: '2027-02-14T18:05:00Z', executedBy: 'usr-comp-admin-1', cryptographicAssurance: 'development_adapter', publicCommitmentHash: 'DEMO:CEREMONY-REVEAL-COMMIT' },
 ];
 
 // أعلام ميزات مُفعّلة — تُظهر بعض الوحدات مُشغّلة في لوحة المشرف الأعلى.

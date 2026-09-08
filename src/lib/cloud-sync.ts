@@ -35,10 +35,10 @@ const WRITERS: Record<SyncedCollection, Role[]> = {
   // النتيجة يكتبها من يملك ختم اللجنة، لا كل محكّم: أضيق صلاحية تُنجز العمل.
   results: [...ADMIN, 'head_judge'],
   certificates: [...ADMIN],
-  reviews: ['head_judge', 'scientific_admin'],
+  reviews: ['head_judge'],
   appeals: [...ADMIN, 'head_judge', 'participant', 'guardian', 'support_agent'],
-  audit: [...ADMIN, ...PANEL, 'scientific_admin', 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
-  quran_sources: [...ADMIN, 'scientific_admin'],
+  audit: [...ADMIN, ...PANEL, 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
+  quran_sources: ['super_admin'],
   session_checkpoints: [...ADMIN, ...PANEL, 'ops_manager'],
 };
 

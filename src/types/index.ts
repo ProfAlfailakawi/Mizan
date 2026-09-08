@@ -2,7 +2,6 @@ export type Role =
   | 'super_admin'
   | 'org_admin'
   | 'comp_admin'
-  | 'scientific_admin'
   | 'head_judge'
   | 'judge'
   | 'ops_manager'
@@ -695,7 +694,7 @@ export interface AppealPolicy {
   enabled: boolean;
   windowHours: number;
   grounds: string[];
-  reviewerRole: 'head_judge' | 'scientific_admin' | 'committee';
+  reviewerRole: 'head_judge' | 'committee';
   allowScoreChange: boolean;
 }
 
