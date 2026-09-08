@@ -43,3 +43,11 @@ test('Super Admin console exposes account security state after protected sign-in
  assert.ok(start>=0&&end>start);
  assert.match(portals.slice(start,end),/<TotpSecurityCard\/>/);
 });
+
+test('active TOTP MFA can be removed and regenerated for Apple or Android authenticator apps',()=>{
+ const security=source('src/components/auth/TotpSecurity.tsx');
+ assert.match(security,/multiFactor\(user\)\.unenroll\(totpFactor\)/);
+ assert.match(security,/حذف وتوليد QR جديد/);
+ assert.match(security,/iPhone أو Android/);
+ assert.match(security,/Scan the QR in an Authenticator app on Apple or Android/);
+});
