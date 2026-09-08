@@ -8,6 +8,13 @@ const base={aud:'mizan-prod',iss:'https://securetoken.google.com/mizan-prod',sub
 test('firebase MIZAN claims require correct tenant audience issuer and role scope',()=>{const id=validateFirebaseClaims(base,'mizan-prod',now);assert.equal(id.uid,'judge-1');assert.equal(id.role,'judge');assert.equal(id.organizationId,'org-1');assert.equal(id.competitionId,'comp-1');});
 test('expired or wrong-tenant Firebase claims are rejected',()=>{assert.throws(()=>validateFirebaseClaims({...base,exp:now-1},'mizan-prod',now),/EXPIRED/);assert.throws(()=>validateFirebaseClaims({...base,aud:'other'},'mizan-prod',now),/AUDIENCE/);assert.throws(()=>validateFirebaseClaims({...base,org_id:''},'mizan-prod',now),/CLAIMS_REQUIRED/);});
 
+test('platform super admin may be global while tenant roles still require org scope',()=>{
+ const owner=validateFirebaseClaims({...base,sub:'owner-1',role:'super_admin',org_id:''},'mizan-prod',now);
+ assert.equal(owner.role,'super_admin');
+ assert.equal(owner.organizationId,'__platform__');
+ assert.throws(()=>validateFirebaseClaims({...base,sub:'judge-no-org',role:'judge',org_id:''},'mizan-prod',now),/CLAIMS_REQUIRED/);
+});
+
 test('server-side MFA evidence is read from the verified Firebase token, not from client UI state',()=>{
  assert.equal(firebaseSecondFactorPresent({...base,firebase:{sign_in_second_factor:'totp'}}),true);
  assert.equal(firebaseSecondFactorPresent({...base,firebase:{}}),false);

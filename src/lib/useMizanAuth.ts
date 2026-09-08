@@ -11,7 +11,10 @@ const ALLOWED_ROLES: Role[] = [
   'auditor', 'guardian', 'support_agent',
 ];
 
-/** Tenant staff MFA is opt-in; the platform owner remains protected by default. */
+/** Platform owner is global; tenant-scoped roles still require a real organization id. */
+const PLATFORM_OWNER_ORGANIZATION_ID = '__platform__';
+
+/** Tenant staff MFA is opt-in. Owner MFA follows its dedicated flag when supplied, otherwise the shared bootstrap flag. */
 const OPTIONAL_STAFF_MFA_ROLES: Role[] = [
   'org_admin', 'comp_admin', 'head_judge', 'judge', 'auditor',
 ];
@@ -109,9 +112,11 @@ export function useMizanAuth(requireAuth: boolean) {
       if (!user) { setSignedIn(false); setAuthReady(true); return; }
       try {
         const token = await getIdTokenResult(user, true);
+        const claimRole = String(token.claims.role || '') as Role;
+        const claimedOrganizationId = String(token.claims.org_id || '');
         const claimIdentity: ResolvedIdentity = {
-          role: String(token.claims.role || '') as Role,
-          organizationId: String(token.claims.org_id || ''),
+          role: claimRole,
+          organizationId: claimedOrganizationId || (claimRole === 'super_admin' ? PLATFORM_OWNER_ORGANIZATION_ID : ''),
           competitionId: token.claims.competition_id ? String(token.claims.competition_id) : undefined,
           serverManaged: false,
         };
@@ -126,7 +131,10 @@ export function useMizanAuth(requireAuth: boolean) {
 
         const firebaseClaim = token.claims.firebase as Record<string, unknown> | undefined;
         const secondFactor = !!firebaseClaim?.sign_in_second_factor;
-        const ownerMfaRequired = import.meta.env.VITE_REQUIRE_MFA_FOR_SUPER_ADMIN !== 'false';
+        const ownerMfaSetting = import.meta.env.VITE_REQUIRE_MFA_FOR_SUPER_ADMIN;
+        const ownerMfaRequired = ownerMfaSetting === undefined
+          ? import.meta.env.VITE_REQUIRE_MFA_FOR_SENSITIVE === 'true'
+          : ownerMfaSetting === 'true';
         const staffMfaRequired = import.meta.env.VITE_REQUIRE_MFA_FOR_SENSITIVE === 'true';
         const mfaRequired = (role === 'super_admin' && ownerMfaRequired) || (staffMfaRequired && OPTIONAL_STAFF_MFA_ROLES.includes(role));
         if (mfaRequired && !secondFactor) { setAccessError('MFA_REQUIRED'); setSignedIn(false); setAuthReady(true); return; }

@@ -23,7 +23,7 @@ export function firebaseSecondFactorPresent(raw:Record<string,unknown>){
 }
 
 export function validateFirebaseClaims(payload:JwtPayload,projectId:string,nowSeconds=Math.floor(Date.now()/1000)):FirebaseVerifiedIdentity{
-  const base=validateFirebaseBaseClaims(payload,projectId,nowSeconds);const role=String(payload.role||''),organizationId=String(payload.org_id||'');
+  const base=validateFirebaseBaseClaims(payload,projectId,nowSeconds);const role=String(payload.role||''),claimedOrganizationId=String(payload.org_id||''),organizationId=claimedOrganizationId||(role==='super_admin'?'__platform__':'');
   if(!role||!organizationId)throw new Error('FIREBASE_MIZAN_CLAIMS_REQUIRED');
   return {...base,role,organizationId,competitionId:payload.competition_id?String(payload.competition_id):undefined};
 }
