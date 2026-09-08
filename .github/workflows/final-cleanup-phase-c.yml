@@ -1,0 +1,96 @@
+name: إكمال ميزان — المرحلة C النهائية
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py'
+      - '.github/workflows/final-cleanup-phase-c.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: mizan-final-cleanup-phase-c
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: جلب المصدر
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: إعداد Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت الاعتمادات
+        run: npm ci
+      - name: تطبيق الإكمال النهائي
+        run: python3 APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py
+      - name: تدقيق حذف الدور القديم من الأسطح النشطة
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Rsn --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' scientific_admin src server server.ts \
+             | grep -v '^server/identity-governance.ts:' \
+             | grep -v '^src/lib/store.ts:'; then
+            echo 'Unexpected active retired-role reference found.'
+            exit 1
+          fi
+          test "$(grep -o scientific_admin server/identity-governance.ts | wc -l)" -eq 1
+          test "$(grep -o scientific_admin src/lib/store.ts | wc -l)" -eq 1
+      - name: فحص الأنواع
+        run: npm run lint
+      - name: الاختبارات
+        run: npm test
+      - name: تدقيق المصدر والأسرار
+        run: npm run source-audit
+      - name: تدقيق العربية
+        run: npm run arabic-ui-audit
+      - name: البناء
+        run: npm run build
+      - name: حفظ الملفات الفعلية في main
+        id: persist
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGETS=(
+            src/types/index.ts
+            src/lib/permissions.ts
+            src/lib/useMizanAuth.ts
+            src/components/admin/CompetitionOverview.tsx
+            src/components/admin/IdentityGovernance.tsx
+            src/components/design-system/RoleSwitcher.tsx
+            src/lib/ui-language.ts
+            server/identity-governance.ts
+            server.ts
+            src/lib/store.ts
+            src/lib/seed-data.ts
+            tests/user-notes-2026-09-08.test.ts
+            tests/final-cleanup-phase-c.test.ts
+          )
+          git add -- "${TARGETS[@]}"
+          git rm -f -- APPLY_FINAL_CLEANUP_PHASE_C_2026_09_08.py .github/workflows/final-cleanup-phase-c.yml
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo 'main changed while final checks were running; refusing stale push.'
+            exit 1
+          fi
+          git config user.name 'MIZAN CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'refactor: retire legacy authority and finish product cleanup'
+          git push origin HEAD:main
+          echo 'materialized=1' >> "$GITHUB_OUTPUT"
+      - name: تشغيل الفحص النهائي
+        if: steps.persist.outputs.materialized == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main
