@@ -37,6 +37,9 @@ npm start
 
 See `PROJECT_STATUS.md` for the exact boundary between implemented code and deployment-time external dependencies.
 
+For multi-tenant licensing, operator administration, quota enforcement, and
+bring-your-own-storage deployment, see `SAAS_PLATFORM.md`.
+
 ## Product rule: no global competition law
 MIZAN provides configurable infrastructure, not one hard-coded competition format. Every competition has its own versioned policy and may differ in registration, eligibility, categories, question selection, panel structure, judge specialization, scoring, tie-breaks, appeals, result visibility, certificates, privacy and automation.
 

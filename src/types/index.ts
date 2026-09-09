@@ -1,6 +1,11 @@
 export type Role =
   | 'super_admin'
+  | 'operator_owner'
+  | 'operator_admin'
   | 'org_admin'
+  | 'storage_admin'
+  | 'billing_admin'
+  | 'branch_admin'
   | 'comp_admin'
   | 'head_judge'
   | 'judge'

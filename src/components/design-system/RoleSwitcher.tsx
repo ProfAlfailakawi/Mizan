@@ -7,7 +7,12 @@ type RoleMeta={ar:string;en:string;icon:React.ComponentType<{className?:string}>
 
 const ROLE_META: Partial<Record<Role,RoleMeta>> = {
   super_admin:{ar:'إدارة المنصة',en:'Super Admin',icon:Crown},
+  operator_owner:{ar:'مالك المشغّل',en:'Operator Owner',icon:Building2},
+  operator_admin:{ar:'مدير المشغّل',en:'Operator Admin',icon:ShieldCheck},
   org_admin:{ar:'مدير الجهة',en:'Organization Admin',icon:Building2},
+  storage_admin:{ar:'مدير التخزين',en:'Storage Admin',icon:FileSearch},
+  billing_admin:{ar:'مدير الفوترة',en:'Billing Admin',icon:FileSearch},
+  branch_admin:{ar:'مدير الفرع',en:'Branch Admin',icon:Building2},
   comp_admin:{ar:'مدير المسابقة',en:'Competition Admin',icon:ShieldCheck},
   head_judge:{ar:'رئيس التحكيم',en:'Head Judge',icon:Gavel},
   judge:{ar:'محكم',en:'Judge',icon:Headphones},

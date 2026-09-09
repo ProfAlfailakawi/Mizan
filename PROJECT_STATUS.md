@@ -1,5 +1,22 @@
 # MIZAN — Implementation Status
 
+## 2026-09-09 — multi-tenant SaaS control plane
+
+- Added durable organizations, immutable license identities, configurable plans,
+  operator accounts, transactional license-credit accounting, and legacy-tenant
+  migration.
+- Added server-enforced active-competition, annual-participant, and storage
+  quotas with reservation-safe uploads and tenant-prefixed object keys.
+- Added super-admin, operator, and organization commercial workspaces in Arabic
+  and English, including legal-identity change approval and real persisted usage
+  summaries.
+- Added encrypted external-storage secret references, mandatory upload/read/delete
+  connection probes, retain-source migrations, and hash-chained audit history.
+- Added least-privilege commercial roles and claim-derived tenant/operator scope.
+- Provider-specific cloud storage adapters remain deployment-bound; the product
+  reports them as unconfigured until a real adapter and credentials pass the
+  connection probe. See `SAAS_PLATFORM.md`.
+
 ## Current local build
 This repository implements the end-to-end product skeleton and executable workflows locally. It is **not deployed** and nothing in this package was uploaded to a cloud environment as part of this revision.
 

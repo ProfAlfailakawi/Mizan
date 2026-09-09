@@ -4,7 +4,7 @@ import path from 'path';
 
 /** Active identity roles. Legacy persisted authority is handled only by the migration guard below. */
 export type GovernanceRole=
-  | 'super_admin'|'org_admin'|'comp_admin'|'head_judge'|'judge'
+  | 'super_admin'|'operator_owner'|'operator_admin'|'org_admin'|'storage_admin'|'billing_admin'|'branch_admin'|'comp_admin'|'head_judge'|'judge'
   | 'ops_manager'|'exception_host'|'delegation_manager'|'participant'
   | 'broadcast_operator'|'auditor'|'guardian'|'support_agent';
 export type ServerIdentity={uid:string;email?:string;role:GovernanceRole;organizationId:string;competitionId?:string};
@@ -22,9 +22,9 @@ const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
 const NON_PROVISIONABLE_SELF_SERVICE_ROLES=new Set<string>(['participant','guardian']);
 const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_ROLE;
 const isProvisionableGovernanceRole=(role:unknown):role is GovernanceRole=>!isRetiredIdentityRole(role)&&!NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(role||''));
-const PRIVILEGED_SESSION=new Set<GovernanceRole>(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
-const SESSION_REVOKERS=new Set<GovernanceRole>(['super_admin','org_admin','comp_admin','head_judge']);
-const ARCHIVE_VISIBILITY_ROLES=new Set<GovernanceRole>(['super_admin','org_admin','auditor']);
+const PRIVILEGED_SESSION=new Set<GovernanceRole>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','auditor']);
+const SESSION_REVOKERS=new Set<GovernanceRole>(['super_admin','operator_owner','org_admin','comp_admin','head_judge']);
+const ARCHIVE_VISIBILITY_ROLES=new Set<GovernanceRole>(['super_admin','operator_owner','operator_admin','org_admin','auditor']);
 
 /**
  * Delegated trust chain:
@@ -33,7 +33,8 @@ const ARCHIVE_VISIBILITY_ROLES=new Set<GovernanceRole>(['super_admin','org_admin
  */
 const GRANT_MATRIX:Record<string,GovernanceRole[]>={
   super_admin:['org_admin','support_agent'],
-  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor'],
+  operator_owner:['operator_admin','org_admin'],
+  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','storage_admin','billing_admin','branch_admin'],
   comp_admin:['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator'],
 };
 
@@ -68,7 +69,7 @@ export class IdentityGovernanceRepository{
     const row:AuditRow={...base,hash:hash(`${previousHash}|${canonical(base)}`)};
     fs.appendFileSync(auditFile,JSON.stringify(row)+'\n',{encoding:'utf8',mode:0o600});return row;
   }
-  private canGrant(actor:ServerIdentity,target:GovernanceRole){return isProvisionableGovernanceRole(target)&&(GRANT_MATRIX[actor.role]||[]).includes(target)}
+  private canGrant(actor:ServerIdentity,target:GovernanceRole){return isProvisionableGovernanceRole(target)&&((actor.role==='super_admin'&&target==='operator_owner')||(GRANT_MATRIX[actor.role]||[]).includes(target))}
   private isSuperAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='super_admin'&&g.status==='ACTIVE')}
   private isOrgAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='org_admin'&&g.status==='ACTIVE')}
   private assertOrgAdminContinuity(s:State,grant:Grant){

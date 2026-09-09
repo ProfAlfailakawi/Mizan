@@ -12,7 +12,8 @@ const AR_TOKENS:Record<string,string>={
   live:'قائمة الآن', upcoming:'قادمة', archived:'مؤرشفة',
   autopilot:'تشغيل ذاتي', assisted:'مساعَد', manual:'يدوي', supervised:'تحت إشراف',
   /* أدوار الفاعلين في دفتر التدقيق. */
-  super_admin:'إدارة المنصة', org_admin:'مدير الجهة', comp_admin:'مدير المسابقة',
+  super_admin:'إدارة المنصة', operator_owner:'مالك المشغّل', operator_admin:'مدير المشغّل',
+  org_admin:'مدير الجهة', storage_admin:'مدير التخزين', billing_admin:'مدير الفوترة', branch_admin:'مدير الفرع', comp_admin:'مدير المسابقة',
   head_judge:'رئيس التحكيم', judge:'محكم', ops_manager:'مدير التشغيل', exception_host:'مكتب الاستثناء',
   delegation_manager:'مندوب الوفد', participant:'متسابق', broadcast_operator:'البث والحفل', auditor:'مدقق',
   guardian:'ولي الأمر', support_agent:'الدعم',

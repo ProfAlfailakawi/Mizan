@@ -10,13 +10,14 @@ const ALLOWED_ROLES: Role[] = [
   'ops_manager', 'exception_host', 'delegation_manager', 'participant', 'broadcast_operator',
   'auditor', 'guardian', 'support_agent',
 ];
+const COMMERCIAL_ROLES: Role[]=['operator_owner','operator_admin','storage_admin','billing_admin','branch_admin'];
 
 /** Platform owner is global; tenant-scoped roles still require a real organization id. */
 const PLATFORM_OWNER_ORGANIZATION_ID = '__platform__';
 
 /** Tenant staff MFA is opt-in. Owner MFA follows its dedicated flag when supplied, otherwise the shared bootstrap flag. */
 const OPTIONAL_STAFF_MFA_ROLES: Role[] = [
-  'org_admin', 'comp_admin', 'head_judge', 'judge', 'auditor',
+  'operator_owner', 'operator_admin', 'org_admin', 'storage_admin', 'billing_admin', 'branch_admin', 'comp_admin', 'head_judge', 'judge', 'auditor',
 ];
 
 export type MizanAccessError =
@@ -124,7 +125,7 @@ export function useMizanAuth(requireAuth: boolean) {
         if ('error' in resolved) { setAccessError(resolved.error); setSignedIn(false); setAuthReady(true); return; }
         const { role, organizationId, competitionId, serverManaged } = resolved.identity;
 
-        if (!ALLOWED_ROLES.includes(role) || !organizationId) {
+        if (![...ALLOWED_ROLES,...COMMERCIAL_ROLES].includes(role) || !organizationId) {
           // Unknown or retired claims must be reassigned; they are never silently remapped.
           setAccessError('ACCOUNT_CLAIMS_REQUIRED'); setSignedIn(false); setAuthReady(true); return;
         }
