@@ -29,7 +29,22 @@ test('owner can edit an unused plan and delete it, while licensed plans are prot
  const used=repo.seedInitialPlan(owner);
  repo.createOrganization(owner,{officialName:'Licensed',shortName:'L',organizationType:'charity',country:'KW',planId:used.id,...dates});
  assert.throws(()=>repo.deletePlan(owner,used.id),/PLAN_IN_USE/);
-}));
+	}));
+
+test('owner can edit and safely delete organizations',withRepo((repo)=>{
+ const basic=repo.seedInitialPlan(owner);
+ const premium=repo.upsertPlan(owner,{name:'Premium',currency:'KWD',priceMinor:500,limits:{licensedOrganizations:1,activeCompetitions:5,annualParticipants:5000,storageBytes:20*1024**3,branches:5}});
+ const cleanOrg=repo.createOrganization(owner,{officialName:'Clean Org',shortName:'Clean',organizationType:'charity',country:'KW',planId:basic.id,...dates}).organization;
+ const updated=repo.updateOrganization(owner,cleanOrg.id,{officialName:'Updated Org',shortName:'Updated',country:'SA',planId:premium.id,status:'suspended',licenseStatus:'grace_period',startsAt:'2026-02-01',expiresAt:'2027-02-01'});
+ assert.equal(updated.organization.officialName,'Updated Org');
+ assert.equal(updated.organization.status,'suspended');
+ assert.equal(updated.license.planId,premium.id);
+ assert.equal(updated.license.status,'grace_period');
+ assert.equal(repo.deleteOrganization(owner,cleanOrg.id).id,cleanOrg.id);
+ const usedOrg=repo.createOrganization(owner,{officialName:'Used Org',shortName:'Used',organizationType:'charity',country:'KW',planId:basic.id,...dates}).organization;
+ repo.setCompetitionState(owner,{organizationId:usedOrg.id,competitionId:'live',state:'registration_open'});
+ assert.throws(()=>repo.deleteOrganization(owner,usedOrg.id),/ORGANIZATION_HAS_RECORDS/);
+	}));
 
 test('legal identity is locked behind an audited change request',withRepo((repo)=>{
  const plan=repo.seedInitialPlan(owner);
