@@ -1,5 +1,5 @@
 import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
-import { sourceUsableForCompetition, certifiedCapabilityFor } from './scientific-core';
+import { sourceUsableForCompetition, certifiedCapabilityFor, isKfgqpcOfficialReading } from './scientific-core';
 
 export type PreflightStatus='ready'|'warning'|'blocker';
 export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'scientific'|'field'|'integrations'|'backup'|'none'}
@@ -10,7 +10,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
  const configured=(kind:IntegrationConfig['kind'])=>integrations.some(i=>i.kind===kind&&i.enabled&&i.status==='configured');
  const check=(id:string,ok:boolean,warning:boolean,labelAr:string,labelEn:string,consequenceAr:string,consequenceEn:string,fix:PreflightCheck['fix']):PreflightCheck=>({id,labelAr,labelEn,consequenceAr,consequenceEn,status:ok?'ready':warning?'warning':'blocker',fix});
  const readyJudges=judges.filter(j=>j.isReady);
- const categoriesWithSource=c.categories.filter(cat=>quranSources.some(source=>sourceUsableForCompetition(source,{riwaya:cat.riwaya}).ok)).length;
+ const categoriesWithSource=c.categories.filter(cat=>isKfgqpcOfficialReading({riwaya:cat.riwaya})||quranSources.some(source=>sourceUsableForCompetition(source,{riwaya:cat.riwaya}).ok)).length;
  const exactQuranSourceReady=c.categories.length>0&&categoriesWithSource===c.categories.length;
  const aiEnabled=p.aiPolicy?.mode&&p.aiPolicy.mode!=='AI_DISABLED';
  const aiScopeOk=!aiEnabled||c.categories.every(cat=>!p.aiPolicy.enabledCapabilities.word_alignment||!!certifiedCapabilityFor(aiValidations,{capability:'word_alignment',riwaya:cat.riwaya}));
@@ -26,7 +26,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
   check('policy',!!p.version,false,'لائحة المسابقة','Competition policy','لا يمكن تشغيل مسابقة بلا نسخة قواعد محددة.','A competition cannot run without a defined policy version.','competition_dna'),
   check('registration',p.registration.fields.some(f=>f.visible&&f.required),!live,'التسجيل','Registration','قد تصل طلبات ناقصة أو غير قابلة للتحقق.','Registrations may arrive without required verifiable data.','competition_dna'),
   check('categories',c.categories.length>0,false,'الفئات','Categories','لا يمكن توجيه أو تحكيم المشاركين.','Participants cannot be routed or judged.','competition_dna'),
-  check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','المصدر القرآني لهذه الفئة غير معتمد بعد من الإدارة العلمية.','The Quran source for this category is not yet certified by scientific governance.','scientific'),
+  check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','لا يوجد لهذه الفئة مصدر قرآني رسمي أو مصدر داخلي معتمد مطابق للرواية.','No official or internally certified Quran source matches this category reading.','scientific'),
   check('fairdraw',p.questions.questionsPerParticipant>0&&p.questions.difficultyTolerance>=0,false,'FairDraw','FairDraw','السحب لا يملك قيودًا صالحة.','The draw has invalid fairness constraints.','competition_dna'),
   check('question_escrow',serverEscrowReady,!live,'حجز السؤال خارج جهاز المحكم','Server-held question escrow','بوابة اللجنة تمنع الكشف المبكر تشغيليًا، لكن السؤال ما زال يحتاج حجزًا خادميًا حتى لا يمكن استخراجه من جهاز المحكم قبل النصاب.','The panel gate blocks early operational reveal, but true anti-leak security requires the question plaintext to remain server-held until quorum.','none'),
   check('ai_scope',aiScopeOk,true,'نطاق الذكاء الاصطناعي','AI scope','قدرة الذكاء الاصطناعي غير معتمدة لكل رواية مطلوبة؛ التحكيم البشري يبقى يعمل بالكامل.','An AI capability is not certified for every required reading; human judging remains fully operational.','scientific'),

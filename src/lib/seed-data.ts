@@ -1157,12 +1157,8 @@ export const SEED_IDENTITY_INVITATIONS: IdentityInvitationRecord[] = [
   { id: 'inv-2', email: 'panel.auditor@awqaf.example', displayName: 'الأستاذة هدى الصباح', organizationId: 'org-gqa-global', requestedRole: 'auditor', competitionId: 'comp-dubai-2027', status: 'PENDING_APPROVAL', createdAt: '2027-02-09T11:00:00Z', createdBy: 'seed', expiresAt: '2027-02-16T11:00:00Z' },
 ];
 
-// سجلات سفر الوفود — تُظهر قائمة بوابة الوفود ومؤشّر الوصول.
-export const SEED_TRAVEL_RECORDS: DelegationTravelRecord[] = [
-  { id: 'trv-1', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-105', flightNumber: 'KU671', arrivalAirport: 'DXB', arrivalAt: '2027-02-10T14:20:00Z', hotel: 'Grand Auditorium Hotel', room: '512', transportStatus: 'completed', companionCount: 1 },
-  { id: 'trv-2', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-106', flightNumber: 'RJ180', arrivalAirport: 'DXB', arrivalAt: '2027-02-10T16:45:00Z', hotel: 'Grand Auditorium Hotel', room: '514', transportStatus: 'scheduled', companionCount: 2 },
-  { id: 'trv-3', competitionId: 'comp-dubai-2027', delegationId: 'delegation-current', participantId: 'part-107', transportStatus: 'pending', companionCount: 0, notes: 'بانتظار تأكيد الرحلة.' },
-];
+// سجلات السفر لا تُزرع إطلاقًا: بوابة الوفود تعرض فقط ما أدخله المستخدم فعليًا.
+export const SEED_TRAVEL_RECORDS: DelegationTravelRecord[] = [];
 
 // شهادات اتحادية (Federation) — ادعاءات موثّقة بلا كشف بيانات.
 export const SEED_FEDERATION_ATTESTATIONS: FederationAttestationRecord[] = [

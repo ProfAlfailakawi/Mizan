@@ -132,7 +132,7 @@ declare module 'lucide-react' {
  export const Siren: any;
 }
 declare module 'firebase/app' { export const initializeApp:any; export const getApps:any; export const getApp:any; }
-declare module 'firebase/firestore' { export type Firestore=any; export const getFirestore:any; export const doc:any; export const setDoc:any; export const onSnapshot:any; export const collection:any; }
+declare module 'firebase/firestore' { export type Firestore=any; export const getFirestore:any; export const doc:any; export const getDoc:any; export const setDoc:any; export const onSnapshot:any; export const collection:any; }
 declare module 'firebase/auth' { export type User=any; export const getAuth:any; export const onAuthStateChanged:any; export const getIdTokenResult:any; export const signOut:any; export const signInWithEmailAndPassword:any; export const sendPasswordResetEmail:any; export const createUserWithEmailAndPassword:any; export const deleteUser:any; }
 declare module 'express' { const express:any; export default express; export type RequestHandler=any; }
 declare module 'path' { const path:any; export default path; }

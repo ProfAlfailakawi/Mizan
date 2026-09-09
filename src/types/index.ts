@@ -187,6 +187,10 @@ export interface Category {
    * المطلوب — فيقع التظليل على ذلك الجزء وحده. تقدير تقريبي لأن أطوال الآيات تختلف.
    */
   pagePortion?: 'full' | 'half' | 'third' | 'quarter';
+  /** طريقة قياس طول مقطع السؤال في واجهة مدير الجهة. */
+  passageMode?: 'ayat' | 'page_quarters';
+  /** عدد أرباع الوجه؛ 1=¼، 2=½، 3=¾، 4=وجه، 5=وجه وربع... */
+  pageQuarterUnits?: number;
 }
 
 export interface Competition {

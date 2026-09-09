@@ -72,7 +72,7 @@ import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
 import { can } from './permissions';
-import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, detectModelChange, explicitConsentGranted } from './scientific-core';
+import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isKfgqpcOfficialReading, detectModelChange, explicitConsentGranted } from './scientific-core';
 import { compilePolicyText, detectContradictions, policyCompilerSummary, applyApprovedCompilation } from './policy-compiler';
 import { validateVerseStructure, compareQuranRows, type QuranVerseRecord } from './quran-source-ingestion';
 import { buildJudgeIndependenceCommitment, buildParticipantFairnessEvidence, questionRevealReady, planQueueTransfer, queueOrderValue, recommendBalancedQueueMove } from './judging-integrity';
@@ -105,7 +105,7 @@ function hydrateSavedState(parsed: AppStoreState): AppStoreState {
       parsed.appeals = parsed.appeals || [];
       parsed.sealApprovals = parsed.sealApprovals || [];
       parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
-      parsed.travelRecords = parsed.travelRecords || []; parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
+      parsed.travelRecords = (parsed.travelRecords || []).filter(r=>!['trv-1','trv-2','trv-3'].includes(r.id)&&r.flightNumber!=='MZ 417'); parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
       parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
       parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||[]; parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})); parsed.roleGrants=parsed.roleGrants||SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})); parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||[]; parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
   // Preserve history, revoke authority: no legacy role is remapped to an active role.
@@ -242,6 +242,12 @@ function getInitialState(): AppStoreState {
 }
 
 let globalState = getInitialState();
+
+function markCompetitionConfigChanged(){
+  const now=new Date().toISOString();
+  globalState.competitionConfigUpdatedAt=now;
+  return now;
+}
 let browserMeshAdapter: MeshTransportAdapter | null = null;
 const productionMode = import.meta.env.PROD === true;
 
@@ -390,14 +396,18 @@ function syncToFirestore() {
       const { db, doc, setDoc } = await getFirestoreClient();
       const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
       // إعداد المسابقة وحده. السجلات تعيش في مجموعاتها الفرعية.
+      const updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString();
       const configuration = {
         competition: globalState.competition,
         judges: globalState.judges,
         emergencyFrozen: globalState.emergencyFrozen,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       };
       if (exceedsSafeDocumentSize(configuration)) { reportCloudError('CLOUD_PAYLOAD_TOO_LARGE', 'competition'); return; }
       await setDoc(docRef, configuration, { merge: true });
+      // نسخة عامة محدودة بالإعداد فقط: تجعل رابط التسجيل المباشر يعمل على جهاز لم يفتح لوحة الإدارة من قبل.
+      const publicRef=doc(db,'public_competitions',globalState.competition.id);
+      await setDoc(publicRef,{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       if (globalState.persistenceError && globalState.persistenceError.code.startsWith('CLOUD_')) clearCloudError();
     } catch (err) {
       reportCloudError(classifyCloudError(err), 'competition');
@@ -478,7 +488,15 @@ export function useAppStore() {
         const data = snapshot.data(); if (!data) return;
         let changed = false;
         if (data.emergencyFrozen !== undefined && data.emergencyFrozen !== globalState.emergencyFrozen) { globalState.emergencyFrozen = data.emergencyFrozen; changed = true; }
-        if (data.competition) { globalState.competition = { ...globalState.competition, ...data.competition, policy: getCompetitionPolicy({ ...globalState.competition, ...data.competition }) }; changed = true; }
+        if (data.competition) {
+          const remoteUpdatedAt=typeof data.updatedAt==='string'?Date.parse(data.updatedAt):0;
+          const localUpdatedAt=globalState.competitionConfigUpdatedAt?Date.parse(globalState.competitionConfigUpdatedAt):0;
+          if(!localUpdatedAt||!remoteUpdatedAt||remoteUpdatedAt>=localUpdatedAt){
+            globalState.competition = { ...globalState.competition, ...data.competition, policy: getCompetitionPolicy({ ...globalState.competition, ...data.competition }) };
+            if(typeof data.updatedAt==='string')globalState.competitionConfigUpdatedAt=data.updatedAt;
+            changed = true;
+          }
+        }
         if (Array.isArray(data.judges)) { globalState.judges = data.judges; changed = true; }
         if (changed) notify();
       }));
@@ -1219,6 +1237,23 @@ export function useAppStore() {
     notify(); return true;
   };
 
+  const loadPublicCompetition = async (competitionId:string) => {
+    try{
+      const {db,doc,getDoc}=await getFirestoreClient();
+      const snap=await getDoc(doc(db,'public_competitions',competitionId));
+      if(!snap.exists())return false;
+      const data=snap.data() as {competition?:Competition;updatedAt?:string};
+      if(!data.competition||data.competition.id!==competitionId)return false;
+      const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
+      globalState.competition=target;
+      const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+      globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+      if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
+      persistLocalSnapshot();listeners.forEach(l=>l());
+      return true;
+    }catch(err){console.warn('Public competition load failed:',err);return false}
+  };
+
   const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {
     if (globalState.currentUser.role !== 'super_admin') return null;
     const org:Organization={id:newId('org'),name:nameEnglish,nameArabic,code:(code||nameEnglish.slice(0,4)).toUpperCase(),brand:{name:nameEnglish,nameArabic,primaryColor:'#214C40',accentColor:'#2F6555',certificateTheme:'quiet_authority'},plan:'enterprise',dataResidency:'configurable',status:'active',createdAt:new Date().toISOString()};
@@ -1323,12 +1358,12 @@ export function useAppStore() {
     delete (base as any).policy;
     globalState.competitions = [base, ...globalState.competitions];
     globalState.competition = base;
-    notify(); return base;
+    markCompetitionConfigChanged(); notify(); return base;
   };
 
   const applyTemplate = (templateId: string) => {
     globalState.competition = applyCompetitionTemplate(globalState.competition, templateId);
-    notify();
+    markCompetitionConfigChanged(); notify();
   };
 
   const updateCompetitionPolicy = (updater: (policy: ReturnType<typeof getCompetitionPolicy>) => ReturnType<typeof getCompetitionPolicy>) => {
@@ -1338,7 +1373,7 @@ export function useAppStore() {
     next.version = current.version === next.version ? `${current.version.split('.')[0]}.${Number(current.version.split('.')[1] || 0) + 1}.0` : next.version;
     next.updatedAt = new Date().toISOString();
     globalState.competition = { ...globalState.competition, policy: next };
-    notify();
+    markCompetitionConfigChanged(); notify();
     return true;
   };
 
@@ -1346,7 +1381,7 @@ export function useAppStore() {
     if (globalState.competition.ruleSet.frozenAt || getCompetitionPolicy(globalState.competition).frozenAt) return false;
     const next = { ...globalState.competition.ruleSet, ...patch, version: `${globalState.competition.ruleSet.version}-rev` };
     globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, ...(globalState.competition.ruleSets || []).filter(r => r.id !== next.id)] };
-    notify();
+    markCompetitionConfigChanged(); notify();
     return true;
   };
 
@@ -1354,7 +1389,7 @@ export function useAppStore() {
 
   const updateCompetitionDetails = (patch: Partial<Competition>) => {
     globalState.competition = { ...globalState.competition, ...patch };
-    notify();
+    markCompetitionConfigChanged(); notify();
   };
 
   const addCategory = (initial?: Partial<Category>) => {
@@ -1366,18 +1401,18 @@ export function useAppStore() {
       ...(initial || {})
     };
     globalState.competition = { ...globalState.competition, categories:[...globalState.competition.categories, category] };
-    notify(); return category;
+    markCompetitionConfigChanged(); notify(); return category;
   };
 
   const updateCategory = (categoryId: string, patch: Partial<Category>) => {
     globalState.competition = { ...globalState.competition, categories:globalState.competition.categories.map(c=>c.id===categoryId?{...c,...patch}:c) };
-    notify();
+    markCompetitionConfigChanged(); notify();
   };
 
   const removeCategory = (categoryId: string) => {
     if (globalState.participants.some(p=>p.categoryId===categoryId)) return false;
     globalState.competition = { ...globalState.competition, categories:globalState.competition.categories.filter(c=>c.id!==categoryId) };
-    notify(); return true;
+    markCompetitionConfigChanged(); notify(); return true;
   };
 
   const addCommittee = () => {
@@ -1409,17 +1444,18 @@ export function useAppStore() {
     const scientificBlockers=scientific.flatMap(({category,reading,source,content})=>{
       const out:{code:string;message:string;categoryId:string}[]=[];
       if(!reading)out.push({code:'CANONICAL_READING_MAPPING_REQUIRED',message:`${category.name}: reading is not mapped to the canonical qiraat graph.`,categoryId:category.id});
-      if(!source)out.push({code:'CERTIFIED_QURAN_SOURCE_REQUIRED',message:`${category.name}: no exact certified Quran source for ${category.riwaya}.`,categoryId:category.id});
-      if(source&&!content)out.push({code:'CERTIFIED_QURAN_CONTENT_REQUIRED',message:`${category.name}: certified source content is not available for exact package ${source.packageHash||source.id}.`,categoryId:category.id});
+      if(!source&&!isKfgqpcOfficialReading({riwaya:category.riwaya}))out.push({code:'CERTIFIED_QURAN_SOURCE_REQUIRED',message:`${category.name}: no official or internally certified Quran source for ${category.riwaya}.`,categoryId:category.id});
+      // فتح التسجيل لا يحتاج نص السؤال على جهاز الإدارة. توفر محتوى الحزمة يُفحص قبل FairDraw/جلسة التحكيم.
+      if(source&&!content&&globalState.competition.status==='live')out.push({code:'CERTIFIED_QURAN_CONTENT_REQUIRED',message:`${category.name}: certified source content is not available for exact package ${source.packageHash||source.id}.`,categoryId:category.id});
       return out;
     });
     const blockers=contradictions.filter(x=>x.severity==='BLOCKER');
-    const secureRevealRequiresServerEscrow=getCompetitionPolicy(globalState.competition).questions.secureReveal?.requireParticipantPresence!==false;
-    if(productionMode&&secureRevealRequiresServerEscrow)scientificBlockers.push({code:'SERVER_QUESTION_ESCROW_REQUIRED',message:'Secure question reveal is configured, but this build only provides an operational panel gate. Production requires server-held question plaintext until participant presence and judge quorum.',categoryId:'competition'});
-    // In production, a competition cannot open as official without exact source content. Development remains usable but visibly non-official.
+    // فتح التسجيل مرحلة قبول طلبات، وليس كشف أسئلة. حجز السؤال الخادمي ومحتوى الحزمة
+    // يبقيان بوابتين صارمتين قبل التشغيل الحي، ولا يمنعان نشر نموذج التسجيل.
     if(issues.length||blockers.length||(productionMode&&scientificBlockers.length)) return {ok:false,issues:[...issues,...blockers.map(x=>x.title),...scientificBlockers.map(x=>x.message)],scientificBlockers,contradictions};
     globalState.contradictionIssues=contradictions;
     globalState.competition={...globalState.competition,status:'registration_open'};
+    markCompetitionConfigChanged();
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return {ok:true,issues:[],scientificBlockers,contradictions};
   };
@@ -2144,7 +2180,7 @@ export function useAppStore() {
     completeCompetition,
     registerParticipant,
     reviewParticipant,
-    selectCompetition,
+    selectCompetition, loadPublicCompetition,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
     submitAppeal,

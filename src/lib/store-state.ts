@@ -62,6 +62,8 @@ export interface AppStoreState {
   language: SupportedLanguage;
   competition: Competition;
   competitions: Competition[];
+  /** آخر تعديل محلي على إعداد المسابقة؛ يمنع snapshot سحابيًا أقدم من مسح حفظ أحدث. */
+  competitionConfigUpdatedAt?: string;
   // Core competition entities
   participants: Participant[];
   committees: Committee[];

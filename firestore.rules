@@ -14,6 +14,18 @@ service cloud.firestore {
     function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
     function admin(orgId,competitionId) { return scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']); }
 
+    // Public registration configuration is read-only to anonymous visitors. It contains
+    // competition setup/categories only — never participants, judge data, results or audit rows.
+    match /public_competitions/{competitionId} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin'])
+        && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
+        && request.resource.data.competition.id == competitionId;
+      allow delete: if signedIn() && roleIs(['super_admin','org_admin'])
+        && (request.auth.token.role == 'super_admin' || resource.data.organizationId == request.auth.token.org_id);
+    }
+
     match /organizations/{orgId} {
       allow read: if sameOrg(orgId);
       allow create, update: if sameOrg(orgId) && roleIs(['super_admin','org_admin']);

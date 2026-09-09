@@ -78,6 +78,11 @@ export function sameReading(a:{qiraah?:string;rawi?:string;riwaya?:string},b:{qi
 export function isDuriAbuAmr(record:{qiraah?:string;rawi?:string;riwaya?:string}){return resolveReading(record)?.rawiId==='al-duri-abu-amr'}
 export function isDuriKisai(record:{qiraah?:string;rawi?:string;riwaya?:string}){return resolveReading(record)?.rawiId==='al-duri-kisai'}
 
+// الروايات التي نشر لها مجمع الملك فهد حزمًا رسمية مستقلة في مكتبة ميزان.
+// هذا يثبت سلطة المصدر العلمية؛ توفر البايتات محليًا يبقى شرطًا تشغيليًا لاحقًا للسحب/العرض، لا لفتح التسجيل.
+const KFGQPC_OFFICIAL_RAWI_IDS=new Set(['hafs','warsh','shubah','qalun','al-duri-abu-amr','al-susi']);
+export function isKfgqpcOfficialReading(input:{qiraah?:string;rawi?:string;riwaya?:string}){const r=resolveReading(input);return !!r&&KFGQPC_OFFICIAL_RAWI_IDS.has(r.rawiId)}
+
 export async function computeQuranPackageHash(record:QuranSourceManifestRecord){
   return hashCanonical({
     sourceAuthority:record.sourceAuthority, sourcePublication:record.sourcePublication, sourceEdition:record.sourceEdition||record.edition,

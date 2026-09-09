@@ -206,6 +206,19 @@ async function startServer() {
   app.put('/api/brand-assets/organizations/:organizationId/competitions/:competitionId/logo',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),brandAssetRaw,(req,res)=>void putBrandLogo(req,res,String(req.params.competitionId||'')));
   app.delete('/api/brand-assets/organizations/:organizationId/competitions/:competitionId/logo',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>void deleteBrandLogo(req,res,String(req.params.competitionId||'')));
 
+  // Licensed modules are a tenant entitlement, not an identity grant. Organization administrators may
+  // read only their own licensing projection; the platform owner may inspect a requested tenant.
+  app.get('/api/identity/entitlements',requireGovernanceRoles(['super_admin','org_admin','comp_admin','auditor']),(req,res)=>{
+    const repo=controlTowerAdmin(res);if(!repo)return;
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    const requested=String(req.query.organizationId||'');
+    const organizationId=actor.role==='super_admin'&&requested?requested:actor.organizationId;
+    if(actor.role!=='super_admin'&&organizationId!==actor.organizationId)return res.status(403).json({code:'ENTITLEMENT_SCOPE_NOT_ALLOWED'});
+    const commercial=repo.listCommercial().find(x=>x.tenantId===organizationId)||null;
+    res.setHeader('Cache-Control','no-store');
+    return res.json({organizationId,licensedModules:commercial?.licensedModules||[],plan:commercial?.plan||null,subscriptionStatus:commercial?.subscriptionStatus||null,updatedAt:commercial?.updatedAt||null});
+  });
+
   // Named-account identity governance. MIZAN stores no passwords; a verified Firebase identity is bound once to a scoped MIZAN invitation.
   app.post('/api/identity/invitation/preview',sensitiveIdentityRateLimit,(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{return res.json({invitation:identityGovernance.previewInvitation(String(req.body?.activationToken||''))})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'ACTIVATION_TOKEN_INVALID'})}});
   app.get('/api/identity/me',requireFirebaseBase,(req,res)=>{const base=(req as any).firebaseBase as {uid:string;email?:string;raw:Record<string,unknown>};const managed=identityGovernance?.identityForUid(base.uid)||null;const identity=identityFromBase(base);if(!identity)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});if(!mfaSatisfied(base,identity.role))return res.status(403).json({code:'MFA_REQUIRED'});let session:any=undefined;if(identityGovernance&&managed){const deviceId=String(req.headers['x-mizan-device-id']||'');if(deviceId){try{session=identityGovernance.openSession(identity,deviceId,String(req.headers['x-mizan-device-name']||''),firebaseSecondFactorPresent(base.raw)?'MFA':'SINGLE_FACTOR')}catch(err){const code=err instanceof Error?err.message:'SESSION_FAILED';if(code==='PRIVILEGED_SESSION_CONFLICT')return res.status(409).json({code});return res.status(400).json({code})}}}res.json({identity,session,managed:!!managed});});
