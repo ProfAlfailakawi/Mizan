@@ -19,6 +19,10 @@ const seededLike=()=>({
   identityAccounts:[{id:'acct'}],roleGrants:[{id:'grant'}],identityInvitations:[{id:'inv'}],authSessions:[{id:'sess'}],
   questionRevealGates:[{id:'g1'}],activeSession:{sessionId:'sess-active-001',participant:SEED_PARTICIPANTS[0],committee:SEED_COMMITTEES[0]},
   webhooks:[{id:'wh'}],integrations:[{id:'intg'}],supportSessions:[{id:'sup'}],travelRecords:[{id:'trv'}],federationAttestations:[{id:'fed'}],participantPassport:[{id:'pass'}],consents:[{id:'con'}],quorumActions:[{id:'q'}],featureFlags:[{id:'flag'}],sessionCheckpoints:[{id:'ck'}],continuityIncidents:[{id:'ci'}],sessionRecoveries:[{id:'sr'}],passReissues:[{id:'pr'}],auditLedgerSeals:[{id:'seal'}],
+  operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
+  persistenceError:null,
+  isOffline:false,
+  emergencyFrozen:false,
   language:'ar',
 }) as any;
 
