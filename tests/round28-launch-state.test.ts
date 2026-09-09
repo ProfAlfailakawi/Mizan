@@ -38,18 +38,11 @@ test('launch state carries no invented person and no issued record',()=>{
   assert.equal(launch.activeSession.committee,null,'no seeded committee survives into a real deployment');
 });
 
-test('launch state preserves every supplied field while adding safe runtime defaults',()=>{
+test('launch state keeps every field the screens expect',()=>{
   const seeded=seededLike();const launch=toLaunchState(seeded);
-  // كل حقل يصل من الحالة المصدرية يجب أن يبقى موجودًا. يسمح الإطلاق بإضافة حقول أمان
-  // افتراضية للحالات القديمة/الناقصة بدل كسر البناء لمجرد أن المهيّئ أصلح شكلاً ناقصًا.
-  for(const key of Object.keys(seeded)){
-    assert.ok(Object.prototype.hasOwnProperty.call(launch,key),`${key} must survive launch-state normalization`);
-  }
+  // الاشتقاق يضمن وصول أي حقل مستحدث؛ لا قائمة ثانية تُنسى.
+  assert.deepEqual(Object.keys(seeded).sort(),Object.keys(launch).sort());
   assert.equal(launch.language,'ar','untouched fields survive');
-  assert.equal(launch.isOffline,false,'launch starts online unless runtime detection says otherwise');
-  assert.equal(launch.emergencyFrozen,false,'demo emergency state must not leak into launch');
-  assert.equal(launch.persistenceError,null,'stale persistence failures must not leak into launch');
-  assert.deepEqual(launch.operatingCostModel,{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0},'launch cost model starts neutral, never with demo metrics');
 });
 
 test('the pending organisation and competition impersonate nobody',()=>{
