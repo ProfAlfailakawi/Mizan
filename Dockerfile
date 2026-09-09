@@ -44,6 +44,12 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
     VITE_REQUIRE_MFA_FOR_SENSITIVE=$VITE_REQUIRE_MFA_FOR_SENSITIVE \
     VITE_REQUIRE_MFA_FOR_SUPER_ADMIN=$VITE_REQUIRE_MFA_FOR_SUPER_ADMIN
 
+# Cloud Run injects the listening port through PORT. A fixed development port in server.ts caused
+# production revisions to bind :3000 while Cloud Run probed :8080. Keep the production image
+# fail-safe: rewrite only that exact legacy declaration before bundling; once source is dynamic,
+# this becomes a no-op and still verifies the runtime contract.
+RUN node -e "const fs=require('fs');const p='server.ts';let s=fs.readFileSync(p,'utf8');const fixed='const PORT = 3000;';const dynamic='const PORT = Number(process.env.PORT || 3000);';if(s.includes(fixed)){s=s.replace(fixed,dynamic);fs.writeFileSync(p,s)}if(!s.includes(dynamic))throw new Error('Cloud Run PORT contract missing');"
+
 RUN npm run build
 
 # Runtime image: production dependencies plus the built server bundle and static assets.
