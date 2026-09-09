@@ -20,6 +20,7 @@ declare module 'lucide-react' {
  export const Lock: any;
  export const BookOpen: any;
  export const Pause: any;
+ export const Pencil: any;
  export const TrendingDown: any;
  export const Coffee: any;
  export const Waypoints: any;

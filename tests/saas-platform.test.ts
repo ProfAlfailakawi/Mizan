@@ -22,6 +22,15 @@ test('operator organization creation atomically consumes one license credit',wit
  assert.equal(repo.operatorDashboard({...owner,role:'operator_owner',operatorId:op.id}).organizations.length,1);
 }));
 
+test('owner can edit an unused plan and delete it, while licensed plans are protected',withRepo((repo)=>{
+ const editable=repo.upsertPlan(owner,{name:'Draft',currency:'KWD',priceMinor:100});
+ assert.equal(repo.upsertPlan(owner,{id:editable.id,name:'Updated',priceMinor:250}).name,'Updated');
+ assert.equal(repo.deletePlan(owner,editable.id).id,editable.id);
+ const used=repo.seedInitialPlan(owner);
+ repo.createOrganization(owner,{officialName:'Licensed',shortName:'L',organizationType:'charity',country:'KW',planId:used.id,...dates});
+ assert.throws(()=>repo.deletePlan(owner,used.id),/PLAN_IN_USE/);
+}));
+
 test('legal identity is locked behind an audited change request',withRepo((repo)=>{
  const plan=repo.seedInitialPlan(owner);
  const {organization}=repo.createOrganization(owner,{officialName:'Original Legal Name',shortName:'Original',organizationType:'charity',country:'KW',planId:plan.id,...dates});
