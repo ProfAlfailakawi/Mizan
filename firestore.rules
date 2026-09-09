@@ -57,11 +57,15 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin'])
+        && competitionId != 'comp-pending-setup'
+        && request.resource.data.organizationId != 'org-pending-setup'
         && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
         && request.resource.data.competition.id == competitionId
         && (roleIs(['super_admin','org_admin']) || !(request.resource.data.competition.status in ['completed','archived']));
       allow update: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin'])
+        && competitionId != 'comp-pending-setup'
+        && request.resource.data.organizationId != 'org-pending-setup'
         && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
         && request.resource.data.organizationId == resource.data.organizationId
         && request.resource.data.competition.id == competitionId
@@ -88,11 +92,15 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
+        && request.resource.data.competitionId != 'comp-pending-setup'
+        && request.resource.data.organizationId != 'org-pending-setup'
         && sameOrg(request.resource.data.organizationId)
         && compScope(request.resource.data.competitionId)
         && competitionOpen(request.resource.data.organizationId, request.resource.data.competitionId);
       allow update: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
+        && request.resource.data.competitionId != 'comp-pending-setup'
+        && request.resource.data.organizationId != 'org-pending-setup'
         && request.resource.data.organizationId == resource.data.organizationId
         && request.resource.data.competitionId == resource.data.competitionId
         && sameOrg(resource.data.organizationId)

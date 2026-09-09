@@ -333,8 +333,9 @@ async function deleteScopedDocument(collectionName:string,id:string){
 }
 
 const JOURNEY_PUBLISHERS:Role[]=['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'];
+const launchPlaceholderActive=()=>globalState.competition.id==='comp-pending-setup'||globalState.competition.organizationId==='org-pending-setup';
 async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<boolean>{
-  if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return false;
+  if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role)||launchPlaceholderActive())return false;
   const records:[string,'participant'|'guardian'][]=[];
   if(participant.journeyAccessToken)records.push([await sha256(participant.journeyAccessToken),'participant']);else if(participant.journeyAccessTokenHash)records.push([participant.journeyAccessTokenHash,'participant']);
   if(participant.guardianAccessToken)records.push([await sha256(participant.guardianAccessToken),'guardian']);else if(participant.guardianAccessTokenHash)records.push([participant.guardianAccessTokenHash,'guardian']);
@@ -454,7 +455,7 @@ function syncToFirestore() {
       await setDoc(docRef, configuration, { merge: true });
       // النسخة العامة لا تُنشأ للمسودات. نشرُها مرتبط بحالة مسابقة حقيقية لا بوجود شاشة في الكود.
       // نبقي completed منشورة لصفحة «انتهت المسابقة» والتحقق العام، لكن التسجيل/الرحلة يُغلقان.
-      if(!['draft','configured'].includes(globalState.competition.status)){
+      if(!launchPlaceholderActive()&&!['draft','configured'].includes(globalState.competition.status)){
         const publicRef=doc(db,'public_competitions',globalState.competition.id);
         await setDoc(publicRef,{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       }
