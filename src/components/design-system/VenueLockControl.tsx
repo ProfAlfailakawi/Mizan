@@ -6,7 +6,7 @@ import {UNLOCK_GESTURE_MS,clearVenueLock,createVenueLock,isValidPin,isWeakPin,re
  * لوحة قفل شاشة القاعة.
  *
  * مفتوحة: زرّ «اقفل الجهاز» يطلب رمزًا من المشرف.
- * مقفولة: لا زرّ خروج ولا Escape — والعودة بإيماءة خفية (ضغط مطوّل على الشعار) ثم رمز.
+ * مقفولة: لا زرّ خروج ولا Escape — والعودة بضغط مطوّل على الزاوية العليا اليمنى ثم رمز.
  * الإيماءة أولًا عمدًا: حقلُ إدخالٍ ظاهر يدعو المارّ للتجريب، والخفيّ لا يُجرَّب.
  */
 
@@ -75,7 +75,7 @@ export const VenueLockButton:React.FC<{surface:string;ar:boolean;onLocked:(l:Ven
       <div className="w-full max-w-xs text-center">
         <LockKeyhole className="w-7 h-7 mx-auto text-white/80"/>
         <h2 className="text-white font-black mt-3">{step==='set'?(ar?'اختر رمز فتح الجهاز':'Choose the unlock code'):(ar?'أعد إدخال الرمز':'Re-enter the code')}</h2>
-        <p className="text-[10px] text-white/55 mt-2 leading-5">{ar?'بعد القفل لن يخرج أحد من هذه الشاشة إلا بضغط مطوّل على الشعار ثم هذا الرمز.':'Once locked, leaving requires a long press on the logo and then this code.'}</p>
+        <p className="text-[10px] text-white/55 mt-2 leading-5">{ar?'بعد القفل تملأ الشاشة الجهاز. اضغط مطولًا على الزاوية العليا اليمنى ثم أدخل هذا الرمز للخروج.':'Once locked, the surface fills the device. Long-press the upper-right corner, then enter this code to leave.'}</p>
         <Dots n={current.length}/>
         <PinPad value={current} onChange={setCurrent} ar={ar}/>
         {err&&<p className="text-[10px] text-[#f0b3aa] mt-3">{err}</p>}
@@ -113,9 +113,9 @@ export const VenueUnlockGuard:React.FC<{lock:VenueLock;ar:boolean;onUnlocked:()=
   };
 
   return <>
-    {/* الإيماءة الخفية: منطقة الشعار أعلى الشاشة. بلا أي علامة تدلّ عليها. */}
+    {/* الإيماءة الخفية: الزاوية العليا اليمنى فقط، وتعمل للمس والماوس. */}
     <div aria-hidden onPointerDown={begin} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel}
-      className="fixed top-0 inset-x-0 h-20 z-[90]" style={{touchAction:'none'}}/>
+      className="fixed top-0 right-0 h-24 w-24 z-[90]" style={{touchAction:'none'}}/>
     {asking&&<div role="dialog" aria-modal="true" aria-label={ar?'فتح قفل الجهاز':'Unlock venue device'} className="fixed inset-0 z-[100] bg-[#0d1512]/96 grid place-items-center p-5">
       <div className="w-full max-w-xs text-center">
         <ShieldAlert className="w-7 h-7 mx-auto text-white/80"/>

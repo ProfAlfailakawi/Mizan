@@ -13,7 +13,7 @@ export const CompetitionLanding: React.FC = () => {
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const [copied, setCopied] = useState(false);
   const closed = competition.status === 'completed' || competition.status === 'archived';
-  const registrationOpen = !closed && !['draft','configured'].includes(competition.status);
+  const registrationOpen = competition.status === 'registration_open';
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/#competition?comp=${competition.id}`

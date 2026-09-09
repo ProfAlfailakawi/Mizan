@@ -289,6 +289,9 @@ export interface Participant {
   /** Opaque capability tokens used by the public journey/guardian portals. They are never used as usernames or passwords. */
   journeyAccessToken?: string;
   guardianAccessToken?: string;
+  /** Server-created public registrations retain only capability hashes; raw tokens are returned once and never persisted. */
+  journeyAccessTokenHash?: string;
+  guardianAccessTokenHash?: string;
   createdAt: string;
 }
 
@@ -323,6 +326,8 @@ export interface JudgeProfile {
   conflictsDeclared: { participantId?: string; institution?: string; type: 'student' | 'relative' | 'institution'; hardConflict: boolean }[];
   calibrationScore: number; // e.g., 96.5% agreement in calibration lab
   isReady: boolean;
+  identityGrantId?: string;
+  competitionId?: string;
 }
 
 export interface QuestionPoolItem {

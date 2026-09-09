@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express, { type RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
-import type { Response } from 'express-serve-static-core';
+import type { Request, Response } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -48,6 +48,8 @@ import { ControlTowerRepository } from './server/control-tower';
 import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type TelemetrySubject } from './server/ops-telemetry';
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
+import { FirestoreRestRepository } from './server/firestore-rest';
+import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -115,10 +117,16 @@ async function startServer() {
      غيابه يعني نشرًا بجهة واحدة، فتبقى الإدارة معطَّلة لا معطوبة. */
   const tenantsFile=process.env.MIZAN_TENANTS_FILE||'';
   let tenantStore:TenantStore|null=null;try{if(tenantsFile&&!process.env.MIZAN_TENANTS)tenantStore=new TenantStore(tenantsFile)}catch(err){console.error('Tenant store disabled:',err)}
-  const saasDir=process.env.MIZAN_SAAS_DATA_DIR||'';
+  const saasDir=process.env.MIZAN_SAAS_DATA_DIR||(isProd?'':path.resolve('.mizan-data/saas'));
   let saasPlatform:SaaSPlatformRepository|null=null;
   try{if(saasDir){const vaultKey=process.env.MIZAN_STORAGE_SECRET_MASTER_KEY||'';const vault=vaultKey?new SecretVault(path.join(saasDir,'vault','storage-secrets.enc.json'),vaultKey):undefined;saasPlatform=new SaaSPlatformRepository(path.join(saasDir,'saas-platform.json'),vault)}}catch(err){console.error('SaaS platform disabled:',err)}
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
+  const firestoreRepository=firebaseProjectId?new FirestoreRestRepository(firebaseProjectId):null;
+  const publicRegistration=firestoreRepository?new PublicRegistrationService({
+    getCompetition:async(id)=>{const row=await firestoreRepository.get(`public_competitions/${id}`);const competition=row?.competition;return competition&&typeof competition==='object'?competition as any:null},
+    create:(documents)=>firestoreRepository.createAtomically(documents),
+    getJourney:(tokenHash)=>firestoreRepository.get(`public_journeys/${tokenHash}`),
+  }):null;
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
   /*
    * السلطة لا تُفعَّل على مسار غير دائم: موافقة نصاب تختفي، أو بذرة التُزم بها ولم تُكشف تضيع،
@@ -140,6 +148,9 @@ async function startServer() {
   const sensitiveIdentityRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:15*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||12),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -324,6 +335,18 @@ async function startServer() {
     res.setHeader('vary','host, x-forwarded-host');
     if(!tenant)return res.status(204).end();
     return res.json(publicTenant(tenant));
+  });
+
+  const publicApiError=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PUBLIC_API_FAILED';const base=code.split(':')[0];const status:Record<string,number>={COMPETITION_NOT_FOUND:404,COMPETITION_REGISTRATION_CLOSED:409,COMPETITION_ACCESS_CLOSED:410,REGISTRATION_REJECTED:400,REGISTRATION_FIELD_REQUIRED:400,REGISTRATION_IDENTITY_REQUIRED:400,REGISTRATION_EMAIL_INVALID:400,REGISTRATION_PHONE_INVALID:400,REGISTRATION_DATE_OF_BIRTH_INVALID:400,REGISTRATION_CATEGORY_INVALID:400,REGISTRATION_READING_INVALID:400,REGISTRATION_AGE_NOT_ELIGIBLE:422,REGISTRATION_GENDER_NOT_ELIGIBLE:422,REGISTRATION_CONSENT_REQUIRED:400,REGISTRATION_AUDIO_CONSENT_REQUIRED:400,REGISTRATION_GUARDIAN_REQUIRED:400,REGISTRATION_NOT_ELIGIBLE:422,REGISTRATION_POLICY_REQUIRES_REVIEW:422,JOURNEY_TOKEN_INVALID:400,JOURNEY_NOT_FOUND:404,JOURNEY_REVOKED:410,FIRESTORE_PERMISSION_DENIED:503,FIRESTORE_UNAVAILABLE:503,GOOGLE_OAUTH_CREDENTIALS_UNAVAILABLE:503,GOOGLE_OAUTH_TOKEN_FAILED:503};return res.status(status[base]||500).json({code,category:base.startsWith('REGISTRATION_')?'validation':base.startsWith('JOURNEY_')?'access':base.startsWith('COMPETITION_')?'competition':base.startsWith('FIRESTORE_')||base.startsWith('GOOGLE_')?'server':'server'})};
+  const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
+  app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
+    if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
+    try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){return publicApiError(res,err)}
+  });
+  app.post('/api/public/journeys/resolve',publicRegistrationRateLimit,async(req,res)=>{
+    if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
+    const audience=req.body?.audience==='guardian'?'guardian':'participant';
+    try{const journey=await publicRegistration.resolve(String(req.body?.competitionId||''),audience,String(req.body?.key||''));res.setHeader('Cache-Control','private, no-store');return res.json({journey})}catch(err){return publicApiError(res,err)}
   });
 
   /* إدارة الجهات من لوحة التحكم. MIZAN_TENANTS المضمّن في البيئة يجمّد السجل عمدًا،

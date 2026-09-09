@@ -35,11 +35,26 @@ node scripts/provision-deployment.mjs --out .env.production --data-root /var/lib
 | المتغيّر | ما هو |
 |---|---|
 | `FIREBASE_PROJECT_ID` | مشروع Firebase الذي يثبت هوية المستخدمين |
+| `FIRESTORE_DATABASE_ID` | اختياري؛ قاعدة Firestore، والافتراضي `(default)` |
 | `MIZAN_BASE_DOMAIN` | النطاق الأساسي الذي تتفرّع منه نطاقات الجهات |
 | `MIZAN_TENANTS` أو `MIZAN_TENANTS_FILE` | سجل الجهات ونطاقاتها |
 | `MIZAN_GEMINI_API_KEY` | لتوليد مقاطع عبارة الإيقاف **مرة واحدة** |
 
 اختياري: `MIZAN_QURAN_ALIGNMENT_URL` (محرك المحاذاة الصامت — ميزة ظل لا تلزم لتشغيل مسابقة).
+
+### التسجيل العام بلا حساب
+
+التسجيل العام لا يكتب إلى Firestore من المتصفح. المسار
+`POST /api/public/competitions/:competitionId/register` ينفّذ التحقق والإنشاء الذري
+للـParticipant ورابطي الطالب وولي الأمر من الخادم، بينما تبقى قواعد Firestore مانعة
+للكتابة المجهولة وقراءة وثائق الرحلات مباشرة. امنح **حساب خدمة Cloud Run** صلاحية
+`roles/datastore.user` على المشروع؛ لا تستخدم مفتاح Service Account داخل الواجهة أو المستودع.
+
+بعد تعديل `firestore.rules` انشر القواعد أيضًا:
+
+```bash
+firebase deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
+```
 
 ## ٤) التشغيل والتحقق
 

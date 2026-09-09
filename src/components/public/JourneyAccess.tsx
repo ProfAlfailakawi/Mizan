@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarClock, CircleDot, LockKeyhole, MapPin, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
-import { getFirestoreClient } from '../../lib/firebase';
-import { sha256 } from '../../lib/crypto';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -34,7 +32,7 @@ export const JourneyAccess:React.FC<{audience:Audience}>=({audience})=>{
   const [token,setToken]=useState(()=>tokenFromHash()||localStorage.getItem(storageKey)||'');
   const [input,setInput]=useState(()=>tokenFromHash()||'');const [journey,setJourney]=useState<PublicJourney|null>(null);const [loading,setLoading]=useState(false);const [error,setError]=useState('');
   const closed=['completed','archived'].includes(competition.status);
-  const load=async(raw:string)=>{const clean=raw.trim();if(!clean)return;setLoading(true);setError('');try{const key=await sha256(clean);const {db,doc,getDoc}=await getFirestoreClient();const snap=await getDoc(doc(db,'public_journeys',key));if(!snap.exists())throw new Error('NOT_FOUND');const data=snap.data() as PublicJourney;if(data.competitionId!==competition.id||data.audience!==audience||data.revoked)throw new Error('REVOKED');setJourney(data);setToken(clean);localStorage.setItem(storageKey,clean)}catch(e){setJourney(null);setError(e instanceof Error&&e.message==='REVOKED'?(ar?'هذا الرابط لم يعد صالحًا.':'This access link is no longer valid.'):(ar?'لم نعثر على رحلة بهذا الرمز. تأكد من الرابط أو اطلب بطاقة جديدة من الجهة.':'We could not find a journey for this code. Check the link or ask the organizer for a new pass.'))}finally{setLoading(false)}};
+  const load=async(raw:string)=>{const clean=raw.trim();if(!clean)return;setLoading(true);setError('');try{const response=await fetch('/api/public/journeys/resolve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({competitionId:competition.id,audience,key:clean}),cache:'no-store'});const body=await response.json().catch(()=>({}));if(!response.ok)throw new Error(String(body.code||`HTTP_${response.status}`));const data=body.journey as PublicJourney;setJourney(data);setToken(clean);localStorage.setItem(storageKey,clean)}catch(e){setJourney(null);setError(journeyError(e instanceof Error?e.message:'SERVER_ERROR',ar))}finally{setLoading(false)}};
   useEffect(()=>{if(token&&!closed)void load(token)},[competition.id]);
   const idx=journey?statusIndex(journey.status):0;
   const next=useMemo(()=>journey&&idx<8?stepLabel(idx+1,ar):null,[journey,idx,ar]);
@@ -53,6 +51,8 @@ export const JourneyAccess:React.FC<{audience:Audience}>=({audience})=>{
     </main>
   </div>;
 };
+
+const journeyError=(code:string,ar:boolean)=>{const labels:Record<string,[string,string]>={JOURNEY_TOKEN_INVALID:['الرمز غير صحيح. استخدم الرابط كاملًا كما أرسلته الجهة.','The code is invalid. Use the full link sent by the organizer.'],JOURNEY_NOT_FOUND:['الرحلة غير موجودة أو لم يكتمل إنشاؤها. اطلب رابطًا جديدًا من الجهة.','The journey was not found or was not created. Ask the organizer for a new link.'],JOURNEY_REVOKED:['هذا الرابط أُلغي ولم يعد صالحًا.','This link was revoked and is no longer valid.'],COMPETITION_NOT_FOUND:['المسابقة غير موجودة.','Competition not found.'],COMPETITION_ACCESS_CLOSED:['أُغلق دخول الرحلات لهذه المسابقة.','Journey access is closed for this competition.'],PUBLIC_REGISTRATION_NOT_CONFIGURED:['خدمة الرحلات غير مهيأة على الخادم.','Journey service is not configured.'],FIRESTORE_PERMISSION_DENIED:['الخادم لا يملك صلاحية قراءة الرحلة.','The server does not have permission to read this journey.']};const key=code.split(':')[0];if(labels[key])return labels[key][ar?0:1];if(code==='Failed to fetch'||code.startsWith('HTTP_'))return ar?'تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.':'Could not connect to the server. Check your network and retry.';return ar?'حدث خطأ في الخادم. أعد المحاولة لاحقًا.':'A server error occurred. Please retry later.'};
 
 const Info=({icon:Icon,label,value}:{icon:React.ComponentType<{className?:string}>;label:string;value:string})=><div className="mizan-surface p-4"><Icon className="w-4 h-4 text-[#2F6555]"/><div className="text-[10px] text-[#656b66] mt-3">{label}</div><div className="text-sm font-black mt-1">{value}</div></div>;
 const Closed=({ar}:{ar:boolean})=><div className="min-h-screen bg-[#FAF8F2] grid place-items-center p-5" dir={ar?'rtl':'ltr'}><div className="mizan-surface max-w-md p-8 text-center"><LockKeyhole className="w-8 h-8 text-[#214C40] mx-auto"/><h1 className="text-2xl font-black mt-4">{ar?'انتهت المسابقة وأُغلق الدخول':'Competition access is closed'}</h1><p className="text-xs text-[#636864] leading-6 mt-3">{ar?'أوقفت الجهة كل روابط الدخول والتشغيل. تبقى النتائج المنشورة والتحقق من الشهادات عبر الواجهة العامة فقط.':'The organizer closed all journey and operational access. Published results and public certificate verification remain separate.'}</p></div></div>;

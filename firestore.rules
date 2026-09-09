@@ -78,7 +78,12 @@ service cloud.firestore {
     // A stale document is still unreadable after the competition closes, even if a client
     // failed to write revoked=true before the root competition status changed.
     match /public_journeys/{tokenHash} {
-      allow get: if resource.data.revoked != true
+      // Student and guardian access is resolved by the server API. Anonymous
+      // clients cannot read even a hashed capability document directly.
+      allow get: if signedIn()
+        && scoped(resource.data.organizationId, resource.data.competitionId)
+        && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
+        && resource.data.revoked != true
         && competitionOpen(resource.data.organizationId, resource.data.competitionId);
       allow list: if false;
       allow create: if signedIn()

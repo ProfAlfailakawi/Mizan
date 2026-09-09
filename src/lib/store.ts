@@ -333,14 +333,15 @@ async function deleteScopedDocument(collectionName:string,id:string){
 }
 
 const JOURNEY_PUBLISHERS:Role[]=['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'];
-async function publishPublicJourneyRecord(participant:Participant,revoked=false){
-  if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return;
-  const tokens:[string,'participant'|'guardian'][]=[];
-  if(participant.journeyAccessToken)tokens.push([participant.journeyAccessToken,'participant']);
-  if(participant.guardianAccessToken)tokens.push([participant.guardianAccessToken,'guardian']);
-  if(!tokens.length)return;
+async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<boolean>{
+  if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return false;
+  const records:[string,'participant'|'guardian'][]=[];
+  if(participant.journeyAccessToken)records.push([await sha256(participant.journeyAccessToken),'participant']);else if(participant.journeyAccessTokenHash)records.push([participant.journeyAccessTokenHash,'participant']);
+  if(participant.guardianAccessToken)records.push([await sha256(participant.guardianAccessToken),'guardian']);else if(participant.guardianAccessTokenHash)records.push([participant.guardianAccessTokenHash,'guardian']);
+  if(!records.length)return false;
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
+    await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt:new Date().toISOString()},{merge:true});
     const committee=globalState.committees.find(c=>c.id===participant.assignedCommitteeId&&c.competitionId===participant.competitionId);
     const result=globalState.results.find(r=>r.participantId===participant.id&&r.competitionId===participant.competitionId&&r.status==='published');
     const certificate=globalState.certificates.find(c=>c.participantId===participant.id&&c.competitionId===participant.competitionId&&c.revocationState!=='REVOKED');
@@ -356,8 +357,9 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
       revoked:revoked||globalState.competition.status==='completed'||globalState.competition.status==='archived',
       updatedAt:new Date().toISOString(),
     };
-    for(const [token,audience] of tokens){const key=await sha256(token);await setDoc(doc(db,'public_journeys',key),{...base,audience},{merge:true});}
-  }catch(err){reportCloudError(classifyCloudError(err),'public journey');}
+    for(const [key,audience] of records)await setDoc(doc(db,'public_journeys',key),{...base,audience},{merge:true});
+    return true;
+  }catch(err){reportCloudError(classifyCloudError(err),'public journey');return false;}
 }
 async function syncPublicJourneys(){
   if(!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return;
@@ -1305,11 +1307,15 @@ export function useAppStore() {
 
   const updateOrganizationBrand = (patch: Partial<OrganizationBrand>) => { globalState.organization={...globalState.organization,brand:{...globalState.organization.brand,...patch}}; notify(); };
 
-  const ensureParticipantJourneyAccess=(participantId:string)=>{
+  const ensureParticipantJourneyAccess=async(participantId:string)=>{
     const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx<0)return null;
-    const current=globalState.participants[idx];const next={...current,journeyAccessToken:current.journeyAccessToken||newId('journey'),guardianAccessToken:current.guardianAccessToken||newId('guardian')};
-    globalState.participants[idx]=next;void persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>);void publishPublicJourneyRecord(next);notify();return next;
+    const current=globalState.participants[idx],journeyAccessToken=current.journeyAccessToken||newId('journey'),guardianAccessToken=current.guardianAccessToken||newId('guardian');const next={...current,journeyAccessToken,guardianAccessToken,journeyAccessTokenHash:await sha256(journeyAccessToken),guardianAccessTokenHash:await sha256(guardianAccessToken)};
+    globalState.participants[idx]=next;const [saved,published]=await Promise.all([persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>),publishPublicJourneyRecord(next)]);notify();if(!globalState.isOffline&&auth.currentUser&&(!saved||!published))return null;return next;
   };
+
+  const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
+
+  const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===(account.firebaseUid||account.id));const old=idx>=0?next[idx]:undefined;const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:account.firebaseUid||account.id,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:old?.specialty||'all',certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
 
   const selectCompetition = (competitionId: string) => {
     const target = globalState.competitions.find(c => c.id === competitionId);
@@ -2304,7 +2310,7 @@ export function useAppStore() {
     publishResults,
     completeCompetition, closeCompetition,
     registerParticipant,
-    reviewParticipant, ensureParticipantJourneyAccess,
+    reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
     selectCompetition, loadPublicCompetition,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
