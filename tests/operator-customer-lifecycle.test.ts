@@ -54,7 +54,7 @@ test('full operator customer lifecycle is server-scoped from invitation to organ
     assert.equal(org1Visible.accounts.length,1);
     assert.equal(org1Visible.accounts[0].uid,'uid-org-x1');
     assert.throws(()=>identity.list(operatorOwner,orgY.id),/CROSS_OPERATOR_ORGANIZATION_BLOCKED/);
-    assert.throws(()=>identity.createInvitation(operatorOwner,{email:'hack@y.test',displayName:'Cross Org',requestedRole:'org_admin',organizationId:orgY.id,reason:'Cross operator attempt'}),/CROSS_OPERATOR_ORGANIZATION_BLOCKED/);
+    assert.throws(()=>identity.createInvitation(operatorOwner,{email:'cross-scope@y.test',displayName:'Cross Org',requestedRole:'org_admin',organizationId:orgY.id,reason:'Cross operator attempt'}),/CROSS_OPERATOR_ORGANIZATION_BLOCKED/);
     assert.throws(()=>identity.createInvitation(operatorOwner,{email:'judge@x1.test',displayName:'Judge',requestedRole:'judge',organizationId:org1.id,competitionId:'c1',reason:'Operator cannot staff competitions'}),/ROLE_GRANT_NOT_ALLOWED/);
 
     const operatorAdmin:ServerIdentity={uid:'uid-admin-x',email:'admin@x.test',role:'operator_admin',organizationId:operatorIdentityOrganizationId(opX.id),operatorId:opX.id,operatorOrganizationIds:saas.operatorOrganizationIds(opX.id)};
