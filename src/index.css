@@ -745,7 +745,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
 /* أعلى من أسطح القاعة ملء الشاشة (z-index:120)، وإلا ظهر التنبيه/الحوار خلفها. */
 .mizan-overlay{ position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center;
   padding:1rem; padding:max(1rem,env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));
-  overflow-y:auto; }
+  overflow-y:auto; overscroll-behavior:contain; }
 @media (max-width:639px){ .mizan-overlay{ align-items:flex-start } }
 @media (min-width:640px){ .mizan-overlay{ padding:1.5rem } }
 .mizan-overlay-scrim{ position:fixed; inset:0; background:rgba(18,32,27,.42); backdrop-filter:blur(2px); }
@@ -764,7 +764,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
   color:var(--muted); transition:background .15s ease, color .15s ease; }
 .mizan-dialog-close:hover{ background:#eceae3; color:var(--ink); }
 /* min-height:0 is what actually lets a flex child scroll instead of forcing the parent taller. */
-.mizan-dialog-body{ padding:1.4rem; flex:1 1 auto; min-height:0; overflow-y:auto; }
+.mizan-dialog-body{ padding:1.4rem; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
 
 /* ── Command palette ───────────────────────────────────────────────────────── */
 .mizan-palette-row{ width:100%; border-radius:var(--radius-sm); padding:.75rem; text-align:start;

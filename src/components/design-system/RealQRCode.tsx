@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 // Dependency-free QR Model 2 encoder for MIZAN operational payloads.
 // Version 4-L remains the compact default (78 UTF-8 bytes). Version 6-L is selected
@@ -61,8 +61,14 @@ export function createQrMatrix(text:string){
 
 export const RealQRCode:React.FC<{value:string;size?:number;label?:string;className?:string}>=({value,size=160,label='رمز مرور ميزان',className=''})=>{
  const result=useMemo(()=>{try{return {matrix:createQrMatrix(value),error:false}}catch{return {matrix:[] as boolean[][],error:true}}},[value]);
+ const [longPayloadUrl,setLongPayloadUrl]=useState('');const [longPayloadFailed,setLongPayloadFailed]=useState(false);
+ useEffect(()=>{let live=true;setLongPayloadUrl('');setLongPayloadFailed(false);if(!result.error||!value)return()=>{live=false};
+  import('qrcode').then(qr=>qr.toDataURL(value,{errorCorrectionLevel:'M',margin:2,width:size,color:{dark:'#17221e',light:'#fffefb'}})).then(url=>{if(live)setLongPayloadUrl(url)}).catch(()=>{if(live)setLongPayloadFailed(true)});
+  return()=>{live=false};
+ },[result.error,value,size]);
  const matrix=result.matrix;const quiet=4;const total=(matrix.length||25)+quiet*2;const path=useMemo(()=>{const parts:string[]=[];matrix.forEach((row,r)=>row.forEach((dark,c)=>{if(dark)parts.push(`M${c+quiet} ${r+quiet}h1v1h-1z`)}));return parts.join('');},[matrix]);
- if(result.error)return <div className={`grid place-items-center rounded-xl border border-dashed border-[#d8d6cf] bg-[#faf9f5] p-3 text-center text-[10px] font-bold leading-5 text-[#696f6b] ${className}`} style={{width:size,height:size}} role="img" aria-label={label}>تعذّر رسم الرمز لهذا الرابط الطويل.<br/>استخدم زر نسخ الرابط.</div>;
+ if(result.error&&longPayloadUrl)return <img className={className} src={longPayloadUrl} width={size} height={size} alt={label}/>;
+ if(result.error)return <div className={`grid place-items-center rounded-xl border border-dashed border-[#d8d6cf] bg-[#faf9f5] p-3 text-center text-[10px] font-bold leading-5 text-[#696f6b] ${className}`} style={{width:size,height:size}} role="img" aria-label={label}>{longPayloadFailed?'تعذّر رسم الرمز لهذا الرابط الطويل. استخدم زر نسخ الرابط.':'جارٍ رسم الرمز…'}</div>;
  return <svg className={className} width={size} height={size} viewBox={`0 0 ${total} ${total}`} role="img" aria-label={label} shapeRendering="crispEdges"><rect width={total} height={total} fill="#fffefb"/><path d={path} fill="#17221e"/></svg>;
 };
 

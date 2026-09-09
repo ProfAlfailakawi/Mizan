@@ -288,6 +288,9 @@ function mergeJudgeSubmissions(local: JudgeSubmission[], remote: JudgeSubmission
   return [...byKey.values()];
 }
 
+const judgeSpecialties=(judge?:JudgeProfile|null)=>[...new Set(((judge?.specialties?.length?judge.specialties:[judge?.specialty||'all'])).filter(Boolean))];
+const judgeCanScoreCriterion=(judge:JudgeProfile|undefined|null,assigned?:string,mode?:string)=>mode==='all_judges_all_criteria'||!judge||judgeSpecialties(judge).includes('all')||!assigned||assigned==='all'||judgeSpecialties(judge).includes(assigned);
+
 /*
  * دمج غير مُفقِد بالمعرّف: السحابة تُضيف ما لا نملكه وتحدّث ما نملكه، ولا تحذف سجلًا محليًا
  * لم يصل الخادم بعد (جهاز كان بلا شبكة). الحذف عملية صريحة لا أثرٌ جانبي لمزامنة.
@@ -867,7 +870,7 @@ export function useAppStore() {
     const criterionScores: Record<string, number> = {};
     const policy = getCompetitionPolicy(globalState.competition);
     const judgeProfile = globalState.judges.find(j => j.userId === globalState.currentUser.id || j.id === globalState.currentUser.id);
-    const eligibleCriteria = criteria.filter(c => policy.judging.mode === 'all_judges_all_criteria' || !judgeProfile || judgeProfile.specialty === 'all' || c.assignedJudgeType === judgeProfile.specialty || (policy.judging.mode === 'hybrid' && c.assignedJudgeType === 'all'));
+    const eligibleCriteria = criteria.filter(c => judgeCanScoreCriterion(judgeProfile,c.assignedJudgeType,policy.judging.mode) || (policy.judging.mode === 'hybrid' && c.assignedJudgeType === 'all'));
     criteria.forEach(c => {
       const eventScore = Math.max(0, c.maxScore - (deductionsByCriterion[c.id] || deductionsByCriterion[c.assignedJudgeType || ''] || 0));
       criterionScores[c.id] = directScores && directScores[c.id] !== undefined ? Math.min(c.maxScore, Math.max(0, directScores[c.id])) : eventScore;
@@ -1325,7 +1328,7 @@ export function useAppStore() {
 
   const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
 
-  const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const managedUid=String((account as IdentityAccountRecord&{uid?:string}).uid||account.firebaseUid||account.id);const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===managedUid);const old=idx>=0?next[idx]:undefined;const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:managedUid,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:old?.specialty||'all',certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
+  const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const managedUid=String((account as IdentityAccountRecord&{uid?:string}).uid||account.firebaseUid||account.id);const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===managedUid);const old=idx>=0?next[idx]:undefined;const specialties=old?.specialties?.length?old.specialties:old?.specialty?[old.specialty]:['all'];const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:managedUid,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:specialties[0]||'all',specialties,certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
 
   const selectCompetition = (competitionId: string) => {
     const target = globalState.competitions.find(c => c.id === competitionId);
@@ -1784,6 +1787,7 @@ export function useAppStore() {
   const completeShadowRun=(id:string)=>{globalState.shadowRuns=globalState.shadowRuns.map(s=>s.id===id?{...s,status:'completed',completedAt:new Date().toISOString(),observations:[{type:'queue',severity:'medium',summary:'Peak queue can be reduced by dynamic arrival slots.'},{type:'judging',severity:'info',summary:'Independent locking preserved across the shadow comparison.'},{type:'automation',severity:'info',summary:'Routine reception steps are eligible for self-service.'}]}:s);notify();};
   const addParticipantPassportEntry=(participantId:string)=>{const p=globalState.participants.find(x=>x.id===participantId);if(!p)return;const r=globalState.results.find(x=>x.participantId===participantId);const c=globalState.certificates.find(x=>x.participantId===participantId);const cat=globalState.competition.categories.find(x=>x.id===p.categoryId);const e:ParticipantPassportEntry={id:newId('pp'),participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:cat?.name||'',year:globalState.competition.startDate.slice(0,4),result:r?`${r.rank} / ${r.finalScore}`:undefined,certificateNumber:c?.certificateNumber,verified:!!c};globalState.participantPassport=[e,...globalState.participantPassport.filter(x=>!(x.participantId===participantId&&x.competitionId===globalState.competition.id))];notify();return e;};
   const addJudgePassportEntry=(judgeId:string)=>{const j=globalState.judges.find(x=>x.id===judgeId||x.userId===judgeId);if(!j)return;const e:JudgePassportEntry={id:newId('jp'),judgeId:j.id,competitionId:globalState.competition.id,competitionName:globalState.competition.name,role:j.specialty,riwayat:j.certifiedRiwayat,calibrationScore:j.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===j.userId).length,verified:j.isReady};globalState.judgePassport=[e,...globalState.judgePassport.filter(x=>!(x.judgeId===j.id&&x.competitionId===globalState.competition.id))];notify();return e;};
+  const updateJudgeSpecialties=(judgeId:string,specialties:string[])=>{const clean=[...new Set(specialties.filter(Boolean))];const next=clean.includes('all')||!clean.length?['all']:clean;globalState.judges=globalState.judges.map(j=>(j.id===judgeId||j.userId===judgeId)?{...j,specialty:next[0],specialties:next}:j);notify();return globalState.judges.find(j=>j.id===judgeId||j.userId===judgeId)||null;};
   const completeJudgeCalibration=(judgeId:string,score:number)=>{
     const bounded=Math.max(0,Math.min(100,score));
     globalState.judges=globalState.judges.map(j=>(j.id===judgeId||j.userId===judgeId)?{...j,calibrationScore:bounded,isReady:bounded>=85}:j);
@@ -2335,7 +2339,7 @@ export function useAppStore() {
     updateCategory,
     removeCategory,
     addCommittee,
-    updateCommittee, removeCommittee,
+    updateCommittee, removeCommittee, updateJudgeSpecialties,
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,

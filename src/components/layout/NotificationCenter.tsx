@@ -54,7 +54,7 @@ export const NotificationCenter:React.FC=()=>{
     {error&&<div className="rounded-2xl border border-[#ead4cf] bg-[#f9efec] px-4 py-3 text-xs font-bold text-[#8b4d44]">{error}</div>}
     <div className="flex gap-2 overflow-x-auto pb-1"><TabButton active={tab==='all'} onClick={()=>setTab('all')} label={ar?'الكل':'All'} count={rows.length}/><TabButton active={tab==='unread'} onClick={()=>setTab('unread')} label={ar?'غير المقروء':'Unread'} count={unread}/>{(['admin','system','competition','identity','support'] as Category[]).map(c=><TabButton key={c} active={tab===c} onClick={()=>setTab(c)} label={meta[c].label}/>)}</div>
     <div className="relative"><Search className="pointer-events-none absolute start-3 top-3.5 h-4 w-4 text-[#606762]"/><input className="mizan-input mizan-input-icon-start" value={query} onChange={e=>setQuery(e.target.value)} placeholder={ar?'ابحث في الإشعارات…':'Search notifications…'}/></div>
-    <div className="max-h-[55vh] space-y-2 overflow-y-auto pe-1">
+    <div className="space-y-2">
      {filtered.map(n=><article key={n.id} className={`group rounded-2xl border p-4 transition ${n.priority==='urgent'?'border-[#dbc3a0] bg-[#fff9ed]':n.readAt?'border-[#e4e2dc] bg-white':'border-[#cddbd3] bg-[#F5FAF7]'} hover:border-[#9eb7aa]`}>
       <div className="flex items-start gap-3">
        <button type="button" onClick={()=>void mark(n)} className="flex min-w-0 flex-1 items-start gap-3 text-start" aria-label={ar?`فتح إشعار: ${n.title}`:`Open notification: ${n.title}`}>

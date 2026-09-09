@@ -14,6 +14,16 @@ test('QR encoder keeps compact passes and supports local TOTP otpauth payloads',
  assert.throws(()=>createQrMatrix('x'.repeat(135)),/exceeds 134/);
 });
 
+test('long administrator-issued reset links fall back to an in-browser QR renderer',()=>{
+ const qr=source('src/components/design-system/RealQRCode.tsx');
+ const pkg=source('package.json');
+ assert.match(qr,/import\('qrcode'\)/);
+ assert.match(qr,/toDataURL\(value/);
+ assert.match(qr,/جارٍ رسم الرمز/);
+ assert.doesNotMatch(qr,/api\.qrserver|chart\.google|quickchart/i);
+ assert.match(pkg,/"qrcode"/);
+});
+
 test('owner can enroll TOTP from the MFA-required bootstrap without external QR services',()=>{
  const security=source('src/components/auth/TotpSecurity.tsx');
  const app=source('src/App.tsx');

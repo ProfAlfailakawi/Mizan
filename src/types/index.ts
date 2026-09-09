@@ -136,7 +136,7 @@ export interface CriterionRule {
   maxScore: number;
   weight: number;
   description?: string;
-  assignedJudgeType?: 'all' | 'memorization' | 'tajweed' | 'performance';
+  assignedJudgeType?: 'all' | 'memorization' | 'tajweed' | 'performance' | string;
 }
 
 export interface PenaltyMapping {
@@ -322,7 +322,8 @@ export interface JudgeProfile {
   nameArabic: string;
   title: string;
   country: string;
-  specialty: 'memorization' | 'tajweed' | 'waqf_ibtida' | 'all';
+  specialty: 'memorization' | 'tajweed' | 'waqf_ibtida' | 'all' | string;
+  specialties?: string[];
   certifiedRiwayat: string[];
   assignedCommitteeId?: string;
   conflictsDeclared: { participantId?: string; institution?: string; type: 'student' | 'relative' | 'institution'; hardConflict: boolean }[];

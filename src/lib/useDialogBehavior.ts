@@ -22,6 +22,11 @@ export function useDialogBehavior(
 ) {
   const { lockScroll = true, autoFocus = true } = options;
   const restoreTo = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +50,7 @@ export function useDialogBehavior(
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key === 'Escape') { e.stopPropagation(); onCloseRef.current(); return; }
       if (e.key !== 'Tab') return;
       const items = focusables();
       if (!items.length) return;
@@ -66,5 +71,5 @@ export function useDialogBehavior(
       }
       restoreTo.current?.focus?.();
     };
-  }, [open, onClose, ref, lockScroll, autoFocus]);
+  }, [open, ref, lockScroll, autoFocus]);
 }
