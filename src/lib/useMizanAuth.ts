@@ -31,6 +31,7 @@ export type MizanAccessError =
 interface ResolvedIdentity {
   role: Role;
   organizationId: string;
+  operatorId?: string;
   competitionId?: string;
   serverManaged: boolean;
 }
@@ -84,6 +85,7 @@ async function resolveServerIdentity(
       return { identity: {
         role: String(identity.role || '') as Role,
         organizationId: String(identity.organizationId || ''),
+        operatorId: identity.operatorId ? String(identity.operatorId) : undefined,
         competitionId: identity.competitionId ? String(identity.competitionId) : undefined,
         serverManaged: !!(body as { managed?: boolean }).managed,
       }};
@@ -117,13 +119,14 @@ export function useMizanAuth(requireAuth: boolean) {
         const claimedOrganizationId = String(token.claims.org_id || '');
         const claimIdentity: ResolvedIdentity = {
           role: claimRole,
-          organizationId: claimedOrganizationId || (claimRole === 'super_admin' ? PLATFORM_OWNER_ORGANIZATION_ID : ''),
+          organizationId: claimedOrganizationId || (claimRole === 'super_admin' ? PLATFORM_OWNER_ORGANIZATION_ID : (COMMERCIAL_ROLES.includes(claimRole) && token.claims.operator_id ? `__operator__:${String(token.claims.operator_id)}` : '')),
+          operatorId: token.claims.operator_id ? String(token.claims.operator_id) : undefined,
           competitionId: token.claims.competition_id ? String(token.claims.competition_id) : undefined,
           serverManaged: false,
         };
         const resolved = await resolveServerIdentity(token.token, claimIdentity);
         if ('error' in resolved) { setAccessError(resolved.error); setSignedIn(false); setAuthReady(true); return; }
-        const { role, organizationId, competitionId, serverManaged } = resolved.identity;
+        const { role, organizationId, operatorId, competitionId, serverManaged } = resolved.identity;
 
         if (![...ALLOWED_ROLES,...COMMERCIAL_ROLES].includes(role) || !organizationId) {
           // Unknown or retired claims must be reassigned; they are never silently remapped.
@@ -142,7 +145,7 @@ export function useMizanAuth(requireAuth: boolean) {
 
         applyAuthenticatedIdentity({
           id: user.uid, email: user.email || '', name: user.displayName || user.email || user.uid,
-          role, organizationId, competitionId, mfaEnabled: secondFactor,
+          role, organizationId, operatorId, competitionId, mfaEnabled: secondFactor,
           identityAssurance: serverManaged ? 'firebase_managed' : 'firebase',
         });
         setAccessError(''); setSignedIn(true);

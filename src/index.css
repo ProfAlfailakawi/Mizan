@@ -133,6 +133,8 @@
 .mizan-input { width:100%; min-height:44px; border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; }
 .mizan-input:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
 .mizan-input.mizan-input-icon-start { padding-inline-start:2.65rem; }
+.mizan-number-input { appearance:textfield; -moz-appearance:textfield; }
+.mizan-number-input::-webkit-outer-spin-button, .mizan-number-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .mizan-consent { display:inline-flex; align-items:center; justify-content:flex-start; gap:.65rem; width:auto; max-width:100%; line-height:1.7; }
 .mizan-consent input[type="checkbox"] { flex:0 0 auto; margin:0; align-self:center; }
 .mizan-consent > span { display:inline-block; }

@@ -10,6 +10,7 @@ import { EmergencyControl } from '../design-system/EmergencyControl';
 import { ClarityGuide } from '../design-system/ClarityGuide';
 import { Modal } from '../design-system/Modal';
 import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
+import { NotificationCenter } from './NotificationCenter';
 
 interface HeaderProps { onOpenExperienceHome?:()=>void; }
 
@@ -56,6 +57,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
       {!superAdmin&&<button onClick={toggleOffline} className={`w-11 h-11 grid place-items-center rounded-xl transition ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'hover:bg-[#efede7] text-[#66706a]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</button>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
+      <NotificationCenter/>
       <LanguageSwitcher compact/>
       {!superAdmin&&<RoleSwitcher/>}
       {/* الخروج ليس أيقونةً بين أيقونات: على جهازٍ مشترك يجب أن يُرى من أول نظرة، فله

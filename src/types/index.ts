@@ -25,6 +25,8 @@ export interface User {
   email: string;
   role: Role;
   organizationId: string;
+  /** Direct managed-identity scope for operator staff. This is not an Organization. */
+  operatorId?: string;
   competitionId?: string;
   avatarUrl?: string;
   phone?: string;
@@ -542,6 +544,8 @@ export interface AuditEvent {
   id: string;
   timestamp: string;
   organizationId: string;
+  /** Direct managed-identity scope for operator staff. This is not an Organization. */
+  operatorId?: string;
   competitionId?: string;
   actorId: string;
   actorName: string;

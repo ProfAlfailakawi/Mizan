@@ -1,42 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   CalendarDays, MapPin, ShieldCheck, Sparkles, ArrowLeft, ArrowRight,
-  Share2, Check, BookOpen, UserRound, UsersRound, BadgeCheck
+  BookOpen, UserRound, UsersRound, BadgeCheck
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
-import { MizanLogo, MizanMark } from '../design-system/MizanLogo';
+import { MizanLogo } from '../design-system/MizanLogo';
 import { Button } from '../design-system/Button';
 
 export const CompetitionLanding: React.FC = () => {
   const { competition, language } = useAppStore();
   const ar = language === 'ar';
   const Arrow = ar ? ArrowLeft : ArrowRight;
-  const [copied, setCopied] = useState(false);
   const closed = competition.status === 'completed' || competition.status === 'archived';
   const registrationOpen = competition.status === 'registration_open';
-
-  const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/#competition?comp=${competition.id}`
-    : `https://mizan.dr-alfailakawi.com/#competition?comp=${competition.id}`;
-
   const compTitle = ar ? competition.nameArabic : competition.name;
-  const shareText = ar
-    ? `ندعوكم للاطلاع والتسجيل في ${compTitle} — عبر منظومة ميزان للمسابقات القرآنية:\n${shareUrl}`
-    : `Invitation to ${compTitle} via MIZAN Quran Competition Platform:\n${shareUrl}`;
-
-  const handleShareWhatsApp = () => {
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleCopyLink = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2400);
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#FAF8F2] text-[#171B18] antialiased selection:bg-[#123f35] selection:text-[#FAF8F2]">
@@ -45,14 +22,6 @@ export const CompetitionLanding: React.FC = () => {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <MizanLogo language={language} compact />
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleShareWhatsApp}
-              aria-label={ar ? 'مشاركة عبر واتساب' : 'Share via WhatsApp'}
-              className="min-h-11 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[#123f35] bg-[#e6ede9] hover:bg-[#d8e4dd] transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>{ar ? 'مشاركة' : 'Share'}</span>
-            </button>
             <a
               href="#"
               className="min-h-11 inline-flex items-center px-3 py-2 rounded-xl text-xs font-bold text-[#3E4A43] hover:text-[#171B18] transition-colors"
@@ -71,7 +40,7 @@ export const CompetitionLanding: React.FC = () => {
           <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[#d4af37]/15 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-[#2a6d5c]/25 blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 grid lg:grid-cols-[1.2fr_0.8fr] gap-8 items-center">
+          <div className="relative z-10 max-w-4xl">
             <div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[#e8cb93] text-xs font-bold tracking-wide">
                 <Sparkles className="w-3.5 h-3.5" />
@@ -103,44 +72,9 @@ export const CompetitionLanding: React.FC = () => {
                   {ar ? 'سجل الآن في المسابقة' : 'Register Now'}
                 </Button> : <div className="min-h-11 px-6 rounded-2xl bg-white/10 border border-white/15 inline-flex items-center text-sm font-black text-[#e8cb93]">{ar ? 'انتهت المسابقة' : 'Competition ended'}</div>}
 
-                <button
-                  onClick={handleShareWhatsApp}
-                  aria-label={ar ? 'إرسال الرابط عبر واتساب' : 'Share on WhatsApp'}
-                  className="min-h-11 px-5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs sm:text-sm font-black inline-flex items-center gap-2.5 transition-all"
-                >
-                  <Share2 className="w-4 h-4 text-[#e8cb93]" />
-                  <span>{ar ? 'إرسال الرابط عبر واتساب' : 'Share on WhatsApp'}</span>
-                </button>
-
-                <button
-                  onClick={handleCopyLink}
-                  aria-label={ar ? 'نسخ رابط المسابقة' : 'Copy competition link'}
-                  className="min-h-11 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 text-xs font-bold inline-flex items-center gap-2 transition-all"
-                >
-                  {copied ? <Check className="w-4 h-4 text-[#48d597]" /> : <Share2 className="w-4 h-4" />}
-                  <span>{copied ? (ar ? 'تم النسخ!' : 'Copied!') : (ar ? 'نسخ الرابط' : 'Copy Link')}</span>
-                </button>
               </div>
             </div>
 
-            {/* Visual Emblem Badge Frame */}
-            <div className="hidden lg:flex justify-center items-center">
-              <div className="relative p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm text-center max-w-xs w-full shadow-inner">
-                <div className="w-24 h-24 mx-auto grid place-items-center rounded-2xl bg-[#09221b] border border-[#d4af37]/30 shadow-lg">
-                  <MizanMark className="w-16 h-16" decorative />
-                </div>
-                <div className="mt-4 font-display font-black text-lg text-[#fffef9]">
-                  {ar ? 'معتمدة وموثقة' : 'Verified Competition'}
-                </div>
-                <div className="mt-1 text-xs text-[#a4c2b7] leading-relaxed">
-                  {ar ? 'بنزاهة رقمية وأختام مشفرة وسجل نتائج غير قابل للتعديل' : 'Governed by cryptographic integrity and immutable records'}
-                </div>
-                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-center gap-2 text-[11px] font-bold text-[#e8cb93]">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>{ar ? 'سجل المسابقة محمي وموثّق داخل ميزان' : 'Competition record protected in MIZAN'}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

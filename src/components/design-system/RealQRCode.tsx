@@ -60,7 +60,9 @@ export function createQrMatrix(text:string){
 }
 
 export const RealQRCode:React.FC<{value:string;size?:number;label?:string;className?:string}>=({value,size=160,label='رمز مرور ميزان',className=''})=>{
- const matrix=useMemo(()=>createQrMatrix(value),[value]);const quiet=4;const total=matrix.length+quiet*2;const path=useMemo(()=>{const parts:string[]=[];matrix.forEach((row,r)=>row.forEach((dark,c)=>{if(dark)parts.push(`M${c+quiet} ${r+quiet}h1v1h-1z`)}));return parts.join('');},[matrix]);
+ const result=useMemo(()=>{try{return {matrix:createQrMatrix(value),error:false}}catch{return {matrix:[] as boolean[][],error:true}}},[value]);
+ const matrix=result.matrix;const quiet=4;const total=(matrix.length||25)+quiet*2;const path=useMemo(()=>{const parts:string[]=[];matrix.forEach((row,r)=>row.forEach((dark,c)=>{if(dark)parts.push(`M${c+quiet} ${r+quiet}h1v1h-1z`)}));return parts.join('');},[matrix]);
+ if(result.error)return <div className={`grid place-items-center rounded-xl border border-dashed border-[#d8d6cf] bg-[#faf9f5] p-3 text-center text-[10px] font-bold leading-5 text-[#696f6b] ${className}`} style={{width:size,height:size}} role="img" aria-label={label}>تعذّر رسم الرمز لهذا الرابط الطويل.<br/>استخدم زر نسخ الرابط.</div>;
  return <svg className={className} width={size} height={size} viewBox={`0 0 ${total} ${total}`} role="img" aria-label={label} shapeRendering="crispEdges"><rect width={total} height={total} fill="#fffefb"/><path d={path} fill="#17221e"/></svg>;
 };
 

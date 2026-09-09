@@ -1,9 +1,9 @@
 import crypto from 'crypto';
 
 export interface FirebaseBaseIdentity { uid:string; email?:string; raw:Record<string,unknown>; }
-export interface FirebaseVerifiedIdentity extends FirebaseBaseIdentity { role:string; organizationId:string; competitionId?:string; }
+export interface FirebaseVerifiedIdentity extends FirebaseBaseIdentity { role:string; organizationId:string; operatorId?:string; competitionId?:string; }
 type JwtHeader={alg?:string;kid?:string;typ?:string};
-type JwtPayload=Record<string,unknown>&{aud?:string;iss?:string;sub?:string;exp?:number;iat?:number;email?:string;role?:string;org_id?:string;competition_id?:string};
+type JwtPayload=Record<string,unknown>&{aud?:string;iss?:string;sub?:string;exp?:number;iat?:number;email?:string;role?:string;org_id?:string;competition_id?:string;operator_id?:string};
 
 const decodeJson=<T>(part:string):T=>JSON.parse(Buffer.from(part,'base64url').toString('utf8')) as T;
 export function validateFirebaseBaseClaims(payload:JwtPayload,projectId:string,nowSeconds=Math.floor(Date.now()/1000)):FirebaseBaseIdentity{
@@ -23,9 +23,9 @@ export function firebaseSecondFactorPresent(raw:Record<string,unknown>){
 }
 
 export function validateFirebaseClaims(payload:JwtPayload,projectId:string,nowSeconds=Math.floor(Date.now()/1000)):FirebaseVerifiedIdentity{
-  const base=validateFirebaseBaseClaims(payload,projectId,nowSeconds);const role=String(payload.role||''),claimedOrganizationId=String(payload.org_id||''),organizationId=claimedOrganizationId||(role==='super_admin'?'__platform__':'');
+  const base=validateFirebaseBaseClaims(payload,projectId,nowSeconds);const role=String(payload.role||''),operatorId=payload.operator_id?String(payload.operator_id):undefined,claimedOrganizationId=String(payload.org_id||''),operatorNamespace=operatorId?`__operator__:${operatorId.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120)}`:'',organizationId=claimedOrganizationId||(role==='super_admin'?'__platform__':(['operator_owner','operator_admin'].includes(role)?operatorNamespace:''));
   if(!role||!organizationId)throw new Error('FIREBASE_MIZAN_CLAIMS_REQUIRED');
-  return {...base,role,organizationId,competitionId:payload.competition_id?String(payload.competition_id):undefined};
+  return {...base,role,organizationId,operatorId,competitionId:payload.competition_id?String(payload.competition_id):undefined};
 }
 
 let certCache:{expiresAt:number;certs:Record<string,string>}|null=null;
