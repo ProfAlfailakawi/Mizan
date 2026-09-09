@@ -156,7 +156,6 @@ export function arCount(
  * unchanged so support can still read them.
  */
 const SERVER_ERROR_AR: Record<string, string> = {
-  IDENTITY_REQUIRED: 'هذه الخدمة تتطلب تسجيل الدخول والخادم المباشر (غير متاحة في وضع العرض).',
   KFGQPC_LIBRARY_UNAVAILABLE: 'مكتبة المصدر الرسمي غير متاحة حاليًا.',
   KFGQPC_DELIVERY_STATUS_UNAVAILABLE: 'حالة تسليم المصدر الرسمي غير متاحة حاليًا.',
   SOURCE_NOT_CERTIFIED: 'المصدر غير معتمد علميًا بعد.',
@@ -167,6 +166,41 @@ const SERVER_ERROR_AR: Record<string, string> = {
   AUTHORIZATION_FAILED: 'تعذّر منح الإذن.',
   REVOKE_FAILED: 'تعذّر سحب الإذن.',
   SECURE_RUNTIME_UNAVAILABLE: 'تعذّر الوصول إلى خادم الأسئلة الآمن (غير متاح في وضع العرض).',
+  ACCOUNT_ALREADY_ACTIVE_IN_COMPETITION: 'هذا الحساب مفعّل بالفعل في هذه المسابقة.',
+  INVITATION_ALREADY_PENDING: 'توجد دعوة تفعيل سارية لهذا الحساب بالفعل.',
+  INVITATION_FIELDS_REQUIRED: 'أكمل الاسم والبريد وسبب إضافة المستخدم.',
+  INVITATION_NOT_FOUND: 'دعوة التفعيل غير موجودة أو لم تعد متاحة.',
+  INVITATION_NOT_PENDING: 'هذه الدعوة ليست بانتظار الاعتماد.',
+  ACTIVATION_TOKEN_INVALID: 'رابط التفعيل غير صالح أو انتهت صلاحيته. اطلب رمز QR جديدًا.',
+  ACTIVATION_EMAIL_MISMATCH: 'البريد المسجل لا يطابق البريد المرتبط بالدعوة.',
+  ACTIVATION_FAILED: 'تعذر تفعيل الحساب. اطلب رمز تفعيل جديدًا وحاول مرة أخرى.',
+  ACCOUNT_NOT_PROVISIONED: 'الحساب صحيح، لكنه غير مضاف إلى هذه الجهة بعد.',
+  ACCOUNT_NOT_FOUND: 'الحساب غير موجود في هذا النطاق.',
+  ACCOUNT_NOT_ACTIVE: 'هذا الحساب غير نشط حاليًا.',
+  IDENTITY_GOVERNANCE_NOT_CONFIGURED: 'خدمة إدارة الحسابات غير مهيأة على الخادم.',
+  IDENTITY_REQUIRED: 'يلزم تسجيل الدخول بحساب مخول لإكمال هذه العملية.',
+  COMPETITION_SCOPE_REQUIRED: 'اختر المسابقة التي ستُمنح فيها هذه الصلاحية.',
+  COMPETITION_SCOPE_MISMATCH: 'هذه الصلاحية تخص مسابقة أخرى.',
+  COMPETITION_ACCESS_CLOSED: 'المسابقة مغلقة ولا تسمح بوصول تشغيلي جديد.',
+  ROLE_GRANT_NOT_ALLOWED: 'ليس لديك صلاحية منح هذا الدور.',
+  ROLE_NOT_ALLOWED: 'هذا الدور غير مسموح لهذا الإجراء.',
+  ROLE_RETIRED: 'هذا الدور لم يعد مستخدمًا في النظام.',
+  SELF_ACCOUNT_CHANGE_NOT_ALLOWED: 'لا يمكن تعديل حسابك من إجراء إدارة المستخدمين هذا.',
+  ORG_ADMIN_PROTECTED: 'حساب مدير الجهة محمي ولا يمكن تغييره من هذا المستوى.',
+  SUPER_ADMIN_PROTECTED: 'حساب مالك المنصة محمي ولا يمكن تغييره من هذا المستوى.',
+  LAST_ORG_ADMIN_PROTECTED: 'لا يمكن إيقاف آخر مدير نشط للجهة. عيّن مديرًا آخر أولًا.',
+  CROSS_TENANT_GRANT_BLOCKED: 'لا يمكن منح صلاحية خارج الجهة الحالية.',
+  PRIVILEGED_SESSION_CONFLICT: 'هذا الحساب الحساس مفتوح على جهاز آخر. أغلق الجلسة القديمة أو استخدم الاستيلاء الآمن.',
+  MFA_REQUIRED: 'يلزم إكمال التحقق بخطوتين لهذا الحساب.',
+  DEVICE_ID_REQUIRED: 'تعذر تحديد الجهاز لهذه الجلسة.',
+  TENANT_SUSPENDED: 'هذه الجهة موقوفة حاليًا.',
+  RATE_LIMITED: 'تمت محاولات كثيرة خلال وقت قصير. انتظر قليلًا ثم أعد المحاولة.',
+  PASSWORD_RESET_REQUEST_NOT_FOUND: 'طلب تغيير كلمة المرور غير موجود أو انتهت صلاحيته.',
+  PASSWORD_RESET_REQUEST_EXPIRED: 'انتهت صلاحية طلب تغيير كلمة المرور. اطلب رابطًا جديدًا.',
+  PASSWORD_RESET_REQUEST_NOT_PENDING: 'تم التعامل مع طلب تغيير كلمة المرور مسبقًا.',
+  PASSWORD_RESET_NOT_ALLOWED: 'ليس لديك صلاحية اعتماد طلب تغيير كلمة المرور هذا.',
+  PASSWORD_RESET_LINK_UNAVAILABLE: 'تعذر إنشاء رابط تغيير كلمة المرور الآن. أعد المحاولة لاحقًا.',
+  PASSWORD_RESET_TOKEN_INVALID: 'رابط تغيير كلمة المرور غير صالح أو استُخدم من قبل.',
 };
 const SERVER_ERROR_EN: Record<string, string> = {
   IDENTITY_REQUIRED: 'This service requires sign-in and the live server (unavailable in demo).',
@@ -183,7 +217,9 @@ const SERVER_ERROR_EN: Record<string, string> = {
 };
 export function serverErrorLabel(code: string, ar: boolean): string {
   const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;
-  return map[code] || code;
+  if(map[code])return map[code];
+  // لا نعرض enum أو exception أو رمز خدمة خارجي للمستخدم. الرمز يبقى في السجل التشخيصي فقط.
+  return ar ? 'تعذر إكمال العملية. تحقق من البيانات وحاول مرة أخرى.' : 'The operation could not be completed. Check the details and try again.';
 }
 
 /* مستوى الأتمتة معروضًا بالعربية (كان يُعرض Assisted/Automated/Autopilot خامًا). */

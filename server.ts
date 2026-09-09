@@ -46,6 +46,7 @@ import { decodePemFromEnv } from './server/pem';
 import { R2PrivateClient, r2ConfigFromEnv } from './server/r2-private';
 import { ControlTowerRepository } from './server/control-tower';
 import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type TelemetrySubject } from './server/ops-telemetry';
+import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -220,6 +221,37 @@ async function startServer() {
   });
 
   // Named-account identity governance. MIZAN stores no passwords; a verified Firebase identity is bound once to a scoped MIZAN invitation.
+  // Password recovery is deliberately administrator-mediated: no Firebase recovery email is sent.
+  // The public request is enumeration-safe; unknown emails receive the same acknowledgement.
+  app.post('/api/identity/password-reset/request',sensitiveIdentityRateLimit,(req,res)=>{
+    if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});
+    const email=String(req.body?.email||'').trim();
+    try{identityGovernance.requestPasswordReset(email);}catch{/* Keep account existence private. */}
+    return res.status(202).json({accepted:true,message:'تم إرسال الطلب إلى المسؤول إن كان الحساب مسجلاً ونشطًا.'});
+  });
+  app.post('/api/identity/password-reset/:id/issue',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
+    if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});
+    try{
+      const actor=(req as any).mizanIdentity as ServerIdentity;const request=identityGovernance.authorizePasswordResetIssue(actor,String(req.params.id));
+      const generated=await generateIdentityPlatformPasswordReset(firebaseProjectId,request.email,String(req.ip||''));
+      const shareToken=crypto.randomBytes(32).toString('base64url');const expiresAt=new Date(Date.now()+30*60_000).toISOString();
+      const configuredOrigin=String(process.env.MIZAN_PUBLIC_APP_ORIGIN||'').trim();let origin='';
+      if(configuredOrigin){const u=new URL(configuredOrigin);if(!['http:','https:'].includes(u.protocol))throw new Error('PASSWORD_RESET_LINK_UNAVAILABLE');origin=u.origin;}
+      else {const headerOrigin=String(req.headers.origin||'');if(headerOrigin){const u=new URL(headerOrigin);if(['http:','https:'].includes(u.protocol)&&u.hostname===req.hostname)origin=u.origin;}if(!origin)origin=`${req.protocol}://${req.get('host')}`;}
+      const resetUrl=`${origin}/#reset-password?oobCode=${encodeURIComponent(generated.oobCode)}&rid=${encodeURIComponent(request.id)}&rt=${encodeURIComponent(shareToken)}`;
+      const updated=identityGovernance.markPasswordResetIssued(actor,request.id,shareToken,expiresAt);
+      return res.status(201).json({request:updated,resetUrl,expiresAt});
+    }catch(err){return res.status(400).json({code:err instanceof Error?err.message:'PASSWORD_RESET_LINK_UNAVAILABLE'});}
+  });
+  app.post('/api/identity/password-reset/validate',sensitiveIdentityRateLimit,(req,res)=>{
+    if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});
+    try{return res.json(identityGovernance.validatePasswordResetShare(String(req.body?.requestId||''),String(req.body?.token||'')));}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'PASSWORD_RESET_TOKEN_INVALID'});}
+  });
+  app.post('/api/identity/password-reset/used',sensitiveIdentityRateLimit,(req,res)=>{
+    if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});
+    try{return res.json(identityGovernance.consumePasswordResetShare(String(req.body?.requestId||''),String(req.body?.token||'')));}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'PASSWORD_RESET_TOKEN_INVALID'});}
+  });
+
   app.post('/api/identity/invitation/preview',sensitiveIdentityRateLimit,(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{return res.json({invitation:identityGovernance.previewInvitation(String(req.body?.activationToken||''))})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'ACTIVATION_TOKEN_INVALID'})}});
   app.get('/api/identity/me',requireFirebaseBase,(req,res)=>{const base=(req as any).firebaseBase as {uid:string;email?:string;raw:Record<string,unknown>};const managed=identityGovernance?.identityForUid(base.uid)||null;const identity=identityFromBase(base);if(!identity)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});if(!mfaSatisfied(base,identity.role))return res.status(403).json({code:'MFA_REQUIRED'});let session:any=undefined;if(identityGovernance&&managed){const deviceId=String(req.headers['x-mizan-device-id']||'');if(deviceId){try{session=identityGovernance.openSession(identity,deviceId,String(req.headers['x-mizan-device-name']||''),firebaseSecondFactorPresent(base.raw)?'MFA':'SINGLE_FACTOR')}catch(err){const code=err instanceof Error?err.message:'SESSION_FAILED';if(code==='PRIVILEGED_SESSION_CONFLICT')return res.status(409).json({code});return res.status(400).json({code})}}}res.json({identity,session,managed:!!managed});});
   app.post('/api/identity/activate',requireFirebaseBase,(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});const base=(req as any).firebaseBase as {uid:string;email?:string};try{const result=identityGovernance.activate(base,String(req.body?.activationToken||''));res.status(201).json(result)}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'ACTIVATION_FAILED'})}});

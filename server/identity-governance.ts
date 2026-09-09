@@ -14,7 +14,8 @@ type Account={id:string;uid:string;organizationId:string;email:string;displayNam
 type Grant={id:string;accountId:string;organizationId:string;competitionId?:string;committeeId?:string;role:GovernanceRole;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;createdBy:string;approvedBy?:string};
 type AuthSession={id:string;uid:string;accountId:string;organizationId:string;competitionId?:string;role:GovernanceRole;deviceId:string;deviceName?:string;authenticationAssurance:'MFA'|'SINGLE_FACTOR';openedAt:string;lastSeenAt:string;expiresAt:string;status:'ACTIVE'|'REVOKED'|'EXPIRED'|'CONFLICT_BLOCKED';revokedAt?:string;revokedBy?:string;revocationReason?:string};
 type CompetitionClosure={organizationId:string;competitionId:string;status:'completed'|'archived';closedAt:string;closedBy:string;reason:string};
-type State={version:1;invitations:Invitation[];accounts:Account[];grants:Grant[];sessions:AuthSession[];competitionClosures?:CompetitionClosure[]};
+export type PasswordResetRequest={id:string;organizationId:string;accountId:string;uid:string;email:string;displayName:string;reviewerRole:'org_admin'|'super_admin';status:'PENDING'|'ISSUED'|'USED'|'EXPIRED'|'REVOKED';requestedAt:string;requestExpiresAt:string;issuedAt?:string;issuedBy?:string;linkExpiresAt?:string;shareTokenHash?:string;usedAt?:string};
+type State={version:1;invitations:Invitation[];accounts:Account[];grants:Grant[];sessions:AuthSession[];competitionClosures?:CompetitionClosure[];passwordResetRequests?:PasswordResetRequest[]};
 export type AuditRow={sequence:number;timestamp:string;organizationId:string;actorId:string;actorRole:string;action:string;entityType:string;entityId:string;reason?:string;previousHash:string;hash:string};
 
 const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
@@ -47,7 +48,7 @@ export class IdentityGovernanceRepository{
     if(!dir)throw new Error('IDENTITY_GOVERNANCE_DIR_REQUIRED');
     fs.mkdirSync(dir,{recursive:true,mode:0o700});
     this.file=path.join(dir,'identity-governance.json');
-    if(!fs.existsSync(this.file))this.write({version:1,invitations:[],accounts:[],grants:[],sessions:[],competitionClosures:[]});
+    if(!fs.existsSync(this.file))this.write({version:1,invitations:[],accounts:[],grants:[],sessions:[],competitionClosures:[],passwordResetRequests:[]});
   }
 
   private auditFile(organizationId:string){return path.join(this.dir,`identity-audit-${safeSegment(organizationId)}.jsonl`)}
@@ -76,7 +77,9 @@ export class IdentityGovernanceRepository{
     if(!another)throw new Error('LAST_ORG_ADMIN_PROTECTED');
   }
   private activeGrantFor(s:State,accountId:string,competitionId?:string){return s.grants.find(g=>g.accountId===accountId&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!competitionId||g.competitionId===competitionId))}
-  private cleanup(s:State){const now=Date.now();for(const x of s.invitations)if(['READY','PENDING_APPROVAL'].includes(x.status)&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of s.sessions)if(x.status==='ACTIVE'&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';}
+  private visibleGrantFor(s:State,accountId:string,competitionId?:string){return s.grants.find(g=>g.accountId===accountId&&['ACTIVE','SUSPENDED'].includes(g.status)&&!isRetiredIdentityRole(g.role)&&(!competitionId||g.competitionId===competitionId))}
+  private passwordResets(s:State){return s.passwordResetRequests||(s.passwordResetRequests=[]);}
+  private cleanup(s:State){const now=Date.now();for(const x of s.invitations)if(['READY','PENDING_APPROVAL'].includes(x.status)&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of s.sessions)if(x.status==='ACTIVE'&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of this.passwordResets(s)){if(x.status==='PENDING'&&new Date(x.requestExpiresAt).getTime()<=now)x.status='EXPIRED';if(x.status==='ISSUED'&&(!x.linkExpiresAt||new Date(x.linkExpiresAt).getTime()<=now)){x.status='EXPIRED';delete x.shareTokenHash;}}}
   private closures(s:State){return s.competitionClosures||(s.competitionClosures=[]);}
   private isCompetitionClosed(s:State,organizationId:string,competitionId?:string){return Boolean(competitionId&&this.closures(s).some(x=>x.organizationId===organizationId&&x.competitionId===competitionId&&['completed','archived'].includes(x.status)));}
   private assertCompetitionOpen(s:State,organizationId:string,competitionId: string|undefined,role?:GovernanceRole){if(this.isCompetitionClosed(s,organizationId,competitionId)&&(!role||!ARCHIVE_VISIBILITY_ROLES.has(role)))throw new Error('COMPETITION_ACCESS_CLOSED');}
@@ -85,7 +88,7 @@ export class IdentityGovernanceRepository{
     if(a.organizationId!==scope)return false;
     if(actor.role!=='super_admin'&&this.isSuperAdminAccount(s,a.id))return false;
     const competitionScope=actor.role==='comp_admin'&&actor.competitionId?actor.competitionId:requestedCompetitionId;
-    const grant=this.activeGrantFor(s,a.id,competitionScope);
+    const grant=this.visibleGrantFor(s,a.id,competitionScope);
     if(!grant)return false;
     return true;
   }
@@ -106,15 +109,18 @@ export class IdentityGovernanceRepository{
     const scope=actor.role==='super_admin'&&requestedOrganizationId?requestedOrganizationId:actor.organizationId;
     const competitionScope=actor.role==='comp_admin'&&actor.competitionId?actor.competitionId:requestedCompetitionId;
     if(actor.role==='comp_admin'&&requestedCompetitionId&&actor.competitionId&&requestedCompetitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
-    const scopedGrants=s.grants.filter(g=>g.organizationId===scope&&!isRetiredIdentityRole(g.role)&&(!competitionScope||g.competitionId===competitionScope));
+    const scopedGrants=s.grants.filter(g=>g.organizationId===scope&&!isRetiredIdentityRole(g.role)&&g.status!=='REVOKED'&&(!competitionScope||g.competitionId===competitionScope));
     const ids=new Set(scopedGrants.map(g=>g.accountId));
-    const accounts=s.accounts.filter(a=>ids.has(a.id)&&this.accountVisibleTo(actor,s,a,scope,competitionScope));
+    const accounts=s.accounts.filter(a=>a.status!=='REVOKED'&&ids.has(a.id)&&this.accountVisibleTo(actor,s,a,scope,competitionScope));
     const visibleIds=new Set(accounts.map(a=>a.id));
+    const invitations=s.invitations.filter(inv=>inv.organizationId===scope&&!isRetiredIdentityRole(inv.requestedRole)&&(!competitionScope||inv.competitionId===competitionScope)&&(actor.role!=='comp_admin'||!actor.competitionId||!inv.competitionId||inv.competitionId===actor.competitionId)).map(inv=>({...inv,activationTokenHash:undefined}));
+    const passwordResetRequests=this.passwordResets(s).filter(x=>x.organizationId===scope&&(actor.role==='super_admin'||(actor.role==='org_admin'&&x.reviewerRole==='org_admin'))).map(x=>({...x,shareTokenHash:undefined}));
     return {
       accounts,
       grants:scopedGrants.filter(g=>visibleIds.has(g.accountId)),
-      invitations:s.invitations.filter(inv=>inv.organizationId===scope&&!isRetiredIdentityRole(inv.requestedRole)&&(!competitionScope||inv.competitionId===competitionScope)&&(actor.role!=='comp_admin'||!actor.competitionId||!inv.competitionId||inv.competitionId===actor.competitionId)).map(inv=>({...inv,activationTokenHash:undefined})),
-      sessions:s.sessions.filter(x=>visibleIds.has(x.accountId)&&x.status==='ACTIVE'&&(!competitionScope||x.competitionId===competitionScope)),
+      invitations,
+      sessions:s.sessions.filter(x=>visibleIds.has(x.accountId)&&(!competitionScope||x.competitionId===competitionScope)).sort((a,b)=>String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))).slice(0,500),
+      passwordResetRequests,
     };
   }
 
@@ -304,6 +310,44 @@ export class IdentityGovernanceRepository{
     else closures.unshift({organizationId:targetOrganizationId,competitionId,status:'completed',closedAt:now,closedBy:actor.uid,reason:reason.trim()});
     this.write(s);this.appendAudit({...actor,organizationId:targetOrganizationId},'COMPETITION_ACCESS_CLOSED','Competition',competitionId,reason.trim());
     return {closed:true,organizationId:targetOrganizationId,competitionId,revokedGrants:grants,revokedSessions:sessions,revokedInvitations:invitations,closedAt:now};
+  }
+
+
+  /** استقبال طلب عام دون كشف إن كان البريد مسجلاً؛ نقطة النهاية تُرجع إقرارًا عامًا دائمًا. */
+  requestPasswordReset(emailInput:string){
+    const email=normalizeEmail(emailInput);if(!email||!email.includes('@'))return null;
+    const s=this.read();this.cleanup(s);const account=s.accounts.find(a=>a.status==='ACTIVE'&&normalizeEmail(a.email)===email);if(!account)return null;
+    const activeGrants=s.grants.filter(g=>g.accountId===account.id&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role));if(!activeGrants.length)return null;
+    const reviewerRole:PasswordResetRequest['reviewerRole']=activeGrants.some(g=>g.role==='org_admin'||g.role==='super_admin')?'super_admin':'org_admin';
+    const now=new Date();for(const old of this.passwordResets(s))if(old.accountId===account.id&&['PENDING','ISSUED'].includes(old.status)){old.status='REVOKED';delete old.shareTokenHash;}
+    const request:PasswordResetRequest={id:crypto.randomUUID(),organizationId:account.organizationId,accountId:account.id,uid:account.uid,email:account.email,displayName:account.displayName,reviewerRole,status:'PENDING',requestedAt:now.toISOString(),requestExpiresAt:new Date(now.getTime()+24*3600_000).toISOString()};
+    this.passwordResets(s).unshift(request);this.write(s);this.appendAudit({uid:account.uid,role:'password_reset_request',organizationId:account.organizationId},'PASSWORD_RESET_REQUESTED','PasswordResetRequest',request.id,reviewerRole==='super_admin'?'Request routed to platform owner':'Request routed to organization administrator');return request;
+  }
+
+  authorizePasswordResetIssue(actor:ServerIdentity,id:string){
+    const s=this.read();this.cleanup(s);const request=this.passwordResets(s).find(x=>x.id===id);if(!request)throw new Error('PASSWORD_RESET_REQUEST_NOT_FOUND');
+    if(!['PENDING','ISSUED'].includes(request.status))throw new Error(request.status==='EXPIRED'?'PASSWORD_RESET_REQUEST_EXPIRED':'PASSWORD_RESET_REQUEST_NOT_PENDING');
+    if(request.reviewerRole==='super_admin'&&actor.role!=='super_admin')throw new Error('PASSWORD_RESET_NOT_ALLOWED');
+    if(request.reviewerRole==='org_admin'&&!['org_admin','super_admin'].includes(actor.role))throw new Error('PASSWORD_RESET_NOT_ALLOWED');
+    if(actor.role!=='super_admin'&&actor.organizationId!==request.organizationId)throw new Error('PASSWORD_RESET_NOT_ALLOWED');
+    return {...request,shareTokenHash:undefined};
+  }
+
+  markPasswordResetIssued(actor:ServerIdentity,id:string,shareToken:string,linkExpiresAt:string){
+    if(!shareToken||shareToken.length<20)throw new Error('PASSWORD_RESET_TOKEN_INVALID');this.authorizePasswordResetIssue(actor,id);
+    const s=this.read();this.cleanup(s);const request=this.passwordResets(s).find(x=>x.id===id);if(!request)throw new Error('PASSWORD_RESET_REQUEST_NOT_FOUND');
+    request.status='ISSUED';request.issuedAt=new Date().toISOString();request.issuedBy=actor.uid;request.linkExpiresAt=linkExpiresAt;request.shareTokenHash=hash(shareToken);this.write(s);this.appendAudit({...actor,organizationId:request.organizationId},'PASSWORD_RESET_LINK_ISSUED','PasswordResetRequest',request.id,'One-time reset link issued to administrator for secure handoff');return {...request,shareTokenHash:undefined};
+  }
+
+  validatePasswordResetShare(id:string,shareToken:string){
+    const s=this.read();this.cleanup(s);this.write(s);const request=this.passwordResets(s).find(x=>x.id===id&&x.status==='ISSUED');if(!request||!request.shareTokenHash||!request.linkExpiresAt||new Date(request.linkExpiresAt).getTime()<=Date.now())throw new Error('PASSWORD_RESET_TOKEN_INVALID');
+    const candidate=hash(String(shareToken||''));const a=Buffer.from(candidate);const b=Buffer.from(request.shareTokenHash);if(a.length!==b.length||!crypto.timingSafeEqual(a,b))throw new Error('PASSWORD_RESET_TOKEN_INVALID');
+    return {valid:true,requestId:request.id,displayName:request.displayName,expiresAt:request.linkExpiresAt};
+  }
+
+  consumePasswordResetShare(id:string,shareToken:string){
+    this.validatePasswordResetShare(id,shareToken);const s=this.read();this.cleanup(s);const request=this.passwordResets(s).find(x=>x.id===id&&x.status==='ISSUED');if(!request)throw new Error('PASSWORD_RESET_TOKEN_INVALID');
+    request.status='USED';request.usedAt=new Date().toISOString();delete request.shareTokenHash;this.write(s);this.appendAudit({uid:request.uid,role:'password_reset_user',organizationId:request.organizationId},'PASSWORD_RESET_COMPLETED','PasswordResetRequest',request.id,'User set a new password through one-time administrator-issued link');return {used:true,requestId:request.id};
   }
 
   audit(actor:ServerIdentity,limit=500){if(!['super_admin','org_admin','comp_admin','auditor'].includes(actor.role))throw new Error('AUDIT_NOT_ALLOWED');const auditFile=this.auditFile(actor.organizationId);if(!fs.existsSync(auditFile))return [] as AuditRow[];const rows=fs.readFileSync(auditFile,'utf8').split('\n').filter(Boolean).map(x=>JSON.parse(x) as AuditRow);return rows.slice(-Math.max(1,Math.min(5000,limit))).reverse()}

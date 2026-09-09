@@ -320,6 +320,18 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
 
+
+async function deleteScopedDocument(collectionName:string,id:string){
+  if(globalState.isOffline||!auth.currentUser)return false;
+  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
+  try{
+    const {db,doc,deleteDoc}=await getFirestoreClient();
+    await deleteDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id));
+    if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
+    return true;
+  }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
+}
+
 const JOURNEY_PUBLISHERS:Role[]=['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'];
 async function publishPublicJourneyRecord(participant:Participant,revoked=false){
   if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return;
@@ -1236,8 +1248,13 @@ export function useAppStore() {
       actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'REGISTRATION_CREATED', entityType:'Participant', entityId:participant.id,
       humanSummaryArabic:`استلام طلب ${code} ومعالجته وفق سياسة التسجيل الخاصة بالمسابقة`, humanSummaryEnglish:`Received ${code} and processed it under this competition registration policy`, currentStateHash:`PENDING:${newId('audit')}`
     }, ...globalState.auditLogs];
+    const finalParticipant=globalState.participants.find(p => p.id === participant.id)!;
+    // انشر الحالة النهائية (approved/under_review) مع مفتاح الرحلة نفسه. كانت النسخة الأولى
+    // وحدها تُحفظ، فيعود الطالب إلى رابط بلا سجل عام صالح فيبدو زر «العودة لمشاركتي» فارغًا.
+    void persistScopedDocument('participants',finalParticipant.id,finalParticipant as unknown as Record<string,unknown>);
+    void publishPublicJourneyRecord(finalParticipant);
     notify();
-    return globalState.participants.find(p => p.id === participant.id)!;
+    return finalParticipant;
   };
 
   const reviewParticipant = (participantId: string, decision: 'approved' | 'rejected', reason = '') => {
@@ -1493,6 +1510,28 @@ export function useAppStore() {
     notify();
   };
 
+  const removeCommittee = (committeeId:string) => {
+    const committee=globalState.committees.find(c=>c.id===committeeId);
+    if(!committee)return {ok:false,mode:'not_found' as const};
+    const hasParticipantHistory=globalState.participants.some(p=>p.assignedCommitteeId===committeeId);
+    const isActive=globalState.activeSession.committee?.id===committeeId||Boolean(committee.currentParticipantId);
+    const hasHistory=hasParticipantHistory||isActive||committee.completedCount>0;
+    if(hasHistory){
+      const paused={...committee,status:'paused' as const,currentParticipantId:undefined};
+      globalState.committees=globalState.committees.map(c=>c.id===committeeId?paused:c);
+      void persistScopedDocument('committees',paused.id,paused as unknown as Record<string,unknown>);
+      auditTrustAction('COMMITTEE_ARCHIVED_FOR_HISTORY','Committee',committeeId,'لم تُحذف اللجنة لأن لها سجلًا تشغيليًا؛ تم إيقافها مع حفظ التاريخ','Committee preserved and paused because operational history exists');
+      notify();
+      return {ok:false,mode:'paused_due_to_history' as const};
+    }
+    globalState.committees=globalState.committees.filter(c=>c.id!==committeeId);
+    globalState.judges=globalState.judges.map(j=>j.assignedCommitteeId===committeeId?{...j,assignedCommitteeId:undefined}:j);
+    void deleteScopedDocument('committees',committeeId);
+    auditTrustAction('COMMITTEE_DELETED','Committee',committeeId,'حذف لجنة فارغة لم تبدأ أي جلسة تحكيم','Deleted an empty committee with no judging history');
+    notify();
+    return {ok:true,mode:'deleted' as const};
+  };
+
   const scientificSourcesForCompetition = () => globalState.competition.categories.flatMap(category => {
     const explicit=(category.readingContexts||[]).map(rc=>TEN_QIRAAT_GRAPH.find(x=>x.qiraahId===rc.qiraahId&&x.rawiId===rc.rawiId)).filter(Boolean);
     const readings=explicit.length?explicit:resolveReadings({riwaya:category.riwaya});
@@ -1516,31 +1555,48 @@ export function useAppStore() {
       if(source&&!content&&globalState.competition.status==='live')out.push({code:'CERTIFIED_QURAN_CONTENT_REQUIRED',message:`${category.name}: certified source content is not available for exact package ${source.packageHash||source.id}.`,categoryId:category.id});
       return out;
     });
-    const blockers=contradictions.filter(x=>x.severity==='BLOCKER');
-    // فتح التسجيل مرحلة قبول طلبات، وليس كشف أسئلة. حجز السؤال الخادمي ومحتوى الحزمة
-    // يبقيان بوابتين صارمتين قبل التشغيل الحي، ولا يمنعان نشر نموذج التسجيل.
-    if(issues.length||blockers.length||(productionMode&&scientificBlockers.length)) return {ok:false,issues:[...issues,...blockers.map(x=>x.title),...scientificBlockers.map(x=>x.message)],scientificBlockers,contradictions};
+    const laterStageWarnings=[...contradictions.filter(x=>x.severity==='BLOCKER').map(x=>x.title),...scientificBlockers.map(x=>x.message)];
+    // فتح التسجيل يعني استقبال الطلبات فقط. نقص المحكمين، تجهيز اللجان، المصدر العلمي للسؤال
+    // وتعارضات نشر النتائج تُعالج قبل التحكيم/النشر في بواباتها الخاصة، ولا تجعل زر التسجيل ميتًا.
+    if(issues.length) return {ok:false,issues:issues.map(x=>x.ar),warnings:laterStageWarnings,scientificBlockers,contradictions};
     globalState.contradictionIssues=contradictions;
     globalState.competition={...globalState.competition,status:'registration_open'};
     markCompetitionConfigChanged();
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
-    notify(); return {ok:true,issues:[],scientificBlockers,contradictions};
+    notify(); return {ok:true,issues:[],warnings:laterStageWarnings,scientificBlockers,contradictions};
+  };
+
+  const categoryPassageAyahRange=(category:Category|undefined)=>{
+    if(!category)return {} as {minAyahCount?:number;maxAyahCount?:number;targetAyahCount?:number};
+    if(category.passageMode==='ayat'&&category.ayatPerQuestion&&category.ayatPerQuestion>0){const n=Math.max(1,Math.round(category.ayatPerQuestion));return {minAyahCount:n,maxAyahCount:n,targetAyahCount:n};}
+    const legacyUnits=category.pagePortion==='quarter'?1:category.pagePortion==='half'?2:category.pagePortion==='third'?Math.max(1,Math.round(4/3)):category.pagePortion==='full'?4:undefined;
+    const units=category.pageQuarterUnits&&category.pageQuarterUnits>0?category.pageQuarterUnits:legacyUnits;
+    if(!units)return category.ayatPerQuestion&&category.ayatPerQuestion>0?{minAyahCount:category.ayatPerQuestion,maxAyahCount:category.ayatPerQuestion,targetAyahCount:category.ayatPerQuestion}:{};
+    // تقدير تشغيلي فقط: طول الآية متغير، لذلك يحدد «ربع/نصف/وجه» نافذة آيات لا رقمًا نصيًا جامدًا.
+    const presets:Record<number,{minAyahCount:number;maxAyahCount:number}>={1:{minAyahCount:1,maxAyahCount:3},2:{minAyahCount:3,maxAyahCount:5},3:{minAyahCount:4,maxAyahCount:7},4:{minAyahCount:6,maxAyahCount:9}};
+    const range=presets[Math.round(units)]||{minAyahCount:Math.max(1,Math.round(units*1.5)),maxAyahCount:Math.max(2,Math.round(units*2.25))};
+    return {...range,targetAyahCount:Math.max(1,Math.round((range.minAyahCount+range.maxAyahCount)/2))};
   };
 
   const sourceResolvedQuestionPool = (participant:Participant, source:QuranSourceManifestRecord, content:QuranSourceContentRecord) => {
     const reading=resolveReading({riwaya:participant.riwaya});
     if(!reading)return [];
+    const category=globalState.competition.categories.find(c=>c.id===participant.categoryId);
+    const passage=categoryPassageAyahRange(category);
     const approved=new Set(globalState.questionGovernance.filter(g=>g.competitionId===globalState.competition.id&&g.status==='approved'&&g.sourceManifestId===source.id).map(g=>g.questionId));
     const rows=new Map(content.rows.map(v=>[`${v.surah}:${v.ayah}`,v.text]));
     const candidates=DEVELOPMENT_QUESTION_BANK.filter(q=>{
       const qr=resolveReading({riwaya:q.riwaya});
-      return qr?.qiraahId===reading.qiraahId&&qr?.rawiId===reading.rawiId&&approved.has(q.id);
+      const available=q.endAyah-q.startAyah+1;
+      return qr?.qiraahId===reading.qiraahId&&qr?.rawiId===reading.rawiId&&approved.has(q.id)&&(!passage.minAyahCount||available>=passage.minAyahCount);
     });
     return candidates.flatMap(q=>{
+      // لا نمد السؤال المعتمد خارج حدوده العلمية؛ يمكن فقط تقصيره إلى طول الفئة.
+      const target=passage.targetAyahCount?Math.min(q.endAyah,q.startAyah+passage.targetAyahCount-1):q.endAyah;
       const verses:string[]=[];
-      for(let ayah=q.startAyah;ayah<=q.endAyah;ayah++){const text=rows.get(`${q.surahNumber}:${ayah}`);if(!text)return [];verses.push(text);}
+      for(let ayah=q.startAyah;ayah<=target;ayah++){const text=rows.get(`${q.surahNumber}:${ayah}`);if(!text)return [];verses.push(text);}
       const governance=globalState.questionGovernance.find(g=>g.competitionId===globalState.competition.id&&g.questionId===q.id&&g.sourceManifestId===source.id&&g.status==='approved');
-      return [{...q,riwaya:participant.riwaya,expectedTextArabic:verses.join(' '),difficultyRating:governance?.expertDifficulty??q.difficultyRating}];
+      return [{...q,endAyah:target,riwaya:participant.riwaya,expectedTextArabic:verses.join(' '),difficultyRating:governance?.expertDifficulty??q.difficultyRating}];
     });
   };
 
@@ -1593,18 +1649,12 @@ export function useAppStore() {
          from the text. The fixture bank remains only for when delivery is unreachable too. */
       /* مقدار الموضع من الوجه ⇒ مدى تقريبي لعدد الآيات. الوجه يظهر كاملًا على سطح المصحف،
          والتظليل يقع على هذا المقدار وحده. تقريبي لأن أطوال الآيات تتفاوت بين السور. */
-      const portion=category?.pagePortion;
-      const portionSpan=portion==='quarter'?{minAyahCount:1,maxAyahCount:3}
-        :portion==='third'?{minAyahCount:2,maxAyahCount:4}
-        :portion==='half'?{minAyahCount:3,maxAyahCount:5}
-        :portion==='full'?{minAyahCount:6,maxAyahCount:9}
-        :{};
-      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount,...portionSpan});
+      const passageSpan=categoryPassageAyahRange(category);
+      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:14,seedBase:`${globalState.competition.id}:${participant.id}`,maxJuz:category?.juzCount,minAyahCount:passageSpan.minAyahCount,maxAyahCount:passageSpan.maxAyahCount});
       pool=generated.length?generated:DEVELOPMENT_QUESTION_BANK;
     }
-    // إعدادات الفئة: طول المقطع (عدد الآيات) وعدد الأسئلة. تُطبَّق على المجمع قبل السحب فتبقى
-    // متسقة مع إثبات FairDraw، ويتحكم بها المنظّم لكل مستوى.
-    if(category?.ayatPerQuestion&&category.ayatPerQuestion>0){const span=category.ayatPerQuestion;pool=pool.map(q=>({...q,endAyah:Math.max(q.startAyah,q.startAyah+span-1)}));}
+    // عدد الأسئلة وطول الموضع الآن يأتيان من الفئة نفسها قبل FairDraw؛ فلا ينفصل «وجه/ربع»
+    // الذي اختاره المنظم عن السؤال الذي يصل إلى لجنة الطالب.
     const effPolicy=category?.questionsCount&&category.questionsCount>0?{...policy,questions:{...policy.questions,questionsPerParticipant:category.questionsCount}}:policy;
     try {
       const selection = await generateFairDraw({ pool, participant, policy:effPolicy, maxJuz: category?.juzCount,poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT' });
@@ -2269,7 +2319,7 @@ export function useAppStore() {
     updateCategory,
     removeCategory,
     addCommittee,
-    updateCommittee,
+    updateCommittee, removeCommittee,
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
