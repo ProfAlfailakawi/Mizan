@@ -14,7 +14,7 @@ type Account={id:string;uid:string;organizationId:string;operatorId?:string;emai
 type Grant={id:string;accountId:string;organizationId:string;operatorId?:string;competitionId?:string;committeeId?:string;role:GovernanceRole;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;createdBy:string;approvedBy?:string};
 type AuthSession={id:string;uid:string;accountId:string;organizationId:string;operatorId?:string;competitionId?:string;role:GovernanceRole;deviceId:string;deviceName?:string;authenticationAssurance:'MFA'|'SINGLE_FACTOR';openedAt:string;lastSeenAt:string;expiresAt:string;status:'ACTIVE'|'REVOKED'|'EXPIRED'|'CONFLICT_BLOCKED';revokedAt?:string;revokedBy?:string;revocationReason?:string};
 type CompetitionClosure={organizationId:string;competitionId:string;status:'completed'|'archived';closedAt:string;closedBy:string;reason:string};
-export type PasswordResetRequest={id:string;organizationId:string;operatorId?:string;accountId:string;uid:string;email:string;displayName:string;reviewerRole:'org_admin'|'operator_owner'|'super_admin';status:'PENDING'|'ISSUED'|'USED'|'EXPIRED'|'REVOKED';requestedAt:string;requestExpiresAt:string;issuedAt?:string;issuedBy?:string;linkExpiresAt?:string;shareTokenHash?:string;usedAt?:string};
+export type PasswordResetRequest={id:string;organizationId:string;operatorId?:string;competitionId?:string;accountId:string;uid:string;email:string;displayName:string;reviewerRole:'org_admin'|'operator_owner'|'super_admin';status:'PENDING'|'ISSUED'|'USED'|'EXPIRED'|'REVOKED';requestedAt:string;requestExpiresAt:string;issuedAt?:string;issuedBy?:string;linkExpiresAt?:string;shareTokenHash?:string;usedAt?:string};
 type State={version:1;invitations:Invitation[];accounts:Account[];grants:Grant[];sessions:AuthSession[];competitionClosures?:CompetitionClosure[];passwordResetRequests?:PasswordResetRequest[]};
 export type AuditRow={sequence:number;timestamp:string;organizationId:string;actorId:string;actorRole:string;action:string;entityType:string;entityId:string;reason?:string;previousHash:string;hash:string};
 
@@ -107,9 +107,13 @@ export class IdentityGovernanceRepository{
   }
   private assertManageableAccount(actor:ServerIdentity,s:State,account:Account){
     if(account.uid===actor.uid)throw new Error('SELF_ACCOUNT_CHANGE_NOT_ALLOWED');
-    const target=this.activeGrantFor(s,account.id);if(!target)throw new Error('ACCOUNT_NOT_FOUND');
+    const target=this.activeGrantFor(s,account.id)||this.visibleGrantFor(s,account.id);if(!target)throw new Error('ACCOUNT_NOT_FOUND');
     if(actor.role==='operator_owner'){
       if(!actor.operatorId||account.operatorId!==actor.operatorId||target.operatorId!==actor.operatorId||target.role!=='operator_admin')throw new Error('ACCOUNT_NOT_FOUND');
+      return target;
+    }
+    if(actor.role==='operator_admin'){
+      if(target.role!=='org_admin'||target.operatorId||!this.operatorCanReachOrganization(actor,account.organizationId))throw new Error('ACCOUNT_NOT_FOUND');
       return target;
     }
     if(actor.role!=='super_admin'&&account.organizationId!==actor.organizationId)throw new Error('ACCOUNT_NOT_FOUND');
@@ -118,6 +122,52 @@ export class IdentityGovernanceRepository{
     if(actor.role!=='super_admin'&&!this.canGrant(actor,target.role))throw new Error('ACCOUNT_MANAGEMENT_NOT_ALLOWED');
     if(actor.role==='comp_admin'&&actor.competitionId&&target.competitionId&&target.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
     return target;
+  }
+
+  private scopedInvitation(actor:ServerIdentity,s:State,id:string){
+    const invitation=s.invitations.find(i=>i.id===id&&!['ACTIVATED','REVOKED','EXPIRED'].includes(i.status));if(!invitation)throw new Error('INVITATION_NOT_FOUND');
+    if(actor.role==='operator_owner'){
+      if(!actor.operatorId||invitation.operatorId!==actor.operatorId||invitation.requestedRole!=='operator_admin')throw new Error('INVITATION_NOT_FOUND');
+    }else if(actor.role==='operator_admin'){
+      if(!(invitation.requestedRole==='org_admin'&&this.operatorCanReachOrganization(actor,invitation.organizationId)))throw new Error('INVITATION_NOT_FOUND');
+    }else{
+      if(actor.role!=='super_admin'&&invitation.organizationId!==actor.organizationId)throw new Error('INVITATION_NOT_FOUND');
+      if(actor.role==='comp_admin'&&actor.competitionId&&invitation.competitionId&&invitation.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
+      if(invitation.requestedRole==='org_admin'&&actor.role!=='super_admin')throw new Error('ORG_ADMIN_PROTECTED');
+    }
+    return invitation;
+  }
+
+  private canManageRoleChange(actor:ServerIdentity,current:Grant|Invitation,nextRole:GovernanceRole){
+    if(!isProvisionableGovernanceRole(nextRole))return false;
+    if(actor.role==='super_admin'){
+      if(current.operatorId)return ['operator_owner','operator_admin'].includes(nextRole);
+      return nextRole!=='super_admin'&&!OPERATOR_ROLES.has(nextRole);
+    }
+    if(actor.role==='operator_owner')return nextRole==='operator_admin';
+    if(actor.role==='operator_admin')return nextRole==='org_admin';
+    return this.canGrant(actor,nextRole);
+  }
+
+  notificationRecipients(actor:ServerIdentity){
+    const s=this.read();this.cleanup(s);this.write(s);
+    const visibleGrant=(g:Grant)=>{
+      if(g.status!=='ACTIVE'||isRetiredIdentityRole(g.role))return false;
+      if(actor.role==='super_admin'||actor.role==='support_agent')return true;
+      if(isOperatorRole(actor.role))return Boolean(actor.operatorId&&(g.operatorId===actor.operatorId||actor.operatorOrganizationIds?.includes(g.organizationId)));
+      if(g.organizationId!==actor.organizationId)return false;
+      if(actor.role==='comp_admin'&&actor.competitionId&&g.competitionId&&g.competitionId!==actor.competitionId)return false;
+      return true;
+    };
+    const byUid=new Map<string,{userId:string;displayName:string;email:string;roles:Set<string>;operatorId?:string;organizationId:string;competitionIds:Set<string>}>();
+    for(const account of s.accounts){
+      if(account.status!=='ACTIVE'||!account.uid)continue;
+      const scoped=s.grants.filter(g=>g.accountId===account.id&&visibleGrant(g));if(!scoped.length)continue;
+      const row=byUid.get(account.uid)||{userId:account.uid,displayName:account.displayName,email:account.email,roles:new Set<string>(),operatorId:account.operatorId,organizationId:account.organizationId,competitionIds:new Set<string>()};
+      for(const g of scoped){row.roles.add(g.role);if(g.operatorId)row.operatorId=g.operatorId;if(g.competitionId)row.competitionIds.add(g.competitionId)}
+      byUid.set(account.uid,row);
+    }
+    return [...byUid.values()].map(x=>({userId:x.userId,displayName:x.displayName,email:x.email,roles:[...x.roles],role:[...x.roles][0]||'',operatorId:x.operatorId,organizationId:x.organizationId,competitionIds:[...x.competitionIds]})).sort((a,b)=>a.displayName.localeCompare(b.displayName,'ar'));
   }
 
   list(actor:ServerIdentity,requestedOrganizationId?:string,requestedCompetitionId?:string,requestedOperatorId?:string){
@@ -155,7 +205,7 @@ export class IdentityGovernanceRepository{
     const accounts=s.accounts.filter(a=>a.status!=='REVOKED'&&ids.has(a.id)&&this.accountVisibleTo(actor,s,a,scope,competitionScope));
     const visibleIds=new Set(accounts.map(a=>a.id));
     const invitations=s.invitations.filter(inv=>inv.organizationId===scope&&!inv.operatorId&&!isRetiredIdentityRole(inv.requestedRole)&&(!competitionScope||!inv.competitionId||inv.competitionId===competitionScope)&&(actor.role!=='comp_admin'||!actor.competitionId||!inv.competitionId||inv.competitionId===actor.competitionId)).map(inv=>({...inv,activationTokenHash:undefined}));
-    const passwordResetRequests=this.passwordResets(s).filter(x=>x.organizationId===scope&&!x.operatorId&&(actor.role==='super_admin'||(actor.role==='org_admin'&&x.reviewerRole==='org_admin'))).map(x=>({...x,shareTokenHash:undefined}));
+    const passwordResetRequests=this.passwordResets(s).filter(x=>x.organizationId===scope&&!x.operatorId&&(!competitionScope||x.competitionId===competitionScope)&&(actor.role==='super_admin'||(actor.role==='org_admin'&&x.reviewerRole==='org_admin'))).map(x=>({...x,shareTokenHash:undefined}));
     return {accounts,grants:scopedGrants.filter(g=>visibleIds.has(g.accountId)),invitations,sessions:s.sessions.filter(x=>visibleIds.has(x.accountId)&&(!competitionScope||!x.competitionId||x.competitionId===competitionScope)).sort((a,b)=>String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))).slice(0,500),passwordResetRequests};
   }
 
@@ -217,6 +267,26 @@ export class IdentityGovernanceRepository{
     return {invitation:{...inv,activationTokenHash:undefined},activationToken:rawToken};
   }
 
+
+  updateInvitation(actor:ServerIdentity,id:string,input:{displayName?:string;email?:string;requestedRole?:GovernanceRole}){
+    const s=this.read();this.cleanup(s);const inv=this.scopedInvitation(actor,s,id);
+    const displayName=input.displayName===undefined?inv.displayName:String(input.displayName).trim();const email=input.email===undefined?inv.email:normalizeEmail(String(input.email));const nextRole=input.requestedRole||inv.requestedRole;
+    if(!displayName||!email||!email.includes('@'))throw new Error('INVITATION_FIELDS_REQUIRED');
+    if(nextRole!==inv.requestedRole&&!this.canManageRoleChange(actor,inv,nextRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');
+    if(nextRole!==inv.requestedRole){if(inv.requestedRole==='org_admin')throw new Error('ORG_ADMIN_PROTECTED');this.assertCompetitionOpen(s,inv.organizationId,inv.competitionId,nextRole)}
+    if(s.invitations.some(x=>x.id!==inv.id&&x.status==='READY'&&x.organizationId===inv.organizationId&&x.operatorId===inv.operatorId&&x.competitionId===inv.competitionId&&x.email===email&&x.requestedRole===nextRole))throw new Error('INVITATION_ALREADY_PENDING');
+    inv.displayName=displayName;inv.email=email;inv.requestedRole=nextRole;this.write(s);this.appendAudit({...actor,organizationId:inv.organizationId},'IDENTITY_INVITATION_UPDATED','Invitation',inv.id,'Pending identity invitation edited');return {invitation:{...inv,activationTokenHash:undefined}};
+  }
+
+  reissueInvitation(actor:ServerIdentity,id:string){
+    const s=this.read();this.cleanup(s);const inv=this.scopedInvitation(actor,s,id);if(inv.status!=='READY')throw new Error('INVITATION_NOT_READY');
+    const rawToken=crypto.randomBytes(24).toString('base64url');inv.activationTokenHash=hash(rawToken);inv.expiresAt=new Date(Date.now()+48*3600_000).toISOString();this.write(s);this.appendAudit({...actor,organizationId:inv.organizationId},'IDENTITY_INVITATION_REISSUED','Invitation',inv.id,'Pending invitation activation token reissued');return {invitation:{...inv,activationTokenHash:undefined},activationToken:rawToken};
+  }
+
+  revokeInvitation(actor:ServerIdentity,id:string,reason:string){
+    if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');const s=this.read();this.cleanup(s);const inv=this.scopedInvitation(actor,s,id);inv.status='REVOKED';delete inv.activationTokenHash;this.write(s);this.appendAudit({...actor,organizationId:inv.organizationId},'IDENTITY_INVITATION_REVOKED','Invitation',inv.id,reason.trim());return {removed:true,invitationId:inv.id};
+  }
+
   activate(base:{uid:string;email?:string},token:string){
     if(!base.uid||!base.email)throw new Error('VERIFIED_EMAIL_REQUIRED');
     const s=this.read();this.cleanup(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
@@ -267,13 +337,35 @@ export class IdentityGovernanceRepository{
     return {grant,account};
   }
 
+
+  updateAccount(actor:ServerIdentity,accountId:string,input:{displayName?:string}){
+    const s=this.read();const account=s.accounts.find(a=>a.id===accountId&&a.status!=='REVOKED');if(!account)throw new Error('ACCOUNT_NOT_FOUND');this.assertManageableAccount(actor,s,account);
+    const displayName=input.displayName===undefined?account.displayName:String(input.displayName).trim();if(!displayName)throw new Error('ACCOUNT_NAME_REQUIRED');account.displayName=displayName;this.write(s);this.appendAudit({...actor,organizationId:account.organizationId},'IDENTITY_ACCOUNT_UPDATED','Account',account.id,'Account display name updated');return {account};
+  }
+
+  resumeAccount(actor:ServerIdentity,accountId:string,reason:string){
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('RESUME_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('RESUME_REASON_REQUIRED');
+    const s=this.read();const account=s.accounts.find(a=>a.id===accountId&&a.status==='SUSPENDED');if(!account)throw new Error('ACCOUNT_NOT_SUSPENDED');this.assertManageableAccount(actor,s,account);
+    account.status='ACTIVE';delete account.suspendedAt;delete account.suspendedBy;delete account.suspensionReason;let resumed=0;
+    for(const g of s.grants)if(g.accountId===account.id&&g.status==='SUSPENDED'){if(this.isCompetitionClosed(s,g.organizationId,g.competitionId)&&!ARCHIVE_VISIBILITY_ROLES.has(g.role))continue;g.status='ACTIVE';resumed++}
+    this.write(s);this.appendAudit({...actor,organizationId:account.organizationId},'IDENTITY_ACCOUNT_RESUMED','Account',account.id,reason.trim());return {account,resumedGrants:resumed};
+  }
+
+  updateGrant(actor:ServerIdentity,grantId:string,input:{role:GovernanceRole;reason:string}){
+    if(input.reason.trim().length<5)throw new Error('UPDATE_REASON_REQUIRED');const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);const nextRole=input.role;
+    if(nextRole===grant.role)return {grant};if(!this.canManageRoleChange(actor,grant,nextRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');if(grant.role==='org_admin')this.assertOrgAdminContinuity(s,grant);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,nextRole);
+    if(s.grants.some(g=>g.id!==grant.id&&g.accountId===grant.accountId&&g.organizationId===grant.organizationId&&g.operatorId===grant.operatorId&&g.competitionId===grant.competitionId&&g.role===nextRole&&g.status==='ACTIVE'))throw new Error('ACCOUNT_ALREADY_ACTIVE_IN_COMPETITION');
+    const previous=grant.role;grant.role=nextRole;for(const x of s.sessions)if(x.accountId===grant.accountId&&x.status==='ACTIVE'&&x.organizationId===grant.organizationId&&x.competitionId===grant.competitionId){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Grant role changed'}
+    this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_UPDATED','Grant',grant.id,`${input.reason.trim()} · ${previous} -> ${nextRole}`);return {grant};
+  }
+
   resumeGrant(actor:ServerIdentity,grantId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('RESUME_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('RESUME_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('RESUME_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('RESUME_REASON_REQUIRED');
     const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,grant.role);if(grant.status!=='SUSPENDED')throw new Error('GRANT_NOT_SUSPENDED');grant.status='ACTIVE';this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_RESUMED','Grant',grant.id,reason);return {grant};
   }
 
   reissueQr(actor:ServerIdentity,grantId:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('QR_REISSUE_NOT_ALLOWED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('QR_REISSUE_NOT_ALLOWED');
     const s=this.read();this.cleanup(s);const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,grant.role);if(grant.status!=='ACTIVE')throw new Error('GRANT_NOT_ACTIVE');
     for(const inv of s.invitations)if(inv.organizationId===grant.organizationId&&inv.competitionId===grant.competitionId&&inv.email===normalizeEmail(account.email)&&inv.status==='READY'){inv.status='REVOKED';delete inv.activationTokenHash;}
     const rawToken=crypto.randomBytes(24).toString('base64url');const now=new Date();
@@ -282,21 +374,21 @@ export class IdentityGovernanceRepository{
   }
 
   suspendGrant(actor:ServerIdentity,grantId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
     const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant);grant.status='SUSPENDED';let count=0;
     for(const x of s.sessions)if(x.accountId===account.id&&x.competitionId===grant.competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Competition grant suspended';count++}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_SUSPENDED','Grant',grant.id,reason);return {grant,revokedSessions:count};
   }
 
   removeGrant(actor:ServerIdentity,grantId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
     const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant);grant.status='REVOKED';let count=0;
     for(const x of s.sessions)if(x.accountId===account.id&&x.competitionId===grant.competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Competition grant removed';count++}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_REMOVED','Grant',grant.id,reason);return {removed:true,grantId:grant.id,revokedSessions:count};
   }
 
   revokeGrantSessions(actor:ServerIdentity,grantId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin','head_judge'].includes(actor.role))throw new Error('SESSION_REVOCATION_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('REVOCATION_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin','head_judge'].includes(actor.role))throw new Error('SESSION_REVOCATION_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('REVOCATION_REASON_REQUIRED');
     const s=this.read();const grant=s.grants.find(g=>g.id===grantId&&g.status==='ACTIVE');if(!grant)throw new Error('GRANT_NOT_FOUND');
     if(actor.role==='operator_owner'){
       if(actor.operatorId&&grant.operatorId===actor.operatorId&&grant.role==='operator_admin'){}
@@ -309,7 +401,7 @@ export class IdentityGovernanceRepository{
   }
 
   suspend(actor:ServerIdentity,accountId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
     const s=this.read();const account=s.accounts.find(a=>a.id===accountId);if(!account)throw new Error('ACCOUNT_NOT_FOUND');this.assertManageableAccount(actor,s,account);
     for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant);
     account.status='SUSPENDED';account.suspendedAt=new Date().toISOString();account.suspendedBy=actor.uid;account.suspensionReason=reason.trim();
@@ -320,7 +412,7 @@ export class IdentityGovernanceRepository{
 
   /** Audit-preserving delete: removes access immediately without erasing historical evidence. */
   remove(actor:ServerIdentity,accountId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
     const s=this.read();const account=s.accounts.find(a=>a.id===accountId);if(!account)throw new Error('ACCOUNT_NOT_FOUND');this.assertManageableAccount(actor,s,account);
     for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant);
     account.status='REVOKED';account.suspendedAt=new Date().toISOString();account.suspendedBy=actor.uid;account.suspensionReason=reason.trim();
@@ -349,7 +441,7 @@ export class IdentityGovernanceRepository{
   }
 
   revokeSessions(actor:ServerIdentity,accountId:string,reason:string){
-    if(!['super_admin','operator_owner','org_admin','comp_admin','head_judge'].includes(actor.role))throw new Error('SESSION_REVOCATION_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('REVOCATION_REASON_REQUIRED');
+    if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin','head_judge'].includes(actor.role))throw new Error('SESSION_REVOCATION_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('REVOCATION_REASON_REQUIRED');
     const s=this.read();const account=s.accounts.find(a=>a.id===accountId);if(!account)throw new Error('ACCOUNT_NOT_FOUND');
     if(actor.role!=='head_judge')this.assertManageableAccount(actor,s,account);else if(account.organizationId!==actor.organizationId||this.isSuperAdminAccount(s,account.id))throw new Error('ACCOUNT_NOT_FOUND');
     let count=0;for(const x of s.sessions)if(x.accountId===accountId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason=reason.trim();count++}
@@ -384,7 +476,8 @@ export class IdentityGovernanceRepository{
     const reviewerRole:PasswordResetRequest['reviewerRole']=operatorOwner?'super_admin':operatorAdmin?'operator_owner':activeGrants.some(g=>g.role==='org_admin'||g.role==='super_admin')?'super_admin':'org_admin';
     const operatorId=activeGrants.find(g=>g.operatorId)?.operatorId||account.operatorId;
     const now=new Date();for(const old of this.passwordResets(s))if(old.accountId===account.id&&['PENDING','ISSUED'].includes(old.status)){old.status='REVOKED';delete old.shareTokenHash;}
-    const request:PasswordResetRequest={id:crypto.randomUUID(),organizationId:account.organizationId,operatorId,accountId:account.id,uid:account.uid,email:account.email,displayName:account.displayName,reviewerRole,status:'PENDING',requestedAt:now.toISOString(),requestExpiresAt:new Date(now.getTime()+24*3600_000).toISOString()};
+    const competitionId=activeGrants.find(g=>g.competitionId)?.competitionId;
+    const request:PasswordResetRequest={id:crypto.randomUUID(),organizationId:account.organizationId,operatorId,competitionId,accountId:account.id,uid:account.uid,email:account.email,displayName:account.displayName,reviewerRole,status:'PENDING',requestedAt:now.toISOString(),requestExpiresAt:new Date(now.getTime()+24*3600_000).toISOString()};
     this.passwordResets(s).unshift(request);this.write(s);this.appendAudit({uid:account.uid,role:'password_reset_request',organizationId:account.organizationId},'PASSWORD_RESET_REQUESTED','PasswordResetRequest',request.id,reviewerRole==='super_admin'?'Request routed to platform owner':reviewerRole==='operator_owner'?'Request routed to operator owner':'Request routed to organization administrator');return request;
   }
 
@@ -414,6 +507,10 @@ export class IdentityGovernanceRepository{
   consumePasswordResetShare(id:string,shareToken:string){
     this.validatePasswordResetShare(id,shareToken);const s=this.read();this.cleanup(s);const request=this.passwordResets(s).find(x=>x.id===id&&x.status==='ISSUED');if(!request)throw new Error('PASSWORD_RESET_TOKEN_INVALID');
     request.status='USED';request.usedAt=new Date().toISOString();delete request.shareTokenHash;this.write(s);this.appendAudit({uid:request.uid,role:'password_reset_user',organizationId:request.organizationId},'PASSWORD_RESET_COMPLETED','PasswordResetRequest',request.id,'User set a new password through one-time administrator-issued link');return {used:true,requestId:request.id};
+  }
+
+  revokePasswordReset(actor:ServerIdentity,id:string,reason:string){
+    if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');const s=this.read();this.cleanup(s);const request=this.passwordResets(s).find(x=>x.id===id);if(!request)throw new Error('PASSWORD_RESET_REQUEST_NOT_FOUND');this.authorizePasswordResetIssue(actor,id);request.status='REVOKED';delete request.shareTokenHash;this.write(s);this.appendAudit({...actor,organizationId:request.organizationId},'PASSWORD_RESET_REQUEST_REVOKED','PasswordResetRequest',request.id,reason.trim());return {removed:true,requestId:request.id};
   }
 
   audit(actor:ServerIdentity,limit=500){if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin','auditor'].includes(actor.role))throw new Error('AUDIT_NOT_ALLOWED');const auditFile=this.auditFile(actor.organizationId);if(!fs.existsSync(auditFile))return [] as AuditRow[];const rows=fs.readFileSync(auditFile,'utf8').split('\n').filter(Boolean).map(x=>JSON.parse(x) as AuditRow);return rows.slice(-Math.max(1,Math.min(5000,limit))).reverse()}
