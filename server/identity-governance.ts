@@ -13,13 +13,17 @@ type Invitation={id:string;organizationId:string;competitionId?:string;committee
 type Account={id:string;uid:string;organizationId:string;email:string;displayName:string;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;activatedFromInvitationId:string;suspendedAt?:string;suspendedBy?:string;suspensionReason?:string};
 type Grant={id:string;accountId:string;organizationId:string;competitionId?:string;committeeId?:string;role:GovernanceRole;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;createdBy:string;approvedBy?:string};
 type AuthSession={id:string;uid:string;accountId:string;organizationId:string;competitionId?:string;role:GovernanceRole;deviceId:string;deviceName?:string;authenticationAssurance:'MFA'|'SINGLE_FACTOR';openedAt:string;lastSeenAt:string;expiresAt:string;status:'ACTIVE'|'REVOKED'|'EXPIRED'|'CONFLICT_BLOCKED';revokedAt?:string;revokedBy?:string;revocationReason?:string};
-type State={version:1;invitations:Invitation[];accounts:Account[];grants:Grant[];sessions:AuthSession[]};
+type CompetitionClosure={organizationId:string;competitionId:string;status:'completed'|'archived';closedAt:string;closedBy:string;reason:string};
+type State={version:1;invitations:Invitation[];accounts:Account[];grants:Grant[];sessions:AuthSession[];competitionClosures?:CompetitionClosure[]};
 export type AuditRow={sequence:number;timestamp:string;organizationId:string;actorId:string;actorRole:string;action:string;entityType:string;entityId:string;reason?:string;previousHash:string;hash:string};
 
 const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
+const NON_PROVISIONABLE_SELF_SERVICE_ROLES=new Set<string>(['participant','guardian']);
 const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_ROLE;
+const isProvisionableGovernanceRole=(role:unknown):role is GovernanceRole=>!isRetiredIdentityRole(role)&&!NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(role||''));
 const PRIVILEGED_SESSION=new Set<GovernanceRole>(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
 const SESSION_REVOKERS=new Set<GovernanceRole>(['super_admin','org_admin','comp_admin','head_judge']);
+const ARCHIVE_VISIBILITY_ROLES=new Set<GovernanceRole>(['super_admin','org_admin','auditor']);
 
 /**
  * Delegated trust chain:
@@ -28,7 +32,7 @@ const SESSION_REVOKERS=new Set<GovernanceRole>(['super_admin','org_admin','comp_
  */
 const GRANT_MATRIX:Record<string,GovernanceRole[]>={
   super_admin:['org_admin','support_agent'],
-  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'],
+  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor'],
   comp_admin:['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator'],
 };
 
@@ -43,7 +47,7 @@ export class IdentityGovernanceRepository{
     if(!dir)throw new Error('IDENTITY_GOVERNANCE_DIR_REQUIRED');
     fs.mkdirSync(dir,{recursive:true,mode:0o700});
     this.file=path.join(dir,'identity-governance.json');
-    if(!fs.existsSync(this.file))this.write({version:1,invitations:[],accounts:[],grants:[],sessions:[]});
+    if(!fs.existsSync(this.file))this.write({version:1,invitations:[],accounts:[],grants:[],sessions:[],competitionClosures:[]});
   }
 
   private auditFile(organizationId:string){return path.join(this.dir,`identity-audit-${safeSegment(organizationId)}.jsonl`)}
@@ -63,7 +67,7 @@ export class IdentityGovernanceRepository{
     const row:AuditRow={...base,hash:hash(`${previousHash}|${canonical(base)}`)};
     fs.appendFileSync(auditFile,JSON.stringify(row)+'\n',{encoding:'utf8',mode:0o600});return row;
   }
-  private canGrant(actor:ServerIdentity,target:GovernanceRole){return !isRetiredIdentityRole(target)&&(GRANT_MATRIX[actor.role]||[]).includes(target)}
+  private canGrant(actor:ServerIdentity,target:GovernanceRole){return isProvisionableGovernanceRole(target)&&(GRANT_MATRIX[actor.role]||[]).includes(target)}
   private isSuperAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='super_admin'&&g.status==='ACTIVE')}
   private isOrgAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='org_admin'&&g.status==='ACTIVE')}
   private assertOrgAdminContinuity(s:State,grant:Grant){
@@ -73,6 +77,9 @@ export class IdentityGovernanceRepository{
   }
   private activeGrantFor(s:State,accountId:string,competitionId?:string){return s.grants.find(g=>g.accountId===accountId&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!competitionId||g.competitionId===competitionId))}
   private cleanup(s:State){const now=Date.now();for(const x of s.invitations)if(['READY','PENDING_APPROVAL'].includes(x.status)&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of s.sessions)if(x.status==='ACTIVE'&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';}
+  private closures(s:State){return s.competitionClosures||(s.competitionClosures=[]);}
+  private isCompetitionClosed(s:State,organizationId:string,competitionId?:string){return Boolean(competitionId&&this.closures(s).some(x=>x.organizationId===organizationId&&x.competitionId===competitionId&&['completed','archived'].includes(x.status)));}
+  private assertCompetitionOpen(s:State,organizationId:string,competitionId: string|undefined,role?:GovernanceRole){if(this.isCompetitionClosed(s,organizationId,competitionId)&&(!role||!ARCHIVE_VISIBILITY_ROLES.has(role)))throw new Error('COMPETITION_ACCESS_CLOSED');}
   private accountVisibleTo(actor:ServerIdentity,s:State,a:Account,requestedOrganizationId?:string,requestedCompetitionId?:string){
     const scope=actor.role==='super_admin'&&requestedOrganizationId?requestedOrganizationId:actor.organizationId;
     if(a.organizationId!==scope)return false;
@@ -113,6 +120,7 @@ export class IdentityGovernanceRepository{
 
   createInvitation(actor:ServerIdentity,input:{email:string;displayName:string;requestedRole:GovernanceRole;organizationId?:string;competitionId?:string;committeeId?:string;reason:string}){
     if(isRetiredIdentityRole(input.requestedRole))throw new Error('ROLE_RETIRED');
+    if(NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(input.requestedRole)))throw new Error('SELF_SERVICE_ROLE_NOT_PROVISIONABLE');
     if(!this.canGrant(actor,input.requestedRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');
     const targetOrganizationId=actor.role==='super_admin'&&input.organizationId?input.organizationId:actor.organizationId;
     if(actor.role!=='super_admin'&&input.organizationId&&input.organizationId!==actor.organizationId)throw new Error('CROSS_TENANT_GRANT_BLOCKED');
@@ -121,7 +129,7 @@ export class IdentityGovernanceRepository{
     if(actor.role==='comp_admin'&&actor.competitionId&&input.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
     const email=normalizeEmail(input.email);
     if(!email||!input.displayName.trim()||input.reason.trim().length<5)throw new Error('INVITATION_FIELDS_REQUIRED');
-    const s=this.read();this.cleanup(s);
+    const s=this.read();this.cleanup(s);this.assertCompetitionOpen(s,targetOrganizationId,input.competitionId||actor.competitionId,input.requestedRole);
     const existing=s.accounts.find(a=>a.organizationId===targetOrganizationId&&normalizeEmail(a.email)===email&&a.status==='ACTIVE');
     if(existing&&s.grants.some(g=>g.accountId===existing.id&&g.status==='ACTIVE'&&g.competitionId===input.competitionId))throw new Error('ACCOUNT_ALREADY_ACTIVE_IN_COMPETITION');
     if(s.invitations.some(inv=>inv.organizationId===targetOrganizationId&&inv.email===email&&inv.competitionId===input.competitionId&&inv.status==='READY'))throw new Error('INVITATION_ALREADY_PENDING');
@@ -136,6 +144,8 @@ export class IdentityGovernanceRepository{
   previewInvitation(token:string){
     const s=this.read();this.cleanup(s);this.write(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
     if(!inv)throw new Error('ACTIVATION_TOKEN_INVALID');
+    if(this.isCompetitionClosed(s,inv.organizationId,inv.competitionId)&&!ARCHIVE_VISIBILITY_ROLES.has(inv.requestedRole))throw new Error('COMPETITION_ACCESS_CLOSED');
+    if(NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(inv.requestedRole)))throw new Error('SELF_SERVICE_ROLE_NOT_PROVISIONABLE');
     const account=s.accounts.find(a=>a.organizationId===inv.organizationId&&normalizeEmail(a.email)===inv.email&&a.status==='ACTIVE');
     const existingAccount=!!account&&s.grants.some(g=>g.accountId===account.id&&g.organizationId===inv.organizationId&&g.competitionId===inv.competitionId&&g.role===inv.requestedRole&&g.status==='ACTIVE');
     return {email:inv.email,displayName:inv.displayName,requestedRole:inv.requestedRole,organizationId:inv.organizationId,competitionId:inv.competitionId,expiresAt:inv.expiresAt,existingAccount};
@@ -154,7 +164,10 @@ export class IdentityGovernanceRepository{
   activate(base:{uid:string;email?:string},token:string){
     if(!base.uid||!base.email)throw new Error('VERIFIED_EMAIL_REQUIRED');
     const s=this.read();this.cleanup(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
-    if(!inv)throw new Error('ACTIVATION_TOKEN_INVALID');if(isRetiredIdentityRole(inv.requestedRole))throw new Error('ROLE_RETIRED');if(normalizeEmail(base.email)!==inv.email)throw new Error('ACTIVATION_EMAIL_MISMATCH');
+    if(!inv)throw new Error('ACTIVATION_TOKEN_INVALID');
+    if(this.isCompetitionClosed(s,inv.organizationId,inv.competitionId)&&!ARCHIVE_VISIBILITY_ROLES.has(inv.requestedRole)){inv.status='REVOKED';delete inv.activationTokenHash;this.write(s);throw new Error('COMPETITION_ACCESS_CLOSED');}
+    if(NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(inv.requestedRole))){inv.status='REVOKED';delete inv.activationTokenHash;this.write(s);throw new Error('SELF_SERVICE_ROLE_NOT_PROVISIONABLE');}
+    if(isRetiredIdentityRole(inv.requestedRole))throw new Error('ROLE_RETIRED');if(normalizeEmail(base.email)!==inv.email)throw new Error('ACTIVATION_EMAIL_MISMATCH');
     const existingByUid=s.accounts.find(a=>a.uid===base.uid&&a.status==='ACTIVE');
     const existingByEmail=s.accounts.find(a=>a.organizationId===inv.organizationId&&normalizeEmail(a.email)===inv.email&&a.status==='ACTIVE');
     if(existingByUid&&existingByEmail&&existingByUid.id!==existingByEmail.id)throw new Error('IDENTITY_BINDING_CONFLICT');
@@ -174,7 +187,7 @@ export class IdentityGovernanceRepository{
 
   identityForUid(uid:string,competitionId?:string){
     const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find(a=>a.uid===uid&&a.status==='ACTIVE');if(!account)return null;
-    let grants=s.grants.filter(g=>g.accountId===account.id&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role));if(competitionId){const exact=grants.filter(g=>g.competitionId===competitionId);if(exact.length)grants=exact;else grants=grants.filter(g=>!g.competitionId);}
+    let grants=s.grants.filter(g=>g.accountId===account.id&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!this.isCompetitionClosed(s,g.organizationId,g.competitionId)||ARCHIVE_VISIBILITY_ROLES.has(g.role)));if(competitionId){const exact=grants.filter(g=>g.competitionId===competitionId);if(exact.length)grants=exact;else grants=grants.filter(g=>!g.competitionId);}
     if(!grants.length)return null;
     const rank:GovernanceRole[]=['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent','guardian','participant'];
     grants.sort((a,b)=>rank.indexOf(a.role)-rank.indexOf(b.role));return {account,grant:grants[0],grants};
@@ -193,12 +206,12 @@ export class IdentityGovernanceRepository{
 
   resumeGrant(actor:ServerIdentity,grantId:string,reason:string){
     if(!['super_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('RESUME_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('RESUME_REASON_REQUIRED');
-    const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);if(grant.status!=='SUSPENDED')throw new Error('GRANT_NOT_SUSPENDED');grant.status='ACTIVE';this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_RESUMED','Grant',grant.id,reason);return {grant};
+    const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,grant.role);if(grant.status!=='SUSPENDED')throw new Error('GRANT_NOT_SUSPENDED');grant.status='ACTIVE';this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_RESUMED','Grant',grant.id,reason);return {grant};
   }
 
   reissueQr(actor:ServerIdentity,grantId:string){
     if(!['super_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('QR_REISSUE_NOT_ALLOWED');
-    const s=this.read();this.cleanup(s);const {grant,account}=this.scopedGrant(actor,s,grantId);if(grant.status!=='ACTIVE')throw new Error('GRANT_NOT_ACTIVE');
+    const s=this.read();this.cleanup(s);const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,grant.role);if(grant.status!=='ACTIVE')throw new Error('GRANT_NOT_ACTIVE');
     for(const inv of s.invitations)if(inv.organizationId===grant.organizationId&&inv.competitionId===grant.competitionId&&inv.email===normalizeEmail(account.email)&&inv.status==='READY'){inv.status='REVOKED';delete inv.activationTokenHash;}
     const rawToken=crypto.randomBytes(24).toString('base64url');const now=new Date();
     const invitation:Invitation={id:crypto.randomUUID(),organizationId:grant.organizationId,competitionId:grant.competitionId,committeeId:grant.committeeId,email:normalizeEmail(account.email),displayName:account.displayName,requestedRole:grant.role,reason:'Reissued activation QR for existing authorized user',status:'READY',createdAt:now.toISOString(),createdBy:actor.uid,expiresAt:new Date(now.getTime()+48*3600_000).toISOString(),activationTokenHash:hash(rawToken)};
@@ -250,7 +263,7 @@ export class IdentityGovernanceRepository{
 
   openSession(identity:ServerIdentity,deviceId:string,deviceName='',authenticationAssurance:'MFA'|'SINGLE_FACTOR'='MFA'){
     if(!deviceId)throw new Error('DEVICE_ID_REQUIRED');if(isRetiredIdentityRole(identity.role))throw new Error('ROLE_RETIRED');
-    const s=this.read();this.cleanup(s);const resolved=this.identityForUid(identity.uid,identity.competitionId);if(!resolved)throw new Error('ACCOUNT_NOT_PROVISIONED');
+    const s=this.read();this.cleanup(s);this.assertCompetitionOpen(s,identity.organizationId,identity.competitionId,identity.role);const resolved=this.identityForUid(identity.uid,identity.competitionId);if(!resolved)throw new Error('ACCOUNT_NOT_PROVISIONED');
     const now=Date.now();const conflict=s.sessions.find(x=>x.uid===identity.uid&&x.status==='ACTIVE'&&x.deviceId!==deviceId&&new Date(x.expiresAt).getTime()>now);
     if(conflict&&PRIVILEGED_SESSION.has(identity.role)){
       const blocked:AuthSession={id:crypto.randomUUID(),uid:identity.uid,accountId:resolved.account.id,organizationId:identity.organizationId,competitionId:identity.competitionId,role:identity.role,deviceId,deviceName,authenticationAssurance,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(now+8*3600_000).toISOString(),status:'CONFLICT_BLOCKED'};
@@ -275,17 +288,22 @@ export class IdentityGovernanceRepository{
     this.write(s);this.appendAudit({...actor,organizationId:account.organizationId},'AUTH_SESSIONS_REVOKED','Account',accountId,reason);return {count};
   }
 
-  closeCompetitionAccess(actor:ServerIdentity,competitionId:string,reason:string){
+  closeCompetitionAccess(actor:ServerIdentity,competitionId:string,reason:string,requestedOrganizationId?:string){
     if(!['super_admin','org_admin'].includes(actor.role))throw new Error('COMPETITION_CLOSE_NOT_ALLOWED');
     if(!competitionId.trim())throw new Error('COMPETITION_REQUIRED');
     if(reason.trim().length<5)throw new Error('CLOSE_REASON_REQUIRED');
+    if(actor.role!=='super_admin'&&requestedOrganizationId&&requestedOrganizationId!==actor.organizationId)throw new Error('CROSS_TENANT_CLOSE_BLOCKED');
+    const targetOrganizationId=actor.role==='super_admin'&&requestedOrganizationId?requestedOrganizationId:actor.organizationId;
     const s=this.read();this.cleanup(s);const now=new Date().toISOString();
     let grants=0,sessions=0,invitations=0;
-    for(const g of s.grants){if(g.organizationId===actor.organizationId&&g.competitionId===competitionId&&['ACTIVE','SUSPENDED'].includes(g.status)){g.status='REVOKED';grants++;}}
-    for(const x of s.sessions){if(x.organizationId===actor.organizationId&&x.competitionId===competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=now;x.revokedBy=actor.uid;x.revocationReason='Competition permanently closed';sessions++;}}
-    for(const inv of s.invitations){if(inv.organizationId===actor.organizationId&&inv.competitionId===competitionId&&['READY','PENDING_APPROVAL'].includes(inv.status)){inv.status='REVOKED';delete inv.activationTokenHash;invitations++;}}
-    this.write(s);this.appendAudit(actor,'COMPETITION_ACCESS_CLOSED','Competition',competitionId,reason.trim());
-    return {closed:true,competitionId,revokedGrants:grants,revokedSessions:sessions,revokedInvitations:invitations,closedAt:now};
+    for(const g of s.grants){if(g.organizationId===targetOrganizationId&&g.competitionId===competitionId&&!ARCHIVE_VISIBILITY_ROLES.has(g.role)&&['ACTIVE','SUSPENDED'].includes(g.status)){g.status='REVOKED';grants++;}}
+    for(const x of s.sessions){if(x.organizationId===targetOrganizationId&&x.competitionId===competitionId&&!ARCHIVE_VISIBILITY_ROLES.has(x.role)&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=now;x.revokedBy=actor.uid;x.revocationReason='Competition permanently closed';sessions++;}}
+    for(const inv of s.invitations){if(inv.organizationId===targetOrganizationId&&inv.competitionId===competitionId&&!ARCHIVE_VISIBILITY_ROLES.has(inv.requestedRole)&&['READY','PENDING_APPROVAL'].includes(inv.status)){inv.status='REVOKED';delete inv.activationTokenHash;invitations++;}}
+    const closures=this.closures(s);const existingClosure=closures.find(x=>x.organizationId===targetOrganizationId&&x.competitionId===competitionId);
+    if(existingClosure){existingClosure.status='completed';existingClosure.closedAt=now;existingClosure.closedBy=actor.uid;existingClosure.reason=reason.trim();}
+    else closures.unshift({organizationId:targetOrganizationId,competitionId,status:'completed',closedAt:now,closedBy:actor.uid,reason:reason.trim()});
+    this.write(s);this.appendAudit({...actor,organizationId:targetOrganizationId},'COMPETITION_ACCESS_CLOSED','Competition',competitionId,reason.trim());
+    return {closed:true,organizationId:targetOrganizationId,competitionId,revokedGrants:grants,revokedSessions:sessions,revokedInvitations:invitations,closedAt:now};
   }
 
   audit(actor:ServerIdentity,limit=500){if(!['super_admin','org_admin','comp_admin','auditor'].includes(actor.role))throw new Error('AUDIT_NOT_ALLOWED');const auditFile=this.auditFile(actor.organizationId);if(!fs.existsSync(auditFile))return [] as AuditRow[];const rows=fs.readFileSync(auditFile,'utf8').split('\n').filter(Boolean).map(x=>JSON.parse(x) as AuditRow);return rows.slice(-Math.max(1,Math.min(5000,limit))).reverse()}

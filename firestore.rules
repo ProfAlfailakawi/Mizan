@@ -2,76 +2,130 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function sameOrg(orgId) { return signedIn() && request.auth.token.org_id == orgId; }
     function roleIs(roles) { return signedIn() && request.auth.token.role in roles; }
-    // Competition-bound roles (a judge) must carry a matching competition_id claim; a missing claim
-    // must NOT grant access to every competition in the org. Org-wide roles keep cross-competition scope.
+    function platformAdmin() { return signedIn() && request.auth.token.role == 'super_admin'; }
+    function sameOrg(orgId) { return signedIn() && (platformAdmin() || request.auth.token.org_id == orgId); }
+
+    // Organization-wide identities may move across competitions in the same tenant.
+    // Every operational competition role is fail-closed unless the Firebase claim names
+    // the exact competition. Platform owner remains global by design.
+    function requiresCompetitionClaim() {
+      return roleIs([
+        'comp_admin','head_judge','judge','ops_manager','exception_host',
+        'delegation_manager','participant','broadcast_operator','auditor','guardian'
+      ]);
+    }
     function compScope(competitionId) {
-      return request.auth.token.role == 'judge'
-        ? (('competition_id' in request.auth.token) && request.auth.token.competition_id == competitionId)
-        : (!('competition_id' in request.auth.token) || request.auth.token.competition_id == competitionId);
+      return platformAdmin()
+        || !requiresCompetitionClaim()
+        || (('competition_id' in request.auth.token) && request.auth.token.competition_id == competitionId);
     }
     function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
-    function competitionOpen(orgId, competitionId) {
-      let c = get(/databases/$(database)/documents/organizations/$(orgId)/competitions/$(competitionId));
-      return c.data.competition.status != 'completed' && c.data.competition.status != 'archived';
-    }
-    // Operational identities lose both reads and writes when the competition is closed.
-    // Organization/platform administrators may still read the archive; reopening is not an org-admin write.
-    function readableScope(orgId,competitionId) {
-      return scoped(orgId,competitionId) && (competitionOpen(orgId,competitionId) || roleIs(['super_admin','org_admin','auditor']));
-    }
-    function writeScope(orgId,competitionId) { return scoped(orgId,competitionId) && competitionOpen(orgId,competitionId); }
-    function admin(orgId,competitionId) { return scoped(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']); }
 
-    // Public registration configuration is read-only to anonymous visitors. It contains
-    // competition setup/categories only — never participants, judge data, results or audit rows.
+    function competitionExists(orgId, competitionId) {
+      return exists(/databases/$(database)/documents/organizations/$(orgId)/competitions/$(competitionId));
+    }
+    function competitionClosed(orgId, competitionId) {
+      return competitionExists(orgId, competitionId)
+        && get(/databases/$(database)/documents/organizations/$(orgId)/competitions/$(competitionId)).data.competition.status in ['completed','archived'];
+    }
+    function competitionOpen(orgId, competitionId) {
+      return competitionExists(orgId, competitionId) && !competitionClosed(orgId, competitionId);
+    }
+
+    // Once closed, all operational identities lose both read and write access.
+    // Only platform/organization administration and the independent auditor keep archive visibility.
+    function archiveReader(orgId, competitionId) {
+      return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','auditor']);
+    }
+    function readableScope(orgId, competitionId) {
+      return scoped(orgId, competitionId) && (competitionOpen(orgId, competitionId) || archiveReader(orgId, competitionId));
+    }
+    function writeScope(orgId, competitionId) {
+      return scoped(orgId, competitionId) && competitionOpen(orgId, competitionId);
+    }
+    function admin(orgId, competitionId) {
+      return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
+    }
+    function closingTransition() {
+      return request.resource.data.competition.status in ['completed','archived']
+        && request.resource.data.competition.status != resource.data.competition.status;
+    }
+
+    // Public registration/landing projection. Anonymous visitors only read it.
     match /public_competitions/{competitionId} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin'])
         && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
-        && request.resource.data.competition.id == competitionId;
+        && request.resource.data.competition.id == competitionId
+        && (roleIs(['super_admin','org_admin']) || !(request.resource.data.competition.status in ['completed','archived']));
+      allow update: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin'])
+        && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.competition.id == competitionId
+        && (
+          roleIs(['super_admin','org_admin'])
+          || (!(resource.data.competition.status in ['completed','archived'])
+            && !(request.resource.data.competition.status in ['completed','archived']))
+        );
       allow delete: if signedIn() && roleIs(['super_admin','org_admin'])
-        && (request.auth.token.role == 'super_admin' || resource.data.organizationId == request.auth.token.org_id);
+        && (platformAdmin() || resource.data.organizationId == request.auth.token.org_id);
     }
 
-    // Capability-link journey projection. The document id is SHA-256 of a random opaque token;
-    // anonymous visitors can read only a document whose unguessable key they already possess.
+    // Capability-link journey projection. The key is the hash of an opaque random token.
+    // A stale document is still unreadable after the competition closes, even if a client
+    // failed to write revoked=true before the root competition status changed.
     match /public_journeys/{tokenHash} {
-      allow get: if true;
+      allow get: if resource.data.revoked != true
+        && competitionOpen(resource.data.organizationId, resource.data.competitionId);
       allow list: if false;
-      allow create, update: if signedIn()
+      allow create: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
-        && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id);
+        && sameOrg(request.resource.data.organizationId)
+        && compScope(request.resource.data.competitionId)
+        && competitionOpen(request.resource.data.organizationId, request.resource.data.competitionId);
+      allow update: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.competitionId == resource.data.competitionId
+        && sameOrg(resource.data.organizationId)
+        && compScope(resource.data.competitionId)
+        && competitionOpen(resource.data.organizationId, resource.data.competitionId);
       allow delete: if false;
     }
 
     match /organizations/{orgId} {
       allow read: if sameOrg(orgId);
       allow create, update: if sameOrg(orgId) && roleIs(['super_admin','org_admin']);
-      allow delete: if sameOrg(orgId) && roleIs(['super_admin']);
+      allow delete: if platformAdmin();
 
       match /competitions/{competitionId} {
-        allow read: if readableScope(orgId,competitionId);
-        allow create: if admin(orgId,competitionId);
-        allow update: if admin(orgId,competitionId)
-          && (resource.data.competition.status != 'completed' && resource.data.competition.status != 'archived' || roleIs(['super_admin']));
-        allow delete: if scoped(orgId,competitionId) && roleIs(['super_admin','org_admin']);
+        allow read: if readableScope(orgId, competitionId);
+        allow create: if admin(orgId, competitionId);
+        // Org admin may perform the one-way closure. Competition staff cannot close themselves,
+        // and after closure only the platform owner may change the root document (for exceptional recovery).
+        allow update: if admin(orgId, competitionId)
+          && (
+            (competitionOpen(orgId, competitionId) && (!closingTransition() || roleIs(['super_admin','org_admin'])))
+            || platformAdmin()
+          );
+        allow delete: if platformAdmin();
 
         match /participants/{participantId} {
-          // A judge must see the contestant in front of them; reading is not authoring.
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','exception_host','delegation_manager']);
           allow delete: if false;
         }
         match /judge_events/{eventId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
           allow create: if writeScope(orgId,competitionId) && roleIs(['judge']);
           allow update, delete: if false;
         }
         match /judge_submissions/{submissionId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']) || (readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.judgeId == request.auth.uid);
+          allow read: if (readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']))
+            || (readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.judgeId == request.auth.uid);
           allow create: if writeScope(orgId,competitionId) && roleIs(['judge']) && request.resource.data.judgeId == request.auth.uid;
           allow update, delete: if false;
         }
@@ -81,12 +135,12 @@ service cloud.firestore {
           allow delete: if false;
         }
         match /reviews/{reviewId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['head_judge','scientific_admin']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['head_judge','comp_admin']);
           allow delete: if false;
         }
         match /results/{resultId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }
@@ -96,20 +150,21 @@ service cloud.firestore {
           allow update, delete: if false;
         }
         match /committees/{committeeId} {
-          // Panel composition is operational structure: administrators author it, the panel reads it.
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
           allow delete: if false;
         }
         match /appeals/{appealId} {
-          // A contestant may raise and read their own appeal; the panel and administration see all.
-          allow read: if readableScope(orgId,competitionId) && (roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor','support_agent']) || (roleIs(['participant','guardian']) && resource.data.participantId == request.auth.uid));
-          allow create: if writeScope(orgId,competitionId) && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent']) || (roleIs(['participant','guardian']) && request.resource.data.participantId == request.auth.uid));
+          allow read: if readableScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor','support_agent'])
+              || (roleIs(['participant','guardian']) && resource.data.participantId == request.auth.uid));
+          allow create: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent'])
+              || (roleIs(['participant','guardian']) && request.resource.data.participantId == request.auth.uid));
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }
         match /support_sessions/{supportId} {
-          // Support requests are shared records: the requester and support team must see the same state.
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent','ops_manager','head_judge']);
           allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge']);
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent']);
@@ -121,16 +176,14 @@ service cloud.firestore {
           allow delete: if false;
         }
         match /quran_sources/{sourceId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }
         match /audit/{eventId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','auditor']);
-          // Audit rows must be attributable: only provisioned roles may write, and the recorded actor
-          // must equal the authenticated caller so no one can forge another user's actions.
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']);
           allow create: if writeScope(orgId,competitionId)
-            && roleIs(['super_admin','org_admin','comp_admin','scientific_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
+            && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
             && request.resource.data.actorId == request.auth.uid;
           allow update, delete: if false;
         }

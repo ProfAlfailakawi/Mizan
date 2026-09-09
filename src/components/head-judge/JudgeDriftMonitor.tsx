@@ -46,7 +46,7 @@ export const JudgeDriftMonitor: React.FC = () => {
         <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
       </div>
 
-      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#7a827d] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحداث فعلية من المحكمين. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judge events arrive. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
+      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحداث فعلية من المحكمين. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judge events arrive. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
       {enoughRealEvidence && <div className="mt-5 grid md:grid-cols-2 gap-3">
         {signals.map((s) => {
           const judgeEvents = events.filter((e) => e.judgeId === s.judgeId).sort((a, b) => a.relativeSeconds - b.relativeSeconds);

@@ -4,8 +4,8 @@ import { newId, sha256 } from './crypto';
 
 const GRANT_MATRIX:Partial<Record<Role,Role[]>>={
   super_admin:['org_admin','support_agent'],
-  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','guardian','support_agent'],
-  comp_admin:['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','guardian'],
+  org_admin:['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor'],
+  comp_admin:['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator'],
 };
 export function canGrantRole(actorRole:Role,targetRole:Role){return GRANT_MATRIX[actorRole]?.includes(targetRole)??false}
 /* Account provisioning follows the delegated authority chain (owner -> tenant admin -> scoped staff).
