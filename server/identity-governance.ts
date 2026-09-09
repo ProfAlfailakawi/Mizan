@@ -7,7 +7,7 @@ export type GovernanceRole=
   | 'super_admin'|'operator_owner'|'operator_admin'|'org_admin'|'storage_admin'|'billing_admin'|'branch_admin'|'comp_admin'|'head_judge'|'judge'
   | 'ops_manager'|'exception_host'|'delegation_manager'|'participant'
   | 'broadcast_operator'|'auditor'|'guardian'|'support_agent';
-export type ServerIdentity={uid:string;email?:string;role:GovernanceRole;organizationId:string;operatorId?:string;competitionId?:string};
+export type ServerIdentity={uid:string;email?:string;role:GovernanceRole;organizationId:string;operatorId?:string;competitionId?:string;operatorOrganizationIds?:string[]};
 
 type Invitation={id:string;organizationId:string;operatorId?:string;competitionId?:string;committeeId?:string;email:string;displayName:string;requestedRole:GovernanceRole;reason:string;status:'PENDING_APPROVAL'|'READY'|'ACTIVATED'|'EXPIRED'|'REVOKED';createdAt:string;createdBy:string;approvedAt?:string;approvedBy?:string;expiresAt:string;activationTokenHash?:string};
 type Account={id:string;uid:string;organizationId:string;operatorId?:string;email:string;displayName:string;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;activatedFromInvitationId:string;suspendedAt?:string;suspendedBy?:string;suspensionReason?:string};
@@ -73,6 +73,9 @@ export class IdentityGovernanceRepository{
     fs.appendFileSync(auditFile,JSON.stringify(row)+'\n',{encoding:'utf8',mode:0o600});return row;
   }
   private canGrant(actor:ServerIdentity,target:GovernanceRole){return isProvisionableGovernanceRole(target)&&((actor.role==='super_admin'&&['operator_owner','operator_admin'].includes(target))||(GRANT_MATRIX[actor.role]||[]).includes(target))}
+  private operatorCanReachOrganization(actor:ServerIdentity,organizationId:string){
+    return Boolean(isOperatorRole(actor.role)&&actor.operatorId&&organizationId&&actor.operatorOrganizationIds?.includes(organizationId));
+  }
   private isSuperAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='super_admin'&&g.status==='ACTIVE')}
   private isOrgAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='org_admin'&&g.status==='ACTIVE')}
   private assertOrgAdminContinuity(s:State,grant:Grant){
@@ -119,6 +122,16 @@ export class IdentityGovernanceRepository{
 
   list(actor:ServerIdentity,requestedOrganizationId?:string,requestedCompetitionId?:string,requestedOperatorId?:string){
     const s=this.read();this.cleanup(s);this.write(s);
+    if(isOperatorRole(actor.role)&&requestedOrganizationId&&!requestedOperatorId){
+      if(!this.operatorCanReachOrganization(actor,requestedOrganizationId))throw new Error('CROSS_OPERATOR_ORGANIZATION_BLOCKED');
+      const scopedGrants=s.grants.filter(g=>g.organizationId===requestedOrganizationId&&!g.operatorId&&g.role==='org_admin'&&g.status!=='REVOKED');
+      const ids=new Set(scopedGrants.map(g=>g.accountId));
+      const accounts=s.accounts.filter(a=>a.organizationId===requestedOrganizationId&&a.status!=='REVOKED'&&ids.has(a.id));
+      const visibleIds=new Set(accounts.map(a=>a.id));
+      const invitations=s.invitations.filter(inv=>inv.organizationId===requestedOrganizationId&&!inv.operatorId&&inv.requestedRole==='org_admin'&&inv.status!=='REVOKED').map(inv=>({...inv,activationTokenHash:undefined}));
+      const passwordResetRequests=this.passwordResets(s).filter(x=>x.organizationId===requestedOrganizationId&&x.reviewerRole==='super_admin').map(x=>({...x,shareTokenHash:undefined}));
+      return {accounts,grants:scopedGrants.filter(g=>visibleIds.has(g.accountId)),invitations,sessions:s.sessions.filter(x=>x.organizationId===requestedOrganizationId&&visibleIds.has(x.accountId)).sort((a,b)=>String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))).slice(0,500),passwordResetRequests};
+    }
     if(isOperatorRole(actor.role)&&requestedOperatorId&&requestedOperatorId!==actor.operatorId)throw new Error('CROSS_OPERATOR_ACCESS_BLOCKED');
     if(requestedOperatorId||isOperatorRole(actor.role)){
       const operatorId=actor.role==='super_admin'?requestedOperatorId:actor.operatorId;if(!operatorId)throw new Error('OPERATOR_SCOPE_REQUIRED');
@@ -149,7 +162,8 @@ export class IdentityGovernanceRepository{
   createInvitation(actor:ServerIdentity,input:{email:string;displayName:string;requestedRole:GovernanceRole;organizationId?:string;operatorId?:string;competitionId?:string;committeeId?:string;reason:string}){
     if(isRetiredIdentityRole(input.requestedRole))throw new Error('ROLE_RETIRED');
     if(NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(input.requestedRole)))throw new Error('SELF_SERVICE_ROLE_NOT_PROVISIONABLE');
-    if(!this.canGrant(actor,input.requestedRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');
+    const operatorInvitesOrganizationAdmin=isOperatorRole(actor.role)&&input.requestedRole==='org_admin';
+    if(!operatorInvitesOrganizationAdmin&&!this.canGrant(actor,input.requestedRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');
     const operatorRole=isOperatorRole(input.requestedRole);
     let operatorId:string|undefined,targetOrganizationId:string;
     if(operatorRole){
@@ -160,8 +174,14 @@ export class IdentityGovernanceRepository{
       if(input.organizationId&&input.organizationId!==targetOrganizationId)throw new Error('OPERATOR_NOT_ORGANIZATION');
       input.competitionId=undefined;input.committeeId=undefined;
     }else{
-      targetOrganizationId=actor.role==='super_admin'&&input.organizationId?input.organizationId:actor.organizationId;
-      if(actor.role!=='super_admin'&&input.organizationId&&input.organizationId!==actor.organizationId)throw new Error('CROSS_TENANT_GRANT_BLOCKED');
+      if(operatorInvitesOrganizationAdmin){
+        targetOrganizationId=String(input.organizationId||'').trim();
+        if(!this.operatorCanReachOrganization(actor,targetOrganizationId))throw new Error('CROSS_OPERATOR_ORGANIZATION_BLOCKED');
+        input.operatorId=undefined;input.competitionId=undefined;input.committeeId=undefined;
+      }else{
+        targetOrganizationId=actor.role==='super_admin'&&input.organizationId?input.organizationId:actor.organizationId;
+      }
+      if(!operatorInvitesOrganizationAdmin&&actor.role!=='super_admin'&&input.organizationId&&input.organizationId!==actor.organizationId)throw new Error('CROSS_TENANT_GRANT_BLOCKED');
       const competitionScopedActor=actor.role==='org_admin'||actor.role==='comp_admin';
       if(competitionScopedActor&&!input.competitionId)throw new Error('COMPETITION_SCOPE_REQUIRED');
       if(actor.role==='comp_admin'&&actor.competitionId&&input.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
@@ -231,7 +251,10 @@ export class IdentityGovernanceRepository{
   private scopedGrant(actor:ServerIdentity,s:State,grantId:string){
     const grant=s.grants.find(g=>g.id===grantId&&!isRetiredIdentityRole(g.role));if(!grant)throw new Error('GRANT_NOT_FOUND');
     if(actor.role==='operator_owner'){
-      if(!actor.operatorId||grant.operatorId!==actor.operatorId||grant.role!=='operator_admin')throw new Error('GRANT_NOT_FOUND');
+      if(actor.operatorId&&grant.operatorId===actor.operatorId&&grant.role==='operator_admin'){}
+      else if(!(grant.role==='org_admin'&&this.operatorCanReachOrganization(actor,grant.organizationId)))throw new Error('GRANT_NOT_FOUND');
+    }else if(actor.role==='operator_admin'){
+      if(!(grant.role==='org_admin'&&this.operatorCanReachOrganization(actor,grant.organizationId)))throw new Error('GRANT_NOT_FOUND');
     }else{
       if(actor.role!=='super_admin'&&grant.organizationId!==actor.organizationId)throw new Error('GRANT_NOT_FOUND');
       if(actor.role==='comp_admin'&&actor.competitionId&&grant.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
@@ -275,7 +298,12 @@ export class IdentityGovernanceRepository{
   revokeGrantSessions(actor:ServerIdentity,grantId:string,reason:string){
     if(!['super_admin','operator_owner','org_admin','comp_admin','head_judge'].includes(actor.role))throw new Error('SESSION_REVOCATION_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('REVOCATION_REASON_REQUIRED');
     const s=this.read();const grant=s.grants.find(g=>g.id===grantId&&g.status==='ACTIVE');if(!grant)throw new Error('GRANT_NOT_FOUND');
-    if(actor.role==='operator_owner'){if(!actor.operatorId||grant.operatorId!==actor.operatorId||grant.role!=='operator_admin')throw new Error('GRANT_NOT_FOUND')}else if(actor.role!=='super_admin'&&grant.organizationId!==actor.organizationId)throw new Error('GRANT_NOT_FOUND');if(actor.role==='comp_admin'&&actor.competitionId&&grant.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
+    if(actor.role==='operator_owner'){
+      if(actor.operatorId&&grant.operatorId===actor.operatorId&&grant.role==='operator_admin'){}
+      else if(!(grant.role==='org_admin'&&this.operatorCanReachOrganization(actor,grant.organizationId)))throw new Error('GRANT_NOT_FOUND')
+    }else if(actor.role==='operator_admin'){
+      if(!(grant.role==='org_admin'&&this.operatorCanReachOrganization(actor,grant.organizationId)))throw new Error('GRANT_NOT_FOUND')
+    }else if(actor.role!=='super_admin'&&grant.organizationId!==actor.organizationId)throw new Error('GRANT_NOT_FOUND');if(actor.role==='comp_admin'&&actor.competitionId&&grant.competitionId!==actor.competitionId)throw new Error('COMPETITION_SCOPE_MISMATCH');
     let count=0;for(const x of s.sessions)if(x.accountId===grant.accountId&&x.competitionId===grant.competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason=reason.trim();count++}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'AUTH_GRANT_SESSIONS_REVOKED','Grant',grant.id,reason);return {count};
   }

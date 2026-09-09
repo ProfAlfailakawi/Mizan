@@ -592,7 +592,16 @@ export function useAppStore() {
 
   const applyAuthenticatedIdentity = (identity:{id:string;email:string;name:string;role:Role;organizationId:string;operatorId?:string;competitionId?:string;mfaEnabled?:boolean;identityAssurance?:User['identityAssurance']}) => {
     globalState.currentUser={id:identity.id,email:identity.email,name:identity.name,nameArabic:identity.name,role:identity.role,organizationId:identity.organizationId,operatorId:identity.operatorId,competitionId:identity.competitionId,mfaEnabled:!!identity.mfaEnabled,accountStatus:'active',lastAuthenticatedAt:new Date().toISOString(),identityAssurance:identity.identityAssurance||'firebase'};
-    if(identity.competitionId){const target=globalState.competitions.find(c=>c.id===identity.competitionId&&c.organizationId===identity.organizationId);if(target)globalState.competition=target;}
+    if(!identity.operatorId&&identity.role!=='super_admin'){
+      const existingOrg=globalState.organizations.find(o=>o.id===identity.organizationId);
+      const organization=existingOrg||{...globalState.organization,id:identity.organizationId,name:identity.organizationId,nameArabic:identity.organizationId,code:identity.organizationId,brand:{...globalState.organization.brand,name:identity.organizationId,nameArabic:identity.organizationId},status:'active' as const,createdAt:new Date().toISOString()};
+      const scopedCompetitions=globalState.competitions.filter(c=>c.organizationId===identity.organizationId);
+      const fallbackCompetition={...globalState.competition,id:'comp-pending-setup',organizationId:identity.organizationId,name:'',nameArabic:'',edition:'',status:'draft' as const,categories:[],totalRegistered:0,totalApproved:0,totalAttended:0,currentDay:0,readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}};
+      globalState.organization=organization;
+      globalState.organizations=[organization];
+      globalState.competitions=scopedCompetitions.length?scopedCompetitions:[fallbackCompetition];
+      globalState.competition=identity.competitionId?(scopedCompetitions.find(c=>c.id===identity.competitionId)||fallbackCompetition):(scopedCompetitions[0]||fallbackCompetition);
+    }else if(identity.competitionId){const target=globalState.competitions.find(c=>c.id===identity.competitionId&&c.organizationId===identity.organizationId);if(target)globalState.competition=target;}
     notify();
   };
 

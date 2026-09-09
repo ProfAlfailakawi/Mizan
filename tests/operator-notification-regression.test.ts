@@ -27,7 +27,7 @@ test('operator identity lifecycle binds directly to operatorId and isolates oper
   assert.equal(admin.grant.operatorId,'OP-X');
 
   assert.throws(()=>repo.createInvitation(operatorOwner,{email:'cross@test',displayName:'Cross',requestedRole:'operator_admin',operatorId:'OP-Y',reason:'Attempt cross operator grant'}),/CROSS_OPERATOR_GRANT_BLOCKED/);
-  assert.throws(()=>repo.createInvitation(operatorOwner,{email:'org@test',displayName:'Org admin',requestedRole:'org_admin',organizationId:'ORG-1',competitionId:'C-1',reason:'Operator must not become organization'}),/ROLE_GRANT_NOT_ALLOWED/);
+  assert.throws(()=>repo.createInvitation(operatorOwner,{email:'org@test',displayName:'Org admin',requestedRole:'org_admin',organizationId:'ORG-1',competitionId:'C-1',reason:'Operator must not become organization'}),/CROSS_OPERATOR_ORGANIZATION_BLOCKED/);
 
   const visible=repo.list(operatorOwner,undefined,undefined,'OP-X');
   assert.equal(visible.accounts.length,1);
