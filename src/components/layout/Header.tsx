@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import { Award, Radio, Wifi, WifiOff, Search, LayoutDashboard, CircleHelp, LogOut, Headphones, LifeBuoy } from 'lucide-react';
+import { Wifi, WifiOff, Search, LayoutDashboard, CircleHelp, LogOut, Headphones, LifeBuoy } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { useAppStore } from '../../lib/store';
@@ -11,21 +11,21 @@ import { ClarityGuide } from '../design-system/ClarityGuide';
 import { Modal } from '../design-system/Modal';
 import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
 
-interface HeaderProps { onOpenKiosk?:()=>void; onOpenCeremony?:()=>void; onOpenExperienceHome?:()=>void; }
+interface HeaderProps { onOpenExperienceHome?:()=>void; }
 
 export const LiveSupportControl:React.FC<{floating?:boolean}>=({floating=false})=>{
- const {language,currentUser,supportSessions,requestSupportSession}=useAppStore();const ar=language==='ar';const [open,setOpen]=useState(false);const [reason,setReason]=useState('');
+ const {language,currentUser,supportSessions,requestSupportSession,persistenceError,incidents,continuityIncidents,sessionRecoveries,emergencyFrozen}=useAppStore();const ar=language==='ar';const [open,setOpen]=useState(false);const [reason,setReason]=useState('');
  const active=supportSessions.find(session=>session.requestedBy===currentUser.id&&!['ended','rejected'].includes(session.status)&&Date.parse(session.expiresAt)>Date.now());
+ const supportNeeded=Boolean(active||persistenceError||emergencyFrozen||incidents.some(i=>i.status!=='resolved')||continuityIncidents.some(i=>i.status!=='RESOLVED')||sessionRecoveries.some(r=>r.status==='PROPOSED'));
+ if(!supportNeeded)return null;
  const submit=()=>{const clean=reason.trim();if(clean.length<3)return;requestSupportSession(clean);setReason('');setOpen(false)};
  const cls=floating?'fixed start-4 bottom-4 z-[120] h-11 px-4 inline-flex items-center gap-2 rounded-xl border border-[#cddbd3] bg-[#F7FAF8] text-[#214C40] shadow-md font-black text-xs':'hidden lg:inline-flex h-11 px-3 items-center gap-1.5 rounded-xl border border-[#cddbd3] bg-[#EBF2EE] hover:bg-[#DCEAE2] text-[#214C40] font-black text-xs shrink-0 transition';
  return <><button type="button" onClick={()=>setOpen(true)} className={cls} aria-label={ar?'الدعم المباشر':'Live support'}><LifeBuoy className="w-4 h-4 shrink-0"/><span>{ar?'الدعم المباشر':'Live support'}</span>{active&&<span className="w-1.5 h-1.5 rounded-full bg-[#2F6555]" aria-hidden="true"/>}</button><Modal isOpen={open} onClose={()=>setOpen(false)} title={ar?'الدعم المباشر':'Live support'} subtitle={ar?'طلب دعم مراقب ومؤقت دون منح باب خلفي للنظام.':'Request a temporary, audited support session without granting a backdoor.'} maxWidth="md">{active?<div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4"><div className="text-sm font-black text-[#214C40]">{ar?'طلب الدعم قائم':'Support request is active'}</div><p className="text-xs text-[#636864] leading-6 mt-2">{ar?'تم إرسال طلبك، وسيبقى مرتبطًا بسبب واضح وينتهي تلقائيًا وفق مدة الجلسة.':'Your request was sent with a recorded reason and will expire automatically with the session window.'}</p></div>:<div><label className="block text-xs font-black text-[#4f5752]">{ar?'ما الذي تحتاج مساعدة فيه؟':'What do you need help with?'}</label><textarea autoFocus value={reason} onChange={e=>setReason(e.target.value)} rows={4} className="mizan-input mt-2 resize-none" placeholder={ar?'اكتب المشكلة باختصار ووضوح':'Describe the issue briefly and clearly'}/><div className="mt-4 flex justify-end"><button type="button" disabled={reason.trim().length<3} onClick={submit} className="min-h-11 px-4 rounded-xl bg-[#214C40] text-white text-xs font-black disabled:opacity-40">{ar?'إرسال طلب الدعم':'Send support request'}</button></div></div>}</Modal></>;
 };
 
-export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpenExperienceHome}) => {
+export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
  const {language,competition,isOffline,toggleOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
  const brandInfo = useBrandInfo();
- const canGate=['comp_admin','ops_manager','exception_host','super_admin'].includes(currentUser.role);
- const canCeremony=['comp_admin','broadcast_operator','super_admin'].includes(currentUser.role);
  const production=(import.meta.env as Record<string,string|undefined>).VITE_REQUIRE_AUTH==='true';
  const superAdmin=currentUser.role==='super_admin';
  const logout=()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())};
@@ -54,8 +54,6 @@ export const Header: React.FC<HeaderProps> = ({onOpenKiosk,onOpenCeremony,onOpen
       {!superAdmin&&<LiveSupportControl/>}
       {!superAdmin&&onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'كل التجارب':'All experiences'} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></button>}
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
-      {!superAdmin&&onOpenKiosk&&canGate&&<button onClick={onOpenKiosk} className="hidden lg:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بوابة الحضور':'Gate'} aria-label={language==='ar'?'بوابة الحضور':'Gate'}><Radio className="w-4 h-4"/></button>}
-      {!superAdmin&&onOpenCeremony&&canCeremony&&<button onClick={onOpenCeremony} className="hidden lg:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'وضع الحفل':'Ceremony'} aria-label={language==='ar'?'وضع الحفل':'Ceremony'}><Award className="w-4 h-4"/></button>}
       {!superAdmin&&<button onClick={toggleOffline} className={`w-11 h-11 grid place-items-center rounded-xl transition ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'hover:bg-[#efede7] text-[#66706a]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</button>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
       <LanguageSwitcher compact/>

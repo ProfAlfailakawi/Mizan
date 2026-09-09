@@ -114,6 +114,5 @@ export const AuthPortal:React.FC=()=>{
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-11 mt-2 text-xs font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
    </>}
   </div>
-  <p className="text-[10px] text-[#686d6a] text-center mt-5 leading-5">{ar?'مدير المسابقة يمنح الصلاحية فقط. كلمة المرور ملك المستخدم ولا تُحفظ في ميزان.':'The competition manager grants access only. Passwords belong to the user and are not stored by MIZAN.'}</p>
  </div></div>
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   CalendarDays, MapPin, ShieldCheck, Sparkles, ArrowLeft, ArrowRight,
-  Share2, Check, BookOpen
+  Share2, Check, BookOpen, UserRound, UsersRound, BadgeCheck
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo, MizanMark } from '../design-system/MizanLogo';
@@ -12,6 +12,8 @@ export const CompetitionLanding: React.FC = () => {
   const ar = language === 'ar';
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const [copied, setCopied] = useState(false);
+  const closed = competition.status === 'completed' || competition.status === 'archived';
+  const registrationOpen = !closed && !['draft','configured'].includes(competition.status);
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/#competition?comp=${competition.id}`
@@ -73,8 +75,7 @@ export const CompetitionLanding: React.FC = () => {
             <div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[#e8cb93] text-xs font-bold tracking-wide">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{competition.edition}</span>
-                <span className="opacity-40">•</span>
+                {competition.edition && <><span>{competition.edition}</span><span className="opacity-40">•</span></>}
                 <span>{ar ? 'منظومة ميزان الرسمية' : 'Official MIZAN Platform'}</span>
               </div>
 
@@ -94,13 +95,13 @@ export const CompetitionLanding: React.FC = () => {
               </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Button
+                {registrationOpen ? <Button
                   onClick={() => { window.location.hash = `register?comp=${competition.id}`; }}
                   icon={<Arrow className="w-4 h-4" />}
                   className="!min-h-11 !px-7 !bg-[#e8cb93] !text-[#0f342c] hover:!bg-[#f5e3ba] !font-black !shadow-lg"
                 >
                   {ar ? 'سجل الآن في المسابقة' : 'Register Now'}
-                </Button>
+                </Button> : <div className="min-h-11 px-6 rounded-2xl bg-white/10 border border-white/15 inline-flex items-center text-sm font-black text-[#e8cb93]">{ar ? 'انتهت المسابقة' : 'Competition ended'}</div>}
 
                 <button
                   onClick={handleShareWhatsApp}
@@ -136,12 +137,25 @@ export const CompetitionLanding: React.FC = () => {
                 </div>
                 <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-center gap-2 text-[11px] font-bold text-[#e8cb93]">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{ar ? 'نص مجمع الملك فهد المعتمد' : 'KFGQPC Certified Text'}</span>
+                  <span>{ar ? 'سجل المسابقة محمي وموثّق داخل ميزان' : 'Competition record protected in MIZAN'}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* البوابة العامة: كل مستخدم يجد مدخله الطبيعي هنا، بلا حسابات وصلاحيات مزعجة. */}
+        <section className="mt-8 grid sm:grid-cols-3 gap-4">
+          {!closed && <button onClick={()=>{window.location.hash=`journey?comp=${competition.id}`}} className="text-start p-5 rounded-2xl bg-white border border-[#e6e0d4] hover:border-[#2f6555]/50 hover:shadow-md transition-all min-h-28">
+            <UserRound className="w-6 h-6 text-[#214C40]"/><div className="font-black mt-3">{ar?'المتسابق':'Participant'}</div><div className="text-xs text-[#636864] mt-1 leading-6">{ar?'افتح رحلتك واعرف دورك ومرحلتك التالية والنتيجة عند اعتمادها.':'Open your journey, queue and published result.'}</div>
+          </button>}
+          {!closed && <button onClick={()=>{window.location.hash=`guardian?comp=${competition.id}`}} className="text-start p-5 rounded-2xl bg-white border border-[#e6e0d4] hover:border-[#2f6555]/50 hover:shadow-md transition-all min-h-28">
+            <UsersRound className="w-6 h-6 text-[#214C40]"/><div className="font-black mt-3">{ar?'ولي الأمر':'Guardian'}</div><div className="text-xs text-[#636864] mt-1 leading-6">{ar?'متابعة آمنة للمتسابق عبر رابط أو رمز خاص، دون إنشاء حساب.':'Secure follow-up without creating an account.'}</div>
+          </button>}
+          <button onClick={()=>{window.location.hash='#verify'}} className="text-start p-5 rounded-2xl bg-white border border-[#e6e0d4] hover:border-[#2f6555]/50 hover:shadow-md transition-all min-h-28">
+            <BadgeCheck className="w-6 h-6 text-[#214C40]"/><div className="font-black mt-3">{ar?'التحقق من شهادة':'Verify a certificate'}</div><div className="text-xs text-[#636864] mt-1 leading-6">{ar?'خدمة عامة للجميع ولا تتطلب تسجيل دخول.':'Public verification — no sign-in required.'}</div>
+          </button>
+        </section>
 
         {/* Categories Section */}
         <section className="mt-16">
@@ -185,14 +199,14 @@ export const CompetitionLanding: React.FC = () => {
                       ? (ar ? 'بنات فقط' : 'Female Only')
                       : (ar ? 'للجميع' : 'Open for All')}
                   </span>
-                  <button
+                  {registrationOpen && <button
                     onClick={() => { window.location.hash = `register?comp=${competition.id}&cat=${c.id}`; }}
                     aria-label={ar ? `اختيار فرع ${c.nameArabic}` : `Select branch ${c.name}`}
                     className="min-h-11 inline-flex items-center gap-1 text-[#123f35] hover:underline"
                   >
                     <span>{ar ? 'اختر هذا الفرع' : 'Select Branch'}</span>
                     <Arrow className="w-3 h-3" />
-                  </button>
+                  </button>}
                 </div>
               </div>
             ))}
@@ -218,11 +232,11 @@ export const CompetitionLanding: React.FC = () => {
           </div>
 
           <button
-            onClick={() => { window.location.hash = `register?comp=${competition.id}`; }}
-            aria-label={ar ? 'بدء التسجيل في المسابقة' : 'Start competition registration'}
+            onClick={() => { window.location.hash = registrationOpen ? `register?comp=${competition.id}` : '#verify'; }}
+            aria-label={ar ? (registrationOpen?'بدء التسجيل في المسابقة':'التحقق من شهادة') : (registrationOpen?'Start competition registration':'Verify certificate')}
             className="shrink-0 min-h-11 px-6 rounded-xl bg-white text-[#123f35] text-xs font-black hover:bg-[#FAF8F2] transition-colors"
           >
-            {ar ? 'ابدأ التسجيل' : 'Get Started'}
+            {ar ? (registrationOpen?'ابدأ التسجيل':'التحقق من شهادة') : (registrationOpen?'Get Started':'Verify Certificate')}
           </button>
         </section>
       </main>

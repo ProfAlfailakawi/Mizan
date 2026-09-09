@@ -46,6 +46,7 @@ const VIEWS = {
   certificateVerification: () => import('./components/public/CertificateVerification'),
   registrationFlow: () => import('./components/public/RegistrationFlow'),
   competitionLanding: () => import('./components/public/CompetitionLanding'),
+  journeyAccess: () => import('./components/public/JourneyAccess'),
   trustVerification: () => import('./components/public/TrustVerification'),
   marketingSite: () => import('./components/marketing/MarketingSite'),
 };
@@ -68,6 +69,7 @@ const JudgeIntelligenceLab = pick(VIEWS.judgeIntelligenceLab, 'JudgeIntelligence
 const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
 const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
 const CompetitionLanding = pick(VIEWS.competitionLanding, 'CompetitionLanding');
+const JourneyAccess = pick(VIEWS.journeyAccess, 'JourneyAccess');
 const TrustVerification = pick(VIEWS.trustVerification, 'TrustVerification');
 const MarketingSite = pick(VIEWS.marketingSite, 'MarketingSite');
 const SuperAdminConsole = pick(VIEWS.rolePortals, 'SuperAdminConsole');
@@ -203,6 +205,7 @@ export default function App() {
  const [tenantSuspended,setTenantSuspended]=useState(false);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
+ useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='broadcast')setBroadcast(true); else if(surface==='jiLab')setJiLab(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
     وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
  useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;setTenantSuspended(t.status==='suspended');if(t.status==='suspended')return;
@@ -226,7 +229,7 @@ export default function App() {
  useEffect(()=>{
   let alive=true;
   if(!requestedComp){setCompMissing(false);setCompLoading(false);return()=>{alive=false}}
-  const publicRoute=hash.startsWith('#register')||hash.startsWith('#competition');
+  const publicRoute=hash.startsWith('#register')||hash.startsWith('#competition')||hash.startsWith('#journey')||hash.startsWith('#guardian');
   const localExists=competitions.some(c=>c.id===requestedComp);
   // الروابط العامة تعيد جلب النسخة المنشورة أولًا حتى لا تعرض ذاكرة المتصفح فئات قديمة.
   // ولا نختار النسخة المحلية قبل الجلب: اختيارها يفعّل مزامنة الإدارة وقد يعيد نشر نسخة قديمة.
@@ -246,18 +249,24 @@ export default function App() {
  if(splashOpen) return <SplashExperience onDone={()=>setSplashOpen(false)}/>;
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
  // التسجيل وصفحة المسابقة روابط عامة؛ لا تُجبر الزائر على حساب موظف.
- if((hash.startsWith('#competition')||hash.startsWith('#register'))&&compLoading) return <ViewFallback/>;
+ if((hash.startsWith('#competition')||hash.startsWith('#register')||hash.startsWith('#journey')||hash.startsWith('#guardian'))&&compLoading) return <ViewFallback/>;
  if(hash.startsWith('#competition')) return compMissing?<CompetitionNotFound/>:<Page><CompetitionLanding/></Page>;
- if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash='';setExperienceHome(demoMode)}}/></Page></div>;
+ if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={()=>{window.location.hash=`#journey?comp=${requestedComp||''}`}}/></Page></div>;
+ if(hash.startsWith('#journey')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="participant"/></Page>;
+ if(hash.startsWith('#guardian')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="guardian"/></Page>;
+ // التحقق من الشهادة خدمة عامة بالكامل ولا تمر ببوابة الموظفين.
+ if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={()=>{window.location.hash='';setExperienceHome(true)}}/>}</div>;
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md w-full text-center"><div className="flex justify-center mb-4"><MizanLogo language="ar" compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق إضافي لهذا الحساب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#636864] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'حساب مالك المنصة محمي بالتحقق بخطوتين. إذا لم تربط Authenticator بعد، أكمل التفعيل هنا دون تسجيل الخروج.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. يمكن لصاحب الصلاحية إغلاق الجلسة القديمة ثم المتابعة بأمان.':'الهوية صحيحة، لكن الحساب يحتاج دعوة وصلاحية محددة داخل الجهة قبل الدخول.'}</p>{accessError==='MFA_REQUIRED'&&<div className="mt-6 text-start"><TotpSecurity bootstrap/></div>}{accessError==='ACCOUNT_NOT_PROVISIONED'&&<div className="mt-5 text-start">{activationFromQr?<div className="rounded-2xl bg-[#E7EEE9] text-[#214C40] p-4 text-xs font-bold leading-6 text-center">{activationMessage==='ACTIVATING'?'تمت قراءة QR — جارٍ ربط الحساب بالدعوة…':'تمت قراءة QR التفعيل. سيُربط الحساب تلقائيًا بالبريد المدعو.'}</div>:<><label className="text-[10px] font-black text-[#616763]">رمز التفعيل الاحتياطي</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="ألصق الرمز فقط إذا تعذر مسح QR"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">تفعيل الحساب</button></>}{activationMessage&&activationMessage!=='ACTIVATING'&&<div className="mt-2 text-[10px] text-center text-[#656b66]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':activationMessage}</div>}</div>}<div className="text-[10px] text-[#696f6b] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div>{accessError==='PRIVILEGED_SESSION_CONFLICT'&&<button onClick={()=>{void takeoverSession()}} className="mt-6 w-full rounded-2xl bg-[#214C40] text-white text-sm font-black py-3">متابعة هنا وإغلاق الجلسة الأخرى</button>}{accessError!=='MFA_REQUIRED'&&<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button>}</div></div>;
  if(requireAuth&&!signedIn) return <AuthPortal/>;
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
  if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</div>;
  if(hash.startsWith('#broadcast')) return <><Overlay><BroadcastStage onClose={returnToExperience}/></Overlay></>;
  if(hash.startsWith('#judge-intelligence')) return <><Overlay><JudgeIntelligenceLab onClose={returnToExperience}/></Overlay></>;
  if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/></>;
+ const competitionClosed=['completed','archived'].includes((competitions.find(c=>c.id===requestedComp)||competitions[0])?.status||'');
+ const operationalRoles=['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','guardian','support_agent'];
+ if(competitionClosed&&operationalRoles.includes(currentUser.role)) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-6" dir="rtl"><div className="mizan-surface max-w-lg w-full p-8 text-center"><MizanLogo language="ar" compact/><div className="mizan-kicker mt-6">المسابقة مغلقة</div><h1 className="text-2xl font-black mt-2">انتهت المسابقة وتم إيقاف الوصول التشغيلي</h1><p className="text-sm text-[#636864] mt-4 leading-7">تم حفظ السجل والنتائج والشهادات، لكن جميع صلاحيات التشغيل والدخول لهذه المسابقة متوقفة.</p><button onClick={()=>void signOut(auth)} className="mt-6 rounded-2xl bg-[#214C40] text-white px-6 py-3 text-sm font-black">تسجيل الخروج</button></div></div>;
  const roleView = () => {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
@@ -282,7 +291,7 @@ export default function App() {
  const isSuperAdmin=currentUser.role==='super_admin';
  return <div className="min-h-screen text-[#171b18] font-arabic">
   {idleWarnSeconds!==null&&<div className="fixed inset-x-0 top-0 z-[210] bg-[#8a4f45] text-white text-center text-xs font-black py-2 px-4">{language==='ar'?`ستُغلق الجلسة تلقائيًا خلال ${idleWarnSeconds} ثانية لعدم النشاط. حرّك الفأرة أو المس الشاشة للبقاء.`:`Signing out in ${idleWarnSeconds}s due to inactivity — move to stay.`}</div>}
-  {!isBroadcast&&<Header onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
+  {!isBroadcast&&<Header onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
   {!isBroadcast&&!isSuperAdmin&&<div className="lg:hidden"><LiveSupportControl floating/></div>}
   {isBroadcast&&<LiveSupportControl floating/>}
   <main><Page>{roleView()}</Page></main>

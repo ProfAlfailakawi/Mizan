@@ -13,7 +13,8 @@ import type { Competition, Organization, User } from '../types';
  * إلى الحالة لاحقًا فسيصل إلى الإطلاق موجودًا لا مفقودًا، ولن تنكسر شاشة لأن أحدًا نسي تحديث
  * قائمة ثانية.
  *
- * ما يبقى عمدًا: هيكل الرُبريك والفئة كقالب يبدأ منه المنظّم — قالبُ تقييم ليس شخصًا مخترعًا.
+ * لا تبقى أي سجلات عرض أو فئات/قاعات/أرقام جاهزة في النشر الحقيقي. الإعدادات البنيوية
+ * المحايدة فقط تبقى كي لا تنكسر الواجهات، وكل ما يُرى للمستخدم يأتي من بيانات أُنشئت فعليًا.
  */
 
 /** يُميّز النشر الحقيقي عن عرض المنتج. المصادقة الإلزامية هي علامة النشر الحقيقي. */
@@ -35,17 +36,46 @@ export function launchOrganization(template: Organization): Organization {
 
 /** مسابقة مسودّة صفرية: الهيكل قائم، والعدّادات صفر، والحالة draft حتى يفتحها المنظّم. */
 export function launchCompetition(template: Competition, organizationId: string): Competition {
+  const ruleSet = { ...template.ruleSet, frozenAt: undefined };
   return {
     ...template,
     id: 'comp-pending-setup',
     organizationId,
     name: 'Competition pending setup',
     nameArabic: 'مسابقة قيد الإعداد',
+    displayName: undefined,
+    displayNameArabic: undefined,
+    logoUrl: undefined,
     edition: '',
+    country: '',
+    timezone: '',
+    startDate: '',
+    endDate: '',
+    registrationStartDate: '',
+    registrationEndDate: '',
+    venueName: '',
+    venuesCount: 0,
+    currentDay: 0,
+    totalDays: 0,
+    categories: [],
+    ruleSet,
+    ruleSets: [ruleSet],
     status: 'draft',
     totalRegistered: 0,
     totalApproved: 0,
     totalAttended: 0,
+    closedAt: undefined,
+    closedBy: undefined,
+    closureReason: undefined,
+    readinessChecklist: {
+      datesConfigured: false,
+      categoriesConfigured: false,
+      ruleSetFrozen: false,
+      judgesAssigned: false,
+      quranSourceLocked: false,
+      devicesRegistered: false,
+      certificatesReady: false,
+    },
   };
 }
 
@@ -67,51 +97,27 @@ export function launchPlaceholderUser(organizationId: string): User {
 export function toLaunchState(seeded: AppStoreState): AppStoreState {
   const organization = launchOrganization(seeded.organization);
   const competition = launchCompetition(seeded.competition, organization.id);
+
+  // Any top-level array in the seed is a record collection. A production launch must never
+  // inherit it: devices, demo halls, scientific fixtures, support rows and "preview" metrics
+  // are just as misleading as fake participants. Start every collection empty, then restore
+  // only the two structural lists that identify the active tenant and competition.
+  const clean = { ...seeded } as AppStoreState;
+  for (const key of Object.keys(clean) as (keyof AppStoreState)[]) {
+    if (Array.isArray(clean[key])) (clean as unknown as Record<string, unknown>)[key as string] = [];
+  }
+
   return {
-    ...seeded,
+    ...clean,
     currentUser: launchPlaceholderUser(organization.id),
     organization,
     organizations: [organization],
     competition,
     competitions: [competition],
-    // أشخاص وسجلات: تبدأ فارغة دائمًا في نشرٍ حقيقي.
-    participants: [],
-    committees: [],
-    judges: [],
-    results: [],
-    certificates: [],
-    reviewCases: [],
-    auditLogs: [],
-    incidents: [],
-    appeals: [],
-    judgeSubmissions: [],
-    aiObservations: [],
-    audioRecordings: [],
-    notifications: [],
-    sealApprovals: [],
-    // هويات وأدوار تأتي من حوكمة الهوية الخادمية، لا من قائمة مزروعة.
-    identityAccounts: [],
-    roleGrants: [],
-    identityInvitations: [],
-    authSessions: [],
-    // بيانات عرض إضافية لا يجوز أن تتسرّب إلى نشرٍ حقيقي (تُزرع للعرض فقط).
-    webhooks: [],
-    integrations: [],
-    supportSessions: [],
-    travelRecords: [],
-    federationAttestations: [],
-    participantPassport: [],
-    consents: [],
-    quorumActions: [],
-    featureFlags: [],
-    sessionCheckpoints: [],
-    continuityIncidents: [],
-    sessionRecoveries: [],
-    passReissues: [],
-    auditLedgerSeals: [],
-    // لا جلسة تحكيم مزروعة ولا بوابات كشف في نشرٍ حقيقي: وإلا ورث محكمٌ حقيقي جلسة العرض
-    // (متسابق ولجنة مخترعان) فتعطّلت موافقته على الكشف لعدم تطابق هويته مع محكمي تلك اللجنة.
-    questionRevealGates: [],
+    operatingCostModel: { baselineStaff: 0, mizanStaff: 0, hoursPerDay: 0, days: 0 },
+    persistenceError: null,
+    isOffline: false,
+    emergencyFrozen: false,
     activeSession: {
       ...seeded.activeSession,
       sessionId: '',
@@ -123,7 +129,12 @@ export function toLaunchState(seeded: AppStoreState): AppStoreState {
       durationSeconds: 0,
       events: [],
       isLocked: false,
+      audioLevel: 0,
       questionPhase: 'SEALED',
+      openingAudioRefId: undefined,
+      openingAudioPlayedAt: undefined,
+      secureRuntimeSessionId: undefined,
+      secureQuestionCount: undefined,
     },
   };
 }

@@ -14,7 +14,7 @@ import type { Role } from '../types';
 /** الأنواع التي تُكتب مستنداتٍ مستقلة في مجموعات فرعية، لا حقولًا في وثيقة واحدة. */
 export const SYNCED_COLLECTIONS = [
   'participants', 'committees', 'judge_submissions', 'judge_events', 'checkins',
-  'results', 'certificates', 'reviews', 'appeals', 'audit', 'quran_sources', 'session_checkpoints',
+  'results', 'certificates', 'reviews', 'appeals', 'support_sessions', 'audit', 'quran_sources', 'session_checkpoints',
 ] as const;
 export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 
@@ -37,6 +37,7 @@ const WRITERS: Record<SyncedCollection, Role[]> = {
   certificates: [...ADMIN],
   reviews: ['head_judge'],
   appeals: [...ADMIN, 'head_judge', 'participant', 'guardian', 'support_agent'],
+  support_sessions: [...ADMIN, 'support_agent'],
   audit: [...ADMIN, ...PANEL, 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
   quran_sources: ['super_admin'],
   session_checkpoints: [...ADMIN, ...PANEL, 'ops_manager'],

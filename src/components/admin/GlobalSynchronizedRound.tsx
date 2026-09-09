@@ -1,113 +1,85 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Globe2, Waypoints, ShieldCheck, LockKeyhole, Play, Pause, CheckCircle2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Globe2, Waypoints, ShieldCheck, LockKeyhole, CircleDot } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
-import { buildGlobalRound, HALL_COUNT, type GlobalHall, type HallStage } from '../../lib/global-round';
 
-// Distributed final: one sealed question capsule, many halls worldwide, one Merkle root.
-// Demonstrates that MIZAN's server-held escrow already supports a synchronized global round —
-// every hall opens the capsule only under its own presence + quorum, and all sealed results fold
-// into a single verifiable anchor.
-
-const STAGE_META: Record<HallStage, { ar: string; en: string; cls: string; dot: string }> = {
-  sealed:    { ar: 'مختوم',        en: 'Sealed',    cls: 'bg-[#EFEEE9] text-[#606863]', dot: 'bg-[#9aa09b]' },
-  present:   { ar: 'حضور',         en: 'Present',   cls: 'bg-[#E8EEF1] text-[#496477]', dot: 'bg-[#496477]' },
-  quorum:    { ar: 'نصاب اللجنة',  en: 'Quorum',    cls: 'bg-[#F2EADC] text-[#7d5e34]', dot: 'bg-[#9B7542]' },
-  revealed:  { ar: 'كُشف محليًا',  en: 'Revealed',  cls: 'bg-[#F2EADC] text-[#7d5e34]', dot: 'bg-[#c49a5d]' },
-  reciting:  { ar: 'تلاوة',        en: 'Reciting',  cls: 'bg-[#E7EEE9] text-[#214C40]', dot: 'bg-[#2f6555]' },
-  submitted: { ar: 'خُتم وأُرسل',  en: 'Sealed',    cls: 'bg-[#214C40] text-white',     dot: 'bg-white' },
-};
-
+/**
+ * الجولة المتزامنة في الإنتاج هي مرآة للواقع فقط. لا تنشئ مدنًا أو قاعات أو نسب تقدم
+ * افتراضية. إذا لم تُنشأ اللجان بعد تظهر حالة فارغة صريحة، وإذا أُنشئت نحسب المؤشرات من
+ * سجلات المسابقة نفسها.
+ */
 export const GlobalSynchronizedRound: React.FC = () => {
-  const { language } = useAppStore();
-  const ar = language === 'ar';
-  const capsuleId = 'CAPSULE-GLOBAL-FINAL-01';
+  const store = useAppStore();
+  const ar = store.language === 'ar';
+  const committees = store.committees.filter(c => c.competitionId === store.competition.id);
+  const participants = store.participants.filter(p => p.competitionId === store.competition.id);
+  const roots = store.publicResultRoots.filter(r => r.competitionId === store.competition.id);
 
-  const [progress, setProgress] = useState(0.32);
-  const [playing, setPlaying] = useState(true);
-  const [round, setRound] = useState<Awaited<ReturnType<typeof buildGlobalRound>> | null>(null);
+  const rows = useMemo(() => committees.map(c => {
+    const assigned = participants.filter(p => p.assignedCommitteeId === c.id);
+    const current = c.currentParticipantId ? participants.find(p => p.id === c.currentParticipantId) : undefined;
+    const done = assigned.filter(p => ['tested','certified'].includes(p.status)).length;
+    return { committee: c, assigned: assigned.length, done, current };
+  }), [committees, participants]);
 
-  useEffect(() => { if (!playing) return; const t = setInterval(() => setProgress((p) => (p >= 1 ? 1 : Math.round((p + 0.04) * 100) / 100)), 1400); return () => clearInterval(t); }, [playing]);
-  useEffect(() => { let live = true; void buildGlobalRound(progress, capsuleId).then((r) => { if (live) setRound(r); }); return () => { live = false; }; }, [progress]);
+  if (!committees.length) {
+    return <section className="rounded-[30px] border border-[#1e3a30] bg-gradient-to-b from-[#12251d] to-[#0e1c16] text-white p-7 sm:p-9">
+      <div className="max-w-2xl mx-auto text-center py-8">
+        <span className="mx-auto w-14 h-14 rounded-2xl bg-white/10 grid place-items-center text-[#bfe0d3]"><CircleDot className="w-6 h-6"/></span>
+        <div className="text-[10px] font-black tracking-[.2em] text-[#a9c6ba] mt-5">{ar?'الجولة المتزامنة':'SYNCHRONIZED ROUND'}</div>
+        <h2 className="text-2xl font-black mt-2">{ar?'لا توجد قاعات أو لجان تشغيلية بعد':'No operational halls or panels yet'}</h2>
+        <p className="text-xs text-white/55 leading-6 mt-3">{ar?'عند إنشاء اللجان وتوزيع المتسابقين ستظهر هنا الحالة الحقيقية فقط. لن يعرض ميزان مدنًا أو أرقامًا أو تقدمًا تجريبيًا.':'Once panels and participants are actually assigned, their real state appears here. MIZAN never invents demo cities, counts or progress.'}</p>
+      </div>
+    </section>;
+  }
 
-  const halls = round?.halls || [];
-  const grouped = useMemo(() => halls, [halls]);
+  const assignedTotal = rows.reduce((n, x) => n + x.assigned, 0);
+  const doneTotal = rows.reduce((n, x) => n + x.done, 0);
+  const progress = assignedTotal ? Math.round((doneTotal / assignedTotal) * 100) : 0;
+  const latestRoot = roots[0];
 
-  return (
-    <section className="rounded-[30px] overflow-hidden border border-[#1e3a30] bg-gradient-to-b from-[#12251d] to-[#0e1c16] text-white">
-      <div className="p-6 sm:p-8">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <span className="w-12 h-12 rounded-2xl bg-white/10 grid place-items-center text-[#bfe0d3]"><Globe2 className="w-6 h-6" /></span>
-            <div>
-              <div className="text-[10px] font-black tracking-[.2em] text-[#a9c6ba]">{ar ? 'الجولة العالمية المتزامنة' : 'GLOBAL SYNCHRONIZED ROUND'}</div>
-              <h2 className="text-2xl sm:text-3xl font-black mt-1">{ar ? 'سؤال واحد مختوم · قاعات حول العالم' : 'One sealed question · halls worldwide'}</h2>
-              <p className="text-xs text-white/50 mt-1 max-w-xl">{ar ? `${HALL_COUNT} قاعة، السؤال لا يُكشف في أي قاعة قبل حضور متسابقها ونصاب لجنتها — وكل النتائج تندمج في جذر ميركل واحد.` : `${HALL_COUNT} halls; the question opens in a hall only under its own presence + quorum — and every result folds into one Merkle root.`}</p>
-            </div>
-          </div>
-          <button onClick={() => setPlaying((v) => !v)} className="self-start inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-black hover:bg-white/10">{playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}{ar ? (playing ? 'إيقاف المحاكاة' : 'تشغيل') : (playing ? 'Pause' : 'Play')}</button>
-        </div>
-
-        {/* Sealed capsule + merged root */}
-        <div className="mt-6 grid lg:grid-cols-[1fr_1.4fr] gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[.04] p-5">
-            <div className="flex items-center gap-2 text-[11px] font-black text-[#a9c6ba]"><LockKeyhole className="w-4 h-4" />{ar ? 'الكبسولة المختومة' : 'SEALED CAPSULE'}</div>
-            <div className="mt-3 font-mono text-sm text-white/80">{capsuleId}</div>
-            <div className="mt-2 text-[11px] text-white/45 leading-6">{ar ? 'نفس الكبسولة زُوّدت لكل القاعات. لا خادم ولا مشرف يرى النص قبل شروط الكشف المحلية.' : 'The same capsule is provisioned to every hall. No server or admin sees the text before local reveal conditions.'}</div>
-          </div>
-          <div className="rounded-2xl border border-[#c49a5d]/25 bg-[#c49a5d]/[.07] p-5">
-            <div className="flex items-center gap-2 text-[11px] font-black text-[#d9c193]"><Waypoints className="w-4 h-4" />{ar ? 'جذر ميركل الموحّد' : 'UNIFIED MERKLE ROOT'}</div>
-            <div className="mt-3 font-mono text-xs sm:text-sm break-all text-white/85 min-h-[2.5em]">{round?.mergedRoot || (ar ? 'بانتظار أول قاعة تختم نتيجتها…' : 'Awaiting the first hall to seal…')}</div>
-            <div className="mt-2 text-[11px] text-white/45">{ar ? `${round?.submittedCount || 0} قاعة أسهمت بنتيجتها المختومة في الجذر` : `${round?.submittedCount || 0} halls folded into the root`}</div>
-          </div>
-        </div>
-
-        {/* Fleet stats */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat n={HALL_COUNT} t={ar ? 'قاعة' : 'Halls'} />
-          <Stat n={round?.totalParticipants || 0} t={ar ? 'متسابق' : 'Finalists'} />
-          <Stat n={round?.revealedCount || 0} t={ar ? 'كشف محلي' : 'Local reveals'} />
-          <Stat n={round?.submittedCount || 0} t={ar ? 'خُتمت' : 'Sealed'} />
-        </div>
-
-        {/* Progress scrubber */}
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-[10px] text-white/40 w-16">{ar ? 'تقدّم الجولة' : 'Round'}</span>
-          <input type="range" min={0} max={1} step={0.01} value={progress} onChange={(e) => { setPlaying(false); setProgress(Number(e.target.value)); }} className="flex-1 accent-[#c49a5d]" />
-          <span className="text-[10px] font-black text-[#d9c193] w-10 text-end">{Math.round(progress * 100)}%</span>
-        </div>
-
-        {/* World fleet grid */}
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-          {grouped.map((h) => <HallCard key={h.id} hall={h} ar={ar} />)}
-        </div>
-
-        <div className="mt-5 flex items-start gap-2 text-[11px] text-white/40 leading-6">
-          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#a9c6ba]" />
-          {ar ? 'محاكاة تنسيق مبنية على حجز الأسئلة الخادمي الحقيقي في ميزان. البنية جاهزة؛ تشغيل حدث عالمي فعلي يتطلب تزويد القاعات وتحقق الشبكة وموافقات الجهات. لا يُكشف نص أي قاعة لأخرى، ولا تُدمج نتيجة إلا بعد ختمها محليًا.' : "A coordination simulation over MIZAN's real server-held escrow. The architecture is ready; a live global event still needs hall provisioning, network verification and institutional approvals. No hall's text is exposed to another, and a result folds in only after it is sealed locally."}
+  return <section className="rounded-[30px] overflow-hidden border border-[#1e3a30] bg-gradient-to-b from-[#12251d] to-[#0e1c16] text-white">
+    <div className="p-6 sm:p-8">
+      <div className="flex items-center gap-4">
+        <span className="w-12 h-12 rounded-2xl bg-white/10 grid place-items-center text-[#bfe0d3]"><Globe2 className="w-6 h-6"/></span>
+        <div>
+          <div className="text-[10px] font-black tracking-[.2em] text-[#a9c6ba]">{ar?'حالة القاعات الفعلية':'LIVE HALL STATE'}</div>
+          <h2 className="text-2xl sm:text-3xl font-black mt-1">{ar?'كل قاعة كما هي الآن':'Every hall, exactly as it is now'}</h2>
+          <p className="text-xs text-white/50 mt-1">{ar?'المؤشرات أدناه مشتقة من اللجان والمتسابقين المسجلين فعليًا في هذه المسابقة.':'Every indicator below is derived from this competition’s actual panels and participants.'}</p>
         </div>
       </div>
-    </section>
-  );
-};
 
-const HallCard: React.FC<{ hall: GlobalHall; ar: boolean }> = ({ hall, ar }) => {
-  const m = STAGE_META[hall.stage as HallStage];
-  return (
-    <div className={`rounded-2xl border p-3.5 transition-colors duration-500 ${hall.stage === 'submitted' ? 'border-[#2f6555] bg-[#183a2e]' : 'border-white/10 bg-white/[.03]'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg leading-none">{hall.flag}</span>
-          <div className="min-w-0"><div className="text-sm font-black truncate">{ar ? hall.cityArabic : hall.city}</div><div className="text-[10px] text-white/40">{hall.localTime} · {hall.participants} {ar ? 'متسابق' : ''}</div></div>
+      <div className="mt-6 grid lg:grid-cols-[1fr_1.4fr] gap-4">
+        <div className="rounded-2xl border border-white/10 bg-white/[.04] p-5">
+          <div className="flex items-center gap-2 text-[11px] font-black text-[#a9c6ba]"><LockKeyhole className="w-4 h-4"/>{ar?'حالة الكشف':'REVEAL STATE'}</div>
+          <div className="mt-3 text-sm font-black">{store.activeSession.questionSelection ? (ar?'هناك جلسة تحكيم فعلية نشطة':'A real judging session is active') : (ar?'لا توجد جلسة كشف نشطة':'No active reveal session')}</div>
+          <div className="mt-2 text-[11px] text-white/45 leading-6">{ar?'لا تُعرض كبسولة أو معرّف افتراضي. يظهر معرّف السؤال فقط داخل جلسة فعلية وبعد شروط الكشف.':'No placeholder capsule or identifier is shown. Question evidence appears only for a real session after reveal conditions are met.'}</div>
         </div>
-        {hall.stage === 'submitted' ? <CheckCircle2 className="w-4 h-4 text-[#7fae9c] shrink-0" /> : <span className={`w-2 h-2 rounded-full shrink-0 ${m.dot}`} />}
+        <div className="rounded-2xl border border-[#c49a5d]/25 bg-[#c49a5d]/[.07] p-5">
+          <div className="flex items-center gap-2 text-[11px] font-black text-[#d9c193]"><Waypoints className="w-4 h-4"/>{ar?'آخر جذر نتائج موثّق':'LATEST VERIFIED RESULT ROOT'}</div>
+          <div className="mt-3 font-mono text-xs sm:text-sm break-all text-white/85 min-h-[2.5em]">{latestRoot?.merkleRoot || (ar?'لم يُنشأ جذر نتائج بعد':'No result root has been created yet')}</div>
+          <div className="mt-2 text-[11px] text-white/45">{latestRoot ? new Date(latestRoot.createdAt).toLocaleString(ar?'ar-KW':'en') : (ar?'يظهر بعد وجود نتائج فعلية قابلة للختم.':'It appears only after actual results can be sealed.')}</div>
+        </div>
       </div>
-      <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black ${m.cls}`}>{ar ? m.ar : m.en}</div>
-      {hall.resultDigest && <div className="mt-2 font-mono text-[9px] text-white/35 truncate">{hall.resultDigest.slice(0, 22)}…</div>}
+
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Stat n={committees.length} t={ar?'لجنة/قاعة فعلية':'Real panels'} />
+        <Stat n={assignedTotal} t={ar?'متسابق موزع':'Assigned'} />
+        <Stat n={doneTotal} t={ar?'أكمل':'Completed'} />
+        <Stat n={`${progress}%`} t={ar?'تقدم محسوب':'Measured progress'} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {rows.map(({committee,assigned,done,current}) => <div key={committee.id} className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-black">{ar?committee.nameArabic:committee.name}</div><div className="text-[10px] text-white/40 mt-1">{committee.venueHall || (ar?'القاعة غير محددة':'Hall not assigned')} · {committee.code}</div></div><Badge variant={committee.status==='ready'?'emerald':committee.status==='paused'?'amber':'neutral'}>{committee.status}</Badge></div>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]"><div className="rounded-xl bg-white/5 p-2"><b className="text-sm block">{assigned}</b>{ar?'موزع':'assigned'}</div><div className="rounded-xl bg-white/5 p-2"><b className="text-sm block">{done}</b>{ar?'مكتمل':'done'}</div></div>
+          {current&&<div className="mt-3 text-[10px] text-[#b9cec5]">{ar?'الآن:':'Now:'} {current.code}</div>}
+        </div>)}
+      </div>
+
+      <div className="mt-5 flex items-start gap-2 text-[11px] text-white/40 leading-6"><ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#a9c6ba]"/>{ar?'هذه الشاشة لا تحتوي وضع عرض أو مولّد محاكاة؛ أي رقم يظهر فيها له سجل فعلي في المسابقة الحالية.':'This screen contains no demo generator or simulation mode; every displayed number has a real record in the active competition.'}</div>
     </div>
-  );
+  </section>;
 };
 
-const Stat: React.FC<{ n: number; t: string }> = ({ n, t }) => (
-  <div className="rounded-2xl bg-white/[.05] px-4 py-3"><div className="text-2xl font-black tabular-nums">{n}</div><div className="text-[10px] text-white/45 mt-0.5">{t}</div></div>
-);
+const Stat: React.FC<{ n: number|string; t: string }> = ({ n, t }) => <div className="rounded-2xl bg-white/[.05] px-4 py-3"><div className="text-2xl font-black tabular-nums">{n}</div><div className="text-[10px] text-white/45 mt-0.5">{t}</div></div>;

@@ -222,6 +222,10 @@ export interface Competition {
   totalDays: number;
   policy?: CompetitionPolicy;
   ruleSets?: RuleSet[];
+  /** Final operational lock. When set, competition-scoped access is blocked and records become read-only. */
+  closedAt?: string;
+  closedBy?: string;
+  closureReason?: string;
   readinessChecklist: {
     datesConfigured: boolean;
     categoriesConfigured: boolean;
@@ -277,6 +281,9 @@ export interface Participant {
   specialNeeds?: boolean;
   photoUrl?: string;
   documents?: { type: string; url: string; verified: boolean }[];
+  /** Opaque capability tokens used by the public journey/guardian portals. They are never used as usernames or passwords. */
+  journeyAccessToken?: string;
+  guardianAccessToken?: string;
   createdAt: string;
 }
 
@@ -799,9 +806,9 @@ export interface ShadowRun { id:string; competitionId:string; mode:'record'|'ana
 export interface ParticipantPassportEntry { id:string; participantId:string; competitionId:string; competitionName:string; categoryName:string; year:string; result?:string; certificateNumber?:string; verified:boolean; }
 export interface JudgePassportEntry { id:string; judgeId:string; competitionId:string; competitionName:string; role:string; riwayat:string[]; calibrationScore?:number; completedSessions:number; verified:boolean; }
 export interface TrainingRun { id:string; competitionId:string; type:'judge_practice'|'operations_dry_run'|'sandbox'; status:'ready'|'running'|'completed'; startedAt?:string; score?:number; notes?:string; }
-export interface BackupRecord { id:string; organizationId:string; competitionId?:string; createdAt:string; scope:'competition'|'organization'; checksum:string; status:'ready'|'failed'; sizeLabel:string; }
+export interface BackupRecord { id:string; organizationId:string; competitionId?:string; createdAt:string; scope:'competition'|'organization'; checksum:string; status:'ready'|'failed'; sizeLabel:string; /** Local encrypted-at-rest responsibility belongs to the deployment; this payload makes the restore point actually restorable. */ snapshotJson?:string; }
 export interface RetentionJob { id:string; competitionId:string; dataType:'audio'|'documents'|'audit'|'participant_pii'; scheduledFor:string; action:'delete'|'anonymize'|'retain'; status:'scheduled'|'completed'|'cancelled'; }
-export interface SupportSession { id:string; organizationId:string; requestedBy:string; approvedBy?:string; reason:string; status:'requested'|'approved'|'active'|'ended'|'rejected'; createdAt:string; expiresAt:string; }
+export interface SupportSession { id:string; organizationId:string; competitionId:string; requestedBy:string; approvedBy?:string; reason:string; status:'requested'|'approved'|'active'|'ended'|'rejected'; createdAt:string; updatedAt?:string; expiresAt:string; }
 export interface RemoteSessionCheck { id:string; participantId:string; competitionId:string; identity:'pending'|'verified'|'failed'; device:'pending'|'passed'|'failed'; environment:'pending'|'passed'|'review'; networkQuality:'good'|'fair'|'poor'; recordingReady:boolean; suspiciousSignals:string[]; }
 
 

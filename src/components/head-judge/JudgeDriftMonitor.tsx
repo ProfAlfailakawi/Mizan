@@ -3,7 +3,7 @@ import { Activity, Coffee, TrendingDown, Gauge, ShieldCheck } from 'lucide-react
 import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
-import { computeAllJudgeDrift, computeJudgeDrift, deriveDemoJudgeEvents, type JudgeEventLike } from '../../lib/judge-drift';
+import { computeAllJudgeDrift, computeJudgeDrift, type JudgeEventLike } from '../../lib/judge-drift';
 
 // Silent Judge Drift — a Head-Judge-only advisory. It NEVER alters a score. It watches whether a
 // judge has grown harsher than their own morning baseline and, past a 2σ threshold, gently
@@ -14,25 +14,20 @@ export const JudgeDriftMonitor: React.FC = () => {
   const ar = store.language === 'ar';
   const [ackd, setAckd] = useState<Record<string, boolean>>({});
 
-  // A thin review roster (often a single demo judge) cannot show the cross-committee comparison
-  // this monitor exists for, so — like MIZAN's other previews — we model a small committee panel
-  // when fewer than three judges exist. Real deployments use the actual judging Flight Recorder.
-  const modelled = store.judges.length < 3;
-  const panel = useMemo(() => (
-    modelled
-      ? Array.from({ length: 5 }, (_, i) => ({ id: `demo-judge-${i + 1}`, userId: `demo-judge-${i + 1}`, calibrationScore: 90, committee: `C${i + 1}` }))
-      : store.judges.map((j) => ({ id: j.id, userId: j.userId, calibrationScore: j.calibrationScore, committee: '' }))
-  ), [modelled, store.judges]);
+  // Production truth only: no synthetic judges and no derived preview events. Drift is meaningful only
+  // after enough real judging events exist for the active panel; before that we show an explicit empty state.
+  const events: JudgeEventLike[] = useMemo(() => store.activeSession.events.map((e) => ({
+    judgeId: e.judgeId,
+    relativeSeconds: e.relativeSeconds,
+    penalty: e.penalty,
+  })), [store.activeSession.events]);
 
-  const events: JudgeEventLike[] = useMemo(() => {
-    const real = store.activeSession.events.map((e) => ({ judgeId: e.judgeId, relativeSeconds: e.relativeSeconds, penalty: e.penalty }));
-    const enough = !modelled && new Set(real.map((e) => e.judgeId)).size >= 3 && real.length >= 24;
-    return enough ? real : deriveDemoJudgeEvents(panel);
-  }, [store.activeSession.events, panel, modelled]);
+  const realJudgeIds = useMemo(() => new Set(events.map(e => e.judgeId)), [events]);
+  const enoughRealEvidence = store.judges.length > 0 && realJudgeIds.size > 0 && events.length >= 8;
 
-  const signals = useMemo(() => computeAllJudgeDrift(events, { driftSigma: 2 }), [events]);
-  const nameOf = (id: string) => { const j = store.judges.find((x) => x.userId === id || x.id === id); if (j) return ar ? j.nameArabic : j.name; const n = id.replace('demo-judge-', ''); return ar ? `محكم اللجنة C${n}` : `Judge · C${n}`; };
-  const committeeFor = (id: string) => { if (id.startsWith('demo-judge-')) return `C${id.replace('demo-judge-', '')}`; const j = store.judges.find((x) => x.userId === id || x.id === id); const c = store.committees.find((cc) => cc.judgeIds?.includes(j?.userId || '') || cc.judgeIds?.includes(j?.id || '')); return c?.code || '—'; };
+  const signals = useMemo(() => enoughRealEvidence ? computeAllJudgeDrift(events, { driftSigma: 2 }) : [], [events, enoughRealEvidence]);
+  const nameOf = (id: string) => { const j = store.judges.find((x) => x.userId === id || x.id === id); return j ? (ar ? j.nameArabic : j.name) : (ar ? 'محكم' : 'Judge'); };
+  const committeeFor = (id: string) => { const j = store.judges.find((x) => x.userId === id || x.id === id); const c = store.committees.find((cc) => cc.judgeIds?.includes(j?.userId || '') || cc.judgeIds?.includes(j?.id || '')); return c?.code || '—'; };
   const judgeName = nameOf;
 
   const flagged = signals.filter((s) => s.attention);
@@ -51,7 +46,8 @@ export const JudgeDriftMonitor: React.FC = () => {
         <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
       </div>
 
-      <div className="mt-5 grid md:grid-cols-2 gap-3">
+      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#7a827d] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحداث فعلية من المحكمين. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judge events arrive. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
+      {enoughRealEvidence && <div className="mt-5 grid md:grid-cols-2 gap-3">
         {signals.map((s) => {
           const judgeEvents = events.filter((e) => e.judgeId === s.judgeId).sort((a, b) => a.relativeSeconds - b.relativeSeconds);
           const detail = computeJudgeDrift(judgeEvents, { driftSigma: 2 });
@@ -86,10 +82,10 @@ export const JudgeDriftMonitor: React.FC = () => {
             </div>
           );
         })}
-      </div>
+      </div>}
 
       <div className="mt-4 text-[10px] text-[#696f6b] leading-6">
-        {ar ? 'إشارة مساندة لرئيس التحكيم فقط، ولا تظهر للمحكم ولا تغيّر درجة. المقارنة ذاتية (كل محكم مع نفسه) حتى لا تُلغى الفروق المشروعة في التحكيم. البيانات هنا مشتقة من مسار اليوم للعرض.' : 'Advisory to the Head Judge only — never shown to the judge, never a score change. The comparison is self-referential (each judge vs their own baseline) so legitimate judging differences are preserved. Data here is derived from the day timeline for preview.'}
+        {ar ? 'إشارة مساندة لرئيس التحكيم فقط، ولا تظهر للمحكم ولا تغيّر درجة. المقارنة ذاتية (كل محكم مع نفسه) وتعتمد على أحداث التحكيم الحقيقية فقط.' : 'Advisory to the Head Judge only — never shown to the judge and never a score change. The comparison is self-referential and uses real judging events only.'}
       </div>
     </section>
   );

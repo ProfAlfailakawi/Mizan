@@ -1147,8 +1147,8 @@ export const SEED_INTEGRATIONS: IntegrationConfig[] = [
 
 // جلسات دعم — تُظهر قائمة وحدة الدعم بدل شاشة فارغة.
 export const SEED_SUPPORT_SESSIONS: SupportSession[] = [
-  { id: 'sup-1', organizationId: 'org-gqa-global', requestedBy: 'usr-comp-admin-1', reason: 'مراجعة إعداد اللجان قبل اليوم الأول', status: 'requested', createdAt: '2027-02-10T15:00:00Z', expiresAt: '2027-02-10T17:00:00Z' },
-  { id: 'sup-2', organizationId: 'org-gqa-global', requestedBy: 'usr-ops-1', approvedBy: 'usr-org-admin-1', reason: 'تشخيص بطء مزامنة في القاعة B', status: 'active', createdAt: '2027-02-11T08:30:00Z', expiresAt: '2027-02-11T10:30:00Z' },
+  { id: 'sup-1', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', requestedBy: 'usr-comp-admin-1', reason: 'مراجعة إعداد اللجان قبل اليوم الأول', status: 'requested', createdAt: '2027-02-10T15:00:00Z', expiresAt: '2027-02-10T17:00:00Z' },
+  { id: 'sup-2', organizationId: 'org-gqa-global', competitionId: 'comp-dubai-2027', requestedBy: 'usr-ops-1', approvedBy: 'usr-org-admin-1', reason: 'تشخيص بطء مزامنة في القاعة B', status: 'active', createdAt: '2027-02-11T08:30:00Z', expiresAt: '2027-02-11T10:30:00Z' },
 ];
 
 // دعوات هوية بانتظار الاعتماد — تُظهر لوحة "الموافقات المعلّقة".

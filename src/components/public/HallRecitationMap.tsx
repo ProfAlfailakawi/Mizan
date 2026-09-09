@@ -44,7 +44,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
           <div className="text-xs mizan-venue-muted mt-1">{ar ? store.competition.nameArabic : store.competition.name}</div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.projectedFullDay ? (ar ? 'يوم مسابقة تمثيلي' : 'Projected day') : (ar ? 'حي · مجمّع' : 'Live · aggregate')}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.totalRecitations>0 ? (ar ? 'حي · بيانات فعلية' : 'Live · real data') : (ar ? 'بانتظار تلاوة فعلية' : 'Waiting for real recitation')}</span>
           {onClose && <button onClick={onClose} className="w-11 h-11 rounded-xl hover:bg-white/10 grid place-items-center text-white/55"><X className="w-5 h-5" /></button>}
         </div>
       </header>
@@ -83,7 +83,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] mizan-venue-muted">
-            <span>{ar ? `أكثر صفحة تلاوةً: ${agg.hottestPage.page}` : `Hottest page: ${agg.hottestPage.page}`}</span>
+            <span>{agg.hottestPage.page>0 ? (ar ? `أكثر صفحة تلاوةً: ${agg.hottestPage.page}` : `Hottest page: ${agg.hottestPage.page}`) : (ar?'لا توجد صفحة مسجلة بعد':'No recorded page yet')}</span>
             <span>{ar ? `${agg.coveredPages} صفحة تُليت` : `${agg.coveredPages} pages recited`}</span>
           </div>
         </div>
@@ -113,13 +113,9 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
       )}
 
       <footer className={`${variant === 'screen' ? 'mt-auto pt-6' : 'mt-4'} text-[11px] mizan-venue-faint leading-6`}>
-        {agg.projectedFullDay
-          ? (ar
-            ? `عرض تمثيلي ليوم مسابقة كامل (${agg.projectedReciters.toLocaleString('ar-EG')} تالٍ عبر اللجان) لأن بيانات المراجعة المحلية صغيرة — بيانات حتمية وليست رسمية. في التشغيل تُغذّى الخريطة من سجل التلاوة الحي، وتبقى مجمّعة على مستوى الصفحة فلا تكشف هوية أحد.`
-            : `Projected full competition day (${agg.projectedReciters.toLocaleString('en-US')} reciters across committees) because the local review roster is tiny — deterministic, non-official data. In production the map is fed by the live recitation ledger, and stays a page-level aggregate that reveals no one.`)
-          : (ar
-            ? 'خريطة مجمّعة على مستوى الصفحة فقط — لا تكشف هوية أي متسابق. في التشغيل تُغذّى من سجل التلاوة الحي لكل اللجان؛ في هذا العرض تُشتق حتميًا من نشاط القاعة وليست سجلًّا رسميًا لموضع بعينه.'
-            : 'Page-level aggregate only — it never reveals any participant. In production it is fed by the live recitation ledger across all committees; in this preview it is derived deterministically from hall activity and is not an official record of any specific locus.')}
+        {ar
+          ? (agg.totalRecitations ? 'هذه الخريطة تعرض فقط مواضع تلاوة موجودة فعليًا في الجلسة الحية التي يملكها النظام الآن. لا توجد إسقاطات أو يوم تمثيلي أو تعبئة تقديرية.' : 'لا توجد تلاوات فعلية مسجلة لهذه الخريطة بعد. لذلك تبقى الخريطة فارغة بدل إنشاء تغطية أو ختمات افتراضية.')
+          : (agg.totalRecitations ? 'This map shows only recitation loci the system actually holds for the live session. No projections or representative-day filling is used.' : 'No real recitation loci are recorded yet, so the map stays empty instead of inventing coverage or khatmah counts.')}
       </footer>
     </div>
   );
