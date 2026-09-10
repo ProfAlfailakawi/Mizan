@@ -64,10 +64,24 @@ let firestoreClient: Promise<FirestoreClient> | null = null;
 export function getFirestoreClient(): Promise<FirestoreClient> {
   if (!firestoreClient) {
     firestoreClient = import('firebase/firestore')
-      .then(({ getFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot, collection }) => ({
-        db: config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
-          ? getFirestore(app, config.firestoreDatabaseId)
-          : getFirestore(app),
+      .then(({ initializeFirestore, doc, setDoc, deleteDoc, getDoc, onSnapshot, collection }) => ({
+        /*
+         * `ignoreUndefinedProperties` ليس تفصيلًا: بدونه يرفض Firestore المستند كلَّه إذا حمل
+         * حقلًا واحدًا قيمته undefined، ورسالته «Unsupported field value: undefined» لا تحوي
+         * كلمة صلاحية ولا حجم — فتُصنَّف عطلًا عامًّا ويظهر «تعذّرت المزامنة» بلا سبب مفهوم.
+         *
+         * والحالة تقع في أكثر مسار استعمالًا: إنشاء مسابقة جديدة يضع displayName وlogoUrl
+         * وfrozenAt = undefined عمدًا (مسابقة نظيفة بلا علامة ولا قفل)، فيُرفض الرفع بصمت
+         * وتبقى إعدادات المسابقة على الجهاز وحده. الراية تُسقط الحقول غير المعرَّفة بدل أن
+         * تُسقط المستند — وهو الغرض الذي وُجدت له.
+         *
+         * والحذف المقصود لحقل يبقى بـ deleteField()، لا بتمرير undefined.
+         */
+        db: initializeFirestore(
+          app,
+          { ignoreUndefinedProperties: true },
+          config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)' ? config.firestoreDatabaseId : undefined,
+        ),
         doc, setDoc, deleteDoc, getDoc, onSnapshot, collection,
       }))
       // A failed load must not poison every later attempt (a flaky venue link is normal).
