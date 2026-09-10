@@ -20,6 +20,9 @@ import {
   RotateCcw,
   Check,
   CircleHelp,
+  Plus,
+  Trash2,
+  Link2,
 } from 'lucide-react';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -27,10 +30,111 @@ import { useAppStore } from '../../lib/store';
 import { auth } from '../../lib/firebase';
 import { uploadOrganizationLogo } from '../../lib/brand-assets';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
-import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits} from '../../lib/input-validation';
+import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits,normalizeDomain,isDomain} from '../../lib/input-validation';
 
 const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.'};
 const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
+
+export const TenantDomainCard: React.FC<{ orgId?: string }> = ({ orgId }) => {
+  const store = useAppStore();
+  const ar = store.language === 'ar';
+  const [subdomain, setSubdomain] = useState('');
+  const [customDomains, setCustomDomains] = useState<string[]>([]);
+  const [newDomain, setNewDomain] = useState('');
+  const [baseDomain, setBaseDomain] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [ok, setOk] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const user = auth?.currentUser; if (!user) return; let live = true;
+    void user.getIdToken().then(token => fetch(`/api/tenant/brand${orgId ? `?orgId=${encodeURIComponent(orgId)}` : ''}`, { headers: { authorization: `Bearer ${token}` } }))
+      .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
+      .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []); setBaseDomain(body?.baseDomain || ''); })
+      .catch(() => {});
+    return () => { live = false };
+  }, [orgId]);
+
+  const addDomain = () => {
+    const d = normalizeDomain(newDomain);
+    if (!d) return;
+    if (!isDomain(d)) { setErr(ar ? 'أدخل نطاقًا صحيحًا مثل: a.example.com' : 'Enter a valid domain, e.g. a.example.com'); return; }
+    if (customDomains.includes(d)) { setErr(ar ? 'هذا النطاق مضاف مسبقًا.' : 'Domain already added.'); return; }
+    setCustomDomains([...customDomains, d]); setNewDomain(''); setErr('');
+  };
+  const removeDomain = (d: string) => setCustomDomains(customDomains.filter(x => x !== d));
+
+  const save = async () => {
+    setSaving(true); setOk(false); setErr('');
+    try {
+      const user = auth?.currentUser; if (!user) throw new Error(ar ? 'تلزم هوية موثقة.' : 'Authentication required.');
+      const token = await user.getIdToken();
+      const res = await fetch('/api/tenant/brand', { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ orgId: orgId || store.organization?.id, subdomain: normalizeDomain(subdomain), customDomains }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String((body.errors || []).join(' · ') || body.code || 'DOMAIN_SAVE_FAILED'));
+      const t = body.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []);
+      setOk(true); setTimeout(() => setOk(false), 4000);
+    } catch (e) { setErr(arError((e as Error).message)); } finally { setSaving(false); }
+  };
+
+  const suffix = baseDomain ? `.${baseDomain}` : '';
+  return (
+    <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 sm:p-6 shadow-sm space-y-5">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]"><Globe className="w-5 h-5" /></span>
+        <div>
+          <div className="mizan-kicker">{ar ? 'النطاق والوصول' : 'DOMAIN & ACCESS'}</div>
+          <h3 className="text-base font-extrabold text-[#171b18]">{ar ? 'نطاق الجهة على ميزان' : 'Tenant domain'}</h3>
+        </div>
+      </div>
+      <p className="text-xs leading-relaxed text-[#636864] max-w-2xl">
+        {ar ? 'اختر نطاقًا فرعيًا سهلًا يصل منه الجميع إلى بوابتك، أو اربط نطاقك الخاص باحترافية. يكفي إدخال العنوان هنا؛ نتكفّل بالباقي.' : 'Pick a friendly subdomain or connect your own custom domain. Enter the address here and we handle the rest.'}
+      </p>
+
+      {/* النطاق الفرعي */}
+      <label className="block">
+        <span className="mizan-field-label">{ar ? 'النطاق الفرعي' : 'Subdomain'}</span>
+        <div className="flex items-stretch mt-1 rounded-xl border border-[#DAD8D0] overflow-hidden focus-within:border-[#2F6555]">
+          <input dir="ltr" lang="en" className="flex-1 px-3 py-2.5 text-sm outline-none bg-white" value={subdomain} onChange={e => setSubdomain(normalizeDomain(e.target.value))} placeholder="a" />
+          {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[11px] font-bold text-[#656b66] border-s border-[#E4E2DB]">{suffix}</span>}
+        </div>
+        <span className="mt-1 block text-[10px] text-[#8d7a52]">{ar ? 'حروف لاتينية وأرقام وشرطة فقط.' : 'Lowercase letters, digits and hyphen only.'}</span>
+      </label>
+
+      {/* النطاقات الخاصة */}
+      <div>
+        <span className="mizan-field-label">{ar ? 'نطاق خاص (اختياري)' : 'Custom domain (optional)'}</span>
+        <div className="flex gap-2 mt-1">
+          <input dir="ltr" lang="en" className="mizan-input flex-1" value={newDomain} onChange={e => setNewDomain(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDomain(); } }} placeholder="a.example.com" />
+          <Button type="button" variant="outline" size="sm" icon={<Plus className="w-4 h-4" />} onClick={addDomain} disabled={!newDomain.trim()}>{ar ? 'إضافة' : 'Add'}</Button>
+        </div>
+        {customDomains.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {customDomains.map(d => (
+              <div key={d} className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E2DB] bg-[#FAFAF7] px-3 py-2">
+                <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[#2F6555] shrink-0" />{d}</span>
+                <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 rounded-xl bg-[#F3F1EB] p-3 text-[11px] leading-6 text-[#666c68]">
+          <ShieldCheck className="mb-1 h-4 w-4 text-[#2F6555]" />
+          {ar ? 'لتفعيل نطاقك الخاص: أضِف سجل CNAME عند مزوّد نطاقك يشير إلى عنوان ميزان' : 'To activate your custom domain: add a CNAME record at your DNS provider pointing to the MIZAN host'}
+          {baseDomain ? <> <span dir="ltr" className="font-black">{baseDomain}</span></> : ''}
+          {ar ? '. تسري الشهادة الآمنة تلقائيًا بعد التحقق.' : '. A secure certificate is issued automatically after verification.'}
+        </div>
+      </div>
+
+      {ok && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'تم حفظ النطاق بنجاح.' : 'Domain saved successfully.'}</div>}
+      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
+
+      <div className="flex justify-end">
+        <Button icon={saving ? undefined : <Check className="w-4 h-4" />} onClick={() => void save()} disabled={saving}>{saving ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ النطاق' : 'Save domain')}</Button>
+      </div>
+    </section>
+  );
+};
 
 interface TenantBrandStudioProps {
   initialBrand?: OrganizationBrand;
@@ -356,6 +460,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           </div>
         )}
       </div>
+
+      {/* بطاقة النطاق والوصول */}
+      <TenantDomainCard orgId={orgId} />
 
       {/* القسم الرئيسي: الإعدادات على اليمين والمعاينة الحية على اليسار */}
       <div className="grid lg:grid-cols-12 gap-6">
