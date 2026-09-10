@@ -615,8 +615,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
         {/* عمود إعدادات الشعار والبيانات ومواضع الظهور */}
         <div className="lg:col-span-7 space-y-5">
           {/* ثلاث مهام متمايزة كانت نموذجًا واحدًا عملاقًا؛ التبويب يفصلها والمحاكي اللاصق يبقى شاهدًا على كل تغيير. */}
-          <div role="tablist" aria-label={ar?'أقسام ستوديو الهوية':'Brand studio sections'} className="flex flex-wrap gap-1.5 rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-1.5 w-fit max-w-full">
-            {([['logo',ar?'الشعار والوضوح':'Logo & clarity'],['org',ar?'البيانات المؤسسية':'Organization details'],['placements',ar?'مواضع العرض':'Display placements']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={studioTab===id} onClick={()=>setStudioTab(id)} className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${studioTab===id?'bg-[#214C40] text-white shadow-sm':'text-[#5d645f] hover:bg-[#f0eee8]'}`}>{label}</button>)}
+          <div role="tablist" aria-label={ar?'أقسام ستوديو الهوية':'Brand studio sections'} className="mizan-tabs">
+            {([['logo',ar?'الشعار والوضوح':'Logo & clarity'],['org',ar?'البيانات المؤسسية':'Organization details'],['placements',ar?'مواضع العرض':'Display placements']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={studioTab===id} onClick={()=>setStudioTab(id)} className={`mizan-tab ${studioTab===id?'is-active':''}`}>{label}</button>)}
           </div>
           {studioTab==='logo'&&<>
           {/* 1. مختبر الشعار وفحص النقاء */}

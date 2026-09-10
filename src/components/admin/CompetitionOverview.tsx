@@ -10,6 +10,7 @@ import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Category, Competition, CompetitionPolicy, RegistrationFieldDefinition } from '../../types';
 import { Button } from '../design-system/Button';
+import { AdvisoryNote } from '../design-system/AdvisoryNote';
 import { Ratio } from '../design-system/Ratio';
 import { Badge } from '../design-system/Badge';
 import { EnterpriseWorkspace } from './EnterpriseWorkspace';
@@ -138,8 +139,8 @@ const IdentitySection=({store,ar}:{store:Store;ar:boolean})=>{
  return <div className="space-y-6"><div className="flex flex-wrap items-start justify-between gap-3"><SectionTitle title={ar?'هوية المسابقة':'Competition identity'} subtitle={ar?'بيانات المسابقة في الأعلى، والفئات تُضاف وتحفظ بشكل مستقل في الأسفل.':'Competition details are above; categories are added and saved independently below.'}/><SaveState store={store} ar={ar}/></div>
   {logoError&&<div role="alert" className="rounded-xl bg-[#f7ece9] px-4 py-3 text-xs font-bold text-[#874b43] mb-3">{logoError}</div>}
   {/* تسعة حقول هوية كانت تسبق إدارة الفئات في عمود واحد؛ التبويب يجعل كل مهمة شاشة. */}
-  <div role="tablist" aria-label={ar?'أقسام الهوية':'Identity sections'} className="flex flex-wrap gap-1.5 rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-1.5 w-fit max-w-full">
-   {([['info',ar?'بيانات المسابقة':'Competition details'],['categories',ar?`الفئات (${c.categories.length})`:`Categories (${c.categories.length})`]] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={identityTab===id} onClick={()=>setIdentityTab(id)} className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${identityTab===id?'bg-[#214C40] text-white shadow-sm':'text-[#5d645f] hover:bg-[#f0eee8]'}`}>{label}</button>)}
+  <div role="tablist" aria-label={ar?'أقسام الهوية':'Identity sections'} className="mizan-tabs">
+   {([['info',ar?'بيانات المسابقة':'Competition details'],['categories',ar?`الفئات (${c.categories.length})`:`Categories (${c.categories.length})`]] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={identityTab===id} onClick={()=>setIdentityTab(id)} className={`mizan-tab ${identityTab===id?'is-active':''}`}>{label}</button>)}
   </div>
   {identityTab==='info'&&<>
   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 [&>*]:min-w-0"><TextControl kind="arabic" label={ar?'الاسم بالعربية':'Arabic name'} value={c.nameArabic} onChange={v=>patch({nameArabic:v})}/><TextControl kind="latin" label={ar?'الاسم بالإنجليزية':'English name'} value={c.name} onChange={v=>patch({name:v})}/><TextControl label={ar?'المنطقة الزمنية':'Timezone'} value={c.timezone} onChange={v=>patch({timezone:v})}/><TextControl label={ar?'المكان':'Venue'} value={c.venueName} onChange={v=>patch({venueName:v})}/><TextControl type="date" label={ar?'بداية المسابقة':'Start date'} value={c.startDate} onChange={v=>patch({startDate:v})}/><TextControl type="date" label={ar?'نهاية المسابقة':'End date'} value={c.endDate} onChange={v=>patch({endDate:v})}/><Control label={ar?'الأتمتة':'Automation'}><TinySelect value={c.automationLevel} onChange={v=>patch({automationLevel:v as any})}><option value="assisted">{automationLevelLabel('assisted',ar)}</option><option value="automated">{automationLevelLabel('automated',ar)}</option><option value="autopilot">{automationLevelLabel('autopilot',ar)}</option></TinySelect></Control><TextControl kind={ar?'arabic':'latin'} label={ar?'اسم العلامة لهذه المسابقة':'Wordmark for this competition'} value={ar?(c.displayNameArabic||''):(c.displayName||'')} onChange={v=>patch(ar?{displayNameArabic:v||undefined}:{displayName:v||undefined})}/><Control label={ar?'شعار هذه المسابقة':'Competition logo'}><div className="rounded-xl border border-[#dcdad2] bg-white p-3"><div className="flex flex-col sm:flex-row sm:items-center gap-3">{visibleLogo?<img src={visibleLogo} alt={ar?'شعار المسابقة':'Competition logo'} className="w-16 h-16 rounded-xl object-contain border bg-white"/>:<div className="w-16 h-16 rounded-xl border border-dashed grid place-items-center text-[10px] text-[#777]">{ar?'لا شعار':'No logo'}</div>}<label aria-disabled={logoBusy} className={`min-h-11 px-4 rounded-xl bg-[#214C40] text-white text-xs font-black inline-flex items-center justify-center gap-2 cursor-pointer ${logoBusy?'opacity-60 pointer-events-none':''}`}><FileUp className="w-4 h-4"/>{logoBusy?(ar?'جارٍ الحفظ…':'Saving…'):(visibleLogo?(ar?'استبدال الشعار':'Replace logo'):(ar?'رفع الشعار':'Upload logo'))}<input type="file" accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={e=>{void uploadLogo(e.target.files?.[0]);e.currentTarget.value=''}}/></label>{c.logoUrl&&<button type="button" disabled={logoBusy} onClick={()=>void removeLogo()} className="min-h-11 px-4 rounded-xl border text-xs font-black disabled:opacity-50">{ar?'حذف':'Remove'}</button>}</div><p className="mt-2 text-[10px] text-[#656b66]">{ar?'PNG أو JPG/JPEG أو WebP أو SVG — بحد أقصى 2MB. يُحفظ الملف في التخزين الفعلي ولا يُخزن داخل بيانات المسابقة.':'PNG, JPG/JPEG, WebP or SVG — max 2MB. The file is stored in object storage, never inside competition state.'}</p></div></Control></div>
@@ -210,8 +211,8 @@ const JudgingSection=({store,ar,policy,patch}:{store:Store;ar:boolean;policy:Com
  const totalMax=r.criteria.reduce((s,c)=>s+(Number(c.maxScore)||0),0);
  return <div className="space-y-5">
   <SectionTitle title={ar?'سياسة التحكيم':'Judging policy'} subtitle={ar?'ابنِ معايير هذه المسابقة وأزرار محكميها كما تنص لائحتها؛ لا توجد معايير مفروضة من ميزان.':'Build this competition’s criteria and judge actions from its own rulebook; MIZAN imposes no scoring schema.'}/>
-  <div role="tablist" aria-label={ar?'أقسام سياسة التحكيم':'Judging policy sections'} className="flex flex-wrap gap-1.5 rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-1.5 w-fit max-w-full">
-   {judgingTabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={judgingTab===t.id} onClick={()=>setJudgingTab(t.id)} className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${judgingTab===t.id?'bg-[#214C40] text-white shadow-sm':'text-[#5d645f] hover:bg-[#f0eee8]'}`}>{t.label}</button>)}
+  <div role="tablist" aria-label={ar?'أقسام سياسة التحكيم':'Judging policy sections'} className="mizan-tabs">
+   {judgingTabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={judgingTab===t.id} onClick={()=>setJudgingTab(t.id)} className={`mizan-tab ${judgingTab===t.id?'is-active':''}`}>{t.label}</button>)}
   </div>
   {judgingTab==='rubric'&&<div className="space-y-5">
    <div className="rounded-2xl border border-[#dfddd6] overflow-hidden">
@@ -295,7 +296,7 @@ const JudgingSection=({store,ar,policy,patch}:{store:Store;ar:boolean;policy:Com
     <div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]"><div className="text-[11px] font-black text-[#48514c]">{ar?'المساندة والاحتياط':'Assistance and reserve'}</div><p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'إمكانات تعمل خلف التحكيم ولا تخصم درجة.':'Capabilities that run behind judging and never deduct a score.'}</p></div>
     <div className="mizan-surface-soft px-4"><Toggle value={policy.judging.silentAiGuardian} onChange={v=>patch(p=>{p.judging.silentAiGuardian=v})} label={ar?'الذكاء الاصطناعي صامت للمراجعة فقط':'Silent AI review only'}/><Toggle value={policy.judging.reserveJudgeAllowed} onChange={v=>patch(p=>{p.judging.reserveJudgeAllowed=v})} label={ar?'محكم احتياط':'Reserve judge'}/></div>
    </div>
-   <div className="rounded-xl bg-[#E7EEE9] text-[#214C40] p-3 text-xs font-semibold">{ar?'الذكاء الاصطناعي لا يخصم أي درجة. أي إشارة آلية تتحول إلى مراجعة بشرية بعد أن يقفل المحكم تقييمه.':'AI never deducts a score. Any machine observation becomes a human review suggestion only after judges lock.'}</div>
+   <AdvisoryNote>{ar?'الذكاء الاصطناعي لا يخصم أي درجة. أي إشارة آلية تتحول إلى مراجعة بشرية بعد أن يقفل المحكم تقييمه.':'AI never deducts a score. Any machine observation becomes a human review suggestion only after judges lock.'}</AdvisoryNote>
   </div>}
  </div>;
 };
@@ -403,9 +404,9 @@ const PanelCard=({c,store,ar,specialtyOptions,toggleJudge,toggleJudgeSpecialty,c
    <span className="rounded-full bg-[#f1efe9] px-2.5 py-1 text-[#5d645f]">{ar?`${assignedParticipants} موزعون فعليًا`:`${assignedParticipants} assigned`}</span>
    <span className="rounded-full bg-[#f1efe9] px-2.5 py-1 text-[#5d645f]">{ar?`${eligibleParticipants} ضمن الفئات`:`${eligibleParticipants} in scope`}</span>
   </div>
-  <div role="tablist" aria-label={ar?'محتوى اللجنة':'Panel content'} className="mt-4 flex gap-1 rounded-xl bg-[#f1efe9] p-1 w-fit max-w-full">
-   <button type="button" role="tab" aria-selected={panelTab==='judges'} onClick={()=>setPanelTab('judges')} className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition ${panelTab==='judges'?'bg-white text-[#214C40] shadow-sm':'text-[#5d645f]'}`}>{ar?'المحكمون':'Judges'}</button>
-   <button type="button" role="tab" aria-selected={panelTab==='categories'} onClick={()=>setPanelTab('categories')} className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition ${panelTab==='categories'?'bg-white text-[#214C40] shadow-sm':'text-[#5d645f]'}`}>{ar?`الفئات (${c.assignedCategories.length})`:`Categories (${c.assignedCategories.length})`}</button>
+  <div role="tablist" aria-label={ar?'محتوى اللجنة':'Panel content'} className="mt-4 mizan-tabs mizan-tabs-sm">
+   <button type="button" role="tab" aria-selected={panelTab==='judges'} onClick={()=>setPanelTab('judges')} className={`mizan-tab ${panelTab==='judges'?'is-active':''}`}>{ar?'المحكمون':'Judges'}</button>
+   <button type="button" role="tab" aria-selected={panelTab==='categories'} onClick={()=>setPanelTab('categories')} className={`mizan-tab ${panelTab==='categories'?'is-active':''}`}>{ar?`الفئات (${c.assignedCategories.length})`:`Categories (${c.assignedCategories.length})`}</button>
   </div>
   {panelTab==='judges'&&<div className="mt-3">
    <div className="text-[10px] font-black text-[#646965]">{ar?'أعضاء اللجنة واختصاصاتهم':'Panel judges and specialties'}</div>

@@ -45,8 +45,8 @@ export const CommandCenter: React.FC = () => {
 
   {expanded&&<>
    {/* ست كتل كاملة العرض كانت سردًا واحدًا؛ ثلاث نوافذ تشغيلية أوضح من طابور تمرير. */}
-   <div role="tablist" aria-label={ar?'أقسام مركز العمليات':'Command center sections'} className="flex flex-wrap gap-1.5 rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-1.5 w-fit max-w-full">
-    {([['pulse',ar?'النبض والمقاييس':'Pulse & metrics'],['panels',ar?'اللجان والصحة':'Panels & health'],['insight',ar?'الرؤى والطابور':'Insights & queue']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={opsTab===id} onClick={()=>setOpsTab(id)} className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${opsTab===id?'bg-[#214C40] text-white shadow-sm':'text-[#5d645f] hover:bg-[#f0eee8]'}`}>{label}</button>)}
+   <div role="tablist" aria-label={ar?'أقسام مركز العمليات':'Command center sections'} className="mizan-tabs">
+    {([['pulse',ar?'النبض والمقاييس':'Pulse & metrics'],['panels',ar?'اللجان والصحة':'Panels & health'],['insight',ar?'الرؤى والطابور':'Insights & queue']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={opsTab===id} onClick={()=>setOpsTab(id)} className={`mizan-tab ${opsTab===id?'is-active':''}`}>{label}</button>)}
    </div>
    {opsTab==='pulse'&&<>
    <section className="mizan-surface p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><div className="mizan-kicker">{ar?'نبض الموقع':'VENUE PULSE'}</div><h2 className="font-extrabold mt-1">{ar?'نبض المكان':'Venue flow'}</h2></div><Badge variant="neutral">{ar?'مجمّع فقط':'Aggregated only'}</Badge></div><div className="grid grid-cols-5 gap-1.5 mt-4"><Pulse n={participants.filter(p=>p.status==='checked_in').length} t={ar?'بوابة':'Gate'}/><Pulse n={waiting} t={ar?'انتظار':'Wait'}/><Pulse n={testing} t={ar?'لجان':'Panels'}/><Pulse n={reviewCases.filter(r=>r.status==='pending').length} t={ar?'مراجعة':'Review'}/><Pulse n={done} t={ar?'خروج':'Exit'}/></div></section>
