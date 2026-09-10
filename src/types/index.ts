@@ -652,6 +652,8 @@ export interface JudgeActionDefinition {
 export interface JudgingPolicy {
   mode: 'all_judges_all_criteria' | 'specialized_judges' | 'hybrid';
   identityVisibility: 'full' | 'code_only' | 'custom';
+  /* درجة العتامة في الغرفة العمياء. غيابها يُشتق من identityVisibility حفاظًا على المسابقات القائمة. */
+  blindnessLevel?: 'OFF' | 'IDENTITY' | 'ORIGIN' | 'FULL';
   independentUntilLock: boolean;
   scoreEntryMode: 'event_based' | 'direct_score' | 'hybrid';
   actions: JudgeActionDefinition[];
@@ -1063,6 +1065,7 @@ export interface AcousticVenuePassportRecord { id:string;competitionId:string;ve
 export interface RecitationDigitalTwinRecord { id:string;competitionId:string;sourceManifestId:string;sourcePackageHash:string;qiraah:string;rawi:string;tariq?:string;wajh?:string;surah:number;ayahStart:number;ayahEnd:number;variantLocusIds:string[];allowedWujuh:string[];phonemeSchemaVersion?:string;expectedSequenceHash:string;createdAt:string;state:'SOURCE_BOUND'|'PENDING_SCIENTIFIC_ENRICHMENT'; }
 export interface MutashabihatTrapRecord { id:string;competitionId:string;sourceManifestId:string;qiraah:string;rawi:string;tariq?:string;expected:{surah:number;ayah:number};possible:{surah:number;ayah:number};similarityEvidence:{kind:'TEXTUAL'|'VARIANT_LOCUS'|'EXPERT';score?:number;reference?:string};status:'REVIEW_MAP'|'APPROVED';createdAt:string;approvedBy?:string; }
 export interface MultiRiwayahRoutingDecisionRecord { id:string;competitionId:string;participantId:string;participantReading:string;createdAt:string;candidates:{committeeId:string;eligible:boolean;score:number;reasons:string[]}[];selectedCommitteeId?:string;status:'ROUTED'|'NO_ELIGIBLE_COMMITTEE';explanation:string; }
+export interface BlindChamberLiftRecord { id:string;competitionId:string;sessionId:string;participantId:string;level:'OFF'|'IDENTITY'|'ORIGIN'|'FULL';createdAt:string;revealedBy:string;revealedAt:string;judgeLocks:{judgeId:string;locked:boolean;lockedAt?:string}[];judgeCount:number;unlockedCount:number;allLockedBeforeReveal:boolean;proofHash:string;assurance:'client_sha256_commitment';status:'PROVEN'|'UNPROVEN'; }
 export interface AppealCapsuleSection { kind:string;ref:string;titleArabic:string;leafHash:string;disclosed:Record<string,unknown>; }
 export const APPEAL_CAPSULE_VERSION='MZ-APPEAL-2';
 export interface AppealCapsuleRecord { id:string;competitionId:string;participantId:string;appealId?:string;createdAt:string;createdBy:string;privacyScope:'APPEAL_PANEL_ONLY';evidenceRefs:string[];includedKinds:string[];excludedKinds:string[];capsuleHash:string;status:'READY'|'REVOKED';capsuleVersion?:string;sections?:AppealCapsuleSection[];merkleRoot?:string;merkleProofs?:{ref:string;proof:{position:'left'|'right';hash:string}[]}[];auditHeadHash?:string;policyVersion?:string;policyHash?:string;ruleSetVersion?:string;ruleSetHash?:string;withheldNoteArabic?:string; }

@@ -25,7 +25,10 @@ test('committee setup synchronizes governed judge names and uses a clean number 
   const css=read('src/index.css');
   assert.match(src,/\/api\/identity\/governance/);
   assert.match(src,/syncAuthorizedJudgeProfiles/);
-  assert.match(src,/إخفاء هوية المتسابق عن المحكم/);
+  // The identity toggle became the blind-chamber level selector; the capability it guarded must remain.
+  assert.match(src,/الغرفة العمياء/);
+  assert.match(src,/BLIND_LEVELS/);
+  assert.match(src,/blindnessLevel/);
   assert.match(src,/إعدادات تحكيم متقدمة/);
   assert.match(src,/aria-label=\{`إنقاص \$\{label\}`\}/);
   assert.match(src,/aria-label=\{`زيادة \$\{label\}`\}/);

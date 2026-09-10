@@ -88,3 +88,43 @@ test('the appeal capsule is self-contained, minimally disclosing, and tamper-evi
  assert.equal((await verifyAppealCapsule({...capsule,status:'REVOKED'})).state,'REVOKED');
  assert.equal((await verifyAppealCapsule({...capsule,capsuleVersion:undefined,sections:undefined})).state,'LEGACY');
 });
+
+test('the blind chamber withholds every inference channel and proves lock came before reveal',async()=>{
+ const {resolveBlindness,maskParticipantForJudge,buildBlindLiftProof,verifyBlindLiftProof}=await import('../src/lib/blind-chamber');
+ const participant={id:'p1',code:'A-104',fullName:'Ahmad',fullNameArabic:'أحمد',country:'KW',nationality:'KW',institution:'دار',riwaya:'حفص',categoryId:'cat-1'} as any;
+
+ // An existing competition set the old way stays blind — the level is derived, never silently reset to open.
+ assert.equal(resolveBlindness({identityVisibility:'code_only'}).level,'IDENTITY');
+ assert.equal(resolveBlindness({identityVisibility:'full'}).level,'OFF');
+
+ // Hiding the name alone leaves origin and affiliation readable; full blind closes every channel.
+ const identity=maskParticipantForJudge(participant,resolveBlindness({identityVisibility:'code_only',blindnessLevel:'IDENTITY'}),true);
+ assert.equal(identity.displayName,'A-104');
+ assert.equal(identity.country,'KW');
+ const full=maskParticipantForJudge(participant,resolveBlindness({identityVisibility:'code_only',blindnessLevel:'FULL'}),true);
+ assert.equal(full.displayName,'A-104');
+ for(const leak of [full.country,full.nationality,full.institution,full.riwaya,full.categoryId])assert.equal(leak,undefined);
+ assert.ok(!JSON.stringify(full).includes('أحمد'),'the name must not survive in any field of the masked view');
+ assert.ok(full.withheldArabic.length>=3,'the judge is told what is withheld rather than shown a silent blank');
+
+ const blindness=resolveBlindness({identityVisibility:'code_only',blindnessLevel:'FULL'});
+ const base={competitionId:'c',sessionId:'s1',participantId:'p1',blindness,revealedBy:'head'};
+
+ // Locks that all precede the reveal are provable, and verify independently from the record alone.
+ const good=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:true,submittedAt:'2026-01-01T10:00:00.000Z'},{judgeId:'j2',locked:true,submittedAt:'2026-01-01T10:01:00.000Z'}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(good.status,'PROVEN');
+ assert.equal(good.allLockedBeforeReveal,true);
+ assert.deepEqual(await verifyBlindLiftProof(good),{state:'PROVEN',reasons:[]});
+
+ // A lock recorded after the reveal is exactly what this proof exists to catch.
+ const late=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:true,submittedAt:'2026-01-01T10:09:00.000Z'}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(late.status,'UNPROVEN');
+ assert.equal((await verifyBlindLiftProof(late)).state,'UNPROVEN');
+
+ // An unlocked judge cannot be papered over, and editing the record breaks its own hash.
+ const open=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:false}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(open.status,'UNPROVEN');
+ const forged=await verifyBlindLiftProof({...good,allLockedBeforeReveal:true,judgeLocks:[...good.judgeLocks,{judgeId:'j3',locked:true,lockedAt:'2026-01-01T10:02:00.000Z'}]});
+ assert.equal(forged.state,'UNPROVEN');
+ assert.ok(forged.reasons.some(r=>r.includes('بصمة')),'an added judge must break the proof hash');
+});
