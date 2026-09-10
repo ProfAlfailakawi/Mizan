@@ -553,13 +553,15 @@ async function startServer() {
     // Domain fields are owner-only: organizations cannot set or replace their subdomain/custom domains here.
     const patch = { ...(req.body || {}) };
     if (!isSuper) { delete (patch as any).subdomain; delete (patch as any).customDomains; }
-    return tenantResult(res, store.saveBrand(orgId, patch));
+    const outcome = store.saveBrand(orgId, patch);
+    if ((outcome as { ok: boolean }).ok) resetTenantRegistry(); // make a saved subdomain/custom domain live for host routing immediately
+    return tenantResult(res, outcome);
   });
 
   // Operator-managed domains for their own organizations
   const operatorOwnsOrg=(req:Request,res:Response):string|null=>{const actor=(req as any).mizanIdentity;const orgId=String(req.params.orgId||'');if(!actor?.operatorId||!saasPlatform?.organizationBelongsToOperator(orgId,actor.operatorId)){res.status(403).json({code:'CROSS_OPERATOR_ORGANIZATION_BLOCKED'});return null}return orgId};
   app.get('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant,baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
-  app.patch('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const existing=store.list().find(x=>x.orgId===orgId);if(existing&&(existing.subdomain||(existing.customDomains||[]).length>0))return res.status(409).json({code:'DOMAIN_LOCKED'});return tenantResult(res, store.saveBrand(orgId, {subdomain:req.body?.subdomain, customDomains:req.body?.customDomains}))});
+  app.patch('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const existing=store.list().find(x=>x.orgId===orgId);if(existing&&(existing.subdomain||(existing.customDomains||[]).length>0))return res.status(409).json({code:'DOMAIN_LOCKED'});const outcome=store.saveBrand(orgId, {subdomain:req.body?.subdomain, customDomains:req.body?.customDomains});if((outcome as {ok:boolean}).ok)resetTenantRegistry();return tenantResult(res, outcome)});
 
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});

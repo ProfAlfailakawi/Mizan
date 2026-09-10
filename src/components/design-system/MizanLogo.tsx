@@ -25,8 +25,11 @@ export function useBrandInfo(): BrandInfo {
   const brand = s.organization?.brand;
   const comp = s.competition;
   const rawPlacements = brand?.displayPlacements || {};
-  const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic);
-  const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name);
+  // للجهات التي اشترت العلامة البيضاء: الافتراضي اسم الجهة نفسها، ولا يظهر «ميزان» إلا كخيار أخير للمنصة نفسها.
+  const orgArabic = cleanName(s.organization?.nameArabic) || cleanName(s.organization?.name);
+  const orgLatin = cleanName(s.organization?.name);
+  const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic) || orgArabic;
+  const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name) || orgLatin;
   return {
     ar: brandArabic || brand?.displayNameArabic || 'ميزان',
     en: brandEnglish || brand?.displayName || 'MIZAN',
