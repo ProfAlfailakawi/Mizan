@@ -10,14 +10,14 @@ import fs from 'node:fs';
  * المسابقة المختارة تحت يده. الإغلاق كان يمسح الحالة ولا يمسح النيّة.
  */
 
-const surfaces = [
-  ['src/components/admin/SaaSWorkspace.tsx', /\[data\]\);/],
-  ['src/components/admin/RolePortals.tsx', /\[competitions,organization\.id,selectCompetition\]\);/],
+const surfaces: string[] = [
+  'src/components/admin/SaaSWorkspace.tsx',
+  'src/components/admin/RolePortals.tsx',
 ];
 
-for (const [file] of surfaces) {
+for (const file of surfaces) {
   test(`${file.split('/').pop()} consumes a deep link once, not on every refresh`, () => {
-    const code = fs.readFileSync(file as string, 'utf8');
+    const code = fs.readFileSync(file, 'utf8');
     assert.match(code, /const handledDeepLink=useRef\(''\)/,
       'the surface must remember which link it already acted on');
     assert.match(code, /handledDeepLink\.current===/,
@@ -29,8 +29,8 @@ for (const [file] of surfaces) {
 
 test('the guard sits before the side effects, not after them', () => {
   /* حارسٌ بعد الفعل لا يمنع شيئًا: النافذة تكون قد فُتحت. */
-  for (const [file] of surfaces) {
-    const code = fs.readFileSync(file as string, 'utf8');
+  for (const file of surfaces) {
+    const code = fs.readFileSync(file, 'utf8');
     const effect = /const openIdentityTarget=\(\)=>\{[\s\S]*?\n/.exec(code)?.[0] || '';
     const guardAt = code.indexOf('handledDeepLink.current===');
     const firstSetter = Math.min(
@@ -45,8 +45,8 @@ test('the guard sits before the side effects, not after them', () => {
 
 test('a genuinely new address still gets acted on', () => {
   // الحارس يقارن العنوان نفسه؛ فتغيّره — نيّة جديدة من المستخدم — يمرّ.
-  for (const [file] of surfaces) {
-    const code = fs.readFileSync(file as string, 'utf8');
+  for (const file of surfaces) {
+    const code = fs.readFileSync(file, 'utf8');
     assert.match(code, /window\.location\.hash/,
       `${file}: the signature must be the address itself, so a new intent is not swallowed`);
     assert.match(code, /addEventListener\('hashchange'/,
