@@ -89,7 +89,14 @@ export async function writeIdentityClaims(uid: string, claims: IdentityClaims | 
     return { status: 'SYNCED', claims };
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'CLAIM_WRITE_FAILED';
-    console.error(`MIZAN identity claims: write failed for ${uid}:`, reason);
+    /*
+     * القيم غير الموثوقة تُمرَّر وسائطَ لا تُدسّ في نصّ التنسيق.
+     *
+     * `uid` يأتي من رمز خارجي. ودسُّه في النصّ يفتح بابين: محدّدات تنسيق (%s) تشوّه المخرجات،
+     * وسطرٌ جديد داخل القيمة يزوّر سطر سجلّ كامل — وهذه السجلات هي أثر أعطال الهوية، فتزويرها
+     * أخطر من ضياعها.
+     */
+    console.error('MIZAN identity claims: write failed', { uid, reason });
     return { status: 'FAILED', reason };
   }
 }

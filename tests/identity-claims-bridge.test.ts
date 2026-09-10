@@ -106,3 +106,21 @@ test('the one-time backfill is owner-only and throttled', () => {
   assert.match(server, /sync-claims',ownerRateLimit,ownerOnly/,
     'a route that rewrites every account’s claims must be the narrowest door in the app');
 });
+
+test('an externally-controlled value never enters a log format string', () => {
+  /*
+   * `uid` يأتي من رمز خارجي. ودسُّه في نصّ التنسيق يفتح بابين: محدّدات تنسيق تشوّه المخرجات،
+   * وسطرٌ جديد داخل القيمة يزوّر سطر سجلّ كامل — وهذه السجلات هي أثر أعطال الهوية، فتزويرها
+   * أخطر من ضياعها.
+   */
+  for (const [file, code] of [['server/firebase-claims.ts', bridge], ['server.ts', server]] as [string, string][]) {
+    const interpolatedLogs = [...code.matchAll(/console\.(?:error|warn|log)\(`[^`]*\$\{([^}]*)\}/g)].map((m) => m[1]);
+    for (const value of interpolatedLogs) {
+      assert.ok(!/\buid\b|\breason\b|token|email/.test(value),
+        `${file}: an untrusted value is interpolated into a log format string: ${value}`);
+    }
+  }
+  // والبديل: تُمرَّر وسائطَ فيُعاملها المشغّل بيانات لا تنسيقًا.
+  assert.match(bridge, /console\.error\('MIZAN identity claims: write failed', \{ uid, reason \}\)/);
+  assert.match(server, /console\.error\('MIZAN claim sync failed',\{uid,reason:outcome\.reason\}\)/);
+});

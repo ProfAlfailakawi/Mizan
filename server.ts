@@ -353,7 +353,7 @@ async function startServer() {
     try{
       const grant=identityGovernance.claimsForUid(uid);
       const outcome=await writeIdentityClaims(uid,grant?claimsFromGrant(grant):null);
-      if(outcome.status==='FAILED')console.error(`MIZAN claim sync failed for ${uid}: ${outcome.reason}`);
+      if(outcome.status==='FAILED')console.error('MIZAN claim sync failed',{uid,reason:outcome.reason});
     }catch(err){console.error('MIZAN claim sync error:',err instanceof Error?err.message:err)}
   };
   /** التعديل يقع على تخويل؛ وصاحبه هو من تُعاد كتابة مطالباته. */
