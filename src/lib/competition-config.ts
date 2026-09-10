@@ -227,7 +227,7 @@ export function getReadinessIssues(competition: Competition): { id: string; ar: 
   if (!competition.ruleSet.criteria.length) issues.push({ id: 'rules', ar: 'أكمل معايير التحكيم', en: 'Complete judging criteria' });
   if (p.judging.actions.filter(a => a.enabled).length === 0 && p.judging.scoreEntryMode !== 'direct_score') issues.push({ id: 'actions', ar: 'حدد أدوات المحكم', en: 'Define judge actions' });
   if (p.questions.questionsPerParticipant < 1) issues.push({ id: 'questions', ar: 'عدد الأسئلة غير صالح', en: 'Question count is invalid' });
-  if (p.results.requireDualApprovalToSeal && competition.ruleSet.judgesCountPerPanel < 2) issues.push({ id: 'seal', ar: 'الختم المزدوج يتطلب أكثر من جهة اعتماد', en: 'Dual seal requires multiple approvers' });
+  if (p.results.requireDualApprovalToSeal && competition.ruleSet.judgesCountPerPanel < 2) issues.push({ id: 'seal', ar: 'الموافقة المزدوجة لختم النتائج مفعّلة: اضبط عدد المحكمين في اللجنة على ٢ فأكثر، أو أطفئ «الموافقة المزدوجة للختم» من إعدادات النتائج.', en: 'Dual approval to seal results is on: set judges per panel to 2 or more, or turn off dual approval in results settings.' });
   if (!p.operations.exceptionDesk && (p.operations.selfCheckIn || p.operations.kioskCheckIn)) issues.push({ id: 'exceptions', ar: 'ينصح بمسار استثناء للحالات غير الطبيعية', en: 'An exception path is recommended for self-service operations' });
   return issues;
 }

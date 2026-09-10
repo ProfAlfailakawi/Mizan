@@ -32,10 +32,10 @@ import { uploadOrganizationLogo } from '../../lib/brand-assets';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
 import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits,normalizeDomain,isDomain} from '../../lib/input-validation';
 
-const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.'};
+const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.',DOMAIN_LOCKED:'النطاق مُعتمد ومقفل. للتغيير تواصل مع مالك المنصة.',DOMAIN_SAVE_FAILED:'تعذّر حفظ النطاق، حاول مجددًا.'};
 const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
 
-export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patchUrl?: string }> = ({ orgId, getUrl, patchUrl }) => {
+export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patchUrl?: string; lockWhenSet?: boolean; confirmOnSave?: boolean }> = ({ orgId, getUrl, patchUrl, lockWhenSet, confirmOnSave }) => {
   const store = useAppStore();
   const ar = store.language === 'ar';
   const [subdomain, setSubdomain] = useState('');
@@ -45,6 +45,8 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
   const [saving, setSaving] = useState(false);
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState('');
+  const [locked, setLocked] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const loadUrl = getUrl || `/api/tenant/brand${orgId ? `?orgId=${encodeURIComponent(orgId)}` : ''}`;
   const saveUrl = patchUrl || '/api/tenant/brand';
 
@@ -52,10 +54,10 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
     const user = auth?.currentUser; if (!user) return; let live = true;
     void user.getIdToken().then(token => fetch(loadUrl, { headers: { authorization: `Bearer ${token}` } }))
       .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
-      .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []); setBaseDomain(body?.baseDomain || ''); })
+      .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; const cds = Array.isArray(t.customDomains) ? t.customDomains : []; setSubdomain(t.subdomain || ''); setCustomDomains(cds); setBaseDomain(body?.baseDomain || ''); if (lockWhenSet && (t.subdomain || cds.length > 0)) setLocked(true); })
       .catch(() => {});
     return () => { live = false };
-  }, [loadUrl]);
+  }, [loadUrl, lockWhenSet]);
 
   const addDomain = () => {
     const d = normalizeDomain(newDomain);
@@ -74,10 +76,13 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
       const res = await fetch(saveUrl, { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ orgId: orgId || store.organization?.id, subdomain: normalizeDomain(subdomain), customDomains }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String((body.errors || []).join(' · ') || body.code || 'DOMAIN_SAVE_FAILED'));
-      const t = body.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []);
+      const t = body.tenant || {}; const cds = Array.isArray(t.customDomains) ? t.customDomains : []; setSubdomain(t.subdomain || ''); setCustomDomains(cds);
+      if (lockWhenSet && (t.subdomain || cds.length > 0)) setLocked(true);
       setOk(true); setTimeout(() => setOk(false), 4000);
     } catch (e) { setErr(arError((e as Error).message)); } finally { setSaving(false); }
   };
+  const requestSave = () => { if (confirmOnSave) setConfirmOpen(true); else void save(); };
+  const canSaveNow = !!subdomain.trim() || customDomains.length > 0;
 
   const suffix = baseDomain ? `.${baseDomain}` : '';
   return (
@@ -93,11 +98,13 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
         {ar ? 'اختر نطاقًا فرعيًا سهلًا يصل منه الجميع إلى بوابتك، أو اربط نطاقك الخاص باحترافية. يكفي إدخال العنوان هنا؛ نتكفّل بالباقي.' : 'Pick a friendly subdomain or connect your own custom domain. Enter the address here and we handle the rest.'}
       </p>
 
+      {locked && <div className="rounded-xl bg-[#F3EFE6] border border-[#E2D6BE] p-3 flex items-start gap-2 text-[11px] leading-6 font-bold text-[#725630]"><ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-[#8b6837]" />{ar ? 'تم ضبط النطاق واعتماده. لا يمكن تغييره من هنا؛ للتعديل تواصل مع مالك المنصة.' : 'The domain is set and locked. Contact the platform owner to change it.'}</div>}
+
       {/* النطاق الفرعي */}
       <label className="block">
         <span className="mizan-field-label">{ar ? 'النطاق الفرعي' : 'Subdomain'}</span>
         <div className="flex items-stretch mt-1 rounded-xl border border-[#DAD8D0] overflow-hidden focus-within:border-[#2F6555]">
-          <input dir="ltr" lang="en" className="flex-1 px-3 py-2.5 text-sm outline-none bg-white" value={subdomain} onChange={e => setSubdomain(normalizeDomain(e.target.value))} placeholder="a" />
+          <input dir="ltr" lang="en" disabled={locked} className="flex-1 px-3 py-2.5 text-sm outline-none bg-white disabled:bg-[#f5f4f0] disabled:text-[#5f6862]" value={subdomain} onChange={e => setSubdomain(normalizeDomain(e.target.value))} placeholder="a" />
           {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[11px] font-bold text-[#656b66] border-s border-[#E4E2DB]">{suffix}</span>}
         </div>
         <span className="mt-1 block text-[10px] text-[#8d7a52]">{ar ? 'حروف لاتينية وأرقام وشرطة فقط.' : 'Lowercase letters, digits and hyphen only.'}</span>
@@ -107,15 +114,15 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
       <div>
         <span className="mizan-field-label">{ar ? 'نطاق خاص (اختياري)' : 'Custom domain (optional)'}</span>
         <div className="flex gap-2 mt-1">
-          <input dir="ltr" lang="en" className="mizan-input flex-1" value={newDomain} onChange={e => setNewDomain(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDomain(); } }} placeholder="a.example.com" />
-          <Button type="button" variant="outline" size="sm" icon={<Plus className="w-4 h-4" />} onClick={addDomain} disabled={!newDomain.trim()}>{ar ? 'إضافة' : 'Add'}</Button>
+          <input dir="ltr" lang="en" disabled={locked} className="mizan-input flex-1 disabled:bg-[#f5f4f0]" value={newDomain} onChange={e => setNewDomain(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDomain(); } }} placeholder="a.example.com" />
+          <Button type="button" variant="outline" size="sm" icon={<Plus className="w-4 h-4" />} onClick={addDomain} disabled={locked || !newDomain.trim()}>{ar ? 'إضافة' : 'Add'}</Button>
         </div>
         {customDomains.length > 0 && (
           <div className="mt-3 space-y-2">
             {customDomains.map(d => (
               <div key={d} className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E2DB] bg-[#FAFAF7] px-3 py-2">
                 <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[#2F6555] shrink-0" />{d}</span>
-                <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>
+                {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
@@ -131,9 +138,11 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
       {ok && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'تم حفظ النطاق بنجاح.' : 'Domain saved successfully.'}</div>}
       {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
 
-      <div className="flex justify-end">
-        <Button icon={saving ? undefined : <Check className="w-4 h-4" />} onClick={() => void save()} disabled={saving}>{saving ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ النطاق' : 'Save domain')}</Button>
-      </div>
+      {!locked && <div className="flex justify-end">
+        <Button icon={saving ? undefined : <Check className="w-4 h-4" />} onClick={requestSave} disabled={saving || !canSaveNow}>{saving ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ النطاق' : 'Save domain')}</Button>
+      </div>}
+
+      {confirmOpen && <div className="fixed inset-0 z-[200] grid place-items-center bg-[#16241f]/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-3xl border border-white/60 bg-[#fffefb] p-6 shadow-2xl"><div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#2F6555]" /><h3 className="font-black">{ar ? 'تأكيد اعتماد النطاق' : 'Confirm domain'}</h3></div><p className="mt-3 text-xs leading-6 text-[#5b625d]">{ar ? 'بعد الحفظ يُعتمد النطاق ويُقفل، ولا يمكنك تغييره إلا بالتواصل مع مالك المنصة. هل تريد المتابعة؟' : 'After saving, the domain is locked and can only be changed by contacting the platform owner. Continue?'}</p><div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={() => setConfirmOpen(false)}>{ar ? 'إلغاء' : 'Cancel'}</Button><Button disabled={saving} onClick={() => { setConfirmOpen(false); void save(); }}>{ar ? 'اعتماد وحفظ' : 'Confirm & save'}</Button></div></div></div>}
     </section>
   );
 };
@@ -463,8 +472,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
         )}
       </div>
 
-      {/* بطاقة النطاق والوصول */}
-      <TenantDomainCard orgId={orgId} />
+      {/* بطاقة النطاق والوصول — لمالك المنصة فقط؛ الجهات لا تضبط نطاقها بنفسها */}
+      {store.currentUser?.role === 'super_admin' && <TenantDomainCard orgId={orgId} />}
 
       {/* القسم الرئيسي: الإعدادات على اليمين والمعاينة الحية على اليسار */}
       <div className="grid lg:grid-cols-12 gap-6">
