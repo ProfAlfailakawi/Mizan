@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { CREDENTIAL_PATTERNS } from './secret-patterns.mjs';
 
 /*
  * نطاقان لا نطاق واحد.
@@ -28,14 +29,9 @@ const PUBLIC_FIREBASE_WEB_KEY='AIzaSyAU13efq58hCJirGDyu9dZf8lzRatbhwcY';
 const forbidden=[
  {name:'unfinished marker',re:/\b(TODO|FIXME|HACK)\b/i,scope:'source'},
  {name:'placeholder copy',re:/\b(lorem ipsum|coming soon|not implemented|fake success)\b/i,scope:'source'},
- {name:'Google API key',re:/AIza[0-9A-Za-z_-]{20,}/g,allow:[PUBLIC_FIREBASE_WEB_KEY]},
- {name:'OpenAI-style secret',re:/\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/g},
- {name:'private key material',re:/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g},
- /* أنماط تخصّ ملفات النشر تحديدًا، وهي أيضًا صحيحة في شجرة المصدر. */
- {name:'AWS access key id',re:/\bAKIA[0-9A-Z]{16}\b/g},
- {name:'Google service account key',re:/"private_key_id"\s*:/g},
- {name:'Slack token',re:/\bxox[abprs]-[A-Za-z0-9-]{10,}/g},
- {name:'GitHub token',re:/\bgh[pousr]_[A-Za-z0-9]{30,}/g},
+ /* أنماط بيانات الاعتماد مشتركة مع scan-secrets: نسختان باليد تفترقان، وقد افترقتا فعلًا
+    فمرّ رمز GitHub الحديث من كليهما. والاستثناء الوحيد قيمةٌ علنية بعينها لا شكلٌ يشبهها. */
+ ...CREDENTIAL_PATTERNS.map(p=>p.name==='Google API key'?{...p,allow:[PUBLIC_FIREBASE_WEB_KEY]}:p),
 ];
 
 const collect=(roots,extensions)=>{
