@@ -17,10 +17,19 @@ import type { Participant } from '../types';
 export const LOCAL_ONLY_PARTICIPANT_FIELDS = ['identityLast4'] as const;
 
 export function redactParticipantForLocalSnapshot(participant: Participant): Participant {
-  const { nationalIdOrPassport, documents, ...rest } = participant;
+  const { nationalIdOrPassport, documents, journeyAccessToken, guardianAccessToken, ...rest } = participant;
   const trimmed = String(nationalIdOrPassport || '').trim();
   const last4 = trimmed.length > 4 ? trimmed.slice(-4) : trimmed;
   return { ...rest, ...(last4 ? { identityLast4: last4 } : {}) } as Participant;
+}
+
+/*
+ * توكنا الرحلة والوليّ اعتمادا وصول حقيقيان: من يملك التوكن يفتح بوابة المتسابق. فلا يبقيان
+ * على الجهاز. وتبقى بصمتاهما (وهما بصمتا معرّف عشوائي طويل، لا يُستخرج منهما شيء) لتكونا
+ * الدليل على أن التوكن **موجود** وإن غاب عن هذا الجهاز.
+ */
+export function journeyTokenWithheldLocally(participant: Participant): boolean {
+  return !participant.journeyAccessToken && !!participant.journeyAccessTokenHash;
 }
 
 /**

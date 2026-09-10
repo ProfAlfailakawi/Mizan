@@ -1,4 +1,0 @@
-MIZAN materialization trigger
-Target observed before this package: main @ 393ae1819f06aa4ec6010c04febf32db8530aa3d
-Purpose: make GitHub execute APPLY_ALL_MIZAN_NOTES.py, run all gates, and commit the resulting source files.
-Generated: 2026-09-08

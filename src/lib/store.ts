@@ -66,7 +66,7 @@ import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { calibrateJudges } from '../../server/judge-calibration';
-import { LOCAL_ONLY_PARTICIPANT_FIELDS, redactStateForLocalSnapshot } from './local-snapshot-privacy';
+import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenWithheldLocally, redactStateForLocalSnapshot } from './local-snapshot-privacy';
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
@@ -1395,7 +1395,14 @@ export function useAppStore() {
 
   const ensureParticipantJourneyAccess=async(participantId:string)=>{
     const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx<0)return null;
-    const current=globalState.participants[idx],journeyAccessToken=current.journeyAccessToken||newId('journey'),guardianAccessToken=current.guardianAccessToken||newId('guardian');const next={...current,journeyAccessToken,guardianAccessToken,journeyAccessTokenHash:await sha256(journeyAccessToken),guardianAccessTokenHash:await sha256(guardianAccessToken)};
+    const current=globalState.participants[idx];
+    /*
+     * التوكن الغائب عن الجهاز ليس توكنًا غير موجود: النسخة المحلية لا تحفظه، والبصمة تشهد
+     * بوجوده. توليد بديل هنا كان سيُبطل بطاقة مطبوعة بيد المتسابق بلا أن يدري أحد — فيُرفض
+     * الإصدار بدل أن يُتلف اعتمادًا قائمًا. المزامنة تُعيد التوكن الأصلي عند الاتصال.
+     */
+    if(journeyTokenWithheldLocally(current))return null;
+    const journeyAccessToken=current.journeyAccessToken||newId('journey'),guardianAccessToken=current.guardianAccessToken||newId('guardian');const next={...current,journeyAccessToken,guardianAccessToken,journeyAccessTokenHash:await sha256(journeyAccessToken),guardianAccessTokenHash:await sha256(guardianAccessToken)};
     globalState.participants[idx]=next;const [saved,published]=await Promise.all([persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>),publishPublicJourneyRecord(next)]);notify();if(!globalState.isOffline&&auth.currentUser&&(!saved||!published))return null;return next;
   };
 
