@@ -550,7 +550,10 @@ async function startServer() {
     const isSuper = actor?.role === 'super_admin';
     const orgId = isSuper && req.body?.orgId ? String(req.body.orgId) : actor?.organizationId;
     if (!orgId) return res.status(400).json({ code: 'ORG_ID_REQUIRED' });
-    return tenantResult(res, store.saveBrand(orgId, req.body || {}));
+    // Domain fields are owner-only: organizations cannot set or replace their subdomain/custom domains here.
+    const patch = { ...(req.body || {}) };
+    if (!isSuper) { delete (patch as any).subdomain; delete (patch as any).customDomains; }
+    return tenantResult(res, store.saveBrand(orgId, patch));
   });
 
   // Operator-managed domains for their own organizations

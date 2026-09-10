@@ -27,11 +27,9 @@ export function useBrandInfo(): BrandInfo {
   const rawPlacements = brand?.displayPlacements || {};
   const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic);
   const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name);
-  const personName = s.currentUser?.nameArabic || s.currentUser?.name || '';
-  const personLatin = s.currentUser?.name || '';
   return {
-    ar: brandArabic || (cleanName(personName) || undefined) || 'ميزان',
-    en: brandEnglish || (cleanName(personLatin) || undefined) || 'MIZAN',
+    ar: brandArabic || brand?.displayNameArabic || 'ميزان',
+    en: brandEnglish || brand?.displayName || 'MIZAN',
     logoUrl: comp?.logoUrl || brand?.logoUrl,
     slogan: brand?.slogan,
     sloganArabic: brand?.sloganArabic,
