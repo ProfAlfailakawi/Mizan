@@ -58,6 +58,16 @@ const sourceFiles=collect(sourceRoots,/\.(ts|tsx|js|mjs|css|md|rules|example)$/)
 /* ملفات Cloud Build تُلتقط بالاسم لأنها في جذر المستودع لا في مجلد. */
 const deploymentFiles=[...collect(deploymentRoots,/\.(ya?ml)$/),...fs.readdirSync('.').filter(f=>/^cloudbuild.*\.ya?ml$/.test(f))];
 
+/*
+ * حارسٌ لا يفحص شيئًا ويقول «سليم» أسوأ من غياب الحارس: يمرّ في CI باللون الأخضر وهو لم
+ * يفتح ملفًا واحدًا. وقع ذلك فعلًا عند تشغيله من مجلد غير جذر المستودع — فالمسارات نسبية،
+ * فلا يجد شيئًا، فيُعلن النجاح. العدد الصفري عطلٌ لا نتيجة.
+ */
+if(!sourceFiles.length||!deploymentFiles.length){
+ console.error(`Source audit could not run: found ${sourceFiles.length} source files and ${deploymentFiles.length} deployment manifests. Run it from the repository root.`);
+ process.exit(1);
+}
+
 const violations=[];
 const audit=(file,scope)=>{
  if(file.endsWith('source-audit.mjs'))return;

@@ -29,6 +29,17 @@ test('the audit passes on the repository as it stands', () => {
   assert.equal(runAudit(), 'PASSED');
 });
 
+test('an audit that inspects nothing fails instead of approving', () => {
+  /*
+   * أسوأ حالات الحارس: يمرّ أخضر وهو لم يفتح ملفًا واحدًا. وقعت فعلًا عند تشغيله من مجلد
+   * غير الجذر — فالمسارات نسبية، فلا يجد شيئًا، فيُعلن النجاح. العدد الصفري عطلٌ لا نتيجة.
+   */
+  let outcome: string;
+  try { execFileSync('node', ['source-audit.mjs'], { cwd: path.join(repo, 'scripts'), stdio: 'pipe' }); outcome = 'PASSED' }
+  catch { outcome = 'FAILED' }
+  assert.equal(outcome, 'FAILED', 'a gate that scanned zero files must never report success');
+});
+
 /*
  * كل طُعم يُركَّب من شظايا ولا يُكتب حرفيًا. السبب أن هذا الملف نفسه داخل نطاق الفحص —
  * وهذا صحيح، فملفُ اختبارٍ يحمل سلسلة تشبه المفتاح لا يفترق عن ملفٍ سرَّبه. إعفاء الملف
