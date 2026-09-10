@@ -1300,6 +1300,25 @@ export function useAppStore() {
     notify(); return next;
   };
 
+  const updateParticipant = (participantId: string, patch: Partial<Participant>) => {
+    const idx = globalState.participants.findIndex(p=>p.id===participantId);
+    if(idx<0) return null;
+    const next: Participant = { ...globalState.participants[idx], ...patch, id: participantId };
+    globalState.participants[idx]=next;
+    void persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>);
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'PARTICIPANT_UPDATED',entityType:'Participant',entityId:participantId,humanSummaryArabic:`تعديل بيانات المتسابق ${next.code}`,humanSummaryEnglish:`Updated participant ${next.code}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    notify(); return next;
+  };
+  const removeParticipant = (participantId: string) => {
+    const target = globalState.participants.find(p=>p.id===participantId);
+    if(!target) return false;
+    // A participant who already sat before a panel keeps a scored record; deleting would orphan it.
+    if(['in_session','tested','certified','appealed'].includes(target.status) || globalState.results.some(r=>r.participantId===participantId)) return false;
+    globalState.participants = globalState.participants.filter(p=>p.id!==participantId);
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'PARTICIPANT_REMOVED',entityType:'Participant',entityId:participantId,humanSummaryArabic:`حذف المتسابق ${target.code} قبل دخوله أي لجنة`,humanSummaryEnglish:`Removed participant ${target.code} before any panel session`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    notify(); return true;
+  };
+
   const submitAppeal = (participantId: string, grounds: AppealRecord['grounds'], reasonText: string) => {
     const policy = getCompetitionPolicy(globalState.competition);
     if (!policy.appeals.enabled) return null;
@@ -2375,7 +2394,7 @@ export function useAppStore() {
     generateCertificate,
     publishResults,
     completeCompetition, closeCompetition,
-    registerParticipant,
+    registerParticipant, updateParticipant, removeParticipant,
     reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
     selectCompetition, loadPublicCompetition,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
