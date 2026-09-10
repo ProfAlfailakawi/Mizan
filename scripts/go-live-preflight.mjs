@@ -77,6 +77,40 @@ if (existsSync(join(ROOT, 'firestore.rules'))) {
   blockers.push(['firestore.rules غير موجود', 'قاعدة بيانات بلا قواعد أمان مفتوحة لمن يعرف عنوانها.']);
 }
 
+/*
+ * نطاقات الجهات الخاصة ومفتاح Firebase.
+ *
+ * تقييد المفتاح بمُحيلات HTTP يمنع كل نطاق ليس في القائمة. وميزان يتيح لكل جهة نطاقها
+ * الخاص، فجهةٌ ربطت نطاقها ولم يُضَف إلى القائمة يتعطّل نظامها كليًا بلا سبب ظاهر —
+ * ولا يظهر ذلك في أي اختبار عندنا، لأن العطل عند Google لا في الكود.
+ *
+ * فتُقرأ النطاقات المسجّلة هنا وتُعرض ليطابقها الناشر بقائمة المُحيلات.
+ */
+const tenantHosts = () => {
+  const raw = has('MIZAN_TENANTS')
+    ? value('MIZAN_TENANTS')
+    : (has('MIZAN_TENANTS_FILE') && existsSync(value('MIZAN_TENANTS_FILE')) ? readFileSync(value('MIZAN_TENANTS_FILE'), 'utf8') : '');
+  if (!raw.trim()) return [];
+  let rows = [];
+  try { rows = JSON.parse(raw); } catch { return []; }
+  if (!Array.isArray(rows)) return [];
+  const base = value('MIZAN_BASE_DOMAIN');
+  const hosts = new Set();
+  for (const row of rows) {
+    for (const domain of row?.customDomains ?? []) if (String(domain || '').trim()) hosts.add(String(domain).trim());
+    if (base && String(row?.subdomain || '').trim()) hosts.add(`${String(row.subdomain).trim()}.${base}`);
+  }
+  return [...hosts].sort();
+};
+
+const hosts = tenantHosts();
+if (hosts.length) {
+  warnings.push([
+    `${hosts.length} نطاقًا لجهات مسجّلة — تأكد أن كلًّا منها في قائمة مُحيلات مفتاح Firebase`,
+    `${hosts.join('، ')}\n   نطاق غير مُدرَج يعني تعطّل النظام كليًا عند تلك الجهة، والعطل عند Google لا في الكود فلا يكشفه اختبار.`,
+  ]);
+}
+
 const optional = [
   ['MIZAN_CERTIFICATE_REGISTRY_DIR', 'التحقق العام من الشهادات لن يعمل: من يمسك شهادة مطبوعة لن يجد لها سجلًا.'],
   ['MIZAN_SAAS_DATA_DIR', 'مسارات التراخيص والحصص والفوترة معطّلة.'],
