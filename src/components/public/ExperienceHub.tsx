@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Pictogram } from '../design-system/Pictogram';
+import { AssemblyIntro } from './AssemblyIntro';
 import { Role } from '../../types';
 
 const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:string; icon:React.ComponentType<{className?:string}>; group:'core'|'governance'|'support'}> = [
@@ -37,6 +38,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
     [ROLES.filter(r=>r.group==='support'),ar?'التجارب المساندة':'Supporting journeys',ar?'الاستثناءات، الحفل، ولي الأمر والدعم':'Exceptions, ceremony, guardians and support'],
   ];
   return <div className="min-h-screen bg-[#F7F5EF] text-[#171b18] font-arabic">
+    <AssemblyIntro/>
     <div className="max-w-[1380px] mx-auto px-5 sm:px-8 py-8 sm:py-12">
       <section className="rounded-[30px] border border-[#DEDCD4] bg-[#FFFEFB] px-6 py-8 sm:px-10 sm:py-10">
         <div className="relative max-w-3xl">
