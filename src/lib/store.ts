@@ -66,7 +66,7 @@ import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { calibrateJudges } from '../../server/judge-calibration';
-import { LOCAL_ONLY_PARTICIPANT_FIELDS, redactParticipantForLocalSnapshot } from './local-snapshot-privacy';
+import { LOCAL_ONLY_PARTICIPANT_FIELDS, redactStateForLocalSnapshot } from './local-snapshot-privacy';
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
@@ -235,7 +235,11 @@ function getInitialState(): AppStoreState {
       if (launch && isDemoResidue(parsed?.organization?.id, SEED_ORGANIZATION.id)) {
         localStorage.removeItem(STORAGE_KEY);
       } else {
-        return hydrateSavedState(parsed);
+        /* جهاز يحمل نسخة سابقة للترقية يبقى حاملًا لأرقام الهوية إلى أن يُكتب شيء جديد — وقد
+           لا يُكتب أبدًا على جهاز خامل. فتُنظَّف النسخة المخزَّنة عند أول قراءة، لا عند أول كتابة. */
+        const sanitized=redactStateForLocalSnapshot(parsed);
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(sanitized))}catch{/* التنظيف لا يمنع الإقلاع */}
+        return hydrateSavedState(sanitized);
       }
     }
   } catch {
@@ -511,7 +515,7 @@ async function finalizeAuditChain(){
 // next refresh would silently roll back hours of work. Instead we record a surfaced error flag.
 function persistLocalSnapshot(): boolean {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({...globalState, participants: globalState.participants.map(redactParticipantForLocalSnapshot)}));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
     if (globalState.persistenceError) globalState.persistenceError = null;
     return true;
   } catch (err) {

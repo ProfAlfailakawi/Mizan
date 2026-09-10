@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
-import {participantMatchesIdentityQuery,redactParticipantForLocalSnapshot} from '../src/lib/local-snapshot-privacy';
+import {participantMatchesIdentityQuery,redactParticipantForLocalSnapshot,redactStateForLocalSnapshot} from '../src/lib/local-snapshot-privacy';
 
 const participant=(over:Record<string,unknown>={})=>({
  id:'p1',code:'A-104',competitionId:'c',organizationId:'o',fullName:'Ahmad',fullNameArabic:'أحمد',
@@ -43,12 +43,35 @@ test('the last four characters remain so the exception desk can still match offl
  assert.equal(redactParticipantForLocalSnapshot(participant({nationalIdOrPassport:''})).identityLast4,undefined);
 });
 
+test('the participant inside the live session is redacted too, not just the array',()=>{
+ const full=participant();
+ const state=redactStateForLocalSnapshot({participants:[full],activeSession:{participant:full,sessionId:'s1'}} as any) as any;
+ // A judging session holds its own full copy, and it is written on every update — the worst moment to leak.
+ assert.equal(state.activeSession.participant.nationalIdOrPassport,undefined);
+ assert.equal(state.activeSession.participant.documents,undefined);
+ assert.equal(state.activeSession.participant.identityLast4,'1234');
+ assert.equal(state.activeSession.sessionId,'s1','the rest of the session is untouched');
+ assert.ok(!JSON.stringify(state).includes('298110401234'),'the number must not survive anywhere in the state');
+
+ // No active participant is not an error.
+ const idle=redactStateForLocalSnapshot({participants:[full],activeSession:{participant:null}} as any) as any;
+ assert.equal(idle.activeSession.participant,null);
+});
+
+test('a snapshot written before this release is cleaned when it is read, not when it is next written',()=>{
+ const src=fs.readFileSync(path.join(process.cwd(),'src/lib/store.ts'),'utf8');
+ // An idle device may never write again; cleaning on read is what actually reaches it.
+ assert.match(src,/const sanitized=redactStateForLocalSnapshot\(parsed\)/);
+ assert.match(src,/localStorage\.setItem\(STORAGE_KEY,JSON\.stringify\(sanitized\)\)/);
+ assert.match(src,/return hydrateSavedState\(sanitized\)/);
+});
+
 test('the derived field is stripped before any write to the server',()=>{
  const src=fs.readFileSync(path.join(process.cwd(),'src/lib/store.ts'),'utf8');
  assert.match(src,/LOCAL_ONLY_PARTICIPANT_FIELDS/);
  assert.match(src,/for\(const key of LOCAL_ONLY_PARTICIPANT_FIELDS\)delete payload\[key\]/);
  // The snapshot writer must go through the redactor, not write globalState directly.
- assert.match(src,/localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(\{\.\.\.globalState, participants: globalState\.participants\.map\(redactParticipantForLocalSnapshot\)\}\)\)/);
+ assert.match(src,/localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(redactStateForLocalSnapshot\(globalState\)\)\)/);
 });
 
 test('the exception desk still finds a participant by the last four characters',()=>{
@@ -62,6 +85,14 @@ test('the exception desk still finds a participant by the last four characters',
  assert.equal(participantMatchesIdentityQuery(redacted,''),false);
  // Before redaction, nothing about the existing search changes.
  assert.equal(participantMatchesIdentityQuery(participant(),'298110401234'),true);
+
+ // The tail is a fallback for a missing number, never an addition to a present one: otherwise a
+ // wrong number ending in the same four characters would surface the wrong person for reissue.
+ const both=participant({identityLast4:'1234'});
+ assert.equal(participantMatchesIdentityQuery(both,'298110401234'),true);
+ assert.equal(participantMatchesIdentityQuery(both,'999999991234'),false,'a wrong full number must never match on its tail');
+ const tailOnly=participant({identityLast4:'9999'});
+ assert.equal(participantMatchesIdentityQuery(tailOnly,'9999'),false,'the tail must not match while the full number is known and differs');
 
  const src=fs.readFileSync(path.join(process.cwd(),'src/components/admin/RolePortals.tsx'),'utf8');
  assert.match(src,/participantMatchesIdentityQuery/,'the desk must use the shared matcher, not its own copy');

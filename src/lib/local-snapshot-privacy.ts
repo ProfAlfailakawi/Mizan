@@ -23,12 +23,35 @@ export function redactParticipantForLocalSnapshot(participant: Participant): Par
   return { ...rest, ...(last4 ? { identityLast4: last4 } : {}) } as Participant;
 }
 
-/** يُطابق ما كتبه الموظف مع ما بقي محليًا: الرقم الكامل إن كان حاضرًا، وإلا آخر أربعة محارف. */
+/**
+ * يُطابق ما كتبه الموظف مع ما بقي محليًا.
+ *
+ * الرجوع إلى آخر أربعة محارف **بديلٌ عند فقد الرقم لا إضافةٌ إليه**: لو قبلناه والرقم الكامل
+ * حاضر، لطابق رقمٌ خاطئ ينتهي بالمحارف نفسها — فيظهر متسابق آخر عند مكتب الاستثناءات، وقد
+ * يُعاد إصدار اعتماد لغير صاحبه.
+ */
 export function participantMatchesIdentityQuery(participant: Participant, query: string): boolean {
   const needle = String(query || '').trim().toLowerCase();
   if (!needle) return false;
-  const haystack = `${participant.code} ${participant.fullName} ${participant.fullNameArabic} ${participant.nationalIdOrPassport || ''}`.toLowerCase();
+  const fullIdentity = String(participant.nationalIdOrPassport || '').trim();
+  const haystack = `${participant.code} ${participant.fullName} ${participant.fullNameArabic} ${fullIdentity}`.toLowerCase();
   if (haystack.includes(needle)) return true;
+  if (fullIdentity) return false;
   const tail = needle.length > 4 ? needle.slice(-4) : needle;
   return !!participant.identityLast4 && participant.identityLast4.toLowerCase() === tail;
+}
+
+/*
+ * حجب على مستوى الحالة كلها: المتسابق يعيش في موضعين — المصفوفة، والجلسة الجارية.
+ * الاكتفاء بأحدهما يُبقي نسخة كاملة تُكتب مع كل تحديث أثناء التحكيم، وهو أسوأ الأوقات.
+ */
+export function redactStateForLocalSnapshot<T extends { participants: Participant[]; activeSession?: { participant: Participant | null } | null }>(state: T): T {
+  const activeSession = state.activeSession;
+  return {
+    ...state,
+    participants: state.participants.map(redactParticipantForLocalSnapshot),
+    ...(activeSession?.participant
+      ? { activeSession: { ...activeSession, participant: redactParticipantForLocalSnapshot(activeSession.participant) } }
+      : {}),
+  };
 }
