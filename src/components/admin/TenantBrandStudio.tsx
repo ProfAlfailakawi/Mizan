@@ -35,7 +35,7 @@ import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicTex
 const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.'};
 const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
 
-export const TenantDomainCard: React.FC<{ orgId?: string }> = ({ orgId }) => {
+export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patchUrl?: string }> = ({ orgId, getUrl, patchUrl }) => {
   const store = useAppStore();
   const ar = store.language === 'ar';
   const [subdomain, setSubdomain] = useState('');
@@ -45,15 +45,17 @@ export const TenantDomainCard: React.FC<{ orgId?: string }> = ({ orgId }) => {
   const [saving, setSaving] = useState(false);
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState('');
+  const loadUrl = getUrl || `/api/tenant/brand${orgId ? `?orgId=${encodeURIComponent(orgId)}` : ''}`;
+  const saveUrl = patchUrl || '/api/tenant/brand';
 
   useEffect(() => {
     const user = auth?.currentUser; if (!user) return; let live = true;
-    void user.getIdToken().then(token => fetch(`/api/tenant/brand${orgId ? `?orgId=${encodeURIComponent(orgId)}` : ''}`, { headers: { authorization: `Bearer ${token}` } }))
+    void user.getIdToken().then(token => fetch(loadUrl, { headers: { authorization: `Bearer ${token}` } }))
       .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
       .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []); setBaseDomain(body?.baseDomain || ''); })
       .catch(() => {});
     return () => { live = false };
-  }, [orgId]);
+  }, [loadUrl]);
 
   const addDomain = () => {
     const d = normalizeDomain(newDomain);
@@ -69,7 +71,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string }> = ({ orgId }) => {
     try {
       const user = auth?.currentUser; if (!user) throw new Error(ar ? 'تلزم هوية موثقة.' : 'Authentication required.');
       const token = await user.getIdToken();
-      const res = await fetch('/api/tenant/brand', { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ orgId: orgId || store.organization?.id, subdomain: normalizeDomain(subdomain), customDomains }) });
+      const res = await fetch(saveUrl, { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ orgId: orgId || store.organization?.id, subdomain: normalizeDomain(subdomain), customDomains }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String((body.errors || []).join(' · ') || body.code || 'DOMAIN_SAVE_FAILED'));
       const t = body.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []);
