@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
+import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
 import {installAppUpdate} from './lib/app-update';
 import {installInputNormalization} from './lib/input-validation';
@@ -19,7 +20,10 @@ installAppUpdate({chunkRecovery:false});
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ArabicInterfaceGuard/>
-    <App />
+    {/* الحارس يلفّ التطبيق كله: استثناء في أي شاشة كان يُسقط الشجرة إلى فراغ أبيض صامت. */}
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );
 

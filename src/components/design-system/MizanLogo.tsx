@@ -28,8 +28,17 @@ export function useBrandInfo(): BrandInfo {
   const comp = s.competition;
   const rawPlacements = brand?.displayPlacements || {};
   // للجهات التي اشترت العلامة البيضاء: الافتراضي اسم الجهة نفسها، ولا يظهر «ميزان» إلا كخيار أخير للمنصة نفسها.
-  const orgArabic = cleanName(s.organization?.nameArabic) || cleanName(s.organization?.name);
-  const orgLatin = cleanName(s.organization?.name);
+  /*
+   * جهةٌ لم تُعدّ بعد ليست علامة تجارية.
+   *
+   * حالة الإطلاق تضع اسمًا نائبًا («جهة قيد الإعداد» / Organization pending setup) ريثما
+   * يُدخل المنظّم بياناته. وكان ذلك النائب يتسرّب إلى ترويسة المنصّة بوصفه اسم العلامة،
+   * فيرى مالك المنصّة نفسه — وهو لا ينتمي إلى جهة أصلًا — منسوبًا إلى «جهة قيد الإعداد».
+   * النائب لا يُشتقّ منه اسم، فتظهر «ميزان» حتى تُعدّ الجهة فعلًا.
+   */
+  const pendingOrganization = s.organization?.id === 'org-pending-setup';
+  const orgArabic = pendingOrganization ? '' : (cleanName(s.organization?.nameArabic) || cleanName(s.organization?.name));
+  const orgLatin = pendingOrganization ? '' : cleanName(s.organization?.name);
   const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic) || orgArabic;
   const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name) || orgLatin;
   return {
