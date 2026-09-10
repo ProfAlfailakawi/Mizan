@@ -83,7 +83,7 @@ test('the heartbeat route admits every active role, from one list', () => {
   const canonical = /export const ALL_GOVERNANCE_ROLES:GovernanceRole\[\]=\[([\s\S]*?)\];/.exec(governance)?.[1] || '';
   const names = (src: string) => new Set(Array.from(src.matchAll(/'([a-z_]+)'/g), m => m[1]));
   assert.deepEqual([...names(union)].sort(), [...names(canonical)].sort(), 'the canonical list must cover the whole role union');
-  assert.match(server, /app\.post\('\/api\/telemetry\/heartbeat',requireGovernanceRoles\(ALL_GOVERNANCE_ROLES\)/,
+  assert.match(server, /app\.post\('\/api\/telemetry\/heartbeat',[^)]*requireGovernanceRoles\(ALL_GOVERNANCE_ROLES\)/,
     'a hand-written copy of the role list is how five real roles were dropped');
 });
 
@@ -103,4 +103,23 @@ test('the server reports its own public-registration outages, and only those', (
   assert.match(reporter, /status<500/, 'a wrong email is the applicant’s to fix, not an outage to wake the owner');
   assert.doesNotMatch(reporter, /req\.body|email|phone|name/, 'the report carries a fault code and a scope, never personal data');
   assert.match(server, /catch\(err\)\{reportPublicFailure\(/, 'the register route must route its failures through it');
+});
+
+test('the busiest write in the product has a ceiling', () => {
+  /*
+   * كل جلسة مفتوحة تطرق هذه النقطة مرة كل دقيقة، فهي أكثر كتابةٍ تكرارًا في المنتج وأوسع
+   * باب للإغراق إن تُركت بلا سقف. والسقف واسع عمدًا: قاعةٌ خلف عنوان واحد قد تحمل عشرات
+   * الأجهزة، فيمنع الإغراق ولا يمسّ تشغيلًا حقيقيًا.
+   */
+  const server = fs.readFileSync('server.ts', 'utf8');
+  assert.match(server, /app\.post\('\/api\/telemetry\/heartbeat',telemetryHeartbeatRateLimit,/,
+    'the heartbeat route must be rate limited ahead of its authorization');
+  assert.match(server, /const telemetryHeartbeatRateLimit:RequestHandler=rateLimit\(/,
+    'and by a real limiter, not a pass-through');
+});
+
+test('one role list, not three', () => {
+  const server = fs.readFileSync('server.ts', 'utf8');
+  assert.match(server, /const governanceRoles=new Set<string>\(ALL_GOVERNANCE_ROLES\)/,
+    'a second hand-written copy is a second chance to drop a role');
 });
