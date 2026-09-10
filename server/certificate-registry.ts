@@ -47,21 +47,18 @@ export interface PublicView{certificateNumber:string;competitionName:string;orga
 const canonical=(v:unknown):string=>{if(v===null||typeof v!=='object')return JSON.stringify(v);if(Array.isArray(v))return `[${v.map(canonical).join(',')}]`;const o=v as Record<string,unknown>;return `{${Object.keys(o).sort().map(k=>`${JSON.stringify(k)}:${canonical(o[k])}`).join(',')}}`};
 const digest=(x:string)=>crypto.createHash('sha256').update(x).digest('hex');
 const clean=(x:unknown,max:number)=>String(x??'').trim().slice(0,max);
-/* رقم الشهادة يصير جزءًا من اسم ملف: يُقيَّد بالمحارف الآمنة قبل أي لمس للقرص. */
-const key=(x:string)=>clean(x,120).toUpperCase().replace(/[^A-Z0-9._-]/g,'_');
+/* الرقم يُطبَّع للبحث فقط: البحث لا يفرّق بين حالة الأحرف ولا يهتم بمسافات الأطراف. */
+const normalizeNumber=(x:string)=>clean(x,120).toUpperCase();
 
 export class PublicCertificateRegistry{
   constructor(private dir:string){if(!dir)throw new Error('CERTIFICATE_REGISTRY_DIR_REQUIRED');fs.mkdirSync(dir,{recursive:true,mode:0o700});}
-  /* الرقم يأتي من الطلب. التنقية وحدها لا تكفي إثباتًا: يُحسم المسار ثم يُتحقق أنه داخل
-     المجلد فعلًا، فأي تسرّب مستقبلي في التنقية يُوقَف هنا لا عند القرص. */
-  private file(number:string){
-    const name=`cert-${key(number)}.json`;
-    if(!name||name.includes('/')||name.includes('\\'))throw new Error('CERTIFICATE_NUMBER_INVALID');
-    const root=path.resolve(this.dir);
-    const resolved=path.resolve(root,name);
-    if(resolved!==path.join(root,name)||!resolved.startsWith(root+path.sep))throw new Error('CERTIFICATE_NUMBER_INVALID');
-    return resolved;
-  }
+
+  /*
+   * اسم الملف بصمة الرقم لا الرقم نفسه. تنقية المحارف كانت تُسقط الفروق: «A/B» و«A_B»
+   * يصيران ملفًا واحدًا، فتدهس شهادةٌ شهادةً أخرى. والبصمة تُخرج مدخل المستخدم من المسار
+   * أصلًا فلا يبقى طريق للهروب من المجلد. الرقم الحقيقي محفوظ داخل الملف.
+   */
+  private file(number:string){return path.join(this.dir,`cert-${digest(normalizeNumber(number)).slice(0,32)}.json`)}
 
   private read(number:string):PublicCertificateRecord|null{
     const file=this.file(number);if(!fs.existsSync(file))return null;

@@ -22,8 +22,8 @@ const base={certificateId:'cert-1',competitionId:'comp-1',organizationId:'org-1'
  issuedAt:'2026-06-01T00:00:00.000Z',disclosed:{participantCode:'A-104',participantName:'أحمد',finalScore:92,rank:1,status:'sealed'},
  certificateVersion:'MZ-CERT-1',resultSealReference:'seal-1',merkleRoot:root,merkleProof:[{position:'right' as const,hash:sibling}],
  merkleLeafMaterial:material,resultId:'res-1',merkleProofId:'proof-1'};
-const packageHash=(revocationState:'ACTIVE')=>digest(canonical({certificateId:base.certificateId,resultId:base.resultId,competitionId:base.competitionId,certificateVersion:base.certificateVersion,resultSealReference:base.resultSealReference,merkleProofId:base.merkleProofId,issuedTimestamp:base.issuedAt,revocationState}));
-const record=(n='MZN-2026-KW-A104')=>({...base,certificateNumber:n,proofPackageHash:packageHash('ACTIVE')});
+const packageHash=(revocationState:'ACTIVE',certificateId=base.certificateId)=>digest(canonical({certificateId,resultId:base.resultId,competitionId:base.competitionId,certificateVersion:base.certificateVersion,resultSealReference:base.resultSealReference,merkleProofId:base.merkleProofId,issuedTimestamp:base.issuedAt,revocationState}));
+const record=(n='MZN-2026-KW-A104',certificateId=base.certificateId)=>({...base,certificateId,certificateNumber:n,proofPackageHash:packageHash('ACTIVE',certificateId)});
 
 test('a stranger holding the paper gets a verdict computed on the server, not from their browser',withRegistry(r=>{
  assert.deepEqual(r.verify('MZN-2026-KW-A104'),{state:'NOT_FOUND'});
@@ -64,15 +64,26 @@ test('revocation is final and cannot be undone by republishing',withRegistry(r=>
  assert.throws(()=>r.revoke('MZN-MISSING','org-1'),/CERTIFICATE_NOT_FOUND/);
 }));
 
-test('a certificate number cannot escape the registry directory or hijack another certificate',withRegistry(r=>{
+test('the file name is derived from the number, so no number escapes the directory or collides',withRegistry(r=>{
  r.publish(record('../../etc/passwd'));
  assert.equal(r.verify('../../etc/passwd').state,'AUTHENTIC');
  assert.ok(!fs.existsSync('/etc/passwd.json'));
- // Whatever the number, the file it maps to stays inside the registry directory.
- for(const f of fs.readdirSync((r as any).dir))assert.ok(/^cert-[A-Z0-9._-]+\.json$/.test(f),`unexpected file name ${f}`);
+
+ // Numbers that a character filter would have flattened together stay separate certificates.
+ r.publish(record('MZN-A/B','cert-slash'));
+ r.publish(record('MZN-A_B','cert-underscore'));
+ assert.equal(r.verify('MZN-A/B').state,'AUTHENTIC');
+ assert.equal(r.verify('MZN-A_B').state,'AUTHENTIC');
+ r.revoke('MZN-A/B','org-1');
+ assert.equal(r.verify('MZN-A/B').state,'REVOKED');
+ assert.equal(r.verify('MZN-A_B').state,'AUTHENTIC','revoking one must not touch the other');
+
+ // Every file the registry writes is a fixed-shape name with no request data in it.
+ for(const f of fs.readdirSync((r as any).dir))assert.match(f,/^cert-[0-9a-f]{32}\.json$/,`unexpected file name ${f}`);
+
  // The same number may not be re-pointed at a different certificate id.
  r.publish(record('MZN-CONFLICT'));
- assert.throws(()=>r.publish({...record('MZN-CONFLICT'),certificateId:'cert-2'}),/CERTIFICATE_NUMBER_CONFLICT/);
+ assert.throws(()=>r.publish(record('MZN-CONFLICT','cert-2')),/CERTIFICATE_NUMBER_CONFLICT/);
 }));
 
 test('the printed link opens the verification page and carries the number back',()=>{
