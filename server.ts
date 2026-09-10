@@ -123,6 +123,14 @@ async function startServer() {
   const saasDir=process.env.MIZAN_SAAS_DATA_DIR||(isProd?'':path.resolve('.mizan-data/saas'));
   let saasPlatform:SaaSPlatformRepository|null=null;
   try{if(saasDir){const vaultKey=process.env.MIZAN_STORAGE_SECRET_MASTER_KEY||'';const vault=vaultKey?new SecretVault(path.join(saasDir,'vault','storage-secrets.enc.json'),vaultKey):undefined;saasPlatform=new SaaSPlatformRepository(path.join(saasDir,'saas-platform.json'),vault)}}catch(err){console.error('SaaS platform disabled:',err)}
+  /* الفوترة تُقفل دورتها بنفسها: تُصدَر فاتورة التجديد عند انتهاء الدورة بلا تدخّل.
+     التشغيل متكرّر بأمان، فالتأخر أو التكرار لا يُصدر فاتورتين. */
+  if(saasPlatform){
+    const runCycle=()=>{try{const out=saasPlatform!.runBillingCycle();if(out.issued.length)console.log(`[billing] issued ${out.issued.length} renewal invoice(s)`)}catch(err){console.error('[billing] renewal cycle failed:',err)}};
+    runCycle();
+    const cycle=setInterval(runCycle,Number(process.env.MIZAN_BILLING_CYCLE_INTERVAL_MS||3600_000));
+    cycle.unref?.();
+  }
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const firestoreRepository=firebaseProjectId?new FirestoreRestRepository(firebaseProjectId):null;
   const publicRegistration=firestoreRepository?new PublicRegistrationService({
@@ -570,7 +578,9 @@ async function startServer() {
     return res.status(201).json({paymentUrl:out.paymentUrl,invoice:updated});
   };
   // Owner billing (subscriptions + invoices for operators and organizations)
+  app.post('/api/saas/owner/billing/run-cycle',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.runBillingCycle())}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/owner/subscriptions/:id/auto-renew',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.setSubscriptionAutoRenew(saasActor(req),String(req.params.id),(req.body||{}).autoRenew!==false)})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions/:id/cancel',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/pay',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
@@ -595,6 +605,7 @@ async function startServer() {
   app.put('/api/saas/operator/plans',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({plan:repo.operatorUpsertPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.delete('/api/saas/operator/plans/:id',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.operatorDeletePlan(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/subscriptions',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/operator/subscriptions/:id/auto-renew',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.setSubscriptionAutoRenew(saasActor(req),String(req.params.id),(req.body||{}).autoRenew!==false)})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/subscriptions/:id/cancel',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/pay',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
