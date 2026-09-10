@@ -135,6 +135,11 @@
 .mizan-input.mizan-input-icon-start { padding-inline-start:2.65rem; }
 .mizan-number-input { appearance:textfield; -moz-appearance:textfield; }
 .mizan-number-input::-webkit-outer-spin-button, .mizan-number-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+/* Native number steppers render on an inconsistent side under RTL (they hop from the right edge
+   to the left edge), which reads as a visual glitch across the app. Hide them everywhere; numeric
+   fields either use MIZAN's own +/− controls or accept typed input. */
+input[type="number"] { appearance:textfield; -moz-appearance:textfield; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .mizan-consent { display:inline-flex; align-items:center; justify-content:flex-start; gap:.65rem; width:auto; max-width:100%; line-height:1.7; }
 .mizan-consent input[type="checkbox"] { flex:0 0 auto; margin:0; align-self:center; }
 .mizan-consent > span { display:inline-block; }
