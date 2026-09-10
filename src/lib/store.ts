@@ -97,6 +97,9 @@ const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_
  */
 function hydrateSavedState(parsed: AppStoreState): AppStoreState {
   const launch = isLaunchDeployment();
+  /* عطل الحفظ حالةٌ حيّة تُكتشف عند وقوعها، لا أثرٌ يُبعث من اللقطة المحفوظة: لقطةٌ حملت
+     الشريط مرةً كانت تُعيده إلى الأبد بعد زوال سببه، ولا شيء يمسحه في صفحةٍ لا تكتب للسحابة. */
+  parsed.persistenceError = null;
   // يسبق الترقية: وإلا لملأ احتياطُ الحسابات المزروعة الفراغَ قبل أن يصل الحارس.
   if (launch) { parsed.identityAccounts = parsed.identityAccounts ?? []; parsed.roleGrants = parsed.roleGrants ?? []; }
       parsed.organization = parsed.organization || SEED_ORGANIZATION;
@@ -355,11 +358,23 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
     /* قواعد فايرستور تربط الرفع بهوية المصادقة عبر uploaderUid لا عبر معرّفات النطاق المحلية:
        actorId وjudgeId معرّفات سجلّ ميزان (usr-...) لا تساوي uid فايربيس أبدًا، ومقارنتها به كانت
        ترفض رفع سجل التدقيق لكل الأدوار بلا استثناء. */
-    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
-    if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
+    const write=()=>setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
+    try{await write();}
+    catch(err){
+      /* رفض صلاحية ورمز المصادقة أقدم من آخر مزامنة مطالبات؟ نجدّد الرمز مرة ونعيد الكتابة
+         مرة — فتلتئم الجلسات القائمة بعد مزامنة الصلاحيات بلا خروجٍ ودخول. */
+      if(classifyCloudError(err)!=='CLOUD_PERMISSION_DENIED'||!refreshAuthTokenOnce())throw err;
+      await auth.currentUser.getIdToken(true);
+      await write();
+    }
+    resolveCloudScope(collectionName);
     return true;
-  }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
+  }catch(err){console.error('MIZAN cloud write denied',{path:`${collectionName}/${id}`,error:err instanceof Error?err.message:String(err)});reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
+
+/* تجديد رمز المصادقة عند أول رفض صلاحية: مرة كل دقيقتين على الأكثر، فلا تنشأ حلقة تجديد. */
+let lastAuthTokenRefreshAt=0;
+function refreshAuthTokenOnce(){const now=Date.now();if(now-lastAuthTokenRefreshAt<120_000)return false;lastAuthTokenRefreshAt=now;return true;}
 
 
 async function deleteScopedDocument(collectionName:string,id:string){
@@ -368,7 +383,7 @@ async function deleteScopedDocument(collectionName:string,id:string){
   try{
     const {db,doc,deleteDoc}=await getFirestoreClient();
     await deleteDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id));
-    if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
+    resolveCloudScope(collectionName);
     return true;
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
@@ -400,6 +415,7 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
       updatedAt:new Date().toISOString(),
     };
     for(const [key,audience] of records)await setDoc(doc(db,'public_journeys',key),{...base,audience},{merge:true});
+    resolveCloudScope('public journey');
     return true;
   }catch(err){reportCloudError(classifyCloudError(err),'public journey');return false;}
 }
@@ -427,15 +443,33 @@ function syncScopeLabel(scope:string){
   const head=String(scope||'').split('/')[0].trim();
   return AR_SYNC_SCOPE[head]||'بيانات المسابقة';
 }
+/*
+ * أعطال السحابة تُحصى بنطاقها، لا بعلمٍ واحد.
+ *
+ * كان علمُ العطل واحدًا: أي رفعٍ ناجح لأي مجموعة يمسحه، وأي فشلٍ يعيده — فيرتجف الشريط مع كل
+ * حفظة (نجاح المتسابقين يمسح، فشل التدقيق يعيد، وهكذا في الثانية الواحدة). الآن لكل نطاقٍ
+ * فاشل قيدُه، ولا يُمسح الشريط إلا حين ينجح النطاق الفاشل نفسه ويخلو السجل كله.
+ */
+const failingCloudScopes=new Map<string,{code:CloudSyncErrorCode;message:string}>();
+const scopeKey=(scope:string)=>String(scope||'').split('/')[0].trim();
 function reportCloudError(code:CloudSyncErrorCode,scope:string){
   const label=syncScopeLabel(scope);
   const message=code==='CLOUD_PAYLOAD_TOO_LARGE'?`حجم ${label} تجاوز الحدّ المسموح، فلم تُرفع إلى السحابة.`
-    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية الحالية لا تسمح برفع ${label} إلى السحابة.`
+    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية الحالية لا تسمح برفع ${label} إلى السحابة. (${scope})`
     :`تعذّرت مزامنة ${label} مع السحابة.`;
+  failingCloudScopes.set(scopeKey(scope),{code,message});
   globalState.persistenceError={code,message,at:new Date().toISOString()};
   notify();
 }
-function clearCloudError(){globalState.persistenceError=null;notify();}
+/* نجاح رفعٍ في نطاقٍ ما يحلّ عطل ذلك النطاق وحده؛ الشريط يبقى ما دام غيره فاشلًا. */
+function resolveCloudScope(scope:string){
+  failingCloudScopes.delete(scopeKey(scope));
+  if(!globalState.persistenceError||!globalState.persistenceError.code.startsWith('CLOUD_'))return;
+  const remaining=[...failingCloudScopes.values()].pop();
+  if(!remaining){globalState.persistenceError=null;notify();return;}
+  if(globalState.persistenceError.message!==remaining.message){globalState.persistenceError={code:remaining.code,message:remaining.message,at:new Date().toISOString()};notify();}
+}
+function clearCloudError(){failingCloudScopes.clear();globalState.persistenceError=null;notify();}
 
 /*
  * لحاق: يرفع ما يملكه هذا الدور ولم يصل الخادم بعد (جهاز عاد من انقطاع).
@@ -516,8 +550,9 @@ function syncToFirestore() {
         const publicRef=doc(db,'public_competitions',globalState.competition.id);
         await setDoc(publicRef,{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       }
-      if (globalState.persistenceError && globalState.persistenceError.code.startsWith('CLOUD_')) clearCloudError();
+      resolveCloudScope('competition');
     } catch (err) {
+      console.error('MIZAN cloud write denied',{path:'competition',error:err instanceof Error?err.message:String(err)});
       reportCloudError(classifyCloudError(err), 'competition');
     }
   }, 1000);

@@ -107,6 +107,6 @@ test('a failed cloud upload survives long enough to be seen', () => {
   assert.ok(writer, 'the local snapshot writer must exist');
   assert.match(writer, /!globalState\.persistenceError\.code\.startsWith\('CLOUD_'\)/,
     'a successful local write may only clear the errors it owns');
-  // وأعطال السحابة تُمسح بنجاح رفعٍ فعليّ، وذلك المسار قائم.
-  assert.match(store, /code\.startsWith\('CLOUD_'\)\)\s*clearCloudError\(\)/);
+  // وأعطال السحابة يحلّها نجاح رفعٍ فعليّ في نطاقها هي — لا مسحٌ شامل يخفي نطاقًا ما زال فاشلًا.
+  assert.match(store, /resolveCloudScope\(collectionName\)/);
 });
