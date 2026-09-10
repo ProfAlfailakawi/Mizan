@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {GoogleDomainAuthorizer,googleDomainAuthorizerFromEnv,matchesReferrer,normalizeHost,referrerPattern} from '../server/google-domain-authorizer';
+import {GoogleDomainAuthorizer,googleDomainAuthorizerFromEnv,isPlausibleHost,matchesReferrer,normalizeHost,referrerPattern} from '../server/google-domain-authorizer';
 
 const KEY_RESOURCE='projects/p/locations/global/keys/k1';
 const config={clientEmail:'sa@p.iam.gserviceaccount.com',privateKey:'',projectId:'p',apiKeyResource:KEY_RESOURCE};
@@ -83,4 +83,30 @@ test('without configuration nothing is built, so linking stays manual instead of
  assert.equal(googleDomainAuthorizerFromEnv({MIZAN_GOOGLE_SERVICE_ACCOUNT_JSON:'not json',MIZAN_FIREBASE_API_KEY_RESOURCE:KEY_RESOURCE} as any),null);
  assert.equal(googleDomainAuthorizerFromEnv({MIZAN_GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify({client_email:'a@b.c'}),MIZAN_FIREBASE_API_KEY_RESOURCE:KEY_RESOURCE} as any),null,'a key without a private key is not usable');
  assert.ok(googleDomainAuthorizerFromEnv({MIZAN_GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify({client_email:'a@b.c',private_key:'k',project_id:'p'}),MIZAN_FIREBASE_API_KEY_RESOURCE:KEY_RESOURCE} as any));
+});
+
+test('a hostile host cannot make normalisation crawl',()=>{
+ /* المدخل يصل من جسم الطلب قبل أي تحقق. نمطٌ غير مثبَّت البداية يجرّب كل موضع، فنصٌّ من
+    مئات الآلاف من الشرطات كان يجعل الكلفة تربيعية ويعلّق الخادم. */
+ for(const hostile of ['/'.repeat(200_000),'https://'+'/'.repeat(200_000),'a'.repeat(500_000),'.'.repeat(200_000)]){
+  const started=Date.now();
+  const out=normalizeHost(hostile);
+  const elapsed=Date.now()-started;
+  assert.ok(elapsed<250,`normalisation took ${elapsed}ms — it must stay linear`);
+  assert.ok(out.length<=253,'anything longer than a DNS name is not a host');
+  assert.equal(isPlausibleHost(out),false,'and none of these is a usable host');
+ }
+ const started=Date.now();
+ matchesReferrer('https://'+'/'.repeat(200_000),'example.com');
+ assert.ok(Date.now()-started<250,'matching a hostile pattern must stay linear too');
+});
+
+test('host validation accepts real domains and refuses what is not one',()=>{
+ for(const good of ['example.com','quran.jamiat-a.org','a.b.c.example.co','mizan.dr-alfailakawi.com'])
+   assert.equal(isPlausibleHost(good),true,`${good} is a real host`);
+ for(const bad of ['','localhost','example','.example.com','example..com','-example.com','example-.com','example.c','example.c0m','exa mple.com','example.com:8080','a'.repeat(254)])
+   assert.equal(isPlausibleHost(bad),false,`${bad} must be refused`);
+ // مقطع أطول من ٦٣ محرفًا مرفوض ولو كان النطاق كله ضمن الحد.
+ assert.equal(isPlausibleHost(`${'a'.repeat(64)}.com`),false);
+ assert.equal(isPlausibleHost(`${'a'.repeat(63)}.com`),true);
 });

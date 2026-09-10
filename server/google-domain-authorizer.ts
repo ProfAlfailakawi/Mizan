@@ -36,14 +36,44 @@ const SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 const base64url = (input: Buffer | string) =>
   Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-/** يُطبَّع المضيف قبل أي مقارنة: الفروق في الحالة أو المسافات تُنتج تكرارًا صامتًا في القائمة. */
+/* أطول اسم مضيف في DNS ‏253 محرفًا. ما تجاوزه ليس مضيفًا، فيُقصّ قبل أي عمل عليه. */
+const MAX_HOST_LENGTH = 253;
+
+/**
+ * يُطبَّع المضيف قبل أي مقارنة: الفروق في الحالة أو المسافات تُنتج تكرارًا صامتًا في القائمة.
+ *
+ * بلا تعابير نمطية عمدًا. المدخل يصل من جسم الطلب قبل أي تحقق، ونمطٌ غير مثبَّت البداية
+ * مثل ‎/\/.*$/‎ يجرّب كل موضع: نصٌّ من آلاف الشرطات يجعل الكلفة تربيعية فيعلّق الخادم.
+ * عمليات النصوص هنا خطّية، والطول مقصوص أولًا فيبقى العمل محدودًا مهما كان المدخل.
+ */
 export function normalizeHost(raw: string): string {
-  return String(raw || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '')
-    .replace(/\.$/, '');
+  let host = String(raw ?? '').trim().toLowerCase();
+  if (host.length > MAX_HOST_LENGTH * 4) host = host.slice(0, MAX_HOST_LENGTH * 4);
+  if (host.startsWith('https://')) host = host.slice(8);
+  else if (host.startsWith('http://')) host = host.slice(7);
+  const slash = host.indexOf('/');
+  if (slash >= 0) host = host.slice(0, slash);
+  while (host.endsWith('.')) host = host.slice(0, -1);
+  return host.length > MAX_HOST_LENGTH ? '' : host;
+}
+
+/** تحقّق خطّي من شكل المضيف: تقسيمٌ على النقاط وفحص كل مقطع، بلا تراجع نمطي. */
+export function isPlausibleHost(host: string): boolean {
+  if (!host || host.length > MAX_HOST_LENGTH) return false;
+  const labels = host.split('.');
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!label || label.length > 63) return false;
+    if (label.startsWith('-') || label.endsWith('-')) return false;
+    for (const ch of label) {
+      const ok = (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch === '-';
+      if (!ok) return false;
+    }
+  }
+  const tld = labels[labels.length - 1];
+  if (tld.length < 2) return false;
+  for (const ch of tld) if (ch < 'a' || ch > 'z') return false;
+  return true;
 }
 
 /** صيغة المُحيل التي تقبلها Google لنطاق كامل. */
@@ -121,7 +151,7 @@ export class GoogleDomainAuthorizer {
    */
   async authorize(rawHost: string): Promise<DomainAuthorizationOutcome> {
     const host = normalizeHost(rawHost);
-    if (!host || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(host)) return { state: 'FAILED', reason: 'HOST_INVALID', host };
+    if (!isPlausibleHost(host)) return { state: 'FAILED', reason: 'HOST_INVALID', host };
     try {
       const referrerAdded = await this.addReferrer(host);
       const authDomainAdded = await this.addAuthorizedDomain(host);
@@ -134,7 +164,13 @@ export class GoogleDomainAuthorizer {
 
 /** يطابق نمط مُحيل مسجَّلًا مع مضيف، بما في ذلك أنماط النجمة التي تغطّي نطاقات فرعية. */
 export function matchesReferrer(pattern: string, host: string): boolean {
-  const cleaned = String(pattern || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  /* النمط يأتي من قائمة Google، وتُطبَّق عليه المعالجة الخطّية نفسها لا تعبيرًا نمطيًا. */
+  let cleaned = String(pattern ?? '').trim().toLowerCase();
+  if (cleaned.length > MAX_HOST_LENGTH * 4) cleaned = cleaned.slice(0, MAX_HOST_LENGTH * 4);
+  if (cleaned.startsWith('https://')) cleaned = cleaned.slice(8);
+  else if (cleaned.startsWith('http://')) cleaned = cleaned.slice(7);
+  const slash = cleaned.indexOf('/');
+  if (slash >= 0) cleaned = cleaned.slice(0, slash);
   if (!cleaned) return false;
   if (cleaned === host) return true;
   if (cleaned.startsWith('*.')) {
