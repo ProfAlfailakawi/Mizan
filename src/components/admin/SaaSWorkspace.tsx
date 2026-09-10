@@ -94,6 +94,13 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine}:{billing:any;subje
    </div>:<div className="mt-4 rounded-xl bg-[#f3f1eb] p-4 text-xs text-[#666c68]">لا يوجد اشتراك أو فاتورة عليك حتى الآن.</div>}
   </div>}
 
+  {(summary.revenueByMonth||[]).some((m:any)=>m.count>0)&&<div className="mizan-surface p-5">
+   <div className="mizan-kicker">الإيرادات المحصّلة — آخر ١٢ شهرًا</div>
+   <p className="mt-1 text-xs text-[#666c68]">من الفواتير المدفوعة فعلًا، لا من الفواتير المُصدَرة.</p>
+   {(()=>{const rows=summary.revenueByMonth||[];const peak=Math.max(1,...rows.map((m:any)=>sumMinor(m.byCurrency||[])));return <div className="mt-5 flex items-end gap-1.5 overflow-x-auto pb-1">{rows.map((m:any)=>{const total=sumMinor(m.byCurrency||[]);const h=Math.round((total/peak)*100);return <div key={m.month} className="flex min-w-[42px] flex-1 flex-col items-center gap-1.5" title={`${m.month} · ${(m.byCurrency||[]).map((c:any)=>money(c.amountMinor,c.currency)).join(' · ')||money(0)}`}><div className="flex h-24 w-full items-end rounded-lg bg-[#f3f1eb]"><div className="w-full rounded-lg bg-[#214C40] transition-all" style={{height:`${total?Math.max(6,h):0}%`}}/></div><span className="text-[9px] text-[#6c726e]" dir="ltr">{m.month.slice(5)}</span></div>})}</div>})()}
+   <div className="mt-4 flex flex-wrap gap-2 border-t border-[#e5e3dc] pt-4 text-[11px]">{(summary.collected||[]).length?(summary.collected||[]).map((c:any)=><span key={c.currency} className="rounded-full bg-[#e8f0eb] px-3 py-1 font-black text-[#214C40]" dir="ltr">{money(c.amountMinor,c.currency)}</span>):<span className="text-[#666c68]">لا تحصيل بعد.</span>}<span className="text-[#666c68]">إجمالي المحصّل منذ البداية</span></div>
+  </div>}
+
   <div className="mizan-surface overflow-hidden">
    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e3e1da] p-5">
     <div><h3 className="font-black">الاشتراكات</h3><p className="mt-1 text-xs text-[#666c68]">من يشترك، بأي باقة، وكم عليه الآن.</p></div>
