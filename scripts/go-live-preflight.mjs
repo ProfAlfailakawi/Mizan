@@ -67,14 +67,21 @@ if (existsSync(appletPath)) {
 
 /* ── ما يُضعف الإطلاق دون أن يمنعه ─────────────────────────────────── */
 
-// القواعد مكتوبة في الشجرة، لكن البناء لا ينشرها. وهذا أخطر ما يُنسى.
-if (existsSync(join(ROOT, 'firestore.rules'))) {
-  warnings.push([
-    'قواعد أمان Firestore موجودة — لكن هل نُشرت؟',
-    'البناء لا ينشرها. شغّل: firebase deploy --only firestore:rules. بدونها قد تكون قاعدة البيانات مفتوحة مهما كان الكود سليمًا.',
-  ]);
-} else {
+/*
+ * صار البناء ينشر القواعد بنفسه. والتحذير القديم — «البناء لا ينشرها، شغّلها بيدك» — صار
+ * كذبًا يدفع المشغّل إلى نشرها خارج الخط، فيتجاوز الترتيب الذي وُضع ليحميه. فالفحص الآن
+ * على أن الخط ما زال ينشرها فعلًا، لا على وجود الملف وحده.
+ */
+if (!existsSync(join(ROOT, 'firestore.rules'))) {
   blockers.push(['firestore.rules غير موجود', 'قاعدة بيانات بلا قواعد أمان مفتوحة لمن يعرف عنوانها.']);
+} else {
+  const pipeline = existsSync(join(ROOT, 'cloudbuild.yaml')) ? readFileSync(join(ROOT, 'cloudbuild.yaml'), 'utf8') : '';
+  if (!/--only firestore:rules/.test(pipeline)) {
+    blockers.push([
+      'خط النشر لم يعد ينشر قواعد Firestore',
+      'كانت الخطوة موجودة ثم أُزيلت. أعِدها إلى cloudbuild.yaml، أو انشر القواعد بيدك قبل كل إطلاق — والأول أسلم.',
+    ]);
+  }
 }
 
 /*
