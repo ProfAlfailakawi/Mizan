@@ -106,3 +106,20 @@ test('cross-tenant reads and organizer impersonation fail on the server',withRep
  assert.throws(()=>repo.usage(admin,b.id),/CROSS_TENANT_ACCESS_BLOCKED/);
  assert.throws(()=>repo.setCompetitionState(admin,{organizationId:a.id,competitionId:'c1',organizerOrganizationId:b.id,state:'draft'}),/INDEPENDENT_ORGANIZER_REQUIRES_LICENSE/);
 }));
+
+test('listOwnerTenants surfaces every operator-owned and direct organization as a tenant row',withRepo((repo)=>{
+ const plan=repo.seedInitialPlan(owner);
+ const op=repo.createOperator(owner,{name:'دار البيان'});
+ repo.adjustCredits(owner,op.id,2,'bootstrap');
+ const orgUnder=repo.createOrganization({...owner,role:'operator_owner',operatorId:op.id},{officialName:'جهة تحت مشغّل',shortName:'U1',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const orgDirect=repo.createOrganization(owner,{officialName:'جهة مباشرة',shortName:'D1',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const tenants=repo.listOwnerTenants();
+ const under=tenants.find(t=>t.orgId===orgUnder.id);
+ const direct=tenants.find(t=>t.orgId===orgDirect.id);
+ // Both appear so Tenant 360 / mirror can diagnose them in one place.
+ assert.ok(under,'operator-owned organization must appear as an owner tenant');
+ assert.ok(direct,'direct organization must appear as an owner tenant');
+ assert.equal(under?.operatorName,'دار البيان');
+ assert.equal(direct?.operatorName,undefined);
+ assert.equal(under?.source,'saas');
+}));

@@ -424,6 +424,15 @@ async function startServer() {
   const saasActor=(req:any):CommercialActor=>{const identity=scopedMizanIdentity(req);const raw=((req as any).firebaseBase?.raw||{}) as Record<string,unknown>;return {uid:identity.uid,role:identity.role,organizationId:identity.organizationId,operatorId:identity.operatorId||(raw.operator_id?String(raw.operator_id):undefined)}}
   const saasAdmin=(res:Response)=>{if(!saasPlatform){res.status(503).json({code:'SAAS_PLATFORM_NOT_CONFIGURED'});return null}return saasPlatform};
   const ownerRuntime=()=>{const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;return {backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,serverAuditLedgerConfigured:!!serverAuditLedger,serverQuranSourceVaultConfigured:!!serverQuranSources,edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetry:opsTelemetry?.summary({providerConfigured:notificationProviderConfigured})||null}};
+  // Unified owner tenant list: the self-service/registry tenants PLUS every SaaS organization
+  // (operator-owned or direct), deduped by orgId, so Tenant 360, the mirror and the owner list
+  // see one complete set instead of two disconnected stores.
+  const ownerTenantList=():TenantRecord[]=>{
+    const base=(tenantStore&&!process.env.MIZAN_TENANTS)?tenantStore.list():tenantRegistry();
+    const seen=new Set(base.map(t=>t.orgId));
+    const saas=(saasPlatform?.listOwnerTenants()||[]).filter(t=>!seen.has(t.orgId)) as unknown as TenantRecord[];
+    return [...base,...saas];
+  };
   const controlTowerAdmin=(res:Response)=>{
     if(!controlTower){res.status(503).json({code:'CONTROL_TOWER_NOT_CONFIGURED'});return null}
     return controlTower;
@@ -439,7 +448,7 @@ async function startServer() {
   app.get('/api/owner/control-tower',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
     const actor=(req as any).mizanIdentity as ServerIdentity;
-    return res.json(repo.buildSnapshot({actor,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS}));
+    return res.json(repo.buildSnapshot({actor,tenants:ownerTenantList(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS}));
   });
   app.post('/api/owner/support-sessions',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
@@ -451,7 +460,7 @@ async function startServer() {
   });
   app.get('/api/owner/tenants/:orgId/360',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
-    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.tenant360({tenantId:String(req.params.orgId),tenants:tenantRegistry(),diagnostics:snapshot.needsAttention,runtime:ownerRuntime()}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'TENANT_360_FAILED'})}
+    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:ownerTenantList(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.tenant360({tenantId:String(req.params.orgId),tenants:ownerTenantList(),diagnostics:snapshot.needsAttention,runtime:ownerRuntime()}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'TENANT_360_FAILED'})}
   });
   app.get('/api/owner/war-room/:orgId/:competitionId',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
@@ -463,7 +472,7 @@ async function startServer() {
   });
   app.post('/api/owner/support-route',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
-    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.routeSupport((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reporterRole:String(req.body?.reporterRole||''),reason:String(req.body?.reason||''),diagnostics:snapshot.needsAttention}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUPPORT_ROUTE_FAILED'})}
+    try{const snapshot=repo.buildSnapshot({actor:(req as any).mizanIdentity,tenants:ownerTenantList(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.routeSupport((req as any).mizanIdentity,{tenantId:String(req.body?.tenantId||''),competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,reporterRole:String(req.body?.reporterRole||''),reason:String(req.body?.reason||''),diagnostics:snapshot.needsAttention}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUPPORT_ROUTE_FAILED'})}
   });
   app.post('/api/owner/incidents',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
@@ -491,9 +500,9 @@ async function startServer() {
   });
   app.get('/api/owner/summary/:period',ownerRateLimit,ownerOnly,(req,res)=>{
     const repo=controlTowerAdmin(res);if(!repo)return;
-    try{const actor=(req as any).mizanIdentity as ServerIdentity;const snapshot=repo.buildSnapshot({actor,tenants:tenantRegistry(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.ownerSummary({period:String(req.params.period)==='weekly'?'weekly':'daily',snapshot}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUMMARY_FAILED'})}
+    try{const actor=(req as any).mizanIdentity as ServerIdentity;const snapshot=repo.buildSnapshot({actor,tenants:ownerTenantList(),runtime:ownerRuntime(),identityGovernanceConfigured:!!identityGovernance,tenantStoreConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS});return res.json(repo.ownerSummary({period:String(req.params.period)==='weekly'?'weekly':'daily',snapshot}))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'SUMMARY_FAILED'})}
   });
-  app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
+  app.get('/api/owner/tenants',ownerRateLimit,ownerOnly,(_req,res)=>{res.json({tenants:ownerTenantList(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/owner/tenants',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/owner/tenants/:orgId',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
   app.post('/api/owner/tenants/:orgId/suspend',ownerRateLimit,ownerOnly,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.suspend(String(req.params.orgId)))});
