@@ -1,4 +1,5 @@
 import React from 'react';
+import { bilingualName } from '../../lib/ui-language';
 import {
   CalendarDays, MapPin, ShieldCheck, Sparkles, ArrowLeft, ArrowRight,
   BookOpen, UserRound, UsersRound, BadgeCheck
@@ -13,7 +14,7 @@ export const CompetitionLanding: React.FC = () => {
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const closed = competition.status === 'completed' || competition.status === 'archived';
   const registrationOpen = competition.status === 'registration_open';
-  const compTitle = ar ? competition.nameArabic : competition.name;
+  const compTitle = bilingualName(competition,ar);
 
   return (
     <div className="min-h-screen bg-[#FAF8F2] text-[#171B18] antialiased selection:bg-[#123f35] selection:text-[#FAF8F2]">
@@ -118,7 +119,7 @@ export const CompetitionLanding: React.FC = () => {
                     <BookOpen className="w-5 h-5" />
                   </div>
                   <h3 className="font-extrabold text-base text-[#171B18] mt-4 group-hover:text-[#123f35] transition-colors">
-                    {ar ? c.nameArabic : c.name}
+                    {bilingualName(c,ar)}
                   </h3>
                   <div className="mt-2 text-xs text-[#3E4A43] leading-relaxed">
                     {c.riwaya} · {c.memorizationScope}

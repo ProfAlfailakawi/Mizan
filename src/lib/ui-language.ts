@@ -251,6 +251,21 @@ export function sealFailureLabel(outcome: { sealed?: boolean; reason?: string; m
   return map[String(outcome.reason || '')] || (ar ? 'تعذّر ختم النتائج. راجع الاعتراضات والمراجعات المعلّقة ثم أعد المحاولة.' : 'Results could not be sealed. Clear pending reviews and appeals, then try again.');
 }
 
+/*
+ * اسمٌ بلغتين، وأحدهما قد يغيب.
+ *
+ * كان إنشاء المسابقة يأخذ حقلًا واحدًا ويكتبه في الاسمين معًا، فيُولد كل سجل ومعه نصٌّ عربي
+ * مخزَّن في خانة الاسم الإنجليزي — بيانٌ يكذب على نفسه، ثم يظهر في الشهادة الإنجليزية.
+ * والحلّ ألّا يُكتب ما لم يُدخَل: يبقى الإنجليزي فارغًا حتى يكتبه صاحبه.
+ *
+ * وحينها يجب ألّا تُفرَّغ شاشة. هذه الدالة تُرجع المتاح: المطلوب أولًا، ثم الآخر إن غاب.
+ */
+export function bilingualName(entity: { name?: string; nameArabic?: string } | null | undefined, ar: boolean): string {
+  const arabic = String(entity?.nameArabic || '').trim();
+  const english = String(entity?.name || '').trim();
+  return (ar ? (arabic || english) : (english || arabic)) || '';
+}
+
 /* مستوى الأتمتة معروضًا بالعربية (كان يُعرض Assisted/Automated/Autopilot خامًا). */
 const AR_AUTOMATION: Record<string, string> = { assisted: 'مساعَد', automated: 'آلي', autopilot: 'تشغيل ذاتي' };
 export function automationLevelLabel(value: string, ar: boolean): string {

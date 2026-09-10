@@ -1524,9 +1524,14 @@ export function useAppStore() {
 
 
 
-  const createCompetition = (nameArabic: string, nameEnglish: string) => {
+  /*
+   * الاسم الإنجليزي اختياري ويُخزَّن كما أُدخل. كان النموذج يمرّر الاسم العربي في الخانتين،
+   * فيُولد كل سجل ومعه نصٌّ عربي في خانة الاسم الإنجليزي — ثم يظهر في الشهادة الإنجليزية.
+   * الفراغ أصدق، والعرض يعالجه بـ bilingualName لا التخزين.
+   */
+  const createCompetition = (nameArabic: string, nameEnglish = '') => {
     const base: Competition = {
-      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish, nameArabic, edition:'', status:'draft',
+      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish.trim(), nameArabic:nameArabic.trim(), edition:'', status:'draft',
       startDate:'', endDate:'', registrationStartDate:'', registrationEndDate:'', totalRegistered:0, totalApproved:0, totalAttended:0, currentDay:0,
       categories: [],
       readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
