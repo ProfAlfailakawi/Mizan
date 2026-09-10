@@ -9,6 +9,10 @@ service cloud.firestore {
     // Organization-wide identities may move across competitions in the same tenant.
     // Every operational competition role is fail-closed unless the Firebase claim names
     // the exact competition. Platform owner remains global by design.
+    // Identity binding on uploaded documents compares request.auth.uid to the
+    // `uploaderUid` field stamped by the client at upload time. Domain fields such as
+    // actorId/judgeId/participantId hold Mizan registry ids (usr-...), never Firebase
+    // UIDs — comparing those to request.auth.uid denies every write for every role.
     function requiresCompetitionClaim() {
       return roleIs([
         'comp_admin','head_judge','judge','ops_manager','exception_host',
@@ -138,9 +142,14 @@ service cloud.firestore {
         }
         match /judge_submissions/{submissionId} {
           allow read: if (readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']))
-            || (readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.judgeId == request.auth.uid);
-          allow create: if writeScope(orgId,competitionId) && roleIs(['judge']) && request.resource.data.judgeId == request.auth.uid;
-          allow update, delete: if false;
+            || (readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.uploaderUid == request.auth.uid);
+          allow create: if writeScope(orgId,competitionId) && roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid;
+          // The client rewrites the same document id when a draft becomes committed,
+          // so the owning judge may update their own submission while the competition is open.
+          allow update: if writeScope(orgId,competitionId) && roleIs(['judge'])
+            && resource.data.uploaderUid == request.auth.uid
+            && request.resource.data.uploaderUid == request.auth.uid;
+          allow delete: if false;
         }
         match /checkins/{participantId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','exception_host']);
@@ -165,21 +174,21 @@ service cloud.firestore {
         match /committees/{committeeId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
-          allow delete: if false;
+          allow delete: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
         }
         match /appeals/{appealId} {
           allow read: if readableScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor','support_agent'])
-              || (roleIs(['participant','guardian']) && resource.data.participantId == request.auth.uid));
+              || (roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent'])
-              || (roleIs(['participant','guardian']) && request.resource.data.participantId == request.auth.uid));
+              || (roleIs(['participant','guardian']) && request.resource.data.uploaderUid == request.auth.uid));
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }
         match /support_sessions/{supportId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent','ops_manager','head_judge']);
-          allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge']);
+          allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge','support_agent']);
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent']);
           allow delete: if false;
         }
@@ -197,7 +206,7 @@ service cloud.firestore {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']);
           allow create: if writeScope(orgId,competitionId)
             && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
-            && request.resource.data.actorId == request.auth.uid;
+            && request.resource.data.uploaderUid == request.auth.uid;
           allow update, delete: if false;
         }
       }
