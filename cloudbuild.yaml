@@ -32,6 +32,35 @@ steps:
       - 'push'
       - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
 
+  # قواعد Firestore تُنشر مع كل دفعة، لا بيدٍ حين يتذكّر أحد.
+  #
+  # القواعد هي الحماية الحقيقية للبيانات — لا إخفاء المفاتيح — وكانت تُنشر يدويًا من جهاز
+  # المالك بأمر يُكتب من الذاكرة. وذلك يعني أن الشيفرة قد تُنشر وقواعدها لم تُنشر، فتعمل
+  # المنصّة على قواعد قديمة لا يعلم أحد أنها قديمة. الآن يمشيان معًا أو لا يمشي أيّهما.
+  #
+  # وترتيبها قبل نشر الخدمة مقصود: البناء إن فشل لم تُمسّ القواعد، والقواعد إن فشلت لم
+  # تُنشر شيفرة تعتمد عليها.
+  #
+  # والاعتماد من حساب خدمة Cloud Build نفسه عبر بيانات الاعتماد الافتراضية: لا رمز مخزَّن،
+  # ولا تسجيل دخول، ولا سرّ يُضاف. ويلزم منح ذلك الحساب دور firebaserules.admin مرة واحدة.
+  #
+  # ملاحظة على الصياغة: Cloud Build يستبدل كل `$` قبل أن تصل إلى الصدفة، فلا تُستعمل هنا
+  # متغيّرات صدفة ولا `$(...)` — وحده `$PROJECT_ID` مقصودٌ استبداله.
+  - name: 'node:22-slim'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        if ! npx --yes firebase-tools@15.30.0 deploy --only firestore:rules --project "$PROJECT_ID" --non-interactive; then
+          echo ''
+          echo 'تعذّر نشر قواعد Firestore.'
+          echo 'إن كان السبب نقص صلاحية، امنح حساب خدمة Cloud Build دوره مرة واحدة:'
+          echo '  gcloud projects add-iam-policy-binding mizan-f2ce3 \'
+          echo '    --member=serviceAccount:<CLOUD_BUILD_SA> --role=roles/firebaserules.admin'
+          exit 1
+        fi
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
