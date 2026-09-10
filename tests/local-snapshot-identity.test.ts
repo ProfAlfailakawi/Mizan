@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
-import {participantMatchesIdentityQuery,redactParticipantForLocalSnapshot,redactStateForLocalSnapshot} from '../src/lib/local-snapshot-privacy';
+import {journeyTokenWithheldLocally,participantMatchesIdentityQuery,redactParticipantForLocalSnapshot,redactStateForLocalSnapshot} from '../src/lib/local-snapshot-privacy';
 
 const participant=(over:Record<string,unknown>={})=>({
  id:'p1',code:'A-104',competitionId:'c',organizationId:'o',fullName:'Ahmad',fullNameArabic:'أحمد',
@@ -96,4 +96,34 @@ test('the exception desk still finds a participant by the last four characters',
 
  const src=fs.readFileSync(path.join(process.cwd(),'src/components/admin/RolePortals.tsx'),'utf8');
  assert.match(src,/participantMatchesIdentityQuery/,'the desk must use the shared matcher, not its own copy');
+});
+
+test('journey capability tokens are withheld, and a withheld one is never mistaken for a missing one',()=>{
+ const withTokens=participant({journeyAccessToken:'journey-abc',guardianAccessToken:'guardian-xyz',journeyAccessTokenHash:'h1',guardianAccessTokenHash:'h2'});
+ const red=redactParticipantForLocalSnapshot(withTokens);
+
+ // Whoever holds the token opens the participant's portal, so it must not sit on the device.
+ assert.equal((red as any).journeyAccessToken,undefined);
+ assert.equal((red as any).guardianAccessToken,undefined);
+ assert.ok(!JSON.stringify(red).includes('journey-abc'));
+ assert.ok(!JSON.stringify(red).includes('guardian-xyz'));
+
+ // The hashes stay: they prove the token exists without revealing it.
+ assert.equal(red.journeyAccessTokenHash,'h1');
+ assert.equal(red.guardianAccessTokenHash,'h2');
+
+ // Absent-on-this-device must never be read as never-issued: minting a replacement would
+ // silently invalidate a card already printed and handed to the participant.
+ assert.equal(journeyTokenWithheldLocally(red),true);
+ assert.equal(journeyTokenWithheldLocally(withTokens),false,'a token present locally is not withheld');
+ assert.equal(journeyTokenWithheldLocally(participant()),false,'a participant who never had one may still be issued one');
+});
+
+test('issuing refuses rather than replacing a token that exists but is withheld locally',()=>{
+ const src=fs.readFileSync(path.join(process.cwd(),'src/lib/store.ts'),'utf8');
+ assert.match(src,/if\(journeyTokenWithheldLocally\(current\)\)return null;/);
+ // The guard must come before any replacement token is minted.
+ const guard=src.indexOf('journeyTokenWithheldLocally(current)');
+ const mint=src.indexOf("current.journeyAccessToken||newId('journey')");
+ assert.ok(guard>=0&&mint>=0&&guard<mint,'the refusal must precede the mint');
 });
