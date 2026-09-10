@@ -135,7 +135,7 @@ test('publication never breaks issuance and never leaks beyond the certificate',
  const g=globalThis as any;const realFetch=g.fetch;
  try{
   g.fetch=async()=>new Response('{}',{status:404});
-  assert.equal(await revokeCertificateInRegistry('MZN-1','r','tok'),'NOT_CONFIGURED');
+  assert.equal(await revokeCertificateInRegistry('MZN-1','r','tok'),'NOT_PUBLISHED','a certificate the registry never held is distinct from having no registry');
   g.fetch=async()=>new Response('{}',{status:503});
   assert.equal(await publishCertificateToRegistry(input,'tok'),'NOT_CONFIGURED');
   // A network error is reported, never thrown — issuance must not be undone by a publish problem.

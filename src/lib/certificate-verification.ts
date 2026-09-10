@@ -71,14 +71,18 @@ export async function publishCertificateToRegistry(input:PublishCertificateInput
  }catch{return 'FAILED'}
 }
 
-export async function revokeCertificateInRegistry(certificateNumber:string,reason:string,bearer:string|undefined):Promise<'REVOKED'|'NOT_CONFIGURED'|'FAILED'>{
+export async function revokeCertificateInRegistry(certificateNumber:string,reason:string,bearer:string|undefined):Promise<'REVOKED'|'NOT_CONFIGURED'|'NOT_PUBLISHED'|'FAILED'>{
  const code=safeNumberPath(certificateNumber);
  if(!code||!bearer||typeof fetch!=='function')return 'NOT_CONFIGURED';
  try{
   const res=await fetch(`/api/certificates/${code}/revoke`,{method:'POST',headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json'},body:JSON.stringify({reason})});
   if(res.status===503)return 'NOT_CONFIGURED';
-  /* شهادة لم تُنشر أصلًا لا شيء يُبطَل لها في السجل: ليس فشلًا. */
-  if(res.status===404)return 'NOT_CONFIGURED';
+  /*
+   * «لا سجل مُهيَّأ» و«الشهادة ليست في السجل» حالتان مختلفتان، وخلطهما يُخفي عطلًا:
+   * الثانية تعني أن نشر الشهادة فشل صامتًا عند إصدارها، فبقيت خارج السجل. الإبطال هنا
+   * ليس فشلًا — لا يوجد ما يُبطَل — لكنه يستحق أن يُقال بدل أن يُبتلع كغياب إعداد.
+   */
+  if(res.status===404)return 'NOT_PUBLISHED';
   return res.ok?'REVOKED':'FAILED';
  }catch{return 'FAILED'}
 }
