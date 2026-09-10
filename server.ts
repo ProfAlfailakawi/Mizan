@@ -553,6 +553,11 @@ async function startServer() {
     return tenantResult(res, store.saveBrand(orgId, req.body || {}));
   });
 
+  // Operator-managed domains for their own organizations
+  const operatorOwnsOrg=(req:Request,res:Response):string|null=>{const actor=(req as any).mizanIdentity;const orgId=String(req.params.orgId||'');if(!actor?.operatorId||!saasPlatform?.organizationBelongsToOperator(orgId,actor.operatorId)){res.status(403).json({code:'CROSS_OPERATOR_ORGANIZATION_BLOCKED'});return null}return orgId};
+  app.get('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant,baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
+  app.patch('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;return tenantResult(res, store.saveBrand(orgId, {subdomain:req.body?.subdomain, customDomains:req.body?.customDomains}))});
+
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
   app.patch('/api/enterprise/tenants/:orgId',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.update(String(req.params.orgId),req.body||{}))});
