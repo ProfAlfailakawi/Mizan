@@ -37,14 +37,14 @@ export const ParticipantDashboard: React.FC = () => {
    <div className="flex flex-wrap items-end justify-between gap-3">
     <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
      <h2 className="text-lg font-black mt-1">{ar?'تدرّب على المصحف نفسه':'Practise on the same Mushaf'}</h2></div>
-    <div className="flex items-end gap-2">
-     <label className="text-[9px] font-black text-[#59615c]">{ar?'السورة':'Surah'}
-      <input type="number" min={1} max={114} value={pSurah} onChange={e=>setPSurah(Math.max(1,Math.min(114,Number(e.target.value)||1)))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
-     <label className="text-[9px] font-black text-[#59615c]">{ar?'من آية':'From ayah'}
-      <input type="number" min={1} value={pStart} onChange={e=>setPStart(Math.max(1,Number(e.target.value)||1))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
-     <label className="text-[9px] font-black text-[#59615c]">{ar?'عدد الآيات':'Ayat'}
-      <input type="number" min={1} max={20} value={pCount} onChange={e=>setPCount(Math.max(1,Math.min(20,Number(e.target.value)||1)))} className="mt-1 w-16 rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
-    </div>
+     <div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-3"><div className="mizan-field-label mb-2">{ar?'مقطع التدريب':'Practice passage'}</div><div className="grid grid-cols-3 gap-2">
+     <label className="block text-[9px] font-black text-[#59615c]">{ar?'السورة':'Surah'}
+      <input type="number" min={1} max={114} value={pSurah} onChange={e=>setPSurah(Math.max(1,Math.min(114,Number(e.target.value)||1)))} className="mt-1 w-full rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+     <label className="block text-[9px] font-black text-[#59615c]">{ar?'من آية':'From ayah'}
+      <input type="number" min={1} value={pStart} onChange={e=>setPStart(Math.max(1,Number(e.target.value)||1))} className="mt-1 w-full rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+     <label className="block text-[9px] font-black text-[#59615c]">{ar?'عدد الآيات':'Ayat'}
+      <input type="number" min={1} max={20} value={pCount} onChange={e=>setPCount(Math.max(1,Math.min(20,Number(e.target.value)||1)))} className="mt-1 w-full rounded-lg border border-[#dcdad2] px-2 py-2 text-sm block"/></label>
+     </div></div>
    </div>
    <PracticeStudio reading={practiceReading} surah={pSurah} startAyah={pStart} endAyah={pStart+pCount-1} ar={ar}/>
   </section>}

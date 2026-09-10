@@ -290,6 +290,14 @@ interface ImageProbeResult {
   message: string;
 }
 
+/* تسع خانات اختيار خام كانت تشكّل «جدار صحّ/خطأ»؛ المفتاح المرئي يوحّدها مع بقية مفاتيح المنصة. */
+const PlacementToggle: React.FC<{ label: React.ReactNode; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
+  <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="w-full flex items-center justify-between gap-3 py-2 text-xs">
+    <span className="text-[#4a504c] font-bold text-start">{label}</span>
+    <span className={`w-9 h-5 shrink-0 rounded-full p-0.5 transition ${checked ? 'bg-[#214C40]' : 'bg-[#d8d6cd]'}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${checked ? 'ms-auto' : ''}`} /></span>
+  </button>
+);
+
 export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
   initialBrand,
   orgId,
@@ -346,6 +354,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [studioTab, setStudioTab] = useState<'logo'|'org'|'placements'>('logo');
   const [serverError, setServerError] = useState('');
 
   // Production always hydrates from the server record, even on admin.dr-* where host-based branding cannot identify the tenant.
@@ -605,6 +614,11 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
       <div className="grid lg:grid-cols-12 gap-6">
         {/* عمود إعدادات الشعار والبيانات ومواضع الظهور */}
         <div className="lg:col-span-7 space-y-5">
+          {/* ثلاث مهام متمايزة كانت نموذجًا واحدًا عملاقًا؛ التبويب يفصلها والمحاكي اللاصق يبقى شاهدًا على كل تغيير. */}
+          <div role="tablist" aria-label={ar?'أقسام ستوديو الهوية':'Brand studio sections'} className="flex flex-wrap gap-1.5 rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-1.5 w-fit max-w-full">
+            {([['logo',ar?'الشعار والوضوح':'Logo & clarity'],['org',ar?'البيانات المؤسسية':'Organization details'],['placements',ar?'مواضع العرض':'Display placements']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={studioTab===id} onClick={()=>setStudioTab(id)} className={`px-3.5 py-2 rounded-xl text-xs font-black transition ${studioTab===id?'bg-[#214C40] text-white shadow-sm':'text-[#5d645f] hover:bg-[#f0eee8]'}`}>{label}</button>)}
+          </div>
+          {studioTab==='logo'&&<>
           {/* 1. مختبر الشعار وفحص النقاء */}
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -726,7 +740,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               </div>
             </div>
           </section>
+          </>}
 
+          {studioTab==='org'&&<>
           {/* 2. بيانات الاسم والسلوجن ومعلومات الاتصال */}
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
@@ -736,55 +752,55 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'اسم الجهة بالعربية' : 'Arabic Name'}</span>
+                <span className="mizan-field-label">{ar ? 'اسم الجهة بالعربية' : 'Arabic Name'}</span>
                 <input
                   type="text"
                   lang="ar" data-mizan-kind="arabic"
                   value={nameArabic}
                   onChange={e => setNameArabic(normalizeArabicText(e.target.value))}
                   placeholder={ar ? 'وزارة الأوقاف والشؤون الإسلامية' : 'Awqaf Authority'}
-                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input text-xs"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الاسم بالإنجليزية (اللاتيني)' : 'English / Latin Name'}</span>
+                <span className="mizan-field-label">{ar ? 'الاسم بالإنجليزية (اللاتيني)' : 'English / Latin Name'}</span>
                 <input
                   type="text"
                   lang="en" data-mizan-kind="latin"
                   value={nameEnglish}
                   onChange={e => setNameEnglish(normalizeLatinText(e.target.value))}
                   placeholder="Ministry of Awqaf & Islamic Affairs"
-                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input text-xs"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الشعار اللفظي (السلوجن بالعربية)' : 'Arabic Slogan / Tagline'}</span>
+                <span className="mizan-field-label">{ar ? 'الشعار اللفظي (السلوجن بالعربية)' : 'Arabic Slogan / Tagline'}</span>
                 <input
                   type="text"
                   lang="ar" data-mizan-kind="arabic"
                   value={sloganArabic}
                   onChange={e => setSloganArabic(normalizeArabicText(e.target.value))}
                   placeholder={ar ? 'خيركم من تعلم القرآن وعلمه' : 'Striving for Quranic Excellence'}
-                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input text-xs"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'السلوجن بالإنجليزية' : 'English Slogan'}</span>
+                <span className="mizan-field-label">{ar ? 'السلوجن بالإنجليزية' : 'English Slogan'}</span>
                 <input
                   type="text"
                   lang="en" data-mizan-kind="latin"
                   value={sloganEnglish}
                   onChange={e => setSloganEnglish(normalizeLatinText(e.target.value))}
                   placeholder="Excellence in Quranic Adjudication"
-                  className="w-full rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input text-xs"
                 />
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'الموقع الإلكتروني الرسمي' : 'Official Website URL'}</span>
+                <span className="mizan-field-label">{ar ? 'الموقع الإلكتروني الرسمي' : 'Official Website URL'}</span>
                 <div className="relative">
                   <Globe className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
                   <input
@@ -793,13 +809,13 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     value={websiteUrl}
                     onChange={e => setWebsiteUrl(toAsciiDigits(e.target.value))}
                     placeholder="https://quran.gov.kw"
-                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                    className="mizan-input mizan-input-icon-start text-xs"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'أرقام التواصل / الهاتف' : 'Official Phone / WhatsApp'}</span>
+                <span className="mizan-field-label">{ar ? 'أرقام التواصل / الهاتف' : 'Official Phone / WhatsApp'}</span>
                 <div className="relative">
                   <Headphones className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
                   <input
@@ -808,13 +824,13 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     onChange={e => setPhoneNumber(normalizePhone(e.target.value))}
                     placeholder="+965 22000000"
                     dir="ltr"
-                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                    className="mizan-input mizan-input-icon-start text-xs"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'البريد الإلكتروني الرسمي للاستفسارات' : 'Support / Inquiries Email'}</span>
+                <span className="mizan-field-label">{ar ? 'البريد الإلكتروني الرسمي للاستفسارات' : 'Support / Inquiries Email'}</span>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
                   <input
@@ -823,13 +839,13 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     value={supportEmail}
                     onChange={e => setSupportEmail(normalizeEmail(e.target.value))}
                     placeholder="support@quran.gov.kw"
-                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                    className="mizan-input mizan-input-icon-start text-xs"
                   />
                 </div>
               </label>
 
               <label className="block">
-                <span className="block text-[11px] font-bold text-[#656b66] mb-1">{ar ? 'العنوان الجغرافي / المقر' : 'Official Headquarters / Location'}</span>
+                <span className="mizan-field-label">{ar ? 'العنوان الجغرافي / المقر' : 'Official Headquarters / Location'}</span>
                 <div className="relative">
                   <MapPin className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
                   <input
@@ -838,13 +854,15 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     value={addressArabic}
                     onChange={e => setAddressArabic(normalizeArabicText(e.target.value))}
                     placeholder={ar ? 'دولة الكويت - العاصمة - برج الأوقاف' : 'Kuwait City, State of Kuwait'}
-                    className="w-full ps-8 pe-3 py-2 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] text-xs font-medium text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                    className="mizan-input mizan-input-icon-start text-xs"
                   />
                 </div>
               </label>
             </div>
           </section>
+          </>}
 
+          {studioTab==='placements'&&<>
           {/* 3. مصفوفة التحكم بأماكن ظهور كل عنصر (الميزة المحورية التي طلبها العميل) */}
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -870,33 +888,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <ScanSearch className="w-3.5 h-3.5" />
                   <span>{ar ? 'الترويسة العلوية (Top Header)' : 'Top Header'}</span>
                 </div>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار الشعار الرسمي' : 'Show Brand Logo'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showHeaderLogo}
-                    onChange={e => setPlacements(p => ({ ...p, showHeaderLogo: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار الشعار اللفظي (السلوجن)' : 'Show Slogan / Tagline'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showHeaderSlogan}
-                    onChange={e => setPlacements(p => ({ ...p, showHeaderSlogan: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار وسيلة تواصل سريعة (الهاتف)' : 'Show Quick Contact Pill'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showHeaderContact}
-                    onChange={e => setPlacements(p => ({ ...p, showHeaderContact: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
+                <PlacementToggle label={ar ? 'إظهار الشعار الرسمي' : 'Show Brand Logo'} checked={placements.showHeaderLogo} onChange={v => setPlacements(p => ({ ...p, showHeaderLogo: v }))} />
+                <PlacementToggle label={ar ? 'إظهار الشعار اللفظي (السلوجن)' : 'Show Slogan / Tagline'} checked={placements.showHeaderSlogan} onChange={v => setPlacements(p => ({ ...p, showHeaderSlogan: v }))} />
+                <PlacementToggle label={ar ? 'إظهار وسيلة تواصل سريعة (الهاتف)' : 'Show Quick Contact Pill'} checked={placements.showHeaderContact} onChange={v => setPlacements(p => ({ ...p, showHeaderContact: v }))} />
               </div>
 
               {/* مجموعة التذييل */}
@@ -905,67 +899,20 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <Layers className="w-3.5 h-3.5" />
                   <span>{ar ? 'تذييل الصفحات العام (Global Footer)' : 'Global Footer'}</span>
                 </div>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار أرقام التواصل والدعم' : 'Show Phone & Support Email'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showFooterContact}
-                    onChange={e => setPlacements(p => ({ ...p, showFooterContact: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار العنوان والمقر الجغرافي' : 'Show Address / HQ Location'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showFooterAddress}
-                    onChange={e => setPlacements(p => ({ ...p, showFooterAddress: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'إظهار رابط الموقع الإلكتروني' : 'Show Official Website Link'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showFooterWebsite}
-                    onChange={e => setPlacements(p => ({ ...p, showFooterWebsite: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
+                <PlacementToggle label={ar ? 'إظهار أرقام التواصل والدعم' : 'Show Phone & Support Email'} checked={placements.showFooterContact} onChange={v => setPlacements(p => ({ ...p, showFooterContact: v }))} />
+                <PlacementToggle label={ar ? 'إظهار العنوان والمقر الجغرافي' : 'Show Address / HQ Location'} checked={placements.showFooterAddress} onChange={v => setPlacements(p => ({ ...p, showFooterAddress: v }))} />
+                <PlacementToggle label={ar ? 'إظهار رابط الموقع الإلكتروني' : 'Show Official Website Link'} checked={placements.showFooterWebsite} onChange={v => setPlacements(p => ({ ...p, showFooterWebsite: v }))} />
               </div>
 
               {/* الشهادات وشاشات القاعات */}
               <div className="sm:col-span-2 p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] grid sm:grid-cols-3 gap-3">
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'الشهادات والوثائق المعتمدة' : 'Certificates & Exports'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showOnCertificates}
-                    onChange={e => setPlacements(p => ({ ...p, showOnCertificates: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'شاشات القاعة والمسرح' : 'Venue & Hall Screens'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showOnVenueScreens}
-                    onChange={e => setPlacements(p => ({ ...p, showOnVenueScreens: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-xs cursor-pointer">
-                  <span className="text-[#4a504c]">{ar ? 'بوابة التسجيل والصفحات العامة' : 'Registration & Public Portal'}</span>
-                  <input
-                    type="checkbox"
-                    checked={placements.showOnPublicPortal}
-                    onChange={e => setPlacements(p => ({ ...p, showOnPublicPortal: e.target.checked }))}
-                    className="w-4 h-4 accent-[#214C40] rounded"
-                  />
-                </label>
+                <PlacementToggle label={ar ? 'الشهادات والوثائق المعتمدة' : 'Certificates & Exports'} checked={placements.showOnCertificates} onChange={v => setPlacements(p => ({ ...p, showOnCertificates: v }))} />
+                <PlacementToggle label={ar ? 'شاشات القاعة والمسرح' : 'Venue & Hall Screens'} checked={placements.showOnVenueScreens} onChange={v => setPlacements(p => ({ ...p, showOnVenueScreens: v }))} />
+                <PlacementToggle label={ar ? 'بوابة التسجيل والصفحات العامة' : 'Registration & Public Portal'} checked={placements.showOnPublicPortal} onChange={v => setPlacements(p => ({ ...p, showOnPublicPortal: v }))} />
               </div>
             </div>
           </section>
+          </>}
 
           {/* أزرار الحفظ والإجراءات */}
           <div className="flex items-center justify-between gap-4 pt-2">
