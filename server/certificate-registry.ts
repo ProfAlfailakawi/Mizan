@@ -52,7 +52,16 @@ const key=(x:string)=>clean(x,120).toUpperCase().replace(/[^A-Z0-9._-]/g,'_');
 
 export class PublicCertificateRegistry{
   constructor(private dir:string){if(!dir)throw new Error('CERTIFICATE_REGISTRY_DIR_REQUIRED');fs.mkdirSync(dir,{recursive:true,mode:0o700});}
-  private file(number:string){return path.join(this.dir,`cert-${key(number)}.json`)}
+  /* الرقم يأتي من الطلب. التنقية وحدها لا تكفي إثباتًا: يُحسم المسار ثم يُتحقق أنه داخل
+     المجلد فعلًا، فأي تسرّب مستقبلي في التنقية يُوقَف هنا لا عند القرص. */
+  private file(number:string){
+    const name=`cert-${key(number)}.json`;
+    if(!name||name.includes('/')||name.includes('\\'))throw new Error('CERTIFICATE_NUMBER_INVALID');
+    const root=path.resolve(this.dir);
+    const resolved=path.resolve(root,name);
+    if(resolved!==path.join(root,name)||!resolved.startsWith(root+path.sep))throw new Error('CERTIFICATE_NUMBER_INVALID');
+    return resolved;
+  }
 
   private read(number:string):PublicCertificateRecord|null{
     const file=this.file(number);if(!fs.existsSync(file))return null;

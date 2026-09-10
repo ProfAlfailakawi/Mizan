@@ -68,6 +68,8 @@ test('a certificate number cannot escape the registry directory or hijack anothe
  r.publish(record('../../etc/passwd'));
  assert.equal(r.verify('../../etc/passwd').state,'AUTHENTIC');
  assert.ok(!fs.existsSync('/etc/passwd.json'));
+ // Whatever the number, the file it maps to stays inside the registry directory.
+ for(const f of fs.readdirSync((r as any).dir))assert.ok(/^cert-[A-Z0-9._-]+\.json$/.test(f),`unexpected file name ${f}`);
  // The same number may not be re-pointed at a different certificate id.
  r.publish(record('MZN-CONFLICT'));
  assert.throws(()=>r.publish({...record('MZN-CONFLICT'),certificateId:'cert-2'}),/CERTIFICATE_NUMBER_CONFLICT/);
