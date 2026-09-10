@@ -19,6 +19,7 @@ import { buildKfgqpcOfficialLibrary, kfgqpcLibrarySummary } from './server/kfgqp
 import { SecureQuestionRuntimeRepository, ServerQuestionPoolRepository } from './server/secure-question-runtime';
 import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-builder';
 import { WitnessModeRepository } from './server/witness-mode';
+import { GoogleDomainAuthorizer, googleDomainAuthorizerFromEnv, normalizeHost as normalizeAuthorizedHost } from './server/google-domain-authorizer';
 import { PublicCertificateRegistry, certificateRegistryFromEnv } from './server/certificate-registry';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
@@ -201,6 +202,34 @@ async function startServer() {
   const questionRuntimeDir=process.env.MIZAN_SECURE_QUESTION_RUNTIME_DIR||'';let secureQuestionRuntime:SecureQuestionRuntimeRepository|null=null;try{if(questionRuntimeDir&&serverQuranSources&&serverQuestionPools&&questionEscrow)secureQuestionRuntime=new SecureQuestionRuntimeRepository(questionRuntimeDir,serverQuranSources,serverQuestionPools,questionEscrow)}catch(err){console.error('Secure question runtime disabled:',err)}
   let certificateRegistry:PublicCertificateRegistry|null=null;try{certificateRegistry=certificateRegistryFromEnv()}catch(err){console.error('Public certificate registry disabled:',err)}
   const witnessDir=process.env.MIZAN_WITNESS_MODE_DIR||'';let witnessMode:WitnessModeRepository|null=null;try{if(witnessDir)witnessMode=new WitnessModeRepository(witnessDir)}catch(err){console.error('Witness mode disabled:',err)}
+
+  /* إبلاغ Google بنطاقات الجهات آليًا. بلا إعداد يبقى الربط يدويًا ولا يفشل شيء. */
+  let googleDomainAuthorizer:GoogleDomainAuthorizer|null=null;
+  try{googleDomainAuthorizer=googleDomainAuthorizerFromEnv()}catch(err){console.error('Google domain authorization disabled:',err)}
+  /* النطاقات التي يحملها التعديل فقط: الفرعي يُبنى من النطاق الأساس، والمخصّصة كما هي. */
+  const tenantDomainHosts=(patch:Record<string,unknown>):string[]=>{
+    const base=String(process.env.MIZAN_BASE_DOMAIN||'').trim();
+    const hosts=new Set<string>();
+    const subdomain=String((patch as {subdomain?:unknown}).subdomain??'').trim();
+    if(base&&subdomain)hosts.add(normalizeAuthorizedHost(`${subdomain}.${base}`));
+    const custom=(patch as {customDomains?:unknown}).customDomains;
+    if(Array.isArray(custom))for(const entry of custom){const host=normalizeAuthorizedHost(String(entry??''));if(host)hosts.add(host)}
+    return [...hosts];
+  };
+  /*
+   * الحفظ تمّ فعلًا ولا يُنقض بفشل الإبلاغ: تُعاد حالته ليعرف المالك أن عليه إتمامه بنفسه،
+   * بدل أن يظنّ الربط تامًّا ويكتشف العطل من الجهة يوم مسابقتها. ومسارا المالك والمشغّل
+   * يمرّان من هنا معًا فلا يفترقان في السلوك.
+   */
+  const authorizeTenantDomains=async(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]},patch:Record<string,unknown>)=>{
+    const hosts=tenantDomainHosts(patch);
+    if(!hosts.length)return tenantResult(res,outcome);
+    /* نطاقات الطلب تُبلَّغ دفعة واحدة: قراءةٌ واحدة وكتابةٌ واحدة، فلا يمحو نطاقٌ أخاه. */
+    const domainAuthorization=googleDomainAuthorizer
+      ? await googleDomainAuthorizer.authorize(hosts)
+      : {state:'NOT_CONFIGURED' as const,hosts};
+    return tenantResult(res,outcome,{domainAuthorization});
+  };
   const coldVaultDir=process.env.MIZAN_COLD_VAULT_DIR||'';let coldVault:ColdVaultRepository|null=null;try{if(coldVaultDir)coldVault=new ColdVaultRepository(coldVaultDir)}catch(err){console.error('Cold vault disabled:',err)}
   const questionEscrowConfigured=!!questionEscrow&&!!process.env.MIZAN_PASS_SIGNING_SECRET&&!!firebaseProjectId;
   const secureQuestionRuntimeConfigured=!!secureQuestionRuntime&&questionEscrowConfigured;
@@ -425,10 +454,12 @@ async function startServer() {
     if(!tenantStore){res.status(503).json({code:'TENANT_STORE_NOT_CONFIGURED'});return null}
     return tenantStore;
   };
-  const tenantResult=(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]})=>{
+  /* extra يُرسَل مع الردّ: حالة إبلاغ Google تُبنى خارج هذه الدالة، وكانت تُرمى هنا بصمت
+     فيرى المالك نجاحًا بينما النطاق غير مُبلَّغ ونظام الجهة معطّل. */
+  const tenantResult=(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]},extra?:Record<string,unknown>)=>{
     if(outcome.ok===false)return res.status(400).json({code:'TENANT_REJECTED',errors:outcome.errors});
     resetTenantRegistry();
-    return res.json({tenant:outcome.tenant});
+    return res.json({tenant:outcome.tenant,...(extra||{})});
   };
   /* نفس إدارة الجهات، لكن بهوية المالك لا بمفتاح المؤسسات: المفتاح سرّ خادمي لا يجوز
      أن يسكن متصفحًا. الدور super_admin وحده، ويُتحقق منه في الخادم لا في الواجهة. */
@@ -634,7 +665,7 @@ async function startServer() {
   /* تحديث الهوية البيضاء وإعدادات الشعار والعرض للجهة المشترية (org_admin أو super_admin) */
   const brandAdmins = requireFirebaseRoles(['super_admin', 'org_admin']);
   app.get('/api/tenant/brand', ownerRateLimit, brandAdmins, (req,res)=>{const store=tenantAdmin(res);if(!store)return;const actor=(req as any).mizanIdentity;const isSuper=actor?.role==='super_admin';const orgId=isSuper&&req.query?.orgId?String(req.query.orgId):actor?.organizationId;if(!orgId)return res.status(400).json({code:'ORG_ID_REQUIRED'});const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant,baseDomain:process.env.MIZAN_BASE_DOMAIN||''});});
-  app.patch('/api/tenant/brand', ownerRateLimit, brandAdmins, (req, res) => {
+  app.patch('/api/tenant/brand', ownerRateLimit, brandAdmins, async (req, res) => {
     const store = tenantAdmin(res);
     if (!store) return;
     const actor = (req as any).mizanIdentity;
@@ -645,8 +676,17 @@ async function startServer() {
     const patch = { ...(req.body || {}) };
     if (!isSuper) { delete (patch as any).subdomain; delete (patch as any).customDomains; }
     const outcome = store.saveBrand(orgId, patch);
-    if ((outcome as { ok: boolean }).ok) resetTenantRegistry(); // make a saved subdomain/custom domain live for host routing immediately
-    return tenantResult(res, outcome);
+    if (!(outcome as { ok: boolean }).ok) return tenantResult(res, outcome);
+    resetTenantRegistry(); // make a saved subdomain/custom domain live for host routing immediately
+
+    /*
+     * نطاق لا يعرفه Google تُرفض طلباته كلها، فيتعطّل النظام عند الجهة بلا رسالة مفهومة.
+     * فيُبلَّغ Google من هنا بدل أن يُدخل المالك كل نطاق يدويًا في وحدة تحكّم Google.
+     *
+     * الحفظ تمّ فعلًا ولا يُنقض بفشل الإبلاغ: تُعاد حالة الإبلاغ ليعرف المالك أن عليه إتمامه
+     * بنفسه، بدل أن يظنّ الربط تامًّا ويكتشف العطل من الجهة يوم مسابقتها.
+     */
+    return authorizeTenantDomains(res, outcome, patch);
   });
 
   /* الجهة لا تضبط نطاقها بنفسها (سياسة المالك)، لكنها تستطيع طلبه بعد إتمام خطوات CNAME،
@@ -665,7 +705,9 @@ async function startServer() {
   // Operator-managed domains for their own organizations
   const operatorOwnsOrg=(req:Request,res:Response):string|null=>{const actor=(req as any).mizanIdentity;const orgId=String(req.params.orgId||'');if(!actor?.operatorId||!saasPlatform?.organizationBelongsToOperator(orgId,actor.operatorId)){res.status(403).json({code:'CROSS_OPERATOR_ORGANIZATION_BLOCKED'});return null}return orgId};
   app.get('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant,baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
-  app.patch('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const existing=store.list().find(x=>x.orgId===orgId);if(existing&&(existing.subdomain||(existing.customDomains||[]).length>0))return res.status(409).json({code:'DOMAIN_LOCKED'});const outcome=store.saveBrand(orgId, {subdomain:req.body?.subdomain, customDomains:req.body?.customDomains});if((outcome as {ok:boolean}).ok)resetTenantRegistry();return tenantResult(res, outcome)});
+  app.patch('/api/saas/operator/organizations/:orgId/domain', ownerRateLimit, requireFirebaseRoles(['operator_owner','operator_admin']), (req,res)=>{const store=tenantAdmin(res);if(!store)return;const orgId=operatorOwnsOrg(req,res);if(!orgId)return;const existing=store.list().find(x=>x.orgId===orgId);if(existing&&(existing.subdomain||(existing.customDomains||[]).length>0))return res.status(409).json({code:'DOMAIN_LOCKED'});const patch={subdomain:req.body?.subdomain, customDomains:req.body?.customDomains};const outcome=store.saveBrand(orgId, patch);if(!(outcome as {ok:boolean}).ok)return tenantResult(res, outcome);resetTenantRegistry();
+    /* المشغّل يضبط نطاقه مرة واحدة، فهذه فرصته الوحيدة لإبلاغ Google — وإلا تعطّل عنده كل شيء. */
+    return void authorizeTenantDomains(res, outcome, patch)});
 
   app.get('/api/enterprise/tenants',requireEnterpriseKey,(_req,res)=>{const store=tenantAdmin(res);if(!store)return;res.json({tenants:store.list(),baseDomain:process.env.MIZAN_BASE_DOMAIN||''})});
   app.post('/api/enterprise/tenants',requireEnterpriseKey,(req,res)=>{const store=tenantAdmin(res);if(!store)return;return tenantResult(res,store.add(req.body||{}))});
