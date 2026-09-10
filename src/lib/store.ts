@@ -65,6 +65,7 @@ import {
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
+import { certificateVerifyUrl } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
@@ -1211,8 +1212,12 @@ export function useAppStore() {
     const certNumber = `MZN-${year}-${shortComp}-${res.participantCode.replace(/[^a-zA-Z0-9]/g,'')}`;
     const issueDate = new Date().toISOString().split('T')[0];
     const verificationToken = await sha256(`${globalState.competition.id}|${res.participantId}|${certNumber}|${issueDate}|${res.finalScore}`);
-    const basePath = (cp.verificationBasePath || '/verify').replace(/\/$/,'');
-    const verificationUrl = `${basePath}/${encodeURIComponent(certNumber)}?token=${verificationToken.slice(0,24)}`;
+    /* الرابط المطبوع يجب أن يفتح صفحة تحقق حقيقية. الافتراضي يُبنى من دالة واحدة مشتركة مع
+       الصفحة نفسها، وتبقى المسارات المخصصة لمن لديه مُتحقِّق خاص كما ضبطها. */
+    const customBase = (cp.verificationBasePath || '').replace(/\/$/,'');
+    const verificationUrl = customBase && customBase !== '/verify'
+      ? `${customBase}/${encodeURIComponent(certNumber)}?token=${verificationToken.slice(0,24)}`
+      : certificateVerifyUrl(typeof window==='undefined'?'':window.location.origin, certNumber);
     const awardTextArabic = cp.awardTextArabic || 'تشهد الجهة المنظمة بإتمام المشاركة وفق لائحة المسابقة المعتمدة.';
 
     let proof=getPublicResultProof(res.id);if(!proof){await buildPublicResultRoot();proof=getPublicResultProof(res.id);}

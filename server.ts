@@ -19,6 +19,7 @@ import { buildKfgqpcOfficialLibrary, kfgqpcLibrarySummary } from './server/kfgqp
 import { SecureQuestionRuntimeRepository, ServerQuestionPoolRepository } from './server/secure-question-runtime';
 import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-builder';
 import { WitnessModeRepository } from './server/witness-mode';
+import { PublicCertificateRegistry, certificateRegistryFromEnv } from './server/certificate-registry';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
@@ -168,6 +169,10 @@ async function startServer() {
   const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* التحقق من الشهادة عام بلا هوية: يُخنق لمنع تعداد أرقام الشهادات بالتخمين. */
+  const certificateVerifyRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_VERIFY_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -192,6 +197,7 @@ async function startServer() {
   const kfgqpcDelivery=new KfgqpcDeliveryRepository({pageRoot:kfgqpcPageImageRoot,fontRoot:kfgqpcFontRoot,audioRoot:kfgqpcAudioRoot,r2BaseUrl:process.env.MIZAN_KFGQPC_R2_DELIVERY_BASE_URL||'',r2BearerToken:process.env.MIZAN_KFGQPC_R2_BEARER_TOKEN||''});
   const questionPoolDir=process.env.MIZAN_SERVER_QUESTION_POOL_DIR||'';let serverQuestionPools:ServerQuestionPoolRepository|null=null;try{if(questionPoolDir)serverQuestionPools=new ServerQuestionPoolRepository(questionPoolDir)}catch(err){console.error('Server question pool disabled:',err)}
   const questionRuntimeDir=process.env.MIZAN_SECURE_QUESTION_RUNTIME_DIR||'';let secureQuestionRuntime:SecureQuestionRuntimeRepository|null=null;try{if(questionRuntimeDir&&serverQuranSources&&serverQuestionPools&&questionEscrow)secureQuestionRuntime=new SecureQuestionRuntimeRepository(questionRuntimeDir,serverQuranSources,serverQuestionPools,questionEscrow)}catch(err){console.error('Secure question runtime disabled:',err)}
+  let certificateRegistry:PublicCertificateRegistry|null=null;try{certificateRegistry=certificateRegistryFromEnv()}catch(err){console.error('Public certificate registry disabled:',err)}
   const witnessDir=process.env.MIZAN_WITNESS_MODE_DIR||'';let witnessMode:WitnessModeRepository|null=null;try{if(witnessDir)witnessMode=new WitnessModeRepository(witnessDir)}catch(err){console.error('Witness mode disabled:',err)}
   const coldVaultDir=process.env.MIZAN_COLD_VAULT_DIR||'';let coldVault:ColdVaultRepository|null=null;try{if(coldVaultDir)coldVault=new ColdVaultRepository(coldVaultDir)}catch(err){console.error('Cold vault disabled:',err)}
   const questionEscrowConfigured=!!questionEscrow&&!!process.env.MIZAN_PASS_SIGNING_SECRET&&!!firebaseProjectId;
@@ -1045,6 +1051,25 @@ async function startServer() {
   // Certificate signing/verification exposes only the fields intentionally signed by the issuer.
   app.post('/api/enterprise/certificates/sign',requireEnterpriseKey,(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERT_SIGNING_NOT_CONFIGURED'});const {certificateNumber,participantDisplayName,competitionDisplayName,issuedAt,status='valid'}=req.body||{};if(!certificateNumber||!participantDisplayName||!competitionDisplayName)return res.status(400).json({code:'INVALID_CERTIFICATE'});const token=signToken({v:1,typ:'certificate',certificateNumber,participantDisplayName,competitionDisplayName,issuedAt:issuedAt||new Date().toISOString(),status},secret);res.json({token})});
   app.get('/api/certificates/verify/:token',(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERTIFICATE_REPOSITORY_NOT_CONNECTED'});const data=verifyToken(req.params.token,secret);if(!data||data.typ!=='certificate')return res.status(404).json({valid:false});res.json({valid:data.status==='valid',certificateNumber:data.certificateNumber,participantDisplayName:data.participantDisplayName,competitionDisplayName:data.competitionDisplayName,issuedAt:data.issuedAt,status:data.status})});
+
+  /* سجل الشهادات العام: من يمسك شهادة مطبوعة يتحقق منها بنفسه، بلا حساب وبلا وصول لبيانات المسابقة. */
+  app.post('/api/certificates/publish',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    const identity=(req as any).mizanIdentity;const body=req.body||{};
+    if(String(body.organizationId||'')!==identity.organizationId)return res.status(403).json({code:'CERTIFICATE_TENANT_MISMATCH'});
+    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED'})}
+  });
+  app.post('/api/certificates/:number/revoke',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    const identity=(req as any).mizanIdentity;
+    try{return res.json({certificate:certificateRegistry.revoke(String(req.params.number||''),identity.organizationId,String(req.body?.reason||''))})}
+    catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_REVOKE_FAILED';return res.status(code==='CERTIFICATE_NOT_FOUND'?404:code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
+  });
+  app.get('/api/public/certificates/:number',certificateVerifyRateLimit,(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    try{const verdict=certificateRegistry.verify(String(req.params.number||''));return res.status(verdict.state==='NOT_FOUND'?404:200).json(verdict)}
+    catch(err){return res.status(500).json({code:err instanceof Error?err.message:'CERTIFICATE_VERIFY_FAILED'})}
+  });
 
   // Trust signatures are real Ed25519 when an institutional key is configured. No development key is invented in production.
   app.post('/api/enterprise/trust/sign',requireEnterpriseKey,(req,res)=>{const signer=trustSigner();if(!signer)return res.status(503).json({code:'TRUST_SIGNING_NOT_CONFIGURED'});const purpose=String(req.body?.purpose||'');if(!['federation_attestation','mizan_protocol','integrity_envelope'].includes(purpose))return res.status(400).json({code:'UNSUPPORTED_TRUST_PURPOSE'});const payload=req.body?.payload;if(!payload||typeof payload!=='object')return res.status(400).json({code:'INVALID_TRUST_PAYLOAD'});const material=canonicalStringify({purpose,payload});const signature=crypto.sign(null,Buffer.from(material),signer.privateKey).toString('base64url');res.json({algorithm:'Ed25519',keyId:signer.keyId,publicKeySpki:signer.spki,signature,purpose})});
