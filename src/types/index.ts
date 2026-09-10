@@ -269,6 +269,8 @@ export interface Participant {
   country: string;
   nationality: string;
   nationalIdOrPassport: string;
+  /** آخر أربعة محارف فقط. تُشتق محليًا لتبقى المطابقة ممكنة دون اتصال بعد حجب الرقم الكامل. */
+  identityLast4?: string;
   dateOfBirth: string;
   gender: 'male' | 'female';
   categoryId: string;

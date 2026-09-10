@@ -66,6 +66,7 @@ import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { calibrateJudges } from '../../server/judge-calibration';
+import { LOCAL_ONLY_PARTICIPANT_FIELDS, redactStateForLocalSnapshot } from './local-snapshot-privacy';
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
@@ -234,7 +235,11 @@ function getInitialState(): AppStoreState {
       if (launch && isDemoResidue(parsed?.organization?.id, SEED_ORGANIZATION.id)) {
         localStorage.removeItem(STORAGE_KEY);
       } else {
-        return hydrateSavedState(parsed);
+        /* جهاز يحمل نسخة سابقة للترقية يبقى حاملًا لأرقام الهوية إلى أن يُكتب شيء جديد — وقد
+           لا يُكتب أبدًا على جهاز خامل. فتُنظَّف النسخة المخزَّنة عند أول قراءة، لا عند أول كتابة. */
+        const sanitized=redactStateForLocalSnapshot(parsed);
+        try{localStorage.setItem(STORAGE_KEY,JSON.stringify(sanitized))}catch{/* التنظيف لا يمنع الإقلاع */}
+        return hydrateSavedState(sanitized);
       }
     }
   } catch {
@@ -335,7 +340,9 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
   if(exceedsSafeDocumentSize(data)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE',`${collectionName}/${id}`);return false;}
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
-    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...data,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
+    /* الحقول المشتقّة محليًا لا تُرفع: الخادم مصدرها الحقيقي ولا يُكتب فوقه بمشتقّ ناقص. */
+    const payload={...data};for(const key of LOCAL_ONLY_PARTICIPANT_FIELDS)delete payload[key];
+    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
     if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
     return true;
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
@@ -508,7 +515,7 @@ async function finalizeAuditChain(){
 // next refresh would silently roll back hours of work. Instead we record a surfaced error flag.
 function persistLocalSnapshot(): boolean {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(globalState));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
     if (globalState.persistenceError) globalState.persistenceError = null;
     return true;
   } catch (err) {
