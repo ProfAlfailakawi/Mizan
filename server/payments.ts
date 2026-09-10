@@ -172,6 +172,9 @@ export function paymentGatewayFromEnv(env:NodeJS.ProcessEnv=process.env):Payment
   let profile:PaymentProviderProfile;
   try{profile=JSON.parse(raw)}catch{return null}
   if(!profile?.checkout?.url||!profile.checkout.paymentUrlPath||!profile.checkout.referencePath)return null;
+  /* بوابة تقبض ولا تستطيع إثبات السداد أسوأ من غياب البوابة: يُدفع العميل ثم تبقى الفاتورة مفتوحة
+     لأن كل إشعار سيُرفض. فلا تُعتبر مهيأة إلا باكتمال جانب الإشعار أيضًا. */
+  if(!webhookSecret||!profile.webhook?.referencePath)return null;
   return new ConfiguredGateway(profile,{apiKey,webhookSecret},String(profile.name||env.MIZAN_PAYMENT_PROVIDER||'gateway').toLowerCase());
 }
 

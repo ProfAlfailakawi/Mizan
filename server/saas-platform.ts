@@ -112,13 +112,25 @@ export class SaaSPlatformRepository{
  beginCheckout(actor:CommercialActor,id:string){const s=this.read();const inv=s.invoices.find(x=>x.id===id);if(!inv)throw new Error('INVOICE_NOT_FOUND');this.assertBillingManage(s,actor,inv.subjectType,inv.subjectId);if(inv.status!=='open')throw new Error('INVOICE_NOT_OPEN');return {invoice:inv,subjectName:this.subjectLabel(s,inv.subjectType,inv.subjectId),contact:inv.subjectType==='organization'?s.organizations.find(x=>x.id===inv.subjectId):undefined}}
  attachCheckout(actor:CommercialActor,id:string,input:{provider:string;externalRef:string}){return this.mutate(s=>{const inv=s.invoices.find(x=>x.id===id);if(!inv)throw new Error('INVOICE_NOT_FOUND');this.assertBillingManage(s,actor,inv.subjectType,inv.subjectId);inv.provider=clean(input.provider,40)||'manual';inv.externalRef=clean(input.externalRef,160);inv.updatedAt=now();this.audit(s,actor,{action:'INVOICE_CHECKOUT_STARTED',entityType:'invoice',entityId:id,reason:inv.provider});return this.decorateInvoice(s,inv)})}
  /* تسوية آلية من إشعار البوابة: بلا فاعل بشري، ومتكرّرة بأمان — إشعار مُعاد لا يغيّر شيئًا. */
- settleInvoiceByReference(provider:string,externalRef:string,input:{amountMinor?:number;currency?:string;paidAt?:string;method?:string}){return this.mutate(s=>{const ref=clean(externalRef,160);if(!ref)throw new Error('PAYMENT_REFERENCE_REQUIRED');const inv=s.invoices.find(x=>x.externalRef===ref);if(!inv)throw new Error('INVOICE_NOT_FOUND');
+ settleInvoiceByReference(provider:string,externalRef:string,input:{amountMinor?:number;currency?:string;paidAt?:string;method?:string}){
+  const gateway=clean(provider,40),ref=clean(externalRef,160);
+  if(!ref)throw new Error('PAYMENT_REFERENCE_REQUIRED');
+  /* المرجع فريد داخل بوابته فقط: مطابقته وحدها قد تصيب فاتورة بوابة أخرى أو تحصيل يدوي. */
+  const locate=(s:State)=>s.invoices.find(x=>x.externalRef===ref&&x.provider===gateway);
+  /* التدقيق يجب أن يبقى حتى مع الرفض: الرمي يمنع الكتابة، فيُكتب المخالفة في معاملة مستقلة. */
+  const auditRejection=(action:string,invoiceId:string,reason:string)=>this.mutate(s=>{this.audit(s,{uid:'__gateway__',role:'system',organizationId:'__platform__'},{action,entityType:'invoice',entityId:invoiceId,reason})});
+  const found=locate(this.read());
+  if(!found)throw new Error('INVOICE_NOT_FOUND');
+  if(found.status==='open'){
+   if(input.amountMinor!==undefined&&Math.round(input.amountMinor)!==found.amountMinor){auditRejection('INVOICE_PAYMENT_AMOUNT_MISMATCH',found.id,`expected ${found.amountMinor} received ${input.amountMinor}`);throw new Error('PAYMENT_AMOUNT_MISMATCH')}
+   /* مبلغ متطابق رقميًا بعملة أخرى ليس سدادًا: ٥٠٠٠ سنت لا تُغلق فاتورة ٥٠٠٠ فلس. */
+   if(input.currency&&clean(input.currency,3).toUpperCase()!==found.currency.toUpperCase()){auditRejection('INVOICE_PAYMENT_CURRENCY_MISMATCH',found.id,`expected ${found.currency} received ${input.currency}`);throw new Error('PAYMENT_CURRENCY_MISMATCH')}
+  }
+  return this.mutate(s=>{const inv=locate(s);if(!inv)throw new Error('INVOICE_NOT_FOUND');
   if(inv.status==='paid')return {invoice:this.decorateInvoice(s,inv),alreadySettled:true};
   if(inv.status!=='open')throw new Error('INVOICE_NOT_OPEN');
-  /* مبلغ لا يطابق الفاتورة لا يُغلقها: يُسجَّل ويُترك للمراجعة البشرية. */
-  if(input.amountMinor!==undefined&&Math.round(input.amountMinor)!==inv.amountMinor){this.audit(s,{uid:'__gateway__',role:'system',organizationId:'__platform__'},{action:'INVOICE_PAYMENT_AMOUNT_MISMATCH',entityType:'invoice',entityId:inv.id,reason:`expected ${inv.amountMinor} received ${input.amountMinor}`});throw new Error('PAYMENT_AMOUNT_MISMATCH')}
-  inv.status='paid';inv.paidAt=input.paidAt?new Date(input.paidAt).toISOString():now();inv.method=clean(input.method,40)||provider;inv.provider=clean(provider,40)||inv.provider;inv.updatedAt=now();
-  this.audit(s,{uid:'__gateway__',role:'system',organizationId:'__platform__'},{action:'INVOICE_PAID_BY_GATEWAY',entityType:'invoice',entityId:inv.id,reason:`${inv.provider}:${ref}`});
+  inv.status='paid';inv.paidAt=input.paidAt?new Date(input.paidAt).toISOString():now();inv.method=clean(input.method,40)||gateway;inv.updatedAt=now();
+  this.audit(s,{uid:'__gateway__',role:'system',organizationId:'__platform__'},{action:'INVOICE_PAID_BY_GATEWAY',entityType:'invoice',entityId:inv.id,reason:`${gateway}:${ref}`});
   return {invoice:this.decorateInvoice(s,inv),alreadySettled:false}})}
  /* تذكير بفاتورة مفتوحة: يتحقق من الصلاحية ويوثّق، ويترك الإرسال لمركز الإشعارات في الطبقة الأعلى. */
  remindInvoice(actor:CommercialActor,id:string){return this.mutate(s=>{const inv=s.invoices.find(x=>x.id===id);if(!inv)throw new Error('INVOICE_NOT_FOUND');this.assertBillingManage(s,actor,inv.subjectType,inv.subjectId);if(inv.status!=='open')throw new Error('INVOICE_NOT_OPEN');this.audit(s,actor,{action:'INVOICE_REMINDER_SENT',entityType:'invoice',entityId:id,reason:`${inv.subjectType}:${inv.subjectId}`});return {invoice:this.decorateInvoice(s,inv),organizationId:inv.subjectType==='organization'?inv.subjectId:undefined,operatorId:inv.subjectType==='operator'?inv.subjectId:inv.ownerOperatorId}})}

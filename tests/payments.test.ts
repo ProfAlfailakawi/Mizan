@@ -21,6 +21,11 @@ test('a gateway is built from configuration alone, and absent configuration mean
   assert.equal(paymentGatewayFromEnv({} as NodeJS.ProcessEnv),null,'no config must fall back to manual, not throw');
   assert.equal(paymentGatewayFromEnv(env({MIZAN_PAYMENT_API_KEY:''})),null,'a missing key must not half-enable the gateway');
   assert.equal(paymentGatewayFromEnv(env({MIZAN_PAYMENT_CONFIG:'{not json'})),null);
+  // A gateway that can charge but can never verify settlement must not be advertised as ready:
+  // customers would be charged while every invoice stayed open.
+  assert.equal(paymentGatewayFromEnv(env({MIZAN_PAYMENT_WEBHOOK_SECRET:''})),null,'missing webhook secret must disable the gateway');
+  const noWebhookProfile={...profile,webhook:undefined};
+  assert.equal(paymentGatewayFromEnv(env({MIZAN_PAYMENT_CONFIG:JSON.stringify(noWebhookProfile)})),null,'a profile without webhook rules must disable the gateway');
 });
 
 test('checkout posts the configured shape and reads the response by configured paths',async()=>{
