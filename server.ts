@@ -1055,7 +1055,7 @@ async function startServer() {
   app.get('/api/certificates/verify/:token',(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERTIFICATE_REPOSITORY_NOT_CONNECTED'});const data=verifyToken(req.params.token,secret);if(!data||data.typ!=='certificate')return res.status(404).json({valid:false});res.json({valid:data.status==='valid',certificateNumber:data.certificateNumber,participantDisplayName:data.participantDisplayName,competitionDisplayName:data.competitionDisplayName,issuedAt:data.issuedAt,status:data.status})});
 
   /* رقم الشهادة يصل من طلب عام: يُقيَّد شكله عند الحدّ قبل أن يمسّ السجل. */
-  const certificateNumberParam=(x:unknown)=>{const v=String(x??'').trim();return /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(v)?v:''};
+  const CERTIFICATE_NUMBER_RE=/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 
   /* سجل الشهادات العام: من يمسك شهادة مطبوعة يتحقق منها بنفسه، بلا حساب وبلا وصول لبيانات المسابقة. */
   app.post('/api/certificates/publish',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
@@ -1067,15 +1067,15 @@ async function startServer() {
   app.post('/api/certificates/:number/revoke',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const identity=(req as any).mizanIdentity;
-    const number=certificateNumberParam(req.params.number);
-    if(!number)return res.status(400).json({code:'CERTIFICATE_NUMBER_INVALID'});
+    const number=String(req.params.number??'').trim();
+    if(!CERTIFICATE_NUMBER_RE.test(number))return res.status(400).json({code:'CERTIFICATE_NUMBER_INVALID'});
     try{return res.json({certificate:certificateRegistry.revoke(number,identity.organizationId,String(req.body?.reason||''))})}
     catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_REVOKE_FAILED';return res.status(code==='CERTIFICATE_NOT_FOUND'?404:code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
   });
   app.get('/api/public/certificates/:number',certificateVerifyRateLimit,(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
-    const number=certificateNumberParam(req.params.number);
-    if(!number)return res.status(404).json({state:'NOT_FOUND'});
+    const number=String(req.params.number??'').trim();
+    if(!CERTIFICATE_NUMBER_RE.test(number))return res.status(404).json({state:'NOT_FOUND'});
     try{const verdict=certificateRegistry.verify(number);return res.status(verdict.state==='NOT_FOUND'?404:200).json(verdict)}
     catch(err){return res.status(500).json({code:err instanceof Error?err.message:'CERTIFICATE_VERIFY_FAILED'})}
   });

@@ -14,7 +14,6 @@ export const CERTIFICATE_VERIFY_ROUTE='#verify';
  */
 const CERTIFICATE_NUMBER_PATTERN=/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 export const isCertificateNumber=(x:unknown)=>CERTIFICATE_NUMBER_PATTERN.test(String(x??'').trim());
-const safeNumberPath=(x:unknown)=>{const v=String(x??'').trim();return CERTIFICATE_NUMBER_PATTERN.test(v)?encodeURIComponent(v):''};
 
 export function certificateVerifyUrl(origin:string,certificateNumber:string){
  const base=String(origin||'').replace(/\/$/,'');
@@ -39,10 +38,11 @@ export interface PublicCertificateVerdict{state:'AUTHENTIC'|'REVOKED'|'INVALID_P
  * أما NOT_FOUND فحكم صادر عن السجل، ولا يُخفى بحكم محلي مناقض إلا بغياب السجل.
  */
 export async function fetchPublicCertificateVerdict(certificateNumber:string,fetcher:typeof fetch|undefined=typeof fetch==='function'?fetch:undefined):Promise<PublicCertificateVerdict|null>{
- const code=safeNumberPath(certificateNumber);
- if(!code||!fetcher)return null;
+ const code=String(certificateNumber??'').trim();
+ /* الفحص هنا لا في دالة مساعدة: الحارس يجب أن يسبق النداء في المسار نفسه ليكون حارسًا فعلًا. */
+ if(!CERTIFICATE_NUMBER_PATTERN.test(code)||!fetcher)return null;
  try{
-  const res=await fetcher(`/api/public/certificates/${code}`,{headers:{accept:'application/json'}});
+  const res=await fetcher(`/api/public/certificates/${encodeURIComponent(code)}`,{headers:{accept:'application/json'}});
   if(res.status===503||res.status===501)return null;
   const body=await res.json().catch(()=>null) as PublicCertificateVerdict|null;
   if(!body||!body.state)return null;
@@ -72,10 +72,10 @@ export async function publishCertificateToRegistry(input:PublishCertificateInput
 }
 
 export async function revokeCertificateInRegistry(certificateNumber:string,reason:string,bearer:string|undefined):Promise<'REVOKED'|'NOT_CONFIGURED'|'NOT_PUBLISHED'|'FAILED'>{
- const code=safeNumberPath(certificateNumber);
- if(!code||!bearer||typeof fetch!=='function')return 'NOT_CONFIGURED';
+ const code=String(certificateNumber??'').trim();
+ if(!CERTIFICATE_NUMBER_PATTERN.test(code)||!bearer||typeof fetch!=='function')return 'NOT_CONFIGURED';
  try{
-  const res=await fetch(`/api/certificates/${code}/revoke`,{method:'POST',headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json'},body:JSON.stringify({reason})});
+  const res=await fetch(`/api/certificates/${encodeURIComponent(code)}/revoke`,{method:'POST',headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json'},body:JSON.stringify({reason})});
   if(res.status===503)return 'NOT_CONFIGURED';
   /*
    * «لا سجل مُهيَّأ» و«الشهادة ليست في السجل» حالتان مختلفتان، وخلطهما يُخفي عطلًا:
