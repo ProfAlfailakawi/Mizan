@@ -8,18 +8,19 @@ export type LicenseState='active'|'grace_period'|'suspended'|'expired'|'archived
 export type StorageProvider='mizan'|'cloudflare_r2'|'amazon_s3'|'google_cloud_storage'|'azure_blob';
 export type CompetitionCommercialState='draft'|'registration_open'|'registration_closed'|'judging'|'completed'|'archived';
 
+export interface PlanOverage{includedParticipants?:number;perParticipantMinor?:number;includedStorageGb?:number;perStorageGbMinor?:number}
 export interface PlanRecord{
  id:string;name:string;currency:string;priceMinor:number;billingPeriod:'monthly'|'annual'|'custom';active:boolean;
  limits:{licensedOrganizations:number;activeCompetitions:number;annualParticipants:number;storageBytes:number;branches:number;videoBytes?:number};
  features:Record<string,boolean>;
  /* تسعير الاستهلاك الزائد: ما يتجاوز المشمول في الباقة يُحتسب بندًا في فاتورة التجديد. */
- overage?:{includedParticipants?:number;perParticipantMinor?:number;includedStorageGb?:number;perStorageGbMinor?:number};
+ overage?:PlanOverage;
  ownerOperatorId?:string;createdAt:string;updatedAt:string;
 }
 export type BillingSubjectType='operator'|'organization';
 export type SubscriptionStatus='trialing'|'active'|'past_due'|'canceled'|'unpaid';
 export type InvoiceStatus='draft'|'open'|'paid'|'void'|'uncollectible';
-export interface SubscriptionRecord{id:string;subjectType:BillingSubjectType;subjectId:string;ownerOperatorId?:string;planId:string;status:SubscriptionStatus;currency:string;amountMinor:number;billingPeriod:'monthly'|'annual'|'custom';currentPeriodStart:string;currentPeriodEnd:string;autoRenew?:boolean;provider:string;externalRef?:string;createdAt:string;updatedAt:string;canceledAt?:string}
+export interface SubscriptionRecord{id:string;subjectType:BillingSubjectType;subjectId:string;ownerOperatorId?:string;planId:string;status:SubscriptionStatus;currency:string;amountMinor:number;billingPeriod:'monthly'|'annual'|'custom';currentPeriodStart:string;currentPeriodEnd:string;autoRenew?:boolean;/* شروط التجاوز تُثبَّت لحظة بدء الدورة: تعديل الباقة لاحقًا لا يغيّر فاتورة دورة انقضت. */overage?:PlanOverage;provider:string;externalRef?:string;createdAt:string;updatedAt:string;canceledAt?:string}
 export interface InvoiceLine{description:string;amountMinor:number;quantity?:number}
 export interface InvoiceRecord{id:string;number:string;subscriptionId?:string;lines?:InvoiceLine[];subjectType:BillingSubjectType;subjectId:string;ownerOperatorId?:string;currency:string;amountMinor:number;status:InvoiceStatus;periodStart?:string;periodEnd?:string;issuedAt:string;dueAt?:string;paidAt?:string;provider:string;externalRef?:string;method?:string;note?:string;createdAt:string;updatedAt:string}
 export interface OperatorRecord{id:string;name:string;status:'active'|'suspended';pricingTier:string;whiteLabelLevel:'mizan'|'co_branded'|'full';storageCapBytes?:number;createdAt:string}
@@ -108,7 +109,7 @@ export class SaaSPlatformRepository{
  private orgOperatorId(s:State,organizationId:string){return s.organizations.find(x=>x.id===organizationId)?.operatorId}
  private assertBillingManage(s:State,actor:CommercialActor,subjectType:BillingSubjectType,subjectId:string){if(actor.role==='super_admin')return;if(['operator_owner','operator_admin'].includes(actor.role)&&actor.operatorId){if(subjectType==='organization'&&this.orgOperatorId(s,subjectId)===actor.operatorId)return}throw new Error('BILLING_NOT_ALLOWED')}
  private periodEnd(startISO:string,period:'monthly'|'annual'|'custom'){const d=new Date(startISO);if(period==='annual')d.setUTCFullYear(d.getUTCFullYear()+1);else if(period==='monthly')d.setUTCMonth(d.getUTCMonth()+1);else d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString()}
- createSubscription(actor:CommercialActor,input:{subjectType:BillingSubjectType;subjectId:string;planId:string;startsAt?:string;provider?:string;amountMinor?:number;autoRenew?:boolean}){return this.mutate(s=>{this.assertBillingManage(s,actor,input.subjectType,input.subjectId);const plan=s.plans.find(x=>x.id===input.planId);if(!plan)throw new Error('PLAN_NOT_FOUND');if(input.subjectType==='operator'){if(!s.operators.some(x=>x.id===input.subjectId))throw new Error('OPERATOR_NOT_FOUND')}else if(!s.organizations.some(x=>x.id===input.subjectId))throw new Error('ORGANIZATION_NOT_FOUND');const t=now(),start=input.startsAt?new Date(input.startsAt).toISOString():t;const ownerOperatorId=input.subjectType==='organization'?this.orgOperatorId(s,input.subjectId):undefined;const sub:SubscriptionRecord={id:this.next(s,'SUB'),subjectType:input.subjectType,subjectId:input.subjectId,ownerOperatorId,planId:plan.id,status:'active',currency:plan.currency,amountMinor:input.amountMinor!=null?positive(input.amountMinor):plan.priceMinor,billingPeriod:plan.billingPeriod,currentPeriodStart:start,currentPeriodEnd:this.periodEnd(start,plan.billingPeriod),autoRenew:input.autoRenew!==false,provider:clean(input.provider||'manual',40),createdAt:t,updatedAt:t};s.subscriptions.push(sub);this.audit(s,actor,{action:'SUBSCRIPTION_CREATED',entityType:'subscription',entityId:sub.id,reason:`${input.subjectType}:${input.subjectId}`});return sub})}
+ createSubscription(actor:CommercialActor,input:{subjectType:BillingSubjectType;subjectId:string;planId:string;startsAt?:string;provider?:string;amountMinor?:number;autoRenew?:boolean}){return this.mutate(s=>{this.assertBillingManage(s,actor,input.subjectType,input.subjectId);const plan=s.plans.find(x=>x.id===input.planId);if(!plan)throw new Error('PLAN_NOT_FOUND');if(input.subjectType==='operator'){if(!s.operators.some(x=>x.id===input.subjectId))throw new Error('OPERATOR_NOT_FOUND')}else if(!s.organizations.some(x=>x.id===input.subjectId))throw new Error('ORGANIZATION_NOT_FOUND');const t=now(),start=input.startsAt?new Date(input.startsAt).toISOString():t;const ownerOperatorId=input.subjectType==='organization'?this.orgOperatorId(s,input.subjectId):undefined;const sub:SubscriptionRecord={id:this.next(s,'SUB'),subjectType:input.subjectType,subjectId:input.subjectId,ownerOperatorId,planId:plan.id,status:'active',currency:plan.currency,amountMinor:input.amountMinor!=null?positive(input.amountMinor):plan.priceMinor,billingPeriod:plan.billingPeriod,currentPeriodStart:start,currentPeriodEnd:this.periodEnd(start,plan.billingPeriod),autoRenew:input.autoRenew!==false,overage:plan.overage?{...plan.overage}:undefined,provider:clean(input.provider||'manual',40),createdAt:t,updatedAt:t};s.subscriptions.push(sub);this.audit(s,actor,{action:'SUBSCRIPTION_CREATED',entityType:'subscription',entityId:sub.id,reason:`${input.subjectType}:${input.subjectId}`});return sub})}
  setSubscriptionAutoRenew(actor:CommercialActor,id:string,autoRenew:boolean){return this.mutate(s=>{const sub=s.subscriptions.find(x=>x.id===id);if(!sub)throw new Error('SUBSCRIPTION_NOT_FOUND');this.assertBillingManage(s,actor,sub.subjectType,sub.subjectId);sub.autoRenew=!!autoRenew;sub.updatedAt=now();this.audit(s,actor,{action:autoRenew?'SUBSCRIPTION_AUTORENEW_ON':'SUBSCRIPTION_AUTORENEW_OFF',entityType:'subscription',entityId:id});return sub})}
  cancelSubscription(actor:CommercialActor,id:string){return this.mutate(s=>{const sub=s.subscriptions.find(x=>x.id===id);if(!sub)throw new Error('SUBSCRIPTION_NOT_FOUND');this.assertBillingManage(s,actor,sub.subjectType,sub.subjectId);sub.status='canceled';sub.canceledAt=now();sub.updatedAt=now();this.audit(s,actor,{action:'SUBSCRIPTION_CANCELED',entityType:'subscription',entityId:id});return sub})}
  issueInvoice(actor:CommercialActor,input:{subjectType:BillingSubjectType;subjectId:string;subscriptionId?:string;amountMinor:number;currency?:string;dueAt?:string;periodStart?:string;periodEnd?:string;provider?:string;note?:string}){return this.mutate(s=>{this.assertBillingManage(s,actor,input.subjectType,input.subjectId);const amount=positive(input.amountMinor);if(!amount)throw new Error('INVOICE_AMOUNT_REQUIRED');const sub=input.subscriptionId?s.subscriptions.find(x=>x.id===input.subscriptionId):undefined;if(input.subscriptionId&&!sub)throw new Error('SUBSCRIPTION_NOT_FOUND');const t=now(),ownerOperatorId=input.subjectType==='organization'?this.orgOperatorId(s,input.subjectId):undefined;const inv:InvoiceRecord={id:this.next(s,'INV'),number:`INV-${String(s.invoices.length+1).padStart(6,'0')}`,subscriptionId:sub?.id,subjectType:input.subjectType,subjectId:input.subjectId,ownerOperatorId,currency:clean(input.currency||sub?.currency||'KWD',3).toUpperCase(),amountMinor:amount,status:'open',periodStart:input.periodStart,periodEnd:input.periodEnd,issuedAt:t,dueAt:input.dueAt?new Date(input.dueAt).toISOString():undefined,provider:clean(input.provider||'manual',40),note:clean(input.note,300)||undefined,createdAt:t,updatedAt:t};s.invoices.push(inv);this.audit(s,actor,{action:'INVOICE_ISSUED',entityType:'invoice',entityId:inv.id,reason:`${input.subjectType}:${input.subjectId} ${amount}`});return inv})}
@@ -117,12 +118,15 @@ export class SaaSPlatformRepository{
   * إقفال الدورة تلقائيًا: عند انتهاء دورة اشتراك نشط تُصدَر فاتورة الدورة التالية وتتقدّم الدورة.
   * متكرّرة بأمان: تشغيلها مرتين لا يُصدر فاتورتين لأن الفاتورة تُميَّز ببداية دورتها.
   */
- private overageLines(s:State,sub:SubscriptionRecord,plan:PlanRecord|undefined):InvoiceLine[]{
-  const o=plan?.overage;if(!o||sub.subjectType!=='organization')return [];
+ private overageLines(s:State,sub:SubscriptionRecord,plan:PlanRecord|undefined,periodStart:string,periodEnd:string):InvoiceLine[]{
+  /* الشروط المثبّتة على الاشتراك تسبق شروط الباقة الحالية: لا تُعاد تسعيرة دورة انقضت بأثر رجعي. */
+  const o=sub.overage??plan?.overage;if(!o||sub.subjectType!=='organization')return [];
   const lines:InvoiceLine[]=[];
-  const year=new Date(sub.currentPeriodEnd).getUTCFullYear();
+  /* الاستهلاك يُقاس بالدورة المفوترة نفسها، لا بالسنة الميلادية: وإلا فاتت دورة لا تبدأ في يناير،
+     وتكرّرت المحاسبة على المتسابقين أنفسهم في كل تجديد شهري. */
+  const from=Date.parse(periodStart),to=Date.parse(periodEnd);
   if(o.perParticipantMinor){
-   const used=s.participantUsage.filter(x=>x.organizationId===sub.subjectId&&x.year===year).length;
+   const used=s.participantUsage.filter(x=>{if(x.organizationId!==sub.subjectId)return false;const at=Date.parse(x.createdAt);return Number.isFinite(at)?at>=from&&at<to:x.year===new Date(periodStart).getUTCFullYear()}).length;
    const extra=Math.max(0,used-positive(o.includedParticipants));
    if(extra>0)lines.push({description:`متسابقون فوق المشمول (${extra})`,quantity:extra,amountMinor:extra*positive(o.perParticipantMinor)});
   }
@@ -139,17 +143,21 @@ export class SaaSPlatformRepository{
    if(sub.status!=='active'||sub.autoRenew===false)continue;
    if(Date.parse(sub.currentPeriodEnd)>asOf.getTime())continue;
    const periodStart=sub.currentPeriodEnd,periodEnd=this.periodEnd(periodStart,sub.billingPeriod);
+   const plan=s.plans.find(x=>x.id===sub.planId);
    const already=s.invoices.some(x=>x.subscriptionId===sub.id&&x.periodStart===periodStart);
    if(!already){
-    const plan=s.plans.find(x=>x.id===sub.planId);
-    const lines:InvoiceLine[]=[{description:`اشتراك ${plan?.name||sub.planId}`,amountMinor:sub.amountMinor},...this.overageLines(s,sub,plan)];
+    const lines:InvoiceLine[]=[{description:`اشتراك ${plan?.name||sub.planId}`,amountMinor:sub.amountMinor},...this.overageLines(s,sub,plan,sub.currentPeriodStart,periodStart)];
     const amountMinor=lines.reduce((n,x)=>n+x.amountMinor,0);
-    const due=new Date(periodStart);due.setUTCDate(due.getUTCDate()+14);
-    const inv:InvoiceRecord={id:this.next(s,'INV'),number:`INV-${String(s.invoices.length+1).padStart(6,'0')}`,subscriptionId:sub.id,lines,subjectType:sub.subjectType,subjectId:sub.subjectId,ownerOperatorId:sub.ownerOperatorId,currency:sub.currency,amountMinor,status:'open',periodStart,periodEnd,issuedAt:at,dueAt:due.toISOString(),provider:'manual',createdAt:at,updatedAt:at};
-    s.invoices.push(inv);issued.push(inv);
-    this.audit(s,{uid:'__billing__',role:'system',organizationId:'__platform__'},{action:'INVOICE_ISSUED_BY_RENEWAL',entityType:'invoice',entityId:inv.id,reason:`${sub.subjectType}:${sub.subjectId}`});
+    /* تجديد بلا مبلغ ليس فاتورة: لا يُفتح مستحق بصفر يتراكم في «غير محصّل» ثم يظهر متأخرًا. */
+    if(amountMinor>0){
+     const due=new Date(periodStart);due.setUTCDate(due.getUTCDate()+14);
+     const inv:InvoiceRecord={id:this.next(s,'INV'),number:`INV-${String(s.invoices.length+1).padStart(6,'0')}`,subscriptionId:sub.id,lines,subjectType:sub.subjectType,subjectId:sub.subjectId,ownerOperatorId:sub.ownerOperatorId,currency:sub.currency,amountMinor,status:'open',periodStart,periodEnd,issuedAt:at,dueAt:due.toISOString(),provider:'manual',createdAt:at,updatedAt:at};
+     s.invoices.push(inv);issued.push(inv);
+     this.audit(s,{uid:'__billing__',role:'system',organizationId:'__platform__'},{action:'INVOICE_ISSUED_BY_RENEWAL',entityType:'invoice',entityId:inv.id,reason:`${sub.subjectType}:${sub.subjectId}`});
+    }
    }
-   sub.currentPeriodStart=periodStart;sub.currentPeriodEnd=periodEnd;sub.updatedAt=at;advanced++;
+   /* الدورة الجديدة تلتقط شروط الباقة كما هي الآن، وتبقى مثبّتة حتى نهايتها. */
+   sub.currentPeriodStart=periodStart;sub.currentPeriodEnd=periodEnd;sub.overage=plan?.overage?{...plan.overage}:undefined;sub.updatedAt=at;advanced++;
   }
   return {at,advanced,issued:issued.map(x=>this.decorateInvoice(s,x))}})}
  /* بدء دفع إلكتروني: يتحقق من الصلاحية ويعيد بيانات الفاتورة للبوابة (النداء الشبكي خارج الحالة). */

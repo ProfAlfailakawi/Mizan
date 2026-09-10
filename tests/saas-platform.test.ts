@@ -274,6 +274,45 @@ test('settlement is scoped to its own gateway and refuses a foreign currency, au
  assert.throws(()=>repo.settleInvoiceByReference('gw-three','shared-ref',{}),/INVOICE_NOT_FOUND/);
 }));
 
+test('renewal bills the period that actually elapsed, at the terms in force when it started',withRepo((repo)=>{
+ const plan=repo.upsertPlan(owner,{name:'Monthly',currency:'KWD',priceMinor:1000,billingPeriod:'monthly',
+  limits:{licensedOrganizations:1,activeCompetitions:3,annualParticipants:1000,storageBytes:100*1024**3,branches:1},
+  overage:{includedParticipants:0,perParticipantMinor:100}});
+ const org=repo.createOrganization(owner,{officialName:'Org B',shortName:'B',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const sub=repo.createSubscription(owner,{subjectType:'organization',subjectId:org.id,planId:plan.id});
+ // The subscription carries its own copy of the overage terms.
+ assert.equal(sub.overage?.perParticipantMinor,100);
+
+ repo.setCompetitionState(owner,{organizationId:org.id,competitionId:'C1',state:'registration_open'});
+ for(const id of ['p1','p2'])repo.recordParticipant(owner,{organizationId:org.id,competitionId:'C1',participantId:id});
+
+ // Raising the price mid-period must not re-price the period that is ending.
+ repo.upsertPlan(owner,{id:plan.id,overage:{includedParticipants:0,perParticipantMinor:900}});
+ const first=repo.runBillingCycle(new Date(Date.parse(sub.currentPeriodEnd)+1000)).issued;
+ assert.equal(first.length,1);
+ assert.equal(first[0].amountMinor,1000+2*100,'the ending period keeps the terms it began with');
+
+ // The next period picks up the new terms — and does not bill the same participants again.
+ const after=repo.dashboard(owner).billing.subscriptions.find((x:any)=>x.id===sub.id);
+ assert.equal(after.overage.perParticipantMinor,900);
+ const second=repo.runBillingCycle(new Date(Date.parse(after.currentPeriodEnd)+1000)).issued;
+ assert.equal(second.length,1);
+ assert.equal(second[0].amountMinor,1000,'participants counted in an earlier period are never billed twice');
+}));
+
+test('a renewal worth nothing advances the period without opening a zero invoice',withRepo((repo)=>{
+ const plan=repo.upsertPlan(owner,{name:'Free',currency:'KWD',priceMinor:0,billingPeriod:'monthly',
+  limits:{licensedOrganizations:1,activeCompetitions:1,annualParticipants:100,storageBytes:1024**3,branches:1}});
+ const org=repo.createOrganization(owner,{officialName:'Org C',shortName:'C',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const sub=repo.createSubscription(owner,{subjectType:'organization',subjectId:org.id,planId:plan.id});
+ const run=repo.runBillingCycle(new Date(Date.parse(sub.currentPeriodEnd)+1000));
+ assert.equal(run.issued.length,0,'no invoice is opened for a total of zero');
+ assert.equal(run.advanced,1,'but the period still moves forward');
+ const billing=repo.dashboard(owner).billing;
+ assert.equal(billing.invoices.filter((x:any)=>x.subscriptionId===sub.id).length,0);
+ assert.equal(billing.summary.overdueInvoices,0);
+}));
+
 test('the billing cycle closes itself: it renews on time, bills real overage, and never double-invoices',withRepo((repo)=>{
  const plan=repo.upsertPlan(owner,{name:'Annual',currency:'KWD',priceMinor:10000,billingPeriod:'annual',
   limits:{licensedOrganizations:1,activeCompetitions:3,annualParticipants:1000,storageBytes:100*1024**3,branches:1},
