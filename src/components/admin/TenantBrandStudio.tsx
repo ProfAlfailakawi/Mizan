@@ -29,6 +29,9 @@ import { uploadOrganizationLogo } from '../../lib/brand-assets';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
 import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits} from '../../lib/input-validation';
 
+const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.'};
+const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
+
 interface TenantBrandStudioProps {
   initialBrand?: OrganizationBrand;
   orgId?: string;
@@ -298,7 +301,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
       if(user){const token=await user.getIdToken();const res=await fetch('/api/tenant/brand',{method:'PATCH',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify({orgId:orgId||store.organization?.id,displayName:updatedBrand.displayName,displayNameArabic:updatedBrand.displayNameArabic,logoUrl:updatedBrand.logoUrl,slogan:updatedBrand.slogan,sloganArabic:updatedBrand.sloganArabic,websiteUrl:updatedBrand.websiteUrl,phoneNumber:updatedBrand.phoneNumber,supportEmail:updatedBrand.supportEmail,address:updatedBrand.address,addressArabic:updatedBrand.addressArabic,certificateTheme:updatedBrand.certificateTheme,displayPlacements:updatedBrand.displayPlacements})});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String((body.errors||[]).join(' · ')||body.code||'BRAND_SAVE_FAILED'));const b=body.tenant||{};const authoritative:OrganizationBrand={...updatedBrand,displayName:b.displayName,displayNameArabic:b.displayNameArabic,logoUrl:b.logoUrl,slogan:b.slogan,sloganArabic:b.sloganArabic,websiteUrl:b.websiteUrl,phoneNumber:b.phoneNumber,supportEmail:b.supportEmail,address:b.address,addressArabic:b.addressArabic,certificateTheme:b.certificateTheme||certificateTheme,displayPlacements:b.displayPlacements||placements};if(!orgId||orgId===store.organization?.id)store.updateOrganizationBrand(authoritative);onSaved?.(authoritative);setWebsiteUrl(authoritative.websiteUrl||'');setPhoneNumber(authoritative.phoneNumber||'');setSupportEmail(authoritative.supportEmail||'');}
       else{store.updateOrganizationBrand(updatedBrand);onSaved?.(updatedBrand)}
       setSaveSuccess(true);setTimeout(()=>setSaveSuccess(false),4000);
-    }catch(err){setServerError(ar?`لم يُحفظ شيء: ${(err as Error).message}`:(err as Error).message)}finally{setSaving(false)}
+    }catch(err){const raw=(err as Error).message;setServerError(ar?`لم يُحفظ شيء: ${arError(raw)}`:raw)}finally{setSaving(false)}
   };
 
   return (

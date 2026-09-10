@@ -27,7 +27,8 @@ export interface TenantValidation { ok: boolean; errors: string[] }
  * يتحقق من جهة واحدة في سياق بقية السجل: الشكل، والتصادم مع جهة أخرى.
  * التصادم خطأ لا تحذير — مضيف واحد يحلّ إلى جهتين يعني تسرّب بيانات بينهما.
  */
-export function validateTenant(candidate: TenantRecord, others: TenantRecord[]): TenantValidation {
+export function validateTenant(candidate: TenantRecord, others: TenantRecord[], opts: { requireHost?: boolean } = {}): TenantValidation {
+  const requireHost = opts.requireHost !== false;
   const errors: string[] = [];
   const orgId = String(candidate.orgId || '').trim();
   if (!orgId) errors.push('ORG_ID_REQUIRED');
@@ -44,7 +45,7 @@ export function validateTenant(candidate: TenantRecord, others: TenantRecord[]):
     if (others.some(t => (t.customDomains || []).map(norm).includes(d))) errors.push(`CUSTOM_DOMAIN_TAKEN:${d}`);
   }
   if (new Set(domains).size !== domains.length) errors.push('CUSTOM_DOMAIN_DUPLICATE');
-  if (!sub && domains.length === 0) errors.push('HOST_REQUIRED');
+  if (requireHost && !sub && domains.length === 0) errors.push('HOST_REQUIRED');
   if (candidate.status && candidate.status !== 'active' && candidate.status !== 'suspended') errors.push('STATUS_INVALID');
   if (candidate.displayNameArabic && !isArabicText(candidate.displayNameArabic)) errors.push('DISPLAY_NAME_AR_INVALID');
   if (candidate.displayName && !isLatinText(candidate.displayName)) errors.push('DISPLAY_NAME_EN_INVALID');
@@ -142,11 +143,15 @@ export class TenantStore {
      التراخيص (SaaS) لا سجل لها هنا، فننشئ سجلًا خفيفًا مفتاحه معرّف الجهة بدل رفض الحفظ. */
   saveBrand(orgId: string, patch: Partial<TenantRecord>): { ok: true; tenant: TenantRecord } | { ok: false; errors: string[] } {
     const rows = this.list();
-    if (rows.some(t => t.orgId === orgId)) return this.update(orgId, patch);
-    const record = normalizeTenant({ status: 'active', ...patch, orgId });
-    const check = validateTenant(record, rows);
+    const index = rows.findIndex(t => t.orgId === orgId);
+    const base = index >= 0 ? rows[index] : { status: 'active' as const };
+    const record = normalizeTenant({ ...base, ...patch, orgId });
+    // A brand/identity save must not require a domain: an org may never expose a custom host.
+    const check = validateTenant(record, rows.filter((_, i) => i !== index), { requireHost: false });
     if (!check.ok) return { ok: false, errors: check.errors };
-    this.write([...rows, record]);
+    const next = [...rows];
+    if (index >= 0) next[index] = record; else next.push(record);
+    this.write(next);
     return { ok: true, tenant: record };
   }
 
