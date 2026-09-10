@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { participantMatchesIdentityQuery } from '../../lib/local-snapshot-privacy';
 import { EmptyState } from '../design-system/EmptyState';
 import { Activity, AlertTriangle, Award, BadgeCheck, Building2, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileSearch, Fingerprint, Globe2, Gavel, Headphones, KeyRound, Layers3, Plane, Plus, QrCode, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Stethoscope, UsersRound, WalletCards, XCircle, LifeBuoy } from 'lucide-react';
@@ -44,9 +44,42 @@ export const SuperAdminConsole: React.FC = () => {
  const loadTower=async()=>{try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const r=await fetch('/api/owner/control-tower',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));setTower(body);setTowerError('')}catch(e){setTowerError((e as Error).message)}};
  useEffect(()=>{void loadTower();const id=window.setInterval(()=>void loadTower(),20000);return()=>window.clearInterval(id)},[]);
  const m=tower?.metrics||{}; const health=tower?.platform; const attention=tower?.needsAttention||[]; const primary=selected||attention[0];
+/*
+  * مزامنة صلاحيات الحسابات — بضغطة، لا بأمر يُكتب في طرفية.
+  *
+  * الحسابات التي أُنشئت قبل وصل سجلّ ميزان بمطالبات Firebase لا مطالبات لها، فتُرفض
+  * كتاباتها إلى قاعدة البيانات وإن كانت مخوَّلة. وهي لا تُصلَح بتفعيلٍ جديد فقد فُعِّلت،
+  * فتلزم تعبئة صريحة مرة واحدة.
+  *
+  * وكان الحلّ الأول أمر curl برمز يُستخرج يدويًا — وهو حلٌّ لمن يكتب الأوامر لا لمالك
+  * منصّة. الزرّ يفعلها، والنتيجة تُقال بالتفصيل: كم حسابًا عولج، وكم أخفق.
+  */
+ const [claimSync,setClaimSync]=useState<{busy:boolean;note:string;tone:'ok'|'error'|''}>({busy:false,note:'',tone:''});
+ const syncClaims=async()=>{
+  setClaimSync({busy:true,note:'',tone:''});
+  try{
+   const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');
+   const token=await user.getIdToken();
+   const r=await fetch('/api/owner/identity/sync-claims',{method:'POST',headers:{authorization:`Bearer ${token}`}});
+   const body=await r.json().catch(()=>({}));
+   if(!r.ok){
+    const code=String(body?.code||`HTTP_${r.status}`);
+    setClaimSync({busy:false,tone:'error',note:code==='IDENTITY_CLAIMS_NOT_CONFIGURED'
+     ?'تعذّر الوصول إلى إدارة الحسابات من الخادم. يلزم منح حساب خدمة النشر صلاحية إدارة المصادقة.'
+     :serverErrorLabel(code,true)});
+    return;
+   }
+   const failed=Array.isArray(body?.failures)?body.failures.length:0;
+   setClaimSync({busy:false,tone:failed?'error':'ok',
+    note:failed
+     ?`عولج ${body.accounts} حسابًا، وأخفق ${failed}. السبب الأول: ${String(body.failures[0]?.reason||'').slice(0,120)}`
+     :`تمت المزامنة: ${body.written} حسابًا مُنحت صلاحياتها، و${body.cleared} مُسحت صلاحياتها.`});
+  }catch(err){setClaimSync({busy:false,tone:'error',note:err instanceof Error?err.message:'تعذّرت المزامنة.'})}
+ };
  const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
  const requestRescue=(action:string,tenantId:string)=>{if(docIsAuto(action))void runRescue(action,tenantId);else setConfirmAction({action,tenantId:tenantId||'__platform__'})};
  return <PortalFrame kicker={ar?'غرفة القيادة':'MIZAN CONTROL TOWER'} title={ar?'غرفة قيادة ميزان':'MIZAN Control Tower'} subtitle={ar?'صحة المنصة، الإنقاذ، الدعم، والتشخيص من الخادم. كل ما يمس النتائج أو النزاهة يبقى محميًا بلا تجاوز صامت.':'Server-side health, rescue, support and diagnostics. Results and integrity surfaces stay protected without silent override.'}>
+   <section className="mizan-surface p-5"><div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4"><div className="min-w-0"><div className="mizan-kicker">{ar?'صلاحيات الحسابات':'ACCOUNT PERMISSIONS'}</div><h2 className="text-sm font-black mt-1">{ar?'مزامنة صلاحيات الحسابات مع قاعدة البيانات':'Sync account permissions'}</h2><p className="text-[11px] leading-6 text-[#656b66] mt-2 max-w-2xl">{ar?'الحسابات التي أُنشئت قبل ربط سجلّ ميزان بقاعدة البيانات لا تستطيع الحفظ فيها، وإن كانت مخوَّلة داخل ميزان. تُشغَّل هذه مرة واحدة فتُكتب صلاحياتها كما هي في السجلّ. آمنة، ولا تمنح أحدًا ما ليس له.':'Accounts created before the identity bridge cannot write to the database even though MIZAN authorizes them. Run this once to write their permissions exactly as the registry holds them.'}</p></div><Button size="sm" variant="outline" disabled={claimSync.busy} onClick={()=>void syncClaims()} icon={<KeyRound className="w-4 h-4"/>}>{claimSync.busy?(ar?'جارٍ المزامنة…':'Syncing…'):(ar?'مزامنة الآن':'Sync now')}</Button></div>{claimSync.note&&<p role={claimSync.tone==='error'?'alert':'status'} className={`mt-3 rounded-xl px-4 py-3 text-[11px] font-bold leading-6 ${claimSync.tone==='error'?'bg-[#F6E7E7] text-[#7A2E2E]':'bg-[#E7EEE9] text-[#214C40]'}`}>{claimSync.note}</p>}</section>
    <div className="mizan-surface p-5 sm:p-6"><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5"><div><div className="mizan-kicker">{ar?'حالة المنصة':'PLATFORM HEALTH'}</div><div className="flex items-end gap-3 mt-2"><h2 className="text-4xl font-black">{health?.scoreAvailable?`${health.healthScore}%`:(ar?'غير متاح':'Unknown')}</h2><Badge variant={health?.state==='HEALTHY'?'emerald':health?.state==='OUTAGE'?'rose':'amber'}>{health?.state||'UNKNOWN'}</Badge></div><p className="text-xs text-[#636864] mt-2">{attention.length?`${attention.length} ${ar?'أشياء تحتاج تدخلك الآن':'items need your attention now'}`:(ar?'كل شيء هادئ. لا تحتاج إلى تدخل الآن.':'Everything is quiet. No owner action needed right now.')}</p></div></div>{towerError&&<div className="mt-4 rounded-2xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#88473f]">{towerError}</div>}</div>
    <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-3">
     <Metric icon={Building2} value={m.activeTenants??organizations.filter(o=>o.status==='active').length} label={ar?'جهات نشطة':'Active tenants'}/><Metric icon={Activity} value={m.liveCompetitions??(ar?'غير متاح':'Unknown')} label={ar?'مسابقات حية':'Live competitions'}/><Metric icon={UsersRound} value={m.connectedUsers??(ar?'غير متاح':'Unknown')} label={ar?'مستخدمون متصلون':'Connected users'}/><Metric icon={KeyRound} value={m.connectedDevices??(ar?'غير متاح':'Unknown')} label={ar?'أجهزة متصلة':'Connected devices'}/><Metric icon={LifeBuoy} value={m.supportEscalations??0} label={ar?'تصعيد دعم':'Support escalations'}/>
@@ -92,7 +125,12 @@ export const OrganizationHome: React.FC = () => {
  const canOpenCompetition=can(role,'competition.configure')||can(role,'operations.manage');
  const canManageAccess=can(role,'identity.invite')||can(role,'identity.approve');
  const [page,setPage]=useState<'competitions'|'organization'>('competitions'); const [licenseOpen,setLicenseOpen]=useState(false); const [creating,setCreating]=useState(false); const [name,setName]=useState(''); const [nameEnglish,setNameEnglish]=useState(''); const [accessCompetitionId,setAccessCompetitionId]=useState('');
- useEffect(()=>{const openIdentityTarget=()=>{if(!window.location.hash.startsWith('#identity'))return;const i=window.location.hash.indexOf('?'),params=new URLSearchParams(i>=0?window.location.hash.slice(i+1):'');const organizationId=params.get('organizationId')||'',competitionId=params.get('competitionId')||'';if(organizationId&&organizationId!==organization.id)return;if(!competitionId)return;const target=competitions.find(c=>c.id===competitionId);if(!target)return;setLicenseOpen(false);setPage('competitions');selectCompetition(target.id);setAccessCompetitionId(target.id)};openIdentityTarget();window.addEventListener('hashchange',openIdentityTarget);return()=>window.removeEventListener('hashchange',openIdentityTarget)},[competitions,organization.id,selectCompetition]);
+/* الرابط العميق يُستهلك مرة واحدة: المؤثّر يعتمد على قائمة المسابقات وهي تتغيّر بعد كل حفظ،
+    فكان يُعاد تنفيذه فيُبدّل المسابقة المختارة ويفتح لوحة الصلاحيات تحت يد المستخدم. */
+ const handledDeepLink=useRef('');
+ useEffect(()=>{const openIdentityTarget=()=>{if(!window.location.hash.startsWith('#identity'))return;
+   if(handledDeepLink.current===window.location.hash)return;
+   handledDeepLink.current=window.location.hash;const i=window.location.hash.indexOf('?'),params=new URLSearchParams(i>=0?window.location.hash.slice(i+1):'');const organizationId=params.get('organizationId')||'',competitionId=params.get('competitionId')||'';if(organizationId&&organizationId!==organization.id)return;if(!competitionId)return;const target=competitions.find(c=>c.id===competitionId);if(!target)return;setLicenseOpen(false);setPage('competitions');selectCompetition(target.id);setAccessCompetitionId(target.id)};openIdentityTarget();window.addEventListener('hashchange',openIdentityTarget);return()=>window.removeEventListener('hashchange',openIdentityTarget)},[competitions,organization.id,selectCompetition]);
  /*
   * حقلان لا حقل واحد. كان الحقل الواحد يُمرَّر في الاسمين معًا، فيُولد كل سجل ومعه نصٌّ
   * عربي مخزَّن في خانة الاسم الإنجليزي — ثم يظهر كما هو في الشهادة الإنجليزية. والإنجليزي

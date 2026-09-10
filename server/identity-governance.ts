@@ -323,6 +323,33 @@ export class IdentityGovernanceRepository{
     return {account:resolvedAccount,grant};
   }
 
+  /*
+   * مطالبات Firestore تُشتقّ من هذا السجلّ لا تُخترع بجانبه.
+   *
+   * `null` تعني: لم يبق لهذا الحساب تخويل فعّال — فتُمسح مطالباته. وذلك مقصود ولا يُهمَل:
+   * مطالبةٌ باقية بعد سحب الصلاحية بابٌ بقي مفتوحًا بعد إغلاقه.
+   */
+  claimsForUid(uid:string):{role:GovernanceRole;organizationId:string;competitionId?:string}|null{
+    const resolved=this.identityForUid(uid);
+    if(!resolved)return null;
+    const {grant}=resolved;
+    return {role:grant.role,organizationId:grant.organizationId,competitionId:grant.competitionId};
+  }
+
+  /** يربط تعديلًا على تخويل بصاحبه، ليُعاد حساب مطالباته بعده. */
+  uidForGrant(grantId:string):string|null{
+    const s=this.read();
+    const grant=s.grants.find(g=>g.id===grantId);
+    if(!grant)return null;
+    return s.accounts.find(a=>a.id===grant.accountId)?.uid||null;
+  }
+
+  /** كل الحسابات الفعّالة — لتعبئة المطالبات لمرة واحدة على نشرٍ قائم. */
+  activeAccountUids():string[]{
+    const s=this.read();
+    return s.accounts.filter(a=>a.status==='ACTIVE').map(a=>a.uid).filter(Boolean);
+  }
+
   identityForUid(uid:string,competitionId?:string){
     const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find(a=>a.uid===uid&&a.status==='ACTIVE');if(!account)return null;
     let grants=s.grants.filter(g=>g.accountId===account.id&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!this.isCompetitionClosed(s,g.organizationId,g.competitionId)||ARCHIVE_VISIBILITY_ROLES.has(g.role)));if(competitionId){const exact=grants.filter(g=>g.competitionId===competitionId);if(exact.length)grants=exact;else grants=grants.filter(g=>!g.competitionId);}
