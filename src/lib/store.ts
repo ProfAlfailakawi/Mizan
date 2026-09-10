@@ -289,6 +289,21 @@ function mergeJudgeSubmissions(local: JudgeSubmission[], remote: JudgeSubmission
 }
 
 const judgeSpecialties=(judge?:JudgeProfile|null)=>[...new Set(((judge?.specialties?.length?judge.specialties:[judge?.specialty||'all'])).filter(Boolean))];
+// A judge may sit on more than one panel with a different scope on each — e.g. "شامل" on one
+// committee and "تجويد" on another. The panel-scoped key is whichever id the committee stored.
+const committeeJudgeKey=(committee:Committee|null|undefined,judge:JudgeProfile|null|undefined):string|undefined=>{
+  if(!committee||!judge)return undefined;
+  if(committee.judgeIds.includes(judge.id))return judge.id;
+  if(committee.judgeIds.includes(judge.userId))return judge.userId;
+  return judge.id;
+};
+const committeeSpecialtiesFor=(committee:Committee|null|undefined,judge:JudgeProfile|null|undefined):string[]=>{
+  const key=committeeJudgeKey(committee,judge);
+  const scoped=key?committee?.judgeSpecialties?.[key]:undefined;
+  if(scoped&&scoped.length)return [...new Set(scoped.filter(Boolean))];
+  return judgeSpecialties(judge);
+};
+const specialtiesCanScore=(specs:string[],assigned?:string,mode?:string)=>mode==='all_judges_all_criteria'||!specs.length||specs.includes('all')||!assigned||assigned==='all'||specs.includes(assigned);
 const judgeCanScoreCriterion=(judge:JudgeProfile|undefined|null,assigned?:string,mode?:string)=>mode==='all_judges_all_criteria'||!judge||judgeSpecialties(judge).includes('all')||!assigned||assigned==='all'||judgeSpecialties(judge).includes(assigned);
 
 /*
@@ -870,7 +885,8 @@ export function useAppStore() {
     const criterionScores: Record<string, number> = {};
     const policy = getCompetitionPolicy(globalState.competition);
     const judgeProfile = globalState.judges.find(j => j.userId === globalState.currentUser.id || j.id === globalState.currentUser.id);
-    const eligibleCriteria = criteria.filter(c => judgeCanScoreCriterion(judgeProfile,c.assignedJudgeType,policy.judging.mode) || (policy.judging.mode === 'hybrid' && c.assignedJudgeType === 'all'));
+    const sessionSpecialties = committeeSpecialtiesFor(globalState.activeSession.committee, judgeProfile);
+    const eligibleCriteria = criteria.filter(c => (!judgeProfile ? true : specialtiesCanScore(sessionSpecialties,c.assignedJudgeType,policy.judging.mode)) || (policy.judging.mode === 'hybrid' && c.assignedJudgeType === 'all'));
     criteria.forEach(c => {
       const eventScore = Math.max(0, c.maxScore - (deductionsByCriterion[c.id] || deductionsByCriterion[c.assignedJudgeType || ''] || 0));
       criterionScores[c.id] = directScores && directScores[c.id] !== undefined ? Math.min(c.maxScore, Math.max(0, directScores[c.id])) : eventScore;
@@ -1477,9 +1493,15 @@ export function useAppStore() {
     return true;
   };
 
-  const updateRuleSet = (patch: Partial<Competition['ruleSet']>) => {
-    if (globalState.competition.ruleSet.frozenAt || getCompetitionPolicy(globalState.competition).frozenAt) return false;
-    const next = { ...globalState.competition.ruleSet, ...patch, version: `${globalState.competition.ruleSet.version}-rev` };
+  const updateRuleSet = (patch: Partial<Competition['ruleSet']>, opts?: { allowWhenFrozen?: boolean }) => {
+    // Panel capacity (judges per panel) is an operational setting, not a scoring rule, so it can be
+    // tuned even after the rulebook is frozen. Everything else stays locked once the event is live.
+    const frozen = globalState.competition.ruleSet.frozenAt || getCompetitionPolicy(globalState.competition).frozenAt;
+    if (frozen && !opts?.allowWhenFrozen) return false;
+    const version = frozen && opts?.allowWhenFrozen
+      ? globalState.competition.ruleSet.version
+      : `${globalState.competition.ruleSet.version}-rev`;
+    const next = { ...globalState.competition.ruleSet, ...patch, version };
     globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, ...(globalState.competition.ruleSets || []).filter(r => r.id !== next.id)] };
     markCompetitionConfigChanged(); notify();
     return true;
@@ -1527,6 +1549,24 @@ export function useAppStore() {
     const next=globalState.committees.find(c=>c.id===committeeId);
     if(next)void persistScopedDocument('committees',next.id,next as unknown as Record<string,unknown>);
     notify();
+  };
+
+  // Toggle a judge's specialty ON A SPECIFIC PANEL only — never mutate the shared judge profile,
+  // so the same judge can carry a different scope on each committee.
+  const updateCommitteeJudgeSpecialty = (committeeId: string, judgeId: string, specialty: string) => {
+    const committee=globalState.committees.find(c=>c.id===committeeId);
+    if(!committee)return;
+    const judge=globalState.judges.find(j=>j.id===judgeId||j.userId===judgeId);
+    const key=(committee.judgeIds.includes(judgeId)?judgeId:(judge&&committee.judgeIds.includes(judge.userId)?judge.userId:(judge?.id||judgeId)));
+    const fallback=judge?[...new Set((judge.specialties?.length?judge.specialties:[judge.specialty||'all']).filter(Boolean))]:['all'];
+    const currentList=committee.judgeSpecialties?.[key]?.length?committee.judgeSpecialties[key]:fallback;
+    const current=new Set(currentList.filter(Boolean));
+    let nextList:string[];
+    if(specialty==='all'){nextList=['all'];}
+    else{current.delete('all');current.has(specialty)?current.delete(specialty):current.add(specialty);nextList=[...current];}
+    if(!nextList.length)nextList=['all'];
+    const map={...(committee.judgeSpecialties||{}),[key]:[...new Set(nextList)]};
+    updateCommittee(committeeId,{judgeSpecialties:map});
   };
 
   const removeCommittee = (committeeId:string) => {
@@ -2235,6 +2275,18 @@ export function useAppStore() {
     const account:IdentityAccountRecord={id:newId('account'),firebaseUid,email:inv.email,displayName:inv.displayName,organizationId:inv.organizationId,status:'ACTIVE',createdAt:inv.createdAt,createdBy:inv.createdBy,activatedAt:new Date().toISOString(),mfaRequired:roleGrantRequiresDualApproval(inv.requestedRole),identityAssurance:'FIREBASE'};const grant:RoleGrantRecord={id:newId('grant'),accountId:account.id,role:inv.requestedRole,organizationId:inv.organizationId,competitionId:inv.competitionId,committeeId:inv.committeeId,status:'ACTIVE',requestedAt:inv.createdAt,requestedBy:inv.createdBy,approvedAt:inv.approvedAt||new Date().toISOString(),approvedBy:inv.approvedBy||inv.createdBy,reason:'Activated from approved invitation',dualApprovalRequired:roleGrantRequiresDualApproval(inv.requestedRole)};globalState.identityAccounts=[account,...globalState.identityAccounts];globalState.roleGrants=[grant,...globalState.roleGrants];globalState.identityInvitations[i]={...inv,status:'ACCEPTED',acceptedAt:new Date().toISOString(),accountId:account.id,activationTokenHash:undefined};auditTrustAction('IDENTITY_ACCOUNT_ACTIVATED','IdentityAccount',account.id,'تفعيل حساب شخصي وربطه بصلاحية محددة النطاق','Activated named account and bound it to a scoped role grant');notify();return {ok:true,account,grant} as const;
   };
   const suspendIdentityAccount=(accountId:string,reason:string)=>{if(!['org_admin','super_admin','comp_admin'].includes(globalState.currentUser.role)||reason.trim().length<3)return false;const i=globalState.identityAccounts.findIndex(x=>x.id===accountId&&x.organizationId===globalState.organization.id);if(i<0)return false;const target=globalState.identityAccounts[i];if(target.firebaseUid===globalState.currentUser.id)return false;globalState.identityAccounts[i]={...target,status:'SUSPENDED',suspendedAt:new Date().toISOString()};globalState.roleGrants=globalState.roleGrants.map(g=>g.accountId===accountId&&g.status==='ACTIVE'?{...g,status:'SUSPENDED'}:g);globalState.authSessions=globalState.authSessions.map(a=>a.accountId===accountId&&a.status==='ACTIVE'?{...a,status:'REVOKED'}:a);auditTrustAction('IDENTITY_ACCOUNT_SUSPENDED','IdentityAccount',accountId,'تعليق الحساب وإبطال جلساته النشطة','Suspended identity account and revoked active sessions');notify();return true;};
+  // Demo-mode identity mutations. In production these go to the identity server; in demo/preview
+  // (no auth server) the governance UI has no backend, so these operate on local seeded state and
+  // keep the same buttons (approve, delete, reissue, freeze) fully functional.
+  const resumeIdentityAccount=(accountId:string)=>{const i=globalState.identityAccounts.findIndex(x=>x.id===accountId);if(i<0)return false;globalState.identityAccounts[i]={...globalState.identityAccounts[i],status:'ACTIVE',suspendedAt:undefined};globalState.roleGrants=globalState.roleGrants.map(g=>g.accountId===accountId&&g.status==='SUSPENDED'?{...g,status:'ACTIVE'}:g);auditTrustAction('IDENTITY_ACCOUNT_RESTORED','IdentityAccount',accountId,'إعادة تفعيل الحساب وصلاحياته','Restored identity account and its grants');notify();return true;};
+  const removeIdentityAccount=(accountId:string,reason:string)=>{const before=globalState.identityAccounts.length;globalState.identityAccounts=globalState.identityAccounts.filter(x=>x.id!==accountId);if(globalState.identityAccounts.length===before)return false;globalState.roleGrants=globalState.roleGrants.filter(g=>g.accountId!==accountId);globalState.authSessions=globalState.authSessions.map(a=>a.accountId===accountId&&a.status==='ACTIVE'?{...a,status:'REVOKED'}:a);auditTrustAction('IDENTITY_ACCOUNT_ACCESS_REMOVED','IdentityAccount',accountId,reason||'إلغاء وصول الحساب بالكامل','Removed account access');notify();return true;};
+  const removeRoleGrant=(grantId:string,reason:string)=>{const before=globalState.roleGrants.length;globalState.roleGrants=globalState.roleGrants.filter(g=>g.id!==grantId);if(globalState.roleGrants.length===before)return false;auditTrustAction('ROLE_GRANT_REMOVED','RoleGrant',grantId,reason||'إلغاء الصلاحية المحددة','Removed scoped grant');notify();return true;};
+  const setRoleGrantStatus=(grantId:string,status:RoleGrantRecord['status'])=>{const i=globalState.roleGrants.findIndex(g=>g.id===grantId);if(i<0)return false;globalState.roleGrants[i]={...globalState.roleGrants[i],status};if(status!=='ACTIVE'){const acct=globalState.roleGrants[i].accountId;globalState.authSessions=globalState.authSessions.map(a=>a.accountId===acct&&a.status==='ACTIVE'?{...a,status:'REVOKED'}:a);}auditTrustAction('ROLE_GRANT_STATUS_CHANGED','RoleGrant',grantId,`تغيير حالة الصلاحية إلى ${status}`,`Grant status set to ${status}`);notify();return true;};
+  const deleteIdentityInvitation=(id:string)=>{const before=globalState.identityInvitations.length;globalState.identityInvitations=globalState.identityInvitations.filter(x=>x.id!==id);if(globalState.identityInvitations.length===before)return false;auditTrustAction('IDENTITY_INVITATION_CANCELLED','IdentityInvitation',id,'إلغاء الدعوة المعلّقة','Cancelled pending invitation');notify();return true;};
+  const updateIdentityAccountName=(accountId:string,displayName:string)=>{const i=globalState.identityAccounts.findIndex(x=>x.id===accountId);if(i<0)return false;globalState.identityAccounts[i]={...globalState.identityAccounts[i],displayName};auditTrustAction('IDENTITY_ACCOUNT_UPDATED','IdentityAccount',accountId,'تعديل اسم الحساب','Updated account display name');notify();return true;};
+  const updateRoleGrantRole=(grantId:string,role:Role)=>{const i=globalState.roleGrants.findIndex(x=>x.id===grantId);if(i<0)return false;globalState.roleGrants[i]={...globalState.roleGrants[i],role};auditTrustAction('ROLE_GRANT_UPDATED','RoleGrant',grantId,`تعديل الدور إلى ${role}`,`Updated grant role to ${role}`);notify();return true;};
+  const updateIdentityInvitationDetails=(id:string,patch:{displayName?:string;email?:string;requestedRole?:Role})=>{const i=globalState.identityInvitations.findIndex(x=>x.id===id);if(i<0)return false;globalState.identityInvitations[i]={...globalState.identityInvitations[i],...patch};auditTrustAction('IDENTITY_INVITATION_UPDATED','IdentityInvitation',id,'تعديل الدعوة المعلّقة','Updated pending invitation');notify();return true;};
+  const reissueIdentityInvitation=async(id:string)=>{const i=globalState.identityInvitations.findIndex(x=>x.id===id);if(i<0)return {ok:false,reason:'NOT_FOUND'} as const;const token=randomInviteToken();const activationTokenHash=await invitationTokenHash(token);globalState.identityInvitations[i]={...globalState.identityInvitations[i],status:'READY',activationTokenHash,expiresAt:new Date(Date.now()+7*86400_000).toISOString()};auditTrustAction('IDENTITY_INVITATION_REISSUED','IdentityInvitation',id,'إصدار رمز تفعيل جديد للدعوة','Reissued one-time activation token');notify();return {ok:true,activationToken:token} as const;};
   const openCurrentAuthSession=(deviceId:string,deviceName?:string,assurance:AuthSessionRecord['authenticationAssurance']='DEMO')=>{if(['completed','archived'].includes(globalState.competition.status)&&!['super_admin','org_admin','auditor'].includes(globalState.currentUser.role))return {ok:false,reason:'COMPETITION_ACCESS_CLOSED'} as const;const account=globalState.identityAccounts.find(a=>a.firebaseUid===globalState.currentUser.id||normalizedIdentityEmail(a.email)===normalizedIdentityEmail(globalState.currentUser.email));if(!account||account.status!=='ACTIVE')return {ok:false,reason:'ACCOUNT_NOT_ACTIVE'} as const;const conflict=detectConcurrentPrivilegedSession({role:globalState.currentUser.role,newDeviceId:deviceId,sessions:globalState.authSessions.filter(s=>s.accountId===account.id)});if(conflict.blocked){const blocked:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'CONFLICT_BLOCKED',authenticationAssurance:assurance};globalState.authSessions=[blocked,...globalState.authSessions];auditTrustAction('CONCURRENT_PRIVILEGED_SESSION_BLOCKED','AuthSession',blocked.id,'منع جلسة متزامنة لحساب حساس على جهاز آخر','Blocked concurrent privileged account session on another device');notify();return {ok:false,reason:conflict.reason,session:blocked} as const;}const session:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'ACTIVE',authenticationAssurance:assurance};globalState.authSessions=[session,...globalState.authSessions];auditTrustAction('AUTH_SESSION_OPENED','AuthSession',session.id,'فتح جلسة مستخدم مسماة مرتبطة بجهاز ودور محدد','Opened named user session bound to a device and scoped role');notify();return {ok:true,session} as const;};
 
   const createContinuityCheckpoint=async(reason='automatic')=>{const a=globalState.activeSession;if(!a.participant||!a.committee||!a.sessionId)return null;const gate=globalState.questionRevealGates.find(g=>g.sessionId===a.sessionId&&g.questionIndex===a.currentQuestionIndex);const locked=globalState.judgeSubmissions.filter(x=>x.sessionId===a.sessionId&&x.locked);const panelComplete=locked.length>=activeRuleSetForCategory(a.participant.categoryId).judgesCountPerPanel;let phase:SessionCheckpointRecord['phase']=a.questionPhase==='SEALED'?'BEFORE_REVEAL':a.questionPhase==='RECITING'?'RECITING':a.questionPhase==='TRANSITION'?'BETWEEN_QUESTIONS':a.isLocked?(panelComplete?'PANEL_LOCKED':'JUDGES_LOCKING'):(gate?.status==='REVEALED'?'REVEALED_NOT_STARTED':'BEFORE_REVEAL');if(panelComplete)phase='PANEL_LOCKED';const previous=globalState.sessionCheckpoints.filter(x=>x.sessionId===a.sessionId).sort((x,y)=>y.sequence-x.sequence)[0];const base={competitionId:globalState.competition.id,sessionId:a.sessionId,participantId:a.participant.id,committeeId:a.committee.id,phase,questionIndex:a.currentQuestionIndex,questionCommitmentHash:gate?.questionCommitmentHash,questionRevealed:gate?.status==='REVEALED',durationSeconds:a.durationSeconds,eventIds:a.events.map(e=>e.id),lockedJudgeIds:locked.map(x=>x.judgeId),sequence:(previous?.sequence||0)+1,createdBy:globalState.currentUser.id,previousCheckpointHash:previous?.checkpointHash};let cp=await buildSessionCheckpoint({...base,assurance:(!globalState.isOffline&&auth.currentUser)?'server_persisted':'client_hash_chain'});let persisted=false;if(cp.assurance==='server_persisted')persisted=await persistScopedDocument('session_checkpoints',cp.id,cp as unknown as Record<string,unknown>);if(cp.assurance==='server_persisted'&&!persisted)cp=await buildSessionCheckpoint({...base,assurance:'client_hash_chain'});globalState.sessionCheckpoints=[cp,...globalState.sessionCheckpoints];if(cp.assurance!=='server_persisted')void persistScopedDocument('session_checkpoints',cp.id,cp as unknown as Record<string,unknown>);auditTrustAction('SESSION_CHECKPOINT_CREATED','JudgingSession',a.sessionId,`حفظ نقطة استمرارية (${reason}) بمستوى ${cp.assurance} دون تغيير السؤال أو الأحكام المقفلة`,`Saved continuity checkpoint (${reason}) at ${cp.assurance} assurance without changing the revealed question or locked human submissions`);notify();return cp;};
@@ -2339,7 +2391,7 @@ export function useAppStore() {
     updateCategory,
     removeCategory,
     addCommittee,
-    updateCommittee, removeCommittee, updateJudgeSpecialties,
+    updateCommittee, removeCommittee, updateJudgeSpecialties, updateCommitteeJudgeSpecialty,
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
@@ -2352,6 +2404,6 @@ export function useAppStore() {
     startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
     issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
     generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
-    getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, reissueQrBundle, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
+    getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, reissueQrBundle, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, resumeIdentityAccount, removeIdentityAccount, removeRoleGrant, setRoleGrantStatus, deleteIdentityInvitation, reissueIdentityInvitation, updateIdentityAccountName, updateRoleGrantRole, updateIdentityInvitationDetails, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
   };
 }

@@ -65,7 +65,21 @@ export class NotificationCenterRepository{
  private read():State{try{return {...JSON.parse(fs.readFileSync(this.file,'utf8')) as State,version:1}}catch{throw new Error('NOTIFICATION_CENTER_CORRUPT')}}
  private write(s:State){const tmp=`${this.file}.${process.pid}.${Date.now()}.tmp`;fs.writeFileSync(tmp,JSON.stringify(s,null,2),{mode:0o600});fs.renameSync(tmp,this.file)}
  private stateFor(s:State,userId:string,notificationId:string){let row=s.userStates.find(x=>x.userId===userId&&x.notificationId===notificationId);if(!row){row={userId,notificationId};s.userStates.push(row)}return row}
- private matches(identity:ServerIdentity,target:NotificationTarget){
+ private matches(identity:ServerIdentity,target:NotificationTarget,context?:NotificationContext){
+  // Hard tenant isolation first: a notification carrying any operator/org/competition scope
+  // (on its target OR its context) never crosses into another tenant, whatever the target type.
+  // This is what keeps an org/tenant user from ever receiving operator- or platform-tenant traffic.
+  // Platform-level actors (owner / support) legitimately oversee every tenant, so isolation is
+  // enforced only for actors that actually sit inside a tenant.
+  const platformActor=identity.role==='super_admin'||identity.role==='support_agent'||!identity.organizationId||identity.organizationId==='__platform__';
+  if(!platformActor){
+   const scopedOperator=target.operatorId||context?.operatorId;
+   const scopedOrganization=target.organizationId||context?.organizationId;
+   const scopedCompetition=target.competitionId||context?.competitionId;
+   if(scopedOperator&&identity.operatorId&&scopedOperator!==identity.operatorId)return false;
+   if(scopedOrganization&&scopedOrganization!==identity.organizationId)return false;
+   if(scopedCompetition&&identity.competitionId&&scopedCompetition!==identity.competitionId)return false;
+  }
   if(target.type==='all')return true;
   if(target.type==='user')return target.userId===identity.uid;
   if(target.type==='users')return !!target.userIds?.includes(identity.uid);
@@ -77,7 +91,7 @@ export class NotificationCenterRepository{
  }
  list(identity:ServerIdentity){
   const s=this.read(),t=Date.now();
-  const notifications=s.notifications.filter(n=>(!n.expiresAt||Date.parse(n.expiresAt)>t)&&this.matches(identity,n.target)).map(n=>{const state=s.userStates.find(x=>x.userId===identity.uid&&x.notificationId===n.id);return {...n,contextKey:notificationContextKey(n.context,n.target),readAt:state?.readAt,archivedAt:state?.archivedAt}}).filter(n=>!n.archivedAt).sort((a,b)=>{const priority={urgent:0,important:1,normal:2};return priority[a.priority]-priority[b.priority]||String(b.createdAt).localeCompare(String(a.createdAt))});
+  const notifications=s.notifications.filter(n=>(!n.expiresAt||Date.parse(n.expiresAt)>t)&&this.matches(identity,n.target,n.context)).map(n=>{const state=s.userStates.find(x=>x.userId===identity.uid&&x.notificationId===n.id);return {...n,contextKey:notificationContextKey(n.context,n.target),readAt:state?.readAt,archivedAt:state?.archivedAt}}).filter(n=>!n.archivedAt).sort((a,b)=>{const priority={urgent:0,important:1,normal:2};return priority[a.priority]-priority[b.priority]||String(b.createdAt).localeCompare(String(a.createdAt))});
   return {notifications,unread:notifications.filter(x=>!x.readAt).length};
  }
  publish(actor:{uid:string;role:string},input:{title:string;body:string;category?:NotificationCategory;priority?:NotificationPriority;target:NotificationTarget;senderName?:string;actionHref?:string;actionLabel?:string;context?:NotificationContext;dedupeKey?:string;expiresAt?:string}){
@@ -94,6 +108,6 @@ export class NotificationCenterRepository{
  }
  system(input:Omit<Parameters<NotificationCenterRepository['publish']>[1],'category'> & {category?:NotificationCategory}){return this.publish({uid:'MIZAN_SYSTEM',role:'system'},{...input,category:input.category||'system'})}
  markRead(userId:string,id:string){const s=this.read();const row=this.stateFor(s,userId,id);row.readAt=now();this.write(s);return {id,readAt:row.readAt}}
- markAllRead(identity:ServerIdentity,contextKey?:string){const s=this.read();const visible=s.notifications.filter(n=>this.matches(identity,n.target)&&(!contextKey||notificationContextKey(n.context,n.target)===contextKey));const at=now();for(const n of visible){const row=this.stateFor(s,identity.uid,n.id);if(!row.archivedAt)row.readAt=at}this.write(s);return {count:visible.length,readAt:at,contextKey:contextKey||undefined}}
+ markAllRead(identity:ServerIdentity,contextKey?:string){const s=this.read();const visible=s.notifications.filter(n=>this.matches(identity,n.target,n.context)&&(!contextKey||notificationContextKey(n.context,n.target)===contextKey));const at=now();for(const n of visible){const row=this.stateFor(s,identity.uid,n.id);if(!row.archivedAt)row.readAt=at}this.write(s);return {count:visible.length,readAt:at,contextKey:contextKey||undefined}}
  archive(userId:string,id:string){const s=this.read();const row=this.stateFor(s,userId,id);row.archivedAt=now();row.readAt=row.readAt||row.archivedAt;this.write(s);return {id,archivedAt:row.archivedAt}}
 }
