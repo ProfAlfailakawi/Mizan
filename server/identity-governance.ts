@@ -78,7 +78,10 @@ export class IdentityGovernanceRepository{
   }
   private isSuperAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='super_admin'&&g.status==='ACTIVE')}
   private isOrgAdminAccount(s:State,accountId:string){return s.grants.some(g=>g.accountId===accountId&&g.role==='org_admin'&&g.status==='ACTIVE')}
-  private assertOrgAdminContinuity(s:State,grant:Grant){
+  private assertOrgAdminContinuity(s:State,grant:Grant,actor?:ServerIdentity){
+    // The platform owner has full authority over every tenant account; only self-change is blocked
+    // (enforced separately). Everyone else must keep at least one active org admin per tenant.
+    if(actor?.role==='super_admin')return;
     if(grant.role!=='org_admin')return;
     const another=s.grants.some(g=>g.id!==grant.id&&g.organizationId===grant.organizationId&&g.role==='org_admin'&&g.status==='ACTIVE');
     if(!another)throw new Error('LAST_ORG_ADMIN_PROTECTED');
@@ -353,7 +356,7 @@ export class IdentityGovernanceRepository{
 
   updateGrant(actor:ServerIdentity,grantId:string,input:{role:GovernanceRole;reason:string}){
     if(input.reason.trim().length<5)throw new Error('UPDATE_REASON_REQUIRED');const s=this.read();const {grant}=this.scopedGrant(actor,s,grantId);const nextRole=input.role;
-    if(nextRole===grant.role)return {grant};if(!this.canManageRoleChange(actor,grant,nextRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');if(grant.role==='org_admin')this.assertOrgAdminContinuity(s,grant);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,nextRole);
+    if(nextRole===grant.role)return {grant};if(!this.canManageRoleChange(actor,grant,nextRole))throw new Error('ROLE_GRANT_NOT_ALLOWED');if(grant.role==='org_admin')this.assertOrgAdminContinuity(s,grant,actor);this.assertCompetitionOpen(s,grant.organizationId,grant.competitionId,nextRole);
     if(s.grants.some(g=>g.id!==grant.id&&g.accountId===grant.accountId&&g.organizationId===grant.organizationId&&g.operatorId===grant.operatorId&&g.competitionId===grant.competitionId&&g.role===nextRole&&g.status==='ACTIVE'))throw new Error('ACCOUNT_ALREADY_ACTIVE_IN_COMPETITION');
     const previous=grant.role;grant.role=nextRole;for(const x of s.sessions)if(x.accountId===grant.accountId&&x.status==='ACTIVE'&&x.organizationId===grant.organizationId&&x.competitionId===grant.competitionId){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Grant role changed'}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_UPDATED','Grant',grant.id,`${input.reason.trim()} · ${previous} -> ${nextRole}`);return {grant};
@@ -375,14 +378,14 @@ export class IdentityGovernanceRepository{
 
   suspendGrant(actor:ServerIdentity,grantId:string,reason:string){
     if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
-    const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant);grant.status='SUSPENDED';let count=0;
+    const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant,actor);grant.status='SUSPENDED';let count=0;
     for(const x of s.sessions)if(x.accountId===account.id&&x.competitionId===grant.competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Competition grant suspended';count++}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_SUSPENDED','Grant',grant.id,reason);return {grant,revokedSessions:count};
   }
 
   removeGrant(actor:ServerIdentity,grantId:string,reason:string){
     if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
-    const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant);grant.status='REVOKED';let count=0;
+    const s=this.read();const {grant,account}=this.scopedGrant(actor,s,grantId);this.assertOrgAdminContinuity(s,grant,actor);grant.status='REVOKED';let count=0;
     for(const x of s.sessions)if(x.accountId===account.id&&x.competitionId===grant.competitionId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Competition grant removed';count++}
     this.write(s);this.appendAudit({...actor,organizationId:grant.organizationId},'IDENTITY_GRANT_REMOVED','Grant',grant.id,reason);return {removed:true,grantId:grant.id,revokedSessions:count};
   }
@@ -403,7 +406,7 @@ export class IdentityGovernanceRepository{
   suspend(actor:ServerIdentity,accountId:string,reason:string){
     if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('SUSPEND_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('SUSPEND_REASON_REQUIRED');
     const s=this.read();const account=s.accounts.find(a=>a.id===accountId);if(!account)throw new Error('ACCOUNT_NOT_FOUND');this.assertManageableAccount(actor,s,account);
-    for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant);
+    for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant,actor);
     account.status='SUSPENDED';account.suspendedAt=new Date().toISOString();account.suspendedBy=actor.uid;account.suspensionReason=reason.trim();
     for(const g of s.grants)if(g.accountId===account.id&&g.status==='ACTIVE')g.status='SUSPENDED';
     for(const x of s.sessions)if(x.accountId===account.id&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Account suspended'}
@@ -414,7 +417,7 @@ export class IdentityGovernanceRepository{
   remove(actor:ServerIdentity,accountId:string,reason:string){
     if(!['super_admin','operator_owner','operator_admin','org_admin','comp_admin'].includes(actor.role))throw new Error('DELETE_NOT_ALLOWED');if(reason.trim().length<5)throw new Error('DELETE_REASON_REQUIRED');
     const s=this.read();const account=s.accounts.find(a=>a.id===accountId);if(!account)throw new Error('ACCOUNT_NOT_FOUND');this.assertManageableAccount(actor,s,account);
-    for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant);
+    for(const grant of s.grants.filter(g=>g.accountId===account.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,grant,actor);
     account.status='REVOKED';account.suspendedAt=new Date().toISOString();account.suspendedBy=actor.uid;account.suspensionReason=reason.trim();
     for(const g of s.grants)if(g.accountId===account.id&&['ACTIVE','SUSPENDED'].includes(g.status))g.status='REVOKED';
     for(const x of s.sessions)if(x.accountId===account.id&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Account removed from tenant'}
