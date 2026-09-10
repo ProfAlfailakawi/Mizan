@@ -352,7 +352,10 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
     const {db,doc,setDoc}=await getFirestoreClient();
     /* الحقول المشتقّة محليًا لا تُرفع: الخادم مصدرها الحقيقي ولا يُكتب فوقه بمشتقّ ناقص. */
     const payload={...data};for(const key of LOCAL_ONLY_PARTICIPANT_FIELDS)delete payload[key];
-    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,updatedAt:new Date().toISOString()},{merge:true});
+    /* قواعد فايرستور تربط الرفع بهوية المصادقة عبر uploaderUid لا عبر معرّفات النطاق المحلية:
+       actorId وjudgeId معرّفات سجلّ ميزان (usr-...) لا تساوي uid فايربيس أبدًا، ومقارنتها به كانت
+       ترفض رفع سجل التدقيق لكل الأدوار بلا استثناء. */
+    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
     if(globalState.persistenceError&&globalState.persistenceError.code.startsWith('CLOUD_'))clearCloudError();
     return true;
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
