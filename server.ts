@@ -221,15 +221,14 @@ async function startServer() {
    * بدل أن يظنّ الربط تامًّا ويكتشف العطل من الجهة يوم مسابقتها. ومسارا المالك والمشغّل
    * يمرّان من هنا معًا فلا يفترقان في السلوك.
    */
-  const authorizeTenantDomains=async(res:Response,outcome:unknown,patch:Record<string,unknown>)=>{
+  const authorizeTenantDomains=async(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]},patch:Record<string,unknown>)=>{
     const hosts=tenantDomainHosts(patch);
-    if(!hosts.length)return tenantResult(res, outcome as never);
-    if(!googleDomainAuthorizer)return tenantResult(res,{...(outcome as object),domainAuthorization:{state:'NOT_CONFIGURED',hosts}} as never);
-    const results=await Promise.all(hosts.map(host=>googleDomainAuthorizer!.authorize(host)));
-    const failed=results.filter(r=>r.state==='FAILED') as {host:string;reason:string}[];
-    return tenantResult(res,{...(outcome as object),domainAuthorization:failed.length
-      ?{state:'FAILED',hosts:failed.map(r=>r.host),detail:failed[0].reason}
-      :{state:'AUTHORIZED',hosts}} as never);
+    if(!hosts.length)return tenantResult(res,outcome);
+    /* نطاقات الطلب تُبلَّغ دفعة واحدة: قراءةٌ واحدة وكتابةٌ واحدة، فلا يمحو نطاقٌ أخاه. */
+    const domainAuthorization=googleDomainAuthorizer
+      ? await googleDomainAuthorizer.authorize(hosts)
+      : {state:'NOT_CONFIGURED' as const,hosts};
+    return tenantResult(res,outcome,{domainAuthorization});
   };
   const coldVaultDir=process.env.MIZAN_COLD_VAULT_DIR||'';let coldVault:ColdVaultRepository|null=null;try{if(coldVaultDir)coldVault=new ColdVaultRepository(coldVaultDir)}catch(err){console.error('Cold vault disabled:',err)}
   const questionEscrowConfigured=!!questionEscrow&&!!process.env.MIZAN_PASS_SIGNING_SECRET&&!!firebaseProjectId;
@@ -455,10 +454,12 @@ async function startServer() {
     if(!tenantStore){res.status(503).json({code:'TENANT_STORE_NOT_CONFIGURED'});return null}
     return tenantStore;
   };
-  const tenantResult=(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]})=>{
+  /* extra يُرسَل مع الردّ: حالة إبلاغ Google تُبنى خارج هذه الدالة، وكانت تُرمى هنا بصمت
+     فيرى المالك نجاحًا بينما النطاق غير مُبلَّغ ونظام الجهة معطّل. */
+  const tenantResult=(res:Response,outcome:{ok:true;tenant:TenantRecord}|{ok:false;errors:string[]},extra?:Record<string,unknown>)=>{
     if(outcome.ok===false)return res.status(400).json({code:'TENANT_REJECTED',errors:outcome.errors});
     resetTenantRegistry();
-    return res.json({tenant:outcome.tenant});
+    return res.json({tenant:outcome.tenant,...(extra||{})});
   };
   /* نفس إدارة الجهات، لكن بهوية المالك لا بمفتاح المؤسسات: المفتاح سرّ خادمي لا يجوز
      أن يسكن متصفحًا. الدور super_admin وحده، ويُتحقق منه في الخادم لا في الواجهة. */

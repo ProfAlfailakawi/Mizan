@@ -91,9 +91,12 @@ const tenantHosts = () => {
     ? value('MIZAN_TENANTS')
     : (has('MIZAN_TENANTS_FILE') && existsSync(value('MIZAN_TENANTS_FILE')) ? readFileSync(value('MIZAN_TENANTS_FILE'), 'utf8') : '');
   if (!raw.trim()) return [];
-  let rows = [];
-  try { rows = JSON.parse(raw); } catch { return []; }
-  if (!Array.isArray(rows)) return [];
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { return []; }
+  /* مخزن الجهات يكتب الملف بالشكل { tenants: [...] }، ويقبل السجلّ الشكلين معًا. قراءة
+     المصفوفة وحدها كانت تُخرج القائمة فارغة في الإعداد الحقيقي، فيصمت التنبيه الذي وُجد له. */
+  const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.tenants) ? parsed.tenants : null;
+  if (!rows) return [];
   const base = value('MIZAN_BASE_DOMAIN');
   const hosts = new Set();
   for (const row of rows) {

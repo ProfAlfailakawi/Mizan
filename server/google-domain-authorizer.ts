@@ -26,9 +26,9 @@ export interface GoogleAuthorizerConfig {
 }
 
 export type DomainAuthorizationOutcome =
-  | { state: 'NOT_CONFIGURED' }
-  | { state: 'AUTHORIZED'; referrerAdded: boolean; authDomainAdded: boolean; host: string }
-  | { state: 'FAILED'; reason: string; host: string };
+  | { state: 'NOT_CONFIGURED'; hosts: string[] }
+  | { state: 'AUTHORIZED'; hosts: string[]; referrersAdded: string[]; authDomainsAdded: string[] }
+  | { state: 'FAILED'; reason: string; hosts: string[] };
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
@@ -116,48 +116,58 @@ export class GoogleDomainAuthorizer {
     return text ? JSON.parse(text) : {};
   }
 
-  /** يضيف المُحيل إلى قائمة المفتاح دون المساس بما فيها. */
-  private async addReferrer(host: string): Promise<boolean> {
+  /**
+   * يضيف المُحيلات الناقصة في قراءة واحدة وكتابة واحدة.
+   *
+   * القائمة تُستبدل لا يُضاف إليها، فكل نطاق بقراءةٍ وكتابةٍ مستقلّتين يعني أن نطاقين في
+   * الطلب نفسه يقرآن القائمة ذاتها ثم يكتب كلٌّ نسخته: فيمحو الثاني ما أضافه الأول، ويُبلَّغ
+   * عن نجاحهما معًا. قراءةٌ واحدة لكل النطاقات تُلغي هذا التسابق من أصله.
+   */
+  private async addReferrers(hosts: string[]): Promise<string[]> {
     const url = `https://apikeys.googleapis.com/v2/${this.config.apiKeyResource}`;
     const key = await this.call(url, { method: 'GET' }) as { restrictions?: { browserKeyRestrictions?: { allowedReferrers?: string[] } } };
     const current = key.restrictions?.browserKeyRestrictions?.allowedReferrers ?? [];
-    const wanted = referrerPattern(host);
     /* تغطية قائمة بأنماط عامة: لا يُضاف ما هو مشمول أصلًا حتى لا تنتفخ القائمة بلا فائدة. */
-    if (current.some(entry => entry === wanted || matchesReferrer(entry, host))) return false;
-    const next = [...current, wanted];
+    const missing = hosts.filter(host => !current.some(entry => entry === referrerPattern(host) || matchesReferrer(entry, host)));
+    if (!missing.length) return [];
     await this.call(`${url}?updateMask=restrictions.browserKeyRestrictions.allowedReferrers`, {
       method: 'PATCH',
-      body: JSON.stringify({ restrictions: { browserKeyRestrictions: { allowedReferrers: next } } }),
+      body: JSON.stringify({ restrictions: { browserKeyRestrictions: { allowedReferrers: [...current, ...missing.map(referrerPattern)] } } }),
     });
-    return true;
+    return missing;
   }
 
-  /** يضيف النطاق إلى النطاقات المصرّح بها في المصادقة، وهي تخصّ مسارات OAuth المنبثقة. */
-  private async addAuthorizedDomain(host: string): Promise<boolean> {
+  /** النطاقات المصرّح بها في المصادقة، وهي تخصّ مسارات OAuth المنبثقة. القراءة والكتابة مرة واحدة. */
+  private async addAuthorizedDomains(hosts: string[]): Promise<string[]> {
     const url = `https://identitytoolkit.googleapis.com/admin/v2/projects/${encodeURIComponent(this.config.projectId)}/config`;
     const config = await this.call(url, { method: 'GET' }) as { authorizedDomains?: string[] };
     const current = config.authorizedDomains ?? [];
-    if (current.some(entry => normalizeHost(entry) === host)) return false;
+    const known = new Set(current.map(entry => normalizeHost(entry)));
+    const missing = hosts.filter(host => !known.has(host));
+    if (!missing.length) return [];
     await this.call(`${url}?updateMask=authorizedDomains`, {
       method: 'PATCH',
-      body: JSON.stringify({ authorizedDomains: [...current, host] }),
+      body: JSON.stringify({ authorizedDomains: [...current, ...missing] }),
     });
-    return true;
+    return missing;
   }
 
   /**
-   * يُبلِّغ Google بالنطاق. إضافة المُحيل أولًا لأنها التي تعطّل كل شيء حين تغيب، ثم النطاق
-   * المصرّح به. فشل الثانية بعد نجاح الأولى يُبلَّغ فشلًا: النظام سيعمل والدخول المنبثق لا.
+   * يُبلِّغ Google بنطاقات الطلب كلها معًا. إضافة المُحيلات أولًا لأنها التي تعطّل كل شيء حين
+   * تغيب، ثم النطاقات المصرّح بها. فشل الثانية بعد نجاح الأولى يُبلَّغ فشلًا: النظام سيعمل
+   * والدخول المنبثق لا، وهذا نصف نجاح لا يجوز أن يُعرض نجاحًا.
    */
-  async authorize(rawHost: string): Promise<DomainAuthorizationOutcome> {
-    const host = normalizeHost(rawHost);
-    if (!isPlausibleHost(host)) return { state: 'FAILED', reason: 'HOST_INVALID', host };
+  async authorize(rawHosts: string | string[]): Promise<DomainAuthorizationOutcome> {
+    const requested = (Array.isArray(rawHosts) ? rawHosts : [rawHosts]).map(normalizeHost);
+    const hosts = [...new Set(requested)];
+    const invalid = hosts.filter(host => !isPlausibleHost(host));
+    if (invalid.length || !hosts.length) return { state: 'FAILED', reason: 'HOST_INVALID', hosts: invalid };
     try {
-      const referrerAdded = await this.addReferrer(host);
-      const authDomainAdded = await this.addAuthorizedDomain(host);
-      return { state: 'AUTHORIZED', referrerAdded, authDomainAdded, host };
+      const referrersAdded = await this.addReferrers(hosts);
+      const authDomainsAdded = await this.addAuthorizedDomains(hosts);
+      return { state: 'AUTHORIZED', hosts, referrersAdded, authDomainsAdded };
     } catch (err) {
-      return { state: 'FAILED', reason: err instanceof Error ? err.message : 'GOOGLE_CALL_FAILED', host };
+      return { state: 'FAILED', reason: err instanceof Error ? err.message : 'GOOGLE_CALL_FAILED', hosts };
     }
   }
 }
