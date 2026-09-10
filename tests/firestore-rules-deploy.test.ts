@@ -52,3 +52,32 @@ test('Cloud Build substitution cannot eat the script', () => {
   assert.deepEqual([...new Set(dollars)], ['$PROJECT_ID'],
     'only the intended Cloud Build substitution may appear in the script');
 });
+
+test('the release guidance matches what the pipeline actually does', () => {
+  /*
+   * كان التحذير يقول «البناء لا ينشرها، شغّلها بيدك» — وصار كذبًا بعد الأتمتة، يدفع
+   * المشغّل إلى نشرها خارج الخط فيتجاوز الترتيب الذي وُضع ليحميه. وتوثيقٌ يناقض الخط
+   * أسوأ من غياب التوثيق: كلاهما يترك المشغّل بلا هدى، وهذا يعطيه هدًى خاطئًا.
+   */
+  const preflight = fs.readFileSync('scripts/go-live-preflight.mjs', 'utf8');
+  /* الفحص على ما يُطبع للمشغّل لا على النثر الذي يشرح ما تغيّر: التعليق يقتبس التحذير
+     القديم ليقول لماذا زال، وذلك ليس تناقضًا. */
+  const emitted = preflight.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(emitted, /البناء لا ينشرها/, 'the preflight must not contradict the pipeline');
+  // والفحص الآن على بقاء الخطوة، لا على وجود الملف: حذفها لاحقًا يُكشف.
+  assert.match(preflight, /--only firestore:rules/, 'the preflight must verify the step still exists');
+
+  const doc = fs.readFileSync('docs/GO-LIVE.md', 'utf8');
+  assert.doesNotMatch(doc, /والبناء لا ينشرها/, 'the go-live doc must not send operators to publish out of band');
+});
+
+test('a failed service deploy never silently rolls the rules back', () => {
+  /*
+   * التراجع التلقائي يُعيد قواعد أوسع، وقد يكون التغيير سدّ ثغرة. فالفشل يُترك مرئيًا
+   * ويُترك القرار لمن يعرف ماذا غيّر.
+   */
+  assert.doesNotMatch(pipeline, /rules:release|firestore:rules.*rollback|rollback.*firestore/i,
+    'no automatic rules rollback: it can reopen access that was just closed');
+  // والشرط الذي يحلّ محلّه مذكور صراحةً، لا متروكًا للفهم.
+  assert.match(pipeline, /متوافقًا مع النسخة العاملة/, 'the compatibility requirement must be stated in the pipeline');
+});
