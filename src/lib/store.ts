@@ -66,7 +66,7 @@ import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { calibrateJudges } from '../../server/judge-calibration';
-import { certificateVerifyUrl } from './certificate-verification';
+import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
@@ -1242,6 +1242,20 @@ export function useAppStore() {
     if (pIdx >= 0) globalState.participants[pIdx] = { ...globalState.participants[pIdx], status:'certified', statusHistory:[...globalState.participants[pIdx].statusHistory,{status:'certified',timestamp:new Date().toISOString(),actor:'Certificate engine'}] };
     const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
     void persistScopedDocument('certificates',newCert.id,newCert as unknown as Record<string,unknown>);
+    /* النشر إلى السجل العام لا يُفشل الإصدار: الشهادة صدرت، وتعذّر النشر يُعاد لاحقًا. */
+    if(proof)void (async()=>{
+      const state=await publishCertificateToRegistry({
+        certificateNumber:certNumber,certificateId:certId,competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,
+        competitionName:globalState.competition.nameArabic||globalState.competition.name,organizationName:SEED_ORGANIZATION.nameArabic||SEED_ORGANIZATION.name,
+        issuedAt:issuedTimestamp,
+        /* ما يُنشر هو ما هو مطبوع على الشهادة، محكومًا بسياستها. */
+        disclosed:{participantCode:proof.disclosed.participantCode,participantName:newCert.participantNameArabic||newCert.participantName,categoryName:newCert.categoryNameArabic||newCert.categoryName,finalScore:cp.showScore?res.finalScore:undefined,rank:cp.showRank?res.rank:undefined,status:res.status},
+        certificateVersion:'MZ-CERT-1',resultSealReference,resultId:res.id,merkleProofId:proof.id,
+        merkleRoot:proof.merkleRoot,merkleProof:proof.proof,merkleLeafMaterial:canonicalStringify({v:'mizan-merkle-v1',disclosed:proof.disclosed,salt:proof.disclosureSalt}),
+        proofPackageHash,
+      },await registryBearer());
+      if(state==='FAILED')console.warn(`[certificates] ${certNumber} issued but not published to the public registry; retry publication.`);
+    })();
     globalState.auditLogs = [{
       id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id,
       actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'CERTIFICATE_ISSUED',
@@ -1959,6 +1973,9 @@ export function useAppStore() {
    * صار يقارن مثلًا بمثل: المحكّم مقابل بقية لجنته على المتسابق نفسه، بانكماش بايزي يمنع
    * وصم محكّم من عيّنة صغيرة. لا يُعدَّل حكم بشري، والمخرج استشاري لرئيس التحكيم وحده.
    */
+  /* بلا هوية مسجَّلة لا نشر: السجل يرفض غير المصرّح له أصلًا، ولا داعي لمحاولة فاشلة. */
+  const registryBearer=async()=>{try{return await auth.currentUser?.getIdToken()}catch{return undefined}};
+
   const getIntegrityAnalytics = () => {
     const observations=globalState.judgeSubmissions.filter(x=>x.locked&&x.participantId).map(x=>({judgeId:x.judgeId,judgeName:x.judgeName,sessionId:x.sessionId,participantId:x.participantId!,score:x.totalScore}));
     const report=calibrateJudges(observations);
@@ -2108,7 +2125,10 @@ export function useAppStore() {
     ];
   };
 
-  const revokeCertificate=(certificateId:string,reason:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role)||!reason.trim())return false;const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);if(!cert)return false;globalState.certificates=globalState.certificates.map(c=>c.id===certificateId?{...c,isAuthentic:false,revocationState:'REVOKED',revocationReason:reason}:c);auditTrustAction('CERTIFICATE_REVOKED','Certificate',certificateId,`إلغاء الشهادة: ${reason}`,`Certificate revoked: ${reason}`);notify();return true;};
+  const revokeCertificate=(certificateId:string,reason:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role)||!reason.trim())return false;const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);if(!cert)return false;globalState.certificates=globalState.certificates.map(c=>c.id===certificateId?{...c,isAuthentic:false,revocationState:'REVOKED',revocationReason:reason}:c);auditTrustAction('CERTIFICATE_REVOKED','Certificate',certificateId,`إلغاء الشهادة: ${reason}`,`Certificate revoked: ${reason}`);
+    /* الإبطال يجب أن يصل السجل العام، وإلا بقيت الشهادة الملغاة «أصلية» لمن يمسك الورقة. */
+    void (async()=>{const state=await revokeCertificateInRegistry(cert.certificateNumber,reason,await registryBearer());if(state==='FAILED')console.warn(`[certificates] ${cert.certificateNumber} revoked locally but the public registry still shows it active; retry revocation.`)})();
+    notify();return true;};
 
   const ingestMeshEnvelope=(wire:MeshWireEnvelope)=>{const mesh=globalState.localMeshSessions.find(x=>x.id===wire.sessionId&&x.competitionId===wire.competitionId);if(!mesh||mesh.events.some(e=>e.id===wire.event.id))return false;const existing=mesh.events.find(e=>e.originDeviceId===wire.event.originDeviceId&&e.sequence===wire.event.sequence);const semantic=wire.event.conflictKey?mesh.events.filter(e=>e.conflictKey===wire.event.conflictKey&&e.payloadHash!==wire.event.payloadHash):[];const conflicts=[...mesh.conflicts,...(existing?[{id:newId('mesh_conflict'),eventIds:[existing.id,wire.event.id],reason:`Duplicate sequence ${wire.event.originDeviceId}:${wire.event.sequence}`,status:'open' as const}]:[]),...(semantic.length?[{id:newId('mesh_conflict'),eventIds:[...semantic.map(e=>e.id),wire.event.id],reason:`Conflicting payloads for ${wire.event.conflictKey}`,status:'open' as const}]:[])];globalState.localMeshSessions=globalState.localMeshSessions.map(x=>x.id===mesh.id?{...x,status:'active',events:[...x.events,{...wire.event,transport:'browser_broadcast'}],conflicts,nodes:x.nodes.map(n=>n.deviceId===wire.event.originDeviceId?{...n,status:'joined',lastSeenAt:new Date().toISOString(),sequence:Math.max(n.sequence,wire.event.sequence)}:n)}:x);notify();return true;};
   const startLocalMesh=()=>{const joined=globalState.devices.filter(d=>d.competitionId===globalState.competition.id&&!['revoked','disabled'].includes(d.status)).map(d=>({deviceId:d.id,name:d.name,role:d.role,status:'joined' as const,lastSeenAt:d.lastSeenAt,sequence:0}));const coordinator=globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.type==='edge_server'&&d.status==='online')||globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.role==='Operations'&&d.status==='online')||globalState.devices.find(d=>d.competitionId===globalState.competition.id&&d.status==='online');const item:LocalMeshSessionRecord={id:newId('mesh'),competitionId:globalState.competition.id,status:joined.length?'active':'forming',coordinatorDeviceId:coordinator?.id,nodes:joined,events:[],conflicts:[],startedAt:new Date().toISOString(),transportMode:'journal_only',transportStatus:'disabled'};browserMeshAdapter?.close();browserMeshAdapter=null;const allowed=!productionMode||import.meta.env.VITE_ENABLE_BROWSER_MESH_ADAPTER==='true';if(allowed){browserMeshAdapter=createBrowserBroadcastMesh({competitionId:item.competitionId,sessionId:item.id,onEnvelope:ingestMeshEnvelope});item.transportMode=browserMeshAdapter.available?'browser_broadcast':'journal_only';item.transportStatus=browserMeshAdapter.available?'connected':'unavailable';}globalState.localMeshSessions=[item,...globalState.localMeshSessions];auditTrustAction('LOCAL_MESH_STARTED','LocalMesh',item.id,item.transportMode==='browser_broadcast'?'بدء Mesh عبر BroadcastChannel لنوافذ نفس الأصل':'بدء دفتر Mesh؛ النقل بين أجهزة مستقلة يحتاج Edge موثوق',item.transportMode==='browser_broadcast'?'Started same-origin BroadcastChannel mesh':'Started mesh journal; independent devices require trusted Edge transport');notify();return item;};

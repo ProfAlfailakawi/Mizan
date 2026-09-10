@@ -103,3 +103,35 @@ test('an unconfigured registry falls back to the local check instead of denying 
  const found=await fetchPublicCertificateVerdict('MZN-1',(async()=>new Response(JSON.stringify({state:'REVOKED'}),{status:200})) as any);
  assert.equal(found?.state,'REVOKED','a real verdict is never swallowed');
 });
+
+test('publication never breaks issuance and never leaks beyond the certificate',async()=>{
+ const {publishCertificateToRegistry,revokeCertificateInRegistry}=await import('../src/lib/certificate-verification');
+ const input={certificateNumber:'MZN-1',certificateId:'c1',competitionId:'comp',organizationId:'org',competitionName:'م',issuedAt:'2026-06-01T00:00:00.000Z',
+  disclosed:{participantCode:'A-1',participantName:'أحمد',finalScore:92,rank:1,status:'sealed'},
+  certificateVersion:'MZ-CERT-1',resultSealReference:'s',resultId:'r',merkleProofId:'p',merkleRoot:'root',merkleProof:[],merkleLeafMaterial:'m',proofPackageHash:'h'};
+
+ // Without a signed-in issuer nothing is attempted, and an unconfigured registry is not a failure.
+ assert.equal(await publishCertificateToRegistry(input,undefined),'NOT_CONFIGURED');
+ assert.equal(await revokeCertificateInRegistry('MZN-1','r',undefined),'NOT_CONFIGURED');
+
+ // Revoking a certificate the registry never held is not a failure either.
+ const g=globalThis as any;const realFetch=g.fetch;
+ try{
+  g.fetch=async()=>new Response('{}',{status:404});
+  assert.equal(await revokeCertificateInRegistry('MZN-1','r','tok'),'NOT_CONFIGURED');
+  g.fetch=async()=>new Response('{}',{status:503});
+  assert.equal(await publishCertificateToRegistry(input,'tok'),'NOT_CONFIGURED');
+  // A network error is reported, never thrown — issuance must not be undone by a publish problem.
+  g.fetch=async()=>{throw new Error('offline')};
+  assert.equal(await publishCertificateToRegistry(input,'tok'),'FAILED');
+  assert.equal(await revokeCertificateInRegistry('MZN-1','r','tok'),'FAILED');
+
+  // The body carries the certificate's own facts and no judging detail.
+  let sent='';
+  g.fetch=async(_u:string,init:any)=>{sent=String(init?.body||'');return new Response('{}',{status:201})};
+  assert.equal(await publishCertificateToRegistry(input,'tok'),'PUBLISHED');
+  const body=JSON.parse(sent);
+  assert.deepEqual(Object.keys(body).sort(),Object.keys(input).sort(),'no field is added or dropped on the way out');
+  for(const secret of ['judge','criterion','audio','email','phone','nationalId'])assert.ok(!sent.includes(secret),`published payload must not carry ${secret}`);
+ }finally{g.fetch=realFetch}
+});
