@@ -138,6 +138,18 @@ export class TenantStore {
     return { ok: true, tenant: record };
   }
 
+  /* حفظ الهوية (العلامة والنطاق) لأي جهة، حتى لو لم تكن في السجل بعد: الجهات المنشأة عبر منظومة
+     التراخيص (SaaS) لا سجل لها هنا، فننشئ سجلًا خفيفًا مفتاحه معرّف الجهة بدل رفض الحفظ. */
+  saveBrand(orgId: string, patch: Partial<TenantRecord>): { ok: true; tenant: TenantRecord } | { ok: false; errors: string[] } {
+    const rows = this.list();
+    if (rows.some(t => t.orgId === orgId)) return this.update(orgId, patch);
+    const record = normalizeTenant({ status: 'active', ...patch, orgId });
+    const check = validateTenant(record, rows);
+    if (!check.ok) return { ok: false, errors: check.errors };
+    this.write([...rows, record]);
+    return { ok: true, tenant: record };
+  }
+
   /* الجهة تُوقَف ولا تُحذف: حذفها يفتح نطاقها لجهة أخرى، فترث بيانات لا تخصّها. */
   suspend(orgId: string) { return this.update(orgId, { status: 'suspended' }); }
   activate(orgId: string) { return this.update(orgId, { status: 'active' }); }
