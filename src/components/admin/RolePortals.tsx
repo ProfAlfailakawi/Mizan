@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { participantMatchesIdentityQuery } from '../../lib/local-snapshot-privacy';
 import { EmptyState } from '../design-system/EmptyState';
 import { Activity, AlertTriangle, Award, BadgeCheck, Building2, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileSearch, Fingerprint, Globe2, Gavel, Headphones, KeyRound, Layers3, Plane, Plus, QrCode, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Stethoscope, UsersRound, WalletCards, XCircle, LifeBuoy } from 'lucide-react';
@@ -92,7 +92,12 @@ export const OrganizationHome: React.FC = () => {
  const canOpenCompetition=can(role,'competition.configure')||can(role,'operations.manage');
  const canManageAccess=can(role,'identity.invite')||can(role,'identity.approve');
  const [page,setPage]=useState<'competitions'|'organization'>('competitions'); const [licenseOpen,setLicenseOpen]=useState(false); const [creating,setCreating]=useState(false); const [name,setName]=useState(''); const [nameEnglish,setNameEnglish]=useState(''); const [accessCompetitionId,setAccessCompetitionId]=useState('');
- useEffect(()=>{const openIdentityTarget=()=>{if(!window.location.hash.startsWith('#identity'))return;const i=window.location.hash.indexOf('?'),params=new URLSearchParams(i>=0?window.location.hash.slice(i+1):'');const organizationId=params.get('organizationId')||'',competitionId=params.get('competitionId')||'';if(organizationId&&organizationId!==organization.id)return;if(!competitionId)return;const target=competitions.find(c=>c.id===competitionId);if(!target)return;setLicenseOpen(false);setPage('competitions');selectCompetition(target.id);setAccessCompetitionId(target.id)};openIdentityTarget();window.addEventListener('hashchange',openIdentityTarget);return()=>window.removeEventListener('hashchange',openIdentityTarget)},[competitions,organization.id,selectCompetition]);
+/* الرابط العميق يُستهلك مرة واحدة: المؤثّر يعتمد على قائمة المسابقات وهي تتغيّر بعد كل حفظ،
+    فكان يُعاد تنفيذه فيُبدّل المسابقة المختارة ويفتح لوحة الصلاحيات تحت يد المستخدم. */
+ const handledDeepLink=useRef('');
+ useEffect(()=>{const openIdentityTarget=()=>{if(!window.location.hash.startsWith('#identity'))return;
+   if(handledDeepLink.current===window.location.hash)return;
+   handledDeepLink.current=window.location.hash;const i=window.location.hash.indexOf('?'),params=new URLSearchParams(i>=0?window.location.hash.slice(i+1):'');const organizationId=params.get('organizationId')||'',competitionId=params.get('competitionId')||'';if(organizationId&&organizationId!==organization.id)return;if(!competitionId)return;const target=competitions.find(c=>c.id===competitionId);if(!target)return;setLicenseOpen(false);setPage('competitions');selectCompetition(target.id);setAccessCompetitionId(target.id)};openIdentityTarget();window.addEventListener('hashchange',openIdentityTarget);return()=>window.removeEventListener('hashchange',openIdentityTarget)},[competitions,organization.id,selectCompetition]);
  /*
   * حقلان لا حقل واحد. كان الحقل الواحد يُمرَّر في الاسمين معًا، فيُولد كل سجل ومعه نصٌّ
   * عربي مخزَّن في خانة الاسم الإنجليزي — ثم يظهر كما هو في الشهادة الإنجليزية. والإنجليزي
