@@ -409,10 +409,26 @@ async function syncPublicJourneys(){
  * فشل المزامنة السحابية كان يُبتلع في console.warn، فتتوقّف المزامنة في منتصف مسابقة ولا يعلم
  * أحد. صار يُرفع إلى حالة يعرضها شريطٌ للمشغّل: عطلٌ مسموع خيرٌ من عطلٍ مكتوم.
  */
+/*
+ * اسم المجموعة معرّف برمجي لا يعني المستخدم شيئًا. وكان يُدسّ وسط جملة عربية فيقرأ المشغّل
+ * «تعذّرت مزامنة competition مع السحابة» — نصفها بلغته ونصفها بلغة قاعدة البيانات.
+ * والنطاق يأتي أحيانًا بصيغة `collection/id`، فيُؤخذ الجزء الأول ويُترجم، ولا يُعرض المعرّف.
+ */
+const AR_SYNC_SCOPE:Record<string,string>={
+  competition:'إعدادات المسابقة',participants:'المتسابقون',results:'النتائج',committees:'اللجان',
+  judges:'المحكمون',audit:'سجل التدقيق',certificates:'الشهادات',organizations:'بيانات الجهة',
+  public_competitions:'الصفحة العامة للمسابقة',public_journeys:'بطاقات الرحلة','public journey':'بطاقة الرحلة',
+  judgeSubmissions:'تقييمات المحكمين',appeals:'الاعتراضات',notifications:'الإشعارات',
+};
+function syncScopeLabel(scope:string){
+  const head=String(scope||'').split('/')[0].trim();
+  return AR_SYNC_SCOPE[head]||'بيانات المسابقة';
+}
 function reportCloudError(code:CloudSyncErrorCode,scope:string){
-  const message=code==='CLOUD_PAYLOAD_TOO_LARGE'?`حمولة ${scope} أكبر من حدّ المستند؛ لم تُرفع.`
-    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية لا تسمح بكتابة ${scope}.`
-    :`تعذّرت مزامنة ${scope} مع السحابة.`;
+  const label=syncScopeLabel(scope);
+  const message=code==='CLOUD_PAYLOAD_TOO_LARGE'?`حجم ${label} تجاوز الحدّ المسموح، فلم تُرفع إلى السحابة.`
+    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية الحالية لا تسمح برفع ${label} إلى السحابة.`
+    :`تعذّرت مزامنة ${label} مع السحابة.`;
   globalState.persistenceError={code,message,at:new Date().toISOString()};
   notify();
 }
