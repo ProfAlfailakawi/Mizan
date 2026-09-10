@@ -243,3 +243,33 @@ test('gateway settlement is idempotent and refuses a mismatched amount',withRepo
 
  assert.throws(()=>repo.settleInvoiceByReference('demo','unknown-ref',{}),/INVOICE_NOT_FOUND/);
 }));
+
+test('settlement is scoped to its own gateway and refuses a foreign currency, auditing every rejection',withRepo((repo)=>{
+ const plan=repo.seedInitialPlan(owner);
+ const mk=(name:string)=>repo.createOrganization(owner,{officialName:name,shortName:name,organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const orgA=mk('Org A'),orgB=mk('Org B');
+ const invA=repo.issueInvoice(owner,{subjectType:'organization',subjectId:orgA.id,amountMinor:5000,currency:'KWD'});
+ const invB=repo.issueInvoice(owner,{subjectType:'organization',subjectId:orgB.id,amountMinor:5000,currency:'KWD'});
+ // The same reference exists under two different providers.
+ repo.attachCheckout(owner,invA.id,{provider:'gw-one',externalRef:'shared-ref'});
+ repo.attachCheckout(owner,invB.id,{provider:'gw-two',externalRef:'shared-ref'});
+
+ // Each gateway settles only its own invoice.
+ repo.settleInvoiceByReference('gw-two','shared-ref',{amountMinor:5000,currency:'KWD'});
+ const after=repo.dashboard(owner).billing.invoices;
+ assert.equal(after.find((x:any)=>x.id===invB.id).status,'paid');
+ assert.equal(after.find((x:any)=>x.id===invA.id).status,'open','the other gateway’s invoice must stay open');
+
+ // A numerically equal amount in another currency is not payment.
+ assert.throws(()=>repo.settleInvoiceByReference('gw-one','shared-ref',{amountMinor:5000,currency:'USD'}),/PAYMENT_CURRENCY_MISMATCH/);
+ assert.equal(repo.dashboard(owner).billing.invoices.find((x:any)=>x.id===invA.id).status,'open');
+
+ // Both rejections are durably audited for the promised human review.
+ const actions=repo.dashboard(owner).audit.map((a:any)=>a.action);
+ assert.ok(actions.includes('INVOICE_PAYMENT_CURRENCY_MISMATCH'),'currency mismatch must be recorded');
+ assert.throws(()=>repo.settleInvoiceByReference('gw-one','shared-ref',{amountMinor:1}),/PAYMENT_AMOUNT_MISMATCH/);
+ assert.ok(repo.dashboard(owner).audit.map((a:any)=>a.action).includes('INVOICE_PAYMENT_AMOUNT_MISMATCH'),'amount mismatch must be recorded');
+
+ // An unknown provider for a known reference finds nothing.
+ assert.throws(()=>repo.settleInvoiceByReference('gw-three','shared-ref',{}),/INVOICE_NOT_FOUND/);
+}));

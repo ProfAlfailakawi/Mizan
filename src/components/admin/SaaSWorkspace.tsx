@@ -75,7 +75,14 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine,gateway}:{billing:a
  const summary=billing?.summary||{},subs=billing?.subscriptions||[],invoices=billing?.invoices||[];
  const shown=invoices.filter((i:any)=>filter==='all'?true:filter==='overdue'?i.overdue:i.status===filter);
  const act=async(path:string,body?:any)=>{setBusy(path);setError('');try{await api(path,{method:'POST',body:body?JSON.stringify(body):undefined});onDone()}catch(e){setError((e as Error).message)}finally{setBusy('')}};
- const payOnline=async(invoiceId:string)=>{const path=`${base}/invoices/${encodeURIComponent(invoiceId)}/checkout`;setBusy(path);setError('');try{const out=await api(path,{method:'POST'});if(out?.paymentUrl)window.open(out.paymentUrl,'_blank','noopener');onDone()}catch(e){setError((e as Error).message)}finally{setBusy('')}};
+ /* تُفتح النافذة أثناء النقرة نفسها: فتحها بعد انتظار الشبكة يُعدّ نافذة غير مطلوبة فيحجبها المتصفح،
+    فتُنشأ الفاتورة عند البوابة ولا يصل إليها الدافع. وإن حُجبت رغم ذلك ننتقل بالتبويب الحالي. */
+ const payOnline=async(invoiceId:string)=>{const path=`${base}/invoices/${encodeURIComponent(invoiceId)}/checkout`;const win=window.open('','_blank','noopener');setBusy(path);setError('');
+  try{const out=await api(path,{method:'POST'});const url=out?.paymentUrl;
+   if(url){if(win&&!win.closed)win.location.href=url;else window.location.href=url}
+   else win?.close();
+   onDone()}
+  catch(e){win?.close();setError((e as Error).message)}finally{setBusy('')}};
  const line=(rows:any[])=>rows.length?rows.map((r:any)=>money(r.amountMinor,r.currency)).join(' · '):money(0);
  return <div className="space-y-4">
   <ErrorNote code={error}/>
