@@ -173,6 +173,10 @@ async function startServer() {
   const certificateVerifyRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_VERIFY_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* نشر الشهادات يقع دفعة واحدة بعد ختم النتائج، فحدّه أوسع من حدّ المالك العام ومع ذلك محدود. */
+  const certificatePublishRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_PUBLISH_RATE_LIMIT_MAX||300),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -1053,13 +1057,13 @@ async function startServer() {
   app.get('/api/certificates/verify/:token',(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERTIFICATE_REPOSITORY_NOT_CONNECTED'});const data=verifyToken(req.params.token,secret);if(!data||data.typ!=='certificate')return res.status(404).json({valid:false});res.json({valid:data.status==='valid',certificateNumber:data.certificateNumber,participantDisplayName:data.participantDisplayName,competitionDisplayName:data.competitionDisplayName,issuedAt:data.issuedAt,status:data.status})});
 
   /* سجل الشهادات العام: من يمسك شهادة مطبوعة يتحقق منها بنفسه، بلا حساب وبلا وصول لبيانات المسابقة. */
-  app.post('/api/certificates/publish',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+  app.post('/api/certificates/publish',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const identity=(req as any).mizanIdentity;const body=req.body||{};
     if(String(body.organizationId||'')!==identity.organizationId)return res.status(403).json({code:'CERTIFICATE_TENANT_MISMATCH'});
     try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED'})}
   });
-  app.post('/api/certificates/:number/revoke',requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+  app.post('/api/certificates/:number/revoke',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const identity=(req as any).mizanIdentity;
     try{return res.json({certificate:certificateRegistry.revoke(String(req.params.number||''),identity.organizationId,String(req.body?.reason||''))})}
