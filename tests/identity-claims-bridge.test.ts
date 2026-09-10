@@ -81,3 +81,28 @@ test('existing accounts have a way back in', () => {
   assert.match(server, /activeAccountUids\(\)/, 'and it must cover every active account');
   assert.match(server, /failures/, 'and report which ones failed rather than claiming success');
 });
+
+test('identity endpoints that change authorization are rate limited', () => {
+  /*
+   * نقطةٌ تفحص الصلاحية بلا سقف معدّل بابٌ للتخمين والإغراق: تفعيلٌ برمز يُخمَّن، أو إغراق
+   * بتعديلات تخويل. وقد كشفها CodeQL على دفعتي حين عدّلتها فصارت «شيفرة متغيّرة» — وهي
+   * ملاحظة صحيحة بذاتها لا مجرّد ضجيج فحص.
+   */
+  const routes = [
+    "app.post('/api/identity/activate',sensitiveIdentityRateLimit",
+    "app.patch('/api/identity/grants/:id',sensitiveIdentityRateLimit",
+    "app.post('/api/identity/grants/:id/suspend',sensitiveIdentityRateLimit",
+    "app.post('/api/identity/grants/:id/resume',sensitiveIdentityRateLimit",
+    "app.delete('/api/identity/grants/:id',sensitiveIdentityRateLimit",
+  ];
+  for (const route of routes) {
+    assert.ok(server.includes(route), `missing rate limit: ${route.split("'")[1]}`);
+  }
+  // والسقف يسبق فحص الصلاحية: خنقٌ بعد التحقق يكون قد أنفق العمل الذي جاء يمنعه.
+  assert.match(server, /activate',sensitiveIdentityRateLimit,requireFirebaseBase/);
+});
+
+test('the one-time backfill is owner-only and throttled', () => {
+  assert.match(server, /sync-claims',ownerRateLimit,ownerOnly/,
+    'a route that rewrites every account’s claims must be the narrowest door in the app');
+});
