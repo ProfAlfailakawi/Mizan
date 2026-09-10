@@ -98,3 +98,28 @@ test('unfinished markers stay a source-tree rule', () => {
   assert.equal(withPlantedLine('Dockerfile', `# ${marker}: revisit the base image tag`), 'PASSED');
   assert.equal(withPlantedLine('server.ts', `// ${marker}: revisit`), 'FAILED');
 });
+
+test('both scanners read one credential list, and it covers current token formats', () => {
+  /*
+   * كان لكل سكربت قائمته، فمرّ رمز GitHub الحديث من كليهما: الأول لا يعرف رموز GitHub أصلًا،
+   * والثاني يعرف الصيغة القديمة وحدها. وهو الخطأ نفسه الذي أسقط خمسة أدوار من مسار النبضة:
+   * نسختان مكتوبتان باليد تفترقان بلا أن ينتبه أحد.
+   */
+  for (const script of ['scripts/scan-secrets.mjs', 'scripts/source-audit.mjs']) {
+    assert.match(fs.readFileSync(path.join(repo, script), 'utf8'),
+      /import \{ CREDENTIAL_PATTERNS \} from '\.\/secret-patterns\.mjs'/,
+      `${script} must not keep its own copy of the list`);
+  }
+  const shared = fs.readFileSync(path.join(repo, 'scripts/secret-patterns.mjs'), 'utf8');
+  for (const name of ['GitHub fine-grained token', 'GitHub token', 'AWS access key id', 'Slack token']) {
+    assert.ok(shared.includes(name), `the shared list is missing: ${name}`);
+  }
+});
+
+test('a fine-grained GitHub token is caught in a deployment manifest', () => {
+  // الصيغة الحديثة `github_pat_` بادئتها أطول وتحمل شرطة سفلية، فلا تكفيها صيغة `ghp_`.
+  const finegrained = `github${'_pat_'}11ABCDEFG0abcdefghijkl_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij0123456789AB`;
+  assert.equal(withPlantedLine('cloudbuild.yaml', `  _LEAK: '${finegrained}'`), 'FAILED');
+  // ورمز AWS المؤقت (ASIA) مثل الدائم (AKIA).
+  assert.equal(withPlantedLine('cloudbuild.yaml', `  _LEAK: '${'AS' + 'IA'}IOSFODNN7EXAMPLE'`), 'FAILED');
+});

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
 import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
-import { uiToken, capabilityLabel } from './ui-language';
+import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { auth, getFirestoreClient } from './firebase';
 import {
@@ -251,6 +251,16 @@ function getInitialState(): AppStoreState {
 
 let globalState = getInitialState();
 
+/*
+ * الاسم كما يُحفَظ داخل مستند مُولَّد — شهادة، أو بطاقة رحلة، أو جواز مشاركة.
+ *
+ * صار الاسم الإنجليزي اختياريًا، وهذه المستندات تنسخه وقت الإنشاء ثم تعيش به إلى الأبد؛
+ * ومنها ما لا يحمل إلا خانة اسم واحدة. فمسابقة عربية بلا اسم إنجليزي كانت ستُصدر شهادة
+ * بلا اسم مسابقة أصلًا. الاحتياط هنا وقت الكتابة لا وقت العرض: المستند الصادر لا يُصلَّح
+ * لاحقًا، ولا يُعاد إصداره لأن اسمًا أُضيف بعده.
+ */
+const storedCompetitionName = (english: boolean) => bilingualName(globalState.competition, !english) || globalState.competition.id;
+
 function markCompetitionConfigChanged(){
   const now=new Date().toISOString();
   globalState.competitionConfigUpdatedAt=now;
@@ -376,7 +386,7 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
     const certificate=globalState.certificates.find(c=>c.participantId===participant.id&&c.competitionId===participant.competitionId&&c.revocationState!=='REVOKED');
     const base={
       organizationId:participant.organizationId,competitionId:participant.competitionId,participantId:participant.id,
-      competitionName:globalState.competition.name,competitionNameArabic:globalState.competition.nameArabic,
+      competitionName:storedCompetitionName(true),competitionNameArabic:storedCompetitionName(false),
       participantCode:participant.code,participantName:participant.fullName,participantNameArabic:participant.fullNameArabic,
       status:participant.status,arrivalSlot:participant.arrivalSlot||null,queueNumber:participant.queueNumber||null,
       venueName:globalState.competition.venueName||null,
@@ -516,7 +526,17 @@ async function finalizeAuditChain(){
 function persistLocalSnapshot(): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
-    if (globalState.persistenceError) globalState.persistenceError = null;
+    /*
+     * كتابةٌ محلية ناجحة تمسح أعطال الكتابة المحلية وحدها.
+     *
+     * كانت تمسح كل شيء — ومنها أعطال المزامنة السحابية. و`reportCloudError` يضبط العطل ثم
+     * ينادي `notify()`، و`notify()` ينادي هذه الدالة قبل أن يُبلّغ المستمعين: فيُمحى العطل
+     * بعد أجزاء من الثانية من ضبطه، ولا تراه شاشة قط. أي أن شريط تنبيه فشل الرفع كان ميتًا
+     * منذ كُتب، لا لعيب فيه بل لأن هذا السطر يسبقه.
+     *
+     * وأعطال السحابة يمسحها `clearCloudError` عند نجاح رفعٍ فعليّ، وهو موجود ويُنادى.
+     */
+    if (globalState.persistenceError && !globalState.persistenceError.code.startsWith('CLOUD_')) globalState.persistenceError = null;
     return true;
   } catch (err) {
     const quota = err instanceof DOMException && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED');
@@ -972,7 +992,7 @@ export function useAppStore() {
     if(participant && sessionSubs.length >= sessionRuleSet.judgesCountPerPanel) reconcileIntegrityForSession(submission.sessionId);
     globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'JUDGE_SUBMISSION_LOCKED', entityType:'JudgeSubmission', entityId:`${submission.sessionId}:${submission.judgeId}`, humanSummaryArabic:`قفل تقييم المحكم للمتسابق ${participant?.code||''} دون إظهار تقييم بقية اللجنة`, humanSummaryEnglish:`Judge submission locked for ${participant?.code||''} independently of the rest of the panel`, currentStateHash:`PENDING:${newId('audit')}` },...globalState.auditLogs];
     void createContinuityCheckpoint('judge-lock');
-    if(judgeProfile){ const existingPass=globalState.judgePassport.findIndex(x=>x.judgeId===judgeProfile.id&&x.competitionId===globalState.competition.id); const pass:JudgePassportEntry={id:existingPass>=0?globalState.judgePassport[existingPass].id:newId('jp'),judgeId:judgeProfile.id,competitionId:globalState.competition.id,competitionName:globalState.competition.name,role:judgeProfile.specialty,riwayat:judgeProfile.certifiedRiwayat,calibrationScore:judgeProfile.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===judgeProfile.userId).length,verified:judgeProfile.isReady}; if(existingPass>=0)globalState.judgePassport[existingPass]=pass;else globalState.judgePassport=[pass,...globalState.judgePassport]; }
+    if(judgeProfile){ const existingPass=globalState.judgePassport.findIndex(x=>x.judgeId===judgeProfile.id&&x.competitionId===globalState.competition.id); const pass:JudgePassportEntry={id:existingPass>=0?globalState.judgePassport[existingPass].id:newId('jp'),judgeId:judgeProfile.id,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),role:judgeProfile.specialty,riwayat:judgeProfile.certifiedRiwayat,calibrationScore:judgeProfile.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===judgeProfile.userId).length,verified:judgeProfile.isReady}; if(existingPass>=0)globalState.judgePassport[existingPass]=pass;else globalState.judgePassport=[pass,...globalState.judgePassport]; }
     notify();
   };
 
@@ -1235,7 +1255,7 @@ export function useAppStore() {
     const proofPackageHash=await hashCanonical({certificateId:certId,resultId:res.id,competitionId:globalState.competition.id,certificateVersion:'MZ-CERT-1',resultSealReference,merkleProofId:proof?.id,issuedTimestamp,revocationState:'ACTIVE'});
     const newCert: Certificate = {
       id: certId, certificateNumber: certNumber, competitionId: globalState.competition.id,
-      competitionName: globalState.competition.name, competitionNameArabic: globalState.competition.nameArabic,
+      competitionName: storedCompetitionName(true), competitionNameArabic: storedCompetitionName(false),
       organizationName: SEED_ORGANIZATION.name, organizationNameArabic: SEED_ORGANIZATION.nameArabic,
       participantId: res.participantId, participantName: res.participantName, participantNameArabic: res.participantNameArabic,
       categoryName: category?.name || res.categoryName, categoryNameArabic: category?.nameArabic || res.categoryName,
@@ -1247,7 +1267,7 @@ export function useAppStore() {
     globalState.certificates = [newCert, ...globalState.certificates];
     const pIdx = globalState.participants.findIndex(p=>p.id===res.participantId);
     if (pIdx >= 0) globalState.participants[pIdx] = { ...globalState.participants[pIdx], status:'certified', statusHistory:[...globalState.participants[pIdx].statusHistory,{status:'certified',timestamp:new Date().toISOString(),actor:'Certificate engine'}] };
-    const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
+    const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
     void persistScopedDocument('certificates',newCert.id,newCert as unknown as Record<string,unknown>);
     /* النشر إلى السجل العام لا يُفشل الإصدار: الشهادة صدرت، وتعذّر النشر يُعاد لاحقًا. */
     if(proof)void (async()=>{
@@ -1529,6 +1549,7 @@ export function useAppStore() {
    * فيُولد كل سجل ومعه نصٌّ عربي في خانة الاسم الإنجليزي — ثم يظهر في الشهادة الإنجليزية.
    * الفراغ أصدق، والعرض يعالجه بـ bilingualName لا التخزين.
    */
+
   const createCompetition = (nameArabic: string, nameEnglish = '') => {
     const base: Competition = {
       ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish.trim(), nameArabic:nameArabic.trim(), edition:'', status:'draft',
@@ -1894,8 +1915,8 @@ export function useAppStore() {
   };
   const startShadowRun=(mode:ShadowRun['mode'])=>{const s:ShadowRun={id:newId('shadow'),competitionId:globalState.competition.id,mode,status:'running',startedAt:new Date().toISOString(),observations:[]};globalState.shadowRuns=[s,...globalState.shadowRuns];notify();return s;};
   const completeShadowRun=(id:string)=>{globalState.shadowRuns=globalState.shadowRuns.map(s=>s.id===id?{...s,status:'completed',completedAt:new Date().toISOString(),observations:[{type:'queue',severity:'medium',summary:'Peak queue can be reduced by dynamic arrival slots.'},{type:'judging',severity:'info',summary:'Independent locking preserved across the shadow comparison.'},{type:'automation',severity:'info',summary:'Routine reception steps are eligible for self-service.'}]}:s);notify();};
-  const addParticipantPassportEntry=(participantId:string)=>{const p=globalState.participants.find(x=>x.id===participantId);if(!p)return;const r=globalState.results.find(x=>x.participantId===participantId);const c=globalState.certificates.find(x=>x.participantId===participantId);const cat=globalState.competition.categories.find(x=>x.id===p.categoryId);const e:ParticipantPassportEntry={id:newId('pp'),participantId,competitionId:globalState.competition.id,competitionName:globalState.competition.name,categoryName:cat?.name||'',year:globalState.competition.startDate.slice(0,4),result:r?`${r.rank} / ${r.finalScore}`:undefined,certificateNumber:c?.certificateNumber,verified:!!c};globalState.participantPassport=[e,...globalState.participantPassport.filter(x=>!(x.participantId===participantId&&x.competitionId===globalState.competition.id))];notify();return e;};
-  const addJudgePassportEntry=(judgeId:string)=>{const j=globalState.judges.find(x=>x.id===judgeId||x.userId===judgeId);if(!j)return;const e:JudgePassportEntry={id:newId('jp'),judgeId:j.id,competitionId:globalState.competition.id,competitionName:globalState.competition.name,role:j.specialty,riwayat:j.certifiedRiwayat,calibrationScore:j.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===j.userId).length,verified:j.isReady};globalState.judgePassport=[e,...globalState.judgePassport.filter(x=>!(x.judgeId===j.id&&x.competitionId===globalState.competition.id))];notify();return e;};
+  const addParticipantPassportEntry=(participantId:string)=>{const p=globalState.participants.find(x=>x.id===participantId);if(!p)return;const r=globalState.results.find(x=>x.participantId===participantId);const c=globalState.certificates.find(x=>x.participantId===participantId);const cat=globalState.competition.categories.find(x=>x.id===p.categoryId);const e:ParticipantPassportEntry={id:newId('pp'),participantId,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),categoryName:cat?.name||'',year:globalState.competition.startDate.slice(0,4),result:r?`${r.rank} / ${r.finalScore}`:undefined,certificateNumber:c?.certificateNumber,verified:!!c};globalState.participantPassport=[e,...globalState.participantPassport.filter(x=>!(x.participantId===participantId&&x.competitionId===globalState.competition.id))];notify();return e;};
+  const addJudgePassportEntry=(judgeId:string)=>{const j=globalState.judges.find(x=>x.id===judgeId||x.userId===judgeId);if(!j)return;const e:JudgePassportEntry={id:newId('jp'),judgeId:j.id,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),role:j.specialty,riwayat:j.certifiedRiwayat,calibrationScore:j.calibrationScore,completedSessions:globalState.judgeSubmissions.filter(x=>x.judgeId===j.userId).length,verified:j.isReady};globalState.judgePassport=[e,...globalState.judgePassport.filter(x=>!(x.judgeId===j.id&&x.competitionId===globalState.competition.id))];notify();return e;};
   const updateJudgeSpecialties=(judgeId:string,specialties:string[])=>{const clean=[...new Set(specialties.filter(Boolean))];const next=clean.includes('all')||!clean.length?['all']:clean;globalState.judges=globalState.judges.map(j=>(j.id===judgeId||j.userId===judgeId)?{...j,specialty:next[0],specialties:next}:j);notify();return globalState.judges.find(j=>j.id===judgeId||j.userId===judgeId)||null;};
   const completeJudgeCalibration=(judgeId:string,score:number)=>{
     const bounded=Math.max(0,Math.min(100,score));
