@@ -57,8 +57,9 @@ test('notification center is global, tabbed, searchable and send-capable',()=>{
   const server=read('server.ts');
   assert.match(header,/<NotificationCenter\/>/);
   for(const token of ['الكل','غير المقروء','رسائل الإدارة','النظام','المسابقات','الدعوات والصلاحيات','الدعم'])assert.match(center,new RegExp(token));
-  assert.match(center,/إرسال إشعار/);
-  assert.match(center,/تعليم الكل كمقروء/);
+  // Labels were intentionally shortened (fewer words); the send + mark-all-read capabilities remain.
+  assert.match(center,/إرسال/);
+  assert.match(center,/تعليم الكل/);
   assert.match(server,/app\.post\('\/api\/notifications'/);
   assert.match(server,/CROSS_OPERATOR_ACCESS_BLOCKED/);
   assert.match(server,/CROSS_TENANT_ACCESS_BLOCKED/);
