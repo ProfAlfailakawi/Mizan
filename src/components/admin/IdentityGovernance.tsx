@@ -15,7 +15,7 @@ import {featureLabel,serverErrorLabel} from '../../lib/ui-language';
 
 const ORG_STAFF:Role[]=['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor'];
 const COMP_STAFF:Role[]=['head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator'];
-const OWNER_STAFF:Role[]=['org_admin','support_agent'];
+const OWNER_STAFF:Role[]=['org_admin'];
 const OPERATOR_STAFF:Role[]=['operator_owner','operator_admin'];
 const roleHint=(r:Role|string,ar:boolean):string=>({
   operator_owner:ar?'السلطة الكاملة للمشغّل: يدير الجهات، ويدعو فريقه، ويعتمد ويوقف حساباتهم.':'Full operator authority: manages tenants, invites the team, approves and suspends accounts.',
@@ -92,9 +92,10 @@ export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:
  const grantForSession=(session:any)=>grants.find((g:any)=>g.accountId===session.accountId&&g.status==='ACTIVE'&&((session.competitionId&&g.competitionId===session.competitionId)||(!session.competitionId&&!g.competitionId)));
  const grantsFor=(account:any)=>grants.filter((g:any)=>g.accountId===account.id&&['ACTIVE','SUSPENDED'].includes(g.status));
  const lastSessionFor=(account:any)=>sessions.filter((x:any)=>x.accountId===account.id).sort((a:any,b:any)=>String(b.lastSeenAt||'').localeCompare(String(a.lastSeenAt||'')))[0];
- const activeOrgAdmins=grants.filter((g:any)=>g.role==='org_admin'&&g.status==='ACTIVE').length;
  const isSelfAccount=(a:any)=>[a.id,a.uid,a.firebaseUid].filter(Boolean).includes(s.currentUser.id)||normalizeEmail(String(a.email||''))===normalizeEmail(s.currentUser.email||'');
- const isProtectedGrant=(a:any,g:any)=>operatorScoped?(isSelfAccount(a)||!(s.currentUser.role==='super_admin'||(s.currentUser.role==='operator_owner'&&g.role==='operator_admin'))):isSelfAccount(a)||(g.role==='org_admin'&&(!['super_admin','operator_owner','operator_admin'].includes(s.currentUser.role)||(s.currentUser.role==='super_admin'&&activeOrgAdmins<=1)));
+ // The platform owner (super admin) can edit/remove every account except their own. Everyone else
+ // keeps the scoped protections. Self-deletion is always blocked here and on the server.
+ const isProtectedGrant=(a:any,g:any)=>operatorScoped?(isSelfAccount(a)||!(s.currentUser.role==='super_admin'||(s.currentUser.role==='operator_owner'&&g.role==='operator_admin'))):(s.currentUser.role==='super_admin'?isSelfAccount(a):isSelfAccount(a)||(g.role==='org_admin'&&!['operator_owner','operator_admin'].includes(s.currentUser.role)));
  const isProtectedAccount=(a:any)=>isSelfAccount(a)||grantsFor(a).some((g:any)=>isProtectedGrant(a,g));
  const roleChoicesForGrant=(g:any):Role[]=>operatorScoped?(s.currentUser.role==='super_admin'?OPERATOR_STAFF:['operator_admin']):operatorManagingOrganization?['org_admin']:effectiveRoles.length?effectiveRoles:[g.role];
 

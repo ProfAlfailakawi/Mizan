@@ -104,3 +104,15 @@ test('identity management UI exposes real backend actions for pending and active
   assert.match(server,/app\.patch\('\/api\/identity\/grants\/:id'/);
   assert.match(server,/app\.delete\('\/api\/identity\/password-reset\/:id'/);
 });
+
+test('super admin has full authority over the last org admin (bypasses last-admin protection)',()=>{
+  const dir=temp('mizan-super-admin-authority');
+  try{
+    const repo=new IdentityGovernanceRepository(dir);
+    const superAdmin:ServerIdentity={uid:'platform-owner',email:'owner@mizan.test',role:'super_admin',organizationId:'__platform__'};
+    const inv=repo.createInvitation(superAdmin,{email:'only@org.test',displayName:'المدير الوحيد',requestedRole:'org_admin',organizationId:'ORG-9',reason:'first org admin for the tenant'});
+    const activated=repo.activate({uid:'uid-only',email:'only@org.test'},inv.activationToken);
+    // The platform owner may remove even the sole org admin — the last-admin guard no longer blocks super admin.
+    assert.equal(repo.removeGrant(superAdmin,activated.grant.id,'إزالة معتمدة من مالك المنصة').removed,true);
+  }finally{fs.rmSync(dir,{recursive:true,force:true})}
+});
