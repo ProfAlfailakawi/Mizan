@@ -144,6 +144,19 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-consent input[type="checkbox"] { flex:0 0 auto; margin:0; align-self:center; }
 .mizan-consent > span { display:inline-block; }
 .mizan-field-label { display:block; color:#686f6b; font-size:10px; font-weight:800; margin:0 0 6px; }
+/* نظام التبويب الموحد: شريط حبات واحد لكل أقسام المنصة، بحركة هادئة تحترم تفضيل تقليل الحركة. */
+.mizan-tabs { display:flex; flex-wrap:wrap; gap:6px; width:fit-content; max-width:100%; padding:6px; border:1px solid #e2e0d8; border-radius:18px; background:#fbfaf7; }
+.mizan-tab { position:relative; padding:.55rem .95rem; border-radius:12px; font-size:12px; font-weight:900; color:#5d645f; transition:color .18s ease, background-color .18s ease, box-shadow .22s ease, transform .12s ease; }
+.mizan-tab:hover { background:#f0eee8; }
+.mizan-tab:active { transform:scale(.965); }
+.mizan-tab.is-active { background:#214C40; color:#fff; box-shadow:0 6px 16px rgba(33,76,64,.22), inset 0 1px 0 rgba(255,255,255,.12); }
+.mizan-tabs-sm { padding:4px; gap:4px; border-radius:14px; }
+.mizan-tabs-sm .mizan-tab { padding:.4rem .8rem; font-size:11px; border-radius:10px; }
+@media (prefers-reduced-motion:reduce){ .mizan-tab { transition:none; } }
+/* الملاحظة الاستشارية الموحدة: عبارة «لا يمس الدرجة» بصوت بصري واحد بدل إحدى عشرة صياغة رمادية. */
+.mizan-advisory { display:flex; align-items:flex-start; gap:.6rem; padding:.8rem 1rem; border-radius:14px; background:linear-gradient(135deg,#E7EEE9,#f3f8f5); color:#214C40; font-size:12px; font-weight:700; line-height:1.8; border-inline-start:3px solid #2F6555; }
+.mizan-advisory > svg { flex:0 0 auto; margin-top:.2rem; width:15px; height:15px; }
+
 .mizan-result-line { min-height:38px; display:flex; align-items:center; justify-content:space-between; gap:16px; border-bottom:1px solid rgba(223,222,215,.75); }
 .mizan-status-orb { width:7px;height:7px;border-radius:99px;background:#2f6555;display:inline-block; }
 .mizan-pictogram { position:relative; isolation:isolate; display:inline-grid; place-items:center; flex:0 0 auto; overflow:hidden; border:1px solid rgba(23,27,24,.07); }
@@ -174,7 +187,8 @@ html[data-mizan-text="xl"]    { --mizan-text-scale: 1.32; }
 /* Legibility floor for the pervasive micro-typography. !important is intentional:
    it overrides the Tailwind arbitrary-size utilities regardless of layer order, and it
    is the accessibility baseline rather than a per-component style choice. */
-.text-\[9px\]  { font-size: calc(10.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
+.text-\[8px\]  { font-size: calc(10px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
+.text-\[9px\]  { font-size: calc(11px   * var(--mizan-text-scale)) !important; line-height: 1.55; }
 .text-\[10px\] { font-size: calc(11.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
 .text-\[11px\] { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
 .mizan-kicker, .mizan-ticket-label { font-size: calc(11.5px * var(--mizan-text-scale)); }

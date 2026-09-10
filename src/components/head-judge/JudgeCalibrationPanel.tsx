@@ -1,4 +1,5 @@
 import React,{useMemo,useState} from 'react';
+import { AdvisoryNote } from '../design-system/AdvisoryNote';
 import {ChevronDown,Scale} from 'lucide-react';
 
 /*
@@ -77,10 +78,10 @@ export const JudgeCalibrationPanel:React.FC<{judges:JudgeCalibrationRow[];scenar
     </div>
    </div>}
 
-   <p className="text-[9px] leading-5 text-[#636864]">
+   <AdvisoryNote>
     {ar?'الانحراف مقيس بمقارنة كل محكّم بزملائه على المتسابقين أنفسهم، ومسحوب نحو الاتزان بقدر قلّة بياناته حتى لا يُوصم من قلّت جلساته. مؤشر استشاري: لا يعدّل درجة ولا يعيد ترتيبًا؛ غايته توجيه مراجعة المقاطع الصوتية قبل الاعتماد.'
        :'Bias is measured against peers on the same participants and shrunk toward balanced in proportion to how little data a judge has, so a short record never brands anyone. Advisory only: it changes no score and re-ranks nothing — it points the head judge to the recordings worth reviewing before results are sealed.'}
-   </p>
+   </AdvisoryNote>
   </div>}
  </div>;
 };

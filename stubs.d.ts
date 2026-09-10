@@ -5,6 +5,7 @@ declare module 'react' { const React:any; export default React; export const Str
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
+ export const Menu: any;
  export const Users: any;
  export const Accessibility: any;
  export const Trophy: any;
