@@ -142,5 +142,5 @@ if (blockers.length) {
 }
 console.log('النتيجة: لا موانع.');
 console.log('يبقى خارج نطاق هذا الفحص، ولا يمكن لأي أداة أن تتحقق منه نيابةً عنك:');
-console.log('  • تدوير مفاتيح Google API التي ظهرت في تاريخ git (انظر SECURITY-TODO.md).');
+console.log('  • تدوير مفاتيح Google API التي ظهرت في تاريخ git (البند ٣ في SECURITY-*.md بجذر المستودع).');
 console.log('  • نشر قواعد Firestore فعليًا على المشروع.\n');
