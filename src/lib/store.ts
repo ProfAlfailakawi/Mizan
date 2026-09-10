@@ -1254,7 +1254,13 @@ export function useAppStore() {
         merkleRoot:proof.merkleRoot,merkleProof:proof.proof,merkleLeafMaterial:canonicalStringify({v:'mizan-merkle-v1',disclosed:proof.disclosed,salt:proof.disclosureSalt}),
         proofPackageHash,
       },await registryBearer());
-      if(state==='FAILED')console.warn(`[certificates] ${certNumber} issued but not published to the public registry; retry publication.`);
+      /* التحذير في الطرفية لا يراه أحد في التشغيل: الأثر يُكتب في سجل التدقيق الذي يُراجَع فعلًا،
+         وإلا بقيت الشهادة غائبة عن السجل العام حتى يفشل تحقق حاملها. */
+      if(state==='FAILED'){
+        console.warn(`[certificates] ${certNumber} issued but not published to the public registry; retry publication.`);
+        auditTrustAction('CERTIFICATE_REGISTRY_PUBLISH_FAILED','Certificate',certId,`تعذّر نشر الشهادة ${certNumber} في السجل العام: لن يتمكن حاملها من التحقق حتى يُعاد النشر`,`Certificate ${certNumber} could not be published to the public registry; its holder cannot verify it until publication is retried`);
+        notify();
+      }
     })();
     globalState.auditLogs = [{
       id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id,
@@ -2128,7 +2134,12 @@ export function useAppStore() {
   const revokeCertificate=(certificateId:string,reason:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role)||!reason.trim())return false;const cert=globalState.certificates.find(c=>c.id===certificateId&&c.competitionId===globalState.competition.id);if(!cert)return false;globalState.certificates=globalState.certificates.map(c=>c.id===certificateId?{...c,isAuthentic:false,revocationState:'REVOKED',revocationReason:reason}:c);auditTrustAction('CERTIFICATE_REVOKED','Certificate',certificateId,`إلغاء الشهادة: ${reason}`,`Certificate revoked: ${reason}`);
     /* الإبطال يجب أن يصل السجل العام، وإلا بقيت الشهادة الملغاة «أصلية» لمن يمسك الورقة. */
     void (async()=>{const state=await revokeCertificateInRegistry(cert.certificateNumber,reason,await registryBearer());
-      if(state==='FAILED')console.warn(`[certificates] ${cert.certificateNumber} revoked locally but the public registry still shows it active; retry revocation.`);
+      if(state==='FAILED'){
+        console.warn(`[certificates] ${cert.certificateNumber} revoked locally but the public registry still shows it active; retry revocation.`);
+        /* الأخطر في الباب كله: شهادة ملغاة تظهر «أصلية» لمن يمسك الورقة. */
+        auditTrustAction('CERTIFICATE_REGISTRY_REVOKE_FAILED','Certificate',certificateId,`تعذّر إبطال الشهادة ${cert.certificateNumber} في السجل العام: ما زالت تظهر أصلية للعامة`,`Certificate ${cert.certificateNumber} could not be revoked in the public registry; it still verifies as authentic publicly`);
+        notify();
+      }
       else if(state==='NOT_PUBLISHED')console.warn(`[certificates] ${cert.certificateNumber} was never published to the public registry, so its issuance publication had failed; nothing to revoke there.`)})();
     notify();return true;};
 
