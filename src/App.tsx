@@ -6,6 +6,7 @@ import { useAppStore } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
 import { Header, LiveSupportControl } from './components/layout/Header';
 import { useIdleSignOut } from './lib/useIdleSignOut';
+import { useOpsHeartbeat } from './lib/ops-heartbeat';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { TotpSecurity } from './components/auth/TotpSecurity';
 import { auth } from './lib/firebase';
@@ -191,7 +192,8 @@ const CompetitionNotFound: React.FC = () => (
 const TenantSuspendedScreen:React.FC<{language:string}>=({language})=>{const ar=language==='ar';return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5" dir={ar?'rtl':'ltr'}><div className="mizan-surface max-w-lg p-8 sm:p-10 text-center"><div className="flex justify-center"><MizanLogo language={ar?'ar':'en'} compact/></div><div className="mizan-kicker mt-6">{ar?'حالة الجهة':'ORGANIZATION STATUS'}</div><h1 className="text-2xl font-black mt-2">{ar?'تم إيقاف وصول هذه الجهة مؤقتًا':'Organization access is temporarily suspended'}</h1><p className="text-sm text-[#636864] leading-7 mt-4">{ar?'بيانات الجهة ومسابقاتها محفوظة بالكامل، لكن الوصول التشغيلي متوقف حاليًا. يرجى التواصل مع إدارة المنصة.':'All organization data remains محفوظة; operational access is temporarily unavailable. Please contact the platform administrator.'}</p></div></div>};
 
 export default function App() {
- const {currentUser,competitions,switchRole,selectCompetition,loadPublicCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand}=useAppStore();
+ const {currentUser,competitions,switchRole,selectCompetition,loadPublicCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand,isOffline:storeIsOffline,persistenceError:activePersistenceError,competition:activeCompetition}=useAppStore();
+ const activeCompetitionId=activeCompetition?.id;
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
  useEffect(()=>{warmViews()},[]);
@@ -201,6 +203,17 @@ export default function App() {
  const marketing=requireAuth&&hostSurface()==='marketing';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationFromQr,activationMessage,activateAccount,takeoverSession}=useMizanAuth(requireAuth);
  const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
+ /* تعثّر المستخدم كان يموت عند شاشته: يُعرض له ولا يبلغ أحدًا. هذه النبضة تُعلم لوحة
+    المالك بالجلسات المتعثّرة والصامتة، ولا تعطّل شيئًا إن تعذّرت أو لم يُهيَّأ التتبّع. */
+ useOpsHeartbeat({
+   signedIn:requireAuth&&signedIn,
+   isOffline:storeIsOffline,
+   subjectId:currentUser.id,
+   role:currentUser.role,
+   name:currentUser.name,
+   competitionId:activeCompetitionId,
+   errorCode:activePersistenceError?.code??null,
+ });
  const demoMode=!requireAuth;
  // Deep links skip the splash, and so do repeat loads inside the same session: the
  // assembly is a 2.8s first-impression, not a per-reload toll for staff reopening the app.
@@ -278,8 +291,10 @@ export default function App() {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
    case 'operator_owner': case 'operator_admin': return <OperatorWorkspace/>;
-   case 'org_admin': return hash.startsWith('#manage-competition')?<CompetitionOverview/>:<OrganizationHome/>;
-   case 'storage_admin': case 'billing_admin': case 'branch_admin': return <OrganizationHome/>;
+   /* مدير الفرع يملك إنشاء المسابقة وضبطها وإدارة لجانها، ولم يكن له مسار إلى أيٍّ منها:
+      يضغط بطاقة المسابقة فيتغيّر العنوان ولا تتغيّر الصفحة. */
+   case 'org_admin': case 'branch_admin': return hash.startsWith('#manage-competition')?<CompetitionOverview/>:<OrganizationHome/>;
+   case 'storage_admin': case 'billing_admin': return <OrganizationHome/>;
    case 'comp_admin': return <CompetitionOverview/>;
    case 'head_judge': return <HeadJudgeInbox/>;
    case 'judge': return <JudgeOS/>;

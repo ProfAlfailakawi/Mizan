@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Bot, Check, FileCheck2, Gavel, Headphones, LockKeyhole, ShieldCheck, X, Activity } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
+import { sealFailureLabel } from '../../lib/ui-language';
 import { Badge } from '../design-system/Badge';
 import { Ratio } from '../design-system/Ratio';
 import { Button } from '../design-system/Button';
@@ -38,7 +39,9 @@ export const HeadJudgeInbox: React.FC = () => {
  const [reliability,setReliability]=useState<ReliabilityReport|null>(null);
  /* رفض الختم يجب أن يُقال. زرٌّ يُضغط فلا يقع شيء ولا يُشرح سببه أسوأ من زرٍّ معطّل. */
  const [sealNote,setSealNote]=useState('');
- const approveSeal=async()=>{const out=await store.sealResults();setSealNote(out?.sealed?'':String((out as {message?:string})?.message||''))};
+ /* الختم نداءٌ إلى الخادم: بلا حارس انشغال يُضغط الزر مرتين فتُرسل موافقتان من جهاز واحد. */
+ const [sealBusy,setSealBusy]=useState(false);
+ const approveSeal=async()=>{setSealBusy(true);setSealNote('');try{const out=await store.sealResults();setSealNote(sealFailureLabel(out as {sealed?:boolean;reason?:string;message?:string},ar))}finally{setSealBusy(false)}};
  useEffect(()=>{let live=true;
   const observations=store.judgeSubmissions.flatMap(sub=>Object.entries(sub.criterionScores||{}).map(([criterionId,score])=>({
    judgeId:sub.judgeId,judgeName:sub.judgeName,sessionId:sub.sessionId,participantId:sub.participantId||sub.sessionId,criterionId,score:Number(score),
@@ -79,7 +82,7 @@ export const HeadJudgeInbox: React.FC = () => {
   {tab==='seal'&&<>
   <EmergencyQuestionAuthorization/>
   {guardianAttention.length>0&&<div className="mizan-surface p-4 flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#F2EADC] text-[#7d5e34] grid place-items-center"><ShieldCheck className="w-5 h-5"/></span><div className="flex-1"><div className="text-sm font-black">{ar?'مراجعة مساندة · ميل مسطرة يحتاج انتباه':'Judge Guardian · scale tendency needs attention'}</div><div className="text-[10px] text-[#656b66] mt-1">{guardianAttention.map(x=>`${x.name}: ${x.deviationFromPanel>0?'+':''}${x.deviationFromPanel} ${ar?(x.tendency==='HAWK'?'أشدّ':'أليَن'):x.tendency}`).join(' · ')}</div><div className="text-[9px] leading-4 text-[#6b706c] mt-1">{ar?'مقارنة مع بقية اللجنة على المتسابق نفسه، بانكماش يمنع الحكم من عيّنة صغيرة. استشاري فقط: لا يُعدَّل حكم محكّم.':'Compared with the rest of the panel on the same participant, shrunk so a small sample cannot label a judge. Advisory only: no judge score is altered.'}</div></div><Badge variant="amber">{guardianAttention.length}</Badge></div>}
-  <div className="mizan-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><LockKeyhole className="w-5 h-5"/></span><div><div className="text-sm font-black">{ar?'اعتماد ختم النتائج':'Result seal approval'}</div><div className="text-[11px] text-[#646965] mt-1">{policy.results.requireDualApprovalToSeal?<>{/* «2/1 اعتمادات» تنقلب في العربية فتُقرأ اعتمادين من واحد. */}<Ratio value={approvals} of={2}/>{ar?' اعتمادات مستقلة':' independent approvals'}</>:(ar?'لا تتطلب هذه المسابقة اعتمادًا مزدوجًا':'Dual approval is disabled for this competition')}</div></div></div><Button size="sm" variant={alreadyApproved?'secondary':'outline'} disabled={!canSeal||alreadyApproved} onClick={()=>void approveSeal()} icon={alreadyApproved?<BadgeCheck className="w-4 h-4"/>:<LockKeyhole className="w-4 h-4"/>}>{alreadyApproved?(ar?'تم اعتمادي':'Approved'):(ar?'أعتمد الختم':'Approve seal')}</Button></div>
+  <div className="mizan-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><LockKeyhole className="w-5 h-5"/></span><div><div className="text-sm font-black">{ar?'اعتماد ختم النتائج':'Result seal approval'}</div><div className="text-[11px] text-[#646965] mt-1">{policy.results.requireDualApprovalToSeal?<>{/* «2/1 اعتمادات» تنقلب في العربية فتُقرأ اعتمادين من واحد. */}<Ratio value={approvals} of={2}/>{ar?' اعتمادات مستقلة':' independent approvals'}</>:(ar?'لا تتطلب هذه المسابقة اعتمادًا مزدوجًا':'Dual approval is disabled for this competition')}</div></div></div><Button size="sm" variant={alreadyApproved?'secondary':'outline'} disabled={!canSeal||alreadyApproved||sealBusy} onClick={()=>void approveSeal()} icon={alreadyApproved?<BadgeCheck className="w-4 h-4"/>:<LockKeyhole className="w-4 h-4"/>}>{sealBusy?(ar?'جارٍ الاعتماد…':'Approving…'):alreadyApproved?(ar?'تم اعتمادي':'Approved'):(ar?'أعتمد الختم':'Approve seal')}</Button></div>
   {sealNote&&<p role="status" className="rounded-2xl bg-[#F5EDE2] px-4 py-3 text-[11px] font-bold leading-5 text-[#7a5a2f]">{sealNote}</p>}
   </>}
   {tab==='reviews'&&(!current?<ClearState ar={ar} textAr="لا توجد مراجعات تحكيم معلقة" textEn="No judging reviews are pending"/>:<div className="grid lg:grid-cols-[300px_1fr] gap-4">

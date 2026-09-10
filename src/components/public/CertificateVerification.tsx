@@ -8,7 +8,7 @@ import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { MizanPictogram } from '../design-system/MizanPictogram';
 
-type VerificationState='AUTHENTIC'|'REVOKED'|'NOT_FOUND'|'INVALID_PROOF';
+type VerificationState='AUTHENTIC'|'REVOKED'|'NOT_FOUND'|'INVALID_PROOF'|'UNREACHABLE';
 
 export const CertificateVerification: React.FC = () => {
   const store = useAppStore();
@@ -30,10 +30,11 @@ export const CertificateVerification: React.FC = () => {
   const verifyCode = async (code:string) => {
     setSubmittedCode(code);setPublicView(null);
     const remote=await fetchPublicCertificateVerdict(code);
-    if(remote){setVerification(remote.state);setPublicView(remote.certificate||null);setChain([]);
+    if(remote&&remote!=='UNREACHABLE'){setVerification(remote.state);setPublicView(remote.certificate||null);setChain([]);
       if(remote.state!=='NOT_FOUND')return;}
     const cert=certificates.find(c=>c.certificateNumber.toLowerCase()===code.toLowerCase());
-    if(!cert){setVerification('NOT_FOUND');setChain([]);return;}
+    /* السجل تعذّر ولا نسخة محلية: يُقال «تعذّر التحقق الآن»، لا «غير موجودة». */
+    if(!cert){setVerification(remote==='UNREACHABLE'?'UNREACHABLE':'NOT_FOUND');setChain([]);return;}
     const result=await store.verifyCertificateEvidence(cert.id);
     setVerification(result.state);
     setChain(store.certificateEvidenceChain(cert.id));
@@ -58,7 +59,8 @@ export const CertificateVerification: React.FC = () => {
     AUTHENTIC:{ar:'أصيلة',en:'AUTHENTIC',variant:'emerald'},
     REVOKED:{ar:'ملغاة',en:'REVOKED',variant:'rose'},
     NOT_FOUND:{ar:'غير موجودة',en:'NOT FOUND',variant:'neutral'},
-    INVALID_PROOF:{ar:'إثبات غير صالح',en:'INVALID PROOF',variant:'rose'}
+    INVALID_PROOF:{ar:'إثبات غير صالح',en:'INVALID PROOF',variant:'rose'},
+    UNREACHABLE:{ar:'تعذّر التحقق الآن',en:'VERIFICATION UNAVAILABLE',variant:'amber'}
   };
 
   return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
@@ -73,6 +75,7 @@ export const CertificateVerification: React.FC = () => {
       </div>}
     </section>
 
+    {submittedCode && verification==='UNREACHABLE' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'تعذّر التحقق الآن':'Verification unavailable'}</h2><p className="text-xs text-[#646965] mt-1">{ar?'لم نتمكّن من الوصول إلى سجل الشهادات، وهذا لا يعني أن الشهادة غير صحيحة. أعد المحاولة بعد قليل.':'The certificate registry could not be reached. This does not mean the certificate is invalid — try again shortly.'}</p><div className="mt-5"><Button variant="outline" onClick={()=>void verifyCode(submittedCode)}>{ar?'إعادة المحاولة':'Try again'}</Button></div></section>}
     {submittedCode && verification==='NOT_FOUND' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'غير موجودة':'NOT FOUND'}</h2><p className="text-xs text-[#646965] mt-1">{ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}</p></section>}
 
     {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">

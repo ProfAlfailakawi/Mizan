@@ -115,10 +115,17 @@ test('a number that is not a certificate number never reaches the network',async
 test('an unconfigured registry falls back to the local check instead of denying a real certificate',async()=>{
  const unconfigured=await fetchPublicCertificateVerdict('MZN-1',(async()=>new Response('{}',{status:503})) as any);
  assert.equal(unconfigured,null,'503 means no registry, which is not a verdict');
+ /*
+  * انقطاع الشبكة ليس نفيًا. الغريب الماسح لرمز مطبوع لا يملك المخزن المحلي، فإعادة null هنا
+  * كانت تُسقطه على فحصٍ لا بيانات له فيُعلن أن شهادة صحيحة «غير موجودة» — تهمةُ تزوير سببها
+  * تعثّر شبكة. التعذّر يُعلَن تعذّرًا.
+  */
  const offline=await fetchPublicCertificateVerdict('MZN-1',(async()=>{throw new Error('offline')}) as any);
- assert.equal(offline,null);
+ assert.equal(offline,'UNREACHABLE');
+ const serverError=await fetchPublicCertificateVerdict('MZN-1',(async()=>new Response('boom',{status:500})) as any);
+ assert.equal(serverError,'UNREACHABLE');
  const found=await fetchPublicCertificateVerdict('MZN-1',(async()=>new Response(JSON.stringify({state:'REVOKED'}),{status:200})) as any);
- assert.equal(found?.state,'REVOKED','a real verdict is never swallowed');
+ assert.equal(found&&found!=='UNREACHABLE'?found.state:'','REVOKED','a real verdict is never swallowed');
 });
 
 test('publication never breaks issuance and never leaks beyond the certificate',async()=>{

@@ -7,6 +7,15 @@ export type GovernanceRole=
   | 'super_admin'|'operator_owner'|'operator_admin'|'org_admin'|'storage_admin'|'billing_admin'|'branch_admin'|'comp_admin'|'head_judge'|'judge'
   | 'ops_manager'|'exception_host'|'delegation_manager'|'participant'
   | 'broadcast_operator'|'auditor'|'guardian'|'support_agent';
+/*
+ * القائمة الواحدة لكل الأدوار الفاعلة. سببها واقعة: مسار النبضة كان يعدّد أدواره يدويًا فسقطت
+ * منه خمسة أدوار حقيقية لها شاشات، فكانت جلساتها تُرفض 403 كل دقيقة إلى الأبد ولا تظهر في
+ * لوحة المالك أبدًا. أي مسار يعني «كل مَن دخل» يشتق منها ولا يعيد كتابتها.
+ */
+export const ALL_GOVERNANCE_ROLES:GovernanceRole[]=[
+  'super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge',
+  'ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent',
+];
 export type ServerIdentity={uid:string;email?:string;role:GovernanceRole;organizationId:string;operatorId?:string;competitionId?:string;operatorOrganizationIds?:string[]};
 
 type Invitation={id:string;organizationId:string;operatorId?:string;competitionId?:string;committeeId?:string;email:string;displayName:string;requestedRole:GovernanceRole;reason:string;status:'PENDING_APPROVAL'|'READY'|'ACTIVATED'|'EXPIRED'|'REVOKED';createdAt:string;createdBy:string;approvedAt?:string;approvedBy?:string;expiresAt:string;activationTokenHash?:string};

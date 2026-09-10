@@ -473,6 +473,8 @@ export interface ResultRecord {
   country: string;
   categoryId: string;
   categoryName: string;
+  /** اسم الفئة بالعربية. كانت النتيجة تحمل الاسم الإنجليزي وحده، فيُعرض داخل جدول عربي. */
+  categoryNameArabic?: string;
   finalScore: number;
   rank: number;
   /** Aggregated per-criterion score (points) — retained for deterministic tie-breaking. */
