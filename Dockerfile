@@ -48,7 +48,9 @@ ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY \
 # production revisions to bind :3000 while Cloud Run probed :8080. Keep the production image
 # fail-safe: rewrite only that exact legacy declaration before bundling; once source is dynamic,
 # this becomes a no-op and still verifies the runtime contract.
-RUN node -e "const fs=require('fs');const p='server.ts';let s=fs.readFileSync(p,'utf8');const fixed='const PORT = 3000;';const dynamic='const PORT = Number(process.env.PORT || 3000);';if(s.includes(fixed)){s=s.replace(fixed,dynamic);fs.writeFileSync(p,s)}if(!s.includes(dynamic))throw new Error('Cloud Run PORT contract missing');"
+# الفحص على العقد لا على نصٍّ بعينه. النسخة السابقة كانت تشترط صيغة حرفية واحدة، فانكسر
+# البناء حين صار المصدر يقرأ PORT بصيغة أمتن منها — أي أن الحارس رفض إصلاحًا أفضل مما ينتظر.
+RUN node -e "const fs=require('fs');const p='server.ts';let s=fs.readFileSync(p,'utf8');const legacy='const PORT = 3000;';if(s.includes(legacy)){s=s.replace(legacy,'const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;');fs.writeFileSync(p,s)}if(!/const PORT\s*=[^;]*process\.env\.PORT/.test(s))throw new Error('Cloud Run PORT contract missing: server.ts must read process.env.PORT');"
 
 RUN npm run build
 

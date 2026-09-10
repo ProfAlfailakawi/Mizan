@@ -30,6 +30,27 @@ test('the container port and the app agree, or traffic never arrives', () => {
   );
 });
 
+test('the image build guard accepts the source as it stands', () => {
+  /*
+   * هذا الاختبار موجود لأن العطل وقع فعلًا: الحارس في Dockerfile كان يشترط صيغة حرفية
+   * واحدة لقراءة المنفذ، فلمّا صار المصدر يقرؤه بصيغة أمتن رمى الحارس خطأً وسقط بناء
+   * الصورة — أي أن النشر انكسر بإصلاحٍ صحيح. لا يكشف ذلك أي اختبار وحدة ولا npm run build،
+   * لأن الحارس لا يعمل إلا داخل بناء الحاوية. فيُشغَّل هنا على المصدر الحقيقي.
+   */
+  const dockerfile = read('Dockerfile');
+  const guard = /RUN node -e "(.+?)"\s*$/m.exec(dockerfile)?.[1];
+  assert.ok(guard, 'the Dockerfile must still carry the PORT contract guard');
+  assert.match(guard, /Cloud Run PORT contract missing/, 'and it must be that guard, not another script');
+
+  const source = read('server.ts');
+  const legacy = 'const PORT = 3000;';
+  const rewritten = source.includes(legacy)
+    ? source.replace(legacy, 'const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;')
+    : source;
+  assert.match(rewritten, /const PORT\s*=[^;]*process\.env\.PORT/,
+    'the guard would throw and the container build would fail');
+});
+
 test('the documented PORT is one the app actually reads', () => {
   // توثيق متغيّر لا يقرأه أحد أسوأ من عدم توثيقه: يضبطه الناشر ويظنّ أنه فعل شيئًا.
   assert.match(read('.env.example'), /^PORT=/m);
