@@ -542,7 +542,7 @@ async function startServer() {
 
   /* تحديث الهوية البيضاء وإعدادات الشعار والعرض للجهة المشترية (org_admin أو super_admin) */
   const brandAdmins = requireFirebaseRoles(['super_admin', 'org_admin']);
-  app.get('/api/tenant/brand', ownerRateLimit, brandAdmins, (req,res)=>{const store=tenantAdmin(res);if(!store)return;const actor=(req as any).mizanIdentity;const isSuper=actor?.role==='super_admin';const orgId=isSuper&&req.query?.orgId?String(req.query.orgId):actor?.organizationId;if(!orgId)return res.status(400).json({code:'ORG_ID_REQUIRED'});const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant});});
+  app.get('/api/tenant/brand', ownerRateLimit, brandAdmins, (req,res)=>{const store=tenantAdmin(res);if(!store)return;const actor=(req as any).mizanIdentity;const isSuper=actor?.role==='super_admin';const orgId=isSuper&&req.query?.orgId?String(req.query.orgId):actor?.organizationId;if(!orgId)return res.status(400).json({code:'ORG_ID_REQUIRED'});const tenant=store.list().find(x=>x.orgId===orgId)||{orgId,status:'active' as const};res.setHeader('cache-control','no-store');return res.json({tenant,baseDomain:process.env.MIZAN_BASE_DOMAIN||''});});
   app.patch('/api/tenant/brand', ownerRateLimit, brandAdmins, (req, res) => {
     const store = tenantAdmin(res);
     if (!store) return;
