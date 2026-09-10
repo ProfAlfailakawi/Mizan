@@ -65,6 +65,7 @@ import {
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
+import { calibrateJudges } from '../../server/judge-calibration';
 import { certificateVerifyUrl } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
@@ -1950,10 +1951,30 @@ export function useAppStore() {
     });
   };
 
+  /*
+   * كان هذا يقارن متوسط درجات المحكّم بمتوسط بقية المحكّمين على **متسابقين مختلفين**، فمن
+   * وقعت له مجموعة أضعف ظهر «متشددًا» بلا ذنب — والإشارة كانت تُعرض في تبويب الختم نفسه،
+   * أي عند لحظة القرار، بينما التحليل المعاير الصحيح في تبويب آخر يقول غير ذلك.
+   *
+   * صار يقارن مثلًا بمثل: المحكّم مقابل بقية لجنته على المتسابق نفسه، بانكماش بايزي يمنع
+   * وصم محكّم من عيّنة صغيرة. لا يُعدَّل حكم بشري، والمخرج استشاري لرئيس التحكيم وحده.
+   */
   const getIntegrityAnalytics = () => {
-    const byJudge=globalState.judges.map(j=>{const subs=globalState.judgeSubmissions.filter(s=>s.judgeId===j.userId); const avg=subs.length?subs.reduce((a,s)=>a+s.totalScore,0)/subs.length:0; return {judgeId:j.id,name:j.name,sessions:subs.length,averageScore:Math.round(avg*100)/100,calibrationScore:j.calibrationScore,isReady:j.isReady};});
-    const scored=byJudge.filter(j=>j.sessions>0); const panelAvg=scored.length?scored.reduce((a,j)=>a+j.averageScore,0)/scored.length:0;
-    return byJudge.map(j=>({...j,deviationFromPanel:Math.round((j.averageScore-panelAvg)*100)/100,attention:j.sessions>=3&&Math.abs(j.averageScore-panelAvg)>=8}));
+    const observations=globalState.judgeSubmissions.filter(x=>x.locked&&x.participantId).map(x=>({judgeId:x.judgeId,judgeName:x.judgeName,sessionId:x.sessionId,participantId:x.participantId!,score:x.totalScore}));
+    const report=calibrateJudges(observations);
+    const byId=new Map(report.judges.map(j=>[j.judgeId,j]));
+    return globalState.judges.map(j=>{
+      const cal=byId.get(j.userId)||byId.get(j.id);
+      const sessions=globalState.judgeSubmissions.filter(s=>s.judgeId===j.userId||s.judgeId===j.id).length;
+      const avg=cal?.mean??0;
+      return {judgeId:j.id,name:j.name,sessions,averageScore:Math.round(avg*100)/100,calibrationScore:j.calibrationScore,isReady:j.isReady,
+        deviationFromPanel:Math.round((cal?.shrunkBias??0)*100)/100,
+        tendency:cal?.tendency||'INSUFFICIENT_DATA',
+        confidence:cal?.confidence??0,
+        /* لا انتباه من عيّنة صغيرة: الميل غير المؤكد ليس إشارة. */
+        attention:!!cal&&cal.tendency!=='INSUFFICIENT_DATA'&&cal.tendency!=='BALANCED',
+        advisoryOnly:true as const};
+    });
   };
 
   const runSimulation = (committeesCount: number, arrivalThroughputPerHr: number): SimulationResult => {

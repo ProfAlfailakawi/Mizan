@@ -40,3 +40,28 @@ test('small samples are marked insufficient rather than accused', () => {
   assert.equal(r.committees[0].regionalEvenness, 'INSUFFICIENT');
   assert.equal(r.committees[0].status, 'CLEAR');
 });
+
+test('a judge assigned weaker reciters is not labelled harsh',async()=>{
+ const {calibrateJudges}=await import('../server/judge-calibration');
+ // Judge A only ever judged a weak field; judge B only a strong one. They never overlap.
+ const observations=[
+  ...['w1','w2','w3','w4','w5'].map(p=>({judgeId:'A',sessionId:`s-${p}`,participantId:p,score:60})),
+  ...['x1','x2','x3','x4','x5'].map(p=>({judgeId:'B',sessionId:`t-${p}`,participantId:p,score:95})),
+ ];
+ for(const j of calibrateJudges(observations).judges){
+  assert.equal(j.tendency,'INSUFFICIENT_DATA',`${j.judgeId} shares no participant with anyone, so no tendency may be claimed`);
+  assert.equal(j.shrunkBias,0);
+ }
+
+ // Real severity — same participants, consistently lower — is still detected.
+ const shared=Array.from({length:12},(_,i)=>`p${i}`).flatMap(p=>[
+  {judgeId:'A',sessionId:p,participantId:p,score:80},
+  {judgeId:'B',sessionId:p,participantId:p,score:90},
+  {judgeId:'C',sessionId:p,participantId:p,score:90},
+ ]);
+ const report=calibrateJudges(shared);
+ const a=report.judges.find(x=>x.judgeId==='A')!;
+ assert.equal(a.tendency,'HAWK');
+ assert.ok(a.shrunkBias<0,'a consistently lower judge reads as harsher than the panel');
+ assert.equal(report.advisoryOnly,true,'the report may never be treated as a score correction');
+});
