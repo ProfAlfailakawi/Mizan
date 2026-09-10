@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { auth } from './firebase';
 
 /*
  * نبضة التشغيل — الوصلة الناقصة بين تعثّر المستخدم وعلم المالك.
@@ -37,7 +36,9 @@ export async function sendHeartbeat(
   if (!fetcher || !input.subjectId) return 'SKIPPED';
   let bearer: string | undefined;
   try {
-    bearer = deps.token ? await deps.token() : await auth.currentUser?.getIdToken();
+    /* استيراد كسول: ربط الوحدة بإعداد Firebase عند التحميل يجعلها غير قابلة للاختبار
+       خارج المتصفح، ولا حاجة إليه قبل أول نبضة. */
+    bearer = deps.token ? await deps.token() : await (await import('./firebase')).auth.currentUser?.getIdToken();
   } catch { return 'SKIPPED' }
   if (!bearer) return 'SKIPPED';
   try {
