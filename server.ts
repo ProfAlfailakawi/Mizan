@@ -155,6 +155,11 @@ async function startServer() {
   const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:15*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||12),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* إشعار بوابة الدفع عام بلا هوية مستخدم، وثقته من توقيعه وحده. يُخنق بحدّ خاص يتّسع
+     لدفعات التسوية المشروعة ويمنع إغراق نقطة عامة بمحاولات توقيع فاشلة. */
+  const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -575,7 +580,7 @@ async function startServer() {
   app.get('/api/saas/operator/dashboard',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({...repo.operatorDashboard(saasActor(req)),paymentGateway:{configured:!!paymentGateway,name:paymentGateway?.name||'manual'}})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/organizations',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const created=repo.createOrganization(saasActor(req),req.body||{});seedTenantBrand(created);return res.status(201).json(created)}catch(err){return commercialError(res,err)}});
   /* إشعار البوابة: لا هوية مستخدم هنا — الثقة من التوقيع على الجسم الخام وحده، والتسوية متكرّرة بأمان. */
-  app.post('/api/payments/webhook',(req,res)=>{
+  app.post('/api/payments/webhook',paymentWebhookRateLimit,(req,res)=>{
     if(!paymentGateway)return res.status(503).json({code:'PAYMENT_GATEWAY_NOT_CONFIGURED'});
     const repo=saasPlatform;if(!repo)return res.status(503).json({code:'SAAS_PLATFORM_NOT_CONFIGURED'});
     const raw=(req as any).rawBody as Buffer|undefined;
