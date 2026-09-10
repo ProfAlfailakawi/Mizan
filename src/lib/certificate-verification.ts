@@ -37,17 +37,24 @@ export interface PublicCertificateVerdict{state:'AUTHENTIC'|'REVOKED'|'INVALID_P
  * null تعني «لا سجل عام مُهيَّأ»، وهي ليست حكمًا: يواصل النداء إلى المخزن المحلي.
  * أما NOT_FOUND فحكم صادر عن السجل، ولا يُخفى بحكم محلي مناقض إلا بغياب السجل.
  */
-export async function fetchPublicCertificateVerdict(certificateNumber:string,fetcher:typeof fetch|undefined=typeof fetch==='function'?fetch:undefined):Promise<PublicCertificateVerdict|null>{
+/*
+ * تعذّر الوصول إلى السجل ليس حكمًا على الشهادة. كان انقطاع الشبكة يُعيد null فيسقط النداء إلى
+ * المخزن المحلي، والغريب الماسح لرمز مطبوع لا يملك ذلك المخزن، فتُعلن شهادة صحيحة «غير موجودة» —
+ * أي تُتَّهم بالتزوير لأن الشبكة تعثّرت. لذلك يُميَّز التعذّر عن النفي بقيمة صريحة.
+ */
+export type CertificateLookupOutcome=PublicCertificateVerdict|'UNREACHABLE'|null;
+export async function fetchPublicCertificateVerdict(certificateNumber:string,fetcher:typeof fetch|undefined=typeof fetch==='function'?fetch:undefined):Promise<CertificateLookupOutcome>{
  const code=String(certificateNumber??'').trim();
  /* الفحص هنا لا في دالة مساعدة: الحارس يجب أن يسبق النداء في المسار نفسه ليكون حارسًا فعلًا. */
  if(!CERTIFICATE_NUMBER_PATTERN.test(code)||!fetcher)return null;
  try{
   const res=await fetcher(`/api/public/certificates/${encodeURIComponent(code)}`,{headers:{accept:'application/json'}});
   if(res.status===503||res.status===501)return null;
+  if(res.status>=500)return 'UNREACHABLE';
   const body=await res.json().catch(()=>null) as PublicCertificateVerdict|null;
-  if(!body||!body.state)return null;
+  if(!body||!body.state)return res.ok?null:'UNREACHABLE';
   return body;
- }catch{return null}
+ }catch{return 'UNREACHABLE'}
 }
 
 /*

@@ -223,6 +223,34 @@ export function serverErrorLabel(code: string, ar: boolean): string {
   return ar ? 'تعذر إكمال العملية. تحقق من البيانات وحاول مرة أخرى.' : 'The operation could not be completed. Check the details and try again.';
 }
 
+/*
+ * رفضُ الختم كان يصل إلى الشاشة فارغًا: الحالة الوحيدة التي تحمل `message` هي تعذّر سلطة
+ * الخادم، وما عداها — «لست مخوّلًا»، «النصاب لم يكتمل»، «قاعدة نزاهة مانعة»، «لا توجد نتائج» —
+ * كان يُعيد `reason` فقط، فيُضغط الزر ولا يقع شيء ولا يُقال لماذا. لكلٍّ منها هنا جملة تقول
+ * السبب والخطوة التالية.
+ */
+const SEAL_FAILURE_AR: Record<string, string> = {
+  not_authorized: 'الختم من صلاحية رئيس التحكيم أو مدير المسابقة أو مالك الجهة فقط.',
+  independent_quorum_required: 'الختم يحتاج موافقة شخصين من جهازين مختلفين. سُجِّلت موافقتك، وينتظر اعتماد الطرف الثاني.',
+  server_authority_required: 'تعذّر الوصول إلى خادم الاعتماد، فلم يُختم شيء. أعد المحاولة بعد استقرار الاتصال.',
+  integrity_invariant: 'قاعدة نزاهة مانعة تمنع الختم. راجع لوحة النزاهة وعالج التنبيه قبل إعادة المحاولة.',
+  no_results: 'لا توجد نتائج مكتملة لختمها بعد.',
+};
+const SEAL_FAILURE_EN: Record<string, string> = {
+  not_authorized: 'Only the head judge, competition manager or organization owner can seal.',
+  independent_quorum_required: 'Sealing needs two people on two devices. Your approval is recorded; the second is still pending.',
+  server_authority_required: 'The sealing authority was unreachable, so nothing was sealed. Try again once the connection is stable.',
+  integrity_invariant: 'A blocking integrity rule prevents sealing. Clear it on the integrity board first.',
+  no_results: 'There are no completed results to seal yet.',
+};
+/** يُعيد جملة عربية دائمًا: لا يُعرض `reason` خامًا، ولا تبقى الشاشة صامتة عند الرفض. */
+export function sealFailureLabel(outcome: { sealed?: boolean; reason?: string; message?: string } | null | undefined, ar: boolean): string {
+  if(!outcome || outcome.sealed) return '';
+  if(outcome.message) return outcome.message;
+  const map = ar ? SEAL_FAILURE_AR : SEAL_FAILURE_EN;
+  return map[String(outcome.reason || '')] || (ar ? 'تعذّر ختم النتائج. راجع الاعتراضات والمراجعات المعلّقة ثم أعد المحاولة.' : 'Results could not be sealed. Clear pending reviews and appeals, then try again.');
+}
+
 /* مستوى الأتمتة معروضًا بالعربية (كان يُعرض Assisted/Automated/Autopilot خامًا). */
 const AR_AUTOMATION: Record<string, string> = { assisted: 'مساعَد', automated: 'آلي', autopilot: 'تشغيل ذاتي' };
 export function automationLevelLabel(value: string, ar: boolean): string {
