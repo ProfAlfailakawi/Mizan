@@ -169,6 +169,14 @@ export function useMizanAuth(requireAuth: boolean) {
       const body = await response.json().catch(() => ({} as Record<string, unknown>));
       if (!response.ok) { setActivationMessage(String((body as { code?: string }).code || 'ACTIVATION_FAILED')); return; }
       setActivationMessage('ACTIVATED'); setActivationTokenState('');
+      /*
+       * تجديد الرمز قسرًا قبل إعادة التحميل.
+       *
+       * قواعد Firestore تقرأ مطالبات الرمز، والخادم كتبها للتوّ. لكن Firebase يخزّن الرمز
+       * قرابة ساعة، فإعادة التحميل وحدها تعود بالرمز القديم بلا مطالبات — فيدخل صاحب
+       * الحساب مخوَّلًا في ميزان ومرفوضًا في قاعدة البيانات، ولا يفهم لماذا.
+       */
+      try { await user.getIdToken(true) } catch { /* فشل التجديد لا يمنع الدخول؛ يُصلحه أول تحديث تالٍ */ }
       if (typeof window !== 'undefined' && window.location.hash.startsWith('#a=')) history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       window.location.reload();
     } catch { setActivationMessage('ACTIVATION_FAILED'); }
