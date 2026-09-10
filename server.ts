@@ -522,7 +522,15 @@ async function startServer() {
   app.post('/api/saas/owner/operators/:operatorId/credits',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({credit:repo.adjustCredits(saasActor(req),String(req.params.operatorId),Number(req.body?.quantity),String(req.body?.reason||''))})}catch(err){return commercialError(res,err)}});
   app.put('/api/saas/owner/operators/:operatorId',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({operator:repo.updateOperator(saasActor(req),String(req.params.operatorId),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.delete('/api/saas/owner/operators/:operatorId',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.deleteOperator(saasActor(req),String(req.params.operatorId))})}catch(err){return commercialError(res,err)}});
-  app.post('/api/saas/owner/organizations',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json(repo.createOrganization(saasActor(req),req.body||{}))}catch(err){return commercialError(res,err)}});
+  /* Seed the tenant brand with the organization's own name so a purchased tenant never shows the
+     platform wordmark on its portal, certificates or domain before anyone opens the brand studio. */
+  const seedTenantBrand=(created:{organization?:{id?:string;officialName?:string;shortName?:string}})=>{
+    const org=created?.organization;if(!org?.id||!tenantStore||process.env.MIZAN_TENANTS)return;
+    const displayNameArabic=String(org.officialName||'').trim();if(!displayNameArabic)return;
+    const outcome=tenantStore.saveBrand(org.id,{displayNameArabic,displayName:String(org.shortName||org.officialName||'').trim()||undefined});
+    if((outcome as {ok:boolean}).ok)resetTenantRegistry();
+  };
+  app.post('/api/saas/owner/organizations',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const created=repo.createOrganization(saasActor(req),req.body||{});seedTenantBrand(created);return res.status(201).json(created)}catch(err){return commercialError(res,err)}});
   app.put('/api/saas/owner/organizations/:id',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.updateOrganization(saasActor(req),String(req.params.id),req.body||{}))}catch(err){return commercialError(res,err)}});
   app.delete('/api/saas/owner/organizations/:id',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.deleteOrganization(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/migrate-tenants',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.migrateLegacyTenants(saasActor(req),tenantRegistry(),String(req.body?.planId||'')))}catch(err){return commercialError(res,err)}});
@@ -534,7 +542,7 @@ async function startServer() {
   app.post('/api/saas/owner/invoices/:id/pay',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/void',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.voidInvoice(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.get('/api/saas/operator/dashboard',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.operatorDashboard(saasActor(req)))}catch(err){return commercialError(res,err)}});
-  app.post('/api/saas/operator/organizations',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json(repo.createOrganization(saasActor(req),req.body||{}))}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/operator/organizations',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const created=repo.createOrganization(saasActor(req),req.body||{});seedTenantBrand(created);return res.status(201).json(created)}catch(err){return commercialError(res,err)}});
   // Operator plans (their own packages) + billing for their organizations
   const opRoles=requireFirebaseRoles(['operator_owner','operator_admin']);
   app.put('/api/saas/operator/plans',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({plan:repo.operatorUpsertPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
