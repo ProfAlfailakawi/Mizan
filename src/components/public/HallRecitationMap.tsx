@@ -1,4 +1,5 @@
 import React, { useRef,  useEffect, useMemo, useState  } from 'react';
+import { bilingualName } from '../../lib/ui-language';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { BookOpen, Sparkles, X, Radio } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -41,7 +42,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
         <div>
           <div className="text-[10px] font-black tracking-[.2em] text-[#c6b58a]">{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1 flex items-center gap-3">{ar ? 'اليوم تُتلى في هذه القاعة' : 'Recited in this hall today'}</h1>
-          <div className="text-xs mizan-venue-muted mt-1">{ar ? store.competition.nameArabic : store.competition.name}</div>
+          <div className="text-xs mizan-venue-muted mt-1">{bilingualName(store.competition,ar)}</div>
         </div>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.totalRecitations>0 ? (ar ? 'حي · بيانات فعلية' : 'Live · real data') : (ar ? 'بانتظار تلاوة فعلية' : 'Waiting for real recitation')}</span>

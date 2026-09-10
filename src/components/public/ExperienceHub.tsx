@@ -1,4 +1,5 @@
 import React from 'react';
+import { bilingualName } from '../../lib/ui-language';
 import {
   ArrowLeft, Award, Baby, Building2, Crown, FileSearch, Gavel, Headphones,
   LifeBuoy, Microscope, RadioTower, ScanLine, ShieldCheck, Sparkles, UserRound,
@@ -47,7 +48,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
             <button onClick={()=>{window.location.hash='#verify'}} className="inline-flex items-center gap-2 rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black"><BadgeCheck className="w-4 h-4"/>{ar?'التحقق من شهادة':'Certificate'}</button>
           </div>
         </div>
-        <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#646a66]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{ar?competition.nameArabic:competition.name}</span></div>
+        <div className="relative mt-8 flex items-center gap-2 text-[11px] text-[#646a66]"><span className="w-2 h-2 rounded-full bg-[#2F6555]"/><span>{bilingualName(competition,ar)}</span></div>
       </section>
 
       {groups.map(([items,title,subtitle])=><section key={title} className="mt-10">
