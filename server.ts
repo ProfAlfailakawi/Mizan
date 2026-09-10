@@ -46,6 +46,7 @@ import type { TenantRecord } from './server/tenant-registry';
 import { decodePemFromEnv } from './server/pem';
 import { R2PrivateClient, r2ConfigFromEnv } from './server/r2-private';
 import { ControlTowerRepository } from './server/control-tower';
+import { paymentGatewayFromEnv } from './server/payments';
 import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type TelemetrySubject } from './server/ops-telemetry';
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
@@ -81,7 +82,8 @@ async function startServer() {
     if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     next();
   });
-  app.use(express.json({ limit: '1mb' }));
+  /* توقيع الـwebhook يُحسب على الجسم الخام كما وصل: أي إعادة ترميز تُبطل التحقق. */
+  app.use(express.json({ limit: '1mb', verify:(req,_res,buf)=>{(req as any).rawBody=Buffer.from(buf)} }));
 
   // Per-instance fixed-window rate limiter.
   // HONEST SCOPE: this counter lives in this process's memory. On a horizontally scaled
@@ -153,6 +155,11 @@ async function startServer() {
   const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:15*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||12),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* إشعار بوابة الدفع عام بلا هوية مستخدم، وثقته من توقيعه وحده. يُخنق بحدّ خاص يتّسع
+     لدفعات التسوية المشروعة ويمنع إغراق نقطة عامة بمحاولات توقيع فاشلة. */
+  const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -514,7 +521,9 @@ async function startServer() {
   const commercialRoles=['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin'];
   const commercialAuth=requireFirebaseRoles(commercialRoles);
   const commercialError=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'SAAS_OPERATION_FAILED';const forbidden=/REQUIRED|NOT_ALLOWED|CROSS_TENANT|BLOCKED/.test(code);return res.status(forbidden?403:code.includes('NOT_FOUND')?404:400).json({code})};
-  app.get('/api/saas/owner/dashboard',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.dashboard(saasActor(req)))}catch(err){return commercialError(res,err)}});
+  /* الدفع الإلكتروني: البوابة تُعرَّف بالإعداد وحده، وغيابها يعني التحصيل اليدوي فلا شيء يتعطّل. */
+  const paymentGateway=paymentGatewayFromEnv();
+  app.get('/api/saas/owner/dashboard',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({...repo.dashboard(saasActor(req)),paymentGateway:{configured:!!paymentGateway,name:paymentGateway?.name||'manual'}})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/plans/initial',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({plan:repo.seedInitialPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.put('/api/saas/owner/plans',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({plan:repo.upsertPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.delete('/api/saas/owner/plans/:id',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.deletePlan(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
@@ -544,15 +553,43 @@ async function startServer() {
     }
     return res.json({invoice:inv,reminded:true});
   };
+  const publicOrigin=(req:Request)=>`${req.protocol}://${req.get('host')||''}`;
+  const startCheckout=async(req:Request,res:Response,repo:SaaSPlatformRepository)=>{
+    if(!paymentGateway)return res.status(503).json({code:'PAYMENT_GATEWAY_NOT_CONFIGURED'});
+    const actor=saasActor(req);
+    const {invoice,subjectName,contact}=repo.beginCheckout(actor,String(req.params.id));
+    const origin=publicOrigin(req);
+    const out=await paymentGateway.createCheckout({
+      invoiceId:invoice.id,invoiceNumber:invoice.number,amountMinor:invoice.amountMinor,currency:invoice.currency,
+      description:`${invoice.number} — ${subjectName}`,
+      customer:{name:subjectName,email:contact?.legalEmail,phone:contact?.legalPhone},
+      callbackUrl:`${origin}/#billing?invoice=${encodeURIComponent(invoice.id)}&status=paid`,
+      errorUrl:`${origin}/#billing?invoice=${encodeURIComponent(invoice.id)}&status=failed`,
+    });
+    const updated=repo.attachCheckout(actor,invoice.id,{provider:paymentGateway.name,externalRef:out.externalRef});
+    return res.status(201).json({paymentUrl:out.paymentUrl,invoice:updated});
+  };
   // Owner billing (subscriptions + invoices for operators and organizations)
   app.post('/api/saas/owner/subscriptions',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions/:id/cancel',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/pay',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/owner/invoices/:id/checkout',ownerRateLimit,ownerOnly,async(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return await startCheckout(req,res,repo)}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/remind',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return sendInvoiceReminder(res,repo.remindInvoice(saasActor(req),String(req.params.id)))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/void',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.voidInvoice(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
-  app.get('/api/saas/operator/dashboard',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.operatorDashboard(saasActor(req)))}catch(err){return commercialError(res,err)}});
+  app.get('/api/saas/operator/dashboard',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({...repo.operatorDashboard(saasActor(req)),paymentGateway:{configured:!!paymentGateway,name:paymentGateway?.name||'manual'}})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/organizations',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const created=repo.createOrganization(saasActor(req),req.body||{});seedTenantBrand(created);return res.status(201).json(created)}catch(err){return commercialError(res,err)}});
+  /* إشعار البوابة: لا هوية مستخدم هنا — الثقة من التوقيع على الجسم الخام وحده، والتسوية متكرّرة بأمان. */
+  app.post('/api/payments/webhook',paymentWebhookRateLimit,(req,res)=>{
+    if(!paymentGateway)return res.status(503).json({code:'PAYMENT_GATEWAY_NOT_CONFIGURED'});
+    const repo=saasPlatform;if(!repo)return res.status(503).json({code:'SAAS_PLATFORM_NOT_CONFIGURED'});
+    const raw=(req as any).rawBody as Buffer|undefined;
+    const settlement=paymentGateway.verifyWebhook(req.headers as Record<string,unknown>,Buffer.isBuffer(raw)?raw:Buffer.from(JSON.stringify(req.body??{})));
+    if(!settlement)return res.status(401).json({code:'PAYMENT_SIGNATURE_INVALID'});
+    if(settlement.status!=='paid')return res.status(202).json({accepted:true,status:settlement.status});
+    try{const out=repo.settleInvoiceByReference(paymentGateway.name,settlement.externalRef,{amountMinor:settlement.amountMinor,currency:settlement.currency,paidAt:settlement.paidAt,method:settlement.method});return res.json({settled:true,alreadySettled:out.alreadySettled})}
+    catch(err){const code=err instanceof Error?err.message:'PAYMENT_SETTLEMENT_FAILED';return res.status(code==='INVOICE_NOT_FOUND'?404:400).json({code})}
+  });
   // Operator plans (their own packages) + billing for their organizations
   const opRoles=requireFirebaseRoles(['operator_owner','operator_admin']);
   app.put('/api/saas/operator/plans',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({plan:repo.operatorUpsertPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
@@ -561,6 +598,7 @@ async function startServer() {
   app.post('/api/saas/operator/subscriptions/:id/cancel',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/pay',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/operator/invoices/:id/checkout',ownerRateLimit,opRoles,async(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return await startCheckout(req,res,repo)}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/remind',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return sendInvoiceReminder(res,repo.remindInvoice(saasActor(req),String(req.params.id)))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/void',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.voidInvoice(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.get('/api/saas/organization',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'&&req.query.organizationId?String(req.query.organizationId):actor.organizationId;return res.json(repo.usage(actor,organizationId))}catch(err){return commercialError(res,err)}});

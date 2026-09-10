@@ -219,3 +219,27 @@ test('storage quota trusts the measured size, releases abandoned reservations an
  const allowed=repo.reserveUpload(orgActor,{organizationId:org.id,fileType:'audio',mimeType:'audio/mpeg',sizeBytes:200});
  assert.equal(allowed.state,'reserved');
 }));
+
+test('gateway settlement is idempotent and refuses a mismatched amount',withRepo((repo)=>{
+ const plan=repo.seedInitialPlan(owner);
+ const org=repo.createOrganization(owner,{officialName:'Direct Org',shortName:'D',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const sub=repo.createSubscription(owner,{subjectType:'organization',subjectId:org.id,planId:plan.id});
+ const inv=repo.issueInvoice(owner,{subjectType:'organization',subjectId:org.id,subscriptionId:sub.id,amountMinor:5000,currency:'KWD'});
+ repo.attachCheckout(owner,inv.id,{provider:'demo',externalRef:'ref-9'});
+
+ // A payment for a different amount must not close the invoice; it is left for a human.
+ assert.throws(()=>repo.settleInvoiceByReference('demo','ref-9',{amountMinor:100}),/PAYMENT_AMOUNT_MISMATCH/);
+ assert.equal(repo.dashboard(owner).billing.invoices[0].status,'open');
+
+ const first=repo.settleInvoiceByReference('demo','ref-9',{amountMinor:5000,method:'knet'});
+ assert.equal(first.alreadySettled,false);
+ assert.equal(first.invoice.status,'paid');
+ assert.equal(first.invoice.method,'knet');
+
+ // A replayed notification changes nothing.
+ const replay=repo.settleInvoiceByReference('demo','ref-9',{amountMinor:5000});
+ assert.equal(replay.alreadySettled,true);
+ assert.equal(repo.dashboard(owner).billing.summary.paidInvoices,1);
+
+ assert.throws(()=>repo.settleInvoiceByReference('demo','unknown-ref',{}),/INVOICE_NOT_FOUND/);
+}));
