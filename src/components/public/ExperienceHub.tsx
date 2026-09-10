@@ -57,7 +57,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
           {items.map(item=>{const Icon=item.icon;return <button key={item.role} onClick={()=>onEnterRole(item.role)} className="group min-h-[138px] text-start rounded-[22px] border border-[#DFDED7] bg-[#FFFEFB] p-5 transition hover:border-[#AEBEB5] focus:outline-none focus:ring-2 focus:ring-[#214C40]/30">
             <div className="flex items-start justify-between gap-3"><Pictogram icon={Icon} size="sm"/><ArrowLeft className={`w-4 h-4 text-[#A3A9A5] opacity-0 group-hover:opacity-100 transition ${ar?'':'rotate-180'}`}/></div>
             <div className="mt-5 font-black text-sm">{ar?item.ar:item.en}</div>
-            <div className="mt-1.5 text-[10px] leading-5 text-[#646a66] line-clamp-1">{ar?item.noteAr:item.noteEn}</div>
+            <div className="mt-1.5 text-[10px] leading-5 text-[#646a66] line-clamp-2">{ar?item.noteAr:item.noteEn}</div>
           </button>})}
         </div>
       </section>)}
