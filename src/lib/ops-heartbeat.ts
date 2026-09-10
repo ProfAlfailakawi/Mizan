@@ -57,6 +57,8 @@ export async function sendHeartbeat(
     });
     /* التتبّع غير مهيّأ على الخادم: ليس عطلًا، ولا داعي لمحاولة أخرى. */
     if (res.status === 503 || res.status === 501) return 'NOT_CONFIGURED';
+    /* رفضٌ للهوية أو الدور لن ينقلب قبولًا بالتكرار: طرقٌ كل دقيقة إلى الأبد بلا فائدة. */
+    if (res.status === 401 || res.status === 403) return 'NOT_CONFIGURED';
     return res.ok ? 'SENT' : 'SKIPPED';
   } catch { return 'SKIPPED' }
 }
@@ -89,8 +91,12 @@ export function useOpsHeartbeat(subject: HeartbeatSubject): void {
 
     const beat = async () => {
       if (disabled.current) return;
-      /* المتصفح دون اتصال لا يصل الخادم أصلًا: تُترك النبضة للعودة بدل محاولة محكوم عليها. */
-      if (subject.isOffline) return;
+      /*
+       * `isOffline` هنا وضعُ قاعةٍ يختاره المشغّل عمدًا (شبكة محلية)، لا انقطاعَ شبكةٍ
+       * يقيسه المتصفح. فحجبُ النبضة عنده كان يمنع الحالة الوحيدة التي من أجلها وُجدت:
+       * لوحة المالك لا تستطيع التفريق بين جلسةٍ في وضع القاعة وجلسةٍ أُغلقت. تُحاوَل
+       * النبضة، وإن تعذّرت فالتعذّر مبتلَع أصلًا.
+       */
       const outcome = await sendHeartbeat({
         competitionId: subject.competitionId,
         subjectId: subject.subjectId,

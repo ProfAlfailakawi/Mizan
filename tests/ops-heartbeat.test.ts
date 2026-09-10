@@ -60,3 +60,47 @@ test('the application wires the beat, or the owner learns nothing', () => {
   assert.match(app, /useOpsHeartbeat\(/, 'a heartbeat nobody calls is the same silence it was written to end');
   assert.match(app, /errorCode:\s*activePersistenceError\?\.code/, 'the fault the user sees must be the fault the owner is told');
 });
+
+test('a rejected role is not hammered once a minute forever', async () => {
+  /*
+   * كان المسار يعدّد أدواره بخط اليد فسقطت منه خمسة أدوار حقيقية لها شاشات؛ جلساتها تُرفض
+   * 403 كل دقيقة ولا تصل اللوحة أبدًا. الإصلاح من طرفين: قائمة أدوار واحدة على الخادم،
+   * ورفضٌ لا يُعاد طرقه على العميل.
+   */
+  for (const status of [401, 403]) {
+    assert.equal(
+      await sendHeartbeat({ subjectId: 'u1', status: 'ONLINE' }, { token: async () => 't', fetcher: (async () => new Response('{}', { status })) as any }),
+      'NOT_CONFIGURED',
+      'a refusal never turns into acceptance by repetition',
+    );
+  }
+});
+
+test('the heartbeat route admits every active role, from one list', () => {
+  const governance = fs.readFileSync('server/identity-governance.ts', 'utf8');
+  const server = fs.readFileSync('server.ts', 'utf8');
+  const union = /export type GovernanceRole=([\s\S]*?);/.exec(governance)?.[1] || '';
+  const canonical = /export const ALL_GOVERNANCE_ROLES:GovernanceRole\[\]=\[([\s\S]*?)\];/.exec(governance)?.[1] || '';
+  const names = (src: string) => new Set(Array.from(src.matchAll(/'([a-z_]+)'/g), m => m[1]));
+  assert.deepEqual([...names(union)].sort(), [...names(canonical)].sort(), 'the canonical list must cover the whole role union');
+  assert.match(server, /app\.post\('\/api\/telemetry\/heartbeat',requireGovernanceRoles\(ALL_GOVERNANCE_ROLES\)/,
+    'a hand-written copy of the role list is how five real roles were dropped');
+});
+
+test('an operator-chosen offline session still reports itself', () => {
+  // isOffline وضعُ قاعةٍ يختاره المشغّل، لا انقطاعُ شبكةٍ يقيسه المتصفح: حجبُ النبضة عنده
+  // كان يمنع الحالة الوحيدة التي من أجلها وُجدت.
+  const src = fs.readFileSync('src/lib/ops-heartbeat.ts', 'utf8');
+  assert.doesNotMatch(src, /if \(subject\.isOffline\) return;/, 'OFFLINE must be able to leave the browser');
+  assert.match(src, /subject\.isOffline \? 'OFFLINE'/, 'and it must still be computed');
+});
+
+test('the server reports its own public-registration outages, and only those', () => {
+  /* زائر التسجيل غير مسجَّل الدخول عمدًا فلا نبضة من متصفحه؛ والخادم يُبلّغ عن أعطاله هو. */
+  const server = fs.readFileSync('server.ts', 'utf8');
+  const reporter = /const reportPublicFailure=\(([\s\S]*?)\n  \};/.exec(server)?.[1] || '';
+  assert.ok(reporter, 'the public failure reporter must exist');
+  assert.match(reporter, /status<500/, 'a wrong email is the applicant’s to fix, not an outage to wake the owner');
+  assert.doesNotMatch(reporter, /req\.body|email|phone|name/, 'the report carries a fault code and a scope, never personal data');
+  assert.match(server, /catch\(err\)\{reportPublicFailure\(/, 'the register route must route its failures through it');
+});
