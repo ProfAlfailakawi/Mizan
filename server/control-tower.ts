@@ -45,9 +45,20 @@ export interface DiagnosticResult{
   evidence:{check:string;state:HealthState|'PASS'|'FAIL'|'UNKNOWN';detail?:string}[];
   recommendedActions:string[];
   safeActionCodes:string[];
+  remedy?:DiagnosticRemedy;
   doctorSummaryArabic:string;
   doctorSummaryEnglish:string;
 }
+
+/*
+ * كيف يُحلّ هذا التشخيص فعلًا:
+ *  auto       — إجراء آمن ينفّذه الخادم ويعيد الفحص.
+ *  navigate   — لا يستطيع أحد اختراع القيمة؛ الحل فتح الشاشة الصحيحة بضغطة واحدة (مثل ضبط النطاق).
+ *  configure  — إعداد نشر (متغيّر بيئة)، يُذكر باسمه بدل اقتراح إجراء لا يصلحه.
+ *  governance — محمي بالنزاهة، لا يُحلّ تلقائيًا أبدًا.
+ */
+export type RemedyKind='auto'|'navigate'|'configure'|'governance';
+export interface DiagnosticRemedy{kind:RemedyKind;actions:string[];href?:string;hintArabic:string;hintEnglish:string}
 
 export interface IncidentRecord{
   id:string;
@@ -247,23 +258,65 @@ export function buildHealthSignals(input:{
   return signals.sort((a,b)=>stateRank(b.state)-stateRank(a.state));
 }
 
+/* عنوان عربي/إنجليزي لكل رمز، بما فيها الرموز التي لا تمثّل عطلًا بل حالة سكون أو إعداد نشر. */
+const DIAGNOSIS_TITLES:Record<string,{ar:string;en:string}>={
+  TENANT_DOMAIN_NOT_SET:{ar:'نطاق الجهة غير مضبوط',en:'Tenant domain not set'},
+  TENANT_DOMAIN_UNVERIFIED:{ar:'نطاق الجهة بانتظار التحقق',en:'Tenant domain awaiting verification'},
+  TENANT_SUSPENDED:{ar:'الجهة موقوفة',en:'Tenant suspended'},
+  NOTIFICATION_PROVIDER_NOT_CONFIGURED:{ar:'مزوّد الإشعارات غير مهيأ',en:'Notification provider not configured'},
+  TELEMETRY_NOT_CONFIGURED:{ar:'قياسات التشغيل غير مهيأة',en:'Operations telemetry not configured'},
+  IDLE_NO_LIVE_COMPETITIONS:{ar:'لا مسابقات حية الآن',en:'No live competitions right now'},
+  IDENTITY_GOVERNANCE_NOT_CONFIGURED:{ar:'حوكمة الهوية غير مهيأة',en:'Identity governance not configured'},
+  TENANT_REGISTRY_NOT_CONFIGURED:{ar:'سجل الجهات غير مهيأ',en:'Tenant registry not configured'},
+  DEPLOYMENT_CAPABILITY_NOT_CONFIGURED:{ar:'قدرة نشر غير مهيأة',en:'Deployment capability not configured'},
+};
+const titleFor=(code:string)=>DIAGNOSIS_TITLES[code]||{ar:KNOWN_ERROR_CATALOG.find(x=>x.code===code)?.humanTitleArabic||code,en:KNOWN_ERROR_CATALOG.find(x=>x.code===code)?.humanTitleEnglish||code};
+const configureRemedy=(envVar:string):DiagnosticRemedy=>({kind:'configure',actions:[],hintArabic:`إعداد نشر: اضبط ${envVar} في بيئة الخادم ثم أعد النشر. لا يمكن حلّه من الواجهة.`,hintEnglish:`Deployment setting: configure ${envVar} in the server environment, then redeploy.`});
+
+/*
+ * تشخيص دقيق: لكل إشارة رمزها الصحيح وتصنيفها وطريقة حلّها.
+ * حالات السكون وإعدادات النشر لا تُصنَّف أعطالًا مصعّدة، ولا يُعرض لها إجراء لا يصلحها.
+ */
+function classifySignal(signal:HealthSignal):{code:string;classification:AttentionClass;remedy:DiagnosticRemedy}{
+  const reason=signal.reason||'';
+  if(signal.key.startsWith('tenant_domain:')){
+    if(reason==='TENANT_SUSPENDED')return {code:'TENANT_SUSPENDED',classification:'INFORMATIONAL',remedy:{kind:'navigate',actions:[],href:'#licensing',hintArabic:'الإيقاف قرار إداري متعمّد. أعد التفعيل من «الجهات والتراخيص» عند الحاجة.',hintEnglish:'Suspension is a deliberate decision; reactivate from Licensing when needed.'}};
+    if(reason==='HOST_REQUIRED')return {code:'TENANT_DOMAIN_NOT_SET',classification:'MIZAN_ACTION_REQUIRED',remedy:{kind:'navigate',actions:[],href:signal.tenantId?`#identity?organizationId=${encodeURIComponent(signal.tenantId)}&panel=domain`:'#licensing',hintArabic:'لا يمكن اختراع نطاق للجهة. افتح «النطاق والوصول» واضبط النطاق الفرعي أو اربط نطاقًا خاصًا.',hintEnglish:'A domain cannot be invented. Open Domain & access and set a subdomain or connect a custom domain.'}};
+    return {code:'TENANT_DOMAIN_UNVERIFIED',classification:'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['domain.retest'],hintArabic:'النطاق مضبوط لكن التحقق لم يكتمل. أعد الاختبار؛ إن استمر فالسبب سجل DNS أو الشهادة عند مزوّد العميل.',hintEnglish:'Domain is set but unverified. Retest; if it persists the cause is the customer DNS record or certificate.'}};
+  }
+  if(signal.key==='notifications'){
+    if(signal.state==='DEGRADED')return {code:'NOTIFICATION_TRANSIENT_FAILURE',classification:'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['notification.retry'],hintArabic:'تعثّر مؤقت لدى المزوّد. إعادة الإرسال بتراجع أسّي آمنة ولا تُكرّر التسليم.',hintEnglish:'Transient provider failure. Retry with backoff is safe and idempotent.'}};
+    return {code:'NOTIFICATION_PROVIDER_NOT_CONFIGURED',classification:'MIZAN_ACTION_REQUIRED',remedy:configureRemedy('MIZAN_NOTIFICATION_PROVIDER')};
+  }
+  if(signal.key==='background_jobs'){
+    if(signal.state==='DEGRADED')return {code:'BACKGROUND_JOB_STUCK',classification:'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['job.retry'],hintArabic:'مهمة خلفية بحجز قديم. إعادة التشغيل محمية بمفتاح تكرار فلا تُنفَّذ مرتين.',hintEnglish:'Stale job lease. Retry is idempotency-guarded.'}};
+    return {code:'TELEMETRY_NOT_CONFIGURED',classification:'INFORMATIONAL',remedy:configureRemedy('MIZAN_OPS_TELEMETRY_DIR')};
+  }
+  if(signal.key==='live_competitions')return {code:'IDLE_NO_LIVE_COMPETITIONS',classification:'INFORMATIONAL',remedy:{kind:'auto',actions:[],hintArabic:'ليست مشكلة: لا توجد مسابقة حية في هذه النافذة الزمنية. تظهر تلقائيًا عند انطلاق أي مسابقة.',hintEnglish:'Not a problem: no competition is live in this window.'}};
+  if(signal.key==='identity_governance')return {code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED',classification:'MIZAN_ACTION_REQUIRED',remedy:configureRemedy('MIZAN_IDENTITY_GOVERNANCE_DIR')};
+  if(signal.key==='tenant_registry')return {code:'TENANT_REGISTRY_NOT_CONFIGURED',classification:'MIZAN_ACTION_REQUIRED',remedy:configureRemedy('MIZAN_TENANTS_FILE')};
+  if(signal.key.startsWith('incident:'))return {code:'BACKGROUND_JOB_STUCK',classification:signal.state==='OUTAGE'?'SECURITY_REVIEW':'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['diagnostic.bundle.generate'],hintArabic:'حادثة مفتوحة. ولّد تقرير تشخيص وتابعها حتى الإغلاق.',hintEnglish:'Open incident. Generate a diagnostic bundle and track to closure.'}};
+  return {code:'DEPLOYMENT_CAPABILITY_NOT_CONFIGURED',classification:'INFORMATIONAL',remedy:{kind:'configure',actions:[],hintArabic:'قدرة اختيارية غير مهيأة في هذا النشر. لا أثر على التشغيل الحالي.',hintEnglish:'Optional capability not configured in this deployment; no impact on current operations.'}};
+}
+
 export function diagnoseSignals(signals:HealthSignal[]):DiagnosticResult[]{
   return signals.filter(s=>s.state!=='HEALTHY').map((signal):DiagnosticResult=>{
-    const code=signal.key.startsWith('tenant_domain:')?'TENANT_DOMAIN_MISCONFIGURED':signal.key.startsWith('incident:')?'BACKGROUND_JOB_STUCK':signal.key==='notifications'?'NOTIFICATION_TRANSIENT_FAILURE':signal.key==='identity_governance'?'PRIVILEGED_SESSION_CONFLICT':'BACKGROUND_JOB_STUCK';
-    const known=KNOWN_ERROR_CATALOG.find(x=>x.code===code)!;
-    const classification:AttentionClass=known.scope==='INTEGRITY'?'INTEGRITY_PROTECTED':known.scope==='TENANT'&&code==='PRIVILEGED_SESSION_CONFLICT'?'TENANT_ACTION_REQUIRED':known.severity==='CRITICAL'?'SECURITY_REVIEW':'MIZAN_ACTION_REQUIRED';
+    const {code,classification,remedy}=classifySignal(signal);
+    const title=titleFor(code);
+    const detail=signal.reason||title.ar;
     return {
       id:`diag-${hash(`${signal.key}:${signal.reason||''}`).slice(0,12)}`,
       code,
       tenantId:signal.tenantId,
       classification,
-      rootCause:signal.reason||known.description,
+      rootCause:signal.reason||title.en,
       confidence:signal.state==='UNKNOWN'?'LOW':'MEDIUM',
       evidence:[{check:signal.label,state:signal.state,detail:signal.reason}],
-      recommendedActions:known.safeActions,
-      safeActionCodes:known.safeActions.map(a=>a.includes('revoke')?'user_sessions.revoke':a.includes('retest')?'domain.retest':a.includes('retry')?'notification.retry':'diagnostic.bundle.generate'),
-      doctorSummaryArabic:`${known.humanTitleArabic}: ${signal.reason||known.description}`,
-      doctorSummaryEnglish:`${known.humanTitleEnglish}: ${signal.reason||known.description}`,
+      recommendedActions:remedy.actions,
+      safeActionCodes:remedy.actions,
+      remedy,
+      doctorSummaryArabic:`${title.ar}: ${detail}`,
+      doctorSummaryEnglish:`${title.en}: ${signal.reason||title.en}`,
     };
   });
 }
