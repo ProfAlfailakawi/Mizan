@@ -10,6 +10,8 @@ import {installInputNormalization} from './lib/input-validation';
 
 // Must run before the first lazy route resolves, so a chunk minted by a previous deploy can
 // recover instead of leaving a venue screen blank.
+// إعلان الإقلاع لحارس index.html: وصلت الحزمة وعملت، فلا حاجة لتعافي الغلاف.
+(window as unknown as { __MIZAN_BOOTED?: boolean }).__MIZAN_BOOTED = true;
 installStaleShellRecovery();
 installInputNormalization();
 

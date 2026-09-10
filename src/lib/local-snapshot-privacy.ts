@@ -58,6 +58,8 @@ export function redactStateForLocalSnapshot<T extends { participants: Participan
   const activeSession = state.activeSession;
   return {
     ...state,
+    // عطل الحفظ لا يُخزَّن: هو حالة لحظية تُكتشف حيًّا، وتخزينه يبعثه بعد زوال سببه.
+    ...('persistenceError' in (state as Record<string, unknown>) ? { persistenceError: null } : {}),
     participants: state.participants.map(redactParticipantForLocalSnapshot),
     ...(activeSession?.participant
       ? { activeSession: { ...activeSession, participant: redactParticipantForLocalSnapshot(activeSession.participant) } }
