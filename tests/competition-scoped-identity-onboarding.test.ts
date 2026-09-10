@@ -47,7 +47,9 @@ test('QR onboarding creates the invited Firebase account and organization admin 
  assert.doesNotMatch(org,/selectCompetition\(c\.id\);switchRole\('comp_admin'\)/);
  assert.doesNotMatch(comp,/IdentityGovernance competitionId=\{competition\.id\}/);
  assert.match(comp,/العودة إلى مسابقات الجهة/);
- assert.match(app,/case 'org_admin': return hash\.startsWith\('#manage-competition'\)\?<CompetitionOverview\/>:<OrganizationHome\/>;/);
+ /* المقصود أن مالك الجهة يبلغ شاشة المسابقة بالمسار لا بانتحال دور مدير المسابقة. الشرط
+    على النيّة لا على نصّ السطر: أدوارٌ أخرى تملك ضبط المسابقة قد تشارك الحالة نفسها. */
+ assert.match(app,/case 'org_admin':[^\n]*hash\.startsWith\('#manage-competition'\)\?<CompetitionOverview\/>:<OrganizationHome\/>;/);
  assert.match(server,/\/api\/identity\/grants\/:id/);
 });
 

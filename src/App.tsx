@@ -291,8 +291,10 @@ export default function App() {
   switch(currentUser.role){
    case 'super_admin': return <SuperAdminConsole/>;
    case 'operator_owner': case 'operator_admin': return <OperatorWorkspace/>;
-   case 'org_admin': return hash.startsWith('#manage-competition')?<CompetitionOverview/>:<OrganizationHome/>;
-   case 'storage_admin': case 'billing_admin': case 'branch_admin': return <OrganizationHome/>;
+   /* مدير الفرع يملك إنشاء المسابقة وضبطها وإدارة لجانها، ولم يكن له مسار إلى أيٍّ منها:
+      يضغط بطاقة المسابقة فيتغيّر العنوان ولا تتغيّر الصفحة. */
+   case 'org_admin': case 'branch_admin': return hash.startsWith('#manage-competition')?<CompetitionOverview/>:<OrganizationHome/>;
+   case 'storage_admin': case 'billing_admin': return <OrganizationHome/>;
    case 'comp_admin': return <CompetitionOverview/>;
    case 'head_judge': return <HeadJudgeInbox/>;
    case 'judge': return <JudgeOS/>;
