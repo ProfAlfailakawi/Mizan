@@ -97,7 +97,7 @@ export class IdentityGovernanceRepository{
     if(requestedOperatorId||isOperatorRole(actor.role)){
       const operatorId=actor.role==='super_admin'?requestedOperatorId:actor.operatorId;
       if(!operatorId||a.operatorId!==operatorId)return false;
-      if(actor.role==='operator_owner'){const grant=this.visibleGrantFor(s,a.id);if(!grant||grant.role!=='operator_admin')return false;}
+      if(actor.role==='operator_owner'&&a.uid!==actor.uid){const grant=this.visibleGrantFor(s,a.id);if(!grant||grant.role!=='operator_admin')return false;}
       return true;
     }
     const scope=actor.role==='super_admin'&&requestedOrganizationId?requestedOrganizationId:actor.organizationId;
@@ -189,7 +189,7 @@ export class IdentityGovernanceRepository{
     if(requestedOperatorId||isOperatorRole(actor.role)){
       const operatorId=actor.role==='super_admin'?requestedOperatorId:actor.operatorId;if(!operatorId)throw new Error('OPERATOR_SCOPE_REQUIRED');
       let scopedGrants=s.grants.filter(g=>g.operatorId===operatorId&&!isRetiredIdentityRole(g.role)&&g.status!=='REVOKED');
-      if(actor.role==='operator_owner')scopedGrants=scopedGrants.filter(g=>g.role==='operator_admin');
+      if(actor.role==='operator_owner'){const ownAccountIds=new Set(s.accounts.filter(a=>a.uid===actor.uid).map(a=>a.id));scopedGrants=scopedGrants.filter(g=>g.role==='operator_admin'||ownAccountIds.has(g.accountId));}
       const ids=new Set(scopedGrants.map(g=>g.accountId));
       const accounts=s.accounts.filter(a=>a.status!=='REVOKED'&&ids.has(a.id)&&this.accountVisibleTo(actor,s,a,undefined,undefined,operatorId));
       const visibleIds=new Set(accounts.map(a=>a.id));

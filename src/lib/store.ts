@@ -1042,7 +1042,9 @@ export function useAppStore() {
      */
     let sealQuorum:QuorumActionRecord|undefined;
     let serverQuorumApprovals=0;
-    if (policy.results.requireDualApprovalToSeal) {
+    // التكيّف التلقائي: الموافقة المزدوجة تُشترط فقط عندما تسمح اللجنة بمحكّمين اثنين فأكثر.
+    const dualApprovalActive = policy.results.requireDualApprovalToSeal && (globalState.competition.ruleSet?.judgesCountPerPanel ?? 0) >= 2;
+    if (dualApprovalActive) {
       const requested=await requestQuorum({competitionId:globalState.competition.id,action:'results_seal',entityId:globalState.competition.id,requiredRoleGroups:[['head_judge'],['comp_admin','org_admin']]});
       if(!succeeded(requested)){notify();return {sealed:false,reason:'server_authority_required' as const,failure:requested.failure,message:authorityFailureText(requested.failure,true),approvals:0};}
       const approved=await approveQuorum(requested.value.id);

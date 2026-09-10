@@ -36,8 +36,9 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       <MizanLogo language={language} compact/>
       <div className="min-w-0 hidden sm:block">
         <div className="flex items-center gap-2">
+          {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[11px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
           <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
-          <span className="text-[10px] text-[#636864] truncate max-w-[min(52vw,520px)]" title={language==='ar'?competition.nameArabic:competition.name}>{language==='ar'?competition.nameArabic:competition.name}</span>
+          <span className="text-[10px] text-[#636864] truncate max-w-[min(44vw,460px)]" title={language==='ar'?competition.nameArabic:competition.name}>{language==='ar'?competition.nameArabic:competition.name}</span>
           {brandInfo.placements.showHeaderContact && (brandInfo.phoneNumber || brandInfo.supportEmail) && (
             <a
               href={brandInfo.phoneNumber ? `tel:${brandInfo.phoneNumber}` : `mailto:${brandInfo.supportEmail}`}

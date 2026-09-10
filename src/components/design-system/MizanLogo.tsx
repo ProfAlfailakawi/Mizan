@@ -16,13 +16,17 @@ export interface BrandInfo {
   placements: Required<BrandDisplayPlacements>;
 }
 
+// معرّفات النظام (مثل MZ-ORG-000016) يجب ألا تظهر كاسم علامة في الترويسة.
+const isSystemId = (v?: string): boolean => !!v && /^MZ-(ORG|TEN|LIC)-\d+$/i.test(v.trim());
+const cleanName = (v?: string): string | undefined => (isSystemId(v) ? undefined : v);
+
 export function useBrandInfo(): BrandInfo {
   const s = useAppStore();
   const brand = s.organization?.brand;
   const comp = s.competition;
   const rawPlacements = brand?.displayPlacements || {};
-  const brandArabic = comp?.displayNameArabic || brand?.displayNameArabic || brand?.nameArabic;
-  const brandEnglish = comp?.displayName || brand?.displayName || brand?.name;
+  const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic);
+  const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name);
   return {
     ar: brandArabic || brand?.displayNameArabic || 'ميزان',
     en: brandEnglish || brand?.displayName || 'MIZAN',
