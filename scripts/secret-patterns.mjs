@@ -14,7 +14,13 @@
 export const CREDENTIAL_PATTERNS = [
   { name: 'Google API key', re: /AIza[0-9A-Za-z_-]{20,}/g },
   { name: 'OpenAI-style secret', re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/g },
-  { name: 'private key material', re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/g },
+  /*
+   * تُطابَق قواعد الترويسة لا قائمةُ أنواع مكتوبة باليد. النسخة السابقة عدّت الأنواع فأخطأت
+   * مرتين: أضافت `PGP PRIVATE KEY` وهي ترويسة لا وجود لها — فأعطت ثقةً كاذبة — وأسقطت
+   * الترويسة الحقيقية `PGP PRIVATE KEY BLOCK` وترويسة PKCS#8 المشفّرة `ENCRYPTED PRIVATE KEY`.
+   * فكان مفتاحٌ خاص حقيقي يمرّ من الفاحصَين معًا.
+   */
+  { name: 'private key material', re: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/g },
   { name: 'AWS access key id', re: /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g },
   { name: 'Google service account key', re: /"private_key_id"\s*:/g },
   { name: 'Slack token', re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/g },
