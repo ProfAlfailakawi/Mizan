@@ -30,10 +30,11 @@ test('operator identity lifecycle binds directly to operatorId and isolates oper
   assert.throws(()=>repo.createInvitation(operatorOwner,{email:'org@test',displayName:'Org admin',requestedRole:'org_admin',organizationId:'ORG-1',competitionId:'C-1',reason:'Operator must not become organization'}),/CROSS_OPERATOR_ORGANIZATION_BLOCKED/);
 
   const visible=repo.list(operatorOwner,undefined,undefined,'OP-X');
-  assert.equal(visible.accounts.length,1);
-  assert.equal(visible.accounts[0].uid,'uid-admin-x');
-  assert.equal(visible.grants.length,1);
-  assert.equal(visible.grants[0].role,'operator_admin');
+  // The operator owner now sees their own account (protected, non-deletable) plus their operator_admin staff — never other operators.
+  const visibleUids=visible.accounts.map(a=>a.uid).sort();
+  assert.deepEqual(visibleUids,['uid-admin-x','uid-owner-x']);
+  assert.ok(visible.grants.some(g=>g.role==='operator_admin'&&g.operatorId==='OP-X'));
+  assert.ok(visible.grants.some(g=>g.role==='operator_owner'&&g.operatorId==='OP-X'));
   assert.throws(()=>repo.list(operatorOwner,undefined,undefined,'OP-Y'),/CROSS_OPERATOR_ACCESS_BLOCKED/);
 
   const resolved=repo.identityForUid('uid-admin-x');
