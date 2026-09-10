@@ -170,13 +170,11 @@ async function startServer() {
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   /* التحقق من الشهادة عام بلا هوية: يُخنق لمنع تعداد أرقام الشهادات بالتخمين. */
-  const certificateVerifyRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_VERIFY_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* هذا الحدّ غير مشروط بغياب الحدّ العام: نقطة عامة تقرأ من القرص برقم يأتي من الطلب،
+     فيبقى لها سقف خاص بها حتى مع وجود حدّ عام أوسع. */
+  const certificateVerifyRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_VERIFY_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   /* نشر الشهادات يقع دفعة واحدة بعد ختم النتائج، فحدّه أوسع من حدّ المالك العام ومع ذلك محدود. */
-  const certificatePublishRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_PUBLISH_RATE_LIMIT_MAX||300),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const certificatePublishRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_PUBLISH_RATE_LIMIT_MAX||300),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
