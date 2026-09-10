@@ -860,3 +860,66 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
 [data-operation-mode="judging"] > section:nth-of-type(2) > div:first-child{display:none}
 [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid > button:nth-child(2){display:none}
 [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid{grid-template-columns:minmax(0,1fr)}
+
+/* ── MIZAN assembly choreography (public surfaces only) ─────────────────────
+   Inspired by product-reveal choreography: independent elements drift in,
+   move with premium easing, and reassemble into the final mark / final card.
+   Transform + opacity only, so it stays on the compositor at 60fps.
+   Used by: ExperienceHub intro overlay, CeremonyView winner reveal.
+   Never applied to JudgeOS / CommandCenter / operational screens. */
+
+.mz-assembly-veil{
+  animation: mzAssemblyVeil 2.7s cubic-bezier(.4,0,.2,1) both;
+  will-change: opacity;
+}
+@keyframes mzAssemblyVeil{
+  0%,88%{ opacity:1 }
+  100%{ opacity:0 }
+}
+
+/* Each fragment: scattered → drifts to its ring seat → converges into the mark. */
+.mz-assembly-chip{
+  position:absolute; top:50%; left:50%; margin:-27px 0 0 -27px;
+  animation: mzAssemblyChip 2.2s cubic-bezier(.22,.61,.2,1) var(--mzd,0ms) both;
+  will-change: transform, opacity;
+}
+@keyframes mzAssemblyChip{
+  0%   { opacity:0; transform: translate(var(--mzsx), var(--mzsy)) scale(.55) rotate(var(--mzsr,0deg)); }
+  22%  { opacity:1; }
+  55%  { opacity:1; transform: translate(var(--mzrx), var(--mzry)) scale(1) rotate(0deg); }
+  82%  { opacity:0; transform: translate(0,0) scale(.3) rotate(0deg); }
+  100% { opacity:0; transform: translate(0,0) scale(.3) rotate(0deg); }
+}
+
+.mz-assembly-mark{
+  animation: mzAssemblyMark 2.5s cubic-bezier(.16,1,.3,1) both;
+  will-change: transform, opacity;
+}
+@keyframes mzAssemblyMark{
+  0%,58%{ opacity:0; transform: scale(.72); }
+  80%   { opacity:1; transform: scale(1.045); }
+  100%  { opacity:1; transform: scale(1); }
+}
+
+/* Ceremony winner: rank medallion, ranking label, name, country and score
+   drift in from independent directions and settle into the final composition;
+   the winner's name arrives last. */
+.mz-cer-item{
+  animation: mzCerItem .95s cubic-bezier(.16,1,.3,1) var(--mzd,0ms) both;
+  will-change: transform, opacity;
+}
+@keyframes mzCerItem{
+  from{ opacity:0; transform: translate(var(--mzax,0px), var(--mzay,18px)) scale(var(--mzas,.94)); }
+  to  { opacity:1; transform: none; }
+}
+
+/* Reduced motion: the global rule collapses durations, but animation-delay
+   would still hold staggered elements in their hidden "from" state. Zero the
+   delays too, so the final state shows immediately. */
+@media (prefers-reduced-motion: reduce){
+  .mz-assembly-veil,.mz-assembly-chip,.mz-assembly-mark,.mz-cer-item{ animation-delay:0ms !important; }
+}
+html[data-mizan-motion="reduced"] .mz-assembly-veil,
+html[data-mizan-motion="reduced"] .mz-assembly-chip,
+html[data-mizan-motion="reduced"] .mz-assembly-mark,
+html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; }
