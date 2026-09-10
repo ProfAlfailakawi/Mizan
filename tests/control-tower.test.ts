@@ -213,3 +213,15 @@ test('escalation queue excludes informational signals so only real work is liste
   assert.ok(snapshot.needsAttention.some((d:any)=>d.code==='TENANT_DOMAIN_NOT_SET'));
   assert.ok(!snapshot.needsAttention.some((d:any)=>d.code==='IDLE_NO_LIVE_COMPETITIONS'));
 });
+
+test('an unrecognised but degraded signal is escalated with evidence rather than silently ignored',()=>{
+  const degraded=diagnoseSignals([{key:'some_future_subsystem',label:'Future subsystem',state:'DEGRADED',source:'x',checkedAt:new Date().toISOString(),reason:'unexpected fault'}])[0];
+  assert.equal(degraded.code,'UNCLASSIFIED_DEGRADATION');
+  assert.equal(degraded.classification,'MIZAN_ACTION_REQUIRED');
+  assert.deepEqual(degraded.remedy?.actions,['diagnostic.bundle.generate']);
+  const outage=diagnoseSignals([{key:'some_future_subsystem',label:'Future subsystem',state:'OUTAGE',source:'x',checkedAt:new Date().toISOString()}])[0];
+  assert.equal(outage.classification,'SECURITY_REVIEW');
+  // An unknown-but-unconfigured capability stays quiet.
+  const quiet=diagnoseSignals([{key:'some_optional_capability',label:'Optional',state:'UNKNOWN',source:'x',checkedAt:new Date().toISOString()}])[0];
+  assert.equal(quiet.classification,'INFORMATIONAL');
+});

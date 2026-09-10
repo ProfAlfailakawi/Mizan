@@ -269,6 +269,8 @@ const DIAGNOSIS_TITLES:Record<string,{ar:string;en:string}>={
   IDENTITY_GOVERNANCE_NOT_CONFIGURED:{ar:'حوكمة الهوية غير مهيأة',en:'Identity governance not configured'},
   TENANT_REGISTRY_NOT_CONFIGURED:{ar:'سجل الجهات غير مهيأ',en:'Tenant registry not configured'},
   DEPLOYMENT_CAPABILITY_NOT_CONFIGURED:{ar:'قدرة نشر غير مهيأة',en:'Deployment capability not configured'},
+  OPEN_INCIDENT:{ar:'حادثة مفتوحة',en:'Open incident'},
+  UNCLASSIFIED_DEGRADATION:{ar:'تدهور غير مصنَّف',en:'Unclassified degradation'},
 };
 const titleFor=(code:string)=>DIAGNOSIS_TITLES[code]||{ar:KNOWN_ERROR_CATALOG.find(x=>x.code===code)?.humanTitleArabic||code,en:KNOWN_ERROR_CATALOG.find(x=>x.code===code)?.humanTitleEnglish||code};
 const configureRemedy=(envVar:string):DiagnosticRemedy=>({kind:'configure',actions:[],hintArabic:`إعداد نشر: اضبط ${envVar} في بيئة الخادم ثم أعد النشر. لا يمكن حلّه من الواجهة.`,hintEnglish:`Deployment setting: configure ${envVar} in the server environment, then redeploy.`});
@@ -295,7 +297,10 @@ function classifySignal(signal:HealthSignal):{code:string;classification:Attenti
   if(signal.key==='live_competitions')return {code:'IDLE_NO_LIVE_COMPETITIONS',classification:'INFORMATIONAL',remedy:{kind:'auto',actions:[],hintArabic:'ليست مشكلة: لا توجد مسابقة حية في هذه النافذة الزمنية. تظهر تلقائيًا عند انطلاق أي مسابقة.',hintEnglish:'Not a problem: no competition is live in this window.'}};
   if(signal.key==='identity_governance')return {code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED',classification:'MIZAN_ACTION_REQUIRED',remedy:configureRemedy('MIZAN_IDENTITY_GOVERNANCE_DIR')};
   if(signal.key==='tenant_registry')return {code:'TENANT_REGISTRY_NOT_CONFIGURED',classification:'MIZAN_ACTION_REQUIRED',remedy:configureRemedy('MIZAN_TENANTS_FILE')};
-  if(signal.key.startsWith('incident:'))return {code:'BACKGROUND_JOB_STUCK',classification:signal.state==='OUTAGE'?'SECURITY_REVIEW':'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['diagnostic.bundle.generate'],hintArabic:'حادثة مفتوحة. ولّد تقرير تشخيص وتابعها حتى الإغلاق.',hintEnglish:'Open incident. Generate a diagnostic bundle and track to closure.'}};
+  if(signal.key.startsWith('incident:'))return {code:'OPEN_INCIDENT',classification:signal.state==='OUTAGE'?'SECURITY_REVIEW':'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['diagnostic.bundle.generate'],hintArabic:'حادثة مفتوحة. ولّد تقرير تشخيص وتابعها حتى الإغلاق.',hintEnglish:'Open incident. Generate a diagnostic bundle and track to closure.'}};
+  /* شبكة أمان للمجهول: إشارة غير معروفة لكنها متدهورة أو متعطّلة مشكلةٌ حقيقية تُصعَّد وتُجمع أدلتها،
+     ولا تُبتلع بصمت. أما «غير معروفة» فحسب فهي قدرة اختيارية غير مهيأة ولا أثر لها. */
+  if(signal.state==='DEGRADED'||signal.state==='OUTAGE')return {code:'UNCLASSIFIED_DEGRADATION',classification:signal.state==='OUTAGE'?'SECURITY_REVIEW':'MIZAN_ACTION_REQUIRED',remedy:{kind:'auto',actions:['diagnostic.bundle.generate'],hintArabic:'تدهور خارج الأنماط المعروفة. وُلِّد تقرير تشخيص لجمع الأدلة، ثم عالجه أو صعّده — لا يُهمل.',hintEnglish:'Degradation outside known patterns. Generate a diagnostic bundle to gather evidence, then treat or escalate; never ignored.'}};
   return {code:'DEPLOYMENT_CAPABILITY_NOT_CONFIGURED',classification:'INFORMATIONAL',remedy:{kind:'configure',actions:[],hintArabic:'قدرة اختيارية غير مهيأة في هذا النشر. لا أثر على التشغيل الحالي.',hintEnglish:'Optional capability not configured in this deployment; no impact on current operations.'}};
 }
 
