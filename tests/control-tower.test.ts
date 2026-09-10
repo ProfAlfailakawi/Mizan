@@ -169,3 +169,59 @@ test('ops telemetry detects stale background jobs and notification failure rate'
     assert.equal(signals.find(s=>s.key==='background_jobs')?.state,'DEGRADED');
   }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
+
+test('diagnosis names the real problem and offers a remedy that can actually resolve it',()=>{
+  const signals=buildHealthSignals({
+    tenants:[{orgId:'org-no-domain',status:'active'} as any,{orgId:'org-with-domain',subdomain:'a',status:'active'} as any],
+    runtime:{backendAvailable:true,notificationProviderConfigured:false},
+    identityGovernanceConfigured:true,tenantStoreConfigured:true,
+  });
+  const byCode=Object.fromEntries(diagnoseSignals(signals).map(d=>[d.code,d]));
+
+  // An idle window is not a stuck background job, and never an escalation.
+  const idle=byCode['IDLE_NO_LIVE_COMPETITIONS'];
+  assert.ok(idle,'no-live-competitions must not be reported as a stuck job');
+  assert.equal(idle.classification,'INFORMATIONAL');
+
+  // A missing tenant domain cannot be invented: the remedy navigates to where it is set.
+  const noDomain=byCode['TENANT_DOMAIN_NOT_SET'];
+  assert.equal(noDomain.classification,'MIZAN_ACTION_REQUIRED');
+  assert.equal(noDomain.remedy?.kind,'navigate');
+  assert.match(String(noDomain.remedy?.href),/organizationId=org-no-domain.*panel=domain/);
+  assert.deepEqual(noDomain.remedy?.actions,[],'must not offer an action that cannot fix it');
+
+  // A configured-but-unverified domain is a genuine retest.
+  assert.equal(byCode['TENANT_DOMAIN_UNVERIFIED']?.remedy?.kind,'auto');
+  assert.deepEqual(byCode['TENANT_DOMAIN_UNVERIFIED']?.remedy?.actions,['domain.retest']);
+
+  // A missing provider is a deployment setting, named explicitly rather than a pointless retry.
+  const provider=byCode['NOTIFICATION_PROVIDER_NOT_CONFIGURED'];
+  assert.equal(provider.remedy?.kind,'configure');
+  assert.deepEqual(provider.remedy?.actions,[]);
+  assert.match(provider.remedy!.hintArabic,/MIZAN_NOTIFICATION_PROVIDER/);
+});
+
+test('escalation queue excludes informational signals so only real work is listed',()=>{
+  const repo=new ControlTowerRepository(tmp());
+  const snapshot=repo.buildSnapshot({
+    actor,
+    tenants:[{orgId:'org-no-domain',status:'active'} as any],
+    runtime:{backendAvailable:true,notificationProviderConfigured:true},
+    identityGovernanceConfigured:true,tenantStoreConfigured:true,
+  });
+  assert.ok(snapshot.needsAttention.every((d:any)=>d.classification!=='INFORMATIONAL'));
+  assert.ok(snapshot.needsAttention.some((d:any)=>d.code==='TENANT_DOMAIN_NOT_SET'));
+  assert.ok(!snapshot.needsAttention.some((d:any)=>d.code==='IDLE_NO_LIVE_COMPETITIONS'));
+});
+
+test('an unrecognised but degraded signal is escalated with evidence rather than silently ignored',()=>{
+  const degraded=diagnoseSignals([{key:'some_future_subsystem',label:'Future subsystem',state:'DEGRADED',source:'x',checkedAt:new Date().toISOString(),reason:'unexpected fault'}])[0];
+  assert.equal(degraded.code,'UNCLASSIFIED_DEGRADATION');
+  assert.equal(degraded.classification,'MIZAN_ACTION_REQUIRED');
+  assert.deepEqual(degraded.remedy?.actions,['diagnostic.bundle.generate']);
+  const outage=diagnoseSignals([{key:'some_future_subsystem',label:'Future subsystem',state:'OUTAGE',source:'x',checkedAt:new Date().toISOString()}])[0];
+  assert.equal(outage.classification,'SECURITY_REVIEW');
+  // An unknown-but-unconfigured capability stays quiet.
+  const quiet=diagnoseSignals([{key:'some_optional_capability',label:'Optional',state:'UNKNOWN',source:'x',checkedAt:new Date().toISOString()}])[0];
+  assert.equal(quiet.classification,'INFORMATIONAL');
+});

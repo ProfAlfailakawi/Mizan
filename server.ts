@@ -535,11 +535,21 @@ async function startServer() {
   app.delete('/api/saas/owner/organizations/:id',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.deleteOrganization(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/migrate-tenants',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.migrateLegacyTenants(saasActor(req),tenantRegistry(),String(req.body?.planId||'')))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/change-requests/:id/decision',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({request:repo.decideChange(saasActor(req),String(req.params.id),String(req.body?.decision||'') as any,String(req.body?.note||''))})}catch(err){return commercialError(res,err)}});
+  const sendInvoiceReminder=(res:Response,out:{invoice:any;organizationId?:string;operatorId?:string})=>{
+    const inv=out.invoice;
+    if(notificationCenter){
+      const target=out.organizationId?{type:'organization' as const,organizationId:out.organizationId}:out.operatorId?{type:'operator' as const,operatorId:out.operatorId}:undefined;
+      const amount=`${(Number(inv.amountMinor||0)/100).toFixed(2)} ${inv.currency}`;
+      if(target)notificationCenter.system({title:inv.overdue?'فاتورة متأخرة تحتاج سدادًا':'تذكير بفاتورة مستحقة',body:`الفاتورة ${inv.number} بمبلغ ${amount}${inv.overdue?` متأخرة منذ ${inv.daysOverdue} يومًا`:''}. يرجى إتمام السداد.`,category:'admin',priority:inv.overdue?'urgent':'important',target,context:{organizationId:out.organizationId,operatorId:out.operatorId,entityType:'Invoice',entityId:inv.id},dedupeKey:`invoice-reminder:${inv.id}:${new Date().toISOString().slice(0,10)}`});
+    }
+    return res.json({invoice:inv,reminded:true});
+  };
   // Owner billing (subscriptions + invoices for operators and organizations)
   app.post('/api/saas/owner/subscriptions',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions/:id/cancel',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/pay',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/owner/invoices/:id/remind',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return sendInvoiceReminder(res,repo.remindInvoice(saasActor(req),String(req.params.id)))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/void',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.voidInvoice(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.get('/api/saas/operator/dashboard',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.operatorDashboard(saasActor(req)))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/organizations',ownerRateLimit,requireFirebaseRoles(['operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const created=repo.createOrganization(saasActor(req),req.body||{});seedTenantBrand(created);return res.status(201).json(created)}catch(err){return commercialError(res,err)}});
@@ -551,6 +561,7 @@ async function startServer() {
   app.post('/api/saas/operator/subscriptions/:id/cancel',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/pay',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/operator/invoices/:id/remind',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return sendInvoiceReminder(res,repo.remindInvoice(saasActor(req),String(req.params.id)))}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/void',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.voidInvoice(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.get('/api/saas/organization',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'&&req.query.organizationId?String(req.query.organizationId):actor.organizationId;return res.json(repo.usage(actor,organizationId))}catch(err){return commercialError(res,err)}});
   app.patch('/api/saas/organization/operational',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'&&req.body?.organizationId?String(req.body.organizationId):actor.organizationId;return res.json({organization:repo.updateOperational(actor,organizationId,req.body?.operational||req.body||{})})}catch(err){return commercialError(res,err)}});
@@ -561,7 +572,7 @@ async function startServer() {
   app.post('/api/saas/usage/competitions/:competitionId/state',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'?String(req.body?.organizationId||''):actor.organizationId;return res.json({competition:repo.setCompetitionState(actor,{organizationId,competitionId:String(req.params.competitionId),organizerOrganizationId:req.body?.organizerOrganizationId?String(req.body.organizerOrganizationId):undefined,state:String(req.body?.state||'draft') as any})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/usage/participants',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'?String(req.body?.organizationId||''):actor.organizationId;return res.status(201).json({usage:repo.recordParticipant(actor,{organizationId,competitionId:String(req.body?.competitionId||''),participantId:String(req.body?.participantId||''),year:req.body?.year?Number(req.body.year):undefined})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/uploads/reserve',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'?String(req.body?.organizationId||''):actor.organizationId;return res.status(201).json({upload:repo.reserveUpload(actor,{organizationId,competitionId:req.body?.competitionId?String(req.body.competitionId):undefined,fileType:String(req.body?.fileType||''),mimeType:String(req.body?.mimeType||''),sizeBytes:Number(req.body?.sizeBytes),provider:req.body?.provider})})}catch(err){return commercialError(res,err)}});
-  app.post('/api/saas/uploads/:id/finalize',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'?String(req.body?.organizationId||''):actor.organizationId;return res.json({upload:repo.finalizeUpload(actor,String(req.params.id),{organizationId,checksum:String(req.body?.checksum||'')})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/uploads/:id/finalize',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req),organizationId=actor.role==='super_admin'?String(req.body?.organizationId||''):actor.organizationId;return res.json({upload:repo.finalizeUpload(actor,String(req.params.id),{organizationId,checksum:String(req.body?.checksum||''),actualSizeBytes:req.body?.actualSizeBytes===undefined?undefined:Number(req.body.actualSizeBytes)})})}catch(err){return commercialError(res,err)}});
 
   /* تحديث الهوية البيضاء وإعدادات الشعار والعرض للجهة المشترية (org_admin أو super_admin) */
   const brandAdmins = requireFirebaseRoles(['super_admin', 'org_admin']);
@@ -579,6 +590,19 @@ async function startServer() {
     const outcome = store.saveBrand(orgId, patch);
     if ((outcome as { ok: boolean }).ok) resetTenantRegistry(); // make a saved subdomain/custom domain live for host routing immediately
     return tenantResult(res, outcome);
+  });
+
+  /* الجهة لا تضبط نطاقها بنفسها (سياسة المالك)، لكنها تستطيع طلبه بعد إتمام خطوات CNAME،
+     فيصل الطلب إلى مالك المنصة باسم الجهة والنطاق المطلوب ليُثبّته. */
+  app.post('/api/tenant/domain-request', ownerRateLimit, requireFirebaseRoles(['org_admin']), (req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    const organizationId=actor?.organizationId;
+    if(!organizationId)return res.status(400).json({code:'ORG_ID_REQUIRED'});
+    const domain=String(req.body?.domain||'').trim().toLowerCase().replace(/^https?:\/\//,'').replace(/[/?#].*$/,'');
+    if(!/^(?=.{4,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain))return res.status(400).json({code:'DOMAIN_INVALID'});
+    const tenantName=tenantByOrganizationId(organizationId)?.displayNameArabic||organizationId;
+    if(notificationCenter)notificationCenter.system({title:'طلب ربط نطاق خاص',body:`طلبت ${tenantName} ربط النطاق ${domain}. تأكّد من سجل CNAME ثم أضِفه من «النطاق والوصول».`,category:'admin',priority:'important',target:{type:'role',role:'super_admin'},context:{organizationId,entityType:'DomainRequest',entityId:domain},actionHref:`#identity?organizationId=${encodeURIComponent(organizationId)}&panel=domain`,actionLabel:'فتح ضبط النطاق',dedupeKey:`domain-request:${organizationId}:${domain}`});
+    return res.status(202).json({requested:true,domain});
   });
 
   // Operator-managed domains for their own organizations

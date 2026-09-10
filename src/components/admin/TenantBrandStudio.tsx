@@ -33,7 +33,7 @@ import { uploadOrganizationLogo } from '../../lib/brand-assets';
 import type { OrganizationBrand, BrandDisplayPlacements } from '../../types';
 import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicText,normalizeEmail,normalizeLatinText,normalizePhone,normalizeWebsiteUrl,toAsciiDigits,normalizeDomain,isDomain} from '../../lib/input-validation';
 
-const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.',DOMAIN_LOCKED:'النطاق مُعتمد ومقفل. للتغيير تواصل مع مالك المنصة.',DOMAIN_SAVE_FAILED:'تعذّر حفظ النطاق، حاول مجددًا.'};
+const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.',DOMAIN_LOCKED:'النطاق مُعتمد ومقفل. للتغيير تواصل مع مالك المنصة.',DOMAIN_SAVE_FAILED:'تعذّر حفظ النطاق، حاول مجددًا.',DOMAIN_INVALID:'أدخل نطاقًا صحيحًا مثل: quran.example.com',DOMAIN_REQUEST_FAILED:'تعذّر إرسال الطلب، حاول مجددًا.'};
 const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
 
 /* دليل مصوّر بسيط: العميل يعطينا النطاق، يضيف سجلًا واحدًا، ونتكفّل نحن بالتحقق والتفعيل. */
@@ -74,18 +74,89 @@ const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }
           </li>
         ))}
       </ol>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-[#E9E7E0] bg-white">
-        <table className="w-full min-w-[420px] text-[11px]">
-          <thead><tr className="bg-[#F3F1EB] text-[10px] font-black text-[#656b66]"><th className="p-2 text-start">{ar ? 'النوع' : 'Type'}</th><th className="p-2 text-start">{ar ? 'الاسم' : 'Name'}</th><th className="p-2 text-start">{ar ? 'القيمة' : 'Value'}</th></tr></thead>
-          <tbody><tr className="border-t border-[#EDEBE4]">
-            <td className="p-2 font-black" dir="ltr">CNAME</td>
-            <td className="p-2" dir="ltr"><span className="font-bold break-all [overflow-wrap:anywhere]">{name}</span></td>
-            <td className="p-2"><span className="flex flex-wrap items-center gap-2"><span dir="ltr" className="font-bold break-all [overflow-wrap:anywhere]">{host}</span><CopyChip value={host} label={ar ? 'نسخ قيمة السجل' : 'Copy record value'} /></span></td>
-          </tr></tbody>
-        </table>
-      </div>
+      {/* السجل كصفوف مُعنونة لا كجدول: لا يُقتطع على شاشة ضيّقة ولا يحتاج تمريرًا أفقيًا. */}
+      <dl className="mt-4 divide-y divide-[#EDEBE4] rounded-xl border border-[#E9E7E0] bg-white">
+        {[
+          { k: ar ? 'النوع' : 'Type', v: 'CNAME', copy: false },
+          { k: ar ? 'الاسم' : 'Name', v: name, copy: true },
+          { k: ar ? 'القيمة' : 'Value', v: host, copy: true },
+        ].map(row => (
+          <div key={row.k} className="flex flex-wrap items-center justify-between gap-2 p-2.5">
+            <dt className="text-[10px] font-black text-[#656b66]">{row.k}</dt>
+            <dd className="flex min-w-0 items-center gap-2">
+              <span dir="ltr" className="text-[11px] font-bold break-all [overflow-wrap:anywhere]">{row.v}</span>
+              {row.copy && <CopyChip value={row.v} label={ar ? `نسخ ${row.k}` : `Copy ${row.k}`} />}
+            </dd>
+          </div>
+        ))}
+      </dl>
       <p className="mt-3 text-[10px] leading-5 text-[#77613e]">{ar ? 'قد يستغرق انتشار السجل حتى بضع ساعات عند بعض المزوّدين. لا حاجة لأي إعداد آخر منك.' : 'DNS propagation can take a few hours with some providers. Nothing else is required from you.'}</p>
     </div>
+  );
+};
+
+/* واجهة الجهة: لا تضبط نطاقها بنفسها، لكنها ترى نطاقها الحالي وخطواتها، وتطلب الربط بضغطة. */
+export const TenantDomainRequestCard: React.FC = () => {
+  const store = useAppStore();
+  const ar = store.language === 'ar';
+  const [subdomain, setSubdomain] = useState('');
+  const [customDomains, setCustomDomains] = useState<string[]>([]);
+  const [baseDomain, setBaseDomain] = useState('');
+  const [wanted, setWanted] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const user = auth?.currentUser; if (!user) return; let live = true;
+    void user.getIdToken().then(token => fetch('/api/tenant/brand', { headers: { authorization: `Bearer ${token}` } }))
+      .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
+      .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []); setBaseDomain(body?.baseDomain || ''); })
+      .catch(() => {});
+    return () => { live = false };
+  }, []);
+
+  const live = customDomains[0] || (subdomain && baseDomain ? `${subdomain}.${baseDomain}` : subdomain);
+  const request = async () => {
+    setBusy(true); setErr(''); setSent(false);
+    try {
+      const user = auth?.currentUser; if (!user) throw new Error(ar ? 'تلزم هوية موثقة.' : 'Authentication required.');
+      const token = await user.getIdToken();
+      const res = await fetch('/api/tenant/domain-request', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ domain: normalizeDomain(wanted) }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(body.code || 'DOMAIN_REQUEST_FAILED'));
+      setSent(true); setWanted('');
+    } catch (e) { setErr(arError((e as Error).message)); } finally { setBusy(false); }
+  };
+
+  return (
+    <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 sm:p-6 shadow-sm space-y-5">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]"><Globe className="w-5 h-5" /></span>
+        <div>
+          <div className="mizan-kicker">{ar ? 'النطاق والوصول' : 'DOMAIN & ACCESS'}</div>
+          <h3 className="text-base font-extrabold text-[#171b18]">{ar ? 'عنوان بوابتك' : 'Your portal address'}</h3>
+        </div>
+      </div>
+
+      {live
+        ? <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex flex-wrap items-center gap-2 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'بوابتك تعمل على:' : 'Your portal is live at:'}<span dir="ltr" className="break-all [overflow-wrap:anywhere]">{live}</span></div>
+        : <p className="text-xs leading-relaxed text-[#636864]">{ar ? 'لم يُربط نطاق ببوابتك بعد. أتمم الخطوات أدناه ثم اطلب الربط، ونتكفّل نحن بالتثبيت والتحقق.' : 'No domain is connected yet. Complete the steps below, then request the connection.'}</p>}
+
+      <label className="block">
+        <span className="mizan-field-label">{ar ? 'النطاق الذي تريده' : 'The domain you want'}</span>
+        <div className="mt-1 flex flex-wrap gap-2">
+          <input dir="ltr" lang="en" className="mizan-input flex-1 min-w-0" value={wanted} onChange={e => setWanted(e.target.value)} placeholder="quran.example.com" />
+          <Button type="button" disabled={busy || !isDomain(normalizeDomain(wanted))} onClick={() => void request()} icon={<Link2 className="w-4 h-4" />}>{busy ? (ar ? 'جارٍ الإرسال…' : 'Sending…') : (ar ? 'اطلب الربط' : 'Request connection')}</Button>
+        </div>
+        <span className="mt-1 block text-[10px] text-[#8d7a52]">{ar ? 'يصل طلبك مباشرة إلى فريق ميزان مع اسم جهتك، ويُثبَّت النطاق بعد التحقق.' : 'Your request reaches the MIZAN team with your organization name.'}</span>
+      </label>
+
+      {sent && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'وصل طلبك. سنتحقق من السجل ونفعّل نطاقك.' : 'Request received. We will verify and activate your domain.'}</div>}
+      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
+
+      <DomainHowTo ar={ar} baseDomain={baseDomain} domain={normalizeDomain(wanted) || customDomains[0]} />
+    </section>
   );
 };
 
@@ -521,8 +592,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
         )}
       </div>
 
-      {/* بطاقة النطاق والوصول — لمالك المنصة فقط؛ الجهات لا تضبط نطاقها بنفسها */}
-      {store.currentUser?.role === 'super_admin' && <TenantDomainCard orgId={orgId} />}
+      {/* المالك يضبط النطاق؛ الجهة ترى عنوانها وخطواتها وتطلب الربط. */}
+      {store.currentUser?.role === 'super_admin' ? <TenantDomainCard orgId={orgId} /> : !orgId && <TenantDomainRequestCard />}
 
       {/* القسم الرئيسي: الإعدادات على اليمين والمعاينة الحية على اليسار */}
       <div className="grid lg:grid-cols-12 gap-6">
