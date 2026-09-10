@@ -26,7 +26,7 @@ import {
   SessionCheckpointRecord, ContinuityIncidentRecord, SessionRecoveryRecord, AuditLedgerSealRecord,
   CompetitionBlackBoxRecord, FairnessConstitutionalCourtRecord, AcousticVenuePassportRecord,
   RecitationDigitalTwinRecord, MutashabihatTrapRecord, MultiRiwayahRoutingDecisionRecord,
-  AppealCapsuleRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord,
+  AppealCapsuleRecord, BlindChamberLiftRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord,
   ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord,
   CertifiedVenueSealRecord, QuestionSelection, JudgeEvent,
 } from '../types';
@@ -164,6 +164,7 @@ export interface AppStoreState {
   mutashabihatTrapMaps: MutashabihatTrapRecord[];
   smartRoutingDecisions: MultiRiwayahRoutingDecisionRecord[];
   appealCapsules: AppealCapsuleRecord[];
+  blindChamberLifts: BlindChamberLiftRecord[];
   blindAnchorCalibrations: BlindAnchorCalibrationRecord[];
   integrityEntropySignals: IntegrityEntropySignalRecord[];
   scientificCircuitBreakers: ScientificCircuitBreakerRecord[];

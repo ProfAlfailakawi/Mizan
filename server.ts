@@ -19,6 +19,7 @@ import { buildKfgqpcOfficialLibrary, kfgqpcLibrarySummary } from './server/kfgqp
 import { SecureQuestionRuntimeRepository, ServerQuestionPoolRepository } from './server/secure-question-runtime';
 import { buildQuestionPoolFromCertifiedSource } from './server/question-pool-builder';
 import { WitnessModeRepository } from './server/witness-mode';
+import { PublicCertificateRegistry, certificateRegistryFromEnv } from './server/certificate-registry';
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
@@ -123,6 +124,14 @@ async function startServer() {
   const saasDir=process.env.MIZAN_SAAS_DATA_DIR||(isProd?'':path.resolve('.mizan-data/saas'));
   let saasPlatform:SaaSPlatformRepository|null=null;
   try{if(saasDir){const vaultKey=process.env.MIZAN_STORAGE_SECRET_MASTER_KEY||'';const vault=vaultKey?new SecretVault(path.join(saasDir,'vault','storage-secrets.enc.json'),vaultKey):undefined;saasPlatform=new SaaSPlatformRepository(path.join(saasDir,'saas-platform.json'),vault)}}catch(err){console.error('SaaS platform disabled:',err)}
+  /* الفوترة تُقفل دورتها بنفسها: تُصدَر فاتورة التجديد عند انتهاء الدورة بلا تدخّل.
+     التشغيل متكرّر بأمان، فالتأخر أو التكرار لا يُصدر فاتورتين. */
+  if(saasPlatform){
+    const runCycle=()=>{try{const out=saasPlatform!.runBillingCycle();if(out.issued.length)console.log(`[billing] issued ${out.issued.length} renewal invoice(s)`)}catch(err){console.error('[billing] renewal cycle failed:',err)}};
+    runCycle();
+    const cycle=setInterval(runCycle,Number(process.env.MIZAN_BILLING_CYCLE_INTERVAL_MS||3600_000));
+    cycle.unref?.();
+  }
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const firestoreRepository=firebaseProjectId?new FirestoreRestRepository(firebaseProjectId):null;
   const publicRegistration=firestoreRepository?new PublicRegistrationService({
@@ -160,6 +169,12 @@ async function startServer() {
   const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* التحقق من الشهادة عام بلا هوية: يُخنق لمنع تعداد أرقام الشهادات بالتخمين. */
+  /* هذا الحدّ غير مشروط بغياب الحدّ العام: نقطة عامة تقرأ من القرص برقم يأتي من الطلب،
+     فيبقى لها سقف خاص بها حتى مع وجود حدّ عام أوسع. */
+  const certificateVerifyRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_VERIFY_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  /* نشر الشهادات يقع دفعة واحدة بعد ختم النتائج، فحدّه أوسع من حدّ المالك العام ومع ذلك محدود. */
+  const certificatePublishRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_CERTIFICATE_PUBLISH_RATE_LIMIT_MAX||300),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   const governanceRoles=new Set<string>(['super_admin','operator_owner','operator_admin','org_admin','storage_admin','billing_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','auditor','guardian','support_agent']);
   const isGovernanceRole=(role:string):role is GovernanceRole=>governanceRoles.has(role);
@@ -184,6 +199,7 @@ async function startServer() {
   const kfgqpcDelivery=new KfgqpcDeliveryRepository({pageRoot:kfgqpcPageImageRoot,fontRoot:kfgqpcFontRoot,audioRoot:kfgqpcAudioRoot,r2BaseUrl:process.env.MIZAN_KFGQPC_R2_DELIVERY_BASE_URL||'',r2BearerToken:process.env.MIZAN_KFGQPC_R2_BEARER_TOKEN||''});
   const questionPoolDir=process.env.MIZAN_SERVER_QUESTION_POOL_DIR||'';let serverQuestionPools:ServerQuestionPoolRepository|null=null;try{if(questionPoolDir)serverQuestionPools=new ServerQuestionPoolRepository(questionPoolDir)}catch(err){console.error('Server question pool disabled:',err)}
   const questionRuntimeDir=process.env.MIZAN_SECURE_QUESTION_RUNTIME_DIR||'';let secureQuestionRuntime:SecureQuestionRuntimeRepository|null=null;try{if(questionRuntimeDir&&serverQuranSources&&serverQuestionPools&&questionEscrow)secureQuestionRuntime=new SecureQuestionRuntimeRepository(questionRuntimeDir,serverQuranSources,serverQuestionPools,questionEscrow)}catch(err){console.error('Secure question runtime disabled:',err)}
+  let certificateRegistry:PublicCertificateRegistry|null=null;try{certificateRegistry=certificateRegistryFromEnv()}catch(err){console.error('Public certificate registry disabled:',err)}
   const witnessDir=process.env.MIZAN_WITNESS_MODE_DIR||'';let witnessMode:WitnessModeRepository|null=null;try{if(witnessDir)witnessMode=new WitnessModeRepository(witnessDir)}catch(err){console.error('Witness mode disabled:',err)}
   const coldVaultDir=process.env.MIZAN_COLD_VAULT_DIR||'';let coldVault:ColdVaultRepository|null=null;try{if(coldVaultDir)coldVault=new ColdVaultRepository(coldVaultDir)}catch(err){console.error('Cold vault disabled:',err)}
   const questionEscrowConfigured=!!questionEscrow&&!!process.env.MIZAN_PASS_SIGNING_SECRET&&!!firebaseProjectId;
@@ -570,7 +586,9 @@ async function startServer() {
     return res.status(201).json({paymentUrl:out.paymentUrl,invoice:updated});
   };
   // Owner billing (subscriptions + invoices for operators and organizations)
+  app.post('/api/saas/owner/billing/run-cycle',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json(repo.runBillingCycle())}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/owner/subscriptions/:id/auto-renew',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.setSubscriptionAutoRenew(saasActor(req),String(req.params.id),(req.body||{}).autoRenew!==false)})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/subscriptions/:id/cancel',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/owner/invoices/:id/pay',ownerRateLimit,ownerOnly,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
@@ -595,6 +613,7 @@ async function startServer() {
   app.put('/api/saas/operator/plans',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({plan:repo.operatorUpsertPlan(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.delete('/api/saas/operator/plans/:id',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({deleted:repo.operatorDeletePlan(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/subscriptions',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({subscription:repo.createSubscription(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/operator/subscriptions/:id/auto-renew',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.setSubscriptionAutoRenew(saasActor(req),String(req.params.id),(req.body||{}).autoRenew!==false)})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/subscriptions/:id/cancel',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({subscription:repo.cancelSubscription(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.status(201).json({invoice:repo.issueInvoice(saasActor(req),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/operator/invoices/:id/pay',ownerRateLimit,opRoles,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({invoice:repo.markInvoicePaid(saasActor(req),String(req.params.id),req.body||{})})}catch(err){return commercialError(res,err)}});
@@ -1034,6 +1053,32 @@ async function startServer() {
   // Certificate signing/verification exposes only the fields intentionally signed by the issuer.
   app.post('/api/enterprise/certificates/sign',requireEnterpriseKey,(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERT_SIGNING_NOT_CONFIGURED'});const {certificateNumber,participantDisplayName,competitionDisplayName,issuedAt,status='valid'}=req.body||{};if(!certificateNumber||!participantDisplayName||!competitionDisplayName)return res.status(400).json({code:'INVALID_CERTIFICATE'});const token=signToken({v:1,typ:'certificate',certificateNumber,participantDisplayName,competitionDisplayName,issuedAt:issuedAt||new Date().toISOString(),status},secret);res.json({token})});
   app.get('/api/certificates/verify/:token',(req,res)=>{const secret=process.env.MIZAN_CERT_SIGNING_SECRET;if(!secret)return res.status(503).json({code:'CERTIFICATE_REPOSITORY_NOT_CONNECTED'});const data=verifyToken(req.params.token,secret);if(!data||data.typ!=='certificate')return res.status(404).json({valid:false});res.json({valid:data.status==='valid',certificateNumber:data.certificateNumber,participantDisplayName:data.participantDisplayName,competitionDisplayName:data.competitionDisplayName,issuedAt:data.issuedAt,status:data.status})});
+
+  /* رقم الشهادة يصل من طلب عام: يُقيَّد شكله عند الحدّ قبل أن يمسّ السجل. */
+  const CERTIFICATE_NUMBER_RE=/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
+
+  /* سجل الشهادات العام: من يمسك شهادة مطبوعة يتحقق منها بنفسه، بلا حساب وبلا وصول لبيانات المسابقة. */
+  app.post('/api/certificates/publish',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    const identity=(req as any).mizanIdentity;const body=req.body||{};
+    if(String(body.organizationId||'')!==identity.organizationId)return res.status(403).json({code:'CERTIFICATE_TENANT_MISMATCH'});
+    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED'})}
+  });
+  app.post('/api/certificates/:number/revoke',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    const identity=(req as any).mizanIdentity;
+    const number=String(req.params.number??'').trim();
+    if(!CERTIFICATE_NUMBER_RE.test(number))return res.status(400).json({code:'CERTIFICATE_NUMBER_INVALID'});
+    try{return res.json({certificate:certificateRegistry.revoke(number,identity.organizationId,String(req.body?.reason||''))})}
+    catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_REVOKE_FAILED';return res.status(code==='CERTIFICATE_NOT_FOUND'?404:code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
+  });
+  app.get('/api/public/certificates/:number',certificateVerifyRateLimit,(req,res)=>{
+    if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
+    const number=String(req.params.number??'').trim();
+    if(!CERTIFICATE_NUMBER_RE.test(number))return res.status(404).json({state:'NOT_FOUND'});
+    try{const verdict=certificateRegistry.verify(number);return res.status(verdict.state==='NOT_FOUND'?404:200).json(verdict)}
+    catch(err){return res.status(500).json({code:err instanceof Error?err.message:'CERTIFICATE_VERIFY_FAILED'})}
+  });
 
   // Trust signatures are real Ed25519 when an institutional key is configured. No development key is invented in production.
   app.post('/api/enterprise/trust/sign',requireEnterpriseKey,(req,res)=>{const signer=trustSigner();if(!signer)return res.status(503).json({code:'TRUST_SIGNING_NOT_CONFIGURED'});const purpose=String(req.body?.purpose||'');if(!['federation_attestation','mizan_protocol','integrity_envelope'].includes(purpose))return res.status(400).json({code:'UNSUPPORTED_TRUST_PURPOSE'});const payload=req.body?.payload;if(!payload||typeof payload!=='object')return res.status(400).json({code:'INVALID_TRUST_PAYLOAD'});const material=canonicalStringify({purpose,payload});const signature=crypto.sign(null,Buffer.from(material),signer.privateKey).toString('base64url');res.json({algorithm:'Ed25519',keyId:signer.keyId,publicKeySpki:signer.spki,signature,purpose})});

@@ -8,7 +8,7 @@ import {KFGQPC_DEVELOPER_ASSETS} from '../server/kfgqpc-developer-assets';
 import {ServerQuranSourceRepository} from '../server/quran-source-repository';
 import {QuestionEscrowRepository} from '../server/question-escrow';
 import {SecureQuestionRuntimeRepository,ServerQuestionPoolRepository} from '../server/secure-question-runtime';
-import {buildCompetitionBlackBox,runFairnessConstitutionalCourt,issueAcousticVenuePassport,buildRecitationDigitalTwin,mapMutashabihatTrap,multiRiwayahSmartRoute,buildAppealCapsule,blindAnchorCalibration,integrityEntropyRadar,tripScientificCircuitBreaker,issueMizanIntegrityPassport,MIZAN_GLOBAL_INTEGRITY_PROTOCOL_VERSION} from '../src/lib/global-integrity-protocol';
+import {buildCompetitionBlackBox,runFairnessConstitutionalCourt,issueAcousticVenuePassport,buildRecitationDigitalTwin,mapMutashabihatTrap,multiRiwayahSmartRoute,buildAppealCapsule,verifyAppealCapsule,blindAnchorCalibration,integrityEntropyRadar,tripScientificCircuitBreaker,issueMizanIntegrityPassport,MIZAN_GLOBAL_INTEGRITY_PROTOCOL_VERSION} from '../src/lib/global-integrity-protocol';
 
 const tmp=()=>fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','mizan-r7-'));
 function officialFixture(){
@@ -52,4 +52,79 @@ test('routing, appeal, blind calibration, entropy, circuit breaker and integrity
  const entropy=integrityEntropyRadar({competitionId:'c',windowStart:'a',windowEnd:'b',events:[{kind:'REISSUE_CLUSTER' as any,entityRef:'p'},{kind:'REISSUE_CLUSTER' as any,entityRef:'p'}],reviewThresholds:{REISSUE_CLUSTER:2} as any});assert.equal(entropy.accusationProhibited,true);
  const breaker=tripScientificCircuitBreaker({competitionId:'c',triggerType:'QURAN_SOURCE',triggerRef:'s',reason:'hash discrepancy',affectedCapabilities:[],createdBy:'science'} as any);assert.equal(breaker.historicalRecordsRewritten,false);
  const passport=await issueMizanIntegrityPassport({competition:{id:'c',name:'C',nameArabic:'ج'} as any,quranSource:{sourceAuthority:'KFGQPC',packageHash:'h'} as any});assert.equal(passport.privacy.rawAudio,false);assert.equal(passport.privacy.judgeScores,false);
+});
+
+test('the appeal capsule is self-contained, minimally disclosing, and tamper-evident',async()=>{
+ const capsule=await buildAppealCapsule({competitionId:'c',participantId:'p',createdBy:'head',appealId:'a1',
+  auditHeadHash:'HEAD',policyVersion:'2',policy:{results:{requireDualApprovalToSeal:true}},ruleSetVersion:'1.4',ruleSet:{id:'rs',version:'1.4'},
+  evidence:[{kind:'fairdraw_proof',ref:'fd1',disclosed:{algorithmVersion:'MIZAN-FAIRDRAW-2.0',seedCommitmentHash:'abc'}},
+   {kind:'result_seal',ref:'r1',disclosed:{finalScore:92,contributingJudges:3}},
+   {kind:'raw_audio',ref:'aud1',private:true}]});
+
+ // The private item never enters the portable bundle, and the panel is told what was withheld.
+ assert.deepEqual(capsule.evidenceRefs,['fd1','r1']);
+ assert.deepEqual(capsule.excludedKinds,['raw_audio']);
+ assert.ok(!JSON.stringify(capsule.sections).includes('aud1'),'a withheld item must not leak through any section');
+ assert.match(capsule.withheldNoteArabic||'',/محجوبة|حُجبت/);
+
+ // Policy and rule set are bound by hash, not by a mutable label alone.
+ assert.ok(capsule.policyHash&&capsule.ruleSetHash&&capsule.policyHash!==capsule.ruleSetHash);
+ assert.equal(capsule.auditHeadHash,'HEAD');
+
+ // An independent judge verifies it with nothing but the capsule itself.
+ assert.deepEqual(await verifyAppealCapsule(capsule),{state:'AUTHENTIC',reasons:[]});
+
+ // Every proof of inclusion is present and each section stands on its own.
+ assert.equal((capsule.merkleProofs||[]).length,2);
+ assert.ok(capsule.merkleRoot);
+
+ // Editing a disclosed value after issuance is detected.
+ const tampered={...capsule,sections:capsule.sections!.map(x=>x.ref==='r1'?{...x,disclosed:{...x.disclosed,finalScore:99}}:x)};
+ const bad=await verifyAppealCapsule(tampered);
+ assert.equal(bad.state,'ALTERED');
+ assert.ok(bad.reasons.length>=2,'a changed value must break both its own leaf and the root');
+
+ // Revocation and legacy capsules report themselves rather than failing silently.
+ assert.equal((await verifyAppealCapsule({...capsule,status:'REVOKED'})).state,'REVOKED');
+ assert.equal((await verifyAppealCapsule({...capsule,capsuleVersion:undefined,sections:undefined})).state,'LEGACY');
+});
+
+test('the blind chamber withholds every inference channel and proves lock came before reveal',async()=>{
+ const {resolveBlindness,maskParticipantForJudge,buildBlindLiftProof,verifyBlindLiftProof}=await import('../src/lib/blind-chamber');
+ const participant={id:'p1',code:'A-104',fullName:'Ahmad',fullNameArabic:'أحمد',country:'KW',nationality:'KW',institution:'دار',riwaya:'حفص',categoryId:'cat-1'} as any;
+
+ // An existing competition set the old way stays blind — the level is derived, never silently reset to open.
+ assert.equal(resolveBlindness({identityVisibility:'code_only'}).level,'IDENTITY');
+ assert.equal(resolveBlindness({identityVisibility:'full'}).level,'OFF');
+
+ // Hiding the name alone leaves origin and affiliation readable; full blind closes every channel.
+ const identity=maskParticipantForJudge(participant,resolveBlindness({identityVisibility:'code_only',blindnessLevel:'IDENTITY'}),true);
+ assert.equal(identity.displayName,'A-104');
+ assert.equal(identity.country,'KW');
+ const full=maskParticipantForJudge(participant,resolveBlindness({identityVisibility:'code_only',blindnessLevel:'FULL'}),true);
+ assert.equal(full.displayName,'A-104');
+ for(const leak of [full.country,full.nationality,full.institution,full.riwaya,full.categoryId])assert.equal(leak,undefined);
+ assert.ok(!JSON.stringify(full).includes('أحمد'),'the name must not survive in any field of the masked view');
+ assert.ok(full.withheldArabic.length>=3,'the judge is told what is withheld rather than shown a silent blank');
+
+ const blindness=resolveBlindness({identityVisibility:'code_only',blindnessLevel:'FULL'});
+ const base={competitionId:'c',sessionId:'s1',participantId:'p1',blindness,revealedBy:'head'};
+
+ // Locks that all precede the reveal are provable, and verify independently from the record alone.
+ const good=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:true,submittedAt:'2026-01-01T10:00:00.000Z'},{judgeId:'j2',locked:true,submittedAt:'2026-01-01T10:01:00.000Z'}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(good.status,'PROVEN');
+ assert.equal(good.allLockedBeforeReveal,true);
+ assert.deepEqual(await verifyBlindLiftProof(good),{state:'PROVEN',reasons:[]});
+
+ // A lock recorded after the reveal is exactly what this proof exists to catch.
+ const late=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:true,submittedAt:'2026-01-01T10:09:00.000Z'}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(late.status,'UNPROVEN');
+ assert.equal((await verifyBlindLiftProof(late)).state,'UNPROVEN');
+
+ // An unlocked judge cannot be papered over, and editing the record breaks its own hash.
+ const open=await buildBlindLiftProof({...base,submissions:[{judgeId:'j1',locked:false}],revealedAt:'2026-01-01T10:05:00.000Z'});
+ assert.equal(open.status,'UNPROVEN');
+ const forged=await verifyBlindLiftProof({...good,allLockedBeforeReveal:true,judgeLocks:[...good.judgeLocks,{judgeId:'j3',locked:true,lockedAt:'2026-01-01T10:02:00.000Z'}]});
+ assert.equal(forged.state,'UNPROVEN');
+ assert.ok(forged.reasons.some(r=>r.includes('بصمة')),'an added judge must break the proof hash');
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { certificateCodeFromLocation, certificateVerifyUrl, fetchPublicCertificateVerdict, type PublicCertificateView } from '../../lib/certificate-verification';
 import { Link2, Printer, Search, ShieldCheck } from 'lucide-react';
 import { RealQRCode } from '../design-system/RealQRCode';
 import { useAppStore } from '../../lib/store';
@@ -23,8 +24,14 @@ export const CertificateVerification: React.FC = () => {
 
   const [chain,setChain]=useState<{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[]>([]);
 
+  const [publicView,setPublicView]=useState<PublicCertificateView|null>(null);
+  /* الغريب الماسح لرمز مطبوع لا يملك مخزن المسابقة: يُسأل السجل العام أولًا، ويبقى المخزن
+     المحلي مرجعًا لمن هو داخل المسابقة أصلًا أو حين لا يكون السجل مهيأً. */
   const verifyCode = async (code:string) => {
-    setSubmittedCode(code);
+    setSubmittedCode(code);setPublicView(null);
+    const remote=await fetchPublicCertificateVerdict(code);
+    if(remote){setVerification(remote.state);setPublicView(remote.certificate||null);setChain([]);
+      if(remote.state!=='NOT_FOUND')return;}
     const cert=certificates.find(c=>c.certificateNumber.toLowerCase()===code.toLowerCase());
     if(!cert){setVerification('NOT_FOUND');setChain([]);return;}
     const result=await store.verifyCertificateEvidence(cert.id);
@@ -39,13 +46,13 @@ export const CertificateVerification: React.FC = () => {
   useEffect(()=>{
     if(autoRan.current)return;autoRan.current=true;
     if(typeof window==='undefined')return;
-    const code=new URLSearchParams(window.location.search).get('cert');
+    const code=certificateCodeFromLocation(window.location.search,window.location.hash);
     if(!code||!policy.certificates.publicVerification)return;
     setSearchCode(code);void verifyCode(code);
   },[]);
 
-  const verifyUrl=(code:string)=>typeof window==='undefined'?code
-    :`${window.location.origin}${window.location.pathname}?cert=${encodeURIComponent(code)}`;
+  /* الرابط المطبوع يجب أن يفتح صفحة التحقق نفسها: المسار وحده يفتح الجذر، فيُثبَّت جزء التوجيه. */
+  const verifyUrl=(code:string)=>typeof window==='undefined'?code:certificateVerifyUrl(window.location.origin,code);
 
   const label:Record<VerificationState,{ar:string;en:string;variant:'emerald'|'rose'|'amber'|'neutral'}>={
     AUTHENTIC:{ar:'أصيلة',en:'AUTHENTIC',variant:'emerald'},
@@ -67,6 +74,25 @@ export const CertificateVerification: React.FC = () => {
     </section>
 
     {submittedCode && verification==='NOT_FOUND' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'غير موجودة':'NOT FOUND'}</h2><p className="text-xs text-[#646965] mt-1">{ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}</p></section>}
+
+    {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">
+      <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
+      <div className="relative">
+        <Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>
+        <div className="mizan-kicker mt-5">{publicView.certificateNumber}</div>
+        <h2 className="text-2xl sm:text-3xl font-black mt-3">{publicView.disclosed.participantName||publicView.disclosed.participantCode}</h2>
+        <p className="text-sm text-[#616762] mt-2">{publicView.competitionName}</p>
+        {publicView.organizationName&&<p className="text-xs font-bold text-[#214C40] mt-2">{publicView.organizationName}</p>}
+        <div className="max-w-lg mx-auto mt-6 border-y border-[#e5e3dc] divide-y divide-[#e5e3dc] text-sm">
+          {publicView.disclosed.categoryName&&<Row label={ar?'الفئة':'Category'} value={publicView.disclosed.categoryName}/>}
+          {publicView.disclosed.finalScore!==undefined&&<Row label={ar?'الدرجة':'Score'} value={publicView.disclosed.finalScore.toFixed(2)}/>}
+          {publicView.disclosed.rank!==undefined&&<Row label={ar?'الترتيب':'Rank'} value={`#${publicView.disclosed.rank}`}/>}
+          <Row label={ar?'تاريخ الإصدار':'Issued'} value={publicView.issuedAt.slice(0,10)}/>
+        </div>
+        <p className="mt-6 text-[10px] leading-5 text-[#6b706c]">{ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}</p>
+        <div className="mt-6 inline-block bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(publicView.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
+      </div>
+    </section>}
 
     {activeCert && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">
       <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
