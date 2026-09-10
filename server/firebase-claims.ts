@@ -29,6 +29,8 @@ export interface IdentityClaims {
   role: GovernanceRole;
   org_id: string;
   competition_id?: string;
+  /** كل مسابقات التخويلات الفعّالة — القواعد تقبل العضوية في القائمة كما تقبل المفرد. */
+  competition_ids?: string[];
 }
 
 export type ClaimSyncOutcome =
@@ -83,8 +85,8 @@ export async function writeIdentityClaims(uid: string, claims: IdentityClaims | 
   try {
     /* الحقول المحذوفة تُكتب null لا undefined: المطالبة الباقية من دورٍ سابق أخطر من غيابها. */
     const payload = claims
-      ? { role: claims.role, org_id: claims.org_id, competition_id: claims.competition_id ?? null }
-      : { role: null, org_id: null, competition_id: null };
+      ? { role: claims.role, org_id: claims.org_id, competition_id: claims.competition_id ?? null, competition_ids: claims.competition_ids?.length ? claims.competition_ids : null }
+      : { role: null, org_id: null, competition_id: null, competition_ids: null };
     await auth.setCustomUserClaims(uid, payload);
     return { status: 'SYNCED', claims };
   } catch (err) {
@@ -107,10 +109,11 @@ export async function writeIdentityClaims(uid: string, claims: IdentityClaims | 
  * الدور الأعلى رتبةً هو الحاكم — وهو ترتيب السجلّ نفسه — ولا يُخترع هنا ترتيب ثانٍ يفترق عنه.
  * ونطاق المسابقة يُكتب فقط حين يحمله التخويل: كتابته فارغة تُقيّد دورًا لا يُقصد تقييده.
  */
-export function claimsFromGrant(grant: { role: GovernanceRole; organizationId: string; competitionId?: string }): IdentityClaims {
+export function claimsFromGrant(grant: { role: GovernanceRole; organizationId: string; competitionId?: string; competitionIds?: string[] }): IdentityClaims {
   return {
     role: grant.role,
     org_id: grant.organizationId,
     ...(grant.competitionId ? { competition_id: grant.competitionId } : {}),
+    ...(grant.competitionIds?.length ? { competition_ids: grant.competitionIds } : {}),
   };
 }
