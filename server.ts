@@ -70,7 +70,13 @@ const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  /*
+   * منصّات الحاويات تحقن المنفذ ولا تتفاوض عليه: Cloud Run وأمثالها تُمرّر PORT وتنتظر
+   * الخدمة عنده، وملف الحاوية هنا يُعلن 8080. ومنفذٌ مثبَّت في الكود يعني أن التطبيق يستمع
+   * في مكان والمنصّة تطرق مكانًا آخر — فلا تصل الطلبات ويسقط النشر في فحص الصحة، بلا خطأ
+   * في السجل يدلّ على السبب. و.env.example يوثّق PORT كأنه مضبوط، فيظنّ الناشر أنه فعل.
+   */
+  const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
   app.disable('x-powered-by'); app.set('trust proxy', 1);
   app.use((req,res,next)=>{
