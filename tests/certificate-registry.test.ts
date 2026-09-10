@@ -95,6 +95,23 @@ test('the printed link opens the verification page and carries the number back',
  assert.equal(certificateCodeFromLocation('','#verify'),'');
 });
 
+test('a number that is not a certificate number never reaches the network',async()=>{
+ const {fetchPublicCertificateVerdict,revokeCertificateInRegistry,isCertificateNumber}=await import('../src/lib/certificate-verification');
+ for(const bad of ['../../etc/passwd','MZN 1','http://evil.example/x','MZN/../../x','','..','MZN?a=b','MZN#f'])assert.equal(isCertificateNumber(bad),false,`${bad} must not pass as a certificate number`);
+ for(const good of ['MZN-2026-KW-A104','abc.def_1'])assert.equal(isCertificateNumber(good),true);
+
+ let called=false;
+ const spy=(async()=>{called=true;return new Response('{}',{status:200})}) as any;
+ assert.equal(await fetchPublicCertificateVerdict('../../etc/passwd',spy),null);
+ assert.equal(called,false,'a malformed number must not be sent to the server at all');
+
+ const g=globalThis as any;const realFetch=g.fetch;
+ try{g.fetch=async()=>{called=true;return new Response('{}',{status:200})};
+  assert.equal(await revokeCertificateInRegistry('../../etc/passwd','r','tok'),'NOT_CONFIGURED');
+  assert.equal(called,false);
+ }finally{g.fetch=realFetch}
+});
+
 test('an unconfigured registry falls back to the local check instead of denying a real certificate',async()=>{
  const unconfigured=await fetchPublicCertificateVerdict('MZN-1',(async()=>new Response('{}',{status:503})) as any);
  assert.equal(unconfigured,null,'503 means no registry, which is not a verdict');
