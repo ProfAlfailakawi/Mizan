@@ -191,3 +191,31 @@ test('billing issues invoices, records payment, and blocks cross-operator billin
  repo.markInvoicePaid(owner,opInv.id,{});
  assert.throws(()=>repo.voidInvoice(owner,opInv.id),/INVOICE_ALREADY_PAID/);
 }));
+
+test('storage quota trusts the measured size, releases abandoned reservations and honours an operator cap',withRepo((repo)=>{
+ const plan=repo.upsertPlan(owner,{name:'Small',limits:{licensedOrganizations:1,activeCompetitions:3,annualParticipants:100,storageBytes:1000,branches:1}});
+ const op=repo.createOperator(owner,{name:'Operator A'});
+ repo.adjustCredits(owner,op.id,2,'seed credits');
+ const actorA={uid:'a',role:'operator_owner',organizationId:'__op__',operatorId:op.id};
+ const org=repo.createOrganization(actorA,{officialName:'Org A',shortName:'A',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+ const orgActor={uid:'admin',role:'org_admin',organizationId:org.id};
+
+ // A client that under-reports its size cannot smuggle a file past the quota: the measured size wins.
+ const sneaky=repo.reserveUpload(orgActor,{organizationId:org.id,fileType:'audio',mimeType:'audio/mpeg',sizeBytes:10});
+ assert.throws(()=>repo.finalizeUpload(orgActor,sneaky.id,{organizationId:org.id,checksum:'abc',actualSizeBytes:5000}),/STORAGE_QUOTA_REACHED/);
+ // The rejected reservation is released, so it does not keep consuming the quota.
+ assert.equal(repo.usage(orgActor,org.id).usage.reservedBytes,0);
+
+ // An honest upload records its real measured size.
+ const good=repo.reserveUpload(orgActor,{organizationId:org.id,fileType:'audio',mimeType:'audio/mpeg',sizeBytes:100});
+ const stored=repo.finalizeUpload(orgActor,good.id,{organizationId:org.id,checksum:'def',actualSizeBytes:400});
+ assert.equal(stored.sizeBytes,400);
+ assert.equal(repo.usage(orgActor,org.id).usage.mizanStorageBytes,400);
+
+ // An operator-wide cap stops the total across all of that operator's organizations.
+ repo.updateOperator(owner,op.id,{storageCapBytes:500});
+ assert.throws(()=>repo.reserveUpload(orgActor,{organizationId:org.id,fileType:'audio',mimeType:'audio/mpeg',sizeBytes:200}),/OPERATOR_STORAGE_CAP_REACHED/);
+ repo.updateOperator(owner,op.id,{storageCapBytes:0});
+ const allowed=repo.reserveUpload(orgActor,{organizationId:org.id,fileType:'audio',mimeType:'audio/mpeg',sizeBytes:200});
+ assert.equal(allowed.state,'reserved');
+}));
