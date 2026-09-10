@@ -123,3 +123,19 @@ test('a fine-grained GitHub token is caught in a deployment manifest', () => {
   // ورمز AWS المؤقت (ASIA) مثل الدائم (AKIA).
   assert.equal(withPlantedLine('cloudbuild.yaml', `  _LEAK: '${'AS' + 'IA'}IOSFODNN7EXAMPLE'`), 'FAILED');
 });
+
+test('every real private-key armor header is caught, and no invented one is trusted', () => {
+  /*
+   * النسخة السابقة عدّت الأنواع باليد فأخطأت مرتين: أضافت `PGP PRIVATE KEY` وهي ترويسة لا
+   * وجود لها — فأعطت ثقةً كاذبة — وأسقطت الترويسة الحقيقية `PGP PRIVATE KEY BLOCK` وترويسة
+   * PKCS#8 المشفّرة. فكان مفتاحٌ خاص حقيقي يمرّ من الفاحصَين معًا. المطابقة الآن على قواعد
+   * الترويسة لا على قائمة أنواع.
+   */
+  const armor = (label: string) => `-----${'BEGIN'} ${label}-----`;
+  for (const label of ['PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY', 'DSA PRIVATE KEY',
+                       'OPENSSH PRIVATE KEY', 'ENCRYPTED PRIVATE KEY', 'PGP PRIVATE KEY BLOCK']) {
+    assert.equal(withPlantedLine('Dockerfile', `# ${armor(label)}`), 'FAILED', `missed: ${label}`);
+  }
+  // ونثرٌ عادي يذكر العبارة ليس مفتاحًا: إنذارٌ كاذب متكرر يُعوّد المراجعين على تجاهل الفحص.
+  assert.equal(withPlantedLine('Dockerfile', '# private key handling is documented below'), 'PASSED');
+});
