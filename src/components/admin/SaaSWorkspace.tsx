@@ -71,9 +71,9 @@ const subTone=(s:string)=>s==='active'?'emerald':s==='past_due'||s==='unpaid'?'a
 const sumMinor=(rows:{amountMinor:number}[])=>rows.reduce((n,x)=>n+(Number(x.amountMinor)||0),0);
 
 const BillingPanel=({billing,subjects,plans,base,onDone,mine}:{billing:any;subjects:{type:'operator'|'organization';id:string;name:string}[];plans:any[];base:string;onDone:()=>void;mine?:boolean})=>{
- const [error,setError]=useState(''),[busy,setBusy]=useState(''),[subOpen,setSubOpen]=useState(false),[invOpen,setInvOpen]=useState(false),[filter,setFilter]=useState<'all'|'open'|'paid'>('all');
+ const [error,setError]=useState(''),[busy,setBusy]=useState(''),[subOpen,setSubOpen]=useState(false),[invOpen,setInvOpen]=useState(false),[filter,setFilter]=useState<'all'|'open'|'overdue'|'paid'>('all');
  const summary=billing?.summary||{},subs=billing?.subscriptions||[],invoices=billing?.invoices||[];
- const shown=invoices.filter((i:any)=>filter==='all'||i.status===filter);
+ const shown=invoices.filter((i:any)=>filter==='all'?true:filter==='overdue'?i.overdue:i.status===filter);
  const act=async(path:string,body?:any)=>{setBusy(path);setError('');try{await api(path,{method:'POST',body:body?JSON.stringify(body):undefined});onDone()}catch(e){setError((e as Error).message)}finally{setBusy('')}};
  const line=(rows:any[])=>rows.length?rows.map((r:any)=>money(r.amountMinor,r.currency)).join(' · '):money(0);
  return <div className="space-y-4">
@@ -82,7 +82,7 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine}:{billing:any;subje
    <Metric icon={WalletCards} value={summary.activeSubscriptions||0} label="اشتراك نشط"/>
    <Metric icon={BadgeCheck} value={line(summary.collected||[])} label="محصّل"/>
    <Metric icon={AlertTriangle} value={line(summary.outstanding||[])} label="غير محصّل" tone="amber"/>
-   <Metric icon={FileSearch} value={summary.openInvoices||0} label="فاتورة بانتظار السداد" tone="amber"/>
+   <Metric icon={AlertTriangle} value={line(summary.overdue||[])} label={`متأخر · ${summary.overdueInvoices||0} فاتورة`} tone="amber"/>
   </div>
 
   {mine&&<div className="mizan-surface p-5">
@@ -115,7 +115,7 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine}:{billing:any;subje
    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e3e1da] p-5">
     <div><h3 className="font-black">الفواتير</h3><p className="mt-1 text-xs text-[#666c68]">من دفع ومن لم يدفع، بوضوح.</p></div>
     <div className="flex flex-wrap gap-2">
-     <Tabs value={filter} onChange={setFilter} items={[{id:'all',label:'الكل',count:invoices.length},{id:'open',label:'لم تُدفع',count:invoices.filter((i:any)=>i.status==='open').length},{id:'paid',label:'مدفوعة',count:invoices.filter((i:any)=>i.status==='paid').length}]}/>
+     <Tabs value={filter} onChange={setFilter} items={[{id:'all',label:'الكل',count:invoices.length},{id:'open',label:'لم تُدفع',count:invoices.filter((i:any)=>i.status==='open').length},{id:'overdue',label:'متأخرة',count:invoices.filter((i:any)=>i.overdue).length},{id:'paid',label:'مدفوعة',count:invoices.filter((i:any)=>i.status==='paid').length}]}/>
      <Button size="sm" icon={<Plus className="h-4 w-4"/>} onClick={()=>setInvOpen(true)}>فاتورة جديدة</Button>
     </div>
    </div>
@@ -124,8 +124,8 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine}:{billing:any;subje
      <span dir="ltr" className="text-[11px] font-black text-[#214C40]">{x.number}</span>
      <div className="min-w-0"><div className="font-bold truncate text-sm">{x.subjectName}</div><div className="mt-1 text-[10px] text-[#6c726e]">{x.subjectType==='operator'?'مشغّل':'جهة'} · صدرت {date(x.issuedAt)}{x.dueAt?` · تستحق ${date(x.dueAt)}`:''}{x.paidAt?` · دُفعت ${date(x.paidAt)}`:''}</div></div>
      <span className="font-black tabular-nums" dir="ltr">{money(x.amountMinor,x.currency)}</span>
-     <Badge variant={invTone(x.status)}>{INV_AR[x.status]||x.status}</Badge>
-     <div className="flex gap-2">{x.status==='open'&&<><Button size="sm" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/pay`,{method:'manual'})}>تسجيل السداد</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/void`)}>إلغاء</Button></>}</div>
+     <Badge variant={x.overdue?'rose':invTone(x.status)}>{x.overdue?`متأخرة ${x.daysOverdue} يومًا`:(INV_AR[x.status]||x.status)}</Badge>
+     <div className="flex flex-wrap gap-2">{x.status==='open'&&<><Button size="sm" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/pay`,{method:'manual'})}>تسجيل السداد</Button><Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/remind`)}>تذكير</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/void`)}>إلغاء</Button></>}</div>
     </div>)}
     {!shown.length&&<EmptyState icon={FileSearch} title="لا توجد فواتير" hint="أصدر فاتورة لاشتراك قائم أو مبلغ لمرة واحدة."/>}
    </div>
