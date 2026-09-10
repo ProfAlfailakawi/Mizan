@@ -307,6 +307,9 @@ export interface Committee {
   assignedCategories: string[];
   headJudgeId: string;
   judgeIds: string[];
+  // Specialties are scoped per panel: the same judge can carry a different scope on each
+  // committee (e.g. "شامل" here, "تجويد" there). Keyed by the judge id used in judgeIds.
+  judgeSpecialties?: Record<string, string[]>;
   status: 'ready' | 'testing' | 'paused' | 'offline';
   currentParticipantId?: string;
   completedCount: number;

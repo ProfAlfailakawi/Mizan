@@ -26,5 +26,7 @@ test('judge specialties are multi-select and derived from competition criteria',
  assert.match(overview,/toggleJudgeSpecialty/);
  assert.match(store,/updateJudgeSpecialties/);
  assert.match(judge,/judgeSpecialties\(judge\)/);
- assert.match(judge,/judgeCanScore\(judge,criterion\.assignedJudgeType,policy\.judging\.mode\)/);
+ // Specialties are resolved per panel: the judge's live view uses the committee-scoped effectiveJudge.
+ assert.match(judge,/judgeCanScore\(effectiveJudge,criterion\.assignedJudgeType,policy\.judging\.mode\)/);
+ assert.match(overview,/updateCommitteeJudgeSpecialty/);
 });
