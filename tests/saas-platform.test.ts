@@ -123,3 +123,71 @@ test('listOwnerTenants surfaces every operator-owned and direct organization as 
  assert.equal(direct?.operatorName,undefined);
  assert.equal(under?.source,'saas');
 }));
+
+test('operator packages stay scoped to their owner and cannot be used or edited across operators',withRepo((repo)=>{
+ const platformPlan=repo.seedInitialPlan(owner);
+ const opA=repo.createOperator(owner,{name:'Operator A'});
+ const opB=repo.createOperator(owner,{name:'Operator B'});
+ const actorA={uid:'a',role:'operator_owner',organizationId:'__op__',operatorId:opA.id};
+ const actorB={uid:'b',role:'operator_owner',organizationId:'__op__',operatorId:opB.id};
+
+ const planA=repo.operatorUpsertPlan(actorA,{name:'باقة أ',priceMinor:5000,currency:'KWD'});
+ assert.equal(planA.ownerOperatorId,opA.id);
+ // Another operator may neither edit nor delete it.
+ assert.throws(()=>repo.operatorUpsertPlan(actorB,{id:planA.id,name:'hijack'}),/CROSS_OPERATOR_PLAN_BLOCKED/);
+ assert.throws(()=>repo.operatorDeletePlan(actorB,planA.id),/PLAN_NOT_FOUND/);
+
+ // Operator B cannot provision an organization on operator A's package.
+ repo.adjustCredits(owner,opB.id,1,'seed credit');
+ assert.throws(()=>repo.createOrganization(actorB,{officialName:'Org B',shortName:'B',organizationType:'charity',country:'KW',planId:planA.id,...dates}),/PLAN_NOT_FOUND/);
+ // The platform package remains available to every operator.
+ const orgB=repo.createOrganization(actorB,{officialName:'Org B',shortName:'B',organizationType:'charity',country:'KW',planId:platformPlan.id,...dates});
+ assert.equal(orgB.organization.operatorId,opB.id);
+
+ // The owner's plan list excludes operator-owned packages; the operator sees their own.
+ assert.ok(!repo.dashboard(owner).plans.some((p:any)=>p.id===planA.id));
+ assert.ok(repo.operatorDashboard(actorA).ownedPlans.some((p:any)=>p.id===planA.id));
+}));
+
+test('billing issues invoices, records payment, and blocks cross-operator billing',withRepo((repo)=>{
+ const plan=repo.seedInitialPlan(owner);
+ const opA=repo.createOperator(owner,{name:'Operator A'});
+ const opB=repo.createOperator(owner,{name:'Operator B'});
+ const actorA={uid:'a',role:'operator_owner',organizationId:'__op__',operatorId:opA.id};
+ const actorB={uid:'b',role:'operator_owner',organizationId:'__op__',operatorId:opB.id};
+ repo.adjustCredits(owner,opA.id,1,'seed credit');
+ const org=repo.createOrganization(actorA,{officialName:'Org A',shortName:'A',organizationType:'charity',country:'KW',planId:plan.id,...dates}).organization;
+
+ // The operator bills their own organization.
+ const sub=repo.createSubscription(actorA,{subjectType:'organization',subjectId:org.id,planId:plan.id});
+ assert.equal(sub.status,'active');
+ assert.equal(sub.ownerOperatorId,opA.id);
+ const inv=repo.issueInvoice(actorA,{subjectType:'organization',subjectId:org.id,subscriptionId:sub.id,amountMinor:5000,currency:'KWD'});
+ assert.equal(inv.status,'open');
+ assert.equal(inv.provider,'manual');
+
+ // Outstanding before payment, collected after.
+ let ownerView=repo.dashboard(owner);
+ assert.equal(ownerView.billing.summary.openInvoices,1);
+ assert.equal(ownerView.billing.summary.outstanding[0].amountMinor,5000);
+ const paid=repo.markInvoicePaid(actorA,inv.id,{method:'bank_transfer',reference:'TRX-1'});
+ assert.equal(paid.status,'paid');
+ assert.equal(paid.externalRef,'TRX-1');
+ ownerView=repo.dashboard(owner);
+ assert.equal(ownerView.billing.summary.openInvoices,0);
+ assert.equal(ownerView.billing.summary.paidInvoices,1);
+ assert.equal(ownerView.billing.summary.collected[0].amountMinor,5000);
+
+ // A different operator cannot bill this organization, and no operator may bill an operator.
+ assert.throws(()=>repo.issueInvoice(actorB,{subjectType:'organization',subjectId:org.id,amountMinor:100}),/BILLING_NOT_ALLOWED/);
+ assert.throws(()=>repo.createSubscription(actorA,{subjectType:'operator',subjectId:opA.id,planId:plan.id}),/BILLING_NOT_ALLOWED/);
+
+ // The platform owner bills the operator directly.
+ const opSub=repo.createSubscription(owner,{subjectType:'operator',subjectId:opA.id,planId:plan.id});
+ assert.equal(opSub.subjectType,'operator');
+ const opInv=repo.issueInvoice(owner,{subjectType:'operator',subjectId:opA.id,subscriptionId:opSub.id,amountMinor:20000});
+ assert.equal(repo.operatorDashboard(actorA).billing.myInvoices[0].id,opInv.id);
+ // A paid invoice cannot be voided.
+ repo.markInvoicePaid(owner,opInv.id,{});
+ assert.throws(()=>repo.voidInvoice(owner,opInv.id),/INVOICE_ALREADY_PAID/);
+}));

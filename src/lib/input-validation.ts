@@ -12,7 +12,14 @@ export function installInputNormalization(){
   else if(kind==='latin'||el.lang==='en')next=normalizeLatinText(next);
   else if(el instanceof HTMLInputElement&&el.type==='tel')next=normalizePhone(next);
   else if(el instanceof HTMLInputElement&&el.type==='email')next=normalizeEmail(next);
-  if(next!==el.value)el.value=next;
+  /* Assigning el.value directly leaves React's internal value tracker unchanged, so React can skip
+     onChange and keep stale state while the DOM shows the normalized text. Writing through the native
+     setter updates the tracker too, so the component's own handler receives the normalized value. */
+  if(next!==el.value){
+   const proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+   const setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;
+   if(setter)setter.call(el,next);else el.value=next;
+  }
  },true);
  document.addEventListener('focusin',event=>{const el=event.target;if(!(el instanceof HTMLInputElement))return;if(['email','url','tel','number'].includes(el.type))el.dir='ltr'},true);
 }

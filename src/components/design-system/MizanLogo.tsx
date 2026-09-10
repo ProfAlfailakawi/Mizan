@@ -17,7 +17,9 @@ export interface BrandInfo {
 }
 
 // معرّفات النظام (مثل MZ-ORG-000016) يجب ألا تظهر كاسم علامة في الترويسة.
-const isSystemId = (v?: string): boolean => !!v && /^MZ-(ORG|TEN|LIC)-\d+$/i.test(v.trim());
+// كذلك القيم المبدئية («ميزان»/MIZAN/org-pending-setup) ليست علامة جهة: لا يصح أن تحجب اسم الجهة المشترية.
+const PLACEHOLDER_BRAND = /^(mizan|ميزان|org-pending-setup|comp-pending-setup)$/i;
+const isSystemId = (v?: string): boolean => !!v && (/^MZ-(ORG|TEN|LIC)-\d+$/i.test(v.trim()) || PLACEHOLDER_BRAND.test(v.trim()));
 const cleanName = (v?: string): string | undefined => (isSystemId(v) ? undefined : v);
 
 export function useBrandInfo(): BrandInfo {

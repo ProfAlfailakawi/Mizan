@@ -23,6 +23,7 @@ import {
   Plus,
   Trash2,
   Link2,
+  Copy,
 } from 'lucide-react';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -34,6 +35,59 @@ import {isArabicText,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeArabicTex
 
 const BRAND_ERR:Record<string,string>={ORG_ID_REQUIRED:'معرّف الجهة مطلوب.',ORG_ID_INVALID:'معرّف الجهة يقبل الحروف اللاتينية والأرقام والشرطة فقط.',ORG_ID_TAKEN:'هذا المعرّف مستعمل.',ORG_NOT_FOUND:'لا توجد جهة بهذا المعرّف.',SUBDOMAIN_INVALID:'النطاق الفرعي غير صالح.',SUBDOMAIN_RESERVED:'هذا النطاق محجوز.',SUBDOMAIN_TAKEN:'النطاق مستخدم.',HOST_REQUIRED:'لا بد من نطاق للجهة.',TENANTS_PINNED_TO_ENV:'سجل الجهات مثبت في بيئة النشر.',TENANT_STORE_NOT_CONFIGURED:'سجل الجهات غير مهيأ في هذا النشر.',IDENTITY_REQUIRED:'تلزم هوية المالك.',FORBIDDEN_ROLE:'هذا الإجراء لمالك المنصة وحده.',BRAND_SAVE_FAILED:'تعذّر حفظ الهوية، حاول مجددًا.',DOMAIN_LOCKED:'النطاق مُعتمد ومقفل. للتغيير تواصل مع مالك المنصة.',DOMAIN_SAVE_FAILED:'تعذّر حفظ النطاق، حاول مجددًا.'};
 const arError=(raw:string):string=>raw.split(' · ').map(c=>BRAND_ERR[c.trim()]||c.trim()).join(' · ');
+
+/* دليل مصوّر بسيط: العميل يعطينا النطاق، يضيف سجلًا واحدًا، ونتكفّل نحن بالتحقق والتفعيل. */
+const CopyChip: React.FC<{ value: string; label: string }> = ({ value, label }) => {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => { try { void navigator.clipboard?.writeText(value); setDone(true); setTimeout(() => setDone(false), 1600); } catch { /* النسخ غير متاح في هذا المتصفح */ } }}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#DAD8D0] bg-white px-2 py-1 text-[10px] font-black text-[#2F6555] hover:bg-[#F3F1EB]"
+      aria-label={label}
+    >
+      {done ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}{done ? 'تم النسخ' : 'نسخ'}
+    </button>
+  );
+};
+
+const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }> = ({ ar, baseDomain, domain }) => {
+  const host = baseDomain || 'mizan.app';
+  const name = domain || 'quran.example.com';
+  const steps = [
+    { icon: Globe, t: ar ? 'أعطنا نطاقك' : 'Give us your domain', d: ar ? 'اكتب العنوان الذي تريده في الحقل أعلاه، مثل quran.example.com.' : 'Type the address you want above.' },
+    { icon: Link2, t: ar ? 'أضِف سجلًا واحدًا' : 'Add one record', d: ar ? 'عند مزوّد نطاقك، أضِف سجل CNAME بالقيم الظاهرة أدناه. سجل واحد فقط لا أكثر.' : 'At your DNS provider, add the CNAME record shown below.' },
+    { icon: ShieldCheck, t: ar ? 'ونتكفّل بالباقي' : 'We handle the rest', d: ar ? 'نتحقق تلقائيًا، ونُصدر شهادة الأمان، ويعمل نطاقك. لا شيء آخر عليك.' : 'We verify, issue the certificate, and your domain goes live.' },
+  ];
+  return (
+    <div className="mt-4 rounded-2xl border border-[#E4E2DB] bg-[#FBFAF7] p-4 sm:p-5">
+      <div className="mizan-kicker">{ar ? 'كيف يعمل نطاقك الخاص' : 'HOW YOUR DOMAIN WORKS'}</div>
+      <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+        {steps.map((s, i) => (
+          <li key={s.t} className="relative rounded-xl border border-[#E9E7E0] bg-white p-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#214C40] text-[11px] font-black text-white">{i + 1}</span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#EBF2EE] text-[#214C40]"><s.icon className="h-4 w-4" /></span>
+              <span className="text-xs font-black text-[#171b18]">{s.t}</span>
+            </div>
+            <p className="mt-2 text-[10px] leading-5 text-[#656b66]">{s.d}</p>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-[#E9E7E0] bg-white">
+        <table className="w-full min-w-[420px] text-[11px]">
+          <thead><tr className="bg-[#F3F1EB] text-[10px] font-black text-[#656b66]"><th className="p-2 text-start">{ar ? 'النوع' : 'Type'}</th><th className="p-2 text-start">{ar ? 'الاسم' : 'Name'}</th><th className="p-2 text-start">{ar ? 'القيمة' : 'Value'}</th></tr></thead>
+          <tbody><tr className="border-t border-[#EDEBE4]">
+            <td className="p-2 font-black" dir="ltr">CNAME</td>
+            <td className="p-2" dir="ltr"><span className="font-bold break-all [overflow-wrap:anywhere]">{name}</span></td>
+            <td className="p-2"><span className="flex flex-wrap items-center gap-2"><span dir="ltr" className="font-bold break-all [overflow-wrap:anywhere]">{host}</span><CopyChip value={host} label={ar ? 'نسخ قيمة السجل' : 'Copy record value'} /></span></td>
+          </tr></tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[10px] leading-5 text-[#77613e]">{ar ? 'قد يستغرق انتشار السجل حتى بضع ساعات عند بعض المزوّدين. لا حاجة لأي إعداد آخر منك.' : 'DNS propagation can take a few hours with some providers. Nothing else is required from you.'}</p>
+    </div>
+  );
+};
 
 export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patchUrl?: string; lockWhenSet?: boolean; confirmOnSave?: boolean }> = ({ orgId, getUrl, patchUrl, lockWhenSet, confirmOnSave }) => {
   const store = useAppStore();
@@ -127,12 +181,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
             ))}
           </div>
         )}
-        <div className="mt-3 rounded-xl bg-[#F3F1EB] p-3 text-[11px] leading-6 text-[#666c68]">
-          <ShieldCheck className="mb-1 h-4 w-4 text-[#2F6555]" />
-          {ar ? 'لتفعيل نطاقك الخاص: أضِف سجل CNAME عند مزوّد نطاقك يشير إلى عنوان ميزان' : 'To activate your custom domain: add a CNAME record at your DNS provider pointing to the MIZAN host'}
-          {baseDomain ? <> <span dir="ltr" className="font-black">{baseDomain}</span></> : ''}
-          {ar ? '. تسري الشهادة الآمنة تلقائيًا بعد التحقق.' : '. A secure certificate is issued automatically after verification.'}
-        </div>
+        <DomainHowTo ar={ar} baseDomain={baseDomain} domain={customDomains[0] || newDomain} />
       </div>
 
       {ok && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'تم حفظ النطاق بنجاح.' : 'Domain saved successfully.'}</div>}
