@@ -329,11 +329,14 @@ export class IdentityGovernanceRepository{
    * `null` تعني: لم يبق لهذا الحساب تخويل فعّال — فتُمسح مطالباته. وذلك مقصود ولا يُهمَل:
    * مطالبةٌ باقية بعد سحب الصلاحية بابٌ بقي مفتوحًا بعد إغلاقه.
    */
-  claimsForUid(uid:string):{role:GovernanceRole;organizationId:string;competitionId?:string}|null{
+  claimsForUid(uid:string):{role:GovernanceRole;organizationId:string;competitionId?:string;competitionIds:string[]}|null{
     const resolved=this.identityForUid(uid);
     if(!resolved)return null;
-    const {grant}=resolved;
-    return {role:grant.role,organizationId:grant.organizationId,competitionId:grant.competitionId};
+    const {grant,grants}=resolved;
+    /* كل مسابقات التخويلات الفعّالة في جهة الدور الحاكم، لا مسابقة التخويل الأعلى وحدها:
+       محكّمٌ له تخويلان في مسابقتين كان يُرفض في الثانية دائمًا لأن المطالبة تحمل واحدة. */
+    const competitionIds=[...new Set(grants.filter(g=>g.organizationId===grant.organizationId&&g.competitionId).map(g=>g.competitionId as string))];
+    return {role:grant.role,organizationId:grant.organizationId,competitionId:grant.competitionId,competitionIds};
   }
 
   /** يربط تعديلًا على تخويل بصاحبه، ليُعاد حساب مطالباته بعده. */

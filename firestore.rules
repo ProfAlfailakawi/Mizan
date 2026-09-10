@@ -22,7 +22,9 @@ service cloud.firestore {
     function compScope(competitionId) {
       return platformAdmin()
         || !requiresCompetitionClaim()
-        || (('competition_id' in request.auth.token) && request.auth.token.competition_id == competitionId);
+        || (('competition_id' in request.auth.token) && request.auth.token.competition_id == competitionId)
+        || (('competition_ids' in request.auth.token) && request.auth.token.competition_ids != null
+          && competitionId in request.auth.token.competition_ids);
     }
     function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
 
@@ -183,7 +185,13 @@ service cloud.firestore {
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent'])
               || (roleIs(['participant','guardian']) && request.resource.data.uploaderUid == request.auth.uid));
-          allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          // The client re-syncs every record its role owns, so a filer's own appeal is
+          // rewritten under the same doc id; without this clause every re-sync is denied.
+          allow update: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','head_judge'])
+              || (roleIs(['participant','guardian','support_agent'])
+                && resource.data.uploaderUid == request.auth.uid
+                && request.resource.data.uploaderUid == request.auth.uid));
           allow delete: if false;
         }
         match /support_sessions/{supportId} {

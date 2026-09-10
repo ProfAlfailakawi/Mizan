@@ -55,3 +55,21 @@ test('support_agent can create support sessions as the client write-map allows',
   const createLine = block.split('\n').find((l) => l.includes('allow create'));
   assert.ok(createLine && createLine.includes("'support_agent'"));
 });
+
+test('claims carry every active competition and rules accept membership in the list', () => {
+  const bridge = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  const governance = fs.readFileSync('server/identity-governance.ts', 'utf8');
+  // السجلّ يجمع كل مسابقات التخويلات الفعّالة، لا مسابقة التخويل الأعلى وحدها.
+  assert.match(governance, /competitionIds=\[\.\.\.new Set\(grants/);
+  // الجسر يكتب القائمة ويمسحها بـnull عند السحب.
+  assert.match(bridge, /competition_ids: claims\.competition_ids\?\.length \? claims\.competition_ids : null/);
+  assert.match(bridge, /competition_id: null, competition_ids: null/);
+  // والقواعد تقرأ الاسم نفسه الذي يكتبه الجسر — عضويةً في القائمة.
+  assert.match(rules, /'competition_ids' in request\.auth\.token/);
+  assert.match(rules, /competitionId in request\.auth\.token\.competition_ids/);
+});
+
+test('a filer may re-sync their own appeal (participant/guardian/support_agent update)', () => {
+  const block = rules.slice(rules.indexOf('match /appeals/'), rules.indexOf('match /support_sessions/'));
+  assert.match(block, /allow update:[\s\S]*roleIs\(\['participant','guardian','support_agent'\]\)[\s\S]*resource\.data\.uploaderUid == request\.auth\.uid[\s\S]*request\.resource\.data\.uploaderUid == request\.auth\.uid/);
+});
