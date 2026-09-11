@@ -1,6 +1,7 @@
 import type {QuestionPoolItem} from '../types';
 import {drawFairPassage,fetchDifficulty} from './kfgqpc-library';
 import {resolveReading} from './scientific-core';
+import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
 
 /*
  * بنك أسئلة مولَّد من المصحف بدل قائمة ثابتة.
@@ -44,7 +45,13 @@ export interface DeliveryPoolOptions{
  seedBase?:string;
  minAyahCount?:number;
  maxAyahCount?:number;
+ /** جسر توافق موروث: أعلى جزء مسموح. يُستعمل فقط حين لا نطاق. */
  maxJuz?:number;
+ /**
+  * نطاق المتسابق المعتمد. متى وُجد فهو المرجع القاطع ويُهمل maxJuz تمامًا:
+  * لا يُولَّد موضعٌ خارجه ولو أخطأت طبقة التسليم.
+  */
+ scope?:QuranScope;
 }
 
 /**
@@ -67,8 +74,10 @@ export async function buildDeliveryQuestionPool(riwaya:string,options:DeliveryPo
  for(const d of draws){
   if(!d?.passage)continue;
   const p=d.passage;
-  // لا يتجاوز الموضع الجزء المسموح للفئة.
-  if(options.maxJuz&&p.juz&&p.juz>options.maxJuz)continue;
+  // النطاق المعتمد هو المرجع القاطع؛ والموروث maxJuz لا يُستعمل إلا حين لا نطاق.
+  if(options.scope&&scopeAyahCount(options.scope)>0){
+   if(!scopeContainsRange(options.scope,{surah:p.surah,ayah:p.startAyah},{surah:p.surah,ayah:p.endAyah}))continue;
+  } else if(options.maxJuz&&p.juz&&p.juz>options.maxJuz)continue;
   const key=`${p.surah}:${p.startAyah}-${p.endAyah}`;
   if(seen.has(key))continue;                       // لا يتكرر الموضع نفسه في البنك
   seen.add(key);

@@ -1,3 +1,11 @@
+import type { QuranScope } from '../lib/quran-scope';
+import type { ParticipantScopeSelectionRule, ParticipantScopeRecord, ParticipantScopeStatus } from '../lib/participant-scope';
+import type { QuestionDistributionPlan } from '../lib/question-zones';
+import type { RepeatPolicy } from '../lib/repeat-policy';
+import type { DifficultyAssurance, SelectionReason } from '../lib/question-engine';
+
+export type { QuranScope, ParticipantScopeSelectionRule, ParticipantScopeRecord, ParticipantScopeStatus, QuestionDistributionPlan, RepeatPolicy, DifficultyAssurance };
+
 export type Role =
   | 'super_admin'
   | 'operator_owner'
@@ -198,6 +206,160 @@ export interface Category {
   passageMode?: 'ayat' | 'page_quarters';
   /** عدد أرباع الوجه؛ 1=¼، 2=½، 3=¾، 4=وجه، 5=وجه وربع... */
   pageQuarterUnits?: number;
+
+  // ---- محرك النطاق ----------------------------------------------------------------------
+  /*
+   * A competition category is data + scope + rules, not a hard-coded competition type.
+   * الفئة في ميزان تُعرّف بنطاقها وقواعدها الفعلية، لا باسمٍ ثابت داخل الكود.
+   *
+   * memorizationScope و juzCount أعلاه حقلان موروثان للعرض والتوافق فقط. لا يُشتق منهما
+   * سحبٌ ولا عدالة ولا تحقّق؛ المرجع هو scope أدناه، وعند اختيار المتسابق فنطاقه المعتمد.
+   */
+  /** النطاق القرآني الحقيقي للفئة. */
+  scope?: QuranScope;
+  /** ثابت للجميع، أم مظلّة يختار المتسابق من داخلها؟ */
+  scopeMode?: 'fixed' | 'participant_selected';
+  /** نسخة نطاق الفئة. تُرفع مع كل تعديل، وتُسجَّل في كل نموذج أسئلة. */
+  scopeVersion?: number;
+  /** قواعد اختيار المتسابق حين يكون له اختيار. */
+  selectionRule?: ParticipantScopeSelectionRule;
+  /** توزيع الأسئلة على المناطق. */
+  distribution?: QuestionDistributionPlan;
+  /** سياسة التكرار الخاصة بهذه الفئة (تتقدّم على سياسة المسابقة). */
+  repeatPolicy?: RepeatPolicy;
+  /** حالة ترحيل النطاق من الحقول القديمة. */
+  scopeMigration?: 'none' | 'derived_from_legacy' | 'needs_scope_confirmation';
+  /** هل تشترط هذه الفئة مراجعة علمية لصعوبة السؤال؟ */
+  requireReviewedDifficulty?: boolean;
+}
+
+/** تفصيل درجة العدالة — لا يُعرض رقم غامض بلا تفسير. */
+export interface FairnessBreakdown {
+  score: number;
+  difficultyParity: number;
+  scopeCoverage: number;
+  repeatPressure: number;
+  diversity: number;
+  similarity: number;
+  exposure: number;
+  zoneCompliance: number;
+  notesArabic: string[];
+  notesEnglish: string[];
+}
+
+export interface QuestionModelQuestion {
+  questionId: string;
+  surahNumber: number;
+  startAyah: number;
+  endAyah: number;
+  zoneId: string | null;
+  zoneName: string;
+  difficultyRating: number;
+  difficultyAssurance: DifficultyAssurance;
+  reason: SelectionReason;
+}
+
+/** نموذج أسئلة متسابق واحد — الكيان الذي يُختم ويُدقَّق ويُبطَل عند تغيّر النطاق. */
+export interface QuestionModelRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  categoryId: string;
+  participantId: string;
+  batchId?: string;
+  participantScopeVersion: number;
+  scopeSignature: string;
+  categoryScopeVersion: number;
+  policyVersion: string;
+  poolVersion: string;
+  quranSourceVersion?: string;
+  quranSourcePackageHash?: string;
+  reading: { qiraahId?: string; rawiId?: string; tariqId?: string };
+  questions: QuestionModelQuestion[];
+  zones: { id: string; name: string; scopeSignature: string }[];
+  aggregateDifficulty: number;
+  difficultyVariance: number;
+  minDifficulty: number;
+  maxDifficulty: number;
+  coverageAyahCount: number;
+  repeatsUsed: number;
+  relaxations: string[];
+  fairness: FairnessBreakdown;
+  generationMode: 'pre_generated' | 'just_in_time' | 'hybrid';
+  engineVersion: string;
+  seed?: string;
+  seedCommitmentHash?: string;
+  status: 'draft' | 'sealed' | 'consumed' | 'invalidated';
+  createdAt: string;
+  sealedAt?: string;
+  invalidatedAt?: string;
+  invalidationReason?: string;
+}
+
+/** دفعة نماذج مُولَّدة مسبقًا مع تقرير عدالتها واعتمادها. */
+export interface QuestionModelBatchRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  categoryId: string;
+  modelCount: number;
+  reserveCount: number;
+  policyVersion: string;
+  poolVersion: string;
+  categoryScopeVersion: number;
+  repeatPolicyVersion: number;
+  generationMode: 'pre_generated' | 'just_in_time' | 'hybrid';
+  aggregateFairness: FairnessBreakdown;
+  simulationId?: string;
+  approvalState: 'draft' | 'approved' | 'sealed' | 'invalidated';
+  approvedBy?: string;
+  approvedAt?: string;
+  sealedAt?: string;
+  sealHash?: string;
+  createdAt: string;
+}
+
+/** نتيجة محاكاة محفوظة — تقرير عدالة وتوزيع الأسئلة. */
+export interface ScopeSimulationRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  label: string;
+  seed: string;
+  participantCount: number;
+  draws: number;
+  metrics: Record<string, unknown>;
+  clusters: { signature: string; label: string; participants: number; demand: number; supply: number; repeats: number }[];
+  recommendations: { id: string; ar: string; en: string; severity: 'critical' | 'warning' | 'recommendation' }[];
+  createdBy: string;
+  createdAt: string;
+  runtimeMs: number;
+  syntheticData: boolean;
+}
+
+/** تجميدة إعدادات محرك النطاق قبل المسابقة — لقطة غير قابلة للتعديل منطقيًا. */
+export interface ScopeEngineSealRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  sealedAt: string;
+  sealedBy: string;
+  sealHash: string;
+  categories: {
+    categoryId: string;
+    scopeSignature: string;
+    scopeVersion: number;
+    selectionRuleVersion: number;
+    distributionVersion: number;
+    repeatPolicyVersion: number;
+    questionsPerParticipant: number;
+  }[];
+  participantScopeVersions: { participantId: string; version: number; scopeSignature: string }[];
+  poolVersion: string;
+  quranSourcePackageHash?: string;
+  status: 'active' | 'superseded';
+  supersededAt?: string;
+  supersededReason?: string;
 }
 
 export interface Competition {
@@ -363,6 +525,20 @@ export interface QuestionSelection {
   fairnessToleranceDelta: number;
   generatedAt: string;
   algorithmVersion?:string; poolVersion?:string; poolSnapshotHash?:string; ruleVersion?:string; constraintHash?:string; publicCommitmentHash?:string; seedReveal?:string; quranSourceManifestId?:string; quranSourceVersion?:string; quranSourcePackageHash?:string; sourceMode?:'CERTIFIED_SOURCE'|'DEVELOPMENT_FIXTURE'; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string;
+  /* ---- وضع النطاق (MIZAN-FAIRDRAW-SCOPE-1) ----
+     يُملأ حين يقود محرك النطاق السحب. القرعة القديمة تترك هذه الحقول فارغة، وإثباتاتها
+     تُتحقَّق بالفرع الموروث كما هي. */
+  scopeSignature?:string;
+  participantScopeVersion?:number;
+  engineVersion?:string;
+  /** توقيع نطاق كل خانة، فيُعرف من التدقيق أن السؤال جاء من منطقته لا من غيرها. */
+  zoneSignatures?:{index:number;zoneId:string|null;zoneName:string;scopeSignature:string}[];
+  /** بصمة حالة الاستعمال لحظة السحب — بها يعيد المدقّق إنتاج القرعة نفسها. */
+  usageDigest?:string;
+  /** سبب اختيار كل سؤال، بنيويًا لا إنشائيًا. */
+  selectionReasons?:import('../lib/question-engine').SelectionReason[];
+  /** تفصيل عدالة النموذج وقت السحب. */
+  fairness?:FairnessBreakdown;
 }
 
 export type JudgeEventType = string;
@@ -1039,6 +1215,10 @@ export interface FairDrawProofRecord {
   id:string;competitionId:string;questionSetId:string;algorithmVersion:string;ruleVersion:string;poolVersion:string;poolSnapshotHash:string;constraintHash:string;seedCommitmentHash:string;publicCommitmentHash:string;secretSeed?:string;selectionIds:string[];status:'COMMITTED'|'REVEALED'|'VERIFIED';createdAt:string;revealedAt?:string;
   participantReading?:string; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string; quranSourceManifestId?:string; quranSourcePackageHash?:string;
   constraints?:{questionsPerParticipant:number;targetDifficulty:number;difficultyTolerance:number;diversity:CompetitionPolicy['questions']['diversity'];maxJuz?:number;excludedIds?:string[]};
+  /* إثبات وضع النطاق: بصمة نطاق المتسابق ونسخته وتوقيع كل منطقة. بها يتحقق المدقّق من أن
+     كل سؤال جاء من نطاق صاحبه ومن منطقته، دون أن يُكشف له نص السؤال. */
+  scopeSignature?:string; participantScopeVersion?:number;
+  zoneSignatures?:{index:number;zoneId:string|null;zoneName:string;scopeSignature:string}[];
   eligiblePoolSnapshot?:{id:string;riwaya:string;surahNumber:number;startAyah:number;endAyah:number;juzNumber:number;difficultyRating:number;mutashabihatDensity:QuestionPoolItem['mutashabihatDensity'];tajweedComplexity:QuestionPoolItem['tajweedComplexity']}[];
   verificationStatement?:string;
 }

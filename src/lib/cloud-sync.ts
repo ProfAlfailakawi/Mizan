@@ -15,6 +15,8 @@ import type { Role } from '../types';
 export const SYNCED_COLLECTIONS = [
   'participants', 'committees', 'judge_submissions', 'judge_events', 'checkins',
   'results', 'certificates', 'reviews', 'appeals', 'support_sessions', 'audit', 'quran_sources', 'session_checkpoints',
+  // نطاق المتسابق المعتمد بيانٌ يقوم عليه سحب يوم المسابقة، فلا يجوز أن يعيش على جهاز واحد.
+  'participant_scopes',
 ] as const;
 export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 
@@ -32,6 +34,8 @@ const WRITERS: Record<SyncedCollection, Role[]> = {
   judge_submissions: ['judge'],
   judge_events: ['judge'],
   checkins: ['comp_admin', 'ops_manager', 'exception_host'],
+  /* المتسابق يكتب اختياره ونسخته، والإدارة وحدها تعتمده أو ترفضه أو تقفله. */
+  participant_scopes: [...ADMIN, 'delegation_manager', 'participant'],
   // النتيجة يكتبها من يملك ختم اللجنة، لا كل محكّم: أضيق صلاحية تُنجز العمل.
   results: [...ADMIN, 'head_judge'],
   certificates: [...ADMIN],

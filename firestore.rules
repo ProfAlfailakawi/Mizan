@@ -200,6 +200,23 @@ service cloud.firestore {
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent']);
           allow delete: if false;
         }
+        // نطاق المتسابق المعتمد: المتسابق يكتب اختياره وحده، والإدارة تعتمده.
+        // القراءة مفتوحة لمن يدير المسابقة ويحكّمها ويدقّقها، لا للعموم.
+        match /participant_scopes/{scopeId} {
+          allow read: if readableScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','delegation_manager','auditor'])
+              || (roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
+          allow create: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','delegation_manager'])
+              || (roleIs(['participant']) && request.resource.data.uploaderUid == request.auth.uid));
+          allow update: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','delegation_manager'])
+              || (roleIs(['participant'])
+                && resource.data.uploaderUid == request.auth.uid
+                && request.resource.data.uploaderUid == request.auth.uid
+                && resource.data.status in ['draft','submitted','rejected']));
+          allow delete: if false;
+        }
         match /session_checkpoints/{checkpointId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','auditor']);
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager']);

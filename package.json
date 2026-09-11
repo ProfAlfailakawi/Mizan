@@ -21,7 +21,9 @@
     "verify:pwa": "node scripts/verify-pwa.mjs",
     "preflight": "node scripts/go-live-preflight.mjs",
     "load:rehearsal": "tsx scripts/load-rehearsal.ts",
-    "drill:failure": "tsx scripts/failure-drill.ts"
+    "drill:failure": "tsx scripts/failure-drill.ts",
+    "fairness:lab": "tsx scripts/fairness-lab.ts",
+    "qa:scope-visual": "node scripts/scope-visual-qa.mjs"
   },
   "engines": {
     "node": ">=22.20.0 <23",
@@ -49,6 +51,7 @@
     "@types/qrcode": "^1.5.6",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "playwright": "^1.49.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

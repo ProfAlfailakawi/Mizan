@@ -1,8 +1,13 @@
 import crypto from 'crypto';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
+import {normalizeScope,scopeAyahCount,scopeSignature,validateScope,type QuranScope} from '../src/lib/quran-scope';
+import {buildParticipantScopeRecord,selectionIsValid,validateParticipantSelection} from '../src/lib/participant-scope';
+import {categorySelectionRule} from '../src/lib/scope-engine';
 
-export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string};
+export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string;
+/* نطاق الحفظ الذي اختاره المتسابق حين تسمح الفئة بذلك. يُتحقَّق منه على الخادم لا في المتصفح. */
+memorizationScope?:QuranScope};
 export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>}
 
 const clean=(value:unknown,max=160)=>String(value??'').trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
@@ -34,6 +39,23 @@ export class PublicRegistrationService{
     if(input.riwaya!==category.riwaya)throw new Error('REGISTRATION_READING_INVALID');
     if((category.minAge!==undefined&&age<category.minAge)||(category.maxAge!==undefined&&age>category.maxAge))throw new Error('REGISTRATION_AGE_NOT_ELIGIBLE');
     if(category.genderConstraint&&category.genderConstraint!=='all'&&category.genderConstraint!==input.gender)throw new Error('REGISTRATION_GENDER_NOT_ELIGIBLE');
+    /*
+     * نطاق الحفظ: يُتحقَّق منه على الخادم بقواعد الفئة نفسها.
+     *
+     * الواجهة تتحقق لتحسين التجربة، والخادم يتحقق لأن التسجيل مفتوح للعموم. واختيارٌ خارج
+     * حدود الفئة يُرفض هنا، فلا يدخل النظام نطاقٌ لا تسمح به اللائحة.
+     */
+    const selectionRule=categorySelectionRule(category);
+    let scopeRecordData:Record<string,unknown>|null=null;
+    if(selectionRule.enabled&&category.scopeMode==='participant_selected'){
+      const chosen=raw.memorizationScope;
+      if(!chosen||!Array.isArray(chosen.segments)||!chosen.segments.length)throw new Error('REGISTRATION_SCOPE_REQUIRED');
+      const normalized=normalizeScope(chosen);
+      if(validateScope(normalized).length||scopeAyahCount(normalized)===0)throw new Error('REGISTRATION_SCOPE_INVALID');
+      const issues=validateParticipantSelection(selectionRule,normalized);
+      if(!selectionIsValid(issues))throw new Error(`REGISTRATION_SCOPE_RULE_VIOLATION:${issues.find(x=>x.severity==='error')?.code||'UNKNOWN'}`);
+      scopeRecordData={selection:normalized,rule:selectionRule};
+    }
     const minor=age<18,guardianRequired=minor&&policy.registration.requireGuardianForMinors;
     if(!input.consents?.terms||!input.consents?.privacy)throw new Error('REGISTRATION_CONSENT_REQUIRED');
     if(policy.judging.requireAudioRecording&&!input.consents.audioRecording)throw new Error('REGISTRATION_AUDIO_CONSENT_REQUIRED');
@@ -50,6 +72,19 @@ export class PublicRegistrationService{
     const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:category.riwaya,institution:'',specialNeeds:false,documents:[],status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,createdAt};
     const journeyBase={organizationId:competition.organizationId,competitionId:competition.id,participantId,competitionName:competition.name,competitionNameArabic:competition.nameArabic,participantCode:code,participantName:participant.fullName,participantNameArabic:participant.fullNameArabic,status,arrivalSlot:null,queueNumber:null,venueName:competition.venueName||null,committee:null,result:null,certificate:null,revoked:false,updatedAt:createdAt};
     const documents=[{path:`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${participantId}`,data:participant as unknown as Record<string,unknown>},{path:`public_journeys/${journeyAccessTokenHash}`,data:{...journeyBase,audience:'participant',tokenHashVersion:'sha256-v1'}},{path:`public_journeys/${guardianAccessTokenHash}`,data:{...journeyBase,audience:'guardian',tokenHashVersion:'sha256-v1'}}];
+    if(scopeRecordData){
+      const scopeId=`pscope-${crypto.randomUUID()}`;
+      const record=buildParticipantScopeRecord({
+        id:scopeId,organizationId:competition.organizationId,competitionId:competition.id,categoryId:category.id,participantId,
+        rule:scopeRecordData.rule as ReturnType<typeof categorySelectionRule>,selection:scopeRecordData.selection as QuranScope,version:1,
+        status:selectionRule.approval==='auto'?'approved':'submitted',now:createdAt,
+      });
+      const approved=selectionRule.approval==='auto';
+      documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/participant_scopes/${scopeId}`,data:{
+        ...record,submittedAt:createdAt,...(approved?{approvedAt:createdAt,approvedBy:'auto_policy'}:{}),
+        scopeSignature:scopeSignature(record.scope),uploaderUid:participantId,updatedAt:createdAt,
+      } as unknown as Record<string,unknown>});
+    }
     const consentKinds=['terms','privacy',...(policy.judging.requireAudioRecording&&input.consents.audioRecording?['audio_recording']:[]),...(policy.privacy.allowAiProcessing&&input.consents.aiProcessing?['ai_processing']:[]),...(guardianRequired?['guardian']:[])];
     for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,version:policy.version,accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
     await this.store.create(documents);

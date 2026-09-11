@@ -18,10 +18,22 @@ test('the store clamps a category juz count to the Quran, whatever screen writes
   assert.match(store, /const safe = clampCategory\(patch\);/, 'updateCategory goes through the clamp');
 });
 
-test('the juz field cannot be typed past thirty on either category editor', () => {
-  const juzControls = overview.match(/<(?:NumberControl|DraftNumber) label=\{ar\?'الأجزاء'[^/]*\/>/g) || [];
-  assert.equal(juzControls.length, 2, 'both the draft and the saved-category editors expose the field');
-  for (const control of juzControls) assert.match(control, /max=\{30\}/, `juz field is unbounded: ${control}`);
+/*
+ * تغيّر العقد بقصد: عدد الأجزاء لم يعد حقلًا يُكتب باليد في محرر الفئة.
+ *
+ * السبب هو سبب الاختبار الأصلي نفسه بل أعمق منه: «عشرة أجزاء» لا تقول أيّ عشرة، فحتى
+ * الرقم المحدود بثلاثين كان يصل إلى السحب بوصفه حدًّا أعلى للجزء، فيُسأل المتسابق من جزءٍ
+ * لم يحفظه ما دام رقمه أقلّ من الحدّ. المحرر الآن يعرض النطاق الحقيقي ويحيل إلى الشاشة
+ * التي ترسمه بالأجزاء أو السور أو حدود الآيات، ويبقى حدّ المخزن قائمًا لأي مسار آخر
+ * يكتب الفئة (استيراد، نسخ مسابقة، بيانات قديمة).
+ */
+test('the category editor no longer takes a free juz number; it shows the real range instead', () => {
+  assert.equal((overview.match(/<(?:NumberControl|DraftNumber) label=\{ar\?'الأجزاء'[^/]*\/>/g) || []).length, 0,
+    'a hand-typed juz count is not a range and must not be offered as one');
+  assert.equal((overview.match(/<ScopeHandoff /g) || []).length, 2,
+    'both the draft and the saved-category editors show the resolved range and open the scope screen');
+  assert.match(overview, /describeScope\(scope!,ar\)/, 'the editor shows what the range actually is');
+  assert.match(overview, /mizan:open-scope-engine/, 'and offers a way to change it');
 });
 
 test('difficulty, passing score and age stay inside their real domains', () => {
