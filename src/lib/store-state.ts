@@ -29,6 +29,7 @@ import {
   AppealCapsuleRecord, BlindChamberLiftRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord,
   ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord,
   CertifiedVenueSealRecord, QuestionSelection, JudgeEvent,
+  ParticipantScopeRecord, QuestionModelRecord, QuestionModelBatchRecord, ScopeSimulationRecord, ScopeEngineSealRecord,
 } from '../types';
 import { SupportedLanguage } from './i18n';
 
@@ -143,6 +144,16 @@ export interface AppStoreState {
   ceremonyVaults: CeremonyVaultRecord[];
   fairDrawProofs: FairDrawProofRecord[];
   questionRevealGates: QuestionRevealGateRecord[];
+  // ---- محرك النطاق والأسئلة ----
+  /** نطاق كل متسابق بدورة حياته ونسخه. النسخة السابقة تبقى superseded ولا تُحذف. */
+  participantScopes: ParticipantScopeRecord[];
+  /** نماذج الأسئلة المولَّدة (مسبقًا أو في وقتها) مع عدالتها وإثباتها. */
+  questionModels: QuestionModelRecord[];
+  questionModelBatches: QuestionModelBatchRecord[];
+  /** نتائج المحاكاة المحفوظة — تقرير عدالة وتوزيع الأسئلة. */
+  scopeSimulations: ScopeSimulationRecord[];
+  /** تجميدات إعداد المحرك قبل المسابقة. */
+  scopeEngineSeals: ScopeEngineSealRecord[];
   queueTransfers: QueueTransferRecord[];
   // Identity governance
   identityAccounts: IdentityAccountRecord[];

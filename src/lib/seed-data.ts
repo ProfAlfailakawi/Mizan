@@ -35,6 +35,7 @@ import {
   FeatureFlagRecord,
   User
 } from '../types';
+import { fullQuranScope } from './quran-scope';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 
 export const SEED_ORGANIZATION: Organization = {
@@ -187,6 +188,9 @@ export const SEED_RULESET: RuleSet = {
   frozenAt: '2026-08-15T10:00:00Z'
 };
 
+/* نطاق المصحف كاملًا مكتوبًا مرة واحدة، فلا يُنسخ في كل موضع من بيانات التطوير. */
+const FULL_QURAN_SEED_SCOPE = fullQuranScope();
+
 export const SEED_CATEGORIES: Category[] = [
   {
     id: 'cat-full-quran',
@@ -229,6 +233,36 @@ export const SEED_CATEGORIES: Category[] = [
     maxAge: 15,
     targetParticipants: 50,
     targetDurationMinutes: 7
+  },
+  {
+    /*
+     * الحالة الدولية التي كان النظام القديم عاجزًا عنها: الفئة اسمها «ربع القرآن»، والمتسابق
+     * يختار أيّ ربع. النظام لا يفهم الاسم؛ يفهم أن لكل متسابق هنا نطاقه المعتمد وحده.
+     * هذه فئةٌ تجريبية في بيانات التطوير، لا بيانات أشخاص حقيقيين.
+     */
+    id: 'cat-open-quarter',
+    competitionId: 'comp-dubai-2027',
+    code: 'CAT-04',
+    name: 'Quarter Quran — participant selected',
+    nameArabic: 'الفرع الرابع: ربع القرآن يختاره المتسابق',
+    description: 'Eight juz chosen by the participant and approved by the committee',
+    riwaya: 'حفص عن عاصم',
+    memorizationScope: 'ربع القرآن (٨ أجزاء يختارها المتسابق)',
+    juzCount: 8,
+    maxAge: 30,
+    targetParticipants: 40,
+    targetDurationMinutes: 8,
+    questionsCount: 4,
+    scope: FULL_QURAN_SEED_SCOPE,
+    scopeMode: 'participant_selected',
+    scopeVersion: 1,
+    scopeMigration: 'none',
+    selectionRule: {
+      version: 1, enabled: true, decidedBy: 'participant', selectionUnit: 'juz', exactUnits: 8,
+      parentScope: FULL_QURAN_SEED_SCOPE, approval: 'committee',
+      noteArabic: 'اختر ثمانية أجزاء تحفظها، متتالية أو متفرقة.',
+      noteEnglish: 'Choose the eight juz you have memorized, contiguous or not.',
+    }
   }
 ];
 

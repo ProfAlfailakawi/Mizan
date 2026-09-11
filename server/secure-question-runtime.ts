@@ -4,6 +4,8 @@ import path from 'path';
 import { QuestionEscrowRepository, type EscrowActor } from './question-escrow';
 import { ServerQuranSourceRepository } from './quran-source-repository';
 import { QuestionDiversityLedger, type StartLocusAssurance, type StartLocusClass } from './question-diversity-ledger';
+import { normalizeScope, scopeAyahCount, scopeRanges, scopeSignature, type QuranScope } from '../src/lib/quran-scope';
+import { ayahOrdinal } from '../src/lib/quran-canon';
 
 export interface ServerQuestionBlueprint {
   id:string;poolId:string;qiraah:string;rawi:string;tariq?:string;surahNumber:number;startAyah:number;endAyah:number;juzNumber:number;difficultyRating:number;difficultyProvenance?:'EXPERT_APPROVED'|'UNRATED_NEUTRAL';mutashabihatDensity?:'low'|'medium'|'high';tajweedComplexity?:'basic'|'intermediate'|'advanced';enabled?:boolean;startLocusAssurance?:StartLocusAssurance;startClass?:StartLocusClass;pageNumber?:number;lineStart?:number;
@@ -11,10 +13,20 @@ export interface ServerQuestionBlueprint {
 export interface RuntimeProvisionInput {
   organizationId:string;competitionId:string;sessionId:string;participantId:string;committeeId:string;requiredJudgeIds:string[];approvalMode:'all_assigned'|'minimum';minimumApprovals?:number;expiresAt:string;
   sourcePackageId:string;poolId:string;questionCount:number;maxJuz?:number;targetDifficulty?:number;difficultyTolerance?:number;qiraah:string;rawi:string;tariq?:string;expectedParticipantCount?:number;acrossSurah?:boolean;acrossJuz?:boolean;requiredStartAssurance?:'QURAN_AYAH_BOUNDARY'|'SCIENTIFICALLY_APPROVED';
+  /*
+   * نطاق المتسابق المعتمد. حين يُمرَّر فهو مرجع الأهلية القاطع، ويتقدّم على maxJuz الموروث.
+   * يُخزَّن في سجل الجلسة ويُعاد التحقق منه عند الكشف، فلا يظهر سؤال خارج نطاق صاحبه حتى
+   * لو أخطأت الواجهة أو تلاعب عميل.
+   */
+  participantScope?:QuranScope;
+  participantScopeVersion?:number;
+  /** نطاق كل خانة (منطقة التوزيع). يجب أن يكون جزءًا من نطاق المتسابق. */
+  zoneScopes?:(QuranScope|null)[];
 }
 export type RuntimeReplacementState='NONE'|'AUTHORIZED'|'PENDING_PANEL_QUORUM'|'CONSUMED'|'EXPIRED'|'REVOKED';
 export interface RuntimeRecord {
   version:3;organizationId:string;competitionId:string;sessionId:string;participantId:string;committeeId:string;createdAt:string;sourcePackageId:string;sourcePackageHash:string;poolId:string;
+  participantScope?:QuranScope;participantScopeVersion?:number;participantScopeSignature?:string;
   qiraah:string;rawi:string;tariq?:string;algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2';ruleVersion:'SERVER_POLICY_V2';seedCommitmentHash:string;seedSecret:string;poolSnapshotHash:string;constraintHash:string;diversityMetrics:{eligibleUniqueStartLoci:number;previousParticipants:number;reusedLoci:number;pageOpeningCount:number;midPageCount:number;globalUniqueCoverageGuaranteed:boolean;requiredUniqueLociForFullField?:number};
   selectedBlueprintIds:string[];retiredBlueprintIds:string[];
   emergencyReplacement:{state:RuntimeReplacementState;authorizationId?:string;authorizedAt?:string;authorizedBy?:string;reason?:string;expiresAt?:string;questionIndex?:number;judgeApprovals?:{judgeId:string;approvedAt:string}[];consumedAt?:string;replacementBlueprintId?:string};
@@ -36,8 +48,22 @@ export class ServerQuestionPoolRepository {
   load(competitionId:string,poolId:string){const f=this.file(competitionId,poolId);if(!fs.existsSync(f))throw new Error('SERVER_QUESTION_POOL_NOT_FOUND');const rows=JSON.parse(fs.readFileSync(f,'utf8')) as ServerQuestionBlueprint[];if(!Array.isArray(rows)||!rows.length)throw new Error('SERVER_QUESTION_POOL_EMPTY');return rows}
 }
 
-function eligiblePool(pool:ServerQuestionBlueprint[],input:Pick<RuntimeProvisionInput,'qiraah'|'rawi'|'tariq'|'maxJuz'|'targetDifficulty'|'difficultyTolerance'>,excluded:Set<string>){
-  const first=pool.filter(x=>x.enabled!==false&&!excluded.has(x.id)&&same(x.qiraah,input.qiraah)&&same(x.rawi,input.rawi)&&(!input.tariq||same(x.tariq,input.tariq))&&(!input.maxJuz||x.juzNumber<=input.maxJuz));
+/*
+ * احتواء المقطع كاملًا داخل النطاق، لا بدايته وحدها: سؤالٌ يبدأ داخل النطاق وينتهي خارجه
+ * سؤالٌ خارج النطاق.
+ */
+export function blueprintInsideScope(item:Pick<ServerQuestionBlueprint,'surahNumber'|'startAyah'|'endAyah'>,scope:QuranScope){
+  const ranges=scopeRanges(scope);if(!ranges.length)return false;
+  let from:number,to:number;
+  try{from=ayahOrdinal({surah:item.surahNumber,ayah:item.startAyah});to=ayahOrdinal({surah:item.surahNumber,ayah:item.endAyah})}catch{return false}
+  return ranges.some(([a,b])=>from>=a&&to<=b);
+}
+
+function eligiblePool(pool:ServerQuestionBlueprint[],input:Pick<RuntimeProvisionInput,'qiraah'|'rawi'|'tariq'|'maxJuz'|'targetDifficulty'|'difficultyTolerance'|'participantScope'>,excluded:Set<string>){
+  const scope=input.participantScope&&scopeAyahCount(input.participantScope)>0?normalizeScope(input.participantScope):null;
+  const first=pool.filter(x=>x.enabled!==false&&!excluded.has(x.id)&&same(x.qiraah,input.qiraah)&&same(x.rawi,input.rawi)&&(!input.tariq||same(x.tariq,input.tariq))
+    // النطاق المعتمد يتقدّم على maxJuz الموروث؛ ولا يُستعمل الموروث إلا حين لا نطاق.
+    &&(scope?blueprintInsideScope(x,scope):(!input.maxJuz||x.juzNumber<=input.maxJuz)));
   if(input.targetDifficulty===undefined)return first;
   const tol=input.difficultyTolerance??1;const strict=first.filter(x=>Math.abs(x.difficultyRating-input.targetDifficulty!)<=tol);return strict.length?strict:first;
 }
@@ -58,6 +84,7 @@ export class SecureQuestionRuntimeRepository {
   provision(input:RuntimeProvisionInput){
     if(fs.existsSync(this.file(input.sessionId)))throw new Error('QUESTION_RUNTIME_SESSION_EXISTS');if(input.questionCount<1||input.questionCount>20)throw new Error('QUESTION_RUNTIME_INVALID_COUNT');
     const source=this.quran.manifest(input.sourcePackageId);if(source.scientificApproval.state!=='CERTIFIED')throw new Error('QUESTION_RUNTIME_SOURCE_NOT_CERTIFIED');if(!same(source.qiraah,input.qiraah)||!same(source.rawi,input.rawi)||!!input.tariq&&!same(source.tariq,input.tariq))throw new Error('QUESTION_RUNTIME_READING_SOURCE_MISMATCH');
+    if(input.participantScope&&scopeAyahCount(input.participantScope)===0)throw new Error('QUESTION_RUNTIME_PARTICIPANT_SCOPE_EMPTY');
     const pool=this.pools.load(input.competitionId,input.poolId),eligibleRaw=eligiblePool(pool,input,new Set());if(eligibleRaw.length<input.questionCount)throw new Error('QUESTION_RUNTIME_INSUFFICIENT_ELIGIBLE_POOL');
     const startMeta=this.quran.questionStartMetadata(input.sourcePackageId,eligibleRaw.map(x=>({id:x.id,surahNumber:x.surahNumber,startAyah:x.startAyah})));const byId=new Map(startMeta.map(x=>[x.id,x]));
     const enriched=eligibleRaw.map(x=>({...x,...byId.get(x.id),startLocusAssurance:x.startLocusAssurance||byId.get(x.id)?.startAssurance||'QURAN_AYAH_BOUNDARY'}));const eligible=input.requiredStartAssurance==='SCIENTIFICALLY_APPROVED'?enriched.filter(x=>x.startLocusAssurance==='SCIENTIFICALLY_APPROVED'):enriched;if(eligible.length<input.questionCount)throw new Error('QUESTION_RUNTIME_INSUFFICIENT_APPROVED_START_LOCI');
@@ -65,10 +92,10 @@ export class SecureQuestionRuntimeRepository {
     const allocation=this.diversity.allocate({competitionId:input.competitionId,poolId:input.poolId,readingKey,sessionId:input.sessionId,participantId:input.participantId,candidates:eligible,count:input.questionCount,targetDifficulty:input.targetDifficulty,acrossSurah:input.acrossSurah!==false,acrossJuz:input.acrossJuz===true,expectedParticipantCount:input.expectedParticipantCount});
     const selected=allocation.selected as ServerQuestionBlueprint[];
     const sourcePackageHash=source.packageHash,poolSnapshotHash=hash(canonical(eligible.map(x=>({id:x.id,qiraah:x.qiraah,rawi:x.rawi,tariq:x.tariq,surahNumber:x.surahNumber,startAyah:x.startAyah,endAyah:x.endAyah,juzNumber:x.juzNumber,difficultyRating:x.difficultyRating,startClass:x.startClass,startLocusAssurance:x.startLocusAssurance}))));
-    const constraints={questionCount:input.questionCount,maxJuz:input.maxJuz,targetDifficulty:input.targetDifficulty,difficultyTolerance:input.difficultyTolerance,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,sourcePackageHash,poolSnapshotHash,expectedParticipantCount:input.expectedParticipantCount,diversityAlgorithm:'LEAST_USED_START_LOCUS_V1',requiredStartAssurance:input.requiredStartAssurance||'QURAN_AYAH_BOUNDARY'};const constraintHash=hash(canonical(constraints));const seedCommitmentHash=hash(`${secret}|${constraintHash}|${allocation.record.setSignature}`);
+    const constraints={questionCount:input.questionCount,maxJuz:input.maxJuz,participantScopeSignature:input.participantScope?scopeSignature(input.participantScope):undefined,participantScopeVersion:input.participantScopeVersion,targetDifficulty:input.targetDifficulty,difficultyTolerance:input.difficultyTolerance,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,sourcePackageHash,poolSnapshotHash,expectedParticipantCount:input.expectedParticipantCount,diversityAlgorithm:'LEAST_USED_START_LOCUS_V1',requiredStartAssurance:input.requiredStartAssurance||'QURAN_AYAH_BOUNDARY'};const constraintHash=hash(canonical(constraints));const seedCommitmentHash=hash(`${secret}|${constraintHash}|${allocation.record.setSignature}`);
     const questions=selected.map((b,index)=>{const passage=this.quran.resolvePassage({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah});return {index,questionId:b.id,payload:{version:'MIZAN-SERVER-QUESTION-1',questionId:b.id,surahNumber:b.surahNumber,surahNameArabic:passage.verses[0]?.sura_name_ar,surahNameEnglish:passage.verses[0]?.sura_name_en,startAyah:b.startAyah,endAyah:b.endAyah,juzNumber:b.juzNumber,difficultyRating:b.difficultyRating,mutashabihatDensity:b.mutashabihatDensity,tajweedComplexity:b.tajweedComplexity,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,quranSourcePackageId:input.sourcePackageId,quranSourcePackageHash:sourcePackageHash,pageNumber:Number(passage.verses[0]?.page||0)||undefined,lineStart:passage.verses[0]?.line_start,lineEnd:passage.verses[passage.verses.length-1]?.line_end||passage.verses[0]?.line_end,pageLoci:this.quran.resolvePassageLoci({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah}),locationAssurance:'KFGQPC_OFFICIAL_METADATA',officialSurfaceAuthority:'King Fahd Glorious Quran Printing Complex',officialSurfaceMode:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR',startLocusClass:b.startClass,startLocusAssurance:b.startLocusAssurance||'QURAN_AYAH_BOUNDARY',expectedTextArabic:passage.text,openingAyahArabic:passage.verses[0]?.aya_text}}});
     this.escrow.create({organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,requiredJudgeIds:input.requiredJudgeIds,approvalMode:input.approvalMode,minimumApprovals:input.minimumApprovals,expiresAt:input.expiresAt,questions});
-    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'}};this.write(r);return this.publicState(r)
+    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,...(input.participantScope?{participantScope:normalizeScope(input.participantScope),participantScopeVersion:input.participantScopeVersion,participantScopeSignature:scopeSignature(input.participantScope)}:{}),qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'}};this.write(r);return this.publicState(r)
   }
   private verifyScopedActor(r:RuntimeRecord,actor:EscrowActor,allowGovernance=false){
     if(actor.organizationId!==r.organizationId)throw new Error('QUESTION_RUNTIME_ORGANIZATION_MISMATCH');
@@ -88,7 +115,32 @@ export class SecureQuestionRuntimeRepository {
   }
   confirmPresence(sessionId:string,actor:EscrowActor,method='manual_visual_confirmation'){const r=this.read(sessionId);this.verifyScopedActor(r,actor);if(!['manual_visual_confirmation','participant_pass','gate_handoff'].includes(method))throw new Error('QUESTION_RUNTIME_PRESENCE_METHOD_INVALID');const escrow=this.escrow.confirmPresence(sessionId,actor,r.participantId,method);return {...this.publicState(r),escrow};}
   approveQuestion(sessionId:string,questionIndex:number,actor:EscrowActor){const r=this.read(sessionId);this.verifyScopedActor(r,actor);const result=this.escrow.approve(sessionId,questionIndex,actor);return {...this.publicState(r),escrow:result};}
-  revealQuestion(sessionId:string,questionIndex:number,actor:EscrowActor){const r=this.read(sessionId);this.verifyScopedActor(r,actor);return this.escrow.reveal(sessionId,questionIndex,actor);}
+  /*
+   * إعادة التحقق قبل الكشف — دفاعٌ في العمق.
+   *
+   * السؤال محجوز على الخادم منذ التهيئة، ومع ذلك يُعاد التحقق من وقوعه داخل نطاق صاحبه
+   * لحظة الكشف. لأن بين التهيئة والكشف زمنًا قد يتغير فيه شيء، ولأن حاجزًا واحدًا لا يكفي
+   * حين تكون الكلفة ظهور سؤالٍ لا يملك المتسابق أن يجيب عنه.
+   */
+  revealQuestion(sessionId:string,questionIndex:number,actor:EscrowActor){
+    const r=this.read(sessionId);this.verifyScopedActor(r,actor);
+    if(r.participantScope){
+      const blueprintId=r.selectedBlueprintIds[questionIndex];
+      const item=blueprintId?this.pools.load(r.competitionId,r.poolId).find(x=>x.id===blueprintId):undefined;
+      if(item&&!blueprintInsideScope(item,r.participantScope))throw new Error('QUESTION_RUNTIME_SCOPE_VIOLATION');
+      if(item&&(!same(item.qiraah,r.qiraah)||!same(item.rawi,r.rawi)))throw new Error('QUESTION_RUNTIME_READING_VIOLATION');
+    }
+    return this.escrow.reveal(sessionId,questionIndex,actor);
+  }
+
+  /** تحقق صريح يمكن للتدقيق استدعاؤه دون كشف السؤال. */
+  verifyAllocationScope(sessionId:string){
+    const r=this.read(sessionId);
+    if(!r.participantScope)return {enforced:false,violations:[] as string[],scopeSignature:undefined};
+    const pool=this.pools.load(r.competitionId,r.poolId),byId=new Map(pool.map(x=>[x.id,x]));
+    const violations=r.selectedBlueprintIds.filter(id=>{const item=byId.get(id);return !item||!blueprintInsideScope(item,r.participantScope!)});
+    return {enforced:true,violations,scopeSignature:r.participantScopeSignature};
+  }
   authorizeEmergencyReplacement(input:{sessionId:string;actor:EscrowActor;reason:string;expiresAt:string}){
     const r=this.read(input.sessionId);this.verifyScopedActor(r,input.actor,true);if(!['comp_admin','org_admin','head_judge'].includes(input.actor.role))throw new Error('QUESTION_REPLACEMENT_ADMIN_REQUIRED');if(r.emergencyReplacement.state==='CONSUMED')throw new Error('QUESTION_REPLACEMENT_ALREADY_USED');if(!input.reason.trim())throw new Error('QUESTION_REPLACEMENT_REASON_REQUIRED');if(Date.parse(input.expiresAt)<=Date.now())throw new Error('QUESTION_REPLACEMENT_EXPIRY_REQUIRED');
     const esc=this.escrow.internalRecord(r.sessionId);if(!esc.questions.some(q=>!!q.releasedAt))throw new Error('QUESTION_REPLACEMENT_SESSION_NOT_STARTED');
@@ -101,7 +153,7 @@ export class SecureQuestionRuntimeRepository {
     a.questionIndex=input.questionIndex;a.state='PENDING_PANEL_QUORUM';a.judgeApprovals=a.judgeApprovals||[];if(!a.judgeApprovals.some(x=>x.judgeId===input.actor.uid))a.judgeApprovals.push({judgeId:input.actor.uid,approvedAt:new Date().toISOString()});
     const required=esc.approvalMode==='all_assigned'?esc.requiredJudgeIds.length:Math.min(esc.requiredJudgeIds.length,Math.max(1,esc.minimumApprovals||1));const count=esc.requiredJudgeIds.filter(id=>a.judgeApprovals!.some(x=>x.judgeId===id)).length;
     if(count<required){this.write(r);return {...this.publicState(r),replacementReady:false,approved:count,required}}
-    const pool=this.pools.load(r.competitionId,r.poolId),excluded=new Set([...r.selectedBlueprintIds,...r.retiredBlueprintIds]);const eligibleRaw=eligiblePool(pool,{qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq},excluded);if(!eligibleRaw.length)throw new Error('QUESTION_REPLACEMENT_NO_ELIGIBLE_QUESTION');const meta=this.quran.questionStartMetadata(r.sourcePackageId,eligibleRaw.map(x=>({id:x.id,surahNumber:x.surahNumber,startAyah:x.startAyah}))),metaById=new Map(meta.map(x=>[x.id,x]));const eligible=eligibleRaw.map(x=>({...x,...metaById.get(x.id),startLocusAssurance:x.startLocusAssurance||metaById.get(x.id)?.startAssurance||'QURAN_AYAH_BOUNDARY'}));const replacementAllocation=this.diversity.allocate({competitionId:r.competitionId,poolId:r.poolId,readingKey:[r.qiraah,r.rawi,r.tariq||''].join('|'),sessionId:`${r.sessionId}#emergency-${a.authorizationId||'1'}`,participantId:r.participantId,candidates:eligible,count:1,targetDifficulty:eligible.find(x=>x.id===r.selectedBlueprintIds[input.questionIndex])?.difficultyRating});const replacement=replacementAllocation.selected[0] as ServerQuestionBlueprint;const passage=this.quran.resolvePassage({packageId:r.sourcePackageId,surah:replacement.surahNumber,startAyah:replacement.startAyah,endAyah:replacement.endAyah});const oldId=r.selectedBlueprintIds[input.questionIndex];
+    const pool=this.pools.load(r.competitionId,r.poolId),excluded=new Set([...r.selectedBlueprintIds,...r.retiredBlueprintIds]);const eligibleRaw=eligiblePool(pool,{qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq,participantScope:r.participantScope},excluded);if(!eligibleRaw.length)throw new Error('QUESTION_REPLACEMENT_NO_ELIGIBLE_QUESTION');const meta=this.quran.questionStartMetadata(r.sourcePackageId,eligibleRaw.map(x=>({id:x.id,surahNumber:x.surahNumber,startAyah:x.startAyah}))),metaById=new Map(meta.map(x=>[x.id,x]));const eligible=eligibleRaw.map(x=>({...x,...metaById.get(x.id),startLocusAssurance:x.startLocusAssurance||metaById.get(x.id)?.startAssurance||'QURAN_AYAH_BOUNDARY'}));const replacementAllocation=this.diversity.allocate({competitionId:r.competitionId,poolId:r.poolId,readingKey:[r.qiraah,r.rawi,r.tariq||''].join('|'),sessionId:`${r.sessionId}#emergency-${a.authorizationId||'1'}`,participantId:r.participantId,candidates:eligible,count:1,targetDifficulty:eligible.find(x=>x.id===r.selectedBlueprintIds[input.questionIndex])?.difficultyRating});const replacement=replacementAllocation.selected[0] as ServerQuestionBlueprint;const passage=this.quran.resolvePassage({packageId:r.sourcePackageId,surah:replacement.surahNumber,startAyah:replacement.startAyah,endAyah:replacement.endAyah});const oldId=r.selectedBlueprintIds[input.questionIndex];
     this.escrow.replaceQuestion(r.sessionId,{questionIndex:input.questionIndex,questionId:replacement.id,reason:a.reason||'Emergency replacement',authorizedBy:a.authorizedBy||'unknown',payload:{version:'MIZAN-SERVER-QUESTION-1',questionId:replacement.id,surahNumber:replacement.surahNumber,surahNameArabic:passage.verses[0]?.sura_name_ar,surahNameEnglish:passage.verses[0]?.sura_name_en,startAyah:replacement.startAyah,endAyah:replacement.endAyah,juzNumber:replacement.juzNumber,difficultyRating:replacement.difficultyRating,mutashabihatDensity:replacement.mutashabihatDensity,tajweedComplexity:replacement.tajweedComplexity,qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq,quranSourcePackageId:r.sourcePackageId,quranSourcePackageHash:r.sourcePackageHash,pageNumber:Number(passage.verses[0]?.page||0)||undefined,lineStart:passage.verses[0]?.line_start,lineEnd:passage.verses[passage.verses.length-1]?.line_end||passage.verses[0]?.line_end,pageLoci:this.quran.resolvePassageLoci({packageId:r.sourcePackageId,surah:replacement.surahNumber,startAyah:replacement.startAyah,endAyah:replacement.endAyah}),locationAssurance:'KFGQPC_OFFICIAL_METADATA',officialSurfaceAuthority:'King Fahd Glorious Quran Printing Complex',officialSurfaceMode:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR',startLocusClass:replacement.startClass,startLocusAssurance:replacement.startLocusAssurance||'QURAN_AYAH_BOUNDARY',expectedTextArabic:passage.text,openingAyahArabic:passage.verses[0]?.aya_text}});
     if(oldId)r.retiredBlueprintIds.push(oldId);r.selectedBlueprintIds[input.questionIndex]=replacement.id;a.state='CONSUMED';a.consumedAt=new Date().toISOString();a.replacementBlueprintId=replacement.id;this.write(r);return {...this.publicState(r),replacementReady:true,approved:count,required}
   }

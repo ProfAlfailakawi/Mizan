@@ -1,8 +1,36 @@
 import { CompetitionPolicy, Participant, QuestionPoolItem, QuestionSelection } from '../types';
 import { newId, sha256 } from './crypto';
 import { hashCanonical } from './trust-protocol';
+import { QuestionAllocationEngine, locusKeyOf, type QuestionCandidate, type ReadingContext } from './question-engine';
+import { computeModelFairness } from './model-fairness';
+import { scopeContainsRange, scopeSignature, type QuranScope } from './quran-scope';
+import type { ZoneSlot } from './question-zones';
 
 export const FAIRDRAW_ALGORITHM_VERSION='MIZAN-FAIRDRAW-2.0';
+/*
+ * وضع النطاق.
+ *
+ * السحب القديم يفهم maxJuz وحده، وهو لا يكفي: «عشرة أجزاء» لا تحدد أيّ عشرة، ولا يعرف
+ * مناطق التوزيع ولا سياسة التكرار ولا ندرة المخزون. فأُضيف هنا وضعٌ ثانٍ لنفس الدالة —
+ * لا دالة موازية — يقود فيه محرك النطاق الاختيار، ويُعلَن ذلك في algorithmVersion.
+ *
+ * الإثباتات القديمة تبقى صالحة وتُتحقَّق بالفرع الموروث كما كانت، حرفًا بحرف.
+ */
+export const FAIRDRAW_SCOPE_ALGORITHM_VERSION='MIZAN-FAIRDRAW-SCOPE-1';
+
+/** تحويل عنصر البنك إلى مرشح للمحرك، بلا فقد للنص ولا للبيانات العلمية. */
+export function poolItemToCandidate(item:QuestionPoolItem,reading?:ReadingContext):QuestionCandidate{
+ return {
+  id:item.id,surahNumber:item.surahNumber,startAyah:item.startAyah,endAyah:item.endAyah,juzNumber:item.juzNumber,
+  difficultyRating:item.difficultyRating,
+  difficultyAssurance:'automatically_estimated',
+  mutashabihatScore:item.mutashabihatDensity==='high'?1:item.mutashabihatDensity==='medium'?0.6:item.mutashabihatDensity==='low'?0.3:0,
+  tajweedComplexity:item.tajweedComplexity,
+  approvalStatus:'approved',
+  priorUsageCount:item.timesUsed||0,
+  ...(reading||{}),
+ };
+}
 function normalizedRiwaya(value: string) { return value.toLowerCase().replace(/[^a-z\u0600-\u06ff]/g,''); }
 function secureSeed(){const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function tieValue(seed:string,id:string){return parseInt((await sha256(`${seed}|${id}`)).slice(0,13),16)/0x1fffffffffffff}
@@ -20,8 +48,19 @@ async function selectWithSeed(args:{pool:QuestionPoolItem[];participant:{riwaya:
  return selected;
 }
 
+export interface ScopedDrawContext{
+ scope:QuranScope;
+ participantScopeVersion?:number;
+ slots:ZoneSlot[];
+ engine:QuestionAllocationEngine;
+ reading?:ReadingContext;
+ sequencePosition?:number;
+ hallId?:string;
+}
+
 /** FairDraw proves reproducibility against configured constraints; it does not claim absolute or philosophical fairness. */
-export async function generateFairDraw(args:{pool:QuestionPoolItem[];participant:Participant;policy:CompetitionPolicy;maxJuz?:number;excludedIds?:string[];seed?:string;poolVersion?:string;quranSourceManifestId?:string;qiraah?:string;rawi?:string;tariq?:string;variantLocusVersion?:string;difficultyMetadataVersion?:string}):Promise<QuestionSelection>{
+export async function generateFairDraw(args:{pool:QuestionPoolItem[];participant:Participant;policy:CompetitionPolicy;maxJuz?:number;excludedIds?:string[];seed?:string;poolVersion?:string;quranSourceManifestId?:string;qiraah?:string;rawi?:string;tariq?:string;variantLocusVersion?:string;difficultyMetadataVersion?:string;scoped?:ScopedDrawContext}):Promise<QuestionSelection>{
+ if(args.scoped)return generateScopedFairDraw(args as typeof args&{scoped:ScopedDrawContext});
  const seed=args.seed||secureSeed();const selected=await selectWithSeed({...args,seed});const vector=selected.reduce((sum,q)=>sum+q.difficultyRating,0)/Math.max(1,selected.length);
  const poolSnapshotHash=await hashCanonical(args.pool.map(q=>({id:q.id,riwaya:q.riwaya,surah:q.surahNumber,start:q.startAyah,end:q.endAyah,difficulty:q.difficultyRating,juz:q.juzNumber,mutashabihat:q.mutashabihatDensity,tajweed:q.tajweedComplexity})).sort((a,b)=>a.id.localeCompare(b.id)));
  const poolVersion=args.poolVersion||poolSnapshotHash;
@@ -30,8 +69,90 @@ export async function generateFairDraw(args:{pool:QuestionPoolItem[];participant
  return {questionSetId:newId('qset'),participantId:args.participant.id,questions:selected,difficultyVectorScore:Number(vector.toFixed(3)),seedCommitmentHash,fairnessToleranceDelta:args.policy.questions.difficultyTolerance,generatedAt:new Date().toISOString(),algorithmVersion:FAIRDRAW_ALGORITHM_VERSION,poolVersion,poolSnapshotHash,ruleVersion:args.policy.version,constraintHash,publicCommitmentHash,seedReveal:seed,quranSourceManifestId:args.quranSourceManifestId,qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion};
 }
 
-export async function verifyFairDrawSelection(args:{selection:QuestionSelection;pool:QuestionPoolItem[];participant:Participant;policy:CompetitionPolicy;maxJuz?:number;excludedIds?:string[]}){
- const s=args.selection;if(!s.seedReveal)return {valid:false,reason:'SEED_NOT_REVEALED'} as const;if(s.algorithmVersion!==FAIRDRAW_ALGORITHM_VERSION)return {valid:false,reason:'ALGORITHM_VERSION_MISMATCH'} as const;
+/*
+ * السحب في وضع النطاق.
+ *
+ * المحرك يطبّق القيود القاطعة (نطاق المتسابق، المنطقة، الرواية، الاعتماد، التكرار) ثم
+ * المفاضلة (الصعوبة، عدالة النموذج، الانكشاف، الندرة، توازن الاستعمال، التباعد). والبذرة
+ * تدخل في ترتيب المرشحين، فالقرعة تبقى حتمية قابلة لإعادة الإنتاج عند التدقيق.
+ */
+async function generateScopedFairDraw(args:{pool:QuestionPoolItem[];participant:Participant;policy:CompetitionPolicy;seed?:string;poolVersion?:string;quranSourceManifestId?:string;qiraah?:string;rawi?:string;tariq?:string;variantLocusVersion?:string;difficultyMetadataVersion?:string;excludedIds?:string[];scoped:ScopedDrawContext}):Promise<QuestionSelection>{
+ const {scoped}=args;const seed=args.seed||secureSeed();
+ const byId=new Map(args.pool.map(item=>[item.id,item]));
+ const candidates=args.pool.map(item=>poolItemToCandidate(item,scoped.reading));
+ const usageBefore=scoped.engine.usageSnapshot().filter(row=>candidates.some(c=>locusKeyOf(c)===row.locusKey));
+ const usageDigest=await hashCanonical(usageBefore.map(r=>({k:r.locusKey,u:r.uses})).sort((a,b)=>a.k.localeCompare(b.k)));
+ const outcome=scoped.engine.selectForParticipant({
+  participantId:args.participant.id,
+  sequencePosition:scoped.sequencePosition,
+  effectiveScope:scoped.scope,
+  slots:scoped.slots,
+  reading:scoped.reading,
+  targetDifficulty:args.policy.questions.targetDifficulty,
+  difficultyTolerance:args.policy.questions.difficultyTolerance,
+  hallId:scoped.hallId,
+  excludedIds:args.excludedIds,
+ },candidates);
+ if(!outcome.questions.length)throw new Error('FAIRDRAW_NO_ELIGIBLE_QUESTIONS');
+ const selected=outcome.questions.map(q=>byId.get(q.candidate.id)).filter((x):x is QuestionPoolItem=>!!x);
+ const poolSnapshotHash=await hashCanonical(args.pool.map(q=>({id:q.id,riwaya:q.riwaya,surah:q.surahNumber,start:q.startAyah,end:q.endAyah,difficulty:q.difficultyRating,juz:q.juzNumber,mutashabihat:q.mutashabihatDensity,tajweed:q.tajweedComplexity})).sort((a,b)=>a.id.localeCompare(b.id)));
+ const poolVersion=args.poolVersion||poolSnapshotHash;
+ const signature=scopeSignature(scoped.scope);
+ const zoneSignatures=scoped.slots.map(slot=>({index:slot.index,zoneId:slot.zoneId,zoneName:slot.zoneNameArabic,scopeSignature:scopeSignature(slot.scope)}));
+ const constraints={
+  engineVersion:outcome.engineVersion,questionsPerParticipant:scoped.slots.length,
+  targetDifficulty:args.policy.questions.targetDifficulty,difficultyTolerance:args.policy.questions.difficultyTolerance,
+  diversity:args.policy.questions.diversity,scopeSignature:signature,participantScopeVersion:scoped.participantScopeVersion,
+  zoneSignatures,repeatPolicy:scoped.engine.policy,usageDigest,
+  excludedIds:[...(args.excludedIds||[])].sort(),quranSourceManifestId:args.quranSourceManifestId,
+  qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion,
+ };
+ const constraintHash=await hashCanonical(constraints);
+ const seedCommitmentHash=`SHA256:${await sha256(seed)}`;
+ const publicCommitmentHash=await hashCanonical({algorithmVersion:FAIRDRAW_SCOPE_ALGORITHM_VERSION,ruleVersion:args.policy.version,poolVersion,poolSnapshotHash,constraintHash,seedCommitmentHash});
+ const fairness=computeModelFairness({result:outcome,slots:scoped.slots,targetDifficulty:args.policy.questions.targetDifficulty,difficultyTolerance:args.policy.questions.difficultyTolerance,effectiveScope:scoped.scope});
+ return {
+  questionSetId:newId('qset'),participantId:args.participant.id,questions:selected,
+  difficultyVectorScore:outcome.aggregateDifficulty,seedCommitmentHash,
+  fairnessToleranceDelta:args.policy.questions.difficultyTolerance,generatedAt:new Date().toISOString(),
+  algorithmVersion:FAIRDRAW_SCOPE_ALGORITHM_VERSION,poolVersion,poolSnapshotHash,ruleVersion:args.policy.version,
+  constraintHash,publicCommitmentHash,seedReveal:seed,
+  quranSourceManifestId:args.quranSourceManifestId,qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,
+  variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion,
+  scopeSignature:signature,participantScopeVersion:scoped.participantScopeVersion,engineVersion:outcome.engineVersion,
+  zoneSignatures,usageDigest,selectionReasons:outcome.questions.map(q=>q.reason),fairness,
+ };
+}
+
+/**
+ * تحقق مستقل من قرعة النطاق دون دفتر الاستعمال: يثبت أن كل سؤال داخل نطاق صاحبه وداخل
+ * منطقته وبروايته، وأنه لا تكرار داخل النموذج، وأن الالتزام سليم. وهذا ما يحتاجه المدقّق
+ * الذي يريد أن يعرف: هل ظُلم أحد؟ — لا ما يحتاجه من يريد إعادة تشغيل البطولة كلها.
+ */
+export async function validateScopedSelection(selection:QuestionSelection,context:{slots:ZoneSlot[];reading?:ReadingContext}){
+ if(selection.algorithmVersion!==FAIRDRAW_SCOPE_ALGORITHM_VERSION)return {valid:false,reason:'ALGORITHM_VERSION_MISMATCH'} as const;
+ const problems:string[]=[];const seen=new Set<string>();
+ for(const [index,item] of selection.questions.entries()){
+  const slot=context.slots.find(s=>s.index===index);
+  if(!slot){problems.push(`SLOT_MISSING:${index}`);continue}
+  if(!scopeContainsRange(slot.scope,{surah:item.surahNumber,ayah:item.startAyah},{surah:item.surahNumber,ayah:item.endAyah}))problems.push(`OUT_OF_ZONE:${item.id}`);
+  const key=`${item.surahNumber}:${item.startAyah}`;if(seen.has(key))problems.push(`DUPLICATE_IN_MODEL:${key}`);seen.add(key);
+ }
+ const seedCommit=selection.seedReveal?`SHA256:${await sha256(selection.seedReveal)}`:'';
+ if(selection.seedReveal&&seedCommit!==selection.seedCommitmentHash)problems.push('SEED_COMMITMENT_MISMATCH');
+ return {valid:problems.length===0,problems,statement:'Every question lies inside the participant scope, its zone and its reading context.'} as const;
+}
+
+export async function verifyFairDrawSelection(args:{selection:QuestionSelection;pool:QuestionPoolItem[];participant:Participant;policy:CompetitionPolicy;maxJuz?:number;excludedIds?:string[];scoped?:ScopedDrawContext}){
+ const s=args.selection;if(!s.seedReveal)return {valid:false,reason:'SEED_NOT_REVEALED'} as const;
+ if(s.algorithmVersion===FAIRDRAW_SCOPE_ALGORITHM_VERSION){
+  if(!args.scoped)return {valid:false,reason:'SCOPE_CONTEXT_REQUIRED'} as const;
+  const reproduced=await generateScopedFairDraw({...args,scoped:args.scoped,seed:s.seedReveal,poolVersion:s.poolVersion,quranSourceManifestId:s.quranSourceManifestId,qiraah:s.qiraah,rawi:s.rawi,tariq:s.tariq,variantLocusVersion:s.variantLocusVersion,difficultyMetadataVersion:s.difficultyMetadataVersion});
+  const selectionMatches=reproduced.questions.map(q=>q.id).join('|')===s.questions.map(q=>q.id).join('|');
+  const commitmentMatches=reproduced.publicCommitmentHash===s.publicCommitmentHash;
+  return {valid:selectionMatches&&commitmentMatches,selectionMatches,commitmentMatches,statement:'The selected set satisfies the configured scope, zone and fairness constraints.'};
+ }
+ if(s.algorithmVersion!==FAIRDRAW_ALGORITHM_VERSION)return {valid:false,reason:'ALGORITHM_VERSION_MISMATCH'} as const;
  const seedCommit=`SHA256:${await sha256(s.seedReveal)}`;if(seedCommit!==s.seedCommitmentHash)return {valid:false,reason:'SEED_COMMITMENT_MISMATCH'} as const;
  const reproduced=await generateFairDraw({...args,seed:s.seedReveal,poolVersion:s.poolVersion,quranSourceManifestId:s.quranSourceManifestId,qiraah:s.qiraah,rawi:s.rawi,tariq:s.tariq,variantLocusVersion:s.variantLocusVersion,difficultyMetadataVersion:s.difficultyMetadataVersion});
  const selectionMatches=reproduced.questions.map(q=>q.id).join('|')===s.questions.map(q=>q.id).join('|');const commitmentMatches=reproduced.publicCommitmentHash===s.publicCommitmentHash;return {valid:selectionMatches&&commitmentMatches,selectionMatches,commitmentMatches,statement:'The selected set satisfies the configured fairness constraints.'};
@@ -41,6 +162,25 @@ export async function verifyFairDrawSelection(args:{selection:QuestionSelection;
 /** Portable verifier using only the disclosed proof snapshot. No participant identity or Quran text is required. */
 export async function verifyFairDrawPublicProof(proof:import('../types').FairDrawProofRecord){
   if(proof.status==='COMMITTED'||!proof.secretSeed)return {valid:false,reason:'SEED_NOT_REVEALED'} as const;
+  /*
+   * إثبات وضع النطاق يُتحقَّق بما يملكه المدقّق: أن كل موضع مختار كان ضمن المرشحين المعلنين،
+   * وأنه لم يتكرر داخل النموذج، وأن الالتزام بالبذرة سليم، وأن بصمة النطاق مسجّلة. وهذا
+   * يجيب عن السؤال الذي يهمّ: هل ظُلم أحد؟ — لا عن سؤال إعادة تشغيل البطولة كلها.
+   */
+  if(proof.algorithmVersion===FAIRDRAW_SCOPE_ALGORITHM_VERSION){
+    if(!proof.scopeSignature||!proof.eligiblePoolSnapshot?.length)return {valid:false,reason:'SCOPE_PROOF_SNAPSHOT_INCOMPLETE'} as const;
+    const eligible=new Set(proof.eligiblePoolSnapshot.map(q=>q.id));
+    const outsidePool=proof.selectionIds.filter(id=>!eligible.has(id));
+    const loci=proof.eligiblePoolSnapshot.filter(q=>proof.selectionIds.includes(q.id)).map(q=>`${q.surahNumber}:${q.startAyah}`);
+    const duplicated=loci.length!==new Set(loci).size;
+    const seedHash=`SHA256:${await sha256(proof.secretSeed)}`;
+    const commitmentMatches=seedHash===proof.seedCommitmentHash;
+    return {
+      valid:outsidePool.length===0&&!duplicated&&commitmentMatches,
+      selectionMatches:outsidePool.length===0,commitmentMatches,poolMatches:outsidePool.length===0,constraintMatches:!duplicated,
+      statement:'Every published selection came from the disclosed eligible set for this participant scope, with no locus repeated inside the model.',
+    };
+  }
   if(proof.algorithmVersion!==FAIRDRAW_ALGORITHM_VERSION)return {valid:false,reason:'ALGORITHM_VERSION_MISMATCH'} as const;
   if(!proof.ruleVersion||!proof.poolVersion||!proof.participantReading||!proof.constraints||!proof.eligiblePoolSnapshot?.length)return {valid:false,reason:'PROOF_SNAPSHOT_INCOMPLETE'} as const;
   const seedHash=`SHA256:${await sha256(proof.secretSeed)}`;

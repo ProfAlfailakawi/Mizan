@@ -38,8 +38,14 @@ test('least privilege: a judge authors evidence, not results or certificates',()
   assert.equal(canWriteSyncedCollection('comp_admin','participants'),true);
 });
 
-test('a contestant may raise an appeal and nothing else',()=>{
-  assert.deepEqual(writableCollectionsFor('participant'),['appeals']);
+/*
+ * تغيّر العقد بقصد مع محرك النطاق: صار للمتسابق ما يكتبه غير الاعتراض — نطاق حفظه الذي
+ * يختاره بنفسه حين تسمح الفئة بذلك. وهو اتساعٌ محدود ومقصود: سجلٌّ واحد يملكه صاحبه،
+ * ولا يعتمده إلا الإدارة، وقواعد Firestore تمنعه من تعديله بعد الاعتماد أو القفل.
+ * والوليّ لم يتسع نطاقه: يبقى الاعتراض وحده.
+ */
+test('a contestant may raise an appeal and record their own memorization scope, and nothing else',()=>{
+  assert.deepEqual(writableCollectionsFor('participant'),['appeals','participant_scopes']);
   assert.deepEqual(writableCollectionsFor('guardian'),['appeals']);
 });
 
