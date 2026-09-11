@@ -24,7 +24,7 @@ export const ScientificGovernance:React.FC=()=>{
  return <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-7 space-y-5">
   <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4"><div className="flex items-start gap-4"><MizanPictogram kind="scientific-approval" size="lg" tone={pending?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'الحوكمة العلمية':'MIZAN SCIENTIFIC CORE'}</div><h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1">{ar?'المصدر قبل البرمجيات':'Source before software'}</h1><p className="text-xs text-[#636864] mt-2 max-w-2xl">{ar?'كل حرف رسمي يعود إلى مصدر ثابت ونسخة وهاش وموافقة علمية. وكل قدرة AI تُعتمد لنطاقها فقط.':'Every official character resolves to an immutable source, version, hash and scientific approval. Every AI capability is scoped independently.'}</p></div></div><div className="flex items-end gap-5"><Metric n={certified} label={ar?'معتمد':'CERTIFIED'}/><Metric n={pending} label={ar?'للمراجعة':'REVIEW'}/></div></header>
   <QuranIntelligenceHealthConsole ar={ar}/>
-  <nav className="flex gap-2 overflow-x-auto">{tabs.map(([id,Icon,label])=><button key={id} onClick={()=>setTab(id)} className={`shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black border ${tab===id?'bg-[#214C40] text-white border-[#214C40]':'bg-white border-[#dedcd5] text-[#616a64]'}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav>
+  <nav className="mizan-tabs" role="tablist">{tabs.map(([id,Icon,label])=><button key={id} onClick={()=>setTab(id)} className={`mizan-tab ${tab===id?'is-active':''}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav>
   {tab==='library'&&<OfficialQuranLibrary/>}{tab==='vault'&&<Vault/>}{tab==='qiraat'&&<Qiraat/>}{tab==='audio'&&<ReferenceAudio/>}{tab==='ai'&&<AIRegistry/>}{tab==='data'&&<Evidence/>}{tab==='questions'&&<Questions/>}
  </div>
 }
@@ -58,8 +58,8 @@ const SourceList=()=>{const s=useAppStore(),ar=s.language==='ar';
  <div className="mt-4 rounded-2xl border border-[#e0ded7] bg-[#faf8f3] p-4">
   <div className="text-xs font-black text-[#4a534d]">{ar?'تكوين السلطة العلمية':'Scientific authority'}</div>
   <p className="text-[10px] leading-5 text-[#656b66] mt-1">{ar?'كم مراجعًا علميًا مستقلًا يلزم لاعتماد مصدر قرآني؟ اختيار «مراجع واحد» يعني أنك السلطة العلمية كاملةً، ويُسجَّل هذا القرار في الأثر التدقيقي.':'How many independent scientific reviewers must approve a Quran source? Choosing one records that a single reviewer is the whole scientific authority.'}</p>
-  <div className="mt-3 flex flex-wrap gap-2">
-   {[2,1].map(n=><button key={n} type="button" onClick={()=>s.setScientificReviewersRequired(n as 1|2)} className={`min-h-10 px-3 rounded-xl text-xs font-black border ${required===n?'bg-[#214C40] text-white border-[#214C40]':'bg-white text-[#59615c] border-[#dedcd5]'}`}>{n===2?(ar?'مراجعان مستقلان':'Two independent reviewers'):(ar?'مراجع واحد (أنا السلطة العلمية)':'One reviewer (sole authority)')}</button>)}
+  <div className="mizan-tabs mizan-tabs-sm mt-3" role="tablist">
+   {[2,1].map(n=><button key={n} type="button" onClick={()=>s.setScientificReviewersRequired(n as 1|2)} className={`mizan-tab ${required===n?'is-active':''}`}>{n===2?(ar?'مراجعان مستقلان':'Two independent reviewers'):(ar?'مراجع واحد (أنا السلطة العلمية)':'One reviewer (sole authority)')}</button>)}
   </div>
  </div>
  {failure&&<div role="alert" className="mt-3 rounded-2xl bg-[#F4E6E3] text-[#88473f] p-4 text-[11px] font-bold leading-5">

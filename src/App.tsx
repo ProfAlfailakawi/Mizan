@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { LanguageSwitcher } from './components/design-system/LanguageSwitcher';
 import { PersistenceAlert } from './components/design-system/PersistenceAlert';
 import { VenueLockButton, VenueUnlockGuard, useVenueLockState } from './components/design-system/VenueLockControl';
 import { signOut } from 'firebase/auth';
@@ -316,6 +317,10 @@ export default function App() {
  return <div className="min-h-screen text-[#171b18] font-arabic">
   {idleWarnSeconds!==null&&<div className="fixed inset-x-0 top-0 z-[210] bg-[#8a4f45] text-white text-center text-xs font-black py-2 px-4">{language==='ar'?`ستُغلق الجلسة تلقائيًا خلال ${idleWarnSeconds} ثانية لعدم النشاط. حرّك الفأرة أو المس الشاشة للبقاء.`:`Signing out in ${idleWarnSeconds}s due to inactivity — move to stay.`}</div>}
   {!isBroadcast&&<Header onOpenExperienceHome={demoMode?()=>setExperienceHome(true):undefined}/>}
+  {isBroadcast&&<div className="fixed top-3 inset-x-3 z-[190] flex items-center justify-between gap-2 pointer-events-none">
+   <span className="pointer-events-auto rounded-xl bg-[#101a16]/85 backdrop-blur px-3 py-2 text-[11px] font-black text-white/80">{language==='ar'?'شاشة البثّ':'Broadcast surface'}</span>
+   <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
+  </div>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/>

@@ -145,6 +145,10 @@
 html[data-mizan-touch="xl"] { --mizan-control-h:52px; }
 .mizan-input:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
 .mizan-input.mizan-input-icon-start { padding-inline-start:2.65rem; }
+/* كانت مساحات النص تُكتب بخمسة ألوان حدود وأربعة ارتفاعات دنيا، فبدت كأنها من برامج شتّى.
+   صارت حقلًا واحدًا بحدّ الحقول نفسه ونصف قطرها، وارتفاعها الأدنى ثلاثة أسطر قابلة للتوسيع. */
+.mizan-textarea { width:100%; min-height:calc(var(--mizan-control-h) * 2.2); border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; resize:vertical; line-height:1.7; }
+.mizan-textarea:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
 .mizan-number-input { appearance:textfield; -moz-appearance:textfield; }
 .mizan-number-input::-webkit-outer-spin-button, .mizan-number-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 /* Native number steppers render on an inconsistent side under RTL (they hop from the right edge
@@ -1051,3 +1055,8 @@ html[data-mizan-motion="reduced"] .mz-ovt-stroke,
 html[data-mizan-motion="reduced"] .mz-ovt-finial,
 html[data-mizan-motion="reduced"] .mz-ovt-skip,
 html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; }
+
+/* زرّ «اقفل الجهاز» يطفو في زاوية أسفل كل أسطح القاعة؛ نحجز له ارتفاعه فلا يجلس فوق
+   سطر تذييلٍ أو آخر صفٍّ في القائمة. */
+.mizan-venue, .mizan-venue-2, .mizan-venue-deep { padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom))); }
+@media (min-width:640px){ .mizan-venue, .mizan-venue-2, .mizan-venue-deep { padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom))); } }
