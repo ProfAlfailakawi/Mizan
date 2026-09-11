@@ -199,7 +199,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-scale-loader { position:relative; display:inline-block; width:2em; height:2em; color:var(--emerald-2); flex:0 0 auto; }
 .mizan-scale-loader.is-delayed { opacity:0; animation:mzLoaderIn .18s ease-out .25s both; }
 .mizan-scale-loader i { position:absolute; display:block; background:currentColor; }
-.mizan-scale-stem { left:calc(50% - .045em); top:.3em; width:.09em; height:1.35em; border-radius:99px; opacity:.55; }
+.mizan-scale-stem { left:calc(50% - .045em); top:.44em; width:.09em; height:1.25em; border-radius:99px; opacity:.55; }
 .mizan-scale-base { left:.6em; right:.6em; bottom:.22em; height:.09em; border-radius:99px; opacity:.55; }
 .mizan-scale-beam {
   left:.18em; right:.18em; top:.42em; height:.11em; border-radius:99px;
@@ -207,26 +207,30 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   animation:mzScaleSettle 1.5s var(--ease-brand) both, mzScaleIdle 3.4s ease-in-out 1.5s infinite;
 }
 .mizan-scale-beam::before, .mizan-scale-beam::after {
-  content:""; position:absolute; top:.08em; width:.52em; height:.3em;
-  border:.09em solid currentColor; border-top:0; border-radius:0 0 .5em .5em; opacity:.8;
+  content:""; position:absolute; top:.22em; width:.5em; height:.26em;
+  background:currentColor; border-radius:.08em .08em .5em .5em; opacity:.85;
 }
-.mizan-scale-beam::before { inset-inline-start:-.06em; }
-.mizan-scale-beam::after  { inset-inline-end:-.06em; }
-.mizan-scale-dot { width:.22em; height:.22em; border-radius:99px; top:.1em; opacity:0; animation:mzScaleDot .8s var(--ease-brand) both; }
-.mizan-scale-dot.is-start { inset-inline-start:.34em; animation-delay:.25s; }
-.mizan-scale-dot.is-end   { inset-inline-end:.34em; animation-delay:.5s; }
+.mizan-scale-beam::before { inset-inline-start:-.05em; }
+.mizan-scale-beam::after  { inset-inline-end:-.05em; }
+/* نقطتا التقييم تسقطان وتُمتصّان داخل الكفّتين ثم تختفيان — الشكل النهائي ميزان صافٍ. */
+.mizan-scale-dot { width:.18em; height:.18em; border-radius:99px; top:.02em; opacity:0; animation:mzScaleDot .9s var(--ease-brand) both; }
+.mizan-scale-dot.is-start { inset-inline-start:.3em; animation-delay:.25s; }
+.mizan-scale-dot.is-end   { inset-inline-end:.3em; animation-delay:.5s; }
 @keyframes mzLoaderIn { from { opacity:0 } to { opacity:1 } }
 @keyframes mzScaleSettle {
   0% { transform:rotate(-6deg) } 38% { transform:rotate(5deg) }
   72% { transform:rotate(-2deg) } 100% { transform:rotate(0deg) }
 }
 @keyframes mzScaleIdle { 0%,100% { transform:rotate(0deg) } 50% { transform:rotate(-1.6deg) } }
-@keyframes mzScaleDot { from { opacity:0; transform:translateY(-.3em) } to { opacity:.9; transform:translateY(.34em) } }
+@keyframes mzScaleDot {
+  0% { opacity:0; transform:translateY(-.25em) } 35% { opacity:.9 }
+  100% { opacity:0; transform:translateY(.62em) }
+}
 /* حركة مقيدة: الشكل النهائي ثابت مع نبض شفافية لطيف فقط. */
 @media (prefers-reduced-motion:reduce){
   .mizan-scale-loader { animation:mzScalePulse 2.4s ease-in-out infinite !important; opacity:1; }
   .mizan-scale-beam { animation:none; }
-  .mizan-scale-dot { animation:none; opacity:.9; transform:translateY(.34em); }
+  .mizan-scale-dot { animation:none; opacity:0; }
 }
 
 /* ظهور مؤجّل ~250ms لأي منطقة انتظار: العملية الخاطفة لا تُظهر شيئًا أصلًا. */
