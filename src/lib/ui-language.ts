@@ -202,6 +202,10 @@ const SERVER_ERROR_AR: Record<string, string> = {
   PASSWORD_RESET_NOT_ALLOWED: 'ليس لديك صلاحية اعتماد طلب تغيير كلمة المرور هذا.',
   PASSWORD_RESET_LINK_UNAVAILABLE: 'تعذر إنشاء رابط تغيير كلمة المرور الآن. أعد المحاولة لاحقًا.',
   PASSWORD_RESET_TOKEN_INVALID: 'رابط تغيير كلمة المرور غير صالح أو استُخدم من قبل.',
+  NOTIFICATION_CENTER_UNAVAILABLE: 'تعذّر تحميل الإشعارات الآن. تحقّق من الاتصال وأعد المحاولة.',
+  NOTIFICATION_RECIPIENTS_FAILED: 'تعذّر تحميل قائمة المستلمين. أعد المحاولة بعد قليل.',
+  NOTIFICATION_UPDATE_FAILED: 'تعذّر تحديث الإشعار. أعد المحاولة بعد قليل.',
+  NOTIFICATION_SEND_FAILED: 'تعذّر إرسال الإشعار. تحقّق من الاتصال وأعد المحاولة.',
 };
 const SERVER_ERROR_EN: Record<string, string> = {
   IDENTITY_REQUIRED: 'This service requires sign-in and the live server (unavailable in demo).',
@@ -215,6 +219,10 @@ const SERVER_ERROR_EN: Record<string, string> = {
   AUTHORIZATION_FAILED: 'Authorization failed.',
   REVOKE_FAILED: 'Could not revoke authorization.',
   SECURE_RUNTIME_UNAVAILABLE: 'The secure question server is unavailable (unavailable in demo).',
+  NOTIFICATION_CENTER_UNAVAILABLE: 'Notifications could not be loaded. Check the connection and try again.',
+  NOTIFICATION_RECIPIENTS_FAILED: 'The recipient list could not be loaded. Try again shortly.',
+  NOTIFICATION_UPDATE_FAILED: 'The notification could not be updated. Try again shortly.',
+  NOTIFICATION_SEND_FAILED: 'The notification could not be sent. Check the connection and try again.',
 };
 export function serverErrorLabel(code: string, ar: boolean): string {
   const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;

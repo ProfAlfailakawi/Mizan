@@ -264,6 +264,7 @@ let globalState = getInitialState();
  */
 const storedCompetitionName = (english: boolean) => bilingualName(globalState.competition, !english) || globalState.competition.id;
 
+const QURAN_JUZ_TOTAL = 30;
 function markCompetitionConfigChanged(){
   const now=new Date().toISOString();
   globalState.competitionConfigUpdatedAt=now;
@@ -1703,20 +1704,32 @@ export function useAppStore() {
     markCompetitionConfigChanged(); notify();
   };
 
+  /*
+   * المصحف ثلاثون جزءًا. فئةٌ مكتوبٌ فيها خمسون لا تعني شيئًا، لكنها تصل إلى FairDraw
+   * بوصفها maxJuz فيبحث عن أسئلة في أجزاء لا وجود لها. الحدّ يُفرض هنا — في المخزن —
+   * لا في شاشةٍ واحدة، فأي واجهة تكتب الفئة (استيراد، نسخ مسابقة، شاشة أخرى) تلتزم به.
+   */
+  const clampCategory = (patch: Partial<Category>): Partial<Category> => {
+    if (patch.juzCount === undefined) return patch;
+    const n = Number(patch.juzCount);
+    return { ...patch, juzCount: Number.isFinite(n) ? Math.max(1, Math.min(QURAN_JUZ_TOTAL, Math.round(n))) : 1 };
+  };
+
   const addCategory = (initial?: Partial<Category>) => {
     const id = newId('cat');
     const category: Category = {
       id, competitionId: globalState.competition.id, code:`CAT-${globalState.competition.categories.length+1}`,
       name:'New category', nameArabic:'فئة جديدة', description:'', riwaya:'', memorizationScope:'Custom', juzCount:30,
       genderConstraint:'all', targetParticipants:100, targetDurationMinutes:8, ruleSetId:globalState.competition.ruleSet.id,
-      ...(initial || {})
+      ...clampCategory(initial || {})
     };
     globalState.competition = { ...globalState.competition, categories:[...globalState.competition.categories, category] };
     markCompetitionConfigChanged(); notify(); return category;
   };
 
   const updateCategory = (categoryId: string, patch: Partial<Category>) => {
-    globalState.competition = { ...globalState.competition, categories:globalState.competition.categories.map(c=>c.id===categoryId?{...c,...patch}:c) };
+    const safe = clampCategory(patch);
+    globalState.competition = { ...globalState.competition, categories:globalState.competition.categories.map(c=>c.id===categoryId?{...c,...safe}:c) };
     markCompetitionConfigChanged(); notify();
   };
 

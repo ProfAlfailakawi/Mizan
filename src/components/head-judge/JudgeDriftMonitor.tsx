@@ -41,7 +41,7 @@ export const JudgeDriftMonitor: React.FC = () => {
           <div>
             <div className="mizan-kicker">{ar ? 'مراقبة انحراف المحكم' : 'JUDGE DRIFT'}</div>
             <h2 className="text-lg font-black mt-0.5">{ar ? 'عدّاد الإرهاق الصامت' : 'Silent fatigue monitor'}</h2>
-            <p className="text-[11px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي — لا يمس أي درجة. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline — never a score change. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
+            <p className="text-[11px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
           </div>
         </div>
         <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
