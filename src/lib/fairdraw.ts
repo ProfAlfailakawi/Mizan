@@ -56,6 +56,8 @@ export interface ScopedDrawContext{
  reading?:ReadingContext;
  sequencePosition?:number;
  hallId?:string;
+ /** مواضع محجوزة الآن لجلساتٍ مفتوحة أخرى — تُمنع منعًا، وتدخل بصمة القيود فيُرى المنع في الإثبات. */
+ excludedLocusKeys?:string[];
  /*
   * نموذجٌ مولَّد مسبقًا ومختوم.
   *
@@ -138,6 +140,7 @@ async function generateScopedFairDraw(args:{pool:QuestionPoolItem[];participant:
   difficultyTolerance:args.policy.questions.difficultyTolerance,
   hallId:scoped.hallId,
   excludedIds:args.excludedIds,
+  excludedLocusKeys:scoped.excludedLocusKeys,
  },candidates);
  if(!outcome.questions.length)throw new Error('FAIRDRAW_NO_ELIGIBLE_QUESTIONS');
  const selected=outcome.questions.map(q=>byId.get(q.candidate.id)).filter((x):x is QuestionPoolItem=>!!x);
@@ -150,6 +153,7 @@ async function generateScopedFairDraw(args:{pool:QuestionPoolItem[];participant:
   targetDifficulty:args.policy.questions.targetDifficulty,difficultyTolerance:args.policy.questions.difficultyTolerance,
   diversity:args.policy.questions.diversity,scopeSignature:signature,participantScopeVersion:scoped.participantScopeVersion,
   zoneSignatures,repeatPolicy:scoped.engine.policy,usageDigest,
+  excludedLocusKeys:[...(scoped.excludedLocusKeys||[])].sort(),
   excludedIds:[...(args.excludedIds||[])].sort(),quranSourceManifestId:args.quranSourceManifestId,
   qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion,
  };

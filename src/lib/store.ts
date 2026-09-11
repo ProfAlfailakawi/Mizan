@@ -2000,29 +2000,14 @@ export function useAppStore() {
   /** خطة ترحيل الفئات القديمة. لا تُطبَّق شيئًا؛ تعرض ما يمكن اشتقاقه وما يحتاج قرار المنظم. */
   const categoryScopeMigrationPlan = () => planCategoryMigration(globalState.competition.categories);
 
-  /** تطبيق ترحيل فئة واحدة. المبهم لا يُطبَّق إلا إذا اعتمد المنظم الاقتراح صراحةً. */
-  const applyCategoryScopeMigration = (categoryId: string, options?: { acceptSuggestion?: boolean }) => {
-    const category = globalState.competition.categories.find(c => c.id === categoryId);
-    if (!category) return { ok: false as const, reason: 'CATEGORY_NOT_FOUND' };
-    const outcome = migrateLegacyScope({ memorizationScope: category.memorizationScope, juzCount: category.juzCount, existingScope: category.scope || null });
-    if (outcome.status === 'already_defined') return { ok: false as const, reason: 'SCOPE_ALREADY_DEFINED' };
-    const scope = outcome.scope || (options?.acceptSuggestion ? outcome.suggestion : null);
-    if (!scope) {
-      bumpCategory(categoryId, { scopeMigration: 'needs_scope_confirmation' }, 'CATEGORY_SCOPE_NEEDS_CONFIRMATION',
-        `«${category.memorizationScope || category.juzCount}» لا تحدد نطاقًا بعينه؛ بقيت الفئة بانتظار قرار المنظم.`,
-        'The legacy value does not identify a specific range; the category awaits an explicit decision.');
-      return { ok: false as const, reason: 'NEEDS_SCOPE_CONFIRMATION', outcome };
-    }
-    const result = setCategoryScope(categoryId, scope, { reason: outcome.basisArabic });
-    if (result.ok) {
-      globalState.competition = {
-        ...globalState.competition,
-        categories: globalState.competition.categories.map(c => c.id === categoryId ? { ...c, scopeMigration: outcome.scope ? 'derived_from_legacy' : 'none' } : c),
-      };
-      notify();
-    }
-    return { ...result, outcome };
-  };
+  /*
+   * لا مسار ثانٍ للترحيل.
+   *
+   * كان هنا `applyCategoryScopeMigration` يطبّق الاقتراح مباشرة — مسارٌ ثانٍ لما تفعله
+   * الشاشة أصلًا وأحسن منه: تحمّل الاقتراح في المسودّة، فيراه المنظم ويعدّله ثم يحفظه عبر
+   * `setCategoryScope` الذي يرفع النسخة ويبطل ما بُني على السابقة. وهو مسارٌ لم تستدعه
+   * شاشةٌ ولا اختبار. ونظامان لعملٍ واحد يفترقان يومًا، فيُبقى على الذي يمرّ به الناس.
+   */
 
   /** حفظ اختيار المتسابق لنطاقه. كل حفظ نسخة جديدة؛ السابقة تُعلَّم superseded ولا تُحذف. */
   const saveParticipantScope = (participantId: string, selection: QuranScope, options?: { submit?: boolean; reason?: string }) => {
@@ -3083,6 +3068,15 @@ export function useAppStore() {
       /* ما سُمع في القاعات قبل الآن يدخل المفاضلة: الموضع المنكشف يُؤخَّر لا يُمنع أعمى. */
       scarcity:buildExposureOracle(exposureProfiles()),
     });
+    /*
+     * ما هو محجوزٌ الآن لغير هذا المتسابق لا يُسحب له.
+     *
+     * دفتر الاستعمال يباعد بحسب عدد الاستعمالات، وهذا يمنع بحسب قيام الحجز الآن — والفرق
+     * يظهر في قاعتين تبدآن في اللحظة نفسها: دفترهما لم يُكتب فيه شيءٌ بعد، وحجزهما قائم.
+     * وتُطلَق المنقضية أولًا، فلا يبقى موضعٌ رهينةَ متسابقٍ لم يحضر.
+     */
+    sweepExpiredReservations();
+    const heldElsewhere=[...reservationBlockedLoci(participant.id)];
     /* الدفتر يُغذَّى بما سُحب قبل الآن في هذه المسابقة، فيباعد المحرك ويوازن الحمل بدل أن يبدأ من صفر. */
     drawEngine.primeUsage(globalState.questionModels
       .filter(m=>m.competitionId===globalState.competition.id&&m.status!=='invalidated'&&m.status!=='draft')
@@ -3109,7 +3103,7 @@ export function useAppStore() {
     }
     try {
       const selection = await generateFairDraw({ pool, participant, policy:effPolicy, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT',
-        scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id, preGenerated } });
+        scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id, preGenerated, excludedLocusKeys:heldElsewhere } });
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
       const sessionId=newId('sess');
       /* نموذج المتسابق يُحفظ كيانًا مستقلًا: عليه تقوم العدالة والتدقيق وإبطال ما بُني على نطاق قديم. */
@@ -3916,7 +3910,7 @@ export function useAppStore() {
     removeCategory,
     // محرك النطاق والأسئلة
     setCategoryScope, setCategorySelectionRule, setCategoryDistribution, setCategoryRepeatPolicy, setCategoryQuestionCount,
-    categoryScopeMigrationPlan, applyCategoryScopeMigration,
+    categoryScopeMigrationPlan,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope, activeParticipantScope,
     scopeCandidatePool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, sealScopeEngine, scopeSealImpact,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant, exposureProfiles,
