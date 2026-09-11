@@ -80,8 +80,11 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
 
   {passage&&<PassageAudio reading={reading} ayat={passage.ayat} ar={ar} onActive={setActive}/>}
 
-  {/* شرح علامة الوقف عند بلوغها — وصل إلى المتسابق بعد أن كان يُعرض للجمهور وحده. */}
-  <WaqfGuide text={activeText?.text} ayah={activeAyah} ar={ar}/>
+  {/* شرح علامات الوقف — وصل إلى المتسابق بعد أن كان يُعرض للجمهور وحده.
+      يبدأ على المقطع كلّه لأنه معروض أمامه قبل أن يشتغل أي صوت، ثم يضيق إلى الآية
+      المتتبَّعة حين تبدأ التلاوة المرجعية. والعلامات تُقرأ من الآيات نفسها لا من حقل
+      النصّ المجمّع، فلا تتوقف الفائدة على شكل حقلٍ قد يتغيّر. */}
+  <WaqfGuide text={activeText?.text??passage?.ayat.map(a=>a.text).join(' ')} ayah={activeAyah} ar={ar}/>
 
   <div className="px-4 sm:px-5 py-4 border-t border-[#e5e1d7]">
    <div className="flex flex-wrap items-center gap-2">
