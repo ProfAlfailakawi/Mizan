@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'gold';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'gold' | 'venue' | 'venue-gold';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   /*
    * زرّ الأيقونة.
@@ -28,7 +28,10 @@ export const Button: React.FC<ButtonProps> = ({ children, variant='primary', siz
     outline: 'mizan-btn-outline',
     danger: 'mizan-btn-danger',
     ghost: 'mizan-btn-ghost',
-    gold: 'mizan-btn-gold'
+    gold: 'mizan-btn-gold',
+    /* أسطح القاعة الداكنة: لونه من رموزها لا من قيمةٍ مكتوبة بيد. */
+    venue: 'mizan-btn-venue',
+    'venue-gold': 'mizan-btn-venue-gold'
   };
   // المقاسان الكبيران كانا بحجم الأوسط تقريبًا (نفس مقاس النص)، فلم يكن لطلب «زرّ أكبر» أثر.
   const sizes = { sm:'text-xs px-3 py-2 gap-1.5', md:'text-sm px-4 py-2.5 gap-2', lg:'text-base px-6 py-3.5 gap-2.5', xl:'text-lg px-8 py-4 gap-3' };

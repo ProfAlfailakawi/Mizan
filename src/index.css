@@ -634,6 +634,10 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-btn-danger:hover:not(:disabled){ background:#8d4038; }
 .mizan-btn-ghost{ background:transparent; color:#5c645f; }
 .mizan-btn-ghost:hover:not(:disabled){ background:#efede7; }
+.mizan-btn-venue{ background:var(--venue-surface); color:var(--venue-ink); border:1px solid var(--venue-line); }
+.mizan-btn-venue:hover:not(:disabled){ background:rgba(255,255,255,.10); }
+.mizan-btn-venue-gold{ background:rgba(244,241,232,.05); color:var(--venue-ink); border:1px solid rgba(232,203,147,.16); }
+.mizan-btn-venue-gold:hover:not(:disabled){ background:rgba(244,241,232,.10); border-color:rgba(232,203,147,.28); }
 .mizan-btn-gold{ background:var(--amber); color:#fff; box-shadow:var(--shadow-1); }
 .mizan-btn-gold:hover:not(:disabled){ background:#846237; }
 

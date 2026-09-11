@@ -12,6 +12,7 @@ import { ClarityGuide } from '../design-system/ClarityGuide';
 import { Modal } from '../design-system/Modal';
 import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
 import { NotificationCenter } from './NotificationCenter';
+import { Button } from '../design-system/Button';
 
 interface HeaderProps { onOpenExperienceHome?:()=>void; }
 
@@ -45,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       </div>
     </div>
     <div className="flex items-center gap-1 shrink-0">
-      {!superAdmin&&onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'كل التجارب':'All experiences'} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></button>}
+      {!superAdmin&&onOpenExperienceHome&&<span className="hidden sm:inline-flex"><Button shape="square" variant="ghost" onClick={onOpenExperienceHome} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></Button></span>}
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
