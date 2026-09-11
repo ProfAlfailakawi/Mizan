@@ -201,37 +201,17 @@ function supplyWeights(candidates: QuestionCandidate[]) {
   return (ordinal: number) => (starts.has(ordinal) ? 1 : 0.05);
 }
 
-export interface DrawInput {
-  participant: Participant;
-  category: Category | undefined;
-  policy: CompetitionPolicy;
-  scopes: ParticipantScopeRecord[];
-  candidates: QuestionCandidate[];
-  engine: QuestionAllocationEngine;
-  sequencePosition?: number;
-  hallId?: string;
-  excludedIds?: string[];
-}
-
-export function drawForParticipant(input: DrawInput) {
-  const resolution = resolveEffectiveScope({ participant: input.participant, category: input.category, scopes: input.scopes });
-  if (resolution.blocked) return { ok: false as const, resolution, reason: resolution.reasonArabic };
-  const reading = readingContextOf({ riwaya: input.participant.riwaya });
-  const plan = planAllocation({ category: input.category, policy: input.policy, effectiveScope: resolution.scope, candidates: input.candidates });
-  if (!plan.slots.length) return { ok: false as const, resolution, reason: 'تعذر بناء خانات الأسئلة لهذا المتسابق.' };
-  const result = input.engine.selectForParticipant({
-    participantId: input.participant.id,
-    sequencePosition: input.sequencePosition,
-    effectiveScope: resolution.scope,
-    slots: plan.slots,
-    reading,
-    targetDifficulty: input.policy.questions.targetDifficulty,
-    difficultyTolerance: input.policy.questions.difficultyTolerance,
-    hallId: input.hallId,
-    excludedIds: input.excludedIds,
-  }, input.candidates);
-  return { ok: true as const, resolution, plan, result, reading };
-}
+/*
+ * لا مسار سحبٍ ثالث.
+ *
+ * كان هنا `drawForParticipant`: واجهةٌ تبدو رسميةً لأنها في هذا الملف، ولا يستدعيها أحد.
+ * والسحب الحقيقي يمرّ بمسارين مختبَرين: `generateFairDraw` في القاعة، و`generateModelBatch`
+ * في الدفعة. والثالث لم يكن زائدًا فحسب — كان **فخًّا**: لا يمرّر `excludedLocusKeys`، فمن
+ * يستعمله يسحب متجاهلًا الحجوز القائمة، فيخرج الموضع الذي بيد متسابقٍ الآن لمتسابقٍ ثانٍ.
+ *
+ * والقاعدة التي تحكم هذا مكتوبة: لا نظامين لعملٍ واحد. ومسارٌ لا يمرّ به أحد لا تصله
+ * الإصلاحات، فيتخلّف عن إخوته قاعدةً بعد قاعدة حتى يصير أخطر ما في الملف.
+ */
 
 /** النماذج التي بُنيت على نسخة نطاق لم تعد سارية — تُحصى قبل التشغيل، لا بعده. */
 export function staleModels(models: QuestionModelRecord[], scopes: ParticipantScopeRecord[], categories: Category[]): QuestionModelRecord[] {

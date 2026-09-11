@@ -73,37 +73,83 @@ export function effectiveState(record: QuestionReservationRecord, now: string): 
   return reservationExpired(record, now) ? 'released' : record.state;
 }
 
-/** المواضع التي لا يجوز سحبها الآن لغير أصحابها. */
+/*
+ * المواضع التي لا يجوز سحبها الآن لغير أصحابها.
+ *
+ * والحدّ هنا **جلسةٌ مفتوحة**، لا جلسةٌ مضت. فالحاجز يمنع أن يخرج الموضع لاثنين في اللحظة
+ * نفسها — لا أن يُستعمل مرة أخرى بعد أن انتهى صاحبه.
+ *
+ * وكان `revealed` محسوبًا حاجبًا، فصار الدفتر يمنع كل إعادة استعمال إلى الأبد. وذلك يناقض
+ * سياسة التكرار مناقضةً صريحة: السياسة تحسب أن الحدّ الأدنى الرياضي قد يكون اثنين — أي أن
+ * إعادة الاستعمال **واجبة** لا مباحة — ثم يأتي الدفتر فيمنعها. نظامان بقاعدتين متضادّتين،
+ * والتناقض صامت.
+ *
+ * فما بعد الكشف يحكمه من يملك حكمه: **سياسة التكرار** (كم مرة، وبأي مباعدة)، و**نموذج
+ * الانكشاف** (من سمعه — ويمنع منعًا باتًّا إعادته في القاعة نفسها في اليوم نفسه). والحجرُ
+ * وحده يبقى حاجبًا أبديًا، لأن الموضع المعيب معيبٌ في كل حال.
+ */
 export function blockedLocusKeys(records: QuestionReservationRecord[], now = new Date().toISOString(), exceptParticipantId?: string): Set<string> {
   const blocked = new Set<string>();
   for (const record of records) {
     const state = effectiveState(record, now);
     if (state === 'quarantined') { blocked.add(record.locusKey); continue; }
-    if (!['temporarily_reserved', 'assigned', 'revealed'].includes(state)) continue;
+    if (state !== 'temporarily_reserved' && state !== 'assigned') continue;
     if (exceptParticipantId && record.participantId === exceptParticipantId) continue;
     blocked.add(record.locusKey);
   }
   return blocked;
 }
 
+/*
+ * الحجز: مرورٌ واحد على الدفتر.
+ *
+ * كان الحجز الواحد يمرّ على الدفتر ثلاث مرات — مرةً يلتمس مفتاح الثبات، ومرةً يبني
+ * مجموعة المحجوب كلِّه، ومرةً يبني خريطة الحائزين كلِّهم — ثم لا يسأل إلا عن مواضع هذا
+ * الطلب وحدها، وهي ثلاثةٌ أو نحوها. فكان بناء الفهرسين بحجم الدفتر كلِّه لا بحجم السؤال،
+ * فيغلو الحجز كلما طال اليوم: آخر من يدخل القاعة يدفع أضعاف ما دفعه أولهم، وكلُّ حجزٍ
+ * يخلّف فهرسين يُبنيان ثم يُرميان.
+ *
+ * والمطلوب معلومٌ قبل المرور، فلا يُبنى فهرسٌ لغيره: مرورٌ واحد يلتقط ما يخصّ هذه المواضع
+ * وحدها، فتبقى الفهارس بحجم الطلب لا بحجم اليوم.
+ *
+ * ويُسمّى في التزاحم السجلُّ المانعُ نفسه، لا سجلٌّ آخر يشاركه الموضع. فقد كانت الخريطة
+ * تُبنى بالترتيب فيُذكر أقدمُ من مرّ بالموضع وإن كان غيرُه هو الحاجز الآن، فيُنسب الحجز
+ * إلى من لا يحجزه. والتزاحم الذي يُسمّى فيه غيرُ صاحبه بلاغٌ كاذب.
+ */
 export function reserveQuestions(input: ReserveInput): ReserveOutcome {
   const now = input.now || new Date().toISOString();
   const ttl = Math.max(30, Math.round(input.ttlSeconds ?? DEFAULT_RESERVATION_TTL_SECONDS));
-  const existing = input.records.filter(r => r.idempotencyKey === input.idempotencyKey);
-  if (existing.length) return { records: input.records, created: existing, conflicts: [], replayed: true };
+
+  const wanted = new Set(input.items.map(item => item.locusKey));
+  const replayedRecords: QuestionReservationRecord[] = [];
+  const blockedBy = new Map<string, QuestionReservationRecord>();
+
+  for (const record of input.records) {
+    if (record.idempotencyKey === input.idempotencyKey) replayedRecords.push(record);
+    if (!wanted.has(record.locusKey)) continue;
+    const state = effectiveState(record, now);
+    const blocks = state === 'quarantined'
+      || ((state === 'temporarily_reserved' || state === 'assigned')
+        && !(input.participantId && record.participantId === input.participantId));
+    if (!blocks) continue;
+    /* والحجر أولى بالذكر من الحجز، لأن الموضع المعيب معيبٌ في كل حال لا في هذه الجلسة. */
+    const known = blockedBy.get(record.locusKey);
+    if (known && effectiveState(known, now) === 'quarantined') continue;
+    blockedBy.set(record.locusKey, record);
+  }
+
+  if (replayedRecords.length) return { records: input.records, created: replayedRecords, conflicts: [], replayed: true };
 
   const conflicts: ReserveOutcome['conflicts'] = [];
   const created: QuestionReservationRecord[] = [];
-  const blocked = blockedLocusKeys(input.records, now, input.participantId);
-  const holderOf = new Map(input.records.map(r => [r.locusKey, r] as const));
 
   for (const item of input.items) {
-    if (blocked.has(item.locusKey)) {
-      const holder = holderOf.get(item.locusKey);
-      conflicts.push({ locusKey: item.locusKey, heldBy: holder?.participantId, state: holder ? effectiveState(holder, now) : 'assigned' });
+    const holder = blockedBy.get(item.locusKey);
+    if (holder) {
+      conflicts.push({ locusKey: item.locusKey, heldBy: holder.participantId, state: effectiveState(holder, now) });
       continue;
     }
-    created.push({
+    const record: QuestionReservationRecord = {
       id: input.newId('qres'),
       organizationId: input.organizationId,
       competitionId: input.competitionId,
@@ -118,8 +164,10 @@ export function reserveQuestions(input: ReserveInput): ReserveOutcome {
       createdAt: now,
       updatedAt: now,
       history: [{ state: 'temporarily_reserved', at: now, by: input.actorId, reason: input.participantId ? `حجز مؤقت لمتسابق` : 'حجز مؤقت' }],
-    });
-    blocked.add(item.locusKey);
+    };
+    created.push(record);
+    /* وموضعٌ تكرّر في الطلب نفسه لا يُحجز مرتين؛ وثانيه يُردّ باسم أولِه لا بلا اسم. */
+    blockedBy.set(item.locusKey, record);
   }
   return { records: [...created, ...input.records], created, conflicts, replayed: false };
 }
@@ -187,5 +235,6 @@ export function expireReservations(records: QuestionReservationRecord[], now = n
 export function reservationSummary(records: QuestionReservationRecord[], now = new Date().toISOString()) {
   const counts: Record<QuestionReservationState, number> = { available: 0, temporarily_reserved: 0, assigned: 0, revealed: 0, released: 0, quarantined: 0 };
   for (const record of records) counts[effectiveState(record, now)]++;
-  return { counts, total: records.length, held: counts.temporarily_reserved + counts.assigned + counts.revealed };
+  /* «القائم» ما يحجب الآن: المؤقت والمخصَّص. والمكشوف انتهى أمره فلا يُعدّ قائمًا. */
+  return { counts, total: records.length, held: counts.temporarily_reserved + counts.assigned };
 }
