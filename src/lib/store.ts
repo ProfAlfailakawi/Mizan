@@ -5,6 +5,7 @@ import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
+import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
 import {
@@ -2023,20 +2024,28 @@ export function useAppStore() {
 
   const startSessionForParticipant = async (participantId: string) => {
     const participant = globalState.participants.find(p => p.id === participantId);
-    if (!participant) return false;
-    const assigned = globalState.committees.find(c => c.id === participant.assignedCommitteeId && !committeeHasHardConflict(c, participant));
-    const committee = assigned || compatibleCommitteesFor(participant)[0];
-    if (!committee) {
+    /* القراران في `session-start-core` مُختبَرين بالتشغيل؛ وما هنا أثرهما. */
+    const assignedCommittee = participant ? globalState.committees.find(c => c.id === participant.assignedCommitteeId) : undefined;
+    const choice = chooseSessionCommittee({
+      participant,
+      assignedCommittee,
+      assignedHasHardConflict: !!(assignedCommittee && participant && committeeHasHardConflict(assignedCommittee, participant)),
+      compatibleCommittees: participant ? compatibleCommitteesFor(participant) : [],
+    });
+    if (choice.kind === 'no-participant' || !participant) return false;
+    if (choice.kind === 'no-safe-committee') {
       createIncident('conflict_routing', 'No conflict-free committee', `Participant ${participant.code} needs a manual conflict-safe committee assignment.`, 'critical');
       return false;
     }
+    const committee = choice.committee;
     const policy = getCompetitionPolicy(globalState.competition);
-    if (!policy.frozenAt) {
-      const now = new Date().toISOString();
-      const frozenPolicy = { ...policy, frozenAt: now, updatedAt: now };
-      const frozenRuleSet = { ...globalState.competition.ruleSet, frozenAt: now };
-      globalState.competition = { ...globalState.competition, policy: frozenPolicy, ruleSet: frozenRuleSet, ruleSets: [frozenRuleSet, ...(globalState.competition.ruleSets || []).filter(r => r.id !== frozenRuleSet.id)] };
-    }
+    const frozen = freezeRulesOnce({
+      policy,
+      ruleSet: globalState.competition.ruleSet,
+      ruleSets: globalState.competition.ruleSets,
+      now: new Date().toISOString(),
+    });
+    if (frozen) globalState.competition = { ...globalState.competition, policy: frozen.policy, ruleSet: frozen.ruleSet, ruleSets: frozen.ruleSets };
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const reading=resolveReading({riwaya:participant.riwaya});
     if(productionMode){
@@ -2467,7 +2476,15 @@ export function useAppStore() {
 
 
   const getQueueEstimate=(participantId:string)=>{
-    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);if(!p||p.status!=='in_queue')return null;const c=globalState.committees.find(x=>x.id===p.assignedCommitteeId);if(!c)return null;const queue=globalState.participants.filter(x=>x.status==='in_queue'&&x.assignedCommitteeId===c.id).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b));const index=Math.max(0,queue.findIndex(x=>x.id===p.id));const avg=Math.max(2,c.averageSessionMinutes||globalState.competition.ruleSet.questionDurationMinutes||8);const activeCarry=c.status==='testing'?avg*.55:0;const pauseCarry=c.status==='paused'?avg:0;const estimatedWaitMinutes=Math.max(1,Math.round(index*avg+activeCarry+pauseCarry));const expectedTurnAt=new Date(Date.now()+estimatedWaitMinutes*60000).toISOString();return {ahead:index,estimatedWaitMinutes,expectedTurnAt,committeeId:c.id,committeeCode:c.code,basis:{currentCompetitionAverageMinutes:avg,activeSession:c.status==='testing',paused:c.status==='paused',queueSize:queue.length},confidence:index<=2?'medium' as const:'low' as const};
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);
+    const c=p?globalState.committees.find(x=>x.id===p.assignedCommitteeId):undefined;
+    return estimateQueueWait({
+      participant:p,
+      committee:c,
+      committeeQueueInOrder:c?globalState.participants.filter(x=>x.status==='in_queue'&&x.assignedCommitteeId===c.id).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)):[],
+      fallbackSessionMinutes:globalState.competition.ruleSet.questionDurationMinutes,
+      now:Date.now(),
+    });
   };
 
   // ---- MIZAN Beyond 8 ------------------------------------------------------------------

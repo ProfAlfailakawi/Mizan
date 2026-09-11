@@ -645,7 +645,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   value={logoUrl}
                   onChange={e => setLogoUrl(e.target.value)}
                   placeholder="https://example.org/brand/logo.svg"
-                  className="flex-1 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-mono text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input flex-1 text-xs font-mono"
                 />
                 <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DFDED7] bg-white hover:bg-[#FAF9F5] text-xs font-bold text-[#4a504c] shrink-0 transition">
                   <FileUp className="w-3.5 h-3.5 text-[#2F6555]" />
