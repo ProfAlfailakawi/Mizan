@@ -3,22 +3,14 @@ import type {ServerQuranSourceRepository,ServerQuranVerse} from './quran-source-
 import type {QuranReadingId,WaqfDataset,WaqfOccurrence,WaqfSymbolDefinition} from './quran-intelligence-types';
 
 export const KFGQPC_WAQF_PARSER_VERSION='MIZAN-KFGQPC-WAQF-DERIVER-2.0.0';
-export const KFGQPC_WAQF_REGISTRY_VERSION='KFGQPC-MADINAH-WAQF-SYMBOLS-1';
 
-/**
- * Unicode stop/sign characters used by the official KFGQPC Uthmanic developer text.
- * The Arabic labels mirror the visible Mushaf marks; meanings are stored as controlled
- * semantics, not as quotations. The source remains the KFGQPC Mushaf/developer package.
+/*
+ * جدول العلامات انتقل إلى shared/ ليقرأه المتصفّح أيضًا: المتسابق في استوديو التدرّب
+ * يحتاج معنى العلامة التي أمامه، وجدولٌ ثانٍ في العميل كان سيفترق عن هذا عند أول تصحيح.
+ * يُعاد تصديرهما من هنا فلا يتغيّر شيء على من يستوردهما من الخادم.
  */
-export const KFGQPC_WAQF_SYMBOLS:readonly WaqfSymbolDefinition[]=[
-  {symbol:'ۘ',codePoint:'U+06D8',labelArabic:'م',officialMeaning:'وقف لازم',category:'WAQF_LAZIM'},
-  {symbol:'ۙ',codePoint:'U+06D9',labelArabic:'لا',officialMeaning:'لا وقف',category:'NO_STOP'},
-  {symbol:'ۚ',codePoint:'U+06DA',labelArabic:'ج',officialMeaning:'وقف جائز',category:'WAQF_JAIZ'},
-  {symbol:'ۖ',codePoint:'U+06D6',labelArabic:'صلى',officialMeaning:'الوصل أولى',category:'WASL_PREFERRED'},
-  {symbol:'ۗ',codePoint:'U+06D7',labelArabic:'قلى',officialMeaning:'الوقف أولى',category:'WAQF_PREFERRED'},
-  {symbol:'ۛ',codePoint:'U+06DB',labelArabic:'∴',officialMeaning:'وقف التعانق',category:'MUANAQAH'},
-  {symbol:'ۜ',codePoint:'U+06DC',labelArabic:'س',officialMeaning:'سكتة',category:'SAKTAH'}
-] as const;
+import {KFGQPC_WAQF_SYMBOLS,KFGQPC_WAQF_REGISTRY_VERSION} from '../shared/kfgqpc-waqf-symbols';
+export {KFGQPC_WAQF_SYMBOLS,KFGQPC_WAQF_REGISTRY_VERSION};
 
 const symbolByChar=new Map(KFGQPC_WAQF_SYMBOLS.map(x=>[x.symbol,x]));
 const occurrenceKey=(x:Pick<WaqfOccurrence,'surah'|'ayah'|'symbol'|'sourceCodePointOffset'>)=>`${x.surah}:${x.ayah}:${x.sourceCodePointOffset}:${x.symbol}`;

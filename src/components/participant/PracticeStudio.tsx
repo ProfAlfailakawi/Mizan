@@ -6,6 +6,7 @@ import {TajweedAyahWords} from '../judge/TajweedText';
 import {splitAyahWords} from '../../lib/word-timing';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
+import {WaqfGuide} from './WaqfGuide';
 
 /*
  * استوديو التدرّب — للمتسابق قبل يوم المسابقة.
@@ -78,6 +79,9 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
   </div>
 
   {passage&&<PassageAudio reading={reading} ayat={passage.ayat} ar={ar} onActive={setActive}/>}
+
+  {/* شرح علامة الوقف عند بلوغها — وصل إلى المتسابق بعد أن كان يُعرض للجمهور وحده. */}
+  <WaqfGuide text={activeText?.text} ayah={activeAyah} ar={ar}/>
 
   <div className="px-4 sm:px-5 py-4 border-t border-[#e5e1d7]">
    <div className="flex flex-wrap items-center gap-2">
