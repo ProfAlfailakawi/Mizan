@@ -4,6 +4,7 @@ import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityF
 import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
+import { decideArrival, findByIdOrCode } from './arrival-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
 import {
@@ -934,16 +935,23 @@ export function useAppStore() {
 
   // Check-In Kiosk & Exceptions
   const checkInParticipant = (participantIdOrCode: string, method: 'kiosk_qr' | 'mobile_self' | 'exception_host' = 'kiosk_qr') => {
-    const pIndex = globalState.participants.findIndex(
-      (p) => p.id === participantIdOrCode || p.code.toLowerCase() === participantIdOrCode.toLowerCase()
-    );
+    /* القرار في `arrival-core` نقيًّا ومُختبَرًا بالتشغيل؛ وما هنا أثرُه: السجلّ والحفظ وتاريخ الحالة. */
+    const found = findByIdOrCode(globalState.participants, participantIdOrCode);
+    const pIndex = found ? globalState.participants.findIndex(x => x.id === found.id) : -1;
+    const decision = decideArrival({
+      participant: found,
+      roster: globalState.participants,
+      competitionId: globalState.competition.id,
+      eligibleCommittees: found ? compatibleCommitteesFor(found) : [],
+      fallbackCommittees: found
+        ? globalState.committees.filter(c => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, found))
+        : [],
+    });
 
     if (pIndex !== -1) {
       const p = globalState.participants[pIndex];
-      if (p.competitionId !== globalState.competition.id) return null;
-      // Idempotent arrival: a duplicate scan (including a photo of the same QR at another gate)
-      // must never allocate a second queue position or rewind an already-started journey.
-      if (['in_queue','in_session','tested','certified'].includes(p.status) || (p.checkedInAt && p.originalQueueNumber)) {
+      if (decision.kind === 'other-competition') return null;
+      if (decision.kind === 'duplicate') {
         auditTrustAction(
           'DUPLICATE_CHECKIN_IGNORED',
           'Participant',
@@ -953,23 +961,16 @@ export function useAppStore() {
         );
         return p;
       }
+      if (decision.kind !== 'admit') return p;
       const updated: Participant = {
         ...p,
         status: 'in_queue',
         checkedInAt: new Date().toISOString(),
         checkInMethod: method,
-        queueNumber: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.originalQueueNumber||x.queueNumber||0)) + 1,
-        originalQueueNumber: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.originalQueueNumber||x.queueNumber||0)) + 1,
-        queueOrderKey: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.queueOrderKey||x.originalQueueNumber||x.queueNumber||0)) + 1,
-        assignedCommitteeId: p.assignedCommitteeId || (() => {
-          const compatible = compatibleCommitteesFor(p);
-          const pool = compatible.length ? compatible : globalState.committees.filter((c) => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, p));
-          return [...pool].sort((a, b) => {
-            const aLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === a.id && x.status === 'in_queue').length;
-            const bLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === b.id && x.status === 'in_queue').length;
-            return aLoad - bLoad || a.averageSessionMinutes - b.averageSessionMinutes;
-          })[0]?.id;
-        })(),
+        queueNumber: decision.queueNumber,
+        originalQueueNumber: decision.originalQueueNumber,
+        queueOrderKey: decision.queueOrderKey,
+        assignedCommitteeId: decision.assignedCommitteeId,
         statusHistory: [
           ...p.statusHistory,
           {
