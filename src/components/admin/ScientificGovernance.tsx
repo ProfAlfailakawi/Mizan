@@ -14,6 +14,7 @@ import { auth } from '../../lib/firebase';
 import {OfficialQuranLibrary} from './OfficialQuranLibrary';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
 import {QuranIntelligenceHealthConsole} from './QuranIntelligenceHealthConsole';
+import { Metric } from '../design-system/Metric';
 
 type Tab='library'|'vault'|'qiraat'|'audio'|'ai'|'data'|'questions';
 export const ScientificGovernance:React.FC=()=>{
@@ -22,7 +23,7 @@ export const ScientificGovernance:React.FC=()=>{
  const pending=s.quranSourceManifests.filter(x=>x.certificationState==='PENDING_REVIEW').length;
  const tabs:[Tab,React.ComponentType<{className?:string}>,string][]=[['library',Database,ar?'مكتبة المجمع':'KFGQPC Library'],['vault',ShieldCheck,ar?'خزنة المصادر':'Source Vault'],['qiraat',GitBranch,ar?'القراءات':'Qiraat'],['audio',AudioLines,ar?'الصوت المرجعي':'Reference audio'],['ai',Microscope,ar?'قدرات الذكاء الاصطناعي':'AI capabilities'],['data',Database,ar?'الأدلة':'Evidence'],['questions',FileCheck2,ar?'الأسئلة':'Questions']];
  return <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-7 space-y-5">
-  <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4"><div className="flex items-start gap-4"><MizanPictogram kind="scientific-approval" size="lg" tone={pending?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'الحوكمة العلمية':'MIZAN SCIENTIFIC CORE'}</div><h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1">{ar?'المصدر قبل البرمجيات':'Source before software'}</h1><p className="text-xs text-[#636864] mt-2 max-w-2xl">{ar?'كل حرف رسمي يعود إلى مصدر ثابت ونسخة وهاش وموافقة علمية. وكل قدرة AI تُعتمد لنطاقها فقط.':'Every official character resolves to an immutable source, version, hash and scientific approval. Every AI capability is scoped independently.'}</p></div></div><div className="flex items-end gap-5"><Metric n={certified} label={ar?'معتمد':'CERTIFIED'}/><Metric n={pending} label={ar?'للمراجعة':'REVIEW'}/></div></header>
+  <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-4"><div className="flex items-start gap-4"><MizanPictogram kind="scientific-approval" size="lg" tone={pending?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'الحوكمة العلمية':'MIZAN SCIENTIFIC CORE'}</div><h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1">{ar?'المصدر قبل البرمجيات':'Source before software'}</h1><p className="text-xs text-[#636864] mt-2 max-w-2xl">{ar?'كل حرف رسمي يعود إلى مصدر ثابت ونسخة وهاش وموافقة علمية. وكل قدرة AI تُعتمد لنطاقها فقط.':'Every official character resolves to an immutable source, version, hash and scientific approval. Every AI capability is scoped independently.'}</p></div></div><div className="flex items-end gap-5"><Metric value={certified} label={ar?'معتمد':'CERTIFIED'} variant="inline"/><Metric value={pending} label={ar?'للمراجعة':'REVIEW'} variant="inline"/></div></header>
   <QuranIntelligenceHealthConsole ar={ar}/>
   <nav className="mizan-tabs" role="tablist">{tabs.map(([id,Icon,label])=><button key={id} onClick={()=>setTab(id)} className={`mizan-tab ${tab===id?'is-active':''}`}><Icon className="w-4 h-4"/>{label}</button>)}</nav>
   {tab==='library'&&<OfficialQuranLibrary/>}{tab==='vault'&&<Vault/>}{tab==='qiraat'&&<Qiraat/>}{tab==='audio'&&<ReferenceAudio/>}{tab==='ai'&&<AIRegistry/>}{tab==='data'&&<Evidence/>}{tab==='questions'&&<Questions/>}
@@ -90,7 +91,6 @@ const OfficialAuthorityPanel=({mode}:{mode:OfficialAuthorityMode})=>{
 const readingDisplay=(qiraah:string|undefined,rawi:string|undefined,ar:boolean)=>{const r=resolveReading({qiraah,rawi,riwaya:rawi});return r?`${qiraahLabel(r,ar)} · ${rawiLabel(r,ar)}`:[qiraah,rawi].filter(Boolean).join(' · ')};
 
 const CAPABILITIES:AICapability[]=['audio_quality','surah_alignment','ayah_alignment','word_alignment','quran_position','omission','insertion','substitution','repetition','restart','jump','hesitation','similar_verse_transition','phoneme_recognition','phoneme_substitution','phoneme_deletion','phoneme_insertion','makhraj','sifat','gemination','madd','madd_duration','ghunnah','ghunnah_duration','ikhfa','idgham','iqlab','izhar','qalqalah','tafkhim','tarqiq','waqf_pause_detection','waqf_classification','ibtida','pause_duration'];
-const Metric=({n,label}:{n:number;label:string})=><div className="text-end"><div className="text-3xl font-black tabular-nums">{n}</div><div className="text-[9px] font-black tracking-[.14em] text-[#656a66]">{label}</div></div>;
 const SmallMetric=({k,v}:{k:string;v?:number})=><div className="mizan-surface-soft p-2.5"><div className="text-[9px] font-black text-[#656b66]">{k}</div><div className="text-base font-black mt-1">{v===undefined?'—':v.toFixed(3)}</div></div>;
 
 const Empty=({kind,text}:{kind:MizanPictogramKind;text:string})=><div className="py-10 text-center"><MizanPictogram kind={kind} className="mx-auto"/><p className="text-xs text-[#656a66] mt-3 max-w-md mx-auto">{text}</p></div>;

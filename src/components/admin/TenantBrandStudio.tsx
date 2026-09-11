@@ -254,7 +254,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
             {customDomains.map(d => (
               <div key={d} className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E2DB] bg-[#FAFAF7] px-3 py-2">
                 <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[#2F6555] shrink-0" />{d}</span>
-                {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
+                {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
@@ -645,7 +645,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   value={logoUrl}
                   onChange={e => setLogoUrl(e.target.value)}
                   placeholder="https://example.org/brand/logo.svg"
-                  className="flex-1 rounded-xl border border-[#DFDED7] bg-[#FAF9F5] px-3 py-2 text-xs font-mono text-[#171b18] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#214C40]/20"
+                  className="mizan-input flex-1 text-xs font-mono"
                 />
                 <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DFDED7] bg-white hover:bg-[#FAF9F5] text-xs font-bold text-[#4a504c] shrink-0 transition">
                   <FileUp className="w-3.5 h-3.5 text-[#2F6555]" />

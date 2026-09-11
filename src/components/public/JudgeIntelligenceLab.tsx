@@ -7,6 +7,7 @@ import { classifyMadd } from '../../lib/mudood-engine';
 import { buildMutashabihatRadar } from '../../lib/mutashabihat-radar';
 import { analyzeCommitteeIntegrity, type ScoreEvent } from '../../lib/committee-integrity';
 import type { MutashabihatTrapRecord, QuestionPoolItem } from '../../types';
+import { Button } from '../design-system/Button';
 
 /*
  * Judge Intelligence Lab (venue mode).
@@ -56,7 +57,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <span style={{ color: GOLD }}>{ar ? 'الموضع الحالي:' : 'Current locus:'}</span>
         {[58, 12, 1].map(a => (
-          <button key={a} onClick={() => setAyah(a)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: a === ayah ? GOLD : 'rgba(232,203,147,.16)', color: a === ayah ? GOLD : '#f4f1e8' }}>{ar ? `البقرة ${a === 58 ? '٥٨' : a === 12 ? '(الأنعام ١٢)' : '١'}` : `2:${a}`}</button>
+          <button key={a} onClick={() => setAyah(a)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: a === ayah ? GOLD : 'rgba(232,203,147,.16)', color: a === ayah ? GOLD : '#f4f1e8' }}>{ar ? `البقرة ${a === 58 ? '٥٨' : a === 12 ? '(الأنعام ١٢)' : '١'}` : `2:${a}`}</button>
         ))}
       </div>
       <div className={card} style={cardStyle}>
@@ -65,7 +66,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
           <Pill ok={radar.competitorCount === 0}>{radar.competitorCount === 0 ? (ar ? 'لا تشابه' : 'no twins') : `${radar.competitorCount} ${ar ? 'مطابقة' : 'matches'}`}</Pill>
         </div>
         {radar.competitors.length === 0 ? (
-          <div className="text-[12.5px]" style={{ color: '#8b9a92' }}>{ar ? 'لا مواضع متشابهة معتمدة عند هذا الموضع.' : 'No approved twin loci at this position.'}</div>
+          <div className="text-[13px]" style={{ color: '#8b9a92' }}>{ar ? 'لا مواضع متشابهة معتمدة عند هذا الموضع.' : 'No approved twin loci at this position.'}</div>
         ) : (
           <div className="space-y-2">
             {radar.competitors.map((c, i) => (
@@ -75,7 +76,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
                   {c.reference && <span className="font-quran text-[15px]" style={{ color: 'rgba(244,241,232,.8)' }}>{c.reference}</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10.5px]" style={{ color: '#8b9a92' }}>{c.evidenceKind}</span>
+                  <span className="text-[11px]" style={{ color: '#8b9a92' }}>{c.evidenceKind}</span>
                   <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: 'rgba(244,241,232,.12)' }}>
                     <div className="h-full rounded-full" style={{ width: `${Math.round(c.score * 100)}%`, background: `linear-gradient(90deg,${EMER},${GOLD})` }} />
                   </div>
@@ -113,8 +114,8 @@ const ParityPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {ar ? 'القرعة تُثبت قابلية إعادة الإنتاج، لكن هل حمل كل متسابق نفس «الطاقة الذهنية»؟ يقيس هذا المؤشر مجموع الصعوبة (صعوبة + متشابهات + تجويد) ويُنبّه عند الفارق.' : 'FairDraw proves reproducibility — but do all sets carry the same cognitive energy? This measures total load (difficulty + mutashabihat + tajweed) and flags gaps.'}
       </p>
       <div className="flex items-center gap-2">
-        <button onClick={() => setBalanced(false)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: !balanced ? DANGER : 'rgba(232,203,147,.16)', color: !balanced ? DANGER : '#f4f1e8' }}>{ar ? 'قرعة متفاوتة' : 'Lopsided draw'}</button>
-        <button onClick={() => setBalanced(true)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: balanced ? GOLD : 'rgba(232,203,147,.16)', color: balanced ? GOLD : '#f4f1e8' }}>{ar ? 'قرعة متكافئة' : 'Balanced draw'}</button>
+        <button onClick={() => setBalanced(false)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: !balanced ? DANGER : 'rgba(232,203,147,.16)', color: !balanced ? DANGER : '#f4f1e8' }}>{ar ? 'قرعة متفاوتة' : 'Lopsided draw'}</button>
+        <button onClick={() => setBalanced(true)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: balanced ? GOLD : 'rgba(232,203,147,.16)', color: balanced ? GOLD : '#f4f1e8' }}>{ar ? 'قرعة متكافئة' : 'Balanced draw'}</button>
       </div>
       <div className={card} style={cardStyle}>
         <div className="mb-3 flex items-center justify-between">
@@ -194,8 +195,8 @@ const CommitteePanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {ar ? 'تشريح إحصائي بعد الجلسة — على مستوى اللجنة فقط، بلا ترتيب أي محكّم. يقيس تزامن الرصد وتكافؤ الخصم بين الوفود، كمؤشرات مراجعة للأمانة العامة.' : 'Post-session autopsy — at committee granularity only, never ranking a judge. Measures submission synchrony and regional evenness as review prompts.'}
       </p>
       <div className="flex items-center gap-2">
-        <button onClick={() => setSynced(true)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: synced ? DANGER : 'rgba(232,203,147,.16)', color: synced ? DANGER : '#f4f1e8' }}>{ar ? 'رصد متزامن + فارق مناطقي' : 'Synced + regional gap'}</button>
-        <button onClick={() => setSynced(false)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: !synced ? GOLD : 'rgba(232,203,147,.16)', color: !synced ? GOLD : '#f4f1e8' }}>{ar ? 'رصد مستقل ومتكافئ' : 'Independent + even'}</button>
+        <button onClick={() => setSynced(true)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: synced ? DANGER : 'rgba(232,203,147,.16)', color: synced ? DANGER : '#f4f1e8' }}>{ar ? 'رصد متزامن + فارق مناطقي' : 'Synced + regional gap'}</button>
+        <button onClick={() => setSynced(false)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: !synced ? GOLD : 'rgba(232,203,147,.16)', color: !synced ? GOLD : '#f4f1e8' }}>{ar ? 'رصد مستقل ومتكافئ' : 'Independent + even'}</button>
       </div>
       <div className={card} style={cardStyle}>
         <div className="grid grid-cols-2 gap-3">
@@ -344,16 +345,16 @@ export const JudgeIntelligenceLab: React.FC<{ onClose?: () => void }> = ({ onClo
           <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><ShieldCheck className="h-5 w-5" style={{ color: GOLD }} /></span>
           <div className="me-auto">
             <div className="font-black text-[16px]">{ar ? 'مختبر ذكاء التحكيم' : 'Judge Intelligence Lab'}</div>
-            <div className="text-[11px]" style={{ color: GOLD }}>{ar ? 'استشاري · لا يمسّ الدرجة · القرار للمحكم' : 'Advisory · never scores · the judge decides'}</div>
+            <div className="text-[11px] font-bold" style={{ color: GOLD }}>{ar ? 'استشاري · لا يمسّ الدرجة · القرار للمحكم' : 'Advisory · never scores · the judge decides'}</div>
           </div>
-          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-11 w-11 place-items-center rounded-[11px]" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
+          {onClose && <Button shape="square" variant="venue-gold" onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'}><X className="h-[18px] w-[18px]" /></Button>}
         </header>
 
         <div className="mb-4 flex flex-wrap gap-2">
           {tabs.map(t => {
             const Icon = t.icon; const active = t.id === tab;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[12.5px] font-bold transition"
+              <button key={t.id} onClick={() => setTab(t.id)} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-bold transition"
                 style={{ background: active ? 'rgba(232,203,147,.12)' : 'rgba(12,23,19,.5)', borderColor: active ? GOLD : 'rgba(232,203,147,.16)', color: active ? GOLD : '#f4f1e8' }}>
                 <Icon className="h-4 w-4" />{ar ? t.ar : t.en}
               </button>

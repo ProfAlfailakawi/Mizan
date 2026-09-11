@@ -63,7 +63,7 @@ const Capability: React.FC<{ icon: React.ElementType; title: string; line: strin
       <Icon size={20} strokeWidth={2.1} />
     </div>
     <div className="mt-4 text-[15px] font-black mizan-title">{title}</div>
-    <div className="mt-1.5 text-[12.5px] leading-6 mizan-muted">{line}</div>
+    <div className="mt-1.5 text-[13px] leading-6 mizan-muted">{line}</div>
   </div>
 );
 
@@ -230,7 +230,7 @@ export const MarketingSite: React.FC = () => {
               <a href="#tawasul" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black text-white" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>اطلب عرضًا تجريبيًّا</a>
               <a href="#kayf" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>كيف تعمل؟</a>
             </div>
-            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[11.5px] font-bold mizan-muted">
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[12px] font-bold mizan-muted">
               <span className="inline-flex items-center gap-1.5"><Check size={14} style={{ color: 'var(--emerald)' }} /> عربيةٌ أولًا</span>
               <span className="inline-flex items-center gap-1.5"><Check size={14} style={{ color: 'var(--emerald)' }} /> تعمل بلا إنترنت</span>
               <span className="inline-flex items-center gap-1.5"><Check size={14} style={{ color: 'var(--emerald)' }} /> نطاقٌ لكل جهة</span>
@@ -279,7 +279,7 @@ export const MarketingSite: React.FC = () => {
                 </div>
                 <div className="mt-4 font-display text-[12px] font-black" style={{ color: 'var(--gold)' }}>{s.step}</div>
                 <div className="mt-1 text-[15px] font-black mizan-title">{s.title}</div>
-                <div className="mt-1.5 text-[12.5px] leading-6 mizan-muted">{s.line}</div>
+                <div className="mt-1.5 text-[13px] leading-6 mizan-muted">{s.line}</div>
               </li>
             ))}
           </ol>
@@ -313,8 +313,8 @@ export const MarketingSite: React.FC = () => {
                 <img src={g.src} alt={g.t} loading="lazy" className="h-full w-full object-contain rounded-md" />
               </div>
               <figcaption className="p-5 flex-1">
-                <div className="text-[14.5px] font-black mizan-title">{g.t}</div>
-                <div className="text-[12.5px] leading-6 mizan-muted mt-1">{g.s}</div>
+                <div className="text-[15px] font-black mizan-title">{g.t}</div>
+                <div className="text-[13px] leading-6 mizan-muted mt-1">{g.s}</div>
               </figcaption>
             </figure>
           ))}
@@ -327,7 +327,7 @@ export const MarketingSite: React.FC = () => {
       <Section>
         <Kicker>ما الذي يختفي</Kicker>
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">الورق، والطوابير، وليلة الفرز</h2>
-        <p className="mt-4 text-[13.5px] leading-7 mizan-muted max-w-[56ch]">
+        <p className="mt-4 text-[14px] leading-7 mizan-muted max-w-[56ch]">
           ليست ثلاث محطات — بل المسابقة كلها. انقر فوق أي مرحلة لاستكشاف الفرق المباشر بالإنفوجرافيك.
         </p>
 
@@ -387,7 +387,7 @@ export const MarketingSite: React.FC = () => {
                 <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="w-full block" />
                 <figcaption className="p-5" style={{ borderTop: '1px solid var(--venue-line)' }}>
                   <div className="text-[14px] font-black">{c.t}</div>
-                  <div className="text-[12.5px] leading-6 mt-1.5" style={{ color: 'var(--venue-muted)' }}>{c.s}</div>
+                  <div className="text-[13px] leading-6 mt-1.5" style={{ color: 'var(--venue-muted)' }}>{c.s}</div>
                 </figcaption>
               </figure>
             ))}
@@ -412,7 +412,7 @@ export const MarketingSite: React.FC = () => {
                   <g.icon size={18} strokeWidth={2.1} />
                 </div>
                 <div className="mt-3.5 text-[14px] font-black">{g.t}</div>
-                <div className="text-[12.5px] leading-6 mt-1" style={{ color: 'var(--venue-muted)' }}>{g.s}</div>
+                <div className="text-[13px] leading-6 mt-1" style={{ color: 'var(--venue-muted)' }}>{g.s}</div>
               </div>
             ))}
           </div>
@@ -473,13 +473,13 @@ export const MarketingSite: React.FC = () => {
           <div>
             <Kicker>من نحن</Kicker>
             <h2 className="font-display text-[clamp(20px,2.8vw,28px)] font-black mt-2.5 mizan-title">إدارةٌ علمية تبني أداتها بنفسها</h2>
-            <p className="mt-3 text-[13.5px] leading-8 mizan-muted max-w-[62ch]">
+            <p className="mt-3 text-[14px] leading-8 mizan-muted max-w-[62ch]">
               ميزان ليست منتج شركةٍ عامة أُسقط على القرآن؛ بُنيت من داخل ميدان المسابقات القرآنية،
               بمرجعيةٍ علمية واحدة تعتمد النصّ والمقرر قبل أن تُفتح أي مسابقة.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               {['مرجعية علمية معتمدة', 'خصوصيةٌ ببيانات معزولة', 'دعمٌ عربي مباشر'].map(b => (
-                <span key={b} className="rounded-full px-3.5 py-1.5 text-[11.5px] font-black" style={{ background: 'var(--surface-soft)', border: '1px solid var(--line)', color: 'var(--ink)' }}>{b}</span>
+                <span key={b} className="rounded-full px-3.5 py-1.5 text-[12px] font-black" style={{ background: 'var(--surface-soft)', border: '1px solid var(--line)', color: 'var(--ink)' }}>{b}</span>
               ))}
             </div>
           </div>
@@ -496,7 +496,7 @@ export const MarketingSite: React.FC = () => {
               <p className="mt-4 text-[14px] leading-8 max-w-[42ch]" style={{ color: 'var(--venue-muted)' }}>
                 اسم جهتك وموعد مسابقتك يكفيان — ونُسلّمك نطاقك ولوحتك جاهزين.
               </p>
-              <div className="mt-7 grid gap-3 text-[12.5px] font-bold" style={{ color: 'var(--venue-faint)' }}>
+              <div className="mt-7 grid gap-3 text-[13px] font-bold" style={{ color: 'var(--venue-faint)' }}>
                 <span className="inline-flex items-center gap-2"><Gauge size={15} /> إطلاقٌ في اليوم نفسه</span>
                 <span className="inline-flex items-center gap-2"><ShieldCheck size={15} /> بياناتك ملكك، معزولةً عن غيرك</span>
                 <span className="inline-flex items-center gap-2"><Users size={15} /> بلا حدٍّ لعدد المتسابقين</span>
@@ -511,7 +511,7 @@ export const MarketingSite: React.FC = () => {
       </Section>
 
       <footer className="mizan-page !pt-2 !pb-10">
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 text-[11.5px] font-bold mizan-muted" style={{ borderTop: '1px solid var(--line)' }}>
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-6 text-[12px] font-bold mizan-muted" style={{ borderTop: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5"><MizanMark className="w-6 h-6" decorative /> ميزان — جميع الحقوق محفوظة</div>
           <a href="#tawasul" className="font-black" style={{ color: 'var(--emerald)' }}>تواصل معنا</a>
         </div>

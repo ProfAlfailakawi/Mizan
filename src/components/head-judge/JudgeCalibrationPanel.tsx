@@ -70,7 +70,7 @@ export const JudgeCalibrationPanel:React.FC<{judges:JudgeCalibrationRow[];scenar
     <div className="text-[9px] font-black text-[#59615c]">{ar?'سيناريو مقارنة — لا يُعتمد':'Comparison scenario — not applied'}</div>
     <div className="mt-2 space-y-1.5">
      {movers.slice(0,6).map(r=><div key={r.participantId} className="flex items-center justify-between gap-3 text-[10px]">
-      <span className="font-black text-[#2a312c] truncate">{r.participantId}</span>
+      <span className="font-black text-[#2a312c] truncate min-w-0">{r.participantId}</span>
       <span className="text-[#636864] tabular-nums shrink-0">
        {ar?'الفعلي':'actual'} {r.actualRank} → {ar?'المعياري':'normalized'} {r.normalizedRank}
       </span>

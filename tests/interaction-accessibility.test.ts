@@ -62,16 +62,21 @@ test('no button is named only by a title attribute', () => {
 });
 
 test('no interactive target is smaller than 44px', () => {
+  /*
+   * كان يفحص ترتيبًا واحدًا فقط (w- ثم h-)، فمرّ منه كل زرٍّ كُتب `h-9 w-9` أو `h-8 w-8` —
+   * ومنها زرّ التفاصيل في رصيف المصحف وأزرار البثّ، وقياسها الحقيقي في المتصفح 32×44 و36×36.
+   * الترتيبان يُفحصان الآن، والفحص محصور في الوسم التفاعلي نفسه لا في أيقونةٍ بداخله.
+   */
   const offenders: string[] = [];
   for (const file of files) {
     for (const tag of openingTags(fs.readFileSync(file, 'utf8'))) {
-      const m = tag.match(/\bw-(\d+)\s+h-(\d+)\b/);
-      if (m && (+m[1] < 11 || +m[2] < 11) && !/min-h/.test(tag)) {
-        offenders.push(`${path.basename(file)}: w-${m[1]} h-${m[2]}`);
-      }
+      if (!/^<(?:button|a)\b/.test(tag)) continue;
+      if (/min-h|min-w/.test(tag)) continue;
+      const m = tag.match(/\bw-(\d+)\s+h-(\d+)\b/) || tag.match(/\bh-(\d+)\s+w-(\d+)\b/);
+      if (m && (+m[1] < 11 || +m[2] < 11)) offenders.push(`${path.basename(file)}: ${m[0]}`);
     }
   }
-  assert.deepEqual(offenders, []);
+  assert.deepEqual(offenders, [], 'an icon button must be at least 44x44 (w-11 h-11)');
 });
 
 test('full-screen venue modes are dismissible and announce themselves', () => {
@@ -102,4 +107,25 @@ test('the shared dialog hook restores focus and traps Tab', () => {
 test('a clickable Card is a button, not a div', () => {
   const s = fs.readFileSync(path.join(root, 'src/components/design-system/Card.tsx'), 'utf8');
   assert.match(s, /if \(onClick\) return <button/, 'a card with onClick must be keyboard reachable');
+});
+
+test('no Button is hidden by a display class it cannot win against', () => {
+  /*
+   * `hidden` و`inline-flex` كلاهما أداةُ display، وترتيبُ ورقة الأنماط يحسم بينهما لا ترتيبُ
+   * الأصناف على العنصر. وقاعدةُ الزرّ المشترك تحمل `inline-flex`، فزرٌّ يُمرَّر إليه
+   * `className="hidden sm:..."` يظهر على الجوال رغم أمرنا بإخفائه — وقد دفع ترويسةَ التطبيق
+   * أربعة بكسلات خارج الشاشة عند عرض ٤٠٠. الإخفاء يكون بغلافٍ حوله، أو بعدم رسمه أصلًا.
+   */
+  const offenders: string[] = [];
+  for (const file of files) {
+    for (const tag of openingTags(fs.readFileSync(file, 'utf8'))) {
+      if (!/^<Button\b/.test(tag)) continue;
+      const m = tag.match(/className=(?:"([^"]*)"|\{`([^`]*)`\})/);
+      const cls = m ? (m[1] ?? m[2] ?? '') : '';
+      if (/\bhidden\b|\bblock\b|\bgrid\b|\bflex\b/.test(cls)) {
+        offenders.push(`${path.basename(file)}: ${cls.slice(0, 60)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'wrap the Button in a span to hide it, do not pass a display class to it');
 });

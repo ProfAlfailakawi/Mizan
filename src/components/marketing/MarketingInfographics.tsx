@@ -332,20 +332,16 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
           </h3>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10">
+        <div className="mizan-tabs mizan-tabs-dark" role="tablist">
           <button
             onClick={() => setActiveTab('isolation')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'isolation' ? 'bg-[#2F6555] text-white shadow' : 'text-[#A9B6AE] hover:text-white'
-            }`}
+            className={`mizan-tab ${activeTab === 'isolation' ? 'is-active' : ''}`}
           >
             نطاق وعزل الجهات
           </button>
           <button
             onClick={() => setActiveTab('chain')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'chain' ? 'bg-[#2F6555] text-white shadow' : 'text-[#A9B6AE] hover:text-white'
-            }`}
+            className={`mizan-tab ${activeTab === 'chain' ? 'is-active' : ''}`}
           >
             سلسلة النزاهة المتصلة
           </button>

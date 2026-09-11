@@ -138,7 +138,7 @@
 /* زرّا العدّاد دائرتان داخل الحقل: يتناغم مع القائمة المنسدلة وحقل النصّ في الصفّ نفسه
    بدل أن يبدو لوحةَ تحكّمٍ بجوار حقل. */
 .mizan-control { padding-inline:.4rem; }
-.mizan-step-btn{ width:34px; height:34px; flex:0 0 auto; border-radius:10px; display:grid; place-items:center; color:#4f5752; transition:background-color .15s ease, color .15s ease; }
+.mizan-step-btn{ width:44px; min-height:44px; align-self:stretch; flex:0 0 auto; border-radius:10px; display:grid; place-items:center; color:#4f5752; transition:background-color .15s ease, color .15s ease; }
 .mizan-step-btn:hover:not(:disabled){ background:#f1efe9; }
 .mizan-step-btn:disabled{ opacity:.28; }
 @media (prefers-reduced-motion:reduce){ .mizan-step-btn{ transition:none } }
@@ -669,6 +669,10 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-btn-danger:hover:not(:disabled){ background:#8d4038; }
 .mizan-btn-ghost{ background:transparent; color:#5c645f; }
 .mizan-btn-ghost:hover:not(:disabled){ background:#efede7; }
+.mizan-btn-venue{ background:var(--venue-surface); color:var(--venue-ink); border:1px solid var(--venue-line); }
+.mizan-btn-venue:hover:not(:disabled){ background:rgba(255,255,255,.10); }
+.mizan-btn-venue-gold{ background:rgba(244,241,232,.05); color:var(--venue-ink); border:1px solid rgba(232,203,147,.16); }
+.mizan-btn-venue-gold:hover:not(:disabled){ background:rgba(244,241,232,.10); border-color:rgba(232,203,147,.28); }
 .mizan-btn-gold{ background:var(--amber); color:#fff; box-shadow:var(--shadow-1); }
 .mizan-btn-gold:hover:not(:disabled){ background:#846237; }
 
@@ -681,6 +685,34 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-venue-deep{ background:var(--venue-deep); color:var(--venue-ink); }
 .mizan-venue-panel{ background:var(--venue-surface); border:1px solid var(--venue-line); border-radius:var(--radius-md); }
 .mizan-venue-muted{ color:var(--venue-muted); }
+/*
+ * أسطح القاعة لم يكن لها من نظام التصميم شيء.
+ *
+ * الحقلُ والشريطُ والملاحظةُ الاستشارية كلّها مكتوبة على الفاتح، فكلّ شاشةٍ داكنة —
+ * بوابة الحضور، لوحة الانتظار، قفل الجهاز، منصّة البثّ، صفحة الحفل — كانت تكتب
+ * هندستها ولونها بيدها: ‎bg-white/[.06]‎ هنا و‎bg-white/10‎ هناك و‎rgba(244,241,232,.05)‎
+ * في ثالثة. خمسة وعشرون موضعًا لا يمكن إصلاحها إلا بأن يكون لها في النظام مقابلٌ داكن.
+ *
+ * هذه هي: الارتفاع والقُطر نفساهما اللذان على الفاتح (‎--mizan-control-h‎)، واللون من
+ * رموز القاعة نفسها فيتبع تغييرها.
+ */
+.mizan-input-dark, .mizan-textarea-dark {
+  width:100%; border:1px solid var(--venue-line); border-radius:13px;
+  background:var(--venue-surface); color:var(--venue-ink); outline:none;
+}
+.mizan-input-dark { min-height:var(--mizan-control-h); padding:.65rem .8rem; }
+.mizan-textarea-dark { min-height:calc(var(--mizan-control-h) * 2.2); padding:.65rem .8rem; resize:vertical; line-height:1.7; }
+.mizan-input-dark::placeholder, .mizan-textarea-dark::placeholder { color:var(--venue-faint); }
+.mizan-input-dark:focus, .mizan-textarea-dark:focus { border-color:rgba(232,203,147,.45); box-shadow:0 0 0 3px rgba(232,203,147,.14); }
+.mizan-input-dark.mizan-input-icon-start { padding-inline-start:2.65rem; }
+
+.mizan-tabs-dark { background:rgba(255,255,255,.05); border-color:var(--venue-line); }
+.mizan-tabs-dark .mizan-tab { color:var(--venue-muted); }
+.mizan-tabs-dark .mizan-tab.is-active { background:rgba(232,203,147,.16); color:var(--venue-ink); box-shadow:inset 0 0 0 1px rgba(232,203,147,.30); }
+
+/* الضمانة نفسها بصوتٍ يُقرأ على الداكن: ذهبٌ هادئ بدل الأخضر الفاتح. */
+.mizan-advisory-dark { background:rgba(232,203,147,.08); border:1px solid rgba(232,203,147,.20); color:#e8cb93; }
+
 .mizan-venue-faint{ color:var(--venue-faint); }
 
 /* ═══════════════════════════════════════════════════════════════════════════

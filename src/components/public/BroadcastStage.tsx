@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, X, Radio } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
+import { Button } from '../design-system/Button';
 
 /*
  * Mizan · Spatial Broadcast Engine (venue mode).
@@ -122,14 +123,14 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           <span className="grid h-8 w-8 place-items-center rounded-[9px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><Radio className="h-4 w-4" style={{ color: gold }} /></span>
           <div className="flex flex-col leading-tight">
             <span className="font-black text-[15px]">{ar ? 'محرك البثّ الحجمي' : 'Spatial Broadcast Engine'}</span>
-            <span className="text-[10.5px]" style={{ color: gold }}>SHADOW · {ar ? 'لا يمسّ الدرجة' : 'never scores'}</span>
+            <span className="text-[11px] font-bold" style={{ color: gold }}>SHADOW · {ar ? 'لا يمسّ الدرجة' : 'never scores'}</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => { if (!playing && elapsed >= TOTAL) restart(); else setPlaying(p => !p); }} aria-label={playing ? (ar ? 'إيقاف مؤقت' : 'Pause') : elapsed >= TOTAL ? (ar ? 'إعادة التشغيل' : 'Replay') : (ar ? 'تشغيل' : 'Play')} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
-          <button onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><RotateCcw className="h-[18px] w-[18px]" /></button>
-          <button onClick={() => setLost(v => !v)} className="h-9 rounded-[11px] px-3 text-[12.5px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'تمرين فقد المحاذاة' : 'Alignment drill')}</button>
-          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
+          <button onClick={() => { if (!playing && elapsed >= TOTAL) restart(); else setPlaying(p => !p); }} aria-label={playing ? (ar ? 'إيقاف مؤقت' : 'Pause') : elapsed >= TOTAL ? (ar ? 'إعادة التشغيل' : 'Replay') : (ar ? 'تشغيل' : 'Play')} className="grid h-11 min-w-11 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
+          <Button shape="square" variant="venue-gold" onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'}><RotateCcw className="h-[18px] w-[18px]" /></Button>
+          <button onClick={() => setLost(v => !v)} className="h-11 rounded-[11px] px-3 text-[13px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'تمرين فقد المحاذاة' : 'Alignment drill')}</button>
+          {onClose && <Button shape="square" variant="venue-gold" onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'}><X className="h-[18px] w-[18px]" /></Button>}
         </div>
           <input type="range" min={0} max={1000} value={Math.round((elapsed / TOTAL) * 1000)} onChange={e => setElapsed((+e.target.value / 1000) * TOTAL)} aria-label={ar ? 'شريط الزمن' : 'Timeline'} className="sm:col-span-2 h-[7px] w-full cursor-pointer appearance-none rounded-full" style={{ background: `linear-gradient(90deg, ${goldDeep} ${(elapsed / TOTAL) * 100}%, rgba(244,241,232,.14) ${(elapsed / TOTAL) * 100}%)` }} />
       </div>
@@ -144,19 +145,19 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
             <span className="h-[9px] w-[9px] flex-none rounded-full" style={{ background: '#2f6555', boxShadow: '0 0 0 4px rgba(47,101,85,.25)' }} />
             <div className="flex flex-col leading-tight">
               <span className="text-[10px]" style={{ color: '#8b9a92' }}>{ar ? 'الرواية' : 'Reading'}</span>
-              <strong className="text-[13.5px] font-semibold" style={{ color: gold }}>{ar ? 'حفص عن عاصم' : 'Ḥafṣ ʿan ʿĀṣim'}</strong>
+              <strong className="text-[14px] font-semibold" style={{ color: gold }}>{ar ? 'حفص عن عاصم' : 'Ḥafṣ ʿan ʿĀṣim'}</strong>
             </div>
             {showReading && cur.reading && (
               <div className="ms-1 flex flex-col border-s ps-2.5 leading-tight" style={{ borderColor: 'rgba(232,203,147,.16)' }}>
-                <span className="text-[9.5px]" style={{ color: '#8b9a92' }}>{ar ? 'خصوصية الرواية' : 'Reading feature'}</span>
-                <strong className="text-[12.5px]" style={{ color: gold }}>{ar ? cur.reading.ar : cur.reading.en}</strong>
+                <span className="text-[10px]" style={{ color: '#8b9a92' }}>{ar ? 'خصوصية الرواية' : 'Reading feature'}</span>
+                <strong className="text-[13px]" style={{ color: gold }}>{ar ? cur.reading.ar : cur.reading.en}</strong>
               </div>
             )}
           </div>
           <div className="flex-1 rounded-[14px] border px-3 py-2.5" style={{ minWidth: 150, background: 'rgba(12,23,19,.6)', borderColor: 'rgba(232,203,147,.16)' }}>
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className="text-[13px] font-bold" style={{ color: lost ? danger : gold }}>{stateLabel}</span>
-              <span className="rounded-full border px-1.5 py-0.5 text-[9.5px]" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>{ar ? 'القرار للمحكم' : 'Judge decides'}</span>
+              <span className="rounded-full border px-1.5 py-0.5 text-[10px]" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>{ar ? 'القرار للمحكم' : 'Judge decides'}</span>
             </div>
             <div className="h-[5px] overflow-hidden rounded-full" style={{ background: 'rgba(244,241,232,.12)' }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(conf * 100)}%`, background: lost ? danger : `linear-gradient(90deg,#2f6555,${gold})` }} />
@@ -197,10 +198,10 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
             <div className="mx-auto flex max-w-[680px] items-center gap-3 rounded-[16px] border px-4 py-2.5" style={{ background: isLazim ? 'linear-gradient(180deg,rgba(197,106,95,.22),rgba(197,106,95,.08))' : 'linear-gradient(180deg,rgba(185,139,78,.22),rgba(185,139,78,.10))', borderColor: isLazim ? 'rgba(197,106,95,.5)' : 'rgba(232,203,147,.35)' }}>
               <div className="font-quran flex-none text-[28px] leading-none" style={{ color: isLazim ? '#eaa79c' : gold }}>{WAQF_GLYPH[cur.waqf.kind]}</div>
               <div className="flex flex-1 flex-col text-start leading-snug">
-                <span className="text-[14.5px] font-bold" style={{ color: isLazim ? '#eaa79c' : gold }}>{w.kind}</span>
+                <span className="text-[15px] font-bold" style={{ color: isLazim ? '#eaa79c' : gold }}>{w.kind}</span>
                 <span className="text-[12px]" style={{ color: '#f4f1e8', opacity: .9 }}>{w.desc}</span>
               </div>
-              <div className="whitespace-nowrap text-[9.5px]" style={{ color: '#8b9a92' }}>{ar ? 'علامات الوقف · مصدر رسمي' : 'Waqf marks · official source'}</div>
+              <div className="whitespace-nowrap text-[10px]" style={{ color: '#8b9a92' }}>{ar ? 'علامات الوقف · مصدر رسمي' : 'Waqf marks · official source'}</div>
             </div>
           );
         })()}
@@ -218,7 +219,7 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
         </div>
       </div>
 
-      <p className="w-full max-w-[1180px] border-t pt-3.5 text-[11.5px] leading-relaxed" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>
+      <p className="w-full max-w-[1180px] border-t pt-3.5 text-[12px] leading-relaxed" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>
         {ar
           ? 'عرض توضيحي بيانياً. في التشغيل الرسمي يُحمَّل نصّ المصحف وعلامات الوقف من حزمة مصدر معتمدة (KFGQPC)، والمحاذاة الصوتية تعمل في وضع الظل ولا تغيّر أي درجة إطلاقاً.'
           : 'Illustrative visualization. In production the Muṣḥaf text and waqf marks load from a certified KFGQPC source package, and audio alignment runs in shadow mode — it never changes any score.'}

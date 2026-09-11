@@ -4,6 +4,9 @@ import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityF
 import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
+import { decideArrival, findByIdOrCode } from './arrival-core';
+import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
+import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
 import {
   User,
@@ -265,6 +268,8 @@ let globalState = getInitialState();
 const storedCompetitionName = (english: boolean) => bilingualName(globalState.competition, !english) || globalState.competition.id;
 
 const QURAN_JUZ_TOTAL = 30;
+const PENDING_CLOUD_KEY = 'mizan_pending_cloud_v1';
+const MAX_PENDING_BYTES = 2_000_000;
 function markCompetitionConfigChanged(){
   const now=new Date().toISOString();
   globalState.competitionConfigUpdatedAt=now;
@@ -292,14 +297,9 @@ function breakTie(a: ResultRecord, b: ResultRecord, rules: RuleSet['tieBreakRule
 // more advanced — sealed/published are authoritative and must never regress to 'calculated'.
 const RESULT_STATUS_RANK: Record<ResultRecord['status'], number> = { calculated: 0, quality_checked: 1, approved: 2, sealed: 3, published: 4 };
 function mergeResultsByAuthority(local: ResultRecord[], remote: ResultRecord[]): ResultRecord[] {
-  const byId = new Map<string, ResultRecord>();
-  for (const r of local) byId.set(r.id, r);
-  for (const r of remote) {
-    const current = byId.get(r.id);
-    if (!current) { byId.set(r.id, r); continue; }
-    byId.set(r.id, (RESULT_STATUS_RANK[r.status] ?? 0) >= (RESULT_STATUS_RANK[current.status] ?? 0) ? r : current);
-  }
-  return [...byId.values()];
+  /* السلطة أولًا: المختوم لا يتراجع. والحارس المحليّ لا يعمل إلا عند تساوي الرتبة، وإلا
+     لحُبست نتيجةٌ ختمها الخادم خلف مسوّدةٍ على جهاز. */
+  return mergeRankedFromCloud(local, remote, RESULT_STATUS_RANK, (rowId) => rowHasPendingWrite('results', rowId));
 }
 // Union judge submissions by (sessionId, judgeId); a locked submission always wins over an unlocked one.
 function mergeJudgeSubmissions(local: JudgeSubmission[], remote: JudgeSubmission[]): JudgeSubmission[] {
@@ -332,10 +332,83 @@ const judgeCanScoreCriterion=(judge:JudgeProfile|undefined|null,assigned?:string
  * دمج غير مُفقِد بالمعرّف: السحابة تُضيف ما لا نملكه وتحدّث ما نملكه، ولا تحذف سجلًا محليًا
  * لم يصل الخادم بعد (جهاز كان بلا شبكة). الحذف عملية صريحة لا أثرٌ جانبي لمزامنة.
  */
-function mergeById<T extends { id: string }>(local: T[], remote: T[]): T[] {
-  const byId = new Map<string, T>(local.map((x) => [x.id, x]));
-  for (const row of remote) if (row && typeof row.id === 'string') byId.set(row.id, { ...(byId.get(row.id) || {} as T), ...row });
-  return [...byId.values()];
+/*
+ * سجلّ ما لم يصل السحابة بعد.
+ *
+ * الأصل هو السحابة: كل صفٍّ يأتي منها يغلب النسخة المحلية. والاستثناء الوحيد صفٌّ غيّره
+ * هذا الجهاز ولم يصل بعد — فلو غلبته السحابة لمُحي التغيير من الشاشة قبل أن يُرفع، ولضاع.
+ * فيُحفظ هنا بحمولته ووقت تغييره، ويُحمى من الكتابة فوقه حتى يُرفع أو تثبت أسبقية السحابة.
+ */
+/*
+ * السجلّ وقواعد السلطة تعيش في `cloud-authority` نقيّةً بلا فايرستور ولا حالةٍ عامّة،
+ * لتُختبر بتشغيلها لا بقراءتها: اختبارها يُنشئ جهازين حقيقيين ويحاكي القاعة. وما هنا
+ * توصيلٌ لتلك القواعد بحالة التطبيق — لا نسخةٌ ثانية منها.
+ */
+const pendingRegister = PendingRegister.deserialize((() => {
+  try { return localStorage.getItem(PENDING_CLOUD_KEY); } catch { return null; }
+})());
+const pendingScope = (): PendingScope => ({ organizationId: globalState.competition.organizationId, competitionId: globalState.competition.id });
+
+/*
+ * السجلّ يعيش عبر إعادة التحميل.
+ *
+ * صار اللحاق يرفع المعلَّق وحده، فلو ضاع السجلّ بإغلاق التبويب لضاع معه ما لم يُرفع إلى
+ * الأبد — وهذا بالضبط حال محكّمٍ رصد درجاته بلا شبكة ثم أغلق الجهاز.
+ */
+let pendingPersistTimer: ReturnType<typeof setTimeout> | null = null;
+function savePendingRegister() {
+  if (pendingPersistTimer) clearTimeout(pendingPersistTimer);
+  pendingPersistTimer = setTimeout(() => {
+    try {
+      const payload = pendingRegister.serialize();
+      /* أكبر من أن يُخزَّن؟ يبقى في الذاكرة ويُرفع في هذه الجلسة؛ الأسوأ ألّا يُخزَّن شيء. */
+      if (payload.length <= MAX_PENDING_BYTES) localStorage.setItem(PENDING_CLOUD_KEY, payload);
+    } catch { /* متصفح يمنع التخزين، أو حصّة ممتلئة */ }
+  }, 200);
+}
+
+/*
+ * ما لا يُعلَّق.
+ *
+ * سجلّ التدقيق له طريق ديمومةٍ خاصّ به: صندوقٌ صادرٌ دائم إلى سجلّ الخادم الملحَق يعيد
+ * المحاولة وحده. فتعليقه هنا تكرارٌ يملأ تخزين المتصفح بآلاف الأحداث، ويزاحم لقطةَ
+ * الحالة على الحصّة. ووضعُ العرض المحليّ لا سحابة له أصلًا: ما لم تقم جلسةٌ سحابية قطّ
+ * فلا معلَّق يُنتظَر رفعه. أمّا من دخل ثم انقطع — وهو حال المحكّم في القاعة — فهذا بالضبط
+ * ما وُجد السجلّ له.
+ */
+const PENDING_EXEMPT_COLLECTIONS = new Set(['audit']);
+function shouldRegisterPending(collection: string) {
+  if (PENDING_EXEMPT_COLLECTIONS.has(collection)) return false;
+  noteCloudSessionState();
+  return !!auth.currentUser || cloudSessionEverEstablished;
+}
+
+function markPendingWrite(collection: string, id: string, data: Record<string, unknown>) {
+  if (!shouldRegisterPending(collection)) return;
+  pendingRegister.markWrite(pendingScope(), collection, id, data);
+  savePendingRegister();
+}
+function clearPendingWrite(collection: string, id: string) {
+  if (pendingRegister.clearWrite(pendingScope(), collection, id)) savePendingRegister();
+}
+function markPendingDelete(collection: string, id: string) {
+  if (!shouldRegisterPending(collection)) return;
+  pendingRegister.markDelete(pendingScope(), collection, id);
+  savePendingRegister();
+}
+function clearPendingDelete(collection: string, id: string) {
+  if (pendingRegister.clearDelete(pendingScope(), collection, id)) savePendingRegister();
+}
+const rowHasPendingWrite = (collection: string, rowId: string) => pendingRegister.rowHasWrite(pendingScope(), collection, rowId);
+const rowHasPendingDelete = (collection: string, rowId: string) => pendingRegister.rowHasDelete(pendingScope(), collection, rowId);
+export function pendingCloudWriteCount() { return pendingRegister.size; }
+
+/* الدمج الوارد بقواعده الخالصة؛ الغلاف هنا يمرّر حارسي المعلَّق لهذه المجموعة وحدها. */
+function mergeById<T extends { id: string }>(local: T[], remote: T[], collection?: string): T[] {
+  return mergeRowsFromCloud(local, remote, collection ? {
+    isPendingWrite: (rowId: string) => rowHasPendingWrite(collection, rowId),
+    isPendingDelete: (rowId: string) => rowHasPendingDelete(collection, rowId),
+  } : undefined);
 }
 
 const listeners = new Set<() => void>();
@@ -349,10 +422,12 @@ let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
  * يجعل عمل المحكّم يبدو محفوظًا وهو ليس كذلك. وأي فشل يُرفَع إلى حالة ظاهرة لا إلى سجلّ الطرفية.
  */
 async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
+  /* لا يُعلَّق ما لا يملك هذا الدور كتابته أصلًا: لن يُرفع أبدًا، فتعليقه حَبْسٌ بلا فائدة. */
+  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
+  markPendingWrite(collectionName,id,data);
   if(cloudSessionLost()){reportLostCloudSession(collectionName);return false;}
   if(globalState.isOffline||!auth.currentUser)return false;
-  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
-  if(exceedsSafeDocumentSize(data)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE',`${collectionName}/${id}`);return false;}
+  if(exceedsSafeDocumentSize(data)){clearPendingWrite(collectionName,id);reportCloudError('CLOUD_PAYLOAD_TOO_LARGE',`${collectionName}/${id}`);return false;}
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
     /* الحقول المشتقّة محليًا لا تُرفع: الخادم مصدرها الحقيقي ولا يُكتب فوقه بمشتقّ ناقص. */
@@ -369,6 +444,7 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
       await auth.currentUser.getIdToken(true);
       await write();
     }
+    clearPendingWrite(collectionName,id);
     resolveCloudScope(collectionName);
     return true;
   }catch(err){console.error('MIZAN cloud write denied',{path:`${collectionName}/${id}`,error:err instanceof Error?err.message:String(err)});reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
@@ -397,12 +473,15 @@ function refreshAuthTokenOnce(){const now=Date.now();if(now-lastAuthTokenRefresh
 
 
 async function deleteScopedDocument(collectionName:string,id:string){
+  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
+  /* حذفٌ لم يصل السحابة يبقى مُعلَّقًا: وإلا أعاد المستمعُ المحذوفَ إلى الشاشة عند أول لقطة. */
+  markPendingDelete(collectionName,id);
   if(cloudSessionLost()){reportLostCloudSession(collectionName);return false;}
   if(globalState.isOffline||!auth.currentUser)return false;
-  if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
   try{
     const {db,doc,deleteDoc}=await getFirestoreClient();
     await deleteDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id));
+    clearPendingDelete(collectionName,id);
     resolveCloudScope(collectionName);
     return true;
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
@@ -498,24 +577,39 @@ function clearCloudError(){failingCloudScopes.clear();globalState.persistenceErr
  * لحاق: يرفع ما يملكه هذا الدور ولم يصل الخادم بعد (جهاز عاد من انقطاع).
  * الأسماء والمعرّفات هي نفسها التي تكتبها مواضع الفعل، فلا يتولّد مستند مكرّر للسجل الواحد.
  */
+/*
+ * لحاقٌ يرفع ما لم يصل السحابة — وما لم يصلها وحده.
+ *
+ * كان يرفع **كل** ما يملكه الدور في كل مزامنة (كل إشعارٍ، كل ثانية). وهذا يقلب الأصل:
+ * جهازٌ لم يمسّ سجلًّا قطّ يكتب نسخته القديمة منه فوق نسخة السحابة الأحدث التي كتبها
+ * جهازٌ آخر قبل لحظة — فيُمحى عمل زميلٍ بلا سبب. والأسوأ جهازٌ عاد من انقطاعِ ساعة:
+ * يرفع عالَمه كلّه عمرَ ساعة فوق الحاضر.
+ *
+ * الآن لا يُرفع إلا صفٌّ غيّره هذا الجهاز فعلًا ولم يصل. وقبل رفعه يُسأل الأصل: إن كانت
+ * نسخة السحابة أحدث من تغييرنا فقد سبقنا إليها غيرنا، فتُترك ويُسقَط المعلَّق — الأصل
+ * السحابي يغلب، ولا يُكتب فوقه بما هو أقدم منه.
+ */
 async function persistOwnedRecords(){
-  const role=globalState.currentUser.role,compId=globalState.competition.id;
-  const mine=<T extends {competitionId?:string}>(rows:T[])=>rows.filter(r=>!r.competitionId||r.competitionId===compId);
-  if(canWriteSyncedCollection(role,'judge_submissions'))
-    for(const x of mine(globalState.judgeSubmissions as any[]))
-      await persistScopedDocument('judge_submissions',`${x.sessionId}_${x.judgeId}`,x);
-  if(canWriteSyncedCollection(role,'results'))
-    for(const x of mine(globalState.results as any[])) await persistScopedDocument('results',x.id,x);
-  if(canWriteSyncedCollection(role,'participants'))
-    for(const x of mine(globalState.participants as any[])) await persistScopedDocument('participants',x.id,x);
-  if(canWriteSyncedCollection(role,'committees'))
-    for(const x of mine(globalState.committees as any[])) await persistScopedDocument('committees',x.id,x);
-  if(canWriteSyncedCollection(role,'appeals'))
-    for(const x of mine(globalState.appeals as any[])) await persistScopedDocument('appeals',x.id,x);
-  if(canWriteSyncedCollection(role,'certificates'))
-    for(const x of mine(globalState.certificates as any[])) await persistScopedDocument('certificates',x.id,x);
-  if(canWriteSyncedCollection(role,'reviews'))
-    for(const x of mine(globalState.reviewCases as any[])) await persistScopedDocument('reviews',x.id,x);
+  if(globalState.isOffline||!auth.currentUser)return;
+  const {db,doc,getDoc}=await getFirestoreClient();
+  const scopedDoc=(collection:string,id:string)=>doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collection,id);
+
+  /* معلَّقٌ من مسابقةٍ أخرى يُترك حتى تُفتح مسابقته: مساره ليس المسار المفتوح الآن. */
+  const scope=pendingScope();
+  for(const entry of pendingRegister.listDeletes()){ if(!sameScope(entry,scope))continue; await deleteScopedDocument(entry.collection,entry.id); }
+
+  for(const entry of pendingRegister.listWrites()){
+    let cloudUpdatedAt=0;
+    if(sameScope(entry,scope)) try{
+      const snap=await getDoc(scopedDoc(entry.collection,entry.id));
+      const raw=snap.exists()?(snap.data() as {updatedAt?:unknown}).updatedAt:undefined;
+      if(typeof raw==='string')cloudUpdatedAt=Date.parse(raw)||0;
+    }catch{ /* تعذّرت القراءة: القاعدة تقرّر الرفع، وفشله يُبقي المعلَّق كما هو. */ }
+    const verdict=decideUpload(entry,{scope,canWrite:(c)=>canWriteSyncedCollection(globalState.currentUser.role,c),cloudUpdatedAt});
+    if(verdict==='skip-other-competition')continue;
+    if(verdict!=='upload'){clearPendingWrite(entry.collection,entry.id);continue;}
+    await persistScopedDocument(entry.collection,entry.id,entry.data);
+  }
 }
 
 
@@ -555,8 +649,10 @@ function syncToFirestore() {
   if (firestoreSyncTimeout) clearTimeout(firestoreSyncTimeout);
   firestoreSyncTimeout = setTimeout(async () => {
     // كل دور يرفع ما يملكه؛ لم يعد جهاز الإدارة نقطة العبور الوحيدة.
-    await persistOwnedRecords();
-    await syncPublicJourneys();
+    try { await persistOwnedRecords(); }
+    catch (err) { console.error('MIZAN pending upload flush failed', err); reportCloudError(classifyCloudError(err), 'competition'); }
+    try { await syncPublicJourneys(); }
+    catch (err) { console.error('MIZAN journey sync failed', err); }
     if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
     try {
       const { db, doc, setDoc } = await getFirestoreClient();
@@ -570,6 +666,19 @@ function syncToFirestore() {
         updatedAt,
       };
       if (exceedsSafeDocumentSize(configuration)) { reportCloudError('CLOUD_PAYLOAD_TOO_LARGE', 'competition'); return; }
+      /*
+       * لا يُكتب فوق الأصل بما هو أقدم منه. المستمع يتبنّى نسخة السحابة حين تكون أحدث ويأخذ
+       * وقتها، فتتساوى الطوابع ويمضي الرفع. أما إن سبقتنا السحابة بين قراءتنا وكتابتنا —
+       * جهاز إدارةٍ آخر عدّل الآن — فالكتابة تُترك ويُترك للمستمع أن يوفّق بيننا.
+       */
+      const { getDoc } = await getFirestoreClient();
+      try {
+        const currentSnap = await getDoc(docRef);
+        const currentRaw = currentSnap.exists() ? (currentSnap.data() as { updatedAt?: unknown }).updatedAt : undefined;
+        const cloudUpdatedAt = typeof currentRaw === 'string' ? (Date.parse(currentRaw) || 0) : 0;
+        const localUpdatedAt = Date.parse(updatedAt) || 0;
+        if (!configWriteAllowed(cloudUpdatedAt, localUpdatedAt)) { resolveCloudScope('competition'); return; }
+      } catch { /* تعذّرت القراءة: نمضي إلى الكتابة، وفشلها يُبلَّغ كعادته. */ }
       await setDoc(docRef, configuration, { merge: true });
       // النسخة العامة لا تُنشأ للمسودات. نشرُها مرتبط بحالة مسابقة حقيقية لا بوجود شاشة في الكود.
       // نبقي completed منشورة لصفحة «انتهت المسابقة» والتحقق العام، لكن التسجيل/الرحلة يُغلقان.
@@ -671,6 +780,9 @@ export function useAppStore() {
     let cancelled = false;
     try {
       if (!auth.currentUser) return () => { listeners.delete(listener); };
+      /* عملٌ نجا من إغلاق التبويب بلا شبكة يُستأنف رفعه فور توفّر جلسة سحابية، لا عند
+         أوّل تغييرٍ يصادف أن يحدث بعده. */
+      if (pendingCloudWriteCount() > 0) syncToFirestore();
       void getFirestoreClient().then((fs) => {
       if (cancelled) return;
       const { db, doc, onSnapshot, collection: collectionFn } = fs;
@@ -705,12 +817,12 @@ export function useAppStore() {
         };
         watch('results', rows => { globalState.results = mergeResultsByAuthority(globalState.results, rows as ResultRecord[]); });
         watch('judge_submissions', rows => { globalState.judgeSubmissions = mergeJudgeSubmissions(globalState.judgeSubmissions, rows as JudgeSubmission[]); });
-        watch('participants', rows => { globalState.participants = mergeById(globalState.participants, rows); });
-        watch('committees', rows => { globalState.committees = mergeById(globalState.committees, rows); });
-        watch('certificates', rows => { globalState.certificates = mergeById(globalState.certificates, rows); });
-        watch('reviews', rows => { globalState.reviewCases = mergeById(globalState.reviewCases, rows); });
-        watch('appeals', rows => { globalState.appeals = mergeById(globalState.appeals, rows); });
-        watch('support_sessions', rows => { globalState.supportSessions = mergeById(globalState.supportSessions, rows); });
+        watch('participants', rows => { globalState.participants = mergeById(globalState.participants, rows, 'participants'); });
+        watch('committees', rows => { globalState.committees = mergeById(globalState.committees, rows, 'committees'); });
+        watch('certificates', rows => { globalState.certificates = mergeById(globalState.certificates, rows, 'certificates'); });
+        watch('reviews', rows => { globalState.reviewCases = mergeById(globalState.reviewCases, rows, 'reviews'); });
+        watch('appeals', rows => { globalState.appeals = mergeById(globalState.appeals, rows, 'appeals'); });
+        watch('support_sessions', rows => { globalState.supportSessions = mergeById(globalState.supportSessions, rows, 'support_sessions'); });
       }
       // A late unmount that raced the import still gets cleaned up here.
       if (cancelled) { unsubscribers.forEach(u => u()); unsubscribers.length = 0; }
@@ -824,16 +936,23 @@ export function useAppStore() {
 
   // Check-In Kiosk & Exceptions
   const checkInParticipant = (participantIdOrCode: string, method: 'kiosk_qr' | 'mobile_self' | 'exception_host' = 'kiosk_qr') => {
-    const pIndex = globalState.participants.findIndex(
-      (p) => p.id === participantIdOrCode || p.code.toLowerCase() === participantIdOrCode.toLowerCase()
-    );
+    /* القرار في `arrival-core` نقيًّا ومُختبَرًا بالتشغيل؛ وما هنا أثرُه: السجلّ والحفظ وتاريخ الحالة. */
+    const found = findByIdOrCode(globalState.participants, participantIdOrCode);
+    const pIndex = found ? globalState.participants.findIndex(x => x.id === found.id) : -1;
+    const decision = decideArrival({
+      participant: found,
+      roster: globalState.participants,
+      competitionId: globalState.competition.id,
+      eligibleCommittees: found ? compatibleCommitteesFor(found) : [],
+      fallbackCommittees: found
+        ? globalState.committees.filter(c => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, found))
+        : [],
+    });
 
     if (pIndex !== -1) {
       const p = globalState.participants[pIndex];
-      if (p.competitionId !== globalState.competition.id) return null;
-      // Idempotent arrival: a duplicate scan (including a photo of the same QR at another gate)
-      // must never allocate a second queue position or rewind an already-started journey.
-      if (['in_queue','in_session','tested','certified'].includes(p.status) || (p.checkedInAt && p.originalQueueNumber)) {
+      if (decision.kind === 'other-competition') return null;
+      if (decision.kind === 'duplicate') {
         auditTrustAction(
           'DUPLICATE_CHECKIN_IGNORED',
           'Participant',
@@ -843,23 +962,16 @@ export function useAppStore() {
         );
         return p;
       }
+      if (decision.kind !== 'admit') return p;
       const updated: Participant = {
         ...p,
         status: 'in_queue',
         checkedInAt: new Date().toISOString(),
         checkInMethod: method,
-        queueNumber: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.originalQueueNumber||x.queueNumber||0)) + 1,
-        originalQueueNumber: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.originalQueueNumber||x.queueNumber||0)) + 1,
-        queueOrderKey: Math.max(0,...globalState.participants.filter((x) => x.competitionId === globalState.competition.id).map(x=>x.queueOrderKey||x.originalQueueNumber||x.queueNumber||0)) + 1,
-        assignedCommitteeId: p.assignedCommitteeId || (() => {
-          const compatible = compatibleCommitteesFor(p);
-          const pool = compatible.length ? compatible : globalState.committees.filter((c) => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, p));
-          return [...pool].sort((a, b) => {
-            const aLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === a.id && x.status === 'in_queue').length;
-            const bLoad = globalState.participants.filter(x => x.competitionId === globalState.competition.id && x.assignedCommitteeId === b.id && x.status === 'in_queue').length;
-            return aLoad - bLoad || a.averageSessionMinutes - b.averageSessionMinutes;
-          })[0]?.id;
-        })(),
+        queueNumber: decision.queueNumber,
+        originalQueueNumber: decision.originalQueueNumber,
+        queueOrderKey: decision.queueOrderKey,
+        assignedCommitteeId: decision.assignedCommitteeId,
         statusHistory: [
           ...p.statusHistory,
           {
@@ -1912,20 +2024,28 @@ export function useAppStore() {
 
   const startSessionForParticipant = async (participantId: string) => {
     const participant = globalState.participants.find(p => p.id === participantId);
-    if (!participant) return false;
-    const assigned = globalState.committees.find(c => c.id === participant.assignedCommitteeId && !committeeHasHardConflict(c, participant));
-    const committee = assigned || compatibleCommitteesFor(participant)[0];
-    if (!committee) {
+    /* القراران في `session-start-core` مُختبَرين بالتشغيل؛ وما هنا أثرهما. */
+    const assignedCommittee = participant ? globalState.committees.find(c => c.id === participant.assignedCommitteeId) : undefined;
+    const choice = chooseSessionCommittee({
+      participant,
+      assignedCommittee,
+      assignedHasHardConflict: !!(assignedCommittee && participant && committeeHasHardConflict(assignedCommittee, participant)),
+      compatibleCommittees: participant ? compatibleCommitteesFor(participant) : [],
+    });
+    if (choice.kind === 'no-participant' || !participant) return false;
+    if (choice.kind === 'no-safe-committee') {
       createIncident('conflict_routing', 'No conflict-free committee', `Participant ${participant.code} needs a manual conflict-safe committee assignment.`, 'critical');
       return false;
     }
+    const committee = choice.committee;
     const policy = getCompetitionPolicy(globalState.competition);
-    if (!policy.frozenAt) {
-      const now = new Date().toISOString();
-      const frozenPolicy = { ...policy, frozenAt: now, updatedAt: now };
-      const frozenRuleSet = { ...globalState.competition.ruleSet, frozenAt: now };
-      globalState.competition = { ...globalState.competition, policy: frozenPolicy, ruleSet: frozenRuleSet, ruleSets: [frozenRuleSet, ...(globalState.competition.ruleSets || []).filter(r => r.id !== frozenRuleSet.id)] };
-    }
+    const frozen = freezeRulesOnce({
+      policy,
+      ruleSet: globalState.competition.ruleSet,
+      ruleSets: globalState.competition.ruleSets,
+      now: new Date().toISOString(),
+    });
+    if (frozen) globalState.competition = { ...globalState.competition, policy: frozen.policy, ruleSet: frozen.ruleSet, ruleSets: frozen.ruleSets };
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const reading=resolveReading({riwaya:participant.riwaya});
     if(productionMode){
@@ -2356,7 +2476,15 @@ export function useAppStore() {
 
 
   const getQueueEstimate=(participantId:string)=>{
-    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);if(!p||p.status!=='in_queue')return null;const c=globalState.committees.find(x=>x.id===p.assignedCommitteeId);if(!c)return null;const queue=globalState.participants.filter(x=>x.status==='in_queue'&&x.assignedCommitteeId===c.id).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b));const index=Math.max(0,queue.findIndex(x=>x.id===p.id));const avg=Math.max(2,c.averageSessionMinutes||globalState.competition.ruleSet.questionDurationMinutes||8);const activeCarry=c.status==='testing'?avg*.55:0;const pauseCarry=c.status==='paused'?avg:0;const estimatedWaitMinutes=Math.max(1,Math.round(index*avg+activeCarry+pauseCarry));const expectedTurnAt=new Date(Date.now()+estimatedWaitMinutes*60000).toISOString();return {ahead:index,estimatedWaitMinutes,expectedTurnAt,committeeId:c.id,committeeCode:c.code,basis:{currentCompetitionAverageMinutes:avg,activeSession:c.status==='testing',paused:c.status==='paused',queueSize:queue.length},confidence:index<=2?'medium' as const:'low' as const};
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);
+    const c=p?globalState.committees.find(x=>x.id===p.assignedCommitteeId):undefined;
+    return estimateQueueWait({
+      participant:p,
+      committee:c,
+      committeeQueueInOrder:c?globalState.participants.filter(x=>x.status==='in_queue'&&x.assignedCommitteeId===c.id).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)):[],
+      fallbackSessionMinutes:globalState.competition.ruleSet.questionDurationMinutes,
+      now:Date.now(),
+    });
   };
 
   // ---- MIZAN Beyond 8 ------------------------------------------------------------------
