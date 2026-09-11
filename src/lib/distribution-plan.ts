@@ -36,9 +36,24 @@ export interface DistributionConstraints {
   maxQueueDepth?: number;
   /** دورات التبديل بعد التوزيع الجشع. اثنتان تكفيان عمليًا؛ صفرٌ يُعطّل التحسين. */
   improvementPasses?: number;
+  /**
+   * السماح بلجنةٍ لا تحكم فئته حين لا تبقى لجنةٌ مؤهَّلة.
+   *
+   * مغلقٌ افتراضًا. وبدونه كان مَن لا لجنة لفئته يسقط في `unassigned` دائمًا — وهو حالٌ
+   * لا تصل إليه «عدالة الطابور» أصلًا لأنها تحتاج لجنةَ مصدر وهو بلا لجنة. فكانت حالةٌ
+   * تُعلَن على الشاشة ولا تملك المنصّة أداةً تعالجها.
+   */
+  allowCategoryException?: boolean;
 }
 
-export type RelaxedConstraint = 'DELEGATION_SHARE_CAP' | 'MAX_QUEUE_DEPTH';
+/**
+ * `CATEGORY_ELIGIBILITY` ليس كأخويه.
+ *
+ * الأوّلان قيدا عدالةٍ تفضيليّان يُخفَّفان تلقائيًا حين لا يبقى بديل. وهذا **أهليةٌ صلبة**
+ * لا تُخفَّف إلا بطلبٍ صريح من مسؤول: لجنةٌ لا تحكم فئته تستقبله استثناءً حين تتعطّل
+ * لجان فئته كلها. وأسئلته تبقى أسئلة فئته هو، وتُوسَم حالته فتعلم اللجنة.
+ */
+export type RelaxedConstraint = 'DELEGATION_SHARE_CAP' | 'MAX_QUEUE_DEPTH' | 'CATEGORY_ELIGIBILITY';
 
 export interface AssignmentRow {
   participantId: string;
@@ -136,6 +151,11 @@ export interface DistributionPlanInput {
   committees: Committee[];
   /** اللجان المؤهَّلة لكل متسابق — الأهلية الصلبة تُقرَّر خارج هذه الوحدة. */
   eligibleFor: (participant: Participant) => Committee[];
+  /**
+   * اللجان التي تستقبله استثناءً حين لا تؤهّله واحدة: لا تحكم فئته، لكنها ليست
+   * متعارضةً معه ولا متوقّفة. تُقرَّر خارج الوحدة كالأهلية، ولا تُستعمل إلا بإذنٍ صريح.
+   */
+  exceptionFor?: (participant: Participant) => Committee[];
   /** طابورٌ قائمٌ قبل الموجة، فالموجة تُضاف إلى واقعٍ لا إلى فراغ. */
   standingQueue?: Participant[];
   constraints?: DistributionConstraints;
@@ -145,12 +165,13 @@ export interface DistributionPlanInput {
 
 export async function planDistribution(input: DistributionPlanInput): Promise<DistributionPlan> {
   const {
-    competitionId, participants, committees, eligibleFor,
+    competitionId, participants, committees, eligibleFor, exceptionFor,
     standingQueue = [], constraints = {}, seed = 'mizan', now = new Date(),
   } = input;
   const cap = Number(constraints.delegationShareCap) || 0;
   const maxDepth = Number(constraints.maxQueueDepth) || 0;
   const passes = constraints.improvementPasses ?? 2;
+  const allowException = constraints.allowCategoryException === true;
 
   const panels = committees.filter(c => c.competitionId === competitionId && c.status !== 'offline');
 
@@ -190,21 +211,35 @@ export async function planDistribution(input: DistributionPlanInput): Promise<Di
 
   /* ── الطبقة الأولى والثانية والثالثة: توزيعٌ جشع بأقل تكلفة ───────────── */
   for (const p of participants) {
-    const eligible = eligibleFor(p).filter(c => state.has(c.id));
+    const qualified = eligibleFor(p).filter(c => state.has(c.id));
+    /*
+     * لا لجنة مؤهَّلة. الاستثناء لا يُؤخذ إلا بإذنٍ صريح — وبدونه يبقى في `unassigned`
+     * ويُقال سببه، فالمنصّة تعترف بعجزها بدل أن تُسنِد إسنادًا خاطئًا بصمت.
+     */
+    const exceptional = !qualified.length && allowException
+      ? (exceptionFor?.(p) || []).filter(c => state.has(c.id))
+      : [];
+    const eligible = qualified.length ? qualified : exceptional;
     if (!eligible.length) {
       unassigned.push({
         participantId: p.id, participantCode: p.code, relaxed: [], drawn: false,
-        reasonArabic: 'لا توجد لجنة مؤهَّلة لفئته وروايته — يحتاج إسنادًا يدويًا أو لجنة تغطي فئته.',
-        reasonEnglish: 'No panel qualifies for this category and reading — needs manual routing or a panel that covers it.',
+        reasonArabic: allowException
+          ? 'لا توجد لجنة مؤهَّلة لفئته، ولا لجنة تصلح استثناءً — يحتاج لجنةً تغطي فئته.'
+          : 'لا توجد لجنة مؤهَّلة لفئته وروايته. يمكن السماح بالاستثناء عبر الفئات إن تعطّلت لجان فئته.',
+        reasonEnglish: allowException
+          ? 'No qualifying panel, and none usable as an exception — a panel covering the category is needed.'
+          : 'No panel qualifies for this category and reading. A cross-category exception can be allowed if his own panels are down.',
       });
       continue;
     }
+    const viaException = !qualified.length;
 
     /* القيود التفضيلية تُخفَّف بالترتيب، ويُسجَّل ما خُفِّف. */
+    const base: RelaxedConstraint[] = viaException ? ['CATEGORY_ELIGIBILITY'] : [];
     const tiers: { relaxed: RelaxedConstraint[]; pool: Committee[] }[] = [
-      { relaxed: [], pool: eligible.filter(c => !breaksDelegationCap(state.get(c.id)!, p, cap) && !breaksDepth(state.get(c.id)!, maxDepth)) },
-      { relaxed: ['DELEGATION_SHARE_CAP'], pool: eligible.filter(c => !breaksDepth(state.get(c.id)!, maxDepth)) },
-      { relaxed: ['DELEGATION_SHARE_CAP', 'MAX_QUEUE_DEPTH'], pool: eligible },
+      { relaxed: base, pool: eligible.filter(c => !breaksDelegationCap(state.get(c.id)!, p, cap) && !breaksDepth(state.get(c.id)!, maxDepth)) },
+      { relaxed: [...base, 'DELEGATION_SHARE_CAP'], pool: eligible.filter(c => !breaksDepth(state.get(c.id)!, maxDepth)) },
+      { relaxed: [...base, 'DELEGATION_SHARE_CAP', 'MAX_QUEUE_DEPTH'], pool: eligible },
     ];
     const tier = tiers.find(t => t.pool.length)!;
 
@@ -231,14 +266,20 @@ export async function planDistribution(input: DistributionPlanInput): Promise<Di
       participantId: p.id, participantCode: p.code,
       committeeId: best.id, committeeCode: best.code,
       relaxed: tier.relaxed, drawn,
-      reasonArabic: tier.relaxed.length
-        ? `أقلّ اللجان المؤهَّلة حِملًا بعد تخفيف: ${tier.relaxed.map(relaxedArabic).join('، ')}.`
-        : drawn ? 'تعادلٌ حقيقي بين لجانٍ مؤهَّلة، حُسم بقرعةٍ ملتزمة ببصمة الخطة.'
-          : 'أقلّ اللجان المؤهَّلة حِملًا بالدقائق.',
-      reasonEnglish: tier.relaxed.length
-        ? `Lightest qualified panel after relaxing: ${tier.relaxed.join(', ')}.`
-        : drawn ? 'A genuine tie between qualified panels, settled by a committed draw.'
-          : 'Lightest qualified panel measured in minutes.',
+      /* لجنةُ الاستثناء ليست «مؤهَّلة» — وتسميتُها كذلك في سطر السبب تُخفي بالضبط ما
+         وُقِّع عليه. فالصياغة تُفرَّق: تخفيفُ قيدٍ تفضيليّ شيء، وتجاوزُ الفئة شيءٌ آخر. */
+      reasonArabic: viaException
+        ? `لا لجنة تغطّي فئته، فأُسند استثناءً موقَّعًا إلى أقلّ اللجان المتاحة حِملًا${tier.relaxed.length > 1 ? ` (مع تخفيف: ${tier.relaxed.filter(r => r !== 'CATEGORY_ELIGIBILITY').map(relaxedArabic).join('، ')})` : ''}. ويبقى يُسأل في نطاق فئته هو.`
+        : tier.relaxed.length
+          ? `أقلّ اللجان المؤهَّلة حِملًا بعد تخفيف: ${tier.relaxed.map(relaxedArabic).join('، ')}.`
+          : drawn ? 'تعادلٌ حقيقي بين لجانٍ مؤهَّلة، حُسم بقرعةٍ ملتزمة ببصمة الخطة.'
+            : 'أقلّ اللجان المؤهَّلة حِملًا بالدقائق.',
+      reasonEnglish: viaException
+        ? `No panel covers this category; routed by signed exception to the lightest available panel${tier.relaxed.length > 1 ? ` (relaxing: ${tier.relaxed.filter(r => r !== 'CATEGORY_ELIGIBILITY').join(', ')})` : ''}. Questions stay within their own scope.`
+        : tier.relaxed.length
+          ? `Lightest qualified panel after relaxing: ${tier.relaxed.join(', ')}.`
+          : drawn ? 'A genuine tie between qualified panels, settled by a committed draw.'
+            : 'Lightest qualified panel measured in minutes.',
     });
   }
 
@@ -256,7 +297,10 @@ export async function planDistribution(input: DistributionPlanInput): Promise<Di
       const p = participantById.get(row.participantId);
       if (!p) continue;
       const from = row.committeeId;
-      const alternatives = eligibleFor(p).filter(c => state.has(c.id) && c.id !== from);
+      /* من أُسند استثناءً تُبدَّل لجنته بين لجان الاستثناء نفسها، لا بين المؤهَّلة — وإلا
+         بدّل التحسينُ استثناءً موقَّعًا بإسنادٍ لم يوقّعه أحد. */
+      const movable = row.relaxed.includes('CATEGORY_ELIGIBILITY') ? (exceptionFor?.(p) || []) : eligibleFor(p);
+      const alternatives = movable.filter(c => state.has(c.id) && c.id !== from);
       if (!alternatives.length) continue;
 
       const peakBefore = peak();
@@ -299,7 +343,7 @@ export async function planDistribution(input: DistributionPlanInput): Promise<Di
     competitionId,
     createdAt,
     seed,
-    constraints: { delegationShareCap: cap, maxQueueDepth: maxDepth, improvementPasses: passes },
+    constraints: { delegationShareCap: cap, maxQueueDepth: maxDepth, improvementPasses: passes, allowCategoryException: allowException },
     inputs: participants.map(p => ({ id: p.id, code: p.code, categoryId: p.categoryId, delegation: delegationOf(p) })),
     assignments: assignments.map(r => ({ participantId: r.participantId, committeeId: r.committeeId, relaxed: r.relaxed })),
     unassigned: unassigned.map(r => r.participantId),
@@ -323,7 +367,9 @@ export async function planDistribution(input: DistributionPlanInput): Promise<Di
 }
 
 function relaxedArabic(c: RelaxedConstraint): string {
-  return c === 'DELEGATION_SHARE_CAP' ? 'سقف حصّة الوفد' : 'سقف عمق الطابور';
+  if (c === 'DELEGATION_SHARE_CAP') return 'سقف حصّة الوفد';
+  if (c === 'MAX_QUEUE_DEPTH') return 'سقف عمق الطابور';
+  return 'شرط الفئة (استثناء موقَّع)';
 }
 
 /**

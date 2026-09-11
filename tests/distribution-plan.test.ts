@@ -256,3 +256,118 @@ test('ten panels and two hundred arrivals stay balanced and fully placed', async
   /* الفارق يبقى في حدود جلسةٍ واحدة من أبطأ لجنة — وهو أدقّ ما يمكن بأعدادٍ صحيحة. */
   assert.ok(spread <= 15, `expected a tight spread across ten panels, got ${spread} minutes`);
 });
+
+/* ── الاستثناء عبر الفئات: باب من لا لجنة لفئته ────────────────────────── */
+
+/*
+ * «عدالة الطابور» تنقل بين لجنتين، وتلزمها لجنةُ مصدر. ومن لا تؤهّله أيُّ لجنة بلا لجنة
+ * أصلًا — فلم يكن له بابٌ إليها. فُتح له هنا بابٌ واحد: استثناءٌ يُطلب صراحةً، وتُوسَم به
+ * صفُّه فتعلم اللجنة أنها تحكم من ليس من فئتها، ويبقى يُسأل في نطاق فئته هو.
+ */
+
+const exceptionAll = (committees: Committee[]) => () => committees;
+
+test('without an explicit exception nobody is placed on a panel outside their category', async () => {
+  const committees = [committee('c1', { assignedCategories: ['cat-1'] })];
+  const p = participant('p1', { categoryId: 'cat-9' });
+  const out = await plan({ participants: [p], committees, eligibleFor: allEligible(committees), exceptionFor: exceptionAll(committees) });
+
+  assert.equal(out.assignments.length, 0);
+  assert.equal(out.unassigned.length, 1);
+  assert.match(out.unassigned[0].reasonArabic, /يمكن السماح بالاستثناء/, 'and the plan says which door exists');
+});
+
+test('with the exception allowed, the same participant is placed — and the relaxation is on the record', async () => {
+  const committees = [committee('c1', { assignedCategories: ['cat-1'] })];
+  const p = participant('p1', { categoryId: 'cat-9' });
+  const out = await plan({
+    participants: [p], committees, eligibleFor: allEligible(committees),
+    exceptionFor: exceptionAll(committees), constraints: { allowCategoryException: true },
+  });
+
+  assert.equal(out.assignments.length, 1);
+  assert.ok(out.assignments[0].relaxed.includes('CATEGORY_ELIGIBILITY'), 'never a silent placement');
+  assert.match(out.assignments[0].reasonArabic, /استثناءً موقَّعًا/, 'the row says so in words, not only in a flag');
+  assert.doesNotMatch(out.assignments[0].reasonArabic, /أقلّ اللجان المؤهَّلة/, 'and never calls a panel qualified that is not');
+  assert.match(out.assignments[0].reasonArabic, /نطاق فئته هو/, 'and states the thing a judge must not get wrong');
+});
+
+test('the exception is a last resort: whoever has a qualifying panel is never routed by it', async () => {
+  const committees = [committee('c1', { assignedCategories: ['cat-1'] }), committee('c2', { assignedCategories: ['cat-2'] })];
+  const fits = participant('p1', { categoryId: 'cat-1' });
+  const orphan = participant('p2', { categoryId: 'cat-9' });
+  const out = await plan({
+    participants: [fits, orphan], committees, eligibleFor: allEligible(committees),
+    exceptionFor: exceptionAll(committees), constraints: { allowCategoryException: true },
+  });
+
+  assert.equal(panelOf(out, 'p1'), 'C1', 'his own category, on a panel that covers it');
+  assert.deepEqual(out.assignments.find(a => a.participantId === 'p1')!.relaxed, []);
+  assert.ok(out.assignments.find(a => a.participantId === 'p2')!.relaxed.includes('CATEGORY_ELIGIBILITY'));
+});
+
+test('permission alone places nobody — with no panel offered as an exception he still waits', async () => {
+  const committees = [committee('c1', { assignedCategories: ['cat-1'] })];
+  const p = participant('p1', { categoryId: 'cat-9' });
+  const out = await plan({
+    participants: [p], committees, eligibleFor: allEligible(committees),
+    exceptionFor: () => [], constraints: { allowCategoryException: true },
+  });
+
+  assert.equal(out.assignments.length, 0);
+  assert.match(out.unassigned[0].reasonArabic, /ولا لجنة تصلح استثناءً/);
+});
+
+test('an exceptional placement still balances minutes rather than taking the first panel', async () => {
+  const committees = [
+    committee('c1', { assignedCategories: ['cat-1'], averageSessionMinutes: 10 }),
+    committee('c2', { assignedCategories: ['cat-1'], averageSessionMinutes: 10 }),
+  ];
+  const loaded = Array.from({ length: 6 }, (_, i) => participant(`q${i}`, { assignedCommitteeId: 'c1', status: 'in_queue' }));
+  const orphan = participant('p1', { categoryId: 'cat-9' });
+  const out = await plan({
+    participants: [orphan], committees, eligibleFor: allEligible(committees),
+    exceptionFor: exceptionAll(committees), constraints: { allowCategoryException: true },
+    standingQueue: loaded,
+  });
+
+  assert.equal(panelOf(out, 'p1'), 'C2', 'the empty panel, not the one already carrying an hour');
+});
+
+test('the improvement pass moves an exceptional placement only among exception panels', async () => {
+  /*
+   * وإلّا لبدّل التحسينُ استثناءً وُقِّع عليه بإسنادٍ لم يوقّعه أحد — وهو أخطر من حِملٍ
+   * غير متوازن، لأن التوقيع هو كل ما يفصل الاستثناء عن الخطأ.
+   */
+  const committees = [
+    committee('c1', { assignedCategories: ['cat-1'], averageSessionMinutes: 10 }),
+    committee('c2', { assignedCategories: ['cat-1'], averageSessionMinutes: 10 }),
+    committee('c3', { assignedCategories: ['cat-1'], averageSessionMinutes: 10 }),
+  ];
+  const orphans = Array.from({ length: 6 }, (_, i) => participant(`p${i}`, { categoryId: 'cat-9' }));
+  const only = committees.filter(c => c.id !== 'c3');
+  const out = await plan({
+    participants: orphans, committees, eligibleFor: allEligible(committees),
+    exceptionFor: () => only, constraints: { allowCategoryException: true },
+  });
+
+  assert.equal(out.assignments.length, 6);
+  assert.ok(out.assignments.every(a => a.committeeCode !== 'C3'), 'C3 was never offered, so no pass may reach it');
+  assert.ok(out.assignments.every(a => a.relaxed.includes('CATEGORY_ELIGIBILITY')));
+});
+
+test('an exception plan re-verifies like any other — its permission is part of what is signed', async () => {
+  const committees = [committee('c1', { assignedCategories: ['cat-1'] })];
+  const p = participant('p1', { categoryId: 'cat-9' });
+  const args = {
+    participants: [p], committees, eligibleFor: allEligible(committees),
+    exceptionFor: exceptionAll(committees), constraints: { allowCategoryException: true },
+  };
+  const first = await plan(args);
+  assert.equal((await verifyDistributionPlan(first, () => plan(args))).ok, true, 'the same reality plans the same way');
+
+  /* والإذن نفسه داخل البصمة: خطةٌ بُنيت باستثناءٍ لا تُقبل حيث سُحب الإذن بين
+     الاقتراح والتوقيع — وإلّا مرّ استثناءٌ لم يعد مأذونًا به تحت توقيعٍ قديم. */
+  const revoked = await verifyDistributionPlan(first, () => plan({ ...args, constraints: { allowCategoryException: false } }));
+  assert.equal(revoked.ok, false);
+});

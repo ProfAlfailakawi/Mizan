@@ -4,6 +4,7 @@
 // diffed on its own, apart from the ~1,900 lines of behaviour. It is intentionally the single
 // source of truth for what MIZAN keeps in local state; store.ts imports it and nothing here
 // carries logic. Grouping is by domain to keep the surface navigable.
+import type { QueueWaitSample, SessionTempoSample } from './session-tempo';
 import {
   User, Role, Organization, Competition, Participant, Committee, JudgeProfile, ResultRecord,
   ReviewCase, AIObservation, Certificate, AuditEvent, JudgeSubmission, IncidentRecord,
@@ -190,6 +191,13 @@ export interface AppStoreState {
   integrityCinemaRecords: IntegrityCinemaRecord[];
   certifiedVenueSeals: CertifiedVenueSealRecord[];
   // Active JudgeOS session
+  /**
+   * ما استغرقته الجلسات فعلًا، لتتعلّم اللجنة إيقاعها بدل أن تبقى على قيمة الإعداد.
+   * محدودةٌ بسقفٍ في المخزن: سجلٌّ بلا حدّ يُضخّم اللقطة المحفوظة على الجهاز.
+   */
+  sessionTempoSamples: SessionTempoSample[];
+  /** ما وُعد به من انتظار وما وقع — فيُحاسَب التقدير بدل أن يَعِد ولا يُراجَع. */
+  queueWaitSamples: QueueWaitSample[];
   activeSession: ActiveSessionState;
 }
 
