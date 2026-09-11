@@ -5,6 +5,7 @@ import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
+import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
 import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
@@ -2735,6 +2736,75 @@ export function useAppStore() {
    * على المسابقة» — لأنها فعلًا لم تصل إليه قطّ. النشر الآن كتابةٌ صريحة تُنتظَر ويُبلَّغ
    * عن فشلها في وجه من نشر، لا في سجلٍّ لا يفتحه أحد.
    */
+  /* ── إسقاط شاشات القاعة ───────────────────────────────────────────────────
+   *
+   * الشاشات كانت تحتاج جهازًا مسجَّلًا بدورٍ تشغيليّ لتقرأ الطابور — أي عشرة أجهزة
+   * بصلاحية قراءة سجلّ المتسابقين كاملًا معلَّقة في ممرّات بلا حارس. فصار جهاز الإدارة
+   * ينشر إسقاطًا واحدًا بالأكواد وحدها، وتقرؤه كل الشاشات بلا تسجيل دخول ولا امتياز.
+   */
+  const currentDisplayBoard = (): DisplayBoard => buildDisplayBoard({
+    competitionId: globalState.competition.id,
+    /* مسابقةٌ بلا اسمٍ إنجليزي كانت ستنشر شاشةً بعنوانٍ فارغ. الاحتياط وقت الكتابة. */
+    competitionName: storedCompetitionName(true),
+    competitionNameArabic: storedCompetitionName(false),
+    participants: globalState.participants,
+    committees: globalState.committees,
+    categories: globalState.competition.categories || [],
+    fallbackSessionMinutes: globalState.competition.ruleSet?.questionDurationMinutes,
+    elapsedSecondsByCommittee: globalState.activeSession.committee
+      ? { [globalState.activeSession.committee.id]: globalState.activeSession.durationSeconds }
+      : undefined,
+    nextDepth: PANEL_NEXT_DEPTH,
+  });
+
+  /** من يملك نشر الإسقاط. أضيق مجموعة تُنجز العمل: من يدير المسابقة أو يشغّلها. */
+  const canPublishDisplayBoard = () =>
+    !!auth.currentUser
+    && !globalState.isOffline
+    && !launchPlaceholderActive()
+    && ['super_admin','org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role);
+
+  const publishDisplayBoard = async ():Promise<{ok:boolean;reason:string}> => {
+    if(!canPublishDisplayBoard())return {ok:false,reason:'NOT_ELIGIBLE'};
+    try{
+      const {db,doc,setDoc}=await getFirestoreClient();
+      await setDoc(doc(db,'public_boards',globalState.competition.id),{
+        organizationId:globalState.competition.organizationId,
+        board:currentDisplayBoard(),
+        updatedAt:new Date().toISOString(),
+      });
+      return {ok:true,reason:''};
+    }catch(err){
+      console.warn('MIZAN display board publish failed',err);
+      return {ok:false,reason:'PUBLISH_FAILED'};
+    }
+  };
+
+  /** إطفاء كل الشاشات دفعةً واحدة: تُحذف الوثيقة فلا يبقى ما يُقرأ. */
+  const unpublishDisplayBoard = async ():Promise<boolean> => {
+    if(!auth.currentUser||!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return false;
+    try{
+      const {db,doc,deleteDoc}=await getFirestoreClient();
+      await deleteDoc(doc(db,'public_boards',globalState.competition.id));
+      return true;
+    }catch(err){console.warn('MIZAN display board unpublish failed',err);return false}
+  };
+
+  /*
+   * قراءة الإسقاط المنشور. الوثيقة مكشوفة للقراءة وكاتبها مُصرَّح لا معصوم، فما يُقرأ
+   * يمرّ بـ`parseDisplayBoard` الذي يعيد بناءه من الحقول المعروفة وحدها — فحقلٌ لم
+   * يُصمَّم لا يبلغ الشاشة ولو كُتب في الوثيقة.
+   */
+  const loadPublicDisplayBoard = async (competitionId:string):Promise<DisplayBoard|null> => {
+    try{
+      const {db,doc,getDoc}=await getFirestoreClient();
+      const snap=await getDoc(doc(db,'public_boards',competitionId));
+      if(!snap.exists())return null;
+      const board=parseDisplayBoard((snap.data() as {board?:unknown})?.board);
+      return board&&board.competitionId===competitionId?board:null;
+    }catch(err){console.warn('MIZAN display board load failed',err);return null}
+  };
+
   const publishPublicCompetitionRecord=async():Promise<{ok:boolean;reason:string}>=>{
     if(launchPlaceholderActive())return {ok:false,reason:'أكمل تهيئة المسابقة والجهة قبل فتح التسجيل.'};
     if(globalState.isOffline)return {ok:false,reason:'الجهاز دون إنترنت الآن، ولا يمكن نشر صفحة التسجيل العامة حتى يعود الاتصال.'};
@@ -3745,6 +3815,7 @@ export function useAppStore() {
     registerParticipant, updateParticipant, removeParticipant,
     reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
     selectCompetition, loadPublicCompetition, checkPublicCompetitionPublished, republishPublicCompetition,
+    currentDisplayBoard, publishDisplayBoard, unpublishDisplayBoard, loadPublicDisplayBoard,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
     submitAppeal,

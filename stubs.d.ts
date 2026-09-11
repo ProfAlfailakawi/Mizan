@@ -148,6 +148,7 @@ declare module 'lucide-react' {
  export const BatteryWarning: any;
  export const ShieldAlert: any;
  export const MonitorX: any;
+ export const MonitorDot: any;
  export const Siren: any;
 }
 declare module 'firebase/app' { export const initializeApp:any; export const getApps:any; export const getApp:any; }

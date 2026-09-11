@@ -85,6 +85,7 @@ test('full-screen venue modes are dismissible and announce themselves', () => {
   for (const rel of [
     'src/components/gate/KioskMode.tsx',
     'src/components/public/WaitingBoard.tsx',
+    'src/components/public/CommitteeDisplay.tsx',
     'src/components/public/HallRecitationMap.tsx',
     'src/components/public/CeremonyView.tsx',
   ]) {
