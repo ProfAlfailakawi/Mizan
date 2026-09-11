@@ -25,6 +25,7 @@
     "fairness:lab": "tsx scripts/fairness-lab.ts",
     "qa:scope-visual": "node scripts/scope-visual-qa.mjs",
     "qa:competition-day": "node scripts/competition-day-qa.mjs",
+    "qa:live-day": "tsx scripts/live-day.ts",
     "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs",
     "qa:venue-legibility": "node scripts/venue-legibility-audit.mjs --panels=10",
     "qa:firestore-rules": "firebase emulators:exec --only firestore --project mizan-rules-test \"tsx --test tests/firestore-rules-*.test.ts tests/firestore-rest-adapter.test.ts\""
