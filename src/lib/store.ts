@@ -6,8 +6,11 @@ import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
 import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
+import type { PublishedLease } from './board-lease';
 import { planDistribution, verifyDistributionPlan, type DistributionPlan } from './distribution-plan';
 import { accruedWaitMinutes, equityWarranted, recommendFairPosition, type EquityRecommendation } from './queue-equity';
+import { tempoMinutesByCommittee, type QueueWaitSample, type SessionTempoSample } from './session-tempo';
+import { buildDayRetrospective, type DayRetrospective } from './day-retrospective';
 import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
@@ -204,6 +207,7 @@ function seededInitialState(): AppStoreState {
       {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
     ],
     travelRecords: SEED_TRAVEL_RECORDS, consents: SEED_CONSENTS, importJobs: [], shadowRuns: [], participantPassport: SEED_PARTICIPANT_PASSPORT, judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: SEED_SUPPORT_SESSIONS, remoteChecks: [], audioRecordings: [], featureFlags: SEED_FEATURE_FLAGS, quranSourceManifests: [], quranSourceContents: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
+    sessionTempoSamples:[], queueWaitSamples:[],
     timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:SEED_PARTICIPANT_SCOPES, questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], questionQuarantines:[], questionReservations:[], fairnessReports:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
     activeSession: {
       sessionId: 'sess-active-001',
@@ -1039,6 +1043,21 @@ export function useAppStore() {
         ]
       };
 
+      /*
+       * الوعد يُختم لحظة إعطائه. التقدير يُحسب عند كل عرض، فلو قورن وقتَ النداء بتقديرٍ
+       * جديد لقُورن الشيء بنفسه — والمحاسبة تكون على ما قيل له عند الباب.
+       */
+      if (!unrouted && updated.assignedCommitteeId) {
+        const promisedPanel = globalState.committees.find(c => c.id === updated.assignedCommitteeId);
+        if (promisedPanel) {
+          const ahead = globalState.participants.filter(x =>
+            x.competitionId === globalState.competition.id && x.status === 'in_queue' &&
+            x.assignedCommitteeId === promisedPanel.id && x.id !== updated.id).length;
+          const tempo = tempoMinutes()[promisedPanel.id] || promisedPanel.averageSessionMinutes || 8;
+          updated.promisedWaitMinutes = Math.max(1, Math.round(ahead * tempo));
+        }
+      }
+
       globalState.participants[pIndex] = updated;
       if (unrouted) {
         createIncident(
@@ -1257,6 +1276,16 @@ export function useAppStore() {
         const pIndex = globalState.participants.findIndex(p => p.id === participant.id);
         if (pIndex !== -1) globalState.participants[pIndex] = { ...globalState.participants[pIndex], status:'tested', statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested',timestamp:new Date().toISOString(),actor:'Panel completion'}] };
         globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
+        /*
+         * ما استغرقته الجلسة فعلًا. كان `averageSessionMinutes` يُكتب مرّة عند إنشاء
+         * اللجنة ثم لا يتغيّر، ويُقرأ في كل موضعٍ يمسّ زمن المتسابق — فكل رقمٍ زمنيّ في
+         * المنصّة كان مشتقًّا من قيمة إعداد لا من لجنةٍ تعمل اليوم.
+         */
+        const tempoCommitteeId=globalState.activeSession.committee?.id;
+        const sessionMinutes=Math.round((globalState.activeSession.durationSeconds||0)/60*10)/10;
+        if(tempoCommitteeId&&sessionMinutes>0){
+          globalState.sessionTempoSamples=[{committeeId:tempoCommitteeId,participantId:participant.id,minutes:sessionMinutes,at:new Date().toISOString()},...globalState.sessionTempoSamples].slice(0,500);
+        }
         refreshQueueNotifications();
       }
       const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||category?.nameArabic||'', categoryNameArabic:category?.nameArabic||category?.name||'', finalScore, criterionScores:aggregatedCriterionScores, penaltyCount:sessionPenaltyCount, rank:0, status:'calculated' };
@@ -2077,13 +2106,20 @@ export function useAppStore() {
     && !launchPlaceholderActive()
     && ['super_admin','org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role);
 
-  const publishDisplayBoard = async ():Promise<{ok:boolean;reason:string}> => {
+  /*
+   * النشر يحمل توقيع ناشره. فالعقد بين أجهزة الإدارة يُقرأ من الوثيقة نفسها بلا وثيقةٍ
+   * ثانية تُنسّق: من كتب آخر مرّة، وبأيّ ختم. وسائر الأجهزة المؤهَّلة تراقب الختم — إن
+   * جمد تولّى أقربها قبل أن تُعلن الشاشات تأخّرها. ولا يُفسَّر الختم زمنًا عند القارئ:
+   * يُقارَن نصًّا، فساعةُ كاتبه لا تدخل حساب أحد.
+   */
+  const publishDisplayBoard = async (publisherId?:string):Promise<{ok:boolean;reason:string}> => {
     if(!canPublishDisplayBoard())return {ok:false,reason:'NOT_ELIGIBLE'};
     try{
       const {db,doc,setDoc}=await getFirestoreClient();
       await setDoc(doc(db,'public_boards',globalState.competition.id),{
         organizationId:globalState.competition.organizationId,
         board:currentDisplayBoard(),
+        publisherId:publisherId||'',
         updatedAt:new Date().toISOString(),
       });
       return {ok:true,reason:''};
@@ -2091,6 +2127,22 @@ export function useAppStore() {
       console.warn('MIZAN display board publish failed',err);
       return {ok:false,reason:'PUBLISH_FAILED'};
     }
+  };
+
+  /**
+   * قراءة توقيع آخر نشر وحده — بلا الإسقاط. يُستدعى عند كل جهاز مؤهَّل كل بضع ثوانٍ،
+   * وإخفاقه يُقرأ «لا ناشر» فيتولّى القارئ: صمتُ الشبكة يجب ألّا يُترجَم صمتَ شاشات.
+   */
+  const readBoardLease = async ():Promise<PublishedLease|null> => {
+    try{
+      const {db,doc,getDoc}=await getFirestoreClient();
+      const snap=await getDoc(doc(db,'public_boards',globalState.competition.id));
+      if(!snap.exists())return null;
+      const data=snap.data() as {publisherId?:unknown;updatedAt?:unknown};
+      const publisherId=typeof data?.publisherId==='string'?data.publisherId:'';
+      const stamp=typeof data?.updatedAt==='string'?data.updatedAt:'';
+      return publisherId&&stamp?{publisherId,stamp}:null;
+    }catch(err){console.warn('MIZAN display board lease read failed',err);return null}
   };
 
   /** إطفاء كل الشاشات دفعةً واحدة: تُحذف الوثيقة فلا يبقى ما يُقرأ. */
@@ -2216,8 +2268,28 @@ export function useAppStore() {
     });
   };
 
+  /*
+   * تصفية الوعد. هنا وحده يُعرف ما وقع فعلًا: انتظر من لحظة دخوله الطابور إلى لحظة ندائه.
+   * وبلا هذه اللحظة يبقى التقدير الشيءَ الوحيد في المنصّة الذي يقول رقمًا عن المستقبل ثم
+   * لا يعود إليه — بينما الشاشة تُعلن تجمّدها، والإسقاط عمره، والخطة بصمتها.
+   */
+  const settleWaitPromise = (participant: Participant) => {
+    const predicted = Number(participant.promisedWaitMinutes);
+    if (!Number.isFinite(predicted) || !participant.assignedCommitteeId) return;
+    if (globalState.queueWaitSamples.some(x => x.participantId === participant.id)) return;
+    const actual = accruedWaitMinutes(participant, new Date());
+    globalState.queueWaitSamples = [{
+      participantId: participant.id,
+      committeeId: participant.assignedCommitteeId,
+      predictedMinutes: predicted,
+      actualMinutes: actual,
+      at: new Date().toISOString(),
+    }, ...globalState.queueWaitSamples].slice(0, 500);
+  };
+
   const startSessionForParticipant = async (participantId: string) => {
     const participant = globalState.participants.find(p => p.id === participantId);
+    if (participant) settleWaitPromise(participant);
     /* القراران في `session-start-core` مُختبَرين بالتشغيل؛ وما هنا أثرهما. */
     const assignedCommittee = participant ? globalState.committees.find(c => c.id === participant.assignedCommitteeId) : undefined;
     const choice = chooseSessionCommittee({
@@ -2782,7 +2854,10 @@ export function useAppStore() {
 
   const getQueueEstimate=(participantId:string)=>{
     const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);
-    const c=p?globalState.committees.find(x=>x.id===p.assignedCommitteeId):undefined;
+    /* التقدير المعروض يقرأ إيقاع اللجنة المقيس لا قيمتها المُعدّة. */
+    const measured=tempoMinutes();
+    const raw=p?globalState.committees.find(x=>x.id===p.assignedCommitteeId):undefined;
+    const c=raw&&measured[raw.id]?{...raw,averageSessionMinutes:measured[raw.id]}:raw;
     return estimateQueueWait({
       participant:p,
       committee:c,
@@ -2906,6 +2981,22 @@ export function useAppStore() {
     refreshQueueNotifications();notify();return {ok:true,record} as const;
   };
 
+  /*
+   * ماذا حدث اليوم فعلًا.
+   *
+   * كل ما سبق يخدم اليوم نفسه. وهذا وحده ينظر إلى الوراء: يقارن ما قُدّر بما وقع، فلا
+   * يُعاد إعداد السنة القادمة بالأرقام التي ثبت خطؤها في هذه.
+   */
+  const buildRetrospective = ():DayRetrospective => buildDayRetrospective({
+    competitionId: globalState.competition.id,
+    participants: globalState.participants,
+    committees: globalState.committees,
+    transfers: globalState.queueTransfers,
+    incidents: globalState.incidents,
+    tempoSamples: globalState.sessionTempoSamples,
+    waitSamples: globalState.queueWaitSamples,
+  });
+
   /* ── توزيع الموجات ────────────────────────────────────────────────────────
    *
    * البوابة تُسند كل واصلٍ وحده، فلا ترى تركيبة الموجة. وهذا يكفي عند لجنتين ويخطئ كلما
@@ -2915,6 +3006,29 @@ export function useAppStore() {
    * والموجة هنا تخدم أوّل ما تخدم مَن دخل الطابور بلا إسناد: يُوزَّعون دفعةً واحدة، بقيود
    * عدالة، وبقرعةٍ ملتزمة عند التعادل. والخطة تُقترح ولا تُنفَّذ حتى يوقّعها إنسان.
    */
+  /**
+   * اللجان التي تصلح استثناءً: عاملة، ولا تعارض صلبًا بينها وبينه — وتختلف عن المؤهَّلة
+   * في شرط الفئة وحده. تُستعمل فقط حين يأذن المسؤول صراحةً.
+   */
+  const exceptionCommitteesFor = (participant: Participant) => globalState.committees.filter(c =>
+    c.competitionId === participant.competitionId &&
+    c.status !== 'offline' &&
+    !committeeHasHardConflict(c, participant) &&
+    !c.assignedCategories.includes(participant.categoryId)
+  );
+
+  /** إيقاع اللجان كما تعمل اليوم: مقيسٌ حين تكفي العيّنة، ومُعدٌّ حين لا تكفي. */
+  const tempoMinutes = () => tempoMinutesByCommittee(
+    globalState.committees.filter(c => c.competitionId === globalState.competition.id),
+    globalState.sessionTempoSamples,
+  );
+
+  /** لجانٌ بإيقاعها المقيس — تُمرَّر لكل ما يحسب بالدقائق بدل القيمة المُعدّة. */
+  const committeesAtMeasuredTempo = () => {
+    const byId = tempoMinutes();
+    return globalState.committees.map(c => byId[c.id] ? { ...c, averageSessionMinutes: byId[c.id] } : c);
+  };
+
   const distributionConstraints = () => {
     const ops = getCompetitionPolicy(globalState.competition).operations;
     return { delegationShareCap: ops.delegationShareCap, maxQueueDepth: ops.maxQueueDepth };
@@ -2924,7 +3038,7 @@ export function useAppStore() {
   const unroutedWaiting = () => globalState.participants.filter(p =>
     p.competitionId === globalState.competition.id && p.status === 'in_queue' && !p.assignedCommitteeId);
 
-  const buildDistributionPlan = async (participantIds?:string[]):Promise<DistributionPlan|null> => {
+  const buildDistributionPlan = async (participantIds?:string[],options?:{allowCategoryException?:boolean}):Promise<DistributionPlan|null> => {
     const pool = participantIds?.length
       ? globalState.participants.filter(p => participantIds.includes(p.id) && p.competitionId === globalState.competition.id && p.status === 'in_queue')
       : unroutedWaiting();
@@ -2934,10 +3048,11 @@ export function useAppStore() {
     return planDistribution({
       competitionId: globalState.competition.id,
       participants: pool,
-      committees: globalState.committees,
+      committees: committeesAtMeasuredTempo(),
       eligibleFor: compatibleCommitteesFor,
+      exceptionFor: exceptionCommitteesFor,
       standingQueue: globalState.participants.filter(p => p.competitionId === globalState.competition.id && p.status === 'in_queue'),
-      constraints: distributionConstraints(),
+      constraints: { ...distributionConstraints(), allowCategoryException: options?.allowCategoryException === true },
       seed,
     });
   };
@@ -2956,29 +3071,43 @@ export function useAppStore() {
       return planDistribution({
         competitionId: globalState.competition.id,
         participants: pool,
-        committees: globalState.committees,
+        committees: committeesAtMeasuredTempo(),
         eligibleFor: compatibleCommitteesFor,
+        exceptionFor: exceptionCommitteesFor,
         standingQueue: globalState.participants.filter(p => p.competitionId === globalState.competition.id && p.status === 'in_queue'),
-        constraints: distributionConstraints(),
+        /* الإذن جزءٌ من الخطة الملتزمة: خطةٌ بُنيت باستثناء تُعاد به، وإلا تغيّرت بصمتها. */
+        constraints: { ...distributionConstraints(), allowCategoryException: plan.assignments.some(a => a.relaxed.includes('CATEGORY_ELIGIBILITY')) },
         seed: plan.seed,
         now: new Date(plan.createdAt),
       });
     });
     if(!check.ok)return {ok:false,reason:check.reason};
 
-    const byParticipant = new Map(plan.assignments.filter(a=>a.committeeId).map(a=>[a.participantId,a.committeeId!]));
+    const byParticipant = new Map(plan.assignments.filter(a=>a.committeeId).map(a=>[a.participantId,a]));
+    const exceptional = new Set(plan.assignments.filter(a=>a.relaxed.includes('CATEGORY_ELIGIBILITY')).map(a=>a.participantId));
+    /* استثناء عبر الفئات ولو داخل خطة: يبقى قرارًا يوقّعه مسؤول، لا أثرًا جانبيًّا لخطة. */
+    if(exceptional.size&&!['super_admin','org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role))return {ok:false,reason:'EXCEPTION_NOT_AUTHORIZED'};
     let assigned=0;
+    const stamp=new Date().toISOString();
     globalState.participants=globalState.participants.map(p=>{
-      const target=byParticipant.get(p.id);
+      const row=byParticipant.get(p.id);
       /* الأسبقية لا تُمسّ: يتغيّر بابُه ولا يتغيّر دوره. */
-      if(!target||p.status!=='in_queue')return p;
+      if(!row?.committeeId||p.status!=='in_queue')return p;
       assigned++;
-      return {...p,assignedCommitteeId:target,statusHistory:[...(p.statusHistory||[]),{status:'in_queue' as const,timestamp:new Date().toISOString(),actor:`Wave distribution · ${globalState.currentUser.name}`,reason:`خطة توزيع ${plan.planHash.slice(0,12)}`}]};
+      const target=globalState.committees.find(c=>c.id===row.committeeId);
+      return {...p,assignedCommitteeId:row.committeeId,
+        /* الوسم هو ما يُعلم اللجنة أنها تحكم من ليس من فئتها — وبدونه يقع الاستثناء صامتًا. */
+        crossCategoryException:exceptional.has(p.id)
+          ?{at:stamp,fromCommitteeId:p.assignedCommitteeId||'',toCommitteeId:row.committeeId,approvedBy:globalState.currentUser.name,reason:`خطة توزيع ${plan.planHash.slice(0,12)} · ${row.reasonArabic}`}
+          :p.crossCategoryException,
+        lastQueueTransfer:{at:stamp,fromCommitteeCode:'—',toCommitteeCode:target?.code||'—',waitedMinutes:accruedWaitMinutes(p,new Date(stamp)),positionIfAppended:0,fairPosition:0,equityApplied:false,reason:row.reasonArabic},
+        statusHistory:[...(p.statusHistory||[]),{status:'in_queue' as const,timestamp:stamp,actor:`Wave distribution · ${globalState.currentUser.name}`,reason:`خطة توزيع ${plan.planHash.slice(0,12)}`}]};
     });
+    for(const id of [...byParticipant.keys()]){const p=globalState.participants.find(x=>x.id===id);if(p)appendParticipantNotifications(p,`queue.transferred:${stamp}`);}
     auditTrustAction(
       'DISTRIBUTION_PLAN_APPLIED','Competition',globalState.competition.id,
-      `تنفيذ خطة توزيع موجة: ${assigned} متسابقًا، ${plan.drawsUsed} قرعة تعادل، بصمة ${plan.planHash.slice(0,12)}`,
-      `Applied a wave distribution plan: ${assigned} participants, ${plan.drawsUsed} tie draws, commitment ${plan.planHash.slice(0,12)}`
+      `تنفيذ خطة توزيع موجة: ${assigned} متسابقًا، ${plan.drawsUsed} قرعة تعادل${exceptional.size?`، و${exceptional.size} استثناءً عبر الفئات يُحكَّمون بنطاق فئتهم`:''}، بصمة ${plan.planHash.slice(0,12)}`,
+      `Applied a wave distribution plan: ${assigned} participants, ${plan.drawsUsed} tie draws${exceptional.size?`, ${exceptional.size} cross-category exceptions judged on their own scope`:''}, commitment ${plan.planHash.slice(0,12)}`
     );
     refreshQueueNotifications();notify();
     return {ok:true,reason:'',assigned};
@@ -3261,7 +3390,7 @@ export function useAppStore() {
     registerParticipant, updateParticipant, removeParticipant,
     reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
     selectCompetition, loadPublicCompetition, checkPublicCompetitionPublished, republishPublicCompetition,
-    currentDisplayBoard, publishDisplayBoard, unpublishDisplayBoard, loadPublicDisplayBoard,
+    currentDisplayBoard, publishDisplayBoard, readBoardLease, canPublishDisplayBoard, unpublishDisplayBoard, loadPublicDisplayBoard,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
     submitAppeal,
@@ -3297,7 +3426,7 @@ export function useAppStore() {
     startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
     issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
     generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
-    buildDistributionPlan, applyDistributionPlan,
+    buildDistributionPlan, applyDistributionPlan, buildRetrospective,
     getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, reissueQrBundle, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, resumeIdentityAccount, removeIdentityAccount, removeRoleGrant, setRoleGrantStatus, deleteIdentityInvitation, reissueIdentityInvitation, updateIdentityAccountName, updateRoleGrantRole, updateIdentityInvitationDetails, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, verifyAppealCapsuleRecord, liftBlindChamber, verifyBlindLift, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
   };
 }
