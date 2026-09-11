@@ -41,7 +41,7 @@ export const WarmupSanctuary: React.FC<{ ar: boolean }> = ({ ar }) => {
     return () => { if (timer.current) window.clearTimeout(timer.current); timer.current = null; };
   }, [open]);
 
-  const scale = phase === 'out' ? 0.62 : 1;
+  const scale = phase === 'out' ? 0.55 : 1;
   const seconds = phase === 'in' ? 4 : phase === 'hold' ? 0 : 6;
 
   return (
@@ -54,13 +54,27 @@ export const WarmupSanctuary: React.FC<{ ar: boolean }> = ({ ar }) => {
         <span className="text-[9px] font-bold text-[#656b66]">{ar ? 'اختياري' : 'optional'}</span>
       </summary>
       <div className="px-4 pb-5">
-        <div className="grid place-items-center py-4" aria-hidden="true">
-          <div className="relative grid h-[150px] w-[150px] place-items-center">
+        {/*
+          * حلقتان: ثابتة تحدّد مدى الشهيق الكامل، ومتحرّكة تتنفّس داخلها. الحلقة الثابتة هي
+          * ما يجعل الحركة مقروءة — دائرة تكبر وتصغر بلا مرجع لا يُعرف أين تنتهي، فيلاحقها
+          * النفَس بدل أن تقوده.
+          *
+          * ويحترم الكل تفضيل تقليل الحركة: من طلب سكون الواجهة لا يُفرض عليه نبضٌ دائم،
+          * وتبقى الكلمة وحدها تقول الطور.
+          */}
+        <div className="grid place-items-center py-2" aria-hidden="true">
+          <div className="relative grid h-[196px] w-[196px] place-items-center">
+            <span className="absolute rounded-full border border-[#d7e2db]" style={{ width: 188, height: 188 }}/>
             <span
-              className="absolute rounded-full border border-[#cfdcd5] bg-[radial-gradient(circle,rgba(47,101,85,.10),transparent_70%)] motion-reduce:!transform-none motion-reduce:!transition-none"
-              style={{ width: 128, height: 128, transform: `scale(${scale})`, transition: `transform ${seconds}s ease-in-out` }}
+              className="absolute rounded-full motion-reduce:!transform-none motion-reduce:!transition-none"
+              style={{
+                width: 172, height: 172,
+                background: 'radial-gradient(circle at 50% 45%, rgba(47,101,85,.20), rgba(47,101,85,.07) 58%, transparent 74%)',
+                boxShadow: '0 0 0 1px rgba(47,101,85,.18), 0 10px 34px -12px rgba(33,76,64,.45)',
+                transform: `scale(${scale})`, transition: `transform ${seconds}s ease-in-out`,
+              }}
             />
-            <span className="relative text-[17px] font-black text-[#214C40]">{PHASE_TEXT[ar ? 'ar' : 'en'][phase]}</span>
+            <span className="relative text-[21px] font-black tracking-tight text-[#214C40]">{PHASE_TEXT[ar ? 'ar' : 'en'][phase]}</span>
           </div>
         </div>
         {/* الحالة تُقال لقارئ الشاشة نصًّا، فالدائرة وحدها لا تصل إليه. */}

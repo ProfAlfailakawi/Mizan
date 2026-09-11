@@ -21,6 +21,12 @@ const ORDER: Record<string, number> = { WAQF_LAZIM: 0, NO_STOP: 1, MUANAQAH: 2, 
 /* اللازم و«لا وقف» يغيّران المعنى إن خولفا، فيُميَّزان لونًا؛ وبقيّة العلامات إرشاد. */
 const STRICT = new Set(['WAQF_LAZIM', 'NO_STOP']);
 
+/*
+ * لماذا يقبل المقطع كلَّه لا الآية الجارية وحدها: كان معلّقًا على الآية الجارية، والآية
+ * الجارية لا تُضبط إلا حين يشتغل الصوت. فمن فتح المقطع وقرأه بعينه — وهو أكثر ما يقع —
+ * لم يكن يرى شرح الوقف إطلاقًا. الآن يعرض علامات المقطع المعروض، ويضيق إلى الآية وحدها
+ * حين تكون هناك آية متتبَّعة فعلًا.
+ */
 export const WaqfGuide: React.FC<{ text?: string; ayah?: number | null; ar: boolean }> = ({ text, ayah, ar }) => {
   const marks = useMemo(() => {
     const found = distinctWaqfSymbols(text || '');
@@ -33,7 +39,7 @@ export const WaqfGuide: React.FC<{ text?: string; ayah?: number | null; ar: bool
     <div className="border-t border-[#e5e1d7] px-4 sm:px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="text-[9px] font-black text-[#59615c]">
-          {ar ? `الوقف في الآية${ayah ? ` ${ayah}` : ''}` : `Waqf in ayah${ayah ? ` ${ayah}` : ''}`}
+          {ayah ? (ar ? `الوقف في الآية ${ayah}` : `Waqf in ayah ${ayah}`) : (ar ? 'الوقف في هذا المقطع' : 'Waqf in this passage')}
         </span>
         {marks.map(m => {
           const strict = STRICT.has(m.category);
