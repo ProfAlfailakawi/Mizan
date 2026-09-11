@@ -135,6 +135,13 @@
 :root { --mizan-control-h:46px; }
 .mizan-input { width:100%; min-height:var(--mizan-control-h); border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; }
 .mizan-control { min-height:var(--mizan-control-h); border:1px solid #dcdad2; border-radius:13px; background:#fffefb; overflow:hidden; }
+/* زرّا العدّاد دائرتان داخل الحقل: يتناغم مع القائمة المنسدلة وحقل النصّ في الصفّ نفسه
+   بدل أن يبدو لوحةَ تحكّمٍ بجوار حقل. */
+.mizan-control { padding-inline:.4rem; }
+.mizan-step-btn{ width:34px; height:34px; flex:0 0 auto; border-radius:10px; display:grid; place-items:center; color:#4f5752; transition:background-color .15s ease, color .15s ease; }
+.mizan-step-btn:hover:not(:disabled){ background:#f1efe9; }
+.mizan-step-btn:disabled{ opacity:.28; }
+@media (prefers-reduced-motion:reduce){ .mizan-step-btn{ transition:none } }
 html[data-mizan-touch="xl"] { --mizan-control-h:52px; }
 .mizan-input:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
 .mizan-input.mizan-input-icon-start { padding-inline-start:2.65rem; }

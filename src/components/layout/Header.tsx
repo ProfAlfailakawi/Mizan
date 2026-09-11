@@ -17,7 +17,7 @@ interface HeaderProps { onOpenExperienceHome?:()=>void; }
 
 
 export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
- const {language,competition,isOffline,toggleOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
+ const {language,competition,isOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
  const brandInfo = useBrandInfo();
  const production=(import.meta.env as Record<string,string|undefined>).VITE_REQUIRE_AUTH==='true';
  const superAdmin=currentUser.role==='super_admin';
@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
           {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
         </div>
       </details>
-      {!superAdmin&&<button onClick={toggleOffline} className={`w-11 h-11 grid place-items-center rounded-xl transition ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'hover:bg-[#efede7] text-[#66706a]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'استمرارية دون إنترنت':'Offline continuity'):(language==='ar'?'متصل':'Online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</button>}
+      {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'text-[#656b66]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
