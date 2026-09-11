@@ -44,7 +44,6 @@ const VIEWS = {
   waitingBoard: () => import('./components/public/WaitingBoard'),
   hallRecitationMap: () => import('./components/public/HallRecitationMap'),
   broadcastStage: () => import('./components/public/BroadcastStage'),
-  judgeIntelligenceLab: () => import('./components/public/JudgeIntelligenceLab'),
   certificateVerification: () => import('./components/public/CertificateVerification'),
   registrationFlow: () => import('./components/public/RegistrationFlow'),
   competitionLanding: () => import('./components/public/CompetitionLanding'),
@@ -68,7 +67,6 @@ const CeremonyView = pick(VIEWS.ceremonyView, 'CeremonyView');
 const WaitingBoard = pick(VIEWS.waitingBoard, 'WaitingBoard');
 const HallRecitationMap = pick(VIEWS.hallRecitationMap, 'HallRecitationMap');
 const BroadcastStage = pick(VIEWS.broadcastStage, 'BroadcastStage');
-const JudgeIntelligenceLab = pick(VIEWS.judgeIntelligenceLab, 'JudgeIntelligenceLab');
 const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
 const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
 const CompetitionLanding = pick(VIEWS.competitionLanding, 'CompetitionLanding');
@@ -137,11 +135,11 @@ const NoRoleConsole: React.FC = () => (
  * ولا دور dialog — لأن السطح حينها ليس نافذةً فوق التطبيق بل هو الجهاز كله. وهذا يستعمل
  * التصميم القائم (شاشة بلا onClose = سطح دائم) بدل أن يضيف حارسًا يمكن تجاوزه.
  */
-const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',hallMap:'خريطة القاعة',broadcast:'شاشة البث',jiLab:'مختبر ذكاء التحكيم',ceremony:'شاشة الحفل'};
-const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean;broadcast:boolean;jiLab:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,hallMap,broadcast,jiLab,ceremony,close})=>{
+const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',hallMap:'خريطة القاعة',broadcast:'شاشة البث',ceremony:'شاشة الحفل'};
+const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean;broadcast:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,hallMap,broadcast,ceremony,close})=>{
  const {language}=useAppStore(); const ar=language==='ar';
  const {lock,apply}=useVenueLockState();
- const active=kiosk?'kiosk':waitingBoard?'waitingBoard':hallMap?'hallMap':broadcast?'broadcast':jiLab?'jiLab':ceremony?'ceremony':'';
+ const active=kiosk?'kiosk':waitingBoard?'waitingBoard':hallMap?'hallMap':broadcast?'broadcast':ceremony?'ceremony':'';
  if(!active) return null;
  const locked=!!lock;
  const lockSurface=async(next:Parameters<typeof apply>[0])=>{apply(next);try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen()}catch{/* Mobile Safari may decline fullscreen; app chrome is still removed. */}};
@@ -155,7 +153,6 @@ const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean
    {waitingBoard&&<WaitingBoard onClose={exit}/>}
    {hallMap&&<HallRecitationMap onClose={exit}/>}
    {broadcast&&<BroadcastStage onClose={exit}/>}
-   {jiLab&&<JudgeIntelligenceLab onClose={exit}/>}
    {ceremony&&<CeremonyView onClose={exit}/>}
   </Overlay>
   {locked
@@ -222,9 +219,9 @@ export default function App() {
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
  const [tenantSuspended,setTenantSuspended]=useState(false);
- const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [jiLab,setJiLab]=useState(false); const [hash,setHash]=useState(window.location.hash);
+ const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [broadcast,setBroadcast]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
- useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='broadcast')setBroadcast(true); else if(surface==='jiLab')setJiLab(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
+ useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='broadcast')setBroadcast(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
     وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
  useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;setTenantSuspended(t.status==='suspended');if(t.status==='suspended')return;
@@ -283,8 +280,7 @@ export default function App() {
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
  if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
  if(hash.startsWith('#broadcast')) return <><Overlay><BroadcastStage onClose={returnToExperience}/></Overlay></>;
- if(hash.startsWith('#judge-intelligence')) return <><Overlay><JudgeIntelligenceLab onClose={returnToExperience}/></Overlay></>;
- if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)} onOpenLab={()=>setJiLab(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/></>;
+ if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)} onOpenBroadcast={()=>setBroadcast(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),ceremony:()=>setCeremony(false)}}/></>;
  const competitionClosed=['completed','archived'].includes((competitions.find(c=>c.id===requestedComp)||competitions[0])?.status||'');
  const operationalRoles=['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','guardian','support_agent'];
  if(competitionClosed&&operationalRoles.includes(currentUser.role)) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-6" dir="rtl"><div className="mizan-surface max-w-lg w-full p-8 text-center"><MizanLogo language="ar" compact/><div className="mizan-kicker mt-6">المسابقة مغلقة</div><h1 className="text-2xl font-black mt-2">انتهت المسابقة وتم إيقاف الوصول التشغيلي</h1><p className="text-sm text-[#636864] mt-4 leading-7">تم حفظ السجل والنتائج والشهادات، لكن جميع صلاحيات التشغيل والدخول لهذه المسابقة متوقفة.</p><button onClick={()=>void signOut(auth)} className="mt-6 rounded-2xl bg-[#214C40] text-white px-6 py-3 text-sm font-black">تسجيل الخروج</button></div></div>;
@@ -323,6 +319,6 @@ export default function App() {
   </div>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
-  <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} jiLab={jiLab} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),jiLab:()=>setJiLab(false),ceremony:()=>setCeremony(false)}}/>
+  <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} broadcast={broadcast} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),broadcast:()=>setBroadcast(false),ceremony:()=>setCeremony(false)}}/>
  </div>
 }

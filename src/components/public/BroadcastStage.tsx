@@ -7,15 +7,20 @@ import { Button } from '../design-system/Button';
 /*
  * Mizan · Spatial Broadcast Engine (venue mode).
  *
- * Turns the on-air name-and-score bar into a living Qur'anic academy: live sub-word
- * tracking on the Muṣḥaf, plain-language waqf explanation, a Riwayah Guard, and an
- * alignment-confidence meter.
+ * Turns the on-air name-and-score bar into a living Qur'anic academy: the recited word lit on
+ * the Muṣḥaf, the waqf mark explained in plain language as it is reached, and the reading named
+ * where it distinguishes itself. A broadcast that teaches instead of only announcing.
  *
- * NON-NEGOTIABLE (consistent with AI_INTEGRITY.md and quran-intelligence.ts): the audio
- * alignment shown here is SHADOW-only and never changes a score — the human judge decides.
- * The passage text and waqf marks are illustrative for this showcase; in official operation
- * they load from a certified KFGQPC source package, never from a model. Sūrat al-Fātiḥah is
- * used as universally-verified illustrative content, not as an in-system source of truth.
+ * This is the broadcast *layout* on a walkthrough timeline — the operator's rehearsal of what
+ * goes on air. Sūrat al-Fātiḥah is used as universally-verified illustrative content; in
+ * official operation the passage text and waqf marks load from a certified KFGQPC source
+ * package, never from a model.
+ *
+ * What deliberately is NOT here: an alignment-confidence meter. This surface has no aligner
+ * behind it, and a percentage drawn from a curve rather than from audio is a trust signal that
+ * has not been earned — the worse failure being that it looks exactly like one that has.
+ * Alignment state belongs where it is real and gated: QuranIntelligenceDock, in front of the
+ * judge, in shadow mode, never touching a score.
  */
 
 type WaqfKind = 'tam' | 'kafi' | 'hasan' | 'lazim';
@@ -62,13 +67,6 @@ function locate(ms: number) {
   for (let i = 0; i < PASSAGE.length; i++) { if (ms < acc + PASSAGE[i].ms) return { idx: i, within: (ms - acc) / PASSAGE[i].ms }; acc += PASSAGE[i].ms; }
   return { idx: PASSAGE.length - 1, within: 1 };
 }
-/** Synthetic shadow-mode confidence: dips at word seams and around the repeated "الرحمن الرحيم". */
-function confidenceAt(idx: number, within: number) {
-  const seam = Math.min(within, 1 - within);
-  let c = 0.72 + 0.26 * Math.min(1, seam * 4);
-  if (idx === 8 || idx === 9) c -= 0.16;
-  return Math.max(0.28, Math.min(0.99, c));
-}
 
 export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const { language } = useAppStore();
@@ -78,7 +76,6 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
 
   const [elapsed, setElapsed] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [lost, setLost] = useState(false);
   const raf = useRef<number | null>(null);
   const last = useRef<number>(0);
 
@@ -98,13 +95,9 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
   useEffect(() => { if (elapsed >= TOTAL && playing) setPlaying(false); }, [elapsed, playing]);
 
   const { idx, within } = locate(elapsed);
-  let conf = confidenceAt(idx, within);
-  let state: 'LOCKED' | 'PROBABLE' | 'LOST' = conf > 0.6 ? 'LOCKED' : 'PROBABLE';
-  if (lost) { conf = 0.18; state = 'LOST'; }
   const cur = PASSAGE[idx];
-  const showWaqf = !!cur.waqf && within > 0.45 && !lost;
-  const showReading = !!cur.reading && within > 0.3 && within < 0.9 && !lost;
-  const stateLabel = ar ? { LOCKED: 'مُقفَلة', PROBABLE: 'مُرجَّحة', LOST: 'مفقودة' }[state] : state[0] + state.slice(1).toLowerCase();
+  const showWaqf = !!cur.waqf && within > 0.45;
+  const showReading = !!cur.reading && within > 0.3 && within < 0.9;
 
   const restart = useCallback(() => { setElapsed(0); setPlaying(true); last.current = performance.now(); }, []);
   const gold = '#E8CB93', goldDeep = '#B98B4E', danger = '#C56A5F';
@@ -123,13 +116,12 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           <span className="grid h-8 w-8 place-items-center rounded-[9px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><Radio className="h-4 w-4" style={{ color: gold }} /></span>
           <div className="flex flex-col leading-tight">
             <span className="font-black text-[15px]">{ar ? 'محرك البثّ الحجمي' : 'Spatial Broadcast Engine'}</span>
-            <span className="text-[11px] font-bold" style={{ color: gold }}>SHADOW · {ar ? 'لا يمسّ الدرجة' : 'never scores'}</span>
+            <span className="text-[11px] font-bold" style={{ color: gold }}>{ar ? 'تجربة إخراج · لا يمسّ الدرجة' : 'Broadcast rehearsal · never scores'}</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => { if (!playing && elapsed >= TOTAL) restart(); else setPlaying(p => !p); }} aria-label={playing ? (ar ? 'إيقاف مؤقت' : 'Pause') : elapsed >= TOTAL ? (ar ? 'إعادة التشغيل' : 'Replay') : (ar ? 'تشغيل' : 'Play')} className="grid h-11 min-w-11 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
           <Button shape="square" variant="venue-gold" onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'}><RotateCcw className="h-[18px] w-[18px]" /></Button>
-          <button onClick={() => setLost(v => !v)} className="h-11 rounded-[11px] px-3 text-[13px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'تمرين فقد المحاذاة' : 'Alignment drill')}</button>
           {onClose && <Button shape="square" variant="venue-gold" onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'}><X className="h-[18px] w-[18px]" /></Button>}
         </div>
           <input type="range" min={0} max={1000} value={Math.round((elapsed / TOTAL) * 1000)} onChange={e => setElapsed((+e.target.value / 1000) * TOTAL)} aria-label={ar ? 'شريط الزمن' : 'Timeline'} className="sm:col-span-2 h-[7px] w-full cursor-pointer appearance-none rounded-full" style={{ background: `linear-gradient(90deg, ${goldDeep} ${(elapsed / TOTAL) * 100}%, rgba(244,241,232,.14) ${(elapsed / TOTAL) * 100}%)` }} />
@@ -154,15 +146,6 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
               </div>
             )}
           </div>
-          <div className="flex-1 rounded-[14px] border px-3 py-2.5" style={{ minWidth: 150, background: 'rgba(12,23,19,.6)', borderColor: 'rgba(232,203,147,.16)' }}>
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-[13px] font-bold" style={{ color: lost ? danger : gold }}>{stateLabel}</span>
-              <span className="rounded-full border px-1.5 py-0.5 text-[10px]" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>{ar ? 'القرار للمحكم' : 'Judge decides'}</span>
-            </div>
-            <div className="h-[5px] overflow-hidden rounded-full" style={{ background: 'rgba(244,241,232,.12)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(conf * 100)}%`, background: lost ? danger : `linear-gradient(90deg,#2f6555,${gold})` }} />
-            </div>
-          </div>
         </div>
 
         {/* passage header */}
@@ -177,12 +160,12 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
         <div className="font-quran self-center text-center" dir="rtl" style={{ fontSize: 'clamp(19px,5.4vw,38px)', lineHeight: 1.95, overflowWrap: 'anywhere', maxWidth: '100%', textShadow: '0 1px 0 rgba(0,0,0,.3)' }}>
           {PASSAGE.map((t, i) => {
             const active = i === idx, spoken = i < idx;
-            const color = active ? (lost ? 'rgba(244,241,232,.72)' : '#fff') : spoken ? '#f4f1e8' : 'rgba(244,241,232,.6)';
+            const color = active ? '#fff' : spoken ? '#f4f1e8' : 'rgba(244,241,232,.6)';
             const el = (
-              <span key={i} style={{ position: 'relative', color, padding: '0 .05em', transition: 'color .3s ease', textShadow: active && !lost ? '0 0 20px rgba(232,203,147,.45)' : undefined }}>
+              <span key={i} style={{ position: 'relative', color, padding: '0 .05em', transition: 'color .3s ease', textShadow: active ? '0 0 20px rgba(232,203,147,.45)' : undefined }}>
                 {t.w}
                 {active && (
-                  <span aria-hidden style={{ position: 'absolute', insetInline: '-.04em', bottom: '-.14em', height: '.1em', borderRadius: 999, background: lost ? danger : `linear-gradient(90deg,${goldDeep},${gold})`, boxShadow: lost ? 'none' : '0 0 14px 2px rgba(232,203,147,.55)', opacity: lost ? 0.5 : 1 }} />
+                  <span aria-hidden style={{ position: 'absolute', insetInline: '-.04em', bottom: '-.14em', height: '.1em', borderRadius: 999, background: `linear-gradient(90deg,${goldDeep},${gold})`, boxShadow: '0 0 14px 2px rgba(232,203,147,.55)' }} />
                 )}
               </span>
             );
@@ -221,8 +204,8 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
 
       <p className="w-full max-w-[1180px] border-t pt-3.5 text-[12px] leading-relaxed" style={{ color: '#8b9a92', borderColor: 'rgba(232,203,147,.16)' }}>
         {ar
-          ? 'عرض توضيحي بيانياً. في التشغيل الرسمي يُحمَّل نصّ المصحف وعلامات الوقف من حزمة مصدر معتمدة (KFGQPC)، والمحاذاة الصوتية تعمل في وضع الظل ولا تغيّر أي درجة إطلاقاً.'
-          : 'Illustrative visualization. In production the Muṣḥaf text and waqf marks load from a certified KFGQPC source package, and audio alignment runs in shadow mode — it never changes any score.'}
+          ? 'تجربة إخراج على خطّ زمني تمثيلي. في التشغيل الرسمي يُحمَّل نصّ المصحف وعلامات الوقف من حزمة مصدر معتمدة (KFGQPC)، ويُتابَع الموضع من التلاوة نفسها. لا تُعرض هنا نسبة ثقة ولا حالة محاذاة: موضعها أمام المحكّم لا على الهواء، ولا تمسّ درجة في الحالين.'
+          : 'A broadcast rehearsal on an illustrative timeline. In production the Muṣḥaf text and waqf marks load from a certified KFGQPC source package and the locus follows the live recitation. No confidence figure or alignment state is shown here: that belongs in front of the judge, not on air — and in neither place does it touch a score.'}
       </p>
     </div>
   );

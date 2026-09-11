@@ -9,6 +9,7 @@ import { RegistrationFlow } from '../public/RegistrationFlow';
 import { RealQRCode, makeMizanPassPayload } from '../design-system/RealQRCode';
 import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 import { PracticeStudio } from './PracticeStudio';
+import { WarmupSanctuary } from './WarmupSanctuary';
 import { deliveryReadingKeyFor } from '../judge/OfficialMushafSurface';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
@@ -33,6 +34,8 @@ export const ParticipantDashboard: React.FC = () => {
  const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
  return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
   <section className="mizan-surface p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="mizan-code">{participant.code}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?participant.fullNameArabic:participant.fullName}</h1><p className="text-xs text-[#646965] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(participant.status,ar)}</Badge></div><div className="mt-7 flex items-start gap-1.5" role="list" aria-label={ar?'مراحل رحلتك':'Your journey'}>{[1,2,3,4,5].map(n=>{const state=n<step?'done':n===step?'current':'upcoming';return <React.Fragment key={n}><span role="listitem" aria-current={state==='current'?'step':undefined} aria-label={`${STEP_LABELS[n-1][ar?'ar':'en']} — ${ar?(state==='done'?'مكتملة':state==='current'?'أنت هنا':'لاحقًا'):(state==='done'?'done':state==='current'?'you are here':'upcoming')}`} className="flex flex-col items-center gap-2 shrink-0"><span className="mizan-step" data-state={state}>{state==='done'?<Check className="w-4 h-4"/>:n}</span><span className="mizan-step-label" data-state={state==='current'?'current':undefined}>{ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en}</span></span>{n<5&&<span className="mizan-step-rule mt-[17px]" data-done={n<step||undefined} aria-hidden="true"/>}</React.Fragment>})}</div></section>
+  {/* الإحماء قبل الدخول فقط: بمجرد أن يصير المتسابق داخل اللجنة يختفي القسم، فما بعد الدخول ليس وقت إحماء. */}
+  {['approved','checked_in','in_queue'].includes(participant.status)&&<WarmupSanctuary ar={ar}/>}
   {practiceReading&&['approved','checked_in','in_queue'].includes(participant.status)&&<section className="space-y-3">
    <div className="flex flex-wrap items-end justify-between gap-3">
     <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
