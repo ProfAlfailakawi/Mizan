@@ -30,6 +30,7 @@ import {
   ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord,
   CertifiedVenueSealRecord, QuestionSelection, JudgeEvent,
   ParticipantScopeRecord, QuestionModelRecord, QuestionModelBatchRecord, ScopeSimulationRecord, ScopeEngineSealRecord,
+  QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord,
 } from '../types';
 import { SupportedLanguage } from './i18n';
 
@@ -154,6 +155,12 @@ export interface AppStoreState {
   scopeSimulations: ScopeSimulationRecord[];
   /** تجميدات إعداد المحرك قبل المسابقة. */
   scopeEngineSeals: ScopeEngineSealRecord[];
+  /** المواضع المحجورة بعد اكتشاف عيب فيها، وأثر كل حجر. */
+  questionQuarantines: QuestionQuarantineRecord[];
+  /** دورة حياة حجز الأسئلة: من حجز ماذا، ومتى ينقضي حجزه. */
+  questionReservations: QuestionReservationRecord[];
+  /** تقارير عدالة وتوزيع الأسئلة المصدَّرة. */
+  fairnessReports: FairnessReportRecord[];
   queueTransfers: QueueTransferRecord[];
   // Identity governance
   identityAccounts: IdentityAccountRecord[];

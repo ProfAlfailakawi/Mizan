@@ -1,0 +1,191 @@
+/*
+ * دورة حياة حجز السؤال.
+ *
+ * بين لحظة اختيار المحرك للسؤال ولحظة كشفه في القاعة مسافةٌ زمنية حقيقية: المتسابق في
+ * الطابور، أو تأخّر، أو لم يحضر. وفي هذه المسافة يجب أن يُجاب سؤالان:
+ *
+ *   ١) هل يجوز أن يُسحب هذا الموضع لمتسابق آخر؟ — لا، ما دام الحجز قائمًا.
+ *   ٢) وإن لم يحضر صاحبه؟ — لا يبقى الموضع رهينةً إلى الأبد؛ للحجز مدة معلنة، فإذا انقضت
+ *      عاد الموضع إلى المخزون وحده، بلا تدخل بشري وبلا قرار صامت.
+ *
+ * والانتقالات محصورة في جدول واحد: لا يُكشف موضعٌ أُطلق، ولا يُطلق موضعٌ كُشف. وكل انتقال
+ * يُسجَّل في تاريخ السجل نفسه بمن فعله ولماذا، فالحجز الذي لا يُعرف سببه ليس حجزًا بل ضياع.
+ */
+
+import type { QuestionReservationRecord, QuestionReservationState } from '../types';
+
+/** المدة الافتراضية للحجز المؤقت: ربع ساعة تكفي طابورًا معقولًا ولا تعطّل قاعة. */
+export const DEFAULT_RESERVATION_TTL_SECONDS = 900;
+
+/** الانتقالات المسموحة وحدها. ما ليس هنا مرفوض بصريح النص لا بالسكوت. */
+export const RESERVATION_TRANSITIONS: Record<QuestionReservationState, QuestionReservationState[]> = {
+  available: ['temporarily_reserved', 'assigned', 'quarantined'],
+  temporarily_reserved: ['assigned', 'released', 'quarantined'],
+  assigned: ['revealed', 'released', 'quarantined'],
+  revealed: ['quarantined'],
+  released: ['temporarily_reserved', 'assigned', 'quarantined'],
+  quarantined: [],
+};
+
+export const RESERVATION_STATE_ARABIC: Record<QuestionReservationState, string> = {
+  available: 'متاح',
+  temporarily_reserved: 'محجوز مؤقتًا',
+  assigned: 'مخصَّص',
+  revealed: 'مكشوف',
+  released: 'مُطلق',
+  quarantined: 'محجور',
+};
+
+export interface ReserveInput {
+  records: QuestionReservationRecord[];
+  organizationId: string;
+  competitionId: string;
+  items: { locusKey: string; questionId: string }[];
+  participantId?: string;
+  sessionId?: string;
+  modelId?: string;
+  /** مفتاح ثبات الطلب: الطلب نفسه مرتين لا ينتج حجزين. */
+  idempotencyKey: string;
+  actorId: string;
+  ttlSeconds?: number;
+  now?: string;
+  newId: (prefix: string) => string;
+}
+
+export interface ReserveOutcome {
+  records: QuestionReservationRecord[];
+  created: QuestionReservationRecord[];
+  /** ما تعذّر حجزه لأن غيره يحجزه الآن، أو لأنه محجور. */
+  conflicts: { locusKey: string; heldBy?: string; state: QuestionReservationState }[];
+  /** صحيحٌ إذا كان هذا الطلب قد نُفّذ من قبل بالمفتاح نفسه، فلم يُنشأ شيء جديد. */
+  replayed: boolean;
+}
+
+const iso = (base: string, addSeconds: number) => new Date(new Date(base).getTime() + addSeconds * 1000).toISOString();
+
+/** هل انقضت مدة الحجز المؤقت؟ الانقضاء وحده لا يغيّر السجل؛ يغيّره expireReservations. */
+export function reservationExpired(record: QuestionReservationRecord, now: string): boolean {
+  return record.state === 'temporarily_reserved' && !!record.expiresAt && record.expiresAt <= now;
+}
+
+/** الحالة الفعلية لحظةَ السؤال: المنقضي يُقرأ متاحًا وإن لم يُكتب بعد. */
+export function effectiveState(record: QuestionReservationRecord, now: string): QuestionReservationState {
+  return reservationExpired(record, now) ? 'released' : record.state;
+}
+
+/** المواضع التي لا يجوز سحبها الآن لغير أصحابها. */
+export function blockedLocusKeys(records: QuestionReservationRecord[], now = new Date().toISOString(), exceptParticipantId?: string): Set<string> {
+  const blocked = new Set<string>();
+  for (const record of records) {
+    const state = effectiveState(record, now);
+    if (state === 'quarantined') { blocked.add(record.locusKey); continue; }
+    if (!['temporarily_reserved', 'assigned', 'revealed'].includes(state)) continue;
+    if (exceptParticipantId && record.participantId === exceptParticipantId) continue;
+    blocked.add(record.locusKey);
+  }
+  return blocked;
+}
+
+export function reserveQuestions(input: ReserveInput): ReserveOutcome {
+  const now = input.now || new Date().toISOString();
+  const ttl = Math.max(30, Math.round(input.ttlSeconds ?? DEFAULT_RESERVATION_TTL_SECONDS));
+  const existing = input.records.filter(r => r.idempotencyKey === input.idempotencyKey);
+  if (existing.length) return { records: input.records, created: existing, conflicts: [], replayed: true };
+
+  const conflicts: ReserveOutcome['conflicts'] = [];
+  const created: QuestionReservationRecord[] = [];
+  const blocked = blockedLocusKeys(input.records, now, input.participantId);
+  const holderOf = new Map(input.records.map(r => [r.locusKey, r] as const));
+
+  for (const item of input.items) {
+    if (blocked.has(item.locusKey)) {
+      const holder = holderOf.get(item.locusKey);
+      conflicts.push({ locusKey: item.locusKey, heldBy: holder?.participantId, state: holder ? effectiveState(holder, now) : 'assigned' });
+      continue;
+    }
+    created.push({
+      id: input.newId('qres'),
+      organizationId: input.organizationId,
+      competitionId: input.competitionId,
+      locusKey: item.locusKey,
+      questionId: item.questionId,
+      participantId: input.participantId,
+      sessionId: input.sessionId,
+      modelId: input.modelId,
+      state: 'temporarily_reserved',
+      expiresAt: iso(now, ttl),
+      idempotencyKey: input.idempotencyKey,
+      createdAt: now,
+      updatedAt: now,
+      history: [{ state: 'temporarily_reserved', at: now, by: input.actorId, reason: input.participantId ? `حجز مؤقت لمتسابق` : 'حجز مؤقت' }],
+    });
+    blocked.add(item.locusKey);
+  }
+  return { records: [...created, ...input.records], created, conflicts, replayed: false };
+}
+
+export interface TransitionOutcome {
+  records: QuestionReservationRecord[];
+  changed: QuestionReservationRecord[];
+  rejected: { id: string; from: QuestionReservationState; to: QuestionReservationState }[];
+}
+
+/** انتقال محكوم بالجدول. المرفوض يُقال صراحةً بدل أن يُبتلع. */
+export function transitionReservations(input: {
+  records: QuestionReservationRecord[];
+  ids: string[];
+  to: QuestionReservationState;
+  actorId: string;
+  reason?: string;
+  now?: string;
+}): TransitionOutcome {
+  const now = input.now || new Date().toISOString();
+  const wanted = new Set(input.ids);
+  const changed: QuestionReservationRecord[] = [];
+  const rejected: TransitionOutcome['rejected'] = [];
+  const records = input.records.map(record => {
+    if (!wanted.has(record.id)) return record;
+    const from = effectiveState(record, now);
+    if (from === input.to) return record;
+    if (!RESERVATION_TRANSITIONS[from].includes(input.to)) { rejected.push({ id: record.id, from, to: input.to }); return record; }
+    const next: QuestionReservationRecord = {
+      ...record,
+      state: input.to,
+      updatedAt: now,
+      expiresAt: input.to === 'temporarily_reserved' ? record.expiresAt : undefined,
+      history: [...record.history, { state: input.to, at: now, by: input.actorId, reason: input.reason }],
+    };
+    changed.push(next);
+    return next;
+  });
+  return { records, changed, rejected };
+}
+
+/*
+ * إطلاق ما انقضت مدته.
+ *
+ * يُكتب هنا مباشرةً لا عبر transitionReservations: ذاك يقرأ الحالة الفعلية، والمنقضي
+ * يُقرأ «مُطلقًا» أصلًا، فيرى الانتقال إلى «مُطلق» انتقالًا إلى ما هو فيه فلا يكتب شيئًا —
+ * فيبقى السجل مكتوبًا فيه «محجوز مؤقتًا» إلى الأبد. الانقضاء واقعٌ يُثبَّت في السجل.
+ */
+export function expireReservations(records: QuestionReservationRecord[], now = new Date().toISOString(), actorId = 'system'): TransitionOutcome {
+  const expired = new Set(records.filter(r => reservationExpired(r, now)).map(r => r.id));
+  if (!expired.size) return { records, changed: [], rejected: [] };
+  const changed: QuestionReservationRecord[] = [];
+  const next = records.map(record => {
+    if (!expired.has(record.id)) return record;
+    const released: QuestionReservationRecord = {
+      ...record, state: 'released', updatedAt: now, expiresAt: undefined,
+      history: [...record.history, { state: 'released', at: now, by: actorId, reason: 'انقضت مدة الحجز المؤقت' }],
+    };
+    changed.push(released);
+    return released;
+  });
+  return { records: next, changed, rejected: [] };
+}
+
+export function reservationSummary(records: QuestionReservationRecord[], now = new Date().toISOString()) {
+  const counts: Record<QuestionReservationState, number> = { available: 0, temporarily_reserved: 0, assigned: 0, revealed: 0, released: 0, quarantined: 0 };
+  for (const record of records) counts[effectiveState(record, now)]++;
+  return { counts, total: records.length, held: counts.temporarily_reserved + counts.assigned + counts.revealed };
+}

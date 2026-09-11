@@ -23,7 +23,9 @@
     "load:rehearsal": "tsx scripts/load-rehearsal.ts",
     "drill:failure": "tsx scripts/failure-drill.ts",
     "fairness:lab": "tsx scripts/fairness-lab.ts",
-    "qa:scope-visual": "node scripts/scope-visual-qa.mjs"
+    "qa:scope-visual": "node scripts/scope-visual-qa.mjs",
+    "qa:competition-day": "node scripts/competition-day-qa.mjs",
+    "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs"
   },
   "engines": {
     "node": ">=22.20.0 <23",

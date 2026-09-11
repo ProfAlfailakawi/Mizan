@@ -182,6 +182,30 @@ export function rubBounds(rub: number) {
 }
 
 /**
+ * حزب الموضع (١..٦٠) وربعه (١..٢٤٠).
+ *
+ * مشتقان بالقسمة داخل الجزء، فيحملان assurance المشتق نفسه الذي تحمله حدودهما. يُذكران في
+ * بيانات السؤال ليُقرأ موضعه بلغة الحفّاظ — «الربع الثاني من الحزب الخامس» — لا ليُبنى
+ * عليهما قرار أهلية: الأهلية تُحسم بالآية وحدها.
+ */
+export function hizbOfLocus(locus: QuranLocus): number {
+  const juz = juzOfLocus(locus);
+  const bounds = juzBounds(juz);
+  const first = ayahOrdinal(bounds.start), last = ayahOrdinal(bounds.end);
+  const position = (ayahOrdinal(locus) - first) / Math.max(1, last - first + 1);
+  return (juz - 1) * 2 + (position < 0.5 ? 1 : 2);
+}
+
+export function rubOfLocus(locus: QuranLocus): number {
+  const juz = juzOfLocus(locus);
+  const bounds = juzBounds(juz);
+  const first = ayahOrdinal(bounds.start), last = ayahOrdinal(bounds.end);
+  const total = Math.max(1, last - first + 1);
+  const eighth = Math.min(7, Math.floor(((ayahOrdinal(locus) - first) / total) * 8));
+  return (juz - 1) * 8 + eighth + 1;
+}
+
+/**
  * صفحة الموضع في المصحف المدني. مرساة الصفحة من جدول مطالع السور، ثم تُنسَّب الآية داخل
  * مدى سورتها. تقريب كافٍ للخرائط والملخصات، وتُستبدل بالصفحة الحقيقية متى قُرئت من حزمة
  * المصدر المعتمدة على الخادم.

@@ -73,7 +73,7 @@ for (const [width, height, label] of VIEWPORTS) {
     await assertNoHorizontalScroll(page, label, 'النطاق');
     ok('شاشة النطاق');
 
-    for (const [tab, file] of [['اختيار المتسابق', 'selection'], ['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['الجاهزية', 'readiness']]) {
+    for (const [tab, file] of [['اختيار المتسابق', 'selection'], ['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness']]) {
       const target = page.locator('[role="tab"]:visible', { hasText: tab }).first();
       if (!await target.count()) { note(`[${label}] التبويب «${tab}» غير موجود`); continue; }
       await target.click({ timeout: 8000 }).catch(e => note(`[${label}] «${tab}»: ${String(e).slice(0, 80)}`));
@@ -96,6 +96,63 @@ for (const [width, height, label] of VIEWPORTS) {
     else ok(`المحاكاة: ${served[1]} سحبة كلها نجحت`);
     if (!/لم يخرج سؤال واحد عن نطاق صاحبه/.test(body)) note(`[${label}] المحاكاة لم تؤكد سلامة النطاقات`);
     await page.screenshot({ path: path.join(OUT, `${label}-simulation-run.png`), fullPage: true });
+
+    /*
+     * النماذج والعدالة: لا يكفي أن تظهر الأزرار. تُضغط فعلًا — تُولَّد دفعة، وتُعتمد، وتُختم،
+     * ويُحجر موضع، ويُصدر تقرير — ويُقرأ ما ظهر على الشاشة بعد كل خطوة.
+     */
+    if (label === 'desktop') {
+      await page.locator('[role="tab"]:visible', { hasText: 'النماذج والعدالة' }).first().click();
+      await page.waitForTimeout(900);
+      const accept = async () => {
+        const confirmBtn = page.locator('[role="dialog"] button:visible, .mizan-confirm button:visible').filter({ hasText: /ولّد الآن|اعتماد|ختم|احجر|أصدر|تأكيد|نعم|Approve|Seal|Generate/ }).first();
+        if (await confirmBtn.count()) { await confirmBtn.click().catch(() => {}); await page.waitForTimeout(1400); return true; }
+        return false;
+      };
+
+      await page.locator('button:visible', { hasText: 'ولّد دفعة' }).first().click();
+      if (!await accept()) note(`[${label}] زر توليد الدفعة لم يفتح تأكيدًا`);
+      await page.waitForTimeout(1800);
+      let body = await page.locator('body').innerText();
+      const generated = body.match(/وُلّد\s*(\d+)\s*نموذجًا\s*و(\d+)\s*احتياطيًا/);
+      if (!generated) note(`[${label}] لم يظهر أثر توليد الدفعة على الشاشة`);
+      else if (generated[1] === '0') note(`[${label}] الدفعة ولّدت صفر نموذج`);
+      else ok(`دفعة: ${generated[1]} نموذجًا و${generated[2]} احتياطيًا`);
+      await page.screenshot({ path: path.join(OUT, `${label}-models-generated.png`), fullPage: true });
+
+      await page.locator('button:visible', { hasText: /^اعتماد$/ }).first().click().catch(() => note(`[${label}] زر اعتماد الدفعة معطّل بعد التوليد`));
+      await accept();
+      await page.locator('button:visible', { hasText: /^ختم$/ }).first().click().catch(() => note(`[${label}] زر ختم الدفعة معطّل بعد الاعتماد`));
+      await accept();
+      body = await page.locator('body').innerText();
+      if (!/مختومة/.test(body)) note(`[${label}] الدفعة لم تصل إلى حالة «مختومة»`); else ok('الدفعة اعتُمدت ثم خُتمت');
+
+      const lociField = page.locator('input[placeholder="2:255، 36:1"]').first();
+      if (!await lociField.count()) note(`[${label}] حقل حجر المواضع غير موجود`);
+      else {
+        await lociField.fill('2:255');
+        await page.locator('input[placeholder="خطأ في ضبط النص"]').first().fill('فحص تشغيلي');
+        await page.locator('button:visible', { hasText: /^احجر$/ }).first().click();
+        await accept();
+        await page.waitForTimeout(1200);
+        body = await page.locator('body').innerText();
+        if (!/حُجر\s*1\s*موضعًا/.test(body)) note(`[${label}] الحجر لم يُظهر أثره بالأرقام`); else ok('الحجر يُظهر أثره: نماذج مُبطلة ومخزون متبقٍ');
+        if (!/ارفع الحجر/.test(body)) note(`[${label}] لا سبيل لرفع الحجر من الشاشة`);
+      }
+
+      await page.locator('button:visible', { hasText: 'أطلق المنقضي' }).first().click().catch(() => note(`[${label}] زر إطلاق الحجوزات المنقضية لا يعمل`));
+      await page.waitForTimeout(800);
+
+      await page.locator('button:visible', { hasText: 'أصدر التقرير' }).first().click();
+      await page.waitForTimeout(2500);
+      body = await page.locator('body').innerText();
+      if (!/تقرير عدالة وتوزيع الأسئلة/.test(body)) note(`[${label}] التقرير لم يصدر`);
+      else if (/شهادة علمية/.test(body) && !/ليس شهادة علمية/.test(body)) note(`[${label}] التقرير يدّعي أنه شهادة علمية`);
+      else ok('تقرير العدالة صدر ولم يدّعِ أنه شهادة علمية');
+      if (!/الحدّ الأدنى الرياضي|أقل تكرار ممكن رياضيًا/.test(body)) note(`[${label}] التقرير لم يذكر الحدّ الأدنى الرياضي للتكرار`);
+      await assertNoHorizontalScroll(page, label, 'النماذج والعدالة');
+      await page.screenshot({ path: path.join(OUT, `${label}-models-report.png`), fullPage: true });
+    }
   } catch (error) {
     note(`[${label}] توقف الفحص: ${String(error).slice(0, 160)}`);
   }

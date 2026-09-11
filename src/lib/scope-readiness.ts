@@ -44,6 +44,14 @@ export interface ScopeReadinessInput {
   questionsPerParticipant: (category: Category) => number;
   repeatPolicyFor: (category: Category) => RepeatPolicy;
   staleModelCount?: number;
+  /*
+   * حالة الحجر والاحتياط.
+   *
+   * حجرٌ أفرغ البنك يمنع المسابقة، وغيابُ احتياطٍ لا يمنعها لكنه يجعل سقوط سؤالٍ واحدٍ
+   * توقفًا في القاعة. فيُقال الأول حاسمًا والثاني توصيةً، ولا يُخلط بينهما.
+   */
+  activeQuarantines?: { locusCount: number; canContinue: boolean; summaryAr: string; summaryEn: string }[];
+  reserveModelCount?: number;
   sealed?: boolean;
   escrowRequired?: boolean;
   escrowReady?: boolean;
@@ -180,6 +188,27 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
       ? { id: 'difficulty_review', severity: 'critical', titleAr: 'مراجعة الصعوبة', titleEn: 'Difficulty review', fix: 'pool',
           detailAr: `${unreviewed.length} فئة تعمل بوضع صارم ولا تملك مواضع مراجَعة علميًا.`, detailEn: `${unreviewed.length} categories run in strict mode with no scientifically reviewed loci.` }
       : pass('difficulty_review', 'مراجعة الصعوبة', 'Difficulty review', 'المواضع المستعملة تحمل تقييم صعوبة مراجَعًا.', 'Used loci carry reviewed difficulty ratings.'));
+  }
+
+  /* ١٠ — الحجر: هل أبقى ما يكفي؟ */
+  const quarantines = input.activeQuarantines || [];
+  const blocking = quarantines.filter(q => !q.canContinue);
+  if (quarantines.length) {
+    checks.push(blocking.length
+      ? { id: 'quarantine', severity: 'critical', titleAr: 'أثر الحجر', titleEn: 'Quarantine impact', fix: 'pool',
+          detailAr: blocking[0].summaryAr, detailEn: blocking[0].summaryEn }
+      : { id: 'quarantine', severity: 'warning', titleAr: 'أثر الحجر', titleEn: 'Quarantine impact', fix: 'pool',
+          detailAr: `${quarantines.length} حجرًا ساريًا يُخرج ${quarantines.reduce((sum, q) => sum + q.locusCount, 0)} موضعًا من البنك. البنك ما زال كافيًا، والنماذج المبطلة تُعاد توليدًا.`,
+          detailEn: `${quarantines.length} active quarantines remove ${quarantines.reduce((sum, q) => sum + q.locusCount, 0)} loci. The pool still suffices; invalidated models are regenerated.` });
+  }
+
+  /* ١١ — الاحتياط: ماذا لو سقط سؤال؟ */
+  if (input.reserveModelCount !== undefined) {
+    checks.push(input.reserveModelCount > 0
+      ? pass('reserve_models', 'النماذج الاحتياطية', 'Reserve models', `${input.reserveModelCount} نموذجًا احتياطيًا جاهزًا، مولَّدًا بالمحرك نفسه ومربوطًا ببصمة نطاقه.`, `${input.reserveModelCount} reserve models are ready, engine-generated and bound to their range signature.`)
+      : { id: 'reserve_models', severity: 'recommendation', titleAr: 'النماذج الاحتياطية', titleEn: 'Reserve models', fix: 'models',
+          detailAr: 'لا نموذج احتياطي جاهز. لو سقط سؤال يوم المسابقة فلا بديل مولَّدًا بالمحرك نفسه، ويصير الخيار انتظارًا أو اختيارًا بشريًا.',
+          detailEn: 'No reserve model is ready. If a question drops on the day there is no engine-generated substitute, leaving a wait or a human pick.' });
   }
 
   if (input.escrowRequired) {

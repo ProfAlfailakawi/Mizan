@@ -311,6 +311,8 @@ export interface QuestionModelBatchRecord {
   generationMode: 'pre_generated' | 'just_in_time' | 'hybrid';
   aggregateFairness: FairnessBreakdown;
   simulationId?: string;
+  /** ما تعذّر توليده وسببه — بلا معرّف متسابق، فالسبب يُقال والهوية تُصان. */
+  declaredFailures?: { code: string; ar: string; en: string; count: number }[];
   approvalState: 'draft' | 'approved' | 'sealed' | 'invalidated';
   approvedBy?: string;
   approvedAt?: string;
@@ -360,6 +362,92 @@ export interface ScopeEngineSealRecord {
   status: 'active' | 'superseded';
   supersededAt?: string;
   supersededReason?: string;
+}
+
+/** حجر موضع بعد اكتشاف عيب فيه — لا حذف، بل إبطالٌ موثّق وأثرٌ مقيس. */
+export interface QuestionQuarantineRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  /** مفاتيح المواضع المحجورة بصيغة «سورة:آية». */
+  locusKeys: string[];
+  /** معرّفات أسئلة البنك المحجورة إن كان الحجر على سؤال بعينه لا على موضع. */
+  questionIds: string[];
+  reason: string;
+  raisedBy: string;
+  raisedAt: string;
+  severity: 'defect' | 'disputed_text' | 'leak' | 'policy';
+  invalidatedModelIds: string[];
+  affectedParticipantCount: number;
+  remainingUniqueLoci: number;
+  averageReuseAfter: number;
+  canContinue: boolean;
+  summaryArabic: string;
+  summaryEnglish: string;
+  status: 'active' | 'lifted';
+  liftedAt?: string;
+  liftedBy?: string;
+  liftReason?: string;
+}
+
+/**
+ * دورة حياة حجز السؤال (§66).
+ *
+ * سؤالٌ «مخصَّص» لمتسابق لم يحضر بعد لا يجوز أن يُسحب لغيره، ولا أن يبقى محجوزًا إلى الأبد
+ * إن لم يحضر. فالحجز مؤقّت بمدة معلنة، وينتهي إلى أحد أبواب أربعة: كُشف، أو أُطلق، أو حُجر،
+ * أو انقضت مدته فعاد إلى المخزون.
+ */
+export type QuestionReservationState = 'available' | 'temporarily_reserved' | 'assigned' | 'revealed' | 'released' | 'quarantined';
+
+export interface QuestionReservationRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  locusKey: string;
+  questionId: string;
+  participantId?: string;
+  sessionId?: string;
+  modelId?: string;
+  state: QuestionReservationState;
+  /** متى ينقضي الحجز المؤقت ويعود الموضع إلى المخزون. */
+  expiresAt?: string;
+  /** مفتاح إعادة المحاولة: الطلب نفسه مرتين لا يحجز موضعين. */
+  idempotencyKey: string;
+  createdAt: string;
+  updatedAt: string;
+  history: { state: QuestionReservationState; at: string; by: string; reason?: string }[];
+}
+
+/**
+ * تقرير عدالة وتوزيع الأسئلة (§98).
+ *
+ * ليس «شهادة علمية» — لا جهة علمية أصدرته. هو بيانُ ما فعله المحرك: كم سُحب، وكم تكرر،
+ * وكم كان الحدّ الأدنى الرياضي للتكرار، وأين وقع الضغط، وبأي قواعد. بلا أسماء متسابقين.
+ */
+export interface FairnessReportRecord {
+  id: string;
+  organizationId: string;
+  competitionId: string;
+  titleArabic: string;
+  titleEnglish: string;
+  scope: 'competition' | 'category' | 'batch' | 'simulation';
+  scopeRef?: string;
+  generatedAt: string;
+  generatedBy: string;
+  engineVersion: string;
+  policyVersion: string;
+  reportHash: string;
+  /** لا أسماء ولا أكواد متسابقين في أي قسم من هذا التقرير. */
+  privacy: { participantIdentities: false; judgeScores: false };
+  sections: {
+    id: string;
+    titleArabic: string;
+    titleEnglish: string;
+    rows: { labelArabic: string; labelEnglish: string; value: string; note?: string }[];
+  }[];
+  findings: { id: string; severity: 'critical' | 'warning' | 'recommendation' | 'passed'; ar: string; en: string }[];
+  honestyNoteArabic: string;
+  honestyNoteEnglish: string;
 }
 
 export interface Competition {
