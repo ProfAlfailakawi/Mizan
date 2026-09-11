@@ -139,4 +139,3 @@ const Governance=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{
 }
 
 const State=({ok,label,ar}:{ok:boolean;label:string;ar?:boolean})=><div className="flex items-center justify-between text-xs"><span>{label}</span><Badge variant={ok?'emerald':'amber'}>{ok?(ar?'سليم':'OK'):(ar?'انتباه':'ATTN')}</Badge></div>;
-const Empty=({ar}:{ar:boolean})=><div className="py-5 text-center text-xs text-[#696f6b]">{ar?'لا يوجد بعد':'None yet'}</div>;
