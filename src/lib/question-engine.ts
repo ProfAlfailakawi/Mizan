@@ -78,6 +78,15 @@ export interface SelectionRequest {
   scarcityBaseline?: number;
   /** مواضع ممنوعة صراحةً (حجر، أو تاريخ سابق لهذا المتسابق). */
   excludedIds?: string[];
+  /*
+   * مواضع محجوزة الآن لغير هذا المتسابق.
+   *
+   * المنع هنا بالموضع لا بالمعرّف: الموضع الواحد يحمل معرّفاتٍ عدة باختلاف طول المقطع
+   * والرواية، فمنعُ معرّفٍ يترك توأمه يمرّ. والفرق بين هذا وبين دفتر الاستعمال أن الدفتر
+   * يباعد بحسب **عدد** الاستعمالات، وهذا يمنع بحسب **قيام الحجز الآن** — وجلستان تبدآن
+   * في قاعتين في اللحظة نفسها لهما دفترٌ لم يُكتب فيه شيءٌ بعد.
+   */
+  excludedLocusKeys?: string[];
 }
 
 export interface SelectionReason {
@@ -259,7 +268,7 @@ export class QuestionAllocationEngine {
     };
   }
 
-  private eligible(candidates: QuestionCandidate[], request: SelectionRequest, slot: ZoneSlot, chosen: SelectedQuestion[], excluded: Set<string>): EligibleRow[] {
+  private eligible(candidates: QuestionCandidate[], request: SelectionRequest, slot: ZoneSlot, chosen: SelectedQuestion[], excluded: Set<string>, heldLoci: Set<string> = new Set()): EligibleRow[] {
     const policy = this.policy;
     // مدى النطاق يُحسب مرة واحدة للخانة، لا مرة لكل مرشح: هذا هو الفرق بين ثوانٍ ودقائق.
     const ranges = scopeRanges(slot.scope);
@@ -278,6 +287,8 @@ export class QuestionAllocationEngine {
       let inside = false;
       for (const [a, b] of ranges) if (span.from >= a && span.to <= b) { inside = true; break; }
       if (!inside) continue;
+      // الحجز القائم لغيره شرطٌ قاطع لا تفضيل: ما هو بيد متسابقٍ الآن لا يُسحب لثانٍ.
+      if (heldLoci.has(span.key)) continue;
       if (policy.noRepeatWithinModel && (chosenIds.has(candidate.id) || chosenLoci.has(span.key))) continue;
       if (policy.noRepeatWithinParticipant && history?.has(span.key)) continue;
       const row = this.usage.get(span.key);
@@ -378,6 +389,7 @@ export class QuestionAllocationEngine {
 
   selectForParticipant(request: SelectionRequest, candidates: QuestionCandidate[]): SelectionResult {
     const excluded = new Set(request.excludedIds || []);
+    const heldLoci = new Set(request.excludedLocusKeys || []);
     const chosen: SelectedQuestion[] = [];
     const failures: SelectionFailure[] = [];
     const relaxations = new Set<string>();
@@ -385,7 +397,7 @@ export class QuestionAllocationEngine {
 
     for (const slot of request.slots) {
       const scoped = this.candidateResolver ? this.candidateResolver(slot.scope) : candidates;
-      const eligible = this.eligible(scoped, request, slot, chosen, excluded);
+      const eligible = this.eligible(scoped, request, slot, chosen, excluded, heldLoci);
       const spaced = this.neighborhoodFilter(eligible, chosen);
       if (spaced.relaxed) relaxations.add('neighborhood');
       const pool = this.usageBand(spaced.rows);

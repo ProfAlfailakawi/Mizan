@@ -55,12 +55,12 @@
   },
   "desktop/models": {
     "buttons": 38,
-    "headings": 7,
+    "headings": 8,
     "inputs": 6,
     "tables": 0,
     "lists": 0,
     "tabs": 8,
-    "height": 1940
+    "height": 2100
   },
   "desktop/readiness": {
     "buttons": 27,
@@ -127,12 +127,12 @@
   },
   "tablet/models": {
     "buttons": 38,
-    "headings": 7,
+    "headings": 8,
     "inputs": 6,
     "tables": 0,
     "lists": 0,
     "tabs": 16,
-    "height": 2260
+    "height": 2420
   },
   "tablet/readiness": {
     "buttons": 27,
@@ -199,12 +199,12 @@
   },
   "mobile/models": {
     "buttons": 38,
-    "headings": 7,
+    "headings": 8,
     "inputs": 6,
     "tables": 0,
     "lists": 0,
     "tabs": 16,
-    "height": 3680
+    "height": 3900
   },
   "mobile/readiness": {
     "buttons": 27,

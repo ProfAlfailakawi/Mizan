@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle, Archive, BadgeCheck, Ban, ClipboardCheck, Download, FileText, LifeBuoy,
-  Layers3, LockKeyhole, RefreshCcw, ShieldAlert, Timer,
+  Layers3, LockKeyhole, Radar, RefreshCcw, ShieldAlert, Timer,
 } from 'lucide-react';
 import type { FairnessReportRecord, QuestionModelBatchRecord, QuestionModelRecord, QuestionQuarantineRecord } from '../../types';
 import { RESERVATION_STATE_ARABIC, reservationSummary } from '../../lib/question-reservation';
+import { topExposedLoci, type ExposureProfile } from '../../lib/exposure-risk';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { EmptyState } from '../design-system/EmptyState';
@@ -40,6 +41,7 @@ type Store = {
   recoverQuarantinedLoci: (input: { locusKeys: string[]; reason: string; categoryId?: string }) => { ok: boolean; reason?: string; record?: QuestionQuarantineRecord; outcome?: { recovered: { participantId: string; via: 'reserve' | 'regenerated' }[]; unrecovered: { participantId: string; ar: string }[]; summaryArabic: string; summaryEnglish: string } };
   liftQuestionQuarantine: (id: string, reason: string) => { ok: boolean; reason?: string };
   sweepExpiredReservations: () => number;
+  exposureProfiles: () => Map<string, ExposureProfile>;
   buildCompetitionFairnessReport: (options?: { categoryId?: string; batchId?: string }) => Promise<{ ok: boolean; reason?: string; leaks?: string[]; report?: FairnessReportRecord }>;
 };
 
@@ -62,6 +64,8 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
   const batches = store.questionModelBatches.filter(b => !categoryId || b.categoryId === categoryId);
   const quarantines = store.questionQuarantines;
   const reservations = reservationSummary(store.questionReservations);
+  /* ما سُمع في القاعات يُعرض للمنظم قبل أن يظهر في قاعةٍ ثانية. */
+  const exposed = useMemo(() => topExposedLoci(store.exposureProfiles(), 8), [store.questionModels.length, store.participants.length]);
   const reportsList = store.fairnessReports;
 
   const reserveByScope = useMemo(() => {
@@ -346,6 +350,39 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
         </div>
       </section>
 
+      {/* ---- الانكشاف ---- */}
+      <section className="rounded-2xl border border-[#dcdad2] bg-white p-4">
+        <h3 className="flex items-center gap-2 text-sm font-black text-[#24302b]"><Radar className="h-4 w-4" />{ar ? 'أعلى المواضع انكشافًا' : 'Most-exposed loci'}</h3>
+        <p className="mt-1.5 text-[11px] leading-6 text-[#666c68]">
+          {ar
+            ? 'الموضع الذي أُلقي في قاعةٍ فيها ثلاثون منتظرًا لم يعد مجهولًا لهم. يُقاس من سمعه وبأي مدى بثّ وكم مضى، ويدخل المفاضلة فيُؤخَّر لا يُمنع أعمى. ولا يُدَّعى هنا معرفةُ من حفظه ممن سمعه — يُدَّعى أنه سُمع.'
+            : 'A locus revealed before thirty waiting people is no longer unknown to them. Exposure is measured from who heard it, the broadcast reach, and how long ago; it enters the weighting rather than a blind ban.'}
+        </p>
+        {exposed.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-[#e4e2da] bg-[#fbfaf6] p-3 text-[11px] font-bold text-[#5b6460]">
+            {ar ? 'لم يُكشف موضع في قاعة بعد، فلا انكشاف يُقاس.' : 'No locus has been revealed in a hall yet, so there is no exposure to measure.'}
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-1.5">
+            {exposed.map(profile => (
+              <li key={profile.locusKey} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#e4e2da] bg-[#fbfaf6] px-3 py-2">
+                <div className="min-w-0">
+                  <span className="text-[12px] font-black tabular-nums text-[#24302b]">{profile.locusKey}</span>
+                  <p className="mt-0.5 text-[10px] text-[#696f6b]">
+                    {ar
+                      ? `كُشف ${profile.reveals} مرة · يُقدَّر أن ${profile.estimatedListeners} سمعوه · ${profile.halls.length} قاعة`
+                      : `${profile.reveals} reveals · ~${profile.estimatedListeners} listeners · ${profile.halls.length} halls`}
+                  </p>
+                </div>
+                <Badge variant={profile.level === 'critical' ? 'rose' : profile.level === 'high' ? 'amber' : profile.level === 'medium' ? 'blue' : 'neutral'}>
+                  {exposureLevelLabel(profile.level, ar)}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* ---- الحجر ---- */}
       <section className="rounded-2xl border border-[#dcdad2] bg-white p-4">
         <h3 className="flex items-center gap-2 text-sm font-black text-[#24302b]"><ShieldAlert className="h-4 w-4" />{ar ? 'حجر المواضع' : 'Locus quarantine'}</h3>
@@ -483,6 +520,13 @@ const ReportView: React.FC<{ report: FairnessReportRecord; ar: boolean; onClose:
     </div>
   </div>
 );
+
+const exposureLevelLabel = (level: ExposureProfile['level'], ar: boolean) =>
+  level === 'critical' ? (ar ? 'انكشاف بالغ' : 'Critical')
+    : level === 'high' ? (ar ? 'انكشاف عالٍ' : 'High')
+      : level === 'medium' ? (ar ? 'انكشاف متوسط' : 'Medium')
+        : level === 'low' ? (ar ? 'انكشاف منخفض' : 'Low')
+          : (ar ? 'بلا انكشاف' : 'None');
 
 const severityLabel = (severity: string, ar: boolean) =>
   severity === 'critical' ? (ar ? 'حرج' : 'Critical')
