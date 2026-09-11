@@ -27,9 +27,9 @@ const ROLES: Array<{role:Role; ar:string; en:string; noteAr:string; noteEn:strin
   // «واجهات يوم المسابقة» أدناه، فلا يتكرر المدخل نفسه في مكانين.
 ];
 
-interface Props { onEnterRole:(role:Role)=>void; onOpenKiosk:()=>void; onOpenCeremony:()=>void; onOpenWaiting:()=>void; onOpenHall?:()=>void; onOpenBroadcast?:()=>void; }
+interface Props { onEnterRole:(role:Role)=>void; onOpenKiosk:()=>void; onOpenCeremony:()=>void; onOpenWaiting:()=>void; onOpenHall?:()=>void; }
 
-export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCeremony,onOpenWaiting,onOpenHall,onOpenBroadcast})=>{
+export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCeremony,onOpenWaiting,onOpenHall})=>{
   const {competition,language}=useAppStore();
   const ar=language==='ar';
   const groups:[typeof ROLES,string,string][]=[
@@ -68,7 +68,7 @@ export const ExperienceHub:React.FC<Props>=({onEnterRole,onOpenKiosk,onOpenCerem
         <div><div className="text-sm font-black">{ar?'واجهات يوم المسابقة':'Venue experiences'}</div><div className="text-xs text-[#656a67] mt-1">{ar?'تُفتح بكامل الشاشة أثناء الحدث':'Full-screen modes used on-site'}</div></div>
         <div className="flex flex-wrap gap-2">
           <button onClick={onOpenKiosk} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><ScanLine className="w-4 h-4"/>{ar?'بوابة الحضور':'Gate kiosk'}</button>
-          <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button>{onOpenHall&&<button onClick={onOpenHall} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><BookOpen className="w-4 h-4"/>{ar?'خريطة تلاوة القاعة':'Hall recitation'}</button>}{onOpenBroadcast&&<button onClick={onOpenBroadcast} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'محرك البثّ الحجمي':'Broadcast Engine'}</button>}<button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>
+          <button onClick={onOpenWaiting} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><RadioTower className="w-4 h-4"/>{ar?'شاشة الانتظار':'Waiting display'}</button>{onOpenHall&&<button onClick={onOpenHall} className="rounded-xl border border-[#DCDAD2] bg-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><BookOpen className="w-4 h-4"/>{ar?'خريطة تلاوة القاعة':'Hall recitation'}</button>}<button onClick={onOpenCeremony} className="rounded-xl bg-[#171B18] text-white px-4 py-2.5 text-xs font-black inline-flex gap-2 items-center"><Award className="w-4 h-4"/>{ar?'وضع الحفل':'Ceremony'}</button>
         </div>
       </section>
     </div>

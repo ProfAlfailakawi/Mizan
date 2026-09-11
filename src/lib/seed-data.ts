@@ -29,9 +29,13 @@ import {
   ParticipantPassportEntry,
   ConsentRecord,
   QuorumActionRecord,
+  MutashabihatTrapRecord,
+  AIObservation,
+  FairDrawProofRecord,
   FeatureFlagRecord,
   User
 } from '../types';
+import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 
 export const SEED_ORGANIZATION: Organization = {
   id: 'org-gqa-global',
@@ -1184,3 +1188,122 @@ export const SEED_QUORUM_ACTIONS: QuorumActionRecord[] = [
 
 // لا نزرع Feature Flags شكلية. القدرات الفعلية تُدار من أنظمتها التشغيلية وصلاحياتها الحقيقية.
 export const SEED_FEATURE_FLAGS: FeatureFlagRecord[] = [];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   بيانات العرض لإشارات ذكاء التحكيم.
+
+   هذه الإشارات الثلاث تعيش في مواضع القرار — رئيس التحكيم، وقسم السحب، والمدقق —
+   وكلٌّ منها مبنيّ على سجلّ حقيقي في المتجر ويصمت حين لا يجد ما يقوله. وهذا الصمت
+   هو الصواب في التشغيل، لكنه في العرض يجعل الميزة غير مرئية تمامًا: لا خريطة
+   متشابهات معتمدة، ولا ملاحظة تردّد، ولا إثبات قرعة مسجّل.
+
+   فتُزرع هنا أقلّ بيانات تجعل كل إشارة تظهر مرّة واحدة بصورتها الحقيقية — من
+   الأنواع نفسها التي يكتبها التشغيل، لا من قوالب خاصة بالعرض.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* خريطة المتشابهات: نقاط معتمدة من اللجنة العلمية، والحالة APPROVED شرط لظهورها.
+   الموضعان مربوطان بالبقرة ٥٨ لأن حالة المراجعة المزروعة (rev-01) تذكر تردّدًا وإعادة. */
+export const SEED_MUTASHABIHAT_TRAPS: MutashabihatTrapRecord[] = [
+  {
+    id: 'trap-baqarah-58-araf-161',
+    competitionId: SEED_COMPETITION.id,
+    sourceManifestId: 'src-kfgqpc-hafs-demo',
+    qiraah: 'quran',
+    rawi: 'hafs',
+    expected: { surah: 2, ayah: 58 },
+    possible: { surah: 7, ayah: 161 },
+    similarityEvidence: { kind: 'TEXTUAL', score: 0.92, reference: 'ادخلوا الباب سجدا' },
+    status: 'APPROVED',
+    createdAt: '2027-02-01T09:00:00Z',
+    approvedBy: 'usr-org-admin-1',
+  },
+  {
+    id: 'trap-baqarah-58-taha-81',
+    competitionId: SEED_COMPETITION.id,
+    sourceManifestId: 'src-kfgqpc-hafs-demo',
+    qiraah: 'quran',
+    rawi: 'hafs',
+    expected: { surah: 2, ayah: 58 },
+    possible: { surah: 20, ayah: 81 },
+    similarityEvidence: { kind: 'EXPERT', score: 0.74, reference: 'كلوا من طيبات ما رزقناكم' },
+    status: 'APPROVED',
+    createdAt: '2027-02-01T09:04:00Z',
+    approvedBy: 'usr-org-admin-1',
+  },
+  /* نقطة قيد المراجعة، مقصودة: الرادار لا يعرضها، فيظهر أن غير المعتمد لا يصل إلى محكّم. */
+  {
+    id: 'trap-review-pending',
+    competitionId: SEED_COMPETITION.id,
+    sourceManifestId: 'src-kfgqpc-hafs-demo',
+    qiraah: 'quran',
+    rawi: 'hafs',
+    expected: { surah: 2, ayah: 58 },
+    possible: { surah: 2, ayah: 61 },
+    similarityEvidence: { kind: 'TEXTUAL', score: 0.66 },
+    status: 'REVIEW_MAP',
+    createdAt: '2027-02-01T09:08:00Z',
+  },
+];
+
+/* ملاحظة الحارس الصامت التي تربط حالة المراجعة بموضعها. الموضع نصّ حرّ من المزوّد،
+   كما يصل فعلًا، ليُقرأ بالمحلّل المتسامح لا بصيغة مثالية مصنوعة للعرض. */
+export const SEED_AI_OBSERVATIONS: AIObservation[] = [
+  {
+    id: 'ai-obs-104-hesitation',
+    competitionId: SEED_COMPETITION.id,
+    sessionId: 'sess-part-104-q1',
+    participantId: 'part-104',
+    timestampSeconds: 142,
+    type: 'hesitation_pause',
+    confidence: 'medium',
+    expectedLocation: 'Al-Baqarah:58',
+    expectedQuranPosition: 'Al-Baqarah:58',
+    detectedHypothesis: 'توقّف يتجاوز عتبة التردّد قبل إكمال الموضع',
+    modelIdentifier: 'demo-observer:1.0',
+    reviewClipStartSec: 138,
+    reviewClipEndSec: 146,
+    flaggedForReview: true,
+    humanReviewState: 'pending',
+  },
+];
+
+/* إثباتات قرعة مسجّلة. الطقم لا يحمل اسم متسابق ولا رمزه — وهذا مقصود: قياس التكافؤ
+   لا يحتاج أن يعرف مَن أخذ أيّ طقم، وربطه بالاسم يفتح بابًا أغلقته غرفة الحجب.
+   الطاقة = صعوبة + كثافة متشابهات + تعقيد تجويد، فتخرج ١٤٫٢٥ و١٦٫٠ و١٧٫٧٥ — أوسع
+   فارق ٢١٫٩٪ فوق هامش ١٥٪، وهو ما يجعل المؤشّر يطلب مراجعة بدل أن يمرّ صامتًا. */
+const SEED_DRAWN_SETS: Array<[string, string[]]> = [
+  ['qs-r1-001', ['q-ali-imran-102', 'q-nur-35', 'q-an-nisa-58']],
+  ['qs-r1-002', ['q-baqarah-142', 'q-nur-35', 'q-an-nisa-58']],
+  ['qs-r1-003', ['q-yusuf-21', 'q-baqarah-142', 'q-nur-35']],
+];
+export const SEED_FAIRDRAW_PROOFS: FairDrawProofRecord[] = SEED_DRAWN_SETS.map(([questionSetId, selectionIds], i) => ({
+  id: `fairproof-${questionSetId}`,
+  competitionId: SEED_COMPETITION.id,
+  questionSetId,
+  algorithmVersion: 'MIZAN-FAIRDRAW-2.0',
+  ruleVersion: SEED_COMPETITION.ruleSet.version,
+  poolVersion: 'development-fixture-1',
+  poolSnapshotHash: `DEMO:POOL-${i + 1}`,
+  constraintHash: `DEMO:CONSTRAINTS-${i + 1}`,
+  seedCommitmentHash: `DEMO:SEED-COMMIT-${i + 1}`,
+  publicCommitmentHash: `DEMO:PUBLIC-COMMIT-${i + 1}`,
+  secretSeed: `DEMO-SEED-${i + 1}`,
+  selectionIds,
+  status: 'REVEALED',
+  createdAt: `2027-02-11T0${8 + i}:15:00Z`,
+  revealedAt: `2027-02-11T0${8 + i}:55:00Z`,
+  participantReading: 'Hafs',
+  // لقطة البنك تُشتق من البنك نفسه، فلا تفترق أرقام الصعوبة عن مصدرها عند أول تعديل.
+  eligiblePoolSnapshot: DEVELOPMENT_QUESTION_BANK.map(q => ({
+    id: q.id,
+    riwaya: q.riwaya,
+    surahNumber: q.surahNumber,
+    startAyah: q.startAyah,
+    endAyah: q.endAyah,
+    juzNumber: q.juzNumber,
+    difficultyRating: q.difficultyRating,
+    mutashabihatDensity: q.mutashabihatDensity,
+    tajweedComplexity: q.tajweedComplexity,
+  })),
+  verificationStatement: 'The selected set satisfies the configured fairness constraints.',
+}));
