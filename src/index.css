@@ -61,7 +61,8 @@
     min-height: 100vh;
     /* حارس ضد أي تجاوز أفقي على الجوال: لا تنزلق الصفحة يمينًا/يسارًا مهما فاض عنصر داخلي.
        العناصر العريضة (جداول/رسوم) تُمرَّر داخل حاويتها عبر overflow-x:auto. */
-    overflow-x: hidden;
+    /* overflow-x: clip يقصّ الفائض الأفقي دون إنشاء حاوية تمرير، فتبقى القوائم اللاصقة (position: sticky) ثابتة على الجوال. */
+    overflow-x: hidden; overflow-x: clip;
     font-family: var(--font-arabic);
     color: var(--ink);
     background: var(--canvas);
