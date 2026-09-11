@@ -52,7 +52,7 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
    <div className="my-auto max-w-lg w-full mx-auto">
     {!done?<div className="text-center">
       <div className="w-52 h-52 rounded-[32px] border border-white/15 bg-white/[.035] grid place-items-center mx-auto relative overflow-hidden">
-       {camera==='active'?<video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" aria-label={ar?'كاميرا مسح رمز QR':'QR scanner camera'}/>:<><QrCode className="w-20 h-20 text-[#b9cec4] stroke-[1.3]"/><span className="absolute start-7 end-7 h-px bg-[#b9cec4]/60"/></>}
+       {camera==='active'?<video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" aria-label={ar?'كاميرا مسح رمز الاستجابة السريعة':'QR scanner camera'}/>:<><QrCode className="w-20 h-20 text-[#b9cec4] stroke-[1.3]"/><span className="absolute start-7 end-7 h-px bg-[#b9cec4]/60"/></>}
        {camera==='active'&&<span className="absolute inset-5 rounded-2xl border border-white/70 pointer-events-none"/>}
       </div>
       <h1 className="text-3xl font-black mt-7">{ar?'امسح بطاقتك':'Scan your pass'}</h1>

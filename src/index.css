@@ -138,7 +138,7 @@
 /* زرّا العدّاد دائرتان داخل الحقل: يتناغم مع القائمة المنسدلة وحقل النصّ في الصفّ نفسه
    بدل أن يبدو لوحةَ تحكّمٍ بجوار حقل. */
 .mizan-control { padding-inline:.4rem; }
-.mizan-step-btn{ width:34px; height:34px; flex:0 0 auto; border-radius:10px; display:grid; place-items:center; color:#4f5752; transition:background-color .15s ease, color .15s ease; }
+.mizan-step-btn{ width:44px; min-height:44px; align-self:stretch; flex:0 0 auto; border-radius:10px; display:grid; place-items:center; color:#4f5752; transition:background-color .15s ease, color .15s ease; }
 .mizan-step-btn:hover:not(:disabled){ background:#f1efe9; }
 .mizan-step-btn:disabled{ opacity:.28; }
 @media (prefers-reduced-motion:reduce){ .mizan-step-btn{ transition:none } }

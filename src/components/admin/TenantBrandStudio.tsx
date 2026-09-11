@@ -254,7 +254,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
             {customDomains.map(d => (
               <div key={d} className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E2DB] bg-[#FAFAF7] px-3 py-2">
                 <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[#2F6555] shrink-0" />{d}</span>
-                {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
+                {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
