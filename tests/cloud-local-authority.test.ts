@@ -5,10 +5,10 @@ import fs from 'node:fs';
 /*
  * الأصل هو السحابة، والمحلّي احتياطٌ لما لم يصلها بعد.
  *
- * كان اللحاق يرفع **كل** ما يملكه الدور في كل مزامنة — كل إشعار، كل ثانية. فجهازٌ لم يمسّ
- * سجلًّا قطّ يكتب نسخته القديمة منه فوق نسخة السحابة الأحدث التي كتبها جهازٌ آخر قبل لحظة،
- * وجهازٌ عاد من انقطاعِ ساعة يرفع عالَمه كلّه عمرَ ساعة فوق الحاضر. هذه الاختبارات تحرس
- * العقد: لا يُرفع إلا ما غُيِّر هنا ولم يصل، ولا يُكتب فوق الأصل بما هو أقدم منه.
+ * قواعد هذه السلطة تعيش في `cloud-authority` نقيّة، و`cloud-authority-behaviour` يختبرها
+ * **بتشغيلها**: يُنشئ جهازين ويحاكي مديرين يعدّلان معًا، وجهازًا عاد من انقطاع، ومحكّمًا
+ * أغلق جهازه بلا شبكة. فهذا الملف لا يعيد اختبار المنطق — يحرس ما لا يراه تشغيلُ وحدةٍ
+ * نقيّة: أن المخزن **يستدعي** تلك القاعدة ولا يكتب نسخةً ثانية منها تنحرف عنها بصمت.
  */
 const store = fs.readFileSync('src/lib/store.ts', 'utf8');
 
@@ -20,18 +20,29 @@ const body = (name: string) => {
   return store.slice(start, end);
 };
 
-test('the catch-up uploads only what this device changed and has not yet sent', () => {
-  const catchUp = body('persistOwnedRecords');
-  assert.match(catchUp, /for\(const entry of \[\.\.\.pendingWrites\.values\(\)\]\)/, 'it walks the pending register');
-  for (const field of ['globalState.participants', 'globalState.results', 'globalState.judgeSubmissions', 'globalState.committees', 'globalState.certificates', 'globalState.appeals', 'globalState.reviewCases']) {
-    assert.ok(!catchUp.includes(field), `the catch-up must not sweep all of ${field} into the cloud`);
+test('the store owns no second copy of the authority rules', () => {
+  assert.match(store, /import \{ PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope \} from '\.\/cloud-authority';/,
+    'the rules come from the tested module');
+  for (const reimplementation of [
+    'const pendingWrites = new Map',
+    'const pendingDeletes = new Map',
+    'cloudUpdatedAt>entry.markedAt',
+    'cloudUpdatedAt > localUpdatedAt',
+  ]) {
+    assert.ok(!store.includes(reimplementation),
+      `the store must delegate, not re-implement: found "${reimplementation}"`);
   }
 });
 
-test('the catch-up yields to a cloud copy that moved on after our change', () => {
+test('the catch-up uploads only what this device changed, and asks the rule for its verdict', () => {
   const catchUp = body('persistOwnedRecords');
-  assert.match(catchUp, /cloudUpdatedAt&&cloudUpdatedAt>entry\.markedAt/, 'a newer cloud row wins over a pending local one');
-  assert.match(catchUp, /clearPendingWrite\(entry\.collection,entry\.id\);continue;/, 'and the stale pending write is dropped, not forced through');
+  assert.match(catchUp, /for\(const entry of pendingRegister\.listWrites\(\)\)/, 'it walks the pending register');
+  assert.match(catchUp, /const verdict=decideUpload\(entry,\{scope,canWrite:/, 'and the shared rule decides');
+  assert.match(catchUp, /if\(verdict==='skip-other-competition'\)continue;/, 'work for another competition waits, it is not dropped');
+  assert.match(catchUp, /if\(verdict!=='upload'\)\{clearPendingWrite/, 'anything the rule refuses is dropped, not forced through');
+  for (const field of ['globalState.participants', 'globalState.results', 'globalState.judgeSubmissions', 'globalState.committees', 'globalState.certificates', 'globalState.appeals', 'globalState.reviewCases']) {
+    assert.ok(!catchUp.includes(field), `the catch-up must not sweep all of ${field} into the cloud`);
+  }
 });
 
 test('a pending write is registered on every attempt and cleared only on success', () => {
@@ -43,16 +54,12 @@ test('a pending write is registered on every attempt and cleared only on success
   assert.ok(markAt < offlineGuard, 'an offline write must still register as pending, not vanish');
 });
 
-test('a delete that has not reached the cloud is remembered, so the row cannot resurrect', () => {
+test('a delete is registered before the network call and cleared only when the cloud confirms', () => {
   const del = store.slice(store.indexOf('async function deleteScopedDocument('), store.indexOf('const JOURNEY_PUBLISHERS'));
-  assert.match(del, /pendingDeletes\.set\(/, 'the delete is registered before the network call');
-  assert.match(del, /pendingDeletes\.delete\(pendingKey\(collectionName,id\)\)/, 'and cleared once the cloud confirms');
-});
-
-test('a cloud snapshot never overwrites a local row that is still pending', () => {
-  const merge = store.slice(store.indexOf('function mergeById<T extends { id: string }>'), store.indexOf('const listeners = new Set'));
-  assert.match(merge, /rowHasPendingDelete\(collection, row\.id\)\) continue;/, 'a locally deleted row stays deleted while its delete is pending');
-  assert.match(merge, /rowHasPendingWrite\(collection, row\.id\) && byId\.has\(row\.id\)\) continue;/, 'a locally changed row survives until it is uploaded');
+  assert.match(del, /markPendingDelete\(collectionName,id\);/, 'registered up front');
+  assert.match(del, /clearPendingDelete\(collectionName,id\);/, 'and cleared on confirmation');
+  assert.ok(del.indexOf('markPendingDelete') < del.indexOf('globalState.isOffline'),
+    'an offline delete must be remembered, or the row resurrects on the next snapshot');
 });
 
 test('every mirrored watcher tells the merge which collection it carries', () => {
@@ -60,36 +67,22 @@ test('every mirrored watcher tells the merge which collection it carries', () =>
     const call = `watch('${collection}', rows => { globalState.${field} = mergeById(globalState.${field}, rows, '${collection}'); });`;
     assert.ok(store.includes(call), `${collection} must pass its name so pending rows are protected: ${call}`);
   }
+  assert.match(store, /return mergeRowsFromCloud\(local, remote, collection \? \{/, 'and the merge itself is the shared rule');
 });
 
-test('sealing authority still outranks a pending local result', () => {
-  const merge = store.slice(store.indexOf('function mergeResultsByAuthority'), store.indexOf('// Union judge submissions'));
-  assert.match(merge, /remoteRank === localRank && rowHasPendingWrite\('results', r\.id\)/,
-    'the pending guard applies only at equal rank, so a sealed cloud result is never held back');
-});
-
-test('the competition config is never overwritten by an older copy', () => {
-  const sync = store.slice(store.indexOf('function syncToFirestore()'), store.indexOf('let auditHashing'));
-  assert.match(sync, /cloudUpdatedAt > localUpdatedAt\) \{ resolveCloudScope\('competition'\); return; \}/,
-    'a device holding an older config must stand down instead of writing over the newer one');
+test('the result merge and the config write both defer to the shared rules', () => {
+  assert.match(store, /return mergeRankedFromCloud\(local, remote, RESULT_STATUS_RANK, \(rowId\) => rowHasPendingWrite\('results', rowId\)\);/,
+    'sealing authority and the pending guard come from one place');
+  assert.match(store, /if \(!configWriteAllowed\(cloudUpdatedAt, localUpdatedAt\)\) \{ resolveCloudScope\('competition'\); return; \}/,
+    'a device holding an older config stands down instead of writing over the newer one');
 });
 
 test('work that has not reached the cloud survives closing the tab', () => {
   assert.match(store, /const PENDING_CLOUD_KEY = 'mizan_pending_cloud_v1';/, 'the register has its own storage key');
-  assert.match(store, /function savePendingRegister\(\)/, 'it is written on change');
-  assert.match(store, /function loadPendingRegister\(\)/, 'and read back on boot');
-  assert.match(store, /^loadPendingRegister\(\);$/m, 'the restore actually runs at module init');
+  assert.match(store, /PendingRegister\.deserialize\(/, 'it is read back on boot');
+  assert.match(store, /const payload = pendingRegister\.serialize\(\);/, 'and written on change');
   assert.match(store, /if \(pendingCloudWriteCount\(\) > 0\) syncToFirestore\(\);/,
     'restored work resumes as soon as a cloud session exists, not at the next incidental change');
-});
-
-test('a pending row is never written into another competition’s path', () => {
-  assert.match(store, /const pendingKey = \(collection: string, id: string, competitionId = globalState\.competition\.id\)/,
-    'the register is keyed by competition as well as row');
-  assert.match(store, /const inCurrentScope = \(entry: PendingScope\)/, 'scope comparison exists');
-  const catchUp = store.slice(store.indexOf('async function persistOwnedRecords(){'));
-  assert.match(catchUp.slice(0, 1400), /if\(!inCurrentScope\(entry\)\)continue;/,
-    'the catch-up skips entries belonging to a competition that is not open');
 });
 
 test('a failure inside the catch-up cannot abort the rest of the sync', () => {
@@ -105,5 +98,6 @@ test('the register holds only what genuinely awaits the cloud', () => {
     'a local-only demo session has no cloud to be pending for');
   assert.match(store, /function markPendingWrite\(collection: string, id: string, data: Record<string, unknown>\) \{\n  if \(!shouldRegisterPending\(collection\)\) return;/,
     'writes check the gate');
-  assert.match(store, /if\(shouldRegisterPending\(collectionName\)\)pendingDeletes\.set\(/, 'and so do deletes');
+  assert.match(store, /function markPendingDelete\(collection: string, id: string\) \{\n  if \(!shouldRegisterPending\(collection\)\) return;/,
+    'and so do deletes');
 });
