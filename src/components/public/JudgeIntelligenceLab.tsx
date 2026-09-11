@@ -76,7 +76,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
                   {c.reference && <span className="font-quran text-[15px]" style={{ color: 'rgba(244,241,232,.8)' }}>{c.reference}</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10.5px]" style={{ color: '#8b9a92' }}>{c.evidenceKind}</span>
+                  <span className="text-[11px]" style={{ color: '#8b9a92' }}>{c.evidenceKind}</span>
                   <div className="h-1.5 w-20 overflow-hidden rounded-full" style={{ background: 'rgba(244,241,232,.12)' }}>
                     <div className="h-full rounded-full" style={{ width: `${Math.round(c.score * 100)}%`, background: `linear-gradient(90deg,${EMER},${GOLD})` }} />
                   </div>
