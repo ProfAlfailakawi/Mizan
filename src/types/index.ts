@@ -537,6 +537,35 @@ export interface Participant {
   originalQueueNumber?: number;
   queueOrderKey?: number;
   queueTransferCount?: number;
+  /**
+   * آخر نقلٍ جرى له، ليقرأه هو لا أن يُفاجأ به: من أين وإلى أين، وكم كان انتظاره، وأين
+   * كان سيقع لولا التعويض وأين وقع به.
+   */
+  lastQueueTransfer?: {
+    at: string;
+    fromCommitteeCode: string;
+    toCommitteeCode: string;
+    waitedMinutes: number;
+    positionIfAppended: number;
+    fairPosition: number;
+    equityApplied: boolean;
+    reason: string;
+  };
+  /**
+   * نُقل إلى لجنةٍ لا تحكم فئته.
+   *
+   * حالةٌ استثنائية لها أثرٌ واحد خطير: **أسئلته تبقى أسئلة فئته هو** — من يحفظ خمسة
+   * وعشرين جزءًا يُسأل فيها ولو جلس أمام لجنةٍ مختصّةٍ بخمسة. النظام يفعل ذلك أصلًا
+   * (النطاق المعتمد للمتسابق هو مرجع أهلية السؤال)، لكنّ اللجنة لا تعلم — فتظنّ الفارق
+   * عطبًا، أو تحكم بمسطرة فئتها المعتادة. هذا الوسم هو ما يُعلمها.
+   */
+  crossCategoryException?: {
+    at: string;
+    fromCommitteeId: string;
+    toCommitteeId: string;
+    approvedBy: string;
+    reason: string;
+  };
   specialNeeds?: boolean;
   photoUrl?: string;
   documents?: { type: string; url: string; verified: boolean }[];
@@ -1361,9 +1390,22 @@ export interface QuestionRevealGateRecord {
 }
 export interface QueueTransferRecord {
   id:string;competitionId:string;sourceCommitteeId:string;targetCommitteeId:string;participantIds:string[];
-  mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';reason:string;requestedAt:string;requestedBy:string;
+  mode:QueueTransferMode;reason:string;requestedAt:string;requestedBy:string;
   status:'APPLIED'|'REJECTED';changes:{participantId:string;previousOrderKey:number;nextOrderKey:number;originalQueueNumber?:number}[];
+  /** نقلٌ إلى لجنةٍ لا تحكم فئة المتسابق — استثناءٌ يُوقَّع ولا يقع صامتًا. */
+  crossCategoryException?:boolean;
+  /** ما عوّضه العدل لكلٍّ منهم: انتظاره السابق، وموضعه لولا التعويض، وموضعه به. */
+  equity?:{participantId:string;waitedMinutes:number;positionIfAppended:number;fairPosition:number}[];
 }
+
+/**
+ * كيف يُرتَّب المنقول في طابوره الجديد.
+ * - `PRESERVE_ORIGINAL_TURN`: بالدمج على رقم الوصول الأصلي.
+ * - `MOVE_TO_END`: آخر الطابور، تنازلٌ صريح.
+ * - `EQUITY_BY_WAITING_TIME`: بما انتظره فعلًا — يتقدّم على من انتظر أقلّ منه. يخالف
+ *   ترتيب الوصول عمدًا، فلا يقع إلا بعرضٍ بالأرقام وسببٍ مكتوب.
+ */
+export type QueueTransferMode='PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END'|'EQUITY_BY_WAITING_TIME';
 
 // ---- Global Integrity Protocol / next-generation judging integrity -----------------------
 export interface CompetitionBlackBoxRecord { id:string;competitionId:string;createdAt:string;eventCount:number;streams:string[];genesisHash:string;headHash:string;timelineHash:string;verificationState:'VERIFIED'|'FAILED';assurance:'client_hash_chain'|'server_evidence_ledger'|'external_worm'; }

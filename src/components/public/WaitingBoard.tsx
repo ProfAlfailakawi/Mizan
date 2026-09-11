@@ -63,7 +63,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
     aria-label={ar?'شاشة الانتظار':'Waiting display'}
     className={`fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto ${age.state === 'STALE' ? 'mizan-board-stale' : ''}`}
   >
-    <div className="min-h-screen p-5 sm:p-8 lg:p-10 flex flex-col">
+    <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'MIZAN WAIT'}</div>
@@ -157,13 +157,13 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     <div key={slice.nowCalling?.code || 'idle'} className={`rounded-2xl px-3 py-3 text-center ${slice.nowCalling ? 'mizan-call-arrive bg-white/[.06]' : ''}`}>
       <div className="text-[10px] font-black tracking-[.14em] mizan-venue-faint">{ar ? 'الآن' : 'NOW'}</div>
       {slice.nowCalling
-        ? <div className="mizan-board-code mizan-code mt-1.5" dir="ltr">{slice.nowCalling.code}</div>
+        ? <div className="mizan-board-code mizan-venue-code mt-1.5" dir="ltr">{slice.nowCalling.code}</div>
         : <div className="mt-2 mb-0.5 text-sm font-black mizan-venue-faint">{offline ? (ar ? 'متوقفة' : 'Offline') : (ar ? '—' : '—')}</div>}
     </div>
 
     <div className="flex items-center justify-between gap-2 text-[11px] border-t border-white/8 pt-2.5">
       <span className="mizan-venue-faint font-bold shrink-0">{ar ? 'التالي' : 'Next'}</span>
-      <span className="mizan-code truncate" dir="ltr">{slice.next[0]?.code || '—'}</span>
+      <span className="mizan-venue-code truncate" dir="ltr">{slice.next[0]?.code || '—'}</span>
     </div>
 
     {/* طول الطابور يُرى قبل أن يُقرأ. */}
