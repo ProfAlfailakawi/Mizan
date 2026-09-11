@@ -17,6 +17,7 @@ declare module 'lucide-react' {
  export const Wand2: any;
  export const ArrowLeftRight: any;
  export const BookMarked: any;
+ export const Wind: any;
  export const Users: any;
  export const Accessibility: any;
  export const Trophy: any;

@@ -54,7 +54,11 @@ export interface FairDrawParityReport {
   statement: string;
 }
 
-function summarize(selection: { participantId: string; questions: Pick<QuestionPoolItem, 'difficultyRating' | 'mutashabihatDensity' | 'tajweedComplexity'>[] }): ParticipantEnergy {
+/** الحد الأدنى الذي يحتاجه القياس فعلًا من كل سؤال. أوسع من QuestionSelection عمدًا، لأن
+ *  لقطة بنك الأسئلة داخل إثبات FairDraw تحمل هذه الحقول الثلاثة ولا تحمل السؤال كاملًا. */
+export type EnergyInput = Pick<QuestionPoolItem, 'difficultyRating' | 'mutashabihatDensity' | 'tajweedComplexity'>;
+
+function summarize(selection: { participantId: string; questions: EnergyInput[] }): ParticipantEnergy {
   const total = selection.questions.reduce((s, q) => s + questionEnergy(q), 0);
   const count = selection.questions.length;
   return { participantId: selection.participantId, questionCount: count, totalEnergy: Number(total.toFixed(3)), averageEnergy: Number((count ? total / count : 0).toFixed(3)) };
@@ -65,7 +69,7 @@ function summarize(selection: { participantId: string; questions: Pick<QuestionP
  * @param toleranceFraction max acceptable pairwise gap as a fraction of the mean (default 0.15 = 15%).
  */
 export function analyzeFairDrawParity(
-  selections: Array<Pick<QuestionSelection, 'participantId' | 'questions'>>,
+  selections: Array<{ participantId: QuestionSelection['participantId']; questions: EnergyInput[] }>,
   toleranceFraction = 0.15,
 ): FairDrawParityReport {
   const participants = selections.map(summarize).sort((a, b) => a.totalEnergy - b.totalEnergy);

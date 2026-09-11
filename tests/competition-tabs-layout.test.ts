@@ -16,8 +16,14 @@ test('the judging tab is a judging screen, not the operations screen again', () 
     'reception and hall belong to operations only');
   assert.match(operations, /\{mode==='operations'&&<section><div[^>]*>\{ar\?'الحفل والنتائج'/,
     'ceremony and results belong to operations only');
-  // والتحكيم والبث يبقى في التبويبين: هو المشترك الحقيقي بينهما.
-  assert.match(operations, /<section><div[^>]*>\{ar\?'التحكيم والبث'/);
+  /*
+   * كان بين التبويبين قسمٌ مشترك اسمه «التحكيم والبث» ببطاقتين. لم يبقَ منه شيء: إشارات
+   * ذكاء التحكيم انتقلت إلى مواضع قرارها (القرعة، رئيس التحكيم، المدقق)، وشاشة البث
+   * وُزّعت مزاياها على أسطحها ثم حُذفت. فلا يعود لأيّ من البابين أثرٌ هنا.
+   */
+  // البطاقة نفسها هي ما يُمنع، لا ذِكر الاسم: التعليق الذي يشرح أين ذهبت الميزة يبقى مسموحًا.
+  assert.doesNotMatch(operations, /<ToolCard[^>]*title=\{ar\?'(مختبر ذكاء التحكيم|البث والتغطية)'/,
+    'neither retired entry may come back as a tool card');
   // والعنوان يقول أي تبويب هو.
   assert.match(operations, /mode==='judging'\?\(ar\?'التحكيم'/, 'the heading must name the tab the user is on');
 });

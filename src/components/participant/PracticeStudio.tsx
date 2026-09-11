@@ -6,6 +6,7 @@ import {TajweedAyahWords} from '../judge/TajweedText';
 import {splitAyahWords} from '../../lib/word-timing';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
+import {WaqfGuide} from './WaqfGuide';
 
 /*
  * استوديو التدرّب — للمتسابق قبل يوم المسابقة.
@@ -78,6 +79,12 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
   </div>
 
   {passage&&<PassageAudio reading={reading} ayat={passage.ayat} ar={ar} onActive={setActive}/>}
+
+  {/* شرح علامات الوقف — وصل إلى المتسابق بعد أن كان يُعرض للجمهور وحده.
+      يبدأ على المقطع كلّه لأنه معروض أمامه قبل أن يشتغل أي صوت، ثم يضيق إلى الآية
+      المتتبَّعة حين تبدأ التلاوة المرجعية. والعلامات تُقرأ من الآيات نفسها لا من حقل
+      النصّ المجمّع، فلا تتوقف الفائدة على شكل حقلٍ قد يتغيّر. */}
+  <WaqfGuide text={activeText?.text??passage?.ayat.map(a=>a.text).join(' ')} ayah={activeAyah} ar={ar}/>
 
   <div className="px-4 sm:px-5 py-4 border-t border-[#e5e1d7]">
    <div className="flex flex-wrap items-center gap-2">

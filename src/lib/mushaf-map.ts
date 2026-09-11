@@ -9,7 +9,7 @@
 //
 // الجداول نفسها تعيش في quran-canon.ts — مرجع بنية المصحف الوحيد — فلا تُنسخ هنا مرة ثانية.
 
-import { MUSHAF_TOTAL_PAGES, QURAN_JUZ_TOTAL, pageOfLocus, surahStartPage as canonicalSurahStartPage } from './quran-canon';
+import { MUSHAF_TOTAL_PAGES, QURAN_JUZ_TOTAL, ayahCountOf, pageOfLocus, surahStartPage as canonicalSurahStartPage } from './quran-canon';
 
 export { MUSHAF_TOTAL_PAGES };
 
@@ -30,3 +30,10 @@ export function locusToPage(surah: number, ayah = 1): number {
 export function surahStartPage(surah: number): number {
   return canonicalSurahStartPage(surah);
 }
+
+/** عدد آيات السورة، لقصر أي اختيار على ما فيها فعلًا. من الجدول القانوني في quran-canon. */
+export function surahAyahCount(surah: number): number {
+  return ayahCountOf(surah);
+}
+
+
