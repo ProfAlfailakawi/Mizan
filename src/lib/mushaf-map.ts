@@ -65,3 +65,30 @@ export function locusToPage(surah: number, ayah = 1): number {
 export function surahStartPage(surah: number): number {
   return SURAH_START_PAGE[surah] || 1;
 }
+
+/** عدد آيات السورة، لقصر أي اختيار على ما فيها فعلًا. */
+export function surahAyahCount(surah: number): number {
+  return SURAH_AYAHS[surah] || 0;
+}
+
+/**
+ * السور الداخلة في نطاق حفظٍ معلن بعدد أجزاء.
+ *
+ * المتسابق يسجّل في فرعٍ له نطاق — عشرة أجزاء، أو عشرون، أو المصحف كله — ثم يُسأل
+ * داخل نطاقه وحده. فتدرّبه يجب أن يُقصر على النطاق نفسه: مقطعٌ من خارج ما سجّل فيه
+ * وقتٌ ضائع في أحسن أحواله، وإرباكٌ قبل الصعود في أسوئها.
+ *
+ * الحدّ بالصفحة لا بالسورة: الأجزاء تُقسَّم بالصفحات، فتُؤخذ كل سورة يبدأ موضعها داخل
+ * صفحات النطاق. وهذا حدٌّ تقريبي بطبيعته — مثل بقية هذا الملف — ويكفي لتوجيه تدرّب،
+ * ولا يُستعمل في سؤال رسمي ولا في درجة.
+ */
+export function surahsWithinJuz(maxJuz: number): number[] {
+  const cap = Number.isFinite(maxJuz) && maxJuz > 0 ? Math.min(30, Math.floor(maxJuz)) : 30;
+  if (cap >= 30) return Array.from({ length: 114 }, (_, i) => i + 1);
+  const out: number[] = [];
+  for (let surah = 1; surah <= 114; surah++) {
+    if (pageToJuz(surahStartPage(surah)) <= cap) out.push(surah);
+  }
+  // نطاقٌ ضيّق جدًّا لا يجوز أن يُخرج قائمة فارغة فيبقى المتسابق بلا شيء يتدرّب عليه.
+  return out.length ? out : [1];
+}
