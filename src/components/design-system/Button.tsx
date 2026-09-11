@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScaleLoader } from './ScaleLoader';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'gold';
@@ -25,7 +26,9 @@ export const Button: React.FC<ButtonProps> = ({ children, variant='primary', siz
   // المقاسان الكبيران كانا بحجم الأوسط تقريبًا (نفس مقاس النص)، فلم يكن لطلب «زرّ أكبر» أثر.
   const sizes = { sm:'text-xs px-3 py-2 gap-1.5', md:'text-sm px-4 py-2.5 gap-2', lg:'text-base px-6 py-3.5 gap-2.5', xl:'text-lg px-8 py-4 gap-3' };
   return <button disabled={disabled || loading} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
-    {loading ? <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" /> : icon ? <span className="shrink-0">{icon}</span> : null}
+    {/* مؤشر الانتظار هو ميزان مصغّر بلون النص نفسه؛ المساحة محجوزة فلا يقفز التخطيط،
+        ويظهر بعد ~250ms فلا يومض في العمليات الخاطفة. */}
+    {loading ? <span className="w-4 h-4 shrink-0 grid place-items-center text-current"><ScaleLoader size="sm" className="!text-current" /></span> : icon ? <span className="shrink-0">{icon}</span> : null}
     {children ? <span className="min-w-0 truncate">{children}</span> : null}
   </button>;
 };
