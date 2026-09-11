@@ -477,7 +477,12 @@ export class IdentityGovernanceRepository{
   }
 
   takeoverSession(identity:ServerIdentity,deviceId:string,deviceName='',authenticationAssurance:'MFA'|'SINGLE_FACTOR'='MFA'){
-    if(!deviceId)throw new Error('DEVICE_ID_REQUIRED');if(!SESSION_REVOKERS.has(identity.role))throw new Error('SESSION_TAKEOVER_NOT_ALLOWED');
+    /* استعادةُ المرء لجلسته هو ليست سحبًا لجلسة غيره: SESSION_REVOKERS تحكم الثانية لا الأولى،
+       وهذا الاستيلاء لا يمسّ إلا جلسات uid نفسه (انظر الشرط أدناه). وكان «محكّم» داخل
+       PRIVILEGED_SESSION وخارج SESSION_REVOKERS، فمن فعّل حسابه على هاتفه ثم دخل من جهاز
+       اللجنة اصطدم بتعارض جلسة، وزرّ «متابعة هنا» يردّ 403، فيُحبس ثماني ساعات كاملة وهو
+       مفعَّلٌ سليم لا حيلة له. */
+    if(!deviceId)throw new Error('DEVICE_ID_REQUIRED');
     const s=this.read();this.cleanup(s);for(const x of s.sessions)if(x.uid===identity.uid&&x.deviceId!==deviceId&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revocationReason='session_takeover';x.revokedBy=identity.uid;}
     this.write(s);this.appendAudit(identity,'AUTH_SESSION_TAKEOVER','AuthSession',deviceId,`استيلاء على الجلسة من ${deviceName||deviceId}`);return this.openSession(identity,deviceId,deviceName,authenticationAssurance);
   }

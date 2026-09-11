@@ -19,9 +19,9 @@ test('FairDraw is system initiated and public registration auto-approval remains
 
 test('super admin stays a clean control tower without direct support/help clutter',()=>{
  const header=s('src/components/layout/Header.tsx');const app=s('src/App.tsx');const guard=s('src/components/design-system/ArabicInterfaceGuard.tsx');
- assert.match(header,/!superAdmin&&<LiveSupportControl\/>/);
+ assert.doesNotMatch(header,/LiveSupportControl/);
+ assert.doesNotMatch(app,/LiveSupportControl/);
  assert.match(header,/!superAdmin&&<button onClick=\{\(\)=>setHelpOpen\(true\)\}/);
- assert.match(app,/!isBroadcast&&!isSuperAdmin&&<div className="lg:hidden"><LiveSupportControl floating\/>/);
  assert.match(guard,/toAsciiDigits/);assert.match(guard,/toAsciiDigits\(raw\)/);
 });
 

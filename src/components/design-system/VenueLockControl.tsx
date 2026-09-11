@@ -68,7 +68,7 @@ export const VenueLockButton:React.FC<{surface:string;ar:boolean;onLocked:(l:Ven
   };
   const current=step==='set'?pin:confirm;const setCurrent=step==='set'?setPin:setConfirm;
   return <>
-    <button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl bg-white/10 text-white text-[10px] font-black hover:bg-white/20">
+    <button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#101a16]/92 backdrop-blur-md text-white text-[10px] font-black shadow-[0_8px_24px_rgba(0,0,0,.35)] hover:bg-[#101a16] transition">
       <Lock className="w-3.5 h-3.5"/>{ar?'اقفل الجهاز':'Lock device'}
     </button>
     {open&&<div role="dialog" aria-modal="true" aria-label={ar?'قفل جهاز القاعة':'Lock venue device'} className="fixed inset-0 z-[100] bg-[#0d1512]/95 grid place-items-center p-5">

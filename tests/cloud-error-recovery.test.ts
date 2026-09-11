@@ -52,8 +52,27 @@ test('a permission denial refreshes the auth token once and retries the write', 
   assert.match(store, /lastAuthTokenRefreshAt<120_000\)return false/);
 });
 
-test('permission-denied banner names the exact document for diagnosis', () => {
-  assert.match(store, /لا تسمح برفع \$\{label\} إلى السحابة\. \(\$\{scope\}\)/);
+/* كان الشريط يطبع مسار الوثيقة الداخلي (audit/aud-…) في وجه مدير المسابقة: معرّفٌ لا يعني له
+   شيئًا ولا يملك حياله فعلًا. التشخيص يبقى كاملًا — في سجلّ الطرفية وفي خريطة النطاقات
+   الفاشلة — والنصّ المعروض يسمّي السجلّ بلغة الإنسان لا بمعرّف الآلة. */
+test('permission-denied banner names the record in human language, never the internal path', () => {
+  assert.match(store, /لا تسمح برفع \$\{label\} إلى السحابة\./);
+  assert.doesNotMatch(store, /إلى السحابة\. \(\$\{scope\}\)/);
+  assert.match(store, /console\.error\('MIZAN cloud write denied'/);
+  assert.match(store, /failingCloudScopes\.set\(scopeKey\(scope\)/);
+});
+
+/* سجلّ التدقيق ملحَقٌ لا يُعدَّل، فإعادة رفع حدثٍ رُفع تصير تحديثًا ترفضه القاعدة أبدًا. */
+test('audit documents upload once each, never re-uploaded as forbidden updates', () => {
+  assert.match(store, /const auditDocumentsUploaded=new Set<string>\(\)/);
+  assert.match(store, /if\(auditDocumentsUploaded\.has\(ev\.id\)\)continue/);
+  assert.doesNotMatch(store, /changed\.slice\(-12\)/);
+  // ولا تُحاوَل أصلًا على مسابقة التهيئة المؤقتة التي لا وجود لها في السحابة.
+  assert.match(store, /if\(!launchPlaceholderActive\(\)\)\{[\s\S]{0,400}persistScopedDocument\('audit'/);
+  // والديمومة الحقيقية: كل حدث يبلغ سجلّ الخادم الملحَق ولو رفضت السحابة نسخته.
+  assert.match(store, /auditEventsMirrored\.add\(ev\.id\); mirrorAuditEventToServer\(ev\)/);
+  // ورفض صلاحية على التدقيق لا يرفع شريطًا أحمر: البيانات ليست مفقودة.
+  assert.match(store, /if\(scopeKey\(scope\)==='audit'\)return;/);
 });
 
 test('index.html carries an inline boot watchdog that survives a dead bundle', () => {
