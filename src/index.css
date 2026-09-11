@@ -130,7 +130,12 @@
 .mizan-hero { background:var(--surface); border:1px solid var(--line); border-radius:28px; padding:1.25rem; }
 @media (min-width:640px){ .mizan-hero { padding:1.75rem; } }
 .mizan-panel { background:#fffefb; border:1px solid #e2e0d9; border-radius:20px; }
-.mizan-input { width:100%; min-height:44px; border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; }
+/* ارتفاع واحد لكل حقول الإدخال: القائمة المنسدلة والعدّاد وحقل النص كانت ثلاثة ارتفاعات
+   مختلفة تتجاور في الصف نفسه؛ الرمز --mizan-control-h يجعل الصف يقرأ كسطر واحد. */
+:root { --mizan-control-h:46px; }
+.mizan-input { width:100%; min-height:var(--mizan-control-h); border:1px solid #dcdad2; border-radius:13px; background:#fffefb; padding:.65rem .8rem; color:var(--ink); outline:none; }
+.mizan-control { min-height:var(--mizan-control-h); border:1px solid #dcdad2; border-radius:13px; background:#fffefb; overflow:hidden; }
+html[data-mizan-touch="xl"] { --mizan-control-h:52px; }
 .mizan-input:focus { border-color:#9eaaa3; box-shadow:0 0 0 3px rgba(47,101,85,.08); }
 .mizan-input.mizan-input-icon-start { padding-inline-start:2.65rem; }
 .mizan-number-input { appearance:textfield; -moz-appearance:textfield; }
@@ -145,13 +150,18 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-consent > span { display:inline-block; }
 .mizan-field-label { display:block; color:#686f6b; font-size:10px; font-weight:800; margin:0 0 6px; }
 /* نظام التبويب الموحد: شريط حبات واحد لكل أقسام المنصة، بحركة هادئة تحترم تفضيل تقليل الحركة. */
-.mizan-tabs { display:flex; flex-wrap:wrap; gap:6px; width:fit-content; max-width:100%; padding:6px; border:1px solid #e2e0d8; border-radius:18px; background:#fbfaf7; }
-.mizan-tab { position:relative; padding:.55rem .95rem; border-radius:12px; font-size:12px; font-weight:900; color:#5d645f; transition:color .18s ease, background-color .18s ease, box-shadow .22s ease, transform .12s ease; }
+/* الحبّة النشطة كانت تُسقط ظلًّا خارج إطار الشريط فتبدو مقصوصةً عند حافته؛ الشريط الآن
+   يحتوي ظلَّها (overflow) والظل صار داخليًّا لا يتجاوز حدود الحبّة نفسها. */
+.mizan-tabs { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; width:fit-content; max-width:100%; padding:6px; border:1px solid #e2e0d8; border-radius:18px; background:#fbfaf7; overflow:hidden; }
+.mizan-tab { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:38px; padding:0 .95rem; border-radius:12px; font-size:12px; font-weight:900; line-height:1.2; white-space:nowrap; color:#5d645f; transition:color .18s ease, background-color .18s ease, transform .12s ease; }
 .mizan-tab:hover { background:#f0eee8; }
 .mizan-tab:active { transform:scale(.965); }
-.mizan-tab.is-active { background:#214C40; color:#fff; box-shadow:0 6px 16px rgba(33,76,64,.22), inset 0 1px 0 rgba(255,255,255,.12); }
+.mizan-tab.is-active { background:#214C40; color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.12); }
 .mizan-tabs-sm { padding:4px; gap:4px; border-radius:14px; }
-.mizan-tabs-sm .mizan-tab { padding:.4rem .8rem; font-size:11px; border-radius:10px; }
+.mizan-tabs-sm .mizan-tab { min-height:32px; padding:0 .8rem; font-size:11px; border-radius:10px; }
+/* شريط تبويب فرعي داخل قسم: أخفّ وزنًا كي لا ينافس الشريط الرئيسي فوقه. */
+.mizan-tabs-sub { background:transparent; border-color:#e7e5de; }
+.mizan-tabs-sub .mizan-tab.is-active { background:#E7EEE9; color:#214C40; box-shadow:inset 0 0 0 1px rgba(33,76,64,.18); }
 @media (prefers-reduced-motion:reduce){ .mizan-tab { transition:none; } }
 /* الملاحظة الاستشارية الموحدة: عبارة «لا يمس الدرجة» بصوت بصري واحد بدل إحدى عشرة صياغة رمادية. */
 .mizan-advisory { display:flex; align-items:flex-start; gap:.6rem; padding:.8rem 1rem; border-radius:14px; background:linear-gradient(135deg,#E7EEE9,#f3f8f5); color:#214C40; font-size:12px; font-weight:700; line-height:1.8; border-inline-start:3px solid #2F6555; }
@@ -873,7 +883,9 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
 [data-operation-mode="judging"] > div.flex:first-of-type,
 [data-operation-mode="judging"] > section:nth-of-type(2) > div:first-child{display:none}
 [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid > button:nth-child(2){display:none}
-[data-operation-mode="judging"] > section:nth-of-type(2) > div.grid{grid-template-columns:minmax(0,1fr)}
+/* كانت تُجبَر بطاقات اللجان على عمودٍ واحدٍ مهما اتّسعت الشاشة، فتُقرأ كطابورٍ لا ينتهي على
+   شاشةٍ نصفها فارغ. الشبكة الآن تتنفّس مع العرض كما صُمِّمت في المكوّن نفسه. */
+@media (max-width:767px){ [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid{grid-template-columns:minmax(0,1fr)} }
 
 /* ── MIZAN assembly choreography (public surfaces only) ─────────────────────
    Inspired by product-reveal choreography: independent elements drift in,

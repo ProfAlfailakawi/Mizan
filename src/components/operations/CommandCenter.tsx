@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { Ratio } from '../design-system/Ratio';
 import {bilingualName,  arCount } from '../../lib/ui-language';
 import { AlertTriangle, BadgeCheck, Clock3, Gauge, Mic2, RadioTower, Server, UsersRound, WifiOff, Sparkles, ChevronDown } from 'lucide-react';
@@ -23,7 +24,8 @@ const ALERT_KIND:Record<string,{ar:string;en:string}>={
 
 export const CommandCenter: React.FC = () => {
  const s=useAppStore(); const {language,participants,committees,incidents,isOffline,reviewCases,notifications,devices,runSimulation}=s; const ar=language==='ar';
- const [expanded,setExpanded]=useState(false); const [opsTab,setOpsTab]=useState<'pulse'|'panels'|'insight'>('pulse'); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
+ const [expanded,setExpanded]=useState(false); const [opsTab,setOpsTab]=useState<'pulse'|'panels'|'insight'>('pulse');
+ const opsTabAnchor=useTabAnchor(opsTab); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
  const [corridor,setCorridor]=useState<QuestionCustodyCorridorSnapshot|null>(null);
  useEffect(()=>{let live=true;const id=s.activeSession.secureRuntimeSessionId;if(!id){setCorridor(null);return}const load=()=>void fetchCustodyCorridor(id).then(x=>live&&setCorridor(x)).catch(()=>live&&setCorridor(null));load();const timer=window.setInterval(load,5000);return()=>{live=false;window.clearInterval(timer)}},[s.activeSession.secureRuntimeSessionId]);
  const waiting=participants.filter(p=>p.status==='in_queue').length; const testing=participants.filter(p=>p.status==='in_session').length; const done=participants.filter(p=>p.status==='tested'||p.status==='certified').length;
@@ -45,7 +47,7 @@ export const CommandCenter: React.FC = () => {
 
   {expanded&&<>
    {/* ست كتل كاملة العرض كانت سردًا واحدًا؛ ثلاث نوافذ تشغيلية أوضح من طابور تمرير. */}
-   <div role="tablist" aria-label={ar?'أقسام مركز العمليات':'Command center sections'} className="mizan-tabs">
+   <div role="tablist" ref={opsTabAnchor} aria-label={ar?'أقسام مركز العمليات':'Command center sections'} className="mizan-tabs">
     {([['pulse',ar?'النبض والمقاييس':'Pulse & metrics'],['panels',ar?'اللجان والصحة':'Panels & health'],['insight',ar?'الرؤى والطابور':'Insights & queue']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={opsTab===id} onClick={()=>setOpsTab(id)} className={`mizan-tab ${opsTab===id?'is-active':''}`}>{label}</button>)}
    </div>
    {opsTab==='pulse'&&<>

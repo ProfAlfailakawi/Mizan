@@ -1,4 +1,5 @@
 import { serverErrorLabel } from '../../lib/ui-language';
+import { useTabAnchor } from '../../lib/use-tab-anchor';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Building2,
@@ -354,7 +355,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [studioTab, setStudioTab] = useState<'logo'|'org'|'placements'>('logo');
+  const [studioTab, setStudioTab] = useState<'logo'|'org'|'placements'|'domain'>('logo');
+  const studioTabAnchor = useTabAnchor(studioTab);
   const [serverError, setServerError] = useState('');
 
   // Production always hydrates from the server record, even on admin.dr-* where host-based branding cannot identify the tenant.
@@ -608,15 +610,14 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
       </div>
 
       {/* المالك يضبط النطاق؛ الجهة ترى عنوانها وخطواتها وتطلب الربط. */}
-      {store.currentUser?.role === 'super_admin' ? <TenantDomainCard orgId={orgId} /> : !orgId && <TenantDomainRequestCard />}
 
       {/* القسم الرئيسي: الإعدادات على اليمين والمعاينة الحية على اليسار */}
       <div className="grid lg:grid-cols-12 gap-6">
         {/* عمود إعدادات الشعار والبيانات ومواضع الظهور */}
         <div className="lg:col-span-7 space-y-5">
           {/* ثلاث مهام متمايزة كانت نموذجًا واحدًا عملاقًا؛ التبويب يفصلها والمحاكي اللاصق يبقى شاهدًا على كل تغيير. */}
-          <div role="tablist" aria-label={ar?'أقسام ستوديو الهوية':'Brand studio sections'} className="mizan-tabs">
-            {([['logo',ar?'الشعار والوضوح':'Logo & clarity'],['org',ar?'البيانات المؤسسية':'Organization details'],['placements',ar?'مواضع العرض':'Display placements']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={studioTab===id} onClick={()=>setStudioTab(id)} className={`mizan-tab ${studioTab===id?'is-active':''}`}>{label}</button>)}
+          <div role="tablist" ref={studioTabAnchor} aria-label={ar?'أقسام ستوديو الهوية':'Brand studio sections'} className="mizan-tabs">
+            {([['logo',ar?'الشعار والوضوح':'Logo & clarity'],['org',ar?'البيانات المؤسسية':'Organization details'],['placements',ar?'مواضع العرض':'Display placements'],['domain',ar?'النطاق':'Domain']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={studioTab===id} onClick={()=>setStudioTab(id)} className={`mizan-tab ${studioTab===id?'is-active':''}`}>{label}</button>)}
           </div>
           {studioTab==='logo'&&<>
           {/* 1. مختبر الشعار وفحص النقاء */}
@@ -862,6 +863,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           </section>
           </>}
 
+          {studioTab==='domain'&&<>
+      {store.currentUser?.role === 'super_admin' ? <TenantDomainCard orgId={orgId} /> : !orgId && <TenantDomainRequestCard />}
+          </>}
           {studioTab==='placements'&&<>
           {/* 3. مصفوفة التحكم بأماكن ظهور كل عنصر (الميزة المحورية التي طلبها العميل) */}
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">

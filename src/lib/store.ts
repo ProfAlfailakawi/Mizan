@@ -454,8 +454,11 @@ const failingCloudScopes=new Map<string,{code:CloudSyncErrorCode;message:string}
 const scopeKey=(scope:string)=>String(scope||'').split('/')[0].trim();
 function reportCloudError(code:CloudSyncErrorCode,scope:string){
   const label=syncScopeLabel(scope);
+  /* سجلّ التدقيق محفوظ محليًا ومرآته في سجلّ الخادم الملحَق؛ تعذّر نسخته في فايرستور ليس فقدًا
+     ولا يستحق شريطًا أحمر يقطع عمل مدير المسابقة، ولا كشف معرّف الوثيقة الداخلي. */
+  if(scopeKey(scope)==='audit')return;
   const message=code==='CLOUD_PAYLOAD_TOO_LARGE'?`حجم ${label} تجاوز الحدّ المسموح، فلم تُرفع إلى السحابة.`
-    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية الحالية لا تسمح برفع ${label} إلى السحابة. (${scope})`
+    :code==='CLOUD_PERMISSION_DENIED'?`الصلاحية الحالية لا تسمح برفع ${label} إلى السحابة.`
     :`تعذّرت مزامنة ${label} مع السحابة.`;
   failingCloudScopes.set(scopeKey(scope),{code,message});
   globalState.persistenceError={code,message,at:new Date().toISOString()};
@@ -496,6 +499,9 @@ async function persistOwnedRecords(){
 }
 
 
+/* ذاكرتان تمنعان تكرار ما تمّ: وثيقةُ تدقيقٍ لا تُرفع مرّتين، وحدثٌ لا يُرسَل مرّتين. */
+const auditDocumentsUploaded=new Set<string>();
+const auditEventsMirrored=new Set<string>();
 const SERVER_AUDIT_OUTBOX_KEY='mizan_server_audit_outbox_v1';
 type ServerAuditMirror={eventId:string;organizationId:string;competitionId:string;action:string;entityType:string;entityId:string;reason?:string;humanSummaryEnglish?:string;clientTimestamp:string;sessionId?:string;authenticationAssurance?:string};
 let serverAuditFlushRunning=false;let serverAuditBackoffUntil=0;
@@ -509,7 +515,7 @@ async function flushServerAuditOutbox(){
   writeServerAuditOutbox(keep);
  }finally{serverAuditFlushRunning=false}
 }
-function mirrorAuditEventToServer(ev:AuditEvent){if(!auth.currentUser)return;const row:ServerAuditMirror={eventId:ev.id,organizationId:ev.organizationId,competitionId:ev.competitionId,action:ev.action,entityType:ev.entityType,entityId:ev.entityId,reason:ev.reason,humanSummaryEnglish:ev.humanSummaryEnglish,clientTimestamp:ev.timestamp,sessionId:ev.sessionId,authenticationAssurance:ev.authenticationAssurance};const rows=readServerAuditOutbox();if(!rows.some(x=>x.eventId===row.eventId)){rows.push(row);writeServerAuditOutbox(rows)}void flushServerAuditOutbox();}
+function mirrorAuditEventToServer(ev:AuditEvent){if(!auth.currentUser)return;auditEventsMirrored.add(ev.id);const row:ServerAuditMirror={eventId:ev.id,organizationId:ev.organizationId,competitionId:ev.competitionId,action:ev.action,entityType:ev.entityType,entityId:ev.entityId,reason:ev.reason,humanSummaryEnglish:ev.humanSummaryEnglish,clientTimestamp:ev.timestamp,sessionId:ev.sessionId,authenticationAssurance:ev.authenticationAssurance};const rows=readServerAuditOutbox();if(!rows.some(x=>x.eventId===row.eventId)){rows.push(row);writeServerAuditOutbox(rows)}void flushServerAuditOutbox();}
 if(typeof window!=='undefined'&&!(window as any).__mizanAuditOnlineHook){(window as any).__mizanAuditOnlineHook=true;window.addEventListener('online',()=>void flushServerAuditOutbox())}
 
 /*
@@ -567,7 +573,21 @@ async function finalizeAuditChain(){
       const ev=chronological[i];ev.sequence=i+1;ev.assurance=ev.assurance||'client_hash_chain';
       const hash=await appendAuditHash(previous,ev); if(ev.previousStateHash!==previous||ev.currentStateHash!==hash) changed.push(ev); ev.previousStateHash=previous; ev.currentStateHash=hash; previous=hash;
     }
-    for(const ev of changed.slice(-12)) void persistScopedDocument('audit',ev.id,ev as unknown as Record<string,unknown>);
+    /* سجلّ التدقيق ملحَق لا يُعدَّل: قاعدة فايرستور تمنع التحديث منعًا باتًّا (allow update: if false).
+       وكانت إعادة التجزئة ترفع آخر اثني عشر حدثًا في كل مرّة، فأيّ حدثٍ رُفع مرّة يصير تحديثًا
+       مرفوضًا إلى الأبد — وهذا مصدر شريط «الصلاحية لا تسمح» المتكرّر على حسابٍ سليم تمامًا.
+       الرفع الآن مرّة واحدة لكل حدث، وبعد اكتمال سلسلة تجزئته، ولا يُحاوَل أصلًا على مسابقة
+       التهيئة المؤقتة التي لا وجود لها في السحابة. والضمانة الحقيقية للديمومة ليست هنا: كل حدث
+       يُرسَل إلى سجلّ الخادم الملحَق عبر صندوق صادرٍ دائم يعيد المحاولة وحده. */
+    if(!launchPlaceholderActive()){
+      for(const ev of changed){
+        if(auditDocumentsUploaded.has(ev.id))continue;
+        auditDocumentsUploaded.add(ev.id);
+        void persistScopedDocument('audit',ev.id,ev as unknown as Record<string,unknown>);
+      }
+    }
+    /* الأحداث المدفوعة مباشرة إلى auditLogs (خارج auditTrustAction) لم تكن تصل الخادم إطلاقًا. */
+    for(const ev of changed){ if(auditEventsMirrored.has(ev.id))continue; auditEventsMirrored.add(ev.id); mirrorAuditEventToServer(ev); }
     persistLocalSnapshot();
     listeners.forEach(l=>l());
     syncToFirestore();

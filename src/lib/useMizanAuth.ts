@@ -199,8 +199,14 @@ export function useMizanAuth(requireAuth: boolean) {
         headers: { authorization: `Bearer ${token}`, 'x-mizan-device-id': deviceIdentity(), 'x-mizan-device-name': navigator.userAgent.slice(0, 120) },
       });
       if (res.ok) { window.location.reload(); return; }
+      /* رمزٌ من الخادم لا تعرفه الواجهة كان يُكتب كما هو في حالة المنع، فتسقط الشاشة إلى
+         نصّها العام: «الحساب غير مفوض… أكمل التفعيل» — وهي رسالة كاذبة في وجه حسابٍ مفعَّل،
+         وتُخفي معها زرّ الاستعادة نفسه. الرموز المجهولة تبقى على حالة التعارض المعروفة كي
+         يظل المخرج ظاهرًا. */
       const body = await res.json().catch(() => ({} as Record<string, unknown>));
-      setAccessError(((body as { code?: string }).code as MizanAccessError) || 'PRIVILEGED_SESSION_CONFLICT');
+      const known: MizanAccessError[] = ['ACCOUNT_NOT_PROVISIONED', 'ACCOUNT_CLAIMS_REQUIRED', 'MFA_REQUIRED', 'PRIVILEGED_SESSION_CONFLICT', 'IDENTITY_TOKEN_ERROR'];
+      const code = (body as { code?: string }).code as MizanAccessError | undefined;
+      setAccessError(code && known.includes(code) ? code : 'PRIVILEGED_SESSION_CONFLICT');
     } catch { /* keep recovery screen */ }
   };
 
