@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { AdvisoryNote } from '../design-system/AdvisoryNote';
 import { Activity, Coffee, TrendingDown, Gauge, ShieldCheck } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
@@ -84,9 +85,9 @@ export const JudgeDriftMonitor: React.FC = () => {
         })}
       </div>}
 
-      <div className="mt-4 text-[10px] text-[#696f6b] leading-6">
+      <div className="mt-4"><AdvisoryNote>
         {ar ? 'إشارة مساندة لرئيس التحكيم فقط، ولا تظهر للمحكم ولا تغيّر درجة. المقارنة ذاتية (كل محكم مع نفسه) وتعتمد على أحداث التحكيم الحقيقية فقط.' : 'Advisory to the Head Judge only — never shown to the judge and never a score change. The comparison is self-referential and uses real judging events only.'}
-      </div>
+      </AdvisoryNote></div>
     </section>
   );
 };

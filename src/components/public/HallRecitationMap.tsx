@@ -78,7 +78,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
               <span>{ar ? 'أكثر' : 'more'}</span>
             </div>
           </div>
-          <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(34, minmax(0, 1fr))' }} dir="ltr" role="img" aria-label={ar ? `تغطية ${Math.round(agg.coveragePct * 100)} بالمئة من صفحات المصحف` : `${Math.round(agg.coveragePct * 100)}% Mushaf coverage`}>
+          <div className="grid gap-[3px] [grid-template-columns:repeat(17,minmax(0,1fr))] sm:[grid-template-columns:repeat(26,minmax(0,1fr))] lg:[grid-template-columns:repeat(34,minmax(0,1fr))]" dir="ltr" role="img" aria-label={ar ? `تغطية ${Math.round(agg.coveragePct * 100)} بالمئة من صفحات المصحف` : `${Math.round(agg.coveragePct * 100)}% Mushaf coverage`}>
             {agg.pages.map((count, i) => (
               <span key={i} title={`${ar ? 'صفحة' : 'p.'} ${i + 1} · ${ar ? 'الجزء' : 'juz'} ${pageToJuz(i + 1)} · ${count}`} className="aspect-square rounded-[2.5px] transition-colors duration-500" style={{ background: pageColor(count, max) }} />
             ))}

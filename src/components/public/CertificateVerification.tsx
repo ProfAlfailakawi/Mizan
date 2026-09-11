@@ -75,14 +75,10 @@ export const CertificateVerification: React.FC = () => {
       </div>}
     </section>
 
-    {submittedCode && verification==='UNREACHABLE' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'تعذّر التحقق الآن':'Verification unavailable'}</h2><p className="text-xs text-[#646965] mt-1">{ar?'لم نتمكّن من الوصول إلى سجل الشهادات، وهذا لا يعني أن الشهادة غير صحيحة. أعد المحاولة بعد قليل.':'The certificate registry could not be reached. This does not mean the certificate is invalid — try again shortly.'}</p><div className="mt-5"><Button variant="outline" onClick={()=>void verifyCode(submittedCode)}>{ar?'إعادة المحاولة':'Try again'}</Button></div></section>}
-    {submittedCode && verification==='NOT_FOUND' && <section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="font-black mt-3">{ar?'غير موجودة':'NOT FOUND'}</h2><p className="text-xs text-[#646965] mt-1">{ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}</p></section>}
+    {submittedCode && verification==='UNREACHABLE' && <StatusCard title={ar?'تعذّر التحقق الآن':'Verification unavailable'} body={ar?'لم نتمكّن من الوصول إلى سجل الشهادات، وهذا لا يعني أن الشهادة غير صحيحة. أعد المحاولة بعد قليل.':'The certificate registry could not be reached. This does not mean the certificate is invalid — try again shortly.'} action={<Button variant="outline" onClick={()=>void verifyCode(submittedCode)}>{ar?'إعادة المحاولة':'Try again'}</Button>}/>}
+    {submittedCode && verification==='NOT_FOUND' && <StatusCard title={ar?'غير موجودة':'NOT FOUND'} body={ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}/>}
 
-    {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">
-      <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
-      <div className="relative">
-        <Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>
-        <div className="mizan-kicker mt-5">{publicView.certificateNumber}</div>
+    {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <VerdictShell badge={<Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>} number={publicView.certificateNumber}>
         <h2 className="text-2xl sm:text-3xl font-black mt-3">{publicView.disclosed.participantName||publicView.disclosed.participantCode}</h2>
         <p className="text-sm text-[#616762] mt-2">{publicView.competitionName}</p>
         {publicView.organizationName&&<p className="text-xs font-bold text-[#214C40] mt-2">{publicView.organizationName}</p>}
@@ -94,14 +90,9 @@ export const CertificateVerification: React.FC = () => {
         </div>
         <p className="mt-6 text-[10px] leading-5 text-[#6b706c]">{ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}</p>
         <div className="mt-6 inline-block bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(publicView.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
-      </div>
-    </section>}
+    </VerdictShell>}
 
-    {activeCert && verification && verification!=='NOT_FOUND' && <section className="bg-[#fffefb] border border-[#dcdad2] rounded-[28px] p-7 sm:p-10 text-center relative overflow-hidden">
-      <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
-      <div className="relative">
-        <Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>
-        <div className="mizan-kicker mt-5">{activeCert.certificateNumber}</div>
+    {activeCert && verification && verification!=='NOT_FOUND' && <VerdictShell badge={<Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>} number={activeCert.certificateNumber}>
         {verification==='AUTHENTIC'?<>
           <h2 className="text-2xl sm:text-3xl font-black mt-3">{ar?activeCert.participantNameArabic:activeCert.participantName}</h2>
           <p className="text-sm text-[#616762] mt-2">{ar?activeCert.competitionNameArabic:activeCert.competitionName}</p>
@@ -121,10 +112,19 @@ export const CertificateVerification: React.FC = () => {
             </div>
           </div>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[#646965] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
-      </div>
-    </section>}
+    </VerdictShell>}
   </div>;
 };
+
+/* حالتا «تعذّر التحقق» و«غير موجودة» كانتا قالبين متطابقين حرفًا بحرف إلا في الجملة. */
+const StatusCard:React.FC<{title:string;body:string;action?:React.ReactNode}>=({title,body,action})=><section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="text-lg font-black mt-3">{title}</h2><p className="text-xs text-[#646965] mt-1.5 leading-6 max-w-md mx-auto">{body}</p>{action&&<div className="mt-5">{action}</div>}</section>;
+
+/* وبطاقتا النتيجة (العامة والكاملة) كانتا تعيدان بناء الإطار نفسه: الخلفية والدرع الغائر
+   والشارة ورقم الشهادة. الإطار واحد، وما يختلف هو ما يُوضع داخله. */
+const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.ReactNode}>=({badge,number,children})=><section className="bg-[#fffefb] border border-[#e2e0d9] rounded-3xl p-7 sm:p-10 text-center relative overflow-hidden">
+  <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
+  <div className="relative">{badge}<div className="mizan-kicker mt-5">{number}</div>{children}</div>
+</section>;
 
 /*
  * الحلقات التي تقوم عليها الأصالة، معروضة لا موصوفة: من المصحف المعتمد إلى الشهادة.
