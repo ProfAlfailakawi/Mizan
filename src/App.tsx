@@ -17,6 +17,7 @@ import { fetchTenant } from './lib/tenant';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
 import { hostSurface } from './lib/host-surface';
+import { parsePanelKeys } from './lib/display-board';
 
 /*
  * Route-level code splitting.
@@ -42,6 +43,7 @@ const VIEWS = {
   kioskMode: () => import('./components/gate/KioskMode'),
   ceremonyView: () => import('./components/public/CeremonyView'),
   waitingBoard: () => import('./components/public/WaitingBoard'),
+  committeeDisplay: () => import('./components/public/CommitteeDisplay'),
   hallRecitationMap: () => import('./components/public/HallRecitationMap'),
   certificateVerification: () => import('./components/public/CertificateVerification'),
   registrationFlow: () => import('./components/public/RegistrationFlow'),
@@ -64,6 +66,7 @@ const ParticipantDashboard = pick(VIEWS.participantDashboard, 'ParticipantDashbo
 const KioskMode = pick(VIEWS.kioskMode, 'KioskMode');
 const CeremonyView = pick(VIEWS.ceremonyView, 'CeremonyView');
 const WaitingBoard = pick(VIEWS.waitingBoard, 'WaitingBoard');
+const CommitteeDisplay = pick(VIEWS.committeeDisplay, 'CommitteeDisplay');
 const HallRecitationMap = pick(VIEWS.hallRecitationMap, 'HallRecitationMap');
 const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
 const RegistrationFlow = pick(VIEWS.registrationFlow, 'RegistrationFlow');
@@ -133,11 +136,11 @@ const NoRoleConsole: React.FC = () => (
  * ولا دور dialog — لأن السطح حينها ليس نافذةً فوق التطبيق بل هو الجهاز كله. وهذا يستعمل
  * التصميم القائم (شاشة بلا onClose = سطح دائم) بدل أن يضيف حارسًا يمكن تجاوزه.
  */
-const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',hallMap:'خريطة القاعة',ceremony:'شاشة الحفل'};
-const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,hallMap,ceremony,close})=>{
+const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',committeeBoard:'شاشة اللجنة',hallMap:'خريطة القاعة',ceremony:'شاشة الحفل'};
+const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;committeeBoard:boolean;hallMap:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,committeeBoard,hallMap,ceremony,close})=>{
  const {language}=useAppStore(); const ar=language==='ar';
  const {lock,apply}=useVenueLockState();
- const active=kiosk?'kiosk':waitingBoard?'waitingBoard':hallMap?'hallMap':ceremony?'ceremony':'';
+ const active=kiosk?'kiosk':waitingBoard?'waitingBoard':committeeBoard?'committeeBoard':hallMap?'hallMap':ceremony?'ceremony':'';
  if(!active) return null;
  const locked=!!lock;
  const lockSurface=async(next:Parameters<typeof apply>[0])=>{apply(next);try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen()}catch{/* Mobile Safari may decline fullscreen; app chrome is still removed. */}};
@@ -149,12 +152,33 @@ const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;hallMap:boolean
   <Overlay>
    {kiosk&&<KioskMode onClose={exit}/>}
    {waitingBoard&&<WaitingBoard onClose={exit}/>}
+   {committeeBoard&&<CommitteeDisplay onClose={exit}/>}
    {hallMap&&<HallRecitationMap onClose={exit}/>}
    {ceremony&&<CeremonyView onClose={exit}/>}
   </Overlay>
   {locked
    ? <VenueUnlockGuard lock={lock!} ar={ar} onUnlocked={unlockSurface}/>
    : <div className="fixed bottom-4 inset-x-0 z-[80] flex justify-end px-4 pointer-events-none"><div className="pointer-events-auto"><VenueLockButton surface={surface} ar={ar} onLocked={next=>void lockSurface(next)}/></div></div>}
+ </>;
+};
+
+/*
+ * شاشة اللجنة حين تُفتح برابطٍ لا بطبقة.
+ *
+ * نفس قفل القاعة: مفتوحةً لها زرُّ قفلٍ وزرُّ خروج، ومقفولةً لا مخرج لها إلا الإيماءة
+ * الخفيّة ثم الرمز. جهازٌ معلَّقٌ في ممرّ لا يُترك بزرِّ خروجٍ يضغطه أيُّ مارّ.
+ */
+const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;onExit:()=>void}>=({panelKeys,rotateSeconds,onExit})=>{
+ const {language}=useAppStore(); const ar=language!=='en';
+ const {lock,apply}=useVenueLockState();
+ const locked=!!lock;
+ const lockSurface=async(next:Parameters<typeof apply>[0])=>{apply(next);try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen()}catch{/* قد يرفض سفاري ملء الشاشة؛ الشاشة تعمل بلا زخرفة التطبيق. */}};
+ const unlockSurface=()=>{apply(null);if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
+ return <>
+  <Overlay><CommitteeDisplay panelKeys={panelKeys} rotateSeconds={rotateSeconds} onClose={locked?undefined:onExit}/></Overlay>
+  {locked
+   ? <VenueUnlockGuard lock={lock} ar={ar} onUnlocked={unlockSurface}/>
+   : <div className="fixed bottom-4 inset-x-0 z-[80] flex justify-end px-4 pointer-events-none"><div className="pointer-events-auto"><VenueLockButton surface={VENUE_LABEL.committeeBoard} ar={ar} onLocked={next=>void lockSurface(next)}/></div></div>}
  </>;
 };
 
@@ -172,6 +196,22 @@ const compParam = (h: string): string | null => {
   const i = h.indexOf('?');
   if (i === -1) return null;
   try { return new URLSearchParams(h.slice(i + 1)).get('comp'); } catch { return null; }
+};
+/*
+ * معاملات شاشة العرض من الرابط: `#board?comp=…&panel=C7,C8&rotate=20`.
+ *
+ * الرابط هو ما يجعل الشاشة تعود وحدها. أسطح القاعة الأخرى تُفتح طبقةً بيد موظّفٍ مسجّل،
+ * فإذا انقطعت الكهرباء عن تلفازٍ في الممر لم يعد إلى شيء. وهذه تعود إلى لجنتها بلا أحد.
+ */
+const boardParams = (h: string): { panelKeys: string[]; rotateSeconds: number } => {
+  const i = h.indexOf('?');
+  if (i === -1) return { panelKeys: [], rotateSeconds: 0 };
+  try {
+    const q = new URLSearchParams(h.slice(i + 1));
+    const rotate = Number(q.get('rotate'));
+    /* تناوبٌ أسرع من خمس ثوانٍ لا يُقرأ على شاشةِ قاعة، فيُهمل بدل أن يُطبَّق. */
+    return { panelKeys: parsePanelKeys(q.get('panel')), rotateSeconds: Number.isFinite(rotate) && rotate >= 5 ? rotate : 0 };
+  } catch { return { panelKeys: [], rotateSeconds: 0 }; }
 };
 /* شاشة تظهر حين يحمل الرابط معرّف مسابقة غير موجودة: تقول الحقيقة بدل أن تُسقط الزائر على مسابقة أخرى. */
 const CompetitionNotFound: React.FC = () => (
@@ -216,9 +256,9 @@ export default function App() {
  const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
  const [experienceHome,setExperienceHome]=useState(()=>demoMode && !window.location.hash);
  const [tenantSuspended,setTenantSuspended]=useState(false);
- const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [hash,setHash]=useState(window.location.hash);
+ const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [committeeBoard,setCommitteeBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
- useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
+ useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='committeeBoard')setCommitteeBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها
     وشعارها) لزوّار نطاقها الخاص أو الفرعي. نشرٌ بجهة واحدة يعيد لا شيء فتبقى «ميزان». */
  useEffect(()=>{const c=new AbortController();void fetchTenant(c.signal).then(t=>{if(!t)return;setTenantSuspended(t.status==='suspended');if(t.status==='suspended')return;
@@ -276,7 +316,9 @@ export default function App() {
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
  if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/></>;
+ /* شاشة اللجنة برابطها: تسبق صفحة التجربة واختيار الدور، فجهاز العرض لا يمرّ بواجهة موظّف. */
+ if(hash.startsWith('#board')) return <BoardRoute {...boardParams(hash)} onExit={returnToExperience}/>;
+ if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/></>;
  const competitionClosed=['completed','archived'].includes((competitions.find(c=>c.id===requestedComp)||competitions[0])?.status||'');
  const operationalRoles=['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','guardian','support_agent'];
  if(competitionClosed&&operationalRoles.includes(currentUser.role)) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-6" dir="rtl"><div className="mizan-surface max-w-lg w-full p-8 text-center"><MizanLogo language="ar" compact/><div className="mizan-kicker mt-6">المسابقة مغلقة</div><h1 className="text-2xl font-black mt-2">انتهت المسابقة وتم إيقاف الوصول التشغيلي</h1><p className="text-sm text-[#636864] mt-4 leading-7">تم حفظ السجل والنتائج والشهادات، لكن جميع صلاحيات التشغيل والدخول لهذه المسابقة متوقفة.</p><button onClick={()=>void signOut(auth)} className="mt-6 rounded-2xl bg-[#214C40] text-white px-6 py-3 text-sm font-black">تسجيل الخروج</button></div></div>;
@@ -315,6 +357,6 @@ export default function App() {
   </div>}
   <main><Page>{roleView()}</Page></main>
   {demoMode&&isBroadcast&&<DemoReturn onReturn={()=>setExperienceHome(true)}/>}
-  <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
+  <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
  </div>
 }

@@ -1128,3 +1128,86 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
    سطر تذييلٍ أو آخر صفٍّ في القائمة. */
 .mizan-venue, .mizan-venue-2, .mizan-venue-deep { padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom))); }
 @media (min-width:640px){ .mizan-venue, .mizan-venue-2, .mizan-venue-deep { padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom))); } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   لوحات النداء — شاشة القاعة وشاشة اللجنة
+   ═══════════════════════════════════════════════════════════════════════════
+
+   هاتان الشاشتان لا يقرؤهما أحد من قرب. تُعلَّق على تلفازٍ في قاعة، فيقرؤها الواقف على
+   بُعد أمتار وهو قلقٌ من أن يفوته دوره. فالنوع هنا يكبر بالشاشة نفسها لا بمقاسٍ ثابت،
+   واللون يخدم أمرًا واحدًا: أن يُعرف النداء الجديد قبل أن يُقرأ.                             */
+
+/* الكود المنادى به: يكبر مع الشاشة ولا يتجاوز حدًّا يكسر السطر على تلفازٍ عريض. */
+.mizan-call-code{
+  font-size:clamp(4rem, 17vw, 13rem); line-height:.86; letter-spacing:-.045em;
+  font-weight:900; font-variant-numeric:tabular-nums;
+  text-shadow:0 0 70px rgba(232,203,147,.16);
+}
+.mizan-board-code{
+  font-size:clamp(1.55rem, 3.4vw, 3rem); line-height:1; letter-spacing:-.035em;
+  font-weight:900; font-variant-numeric:tabular-nums;
+}
+.mizan-board-next{
+  font-size:clamp(1.5rem, 3.6vw, 2.6rem); line-height:1; letter-spacing:-.03em;
+  font-weight:900; font-variant-numeric:tabular-nums;
+}
+
+/* هالة ساكنة خلف الكود. لا تتحرّك ولا تلفت — تفصل الرقم عن الخلفية فحسب. */
+.mizan-call-halo{
+  position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(58% 52% at 50% 44%, rgba(232,203,147,.13), rgba(232,203,147,0) 70%);
+}
+
+/*
+ * وميض النداء: ثلاث ثوانٍ عند تغيّر الكود، ثم سكون.
+ *
+ * المشكلة التي يحلّها حقيقية: شاشةٌ تتبدّل بلا حركة لا ينتبه لها أحد في قاعةٍ ممتلئة،
+ * فيُنادى على المتسابق ويظلّ ينتظر. والحلّ لا يكون بصوتٍ في قاعة تلاوة، ولا بوميضٍ
+ * متكرّر — مرّة واحدة عند التغيير تكفي العين وتترك الأذن في حالها.
+ */
+@keyframes mzCallArrive{
+  0%   { box-shadow:0 0 0 0 rgba(232,203,147,.55); background-color:rgba(232,203,147,.14) }
+  70%  { box-shadow:0 0 0 18px rgba(232,203,147,0);  background-color:rgba(232,203,147,.05) }
+  100% { box-shadow:0 0 0 0 rgba(232,203,147,0);     background-color:transparent }
+}
+.mizan-call-arrive{ animation:mzCallArrive 3s var(--ease-brand) 1 both; }
+
+/* نقطة الحالة تتنفّس أثناء التلاوة وحدها: حركةٌ دائمة بلا معنى تصير ضوضاء بصرية. */
+@keyframes mzCallPulse{ 0%,100%{ opacity:1; transform:scale(1) } 50%{ opacity:.45; transform:scale(.86) } }
+.mizan-call-live{ animation:mzCallPulse 2.4s ease-in-out infinite; }
+
+/*
+ * شبكة القاعة: عشر لجان في لقطةٍ واحدة بلا تمرير.
+ *
+ * `auto-fit` مع حدٍّ أدنى يجعل الصفوف تتقرّر بعرض الشاشة لا بعددٍ مكتوب: لجنتان على لوح،
+ * وعشر على تلفاز — ولا يحتاج إضافةُ لجنةٍ حاديةَ عشرةَ تعديلَ الشيفرة.
+ */
+.mizan-board-grid{
+  display:grid; gap:clamp(.5rem, 1vw, 1rem);
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+}
+.mizan-board-cell{
+  background:var(--venue-surface); border:1px solid var(--venue-line);
+  border-radius:var(--radius-md); padding:clamp(.85rem, 1.4vw, 1.35rem);
+  display:flex; flex-direction:column; gap:.55rem; min-width:0;
+}
+.mizan-board-cell.is-offline{ opacity:.45; }
+.mizan-board-cell.is-testing{ border-color:rgba(232,203,147,.30); }
+
+/* وسم الفئة: هوية اللجنة التي يبحث عنها الواقف في الممر. ذهبٌ هادئ لا يزاحم الكود. */
+.mizan-board-tag{
+  display:inline-flex; align-items:center; gap:.3rem; max-width:100%;
+  padding:.2rem .55rem; border-radius:999px;
+  background:rgba(232,203,147,.12); border:1px solid rgba(232,203,147,.22);
+  color:#e8cb93; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* الشاشة المتأخّرة تُعلن تأخّرها، والمتوقّفة تُعتم صراحةً. بياناتٌ قديمة تُعرض كأنها حيّة
+   تُفقد الجمهور ثقته في كل شاشةٍ بعدها. */
+.mizan-board-stale{ filter:saturate(.45) brightness(.7); }
+
+@media (prefers-reduced-motion: reduce){
+  .mizan-call-arrive, .mizan-call-live{ animation:none !important; }
+}
+html[data-mizan-motion="reduced"] .mizan-call-arrive,
+html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
