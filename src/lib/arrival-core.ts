@@ -24,6 +24,12 @@ export type ArrivalDecision =
   | { kind: 'not-found' }
   | { kind: 'other-competition' }
   | { kind: 'duplicate'; reason: 'already-arrived' | 'already-numbered' }
+  /**
+   * وصل، ولا لجنة تؤهّله. يأخذ رقمه ويدخل الطابور بلا إسناد، وتُفتح حادثة توجيه.
+   * إبقاؤه خارج الطابور يخسره أسبقيته، وإسناده للجنةٍ لا تحكم فئته يؤجّل الرفض إلى
+   * لحظة الجلسة — وهو أسوأ موضعٍ يُكتشف فيه.
+   */
+  | { kind: 'admit-unrouted'; queueNumber: number; originalQueueNumber: number; queueOrderKey: number; reason: 'no-eligible-committee' }
   | { kind: 'admit'; queueNumber: number; originalQueueNumber: number; queueOrderKey: number; assignedCommitteeId?: string };
 
 /** أكبر رقم دورٍ مُنح في هذه المسابقة، أيًّا كان الحقل الذي حمله. */
@@ -39,28 +45,63 @@ export function highestQueueOrderKey(roster: Participant[], competitionId: strin
     .map(p => p.queueOrderKey || p.originalQueueNumber || p.queueNumber || 0));
 }
 
-/** أقلّ اللجان حِملًا، والتعادل للأسرع جلسةً. لا لجنة ⇒ لا إسناد، ولا اختيارٌ عشوائي. */
+/** حدٌّ أدنى لزمن الجلسة، فلا تصير لجنةٌ بمتوسّطٍ صفر بلا حِملٍ مهما طال طابورها. */
+const MIN_SESSION_MINUTES = 1;
+
+/**
+ * حِمل اللجنة **بالدقائق لا بالرؤوس**.
+ *
+ * كان العدّ للرؤوس وحدها، فلجنةٌ متوسّط جلستها ست دقائق وأخرى أربع عشرة تبدوان
+ * متساويتين عند طابورٍ متساوٍ — وهما في الزمن على الضعف. وعند عشر لجانٍ متفاوتة يتراكم
+ * الخطأ إلى ساعات على من وقع في الأبطأ.
+ *
+ * وهذا هو المقياس نفسه الذي تحتكم إليه مرونة اللجان (`recommendCommitteeElasticity`)،
+ * فلا يُسنِد الوصولُ إسنادًا تنقضه المرونة بعد دقائق.
+ */
+export function committeeLoadMinutes(committee: Committee, roster: Participant[], competitionId: string): number {
+  const waiting = roster.filter(p =>
+    p.competitionId === competitionId && p.assignedCommitteeId === committee.id && p.status === 'in_queue').length;
+  return waiting * Math.max(MIN_SESSION_MINUTES, committee.averageSessionMinutes || 0);
+}
+
+/**
+ * أقلّ اللجان حِملًا بالدقائق. لا لجنة ⇒ لا إسناد، ولا اختيارٌ عشوائي.
+ *
+ * وفضّ التعادل **حتميّ**: الأسرع جلسةً، ثم الأقلّ طابورًا، ثم الكود أبجديًا. الحتمية ليست
+ * تجميلًا — قرارُ إسنادٍ لا يُعاد إنتاجه لا يُدقَّق، ولا يُجاب صاحبه إن سأل «لِمَ لجنتي هذه؟».
+ */
 export function leastLoadedCommittee(pool: Committee[], roster: Participant[], competitionId: string): string | undefined {
   if (!pool.length) return undefined;
-  const load = (committeeId: string) => roster.filter(p =>
+  const waiting = (committeeId: string) => roster.filter(p =>
     p.competitionId === competitionId && p.assignedCommitteeId === committeeId && p.status === 'in_queue').length;
-  return [...pool].sort((a, b) => load(a.id) - load(b.id) || a.averageSessionMinutes - b.averageSessionMinutes)[0]?.id;
+  return [...pool].sort((a, b) =>
+    committeeLoadMinutes(a, roster, competitionId) - committeeLoadMinutes(b, roster, competitionId)
+    || a.averageSessionMinutes - b.averageSessionMinutes
+    || waiting(a.id) - waiting(b.id)
+    || a.code.localeCompare(b.code)
+  )[0]?.id;
 }
 
 /**
  * قرار البوابة عند مسحٍ واحد.
  *
- * `eligibleCommittees` هي اللجان المؤهَّلة لهذا المتسابق (فئةً وتعارضًا)، و`fallbackCommittees`
- * ما يُلجأ إليه حين لا تؤهّله أيٌّ منها — يقرّرهما المخزن لأنهما يعتمدان على سياسة المسابقة.
+ * `eligibleCommittees` هي اللجان المؤهَّلة لهذا المتسابق (فئةً ورواية وتعارضًا)، يقرّرها
+ * المخزن لأنها تعتمد على سياسة المسابقة.
+ *
+ * و`fallbackCommittees` لا يُلجأ إليه إلا حين تأذن السياسة صراحةً (`ANY_AVAILABLE`).
+ * كان يُستعمل دائمًا، وهو **لا يفلتر الفئة** — فيُسنَد المتسابق للجنةٍ لا تحكم فئته ثم
+ * يُرفض عند بدء الجلسة. والاختبار هنا يوثّق النقيض منذ البداية: «لا لجنة خيرٌ من لجنةٍ خطأ».
  */
 export function decideArrival(args: {
   participant: Participant | undefined;
   roster: Participant[];
   competitionId: string;
   eligibleCommittees: Committee[];
-  fallbackCommittees: Committee[];
+  fallbackCommittees?: Committee[];
+  /** الافتراض يمنع الإسناد الخطأ؛ و`ANY_AVAILABLE` يستعيد السلوك القديم صراحةً. */
+  unmatchedPolicy?: 'INCIDENT' | 'ANY_AVAILABLE';
 }): ArrivalDecision {
-  const { participant, roster, competitionId, eligibleCommittees, fallbackCommittees } = args;
+  const { participant, roster, competitionId, eligibleCommittees, fallbackCommittees = [], unmatchedPolicy = 'INCIDENT' } = args;
   if (!participant) return { kind: 'not-found' };
   if (participant.competitionId !== competitionId) return { kind: 'other-competition' };
 
@@ -69,15 +110,20 @@ export function decideArrival(args: {
   if (participant.checkedInAt && participant.originalQueueNumber) return { kind: 'duplicate', reason: 'already-numbered' };
 
   const next = highestQueueNumber(roster, competitionId) + 1;
-  const pool = eligibleCommittees.length ? eligibleCommittees : fallbackCommittees;
-  return {
-    kind: 'admit',
-    queueNumber: next,
-    originalQueueNumber: next,
-    queueOrderKey: highestQueueOrderKey(roster, competitionId) + 1,
-    /* لجنةٌ أُسندت من قبل لا تُبدَّل عند الوصول. */
-    assignedCommitteeId: participant.assignedCommitteeId || leastLoadedCommittee(pool, roster, competitionId),
-  };
+  const queueOrderKey = highestQueueOrderKey(roster, competitionId) + 1;
+  const pool = eligibleCommittees.length
+    ? eligibleCommittees
+    : unmatchedPolicy === 'ANY_AVAILABLE' ? fallbackCommittees : [];
+
+  /* لجنةٌ أُسندت من قبل لا تُبدَّل عند الوصول، ولا تُراجَع أهليتها هنا. */
+  const assignedCommitteeId = participant.assignedCommitteeId || leastLoadedCommittee(pool, roster, competitionId);
+
+  /* رقمه يبقى له وإن لم تُوجد لجنة: الأسبقية حقٌّ لا يسقط بعطبٍ في التهيئة. */
+  if (!assignedCommitteeId) {
+    return { kind: 'admit-unrouted', queueNumber: next, originalQueueNumber: next, queueOrderKey, reason: 'no-eligible-committee' };
+  }
+
+  return { kind: 'admit', queueNumber: next, originalQueueNumber: next, queueOrderKey, assignedCommitteeId };
 }
 
 /** البحث بالمعرّف أو بالكود، والكود غير حسّاس لحالة الأحرف. */

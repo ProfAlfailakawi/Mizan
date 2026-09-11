@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decideArrival, findByIdOrCode, highestQueueNumber, leastLoadedCommittee } from '../src/lib/arrival-core';
+import { committeeLoadMinutes, decideArrival, findByIdOrCode, highestQueueNumber, leastLoadedCommittee } from '../src/lib/arrival-core';
 import type { Committee, Participant } from '../src/types';
 
 /*
@@ -122,14 +122,71 @@ test('a panel already assigned to this participant is not swapped at the gate', 
   assert.equal(d.assignedCommitteeId, 'c-preset');
 });
 
-test('with no eligible panel the fallback is used, and with neither nobody is invented', () => {
+test('by default no eligible panel means no assignment — a wrong panel is worse than none', () => {
+  /*
+   * كان الاحتياطي يُستعمل دائمًا وهو لا يفلتر الفئة، فيُسنَد المتسابق للجنةٍ لا تحكم فئته
+   * ثم يرفضه بدءُ الجلسة (`chooseSessionCommittee`) والمتسابق جالس. الرفض عند البوابة
+   * يقع حيث يمكن إصلاحه.
+   */
   const p = participant();
-  const withFallback = admit({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [], fallbackCommittees: [committee('cf')] });
-  assert.equal(withFallback.assignedCommitteeId, 'cf');
+  const d = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [], fallbackCommittees: [committee('cf')] });
+  assert.equal(d.kind, 'admit-unrouted', 'an ineligible panel is not a fallback');
+  if (d.kind !== 'admit-unrouted') return;
+  assert.equal(d.reason, 'no-eligible-committee');
+  assert.equal(d.queueNumber, 1, 'his arrival number is still his — priority does not lapse for a setup fault');
+  assert.equal(d.originalQueueNumber, 1);
+});
 
-  const withNone = admit({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [], fallbackCommittees: [] });
-  assert.equal(withNone.assignedCommitteeId, undefined, 'no panel is better than a wrong panel');
-  assert.equal(withNone.queueNumber, 1, 'and the participant is still admitted with a number');
+test('a competition may still opt back into the old any-available behaviour, explicitly', () => {
+  const p = participant();
+  const d = admit({
+    participant: p, roster: [p], competitionId: COMP,
+    eligibleCommittees: [], fallbackCommittees: [committee('cf')],
+    unmatchedPolicy: 'ANY_AVAILABLE',
+  });
+  assert.equal(d.assignedCommitteeId, 'cf');
+});
+
+test('with no panel at all, nobody is invented under either policy', () => {
+  const p = participant();
+  for (const unmatchedPolicy of ['INCIDENT', 'ANY_AVAILABLE'] as const) {
+    const d = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [], fallbackCommittees: [], unmatchedPolicy });
+    assert.equal(d.kind, 'admit-unrouted', unmatchedPolicy);
+    if (d.kind === 'admit-unrouted') assert.equal(d.queueNumber, 1, 'and he is still admitted with a number');
+  }
+});
+
+/* ── الحِمل بالدقائق لا بالرؤوس ──────────────────────────────────────────── */
+
+test('a slow panel is not mistaken for a light one when the queues are equal', () => {
+  /* ست دقائق مقابل أربع عشرة: طابورٌ متساوٍ عددًا هو الضعف زمنًا. */
+  const fast = committee('fast', { averageSessionMinutes: 6 } as Partial<Committee>);
+  const slow = committee('slow', { averageSessionMinutes: 14 } as Partial<Committee>);
+  const roster = [
+    merge(participant(), { id: 'f1', code: 'F-1', status: 'in_queue', assignedCommitteeId: 'fast' } as Partial<Participant>),
+    merge(participant(), { id: 'f2', code: 'F-2', status: 'in_queue', assignedCommitteeId: 'fast' } as Partial<Participant>),
+    merge(participant(), { id: 's1', code: 'S-1', status: 'in_queue', assignedCommitteeId: 'slow' } as Partial<Participant>),
+  ];
+  assert.equal(committeeLoadMinutes(fast, roster, COMP), 12);
+  assert.equal(committeeLoadMinutes(slow, roster, COMP), 14);
+  /* بالرؤوس كانت البطيئة تفوز (واحدٌ مقابل اثنين)؛ وبالدقائق تفوز السريعة. */
+  assert.equal(leastLoadedCommittee([slow, fast], roster, COMP), 'fast');
+});
+
+test('a panel with no configured session length still carries weight', () => {
+  const zero = committee('zero', { averageSessionMinutes: 0 } as Partial<Committee>);
+  const roster = [merge(participant(), { id: 'z1', code: 'Z-1', status: 'in_queue', assignedCommitteeId: 'zero' } as Partial<Participant>)];
+  assert.ok(committeeLoadMinutes(zero, roster, COMP) > 0, 'otherwise every arrival piles onto it forever');
+});
+
+test('tie-breaking is deterministic, so an assignment can be re-derived and audited', () => {
+  const a = committee('a', { averageSessionMinutes: 8 } as Partial<Committee>);
+  const b = committee('b', { averageSessionMinutes: 8 } as Partial<Committee>);
+  const c = committee('c', { averageSessionMinutes: 8 } as Partial<Committee>);
+  /* نفس المجموعة بترتيبٍ مختلف تعطي القرار نفسه — وإلا لم يكن للقرار جواب. */
+  assert.equal(leastLoadedCommittee([a, b, c], [], COMP), 'a');
+  assert.equal(leastLoadedCommittee([c, b, a], [], COMP), 'a');
+  assert.equal(leastLoadedCommittee([b, c, a], [], COMP), 'a');
 });
 
 test('a code is matched whatever case it is typed or scanned in', () => {
