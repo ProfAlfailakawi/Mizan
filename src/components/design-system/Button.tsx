@@ -22,7 +22,8 @@ export const Button: React.FC<ButtonProps> = ({ children, variant='primary', siz
     ghost: 'mizan-btn-ghost',
     gold: 'mizan-btn-gold'
   };
-  const sizes = { sm:'text-xs px-3 py-2 gap-1.5', md:'text-sm px-4 py-2.5 gap-2', lg:'text-sm px-5 py-3 gap-2.5', xl:'text-base px-6 py-3.5 gap-3' };
+  // المقاسان الكبيران كانا بحجم الأوسط تقريبًا (نفس مقاس النص)، فلم يكن لطلب «زرّ أكبر» أثر.
+  const sizes = { sm:'text-xs px-3 py-2 gap-1.5', md:'text-sm px-4 py-2.5 gap-2', lg:'text-base px-6 py-3.5 gap-2.5', xl:'text-lg px-8 py-4 gap-3' };
   return <button disabled={disabled || loading} className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
     {loading ? <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" /> : icon ? <span className="shrink-0">{icon}</span> : null}
     {children ? <span className="min-w-0 truncate">{children}</span> : null}

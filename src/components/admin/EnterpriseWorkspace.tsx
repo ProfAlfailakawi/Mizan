@@ -1,4 +1,5 @@
 import React, {Suspense, lazy, useEffect, useMemo, useState} from 'react';
+import { Mini } from '../design-system/Field';
 import { Bell, Cable, DatabaseBackup, FileUp, Globe2, HardDrive, Plane, Radar, RadioTower, ShieldCheck, Stethoscope, UsersRound, Wifi, Copy, Download, Play, RefreshCw, Plus, CheckCircle2, AlertTriangle, Fingerprint, WandSparkles } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
@@ -138,5 +139,4 @@ const Governance=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{
 }
 
 const State=({ok,label,ar}:{ok:boolean;label:string;ar?:boolean})=><div className="flex items-center justify-between text-xs"><span>{label}</span><Badge variant={ok?'emerald':'amber'}>{ok?(ar?'سليم':'OK'):(ar?'انتباه':'ATTN')}</Badge></div>;
-const Mini=({n,t}:{n:number;t:string})=><div className="rounded-xl bg-[#f3f1eb] p-3"><div className="text-lg font-black">{n}</div><div className="text-[10px] text-[#656b66]">{t}</div></div>;
 const Empty=({ar}:{ar:boolean})=><div className="py-5 text-center text-xs text-[#696f6b]">{ar?'لا يوجد بعد':'None yet'}</div>;

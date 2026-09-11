@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import { Mini } from '../design-system/Field';
 import {
  BellRing,CheckCircle2,Copy,KeyRound,Laptop2,Layers3,LockKeyhole,Pause,Pencil,Play,QrCode,
  RotateCcw,ShieldCheck,Trash2,UserPlus,XCircle,
@@ -234,4 +235,3 @@ export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:
 };
 
 const IconButton=({title,onClick,children,danger=false}:{title:string;onClick:()=>void;children:React.ReactNode;danger?:boolean})=><button type="button" title={title} aria-label={title} onClick={onClick} className={`w-11 h-11 rounded-xl border grid place-items-center transition ${danger?'text-[#94564d] border-[#ead9d5] hover:bg-[#f7ece9]':'text-[#214C40] border-[#d9dfdb] hover:bg-white'}`}>{children}</button>;
-const Mini=({n,t}:{n:number;t:string})=><div className="rounded-xl bg-[#f3f1eb] p-3 text-center"><div className="text-lg font-black">{n}</div><div className="text-[10px] text-[#656b66]">{t}</div></div>;
