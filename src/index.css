@@ -1139,16 +1139,19 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 
 /* الكود المنادى به: يكبر مع الشاشة ولا يتجاوز حدًّا يكسر السطر على تلفازٍ عريض. */
 .mizan-call-code{
-  font-size:clamp(4rem, 17vw, 13rem); line-height:.86; letter-spacing:-.045em;
+  /* قِيس: ٢٠٨px على 55" يُقرأ من ١٣٫٩ م، لكن السقف نفسه يُقزّمه على 4K إلى ٨٫٢ م —
+     لأن بكسل 4K أصغر فيزيائيًا. رفعُ السقف يجعل الشاشة تكبر بكِبَر لوحها لا بعدد بكسلاته. */
+  font-size:clamp(4rem, 15vw, 20rem); line-height:.86; letter-spacing:-.045em;
   font-weight:900; font-variant-numeric:tabular-nums;
   text-shadow:0 0 70px rgba(232,203,147,.16);
 }
 .mizan-board-code{
-  font-size:clamp(1.55rem, 3.4vw, 3rem); line-height:1; letter-spacing:-.035em;
+  /* قِيس: ٤٨px يُقرأ من ٣٫٢ م على 55" — وشاشة القاعة تُقرأ من وسطها لا من أمامها. */
+  font-size:clamp(1.6rem, 4.4vw, 9rem); line-height:1; letter-spacing:-.035em;
   font-weight:900; font-variant-numeric:tabular-nums;
 }
 .mizan-board-next{
-  font-size:clamp(1.5rem, 3.6vw, 2.6rem); line-height:1; letter-spacing:-.03em;
+  font-size:clamp(1.5rem, 3.4vw, 7rem); line-height:1; letter-spacing:-.03em;
   font-weight:900; font-variant-numeric:tabular-nums;
 }
 
@@ -1184,7 +1187,9 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
  */
 .mizan-board-grid{
   display:grid; gap:clamp(.5rem, 1vw, 1rem);
-  grid-template-columns:repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+  /* الحدّ الأدنى يحكم عدد الأعمدة: ١٥٫٥rem كانت تعطي سبعة أعمدة على 1080p فتضيق الخليّة
+     ويضيق كودها معها حتى لا يُقرأ إلا من ثلاثة أمتار. ٢٠rem تعطي خمسة، وهي لقطة 5×2. */
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
 }
 .mizan-board-cell{
   background:var(--venue-surface); border:1px solid var(--venue-line);
@@ -1213,16 +1218,21 @@ html[data-mizan-motion="reduced"] .mizan-call-arrive,
 html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
 
 /*
- * الأكواد بخطٍّ غير خطّ العناوين.
+ * أكواد شاشات القاعة بخطٍّ غير خطّ العناوين.
  *
  * كانت الشاشة كلّها بخطٍّ عربيٍّ واحد بأوزان — فالكود `A-104` والعنوان «قاعة الانتظار»
  * يُقرآن كنسيجٍ واحد، والعين تبحث عن الرقم بدل أن يقع عليها. والمصحف الذي يحفظه هؤلاء
  * قائمٌ على تباينٍ بصريٍّ دقيق بين المتن وما حوله؛ هذا أقلّ ما يُقتبس منه.
  *
- * العناوين تبقى على خطّ الواجهة العربي، والأكواد على خطٍّ هندسيّ لاتينيّ بأرقامٍ متساوية
- * العرض — فلا يرتجف السطر حين يتغيّر الرقم، ويصير الكود شيئًا تراه لا شيئًا تقرؤه.
+ * والاسم `mizan-venue-code` لا `mizan-code`: الثاني مأخوذٌ لرقاقة كود المتسابق على
+ * الأسطح الفاتحة، وهي تحمل `color:var(--emerald)` — أخضرَ داكنًا. استعمالُه على سطحٍ
+ * داكن جعل الكود أخضرَ على أخضر بنسبة تباينٍ ١٫٣:١، أي غير مرئيٍّ عمليًا. لم يُكتشف
+ * ذلك بالقراءة بل بالقياس: `scripts/venue-legibility-audit.mjs` يصوّر الشاشة ويقيسها.
+ *
+ * فاللون هنا **موروث** عمدًا — سطحُ القاعة يقرّر لون حبره، لا رقاقةٌ صُمّمت لسطحٍ آخر.
  */
-.mizan-code{
+.mizan-venue-code{
+  color:inherit;
   font-family:var(--font-sans);
   font-variant-numeric:tabular-nums lining-nums;
   font-feature-settings:"tnum" 1,"lnum" 1;
