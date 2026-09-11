@@ -56,7 +56,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <span style={{ color: GOLD }}>{ar ? 'الموضع الحالي:' : 'Current locus:'}</span>
         {[58, 12, 1].map(a => (
-          <button key={a} onClick={() => setAyah(a)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: a === ayah ? GOLD : 'rgba(232,203,147,.16)', color: a === ayah ? GOLD : '#f4f1e8' }}>{ar ? `البقرة ${a === 58 ? '٥٨' : a === 12 ? '(الأنعام ١٢)' : '١'}` : `2:${a}`}</button>
+          <button key={a} onClick={() => setAyah(a)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: a === ayah ? GOLD : 'rgba(232,203,147,.16)', color: a === ayah ? GOLD : '#f4f1e8' }}>{ar ? `البقرة ${a === 58 ? '٥٨' : a === 12 ? '(الأنعام ١٢)' : '١'}` : `2:${a}`}</button>
         ))}
       </div>
       <div className={card} style={cardStyle}>
@@ -65,7 +65,7 @@ const RadarPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
           <Pill ok={radar.competitorCount === 0}>{radar.competitorCount === 0 ? (ar ? 'لا تشابه' : 'no twins') : `${radar.competitorCount} ${ar ? 'مطابقة' : 'matches'}`}</Pill>
         </div>
         {radar.competitors.length === 0 ? (
-          <div className="text-[12.5px]" style={{ color: '#8b9a92' }}>{ar ? 'لا مواضع متشابهة معتمدة عند هذا الموضع.' : 'No approved twin loci at this position.'}</div>
+          <div className="text-[13px]" style={{ color: '#8b9a92' }}>{ar ? 'لا مواضع متشابهة معتمدة عند هذا الموضع.' : 'No approved twin loci at this position.'}</div>
         ) : (
           <div className="space-y-2">
             {radar.competitors.map((c, i) => (
@@ -113,8 +113,8 @@ const ParityPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {ar ? 'القرعة تُثبت قابلية إعادة الإنتاج، لكن هل حمل كل متسابق نفس «الطاقة الذهنية»؟ يقيس هذا المؤشر مجموع الصعوبة (صعوبة + متشابهات + تجويد) ويُنبّه عند الفارق.' : 'FairDraw proves reproducibility — but do all sets carry the same cognitive energy? This measures total load (difficulty + mutashabihat + tajweed) and flags gaps.'}
       </p>
       <div className="flex items-center gap-2">
-        <button onClick={() => setBalanced(false)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: !balanced ? DANGER : 'rgba(232,203,147,.16)', color: !balanced ? DANGER : '#f4f1e8' }}>{ar ? 'قرعة متفاوتة' : 'Lopsided draw'}</button>
-        <button onClick={() => setBalanced(true)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: balanced ? GOLD : 'rgba(232,203,147,.16)', color: balanced ? GOLD : '#f4f1e8' }}>{ar ? 'قرعة متكافئة' : 'Balanced draw'}</button>
+        <button onClick={() => setBalanced(false)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: !balanced ? DANGER : 'rgba(232,203,147,.16)', color: !balanced ? DANGER : '#f4f1e8' }}>{ar ? 'قرعة متفاوتة' : 'Lopsided draw'}</button>
+        <button onClick={() => setBalanced(true)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: balanced ? GOLD : 'rgba(232,203,147,.16)', color: balanced ? GOLD : '#f4f1e8' }}>{ar ? 'قرعة متكافئة' : 'Balanced draw'}</button>
       </div>
       <div className={card} style={cardStyle}>
         <div className="mb-3 flex items-center justify-between">
@@ -194,8 +194,8 @@ const CommitteePanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {ar ? 'تشريح إحصائي بعد الجلسة — على مستوى اللجنة فقط، بلا ترتيب أي محكّم. يقيس تزامن الرصد وتكافؤ الخصم بين الوفود، كمؤشرات مراجعة للأمانة العامة.' : 'Post-session autopsy — at committee granularity only, never ranking a judge. Measures submission synchrony and regional evenness as review prompts.'}
       </p>
       <div className="flex items-center gap-2">
-        <button onClick={() => setSynced(true)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: synced ? DANGER : 'rgba(232,203,147,.16)', color: synced ? DANGER : '#f4f1e8' }}>{ar ? 'رصد متزامن + فارق مناطقي' : 'Synced + regional gap'}</button>
-        <button onClick={() => setSynced(false)} className="rounded-lg border px-3 py-1.5 text-[12.5px] font-bold" style={{ ...cardStyle, borderColor: !synced ? GOLD : 'rgba(232,203,147,.16)', color: !synced ? GOLD : '#f4f1e8' }}>{ar ? 'رصد مستقل ومتكافئ' : 'Independent + even'}</button>
+        <button onClick={() => setSynced(true)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: synced ? DANGER : 'rgba(232,203,147,.16)', color: synced ? DANGER : '#f4f1e8' }}>{ar ? 'رصد متزامن + فارق مناطقي' : 'Synced + regional gap'}</button>
+        <button onClick={() => setSynced(false)} className="rounded-lg border px-3 py-1.5 text-[13px] font-bold" style={{ ...cardStyle, borderColor: !synced ? GOLD : 'rgba(232,203,147,.16)', color: !synced ? GOLD : '#f4f1e8' }}>{ar ? 'رصد مستقل ومتكافئ' : 'Independent + even'}</button>
       </div>
       <div className={card} style={cardStyle}>
         <div className="grid grid-cols-2 gap-3">
@@ -353,7 +353,7 @@ export const JudgeIntelligenceLab: React.FC<{ onClose?: () => void }> = ({ onClo
           {tabs.map(t => {
             const Icon = t.icon; const active = t.id === tab;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[12.5px] font-bold transition"
+              <button key={t.id} onClick={() => setTab(t.id)} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-[13px] font-bold transition"
                 style={{ background: active ? 'rgba(232,203,147,.12)' : 'rgba(12,23,19,.5)', borderColor: active ? GOLD : 'rgba(232,203,147,.16)', color: active ? GOLD : '#f4f1e8' }}>
                 <Icon className="h-4 w-4" />{ar ? t.ar : t.en}
               </button>

@@ -12,6 +12,7 @@ import { ContinuityRecovery } from './ContinuityRecovery';
 import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
 import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
+import { Metric } from '../design-system/Metric';
 
 // The alert kind was rendered raw, so an Arabic-first screen printed "review",
 // "incident" and "device" in English. It also carried no severity, so a hardware
@@ -68,7 +69,6 @@ export const CommandCenter: React.FC = () => {
   </>}
  </div>
 }
-const Metric=({icon:Icon,value,label}:{icon:React.ComponentType<{className?:string}>;value:number;label:string})=><div className="mizan-surface p-4"><Icon className="w-4 h-4 text-[#2F6555]"/><div className="text-3xl font-black mt-4">{value}</div><div className="text-[11px] text-[#646965] mt-1">{label}</div></div>;
 const Health=({icon:Icon,label,ok,note}:{icon:React.ComponentType<{className?:string}>;label:string;ok:boolean;note?:string})=><div className="rounded-xl bg-[#f1efe9] p-3 flex items-center gap-3"><span className={`w-8 h-8 rounded-lg grid place-items-center ${ok?'bg-[#E7EEE9] text-[#214C40]':'bg-[#F4E6E3] text-[#A34D43]'}`}><Icon className="w-4 h-4"/></span><div><div className="text-xs font-bold">{label}</div><div className="text-[10px] text-[#656b66] mt-0.5">{note||(ok?'جاهز':'يحتاج انتباه')}</div></div></div>;
 
 const Pulse=({n,t}:{n:number;t:string})=><div className="rounded-xl bg-[#f1efe9] p-2 sm:p-3 text-center min-w-0"><div className="text-xl sm:text-2xl font-black tabular-nums">{n}</div><div className="text-[9px] sm:text-[10px] text-[#646965] truncate mt-1">{t}</div></div>;
