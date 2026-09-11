@@ -81,7 +81,7 @@ const CompetitionDNA=({store,ar,policy,section,setSection,patchPolicy}:{store:St
   <div><div className="mizan-kicker">{ar?'بصمة المسابقة':'MIZAN COMPETITION DNA'}</div><h1 className="text-2xl sm:text-3xl font-black mt-1">{ar?'كل مسابقة لها نظامها':'Every competition is its own system'}</h1><p className="text-sm text-[#626864] mt-2 max-w-2xl">{ar?'لا توجد لائحة عالمية مفروضة. كل شرط وكل زر تحكيم وكل مرحلة تخص هذه المسابقة وحدها.':'No global rules are imposed. Registration, judging actions, workflow and policies belong to this competition only.'}</p></div>
   <div className="grid lg:grid-cols-[220px_minmax(0,1fr)] gap-4 min-w-0">
    <div className="mizan-surface p-2 h-fit"><div className="grid grid-cols-2 lg:grid-cols-1 gap-1">{sections.map(([id,Icon,label])=><button key={id} onClick={()=>setSection(id)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-start ${section===id?'bg-[#E7EEE9] text-[#214C40]':'text-[#626a65] hover:bg-[#f2f0ea]'}`}><Icon className="w-4 h-4 shrink-0"/><span className="truncate min-w-0">{label}</span></button>)}</div></div>
-   <div className="mizan-surface p-5 sm:p-7 min-h-[520px] min-w-0 max-w-full overflow-x-hidden">
+   <div className="mizan-surface p-5 sm:p-7 min-h-[520px] min-w-0 max-w-full overflow-x-clip">
     {section==='identity'&&<IdentitySection store={store} ar={ar}/>} 
     {section==='registration'&&<RegistrationSection ar={ar} policy={policy} patch={patchPolicy}/>} 
     {section==='workflow'&&<WorkflowSection ar={ar} policy={policy} patch={patchPolicy}/>} 
