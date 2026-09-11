@@ -244,4 +244,4 @@ export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:
  </section>;
 };
 
-const IconButton=({title,onClick,children,danger=false}:{title:string;onClick:()=>void;children:React.ReactNode;danger?:boolean})=><button type="button" title={title} aria-label={title} onClick={onClick} className={`w-11 h-11 rounded-xl border grid place-items-center transition ${danger?'text-[#94564d] border-[#ead9d5] hover:bg-[#f7ece9]':'text-[#214C40] border-[#d9dfdb] hover:bg-white'}`}>{children}</button>;
+const IconButton=({title,onClick,children,danger=false}:{title:string;onClick:()=>void;children:React.ReactNode;danger?:boolean})=><Button shape="square" variant={danger?'danger':'outline'} aria-label={title} onClick={onClick}>{children}</Button>;

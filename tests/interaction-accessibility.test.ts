@@ -108,3 +108,24 @@ test('a clickable Card is a button, not a div', () => {
   const s = fs.readFileSync(path.join(root, 'src/components/design-system/Card.tsx'), 'utf8');
   assert.match(s, /if \(onClick\) return <button/, 'a card with onClick must be keyboard reachable');
 });
+
+test('no Button is hidden by a display class it cannot win against', () => {
+  /*
+   * `hidden` و`inline-flex` كلاهما أداةُ display، وترتيبُ ورقة الأنماط يحسم بينهما لا ترتيبُ
+   * الأصناف على العنصر. وقاعدةُ الزرّ المشترك تحمل `inline-flex`، فزرٌّ يُمرَّر إليه
+   * `className="hidden sm:..."` يظهر على الجوال رغم أمرنا بإخفائه — وقد دفع ترويسةَ التطبيق
+   * أربعة بكسلات خارج الشاشة عند عرض ٤٠٠. الإخفاء يكون بغلافٍ حوله، أو بعدم رسمه أصلًا.
+   */
+  const offenders: string[] = [];
+  for (const file of files) {
+    for (const tag of openingTags(fs.readFileSync(file, 'utf8'))) {
+      if (!/^<Button\b/.test(tag)) continue;
+      const m = tag.match(/className=(?:"([^"]*)"|\{`([^`]*)`\})/);
+      const cls = m ? (m[1] ?? m[2] ?? '') : '';
+      if (/\bhidden\b|\bblock\b|\bgrid\b|\bflex\b/.test(cls)) {
+        offenders.push(`${path.basename(file)}: ${cls.slice(0, 60)}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'wrap the Button in a span to hide it, do not pass a display class to it');
+});

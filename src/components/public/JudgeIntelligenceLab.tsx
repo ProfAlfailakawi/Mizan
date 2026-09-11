@@ -7,6 +7,7 @@ import { classifyMadd } from '../../lib/mudood-engine';
 import { buildMutashabihatRadar } from '../../lib/mutashabihat-radar';
 import { analyzeCommitteeIntegrity, type ScoreEvent } from '../../lib/committee-integrity';
 import type { MutashabihatTrapRecord, QuestionPoolItem } from '../../types';
+import { Button } from '../design-system/Button';
 
 /*
  * Judge Intelligence Lab (venue mode).
@@ -344,9 +345,9 @@ export const JudgeIntelligenceLab: React.FC<{ onClose?: () => void }> = ({ onClo
           <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><ShieldCheck className="h-5 w-5" style={{ color: GOLD }} /></span>
           <div className="me-auto">
             <div className="font-black text-[16px]">{ar ? 'مختبر ذكاء التحكيم' : 'Judge Intelligence Lab'}</div>
-            <div className="text-[11px]" style={{ color: GOLD }}>{ar ? 'استشاري · لا يمسّ الدرجة · القرار للمحكم' : 'Advisory · never scores · the judge decides'}</div>
+            <div className="text-[11px] font-bold" style={{ color: GOLD }}>{ar ? 'استشاري · لا يمسّ الدرجة · القرار للمحكم' : 'Advisory · never scores · the judge decides'}</div>
           </div>
-          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-11 w-11 place-items-center rounded-[11px]" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
+          {onClose && <Button shape="square" variant="venue-gold" onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'}><X className="h-[18px] w-[18px]" /></Button>}
         </header>
 
         <div className="mb-4 flex flex-wrap gap-2">

@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {ChevronDown,GitBranch,Gauge} from 'lucide-react';
 import {fetchDifficulty,fetchDivergencePoints,type DifficultyVector,type DivergencePoint} from '../../lib/kfgqpc-library';
+import { AdvisoryNote } from '../design-system/AdvisoryNote';
 
 /*
  * رادار المفترقات — تنبيه هادئ قبل موضع الالتباس.
@@ -80,10 +81,10 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
     </div>
    </div>)}
 
-   <p className="text-[9px] leading-5 text-[#636864]">
+   <AdvisoryNote>
     {ar?'وقائع نصية معدودة من حزمة الرواية نفسها. تنبيه للجنة فقط — لا يرصد خطأً ولا يؤثر في الدرجة.'
        :'Counted text facts from this reading\'s own package. Panel awareness only — it marks no error and moves no score.'}
-   </p>
+   </AdvisoryNote>
   </div>}
  </div>;
 };

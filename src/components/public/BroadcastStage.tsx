@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw, X, Radio } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
+import { Button } from '../design-system/Button';
 
 /*
  * Mizan · Spatial Broadcast Engine (venue mode).
@@ -127,9 +128,9 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => { if (!playing && elapsed >= TOTAL) restart(); else setPlaying(p => !p); }} aria-label={playing ? (ar ? 'إيقاف مؤقت' : 'Pause') : elapsed >= TOTAL ? (ar ? 'إعادة التشغيل' : 'Replay') : (ar ? 'تشغيل' : 'Play')} className="grid h-11 min-w-11 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
-          <button onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'} className="grid h-11 min-w-11 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><RotateCcw className="h-[18px] w-[18px]" /></button>
+          <Button shape="square" variant="venue-gold" onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'}><RotateCcw className="h-[18px] w-[18px]" /></Button>
           <button onClick={() => setLost(v => !v)} className="h-11 rounded-[11px] px-3 text-[12.5px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'تمرين فقد المحاذاة' : 'Alignment drill')}</button>
-          {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-11 min-w-11 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
+          {onClose && <Button shape="square" variant="venue-gold" onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'}><X className="h-[18px] w-[18px]" /></Button>}
         </div>
           <input type="range" min={0} max={1000} value={Math.round((elapsed / TOTAL) * 1000)} onChange={e => setElapsed((+e.target.value / 1000) * TOTAL)} aria-label={ar ? 'شريط الزمن' : 'Timeline'} className="sm:col-span-2 h-[7px] w-full cursor-pointer appearance-none rounded-full" style={{ background: `linear-gradient(90deg, ${goldDeep} ${(elapsed / TOTAL) * 100}%, rgba(244,241,232,.14) ${(elapsed / TOTAL) * 100}%)` }} />
       </div>
