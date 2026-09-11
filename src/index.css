@@ -875,45 +875,101 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
 [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid > button:nth-child(2){display:none}
 [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid{grid-template-columns:minmax(0,1fr)}
 
-/* ── MIZAN assembly choreography (public surfaces only) ─────────────────────
-   Inspired by product-reveal choreography: independent elements drift in,
-   move with premium easing, and reassemble into the final mark / final card.
-   Transform + opacity only, so it stays on the compositor at 60fps.
-   Used by: ExperienceHub intro overlay, CeremonyView winner reveal.
-   Never applied to JudgeOS / CommandCenter / operational screens. */
+/* ── MIZAN overture — «الميزان يتزن» (public surfaces only) ─────────────────
+   The signature ExperienceHub opening: an abstract balance scale draws in,
+   the six moments descend into its pans, the beam tips and rebalances with a
+   weighted spring-like settle — and at perfect equilibrium the composition
+   fuses into the MIZAN mark. Transform + opacity only (SVG stroke drawing via
+   dashoffset), so it stays on the compositor at 60fps. Total ≈ 3.25s.
+   Never applied to JudgeOS / CommandCenter / operational screens.
+   (CeremonyView keeps its own mz-cer-item choreography below.) */
 
-.mz-assembly-veil{
-  animation: mzAssemblyVeil 2.7s cubic-bezier(.4,0,.2,1) both;
+.mz-ovt-veil{
+  animation: mzOvtVeil 3.25s cubic-bezier(.4,0,.2,1) both;
   will-change: opacity;
 }
-@keyframes mzAssemblyVeil{
-  0%,88%{ opacity:1 }
+@keyframes mzOvtVeil{
+  0%,90%{ opacity:1 }
   100%{ opacity:0 }
 }
+/* Elegant early exit for the skip button. */
+.mz-ovt-veil--skip{ animation: mzOvtSkip .24s cubic-bezier(.4,0,.2,1) both; }
+@keyframes mzOvtSkip{ from{ opacity:1 } to{ opacity:0 } }
 
-/* Each fragment: scattered → drifts to its ring seat → converges into the mark. */
-.mz-assembly-chip{
-  position:absolute; top:50%; left:50%; margin:-27px 0 0 -27px;
-  animation: mzAssemblyChip 2.2s cubic-bezier(.22,.61,.2,1) var(--mzd,0ms) both;
+/* Scale strokes draw themselves in (beam → cords → pans). */
+.mz-ovt-stroke{
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: mzOvtStroke .7s cubic-bezier(.16,1,.3,1) both;
+}
+.mz-ovt-stroke-2{ animation-delay: .14s; }
+.mz-ovt-stroke-3{ animation-delay: .28s; }
+@keyframes mzOvtStroke{ to{ stroke-dashoffset: 0; } }
+
+.mz-ovt-finial{
+  transform-origin: 140px 44px;
+  animation: mzOvtFinial .55s cubic-bezier(.16,1,.3,1) .4s both;
   will-change: transform, opacity;
 }
-@keyframes mzAssemblyChip{
-  0%   { opacity:0; transform: translate(var(--mzsx), var(--mzsy)) scale(.55) rotate(var(--mzsr,0deg)); }
-  22%  { opacity:1; }
-  55%  { opacity:1; transform: translate(var(--mzrx), var(--mzry)) scale(1) rotate(0deg); }
-  82%  { opacity:0; transform: translate(0,0) scale(.3) rotate(0deg); }
-  100% { opacity:0; transform: translate(0,0) scale(.3) rotate(0deg); }
+@keyframes mzOvtFinial{
+  from{ opacity:0; transform: scale(.4); }
+  to  { opacity:1; transform: scale(1); }
 }
 
-.mz-assembly-mark{
-  animation: mzAssemblyMark 2.5s cubic-bezier(.16,1,.3,1) both;
+/* Each moment descends gracefully from above into its seat in a pan. */
+.mz-ovt-chip{
+  animation: mzOvtChip .85s cubic-bezier(.22,.61,.2,1) calc(.5s + var(--mzd,0ms)) both;
   will-change: transform, opacity;
 }
-@keyframes mzAssemblyMark{
-  0%,58%{ opacity:0; transform: scale(.72); }
-  80%   { opacity:1; transform: scale(1.045); }
-  100%  { opacity:1; transform: scale(1); }
+@keyframes mzOvtChip{
+  0%  { opacity:0; transform: translate(var(--mzx), calc(var(--mzy) - 190px)) scale(.8); }
+  35% { opacity:1; }
+  100%{ opacity:1; transform: translate(var(--mzx), var(--mzy)) scale(1); }
 }
+
+/* The beam tips under the arriving weight, then rebalances: a decaying,
+   spring-like oscillation around the fulcrum, reaching perfect equilibrium
+   at ~76% — the exact moment the mark takes over. */
+.mz-ovt-tilt{
+  transform-origin: 50% 29%;
+  animation: mzOvtTilt 3.25s cubic-bezier(.45,.05,.55,.95) both;
+  will-change: transform;
+}
+@keyframes mzOvtTilt{
+  0%,26%{ transform: rotate(0deg); }
+  40%   { transform: rotate(-4.5deg); }
+  54%   { transform: rotate(3deg); }
+  65%   { transform: rotate(-1.4deg); }
+  72%   { transform: rotate(.5deg); }
+  76%,100%{ transform: rotate(0deg); }
+}
+
+/* At equilibrium the whole composition condenses… */
+.mz-ovt-scale{
+  animation: mzOvtScaleOut 3.25s cubic-bezier(.4,0,.2,1) both;
+  will-change: transform, opacity;
+}
+@keyframes mzOvtScaleOut{
+  0%,76%{ opacity:1; transform: scale(1); }
+  86%,100%{ opacity:0; transform: scale(.62); }
+}
+
+/* …and fuses into the mark: a calm beat, then the veil lifts. */
+.mz-ovt-mark{
+  animation: mzOvtMark 3.25s cubic-bezier(.16,1,.3,1) both;
+  will-change: transform, opacity;
+}
+@keyframes mzOvtMark{
+  0%,74%{ opacity:0; transform: scale(.7); }
+  86%   { opacity:1; transform: scale(1.04); }
+  92%,100%{ opacity:1; transform: scale(1); }
+}
+
+/* The skip affordance arrives quietly once the scene is set. */
+.mz-ovt-skip{
+  animation: mzOvtSkipIn .5s cubic-bezier(.16,1,.3,1) .6s both;
+  will-change: opacity;
+}
+@keyframes mzOvtSkipIn{ from{ opacity:0 } to{ opacity:1 } }
 
 /* Ceremony winner: rank medallion, ranking label, name, country and score
    drift in from independent directions and settle into the final composition;
@@ -931,9 +987,12 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:128px }
    would still hold staggered elements in their hidden "from" state. Zero the
    delays too, so the final state shows immediately. */
 @media (prefers-reduced-motion: reduce){
-  .mz-assembly-veil,.mz-assembly-chip,.mz-assembly-mark,.mz-cer-item{ animation-delay:0ms !important; }
+  .mz-ovt-veil,.mz-ovt-chip,.mz-ovt-mark,.mz-ovt-stroke,.mz-ovt-finial,.mz-ovt-skip,.mz-cer-item{ animation-delay:0ms !important; }
 }
-html[data-mizan-motion="reduced"] .mz-assembly-veil,
-html[data-mizan-motion="reduced"] .mz-assembly-chip,
-html[data-mizan-motion="reduced"] .mz-assembly-mark,
+html[data-mizan-motion="reduced"] .mz-ovt-veil,
+html[data-mizan-motion="reduced"] .mz-ovt-chip,
+html[data-mizan-motion="reduced"] .mz-ovt-mark,
+html[data-mizan-motion="reduced"] .mz-ovt-stroke,
+html[data-mizan-motion="reduced"] .mz-ovt-finial,
+html[data-mizan-motion="reduced"] .mz-ovt-skip,
 html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; }
