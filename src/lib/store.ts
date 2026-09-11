@@ -1766,7 +1766,31 @@ export function useAppStore() {
     });
   });
 
-  const publishCompetition = () => {
+  /*
+   * النسخة العامة للمسابقة — وهي وحدها ما يراه الخادم — كانت تُكتب كأثرٍ جانبيّ لمزامنةٍ
+   * مؤجَّلة ثانيةً واحدة، تُلغى صامتةً إن كان الجهاز دون إنترنت أو المستخدم غير مسجَّل أو
+   * دوره غير مخوَّل، وتُبتلع أخطاؤها في سجلّ الطرفية. فيرى المدير «فُتحت المسابقة»، وتَظهر
+   * الصفحة العامة من نسخته المحلية، ثم يُكمل المتسابق خطواته الثلاث فيردّ الخادم «لم نعثر
+   * على المسابقة» — لأنها فعلًا لم تصل إليه قطّ. النشر الآن كتابةٌ صريحة تُنتظَر ويُبلَّغ
+   * عن فشلها في وجه من نشر، لا في سجلٍّ لا يفتحه أحد.
+   */
+  const publishPublicCompetitionRecord=async():Promise<{ok:boolean;reason:string}>=>{
+    if(launchPlaceholderActive())return {ok:false,reason:'أكمل تهيئة المسابقة والجهة قبل فتح التسجيل.'};
+    if(globalState.isOffline)return {ok:false,reason:'الجهاز دون إنترنت الآن، ولا يمكن نشر صفحة التسجيل العامة حتى يعود الاتصال.'};
+    if(!auth.currentUser)return {ok:false,reason:'يلزم تسجيل الدخول لنشر صفحة التسجيل العامة.'};
+    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'صلاحية هذا الحساب لا تسمح بنشر صفحة التسجيل العامة.'};
+    try{
+      const {db,doc,setDoc}=await getFirestoreClient();
+      await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt:new Date().toISOString()},{merge:true});
+      resolveCloudScope('competition');
+      return {ok:true,reason:''};
+    }catch(err){
+      console.error('MIZAN public competition publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
+      return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
+    }
+  };
+
+  const publishCompetition = async () => {
     const issues=getReadinessIssues(globalState.competition);
     const contradictions=detectContradictions({competition:globalState.competition,quranSources:globalState.quranSourceManifests,aiValidations:globalState.aiCapabilityValidations,availableQualifiedJudges:globalState.judges.filter(j=>j.isReady).length,committeeCount:globalState.committees.filter(c=>c.status!=='offline').length});
     const scientific=scientificSourcesForCompetition();
@@ -1783,7 +1807,15 @@ export function useAppStore() {
     // وتعارضات نشر النتائج تُعالج قبل التحكيم/النشر في بواباتها الخاصة، ولا تجعل زر التسجيل ميتًا.
     if(issues.length) return {ok:false,issues:issues.map(x=>x.ar),warnings:laterStageWarnings,scientificBlockers,contradictions};
     globalState.contradictionIssues=contradictions;
+    const previousStatus=globalState.competition.status;
     globalState.competition={...globalState.competition,status:'registration_open'};
+    const published=await publishPublicCompetitionRecord();
+    if(!published.ok){
+      /* لا تُترك المسابقة «مفتوحة» على جهاز الإدارة وحده: الحالة تعود كما كانت حتى ينجح النشر. */
+      globalState.competition={...globalState.competition,status:previousStatus};
+      notify();
+      return {ok:false,issues:[published.reason],warnings:laterStageWarnings,scientificBlockers,contradictions};
+    }
     markCompetitionConfigChanged();
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return {ok:true,issues:[],warnings:laterStageWarnings,scientificBlockers,contradictions};
