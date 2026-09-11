@@ -376,12 +376,12 @@ export const MarketingSite: React.FC = () => {
             </p>
           </div>
 
-          {/* لقطاتٌ حقيقية من مختبر ذكاء التحكيم */}
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {/* لقطاتٌ حقيقية، كلٌّ منها في موضعه من المنصّة لا في مختبرٍ منفصل:
+              لا يُعرض هنا إلا ما له مكانٌ يعمل فيه فعلًا. */}
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
             {[
-              { src: '/marketing/ai-radar.png', t: 'رادار المتشابهات', s: 'عند التردّد، يُظهر المواضع التي تجذب الذاكرة — من خريطةٍ معتمدةٍ سلفًا، لرئيس التحكيم وحده.' },
-              { src: '/marketing/ai-parity.png', t: 'تكافؤ القرعة', s: 'هل حمل المتسابقان العبء نفسه؟ يقيس مجموع الصعوبة والمتشابهات والتجويد، ويُنبّه عند الفارق.' },
-              { src: '/marketing/ai-mudood.png', t: 'محرك المدود', s: 'المدّ يُقاس بالحركات لا بالثواني: يقيسه بنبض القارئ نفسه، لا بساعةٍ مطلقة.' },
+              { src: '/marketing/ai-radar.png', t: 'رادار المتشابهات', s: 'عند التردّد، يُظهر المواضع التي تجذب الذاكرة — من خريطةٍ معتمدةٍ سلفًا، في حالة المراجعة أمام رئيس التحكيم وحده.' },
+              { src: '/marketing/ai-parity.png', t: 'تكافؤ القرعة', s: 'هل حمل المتسابقان العبء نفسه؟ يقيس مجموع الصعوبة والمتشابهات والتجويد بجانب إعدادات السحب، ويُنبّه عند الفارق.' },
             ].map(c => (
               <figure key={c.src} className="rounded-[20px] overflow-hidden" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--venue-line)' }}>
                 <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="w-full block" />

@@ -61,6 +61,6 @@ test('the numeric keypad stays left-to-right',()=>{
 test('venue screens can be locked, and a locked one exposes no exit',()=>{
   const app=read('src/App.tsx');
   assert.match(app,/const exit=locked\?undefined:close\[active\]/);
-  for(const surface of ['KioskMode','WaitingBoard','HallRecitationMap','BroadcastStage','JudgeIntelligenceLab','CeremonyView'])
+  for(const surface of ['KioskMode','WaitingBoard','HallRecitationMap','BroadcastStage','CeremonyView'])
     assert.ok(app.includes(`<${surface} onClose={exit}/>`),`${surface} must take its exit from the lock`);
 });

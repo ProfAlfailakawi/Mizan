@@ -16,8 +16,10 @@ test('the judging tab is a judging screen, not the operations screen again', () 
     'reception and hall belong to operations only');
   assert.match(operations, /\{mode==='operations'&&<section><div[^>]*>\{ar\?'الحفل والنتائج'/,
     'ceremony and results belong to operations only');
-  // والتحكيم والبث يبقى في التبويبين: هو المشترك الحقيقي بينهما.
-  assert.match(operations, /<section><div[^>]*>\{ar\?'التحكيم والبث'/);
+  // والبث يبقى في التبويبين: هو المشترك الحقيقي بينهما.
+  // (كان القسم يحمل «التحكيم والبث» ببطاقتين؛ وبعد أن انتقلت إشارات ذكاء التحكيم إلى
+  //  مواضع قرارها — القرعة، رئيس التحكيم، المدقق — لم يبقَ في القسم إلا البث.)
+  assert.match(operations, /<section><div[^>]*>\{ar\?'البث'/);
   // والعنوان يقول أي تبويب هو.
   assert.match(operations, /mode==='judging'\?\(ar\?'التحكيم'/, 'the heading must name the tab the user is on');
 });
