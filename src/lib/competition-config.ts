@@ -84,7 +84,14 @@ export const BASE_POLICY: CompetitionPolicy = {
     badgeMode: 'digital',
     fatigueGuardEnabled: true,
     fatigueTargetMinutes: 105,
-    fatigueRecommendedBreakMinutes: 12
+    fatigueRecommendedBreakMinutes: 12,
+    distributionMode: 'ON_ARRIVAL',
+    /* الافتراض يمنع الإسناد الخطأ: لجنةٌ لا تحكم فئته سترفضه عند بدء الجلسة على أي حال،
+       فالعطب يُرى عند البوابة حيث يُصلَح، لا في القاعة والمتسابق جالس. */
+    unmatchedArrivalPolicy: 'INCIDENT',
+    requireReadingQualifiedPanel: false,
+    delegationShareCap: 0.4,
+    maxQueueDepth: 0
   },
   results: {
     visibility: 'ceremony_only',

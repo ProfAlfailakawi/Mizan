@@ -111,6 +111,7 @@ declare module 'lucide-react' {
  export const Server: any;
  export const Settings2: any;
  export const ShieldCheck: any;
+ export const Shuffle: any;
  export const SkipForward: any;
  export const Sparkles: any;
  export const Stethoscope: any;

@@ -6,6 +6,7 @@ import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
 import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
+import { planDistribution, verifyDistributionPlan, type DistributionPlan } from './distribution-plan';
 import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
@@ -947,12 +948,33 @@ export function useAppStore() {
     return panelJudges.some(j => j.conflictsDeclared.some(c => c.hardConflict && (c.participantId === participant.id || (!!c.institution && !!participant.institution && c.institution.trim().toLowerCase() === participant.institution.trim().toLowerCase()))));
   };
 
-  const compatibleCommitteesFor = (participant: Participant) => globalState.committees.filter(c =>
-    c.competitionId === participant.competitionId &&
-    c.status !== 'offline' &&
-    c.assignedCategories.includes(participant.categoryId) &&
-    !committeeHasHardConflict(c, participant)
-  );
+  /*
+   * هل تملك هذه اللجنة محكّمين مؤهَّلين لرواية هذا المتسابق؟
+   *
+   * `multiRiwayahSmartRoute` يفحص هذا منذ زمن، لكنه لم يكن يُستدعى من البوابة قطّ —
+   * يُستدعى يدويًا من مختبر النزاهة وحده. فكان يُسنَد متسابقٌ برواية إلى لجنةٍ لا تملك
+   * من يقرؤها، ولا يُكتشف ذلك إلا في القاعة.
+   */
+  const panelQualifiedForReading = (committee: Committee, participant: Participant) => {
+    const reading = resolveReading({ riwaya: participant.riwaya });
+    const needle = String(reading?.rawi || participant.riwaya || '').toLowerCase().split(' ')[0];
+    if (!needle) return true; /* متسابقٌ بلا رواية محدّدة لا تُضيَّق عليه اللجان. */
+    const panel = globalState.judges.filter(j => committee.judgeIds.includes(j.id) || committee.judgeIds.includes(j.userId));
+    /* لجنةٌ بلا محكّمين بعد لا تُستبعد: التهيئة ناقصة، وليست تعارضًا مع الرواية. */
+    if (!panel.length) return true;
+    return panel.some(j => j.certifiedRiwayat.some(r => r.toLowerCase().includes(needle)));
+  };
+
+  const compatibleCommitteesFor = (participant: Participant) => {
+    const ops = getCompetitionPolicy(globalState.competition).operations;
+    return globalState.committees.filter(c =>
+      c.competitionId === participant.competitionId &&
+      c.status !== 'offline' &&
+      c.assignedCategories.includes(participant.categoryId) &&
+      !committeeHasHardConflict(c, participant) &&
+      (!ops.requireReadingQualifiedPanel || panelQualifiedForReading(c, participant))
+    );
+  };
 
   // Check-In Kiosk & Exceptions
   const checkInParticipant = (participantIdOrCode: string, method: 'kiosk_qr' | 'mobile_self' | 'exception_host' = 'kiosk_qr') => {
@@ -967,6 +989,7 @@ export function useAppStore() {
       fallbackCommittees: found
         ? globalState.committees.filter(c => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, found))
         : [],
+      unmatchedPolicy: getCompetitionPolicy(globalState.competition).operations.unmatchedArrivalPolicy,
     });
 
     if (pIndex !== -1) {
@@ -982,7 +1005,13 @@ export function useAppStore() {
         );
         return p;
       }
-      if (decision.kind !== 'admit') return p;
+      if (decision.kind !== 'admit' && decision.kind !== 'admit-unrouted') return p;
+      /*
+       * وصل ولا لجنة تؤهّله: يدخل الطابور برقمه بلا إسناد، وتُفتح حادثة توجيه.
+       * إبقاؤه خارج الطابور يخسره أسبقيته، وإسناده للجنةٍ لا تحكم فئته يؤجّل الرفض إلى
+       * لحظة الجلسة. والشاشة تعدّه في «منتظرون بلا لجنة» فلا يغيب عن انتباه المشرف.
+       */
+      const unrouted = decision.kind === 'admit-unrouted';
       const updated: Participant = {
         ...p,
         status: 'in_queue',
@@ -991,7 +1020,7 @@ export function useAppStore() {
         queueNumber: decision.queueNumber,
         originalQueueNumber: decision.originalQueueNumber,
         queueOrderKey: decision.queueOrderKey,
-        assignedCommitteeId: decision.assignedCommitteeId,
+        assignedCommitteeId: unrouted ? undefined : decision.assignedCommitteeId,
         statusHistory: [
           ...p.statusHistory,
           {
@@ -1002,12 +1031,21 @@ export function useAppStore() {
           {
             status: 'in_queue',
             timestamp: new Date().toISOString(),
-            actor: 'Smart Auto Routing Dispatcher'
+            actor: unrouted ? 'Arrival — no eligible committee' : 'Smart Auto Routing Dispatcher',
+            reason: unrouted ? 'لا توجد لجنة مؤهَّلة لفئة هذا المتسابق وروايته' : undefined,
           }
         ]
       };
 
       globalState.participants[pIndex] = updated;
+      if (unrouted) {
+        createIncident(
+          'conflict_routing',
+          'Arrival with no eligible committee',
+          `المتسابق ${p.code} حضر ولا توجد لجنة مؤهَّلة لفئته. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا أو لجنة تغطي فئته.`,
+          'critical'
+        );
+      }
       void persistScopedDocument('checkins',p.id,{participantId:p.id,participantCode:p.code,method,checkedInAt:updated.checkedInAt,assignedCommitteeId:updated.assignedCommitteeId,queueNumber:updated.queueNumber});
 
       const log: AuditEvent = {
@@ -3624,6 +3662,84 @@ export function useAppStore() {
     refreshQueueNotifications();notify();return {ok:true,record} as const;
   };
 
+  /* ── توزيع الموجات ────────────────────────────────────────────────────────
+   *
+   * البوابة تُسند كل واصلٍ وحده، فلا ترى تركيبة الموجة. وهذا يكفي عند لجنتين ويخطئ كلما
+   * زادت اللجان — لأن القرار الفردي لا يملك ترف التبديل: ما إن يُسنَد المتسابق حتى يصير
+   * تصحيحه نقلًا يمسّ الأسبقية.
+   *
+   * والموجة هنا تخدم أوّل ما تخدم مَن دخل الطابور بلا إسناد: يُوزَّعون دفعةً واحدة، بقيود
+   * عدالة، وبقرعةٍ ملتزمة عند التعادل. والخطة تُقترح ولا تُنفَّذ حتى يوقّعها إنسان.
+   */
+  const distributionConstraints = () => {
+    const ops = getCompetitionPolicy(globalState.competition).operations;
+    return { delegationShareCap: ops.delegationShareCap, maxQueueDepth: ops.maxQueueDepth };
+  };
+
+  /** المرشّحون افتراضًا: مَن ينتظر بلا لجنة. إسنادٌ قائمٌ لا يُبدَّل إلا عبر «عدالة الطابور». */
+  const unroutedWaiting = () => globalState.participants.filter(p =>
+    p.competitionId === globalState.competition.id && p.status === 'in_queue' && !p.assignedCommitteeId);
+
+  const buildDistributionPlan = async (participantIds?:string[]):Promise<DistributionPlan|null> => {
+    const pool = participantIds?.length
+      ? globalState.participants.filter(p => participantIds.includes(p.id) && p.competitionId === globalState.competition.id && p.status === 'in_queue')
+      : unroutedWaiting();
+    if(!pool.length)return null;
+    /* البذرة من هوية المسابقة ولحظة البناء: لا تُخمَّن مسبقًا، وتُحفظ فتُعاد الخطة نفسها. */
+    const seed = `${globalState.competition.id}:${new Date().toISOString()}`;
+    return planDistribution({
+      competitionId: globalState.competition.id,
+      participants: pool,
+      committees: globalState.committees,
+      eligibleFor: compatibleCommitteesFor,
+      standingQueue: globalState.participants.filter(p => p.competitionId === globalState.competition.id && p.status === 'in_queue'),
+      constraints: distributionConstraints(),
+      seed,
+    });
+  };
+
+  /**
+   * تنفيذ خطة. يُعاد بناؤها بالبذرة نفسها ويُقارَن الالتزام أولًا: بين الاقتراح والتوقيع
+   * قد تُقفل لجنة أو يصل من ليس في الخطة، فتُنفَّذ خطةٌ لم تعد تصف الواقع.
+   */
+  const applyDistributionPlan = async (plan:DistributionPlan):Promise<{ok:boolean;reason:string;assigned?:number}> => {
+    if(!['super_admin','org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role))return {ok:false,reason:'UNAUTHORIZED'};
+    if(plan.competitionId!==globalState.competition.id)return {ok:false,reason:'OTHER_COMPETITION'};
+
+    const ids = plan.assignments.map(a=>a.participantId);
+    const check = await verifyDistributionPlan(plan, async () => {
+      const pool = globalState.participants.filter(p => ids.includes(p.id) && p.status === 'in_queue');
+      return planDistribution({
+        competitionId: globalState.competition.id,
+        participants: pool,
+        committees: globalState.committees,
+        eligibleFor: compatibleCommitteesFor,
+        standingQueue: globalState.participants.filter(p => p.competitionId === globalState.competition.id && p.status === 'in_queue'),
+        constraints: distributionConstraints(),
+        seed: plan.seed,
+        now: new Date(plan.createdAt),
+      });
+    });
+    if(!check.ok)return {ok:false,reason:check.reason};
+
+    const byParticipant = new Map(plan.assignments.filter(a=>a.committeeId).map(a=>[a.participantId,a.committeeId!]));
+    let assigned=0;
+    globalState.participants=globalState.participants.map(p=>{
+      const target=byParticipant.get(p.id);
+      /* الأسبقية لا تُمسّ: يتغيّر بابُه ولا يتغيّر دوره. */
+      if(!target||p.status!=='in_queue')return p;
+      assigned++;
+      return {...p,assignedCommitteeId:target,statusHistory:[...(p.statusHistory||[]),{status:'in_queue' as const,timestamp:new Date().toISOString(),actor:`Wave distribution · ${globalState.currentUser.name}`,reason:`خطة توزيع ${plan.planHash.slice(0,12)}`}]};
+    });
+    auditTrustAction(
+      'DISTRIBUTION_PLAN_APPLIED','Competition',globalState.competition.id,
+      `تنفيذ خطة توزيع موجة: ${assigned} متسابقًا، ${plan.drawsUsed} قرعة تعادل، بصمة ${plan.planHash.slice(0,12)}`,
+      `Applied a wave distribution plan: ${assigned} participants, ${plan.drawsUsed} tie draws, commitment ${plan.planHash.slice(0,12)}`
+    );
+    refreshQueueNotifications();notify();
+    return {ok:true,reason:'',assigned};
+  };
+
   const recommendCommitteeElasticity=()=>{
     const active=globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline');if(active.length<2)return null;
     const load=(c:Committee)=>globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===c.id).length*Math.max(1,c.averageSessionMinutes);
@@ -3937,6 +4053,7 @@ export function useAppStore() {
     startLocalMesh, appendLocalMeshEvent, reconcileLocalMesh, resolveLocalMeshConflict,
     issueFederationAttestation, verifyFederationAttestation, revokeFederationAttestation,
     generateMizanProtocolPackage, verifyMizanProtocolPackage, exportMizanProtocolPackage,
+    buildDistributionPlan, applyDistributionPlan,
     getQueueEstimate, buildFlightRecorder, createIntegrityEnvelope, verifyIntegrityEnvelope, runChaosDrill, ensureAccessibilityProfile, updateAccessibilityProfile, recommendCommitteeElasticity, decideCommitteeElasticity, transferQueueParticipants, issueJourneyPass, verifyOfflineJourneyPass, revokeJourneyPass, reissueJourneyPass, reissueQrBundle, compileCompetitionPolicy, reviewPolicyCompilation, simulatePolicyCompilation, publishPolicyCompilation, refreshContradictionRadar, exportEmergencyPack, verifyEmergencyPack, testRestoreEmergencyPack, proposeDeviceHealing, decideDeviceHealing, refreshFatigueGuard, createLocalBenchmark, runOperationalRehearsal, buildFairDrawPublicProof, verifyActiveFairDrawProof, setFederationTrust, sealCeremonyVault, createIdentityInvitation, approveIdentityInvitation, activateIdentityInvitation, suspendIdentityAccount, resumeIdentityAccount, removeIdentityAccount, removeRoleGrant, setRoleGrantStatus, deleteIdentityInvitation, reissueIdentityInvitation, updateIdentityAccountName, updateRoleGrantRole, updateIdentityInvitationDetails, openCurrentAuthSession, createContinuityCheckpoint, reportSessionInterruption, proposeSessionRecovery, applySessionRecovery, requestFullRetestLastResort, approveFullRetestLastResort, verifyAuditLedger, sealAuditLedger, createCompetitionBlackBox, runFairnessCourt, createAcousticVenuePassport, createRecitationDigitalTwin, createMutashabihatTrap, routeParticipantByReading, createAppealCapsule, verifyAppealCapsuleRecord, liftBlindChamber, verifyBlindLift, runBlindAnchorCalibration, runIntegrityEntropyRadar, activateScientificCircuitBreaker, issueIntegrityPassport, createIntegrityCinema, certifyCurrentVenue, verifyCurrentVenueSeal
   };
 }
