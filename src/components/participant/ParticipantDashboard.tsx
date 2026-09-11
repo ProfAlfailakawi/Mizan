@@ -4,8 +4,10 @@ import { Award, BadgeCheck, CalendarClock, Check, FileText, MapPin, QrCode, Shie
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { surahAyahCount } from '../../lib/mushaf-map';
-import { ScopeSummary } from '../scope/QuranScopePicker';
-import { describeScope, scopeMetrics } from '../../lib/quran-scope';
+import { QuranScopePicker, ScopeSummary } from '../scope/QuranScopePicker';
+import { describeScope, scopeMetrics, type QuranScope } from '../../lib/quran-scope';
+import { selectionIsValid, validateParticipantSelection } from '../../lib/participant-scope';
+import { categorySelectionRule } from '../../lib/scope-engine';
 import { Badge } from '../design-system/Badge';
 import { QueueRibbon } from '../design-system/QueueRibbon';
 import { Button } from '../design-system/Button';
@@ -48,6 +50,32 @@ export const ParticipantDashboard: React.FC = () => {
   */
  const scopeResolution=participant?store.participantEffectiveScope(participant.id):null;
  const scopeRecord=participant?store.activeParticipantScope(participant.id):undefined;
+ const scopeHistory=participant?store.participantScopeHistory(participant.id):[];
+ /*
+  * تعديل النطاق بعد التسجيل.
+  *
+  * دورةُ الحياة كانت مبنيةً كاملةً (نسخٌ، واعتماد، ورفضٌ بسبب) ثم لا بابَ يدخل منها أحد:
+  * `saveParticipantScope` لم تكن تُستدعى من أي شاشة، فلا نسخة ثانية تُولد أصلًا. وهذا هو
+  * الباب: يفتح ما دام النطاق غير مقفل، ويُغلق بالقفل لا بالاعتماد — فالمعتمد يُراجَع،
+  * والمقفول انتهى أمره.
+  */
+ const scopeRule=categorySelectionRule(category);
+ const scopeEditable=!!participant&&scopeRule.enabled&&category?.scopeMode==='participant_selected'&&scopeRecord?.status!=='locked';
+ const [editingScope,setEditingScope]=useState(false);
+ const [draftScope,setDraftScope]=useState<QuranScope|null>(null);
+ const [scopeChangeReason,setScopeChangeReason]=useState('');
+ const [scopeNotice,setScopeNotice]=useState('');
+ const workingScope=draftScope||scopeRecord?.scope||{version:1 as const,segments:[],assurance:'CANONICAL_TABLE' as const};
+ const scopeIssues=useMemo(()=>validateParticipantSelection(scopeRule,workingScope),[scopeRule,workingScope]);
+ const scopeValid=selectionIsValid(scopeIssues);
+ const submitScopeChange=()=>{
+  if(!participant||!draftScope)return;
+  if(!scopeChangeReason.trim()){setScopeNotice(ar?'اكتب سبب التغيير — اللجنة تقرأ السبب لا الاختيار وحده.':'Write why you are changing it; the committee reads the reason, not only the choice.');return}
+  const outcome=store.saveParticipantScope(participant.id,draftScope,{submit:true,reason:scopeChangeReason.trim()});
+  if(!outcome.ok){setScopeNotice(outcome.issues?.find(i=>i.severity==='error')?.ar||(ar?'اختيارك لا يطابق لائحة هذه الفئة.':'Your choice does not match this category rule.'));return}
+  setEditingScope(false);setDraftScope(null);setScopeChangeReason('');
+  setScopeNotice(ar?'أُرسل نطاقك الجديد إلى اللجنة. نسختك السابقة محفوظة في سجلّك.':'Your new range was sent to the committee. Your previous version is kept in your history.');
+ };
  const scopeSurahs=useMemo(()=>(scopeResolution&&!scopeResolution.blocked?scopeMetrics(scopeResolution.scope).surahs:[]),[scopeResolution?.signature]);
  const [tab,setTab]=useState<Tab>('journey');
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
@@ -88,7 +116,23 @@ export const ParticipantDashboard: React.FC = () => {
 
   {activeTab==='journey'&&<>
    {/* نطاق حفظي: المتسابق يرى ما سيُسأل منه بالضبط قبل أن يدخل، لا بعد أن يخرج. */}
-   {scopeResolution&&<section className="mizan-surface p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="mizan-kicker">{ar?'نطاق حفظي':'MY MEMORIZATION RANGE'}</div><h2 className="mt-1 text-lg font-black">{scopeResolution.blocked?(ar?'لم يُعتمد بعد':'Not approved yet'):describeScope(scopeResolution.scope,ar)}</h2><p className="mt-1 text-[11px] leading-6 text-[#646965]">{scopeResolution.blocked?(ar?'نطاق حفظك يحتاج مراجعة من إدارة المسابقة قبل أن تبدأ جلستك.':'Your range needs review from the organisers before your session can begin.'):(ar?'لن يُطرح عليك سؤال واحد خارج هذا النطاق.':'Not one question will come from outside this range.')}</p></div>{scopeRecord&&<Badge variant={scopeRecord.status==='approved'||scopeRecord.status==='locked'?'emerald':scopeRecord.status==='rejected'?'rose':'amber'}>{scopeStatusText(scopeRecord.status,ar)}</Badge>}</div>{!scopeResolution.blocked&&<div className="mt-4"><ScopeSummary scope={scopeResolution.scope} arabic={ar} compact/></div>}{scopeRecord?.rejectionReason&&<p role="status" className="mt-3 rounded-xl bg-[#F5EDE2] p-3 text-[11px] font-bold text-[#7a5a2f]">{scopeRecord.rejectionReason}</p>}</section>}
+   {scopeResolution&&<section className="mizan-surface p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="mizan-kicker">{ar?'نطاق حفظي':'MY MEMORIZATION RANGE'}</div><h2 className="mt-1 text-lg font-black">{scopeResolution.blocked?(ar?'لم يُعتمد بعد':'Not approved yet'):describeScope(scopeResolution.scope,ar)}</h2><p className="mt-1 text-[11px] leading-6 text-[#646965]">{scopeResolution.blocked?(ar?'نطاق حفظك يحتاج مراجعة من إدارة المسابقة قبل أن تبدأ جلستك.':'Your range needs review from the organisers before your session can begin.'):(ar?'لن يُطرح عليك سؤال واحد خارج هذا النطاق.':'Not one question will come from outside this range.')}</p></div>{scopeRecord&&<Badge variant={scopeRecord.status==='approved'||scopeRecord.status==='locked'?'emerald':scopeRecord.status==='rejected'?'rose':'amber'}>{scopeStatusText(scopeRecord.status,ar)}</Badge>}</div>{!scopeResolution.blocked&&<div className="mt-4"><ScopeSummary scope={scopeResolution.scope} arabic={ar} compact/></div>}{scopeRecord?.rejectionReason&&<p role="status" className="mt-3 rounded-xl bg-[#F5EDE2] p-3 text-[11px] font-bold text-[#7a5a2f]">{scopeRecord.rejectionReason}</p>}
+   {scopeNotice&&<p role="status" className="mt-3 rounded-xl bg-[#EEF2EF] p-3 text-[11px] font-bold text-[#24463a]">{scopeNotice}</p>}
+   {/* الباب إلى دورة الحياة: نسخةٌ جديدة تُرسل إلى اللجنة، والسابقة تبقى. */}
+   {scopeEditable&&!editingScope&&<div className="mt-4"><Button size="sm" variant="outline" onClick={()=>{setDraftScope(scopeRecord?.scope||null);setScopeNotice('')}}>{ar?'اطلب تعديل نطاقي':'Request a range change'}</Button></div>}
+   {scopeEditable&&draftScope&&<div className="mt-4 rounded-2xl border border-[#e4e2da] bg-[#fbfaf6] p-4">
+    <p className="text-[11px] leading-6 text-[#5b6460]">{ar?'اختر نطاقك الجديد. لن يُعتمد حتى تراجعه اللجنة، ونطاقك الحالي يبقى ساريًا حتى ذلك الحين.':'Choose your new range. It is not approved until the committee reviews it; your current range stays in force until then.'}</p>
+    <div className="mt-3"><QuranScopePicker value={draftScope} onChange={setDraftScope} arabic={ar} parentScope={scopeRule.parentScope} idPrefix="participant"/></div>
+    {!scopeValid&&<p role="status" className="mt-3 rounded-xl bg-[#F5EDE2] p-3 text-[11px] font-bold text-[#7a5a2f]">{scopeIssues.find(i=>i.severity==='error')?.[ar?'ar':'en']}</p>}
+    <label className="mt-3 block"><span className="block text-[10px] font-black tracking-[.1em] text-[#696f6b]">{ar?'سبب التغيير':'Why are you changing it?'}</span>
+     <input value={scopeChangeReason} onChange={e=>setScopeChangeReason(e.target.value)} placeholder={ar?'أتقنت الجزء الخامس أكثر من الأول':'I know juz 5 better than juz 1'} className="mizan-control mt-1 w-full px-3 py-2 text-[12px]"/></label>
+    <div className="mt-3 flex flex-wrap gap-2">
+     <Button size="sm" disabled={!scopeValid} onClick={submitScopeChange}>{ar?'أرسل إلى اللجنة':'Send to the committee'}</Button>
+     <Button size="sm" variant="ghost" onClick={()=>{setDraftScope(null);setScopeChangeReason('');setScopeNotice('')}}>{ar?'إلغاء':'Cancel'}</Button>
+    </div>
+   </div>}
+   {/* نسخُك السابقة تُعرض لك: نطاقك تاريخٌ تراه، لا حقلٌ يتغيّر من خلفك. */}
+   {scopeHistory.length>1&&<details className="mizan-collapse mt-3 rounded-xl border border-[#e9e7e0] bg-[#fbfaf6]"><summary className="cursor-pointer select-none list-none px-3 py-2 text-[10px] font-black text-[#5b6460]">{ar?`سجل نطاقي (${scopeHistory.length} نسخة)`:`My range history (${scopeHistory.length} versions)`}</summary><ol className="space-y-1.5 px-3 pb-3">{scopeHistory.map(entry=><li key={entry.id} className="rounded-lg border border-[#e9e7e0] bg-white px-2.5 py-2"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] font-black text-[#24302b]">{ar?`النسخة ${entry.version}`:`v${entry.version}`} · {describeScope(entry.scope,ar)}</span><Badge variant={entry.status==='approved'||entry.status==='locked'?'emerald':entry.status==='rejected'?'rose':entry.status==='superseded'?'neutral':'amber'}>{scopeStatusText(entry.status,ar)}</Badge></div>{entry.changeReason&&<p className="mt-1 text-[10px] leading-5 text-[#5b6460]">{ar?'سبب التغيير: ':'Change reason: '}{entry.changeReason}</p>}</li>)}</ol></details>}</section>}
   {participant.status==='approved'&&<section className="mizan-surface p-6 sm:p-8 text-center"><div className="w-12 h-12 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><QrCode className="w-6 h-6"/></div><h2 className="text-xl font-black mt-4">{ar?'بطاقتك جاهزة':'Your pass is ready'}</h2><div className="mt-5 w-44 h-44 border-8 border-white outline outline-1 outline-[#deddd6] bg-white rounded-2xl mx-auto grid place-items-center overflow-hidden"><RealQRCode value={passPayload} size={160} label={ar?'رمز دخول ميزان':'MIZAN entry pass'}/></div><div className="mt-3 text-[10px] font-mono text-[#656a66]">{participant.code}</div><div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-[#626a65]"><span className="flex items-center gap-1.5"><CalendarClock className="w-4 h-4"/>{participant.arrivalSlot||(ar?'يُحدد بعد الجدولة':'Set after scheduling')}</span><span className="flex items-center gap-1.5"><MapPin className="w-4 h-4"/>{competition.venueName}</span></div>{policy.operations.selfCheckIn&&<Button className="mt-6" onClick={()=>checkInParticipant(participant.id,'mobile_self')}>{ar?'أنا وصلت':'I’m here'}</Button>}</section>}
 
   {participant.status==='in_queue'&&<section className="mizan-surface p-7 text-center"><TearOffQueueTicket number={participant.originalQueueNumber||participant.queueNumber||1} committee={committee?.code} ar={ar}/><div className="mizan-kicker mt-2">{ar?'حالة الدور':'QUEUE STATUS'}</div><div className="text-4xl font-black mt-2">{queueEstimate?.ahead??0}</div><div className="text-sm font-bold mt-2">{(queueEstimate?.ahead||0)===0?(ar?'أنت التالي':'You’re next'):(ar?'متسابق أمامك':'ahead')}</div>{queueEstimate&&<QueueRibbon total={queueEstimate.basis.queueSize} youAt={queueEstimate.ahead+1} ar={ar} className="justify-center mt-4 text-[#214C40]"/>}{queueEstimate&&<div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">~{queueEstimate.estimatedWaitMinutes}</div><div className="text-[10px] text-[#646965]">{ar?'دقيقة تقديريًا':'estimated min'}</div></div><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">{new Date(queueEstimate.expectedTurnAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div><div className="text-[10px] text-[#646965]">{ar?'وقت متوقع':'estimated turn'}</div></div></div>}<div className="mt-2 text-[10px] text-[#696f6b]">{ar?'يتغير التقدير مع حركة اللجان.':'Estimate updates with live flow.'}</div><div className="mt-4 text-xs font-bold text-[#626a65]">{committee?.code||'—'} · {ar?committee?.nameArabic:committee?.name}</div></section>}

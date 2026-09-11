@@ -195,6 +195,97 @@ for (const [width, height, label] of [VIEWPORTS[0], VIEWPORTS[2]]) {
   await ctx.close();
 }
 
+/*
+ * دورة حياة نطاق المتسابق، من بابها إلى سجلّها.
+ *
+ * كانت `saveParticipantScope` مبنيّةً كاملةً ولا تستدعيها شاشة، فلا نسخة ثانية تُولد أصلًا،
+ * فسجلُّ النسخ يُعرض فارغًا أبدًا. هذا الفحص يطرق الباب فعلًا: يغيّر النطاق، ويكتب السبب،
+ * ويرسل، ثم يقرأ السجل، ثم ينتقل إلى اللجنة فيقرأ الطلب ويرفضه بسببٍ يقرأه صاحبه.
+ */
+console.log('\n── دورة حياة نطاق المتسابق');
+{
+  const { ctx, page } = await newPage(1440, 1100, 'lifecycle');
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    await page.locator('button:visible', { hasText: 'المتسابق' }).first().click();
+    await page.waitForTimeout(2200);
+
+    const door = page.locator('button:visible', { hasText: 'اطلب تعديل نطاقي' }).first();
+    if (!await door.count()) note('لا باب لتعديل النطاق في صفحة المتسابق — دورة الحياة غير قابلة للوصول');
+    else {
+      ok('باب تعديل النطاق موجود للفئة التي يختار فيها المتسابق');
+      await door.click();
+      await page.waitForTimeout(1000);
+      if (!await page.locator('#participant-juz-1').count()) note('منتقي النطاق لم يظهر عند طلب التعديل');
+
+      await page.locator('button:visible', { hasText: 'أرسل إلى اللجنة' }).first().click();
+      await page.waitForTimeout(700);
+      if (!/اكتب سبب التغيير/.test(await page.locator('body').innerText())) note('أُرسل تغيير النطاق بلا سبب');
+      else ok('التغيير بلا سبب مرفوض بنصٍّ يشرح المطلوب');
+
+      /* نبدّل جزءًا بجزء فيبقى العدد مطابقًا للائحة، وإلا رُفض الاختيار نفسه. */
+      await page.locator('#participant-juz-1').click(); await page.waitForTimeout(250);
+      await page.locator('#participant-juz-9').click(); await page.waitForTimeout(400);
+      await page.locator('input[placeholder="أتقنت الجزء الخامس أكثر من الأول"]').fill('أتقن التاسع أكثر من الأول');
+      await page.locator('button:visible', { hasText: 'أرسل إلى اللجنة' }).first().click();
+      await page.waitForTimeout(1400);
+
+      const after = await page.locator('body').innerText();
+      if (!/أُرسل نطاقك الجديد إلى اللجنة/.test(after)) note('لم يُؤكَّد إرسال النطاق الجديد');
+      else ok('النطاق الجديد أُرسل إلى اللجنة والنسخة السابقة محفوظة');
+      const versions = after.match(/سجل نطاقي \((\d+) نسخة\)/);
+      if (!versions) note('سجل النسخ لم يظهر بعد التغيير');
+      else if (versions[1] === '1') note('سجل النسخ ما زال يعرض نسخة واحدة بعد التغيير');
+      else ok(`سجل النسخ يعرض ${versions[1]} نسخة`);
+      await page.locator('summary:visible', { hasText: 'سجل نطاقي' }).first().click().catch(() => {});
+      await page.waitForTimeout(500);
+      if (!/أتقن التاسع أكثر من الأول/.test(await page.locator('body').innerText())) note('سبب التغيير لا يظهر في سجل المتسابق');
+      else ok('سبب التغيير مكتوب في السجل لا مدفون في التخزين');
+      await assertNoHorizontalScroll(page, 'lifecycle', 'صفحة المتسابق');
+      await page.screenshot({ path: path.join(OUT, 'participant-scope-history.png'), fullPage: true });
+    }
+
+    /* اللجنة: ترى الطلب، وترى السجل، وترفض بسببٍ يقرأه صاحبه. */
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    await page.locator('button:visible', { hasText: 'مدير المسابقة' }).first().click();
+    await page.waitForTimeout(1500);
+    await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
+    await page.waitForTimeout(1200);
+    await page.locator('[role="tab"]:visible', { hasText: 'اختيار المتسابق' }).first().click();
+    await page.waitForTimeout(900);
+    await page.locator('button:visible', { hasText: 'ربع القرآن يختاره المتسابق' }).first().click().catch(() => {});
+    await page.waitForTimeout(1200);
+
+    let panel = await page.locator('body').innerText();
+    if (!/بانتظار المراجعة/.test(panel)) note('طلب تعديل النطاق لا يصل إلى شاشة اللجنة');
+    else ok('طلب التعديل يصل إلى اللجنة بحالة «بانتظار المراجعة»');
+    if (!/نسخة سابقة/.test(panel)) note('اللجنة لا ترى النسخ السابقة');
+    else ok('اللجنة ترى النسخ السابقة بتواريخها وأسبابها');
+
+    const reject = page.locator('button:visible', { hasText: /^رفض$/ }).first();
+    if (!await reject.count()) note('لا سبيل للجنة أن ترفض نطاقًا');
+    else {
+      await reject.click();
+      await page.waitForTimeout(600);
+      if (!await page.locator('button:visible', { hasText: 'أرسل الرفض' }).first().isDisabled()) note('الرفض قابل للإرسال بلا سبب');
+      else ok('الرفض بلا سبب موقوف');
+      await page.locator('input[placeholder="النطاق المختار أقل من المطلوب في اللائحة"]').fill('يرجى إبقاء الجزء الأول ضمن اختيارك');
+      await page.locator('button:visible', { hasText: 'أرسل الرفض' }).first().click();
+      await page.waitForTimeout(1200);
+      panel = await page.locator('body').innerText();
+      if (!/مرفوض/.test(panel)) note('الرفض لم يُسجَّل');
+      else ok('الرفض سُجِّل بسببه');
+    }
+    await assertNoHorizontalScroll(page, 'lifecycle', 'مراجعة اللجنة');
+    await page.screenshot({ path: path.join(OUT, 'committee-scope-review.png'), fullPage: true });
+  } catch (error) {
+    note(`توقف فحص دورة الحياة: ${String(error).slice(0, 160)}`);
+  }
+  await ctx.close();
+}
+
 await browser.close();
 console.log(`\nاللقطات في ${OUT}`);
 console.log(problems.length ? `\n${problems.length} ملاحظة تحتاج معالجة` : '\nكل الفحوص البصرية والتشغيلية نجحت');

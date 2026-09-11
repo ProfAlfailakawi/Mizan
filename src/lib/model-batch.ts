@@ -286,3 +286,162 @@ export function describeBatch(batch: QuestionModelBatchRecord, scope: QuranScope
 }
 
 export type { FairnessBreakdown };
+
+/*
+ * ---- الاسترداد الطارئ للعدالة -------------------------------------------------------------
+ *
+ * الحجر وحده ليس علاجًا: يقول «بطل نموذج فلان» ثم يترك فلانًا بلا نموذج. والمنظم في القاعة
+ * لا يملك ترف تنفيذ أربع خطواتٍ بيده بينما المتسابق واقفٌ أمام اللجنة.
+ *
+ * فهذا إجراءٌ واحد يمشي الطريق كلّه: يحجر، ثم يبطل، ثم يعطي كل متأثرٍ نموذجًا احتياطيًا
+ * إن وُجد لبصمة نطاقه، وإلا يولّد له نموذجًا جديدًا من البنك بعد الحجر — بالمحرك نفسه
+ * وبقيوده نفسها، مغذًّى بما استُعمل فعلًا حتى لا يعيد ما سُحب لغيره.
+ *
+ * ومن لم يُسترد يُقال باسمه وبسببه. «عولج الأثر» لا تعني «عولج الجميع».
+ */
+
+export interface RecoveryOutcome {
+  quarantine: QuarantineImpact;
+  /** من استُرد، وبأي طريق، وبأي نموذج. */
+  recovered: { participantId: string; via: 'reserve' | 'regenerated'; modelId: string }[];
+  /** من لم يُسترد، وسببه صريحًا. */
+  unrecovered: { participantId: string; code: string; ar: string; en: string }[];
+  /** قائمة النماذج بعد الاسترداد: المبطل مُعلَّم، والجديد مضاف، والاحتياط المستهلك مخصَّص. */
+  models: QuestionModelRecord[];
+  reservesRemaining: number;
+  summaryArabic: string;
+  summaryEnglish: string;
+}
+
+export function recoverFromQuarantine(input: {
+  locusKeys: string[];
+  reason: string;
+  models: QuestionModelRecord[];
+  candidates: QuestionCandidate[];
+  /** نطاق كل متسابق ونسخته وعدد أسئلته — لإعادة التوليد لمن لا احتياط له. */
+  participants: BatchParticipant[];
+  distribution: QuestionDistributionPlan;
+  repeatPolicy: RepeatPolicy;
+  targetDifficulty: number;
+  difficultyTolerance: number;
+  seed: string;
+  organizationId: string;
+  competitionId: string;
+  categoryId: string;
+  categoryScopeVersion: number;
+  policyVersion: string;
+  poolVersion: string;
+  requireReviewedDifficulty?: boolean;
+  requiredDraws: number;
+  now?: string;
+  newId: (prefix: string) => string;
+}): RecoveryOutcome {
+  const now = input.now || new Date().toISOString();
+  const quarantined = new Set(input.locusKeys);
+
+  const impact = applyQuarantine({
+    locusKeys: input.locusKeys, reason: input.reason, models: input.models,
+    candidates: input.candidates, requiredDraws: input.requiredDraws, now,
+  });
+  const invalidatedById = new Map(impact.invalidatedModels.map(m => [m.id, m] as const));
+  let models = input.models.map(m => invalidatedById.get(m.id) || m);
+
+  /* البنك بعد الحجر. الاسترداد لا يعيد الموضع المعيب من باب خلفي. */
+  const survivors = input.candidates.filter(c => !quarantined.has(locusKeyOf(c)));
+  const byScope = new Map<string, QuestionCandidate[]>();
+  const poolFor = (scope: QuranScope) => {
+    const key = scopeSignature(scope);
+    const hit = byScope.get(key);
+    if (hit) return hit;
+    const list = candidatesInScope(survivors, scope);
+    byScope.set(key, list);
+    return list;
+  };
+
+  /* المحرك يُغذَّى بما بقي صالحًا ومستعملًا، فلا يعطي المسترَدَّ ما هو بيد غيره. */
+  const engine = new QuestionAllocationEngine({
+    policy: input.repeatPolicy, seed: `${input.seed}:recovery`,
+    requireReviewedDifficulty: input.requireReviewedDifficulty,
+    defaultTargetDifficulty: input.targetDifficulty,
+  });
+  engine.primeUsage(models
+    .filter(m => m.status !== 'invalidated' && m.status !== 'draft' && !!m.participantId)
+    .flatMap((m, order) => m.questions
+      .filter(q => !quarantined.has(`${q.surahNumber}:${q.startAyah}`))
+      .map(q => ({ locusKey: `${q.surahNumber}:${q.startAyah}`, participantId: m.participantId, sequence: order }))));
+
+  const byParticipant = new Map(input.participants.map(p => [p.participantId, p] as const));
+  const recovered: RecoveryOutcome['recovered'] = [];
+  const unrecovered: RecoveryOutcome['unrecovered'] = [];
+  let position = models.length;
+
+  for (const participantId of impact.affectedParticipantIds) {
+    const participant = byParticipant.get(participantId);
+    if (!participant) {
+      unrecovered.push({ participantId, code: 'PARTICIPANT_SCOPE_UNKNOWN',
+        ar: 'لا نطاق معتمدًا معروفًا لهذا المتسابق الآن، فلا يمكن توليد بديل له.',
+        en: 'No known approved range for this participant, so no substitute can be generated.' });
+      continue;
+    }
+
+    /* أولًا الاحتياط: مولَّدٌ ومراجَع قبل اليوم، وأسرع من توليدٍ في القاعة. */
+    const reserves = models.filter(m => !m.participantId && m.status === 'draft'
+      && !m.questions.some(q => quarantined.has(`${q.surahNumber}:${q.startAyah}`)));
+    const claim = claimReserveModel({
+      reserves, participantId, scope: participant.scope, scopeVersion: participant.scopeVersion,
+      reason: `quarantine_recovery:${input.reason}`, now,
+    });
+    if (claim.ok && claim.model) {
+      const claimed = claim.model;
+      models = models.map(m => (m.id === claimed.id ? claimed : m));
+      engine.primeUsage(claimed.questions.map(q => ({ locusKey: `${q.surahNumber}:${q.startAyah}`, participantId, sequence: position++ })));
+      recovered.push({ participantId, via: 'reserve', modelId: claimed.id });
+      continue;
+    }
+
+    /* وإلا يُولَّد له من البنك بعد الحجر — لا من البنك قبله. */
+    const { slots } = resolveZoneSlots({ plan: input.distribution, effectiveScope: participant.scope, questionCount: participant.questionCount });
+    if (!slots.length) {
+      unrecovered.push({ participantId, code: 'NO_ZONE_SLOTS',
+        ar: 'تعذّر بناء مناطق التوزيع لنطاق هذا المتسابق بعد الحجر.',
+        en: 'Distribution zones could not be resolved for this range after the quarantine.' });
+      continue;
+    }
+    const result = engine.selectForParticipant({
+      participantId, sequencePosition: position++, effectiveScope: participant.scope, slots,
+      reading: participant.reading, targetDifficulty: input.targetDifficulty,
+      difficultyTolerance: input.difficultyTolerance, hallId: participant.hallId,
+    }, poolFor(participant.scope));
+    if (!result.questions.length) {
+      const failure = result.failures[0];
+      unrecovered.push({ participantId, code: failure?.code || 'NO_ELIGIBLE_QUESTION',
+        ar: failure?.ar || 'لم يبقَ في نطاق هذا المتسابق موضعٌ صالح بعد الحجر.',
+        en: failure?.en || 'No eligible locus remains inside this participant range after the quarantine.' });
+      continue;
+    }
+    const model = buildQuestionModel({
+      result, slots, targetDifficulty: input.targetDifficulty, difficultyTolerance: input.difficultyTolerance,
+      effectiveScope: participant.scope, id: input.newId('qmodel'),
+      organizationId: input.organizationId, competitionId: input.competitionId, categoryId: input.categoryId,
+      participantId, participantScopeVersion: participant.scopeVersion,
+      categoryScopeVersion: input.categoryScopeVersion, policyVersion: input.policyVersion,
+      poolVersion: input.poolVersion, reading: participant.reading || {},
+      generationMode: 'just_in_time', seed: `${input.seed}:recovery`, now,
+    });
+    const sealed: QuestionModelRecord = {
+      ...model, status: 'sealed', sealedAt: now,
+      relaxations: [...model.relaxations, `quarantine_recovery:${input.reason}`],
+    };
+    models = [sealed, ...models];
+    recovered.push({ participantId, via: 'regenerated', modelId: sealed.id });
+  }
+
+  const reservesRemaining = models.filter(m => !m.participantId && m.status === 'draft').length;
+  const viaReserve = recovered.filter(r => r.via === 'reserve').length;
+  const viaDraw = recovered.length - viaReserve;
+  return {
+    quarantine: impact, recovered, unrecovered, models, reservesRemaining,
+    summaryArabic: `${impact.summaryArabic} استُرد ${recovered.length} متسابقًا (${viaReserve} باحتياطٍ جاهز و${viaDraw} بتوليدٍ جديد)${unrecovered.length ? `، وبقي ${unrecovered.length} يحتاج قرارًا.` : ' بلا متبقٍّ.'}`,
+    summaryEnglish: `${impact.summaryEnglish} ${recovered.length} participants recovered (${viaReserve} from reserves, ${viaDraw} regenerated)${unrecovered.length ? `; ${unrecovered.length} still need a decision.` : ' with none left over.'}`,
+  };
+}
