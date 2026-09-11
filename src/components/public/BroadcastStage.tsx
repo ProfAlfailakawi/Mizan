@@ -122,7 +122,7 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           <span className="grid h-8 w-8 place-items-center rounded-[9px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><Radio className="h-4 w-4" style={{ color: gold }} /></span>
           <div className="flex flex-col leading-tight">
             <span className="font-black text-[15px]">{ar ? 'محرك البثّ الحجمي' : 'Spatial Broadcast Engine'}</span>
-            <span className="text-[10.5px]" style={{ color: gold }}>SHADOW · {ar ? 'لا يمسّ الدرجة' : 'never scores'}</span>
+            <span className="text-[11px] font-bold" style={{ color: gold }}>SHADOW · {ar ? 'لا يمسّ الدرجة' : 'never scores'}</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
