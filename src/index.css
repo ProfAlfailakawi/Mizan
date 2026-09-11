@@ -191,6 +191,41 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-pictogram-rose { color:#91483f;background:#f6e9e6; }.mizan-pictogram-rose .mizan-pictogram-dot,.mizan-pictogram-rose .mizan-pictogram-plane{background:#c37c73}
 .mizan-pictogram-blue { color:#435f70;background:#eaf0f3; }.mizan-pictogram-blue .mizan-pictogram-dot,.mizan-pictogram-blue .mizan-pictogram-plane{background:#7799aa}
 .mizan-pictogram-neutral { color:#59615c;background:#f0eee8; }.mizan-pictogram-neutral .mizan-pictogram-dot,.mizan-pictogram-neutral .mizan-pictogram-plane{background:#9fa49f}
+/* ── Mizan mark micro-loader ─────────────────────────────────────────────
+   محمّل العلامة: قوس المحراب والمصحف والقلم يتجمّعون مرة واحدة بترتيب قراءة
+   العلامة (حركة mizan-mark.is-animated الموجودة أصلًا) ثم خمول نبضي هادئ.
+   لا كفّتي ميزان عدليّ — القراءة المزدوجة قائمة في العلامة ذاتها. */
+.mizan-mark-loader { position:relative; display:inline-grid; place-items:center; color:var(--emerald-2); flex:0 0 auto; }
+.mizan-mark-loader.is-delayed { opacity:0; animation:mzLoaderIn .18s ease-out .25s both; }
+.mizan-mark-loader .mizan-mark { width:100%; height:100%; display:block; animation:mzMarkIdle 3s ease-in-out 1.8s infinite; }
+@keyframes mzLoaderIn { from { opacity:0 } to { opacity:1 } }
+@keyframes mzMarkIdle { 0%,100% { opacity:1 } 50% { opacity:.7 } }
+/* حركة مقيدة: العلامة مكتملة ثابتة مع نبض شفافية لطيف فقط. */
+@media (prefers-reduced-motion:reduce){
+  .mizan-mark-loader .mizan-mark,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-arch,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-page-l,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-page-r,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-cover-l,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-cover-r,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-qalam,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-orb,
+  .mizan-mark-loader .mizan-mark.is-animated .mz-finial { animation:none; }
+  .mizan-mark-loader { animation:mzScalePulse 2.4s ease-in-out infinite; opacity:1; }
+}
+
+/* ظهور مؤجّل ~250ms لأي منطقة انتظار: العملية الخاطفة لا تُظهر شيئًا أصلًا. */
+.mizan-delayed-in { opacity:0; animation:mzLoaderIn .18s ease-out .25s both; }
+
+/* صف دليل قيد الفحص داخل بطاقة التحقق: يظهر تدريجيًا ويحمل نقطة محايدة تنبض —
+   لا لون حكم قبل وصول الحكم الحقيقي. */
+.mizan-verify-step { opacity:0; animation:mzLift .5s var(--ease-brand) both; }
+.mizan-verify-step .mizan-verify-dot {
+  width:9px; height:9px; border-radius:99px; background:#b7b4aa; flex:0 0 auto;
+  animation:mzScalePulse 1.8s ease-in-out infinite;
+}
+@keyframes mzScalePulse { 0%,100% { opacity:1 } 50% { opacity:.45 } }
+
 .mizan-trust-mark { width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:#202924;color:#fff;border:1px solid rgba(255,255,255,.06); }
 .mizan-proof-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;overflow-wrap:anywhere; }
 @media (max-width:639px){ .mizan-surface{border-radius:20px}.mizan-hero{border-radius:22px}.mizan-panel{border-radius:17px} }

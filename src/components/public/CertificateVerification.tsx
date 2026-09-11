@@ -7,6 +7,7 @@ import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { MizanPictogram } from '../design-system/MizanPictogram';
+import { ScaleLoader } from '../design-system/ScaleLoader';
 import { DetailRow } from '../design-system/DetailRow';
 
 type VerificationState='AUTHENTIC'|'REVOKED'|'NOT_FOUND'|'INVALID_PROOF'|'UNREACHABLE';
@@ -19,6 +20,7 @@ export const CertificateVerification: React.FC = () => {
   const [searchCode, setSearchCode] = useState('');
   const [submittedCode, setSubmittedCode] = useState<string | null>(null);
   const [verification, setVerification] = useState<VerificationState | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const activeCert = submittedCode
     ? certificates.find(c => c.certificateNumber.toLowerCase() === submittedCode.trim().toLowerCase())
     : undefined;
@@ -29,16 +31,21 @@ export const CertificateVerification: React.FC = () => {
   /* الغريب الماسح لرمز مطبوع لا يملك مخزن المسابقة: يُسأل السجل العام أولًا، ويبقى المخزن
      المحلي مرجعًا لمن هو داخل المسابقة أصلًا أو حين لا يكون السجل مهيأً. */
   const verifyCode = async (code:string) => {
-    setSubmittedCode(code);setPublicView(null);
-    const remote=await fetchPublicCertificateVerdict(code);
-    if(remote&&remote!=='UNREACHABLE'){setVerification(remote.state);setPublicView(remote.certificate||null);setChain([]);
-      if(remote.state!=='NOT_FOUND')return;}
-    const cert=certificates.find(c=>c.certificateNumber.toLowerCase()===code.toLowerCase());
-    /* السجل تعذّر ولا نسخة محلية: يُقال «تعذّر التحقق الآن»، لا «غير موجودة». */
-    if(!cert){setVerification(remote==='UNREACHABLE'?'UNREACHABLE':'NOT_FOUND');setChain([]);return;}
-    const result=await store.verifyCertificateEvidence(cert.id);
-    setVerification(result.state);
-    setChain(store.certificateEvidenceChain(cert.id));
+    /* أثناء الفحص لا حكم على الشاشة إطلاقًا: تُمحى النتيجة السابقة ويُعرض إطار الحكم نفسه
+       بمحتوى محايد (ميزان يستقر وحلقات الدليل قيد الفحص) إلى أن يصل الحكم الحقيقي —
+       فلا يوحي شيء بالنجاح أو الفشل قبل أوانه. */
+    setSubmittedCode(code);setPublicView(null);setVerification(null);setChain([]);setVerifying(true);
+    try{
+      const remote=await fetchPublicCertificateVerdict(code);
+      if(remote&&remote!=='UNREACHABLE'){setVerification(remote.state);setPublicView(remote.certificate||null);setChain([]);
+        if(remote.state!=='NOT_FOUND')return;}
+      const cert=certificates.find(c=>c.certificateNumber.toLowerCase()===code.toLowerCase());
+      /* السجل تعذّر ولا نسخة محلية: يُقال «تعذّر التحقق الآن»، لا «غير موجودة». */
+      if(!cert){setVerification(remote==='UNREACHABLE'?'UNREACHABLE':'NOT_FOUND');setChain([]);return;}
+      const result=await store.verifyCertificateEvidence(cert.id);
+      setVerification(result.state);
+      setChain(store.certificateEvidenceChain(cert.id));
+    }finally{setVerifying(false);}
   };
   const verify = () => void verifyCode(searchCode.trim());
 
@@ -76,7 +83,28 @@ export const CertificateVerification: React.FC = () => {
       </div>}
     </section>
 
-    {submittedCode && verification==='UNREACHABLE' && <StatusCard title={ar?'تعذّر التحقق الآن':'Verification unavailable'} body={ar?'لم نتمكّن من الوصول إلى سجل الشهادات، وهذا لا يعني أن الشهادة غير صحيحة. أعد المحاولة بعد قليل.':'The certificate registry could not be reached. This does not mean the certificate is invalid — try again shortly.'} action={<Button variant="outline" onClick={()=>void verifyCode(submittedCode)}>{ar?'إعادة المحاولة':'Try again'}</Button>}/>}
+    {/* أثناء الفحص يظهر إطار الحكم نفسه (VerdictShell) بمحتوى محايد: رقم الشهادة الحقيقي،
+        ميزان يستقر، وحلقات الدليل الفعلية قيد الفحص. حين يصل الحكم يتبدل ما داخل الإطار
+        فقط — الإطار «يصبح» بطاقة الحكم، لا حركة تُرمى ثم تُبنى بطاقة أخرى.
+        يظهر بعد ~250ms حتى لا يومض إن أجاب السجل فورًا، ولا يؤخَّر الحكم لإكمال أي حركة. */}
+    {verifying && submittedCode && <div className="mizan-delayed-in" role="status" aria-live="polite">
+      <VerdictShell badge={<Badge variant="neutral" dot={false}>{ar?'جارٍ التحقق':'VERIFYING'}</Badge>} number={submittedCode}>
+        <div className="mt-6 mx-auto w-fit"><ScaleLoader size="lg" delayed={false} label={ar?'جارٍ التحقق من الشهادة':'Verifying certificate'}/></div>
+        <p className="text-xs text-[#616762] mt-4">{ar?'يُسأل سجل الشهادات العام وتُعاد الموازنة الآن.':'Asking the public certificate registry and re-weighing the evidence.'}</p>
+        <div className="max-w-xs mx-auto mt-5 text-start space-y-1">
+          {[
+            {id:'registry',ar:'سجل الشهادات العام',en:'Public certificate registry'},
+            {id:'hash',ar:'بصمة الحزمة',en:'Package hash'},
+            {id:'proof',ar:'برهان الاشتمال',en:'Inclusion proof'}
+          ].map((s,i)=><div key={s.id} className="mizan-verify-step flex items-center gap-2.5 py-1.5" style={{animationDelay:`${.15+i*.35}s`}}>
+            <span aria-hidden className="mizan-verify-dot"/>
+            <span className="text-[11px] font-bold text-[#6b706c]">{ar?s.ar:s.en}</span>
+          </div>)}
+        </div>
+      </VerdictShell>
+    </div>}
+
+    {!verifying && submittedCode && verification==='UNREACHABLE' && <StatusCard title={ar?'تعذّر التحقق الآن':'Verification unavailable'} body={ar?'لم نتمكّن من الوصول إلى سجل الشهادات، وهذا لا يعني أن الشهادة غير صحيحة. أعد المحاولة بعد قليل.':'The certificate registry could not be reached. This does not mean the certificate is invalid — try again shortly.'} action={<Button variant="outline" onClick={()=>void verifyCode(submittedCode)}>{ar?'إعادة المحاولة':'Try again'}</Button>}/>}
     {submittedCode && verification==='NOT_FOUND' && <StatusCard title={ar?'غير موجودة':'NOT FOUND'} body={ar?'لا يوجد سجل شهادة بهذا الرقم في هذه المسابقة.':'No certificate record with this number exists in this competition.'}/>}
 
     {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <VerdictShell badge={<Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>} number={publicView.certificateNumber}>
