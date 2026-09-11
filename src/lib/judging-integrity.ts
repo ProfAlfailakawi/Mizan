@@ -1,4 +1,4 @@
-import type { Committee, Participant, QuranReferenceAudioRecord } from '../types';
+import type { Committee, Participant, QuranReferenceAudioRecord, QueueTransferMode } from '../types';
 import { hashCanonical } from './trust-protocol';
 
 export type QuestionRevealApproval = { judgeId:string; judgeName:string; approvedAt:string };
@@ -61,7 +61,12 @@ export function planQueueTransfer(input:{
   sourceCommitteeId:string;
   targetCommitteeId:string;
   participantIds?:string[];
-  mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';
+  mode:QueueTransferMode;
+  /**
+   * مفتاح الترتيب لكل منقولٍ في وضع عدالة الانتظار — يحسبه `queue-equity` من انتظاره
+   * الفعلي. وغيابه في هذا الوضع يُعيده إلى الدمج بالوصول بدل أن يسقط في آخر الطابور.
+   */
+  equityOrderKeys?:Record<string,number>;
 }){
   if(input.sourceCommitteeId===input.targetCommitteeId)return {ok:false as const,reason:'SAME_COMMITTEE'};
   const source=input.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===input.sourceCommitteeId).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b));
@@ -74,7 +79,9 @@ export function planQueueTransfer(input:{
     fromCommitteeId:input.sourceCommitteeId,
     toCommitteeId:input.targetCommitteeId,
     previousOrderKey:queueOrderValue(p),
-    nextOrderKey:input.mode==='PRESERVE_ORIGINAL_TURN'?(p.originalQueueNumber??p.queueNumber??queueOrderValue(p)):maxOrder+index+1,
+    nextOrderKey:input.mode==='EQUITY_BY_WAITING_TIME'
+      ?(input.equityOrderKeys?.[p.id]??(p.originalQueueNumber??p.queueNumber??queueOrderValue(p)))
+      :input.mode==='PRESERVE_ORIGINAL_TURN'?(p.originalQueueNumber??p.queueNumber??queueOrderValue(p)):maxOrder+index+1,
     originalQueueNumber:p.originalQueueNumber??p.queueNumber,
   }));
   const simulated=[...target.map(p=>({id:p.id,key:queueOrderValue(p),moved:false})),...changes.map(c=>({id:c.participantId,key:c.nextOrderKey,moved:true}))].sort((a,b)=>a.key-b.key||Number(a.moved)-Number(b.moved));
@@ -99,7 +106,8 @@ export function queueTransferImpact(input:{
   sourceCommitteeId:string;
   targetCommitteeId:string;
   participantIds?:string[];
-  mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';
+  mode:QueueTransferMode;
+  equityOrderKeys?:Record<string,number>;
 }):QueueTransferImpactResult{
   const plan=planQueueTransfer(input);
   if(plan.ok!==true)return {ok:false,reason:plan.reason};
@@ -161,7 +169,7 @@ export function buildParticipantFairnessEvidence(input:{
   participant:Participant;
   policyVersion:string;
   ruleSetVersion:string;
-  queueTransfers:{id:string;mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';sourceCommitteeId:string;targetCommitteeId:string;requestedAt:string;changes:{participantId:string;previousOrderKey:number;nextOrderKey:number;originalQueueNumber?:number}[]}[];
+  queueTransfers:{id:string;mode:QueueTransferMode;sourceCommitteeId:string;targetCommitteeId:string;requestedAt:string;changes:{participantId:string;previousOrderKey:number;nextOrderKey:number;originalQueueNumber?:number}[]}[];
   revealGates:{questionIndex:number;participantPresence:{verified:boolean};approvals:{judgeId:string}[];requiredJudgeIds:string[];status:string;revealedAt?:string;questionCommitmentHash:string;quranSourcePackageHash?:string;revealAssurance:string}[];
   independentJudgeSubmissions:{locked:boolean;submittedAt:string;independenceCommitmentHash?:string;independenceCommittedAt?:string;independenceCommitmentAssurance?:string}[];
   result?:{status:string;sealMetadata?:{cryptographicChecksum?:string}};

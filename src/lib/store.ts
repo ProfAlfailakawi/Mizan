@@ -7,6 +7,7 @@ import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, 
 import { decideArrival, findByIdOrCode } from './arrival-core';
 import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
 import { planDistribution, verifyDistributionPlan, type DistributionPlan } from './distribution-plan';
+import { accruedWaitMinutes, equityWarranted, recommendFairPosition, type EquityRecommendation } from './queue-equity';
 import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
@@ -33,7 +34,7 @@ import {
   IncidentRecord,
   SimulationResult,
   AppealRecord,
-  IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel, TimeMachineScenarioRecord, QuorumActionRecord, QuorumActionType, InvariantCheckResult, InvariantViolationRecord, ScientificEvidenceNode, ScientificEvidenceEdge, PublicResultRootRecord, PublicResultProofRecord, LocalMeshSessionRecord, FederationAttestationRecord, MizanProtocolPackageRecord, FlightRecorderEntry, IntegrityEnvelopeRecord, ChaosDrillRecord, AccessibilityProfileRecord, CommitteeElasticityRecommendation, JourneyPassRecord, PolicyCompilationRecord, ContradictionIssueRecord, DisasterPackRecord, DeviceReassignmentRecord, JudgeFatigueRecommendationRecord, CompetitionBenchmarkRecord, RehearsalRecord, RehearsalCheckRecord, ScientificDatasetRecord, BenchmarkRunRecord, VariantLocusRecord, QuranReferenceAudioRecord, FederationTrustRecord, CeremonyVaultRecord, FairDrawProofRecord, QuranSourceContentRecord, QuranCrossCheckRecord, ScientificAdjudicationCaseRecord, ScientificImpactReportRecord, QuestionRevealGateRecord, QueueTransferRecord, IdentityAccountRecord, RoleGrantRecord, IdentityInvitationRecord, AuthSessionRecord, PassReissueRecord, ParticipantCredentialLineageRecord, SessionCheckpointRecord, ContinuityIncidentRecord, SessionRecoveryRecord, AuditLedgerSealRecord, CompetitionBlackBoxRecord, FairnessConstitutionalCourtRecord, AcousticVenuePassportRecord, RecitationDigitalTwinRecord, MutashabihatTrapRecord, MultiRiwayahRoutingDecisionRecord, AppealCapsuleRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord, ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord, CertifiedVenueSealRecord
+  IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel, TimeMachineScenarioRecord, QuorumActionRecord, QuorumActionType, InvariantCheckResult, InvariantViolationRecord, ScientificEvidenceNode, ScientificEvidenceEdge, PublicResultRootRecord, PublicResultProofRecord, LocalMeshSessionRecord, FederationAttestationRecord, MizanProtocolPackageRecord, FlightRecorderEntry, IntegrityEnvelopeRecord, ChaosDrillRecord, AccessibilityProfileRecord, CommitteeElasticityRecommendation, JourneyPassRecord, PolicyCompilationRecord, ContradictionIssueRecord, DisasterPackRecord, DeviceReassignmentRecord, JudgeFatigueRecommendationRecord, CompetitionBenchmarkRecord, RehearsalRecord, RehearsalCheckRecord, ScientificDatasetRecord, BenchmarkRunRecord, VariantLocusRecord, QuranReferenceAudioRecord, FederationTrustRecord, CeremonyVaultRecord, FairDrawProofRecord, QuranSourceContentRecord, QuranCrossCheckRecord, ScientificAdjudicationCaseRecord, ScientificImpactReportRecord, QuestionRevealGateRecord, QueueTransferRecord, QueueTransferMode, IdentityAccountRecord, RoleGrantRecord, IdentityInvitationRecord, AuthSessionRecord, PassReissueRecord, ParticipantCredentialLineageRecord, SessionCheckpointRecord, ContinuityIncidentRecord, SessionRecoveryRecord, AuditLedgerSealRecord, CompetitionBlackBoxRecord, FairnessConstitutionalCourtRecord, AcousticVenuePassportRecord, RecitationDigitalTwinRecord, MutashabihatTrapRecord, MultiRiwayahRoutingDecisionRecord, AppealCapsuleRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord, ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord, CertifiedVenueSealRecord
 } from '../types';
 import {
   SEED_ORGANIZATION,
@@ -3640,19 +3641,65 @@ export function useAppStore() {
   };
   const updateAccessibilityProfile=(patch:Partial<Pick<AccessibilityProfileRecord,'textScale'|'touchScale'|'contrast'|'motion'|'audioCues'>>)=>{const current=ensureAccessibilityProfile();const next={...current,...patch,source:'user' as const,updatedAt:new Date().toISOString()};globalState.accessibilityProfiles=globalState.accessibilityProfiles.map(x=>x.id===current.id?next:x);if(typeof document!=='undefined'){document.documentElement.dataset.mizanText=next.textScale;document.documentElement.dataset.mizanTouch=next.touchScale;document.documentElement.dataset.mizanContrast=next.contrast;document.documentElement.dataset.mizanMotion=next.motion;}notify();return next;};
 
-  const transferQueueParticipants=(input:{sourceCommitteeId:string;targetCommitteeId:string;participantIds?:string[];mode:'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END';reason:string})=>{
+  const transferQueueParticipants=(input:{sourceCommitteeId:string;targetCommitteeId:string;participantIds?:string[];mode:QueueTransferMode;reason:string;allowCrossCategory?:boolean})=>{
     if(!['ops_manager','comp_admin','head_judge'].includes(globalState.currentUser.role))return {ok:false,reason:'UNAUTHORIZED'} as const;
     if(!input.reason.trim())return {ok:false,reason:'REASON_REQUIRED'} as const;
     const target=globalState.committees.find(c=>c.id===input.targetCommitteeId&&c.competitionId===globalState.competition.id&&c.status!=='offline');
     const source=globalState.committees.find(c=>c.id===input.sourceCommitteeId&&c.competitionId===globalState.competition.id);if(!target||!source)return {ok:false,reason:'COMMITTEE_NOT_FOUND'} as const;
-    const plan=planQueueTransfer({participants:globalState.participants,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:input.participantIds,mode:input.mode});if(!plan.ok)return plan;
+    /*
+     * عدالة الانتظار: من نُقل لا يبدأ انتظاره من جديد. يُحسب لكلٍّ منهم موضعُه بما انتظره
+     * فعلًا — يتقدّم على من انتظر أقلّ منه ويبقى خلف من انتظر مثله أو أكثر.
+     */
+    const now=new Date();
+    const preselected=(input.participantIds?.length
+      ? globalState.participants.filter(p=>input.participantIds!.includes(p.id)&&p.status==='in_queue'&&p.assignedCommitteeId===source.id)
+      : globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===source.id));
+    const targetQueue=globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===target.id);
+    const equityByParticipant=new Map<string,EquityRecommendation>();
+    if(input.mode==='EQUITY_BY_WAITING_TIME'){
+      /* يُحسب كلٌّ على الطابور الهدف وقد دخله من سبقه من الدفعة نفسها، فلا يتزاحمون على مفتاحٍ واحد. */
+      const growing=[...targetQueue];
+      for(const p of [...preselected].sort((a,b)=>accruedWaitMinutes(b,now)-accruedWaitMinutes(a,now))){
+        const rec=recommendFairPosition({mover:p,targetQueue:growing,now});
+        equityByParticipant.set(p.id,rec);
+        growing.push({...p,queueOrderKey:rec.orderKey});
+      }
+    }
+    const equityOrderKeys=Object.fromEntries([...equityByParticipant].map(([id,rec])=>[id,rec.orderKey]));
+
+    const plan=planQueueTransfer({participants:globalState.participants,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:input.participantIds,mode:input.mode,equityOrderKeys});if(!plan.ok)return plan;
     const invalid=plan.selectedIds.map(id=>globalState.participants.find(p=>p.id===id)).filter((p):p is Participant=>!!p).filter(p=>!compatibleCommitteesFor(p).some(c=>c.id===target.id));
-    if(invalid.length)return {ok:false,reason:'INCOMPATIBLE_TARGET',participantCodes:invalid.map(p=>p.code)} as const;
+    /*
+     * لجنةٌ لا تحكم فئته ليست خطأً يُمنع دائمًا — أحيانًا تتعطّل لجنةُ فئته كلها. لكنه
+     * استثناءٌ يُطلب صراحةً ويُوقَّع ويُوسَم، لا شيءٌ يقع صامتًا. وأسئلته تبقى أسئلة فئته
+     * هو، لأن مرجع أهلية السؤال هو نطاق المتسابق المعتمد لا تخصّص اللجنة.
+     */
+    if(invalid.length&&!input.allowCrossCategory)return {ok:false,reason:'INCOMPATIBLE_TARGET',participantCodes:invalid.map(p=>p.code)} as const;
+    const exceptionIds=new Set(invalid.map(p=>p.id));
+    if(exceptionIds.size&&!['ops_manager','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'EXCEPTION_NOT_AUTHORIZED'} as const;
+
     const byId=new Map(plan.changes.map(c=>[c.participantId,c]));
-    globalState.participants=globalState.participants.map(p=>{const c=byId.get(p.id);if(!c)return p;return {...p,assignedCommitteeId:target.id,originalQueueNumber:p.originalQueueNumber??p.queueNumber,queueOrderKey:c.nextOrderKey,queueTransferCount:(p.queueTransferCount||0)+1,statusHistory:[...(p.statusHistory||[]),{status:'in_queue',timestamp:new Date().toISOString(),actor:`Queue Justice · ${globalState.currentUser.name}`,reason:input.reason}]};});
-    const record:QueueTransferRecord={id:newId('qtransfer'),competitionId:globalState.competition.id,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:plan.selectedIds,mode:input.mode,reason:input.reason.trim(),requestedAt:new Date().toISOString(),requestedBy:globalState.currentUser.id,status:'APPLIED',changes:plan.changes.map(c=>({participantId:c.participantId,previousOrderKey:c.previousOrderKey,nextOrderKey:c.nextOrderKey,originalQueueNumber:c.originalQueueNumber}))};
+    const stamp=now.toISOString();
+    globalState.participants=globalState.participants.map(p=>{const c=byId.get(p.id);if(!c)return p;
+      const rec=equityByParticipant.get(p.id);
+      const waited=rec?.waitedMinutes??accruedWaitMinutes(p,now);
+      return {...p,assignedCommitteeId:target.id,originalQueueNumber:p.originalQueueNumber??p.queueNumber,queueOrderKey:c.nextOrderKey,queueTransferCount:(p.queueTransferCount||0)+1,
+      /* ما يقرؤه هو في صفحته: لا يُفاجأ بلجنةٍ تبدّلت ولا برقمٍ تأخّر بلا تفسير. */
+      lastQueueTransfer:{at:stamp,fromCommitteeCode:source.code,toCommitteeCode:target.code,waitedMinutes:waited,positionIfAppended:rec?.positionIfAppended??0,fairPosition:rec?.fairPosition??0,equityApplied:!!rec&&equityWarranted(rec),reason:input.reason.trim()},
+      crossCategoryException:exceptionIds.has(p.id)?{at:stamp,fromCommitteeId:source.id,toCommitteeId:target.id,approvedBy:globalState.currentUser.name,reason:input.reason.trim()}:p.crossCategoryException,
+      statusHistory:[...(p.statusHistory||[]),{status:'in_queue',timestamp:stamp,actor:`Queue Justice · ${globalState.currentUser.name}`,reason:input.reason}]};});
+    /* إشعارٌ لكل منقول. المفتاح يحمل لحظته، فنقلٌ ثانٍ لا يبتلعه منعُ التكرار. */
+    for(const id of plan.selectedIds){const p=globalState.participants.find(x=>x.id===id);if(p)appendParticipantNotifications(p,`queue.transferred:${stamp}`);}
+    const record:QueueTransferRecord={id:newId('qtransfer'),competitionId:globalState.competition.id,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:plan.selectedIds,mode:input.mode,reason:input.reason.trim(),requestedAt:stamp,requestedBy:globalState.currentUser.id,status:'APPLIED',
+      crossCategoryException:exceptionIds.size>0||undefined,
+      equity:equityByParticipant.size?[...equityByParticipant].map(([id,r])=>({participantId:id,waitedMinutes:r.waitedMinutes,positionIfAppended:r.positionIfAppended,fairPosition:r.fairPosition})):undefined,
+      changes:plan.changes.map(c=>({participantId:c.participantId,previousOrderKey:c.previousOrderKey,nextOrderKey:c.nextOrderKey,originalQueueNumber:c.originalQueueNumber}))};
     globalState.queueTransfers=[record,...globalState.queueTransfers];
-    auditTrustAction('QUEUE_TRANSFER_APPLIED','QueueTransfer',record.id,input.mode==='PRESERVE_ORIGINAL_TURN'?`نقل ${plan.selectedIds.length} متسابقًا من ${source.code} إلى ${target.code} مع حفظ أسبقية الوصول الأصلية`:`نقل ${plan.selectedIds.length} متسابقًا من ${source.code} إلى ${target.code} إلى آخر الطابور`,input.mode==='PRESERVE_ORIGINAL_TURN'?`Moved ${plan.selectedIds.length} participant(s) from ${source.code} to ${target.code} preserving original arrival priority`:`Moved ${plan.selectedIds.length} participant(s) from ${source.code} to ${target.code} at the end of the queue`);
+    const modeArabic=input.mode==='PRESERVE_ORIGINAL_TURN'?'مع حفظ أسبقية الوصول الأصلية':input.mode==='EQUITY_BY_WAITING_TIME'?'بترتيبٍ يراعي ما انتظره كلٌّ منهم فعلًا':'إلى آخر الطابور';
+    const modeEnglish=input.mode==='PRESERVE_ORIGINAL_TURN'?'preserving original arrival priority':input.mode==='EQUITY_BY_WAITING_TIME'?'placed by the waiting time each had already served':'at the end of the queue';
+    const exceptionArabic=exceptionIds.size?` · استثناء عبر الفئات لـ${exceptionIds.size}: يُحكَّمون بنطاق فئتهم لا بتخصّص اللجنة`:'';
+    const exceptionEnglish=exceptionIds.size?` · cross-category exception for ${exceptionIds.size}: judged on their own category scope, not the panel's specialty`:'';
+    auditTrustAction('QUEUE_TRANSFER_APPLIED','QueueTransfer',record.id,`نقل ${plan.selectedIds.length} متسابقًا من ${source.code} إلى ${target.code} ${modeArabic}${exceptionArabic}`,`Moved ${plan.selectedIds.length} participant(s) from ${source.code} to ${target.code} ${modeEnglish}${exceptionEnglish}`);
     refreshQueueNotifications();notify();return {ok:true,record} as const;
   };
 

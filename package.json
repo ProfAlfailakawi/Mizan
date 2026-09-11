@@ -25,7 +25,8 @@
     "fairness:lab": "tsx scripts/fairness-lab.ts",
     "qa:scope-visual": "node scripts/scope-visual-qa.mjs",
     "qa:competition-day": "node scripts/competition-day-qa.mjs",
-    "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs"
+    "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs",
+    "qa:venue-legibility": "node scripts/venue-legibility-audit.mjs --panels=10"
   },
   "engines": {
     "node": ">=22.20.0 <23",

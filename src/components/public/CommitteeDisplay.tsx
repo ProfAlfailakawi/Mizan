@@ -141,7 +141,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
         <div className="relative z-[1]">
           <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الآن' : 'NOW CALLING'}</div>
           {slice.nowCalling
-            ? <div className="mizan-call-code mizan-code mt-4 sm:mt-6" dir="ltr">{slice.nowCalling.code}</div>
+            ? <div className="mizan-call-code mizan-venue-code mt-4 sm:mt-6" dir="ltr">{slice.nowCalling.code}</div>
             : <div className="mt-8 sm:mt-12 mb-4 text-2xl sm:text-4xl font-black mizan-venue-faint">{ar ? 'لا يوجد استدعاء' : 'No active call'}</div>}
           {slice.stalled && <div className="mt-5 text-sm font-black text-[#f0c9a0]">{ar ? 'اللجنة شاغرة — لم يُنادَ أحد بعد' : 'Panel is free — nobody called yet'}</div>}
           <div className="mt-6 sm:mt-9 inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/[.05] px-4 py-2">
@@ -169,7 +169,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
           ? <ol className="flex flex-wrap items-center gap-2.5 sm:gap-4 mt-3">
               {slice.next.map((slot) => <li key={slot.code} className="flex items-center gap-2.5 rounded-2xl bg-white/[.06] px-3.5 py-2.5">
                 <span className="text-[11px] font-black mizan-venue-faint tabular-nums">{slot.position}</span>
-                <span className="mizan-board-next mizan-code" dir="ltr">{slot.code}</span>
+                <span className="mizan-board-next mizan-venue-code" dir="ltr">{slot.code}</span>
               </li>)}
             </ol>
           : <div className="py-4 text-sm font-bold mizan-venue-faint">{ar ? 'لا أحد في انتظار هذه اللجنة' : 'Nobody is waiting for this panel'}</div>}
@@ -206,7 +206,7 @@ const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolea
     aria-label={ar?'شاشة اللجنة':'Committee display'}
     className={`fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto ${stale ? 'mizan-board-stale' : ''}`}
   >
-    <div className="min-h-screen p-5 sm:p-8 lg:p-10 flex flex-col">
+    <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
       {onClose && <div className="absolute top-4 end-4 z-10">
         <Button shape="square" variant="venue" onClick={onClose} aria-label={ar ? 'إغلاق شاشة اللجنة' : 'Close committee display'}><X className="w-5 h-5" /></Button>
       </div>}

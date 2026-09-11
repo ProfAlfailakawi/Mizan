@@ -204,6 +204,28 @@ export const JudgeOS: React.FC = () => {
  if(!participant) return <div className="max-w-3xl mx-auto px-4 py-20 text-center"><HeadphonesEmpty/><h1 className="text-2xl font-black mt-4">{ar?'لا توجد جلسة الآن':'No active session'}</h1>{nextQueued&&<Button className="mt-5" onClick={()=>void callParticipant(nextQueued.id)}>{ar?'استقبال المتسابق التالي':'Call next participant'}</Button>}{startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-5">{startError}</div>}</div>;
 
  return <div className="min-h-[calc(100vh-64px)] bg-[#fbfaf6]"><div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-7">
+  {/*
+   * استثناء عبر الفئات.
+   *
+   * متسابقٌ نُقل إلى لجنةٍ لا تحكم فئته — تتعطّل لجان فئته فيُنقل استثناءً. وأسئلته تبقى
+   * أسئلة فئته هو، لأن مرجع أهلية السؤال هو نطاقه المعتمد لا تخصّص اللجنة. النظام يفعل
+   * ذلك أصلًا، لكنّ اللجنة لا تعلم — فترى موضعًا خارج ما اعتادت وتظنّه عطبًا، أو تحكم
+   * بمسطرة فئتها. هذا السطر هو ما يمنع الأمرين، ولذلك يقف فوق كل شيء ولا يُطوى.
+   */}
+  {participant?.crossCategoryException&&<div role="alert" className="rounded-2xl border-2 border-[#c9a227] bg-[#fffaf0] p-4 sm:p-5 mb-4">
+   <div className="flex items-start gap-3">
+    <AlertTriangle className="w-5 h-5 text-[#8a6d1f] shrink-0 mt-0.5"/>
+    <div className="min-w-0">
+     <div className="text-sm font-black text-[#604724]">{ar?'استثناء: هذا المتسابق ليس من فئة هذه اللجنة':'Exception: this participant is not from this panel’s category'}</div>
+     <p className="text-xs text-[#6b5b45] mt-1.5 leading-6">
+      {ar
+       ?`فئته «${bilingualName(participantCategory,true)||'—'}»، ونطاقها هو ما يُسأل فيه — لا تخصّص هذه اللجنة. الموضع المعروض صحيح وإن بدا خارج ما اعتدتموه، والتقييم يكون بمسطرة فئته هو.`
+       :`His category is “${bilingualName(participantCategory,false)||'—'}”, and its scope governs the questions — not this panel’s specialty. The passage shown is correct even if it looks outside your usual range, and he is scored by his own category’s rubric.`}
+     </p>
+     <div className="text-[10px] text-[#8a7a62] mt-2">{ar?'اعتمده: ':'Approved by: '}{participant.crossCategoryException.approvedBy} · {participant.crossCategoryException.reason}</div>
+    </div>
+   </div>
+  </div>}
   {/* قمرة التحكيم: شريطٌ لاصق واحد يحمل كل ما يُقرأ بنظرة — من أمامي، وأين نحن من المصحف،
       وكم مضى — ويطوي ما عداه خلف زرّ. كان ذلك رأسين متتاليين يدفعان المصحف إلى أسفل الشاشة. */}
   <div className="mizan-judge-strip -mx-4 sm:-mx-6 -mt-5 sm:-mt-7 px-4 sm:px-6">
