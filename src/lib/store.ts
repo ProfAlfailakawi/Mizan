@@ -88,7 +88,11 @@ import { invalidateStaleModels, buildQuestionModel } from './model-fairness';
 import { migrateLegacyScope, planCategoryMigration } from './scope-migration';
 import { buildCandidatePool, categoryDistribution, categoryRepeatPolicy, categoryScopeOf, categorySelectionRule, planAllocation, readingContextOf, resolveEffectiveScope, resolveQuestionCount, staleModels } from './scope-engine';
 import { surahNameArabic } from './quran-canon';
-import type { ScopeEngineSealRecord, ScopeSimulationRecord, QuestionModelRecord } from '../types';
+import type { ScopeEngineSealRecord, ScopeSimulationRecord, QuestionModelRecord, QuestionModelBatchRecord, QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord } from '../types';
+import { applyQuarantine, claimReserveModel, generateModelBatch } from './model-batch';
+import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations } from './question-reservation';
+import { buildExposureOracle, buildExposureProfiles } from './exposure-risk';
+import { aggregateFairness } from './model-fairness';
 import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
@@ -195,7 +199,7 @@ function seededInitialState(): AppStoreState {
       {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
     ],
     travelRecords: SEED_TRAVEL_RECORDS, consents: SEED_CONSENTS, importJobs: [], shadowRuns: [], participantPassport: SEED_PARTICIPANT_PASSPORT, judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: SEED_SUPPORT_SESSIONS, remoteChecks: [], audioRecordings: [], featureFlags: SEED_FEATURE_FLAGS, quranSourceManifests: [], quranSourceContents: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
-    timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:[], questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
+    timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:[], questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], questionQuarantines:[], questionReservations:[], fairnessReports:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
     activeSession: {
       sessionId: 'sess-active-001',
       participant: SEED_PARTICIPANTS[0], // Bilal Yusuf (A-104)
@@ -2068,6 +2072,7 @@ export function useAppStore() {
       participant,
       category: globalState.competition.categories.find(c => c.id === participant.categoryId),
       scopes: globalState.participantScopes,
+      tenant: { organizationId: globalState.competition.organizationId, competitionId: globalState.competition.id },
     });
   };
 
@@ -2080,8 +2085,55 @@ export function useAppStore() {
    */
   const scopeCandidatePool = (scope: QuranScope, categoryId?: string, reading?: ReturnType<typeof readingContextOf>) => {
     const category = globalState.competition.categories.find(c => c.id === categoryId);
-    return buildCandidatePool({ scope, category, reading: reading || readingContextOf({ riwaya: category?.riwaya }) });
+    const pool = buildCandidatePool({ scope, category, reading: reading || readingContextOf({ riwaya: category?.riwaya }) });
+    /* الموضع المحجور يخرج من البنك عند منبعه، فلا يصل إلى سحبٍ ولا إلى إحصاء سعة. */
+    const quarantined = activeQuarantinedLoci();
+    const clean = quarantined.size ? pool.filter(c => !quarantined.has(`${c.surahNumber}:${c.startAyah}`)) : pool;
+    return enrichCandidates(clean);
   };
+
+  /*
+   * إثراء بيانات السؤال بما هو معروف فعلًا، لا بما يمكن تخمينه.
+   *
+   * ثلاثة حقول تُملأ من مصادر قائمة: عدد مرات الكشف (من سجل الانكشاف)، والأوجه المسموحة
+   * (من مواضع الخلاف المعتمدة علميًا وحدها)، وكثافة المتشابه (من خريطة المتشابهات المعتمدة).
+   * وما لا مصدر له يبقى فارغًا: الفراغ يقول «لم يُقرأ من مصدر»، والتخمين يقول «هذا هو» وهو
+   * كذب. ولا يُبنى على أيٍّ من الثلاثة قرارُ أهلية — الأهلية بالآية وحدها.
+   */
+  const enrichCandidates = (candidates: QuestionCandidate[]): QuestionCandidate[] => {
+    const exposure = exposureProfiles();
+    const variants = globalState.variantLoci.filter(v => v.approvalState === 'CERTIFIED' && v.allowedWajh);
+    const traps = globalState.mutashabihatTrapMaps.filter(t => t.status === 'APPROVED');
+    if (!exposure.size && !variants.length && !traps.length) return candidates;
+    const wujuhAt = new Map<string, string[]>();
+    for (const variant of variants) {
+      const key = `${variant.surah}:${variant.ayah}`;
+      const list = wujuhAt.get(key) || [];
+      if (variant.allowedWajh && !list.includes(variant.allowedWajh)) list.push(variant.allowedWajh);
+      wujuhAt.set(key, list);
+    }
+    const trapAt = new Set(traps.map(t => `${t.expected.surah}:${t.expected.ayah}`));
+    return candidates.map(candidate => {
+      const key = `${candidate.surahNumber}:${candidate.startAyah}`;
+      const revealed = exposure.get(key)?.reveals;
+      const wujuh = wujuhAt.get(key);
+      const trapped = trapAt.has(key);
+      if (revealed === undefined && !wujuh && !trapped) return candidate;
+      return {
+        ...candidate,
+        ...(revealed === undefined ? {} : { exposureCount: revealed }),
+        ...(wujuh ? { allowedWujuh: wujuh } : {}),
+        ...(trapped ? { mutashabihatScore: Math.max(candidate.mutashabihatScore || 0, 0.8) } : {}),
+      };
+    });
+  };
+
+  /** مفاتيح المواضع المحجورة حجرًا ساريًا في هذه المسابقة. */
+  const activeQuarantinedLoci = () => new Set(
+    globalState.questionQuarantines
+      .filter(q => q.status === 'active' && q.competitionId === globalState.competition.id)
+      .flatMap(q => q.locusKeys),
+  );
 
   /* تجميع البنك بحسب (النطاق × سياق القراءة): لا يُبنى مرتين لعنقود واحد، ولا يُخلط بين روايتين. */
   const poolsForRows = (rows: { scope: QuranScope; categoryId: string; reading: ReturnType<typeof readingContextOf> }[]) => {
@@ -2127,6 +2179,10 @@ export function useAppStore() {
       questionsPerParticipant: category => resolveQuestionCount(category, policy),
       repeatPolicyFor: category => categoryRepeatPolicy(category, policy),
       staleModelCount: staleModels(globalState.questionModels, globalState.participantScopes, globalState.competition.categories).length,
+      activeQuarantines: globalState.questionQuarantines
+        .filter(q => q.status === 'active' && q.competitionId === globalState.competition.id)
+        .map(q => ({ locusCount: q.locusKeys.length, canContinue: q.canContinue, summaryAr: q.summaryArabic, summaryEn: q.summaryEnglish })),
+      reserveModelCount: globalState.questionModels.filter(m => !m.participantId && m.status === 'draft').length,
       escrowRequired: policy.questions.secureReveal?.requireParticipantPresence !== false,
       escrowReady: globalState.activeSession.secureQuestionMode === 'SERVER' || !isLaunchDeployment(),
       strictDifficultyRequired: globalState.competition.categories.some(c => c.requireReviewedDifficulty),
@@ -2257,6 +2313,345 @@ export function useAppStore() {
       `Sealed the scope engine configuration: ${categories.length} categories and ${participantScopeVersions.length} participant scopes`);
     notify();
     return { ok: true as const, seal };
+  };
+
+  /*
+   * ---- الدفعات والاحتياط والحجر والتقرير -------------------------------------------------
+   *
+   * حتى الآن كان كل نموذج يُولَّد في لحظته (just_in_time). هذا يصلح لمسابقةٍ صغيرة، ولا
+   * يصلح لمسابقةٍ تريد أن تراجع نماذجها قبل يومها، ولا لمسابقةٍ تريد احتياطًا جاهزًا إن
+   * سقط سؤال. فهنا وضعان آخران: التوليد المسبق، والمختلط.
+   */
+
+  /*
+   * مِرصد الانكشاف.
+   *
+   * الموضع الذي أُلقي في قاعةٍ فيها ثلاثون منتظرًا لم يعد مجهولًا لهم. فيُقاس نصف قطر
+   * انكشافه — عدد من سمعه، ومدى البثّ، وكم مضى — ثم يدخل المحرك من بوابة الندرة نفسها،
+   * لا من باب ثانٍ موازٍ، فيُفاضل به بدل أن يُمنع به منعًا أعمى.
+   */
+  const exposureEvents = () => {
+    const committeeSize = (committeeId?: string) => {
+      const committee = globalState.committees.find(c => c.id === committeeId);
+      return committee ? Math.max(6, committee.judgeIds.length + 8) : 12;
+    };
+    return globalState.questionModels
+      .filter(m => m.competitionId === globalState.competition.id && (m.status === 'consumed' || m.status === 'sealed') && !!m.participantId)
+      .flatMap((model, order) => {
+        const participant = globalState.participants.find(p => p.id === model.participantId);
+        const hallId = participant?.assignedCommitteeId;
+        return model.questions.map(q => ({
+          locusKey: `${q.surahNumber}:${q.startAyah}`,
+          hallId,
+          audienceSize: committeeSize(hallId),
+          broadcast: 'hall_only' as const,
+          sequence: order,
+          day: model.createdAt.slice(0, 10),
+        }));
+      });
+  };
+
+  /*
+   * ملفات الانكشاف الحالية — تُعرض للمنظم وتُستهلك في المفاضلة.
+   *
+   * تُحسب مرة لكل حالة: بناء بنك عشرة آلاف متسابق يستدعيها لكل عنقود، وإعادة الحساب لكل
+   * عنقود تضاعف زمن السحب بلا فائدة ما دام السجل لم يتغيّر.
+   */
+  let exposureMemo: { key: string; profiles: ReturnType<typeof buildExposureProfiles> } | null = null;
+  const exposureProfiles = () => {
+    const key = `${globalState.competition.id}:${globalState.questionModels.length}:${globalState.participants.length}`;
+    if (exposureMemo?.key === key) return exposureMemo.profiles;
+    const profiles = buildExposureProfiles(exposureEvents());
+    exposureMemo = { key, profiles };
+    return profiles;
+  };
+
+  /** المتسابقون الصالحون للتوليد في فئة، مع نطاق كلٍّ منهم وعدد أسئلته. */
+  const batchRowsFor = (categoryId?: string) => {
+    const policy = getCompetitionPolicy(globalState.competition);
+    return globalState.participants
+      .filter(p => !['rejected', 'draft'].includes(p.status))
+      .filter(p => !categoryId || p.categoryId === categoryId)
+      .map(p => {
+        const resolution = participantEffectiveScope(p.id);
+        const category = globalState.competition.categories.find(c => c.id === p.categoryId);
+        if (!resolution || resolution.blocked) return null;
+        return {
+          participantId: p.id, categoryId: p.categoryId, scope: resolution.scope, scopeVersion: resolution.version,
+          questionCount: resolveQuestionCount(category, policy),
+          reading: readingContextOf({ riwaya: p.riwaya }),
+          hallId: p.assignedCommitteeId,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+  };
+
+  /**
+   * توليد دفعة نماذج مسبقًا.
+   *
+   * بالمحرك نفسه وبالقيود نفسها التي تعمل يوم المسابقة — لا بمسار ثانٍ «للتجهيز». ولو
+   * اختلف المساران لكان التجهيز كذبًا مهذّبًا.
+   */
+  const generateQuestionModelBatch = (options?: { categoryId?: string; reserveCount?: number; generationMode?: 'pre_generated' | 'hybrid'; seed?: string }) => {
+    const rows = batchRowsFor(options?.categoryId);
+    if (!rows.length) return { ok: false as const, reason: 'NO_ELIGIBLE_PARTICIPANTS' };
+    const categoryId = options?.categoryId || rows[0].categoryId;
+    const category = globalState.competition.categories.find(c => c.id === categoryId);
+    const policy = getCompetitionPolicy(globalState.competition);
+    const questionCount = resolveQuestionCount(category, policy);
+    const candidates = poolsForRows(rows.map(r => ({ scope: r.scope, categoryId: r.categoryId, reading: r.reading })));
+    if (!candidates.length) return { ok: false as const, reason: 'EMPTY_CANDIDATE_POOL' };
+    const batchId = newId('qbatch');
+    const outcome = generateModelBatch({
+      batchId,
+      organizationId: globalState.competition.organizationId,
+      competitionId: globalState.competition.id,
+      categoryId,
+      categoryScopeVersion: category?.scopeVersion || 1,
+      policyVersion: policy.version,
+      poolVersion: `STRUCTURAL:${scopeSignature(categoryScopeOf(category))}`,
+      participants: rows.map(r => ({ participantId: r.participantId, scope: r.scope, scopeVersion: r.scopeVersion, questionCount: r.questionCount, reading: r.reading, hallId: r.hallId })),
+      candidates,
+      distribution: categoryDistribution(category, questionCount),
+      repeatPolicy: categoryRepeatPolicy(category, policy),
+      targetDifficulty: policy.questions.targetDifficulty,
+      difficultyTolerance: policy.questions.difficultyTolerance,
+      seed: options?.seed || `${globalState.competition.id}:${categoryId}:${batchId}`,
+      reserveCount: options?.reserveCount ?? 2,
+      generationMode: options?.generationMode || 'pre_generated',
+      requireReviewedDifficulty: !!category?.requireReviewedDifficulty,
+      newId,
+    });
+    /* النماذج السابقة المسوّدة لهذه الفئة تُبطَل لا تُحذف: لا تاريخ يُمحى. */
+    const now = new Date().toISOString();
+    globalState.questionModels = [
+      ...outcome.models, ...outcome.reserves,
+      ...globalState.questionModels.map(m => m.categoryId === categoryId && m.batchId && m.batchId !== batchId && m.status !== 'consumed'
+        ? { ...m, status: 'invalidated' as const, invalidatedAt: now, invalidationReason: `SUPERSEDED_BY_BATCH:${batchId}` } : m),
+    ];
+    globalState.questionModelBatches = [outcome.batch, ...globalState.questionModelBatches];
+    auditTrustAction('QUESTION_MODEL_BATCH_GENERATED', 'QuestionModelBatch', batchId,
+      `توليد دفعة: ${outcome.models.length} نموذجًا و${outcome.reserves.length} احتياطيًا لفئة ${category?.nameArabic || categoryId}${outcome.failures.length ? ` — تعذّر ${outcome.failures.length}` : ''}`,
+      `Generated a batch of ${outcome.models.length} models and ${outcome.reserves.length} reserves for category ${categoryId}${outcome.failures.length ? ` — ${outcome.failures.length} failures` : ''}`);
+    notify();
+    return { ok: true as const, ...outcome };
+  };
+
+  const decideModelBatch = (batchId: string, decision: 'approved' | 'sealed' | 'invalidated', reason?: string) => {
+    const batch = globalState.questionModelBatches.find(b => b.id === batchId);
+    if (!batch) return { ok: false as const, reason: 'BATCH_NOT_FOUND' };
+    if (decision === 'approved' && batch.approvalState !== 'draft') return { ok: false as const, reason: 'BATCH_NOT_DRAFT' };
+    if (decision === 'sealed' && batch.approvalState !== 'approved') return { ok: false as const, reason: 'BATCH_NOT_APPROVED' };
+    const now = new Date().toISOString();
+    const next: QuestionModelBatchRecord = {
+      ...batch, approvalState: decision,
+      ...(decision === 'approved' ? { approvedBy: globalState.currentUser.id, approvedAt: now } : {}),
+      ...(decision === 'sealed' ? { sealedAt: now } : {}),
+    };
+    globalState.questionModelBatches = globalState.questionModelBatches.map(b => b.id === batchId ? next : b);
+    if (decision === 'invalidated') {
+      globalState.questionModels = globalState.questionModels.map(m => m.batchId === batchId && m.status !== 'consumed'
+        ? { ...m, status: 'invalidated' as const, invalidatedAt: now, invalidationReason: `BATCH_INVALIDATED:${reason || 'قرار المنظم'}` } : m);
+    }
+    auditTrustAction('QUESTION_MODEL_BATCH_DECIDED', 'QuestionModelBatch', batchId,
+      `${decision === 'approved' ? 'اعتماد' : decision === 'sealed' ? 'ختم' : 'إبطال'} دفعة النماذج${reason ? ` — ${reason}` : ''}`,
+      `${decision} question model batch${reason ? ` — ${reason}` : ''}`);
+    notify();
+    return { ok: true as const, batch: next };
+  };
+
+  /** النموذج المولَّد مسبقًا لمتسابق، إن وُجد صالحًا لنطاقه الساري. */
+  const preGeneratedModelFor = (participantId: string) => {
+    const resolution = participantEffectiveScope(participantId);
+    if (!resolution || resolution.blocked) return null;
+    const signature = resolution.signature || scopeSignature(resolution.scope);
+    return globalState.questionModels.find(m =>
+      m.participantId === participantId && m.status === 'sealed' && m.batchId
+      && m.scopeSignature === signature && m.participantScopeVersion === resolution.version
+      && globalState.questionModelBatches.find(b => b.id === m.batchId)?.approvalState === 'sealed') || null;
+  };
+
+  /** استدعاء نموذج احتياطي — بمطابقة بصمة النطاق، لا بالتقريب. */
+  const claimReserveForParticipant = (participantId: string, reason: string) => {
+    const resolution = participantEffectiveScope(participantId);
+    if (!resolution || resolution.blocked) return { ok: false as const, reason: 'PARTICIPANT_SCOPE_UNAVAILABLE' };
+    if (!reason?.trim()) return { ok: false as const, reason: 'REASON_REQUIRED' };
+    const reserves = globalState.questionModels.filter(m => !m.participantId && m.status === 'draft');
+    const outcome = claimReserveModel({ reserves, participantId, scope: resolution.scope, scopeVersion: resolution.version, reason: reason.trim() });
+    const claimed = outcome.model;
+    if (!outcome.ok || !claimed) return { ok: false as const, reason: outcome.reason || 'NO_RESERVE_FOR_THIS_SCOPE' };
+    globalState.questionModels = globalState.questionModels.map(m => m.id === claimed.id ? claimed : m);
+    const participant = globalState.participants.find(p => p.id === participantId);
+    auditTrustAction('QUESTION_MODEL_RESERVE_CLAIMED', 'QuestionModel', claimed.id,
+      `استدعاء نموذج احتياطي للمتسابق ${participant?.code || participantId} — ${reason.trim()}`,
+      `Claimed a reserve question model for ${participant?.code || participantId} — ${reason.trim()}`);
+    notify();
+    return { ok: true as const, model: claimed, remaining: outcome.remaining.length };
+  };
+
+  /**
+   * حجر مواضع.
+   *
+   * لا يُحذف سؤال ولا تاريخ. يُعلَّم الموضع محجورًا فيخرج من البنك عند منبعه، ويُبطل كل
+   * نموذج يحمله، ويُقاس الأثر: كم متسابقًا، وكم بقي، وهل تستطيع المسابقة الاستمرار.
+   */
+  const quarantineQuestionLoci = (input: { locusKeys: string[]; reason: string; severity?: QuestionQuarantineRecord['severity']; questionIds?: string[] }) => {
+    const keys = [...new Set(input.locusKeys.map(k => k.trim()).filter(Boolean))];
+    if (!keys.length) return { ok: false as const, reason: 'NO_LOCI' };
+    if (!input.reason?.trim()) return { ok: false as const, reason: 'REASON_REQUIRED' };
+    const policy = getCompetitionPolicy(globalState.competition);
+    const rows = batchRowsFor();
+    const candidates = rows.length ? poolsForRows(rows.map(r => ({ scope: r.scope, categoryId: r.categoryId, reading: r.reading }))) : [];
+    const requiredDraws = rows.reduce((sum, r) => sum + r.questionCount, 0) || policy.questions.questionsPerParticipant;
+    const now = new Date().toISOString();
+    const impact = applyQuarantine({
+      locusKeys: keys, reason: input.reason.trim(),
+      models: globalState.questionModels.filter(m => m.competitionId === globalState.competition.id),
+      candidates, requiredDraws, now,
+    });
+    const invalidatedIds = new Set(impact.invalidatedModels.map(m => m.id));
+    globalState.questionModels = globalState.questionModels.map(m => invalidatedIds.has(m.id) ? impact.invalidatedModels.find(x => x.id === m.id)! : m);
+    /* الحجوزات القائمة على موضع محجور تُنقل إلى «محجور» فلا يصل الموضع إلى قاعة. */
+    const heldOnQuarantined = globalState.questionReservations.filter(r => keys.includes(r.locusKey) && r.state !== 'quarantined').map(r => r.id);
+    if (heldOnQuarantined.length) {
+      globalState.questionReservations = transitionReservations({
+        records: globalState.questionReservations, ids: heldOnQuarantined, to: 'quarantined',
+        actorId: globalState.currentUser.id, reason: input.reason.trim(), now,
+      }).records;
+    }
+    const record: QuestionQuarantineRecord = {
+      id: newId('qquar'), organizationId: globalState.competition.organizationId, competitionId: globalState.competition.id,
+      locusKeys: keys, questionIds: input.questionIds || [], reason: input.reason.trim(),
+      raisedBy: globalState.currentUser.id, raisedAt: now, severity: input.severity || 'defect',
+      invalidatedModelIds: [...invalidatedIds], affectedParticipantCount: impact.affectedParticipantIds.length,
+      remainingUniqueLoci: impact.remainingUniqueLoci, averageReuseAfter: impact.averageReuseAfter,
+      canContinue: impact.canContinue, summaryArabic: impact.summaryArabic, summaryEnglish: impact.summaryEnglish,
+      status: 'active',
+    };
+    globalState.questionQuarantines = [record, ...globalState.questionQuarantines];
+    auditTrustAction('QUESTION_LOCI_QUARANTINED', 'QuestionQuarantine', record.id, record.summaryArabic, record.summaryEnglish);
+    if (!impact.canContinue) createIncident('quran_source_discrepancy', 'الحجر أفرغ البنك', record.summaryArabic, 'critical');
+    notify();
+    return { ok: true as const, record, impact };
+  };
+
+  const liftQuestionQuarantine = (quarantineId: string, reason: string) => {
+    const record = globalState.questionQuarantines.find(q => q.id === quarantineId);
+    if (!record) return { ok: false as const, reason: 'QUARANTINE_NOT_FOUND' };
+    if (record.status === 'lifted') return { ok: false as const, reason: 'ALREADY_LIFTED' };
+    if (!reason?.trim()) return { ok: false as const, reason: 'REASON_REQUIRED' };
+    const now = new Date().toISOString();
+    globalState.questionQuarantines = globalState.questionQuarantines.map(q => q.id === quarantineId
+      ? { ...q, status: 'lifted' as const, liftedAt: now, liftedBy: globalState.currentUser.id, liftReason: reason.trim() } : q);
+    /* رفع الحجر يعيد الموضع إلى البنك، ولا يعيد إحياء نموذج أُبطل: ذاك يُعاد توليده. */
+    auditTrustAction('QUESTION_QUARANTINE_LIFTED', 'QuestionQuarantine', quarantineId,
+      `رفع حجر ${record.locusKeys.length} موضعًا — ${reason.trim()}؛ النماذج المبطلة لا تُحيا، تُعاد توليدًا.`,
+      `Lifted quarantine on ${record.locusKeys.length} loci — ${reason.trim()}; invalidated models are regenerated, not revived.`);
+    notify();
+    return { ok: true as const };
+  };
+
+  /* ---- دورة حياة الحجز ---- */
+
+  const reserveQuestionsForParticipant = (input: { participantId: string; items: { locusKey: string; questionId: string }[]; sessionId?: string; modelId?: string; ttlSeconds?: number; idempotencyKey?: string }) => {
+    const expired = expireReservations(globalState.questionReservations, new Date().toISOString(), 'system');
+    globalState.questionReservations = expired.records;
+    const outcome = reserveQuestions({
+      records: globalState.questionReservations,
+      organizationId: globalState.competition.organizationId,
+      competitionId: globalState.competition.id,
+      items: input.items, participantId: input.participantId, sessionId: input.sessionId, modelId: input.modelId,
+      idempotencyKey: input.idempotencyKey || `${globalState.competition.id}:${input.participantId}:${input.modelId || input.sessionId || 'draw'}`,
+      actorId: globalState.currentUser.id, ttlSeconds: input.ttlSeconds, newId,
+    });
+    globalState.questionReservations = outcome.records;
+    if (!outcome.replayed && outcome.created.length) {
+      auditTrustAction('QUESTION_RESERVATIONS_CREATED', 'QuestionReservation', outcome.created[0].id,
+        `حجز ${outcome.created.length} موضعًا مؤقتًا${outcome.conflicts.length ? ` وتعذّر ${outcome.conflicts.length} لأن غيرهم يحجزها` : ''}`,
+        `Reserved ${outcome.created.length} loci${outcome.conflicts.length ? `; ${outcome.conflicts.length} were held by others` : ''}`);
+    }
+    notify();
+    return outcome;
+  };
+
+  const advanceReservations = (ids: string[], to: QuestionReservationRecord['state'], reason?: string) => {
+    const outcome = transitionReservations({ records: globalState.questionReservations, ids, to, actorId: globalState.currentUser.id, reason });
+    globalState.questionReservations = outcome.records;
+    if (outcome.changed.length) {
+      auditTrustAction('QUESTION_RESERVATION_ADVANCED', 'QuestionReservation', outcome.changed[0].id,
+        `نقل ${outcome.changed.length} حجزًا إلى «${to}»${reason ? ` — ${reason}` : ''}`,
+        `Advanced ${outcome.changed.length} reservations to ${to}${reason ? ` — ${reason}` : ''}`);
+    }
+    notify();
+    return outcome;
+  };
+
+  const sweepExpiredReservations = () => {
+    const outcome = expireReservations(globalState.questionReservations, new Date().toISOString(), 'system');
+    globalState.questionReservations = outcome.records;
+    if (outcome.changed.length) {
+      auditTrustAction('QUESTION_RESERVATIONS_EXPIRED', 'QuestionReservation', outcome.changed[0].id,
+        `انقضت مدة ${outcome.changed.length} حجزًا فعادت مواضعها إلى المخزون`,
+        `${outcome.changed.length} reservations expired and their loci returned to the pool`);
+      notify();
+    }
+    return outcome.changed.length;
+  };
+
+  const reservationBlockedLoci = (exceptParticipantId?: string) => blockedLocusKeys(globalState.questionReservations, new Date().toISOString(), exceptParticipantId);
+
+  /**
+   * تقرير عدالة وتوزيع الأسئلة.
+   *
+   * يُبنى من النماذج المعتمدة ومن تحليل الازدحام، ويُختم ببصمة تُعيد إنتاجه. وقبل أن يُحفظ
+   * يُفحص فحصًا صريحًا: لا اسم متسابق ولا كوده فيه. التقرير عن الأسئلة لا عن الناس.
+   */
+  const buildCompetitionFairnessReport = async (options?: { categoryId?: string; batchId?: string; label?: string }) => {
+    const [{ buildFairnessReport, fairnessReportPrivacyViolations }, { zoneAwareReuseLowerBound }] = await Promise.all([import('./fairness-report'), import('./scope-demand')]);
+    const policy = getCompetitionPolicy(globalState.competition);
+    const models = globalState.questionModels.filter(m =>
+      m.competitionId === globalState.competition.id && m.status !== 'invalidated' && !!m.participantId
+      && (!options?.categoryId || m.categoryId === options.categoryId)
+      && (!options?.batchId || m.batchId === options.batchId));
+    if (!models.length) return { ok: false as const, reason: 'NO_MODELS' };
+    const demand = await scopeDemandAnalysis();
+    const rows = batchRowsFor(options?.categoryId);
+    const candidates = rows.length ? poolsForRows(rows.map(r => ({ scope: r.scope, categoryId: r.categoryId, reading: r.reading }))) : [];
+    const lowerBound = demand.clusters.length && candidates.length ? zoneAwareReuseLowerBound({
+      clusters: demand.clusters, candidates,
+      planFor: categoryId => categoryDistribution(globalState.competition.categories.find(c => c.id === categoryId), resolveQuestionCount(globalState.competition.categories.find(c => c.id === categoryId), policy)),
+      questionCountFor: cluster => resolveQuestionCount(globalState.competition.categories.find(c => c.id === cluster.categoryIds[0]), policy),
+    }) : null;
+    const category = globalState.competition.categories.find(c => c.id === options?.categoryId);
+    const report = await buildFairnessReport({
+      id: newId('fairrep'),
+      organizationId: globalState.competition.organizationId,
+      competitionId: globalState.competition.id,
+      scope: options?.batchId ? 'batch' : options?.categoryId ? 'category' : 'competition',
+      scopeRef: options?.batchId || options?.categoryId,
+      titleSuffixArabic: options?.label || category?.nameArabic,
+      models, aggregate: aggregateFairness(models), demand, lowerBound,
+      /* الفشل المعلَن يدخل التقرير: نماذجُ ناجحةٌ وحدها تُخرج ورقةً نظيفة تُضلّل. */
+      declaredFailures: globalState.questionModelBatches
+        .filter(b => b.competitionId === globalState.competition.id
+          && (!options?.batchId || b.id === options.batchId)
+          && (!options?.categoryId || b.categoryId === options.categoryId)
+          && b.approvalState !== 'invalidated')
+        .flatMap(b => (b.declaredFailures || []).flatMap(f => Array.from({ length: f.count }, () => ({ code: f.code, ar: f.ar, en: f.en })))),
+      repeatPolicy: categoryRepeatPolicy(category, policy),
+      policyVersion: policy.version,
+      generatedBy: globalState.currentUser.id,
+    });
+    /* حاجز الخصوصية: لو تسرّب اسم أو كود إلى نصّ التقرير لم يُحفظ ولم يُصدَّر. */
+    const forbidden = globalState.participants.flatMap(p => [p.code, p.fullName, p.fullNameArabic].filter((x): x is string => !!x));
+    const leaks = fairnessReportPrivacyViolations(report, forbidden);
+    if (leaks.length) return { ok: false as const, reason: 'PRIVACY_VIOLATION', leaks };
+    globalState.fairnessReports = [report, ...globalState.fairnessReports].slice(0, 20);
+    auditTrustAction('FAIRNESS_REPORT_BUILT', 'FairnessReport', report.id,
+      `إصدار تقرير عدالة وتوزيع الأسئلة عن ${models.length} نموذجًا — بصمته ${report.reportHash.slice(0, 12)}`,
+      `Issued a question fairness and distribution report over ${models.length} models — hash ${report.reportHash.slice(0, 12)}`);
+    notify();
+    return { ok: true as const, report };
   };
 
   const removeCategory = (categoryId: string) => {
@@ -2527,14 +2922,36 @@ export function useAppStore() {
       seed:`${globalState.competition.id}:${participant.id}`,
       requireReviewedDifficulty:!!category?.requireReviewedDifficulty,
       defaultTargetDifficulty:policy.questions.targetDifficulty,
+      /* ما سُمع في القاعات قبل الآن يدخل المفاضلة: الموضع المنكشف يُؤخَّر لا يُمنع أعمى. */
+      scarcity:buildExposureOracle(exposureProfiles()),
     });
     /* الدفتر يُغذَّى بما سُحب قبل الآن في هذه المسابقة، فيباعد المحرك ويوازن الحمل بدل أن يبدأ من صفر. */
     drawEngine.primeUsage(globalState.questionModels
-      .filter(m=>m.competitionId===globalState.competition.id&&m.status!=='invalidated')
+      .filter(m=>m.competitionId===globalState.competition.id&&m.status!=='invalidated'&&m.status!=='draft')
       .flatMap((m,order)=>m.questions.map(q=>({locusKey:`${q.surahNumber}:${q.startAyah}`,participantId:m.participantId,sequence:order}))));
+    /*
+     * نموذجٌ مختوم مسبقًا يُنفَّذ ولا يُعاد سحبه.
+     *
+     * لكن البنك في القاعة قد يكون غير البنك الذي وُلّد منه النموذج (مصدر معتمد مقابل بنية
+     * المصحف)، فالمطابقة بالموضع لا بالمعرّف. وإن لم يُوجد لموضعٍ من النموذج مقابلٌ في بنك
+     * القاعة، لا يُلفَّق نصفُ نموذج: يُسحب حيًّا ويُقال السبب في السجل.
+     */
+    let preGenerated:{modelId:string;batchId?:string;questionIds:string[];reasons?:typeof sealedModel.questions[number]['reason'][];fairness?:typeof sealedModel.fairness}|undefined;
+    const sealedModel=preGeneratedModelFor(participantId);
+    if(sealedModel){
+      const byLocus=new Map(pool.map(item=>[`${item.surahNumber}:${item.startAyah}:${item.endAyah}`,item] as const));
+      const mapped=sealedModel.questions.map(q=>byLocus.get(`${q.surahNumber}:${q.startAyah}:${q.endAyah}`));
+      if(mapped.every(Boolean)){
+        preGenerated={modelId:sealedModel.id,batchId:sealedModel.batchId,questionIds:mapped.map(item=>item!.id),reasons:sealedModel.questions.map(q=>q.reason),fairness:sealedModel.fairness};
+      }else{
+        auditTrustAction('QUESTION_MODEL_PREGENERATED_SKIPPED','QuestionModel',sealedModel.id,
+          `تعذّر تنفيذ النموذج المختوم للمتسابق ${participant.code}: ${mapped.filter(x=>!x).length} من مواضعه غير موجودة في بنك القاعة؛ جرى سحب حيّ بدلًا منه.`,
+          `Could not execute the sealed model for ${participant.code}: ${mapped.filter(x=>!x).length} of its loci are absent from the hall pool; drew live instead.`);
+      }
+    }
     try {
       const selection = await generateFairDraw({ pool, participant, policy:effPolicy, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT',
-        scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id } });
+        scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id, preGenerated } });
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
       const sessionId=newId('sess');
       /* نموذج المتسابق يُحفظ كيانًا مستقلًا: عليه تقوم العدالة والتدقيق وإبطال ما بُني على نطاق قديم. */
@@ -2558,7 +2975,24 @@ export function useAppStore() {
         generationMode:'just_in_time',engineVersion:selection.engineVersion||'MIZAN-FAIRDRAW-2.0',
         seedCommitmentHash:selection.seedCommitmentHash,status:'sealed',createdAt:new Date().toISOString(),sealedAt:new Date().toISOString(),
       };
-      globalState.questionModels=[model,...globalState.questionModels];
+      if(preGenerated){
+        /* النموذج المختوم لا يُستنسخ: يُعلَّم مستهلَكًا ويُربط بالجلسة، فيبقى كيانًا واحدًا له تاريخ واحد. */
+        globalState.questionModels=globalState.questionModels.map(m=>m.id===preGenerated!.modelId?{...m,status:'consumed' as const}:m);
+        auditTrustAction('QUESTION_MODEL_PREGENERATED_EXECUTED','QuestionModel',preGenerated.modelId,
+          `تنفيذ نموذج مختوم مسبقًا للمتسابق ${participant.code} من الدفعة ${preGenerated.batchId||'—'}؛ لم يُعد السحب في القاعة.`,
+          `Executed a pre-sealed model for ${participant.code} from batch ${preGenerated.batchId||'—'}; no draw ran in the hall.`);
+      } else {
+        globalState.questionModels=[model,...globalState.questionModels];
+      }
+      /* الحجز: مواضع هذه الجلسة تُخصَّص فلا تُسحب لغير صاحبها، وتنقضي وحدها إن لم يحضر. */
+      const reservation=reserveQuestionsForParticipant({
+        participantId:participant.id,
+        items:selection.questions.map(item=>({locusKey:`${item.surahNumber}:${item.startAyah}`,questionId:item.id})),
+        sessionId,modelId:preGenerated?preGenerated.modelId:model.id,
+        idempotencyKey:`${globalState.competition.id}:${selection.questionSetId}`,
+      });
+      /* المتسابق أمام اللجنة الآن، فالحجز ينتقل من «مؤقت» إلى «مخصَّص» ولا ينقضي بمرور الوقت. */
+      if(reservation.created.length)advanceReservations(reservation.created.map(r=>r.id),'assigned',`بدء جلسة ${participant.code}`);
       const revealGates:QuestionRevealGateRecord[]=[];
       for(let questionIndex=0;questionIndex<selection.questions.length;questionIndex++){
         const item=selection.questions[questionIndex];
@@ -2615,6 +3049,14 @@ export function useAppStore() {
     const ready=questionRevealReady({participantPresent:gate.participantPresence.verified,requiredJudgeIds:gate.requiredJudgeIds,approvals,mode:revealPolicy.judgeApprovalMode,minimumApprovals:revealPolicy.minimumApprovals});
     const status=ready.ready?'REVEALED' as const:'SEALED' as const;const revealedAt=ready.ready?new Date().toISOString():undefined;
     globalState.questionRevealGates=globalState.questionRevealGates.map(g=>g.id===gate.id?{...g,approvals,status,revealedAt}:g);
+    if(ready.ready){
+      /* الكشف ينقل الحجز إلى «مكشوف»: بابٌ لا رجعة منه إلا بالحجر، فلا يُعاد الموضع إلى المخزون بعد أن سُمع. */
+      const revealedItem=session.questionSelection?.questions[gate.questionIndex];
+      if(revealedItem){
+        const held=globalState.questionReservations.filter(r=>r.sessionId===session.sessionId&&r.questionId===revealedItem.id).map(r=>r.id);
+        if(held.length)advanceReservations(held,'revealed',`كُشف السؤال ${gate.questionIndex+1} في القاعة`);
+      }
+    }
     if(ready.ready){globalState.activeSession.isReciting=true;globalState.activeSession.questionPhase='RECITING';auditTrustAction('QUESTION_REVEALED_AFTER_PANEL_APPROVAL','QuestionRevealGate',gate.id,`كشف السؤال ${gate.questionIndex+1} بعد حضور المتسابق واكتمال موافقات ${ready.approved}/${ready.required}`,`Revealed question ${gate.questionIndex+1} after participant presence and ${ready.approved}/${ready.required} judge approvals`);}else auditTrustAction('QUESTION_REVEAL_APPROVAL_RECORDED','QuestionRevealGate',gate.id,`تسجيل موافقة محكم على فتح السؤال (${ready.approved}/${ready.required})`,`Recorded judge approval to reveal question (${ready.approved}/${ready.required})`);
     void createContinuityCheckpoint(ready.ready?'question-revealed':'judge-reveal-approval');
     notify();return {ok:true,revealed:ready.ready,approved:ready.approved,required:ready.required} as const;
@@ -3318,6 +3760,10 @@ export function useAppStore() {
     categoryScopeMigrationPlan, applyCategoryScopeMigration,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope, activeParticipantScope,
     scopeCandidatePool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, sealScopeEngine, scopeSealImpact,
+    generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant, exposureProfiles,
+    quarantineQuestionLoci, liftQuestionQuarantine,
+    reserveQuestionsForParticipant, advanceReservations, sweepExpiredReservations, reservationBlockedLoci,
+    buildCompetitionFairnessReport,
     addCommittee,
     updateCommittee, removeCommittee, updateJudgeSpecialties, updateCommitteeJudgeSpecialty,
     publishCompetition,

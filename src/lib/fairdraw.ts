@@ -1,7 +1,7 @@
-import { CompetitionPolicy, Participant, QuestionPoolItem, QuestionSelection } from '../types';
+import { CompetitionPolicy, FairnessBreakdown, Participant, QuestionPoolItem, QuestionSelection } from '../types';
 import { newId, sha256 } from './crypto';
 import { hashCanonical } from './trust-protocol';
-import { QuestionAllocationEngine, locusKeyOf, type QuestionCandidate, type ReadingContext } from './question-engine';
+import { QUESTION_ENGINE_VERSION, QuestionAllocationEngine, locusKeyOf, type QuestionCandidate, type ReadingContext, type SelectionReason } from './question-engine';
 import { computeModelFairness } from './model-fairness';
 import { scopeContainsRange, scopeSignature, type QuranScope } from './quran-scope';
 import type { ZoneSlot } from './question-zones';
@@ -56,6 +56,15 @@ export interface ScopedDrawContext{
  reading?:ReadingContext;
  sequencePosition?:number;
  hallId?:string;
+ /*
+  * نموذجٌ مولَّد مسبقًا ومختوم.
+  *
+  * حين يكون للمتسابق نموذجٌ في دفعةٍ معتمدةٍ مختومة، لا يُعاد السحب في القاعة: يُنفَّذ
+  * النموذج كما اعتُمد. وهذا ليس التفافًا على القرعة، بل هو القرعة نفسها وقد جرت قبل
+  * أيام وخُتمت وأُتيحت للمراجعة. والإثبات يقول ذلك صراحةً — preGeneratedModelId في
+  * القيود — فلا يظن مدقّقٌ أن السحب جرى لحظتَه.
+  */
+ preGenerated?:{modelId:string;batchId?:string;questionIds:string[];reasons?:SelectionReason[];fairness?:FairnessBreakdown};
 }
 
 /** FairDraw proves reproducibility against configured constraints; it does not claim absolute or philosophical fairness. */
@@ -82,6 +91,43 @@ async function generateScopedFairDraw(args:{pool:QuestionPoolItem[];participant:
  const candidates=args.pool.map(item=>poolItemToCandidate(item,scoped.reading));
  const usageBefore=scoped.engine.usageSnapshot().filter(row=>candidates.some(c=>locusKeyOf(c)===row.locusKey));
  const usageDigest=await hashCanonical(usageBefore.map(r=>({k:r.locusKey,u:r.uses})).sort((a,b)=>a.k.localeCompare(b.k)));
+ /* التنفيذ من نموذج مختوم: لا إعادة سحب، وبقاء الإثبات على صورته نفسها. */
+ if(scoped.preGenerated){
+  const ordered=scoped.preGenerated.questionIds.map(id=>byId.get(id)).filter((x):x is QuestionPoolItem=>!!x);
+  if(ordered.length!==scoped.preGenerated.questionIds.length)throw new Error('FAIRDRAW_PREGENERATED_MODEL_POOL_MISMATCH');
+  for(const item of ordered){
+   if(!scopeContainsRange(scoped.scope,{surah:item.surahNumber,ayah:item.startAyah},{surah:item.surahNumber,ayah:item.endAyah}))throw new Error('FAIRDRAW_PREGENERATED_MODEL_OUT_OF_SCOPE');
+  }
+  /* الدفتر يُغذَّى بما نُفّذ فعلًا، فيباعد المحرك عن هذه المواضع في سحوب اليوم التالية. */
+  scoped.engine.primeUsage(ordered.map(item=>({locusKey:`${item.surahNumber}:${item.startAyah}`,participantId:args.participant.id,hallId:scoped.hallId,sequence:scoped.sequencePosition})));
+  const poolSnapshotHash=await hashCanonical(args.pool.map(q=>({id:q.id,riwaya:q.riwaya,surah:q.surahNumber,start:q.startAyah,end:q.endAyah,difficulty:q.difficultyRating,juz:q.juzNumber,mutashabihat:q.mutashabihatDensity,tajweed:q.tajweedComplexity})).sort((a,b)=>a.id.localeCompare(b.id)));
+  const poolVersion=args.poolVersion||poolSnapshotHash;
+  const signature=scopeSignature(scoped.scope);
+  const zoneSignatures=scoped.slots.map(slot=>({index:slot.index,zoneId:slot.zoneId,zoneName:slot.zoneNameArabic,scopeSignature:scopeSignature(slot.scope)}));
+  const constraints={
+   engineVersion:QUESTION_ENGINE_VERSION,questionsPerParticipant:ordered.length,
+   targetDifficulty:args.policy.questions.targetDifficulty,difficultyTolerance:args.policy.questions.difficultyTolerance,
+   diversity:args.policy.questions.diversity,scopeSignature:signature,participantScopeVersion:scoped.participantScopeVersion,
+   zoneSignatures,repeatPolicy:scoped.engine.policy,usageDigest,
+   preGeneratedModelId:scoped.preGenerated.modelId,preGeneratedBatchId:scoped.preGenerated.batchId,
+   excludedIds:[...(args.excludedIds||[])].sort(),quranSourceManifestId:args.quranSourceManifestId,
+   qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion,
+  };
+  const constraintHash=await hashCanonical(constraints);
+  const seedCommitmentHash=`SHA256:${await sha256(seed)}`;
+  const publicCommitmentHash=await hashCanonical({algorithmVersion:FAIRDRAW_SCOPE_ALGORITHM_VERSION,ruleVersion:args.policy.version,poolVersion,poolSnapshotHash,constraintHash,seedCommitmentHash});
+  return {
+   questionSetId:newId('qset'),participantId:args.participant.id,questions:ordered,
+   difficultyVectorScore:Number((ordered.reduce((sum,q)=>sum+q.difficultyRating,0)/Math.max(1,ordered.length)).toFixed(3)),
+   seedCommitmentHash,fairnessToleranceDelta:args.policy.questions.difficultyTolerance,generatedAt:new Date().toISOString(),
+   algorithmVersion:FAIRDRAW_SCOPE_ALGORITHM_VERSION,poolVersion,poolSnapshotHash,ruleVersion:args.policy.version,
+   constraintHash,publicCommitmentHash,seedReveal:seed,
+   quranSourceManifestId:args.quranSourceManifestId,qiraah:args.qiraah,rawi:args.rawi,tariq:args.tariq,
+   variantLocusVersion:args.variantLocusVersion,difficultyMetadataVersion:args.difficultyMetadataVersion,
+   scopeSignature:signature,participantScopeVersion:scoped.participantScopeVersion,engineVersion:QUESTION_ENGINE_VERSION,
+   zoneSignatures,usageDigest,selectionReasons:scoped.preGenerated.reasons,fairness:scoped.preGenerated.fairness,
+  };
+ }
  const outcome=scoped.engine.selectForParticipant({
   participantId:args.participant.id,
   sequencePosition:scoped.sequencePosition,

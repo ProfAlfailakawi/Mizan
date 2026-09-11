@@ -28,6 +28,9 @@ export interface QuestionCandidate {
   startAyah: number;
   endAyah: number;
   juzNumber?: number;
+  /** الحزب والربع مشتقان بالقسمة داخل الجزء (DERIVED_PROPORTIONAL)؛ للعرض لا للأهلية. */
+  hizbNumber?: number;
+  rubNumber?: number;
   pageNumber?: number;
   difficultyRating: number;
   difficultyAssurance: DifficultyAssurance;
@@ -41,6 +44,15 @@ export interface QuestionCandidate {
   tajweedComplexity?: 'basic' | 'intermediate' | 'advanced';
   /** عدد الاستعمالات الموروثة من مسابقات سابقة أو من مصدر خارجي. */
   priorUsageCount?: number;
+  /** كم مرة كُشف هذا الموضع في قاعة — يأتي من سجل الانكشاف، لا يُخمَّن. */
+  exposureCount?: number;
+  /*
+   * أوجه الأداء المسموحة في هذا الموضع لهذه الرواية.
+   *
+   * لا تُختلق: تأتي من حزمة المصدر المعتمدة وحدها. وغيابها يعني «لم يُقرأ من مصدر» لا
+   * «لا وجه فيه» — والفرق بينهما هو الفرق بين الصمت والادّعاء.
+   */
+  allowedWujuh?: string[];
 }
 
 export interface ReadingContext { qiraahId?: string; rawiId?: string; tariqId?: string }

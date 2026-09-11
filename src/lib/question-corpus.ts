@@ -10,7 +10,7 @@
  * ولا يُسلَّم منه سؤالٌ إلى لجنة تحكيم: التسليم من المصدر المعتمد عبر خزنة السؤال.
  */
 
-import { QURAN_TOTAL_AYAHS, ayahCountOf, ayahOrdinal, juzOfLocus, ordinalToLocus, pageOfLocus } from './quran-canon';
+import { QURAN_TOTAL_AYAHS, ayahCountOf, ayahOrdinal, hizbOfLocus, juzOfLocus, ordinalToLocus, pageOfLocus, rubOfLocus } from './quran-canon';
 import { scopeRanges, type QuranScope } from './quran-scope';
 import type { DifficultyAssurance, QuestionCandidate } from './question-engine';
 
@@ -75,6 +75,8 @@ export function projectCandidatesFromScope(scope: QuranScope, options: CorpusPro
         startAyah: start.ayah,
         endAyah,
         juzNumber: juzOfLocus(start),
+        hizbNumber: hizbOfLocus(start),
+        rubNumber: rubOfLocus(start),
         pageNumber: pageOfLocus(start),
         difficultyRating: Number.isFinite(rated) ? Math.max(1, Math.min(5, Number(rated))) : structuralDifficulty(start.surah, start.ayah, endAyah),
         difficultyAssurance: Number.isFinite(rated) ? 'scientifically_approved' : (options.fallbackAssurance || 'automatically_estimated'),

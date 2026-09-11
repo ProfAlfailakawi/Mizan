@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, UsersRound, Wand2,
+  Layers3,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -21,6 +22,7 @@ import { QuranScopePicker, ScopeSummary } from '../scope/QuranScopePicker';
 import { ScopeHeatMap } from '../scope/ScopeHeatMap';
 import type { DemandAnalysis } from '../../lib/scope-demand';
 import { ScopeSimulationStudio, type WhatIfState } from '../scope/ScopeSimulationStudio';
+import { ModelFairnessStudio } from '../scope/ModelFairnessStudio';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { EmptyState } from '../design-system/EmptyState';
@@ -38,7 +40,7 @@ import { useConfirm } from '../design-system/ConfirmDialog';
  * والوضع البسيط يكفي مسابقة مدرسة في دقائق؛ والمتقدّم لمن يحتاج مقاطع ومناطق وقواعد.
  */
 
-type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'readiness';
+type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -57,6 +59,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['policy', Settings2, ar ? 'سياسة الأسئلة' : 'Question policy'],
     ['demand', Flame, ar ? 'الازدحام' : 'Demand'],
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
+    ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
   ];
 
@@ -100,6 +103,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'policy' && <PolicyTab store={store} ar={ar} category={category} advanced={advanced} />}
             {tab === 'demand' && <DemandTab store={store} ar={ar} />}
             {tab === 'simulation' && <SimulationTab store={store} ar={ar} />}
+            {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
           </div>
         </>
