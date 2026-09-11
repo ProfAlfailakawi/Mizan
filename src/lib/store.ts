@@ -2182,7 +2182,7 @@ export function useAppStore() {
       activeQuarantines: globalState.questionQuarantines
         .filter(q => q.status === 'active' && q.competitionId === globalState.competition.id)
         .map(q => ({ locusCount: q.locusKeys.length, canContinue: q.canContinue, summaryAr: q.summaryArabic, summaryEn: q.summaryEnglish })),
-      reserveModelCount: globalState.questionModels.filter(m => !m.participantId && m.status === 'draft').length,
+      reserveModelCount: globalState.questionModels.filter(m => !m.participantId && m.status === 'draft' && m.competitionId === globalState.competition.id).length,
       escrowRequired: policy.questions.secureReveal?.requireParticipantPresence !== false,
       escrowReady: globalState.activeSession.secureQuestionMode === 'SERVER' || !isLaunchDeployment(),
       strictDifficultyRequired: globalState.competition.categories.some(c => c.requireReviewedDifficulty),
@@ -2466,7 +2466,7 @@ export function useAppStore() {
     if (!resolution || resolution.blocked) return null;
     const signature = resolution.signature || scopeSignature(resolution.scope);
     return globalState.questionModels.find(m =>
-      m.participantId === participantId && m.status === 'sealed' && m.batchId
+      m.participantId === participantId && m.competitionId === globalState.competition.id && m.status === 'sealed' && m.batchId
       && m.scopeSignature === signature && m.participantScopeVersion === resolution.version
       && globalState.questionModelBatches.find(b => b.id === m.batchId)?.approvalState === 'sealed') || null;
   };
@@ -2476,7 +2476,9 @@ export function useAppStore() {
     const resolution = participantEffectiveScope(participantId);
     if (!resolution || resolution.blocked) return { ok: false as const, reason: 'PARTICIPANT_SCOPE_UNAVAILABLE' };
     if (!reason?.trim()) return { ok: false as const, reason: 'REASON_REQUIRED' };
-    const reserves = globalState.questionModels.filter(m => !m.participantId && m.status === 'draft');
+    /* الاحتياط من هذه المسابقة وهذه الجهة وحدها: نموذجٌ من مسابقةٍ أخرى ليس احتياطًا لهذه. */
+    const reserves = globalState.questionModels.filter(m => !m.participantId && m.status === 'draft'
+      && m.competitionId === globalState.competition.id && m.organizationId === globalState.competition.organizationId);
     const outcome = claimReserveModel({ reserves, participantId, scope: resolution.scope, scopeVersion: resolution.version, reason: reason.trim() });
     const claimed = outcome.model;
     if (!outcome.ok || !claimed) return { ok: false as const, reason: outcome.reason || 'NO_RESERVE_FOR_THIS_SCOPE' };

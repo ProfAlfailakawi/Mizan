@@ -63,13 +63,13 @@
     "height": 1980
   },
   "desktop/readiness": {
-    "buttons": 26,
-    "headings": 9,
+    "buttons": 27,
+    "headings": 10,
     "inputs": 2,
     "tables": 0,
     "lists": 1,
     "tabs": 8,
-    "height": 1240
+    "height": 1320
   },
   "tablet/scope": {
     "buttons": 59,
@@ -135,13 +135,13 @@
     "height": 2220
   },
   "tablet/readiness": {
-    "buttons": 26,
-    "headings": 9,
+    "buttons": 27,
+    "headings": 10,
     "inputs": 2,
     "tables": 0,
     "lists": 1,
     "tabs": 16,
-    "height": 1440
+    "height": 1540
   },
   "mobile/scope": {
     "buttons": 59,
@@ -207,12 +207,12 @@
     "height": 3600
   },
   "mobile/readiness": {
-    "buttons": 26,
-    "headings": 9,
+    "buttons": 27,
+    "headings": 10,
     "inputs": 2,
     "tables": 0,
     "lists": 1,
     "tabs": 16,
-    "height": 1820
+    "height": 2000
   }
 }
