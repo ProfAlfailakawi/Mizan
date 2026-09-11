@@ -1,12 +1,18 @@
 import React from 'react';
+import { MizanMark } from './MizanLogo';
 
 /*
- * الميزان المصغّر — مؤشر الانتظار الموحّد في ميزان.
- * العارضة تتأرجح قليلًا ثم تستقر بينما تصل نقطتا تقييم إلى الكفّتين؛ بعدها خمول
- * هادئ (ميلان طفيف) دون إعادة تبعثر. CSS خالص: transform/opacity فقط، ويستمد
- * لونه من currentColor فيصلح داخل الأزرار وعلى الأسطح الفاتحة والداكنة.
+ * محمّل ميزان الدقيق — العلامة المعتمدة نفسها تتجمّع مصغّرة.
  *
- * delayed (افتراضيًا) يؤخر الظهور ~250ms حتى لا يومض المؤشر في العمليات القصيرة —
+ * لا كفّتي ميزان عدليّ هنا: هوية ميزان (منصّة مسابقات القرآن) هي قوس المحراب
+ * والمصحف المفتوح والقلم الذهبي، والقراءة المزدوجة قائمة في العلامة ذاتها —
+ * القلم عارضةُ ميزانٍ والصفحتان كفّتاه. أثناء الانتظار تتجمّع العلامة بترتيب
+ * قراءتها (قوس، صفحتان، قلم، نور) عبر حركة `mizan-mark.is-animated` الموجودة
+ * أصلًا، ثم تدخل خمولًا هادئًا (نبض شفافية) دون إعادة تفكيك.
+ *
+ * sm (16px) يستخدم النغمة الأحادية currentColor فيتلوّن بلون نص الزر؛
+ * md/lg يعرضان ألوان العلامة الكاملة.
+ * delayed (افتراضيًا) يؤخّر الظهور ~250ms حتى لا يومض في العمليات الخاطفة —
  * تأخير CSS لا مؤقّت، فلا حالة تُنظّف عند الفكّ.
  */
 export const ScaleLoader: React.FC<{
@@ -15,19 +21,14 @@ export const ScaleLoader: React.FC<{
   delayed?: boolean;
   className?: string;
 }> = ({ size = 'md', label, delayed = true, className = '' }) => {
-  // 2em عرضًا: sm=16px (أزرار)، md=28px (بطاقات)، lg=44px (لوحات).
-  const px = { sm: 8, md: 14, lg: 22 }[size];
+  const px = { sm: 16, md: 28, lg: 44 }[size];
   return (
     <span
       role="status"
-      className={`mizan-scale-loader ${delayed ? 'is-delayed' : ''} ${className}`}
-      style={{ fontSize: px }}
+      className={`mizan-mark-loader ${delayed ? 'is-delayed' : ''} ${className}`}
+      style={{ width: px, height: px }}
     >
-      <i aria-hidden className="mizan-scale-stem" />
-      <i aria-hidden className="mizan-scale-base" />
-      <i aria-hidden className="mizan-scale-beam" />
-      <i aria-hidden className="mizan-scale-dot is-start" />
-      <i aria-hidden className="mizan-scale-dot is-end" />
+      <MizanMark className="is-animated" tone={size === 'sm' ? 'mono' : 'brand'} decorative />
       {label && <span className="sr-only">{label}</span>}
     </span>
   );
