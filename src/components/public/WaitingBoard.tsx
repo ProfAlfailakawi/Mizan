@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Clock3, TriangleAlert, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, Clock3, TriangleAlert, UsersRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { useScreenAwake } from '../../lib/use-screen-awake';
 import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
+import { QueueRibbon } from '../design-system/QueueRibbon';
 import {
   HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait,
-  type CommitteeBoardSlice,
+  type CommitteeBoardSlice, type DisplayBoard,
 } from '../../lib/display-board';
 
 /*
@@ -23,7 +24,8 @@ import {
  * والمعروض أكوادٌ فقط: هي عين ما ينادي به المنادي صوتًا، ولا اسم ولا سؤال ولا درجة.
  */
 
-export const WaitingBoard: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
+/** `board` يأتي من وثيقةٍ منشورة على شاشةٍ بلا تسجيل دخول؛ وغيابه يبني الإسقاط من المخزن. */
+export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void }> = ({ board: externalBoard, onClose }) => {
   const venueRef = useRef<HTMLDivElement | null>(null);
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
   useScreenAwake(true);
@@ -34,7 +36,7 @@ export const WaitingBoard: React.FC<{ onClose?: () => void }> = ({ onClose }) =>
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 5000); return () => clearInterval(t) }, []);
 
-  const board = useMemo(() => buildDisplayBoard({
+  const localBoard = useMemo(() => buildDisplayBoard({
     competitionId: competition.id,
     competitionName: competition.name,
     competitionNameArabic: competition.nameArabic,
@@ -50,6 +52,7 @@ export const WaitingBoard: React.FC<{ onClose?: () => void }> = ({ onClose }) =>
     now,
   }), [competition, participants, committees, activeSession.committee, activeSession.durationSeconds, ar, now]);
 
+  const board = externalBoard || localBoard;
   const age = boardAge(board.generatedAt, now);
   const calling = board.committees.filter((c) => c.nowCalling);
 
@@ -65,7 +68,7 @@ export const WaitingBoard: React.FC<{ onClose?: () => void }> = ({ onClose }) =>
         <div className="min-w-0">
           <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'MIZAN WAIT'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
-          <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName(competition, ar)}</div>
+          <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName({ name: board.competitionName, nameArabic: board.competitionNameArabic }, ar)}</div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-end">
@@ -103,11 +106,19 @@ export const WaitingBoard: React.FC<{ onClose?: () => void }> = ({ onClose }) =>
           </span>
         </div>}
 
-        <div className="grid sm:grid-cols-3 gap-2">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <Stat icon={UsersRound} n={board.totalWaiting} t={ar ? 'في الانتظار' : 'Waiting'} />
           <Stat icon={Clock3} n={board.activePanels} t={ar ? 'لجان عاملة' : 'Active panels'} />
+          {/*
+            الانتظار يصير تقدّمًا حين يُرى مجموعه: القاعة ترى ما أنجزته اليوم، وكل
+            اكتمالٍ يومض مرّة. المفتاح هو العدد، فتغيّره يعيد تشغيل الومضة بلا مؤقّت.
+          */}
+          <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
+            <span key={board.totalCompleted} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-4 h-4" /></span>
+            <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-[10px] mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
+          </div>
           <div className="rounded-2xl border border-white/8 px-4 py-3 text-[11px] mizan-venue-muted flex items-center">
-            {ar ? 'تُعرض الأكواد فقط احترامًا للخصوصية. تعمل على أي تلفاز أو شاشة متصلة بمتصفح.' : 'Codes only by default for privacy. Runs on any TV or display with a browser.'}
+            {ar ? 'تُعرض الأكواد فقط احترامًا للخصوصية.' : 'Codes only, by design.'}
           </div>
         </div>
       </footer>
@@ -135,7 +146,7 @@ export const FreshnessLine: React.FC<{ state: ReturnType<typeof boardAge>['state
  */
 const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slice, ar }) => {
   const offline = slice.status === 'offline';
-  return <section className={`mizan-board-cell ${offline ? 'is-offline' : ''} ${slice.status === 'testing' ? 'is-testing' : ''}`}>
+  return <section className={`mizan-board-cell ${offline ? 'is-offline' : ''} ${slice.status === 'testing' ? 'is-testing' : ''} ${slice.stalled ? 'is-stalled' : ''}`}>
     <div className="flex items-center justify-between gap-2 min-w-0">
       <span className="shrink-0 w-11 h-11 rounded-xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums text-sm">{slice.code}</span>
       <span className="min-w-0 text-end">
@@ -146,19 +157,25 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     <div key={slice.nowCalling?.code || 'idle'} className={`rounded-2xl px-3 py-3 text-center ${slice.nowCalling ? 'mizan-call-arrive bg-white/[.06]' : ''}`}>
       <div className="text-[10px] font-black tracking-[.14em] mizan-venue-faint">{ar ? 'الآن' : 'NOW'}</div>
       {slice.nowCalling
-        ? <div className="mizan-board-code mt-1.5" dir="ltr">{slice.nowCalling.code}</div>
+        ? <div className="mizan-board-code mizan-code mt-1.5" dir="ltr">{slice.nowCalling.code}</div>
         : <div className="mt-2 mb-0.5 text-sm font-black mizan-venue-faint">{offline ? (ar ? 'متوقفة' : 'Offline') : (ar ? '—' : '—')}</div>}
     </div>
 
     <div className="flex items-center justify-between gap-2 text-[11px] border-t border-white/8 pt-2.5">
       <span className="mizan-venue-faint font-bold shrink-0">{ar ? 'التالي' : 'Next'}</span>
-      <span className="font-black tabular-nums truncate" dir="ltr">{slice.next[0]?.code || '—'}</span>
+      <span className="mizan-code truncate" dir="ltr">{slice.next[0]?.code || '—'}</span>
     </div>
+
+    {/* طول الطابور يُرى قبل أن يُقرأ. */}
+    <QueueRibbon total={slice.waitingCount} ar={ar} className="text-[#b9cec4] min-h-4" />
 
     <div className="flex items-center justify-between gap-2 text-[10px] mizan-venue-muted font-bold">
       <span>{ar ? `${slice.waitingCount} منتظرًا` : `${slice.waitingCount} waiting`}</span>
       <span className="truncate">{describeWait(slice.estimatedWaitMinutes, ar)}</span>
     </div>
+
+    {/* لجنةٌ شاغرة وأمامها منتظرون: عطبٌ تشغيليّ يُقال، لا حكمٌ على سرعة اللجنة. */}
+    {slice.stalled && <div className="text-[10px] font-black text-[#f0c9a0]">{ar ? 'شاغرة — لم يُنادَ أحد بعد' : 'Free — nobody called yet'}</div>}
   </section>;
 };
 

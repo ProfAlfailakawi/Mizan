@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MonitorX, UsersRound, X } from 'lucide-react';
+import { CheckCircle2, MonitorX, UsersRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { useScreenAwake } from '../../lib/use-screen-awake';
 import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
+import { QueueRibbon } from '../design-system/QueueRibbon';
 import { FreshnessLine } from './WaitingBoard';
 import {
   PANEL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describePanelStatus,
@@ -44,7 +45,11 @@ function writeStoredPanels(keys: string[]): void {
   try { window.localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(keys)) } catch { /* وضع خاص */ }
 }
 
-export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: number; onClose?: () => void }> = ({ panelKeys, rotateSeconds = 0, onClose }) => {
+/**
+ * `board` هو الإسقاط حين يأتي من وثيقةٍ منشورة — شاشةٌ بلا تسجيل دخول. وغيابه يعني
+ * جهازًا مصرَّحًا يبني إسقاطه من مخزنه. العدسة واحدة والمصدر مختلف.
+ */
+export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: number; board?: DisplayBoard; onClose?: () => void }> = ({ panelKeys, rotateSeconds = 0, board: externalBoard, onClose }) => {
   const venueRef = useRef<HTMLDivElement | null>(null);
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
   useScreenAwake(true);
@@ -60,7 +65,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
   useEffect(() => { if (panelKeys?.length) setChosen(panelKeys) }, [panelKeys?.join(',')]);
   const pick = (keys: string[]) => { setChosen(keys); writeStoredPanels(keys) };
 
-  const board: DisplayBoard = useMemo(() => buildDisplayBoard({
+  const localBoard: DisplayBoard = useMemo(() => buildDisplayBoard({
     competitionId: competition.id,
     competitionName: competition.name,
     competitionNameArabic: competition.nameArabic,
@@ -77,6 +82,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
     now,
   }), [competition, participants, committees, activeSession.committee, activeSession.durationSeconds, ar, now]);
 
+  const board = externalBoard || localBoard;
   const slices = useMemo(() => selectCommitteeSlices(board, chosen), [board, chosen]);
 
   /* التناوب حين تقلّ الشاشات عن اللجان: لجنتان على تلفازٍ واحد أشرف من نصف قاعةٍ بلا شاشة. */
@@ -97,7 +103,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
     </Shell>;
   }
 
-  const reciting = !!activeSession.isReciting && activeSession.committee?.id === slice.committeeId;
+  const reciting = !externalBoard && !!activeSession.isReciting && activeSession.committee?.id === slice.committeeId;
   const statusText = describePanelStatus(slice.status, reciting, ar);
   const live = slice.status === 'testing';
 
@@ -135,8 +141,9 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
         <div className="relative z-[1]">
           <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الآن' : 'NOW CALLING'}</div>
           {slice.nowCalling
-            ? <div className="mizan-call-code mt-4 sm:mt-6" dir="ltr">{slice.nowCalling.code}</div>
+            ? <div className="mizan-call-code mizan-code mt-4 sm:mt-6" dir="ltr">{slice.nowCalling.code}</div>
             : <div className="mt-8 sm:mt-12 mb-4 text-2xl sm:text-4xl font-black mizan-venue-faint">{ar ? 'لا يوجد استدعاء' : 'No active call'}</div>}
+          {slice.stalled && <div className="mt-5 text-sm font-black text-[#f0c9a0]">{ar ? 'اللجنة شاغرة — لم يُنادَ أحد بعد' : 'Panel is free — nobody called yet'}</div>}
           <div className="mt-6 sm:mt-9 inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/[.05] px-4 py-2">
             <span aria-hidden className={`w-2.5 h-2.5 rounded-full ${live ? 'bg-[#e8cb93]' : slice.status === 'offline' ? 'bg-[#8a5f55]' : 'bg-[#7fae9a]'} ${reciting ? 'mizan-call-live' : ''}`} />
             <span className="text-xs sm:text-sm font-black">{statusText}</span>
@@ -162,17 +169,22 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
           ? <ol className="flex flex-wrap items-center gap-2.5 sm:gap-4 mt-3">
               {slice.next.map((slot) => <li key={slot.code} className="flex items-center gap-2.5 rounded-2xl bg-white/[.06] px-3.5 py-2.5">
                 <span className="text-[11px] font-black mizan-venue-faint tabular-nums">{slot.position}</span>
-                <span className="mizan-board-next" dir="ltr">{slot.code}</span>
+                <span className="mizan-board-next mizan-code" dir="ltr">{slot.code}</span>
               </li>)}
             </ol>
           : <div className="py-4 text-sm font-bold mizan-venue-faint">{ar ? 'لا أحد في انتظار هذه اللجنة' : 'Nobody is waiting for this panel'}</div>}
+        {/* طول الطابور يُرى قبل أن يُقرأ: نقطةٌ لكل منتظر أمام هذا الباب. */}
+        <QueueRibbon total={slice.waitingCount} ar={ar} className="text-[#b9cec4] mt-3.5" />
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-[11px]">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 font-bold mizan-venue-muted">
           <span>{ar ? `${slice.waitingCount} في الانتظار` : `${slice.waitingCount} waiting`}</span>
           <span>{describeWait(slice.estimatedWaitMinutes, ar)}</span>
-          <span>{ar ? `أُنجز ${slice.completedCount}` : `${slice.completedCount} completed`}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span key={slice.completedCount} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-3.5 h-3.5" /></span>
+            {ar ? `أُنجز ${slice.completedCount}` : `${slice.completedCount} completed`}
+          </span>
         </div>
         <span className="mizan-venue-faint">{ar ? 'تُعرض الأكواد فقط احترامًا للخصوصية.' : 'Codes only, by design.'}</span>
       </div>

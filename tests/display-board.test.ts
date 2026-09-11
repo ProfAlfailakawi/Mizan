@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BOARD_LAGGING_MS, BOARD_STALE_MS, boardAge, buildDisplayBoard, categoryLine, categoryTagsFor,
-  describeAge, describePanelStatus, describeWait, parsePanelKeys, scopeLabelFor,
+  describeAge, describePanelStatus, describeWait, parseDisplayBoard, parsePanelKeys, scopeLabelFor,
   selectCommitteeSlice, selectCommitteeSlices,
 } from '../src/lib/display-board';
 import type { Category, Committee, Participant } from '../src/types';
@@ -325,4 +325,139 @@ test('active panels counts the ones actually testing', () => {
     ],
   });
   assert.equal(board.activePanels, 2);
+});
+
+/* ── اللجنة الشاغرة وأمامها منتظرون ─────────────────────────────────────── */
+
+test('a free panel with people waiting is flagged — that is a routing fault, not a slow panel', () => {
+  const busy = committee('busy', { currentParticipantId: 'p1', status: 'testing' });
+  const free = committee('free', { status: 'ready' });
+  const participants = [
+    participant({ id: 'p1', code: 'A-1', status: 'in_session' }),
+    participant({ id: 'p2', code: 'A-2', assignedCommitteeId: 'free', queueOrderKey: 2 }),
+  ];
+  const board = build({ participants, committees: [busy, free] });
+  assert.equal(selectCommitteeSlice(board, 'BUSY')?.stalled, false, 'a panel that is calling someone is not stalled');
+  assert.equal(selectCommitteeSlice(board, 'FREE')?.stalled, true, 'a free panel with a queue is');
+  assert.equal(board.stalledPanels, 1);
+});
+
+test('an idle panel with an empty queue is not stalled — it is simply free', () => {
+  const board = build({ committees: [committee('c1', { status: 'ready' })] });
+  assert.equal(board.committees[0].stalled, false);
+  assert.equal(board.stalledPanels, 0);
+});
+
+test('an offline panel is never called stalled — it is reported offline', () => {
+  const c = committee('c1', { status: 'offline' });
+  const participants = [participant({ id: 'p1', code: 'A-1', assignedCommitteeId: 'c1', queueOrderKey: 1 })];
+  const board = build({ participants, committees: [c] });
+  assert.equal(board.committees[0].stalled, false);
+  assert.equal(board.committees[0].status, 'offline');
+});
+
+test('the hall counts what it has finished today', () => {
+  const board = build({
+    committees: [committee('c1', { completedCount: 12 }), committee('c2', { completedCount: 9 }), committee('c3')],
+  });
+  assert.equal(board.totalCompleted, 21);
+});
+
+/* ── قراءة إسقاطٍ من وثيقةٍ عامة ────────────────────────────────────────── */
+
+test('a public projection is rebuilt from known fields — an injected name can never reach a screen', () => {
+  /* الوثيقة مكشوفة للقراءة وكاتبها مُصرَّح لا معصوم. فحقلٌ لم يُصمَّم يسقط بالبنية. */
+  const hostile = {
+    competitionId: 'comp-1',
+    generatedAt: new Date().toISOString(),
+    committees: [{
+      committeeId: 'c1', code: 'C1', status: 'testing',
+      nowCalling: { code: 'A-1', position: 0 },
+      participantName: 'عبدالله الفلاني',
+      questionText: 'سورة البقرة ١٢٥',
+      score: 98.5,
+      judgeNames: ['محكّم أول'],
+    }],
+  };
+  const parsed = parseDisplayBoard(hostile);
+  assert.ok(parsed);
+  const serialized = JSON.stringify(parsed);
+  assert.ok(!serialized.includes('عبدالله'), 'an injected name is not carried over');
+  assert.ok(!serialized.includes('البقرة'), 'nor an injected question');
+  assert.ok(!serialized.includes('98.5'), 'nor an injected score');
+  assert.ok(!serialized.includes('محكّم'), 'nor injected judge names');
+  assert.equal(parsed.committees[0].nowCalling?.code, 'A-1', 'what was designed still arrives');
+});
+
+test('privacy mode is enforced by the reader, never read from the document', () => {
+  const parsed = parseDisplayBoard({
+    competitionId: 'comp-1', generatedAt: new Date().toISOString(),
+    privacyMode: 'FULL_NAMES', committees: [],
+  });
+  assert.equal(parsed?.privacyMode, 'CODES_ONLY', 'a document cannot widen its own privacy');
+});
+
+test('a malformed projection is refused rather than half-rendered', () => {
+  assert.equal(parseDisplayBoard(null), null);
+  assert.equal(parseDisplayBoard('board'), null);
+  assert.equal(parseDisplayBoard({}), null, 'no competition id');
+  assert.equal(parseDisplayBoard({ competitionId: 'comp-1' }), null, 'no generated-at stamp');
+  assert.equal(parseDisplayBoard({ competitionId: 'comp-1', generatedAt: 'yesterday' }), null, 'unreadable stamp');
+});
+
+test('wrong types degrade to safe values instead of reaching the DOM', () => {
+  const parsed = parseDisplayBoard({
+    competitionId: 'comp-1', generatedAt: new Date().toISOString(),
+    totalWaiting: 'many', activePanels: -4, totalCompleted: 1.9,
+    committees: [
+      { committeeId: 'c1', code: 'C1', status: 'exploded', waitingCount: -3, averageSessionMinutes: 0, next: 'nope', categories: 'nope' },
+      { code: 'C2' },
+      'not-an-object',
+    ],
+  });
+  assert.ok(parsed);
+  assert.equal(parsed.totalWaiting, 0, 'a non-numeric count is zero, not NaN');
+  assert.equal(parsed.activePanels, 0, 'a negative count is zero');
+  assert.equal(parsed.totalCompleted, 1, 'a fractional count is floored');
+  assert.equal(parsed.committees.length, 1, 'entries without an id are dropped');
+  assert.equal(parsed.committees[0].status, 'ready', 'an unknown status falls back to a known one');
+  assert.equal(parsed.committees[0].waitingCount, 0);
+  assert.ok(parsed.committees[0].averageSessionMinutes >= 1, 'never zero, so no division by zero downstream');
+  assert.deepEqual(parsed.committees[0].next, []);
+  assert.deepEqual(parsed.committees[0].categories, []);
+});
+
+test('a published board survives the round trip it was designed for', () => {
+  const committees = [committee('c1', { currentParticipantId: 'p1', status: 'testing', completedCount: 4 }), committee('c2')];
+  const participants = [
+    participant({ id: 'p1', code: 'A-1', status: 'in_session' }),
+    participant({ id: 'p2', code: 'A-2', assignedCommitteeId: 'c1', queueOrderKey: 2 }),
+    participant({ id: 'p3', code: 'A-3', assignedCommitteeId: 'c2', queueOrderKey: 3 }),
+  ];
+  const original = build({ participants, committees, categories: [category('cat-1')] });
+  /* JSON هو ما يعبر فايرستور فعلًا؛ الاختبار يعبره لا يتخطّاه. */
+  const parsed = parseDisplayBoard(JSON.parse(JSON.stringify(original)));
+  assert.ok(parsed);
+  assert.equal(parsed.committees.length, 2);
+  assert.equal(parsed.committees[0].nowCalling?.code, 'A-1');
+  assert.deepEqual(parsed.committees[0].next.map((x) => x.code), ['A-2']);
+  assert.equal(parsed.committees[0].categories[0]?.label, 'القرآن كامل');
+  assert.equal(parsed.totalCompleted, original.totalCompleted);
+  assert.equal(parsed.stalledPanels, original.stalledPanels);
+});
+
+test('an oversized document is bounded, so one screen cannot be flooded', () => {
+  const parsed = parseDisplayBoard({
+    competitionId: 'comp-1', generatedAt: new Date().toISOString(),
+    competitionNameArabic: 'م'.repeat(5000),
+    committees: Array.from({ length: 500 }, (_, i) => ({
+      committeeId: `c${i}`, code: 'C'.repeat(300),
+      next: Array.from({ length: 200 }, (_, n) => ({ code: `A-${n}`, position: n })),
+    })),
+  });
+  assert.ok(parsed);
+  assert.ok(parsed.committees.length <= 64, 'panel count is capped');
+  assert.ok(parsed.competitionNameArabic.length <= 200, 'text length is capped');
+  assert.ok(parsed.committees[0].code.length <= 24);
+  assert.ok(parsed.committees[0].next.length <= 12);
 });

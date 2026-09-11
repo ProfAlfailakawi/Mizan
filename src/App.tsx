@@ -8,6 +8,7 @@ import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
 import { useIdleSignOut } from './lib/useIdleSignOut';
 import { useOpsHeartbeat } from './lib/ops-heartbeat';
+import { useBoardPublisher } from './lib/use-board-publisher';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { TotpSecurity } from './components/auth/TotpSecurity';
 import { auth } from './lib/firebase';
@@ -17,7 +18,7 @@ import { fetchTenant } from './lib/tenant';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
 import { hostSurface } from './lib/host-surface';
-import { parsePanelKeys } from './lib/display-board';
+import { parsePanelKeys, type DisplayBoard } from './lib/display-board';
 
 /*
  * Route-level code splitting.
@@ -163,24 +164,81 @@ const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;committeeBoard:
 };
 
 /*
- * شاشة اللجنة حين تُفتح برابطٍ لا بطبقة.
+ * شاشات القاعة حين تُفتح برابطٍ لا بطبقة.
  *
- * نفس قفل القاعة: مفتوحةً لها زرُّ قفلٍ وزرُّ خروج، ومقفولةً لا مخرج لها إلا الإيماءة
- * الخفيّة ثم الرمز. جهازٌ معلَّقٌ في ممرّ لا يُترك بزرِّ خروجٍ يضغطه أيُّ مارّ.
+ * هذا المسار هو ما يجعل الشاشة **بلا امتياز**: تقرأ إسقاطًا منشورًا بالأكواد وحدها، بلا
+ * حساب ولا جلسة. والبديل — أن يُسجَّل جهاز عرضٍ بدورٍ تشغيليّ — يعطي تلفازًا في ممرّ
+ * صلاحيةَ قراءةِ سجلّ المتسابقين كاملًا.
+ *
+ * وجهازٌ مصرَّح فتح الرابط لا يُحرم: إن لم يجد إسقاطًا منشورًا بنى إسقاطه من مخزنه.
+ *
+ * والقفل هو قفل القاعة نفسه: مفتوحةً لها زرّ خروج، ومقفولةً لا مخرج إلا الإيماءة الخفيّة
+ * ثم الرمز — جهازٌ معلَّقٌ في ممرّ لا يُترك بزرّ خروجٍ يضغطه أيُّ مارّ.
  */
-const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;onExit:()=>void}>=({panelKeys,rotateSeconds,onExit})=>{
- const {language}=useAppStore(); const ar=language!=='en';
+const BOARD_POLL_MS = 5_000;
+
+const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;competitionId:string|null;hallView:boolean;onExit:()=>void}>=({panelKeys,rotateSeconds,competitionId,hallView,onExit})=>{
+ const {language,competition,loadPublicDisplayBoard}=useAppStore(); const ar=language!=='en';
  const {lock,apply}=useVenueLockState();
+ const targetId=competitionId||competition.id;
+ const [published,setPublished]=useState<DisplayBoard|null>(null);
+ const [probed,setProbed]=useState(false);
+
+ /* استطلاعٌ دوري بدل اشتراكٍ لحظي: الاشتراك المجهول يفتح اتصالًا دائمًا لكل شاشة، والفارق
+    على لوحة نداءٍ ثوانٍ لا تُلحظ. */
+ useEffect(()=>{
+  let cancelled=false;
+  const pull=async()=>{
+   const board=await loadPublicDisplayBoard(targetId);
+   if(cancelled)return;
+   /* إخفاقٌ عابر لا يمسح ما يُعرض: تبقى آخر نسخة معروفة ويُعلن عمرها وحده. */
+   if(board)setPublished(board);
+   setProbed(true);
+  };
+  void pull();
+  const t=setInterval(()=>void pull(),BOARD_POLL_MS);
+  return()=>{cancelled=true;clearInterval(t)};
+ },[targetId,loadPublicDisplayBoard]);
+
  const locked=!!lock;
  const lockSurface=async(next:Parameters<typeof apply>[0])=>{apply(next);try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen()}catch{/* قد يرفض سفاري ملء الشاشة؛ الشاشة تعمل بلا زخرفة التطبيق. */}};
  const unlockSurface=()=>{apply(null);if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
+ const exit=locked?undefined:onExit;
+ const surface=hallView?VENUE_LABEL.waitingBoard:VENUE_LABEL.committeeBoard;
+
+ /* لا إسقاط منشورًا ولا مخزنَ مسابقةٍ مطابقًا ⇒ قل السبب بدل عرض مسابقةٍ أخرى. */
+ const canFallBackToStore=competition.id===targetId;
+ if(!published&&probed&&!canFallBackToStore) return <BoardUnavailable ar={ar} competitionId={targetId} onExit={onExit}/>;
+ if(!published&&!probed&&!canFallBackToStore) return <OverlayFallback/>;
+
  return <>
-  <Overlay><CommitteeDisplay panelKeys={panelKeys} rotateSeconds={rotateSeconds} onClose={locked?undefined:onExit}/></Overlay>
+  <Overlay>
+   {hallView
+    ? <WaitingBoard board={published||undefined} onClose={exit}/>
+    : <CommitteeDisplay panelKeys={panelKeys} rotateSeconds={rotateSeconds} board={published||undefined} onClose={exit}/>}
+  </Overlay>
   {locked
    ? <VenueUnlockGuard lock={lock} ar={ar} onUnlocked={unlockSurface}/>
-   : <div className="fixed bottom-4 inset-x-0 z-[80] flex justify-end px-4 pointer-events-none"><div className="pointer-events-auto"><VenueLockButton surface={VENUE_LABEL.committeeBoard} ar={ar} onLocked={next=>void lockSurface(next)}/></div></div>}
+   : <div className="fixed bottom-4 inset-x-0 z-[80] flex justify-end px-4 pointer-events-none"><div className="pointer-events-auto"><VenueLockButton surface={surface} ar={ar} onLocked={next=>void lockSurface(next)}/></div></div>}
  </>;
 };
+
+/** لا شيء يُعرض، فيُقال السبب وما يُفعل — لا شاشة سوداء يقف أمامها المشرف حائرًا. */
+const BoardUnavailable:React.FC<{ar:boolean;competitionId:string;onExit:()=>void}>=({ar,competitionId,onExit})=>(
+ <div className="fixed inset-0 z-50 mizan-venue-2 text-white font-arabic grid place-items-center p-6">
+  <div className="max-w-md text-center">
+   <MizanLogo language="ar" tone="inverse" compact/>
+   <h1 className="text-xl font-black mt-6">{ar?'لم تُنشر شاشة هذه المسابقة بعد':'This competition has no published board yet'}</h1>
+   <p className="text-xs mizan-venue-muted mt-3 leading-6">
+    {ar
+     ?'تُنشر الشاشة من جهاز إدارة المسابقة وهي مفتوحة. افتح المسابقة من جهاز الإدارة، ثم ستظهر هذه الشاشة وحدها بلا إعادة تحميل.'
+     :'The board is published from the competition console while it is open. Open it there and this screen fills in on its own.'}
+   </p>
+   <p className="text-[10px] mizan-venue-faint mt-4 font-mono break-all">{competitionId}</p>
+   <button type="button" onClick={onExit} className="mt-6 min-h-11 px-5 rounded-2xl bg-white/10 text-xs font-black">{ar?'رجوع':'Back'}</button>
+  </div>
+ </div>
+);
 
 const Page: React.FC<{children: React.ReactNode}> = ({children}) => <><PersistenceAlert/><Suspense fallback={<ViewFallback/>}>{children}</Suspense></>;
 const Overlay: React.FC<{children: React.ReactNode}> = ({children}) => <Suspense fallback={<OverlayFallback/>}>{children}</Suspense>;
@@ -203,15 +261,25 @@ const compParam = (h: string): string | null => {
  * الرابط هو ما يجعل الشاشة تعود وحدها. أسطح القاعة الأخرى تُفتح طبقةً بيد موظّفٍ مسجّل،
  * فإذا انقطعت الكهرباء عن تلفازٍ في الممر لم يعد إلى شيء. وهذه تعود إلى لجنتها بلا أحد.
  */
-const boardParams = (h: string): { panelKeys: string[]; rotateSeconds: number } => {
+type BoardParams = { panelKeys: string[]; rotateSeconds: number; competitionId: string | null; hallView: boolean };
+const boardParams = (h: string): BoardParams => {
+  const empty: BoardParams = { panelKeys: [], rotateSeconds: 0, competitionId: null, hallView: true };
   const i = h.indexOf('?');
-  if (i === -1) return { panelKeys: [], rotateSeconds: 0 };
+  if (i === -1) return empty;
   try {
     const q = new URLSearchParams(h.slice(i + 1));
     const rotate = Number(q.get('rotate'));
-    /* تناوبٌ أسرع من خمس ثوانٍ لا يُقرأ على شاشةِ قاعة، فيُهمل بدل أن يُطبَّق. */
-    return { panelKeys: parsePanelKeys(q.get('panel')), rotateSeconds: Number.isFinite(rotate) && rotate >= 5 ? rotate : 0 };
-  } catch { return { panelKeys: [], rotateSeconds: 0 }; }
+    const panelKeys = parsePanelKeys(q.get('panel'));
+    const view = String(q.get('view') || '').toLowerCase();
+    return {
+      panelKeys,
+      /* تناوبٌ أسرع من خمس ثوانٍ لا يُقرأ على شاشةِ قاعة، فيُهمل بدل أن يُطبَّق. */
+      rotateSeconds: Number.isFinite(rotate) && rotate >= 5 ? rotate : 0,
+      competitionId: q.get('comp'),
+      /* لجنةٌ مسمّاة أو طلبٌ صريح للوحة اللجنة ⇒ عدسة اللجنة؛ وإلا فالقاعة كلها. */
+      hallView: view === 'hall' ? true : !(panelKeys.length || view === 'panel'),
+    };
+  } catch { return empty; }
 };
 /* شاشة تظهر حين يحمل الرابط معرّف مسابقة غير موجودة: تقول الحقيقة بدل أن تُسقط الزائر على مسابقة أخرى. */
 const CompetitionNotFound: React.FC = () => (
@@ -227,7 +295,8 @@ const CompetitionNotFound: React.FC = () => (
 const TenantSuspendedScreen:React.FC<{language:string}>=({language})=>{const ar=language==='ar';return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5" dir={ar?'rtl':'ltr'}><div className="mizan-surface max-w-lg p-8 sm:p-10 text-center"><div className="flex justify-center"><MizanLogo language={ar?'ar':'en'} compact/></div><div className="mizan-kicker mt-6">{ar?'حالة الجهة':'ORGANIZATION STATUS'}</div><h1 className="text-2xl font-black mt-2">{ar?'تم إيقاف وصول هذه الجهة مؤقتًا':'Organization access is temporarily suspended'}</h1><p className="text-sm text-[#636864] leading-7 mt-4">{ar?'بيانات الجهة ومسابقاتها محفوظة بالكامل، لكن الوصول التشغيلي متوقف حاليًا. يرجى التواصل مع إدارة المنصة.':'All organization data remains محفوظة; operational access is temporarily unavailable. Please contact the platform administrator.'}</p></div></div>};
 
 export default function App() {
- const {currentUser,competitions,switchRole,selectCompetition,loadPublicCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand,isOffline:storeIsOffline,persistenceError:activePersistenceError,competition:activeCompetition}=useAppStore();
+ const store=useAppStore();
+ const {currentUser,competitions,switchRole,selectCompetition,loadPublicCompetition,accessibilityProfiles,ensureAccessibilityProfile,language,updateOrganizationBrand,isOffline:storeIsOffline,persistenceError:activePersistenceError,competition:activeCompetition}=store;
  const activeCompetitionId=activeCompetition?.id;
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
@@ -238,6 +307,9 @@ export default function App() {
  const marketing=requireAuth&&hostSurface()==='marketing';
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationFromQr,activationMessage,activateAccount,takeoverSession}=useMizanAuth(requireAuth);
  const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
+ /* جهازٌ واحد مصرَّح ينشر ما تعرضه كل شاشات القاعة، فتبقى الشاشات بلا حساب ولا امتياز.
+    الأهلية تُفحص داخل المخزن، فالنداء هنا غير مشروط ولا يخالف ترتيب الخطّافات. */
+ useBoardPublisher(signedIn, store);
  /* تعثّر المستخدم كان يموت عند شاشته: يُعرض له ولا يبلغ أحدًا. هذه النبضة تُعلم لوحة
     المالك بالجلسات المتعثّرة والصامتة، ولا تعطّل شيئًا إن تعذّرت أو لم يُهيَّأ التتبّع. */
  useOpsHeartbeat({
@@ -312,12 +384,17 @@ export default function App() {
  // التحقق من الشهادة خدمة عامة بالكامل ولا تمر ببوابة الموظفين.
  if(hash.startsWith('#verify')) return <div className="min-h-screen text-[#171b18] font-arabic"><Page><CertificateVerification/></Page>{demoMode&&<DemoReturn onReturn={()=>{window.location.hash='';setExperienceHome(true)}}/>}</div>;
  if(requireAuth&&accessError) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5"><div className="mizan-surface p-7 max-w-md w-full text-center"><div className="flex justify-center mb-4"><MizanLogo language="ar" compact/></div><div className="mizan-kicker">حوكمة الوصول</div><h1 className="text-xl font-black mt-2">{accessError==='MFA_REQUIRED'?'يلزم تحقق إضافي لهذا الحساب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'الحساب مفتوح على جهاز حساس آخر':'الحساب غير مفوض'}</h1><p className="text-xs text-[#636864] mt-3 leading-6">{accessError==='MFA_REQUIRED'?'حساب مالك المنصة محمي بالتحقق بخطوتين. إذا لم تربط Authenticator بعد، أكمل التفعيل هنا دون تسجيل الخروج.':accessError==='PRIVILEGED_SESSION_CONFLICT'?'منع ميزان جلسة متزامنة لهذا الدور. يمكن لصاحب الصلاحية إغلاق الجلسة القديمة ثم المتابعة بأمان.':(accessError==='ACCOUNT_NOT_PROVISIONED'||accessError==='ACCOUNT_CLAIMS_REQUIRED')?'الهوية صحيحة، لكن الحساب يحتاج تفعيل الدعوة التي أرسلها مدير جهتك. إذا وصلك رمز أو QR تفعيل، أكمل التفعيل من هنا قبل الدخول.':'هويتك صحيحة، وتعذّر على ميزان تأكيد صلاحيتها الآن. أعد المحاولة بعد قليل، فإن تكرّر فاطلب من مدير جهتك إغلاق جلساتك السابقة من «الفريق والصلاحيات».'}</p>{accessError==='MFA_REQUIRED'&&<div className="mt-6 text-start"><TotpSecurity bootstrap/></div>}{(accessError==='ACCOUNT_NOT_PROVISIONED'||accessError==='ACCOUNT_CLAIMS_REQUIRED')&&<div className="mt-5 text-start">{activationFromQr?<div className="rounded-2xl bg-[#E7EEE9] text-[#214C40] p-4 text-xs font-bold leading-6 text-center">{activationMessage==='ACTIVATING'?'تمت قراءة QR — جارٍ ربط الحساب بالدعوة…':'تمت قراءة QR التفعيل. سيُربط الحساب تلقائيًا بالبريد المدعو.'}</div>:<><label className="text-[10px] font-black text-[#616763]">رمز التفعيل الاحتياطي</label><input value={activationToken} onChange={e=>setActivationToken(e.target.value)} className="mizan-input mt-2" placeholder="ألصق الرمز فقط إذا تعذر مسح QR"/><button onClick={()=>void activateAccount()} className="mt-3 w-full rounded-xl bg-[#214C40] text-white py-2.5 text-xs font-black">تفعيل الحساب</button></>}{activationMessage&&activationMessage!=='ACTIVATING'&&<div className="mt-2 text-[10px] text-center text-[#656b66]">{activationMessage==='ACTIVATED'?'تم تفعيل الحساب':activationMessage==='ACTIVATION_FAILED'?'تعذر تفعيل الحساب':activationMessage}</div>}</div>}<div className="text-[10px] text-[#696f6b] mt-3">{accessError==='MFA_REQUIRED'?'تحقق إضافي مطلوب':accessError==='PRIVILEGED_SESSION_CONFLICT'?'تعارض جلسة حساسة':accessError==='ACCOUNT_NOT_PROVISIONED'||accessError==='ACCOUNT_CLAIMS_REQUIRED'?'الحساب بانتظار التفعيل':'تعذر التحقق من صلاحية الحساب'}</div>{accessError==='PRIVILEGED_SESSION_CONFLICT'&&<button onClick={()=>{void takeoverSession()}} className="mt-6 w-full rounded-2xl bg-[#214C40] text-white text-sm font-black py-3">متابعة هنا وإغلاق الجلسة الأخرى</button>}{accessError!=='MFA_REQUIRED'&&<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="mt-5 text-xs font-bold text-[#214C40]">تسجيل الخروج</button>}</div></div>;
+ /*
+  * شاشات القاعة برابطها — قبل بوابة الدخول عمدًا.
+  *
+  * جهاز العرض المعلّق في ممرّ لا يملك حسابًا ولا ينبغي أن يملكه: يقرأ إسقاطًا منشورًا
+  * بالأكواد وحدها. ولو وقع هذا المسار بعد البوابة لطالبت شاشةَ تلفازٍ بتسجيل دخول.
+  */
+ if(hash.startsWith('#board')) return <BoardRoute {...boardParams(hash)} onExit={()=>{window.location.hash='';setHash('')}}/>;
  if(requireAuth&&!signedIn) return <AuthPortal/>;
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  const returnToExperience=()=>{window.location.hash='';setHash('');setExperienceHome(true)};
  if(hash.startsWith('#trust-verify')) return <><Page><TrustVerification/></Page>{demoMode&&<DemoReturn onReturn={returnToExperience}/>}</>;
- /* شاشة اللجنة برابطها: تسبق صفحة التجربة واختيار الدور، فجهاز العرض لا يمرّ بواجهة موظّف. */
- if(hash.startsWith('#board')) return <BoardRoute {...boardParams(hash)} onExit={returnToExperience}/>;
  if(demoMode&&experienceHome) return <><Page><ExperienceHub onEnterRole={(role)=>{switchRole(role);setExperienceHome(false)}} onOpenKiosk={()=>setKiosk(true)} onOpenCeremony={()=>setCeremony(true)} onOpenWaiting={()=>setWaitingBoard(true)} onOpenHall={()=>setHallMap(true)}/></Page><VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/></>;
  const competitionClosed=['completed','archived'].includes((competitions.find(c=>c.id===requestedComp)||competitions[0])?.status||'');
  const operationalRoles=['comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','participant','broadcast_operator','guardian','support_agent'];

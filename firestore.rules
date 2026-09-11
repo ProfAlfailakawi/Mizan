@@ -84,6 +84,37 @@ service cloud.firestore {
         && (platformAdmin() || resource.data.organizationId == request.auth.token.org_id);
     }
 
+    /*
+     * إسقاط شاشات القاعة. أكوادٌ وحالاتُ لجانٍ فقط — لا اسم ولا سؤال ولا درجة.
+     *
+     * القراءة عامة عن قصد: شاشة القاعة وشاشة اللجنة تُعلَّق على تلفازٍ في ممرّ، والبديل
+     * أن يُسجَّل جهازُ عرضٍ بدورٍ تشغيليّ فيملك قراءة سجلّ المتسابقين كاملًا — صلاحيةٌ
+     * كاملة على جهازٍ بلا حارس. والمعروض هنا هو عين ما ينادي به المنادي صوتًا في القاعة.
+     *
+     * والكتابة مقصورة على من يدير المسابقة فعلًا، ومقيّدة بثلاثة شروط في القاعدة نفسها:
+     * أن تكون الوثيقة لهذه المسابقة، وأن تُعلن وضع الأكواد صراحةً، وألّا تُنقل الوثيقة
+     * إلى جهةٍ أخرى بتحديث.
+     */
+    match /public_boards/{competitionId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin','ops_manager'])
+        && competitionId != 'comp-pending-setup'
+        && scoped(request.resource.data.organizationId, competitionId)
+        && request.resource.data.board.competitionId == competitionId
+        && request.resource.data.board.privacyMode == 'CODES_ONLY';
+      allow update: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin','ops_manager'])
+        && scoped(request.resource.data.organizationId, competitionId)
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.board.competitionId == competitionId
+        && request.resource.data.board.privacyMode == 'CODES_ONLY';
+      // انتهت المسابقة أو أُوقفت الشاشات ⇒ تُحذف الوثيقة فتنطفئ كل الشاشات دفعةً واحدة.
+      allow delete: if signedIn()
+        && roleIs(['super_admin','org_admin','comp_admin'])
+        && sameOrg(resource.data.organizationId);
+    }
+
     // Capability-link journey projection. The key is the hash of an opaque random token.
     // A stale document is still unreadable after the competition closes, even if a client
     // failed to write revoked=true before the root competition status changed.

@@ -65,6 +65,11 @@ export interface CommitteeBoardSlice {
   next: BoardCallSlot[];
   waitingCount: number;
   completedCount: number;
+  /**
+   * لجنةٌ شاغرة وأمامها منتظرون. عطبٌ تشغيليّ حقيقي — لا حكمٌ على سرعة اللجنة: النظام
+   * يحظر ترتيب اللجان بالسرعة، وهذا يقول «أحدٌ لم يُنادَ» لا «هذه اللجنة بطيئة».
+   */
+  stalled: boolean;
   averageSessionMinutes: number;
   /** تقدير، لا وعد. يُعرض مقرونًا بكلمة «تقريبًا». */
   estimatedWaitMinutes: number;
@@ -87,6 +92,10 @@ export interface DisplayBoard {
    */
   unassignedWaiting: number;
   activePanels: number;
+  /** ما أنجزته القاعة كلها اليوم. الانتظار يصير تقدّمًا حين يُرى مجموعه. */
+  totalCompleted: number;
+  /** لجانٌ شاغرة وأمامها منتظرون — يراها المشرف قبل أن يشتكي أحد. */
+  stalledPanels: number;
 }
 
 /* ── الفئة ───────────────────────────────────────────────────────────────── */
@@ -212,6 +221,7 @@ export function buildDisplayBoard(input: DisplayBoardInput): DisplayBoard {
       next: queue.slice(0, depth).map((p, i) => ({ code: p.code, position: i + 1 })),
       waitingCount: queue.length,
       completedCount: Math.max(0, Number(c.completedCount) || 0),
+      stalled: !current && queue.length > 0 && c.status !== 'offline',
       averageSessionMinutes: avg,
       estimatedWaitMinutes: Math.round(queue.length * avg + remainingMinutes),
     };
@@ -228,6 +238,8 @@ export function buildDisplayBoard(input: DisplayBoardInput): DisplayBoard {
     totalWaiting: waiting.length,
     unassignedWaiting,
     activePanels: panels.filter((c) => c.status === 'testing').length,
+    totalCompleted: slices.reduce((sum, c) => sum + c.completedCount, 0),
+    stalledPanels: slices.filter((c) => c.stalled).length,
   };
 }
 
@@ -318,4 +330,89 @@ export function describePanelStatus(status: Committee['status'], reciting: boole
   if (status === 'paused') return 'موقوفة مؤقتًا';
   if (status === 'testing') return reciting ? 'تحت التلاوة' : 'الجلسة جارية';
   return 'جاهزة لاستقبال التالي';
+}
+
+/* ── القراءة من مصدرٍ خارجي ──────────────────────────────────────────────── */
+
+/*
+ * إسقاطٌ يُقرأ من وثيقةٍ عامة لا يُصدَّق كما جاء.
+ *
+ * شاشة القاعة تقرأ `public_boards/{competitionId}` بلا تسجيل دخول، فالوثيقة مكشوفة
+ * للقراءة. والكاتب مُصرَّح له، لكن «مُصرَّح» ليست «معصوم»: جهازٌ مخترق، أو إصدارٌ أقدم
+ * يكتب حقولًا زائدة، أو خطأٌ في النشر — كلّها تصل الشاشة.
+ *
+ * فالمُحلِّل هنا **يعيد بناء** الإسقاط من الحقول المعروفة وحدها بأنواعها، ولا ينسخ ما جاء.
+ * وأثرُه أن حقلًا لم يُصمَّم — اسمًا، سؤالًا، درجة — لا يمكن أن يصل الشاشة ولو كُتب في
+ * الوثيقة: ليس له مكانٌ في البناء الجديد فيسقط صامتًا. المنعُ بالبنية لا بالثقة.
+ */
+
+const asText = (v: unknown, max = 200): string => (typeof v === 'string' ? v.slice(0, max) : '');
+const asCount = (v: unknown): number => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+};
+const PANEL_STATUSES: Committee['status'][] = ['ready', 'testing', 'paused', 'offline'];
+
+function parseSlot(raw: unknown): BoardCallSlot | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const code = asText((raw as Record<string, unknown>).code, 40);
+  return code ? { code, position: asCount((raw as Record<string, unknown>).position) } : undefined;
+}
+
+function parseSlice(raw: unknown): CommitteeBoardSlice | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const committeeId = asText(r.committeeId, 80);
+  if (!committeeId) return null;
+  const status = PANEL_STATUSES.includes(r.status as Committee['status']) ? (r.status as Committee['status']) : 'ready';
+  return {
+    committeeId,
+    code: asText(r.code, 24),
+    name: asText(r.name, 120),
+    nameArabic: asText(r.nameArabic, 120),
+    venueHall: asText(r.venueHall, 120),
+    status,
+    categories: (Array.isArray(r.categories) ? r.categories : []).slice(0, 24).flatMap((t) => {
+      if (!t || typeof t !== 'object') return [];
+      const tag = t as Record<string, unknown>;
+      const id = asText(tag.id, 80);
+      return id ? [{ id, code: asText(tag.code, 24), label: asText(tag.label, 120), scopeLabel: asText(tag.scopeLabel, 60) }] : [];
+    }),
+    nowCalling: parseSlot(r.nowCalling),
+    next: (Array.isArray(r.next) ? r.next : []).slice(0, 12).flatMap((x) => { const s = parseSlot(x); return s ? [s] : [] }),
+    waitingCount: asCount(r.waitingCount),
+    completedCount: asCount(r.completedCount),
+    stalled: r.stalled === true,
+    averageSessionMinutes: Math.max(MIN_SESSION_MINUTES, asCount(r.averageSessionMinutes)),
+    estimatedWaitMinutes: asCount(r.estimatedWaitMinutes),
+  };
+}
+
+/** يعيد إسقاطًا نظيفًا، أو `null` حين لا يكون ما جاء إسقاطًا أصلًا. */
+export function parseDisplayBoard(raw: unknown): DisplayBoard | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const competitionId = asText(r.competitionId, 80);
+  const generatedAt = asText(r.generatedAt, 40);
+  if (!competitionId || !Number.isFinite(Date.parse(generatedAt))) return null;
+
+  const committees = (Array.isArray(r.committees) ? r.committees : [])
+    .slice(0, 64)
+    .flatMap((c) => { const s = parseSlice(c); return s ? [s] : [] });
+
+  return {
+    version: DISPLAY_BOARD_VERSION,
+    competitionId,
+    competitionName: asText(r.competitionName, 200),
+    competitionNameArabic: asText(r.competitionNameArabic, 200),
+    generatedAt,
+    /* الخصوصية تُفرَض هنا، ولا تُقرأ من الوثيقة: قيمةٌ أخرى مكتوبةً لا تفتح بابًا. */
+    privacyMode: 'CODES_ONLY',
+    committees,
+    totalWaiting: asCount(r.totalWaiting),
+    unassignedWaiting: asCount(r.unassignedWaiting),
+    activePanels: asCount(r.activePanels),
+    totalCompleted: asCount(r.totalCompleted),
+    stalledPanels: committees.filter((c) => c.stalled).length,
+  };
 }

@@ -1211,3 +1211,57 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 }
 html[data-mizan-motion="reduced"] .mizan-call-arrive,
 html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
+
+/*
+ * الأكواد بخطٍّ غير خطّ العناوين.
+ *
+ * كانت الشاشة كلّها بخطٍّ عربيٍّ واحد بأوزان — فالكود `A-104` والعنوان «قاعة الانتظار»
+ * يُقرآن كنسيجٍ واحد، والعين تبحث عن الرقم بدل أن يقع عليها. والمصحف الذي يحفظه هؤلاء
+ * قائمٌ على تباينٍ بصريٍّ دقيق بين المتن وما حوله؛ هذا أقلّ ما يُقتبس منه.
+ *
+ * العناوين تبقى على خطّ الواجهة العربي، والأكواد على خطٍّ هندسيّ لاتينيّ بأرقامٍ متساوية
+ * العرض — فلا يرتجف السطر حين يتغيّر الرقم، ويصير الكود شيئًا تراه لا شيئًا تقرؤه.
+ */
+.mizan-code{
+  font-family:var(--font-sans);
+  font-variant-numeric:tabular-nums lining-nums;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+  font-weight:800;
+}
+
+/*
+ * شريط الطابور.
+ *
+ * الرقم يقول «أمامك ثلاثة»؛ والشريط يجعلها تُرى. نقطةٌ لكل منتظر، والمسافة بصرية لا
+ * حسابية — فيفهم الواقف موقعه في لحظةٍ دون أن يقرأ. وطابورٌ طويل لا يُرسم كلّه: تُرسم
+ * أوائله ويُقال كم بقي، فالشريط يبقى مقروءًا عند العشرة وعند المئة.
+ */
+.mizan-queue-ribbon{ display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+.mizan-queue-dot{
+  width:.5rem; height:.5rem; border-radius:999px; flex:0 0 auto;
+  background:currentColor; opacity:.28;
+}
+.mizan-queue-dot.is-next{ opacity:.85; width:.72rem; height:.72rem; }
+.mizan-queue-dot.is-you{
+  width:.95rem; height:.95rem; opacity:1;
+  background:var(--gold-light); box-shadow:0 0 0 3px rgba(232,203,147,.22);
+}
+
+/*
+ * اللجنة الشاغرة وأمامها منتظرون.
+ *
+ * عطبٌ تشغيليّ لا حكمٌ على سرعة اللجنة — النظام يحظر ترتيب اللجان بالسرعة. فالنبض هنا
+ * يقول «أحدٌ لم يُنادَ» ليراه المشرف قبل أن يشتكي أحد، وهو هادئٌ بطيء لا ينافس النداء.
+ */
+@keyframes mzStallBreathe{ 0%,100%{ border-color:rgba(240,201,160,.20) } 50%{ border-color:rgba(240,201,160,.55) } }
+.mizan-board-cell.is-stalled{ animation:mzStallBreathe 3.6s ease-in-out infinite; }
+
+/* لحظة الإنجاز: ومضةٌ خضراء هادئة حين يُنهي متسابقٌ جلسته. الانتظار يصير تقدّمًا. */
+@keyframes mzDoneMark{ 0%{ opacity:0; transform:scale(.7) } 30%{ opacity:1; transform:scale(1) } 100%{ opacity:0; transform:scale(1) } }
+.mizan-done-mark{ animation:mzDoneMark 2.6s var(--ease-brand) 1 both; }
+
+@media (prefers-reduced-motion: reduce){
+  .mizan-board-cell.is-stalled, .mizan-done-mark{ animation:none !important; }
+}
+html[data-mizan-motion="reduced"] .mizan-board-cell.is-stalled,
+html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
