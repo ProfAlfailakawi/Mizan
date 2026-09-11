@@ -25,11 +25,25 @@ const decodeValue=(value:FirestoreValue):unknown=>{
 };
 const decodeFields=(fields:Record<string,FirestoreValue>)=>Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,decodeValue(v)]));
 
+/*
+ * قاعدة العنوان: السحابة، أو المحاكي حين يُعلَن.
+ *
+ * `FIRESTORE_EMULATOR_HOST` اصطلاحٌ تتبعه حزم Google الرسمية كلها. واتّباعه هنا يفتح بابين:
+ * أن يعمل المطوّر بلا اعتماد سحابي، وأن يُختبر هذا المُهايئ نفسه — ترميزُ الحقول، وذرّيةُ
+ * الكتابة، وترجمةُ رموز الخطأ — على خادمٍ حقيقي بدل أن يبقى الجزء الوحيد الذي لا يمسّه فحص.
+ *
+ * ولا يُفتح الباب إلا بإعلان صريح: غياب المتغيّر يعني السحابة، فلا يُهبَط إلى محاكٍ صدفةً.
+ */
+export function firestoreRestRoot(projectId:string,databaseId:string,emulatorHost=process.env.FIRESTORE_EMULATOR_HOST){
+  const base=emulatorHost?`http://${emulatorHost}/v1`:'https://firestore.googleapis.com/v1';
+  return `${base}/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents`;
+}
+
 export class FirestoreRestRepository{
   private readonly root:string;
   constructor(private readonly projectId:string,private readonly databaseId=process.env.FIRESTORE_DATABASE_ID||'(default)',private readonly tokenProvider=googleAccessToken){
     if(!projectId)throw new Error('FIRESTORE_NOT_CONFIGURED');
-    this.root=`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents`;
+    this.root=firestoreRestRoot(projectId,databaseId);
   }
   private name(path:string){const clean=path.split('/').filter(Boolean).map(encodeURIComponent).join('/');return `projects/${this.projectId}/databases/${this.databaseId}/documents/${clean}`}
   private url(path:string){return `${this.root}/${path.split('/').filter(Boolean).map(encodeURIComponent).join('/')}`}
