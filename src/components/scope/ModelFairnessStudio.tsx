@@ -37,6 +37,7 @@ type Store = {
   decideModelBatch: (batchId: string, decision: 'approved' | 'sealed' | 'invalidated', reason?: string) => { ok: boolean; reason?: string };
   claimReserveForParticipant: (participantId: string, reason: string) => { ok: boolean; reason?: string };
   quarantineQuestionLoci: (input: { locusKeys: string[]; reason: string; severity?: QuestionQuarantineRecord['severity'] }) => { ok: boolean; reason?: string; record?: QuestionQuarantineRecord };
+  recoverQuarantinedLoci: (input: { locusKeys: string[]; reason: string; categoryId?: string }) => { ok: boolean; reason?: string; record?: QuestionQuarantineRecord; outcome?: { recovered: { participantId: string; via: 'reserve' | 'regenerated' }[]; unrecovered: { participantId: string; ar: string }[]; summaryArabic: string; summaryEnglish: string } };
   liftQuestionQuarantine: (id: string, reason: string) => { ok: boolean; reason?: string };
   sweepExpiredReservations: () => number;
   buildCompetitionFairnessReport: (options?: { categoryId?: string; batchId?: string }) => Promise<{ ok: boolean; reason?: string; leaks?: string[]; report?: FairnessReportRecord }>;
@@ -109,6 +110,40 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
     setNotice(outcome.ok
       ? { tone: 'ok', text: ar ? `تم ${label}.` : `${label} done.` }
       : { tone: 'warn', text: ar ? 'تعذّر تنفيذ القرار على هذه الدفعة بحالتها الحالية.' : 'That decision does not apply to this batch in its current state.' });
+  };
+
+  /*
+   * الحجر مع الاسترداد: خطوةٌ واحدة بدل أربع.
+   *
+   * الحجر وحده يترك المتأثرين بلا نماذج، والمنظم في القاعة لا يملك ترف تنفيذ أربع خطواتٍ
+   * بيده والمتسابق واقفٌ أمام اللجنة. وما لم يُسترد يُقال باسمه لا يُبتلع.
+   */
+  const quarantineAndRecover = async () => {
+    const keys = quarantineInput.split(/[,\n\s]+/).map(x => x.trim()).filter(Boolean);
+    if (!keys.length || !quarantineReason.trim()) {
+      setNotice({ tone: 'warn', text: ar ? 'اكتب مواضع بصيغة «سورة:آية» وسببًا صريحًا للحجر.' : 'Enter loci as surah:ayah and an explicit reason.' });
+      return;
+    }
+    if (!(await confirm({
+      title: ar ? 'احجر وعالج الأثر؟' : 'Quarantine and recover?',
+      body: ar
+        ? `سيُحجر ${keys.length} موضعًا، ثم يُعطى كل متأثرٍ نموذجًا احتياطيًا إن وُجد لبصمة نطاقه، وإلا يُولَّد له من البنك بعد الحجر. ومن لم يُسترد يُقال باسمه.`
+        : `${keys.length} loci are quarantined, then every affected participant gets a reserve matching their range signature, or a freshly generated model. Anyone left over is named.`,
+      confirmLabel: ar ? 'احجر وعالج' : 'Quarantine and recover', tone: 'destructive',
+    }))) return;
+    setBusy(true);
+    try {
+      const outcome = store.recoverQuarantinedLoci({ locusKeys: keys, reason: quarantineReason.trim(), categoryId });
+      if (!outcome.ok) {
+        setNotice({ tone: 'warn', text: outcome.reason === 'NO_ELIGIBLE_PARTICIPANTS'
+          ? (ar ? 'لا متسابق له نطاق معتمد، فلا أحد يُسترد. استعمل «احجر» وحده.' : 'No participant has an approved range, so there is nobody to recover.')
+          : (ar ? 'تعذّر الاسترداد: راجع المواضع والسبب.' : 'Recovery failed: check the loci and reason.') });
+        return;
+      }
+      setQuarantineInput(''); setQuarantineReason('');
+      const left = outcome.outcome?.unrecovered.length || 0;
+      setNotice({ tone: left ? 'warn' : 'ok', text: outcome.outcome?.summaryArabic || '' });
+    } finally { setBusy(false); }
   };
 
   const quarantine = async () => {
@@ -314,6 +349,11 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
       {/* ---- الحجر ---- */}
       <section className="rounded-2xl border border-[#dcdad2] bg-white p-4">
         <h3 className="flex items-center gap-2 text-sm font-black text-[#24302b]"><ShieldAlert className="h-4 w-4" />{ar ? 'حجر المواضع' : 'Locus quarantine'}</h3>
+        <p className="mt-1.5 text-[11px] leading-6 text-[#666c68]">
+          {ar
+            ? '«احجر» يُخرج الموضع ويُبطل ما يحمله ويقف. و«احجر وعالج الأثر» يكمل الطريق: يعطي كل متأثرٍ احتياطَه إن وُجد لبصمة نطاقه، وإلا يولّد له من البنك بعد الحجر — ويقول باسمه من لم يُسترد.'
+            : '“Quarantine” removes the locus, invalidates what carries it, and stops. “Quarantine & recover” finishes the job: a matching reserve where one exists, a freshly generated model otherwise — and it names whoever is left over.'}
+        </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <label className="block">
             <span className="block text-[10px] font-black tracking-[.1em] text-[#696f6b]">{ar ? 'المواضع (سورة:آية)' : 'Loci (surah:ayah)'}</span>
@@ -325,8 +365,9 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
             <input value={quarantineReason} onChange={e => setQuarantineReason(e.target.value)} placeholder={ar ? 'خطأ في ضبط النص' : 'Text vocalisation defect'}
               className="mizan-control mt-1 w-full px-3 py-2 text-[12px]" />
           </label>
-          <div className="flex items-end">
+          <div className="flex flex-wrap items-end gap-2">
             <Button size="sm" variant="danger" icon={<AlertTriangle className="h-4 w-4" />} onClick={() => void quarantine()}>{ar ? 'احجر' : 'Quarantine'}</Button>
+            <Button size="sm" variant="outline" icon={<LifeBuoy className="h-4 w-4" />} loading={busy} onClick={() => void quarantineAndRecover()}>{ar ? 'احجر وعالج الأثر' : 'Quarantine & recover'}</Button>
           </div>
         </div>
         {quarantines.length > 0 && (

@@ -40,6 +40,7 @@ import {
   SEED_COMMITTEES,
   SEED_JUDGES,
   SEED_PARTICIPANTS,
+  SEED_PARTICIPANT_SCOPES,
   SEED_REVIEW_CASES,
   SEED_MUTASHABIHAT_TRAPS,
   SEED_AI_OBSERVATIONS,
@@ -89,7 +90,7 @@ import { migrateLegacyScope, planCategoryMigration } from './scope-migration';
 import { buildCandidatePool, categoryDistribution, categoryRepeatPolicy, categoryScopeOf, categorySelectionRule, planAllocation, readingContextOf, resolveEffectiveScope, resolveQuestionCount, staleModels } from './scope-engine';
 import { surahNameArabic } from './quran-canon';
 import type { ScopeEngineSealRecord, ScopeSimulationRecord, QuestionModelRecord, QuestionModelBatchRecord, QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord } from '../types';
-import { applyQuarantine, claimReserveModel, generateModelBatch } from './model-batch';
+import { applyQuarantine, claimReserveModel, generateModelBatch, recoverFromQuarantine } from './model-batch';
 import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations } from './question-reservation';
 import { buildExposureOracle, buildExposureProfiles } from './exposure-risk';
 import { aggregateFairness } from './model-fairness';
@@ -199,7 +200,7 @@ function seededInitialState(): AppStoreState {
       {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
     ],
     travelRecords: SEED_TRAVEL_RECORDS, consents: SEED_CONSENTS, importJobs: [], shadowRuns: [], participantPassport: SEED_PARTICIPANT_PASSPORT, judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: SEED_SUPPORT_SESSIONS, remoteChecks: [], audioRecordings: [], featureFlags: SEED_FEATURE_FLAGS, quranSourceManifests: [], quranSourceContents: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
-    timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:[], questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], questionQuarantines:[], questionReservations:[], fairnessReports:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
+    timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:SEED_PARTICIPANT_SCOPES, questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], questionQuarantines:[], questionReservations:[], fairnessReports:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
     activeSession: {
       sessionId: 'sess-active-001',
       participant: SEED_PARTICIPANTS[0], // Bilal Yusuf (A-104)
@@ -1902,6 +1903,19 @@ export function useAppStore() {
   const activeParticipantScope = (participantId: string) =>
     globalState.participantScopes.find(x => x.participantId === participantId && x.status !== 'superseded');
 
+  /*
+   * سجل نسخ نطاق المتسابق.
+   *
+   * النسخة السابقة كانت تُحفظ ولا تُعرض — وهذا حفظٌ بلا شهادة: «لا تغيير صامت بعد الاعتماد»
+   * لا تتحقق بأن يكون التغيير مكتوبًا في التخزين، بل بأن يراه صاحبه واللجنة. فيُفتح السجل
+   * كاملًا بنسخه وحالاتها وأسباب تغييرها ومن قرّرها.
+   */
+  const participantScopeHistory = (participantId: string) => globalState.participantScopes
+    .filter(x => x.participantId === participantId
+      && x.competitionId === globalState.competition.id
+      && x.organizationId === globalState.competition.organizationId)
+    .sort((a, b) => b.version - a.version);
+
   /* إبطال ما بُني على نسخة نطاق لم تعد سارية. لا تغيير صامت بعد الاعتماد. */
   const invalidateAffectedModels = (reason: string) => {
     const stale = staleModels(globalState.questionModels, globalState.participantScopes, globalState.competition.categories);
@@ -2535,6 +2549,78 @@ export function useAppStore() {
     if (!impact.canContinue) createIncident('quran_source_discrepancy', 'الحجر أفرغ البنك', record.summaryArabic, 'critical');
     notify();
     return { ok: true as const, record, impact };
+  };
+
+  /**
+   * الاسترداد الطارئ: خطوةٌ واحدة بدل أربع.
+   *
+   * الحجر وحده يترك المتأثرين بلا نماذج، والمنظم في القاعة لا يملك ترف تنفيذ أربع خطواتٍ
+   * بيده. فهذا يحجر، ويبطل، ويعطي كل متأثرٍ احتياطَه إن وُجد لبصمة نطاقه، وإلا يولّد له من
+   * البنك **بعد** الحجر. ومن لم يُسترد يُقال باسمه وبسببه: «عولج الأثر» ليست «عولج الجميع».
+   */
+  const recoverQuarantinedLoci = (input: { locusKeys: string[]; reason: string; severity?: QuestionQuarantineRecord['severity']; categoryId?: string }) => {
+    const keys = [...new Set(input.locusKeys.map(k => k.trim()).filter(Boolean))];
+    if (!keys.length) return { ok: false as const, reason: 'NO_LOCI' };
+    if (!input.reason?.trim()) return { ok: false as const, reason: 'REASON_REQUIRED' };
+    const policy = getCompetitionPolicy(globalState.competition);
+    const rows = batchRowsFor(input.categoryId);
+    if (!rows.length) return { ok: false as const, reason: 'NO_ELIGIBLE_PARTICIPANTS' };
+    const categoryId = input.categoryId || rows[0].categoryId;
+    const category = globalState.competition.categories.find(c => c.id === categoryId);
+    const candidates = poolsForRows(rows.map(r => ({ scope: r.scope, categoryId: r.categoryId, reading: r.reading })));
+    const now = new Date().toISOString();
+    const outcome = recoverFromQuarantine({
+      locusKeys: keys, reason: input.reason.trim(),
+      models: globalState.questionModels.filter(m => m.competitionId === globalState.competition.id),
+      candidates,
+      participants: rows.map(r => ({ participantId: r.participantId, scope: r.scope, scopeVersion: r.scopeVersion, questionCount: r.questionCount, reading: r.reading, hallId: r.hallId })),
+      distribution: categoryDistribution(category, resolveQuestionCount(category, policy)),
+      repeatPolicy: categoryRepeatPolicy(category, policy),
+      targetDifficulty: policy.questions.targetDifficulty,
+      difficultyTolerance: policy.questions.difficultyTolerance,
+      seed: `${globalState.competition.id}:${categoryId}:${now}`,
+      organizationId: globalState.competition.organizationId,
+      competitionId: globalState.competition.id,
+      categoryId, categoryScopeVersion: category?.scopeVersion || 1,
+      policyVersion: policy.version,
+      poolVersion: `STRUCTURAL:${scopeSignature(categoryScopeOf(category))}`,
+      requireReviewedDifficulty: !!category?.requireReviewedDifficulty,
+      requiredDraws: rows.reduce((sum, r) => sum + r.questionCount, 0),
+      now, newId,
+    });
+    /* نماذج المسابقات الأخرى تبقى كما هي: الاسترداد لا يمسّ ما ليس له. */
+    const foreign = globalState.questionModels.filter(m => m.competitionId !== globalState.competition.id);
+    globalState.questionModels = [...outcome.models, ...foreign];
+
+    const heldOnQuarantined = globalState.questionReservations.filter(r => keys.includes(r.locusKey) && r.state !== 'quarantined').map(r => r.id);
+    if (heldOnQuarantined.length) {
+      globalState.questionReservations = transitionReservations({
+        records: globalState.questionReservations, ids: heldOnQuarantined, to: 'quarantined',
+        actorId: globalState.currentUser.id, reason: input.reason.trim(), now,
+      }).records;
+    }
+
+    const record: QuestionQuarantineRecord = {
+      id: newId('qquar'), organizationId: globalState.competition.organizationId, competitionId: globalState.competition.id,
+      locusKeys: keys, questionIds: [], reason: input.reason.trim(),
+      raisedBy: globalState.currentUser.id, raisedAt: now, severity: input.severity || 'defect',
+      invalidatedModelIds: outcome.quarantine.invalidatedModels.map(m => m.id),
+      affectedParticipantCount: outcome.quarantine.affectedParticipantIds.length,
+      remainingUniqueLoci: outcome.quarantine.remainingUniqueLoci,
+      averageReuseAfter: outcome.quarantine.averageReuseAfter,
+      canContinue: outcome.quarantine.canContinue,
+      summaryArabic: outcome.summaryArabic, summaryEnglish: outcome.summaryEnglish,
+      status: 'active',
+    };
+    globalState.questionQuarantines = [record, ...globalState.questionQuarantines];
+    auditTrustAction('QUESTION_QUARANTINE_RECOVERED', 'QuestionQuarantine', record.id, outcome.summaryArabic, outcome.summaryEnglish);
+    for (const row of outcome.unrecovered) {
+      const participant = globalState.participants.find(p => p.id === row.participantId);
+      createIncident('conflict_routing', 'متسابق بلا نموذج بعد الحجر',
+        `${participant?.code || row.participantId}: ${row.ar}`, 'critical');
+    }
+    notify();
+    return { ok: true as const, record, outcome };
   };
 
   const liftQuestionQuarantine = (quarantineId: string, reason: string) => {
@@ -3763,7 +3849,7 @@ export function useAppStore() {
     saveParticipantScope, decideParticipantScope, participantEffectiveScope, activeParticipantScope,
     scopeCandidatePool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, sealScopeEngine, scopeSealImpact,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant, exposureProfiles,
-    quarantineQuestionLoci, liftQuestionQuarantine,
+    quarantineQuestionLoci, liftQuestionQuarantine, recoverQuarantinedLoci, participantScopeHistory,
     reserveQuestionsForParticipant, advanceReservations, sweepExpiredReservations, reservationBlockedLoci,
     buildCompetitionFairnessReport,
     addCommittee,

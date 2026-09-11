@@ -35,7 +35,8 @@ import {
   FeatureFlagRecord,
   User
 } from '../types';
-import { fullQuranScope } from './quran-scope';
+import { fullQuranScope, scopeFromJuz, scopeSignature } from './quran-scope';
+import type { ParticipantScopeRecord } from './participant-scope';
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 
 export const SEED_ORGANIZATION: Organization = {
@@ -341,7 +342,7 @@ export const SEED_COMMITTEES: Committee[] = [
     nameArabic: 'اللجنة الثالثة (القاعة الشرقية C)',
     code: 'C3',
     venueHall: 'Recitation Hall C',
-    assignedCategories: ['cat-10-juz'],
+    assignedCategories: ['cat-10-juz', 'cat-open-quarter'],
     headJudgeId: '',
     judgeIds: [],
     status: 'offline',
@@ -416,7 +417,8 @@ export const SEED_PARTICIPANTS: Participant[] = [
     nationalIdOrPassport: 'KWT-29901452',
     dateOfBirth: '2005-01-20',
     gender: 'male',
-    categoryId: 'cat-full-quran',
+    categoryId: 'cat-open-quarter',
+    /* متسابق الفئة التي يختار فيها كلٌّ نطاقه: منه تُرى دورةُ الحياة كاملةً في العرض. */
     riwaya: 'Hafs',
     institution: 'Kuwait Grand Mosque Quran Academy',
     status: 'in_queue',
@@ -427,7 +429,7 @@ export const SEED_PARTICIPANTS: Participant[] = [
     arrivalSlot: '08:50–09:10',
     checkedInAt: '2027-02-11T08:52:30Z',
     checkInMethod: 'kiosk_qr',
-    assignedCommitteeId: 'comm-1',
+    assignedCommitteeId: 'comm-3',
     queueNumber: 2,
     createdAt: '2026-11-13T10:00:00Z'
   },
@@ -862,6 +864,36 @@ export const SEED_PARTICIPANTS: Participant[] = [
     queueNumber: 11,
     createdAt: '2026-11-12T09:00:00Z'
   }
+];
+
+/*
+ * نطاق المتسابق المعتمد في العرض.
+ *
+ * ثمانية أجزاء اختارها بنفسه واعتمدتها اللجنة — مطابقًا لقاعدة الفئة بالضبط. ومنه تبدأ
+ * دورةُ الحياة الظاهرة: يطلب تعديلًا فتُولد نسخةٌ ثانية، وتبقى هذه الأولى في سجلّه.
+ */
+const QUARTER_DEMO_SCOPE = scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8]);
+
+export const SEED_PARTICIPANT_SCOPES: ParticipantScopeRecord[] = [
+  {
+    id: 'pscope-105-v1',
+    organizationId: 'org-gqa-global',
+    competitionId: 'comp-dubai-2027',
+    categoryId: 'cat-open-quarter',
+    participantId: 'part-105',
+    version: 1,
+    selection: QUARTER_DEMO_SCOPE,
+    scope: QUARTER_DEMO_SCOPE,
+    scopeSignature: scopeSignature(QUARTER_DEMO_SCOPE),
+    selectionRuleVersion: 1,
+    status: 'approved',
+    changeReason: 'اختياري عند التسجيل',
+    createdAt: '2026-11-12T09:05:00Z',
+    updatedAt: '2026-11-14T14:25:00Z',
+    submittedAt: '2026-11-12T09:05:00Z',
+    approvedAt: '2026-11-14T14:25:00Z',
+    approvedBy: 'usr-head-judge',
+  },
 ];
 
 export const SEED_REVIEW_CASES: ReviewCase[] = [

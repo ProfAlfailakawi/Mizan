@@ -42,7 +42,7 @@
     "tables": 1,
     "lists": 1,
     "tabs": 8,
-    "height": 1160
+    "height": 1200
   },
   "desktop/simulation": {
     "buttons": 34,
@@ -60,7 +60,7 @@
     "tables": 0,
     "lists": 0,
     "tabs": 8,
-    "height": 1980
+    "height": 1940
   },
   "desktop/readiness": {
     "buttons": 27,
@@ -114,7 +114,7 @@
     "tables": 1,
     "lists": 1,
     "tabs": 16,
-    "height": 1520
+    "height": 1540
   },
   "tablet/simulation": {
     "buttons": 34,
@@ -132,7 +132,7 @@
     "tables": 0,
     "lists": 0,
     "tabs": 16,
-    "height": 2220
+    "height": 2260
   },
   "tablet/readiness": {
     "buttons": 27,
@@ -186,7 +186,7 @@
     "tables": 1,
     "lists": 1,
     "tabs": 16,
-    "height": 2040
+    "height": 2080
   },
   "mobile/simulation": {
     "buttons": 34,
@@ -204,7 +204,7 @@
     "tables": 0,
     "lists": 0,
     "tabs": 16,
-    "height": 3600
+    "height": 3680
   },
   "mobile/readiness": {
     "buttons": 27,

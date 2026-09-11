@@ -265,6 +265,8 @@ const SelectionTab: React.FC<{ store: Store; ar: boolean; category?: Category; a
 
 const ParticipantScopeReview: React.FC<{ store: Store; ar: boolean; category: Category; members: Store['participants'] }> = ({ store, ar, category, members }) => {
   const rows = members.map(participant => ({ participant, record: store.activeParticipantScope(participant.id) }));
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const pending = rows.filter(r => r.record && ['submitted', 'under_review'].includes(r.record.status));
   const missing = rows.filter(r => !r.record || r.record.status === 'draft');
   return (
@@ -281,22 +283,65 @@ const ParticipantScopeReview: React.FC<{ store: Store; ar: boolean; category: Ca
           hint={ar ? 'تظهر نطاقاتهم هنا بمجرد تسجيلهم واختيارهم.' : 'Their chosen ranges appear here once they register.'} />
       ) : (
         <ul className="divide-y divide-[#efeee8]">
-          {rows.slice(0, 40).map(({ participant, record }) => (
-            <li key={participant.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-              <div className="min-w-0">
-                <div className="text-xs font-black text-[#24302b]">{participant.code} · {bilingualName({ name: participant.fullName, nameArabic: participant.fullNameArabic }, ar)}</div>
-                <div className="text-[10px] text-[#696f6b]">
-                  {record ? `${describeScope(record.scope, ar)} · ${ar ? `النسخة ${record.version}` : `v${record.version}`}` : (ar ? 'لم يختر نطاقه بعد' : 'Has not chosen a range yet')}
+          {rows.slice(0, 40).map(({ participant, record }) => {
+            const history = store.participantScopeHistory(participant.id);
+            const previous = history.filter(x => x.status === 'superseded');
+            return (
+            <li key={participant.id} className="py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-[#24302b]">{participant.code} · {bilingualName({ name: participant.fullName, nameArabic: participant.fullNameArabic }, ar)}</div>
+                  <div className="text-[10px] text-[#696f6b]">
+                    {record ? `${describeScope(record.scope, ar)} · ${ar ? `النسخة ${record.version}` : `v${record.version}`}` : (ar ? 'لم يختر نطاقه بعد' : 'Has not chosen a range yet')}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {record && <Badge variant={record.status === 'approved' || record.status === 'locked' ? 'emerald' : record.status === 'rejected' ? 'rose' : 'amber'}>{scopeStatusLabel(record.status, ar)}</Badge>}
+                  {record && ['submitted', 'under_review', 'draft'].includes(record.status) && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => store.decideParticipantScope(participant.id, 'approved')}>{ar ? 'اعتماد' : 'Approve'}</Button>
+                      {/* الرفض يحتاج سببًا يقرأه المتسابق. رفضٌ بلا سبب يترك صاحبه يخمّن. */}
+                      <Button size="sm" variant="ghost" onClick={() => setRejecting(rejecting === participant.id ? null : participant.id)}>{ar ? 'رفض' : 'Reject'}</Button>
+                    </>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {record && <Badge variant={record.status === 'approved' || record.status === 'locked' ? 'emerald' : record.status === 'rejected' ? 'rose' : 'amber'}>{scopeStatusLabel(record.status, ar)}</Badge>}
-                {record && ['submitted', 'under_review', 'draft'].includes(record.status) && (
-                  <Button size="sm" variant="outline" onClick={() => store.decideParticipantScope(participant.id, 'approved')}>{ar ? 'اعتماد' : 'Approve'}</Button>
-                )}
-              </div>
+              {rejecting === participant.id && (
+                <div className="mt-2 flex flex-wrap items-end gap-2 rounded-xl border border-[#e8d6b8] bg-[#fdf6e8] p-3">
+                  <label className="min-w-0 flex-1">
+                    <span className="block text-[10px] font-black tracking-[.1em] text-[#6b4f18]">{ar ? 'سبب الرفض — يقرأه المتسابق' : 'Rejection reason — the participant reads it'}</span>
+                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                      placeholder={ar ? 'النطاق المختار أقل من المطلوب في اللائحة' : 'The chosen range is below the rule minimum'}
+                      className="mizan-control mt-1 w-full px-3 py-2 text-[12px]" />
+                  </label>
+                  <Button size="sm" variant="danger" disabled={!rejectReason.trim()} onClick={() => {
+                    const outcome = store.decideParticipantScope(participant.id, 'rejected', rejectReason.trim());
+                    if (outcome.ok) { setRejecting(null); setRejectReason(''); }
+                  }}>{ar ? 'أرسل الرفض' : 'Send rejection'}</Button>
+                </div>
+              )}
+              {/* النسخ السابقة تُعرض لا تُدفن: من غيّر نطاقه ومتى ولماذا سؤالٌ للجنة لا للتخزين. */}
+              {previous.length > 0 && (
+                <details className="mizan-collapse mt-2 rounded-xl border border-[#e9e7e0] bg-[#fbfaf6]">
+                  <summary className="cursor-pointer select-none list-none px-3 py-2 text-[10px] font-black text-[#5b6460]">
+                    {ar ? `${previous.length} نسخة سابقة` : `${previous.length} earlier versions`}
+                  </summary>
+                  <ol className="space-y-1.5 px-3 pb-3">
+                    {previous.map(entry => (
+                      <li key={entry.id} className="rounded-lg border border-[#e9e7e0] bg-white px-2.5 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-[#24302b]">{ar ? `النسخة ${entry.version}` : `v${entry.version}`} · {describeScope(entry.scope, ar)}</span>
+                          <span className="text-[9px] text-[#696f6b]">{entry.supersededAt ? new Date(entry.supersededAt).toLocaleString(ar ? 'ar' : 'en') : ''}</span>
+                        </div>
+                        {entry.changeReason && <p className="mt-1 text-[10px] leading-5 text-[#5b6460]">{ar ? 'سبب التغيير: ' : 'Change reason: '}{entry.changeReason}</p>}
+                        {entry.rejectionReason && <p className="mt-1 text-[10px] leading-5 text-[#7a5a2f]">{ar ? 'سبب الرفض: ' : 'Rejection reason: '}{entry.rejectionReason}</p>}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
             </li>
-          ))}
+          );})}
         </ul>
       )}
       <p className="text-[10px] text-[#696f6b]">{ar ? `الفئة: ${bilingualName(category, ar)}` : `Category: ${bilingualName(category, ar)}`}</p>
