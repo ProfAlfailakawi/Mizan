@@ -17,9 +17,16 @@ import type { Competition, Organization, User } from '../types';
  * المحايدة فقط تبقى كي لا تنكسر الواجهات، وكل ما يُرى للمستخدم يأتي من بيانات أُنشئت فعليًا.
  */
 
-/** يُميّز النشر الحقيقي عن عرض المنتج. المصادقة الإلزامية هي علامة النشر الحقيقي. */
-export function isLaunchDeployment(env: Record<string, unknown> = import.meta.env as unknown as Record<string, unknown>): boolean {
-  return env.VITE_REQUIRE_AUTH === 'true';
+/*
+ * يُميّز النشر الحقيقي عن عرض المنتج. المصادقة الإلزامية هي علامة النشر الحقيقي.
+ *
+ * و`import.meta.env` قد لا يوجد أصلًا: في Node، وفي عاملٍ خلفي، وفي أي تشغيلٍ خارج حزمة
+ * Vite. وكان غيابُه يرمي عند قراءة الحقل منه — أي أن دالةً تجيب بنعم أو لا كانت تُسقط ما
+ * يستدعيها. والغياب ليس نشرًا حقيقيًا: النشر الحقيقي يُعلَن صراحةً، فإن لم يُعلَن فهو عرض.
+ */
+export function isLaunchDeployment(env?: Record<string, unknown>): boolean {
+  const source = env ?? (typeof import.meta !== 'undefined' ? (import.meta.env as unknown as Record<string, unknown>) : undefined);
+  return source?.VITE_REQUIRE_AUTH === 'true';
 }
 
 /** مؤسسة فارغة تنتظر إعداد المنظّم — لا اسم مخترع ولا علامة تجارية منتحلة. */

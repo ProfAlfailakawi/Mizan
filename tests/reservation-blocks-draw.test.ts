@@ -138,7 +138,7 @@ test('there is exactly one path that applies a legacy scope migration', () => {
 });
 
 test('every scope-engine action the store exports is reachable, internally or from a screen', () => {
-  const store = fs.readFileSync('src/lib/store.ts', 'utf8');
+  const store = fs.readFileSync('src/lib/store.ts', 'utf8') + '\n' + fs.readFileSync('src/lib/store-scope-actions.ts', 'utf8');
   const components = fs.readdirSync('src/components', { recursive: true, encoding: 'utf8' })
     .filter(f => f.endsWith('.tsx'))
     .map(f => fs.readFileSync(`src/components/${f}`, 'utf8'))
@@ -153,8 +153,8 @@ test('every scope-engine action the store exports is reachable, internally or fr
   const orphans = actions.filter(name => {
     const inStore = (store.match(new RegExp(`\\b${name}\\b`, 'g')) || []).length;
     const inUi = components.includes(name);
-    // التعريف + التصدير = ٢. فأكثر من ٢ يعني استدعاءً داخليًا حقيقيًا.
-    return inStore <= 2 && !inUi;
+    // التعريف + التصدير من الوحدة + التفكيك في المخزن = ٣. فأكثر من ٣ يعني استدعاءً داخليًا حقيقيًا.
+    return inStore <= 3 && !inUi;
   });
   assert.deepEqual(orphans, [], `these are exported but nothing calls them: ${orphans.join(', ')}`);
 });

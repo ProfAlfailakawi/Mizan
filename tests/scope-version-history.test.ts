@@ -26,16 +26,18 @@ test('each save is a new version; the previous one is superseded and keeps its o
   assert.notEqual(superseded.scopeSignature, second.scopeSignature, 'two different ranges never share a signature');
 });
 
-test('the store exposes the whole history, tenant-bounded, newest version first', () => {
-  const source = fs.readFileSync('src/lib/store.ts', 'utf8');
-  const start = source.indexOf('const participantScopeHistory');
-  assert.ok(start > 0, 'the history is not reachable from the store at all');
-  const body = source.slice(start, start + 700);
-  assert.match(body, /competitionId === globalState\.competition\.id/, 'history must not cross competitions');
-  assert.match(body, /organizationId === globalState\.competition\.organizationId/, 'history must not cross organizations');
+/* السلوك نفسه مُختبَرٌ في store-scope-actions (النسخ، والحدّ بين الجهات، والترتيب). هنا يُحرس الوصول. */
+test('the store surfaces the history through its API, and the engine module owns the rule', () => {
+  const store = fs.readFileSync('src/lib/store.ts', 'utf8');
+  assert.match(store, /participantScopeHistory,/, 'the history must be exported from the store API');
+  const actions = fs.readFileSync('src/lib/store-scope-actions.ts', 'utf8');
+  const start = actions.indexOf('const participantScopeHistory');
+  assert.ok(start > 0, 'the history lives in the engine module');
+  const body = actions.slice(start, start + 700);
+  assert.match(body, /competitionId === S\(\)\.competition\.id/, 'history must not cross competitions');
+  assert.match(body, /organizationId === S\(\)\.competition\.organizationId/, 'history must not cross organizations');
   assert.match(body, /b\.version - a\.version/, 'newest version first');
   assert.doesNotMatch(body, /status !== 'superseded'/, 'the whole point is that superseded versions are included');
-  assert.match(source, /participantScopeHistory,/, 'the history must be exported from the store API');
 });
 
 test('the committee screen renders earlier versions with their dates and reasons, not just a count', () => {
@@ -56,10 +58,10 @@ test('the participant sees their own history, so their range never changes from 
 });
 
 test('nothing in the history path deletes a record — versions are superseded, never removed', () => {
-  const source = fs.readFileSync('src/lib/store.ts', 'utf8');
+  const source = fs.readFileSync('src/lib/store-scope-actions.ts', 'utf8');
   const save = source.slice(source.indexOf('const saveParticipantScope'), source.indexOf('const decideParticipantScope'));
   assert.match(save, /status: 'superseded' as const/, 'the previous version is marked, not dropped');
-  assert.doesNotMatch(save, /participantScopes\s*=\s*globalState\.participantScopes\.filter\(/, 'no filter may drop an older version');
+  assert.doesNotMatch(save, /participantScopes\s*=\s*S\(\)\.participantScopes\.filter\(/, 'no filter may drop an older version');
 });
 
 /*
@@ -91,7 +93,7 @@ test('the committee can reject with a reason the participant will read, not only
 });
 
 test('the store refuses a rejection with no reason, so the screen guard is not the only guard', () => {
-  const source = fs.readFileSync('src/lib/store.ts', 'utf8');
+  const source = fs.readFileSync('src/lib/store-scope-actions.ts', 'utf8');
   const decide = source.slice(source.indexOf('const decideParticipantScope'), source.indexOf('const participantEffectiveScope'));
-  assert.match(decide, /REJECTION_REASON_REQUIRED/, 'the rule lives in the store, not only in the UI');
+  assert.match(decide, /REJECTION_REASON_REQUIRED/, 'the rule lives in the engine module, not only in the UI');
 });
