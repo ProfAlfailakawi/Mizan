@@ -84,10 +84,21 @@ export function resolveEffectiveScope(input: {
   participant: Pick<Participant, 'id'>;
   category: Category | undefined;
   scopes: ParticipantScopeRecord[];
+  /*
+   * حدّ العزل بين الجهات.
+   *
+   * المطابقة بالمعرّف وحده تكفي ما دامت المعرّفات فريدة — وهذا ما لا يُضمن حين تُستورد
+   * بيانات أو تُستنسخ مسابقة. فيُقال الحدّ صراحةً: سجلٌّ من جهةٍ أخرى أو مسابقةٍ أخرى لا
+   * يُقرأ أصلًا، لا أن يُقرأ ثم يُرجى ألا يتطابق.
+   */
+  tenant?: { organizationId?: string; competitionId?: string };
 }): EffectiveScopeResolution {
   const category = input.category;
   const rule = categorySelectionRule(category);
-  const record = input.scopes.find(r => r.participantId === input.participant.id && r.status !== 'superseded');
+  const tenant = input.tenant;
+  const record = input.scopes.find(r => r.participantId === input.participant.id && r.status !== 'superseded'
+    && (!tenant?.organizationId || r.organizationId === tenant.organizationId)
+    && (!tenant?.competitionId || r.competitionId === tenant.competitionId));
   const recordVersion = record?.version || 0;
   if (rule.enabled && category?.scopeMode === 'participant_selected') {
     if (!scopeRecordIsUsable(record)) {
