@@ -36,8 +36,15 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
   const agg = useMemo(() => buildHallRecitation(store), [store.participants, store.activeSession, store.competition, store.questionGovernance]);
   const max = agg.hottestPage.count || 1;
 
+  /*
+   * `min-h-full` لا `min-h-screen`: حاوية التمرير تحمل حشوًا سفليًا لزرّ قفل الجهاز
+   * (‎.mizan-venue*‎ في index.css)، فطفلٌ يطلب ارتفاع الشاشة كاملًا يصير المجموع
+   * 100vh + الحشو — تُمرَّر الشاشة ثمانيةً وثمانين بكسلًا ويسقط تذييلها تحت الحافة.
+   * ولا أحد يمرّر تلفازًا معلّقًا في قاعة. والنسبة تُحسب من صندوق المحتوى، فيصير المجموع
+   * ارتفاع الشاشة بالضبط.
+   */
   const body = (
-    <div className={variant === 'screen' ? 'min-h-screen p-5 sm:p-8 lg:p-10 flex flex-col' : ''}>
+    <div className={variant === 'screen' ? 'min-h-full p-5 sm:p-8 lg:p-10 flex flex-col' : ''}>
       <header className="flex items-start justify-between gap-5">
         <div>
           <div className="text-[10px] font-black tracking-[.2em] text-[#c6b58a]">{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>

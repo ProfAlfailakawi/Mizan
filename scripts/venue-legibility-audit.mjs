@@ -172,6 +172,24 @@ async function main() {
     '/opt/pw-browsers/chromium/chrome-linux/chrome',
   ].find(p => p && fs.existsSync(p));
   const browser = await chromium.launch(explicit ? { executablePath: explicit } : {});
+
+  /*
+   * إثبات القاعدة التي بُني عليها إصلاح الفيض، بالقياس لا بالدعوى.
+   *
+   * أسطح القاعة حاوياتُ تمريرٍ تحمل حشوًا سفليًا محجوزًا لزرّ قفل الجهاز. فطفلٌ يطلب
+   * `min-h-screen` يصير المجموع 100vh + الحشو، وتُمرَّر الشاشة بقدر الحشو ويسقط تذييلها
+   * تحت الحافة — على تلفازٍ لا يمرّره أحد. و`min-h-full` تُحسب من صندوق المحتوى فتنضبط.
+   */
+  const rulePage = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await rulePage.setContent(`<style>${css}</style><body class="font-arabic">
+    <div id="bad" class="mizan-venue-2" style="position:fixed;inset:0;overflow:auto"><div class="min-h-screen"></div></div>
+    <div id="good" class="mizan-venue-2" style="position:fixed;inset:0;overflow:auto"><div class="min-h-full"></div></div>
+  </body>`);
+  const shellRule = await rulePage.evaluate(() => ['bad', 'good'].map(id => {
+    const el = document.getElementById(id);
+    return { id, overflowPx: Math.round(el.scrollHeight - el.clientHeight) };
+  }));
+  await rulePage.close();
   const rows = [];
   let overflow = [];
   const lowContrast = [];
@@ -270,12 +288,18 @@ async function main() {
   const callM = readableMeters(callPx, callRow?.mmPx || 0);
   console.log(`  • الكود المنادى به على تلفاز 55" يُقرأ من ${callM.toFixed(1)} م — ${callM >= 10 ? 'يكفي قاعةً بطول عشرة أمتار.' : 'لا يكفي قاعةً بطول عشرة أمتار.'}`);
   console.log(overflow.length ? `  • ⚠️  الشبكة تحتاج تمريرًا على: ${overflow.join('، ')}` : '  • الشبكة تتّسع بلا تمرير على كل شاشات الجدار المقيسة.');
+  const bad = shellRule.find(x => x.id === 'bad').overflowPx;
+  const good = shellRule.find(x => x.id === 'good').overflowPx;
+  console.log(`  • قاعدة ارتفاع السطح: طفلٌ بـ min-h-screen يفيض ${bad}px، وبـ min-h-full يفيض ${good}px.`);
   console.log(lowContrast.length ? `  • ⚠️  تباينٌ دون الحدّ:\n      ${[...new Set(lowContrast)].join('\n      ')}` : '  • كل نصٍّ مقيس يحقّق حدّ التباين (AA).');
   if (shotDir) console.log(`  • اللقطات في: ${shotDir}`);
   console.log('');
 
   /* شاشةٌ تحتاج تمريرًا عطبٌ لا ملاحظة: لا أحد يمرّر تلفازًا معلّقًا في ممرّ. */
-  if (overflow.length || lowContrast.length) process.exit(1);
+  /* القاعدة نفسها تُفحص: لو لم يعد الفرق قائمًا فالإصلاح يستند إلى ما لم يعد صحيحًا. */
+  const ruleHolds = bad > 0 && good === 0;
+  if (!ruleHolds) console.log(`  • ⚠️  قاعدة ارتفاع السطح لم تعد تنطبق كما وُصفت.`);
+  if (overflow.length || lowContrast.length || !ruleHolds) process.exit(1);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
