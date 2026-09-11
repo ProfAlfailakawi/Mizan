@@ -50,6 +50,15 @@ export class PublicRegistrationService{
     if(selectionRule.enabled&&category.scopeMode==='participant_selected'){
       const chosen=raw.memorizationScope;
       if(!chosen||!Array.isArray(chosen.segments)||!chosen.segments.length)throw new Error('REGISTRATION_SCOPE_REQUIRED');
+      /*
+       * يُتحقَّق من **الخام** قبل التطبيع، لا بعده.
+       *
+       * التطبيع يُصلح ما يمكن إصلاحه: يقلب المعكوس، ويدمج المتداخل، ويقصر ما تجاوز الحدّ.
+       * فسورةٌ رقمها ٩٩٩ تصير «الناس» — وهذا إصلاحٌ لخطأٍ في الكتابة، لكنه **اختراعُ نطاق**
+       * حين يأتي من طلبٍ عامّ: يخرج المتسابق بنطاقٍ لم يختره قط. فالخام يُفحص أولًا، ثم
+       * يُطبَّع ما صحّ منه.
+       */
+      if(validateScope(chosen).length)throw new Error('REGISTRATION_SCOPE_INVALID');
       const normalized=normalizeScope(chosen);
       if(validateScope(normalized).length||scopeAyahCount(normalized)===0)throw new Error('REGISTRATION_SCOPE_INVALID');
       const issues=validateParticipantSelection(selectionRule,normalized);
