@@ -111,10 +111,18 @@ export const SEED_USERS: User[] = [
     competitionId: 'comp-dubai-2027'
   },
   {
+    /*
+     * شخصية «المتسابق» في العرض تقابل A-105 المنتظِر دوره، لا A-104.
+     *
+     * A-104 هو صاحب الجلسة الجارية في عرض شاشة المحكّم (activeSession)، فمن دخل بصفته
+     * رأى «اختبارك جارٍ الآن» وحدها: لا بطاقة، ولا تذكرة دور، ولا إحماء، ولا تدرّب — أي
+     * أن أغلب صفحة المتسابق كانت محجوبة عمّن جاء ليراها، بينما شاشة المحكّم تحكّمه في
+     * اللحظة نفسها. والانتظار هو الحال التي يستعمل فيها المتسابق صفحته فعلًا.
+     */
     id: 'usr-part-1',
-    name: 'Bilal Yusuf Al-Sayed',
-    nameArabic: 'بلال يوسف السيد',
-    email: 'bilal.sayed@gmail.com',
+    name: 'Zaid Omar Al-Husseini',
+    nameArabic: 'زيد عمر الحسيني',
+    email: 'zaid.omar@gmail.com',
     role: 'participant',
     organizationId: 'org-gqa-global',
     competitionId: 'comp-dubai-2027'
