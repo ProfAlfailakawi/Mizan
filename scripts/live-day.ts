@@ -246,6 +246,32 @@ ok(`${fmt(held)} حجزًا${refusedByHold ? ` · و${fmt(refusedByHold)} تزا
 const collisions = auditCollisions('بعد انتهاء الطابور');
 if (!collisions) ok('ولا موضع واحد بيد متسابقين في آنٍ واحد، طوال اليوم');
 
+/*
+ * الموضع نفسه في القاعة نفسها في اليوم نفسه.
+ *
+ * هذا ليس تزاحمًا — الأول انتهى قبل أن يُنادى الثاني. لكنه انكشاف: من سمع السؤال
+ * يسمعه مرةً أخرى بعد قليل، وقد يكون في الصف نفسه. و«مباعدة القاعة» في المحرك
+ * **عقوبةُ ترجيح** لا منعًا باتًّا (‎+0.6‎ في ميزان المباعدة، ويُقيَّد في `relaxed`
+ * أي أن المحرك يعلن أنه رخّص)، فتُغلَب عند الشحّ. فيُقاس أثرها بدل أن يُفترض.
+ */
+const hallRepeats = (() => {
+  const perHallLocus = new Map<string, number>();
+  for (const m of state.questionModels) {
+    if (m.status === 'invalidated' || !m.participantId) continue;
+    const hall = state.participants.find(p => p.id === m.participantId)?.assignedCommitteeId;
+    if (!hall) continue;
+    for (const q of m.questions) {
+      const key = `${hall}|${locusOf(q)}`;
+      perHallLocus.set(key, (perHallLocus.get(key) || 0) + 1);
+    }
+  }
+  const repeated = [...perHallLocus.entries()].filter(([, n]) => n > 1);
+  const worst = repeated.sort((a, b) => b[1] - a[1]).slice(0, 3);
+  return { pairs: perHallLocus.size, repeated: repeated.length, worst };
+})();
+if (!hallRepeats.repeated) ok('ولا موضع تكرّر في قاعةٍ واحدة في اليوم نفسه');
+else note(`${fmt(hallRepeats.repeated)} من ${fmt(hallRepeats.pairs)} زوج (قاعة، موضع) تكرّر في القاعة نفسها — أكثرها ${hallRepeats.worst.map(([k, n]) => `${k.split('|')[1]}×${n}`).join('، ')}`);
+
 step('الساعة ٣ — يُكتشف عيبٌ في موضع: حجرٌ واسترداد');
 const busiest = (() => {
   const counts = new Map<string, number>();
