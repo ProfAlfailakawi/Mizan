@@ -348,6 +348,7 @@ let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
  * يجعل عمل المحكّم يبدو محفوظًا وهو ليس كذلك. وأي فشل يُرفَع إلى حالة ظاهرة لا إلى سجلّ الطرفية.
  */
 async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
+  if(cloudSessionLost()){reportLostCloudSession(collectionName);return false;}
   if(globalState.isOffline||!auth.currentUser)return false;
   if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
   if(exceedsSafeDocumentSize(data)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE',`${collectionName}/${id}`);return false;}
@@ -373,11 +374,29 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
 }
 
 /* تجديد رمز المصادقة عند أول رفض صلاحية: مرة كل دقيقتين على الأكثر، فلا تنشأ حلقة تجديد. */
+/*
+ * انقطاع الجلسة أثناء التحكيم كان صامتًا تمامًا: الكتابة تخرج من الدالة عند غياب
+ * auth.currentUser دون شكوى، فيرصد المحكّم درجاته وهي لا تغادر الجهاز، ولا يعلم
+ * إلا بعد إعادة التحميل. نتذكّر أن جلسة سحابية قامت فعلًا، فإن غابت والجهاز متصل
+ * فهذا انقطاعٌ يستحق شريطًا ظاهرًا لا صمتًا. (لا يُطلق قبل أول دخول ولا في وضع العرض.)
+ */
+let cloudSessionEverEstablished=false;
+function noteCloudSessionState(){ if(auth.currentUser)cloudSessionEverEstablished=true; }
+function cloudSessionLost(){ noteCloudSessionState(); return cloudSessionEverEstablished&&!auth.currentUser&&!globalState.isOffline; }
+function reportLostCloudSession(scope:string){
+  if(scopeKey(scope)==='audit')return;
+  const message='انتهت جلسة الدخول، فتوقّف الحفظ السحابي. عملك محفوظ على هذا الجهاز؛ سجّل الدخول من جديد ليُرفع.';
+  failingCloudScopes.set(scopeKey(scope),{code:'CLOUD_PERMISSION_DENIED',message});
+  globalState.persistenceError={code:'CLOUD_PERMISSION_DENIED',message,at:new Date().toISOString()};
+  listeners.forEach(l=>l());
+}
+
 let lastAuthTokenRefreshAt=0;
 function refreshAuthTokenOnce(){const now=Date.now();if(now-lastAuthTokenRefreshAt<120_000)return false;lastAuthTokenRefreshAt=now;return true;}
 
 
 async function deleteScopedDocument(collectionName:string,id:string){
+  if(cloudSessionLost()){reportLostCloudSession(collectionName);return false;}
   if(globalState.isOffline||!auth.currentUser)return false;
   if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
   try{
@@ -530,6 +549,7 @@ if(typeof window!=='undefined'&&!(window as any).__mizanAuditOnlineHook){(window
  * الوثيقة الواحدة.
  */
 function syncToFirestore() {
+  if(cloudSessionLost()){reportLostCloudSession('competition');return;}
   if (globalState.isOffline || !auth.currentUser) return;
   if (firestoreSyncTimeout) clearTimeout(firestoreSyncTimeout);
   firestoreSyncTimeout = setTimeout(async () => {
@@ -1447,6 +1467,11 @@ export function useAppStore() {
     // A participant who already sat before a panel keeps a scored record; deleting would orphan it.
     if(['in_session','tested','certified','appealed'].includes(target.status) || globalState.results.some(r=>r.participantId===participantId)) return false;
     globalState.participants = globalState.participants.filter(p=>p.id!==participantId);
+    // كان الحذف محليًّا فقط: الوثيقة تبقى في السحابة، فيعيدها المستمع (watch/mergeById)
+    // بعد لحظات فيظهر المتسابق المحذوف من جديد. الحذف الآن يطال النسخة السحابية
+    // ويُبطل بطاقة رحلته العامة، وإلا بقي رابطها صالحًا لمن لم يعد مسجّلًا.
+    void deleteScopedDocument('participants',participantId);
+    void publishPublicJourneyRecord(target,true);
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'PARTICIPANT_REMOVED',entityType:'Participant',entityId:participantId,humanSummaryArabic:`حذف المتسابق ${target.code} قبل دخوله أي لجنة`,humanSummaryEnglish:`Removed participant ${target.code} before any panel session`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return true;
   };
@@ -1789,6 +1814,23 @@ export function useAppStore() {
       return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
     }
   };
+
+  /*
+   * النشر كان يحدث لحظة فتح التسجيل فقط. أي مسابقة فُتحت قبل ذلك — أو فُتحت ثم تعذّر
+   * رفع نسختها العامة مرّة واحدة — تبقى بلا سجلّ عامّ، فتظهر صفحتها من ذاكرة جهاز الإدارة
+   * بينما يرد الخادم «لم نعثر على المسابقة» عند إرسال الطلب. هذان الفعلان يجعلان الحالة
+   * قابلة للفحص وللإصلاح بضغطة واحدة بدل أن تُكتشف من متسابقٍ ضاع نموذجه.
+   */
+  const checkPublicCompetitionPublished=async():Promise<boolean>=>{
+    if(launchPlaceholderActive()||globalState.isOffline)return false;
+    try{
+      const {db,doc,getDoc}=await getFirestoreClient();
+      const snap=await getDoc(doc(db,'public_competitions',globalState.competition.id));
+      const data=snap.exists()?snap.data() as {competition?:Competition}:null;
+      return !!data?.competition&&data.competition.id===globalState.competition.id;
+    }catch(err){console.warn('MIZAN public competition check failed',err);return false}
+  };
+  const republishPublicCompetition=async()=>publishPublicCompetitionRecord();
 
   const publishCompetition = async () => {
     const issues=getReadinessIssues(globalState.competition);
@@ -2637,7 +2679,7 @@ export function useAppStore() {
     completeCompetition, closeCompetition,
     registerParticipant, updateParticipant, removeParticipant,
     reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
-    selectCompetition, loadPublicCompetition,
+    selectCompetition, loadPublicCompetition, checkPublicCompetitionPublished, republishPublicCompetition,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
     createCompetition,
     submitAppeal,

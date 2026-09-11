@@ -112,11 +112,11 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
 
   return (
     <div ref={venueRef} role="dialog" aria-modal="true" aria-label={ar ? 'محرك البثّ الحجمي' : 'Spatial Broadcast Engine'}
-      className="fixed inset-0 z-50 flex flex-col items-center gap-3 overflow-y-auto p-3 sm:p-5"
+      className="fixed inset-0 z-50 flex flex-col items-center gap-3 overflow-y-auto p-3 sm:p-5 pb-24 sm:pb-20"
       style={{ background: 'radial-gradient(120% 90% at 50% -10%, #1d3128 0%, #16241f 42%, #0c1713 100%)', color: '#f4f1e8' }} dir={ar ? 'rtl' : 'ltr'}>
 
       {/* control rail */}
-      <div className="w-full max-w-[1180px] grid grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-2 rounded-[18px] border px-3.5 py-2.5"
+      <div className="w-full max-w-[1180px] grid grid-cols-1 sm:grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-2.5 rounded-[18px] border px-3.5 py-2.5"
         style={{ background: 'rgba(12,23,19,.55)', borderColor: 'rgba(232,203,147,.16)', backdropFilter: 'blur(8px)' }}>
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="grid h-8 w-8 place-items-center rounded-[9px]" style={{ background: 'rgba(232,203,147,.10)', border: '1px solid rgba(232,203,147,.16)' }}><Radio className="h-4 w-4" style={{ color: gold }} /></span>
@@ -126,12 +126,12 @@ export const BroadcastStage: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setPlaying(p => !p)} aria-label={playing ? 'pause' : 'play'} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
-          <button onClick={restart} aria-label="restart" className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><RotateCcw className="h-[18px] w-[18px]" /></button>
-          <button onClick={() => setLost(v => !v)} className="h-9 rounded-[11px] px-3 text-[12.5px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'محاكاة فقد المحاذاة' : 'Simulate loss')}</button>
+          <button onClick={() => { if (!playing && elapsed >= TOTAL) restart(); else setPlaying(p => !p); }} aria-label={playing ? (ar ? 'إيقاف مؤقت' : 'Pause') : elapsed >= TOTAL ? (ar ? 'إعادة التشغيل' : 'Replay') : (ar ? 'تشغيل' : 'Play')} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: `linear-gradient(180deg, ${gold}, ${goldDeep})`, color: '#2a1e0c' }}>{playing ? <Pause className="h-[18px] w-[18px]" /> : <Play className="h-[18px] w-[18px]" />}</button>
+          <button onClick={restart} aria-label={ar ? 'إعادة من البداية' : 'Restart'} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><RotateCcw className="h-[18px] w-[18px]" /></button>
+          <button onClick={() => setLost(v => !v)} className="h-9 rounded-[11px] px-3 text-[12.5px] font-bold" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}>{lost ? (ar ? 'استعادة المحاذاة' : 'Reacquire') : (ar ? 'تمرين فقد المحاذاة' : 'Alignment drill')}</button>
           {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'close'} className="grid h-9 min-w-9 place-items-center rounded-[11px] px-3" style={{ background: 'rgba(244,241,232,.05)', border: '1px solid rgba(232,203,147,.16)' }}><X className="h-[18px] w-[18px]" /></button>}
         </div>
-          <input type="range" min={0} max={1000} value={Math.round((elapsed / TOTAL) * 1000)} onChange={e => setElapsed((+e.target.value / 1000) * TOTAL)} aria-label="timeline" className="col-span-2 h-[7px] w-full cursor-pointer appearance-none rounded-full" style={{ background: `linear-gradient(90deg, ${goldDeep} ${(elapsed / TOTAL) * 100}%, rgba(244,241,232,.14) ${(elapsed / TOTAL) * 100}%)` }} />
+          <input type="range" min={0} max={1000} value={Math.round((elapsed / TOTAL) * 1000)} onChange={e => setElapsed((+e.target.value / 1000) * TOTAL)} aria-label={ar ? 'شريط الزمن' : 'Timeline'} className="sm:col-span-2 h-[7px] w-full cursor-pointer appearance-none rounded-full" style={{ background: `linear-gradient(90deg, ${goldDeep} ${(elapsed / TOTAL) * 100}%, rgba(244,241,232,.14) ${(elapsed / TOTAL) * 100}%)` }} />
       </div>
 
       {/* stage */}
