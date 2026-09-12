@@ -24,8 +24,25 @@ test('the judging tab is a judging screen, not the operations screen again', () 
   // البطاقة نفسها هي ما يُمنع، لا ذِكر الاسم: التعليق الذي يشرح أين ذهبت الميزة يبقى مسموحًا.
   assert.doesNotMatch(operations, /<ToolCard[^>]*title=\{ar\?'(مختبر ذكاء التحكيم|البث والتغطية)'/,
     'neither retired entry may come back as a tool card');
-  // والعنوان يقول أي تبويب هو.
-  assert.match(operations, /mode==='judging'\?\(ar\?'التحكيم'/, 'the heading must name the tab the user is on');
+  /*
+   * وشاشة التحكيم تعرض اللجان فعلًا.
+   *
+   * كان ما يظهر في كل وضع يُرشَّح بمُحدِّدٍ في ملف الأنماط يعدّ الأقسام بترتيبها؛ ثم انتقلت
+   * الأقسام غير المشتركة إلى شرطٍ في الشيفرة فتبدّل الترتيب، فصار المُحدِّد يخفي قسم اللجان
+   * نفسه: تبويب التحكيم عنوانٌ وفراغ، بلا لجنة ولا زرّ إنشاء. فالحارس على الأثر لا على النص.
+   */
+  assert.doesNotMatch(fs.readFileSync('src/index.css', 'utf8'), /\[data-operation-mode="judging"\][^{]*\{\s*display:none/,
+    'no stylesheet may hide a judging section by its position in the tree');
+  assert.match(operations, /mode==='operations'\s*\n?\s*\?[\s\S]{0,400}'إدارة يوم المسابقة'/,
+    'the event-day heading belongs to operations only');
+  assert.match(operations, /:\s*<div className="flex justify-end"><Button[^>]*onClick=\{\(\)=>store\.addCommittee\(\)\}/,
+    'judging keeps the create-panel action — it is where panels are built');
+  assert.match(operations, /mode==='operations'&&store\.committees\.length>0&&<div className="grid xl:grid-cols/,
+    'the capacity simulation belongs to operations only');
+  // وقسم اللجان نفسه غير مشروط: هو جوهر شاشة التحكيم، ويظهر في الوضعين.
+  assert.match(operations, /<PanelCard key=\{c\.id\}/, 'the panel cards must render');
+  assert.doesNotMatch(operations, /mode==='operations'&&<section className="mizan-surface p-5 sm:p-6"><div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">/,
+    'the panels section is never gated to a single mode');
 });
 
 test('the judging policy toggles are grouped by what they actually change', () => {

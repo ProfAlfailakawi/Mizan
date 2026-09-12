@@ -1031,7 +1031,9 @@ export function useAppStore() {
         ? 'نمط الموجات: الإسناد يتمّ عند توزيع الدفعة'
         : unroutedReason === 'missing-pre-assignment'
           ? 'نمط الإسناد المسبق ولا لجنة مُسندة له قبل اليوم'
-          : 'لا توجد لجنة مؤهَّلة لفئة هذا المتسابق وروايته';
+          : unroutedReason === 'no-category-panel'
+            ? 'التوزيع بالفئة ولا لجنةَ مُسندة إليها فئة هذا المتسابق'
+            : 'لا توجد لجنة مؤهَّلة لفئة هذا المتسابق وروايته';
       const updated: Participant = {
         ...p,
         status: 'in_queue',
@@ -1075,12 +1077,20 @@ export function useAppStore() {
       globalState.participants[pIndex] = updated;
       /* الحادثة للعطب وحده. والموجةُ المؤجَّلة تظهر في «منتظرون بلا لجنة» وفي بطاقة التوزيع. */
       if (unrouted && !deferred) {
+        /* اسم الفئة يُذكر في حادثة التوزيع بالفئة: «لا لجنة» لا تقول للمشرف أيَّ لجنةٍ ينقصه. */
+        const categoryName = globalState.competition.categories.find(x => x.id === p.categoryId)?.nameArabic
+          || globalState.competition.categories.find(x => x.id === p.categoryId)?.name
+          || '';
         createIncident(
           'conflict_routing',
-          unroutedReason === 'missing-pre-assignment' ? 'Arrival with no pre-assigned committee' : 'Arrival with no eligible committee',
+          unroutedReason === 'missing-pre-assignment' ? 'Arrival with no pre-assigned committee'
+            : unroutedReason === 'no-category-panel' ? 'Arrival with no panel for its category'
+            : 'Arrival with no eligible committee',
           unroutedReason === 'missing-pre-assignment'
             ? `المتسابق ${p.code} حضر والمسابقة على نمط الإسناد المسبق، ولا لجنة مُسندة له. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا.`
-            : `المتسابق ${p.code} حضر ولا توجد لجنة مؤهَّلة لفئته. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا أو لجنة تغطي فئته.`,
+            : unroutedReason === 'no-category-panel'
+              ? `المتسابق ${p.code} حضر والتوزيع بالفئة، ولا لجنةَ مُسندة إليها فئته${categoryName ? ` «${categoryName}»` : ''}. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد. أسنِد الفئة إلى لجنة من «التحكيم ← الفئات».`
+              : `المتسابق ${p.code} حضر ولا توجد لجنة مؤهَّلة لفئته. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا أو لجنة تغطي فئته.`,
           'critical'
         );
       }
@@ -1765,21 +1775,29 @@ export function useAppStore() {
     notify(); return true;
   };
 
-  const loadPublicCompetition = async (competitionId:string) => {
+  /*
+   * الجلب يقول ثلاثًا: وصلت، أو ليست على الخادم، أو تعذّر الوصول.
+   *
+   * كان يردّ «نجح/فشل»، فاستوى عند الرابط العام غيابُ السجلّ وانقطاعُ الشبكة — وهما
+   * نقيضان في ما يجب أن يُفعل: الانقطاع يُعالَج بنسخةٍ محلية حتى يعود الاتصال، والغياب
+   * يعني صفحةً لا تُفتح لأحدٍ غير صاحب الجهاز، فعرضُها من الذاكرة يمشي بالمتسابق ثلاث
+   * خطوات إلى «لم نعثر على المسابقة» بعد أن ملأ بياناته كلّها.
+   */
+  const loadPublicCompetition = async (competitionId:string):Promise<'loaded'|'missing'|'unavailable'> => {
     try{
       const {db,doc,getDoc}=await getFirestoreClient();
       const snap=await getDoc(doc(db,'public_competitions',competitionId));
-      if(!snap.exists())return false;
+      if(!snap.exists())return 'missing';
       const data=snap.data() as {competition?:Competition;updatedAt?:string};
-      if(!data.competition||data.competition.id!==competitionId)return false;
+      if(!data.competition||data.competition.id!==competitionId)return 'missing';
       const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
       globalState.competition=target;
       const existing=globalState.competitions.findIndex(c=>c.id===target.id);
       globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
       if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
       persistLocalSnapshot();listeners.forEach(l=>l());
-      return true;
-    }catch(err){console.warn('Public competition load failed:',err);return false}
+      return 'loaded';
+    }catch(err){console.warn('Public competition load failed:',err);return 'unavailable'}
   };
 
   const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {
@@ -2211,14 +2229,30 @@ export function useAppStore() {
    * بينما يرد الخادم «لم نعثر على المسابقة» عند إرسال الطلب. هذان الفعلان يجعلان الحالة
    * قابلة للفحص وللإصلاح بضغطة واحدة بدل أن تُكتشف من متسابقٍ ضاع نموذجه.
    */
-  const checkPublicCompetitionPublished=async():Promise<boolean>=>{
-    if(launchPlaceholderActive()||globalState.isOffline)return false;
+  /*
+   * والفحص يقول ثلاثًا لا اثنتين.
+   *
+   * كان يردّ «نعم/لا» وحدهما، فكلُّ ما ليس نعمًا صار «غير منشور»: جهازٌ بلا شبكة، أو
+   * نسخةٌ قيد الإقلاع، أو قراءةٌ ردّها الخادم بخطأ — كلّها تُقال للمسؤول بعبارةٍ واحدة
+   * حاسمة: «الرابط غير منشور بعد على الخادم»، ويُعرض عليه زرّ نشرٍ لصفحةٍ منشورةٍ أصلًا.
+   * وهذا أسوأ من الصمت: يُكذّب عينَه وقد فتح الرابط قبل قليل فعمل.
+   *
+   * فصار الجهل حالةً ثالثة تُسمّى باسمها: `unknown` لا يتّهم ولا يطمئن، ولا يعرض إصلاحًا
+   * لعطبٍ لم يثبت. و«غير منشور» لا تُقال إلا حين قرأنا الخادم فعلًا ولم نجد السجلّ.
+   */
+  const checkPublicCompetitionPublished=async():Promise<{state:'published'|'missing'|'unknown';reason:string}>=>{
+    if(launchPlaceholderActive())return {state:'unknown',reason:'هذه نسخة عرضٍ لا تتصل بالخادم، فحالة النشر لا تُفحص هنا.'};
+    if(globalState.isOffline)return {state:'unknown',reason:'الجهاز دون اتصال الآن، فتعذّر فحص حالة النشر. أعد الفحص بعد عودة الشبكة.'};
     try{
       const {db,doc,getDoc}=await getFirestoreClient();
       const snap=await getDoc(doc(db,'public_competitions',globalState.competition.id));
       const data=snap.exists()?snap.data() as {competition?:Competition}:null;
-      return !!data?.competition&&data.competition.id===globalState.competition.id;
-    }catch(err){console.warn('MIZAN public competition check failed',err);return false}
+      const published=!!data?.competition&&data.competition.id===globalState.competition.id;
+      return {state:published?'published':'missing',reason:''};
+    }catch(err){
+      console.warn('MIZAN public competition check failed',err);
+      return {state:'unknown',reason:'تعذّر الوصول إلى الخادم لفحص حالة النشر. أعد الفحص، ولا تعتمد هذه الرسالة دليلًا على أن الرابط لا يعمل.'};
+    }
   };
   const republishPublicCompetition=async()=>publishPublicCompetitionRecord();
 

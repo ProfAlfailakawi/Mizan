@@ -416,3 +416,19 @@ export function parseDisplayBoard(raw: unknown): DisplayBoard | null {
     stalledPanels: committees.filter((c) => c.stalled).length,
   };
 }
+
+/*
+ * ساعة القاعة.
+ *
+ * كانت تُبنى بـ`toLocaleTimeString('ar-KW')`، فتردّ «٠٣:٢٦ ص» — ورمز الفترة يخرج من
+ * تشكيلٍ عربيٍّ في خطّ الشاشة الداكنة مشوّهًا ملتصقًا بما قبله، ويقف في سياقٍ ثنائي
+ * الاتجاه فيقفز موضعه بين جهاز وجهاز. ومن يقرأ من آخر الممرّ لا يجادل في الرمز: يراه
+ * عطبًا.
+ *
+ * فالساعة هنا أربعٌ وعشرون ساعةً بأرقام لاتينية، بلا رمز فترةٍ يُشكَّل أصلًا — ولا لبس
+ * في «١٥:٢٦» يحتاج «م» ليُرفع. قيمةٌ واحدة على كل جهاز، وتُقرأ من بعيد.
+ */
+export function venueClock(now: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}

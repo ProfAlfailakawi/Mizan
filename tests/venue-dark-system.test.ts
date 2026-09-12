@@ -50,8 +50,27 @@ test('the venue surfaces use the system instead of hand-rolling it', () => {
   assert.ok(!/bg-\[#2F6555\] text-white shadow/.test(infographics), 'its hand-painted active pill is gone');
 });
 
-test('the kiosk header is Arabic on an Arabic screen', () => {
+test('the gate carries the competition name, never the platform’s', () => {
   const kiosk = read('src/components/gate/KioskMode.tsx');
-  /* كان مكتوبًا «MIZAN Gate» ثابتًا، والحارس يترجم MIZAN وحدها فيبقى «ميزان Gate». */
-  assert.match(kiosk, /\{ar\?'بوابة ميزان':'MIZAN Gate'\}/, 'the gate header follows the chosen language');
+  /*
+   * كان العنوان «بوابة ميزان» ثابتًا والتذييل «ميزان · تشغيل هادئ». والمتسابق لا يعرف
+   * ميزان: هو في مسابقةٍ باسمها، تنظّمها جهةٌ اشترت أن تظهر باسمها هي. فاسم المنصّة لا
+   * يقف في شاشةٍ يراها الجمهور، ولا يعود بابًا خلفيًّا لنصٍّ ثابت.
+   */
+  assert.match(kiosk, /const gateTitle=bilingualName\(competition,ar\)/, 'the gate header is the competition’s own name');
+  assert.doesNotMatch(kiosk, /'بوابة ميزان'|'MIZAN Gate'|'ميزان · تشغيل هادئ'/, 'no hard-coded platform wordmark on a public screen');
+  assert.match(kiosk, /brand\.logoUrl/, 'the organizer’s logo takes the mark when one is set');
+});
+
+test('the venue boards read their clock without a shaped period marker', () => {
+  /*
+   * كانت الساعة تُبنى بـ`toLocaleTimeString('ar-KW')`، فيخرج رمز «ص/م» من تشكيلٍ عربيٍّ
+   * في خطّ الشاشة الداكنة ملتصقًا مشوّهًا، ويتنقّل موضعه في سياقٍ ثنائي الاتجاه. ومن يقرأ
+   * من آخر الممرّ يراه عطبًا لا رمزًا.
+   */
+  for (const file of ['src/components/public/WaitingBoard.tsx', 'src/components/public/CommitteeDisplay.tsx']) {
+    const source = read(file);
+    assert.match(source, /venueClock\(now\)/, `${file} must use the shared venue clock`);
+    assert.doesNotMatch(source, /toLocaleTimeString/, `${file} must not hand-roll a localized clock`);
+  }
 });

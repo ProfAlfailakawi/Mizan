@@ -7,7 +7,7 @@ import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
 import { QueueRibbon } from '../design-system/QueueRibbon';
 import {
-  HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait,
+  HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait, venueClock,
   type CommitteeBoardSlice, type DisplayBoard,
 } from '../../lib/display-board';
 
@@ -66,13 +66,13 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
     <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
-          <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'MIZAN WAIT'}</div>
+          <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'NOW SERVING'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
           <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName({ name: board.competitionName, nameArabic: board.competitionNameArabic }, ar)}</div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-end">
-            <div className="text-xl font-black tabular-nums">{now.toLocaleTimeString(ar ? 'ar-KW' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div dir="ltr" className="text-xl font-black tabular-nums">{venueClock(now)}</div>
             <FreshnessLine state={age.state} ageSeconds={age.ageSeconds} ar={ar} />
           </div>
           {onClose && <Button shape="square" variant="venue" onClick={onClose} aria-label={ar ? 'إغلاق شاشة الانتظار' : 'Close waiting display'}><X className="w-5 h-5" /></Button>}
@@ -106,7 +106,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
           </span>
         </div>}
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
           <Stat icon={UsersRound} n={board.totalWaiting} t={ar ? 'في الانتظار' : 'Waiting'} />
           <Stat icon={Clock3} n={board.activePanels} t={ar ? 'لجان عاملة' : 'Active panels'} />
           {/*
@@ -116,9 +116,6 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
           <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
             <span key={board.totalCompleted} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-4 h-4" /></span>
             <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-[10px] mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
-          </div>
-          <div className="rounded-2xl border border-white/8 px-4 py-3 text-[11px] mizan-venue-muted flex items-center">
-            {ar ? 'تُعرض الأكواد فقط احترامًا للخصوصية.' : 'Codes only, by design.'}
           </div>
         </div>
       </footer>

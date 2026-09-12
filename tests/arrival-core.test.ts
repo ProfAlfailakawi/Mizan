@@ -235,12 +235,62 @@ test('in PRE_ASSIGNED an arrival with no prior panel is a setup gap, and says wh
 });
 
 test('a panel already assigned is honoured in every mode — the gate never overrides a signed decision', () => {
-  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED'] as const) {
+  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED', 'BY_CATEGORY'] as const) {
     const p = { ...participant(), assignedCommitteeId: 'c9' };
     const out = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [committee('c1')], mode });
     assert.equal(out.kind, 'admit', mode);
     assert.equal((out as { assignedCommitteeId?: string }).assignedCommitteeId, 'c9', mode);
   }
+});
+
+/*
+ * التوزيع بالفئة.
+ *
+ * وعدُ النمط هو ما يُكتب على باب اللجنة: «هذه لجنة عشرة أجزاء». فاللجنة المكرَّسة لفئةٍ
+ * لا تُزاحَم بمن تسعه لجنةٌ مشتركة، ولا يُسنَد أحدٌ خارج فئته مهما ضاقت الخيارات — وإلا
+ * كان النمط لافتةً تُكذّبها القاعة.
+ */
+test('BY_CATEGORY prefers the panel dedicated to the category over a shared one', () => {
+  const p = participant();
+  const shared = committee('c1', { assignedCategories: ['cat-1', 'cat-2'] });
+  const dedicated = committee('c2', { assignedCategories: ['cat-1'] });
+  const out = admit({
+    participant: p, roster: [p], competitionId: COMP,
+    eligibleCommittees: [shared, dedicated], mode: 'BY_CATEGORY',
+  });
+  assert.equal(out.assignedCommitteeId, 'c2');
+});
+
+test('BY_CATEGORY falls back to a shared panel that still covers the category', () => {
+  const p = participant();
+  const out = admit({
+    participant: p, roster: [p], competitionId: COMP,
+    eligibleCommittees: [committee('c1', { assignedCategories: ['cat-1', 'cat-2'] })], mode: 'BY_CATEGORY',
+  });
+  assert.equal(out.assignedCommitteeId, 'c1');
+});
+
+test('BY_CATEGORY splits the load between two dedicated panels by measured minutes', () => {
+  const waiting = { ...participant({ id: 'p-0', code: 'A-100' }), status: 'in_queue' as const, assignedCommitteeId: 'c1', originalQueueNumber: 1, queueOrderKey: 1 };
+  const p = participant();
+  const out = admit({
+    participant: p, roster: [waiting, p], competitionId: COMP,
+    eligibleCommittees: [committee('c1'), committee('c2')], mode: 'BY_CATEGORY',
+  });
+  assert.equal(out.assignedCommitteeId, 'c2');
+});
+
+test('BY_CATEGORY never routes outside the category, even when ANY_AVAILABLE is allowed', () => {
+  /* وإلّا نقض الخيارُ العامّ النمطَ الذي اختير ليمنعه بالذات. */
+  const p = participant();
+  const out = decideArrival({
+    participant: p, roster: [p], competitionId: COMP,
+    eligibleCommittees: [], fallbackCommittees: [committee('c9', { assignedCategories: ['cat-2'] })],
+    unmatchedPolicy: 'ANY_AVAILABLE', mode: 'BY_CATEGORY',
+  });
+  assert.equal(out.kind, 'admit-unrouted');
+  assert.equal((out as { reason: string }).reason, 'no-category-panel', 'the supervisor must be told which gap this is');
+  assert.equal((out as { originalQueueNumber: number }).originalQueueNumber, 1, 'priority is earned at the door in every mode');
 });
 
 test('WAVES never routes, not even when exactly one panel qualifies', () => {
@@ -254,7 +304,7 @@ test('WAVES never routes, not even when exactly one panel qualifies', () => {
 });
 
 test('every mode still refuses a duplicate scan', () => {
-  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED'] as const) {
+  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED', 'BY_CATEGORY'] as const) {
     const p = { ...participant(), status: 'in_queue' as const };
     const out = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [committee('c1')], mode });
     assert.equal(out.kind, 'duplicate', mode);

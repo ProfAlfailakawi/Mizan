@@ -282,6 +282,23 @@ const boardParams = (h: string): BoardParams => {
   } catch { return empty; }
 };
 /* شاشة تظهر حين يحمل الرابط معرّف مسابقة غير موجودة: تقول الحقيقة بدل أن تُسقط الزائر على مسابقة أخرى. */
+/*
+ * شريطٌ لا يراه إلا من تظهر عنده المشكلة.
+ *
+ * يظهر حين تكون الصفحة مرسومة من ذاكرة هذا الجهاز بينما لا سجلَّ لها على الخادم: أي
+ * لصاحب الجهاز وحده — ولا يراه المتسابق، لأنه لا يصل إلى هذه الصفحة أصلًا. وهو يقول
+ * الفرق بين ما يرى وما يرى الناس، في موضع الوهم نفسه لا في شاشةٍ أخرى.
+ */
+const LocalPreviewNote: React.FC<{show:boolean}> = ({show}) => show ? (
+  <div role="status" className="mx-auto max-w-3xl px-4 pt-4">
+    <div className="rounded-2xl border border-[#E2D6BE] bg-[#F3EFE6] px-4 py-3 text-[11px] font-bold leading-6 text-[#725630]">
+      هذه الصفحة مرسومة من نسخةٍ محفوظة على جهازك، ولا سجلّ لها على الخادم — فهي لا تُفتح
+      لأحدٍ غيرك، وأيّ طلبٍ يُرسَل منها يُردّ بـ«لم نعثر على المسابقة».
+      انشر المسابقة من «هوية المسابقة ← مشاركة التسجيل» قبل توزيع الرابط.
+    </div>
+  </div>
+) : null;
+
 const CompetitionNotFound: React.FC = () => (
   <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5">
     <div className="mizan-surface p-8 max-w-md text-center">
@@ -351,6 +368,15 @@ export default function App() {
  // رابط يحمل معرّف مسابقة ⇒ اجعلها المسابقة النشطة قبل عرض صفحتها. غياب المعرّف يبقي المسابقة الحالية.
  const requestedComp=compParam(hash);
  const [compMissing,setCompMissing]=useState(false); const [compLoading,setCompLoading]=useState(false);
+ /*
+  * نسخةٌ محلية على جهازٍ واحد ليست صفحةً منشورة.
+  *
+  * حين لا يجد الرابط العام سجلَّ المسابقة على الخادم، وكانت نسخةٌ منها في ذاكرة هذا
+  * الجهاز (وهو حال جهاز الإدارة وحده)، كانت الصفحة تُعرض كاملةً كأنّ كل شيء يعمل —
+  * فيختبرها المسؤول من جهازه فتنجح، ويفتحها المتسابق من جهازه فلا يجد شيئًا، أو يملأ
+  * النموذج كلَّه ثم يردّه الخادم بـ«لم نعثر على المسابقة». والفرق لا يظهر إلا هنا.
+  */
+ const [localPreview,setLocalPreview]=useState(false);
  useEffect(()=>{
   let alive=true;
   if(!requestedComp){setCompMissing(false);setCompLoading(false);return()=>{alive=false}}
@@ -359,14 +385,16 @@ export default function App() {
   // الروابط العامة تعيد جلب النسخة المنشورة أولًا حتى لا تعرض ذاكرة المتصفح فئات قديمة.
   // ولا نختار النسخة المحلية قبل الجلب: اختيارها يفعّل مزامنة الإدارة وقد يعيد نشر نسخة قديمة.
   if(publicRoute){
-   setCompLoading(true);setCompMissing(false);
-   void loadPublicCompetition(requestedComp).then(ok=>{if(!alive)return;if(!ok&&localExists)selectCompetition(requestedComp);setCompMissing(!ok&&!localExists);setCompLoading(false)});
+   setCompLoading(true);setCompMissing(false);setLocalPreview(false);
+   void loadPublicCompetition(requestedComp).then(state=>{if(!alive)return;const ok=state==='loaded';if(!ok&&localExists)selectCompetition(requestedComp);setCompMissing(!ok&&!localExists);
+    /* الانقطاع يُحتمَل بالنسخة المحلية بلا ضجيج؛ والغياب يُقال، فهو عطبٌ لا يراه إلا صاحب الجهاز. */
+    setLocalPreview(state==='missing'&&localExists);setCompLoading(false)});
    return()=>{alive=false};
   }
   // شاشة الإدارة تفضّل النسخة المحلية الأحدث ولا تستبدلها بنسخة نشر قديمة.
   if(selectCompetition(requestedComp)){setCompMissing(false);setCompLoading(false);return()=>{alive=false}}
   setCompLoading(true);setCompMissing(false);
-  void loadPublicCompetition(requestedComp).then(ok=>{if(!alive)return;setCompMissing(!ok);setCompLoading(false)});
+  void loadPublicCompetition(requestedComp).then(state=>{if(!alive)return;setCompMissing(state!=='loaded');setCompLoading(false)});
   return()=>{alive=false};
  },[requestedComp,hash]);
  if(marketing) return <Suspense fallback={<ViewFallback/>}><MarketingSite/></Suspense>;
@@ -377,8 +405,8 @@ export default function App() {
  if(!authReady) return <div className="min-h-screen grid place-items-center bg-[#f7f5ef] text-xs font-bold text-[#636864]"><MizanLogo language="ar" compact/></div>;
  // التسجيل وصفحة المسابقة روابط عامة؛ لا تُجبر الزائر على حساب موظف.
  if((hash.startsWith('#competition')||hash.startsWith('#register')||hash.startsWith('#journey')||hash.startsWith('#guardian'))&&compLoading) return <ViewFallback/>;
- if(hash.startsWith('#competition')) return compMissing?<CompetitionNotFound/>:<Page><CompetitionLanding/></Page>;
- if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><RegistrationFlow onSuccess={(participant)=>{window.location.hash=`#journey?comp=${encodeURIComponent(requestedComp||participant.competitionId||'')}&key=${encodeURIComponent(participant.journeyAccessToken||'')}`}}/></Page></div>;
+ if(hash.startsWith('#competition')) return compMissing?<CompetitionNotFound/>:<Page><LocalPreviewNote show={localPreview}/><CompetitionLanding/></Page>;
+ if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><LocalPreviewNote show={localPreview}/><RegistrationFlow onSuccess={(participant)=>{window.location.hash=`#journey?comp=${encodeURIComponent(requestedComp||participant.competitionId||'')}&key=${encodeURIComponent(participant.journeyAccessToken||'')}`}}/></Page></div>;
  if(hash.startsWith('#journey')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="participant"/></Page>;
  if(hash.startsWith('#guardian')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="guardian"/></Page>;
  // التحقق من الشهادة خدمة عامة بالكامل ولا تمر ببوابة الموظفين.
