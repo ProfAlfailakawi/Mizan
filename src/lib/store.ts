@@ -1791,28 +1791,86 @@ export function useAppStore() {
    * خطوات إلى «لم نعثر على المسابقة» بعد أن ملأ بياناته كلّها.
    */
   const loadPublicCompetition = async (competitionId:string):Promise<'loaded'|'missing'|'unavailable'> => {
-    try{
-      const {db,doc,getDoc}=await getFirestoreClient();
-      const snap=await getDoc(doc(db,'public_competitions',competitionId));
-      if(snap.exists()){
-        const data=snap.data() as {competition?:Competition;updatedAt?:string};
-        if(data.competition&&data.competition.id===competitionId){
-          const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
-          globalState.competition=target;
-          const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-          globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-          if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
-          persistLocalSnapshot();listeners.forEach(l=>l());
-          return 'loaded';
-        }
-      }
-    }catch(err){console.warn('Public competition Firestore load failed:',err)}
+    const isPlaceholder = !competitionId || competitionId === 'comp-pending-setup';
+    const effectiveId = isPlaceholder ? '' : competitionId;
 
+    if(globalState.isOffline){
+      const cached = effectiveId ? (globalState.competitions.find(c=>c.id===effectiveId)||(globalState.competition?.id===effectiveId?globalState.competition:null)) : (globalState.competitions.find(c=>c.id!=='comp-pending-setup'&&c.categories?.length)||globalState.competition);
+      if(cached && cached.categories?.length){
+        globalState.competition={...cached,policy:getCompetitionPolicy(cached),ruleSets:cached.ruleSets||[cached.ruleSet]};
+        persistLocalSnapshot();listeners.forEach(l=>l());
+        return 'loaded';
+      }
+      return 'unavailable';
+    }
+
+    if(effectiveId){
+      try{
+        const {db,doc,getDoc}=await getFirestoreClient();
+        const snap=await getDoc(doc(db,'public_competitions',effectiveId));
+        if(snap.exists()){
+          const data=snap.data() as {competition?:Competition;updatedAt?:string};
+          if(data.competition&&data.competition.id===effectiveId&&Array.isArray(data.competition.categories)&&data.competition.categories.length>0){
+            const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
+            globalState.competition=target;
+            const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+            globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+            if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
+            persistLocalSnapshot();listeners.forEach(l=>l());
+            return 'loaded';
+          }
+        }
+      }catch(err){console.warn('Public competition Firestore load failed:',err)}
+
+      try{
+        const resp=await fetch(`/api/public/competitions/${encodeURIComponent(effectiveId)}`);
+        if(resp.ok){
+          const payload=await resp.json();
+          if(payload?.competition&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
+            const target={...payload.competition,policy:getCompetitionPolicy(payload.competition),ruleSets:payload.competition.ruleSets||[payload.competition.ruleSet]};
+            globalState.competition=target;
+            const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+            globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+            if(payload.updatedAt)globalState.competitionConfigUpdatedAt=payload.updatedAt;
+            persistLocalSnapshot();listeners.forEach(l=>l());
+            return 'loaded';
+          }
+        }
+      }catch(err){console.warn('Public competition server API load failed:',err)}
+
+      const localComp=globalState.competitions.find(c=>c.id===effectiveId)||(globalState.competition?.id===effectiveId?globalState.competition:null);
+      if(localComp && Array.isArray(localComp.categories) && localComp.categories.length>0){
+        try{
+          await fetch(`/api/public/competitions/${encodeURIComponent(effectiveId)}/publish`,{
+            method:'POST',
+            headers:{'content-type':'application/json'},
+            body:JSON.stringify({organizationId:localComp.organizationId,competition:localComp})
+          });
+        }catch{/* ignore */}
+        const target={...localComp,policy:getCompetitionPolicy(localComp),ruleSets:localComp.ruleSets||[localComp.ruleSet]};
+        globalState.competition=target;
+        persistLocalSnapshot();listeners.forEach(l=>l());
+        return 'loaded';
+      }
+
+      if(effectiveId===SEED_COMPETITION.id||effectiveId==='comp-dubai-2027'){
+        const target={...SEED_COMPETITION,policy:getCompetitionPolicy(SEED_COMPETITION),ruleSets:SEED_COMPETITION.ruleSets||[SEED_COMPETITION.ruleSet]};
+        globalState.competition=target;
+        const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+        globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+        persistLocalSnapshot();listeners.forEach(l=>l());
+        return 'loaded';
+      }
+
+      return 'missing';
+    }
+
+    // Default / latest when competitionId is empty or placeholder
     try{
-      const resp=await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}`);
+      const resp=await fetch('/api/public/competitions/latest');
       if(resp.ok){
         const payload=await resp.json();
-        if(payload?.competition&&payload.competition.id===competitionId){
+        if(payload?.competition&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
           const target={...payload.competition,policy:getCompetitionPolicy(payload.competition),ruleSets:payload.competition.ruleSets||[payload.competition.ruleSet]};
           globalState.competition=target;
           const existing=globalState.competitions.findIndex(c=>c.id===target.id);
@@ -1822,33 +1880,15 @@ export function useAppStore() {
           return 'loaded';
         }
       }
-    }catch(err){console.warn('Public competition server API load failed:',err)}
+    }catch(err){console.warn('Public competition latest load failed:',err)}
 
-    const localComp=globalState.competitions.find(c=>c.id===competitionId)||(globalState.competition?.id===competitionId?globalState.competition:null);
-    if(localComp){
-      try{
-        await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/publish`,{
-          method:'POST',
-          headers:{'content-type':'application/json'},
-          body:JSON.stringify({organizationId:localComp.organizationId,competition:localComp})
-        });
-      }catch{/* ignore */}
-      const target={...localComp,policy:getCompetitionPolicy(localComp),ruleSets:localComp.ruleSets||[localComp.ruleSet]};
-      globalState.competition=target;
-      persistLocalSnapshot();listeners.forEach(l=>l());
-      return 'loaded';
-    }
-
-    if(competitionId===SEED_COMPETITION.id||competitionId==='comp-dubai-2027'){
-      const target={...SEED_COMPETITION,policy:getCompetitionPolicy(SEED_COMPETITION),ruleSets:SEED_COMPETITION.ruleSets||[SEED_COMPETITION.ruleSet]};
-      globalState.competition=target;
-      const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-      globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-      persistLocalSnapshot();listeners.forEach(l=>l());
-      return 'loaded';
-    }
-
-    return 'missing';
+    const anyValid=globalState.competitions.find(c=>c.id!=='comp-pending-setup'&&Array.isArray(c.categories)&&c.categories.length>0)||SEED_COMPETITION;
+    const target={...anyValid,status:'registration_open' as const,policy:getCompetitionPolicy(anyValid),ruleSets:anyValid.ruleSets||[anyValid.ruleSet]};
+    globalState.competition=target;
+    const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+    globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+    persistLocalSnapshot();listeners.forEach(l=>l());
+    return 'loaded';
   };
 
   const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {

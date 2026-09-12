@@ -147,10 +147,46 @@ async function startServer() {
   const publicDataDir=process.env.MIZAN_PUBLIC_DATA_DIR||path.resolve('.mizan-data/public-data');
   try{fs.mkdirSync(publicCompDir,{recursive:true,mode:0o700})}catch{/* ignore */}
   try{fs.mkdirSync(publicDataDir,{recursive:true,mode:0o700})}catch{/* ignore */}
+  try{
+    const seedFile=path.join(publicCompDir,`${SEED_COMPETITION.id}.json`);
+    if(!fs.existsSync(seedFile)){
+      fs.writeFileSync(seedFile,JSON.stringify({organizationId:SEED_COMPETITION.organizationId,competition:{...SEED_COMPETITION,status:'registration_open'},updatedAt:new Date().toISOString()},null,2),'utf8');
+    }
+  }catch{/* ignore */}
+
+  const getLatestOrActiveCompetition=async():Promise<any>=>{
+    try{
+      if(fs.existsSync(publicCompDir)){
+        const files=fs.readdirSync(publicCompDir).filter(f=>f.endsWith('.json')&&!f.startsWith('comp-pending-setup'));
+        if(files.length>0){
+          files.sort((a,b)=>{
+            const statA=fs.statSync(path.join(publicCompDir,a));
+            const statB=fs.statSync(path.join(publicCompDir,b));
+            return statB.mtimeMs-statA.mtimeMs;
+          });
+          for(const f of files){
+            try{
+              const raw=fs.readFileSync(path.join(publicCompDir,f),'utf8');
+              const parsed=JSON.parse(raw);
+              const comp=parsed?.competition||parsed;
+              if(comp&&typeof comp==='object'&&Array.isArray(comp.categories)&&comp.categories.length>0){
+                return {...comp,status:comp.status==='draft'?'registration_open':comp.status};
+              }
+            }catch{/* ignore */}
+          }
+        }
+      }
+    }catch(err){
+      console.warn('[public-competitions] Failed to get latest from disk:',err);
+    }
+    return {...SEED_COMPETITION,status:'registration_open'};
+  };
 
   const getPublicCompetitionRecord=async(id:string):Promise<any>=>{
     const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
-    if(!cleanId) return null;
+    if(!cleanId||cleanId==='latest'||cleanId==='current'||cleanId==='default'||cleanId==='comp-pending-setup'){
+      return await getLatestOrActiveCompetition();
+    }
     if(firestoreRepository){
       try{
         const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
@@ -587,6 +623,16 @@ async function startServer() {
     try{opsTelemetry.recordJob({id:`public_registration:${competitionId||'unknown'}:${code}`,competitionId:competitionId||undefined,jobType:'public_registration',status:'FAILED',errorCode:code})}catch{/* التتبّع لا يُفشل تسجيلًا ولا يُغيّر ردًّا */}
   };
   const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
+  app.get('/api/public/competition',async(req,res)=>{
+    const comp=await getLatestOrActiveCompetition();
+    res.setHeader('Cache-Control','public, max-age=60');
+    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+  });
+  app.get('/api/public/competitions',async(req,res)=>{
+    const comp=await getLatestOrActiveCompetition();
+    res.setHeader('Cache-Control','public, max-age=60');
+    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+  });
   app.get('/api/public/competitions/:competitionId',async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     const comp=await getPublicCompetitionRecord(competitionId);
