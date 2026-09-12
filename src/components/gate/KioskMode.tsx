@@ -5,13 +5,26 @@ import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { Participant } from '../../types';
 import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
+import { useBrandName } from '../design-system/MizanLogo';
+import { bilingualName } from '../../lib/ui-language';
 
 export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  // Full-screen venue modes open over the app, but had no Escape and no dialog
  // semantics: a keyboard or screen-reader user had no way back out.
  const venueRef = useRef<HTMLDivElement|null>(null);
  useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
- const {language,checkInParticipant,verifyOfflineJourneyPass,committees}=useAppStore(); const ar=language==='ar';
+ const {language,checkInParticipant,verifyOfflineJourneyPass,committees,competition}=useAppStore(); const ar=language==='ar';
+ /*
+  * البوابة تحمل اسم المسابقة، لا اسم المنصّة.
+  *
+  * كانت تقول «بوابة ميزان» ثابتةً، وتذيّل الشاشة بـ«ميزان · تشغيل هادئ». والمتسابق لا
+  * يعرف ميزان ولا يعنيه: هو جاء إلى مسابقةٍ باسمها، والجهة التي تنظّمها اشترت أن تظهر
+  * باسمها هي. فصار العنوان اسم المسابقة، والشعار شعارها أو شعار الجهة، وحرف الشارة أوّل
+  * حرفٍ من ذلك الاسم — ولا يبقى في الشاشة اسم منصّةٍ يزاحم اسم صاحب القاعة.
+  */
+ const brand=useBrandName();
+ const gateTitle=bilingualName(competition,ar)||(ar?brand.ar:brand.en);
+ const gateMark=(gateTitle.trim()[0]||'').toUpperCase();
  const [code,setCode]=useState(''); const [done,setDone]=useState<Participant|null>(null); const [error,setError]=useState(false); const [errorReason,setErrorReason]=useState('');
  const [camera,setCamera]=useState<'idle'|'starting'|'active'|'unsupported'|'denied'>('idle');
  const videoRef=useRef<HTMLVideoElement|null>(null); const streamRef=useRef<MediaStream|null>(null); const scanTimer=useRef<number|undefined>(undefined);
@@ -48,7 +61,10 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
   return hit?(ar?hit[0]:hit[1]):(ar?'تعذّر التحقق من البطاقة.':'We could not verify this pass.');
  };
  return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'بوابة الحضور':'Gate kiosk'} className="fixed inset-0 z-50 mizan-venue text-white p-5 sm:p-8 flex flex-col">
-   <div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-white/8 border border-white/10 grid place-items-center font-black text-[#dbe7df]">م</span><div><div className="font-black">{ar?'بوابة ميزان':'MIZAN Gate'}</div><div className="text-[10px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
+   <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3 min-w-0">{brand.logoUrl
+     ?<img src={brand.logoUrl} alt="" className="w-10 h-10 rounded-xl object-contain bg-white/8 border border-white/10 p-1 shrink-0"/>
+     :<span aria-hidden className="w-10 h-10 rounded-xl bg-white/8 border border-white/10 grid place-items-center font-black text-[#dbe7df] shrink-0">{gateMark}</span>}
+    <div className="min-w-0"><div className="font-black truncate">{gateTitle}</div><div className="text-[10px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
    <div className="my-auto max-w-lg w-full mx-auto">
     {!done?<div className="text-center">
       <div className="w-52 h-52 rounded-[32px] border border-white/15 bg-white/[.035] grid place-items-center mx-auto relative overflow-hidden">
@@ -62,6 +78,5 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
      </div>
     :<div className="rounded-[32px] border border-white/12 bg-white/[.055] p-8 text-center"><span className="w-16 h-16 rounded-full bg-[#dbe7df] text-[#214C40] grid place-items-center mx-auto"><Check className="w-8 h-8"/></span><div className="mizan-kicker !mizan-venue-muted mt-6">{done.code}</div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?`أهلًا ${done.fullNameArabic}`:`Welcome ${done.fullName}`}</h1>{!!ticketNumber&&<div className="mt-5 rounded-[26px] bg-[#f8f6ef] text-[#17352c] p-2 overflow-hidden"><TearOffQueueTicket number={ticketNumber} committee={committee?.code} ar={ar} compact/></div>}{(!!done.queueNumber||!!committee)&&<div className={`mt-3 grid gap-3 ${done.queueNumber&&committee?'grid-cols-2':'grid-cols-1'}`}>{!!done.queueNumber&&<div className="rounded-2xl bg-black/10 p-4"><div className="text-[10px] mizan-venue-muted">{ar?'أمامك':'Ahead'}</div><div className="text-3xl font-black mt-1">{Math.max(0,done.queueNumber-1)}</div></div>}{!!committee&&<div className="rounded-2xl bg-black/10 p-4"><div className="text-[10px] mizan-venue-muted">{ar?'اللجنة':'Committee'}</div><div className="text-lg font-black mt-2">{committee.code}</div></div>}</div>}</div>}
    </div>
-   <div className="text-center text-[10px] mizan-venue-faint">{ar?'ميزان · تشغيل هادئ':'MIZAN · Quiet automation'}</div>
  </div>
 }

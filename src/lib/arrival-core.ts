@@ -30,8 +30,15 @@ export const ARRIVED_STATUSES = ['in_queue', 'in_session', 'tested', 'certified'
  *   الأسبقية. وهذا ليس عطبًا في الانتظار: الرقم يُمنح عند الباب كما في كل نمط.
  * - `PRE_ASSIGNED` — اللجان أُسندت قبل اليوم، والبوابة تحترمها ولا تُسند من تلقائها.
  *   فمن وصل بلا إسنادٍ مسبق ثغرةُ إعداد تُعلَن، لا فراغٌ تملؤه البوابة بالتخمين.
+ * - `BY_CATEGORY` — اللجنة تُختار بفئة المتسابق وحدها: تُقدَّم اللجنة المكرَّسة لفئته —
+ *   تلك التي لا تحكم غيرها — على اللجنة التي تجمع فئته مع فئاتٍ أخرى، ثم يُفضّ التعادل
+ *   بأقلّها حِملًا. وهو النمط الذي تُعلَن فيه القاعة على الفئات: «هذه لجنة حفظ القرآن
+ *   كاملًا، وتلك لعشرة أجزاء»، فيقف كلٌّ حيث يعرف قبل أن يُنادى.
+ *
+ *   وفيه وحده لا يُفتح باب `ANY_AVAILABLE`: إسنادٌ خارج الفئة ينقض سببَ اختيار النمط،
+ *   فمن لا لجنةَ لفئته يدخل الطابور برقمه وتُعلَن الحاجة، ولا يُملأ الفراغ بلجنةٍ خطأ.
  */
-export type DistributionMode = 'ON_ARRIVAL' | 'WAVES' | 'PRE_ASSIGNED';
+export type DistributionMode = 'ON_ARRIVAL' | 'WAVES' | 'PRE_ASSIGNED' | 'BY_CATEGORY';
 
 /** لماذا دخل الطابور بلا لجنة — والسبب يغيّر ما يُقال للمشرف وهل تُفتح حادثة. */
 export type UnroutedReason =
@@ -40,7 +47,9 @@ export type UnroutedReason =
   /** نمط الموجات: الإسناد مؤجَّل بالتصميم، وليس عطبًا ولا يُفتح له شيء. */
   | 'awaiting-wave'
   /** نمط الإسناد المسبق ولا إسناد له: ثغرةُ إعداد كذلك. */
-  | 'missing-pre-assignment';
+  | 'missing-pre-assignment'
+  /** التوزيع بالفئة ولا لجنةَ تحمل فئته: ثغرةُ إعداد تُعلَن باسم الفئة. */
+  | 'no-category-panel';
 
 export type ArrivalDecision =
   | { kind: 'not-found' }
@@ -149,6 +158,19 @@ export function decideArrival(args: {
     return { kind: 'admit-unrouted', ...admitted, reason: 'awaiting-wave' };
   if (mode === 'PRE_ASSIGNED')
     return { kind: 'admit-unrouted', ...admitted, reason: 'missing-pre-assignment' };
+
+  /*
+   * التوزيع بالفئة. اللجنة المكرَّسة — التي لا تحكم سوى فئته — تسبق المشتركة، لأن
+   * إشغالها بغيره يُفرغ الوعد المعلن على بابها. وإن تعدّدت المكرَّسات فُضّ بالأقلّ حِملًا
+   * كما في بقيّة الأنماط، فالحتمية واحدة أينما وقع القرار.
+   */
+  if (mode === 'BY_CATEGORY') {
+    const dedicated = eligibleCommittees.filter(c =>
+      (c.assignedCategories || []).length === 1 && c.assignedCategories[0] === participant.categoryId);
+    const byCategory = leastLoadedCommittee(dedicated.length ? dedicated : eligibleCommittees, roster, competitionId);
+    if (!byCategory) return { kind: 'admit-unrouted', ...admitted, reason: 'no-category-panel' };
+    return { kind: 'admit', ...admitted, assignedCommitteeId: byCategory };
+  }
 
   const pool = eligibleCommittees.length
     ? eligibleCommittees

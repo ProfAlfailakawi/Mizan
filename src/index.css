@@ -989,18 +989,11 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:196px }
 }
 .mizan-code small{ font-family:var(--font-arabic); font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); letter-spacing:0; }
 
-/* One governed implementation, two quiet top-level workspaces: operations and judging. */
-[data-operation-mode="operations"] > section:nth-of-type(4),
-[data-operation-mode="operations"] > div.flex > button:last-child{display:none}
-[data-operation-mode="judging"] > section:nth-of-type(1),
-[data-operation-mode="judging"] > section:nth-of-type(3),
-[data-operation-mode="judging"] > div.grid.xl\:grid-cols-\[1fr_\.55fr\]{display:none}
-[data-operation-mode="judging"] > div.flex:first-of-type,
-[data-operation-mode="judging"] > section:nth-of-type(2) > div:first-child{display:none}
-[data-operation-mode="judging"] > section:nth-of-type(2) > div.grid > button:nth-child(2){display:none}
-/* كانت تُجبَر بطاقات اللجان على عمودٍ واحدٍ مهما اتّسعت الشاشة، فتُقرأ كطابورٍ لا ينتهي على
-   شاشةٍ نصفها فارغ. الشبكة الآن تتنفّس مع العرض كما صُمِّمت في المكوّن نفسه. */
-@media (max-width:767px){ [data-operation-mode="judging"] > section:nth-of-type(2) > div.grid{grid-template-columns:minmax(0,1fr)} }
+/* One governed implementation, two quiet top-level workspaces: operations and judging.
+   ما يظهر في كل وضع يُقرَّر في المكوّن نفسه. كان هنا مُحدِّدٌ يعدّ الأقسام بترتيبها
+   (`section:nth-of-type(n)`) ويخفي ما لا يخصّ الوضع؛ ثم انتقلت الأقسام غير المشتركة إلى
+   شرطٍ في الشيفرة فتبدّل ترتيبها، فصار المُحدِّد يخفي قسم اللجان نفسه: شاشة التحكيم
+   عنوانٌ وفراغ. حِيلةُ ترتيبٍ في ملف الأنماط لا تعرف متى تغيّرت الشجرة، فلا تُستعمل حارسًا. */
 
 /* ── MIZAN overture — «الميزان يتزن» (public surfaces only) ─────────────────
    The signature ExperienceHub opening: an abstract balance scale draws in,

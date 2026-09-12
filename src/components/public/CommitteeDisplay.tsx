@@ -9,7 +9,7 @@ import { QueueRibbon } from '../design-system/QueueRibbon';
 import { FreshnessLine } from './WaitingBoard';
 import {
   PANEL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describePanelStatus,
-  describeWait, selectCommitteeSlices, type DisplayBoard,
+  describeWait, selectCommitteeSlices, venueClock, type DisplayBoard,
 } from '../../lib/display-board';
 
 /*
@@ -125,7 +125,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
         </div>
       </div>
       <div className="text-end shrink-0">
-        <div className="text-lg sm:text-2xl font-black tabular-nums">{now.toLocaleTimeString(ar ? 'ar-KW' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div dir="ltr" className="text-lg sm:text-2xl font-black tabular-nums">{venueClock(now)}</div>
         <FreshnessLine state={age.state} ageSeconds={age.ageSeconds} ar={ar} />
       </div>
     </header>
@@ -186,7 +186,6 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
             {ar ? `أُنجز ${slice.completedCount}` : `${slice.completedCount} completed`}
           </span>
         </div>
-        <span className="mizan-venue-faint">{ar ? 'تُعرض الأكواد فقط احترامًا للخصوصية.' : 'Codes only, by design.'}</span>
       </div>
 
       {slices.length > 1 && <div className="flex items-center justify-center gap-1.5" aria-hidden>
