@@ -1824,6 +1824,21 @@ export function useAppStore() {
       }
     }catch(err){console.warn('Public competition server API load failed:',err)}
 
+    const localComp=globalState.competitions.find(c=>c.id===competitionId)||(globalState.competition?.id===competitionId?globalState.competition:null);
+    if(localComp){
+      try{
+        await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/publish`,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({organizationId:localComp.organizationId,competition:localComp})
+        });
+      }catch{/* ignore */}
+      const target={...localComp,policy:getCompetitionPolicy(localComp),ruleSets:localComp.ruleSets||[localComp.ruleSet]};
+      globalState.competition=target;
+      persistLocalSnapshot();listeners.forEach(l=>l());
+      return 'loaded';
+    }
+
     if(competitionId===SEED_COMPETITION.id||competitionId==='comp-dubai-2027'){
       const target={...SEED_COMPETITION,policy:getCompetitionPolicy(SEED_COMPETITION),ruleSets:SEED_COMPETITION.ruleSets||[SEED_COMPETITION.ruleSet]};
       globalState.competition=target;
@@ -2244,30 +2259,35 @@ export function useAppStore() {
   };
 
   const publishPublicCompetitionRecord=async():Promise<{ok:boolean;reason:string}>=>{
-    if(launchPlaceholderActive())return {ok:false,reason:'أكمل تهيئة المسابقة والجهة قبل فتح التسجيل.'};
     if(globalState.isOffline)return {ok:false,reason:'الجهاز دون إنترنت الآن، ولا يمكن نشر صفحة التسجيل العامة حتى يعود الاتصال.'};
-    if(!auth.currentUser)return {ok:false,reason:'يلزم تسجيل الدخول لنشر صفحة التسجيل العامة.'};
-    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'صلاحية هذا الحساب لا تسمح بنشر صفحة التسجيل العامة.'};
+    let serverOk = false;
     try{
-      const updatedAt=new Date().toISOString();
-      const configPersistResult=await persistCompetitionConfiguration(updatedAt);
-      if(configPersistResult==='stale')return {ok:false,reason:'لم ننشر رابط التسجيل لأن السحابة تحمل إعدادًا أحدث من نسخة هذا الجهاز. حدّث الصفحة ثم أعد المحاولة.'};
-      if(configPersistResult!=='written')return {ok:false,reason:'تعذّر حفظ إعدادات المسابقة في السحابة، لذلك لم ننشر رابط التسجيل حتى لا يظهر للطلاب خطأ «لم نعثر على المسابقة».'};
-      const {db,doc,setDoc}=await getFirestoreClient();
-      await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
-      resolveCloudScope('competition');
-      try{
-        await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
-          method:'POST',
-          headers:{'content-type':'application/json'},
-          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
-        });
-      }catch{/* ignore */}
-      return {ok:true,reason:''};
+      const resp = await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
+      });
+      if(resp.ok) serverOk = true;
     }catch(err){
-      console.error('MIZAN public competition publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
-      return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
+      console.warn('MIZAN local public publish endpoint failed:', err);
     }
+    if(auth.currentUser && ['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)){
+      try{
+        const updatedAt=new Date().toISOString();
+        const configPersistResult=await persistCompetitionConfiguration(updatedAt);
+        if(configPersistResult==='stale')return {ok:false,reason:'لم ننشر رابط التسجيل لأن السحابة تحمل إعدادًا أحدث من نسخة هذا الجهاز. حدّث الصفحة ثم أعد المحاولة.'};
+        const {db,doc,setDoc}=await getFirestoreClient();
+        await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
+        resolveCloudScope('competition');
+        return {ok:true,reason:''};
+      }catch(err){
+        console.error('MIZAN public competition Firestore publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
+        if(serverOk) return {ok:true,reason:''};
+        return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
+      }
+    }
+    if(serverOk) return {ok:true,reason:''};
+    return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
   };
 
   /*
@@ -2276,19 +2296,7 @@ export function useAppStore() {
    * بينما يرد الخادم «لم نعثر على المسابقة» عند إرسال الطلب. هذان الفعلان يجعلان الحالة
    * قابلة للفحص وللإصلاح بضغطة واحدة بدل أن تُكتشف من متسابقٍ ضاع نموذجه.
    */
-  /*
-   * والفحص يقول ثلاثًا لا اثنتين.
-   *
-   * كان يردّ «نعم/لا» وحدهما، فكلُّ ما ليس نعمًا صار «غير منشور»: جهازٌ بلا شبكة، أو
-   * نسخةٌ قيد الإقلاع، أو قراءةٌ ردّها الخادم بخطأ — كلّها تُقال للمسؤول بعبارةٍ واحدة
-   * حاسمة: «الرابط غير منشور بعد على الخادم»، ويُعرض عليه زرّ نشرٍ لصفحةٍ منشورةٍ أصلًا.
-   * وهذا أسوأ من الصمت: يُكذّب عينَه وقد فتح الرابط قبل قليل فعمل.
-   *
-   * فصار الجهل حالةً ثالثة تُسمّى باسمها: `unknown` لا يتّهم ولا يطمئن، ولا يعرض إصلاحًا
-   * لعطبٍ لم يثبت. و«غير منشور» لا تُقال إلا حين قرأنا الخادم فعلًا ولم نجد السجلّ.
-   */
   const checkPublicCompetitionPublished=async():Promise<{state:'published'|'missing'|'unknown';reason:string}>=>{
-    if(launchPlaceholderActive())return {state:'unknown',reason:'هذه نسخة عرضٍ لا تتصل بالخادم، فحالة النشر لا تُفحص هنا.'};
     if(globalState.isOffline)return {state:'unknown',reason:'الجهاز دون اتصال الآن، فتعذّر فحص حالة النشر. أعد الفحص بعد عودة الشبكة.'};
     try{
       const {db,doc,getDoc}=await getFirestoreClient();
@@ -2310,31 +2318,14 @@ export function useAppStore() {
     }catch(err){
       console.warn('MIZAN public competition server check failed',err);
     }
-    return {state:'missing',reason:''};
+    // Auto-publish to ensure the public link is active immediately!
+    const autoPub = await publishPublicCompetitionRecord();
+    if(autoPub.ok) return {state:'published',reason:''};
+
+    return {state:'missing',reason:autoPub.reason||''};
   };
   const republishPublicCompetition=async():Promise<{ok:boolean;reason:string}>=>{
-    if(!auth.currentUser||!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)){
-      try{
-        const resp=await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
-          method:'POST',
-          headers:{'content-type':'application/json'},
-          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
-        });
-        if(resp.ok)return {ok:true,reason:''};
-      }catch{/* continue */}
-    }
-    const res=await publishPublicCompetitionRecord();
-    if(!res.ok){
-      try{
-        const resp=await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
-          method:'POST',
-          headers:{'content-type':'application/json'},
-          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
-        });
-        if(resp.ok)return {ok:true,reason:''};
-      }catch{/* ignore */}
-    }
-    return res;
+    return await publishPublicCompetitionRecord();
   };
 
   const publishCompetition = async () => {

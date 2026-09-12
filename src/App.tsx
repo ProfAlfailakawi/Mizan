@@ -289,15 +289,7 @@ const boardParams = (h: string): BoardParams => {
  * لصاحب الجهاز وحده — ولا يراه المتسابق، لأنه لا يصل إلى هذه الصفحة أصلًا. وهو يقول
  * الفرق بين ما يرى وما يرى الناس، في موضع الوهم نفسه لا في شاشةٍ أخرى.
  */
-const LocalPreviewNote: React.FC<{show:boolean}> = ({show}) => show ? (
-  <div role="status" className="mx-auto max-w-3xl px-4 pt-4">
-    <div className="rounded-2xl border border-[#E2D6BE] bg-[#F3EFE6] px-4 py-3 text-[11px] font-bold leading-6 text-[#725630]">
-      هذه الصفحة مرسومة من نسخةٍ محفوظة على جهازك، ولا سجلّ لها على الخادم — فهي لا تُفتح
-      لأحدٍ غيرك، وأيّ طلبٍ يُرسَل منها يُردّ بـ«لم نعثر على المسابقة».
-      انشر المسابقة من «هوية المسابقة ← مشاركة التسجيل» قبل توزيع الرابط.
-    </div>
-  </div>
-) : null;
+const LocalPreviewNote: React.FC<{show:boolean}> = () => null;
 
 const CompetitionNotFound: React.FC = () => (
   <div className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5">

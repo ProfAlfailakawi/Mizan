@@ -25,8 +25,10 @@ export class PublicRegistrationService{
     if(clean(raw.website,10))throw new Error('REGISTRATION_REJECTED');
     const competition=await this.store.getCompetition(clean(competitionId,120));if(!competition)throw new Error('COMPETITION_NOT_FOUND');
     const policy=getCompetitionPolicy(competition),now=this.now();
-    const starts=Date.parse(competition.registrationStartDate),ends=Date.parse(competition.registrationEndDate);
-    if(competition.status!=='registration_open'||!['public','hybrid'].includes(policy.registration.mode)||(Number.isFinite(starts)&&now.getTime()<starts)||(Number.isFinite(ends)&&now.getTime()>ends))throw new Error('COMPETITION_REGISTRATION_CLOSED');
+    const ends=Date.parse(competition.registrationEndDate);
+    if(competition.status!=='registration_open'&&competition.status!=='live')throw new Error('COMPETITION_REGISTRATION_CLOSED');
+    if(!['public','hybrid'].includes(policy.registration.mode))throw new Error('COMPETITION_REGISTRATION_CLOSED');
+    if(Number.isFinite(ends)&&now.getTime()>ends)throw new Error('COMPETITION_REGISTRATION_CLOSED');
     const input:PublicRegistrationInput={fullNameArabic:clean(raw.fullNameArabic,120),fullName:clean(raw.fullName,120),email:clean(raw.email,254).toLowerCase(),phone:clean(raw.phone,32),country:clean(raw.country,100),nationality:clean(raw.nationality,100),nationalIdOrPassport:clean(raw.nationalIdOrPassport,80),dateOfBirth:clean(raw.dateOfBirth,10),gender:raw.gender==='female'?'female':'male',categoryId:clean(raw.categoryId,120),riwaya:clean(raw.riwaya,120),guardianName:clean(raw.guardianName,120),consents:raw.consents||{}};
     for(const field of policy.registration.fields.filter(x=>x.visible&&x.required))if(!String(fieldValue(field,input)).trim())throw new Error(`REGISTRATION_FIELD_REQUIRED:${field.id}`);
     // A competition may accidentally hide the identity field while keeping identity

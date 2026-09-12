@@ -221,7 +221,7 @@ const ShareRegistration:React.FC<{c:Competition;ar:boolean}>=({c,ar})=>{
   <div className={`mt-3 rounded-2xl border p-3.5 ${pubTone==='warn'?'border-[#E2D6BE] bg-[#F3EFE6]':'border-[#dcdad2] bg-[#f8f7f2]'}`}><div className="flex flex-wrap items-center gap-2.5">
    <span className={`w-2.5 h-2.5 rounded-full ${pubTone==='ok'?'bg-[#2F6555]':pubTone==='warn'?'bg-[#9B7542]':'bg-[#b9b6ad]'}`}/>
    <span className="text-xs font-black text-[#3f4742]">{pubLine}</span>
-   {pub==='missing'&&<Button size="sm" variant="secondary" onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ النشر…':'Publishing…'):(ar?'انشر الآن':'Publish now')}</Button>}
+   {pub!=='published'&&pub!=='checking'&&<Button size="sm" variant="secondary" onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ النشر…':'Publishing…'):(ar?'انشر الآن':'Publish now')}</Button>}
    {pub!=='checking'&&pub!=='missing'&&<button type="button" onClick={refreshPub} className="text-[11px] font-bold text-[#214C40] underline">{ar?'أعد الفحص':'Re-check'}</button>}
   </div>
   {pub==='unknown'&&!!pubNote&&<p className="text-[11px] font-bold text-[#5f6763] mt-2 leading-6">{pubNote}</p>}
