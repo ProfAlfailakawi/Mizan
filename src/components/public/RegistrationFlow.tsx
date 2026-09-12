@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, BadgeCheck, BookMarked, Check, FileCheck2, UserRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
