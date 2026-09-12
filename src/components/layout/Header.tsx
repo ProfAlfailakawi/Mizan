@@ -62,9 +62,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       <NotificationCenter/>
       <LanguageSwitcher compact/>
       {!superAdmin&&<RoleSwitcher/>}
-      {/* الخروج ليس أيقونةً بين أيقونات: على جهازٍ مشترك يجب أن يُرى من أول نظرة، فله
-          إطارٌ ولونٌ ونصّ. على الجوال يبقى النص «خروج» ليتّسع الشريط. */}
-      {production&&<button onClick={logout} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 h-11 ps-3 pe-3.5 inline-flex items-center gap-2 rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] text-xs font-black shrink-0"><LogOut className="w-4 h-4"/><span className="hidden sm:inline">{language==='ar'?'تسجيل الخروج':'Sign out'}</span><span className="sm:hidden">{language==='ar'?'خروج':'Out'}</span></button>}
+      {production&&<button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>}
     </div>
   </div>
   <CommandPalette open={searchOpen} onOpenChange={setSearchOpen}/><ClarityGuide open={helpOpen} onClose={()=>setHelpOpen(false)} role={currentUser.role} ar={language==='ar'}/>

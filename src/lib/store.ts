@@ -477,6 +477,32 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
   }catch(err){console.error('MIZAN cloud write denied',{path:`${collectionName}/${id}`,error:err instanceof Error?err.message:String(err)});reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
 
+async function persistCompetitionConfiguration(updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString()){
+  if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return false;
+  if(cloudSessionLost()){reportLostCloudSession('competition');return false;}
+  if(globalState.isOffline||!auth.currentUser)return false;
+  const configuration={competition:globalState.competition,judges:globalState.judges,emergencyFrozen:globalState.emergencyFrozen,updatedAt};
+  if(exceedsSafeDocumentSize(configuration)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE','competition');return false;}
+  try{
+    const {db,doc,setDoc,getDoc}=await getFirestoreClient();
+    const docRef=doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id);
+    try{
+      const currentSnap=await getDoc(docRef);
+      const currentRaw=currentSnap.exists()?(currentSnap.data() as {updatedAt?:unknown}).updatedAt:undefined;
+      const cloudUpdatedAt=typeof currentRaw==='string'?(Date.parse(currentRaw)||0):0;
+      const localUpdatedAt=Date.parse(updatedAt)||0;
+      if(!configWriteAllowed(cloudUpdatedAt,localUpdatedAt)){resolveCloudScope('competition');return true;}
+    }catch{/* If the preflight read fails, the write below still reports the authoritative outcome. */}
+    await setDoc(docRef,configuration,{merge:true});
+    resolveCloudScope('competition');
+    return true;
+  }catch(err){
+    console.error('MIZAN cloud write denied',{path:'competition',error:err instanceof Error?err.message:String(err)});
+    reportCloudError(classifyCloudError(err),'competition');
+    return false;
+  }
+}
+
 /* تجديد رمز المصادقة عند أول رفض صلاحية: مرة كل دقيقتين على الأكثر، فلا تنشأ حلقة تجديد. */
 /*
  * انقطاع الجلسة أثناء التحكيم كان صامتًا تمامًا: الكتابة تخرج من الدالة عند غياب
@@ -683,30 +709,8 @@ function syncToFirestore() {
     if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
     try {
       const { db, doc, setDoc } = await getFirestoreClient();
-      const docRef = doc(db, 'organizations', globalState.competition.organizationId, 'competitions', globalState.competition.id);
-      // إعداد المسابقة وحده. السجلات تعيش في مجموعاتها الفرعية.
       const updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString();
-      const configuration = {
-        competition: globalState.competition,
-        judges: globalState.judges,
-        emergencyFrozen: globalState.emergencyFrozen,
-        updatedAt,
-      };
-      if (exceedsSafeDocumentSize(configuration)) { reportCloudError('CLOUD_PAYLOAD_TOO_LARGE', 'competition'); return; }
-      /*
-       * لا يُكتب فوق الأصل بما هو أقدم منه. المستمع يتبنّى نسخة السحابة حين تكون أحدث ويأخذ
-       * وقتها، فتتساوى الطوابع ويمضي الرفع. أما إن سبقتنا السحابة بين قراءتنا وكتابتنا —
-       * جهاز إدارةٍ آخر عدّل الآن — فالكتابة تُترك ويُترك للمستمع أن يوفّق بيننا.
-       */
-      const { getDoc } = await getFirestoreClient();
-      try {
-        const currentSnap = await getDoc(docRef);
-        const currentRaw = currentSnap.exists() ? (currentSnap.data() as { updatedAt?: unknown }).updatedAt : undefined;
-        const cloudUpdatedAt = typeof currentRaw === 'string' ? (Date.parse(currentRaw) || 0) : 0;
-        const localUpdatedAt = Date.parse(updatedAt) || 0;
-        if (!configWriteAllowed(cloudUpdatedAt, localUpdatedAt)) { resolveCloudScope('competition'); return; }
-      } catch { /* تعذّرت القراءة: نمضي إلى الكتابة، وفشلها يُبلَّغ كعادته. */ }
-      await setDoc(docRef, configuration, { merge: true });
+      if(!(await persistCompetitionConfiguration(updatedAt)))return;
       // النسخة العامة لا تُنشأ للمسودات. نشرُها مرتبط بحالة مسابقة حقيقية لا بوجود شاشة في الكود.
       // نبقي completed منشورة لصفحة «انتهت المسابقة» والتحقق العام، لكن التسجيل/الرحلة يُغلقان.
       if(!launchPlaceholderActive()&&!['draft','configured'].includes(globalState.competition.status)){
@@ -2213,8 +2217,10 @@ export function useAppStore() {
     if(!auth.currentUser)return {ok:false,reason:'يلزم تسجيل الدخول لنشر صفحة التسجيل العامة.'};
     if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'صلاحية هذا الحساب لا تسمح بنشر صفحة التسجيل العامة.'};
     try{
+      const updatedAt=new Date().toISOString();
+      if(!(await persistCompetitionConfiguration(updatedAt)))return {ok:false,reason:'تعذّر حفظ إعدادات المسابقة في السحابة، لذلك لم ننشر رابط التسجيل حتى لا يظهر للطلاب خطأ «لم نعثر على المسابقة».'};
       const {db,doc,setDoc}=await getFirestoreClient();
-      await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt:new Date().toISOString()},{merge:true});
+      await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       resolveCloudScope('competition');
       return {ok:true,reason:''};
     }catch(err){
@@ -2279,6 +2285,7 @@ export function useAppStore() {
     if(!published.ok){
       /* لا تُترك المسابقة «مفتوحة» على جهاز الإدارة وحده: الحالة تعود كما كانت حتى ينجح النشر. */
       globalState.competition={...globalState.competition,status:previousStatus};
+      markCompetitionConfigChanged();
       notify();
       return {ok:false,issues:[published.reason],warnings:laterStageWarnings,scientificBlockers,contradictions};
     }

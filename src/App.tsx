@@ -406,7 +406,7 @@ export default function App() {
  // التسجيل وصفحة المسابقة روابط عامة؛ لا تُجبر الزائر على حساب موظف.
  if((hash.startsWith('#competition')||hash.startsWith('#register')||hash.startsWith('#journey')||hash.startsWith('#guardian'))&&compLoading) return <ViewFallback/>;
  if(hash.startsWith('#competition')) return compMissing?<CompetitionNotFound/>:<Page><LocalPreviewNote show={localPreview}/><CompetitionLanding/></Page>;
- if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><LocalPreviewNote show={localPreview}/><RegistrationFlow onSuccess={(participant)=>{window.location.hash=`#journey?comp=${encodeURIComponent(requestedComp||participant.competitionId||'')}&key=${encodeURIComponent(participant.journeyAccessToken||'')}`}}/></Page></div>;
+ if(hash.startsWith('#register')) return compMissing?<CompetitionNotFound/>:<div className="min-h-screen text-[#171b18] font-arabic"><Page><LocalPreviewNote show={localPreview}/><RegistrationFlow localPreview={localPreview} onSuccess={(participant)=>{window.location.hash=`#journey?comp=${encodeURIComponent(requestedComp||participant.competitionId||'')}&key=${encodeURIComponent(participant.journeyAccessToken||'')}`}}/></Page></div>;
  if(hash.startsWith('#journey')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="participant"/></Page>;
  if(hash.startsWith('#guardian')) return compMissing?<CompetitionNotFound/>:<Page><JourneyAccess audience="guardian"/></Page>;
  // التحقق من الشهادة خدمة عامة بالكامل ولا تمر ببوابة الموظفين.
