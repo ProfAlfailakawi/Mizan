@@ -31,7 +31,7 @@ test('every reason a publish can be skipped is reported to the person who publis
   for (const guard of ['launchPlaceholderActive', 'isOffline', 'auth.currentUser', 'currentUser.role']) {
     assert.ok(publisher.includes(guard) && publisher.includes('return {ok:false,reason:'), guard);
   }
-  assert.equal((publisher.match(/return \{ok:false,reason:/g) || []).length, 6, 'كل مانعٍ يقول سببه');
+  assert.equal((publisher.match(/return \{ok:false,reason:/g) || []).length, 7, 'كل مانعٍ يقول سببه');
   // والواجهة تنتظر النتيجة بدل أن تمضي متفائلة.
   assert.match(overview, /const publish=async\(\)=>\{[\s\S]*?await store\.publishCompetition\(\)/);
 });

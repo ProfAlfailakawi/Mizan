@@ -477,12 +477,14 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
   }catch(err){console.error('MIZAN cloud write denied',{path:`${collectionName}/${id}`,error:err instanceof Error?err.message:String(err)});reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
 
-async function persistCompetitionConfiguration(updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString()){
-  if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return false;
-  if(cloudSessionLost()){reportLostCloudSession('competition');return false;}
-  if(globalState.isOffline||!auth.currentUser)return false;
+type CompetitionConfigurationPersistResult = 'written' | 'stale' | 'failed';
+
+async function persistCompetitionConfiguration(updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString()): Promise<CompetitionConfigurationPersistResult>{
+  if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return 'failed';
+  if(cloudSessionLost()){reportLostCloudSession('competition');return 'failed';}
+  if(globalState.isOffline||!auth.currentUser)return 'failed';
   const configuration={competition:globalState.competition,judges:globalState.judges,emergencyFrozen:globalState.emergencyFrozen,updatedAt};
-  if(exceedsSafeDocumentSize(configuration)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE','competition');return false;}
+  if(exceedsSafeDocumentSize(configuration)){reportCloudError('CLOUD_PAYLOAD_TOO_LARGE','competition');return 'failed';}
   try{
     const {db,doc,setDoc,getDoc}=await getFirestoreClient();
     const docRef=doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id);
@@ -491,15 +493,15 @@ async function persistCompetitionConfiguration(updatedAt=globalState.competition
       const currentRaw=currentSnap.exists()?(currentSnap.data() as {updatedAt?:unknown}).updatedAt:undefined;
       const cloudUpdatedAt=typeof currentRaw==='string'?(Date.parse(currentRaw)||0):0;
       const localUpdatedAt=Date.parse(updatedAt)||0;
-      if(!configWriteAllowed(cloudUpdatedAt,localUpdatedAt)){resolveCloudScope('competition');return true;}
+      if(!configWriteAllowed(cloudUpdatedAt,localUpdatedAt)){resolveCloudScope('competition');return 'stale';}
     }catch{/* If the preflight read fails, the write below still reports the authoritative outcome. */}
     await setDoc(docRef,configuration,{merge:true});
     resolveCloudScope('competition');
-    return true;
+    return 'written';
   }catch(err){
     console.error('MIZAN cloud write denied',{path:'competition',error:err instanceof Error?err.message:String(err)});
     reportCloudError(classifyCloudError(err),'competition');
-    return false;
+    return 'failed';
   }
 }
 
@@ -710,7 +712,8 @@ function syncToFirestore() {
     try {
       const { db, doc, setDoc } = await getFirestoreClient();
       const updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString();
-      if(!(await persistCompetitionConfiguration(updatedAt)))return;
+      const configPersistResult=await persistCompetitionConfiguration(updatedAt);
+      if(configPersistResult!=='written')return;
       // النسخة العامة لا تُنشأ للمسودات. نشرُها مرتبط بحالة مسابقة حقيقية لا بوجود شاشة في الكود.
       // نبقي completed منشورة لصفحة «انتهت المسابقة» والتحقق العام، لكن التسجيل/الرحلة يُغلقان.
       if(!launchPlaceholderActive()&&!['draft','configured'].includes(globalState.competition.status)){
@@ -2218,7 +2221,9 @@ export function useAppStore() {
     if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'صلاحية هذا الحساب لا تسمح بنشر صفحة التسجيل العامة.'};
     try{
       const updatedAt=new Date().toISOString();
-      if(!(await persistCompetitionConfiguration(updatedAt)))return {ok:false,reason:'تعذّر حفظ إعدادات المسابقة في السحابة، لذلك لم ننشر رابط التسجيل حتى لا يظهر للطلاب خطأ «لم نعثر على المسابقة».'};
+      const configPersistResult=await persistCompetitionConfiguration(updatedAt);
+      if(configPersistResult==='stale')return {ok:false,reason:'لم ننشر رابط التسجيل لأن السحابة تحمل إعدادًا أحدث من نسخة هذا الجهاز. حدّث الصفحة ثم أعد المحاولة.'};
+      if(configPersistResult!=='written')return {ok:false,reason:'تعذّر حفظ إعدادات المسابقة في السحابة، لذلك لم ننشر رابط التسجيل حتى لا يظهر للطلاب خطأ «لم نعثر على المسابقة».'};
       const {db,doc,setDoc}=await getFirestoreClient();
       await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       resolveCloudScope('competition');

@@ -73,7 +73,8 @@ test('every mirrored watcher tells the merge which collection it carries', () =>
 test('the result merge and the config write both defer to the shared rules', () => {
   assert.match(store, /return mergeRankedFromCloud\(local, remote, RESULT_STATUS_RANK, \(rowId\) => rowHasPendingWrite\('results', rowId\)\);/,
     'sealing authority and the pending guard come from one place');
-  assert.match(store, /if \(!configWriteAllowed\(cloudUpdatedAt, localUpdatedAt\)\) \{ resolveCloudScope\('competition'\); return; \}/,
+  const configPersist = store.slice(store.indexOf('async function persistCompetitionConfiguration('), store.indexOf('function syncToFirestore()'));
+  assert.match(configPersist, /if\(!configWriteAllowed\(cloudUpdatedAt,localUpdatedAt\)\)\{resolveCloudScope\('competition'\);return 'stale';\}/,
     'a device holding an older config stands down instead of writing over the newer one');
 });
 
