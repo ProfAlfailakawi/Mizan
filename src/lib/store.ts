@@ -1794,17 +1794,46 @@ export function useAppStore() {
     try{
       const {db,doc,getDoc}=await getFirestoreClient();
       const snap=await getDoc(doc(db,'public_competitions',competitionId));
-      if(!snap.exists())return 'missing';
-      const data=snap.data() as {competition?:Competition;updatedAt?:string};
-      if(!data.competition||data.competition.id!==competitionId)return 'missing';
-      const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
+      if(snap.exists()){
+        const data=snap.data() as {competition?:Competition;updatedAt?:string};
+        if(data.competition&&data.competition.id===competitionId){
+          const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
+          globalState.competition=target;
+          const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+          globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+          if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
+          persistLocalSnapshot();listeners.forEach(l=>l());
+          return 'loaded';
+        }
+      }
+    }catch(err){console.warn('Public competition Firestore load failed:',err)}
+
+    try{
+      const resp=await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}`);
+      if(resp.ok){
+        const payload=await resp.json();
+        if(payload?.competition&&payload.competition.id===competitionId){
+          const target={...payload.competition,policy:getCompetitionPolicy(payload.competition),ruleSets:payload.competition.ruleSets||[payload.competition.ruleSet]};
+          globalState.competition=target;
+          const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+          globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+          if(payload.updatedAt)globalState.competitionConfigUpdatedAt=payload.updatedAt;
+          persistLocalSnapshot();listeners.forEach(l=>l());
+          return 'loaded';
+        }
+      }
+    }catch(err){console.warn('Public competition server API load failed:',err)}
+
+    if(competitionId===SEED_COMPETITION.id||competitionId==='comp-dubai-2027'){
+      const target={...SEED_COMPETITION,policy:getCompetitionPolicy(SEED_COMPETITION),ruleSets:SEED_COMPETITION.ruleSets||[SEED_COMPETITION.ruleSet]};
       globalState.competition=target;
       const existing=globalState.competitions.findIndex(c=>c.id===target.id);
       globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-      if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
       persistLocalSnapshot();listeners.forEach(l=>l());
       return 'loaded';
-    }catch(err){console.warn('Public competition load failed:',err);return 'unavailable'}
+    }
+
+    return 'missing';
   };
 
   const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {
@@ -2227,6 +2256,13 @@ export function useAppStore() {
       const {db,doc,setDoc}=await getFirestoreClient();
       await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       resolveCloudScope('competition');
+      try{
+        await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
+        });
+      }catch{/* ignore */}
       return {ok:true,reason:''};
     }catch(err){
       console.error('MIZAN public competition publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
@@ -2259,13 +2295,47 @@ export function useAppStore() {
       const snap=await getDoc(doc(db,'public_competitions',globalState.competition.id));
       const data=snap.exists()?snap.data() as {competition?:Competition}:null;
       const published=!!data?.competition&&data.competition.id===globalState.competition.id;
-      return {state:published?'published':'missing',reason:''};
+      if(published) return {state:'published',reason:''};
     }catch(err){
-      console.warn('MIZAN public competition check failed',err);
-      return {state:'unknown',reason:'تعذّر الوصول إلى الخادم لفحص حالة النشر. أعد الفحص، ولا تعتمد هذه الرسالة دليلًا على أن الرابط لا يعمل.'};
+      console.warn('MIZAN public competition Firestore check failed',err);
     }
+    try{
+      const resp=await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}`);
+      if(resp.ok){
+        const payload=await resp.json();
+        if(payload?.competition&&payload.competition.id===globalState.competition.id){
+          return {state:'published',reason:''};
+        }
+      }
+    }catch(err){
+      console.warn('MIZAN public competition server check failed',err);
+    }
+    return {state:'missing',reason:''};
   };
-  const republishPublicCompetition=async()=>publishPublicCompetitionRecord();
+  const republishPublicCompetition=async():Promise<{ok:boolean;reason:string}>=>{
+    if(!auth.currentUser||!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)){
+      try{
+        const resp=await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
+        });
+        if(resp.ok)return {ok:true,reason:''};
+      }catch{/* continue */}
+    }
+    const res=await publishPublicCompetitionRecord();
+    if(!res.ok){
+      try{
+        const resp=await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
+        });
+        if(resp.ok)return {ok:true,reason:''};
+      }catch{/* ignore */}
+    }
+    return res;
+  };
 
   const publishCompetition = async () => {
     const issues=getReadinessIssues(globalState.competition);

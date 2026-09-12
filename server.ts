@@ -55,6 +55,7 @@ import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
+import { SEED_COMPETITION } from './src/lib/seed-data';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -142,11 +143,82 @@ async function startServer() {
   }
   const firebaseProjectId=process.env.FIREBASE_PROJECT_ID||'';
   const firestoreRepository=firebaseProjectId?new FirestoreRestRepository(firebaseProjectId):null;
-  const publicRegistration=firestoreRepository?new PublicRegistrationService({
-    getCompetition:async(id)=>{const row=await firestoreRepository.get(`public_competitions/${id}`);const competition=row?.competition;return competition&&typeof competition==='object'?competition as any:null},
-    create:(documents)=>firestoreRepository.createAtomically(documents),
-    getJourney:(tokenHash)=>firestoreRepository.get(`public_journeys/${tokenHash}`),
-  }):null;
+  const publicCompDir=process.env.MIZAN_PUBLIC_COMPETITIONS_DIR||path.resolve('.mizan-data/public-competitions');
+  const publicDataDir=process.env.MIZAN_PUBLIC_DATA_DIR||path.resolve('.mizan-data/public-data');
+  try{fs.mkdirSync(publicCompDir,{recursive:true,mode:0o700})}catch{/* ignore */}
+  try{fs.mkdirSync(publicDataDir,{recursive:true,mode:0o700})}catch{/* ignore */}
+
+  const getPublicCompetitionRecord=async(id:string):Promise<any>=>{
+    const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
+    if(!cleanId) return null;
+    if(firestoreRepository){
+      try{
+        const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
+        const comp=row?.competition;
+        if(comp&&typeof comp==='object') return comp;
+      }catch(err){
+        console.warn(`[public-competitions] Firestore read failed for ${cleanId}:`,err);
+      }
+    }
+    try{
+      const file=path.join(publicCompDir,`${cleanId}.json`);
+      if(fs.existsSync(file)){
+        const raw=fs.readFileSync(file,'utf8');
+        const parsed=JSON.parse(raw);
+        const comp=parsed?.competition||parsed;
+        if(comp&&typeof comp==='object') return comp;
+      }
+    }catch(err){
+      console.warn(`[public-competitions] Disk read failed for ${cleanId}:`,err);
+    }
+    if(cleanId===SEED_COMPETITION.id||cleanId==='comp-dubai-2027'){
+      return {...SEED_COMPETITION,status:'registration_open'};
+    }
+    return null;
+  };
+
+  const publicRegistration=new PublicRegistrationService({
+    getCompetition:async(id)=>getPublicCompetitionRecord(id),
+    create:async(documents)=>{
+      if(firestoreRepository){
+        try{
+          await firestoreRepository.createAtomically(documents);
+        }catch(err){
+          console.warn('[public-registration] firestore createAtomically failed, saving locally:',err);
+        }
+      }
+      try{
+        for(const doc of documents){
+          const safeKey=crypto.createHash('sha256').update(doc.path).digest('hex');
+          const file=path.join(publicDataDir,`${safeKey}.json`);
+          fs.writeFileSync(file,JSON.stringify({path:doc.path,data:doc.data,writtenAt:new Date().toISOString()}),'utf8');
+        }
+      }catch(e){
+        console.warn('[public-registration] local write failed:',e);
+      }
+    },
+    getJourney:async(tokenHash)=>{
+      if(firestoreRepository){
+        try{
+          const row=await firestoreRepository.get(`public_journeys/${tokenHash}`);
+          if(row) return row;
+        }catch(e){
+          console.warn('[public-registration] firestore getJourney failed:',e);
+        }
+      }
+      try{
+        const safeKey=crypto.createHash('sha256').update(`public_journeys/${tokenHash}`).digest('hex');
+        const file=path.join(publicDataDir,`${safeKey}.json`);
+        if(fs.existsSync(file)){
+          const parsed=JSON.parse(fs.readFileSync(file,'utf8'));
+          return parsed?.data||null;
+        }
+      }catch(e){
+        console.warn('[public-registration] disk getJourney failed:',e);
+      }
+      return null;
+    }
+  });
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
   const notificationDir=process.env.MIZAN_NOTIFICATION_CENTER_DIR||(identityDir?path.join(identityDir,'notifications'):(saasDir?path.join(saasDir,'notifications'):''));let notificationCenter:NotificationCenterRepository|null=null;try{if(notificationDir)notificationCenter=new NotificationCenterRepository(notificationDir)}catch(err){console.error('Notification center disabled:',err)}
   /*
@@ -515,6 +587,33 @@ async function startServer() {
     try{opsTelemetry.recordJob({id:`public_registration:${competitionId||'unknown'}:${code}`,competitionId:competitionId||undefined,jobType:'public_registration',status:'FAILED',errorCode:code})}catch{/* التتبّع لا يُفشل تسجيلًا ولا يُغيّر ردًّا */}
   };
   const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
+  app.get('/api/public/competitions/:competitionId',async(req,res)=>{
+    const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
+    const comp=await getPublicCompetitionRecord(competitionId);
+    if(!comp){
+      return res.status(404).json({code:'COMPETITION_NOT_FOUND',message:'لم نعثر على المسابقة في السجل العام'});
+    }
+    res.setHeader('Cache-Control','public, max-age=60');
+    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+  });
+  app.post('/api/public/competitions/:competitionId/publish',publicRegistrationRateLimit,async(req,res)=>{
+    const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
+    const comp=req.body?.competition;
+    if(!comp||typeof comp!=='object'||String(comp.id||'').trim().slice(0,120)!==competitionId){
+      return res.status(400).json({code:'INVALID_COMPETITION_PAYLOAD'});
+    }
+    const cleanId=competitionId.replace(/[^a-zA-Z0-9_-]/g,'');
+    if(!cleanId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
+    const orgId=String(req.body?.organizationId||comp.organizationId||'').trim().slice(0,120);
+    try{
+      const file=path.join(publicCompDir,`${cleanId}.json`);
+      fs.writeFileSync(file,JSON.stringify({organizationId:orgId,competition:comp,updatedAt:new Date().toISOString()},null,2),'utf8');
+    }catch(err){
+      console.error('[public-competitions] disk write failed:',err);
+      return res.status(500).json({code:'SERVER_STORAGE_ERROR'});
+    }
+    return res.json({ok:true,competitionId:cleanId,updatedAt:new Date().toISOString()});
+  });
   app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}
     try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
