@@ -2259,35 +2259,32 @@ export function useAppStore() {
   };
 
   const publishPublicCompetitionRecord=async():Promise<{ok:boolean;reason:string}>=>{
+    if(launchPlaceholderActive())return {ok:false,reason:'أكمل تهيئة المسابقة والجهة قبل فتح التسجيل.'};
     if(globalState.isOffline)return {ok:false,reason:'الجهاز دون إنترنت الآن، ولا يمكن نشر صفحة التسجيل العامة حتى يعود الاتصال.'};
-    let serverOk = false;
+    if(!auth.currentUser)return {ok:false,reason:'يلزم تسجيل الدخول لنشر صفحة التسجيل العامة.'};
+    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'صلاحية هذا الحساب لا تسمح بنشر صفحة التسجيل العامة.'};
     try{
-      const resp = await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
-      });
-      if(resp.ok) serverOk = true;
-    }catch(err){
-      console.warn('MIZAN local public publish endpoint failed:', err);
-    }
-    if(auth.currentUser && ['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)){
+      const updatedAt=new Date().toISOString();
+      const configPersistResult=await persistCompetitionConfiguration(updatedAt);
+      if(configPersistResult==='stale')return {ok:false,reason:'لم ننشر رابط التسجيل لأن السحابة تحمل إعدادًا أحدث من نسخة هذا الجهاز. حدّث الصفحة ثم أعد المحاولة.'};
+      if(configPersistResult!=='written')return {ok:false,reason:'تعذّر حفظ إعدادات المسابقة في السحابة، لذلك لم ننشر رابط التسجيل حتى لا يظهر للطلاب خطأ «لم نعثر على المسابقة».'};
+      const {db,doc,setDoc}=await getFirestoreClient();
+      await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       try{
-        const updatedAt=new Date().toISOString();
-        const configPersistResult=await persistCompetitionConfiguration(updatedAt);
-        if(configPersistResult==='stale')return {ok:false,reason:'لم ننشر رابط التسجيل لأن السحابة تحمل إعدادًا أحدث من نسخة هذا الجهاز. حدّث الصفحة ثم أعد المحاولة.'};
-        const {db,doc,setDoc}=await getFirestoreClient();
-        await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
-        resolveCloudScope('competition');
-        return {ok:true,reason:''};
-      }catch(err){
-        console.error('MIZAN public competition Firestore publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
-        if(serverOk) return {ok:true,reason:''};
-        return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
+        await fetch(`/api/public/competitions/${encodeURIComponent(globalState.competition.id)}/publish`,{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({organizationId:globalState.competition.organizationId,competition:globalState.competition})
+        });
+      }catch(serverErr){
+        console.warn('MIZAN local public publish endpoint failed:',serverErr);
       }
+      resolveCloudScope('competition');
+      return {ok:true,reason:''};
+    }catch(err){
+      console.error('MIZAN public competition Firestore publish failed',{competitionId:globalState.competition.id,error:err instanceof Error?err.message:String(err)});
+      return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
     }
-    if(serverOk) return {ok:true,reason:''};
-    return {ok:false,reason:'تعذّر نشر صفحة التسجيل العامة. تحقّق من الاتصال وأعد المحاولة.'};
   };
 
   /*

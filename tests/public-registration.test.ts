@@ -39,3 +39,9 @@ test('identity policy is enforced by the server even when a client omits the fie
   const service=new PublicRegistrationService(new MemoryStore(),()=>new Date('2026-09-09T08:00:00Z'));
   await assert.rejects(()=>service.register(SEED_COMPETITION.id,{...input,nationalIdOrPassport:''},'https://mizan.example'),/REGISTRATION_(FIELD_REQUIRED:identity|IDENTITY_REQUIRED)/);
 });
+
+test('public registration permits registration while competition is live',async()=>{
+  const liveStore=new MemoryStore({...openCompetition(),status:'live'}),liveService=new PublicRegistrationService(liveStore,()=>new Date('2026-09-09T08:00:00Z'));
+  const res=await liveService.register(SEED_COMPETITION.id,input,'https://mizan.example');
+  assert.equal(res.participant.status,'under_review');
+});
