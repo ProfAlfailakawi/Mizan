@@ -223,10 +223,23 @@ export function reserveQuestions(input: ReserveInput): ReserveOutcome {
 export interface TransitionOutcome {
   records: QuestionReservationRecord[];
   changed: QuestionReservationRecord[];
-  rejected: { id: string; from: QuestionReservationState; to: QuestionReservationState }[];
+  /** المرفوض بسببه: إمّا الجدول لا يسمح، وإمّا الموضع مأخوذ الآن لغير صاحب السجلّ. */
+  rejected: { id: string; from: QuestionReservationState; to: QuestionReservationState; code?: 'TRANSITION_NOT_ALLOWED' | 'LOCUS_HELD_BY_ANOTHER'; heldBy?: string }[];
 }
 
-/** انتقال محكوم بالجدول. المرفوض يُقال صراحةً بدل أن يُبتلع. */
+/*
+ * انتقال محكوم بالجدول، وبالموضع.
+ *
+ * الجدول وحده لا يكفي، وهذا كشفه مُدقّق النماذج لا فحصٌ يدوي: مجرًى من أربع خطوات —
+ * «حجزٌ لفلان ← إطلاقه ← حجزٌ لعلّان ← تخصيصُ سجلّ فلان القديم» — يمرّ في الجدول كلَّه،
+ * لأن `released → assigned` انتقالٌ مسموح، فيخرج الموضع الواحد بصاحبين قائمين معًا.
+ *
+ * وليس هذا فرضًا نظريًا: كتابةٌ مؤجَّلة من جهازٍ كان بلا شبكة، أو ضغطةٌ ثانية على
+ * «تخصيص» بعد انقضاء المهلة وأخذِ غيره الموضعَ — كلاهما يحمل معرّف حجزٍ قديم.
+ *
+ * فالحكم هنا على شيئين لا واحد: أن الانتقال مسموح في الجدول، وأن الموضع غير مأخوذٍ الآن
+ * لغير صاحب هذا السجلّ. والرفض يُقال بسببه لا يُبتلع.
+ */
 export function transitionReservations(input: {
   records: QuestionReservationRecord[];
   ids: string[];
@@ -239,11 +252,29 @@ export function transitionReservations(input: {
   const wanted = new Set(input.ids);
   const changed: QuestionReservationRecord[] = [];
   const rejected: TransitionOutcome['rejected'] = [];
+
+  /* من يحجب كلَّ موضعٍ الآن — يُبنى مرة، ولا يُسأل عنه إلا حين يكون المقصد حجبًا. */
+  const holdingTarget = input.to === 'temporarily_reserved' || input.to === 'assigned';
+  const holderOf = new Map<string, QuestionReservationRecord>();
+  if (holdingTarget) {
+    for (const record of input.records) {
+      const state = effectiveState(record, now);
+      if (state === 'temporarily_reserved' || state === 'assigned') holderOf.set(record.locusKey, record);
+    }
+  }
+
   const records = input.records.map(record => {
     if (!wanted.has(record.id)) return record;
     const from = effectiveState(record, now);
     if (from === input.to) return record;
     if (!RESERVATION_TRANSITIONS[from].includes(input.to)) { rejected.push({ id: record.id, from, to: input.to }); return record; }
+    if (holdingTarget) {
+      const holder = holderOf.get(record.locusKey);
+      if (holder && holder.id !== record.id && holder.participantId !== record.participantId) {
+        rejected.push({ id: record.id, from, to: input.to, code: 'LOCUS_HELD_BY_ANOTHER', heldBy: holder.participantId });
+        return record;
+      }
+    }
     const next: QuestionReservationRecord = {
       ...record,
       state: input.to,

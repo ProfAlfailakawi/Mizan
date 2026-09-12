@@ -13,7 +13,7 @@ import { describeScope, scopeAyahCount, scopeSignature, type QuranScope } from '
 import { resolveZoneSlots, type QuestionDistributionPlan } from './question-zones';
 import {
   QuestionAllocationEngine, candidatesInScope, locusKeyOf, uniqueLocusCount,
-  type QuestionCandidate, type ReadingContext, type SelectionResult,
+  type EngineWeights, type QuestionCandidate, type ReadingContext, type SelectionResult,
 } from './question-engine';
 import { theoreticalRepeatFloor, type RepeatPolicy } from './repeat-policy';
 import { analyzeDemand, buildDemandGroups, buildGroupScarcityOracle, zoneAwareReuseLowerBound, type DemandAnalysis, type ReuseLowerBound } from './scope-demand';
@@ -45,6 +45,22 @@ export interface TwinInput {
   failureAbortThreshold?: number;
   /** هامش موازنة الحمل الممرَّر إلى المحرك. */
   usageBandTolerance?: number;
+  /*
+   * أوزان المفاضلة الممرَّرة إلى المحرك.
+   *
+   * تُترك فارغة في التشغيل العادي فتعمل أوزان المحرك الافتراضية. وإنما تُمرَّر في مختبر
+   * الحساسية والاستئصال: تُعطَّل طبقةٌ بوزنها صفرًا، أو يُزاح وزنٌ ٥٪ ويُقاس الأثر — وهذا
+   * لا يُمكن بلا مَنفذ، ولا يجوز أن يكون منفذًا إلى الإنتاج.
+   */
+  weights?: Partial<EngineWeights>;
+  /*
+   * يجمع التخصيصات نفسها لا مقاييسها.
+   *
+   * مطفأ افتراضًا: عشرة آلاف متسابق × خمسة أسئلة = خمسون ألف صفّ لا يحتاجها تقرير
+   * المحاكاة. وتُطلب حين يُراد قياس الفجوة عن الأمثل أو ندم العدالة، فتلك لا تُقاس
+   * بالمجاميع بل بالتخصيص عينه.
+   */
+  collectAssignments?: boolean;
 }
 
 export interface TwinMetrics {
@@ -83,10 +99,15 @@ export interface TwinMetrics {
   heapUsedMb?: number;
 }
 
+/** تخصيصٌ واحد كما خرج من المحرّك — مادّة المقارنة بالمِرصد. */
+export interface TwinAssignment { participantId: string; zoneId: string | null; slotIndex: number; questionId: string; locusKey: string; difficulty: number; hallId?: string }
+
 export interface TwinResult {
   competitionId: string;
   seed: string;
   metrics: TwinMetrics;
+  /** موجودة حين يُطلب `collectAssignments` وحده. */
+  assignments?: TwinAssignment[];
   demand: DemandAnalysis;
   failures: { participantId: string; code: string; ar: string; en: string }[];
   perCluster: { signature: string; label: string; participants: number; demand: number; supply: number; repeats: number }[];
@@ -131,6 +152,7 @@ export function runCompetitionTwin(input: TwinInput): TwinResult {
     requireReviewedDifficulty: input.requireReviewedDifficulty,
     defaultTargetDifficulty: input.targetDifficulty,
     scarcity,
+    weights: input.weights,
     usageBandTolerance: input.usageBandTolerance,
     candidateResolver: candidatesFor,
   });
@@ -138,6 +160,7 @@ export function runCompetitionTwin(input: TwinInput): TwinResult {
   for (const cluster of demand.clusters) baselineByScope.set(cluster.signature, scarcity?.pressureOfLocus(`cluster:${cluster.signature}`) ?? 0);
 
   const failures: TwinResult['failures'] = [];
+  const assignments: TwinAssignment[] = [];
   const durations: number[] = [];
   const results: SelectionResult[] = [];
   const relaxationCounts: Record<string, number> = {};
@@ -187,6 +210,7 @@ export function runCompetitionTwin(input: TwinInput): TwinResult {
       history.add(key);
       const cluster = scopeSignature(participant.scope);
       if (picked.reason.usesBeforeSelection > 0) repeatsByCluster.set(cluster, (repeatsByCluster.get(cluster) || 0) + 1);
+      if (input.collectAssignments) assignments.push({ participantId: participant.participantId, zoneId: picked.reason.zoneId, slotIndex: picked.slotIndex, questionId: picked.candidate.id, locusKey: key, difficulty: picked.candidate.difficultyRating, hallId: participant.hallId });
     }
     seenByParticipant.set(participant.participantId, history);
     if (failures.length >= abortAt) break;
@@ -212,6 +236,7 @@ export function runCompetitionTwin(input: TwinInput): TwinResult {
     seed: input.seed,
     demand,
     failures,
+    ...(input.collectAssignments ? { assignments } : {}),
     perCluster: demand.clusters.map(cluster => ({
       signature: cluster.signature, label: cluster.label, participants: cluster.participantCount,
       demand: cluster.demand, supply: cluster.supply, repeats: repeatsByCluster.get(cluster.signature) || 0,
