@@ -4,6 +4,7 @@
 // diffed on its own, apart from the ~1,900 lines of behaviour. It is intentionally the single
 // source of truth for what MIZAN keeps in local state; store.ts imports it and nothing here
 // carries logic. Grouping is by domain to keep the surface navigable.
+import type { CompetitionClockState } from './competition-clock';
 import {
   User, Role, Organization, Competition, Participant, Committee, JudgeProfile, ResultRecord,
   ReviewCase, AIObservation, Certificate, AuditEvent, JudgeSubmission, IncidentRecord,
@@ -159,6 +160,8 @@ export interface AppStoreState {
   questionQuarantines: QuestionQuarantineRecord[];
   /** دورة حياة حجز الأسئلة: من حجز ماذا، ومتى ينقضي حجزه. */
   questionReservations: QuestionReservationRecord[];
+  /** ساعة المسابقة على هذا الجهاز: الفرق عن الجهاز المرجعي، لا وقتٌ منسوخ. */
+  competitionClock?: CompetitionClockState;
   /** تقارير عدالة وتوزيع الأسئلة المصدَّرة. */
   fairnessReports: FairnessReportRecord[];
   queueTransfers: QueueTransferRecord[];
