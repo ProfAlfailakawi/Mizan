@@ -20,7 +20,27 @@ test('operator organization creation atomically consumes one license credit',wit
  assert.match(created.organization.tenantId,/^MZ-TEN-/);
  assert.match(created.license.id,/^MZ-LIC-/);
  assert.equal(repo.operatorDashboard({...owner,role:'operator_owner',operatorId:op.id}).organizations.length,1);
-}));
+	}));
+
+test('owner edits the full operator profile and deletion never erases live scope or credit silently',withRepo((repo)=>{
+ const plan=repo.seedInitialPlan(owner);
+ const op=repo.createOperator(owner,{name:'Operator Draft'});
+ const updated=repo.updateOperator(owner,op.id,{name:'Operator Final',status:'suspended',pricingTier:'partner-plus',whiteLabelLevel:'full',storageCapBytes:8*1024**3});
+ assert.equal(updated.name,'Operator Final');
+ assert.equal(updated.status,'suspended');
+ assert.equal(updated.pricingTier,'partner-plus');
+ assert.equal(updated.whiteLabelLevel,'full');
+ assert.equal(updated.storageCapBytes,8*1024**3);
+ repo.adjustCredits(owner,op.id,1,'prepaid organization credit');
+ assert.throws(()=>repo.deleteOperator(owner,op.id),/OPERATOR_HAS_CREDIT_BALANCE/);
+ repo.adjustCredits(owner,op.id,-1,'zero before deletion');
+ repo.updateOperator(owner,op.id,{status:'active'});
+ repo.adjustCredits(owner,op.id,1,'one organization credit');
+ repo.createOrganization({...owner,role:'operator_owner',operatorId:op.id},{officialName:'Linked Org',shortName:'Linked',organizationType:'charity',country:'KW',planId:plan.id,...dates});
+ assert.throws(()=>repo.deleteOperator(owner,op.id),/OPERATOR_HAS_ORGANIZATIONS/);
+ const empty=repo.createOperator(owner,{name:'Empty Operator'});
+ assert.equal(repo.deleteOperator(owner,empty.id).id,empty.id);
+	}));
 
 test('owner can edit an unused plan and delete it, while licensed plans are protected',withRepo((repo)=>{
  const editable=repo.upsertPlan(owner,{name:'Draft',currency:'KWD',priceMinor:100});
