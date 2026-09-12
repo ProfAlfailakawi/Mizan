@@ -36,6 +36,27 @@ export const DEFAULT_RESERVATION_TTL_SECONDS = 900;
  * يُكتب هنا لئلا يُظنّ محلولًا.
  */
 
+/*
+ * لمن هذا الحجز؟
+ *
+ * السجلّ يحمل `organizationId` و`competitionId` منذ أول يوم — ولم يكن أحدٌ يقرؤهما.
+ * فكانت قراءات الدفتر كلُّها تمسح السجلّ بلا تمييز، ومواضعُ المصحف واحدةٌ عند الجميع
+ * (`2:255` هو `2:255` في كل مسابقة على وجه الأرض). فحجزُ جهةٍ يمنع جهةً أخرى من موضعٍ
+ * لا شأن لها به، ويُذكر في رسالة التزاحم **كودُ متسابقٍ من جهةٍ أخرى** — فهو منعٌ
+ * وتسريبٌ معًا.
+ *
+ * ويكفي في وقوعه أن تُبدَّل المسابقة: `selectCompetition` يبدّل المسابقة ولا يمسح
+ * الدفتر. فالعطب داخل الجهة الواحدة قبل أن يكون بين جهتين.
+ *
+ * فصار كلُّ قارئٍ للدفتر يُسأل: لمن تقرأ؟ ومن لم يُجب قرأ الكلّ كما كان — لأن الدوالّ
+ * تُستعمل في فحوصٍ ومحاكاةٍ لا تعرف جهة. والكتابةُ تُعيد الدفتر كاملًا دائمًا: العزل
+ * في **القراءة** لا في الحفظ، فلا يضيع سجلُّ أحد.
+ */
+export interface ReservationScope { organizationId: string; competitionId: string }
+
+const inScope = (record: QuestionReservationRecord, scope?: ReservationScope) =>
+  !scope || (record.organizationId === scope.organizationId && record.competitionId === scope.competitionId);
+
 /** الانتقالات المسموحة وحدها. ما ليس هنا مرفوض بصريح النص لا بالسكوت. */
 export const RESERVATION_TRANSITIONS: Record<QuestionReservationState, QuestionReservationState[]> = {
   available: ['temporarily_reserved', 'assigned', 'quarantined'],
@@ -112,9 +133,10 @@ export function effectiveState(record: QuestionReservationRecord, now: string): 
  *
  * والحجرُ وحده يبقى حاجبًا أبديًا، لأن الموضع المعيب معيبٌ في كل حال.
  */
-export function blockedLocusKeys(records: QuestionReservationRecord[], now = new Date().toISOString(), exceptParticipantId?: string): Set<string> {
+export function blockedLocusKeys(records: QuestionReservationRecord[], now = new Date().toISOString(), exceptParticipantId?: string, scope?: ReservationScope): Set<string> {
   const blocked = new Set<string>();
   for (const record of records) {
+    if (!inScope(record, scope)) continue;
     const state = effectiveState(record, now);
     if (state === 'quarantined') { blocked.add(record.locusKey); continue; }
     if (state !== 'temporarily_reserved' && state !== 'assigned') continue;
@@ -148,7 +170,9 @@ export function reserveQuestions(input: ReserveInput): ReserveOutcome {
   const replayedRecords: QuestionReservationRecord[] = [];
   const blockedBy = new Map<string, QuestionReservationRecord>();
 
+  const scope: ReservationScope = { organizationId: input.organizationId, competitionId: input.competitionId };
   for (const record of input.records) {
+    if (!inScope(record, scope)) continue;
     if (record.idempotencyKey === input.idempotencyKey) replayedRecords.push(record);
     if (!wanted.has(record.locusKey)) continue;
     const state = effectiveState(record, now);
@@ -240,8 +264,8 @@ export function transitionReservations(input: {
  * يُقرأ «مُطلقًا» أصلًا، فيرى الانتقال إلى «مُطلق» انتقالًا إلى ما هو فيه فلا يكتب شيئًا —
  * فيبقى السجل مكتوبًا فيه «محجوز مؤقتًا» إلى الأبد. الانقضاء واقعٌ يُثبَّت في السجل.
  */
-export function expireReservations(records: QuestionReservationRecord[], now = new Date().toISOString(), actorId = 'system'): TransitionOutcome {
-  const expired = new Set(records.filter(r => reservationExpired(r, now)).map(r => r.id));
+export function expireReservations(records: QuestionReservationRecord[], now = new Date().toISOString(), actorId = 'system', scope?: ReservationScope): TransitionOutcome {
+  const expired = new Set(records.filter(r => inScope(r, scope) && reservationExpired(r, now)).map(r => r.id));
   if (!expired.size) return { records, changed: [], rejected: [] };
   const changed: QuestionReservationRecord[] = [];
   const next = records.map(record => {
@@ -256,9 +280,10 @@ export function expireReservations(records: QuestionReservationRecord[], now = n
   return { records: next, changed, rejected: [] };
 }
 
-export function reservationSummary(records: QuestionReservationRecord[], now = new Date().toISOString()) {
+export function reservationSummary(records: QuestionReservationRecord[], now = new Date().toISOString(), scope?: ReservationScope) {
   const counts: Record<QuestionReservationState, number> = { available: 0, temporarily_reserved: 0, assigned: 0, revealed: 0, released: 0, quarantined: 0 };
-  for (const record of records) counts[effectiveState(record, now)]++;
+  let total = 0;
+  for (const record of records) { if (!inScope(record, scope)) continue; total++; counts[effectiveState(record, now)]++; }
   /* «القائم» ما يحجب الآن: المؤقت والمخصَّص. والمكشوف انتهى أمره فلا يُعدّ قائمًا. */
-  return { counts, total: records.length, held: counts.temporarily_reserved + counts.assigned };
+  return { counts, total, held: counts.temporarily_reserved + counts.assigned };
 }

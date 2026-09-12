@@ -29,7 +29,8 @@ import {
   type ParticipantScopeRecord, type ParticipantScopeSelectionRule,
 } from './participant-scope';
 import type { QuestionCandidate } from './question-engine';
-import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations } from './question-reservation';
+import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations, type ReservationScope } from './question-reservation';
+import { adoptReferenceTime, competitionClockStatus, competitionNow, selfAsReference } from './competition-clock';
 import type { QuestionDistributionPlan } from './question-zones';
 import {
   derivedLegacyJuzCount, describeScope, fullQuranScope, normalizeScope, scopeAyahCount,
@@ -58,6 +59,23 @@ export interface ScopeEngineHost {
 export function createScopeEngineActions(host: ScopeEngineHost) {
   const S = host.getState;
   const newId = host.newId;
+
+  /*
+   * لمن نقرأ الدفتر، وبأيّ ساعة.
+   *
+   * النطاق: مواضع المصحف واحدةٌ عند كل الجهات، فبلا عزلٍ يمنع حجزُ جهةٍ جهةً أخرى
+   * ويُسمّى في التزاحم كودُ متسابقٍ لا يخصّها. و`selectCompetition` يبدّل المسابقة ولا
+   * يمسح الدفتر، فالعطب داخل الجهة الواحدة قبل أن يكون بين جهتين.
+   *
+   * والساعة: ساعةُ المسابقة لا ساعةُ الجهاز. فلو انحرفت ساعةُ جهاز قاعةٍ أنشأ حجزًا
+   * يولد منقضيًا فكنسه غيرُه، والمتسابق واقفٌ أمام اللجنة. والساعة تتبع المسابقة لا
+   * الشخص: لكل جهةٍ أجهزتها ومرجعُها، ولا تحتاج جهتان أن تتفقا على ساعة.
+   */
+  const tenant = (): ReservationScope => ({
+    organizationId: S().competition.organizationId,
+    competitionId: S().competition.id,
+  });
+  const clockNow = () => competitionNow(S().competitionClock);
 
   const activeParticipantScope = (participantId: string) =>
     S().participantScopes.find(x => x.participantId === participantId && x.status !== 'superseded');
@@ -786,10 +804,57 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     return { ok: true as const };
   };
 
+  /* ---- ساعة المسابقة ---- */
+
+  /*
+   * الجهاز المرجعي للمسابقة: هو منسّق الشبكة المحلية نفسه الذي يختاره `startLocalMesh`
+   * (جهاز Edge، ثم جهاز العمليات، ثم أي متصل). فلا يُصنع مفهومٌ ثانٍ لشيءٍ له مفهوم.
+   */
+  const competitionReferenceDevice = () => {
+    const mine = S().devices.filter(d => d.competitionId === S().competition.id && !['revoked', 'disabled'].includes(d.status));
+    return mine.find(d => d.type === 'edge_server' && d.status === 'online')
+      || mine.find(d => d.role === 'Operations' && d.status === 'online')
+      || mine.find(d => d.status === 'online');
+  };
+
+  /** اعتماد ساعة الجهاز المرجعي لهذه المسابقة. يُنقل الفرق لا الوقت، فيصمد بعد انقطاع الشبكة. */
+  const syncCompetitionClock = (input: { referenceDeviceId?: string; referenceNow: string }) => {
+    const deviceId = input.referenceDeviceId || competitionReferenceDevice()?.id;
+    if (!deviceId) return { ok: false as const, reason: 'NO_REFERENCE_DEVICE' };
+    if (!input.referenceNow || Number.isNaN(new Date(input.referenceNow).getTime())) {
+      return { ok: false as const, reason: 'REFERENCE_TIME_INVALID' };
+    }
+    const next = adoptReferenceTime({ referenceDeviceId: deviceId, referenceNow: input.referenceNow });
+    S().competitionClock = next;
+    const status = competitionClockStatus(next);
+    host.audit('COMPETITION_CLOCK_SYNCED', 'Competition', S().competition.id,
+      `اعتماد ساعة المسابقة من الجهاز المرجعي ${deviceId} — ${status.ar}`,
+      `Adopted the competition clock from reference device ${deviceId} — ${status.en}`);
+    if (status.noteworthy) {
+      host.createIncident('CLOCK_OFFSET', 'فرقٌ في الساعة بين هذا الجهاز والمرجع', status.ar, 'low');
+    }
+    host.notify();
+    return { ok: true as const, clock: next, status };
+  };
+
+  /** هذا الجهاز هو المرجع: ساعتُه ساعةُ المسابقة. */
+  const declareClockReference = (deviceId?: string) => {
+    const id = deviceId || competitionReferenceDevice()?.id;
+    if (!id) return { ok: false as const, reason: 'NO_REFERENCE_DEVICE' };
+    S().competitionClock = selfAsReference(id);
+    host.audit('COMPETITION_CLOCK_REFERENCE_SET', 'Competition', S().competition.id,
+      `ساعة المسابقة صارت ساعة الجهاز ${id}`, `The competition clock now follows device ${id}`);
+    host.notify();
+    return { ok: true as const, clock: S().competitionClock };
+  };
+
+  /** حال الساعة الآن — تُقال للمشغّل لا تُدفن. */
+  const competitionClockNow = () => ({ now: clockNow(), status: competitionClockStatus(S().competitionClock) });
+
   /* ---- دورة حياة الحجز ---- */
 
   const reserveQuestionsForParticipant = (input: { participantId: string; items: { locusKey: string; questionId: string }[]; sessionId?: string; modelId?: string; ttlSeconds?: number; idempotencyKey?: string }) => {
-    const expired = expireReservations(S().questionReservations, new Date().toISOString(), 'system');
+    const expired = expireReservations(S().questionReservations, clockNow(), 'system', tenant());
     S().questionReservations = expired.records;
     const outcome = reserveQuestions({
       records: S().questionReservations,
@@ -797,7 +862,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
       competitionId: S().competition.id,
       items: input.items, participantId: input.participantId, sessionId: input.sessionId, modelId: input.modelId,
       idempotencyKey: input.idempotencyKey || `${S().competition.id}:${input.participantId}:${input.modelId || input.sessionId || 'draw'}`,
-      actorId: S().currentUser.id, ttlSeconds: input.ttlSeconds, newId,
+      actorId: S().currentUser.id, ttlSeconds: input.ttlSeconds, now: clockNow(), newId,
     });
     S().questionReservations = outcome.records;
     if (!outcome.replayed && outcome.created.length) {
@@ -810,7 +875,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
   };
 
   const advanceReservations = (ids: string[], to: QuestionReservationRecord['state'], reason?: string) => {
-    const outcome = transitionReservations({ records: S().questionReservations, ids, to, actorId: S().currentUser.id, reason });
+    const outcome = transitionReservations({ records: S().questionReservations, ids, to, actorId: S().currentUser.id, reason, now: clockNow() });
     S().questionReservations = outcome.records;
     if (outcome.changed.length) {
       host.audit('QUESTION_RESERVATION_ADVANCED', 'QuestionReservation', outcome.changed[0].id,
@@ -822,7 +887,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
   };
 
   const sweepExpiredReservations = () => {
-    const outcome = expireReservations(S().questionReservations, new Date().toISOString(), 'system');
+    const outcome = expireReservations(S().questionReservations, clockNow(), 'system', tenant());
     S().questionReservations = outcome.records;
     if (outcome.changed.length) {
       host.audit('QUESTION_RESERVATIONS_EXPIRED', 'QuestionReservation', outcome.changed[0].id,
@@ -833,7 +898,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     return outcome.changed.length;
   };
 
-  const reservationBlockedLoci = (exceptParticipantId?: string) => blockedLocusKeys(S().questionReservations, new Date().toISOString(), exceptParticipantId);
+  const reservationBlockedLoci = (exceptParticipantId?: string) => blockedLocusKeys(S().questionReservations, clockNow(), exceptParticipantId, tenant());
 
   /**
    * تقرير عدالة وتوزيع الأسئلة.
@@ -900,6 +965,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant,
     quarantineQuestionLoci, liftQuestionQuarantine, recoverQuarantinedLoci,
     reserveQuestionsForParticipant, advanceReservations, sweepExpiredReservations, reservationBlockedLoci,
+    syncCompetitionClock, declareClockReference, competitionClockNow, competitionReferenceDevice,
     buildCompetitionFairnessReport,
     invalidateAffectedModels, activeQuarantinedLoci,
   };
