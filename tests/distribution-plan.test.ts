@@ -371,3 +371,41 @@ test('an exception plan re-verifies like any other — its permission is part of
   const revoked = await verifyDistributionPlan(first, () => plan({ ...args, constraints: { allowCategoryException: false } }));
   assert.equal(revoked.ok, false);
 });
+
+/* ── لماذا الموجة أصلًا: الأهلية غير المتساوية ─────────────────────────── */
+
+test('a wave beats gate-by-gate routing when one panel is the only one for a scarce category', async () => {
+  /*
+   * هذا هو الموضع الذي يفترق فيه النمطان فعلًا — وقياسُه سبقَ هذا الاختبار.
+   *
+   * لجنةٌ واحدة تحكم فئةً نادرة وتحكم الشائعة أيضًا. والبوابة تُسند واحدًا واحدًا: فترى تلك
+   * اللجنة فارغةً أوّل الصباح فتصبّ فيها الشائعين، ثم يصل النادرون ولا لجنة لهم غيرها —
+   * فتتضخّم وحدها. والموجة ترى أن ستّة **مضطرّون** إليها، فتُبعد عنها من يملك بديلًا.
+   *
+   * ولا يُصلَح هذا بالنقل بعد وقوعه: كل نقلٍ يمسّ أسبقيةً اكتُسبت عند الباب.
+   */
+  const shared = committee('c1', { assignedCategories: ['rare', 'common'], averageSessionMinutes: 10 });
+  const committees = [shared, committee('c2', { assignedCategories: ['common'], averageSessionMinutes: 10 }), committee('c3', { assignedCategories: ['common'], averageSessionMinutes: 10 })];
+  const eligibleFor = (p: Participant) => committees.filter(c => c.assignedCategories.includes(p.categoryId));
+
+  const common = Array.from({ length: 18 }, (_, i) => participant(`m${i}`, { categoryId: 'common' }));
+  const rare = Array.from({ length: 6 }, (_, i) => participant(`r${i}`, { categoryId: 'rare' }));
+
+  const out = await plan({ participants: [...common, ...rare], committees, eligibleFor });
+
+  assert.equal(out.unassigned.length, 0);
+  assert.equal(out.assignments.filter(a => a.committeeCode === 'C1').length, 9,
+    'the shared panel carries its six forced arrivals plus only three who had a choice');
+  assert.equal(out.maxLoadMinutesAfter, 90,
+    'gate-by-gate routing measured 120 minutes on this same intake — the wave sees the whole picture first');
+});
+
+test('the wave still gives the scarce category the only panel that can take it', async () => {
+  const committees = [committee('c1', { assignedCategories: ['rare', 'common'] }), committee('c2', { assignedCategories: ['common'] })];
+  const eligibleFor = (p: Participant) => committees.filter(c => c.assignedCategories.includes(p.categoryId));
+  const out = await plan({
+    participants: [...Array.from({ length: 6 }, (_, i) => participant(`m${i}`, { categoryId: 'common' })), participant('r1', { categoryId: 'rare' })],
+    committees, eligibleFor,
+  });
+  assert.equal(panelOf(out, 'r1'), 'C1', 'balancing minutes never overrides who may judge whom');
+});

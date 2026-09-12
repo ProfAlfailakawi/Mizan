@@ -991,11 +991,14 @@ export function useAppStore() {
       participant: found,
       roster: globalState.participants,
       competitionId: globalState.competition.id,
-      eligibleCommittees: found ? compatibleCommitteesFor(found) : [],
+      /* الأهلية تُقرَّر بالفئة والرواية، ثم يُوازَن بالدقائق — والدقائق هنا مقيسة: اختيارُ
+         «أخفّ لجنة» بقيمةٍ مُعدّة خاطئة يرسل الواصلَ إلى أثقلها وهو يحسب أنه أراحه. */
+      eligibleCommittees: found ? atMeasuredTempo(compatibleCommitteesFor(found)) : [],
       fallbackCommittees: found
-        ? globalState.committees.filter(c => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, found))
+        ? atMeasuredTempo(globalState.committees.filter(c => c.competitionId === globalState.competition.id && c.status !== 'offline' && !committeeHasHardConflict(c, found)))
         : [],
       unmatchedPolicy: getCompetitionPolicy(globalState.competition).operations.unmatchedArrivalPolicy,
+      mode: getCompetitionPolicy(globalState.competition).operations.distributionMode,
     });
 
     if (pIndex !== -1) {
@@ -1013,11 +1016,22 @@ export function useAppStore() {
       }
       if (decision.kind !== 'admit' && decision.kind !== 'admit-unrouted') return p;
       /*
-       * وصل ولا لجنة تؤهّله: يدخل الطابور برقمه بلا إسناد، وتُفتح حادثة توجيه.
-       * إبقاؤه خارج الطابور يخسره أسبقيته، وإسناده للجنةٍ لا تحكم فئته يؤجّل الرفض إلى
-       * لحظة الجلسة. والشاشة تعدّه في «منتظرون بلا لجنة» فلا يغيب عن انتباه المشرف.
+       * وصل ولم يُسنَد: يدخل الطابور برقمه بلا إسناد. إبقاؤه خارجه يخسره أسبقيته، وإسناده
+       * للجنةٍ لا تحكم فئته يؤجّل الرفض إلى لحظة الجلسة. والشاشة تعدّه في «منتظرون بلا
+       * لجنة» فلا يغيب عن انتباه المشرف.
+       *
+       * ويُفرَّق **لماذا**: تأجيلُ الموجات مقصودٌ بالتصميم، فحادثةٌ عند كل واصلٍ في نمط
+       * الموجات تُغرق سجلّ الحوادث بمائة «عطب» وهو يعمل كما أُريد — ثم لا يُصدَّق السجلّ
+       * حين تقع حادثةٌ حقيقية.
        */
       const unrouted = decision.kind === 'admit-unrouted';
+      const deferred = decision.kind === 'admit-unrouted' && decision.reason === 'awaiting-wave';
+      const unroutedReason = decision.kind === 'admit-unrouted' ? decision.reason : undefined;
+      const unroutedArabic = unroutedReason === 'awaiting-wave'
+        ? 'نمط الموجات: الإسناد يتمّ عند توزيع الدفعة'
+        : unroutedReason === 'missing-pre-assignment'
+          ? 'نمط الإسناد المسبق ولا لجنة مُسندة له قبل اليوم'
+          : 'لا توجد لجنة مؤهَّلة لفئة هذا المتسابق وروايته';
       const updated: Participant = {
         ...p,
         status: 'in_queue',
@@ -1037,8 +1051,8 @@ export function useAppStore() {
           {
             status: 'in_queue',
             timestamp: new Date().toISOString(),
-            actor: unrouted ? 'Arrival — no eligible committee' : 'Smart Auto Routing Dispatcher',
-            reason: unrouted ? 'لا توجد لجنة مؤهَّلة لفئة هذا المتسابق وروايته' : undefined,
+            actor: unrouted ? (deferred ? 'Arrival — awaiting wave distribution' : 'Arrival — not routed') : 'Smart Auto Routing Dispatcher',
+            reason: unrouted ? unroutedArabic : undefined,
           }
         ]
       };
@@ -1059,11 +1073,14 @@ export function useAppStore() {
       }
 
       globalState.participants[pIndex] = updated;
-      if (unrouted) {
+      /* الحادثة للعطب وحده. والموجةُ المؤجَّلة تظهر في «منتظرون بلا لجنة» وفي بطاقة التوزيع. */
+      if (unrouted && !deferred) {
         createIncident(
           'conflict_routing',
-          'Arrival with no eligible committee',
-          `المتسابق ${p.code} حضر ولا توجد لجنة مؤهَّلة لفئته. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا أو لجنة تغطي فئته.`,
+          unroutedReason === 'missing-pre-assignment' ? 'Arrival with no pre-assigned committee' : 'Arrival with no eligible committee',
+          unroutedReason === 'missing-pre-assignment'
+            ? `المتسابق ${p.code} حضر والمسابقة على نمط الإسناد المسبق، ولا لجنة مُسندة له. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا.`
+            : `المتسابق ${p.code} حضر ولا توجد لجنة مؤهَّلة لفئته. دخل الطابور برقمه ${decision.originalQueueNumber} بلا إسناد، ويحتاج إسنادًا يدويًا أو لجنة تغطي فئته.`,
           'critical'
         );
       }
@@ -2090,7 +2107,9 @@ export function useAppStore() {
     competitionName: storedCompetitionName(true),
     competitionNameArabic: storedCompetitionName(false),
     participants: globalState.participants,
-    committees: globalState.committees,
+    /* الشاشة تعرض دقائق انتظارٍ يقرأها الناس ويبنون عليها؛ فتُبنى من الإيقاع المقيس لا
+       من قيمة الإعداد — وإلّا أعلنت لجنةٌ تأخذ خمس عشرة دقيقة انتظارًا محسوبًا بثمان. */
+    committees: committeesAtMeasuredTempo(),
     categories: globalState.competition.categories || [],
     fallbackSessionMinutes: globalState.competition.ruleSet?.questionDurationMinutes,
     elapsedSecondsByCommittee: globalState.activeSession.committee
@@ -3024,10 +3043,9 @@ export function useAppStore() {
   );
 
   /** لجانٌ بإيقاعها المقيس — تُمرَّر لكل ما يحسب بالدقائق بدل القيمة المُعدّة. */
-  const committeesAtMeasuredTempo = () => {
-    const byId = tempoMinutes();
-    return globalState.committees.map(c => byId[c.id] ? { ...c, averageSessionMinutes: byId[c.id] } : c);
-  };
+  const atMeasuredTempo = (list: Committee[], byId = tempoMinutes()) =>
+    list.map(c => byId[c.id] ? { ...c, averageSessionMinutes: byId[c.id] } : c);
+  const committeesAtMeasuredTempo = () => atMeasuredTempo(globalState.committees);
 
   const distributionConstraints = () => {
     const ops = getCompetitionPolicy(globalState.competition).operations;
@@ -3114,11 +3132,13 @@ export function useAppStore() {
   };
 
   const recommendCommitteeElasticity=()=>{
-    const active=globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline');if(active.length<2)return null;
+    /* الفجوة تُقاس بالدقائق، فالدقائق مقيسة: لجنتان متساويتان في عدد المنتظرين قد تفترقان
+       بنصف ساعةٍ حقيقية، وترتيبُهما بقيمة الإعداد كان يخفي ذلك تمامًا. */
+    const active=atMeasuredTempo(globalState.committees.filter(c=>c.competitionId===globalState.competition.id&&c.status!=='offline'));if(active.length<2)return null;
     const load=(c:Committee)=>globalState.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===c.id).length*Math.max(1,c.averageSessionMinutes);
     const source=[...active].sort((a,b)=>load(b)-load(a))[0],target=[...active].sort((a,b)=>load(a)-load(b))[0];if(!source||!target||source.id===target.id||load(source)<=load(target)+Math.max(5,source.averageSessionMinutes))return null;
     const recommendation=recommendBalancedQueueMove({participants:globalState.participants,sourceCommittee:source,targetCommittee:target,maxMove:5,isCompatible:(p,t)=>compatibleCommitteesFor(p).some(c=>c.id===t.id)});if(!recommendation.participantIds.length)return null;
-    const item:CommitteeElasticityRecommendation={id:newId('elastic'),competitionId:globalState.competition.id,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:recommendation.participantIds,reasonArabic:`${source.code} أعلى حملًا؛ أقل نقل يحسن الفجوة هو ${recommendation.participantIds.length} إلى ${target.code} مع حفظ أسبقية الوصول.`,reasonEnglish:`${source.code} is carrying more load; the smallest transfer improving the gap is ${recommendation.participantIds.length} to ${target.code} while preserving arrival priority.`,constraintsChecked:['category','committee availability','declared hard conflicts','current load','average session duration',`projected gap ${recommendation.before.gapMinutes}→${recommendation.after.gapMinutes} min`],status:'proposed'};globalState.elasticityRecommendations=[item,...globalState.elasticityRecommendations];auditTrustAction('ELASTICITY_RECOMMENDATION_CREATED','Committee',source.id,'اقتراح أقل نقل يحسن توازن اللجان دون تنفيذ تلقائي ومع حفظ الأسبقية','Proposed the smallest queue move that improves panel balance without automatic execution and while preserving priority');notify();return item;
+    const item:CommitteeElasticityRecommendation={id:newId('elastic'),competitionId:globalState.competition.id,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.name,sourceCommitteeId:source.id,targetCommitteeId:target.id,participantIds:recommendation.participantIds,reasonArabic:`${source.code} أعلى حملًا؛ أقل نقل يحسن الفجوة هو ${recommendation.participantIds.length} إلى ${target.code} مع حفظ أسبقية الوصول.`,reasonEnglish:`${source.code} is carrying more load; the smallest transfer improving the gap is ${recommendation.participantIds.length} to ${target.code} while preserving arrival priority.`,constraintsChecked:['category','committee availability','declared hard conflicts','current load','measured session duration',`projected gap ${recommendation.before.gapMinutes}→${recommendation.after.gapMinutes} min`],status:'proposed'};globalState.elasticityRecommendations=[item,...globalState.elasticityRecommendations];auditTrustAction('ELASTICITY_RECOMMENDATION_CREATED','Committee',source.id,'اقتراح أقل نقل يحسن توازن اللجان دون تنفيذ تلقائي ومع حفظ الأسبقية','Proposed the smallest queue move that improves panel balance without automatic execution and while preserving priority');notify();return item;
   };
   const decideCommitteeElasticity=(id:string,approve:boolean)=>{const item=globalState.elasticityRecommendations.find(x=>x.id===id&&x.competitionId===globalState.competition.id);if(!item||item.status!=='proposed')return false;if(!['comp_admin','ops_manager','head_judge'].includes(globalState.currentUser.role))return false;if(approve&&item.targetCommitteeId){const moved=transferQueueParticipants({sourceCommitteeId:item.sourceCommitteeId,targetCommitteeId:item.targetCommitteeId,participantIds:item.participantIds,mode:'PRESERVE_ORIGINAL_TURN',reason:'Approved committee load balancing'});if(!moved.ok)return false;}
     globalState.elasticityRecommendations=globalState.elasticityRecommendations.map(x=>x.id===id?{...x,status:approve?'approved':'dismissed',approvedAt:approve?new Date().toISOString():undefined,approvedBy:approve?globalState.currentUser.name:undefined}:x);auditTrustAction(approve?'ELASTICITY_APPROVED':'ELASTICITY_DISMISSED','CommitteeElasticity',id,approve?'اعتماد موازنة اللجان يدويًا مع حفظ أسبقية الوصول':'رفض اقتراح موازنة اللجان',approve?'Approved committee elasticity recommendation while preserving arrival priority':'Dismissed committee elasticity recommendation');notify();return true;};

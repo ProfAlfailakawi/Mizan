@@ -20,16 +20,38 @@ import type { Committee, Participant } from '../types';
 /** الحالات التي تعني أن الرحلة بدأت فعلًا، فلا يُعاد ترقيمها. */
 export const ARRIVED_STATUSES = ['in_queue', 'in_session', 'tested', 'certified'] as const;
 
+/**
+ * متى تُسنَد اللجنة.
+ *
+ * - `ON_ARRIVAL` — البوابة تُسند كل واصلٍ فور مسحه. الافتراض، وأبسطُ ما يعمل.
+ * - `WAVES` — البوابة **لا تُسند**: يأخذ رقمه ويدخل الطابور، ثم تُوزَّع الدفعة كلّها
+ *   مرّةً واحدة بقيود عدالةٍ ترى التركيبة. فالجشع يوزّع كل واصلٍ وحده، ولا يرى أن وفدًا
+ *   كاملًا وقع تحت لجنةٍ واحدة إلا بعد فوات أوان التصحيح — إذ يصير كل تعديلٍ نقلًا يمسّ
+ *   الأسبقية. وهذا ليس عطبًا في الانتظار: الرقم يُمنح عند الباب كما في كل نمط.
+ * - `PRE_ASSIGNED` — اللجان أُسندت قبل اليوم، والبوابة تحترمها ولا تُسند من تلقائها.
+ *   فمن وصل بلا إسنادٍ مسبق ثغرةُ إعداد تُعلَن، لا فراغٌ تملؤه البوابة بالتخمين.
+ */
+export type DistributionMode = 'ON_ARRIVAL' | 'WAVES' | 'PRE_ASSIGNED';
+
+/** لماذا دخل الطابور بلا لجنة — والسبب يغيّر ما يُقال للمشرف وهل تُفتح حادثة. */
+export type UnroutedReason =
+  /** لا لجنة تحكم فئته: ثغرةُ إعداد تُفتح لها حادثة. */
+  | 'no-eligible-committee'
+  /** نمط الموجات: الإسناد مؤجَّل بالتصميم، وليس عطبًا ولا يُفتح له شيء. */
+  | 'awaiting-wave'
+  /** نمط الإسناد المسبق ولا إسناد له: ثغرةُ إعداد كذلك. */
+  | 'missing-pre-assignment';
+
 export type ArrivalDecision =
   | { kind: 'not-found' }
   | { kind: 'other-competition' }
   | { kind: 'duplicate'; reason: 'already-arrived' | 'already-numbered' }
   /**
-   * وصل، ولا لجنة تؤهّله. يأخذ رقمه ويدخل الطابور بلا إسناد، وتُفتح حادثة توجيه.
-   * إبقاؤه خارج الطابور يخسره أسبقيته، وإسناده للجنةٍ لا تحكم فئته يؤجّل الرفض إلى
-   * لحظة الجلسة — وهو أسوأ موضعٍ يُكتشف فيه.
+   * وصل ولم يُسنَد. يأخذ رقمه ويدخل الطابور، ويقول `reason` **لماذا** — فالتأجيلُ
+   * المقصود لا يُعامَل معاملة العطب. إبقاؤه خارج الطابور يخسره أسبقيته، وإسناده للجنةٍ
+   * لا تحكم فئته يؤجّل الرفض إلى لحظة الجلسة — وهو أسوأ موضعٍ يُكتشف فيه.
    */
-  | { kind: 'admit-unrouted'; queueNumber: number; originalQueueNumber: number; queueOrderKey: number; reason: 'no-eligible-committee' }
+  | { kind: 'admit-unrouted'; queueNumber: number; originalQueueNumber: number; queueOrderKey: number; reason: UnroutedReason }
   | { kind: 'admit'; queueNumber: number; originalQueueNumber: number; queueOrderKey: number; assignedCommitteeId?: string };
 
 /** أكبر رقم دورٍ مُنح في هذه المسابقة، أيًّا كان الحقل الذي حمله. */
@@ -100,8 +122,10 @@ export function decideArrival(args: {
   fallbackCommittees?: Committee[];
   /** الافتراض يمنع الإسناد الخطأ؛ و`ANY_AVAILABLE` يستعيد السلوك القديم صراحةً. */
   unmatchedPolicy?: 'INCIDENT' | 'ANY_AVAILABLE';
+  /** متى تُسنَد اللجنة. الافتراض `ON_ARRIVAL`، وهو سلوك البوابة قبل وجود هذا الخيار. */
+  mode?: DistributionMode;
 }): ArrivalDecision {
-  const { participant, roster, competitionId, eligibleCommittees, fallbackCommittees = [], unmatchedPolicy = 'INCIDENT' } = args;
+  const { participant, roster, competitionId, eligibleCommittees, fallbackCommittees = [], unmatchedPolicy = 'INCIDENT', mode = 'ON_ARRIVAL' } = args;
   if (!participant) return { kind: 'not-found' };
   if (participant.competitionId !== competitionId) return { kind: 'other-competition' };
 
@@ -111,19 +135,29 @@ export function decideArrival(args: {
 
   const next = highestQueueNumber(roster, competitionId) + 1;
   const queueOrderKey = highestQueueOrderKey(roster, competitionId) + 1;
+  const admitted = { queueNumber: next, originalQueueNumber: next, queueOrderKey } as const;
+
+  /* إسنادٌ سابق يُحترم في كل نمط: هو قرارُ إنسانٍ أو خطةٍ موقَّعة، والبوابة لا تنقضه. */
+  if (participant.assignedCommitteeId)
+    return { kind: 'admit', ...admitted, assignedCommitteeId: participant.assignedCommitteeId };
+
+  /*
+   * الرقم يُمنح في كل الأنماط قبل أيّ كلامٍ عن اللجنة — فالأسبقية حقٌّ يُكتسب بالوصول
+   * وحده، ولا يسقط بتأجيلٍ في التوزيع ولا بعطبٍ في التهيئة.
+   */
+  if (mode === 'WAVES')
+    return { kind: 'admit-unrouted', ...admitted, reason: 'awaiting-wave' };
+  if (mode === 'PRE_ASSIGNED')
+    return { kind: 'admit-unrouted', ...admitted, reason: 'missing-pre-assignment' };
+
   const pool = eligibleCommittees.length
     ? eligibleCommittees
     : unmatchedPolicy === 'ANY_AVAILABLE' ? fallbackCommittees : [];
+  const assignedCommitteeId = leastLoadedCommittee(pool, roster, competitionId);
+  if (!assignedCommitteeId)
+    return { kind: 'admit-unrouted', ...admitted, reason: 'no-eligible-committee' };
 
-  /* لجنةٌ أُسندت من قبل لا تُبدَّل عند الوصول، ولا تُراجَع أهليتها هنا. */
-  const assignedCommitteeId = participant.assignedCommitteeId || leastLoadedCommittee(pool, roster, competitionId);
-
-  /* رقمه يبقى له وإن لم تُوجد لجنة: الأسبقية حقٌّ لا يسقط بعطبٍ في التهيئة. */
-  if (!assignedCommitteeId) {
-    return { kind: 'admit-unrouted', queueNumber: next, originalQueueNumber: next, queueOrderKey, reason: 'no-eligible-committee' };
-  }
-
-  return { kind: 'admit', queueNumber: next, originalQueueNumber: next, queueOrderKey, assignedCommitteeId };
+  return { kind: 'admit', ...admitted, assignedCommitteeId };
 }
 
 /** البحث بالمعرّف أو بالكود، والكود غير حسّاس لحالة الأحرف. */
