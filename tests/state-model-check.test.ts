@@ -48,18 +48,24 @@ test('التسلسل القانوني يوحّد الحالتين المتطاب
   assert.notEqual(canonicalState({ a: 1 }), canonicalState({ a: 2 }));
 });
 
-test('دورة حياة الحجز: كل التشابكات الممكنة في عالمٍ من موضعين وفاعلَين', () => {
+test('دورة حياة الحجز: الفضاء يُستنفد، فالنتيجة برهانٌ لا انطباع', () => {
+  /*
+   * موضعٌ واحد وثلاثة فاعلين: أشدّ ما يكون التزاحم على مورد واحد. والفضاء يُستنفد هنا
+   * فعلًا — وهذا هو الفرق بين «لم يُكسر فيما جرّبنا» وبين «لا يُكسر بحال داخل هذا النموذج».
+   * (والعالم الأكبر — موضعان وفاعلان — في `npm run check:model` لأنه أبطأ من فحص دفعة.)
+   */
   const result = checkModel<ReservationWorld>({
     initial: initialReservationWorld(),
-    actions: reservationActions(),
+    actions: reservationActions({ loci: ['2:255'], participants: ['p1', 'p2', 'p3'] }),
     invariants: reservationInvariants(),
     canonical: canonicalReservationWorld,
-    maxStates: 120_000,
-    maxDepth: 12,
+    maxStates: 500_000,
+    maxDepth: 24,
   });
   const report = renderModelCheck('دورة حياة الحجز والكشف', result);
   assert.deepEqual(result.violations.map(v => v.invariantId), [], `ثوابت مكسورة:\n${report}`);
-  assert.ok(result.statesExplored > 200, `فضاءٌ صغير جدًا ليكون فحصًا (${result.statesExplored} حالة)`);
+  assert.equal(result.exhaustive, true, `لم يُستنفد الفضاء، فالنتيجة ليست برهانًا:\n${report}`);
+  assert.ok(result.statesExplored > 500, `فضاءٌ صغير جدًا ليكون فحصًا (${result.statesExplored} حالة)`);
   assert.equal(result.invariantsHeld.length, reservationInvariants().length, 'لم تصمد كل الثوابت');
 });
 

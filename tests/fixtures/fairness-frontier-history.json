@@ -1,0 +1,59 @@
+{
+  "historyVersion": "MIZAN-FAIRNESS-BUDGET-1",
+  "entries": [
+    {
+      "recordedAt": "2026-09-12T01:27:39.231Z",
+      "engineVersion": "MIZAN-QUESTION-ENGINE-1",
+      "scenario": "juz30-400x3-balanced",
+      "metrics": {
+        "scopeViolations": 0,
+        "readingViolations": 0,
+        "duplicateWithinModelViolations": 0,
+        "duplicateForParticipantViolations": 0,
+        "failedDraws": 0,
+        "excessOverLowerBound": 0,
+        "maxUsesOfAnyQuestion": 3,
+        "totalRepeats": 710,
+        "maxModelDifficultyDelta": 1.167,
+        "selectionMillisP95": 3,
+        "heapUsedMb": 17.6
+      },
+      "optimalityGap": {
+        "max_reuse": 0,
+        "total_repeats": 0,
+        "difficulty_deviation": 280,
+        "exposure_cost": 0,
+        "scarcity_cost": 0,
+        "same_hall_reuses": 3,
+        "aggregate_cost": 535.5
+      }
+    },
+    {
+      "recordedAt": "2026-09-12T01:27:51.264Z",
+      "engineVersion": "MIZAN-QUESTION-ENGINE-1",
+      "scenario": "juz30-400x3-balanced",
+      "metrics": {
+        "scopeViolations": 0,
+        "readingViolations": 0,
+        "duplicateWithinModelViolations": 0,
+        "duplicateForParticipantViolations": 0,
+        "failedDraws": 0,
+        "excessOverLowerBound": 0,
+        "maxUsesOfAnyQuestion": 3,
+        "totalRepeats": 710,
+        "maxModelDifficultyDelta": 1.167,
+        "selectionMillisP95": 3,
+        "heapUsedMb": 13.5
+      },
+      "optimalityGap": {
+        "max_reuse": 0,
+        "total_repeats": 0,
+        "difficulty_deviation": 280,
+        "exposure_cost": 0,
+        "scarcity_cost": 0,
+        "same_hall_reuses": 3,
+        "aggregate_cost": 535.5
+      }
+    }
+  ]
+}

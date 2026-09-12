@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, UsersRound, Wand2,
-  Layers3,
+  Layers3, Sigma,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -22,6 +22,7 @@ import { QuranScopePicker, ScopeSummary } from '../scope/QuranScopePicker';
 import { ScopeHeatMap } from '../scope/ScopeHeatMap';
 import type { DemandAnalysis } from '../../lib/scope-demand';
 import { ScopeSimulationStudio, type WhatIfState } from '../scope/ScopeSimulationStudio';
+import { MathematicalBoundPanel } from '../scope/MathematicalBoundPanel';
 import { ModelFairnessStudio } from '../scope/ModelFairnessStudio';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -40,7 +41,7 @@ import { useConfirm } from '../design-system/ConfirmDialog';
  * والوضع البسيط يكفي مسابقة مدرسة في دقائق؛ والمتقدّم لمن يحتاج مقاطع ومناطق وقواعد.
  */
 
-type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
+type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'bound' | 'models' | 'readiness';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -59,6 +60,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['policy', Settings2, ar ? 'سياسة الأسئلة' : 'Question policy'],
     ['demand', Flame, ar ? 'الازدحام' : 'Demand'],
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
+    ['bound', Sigma, ar ? 'الحدّ الرياضي' : 'Mathematical bound'],
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
   ];
@@ -103,6 +105,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'policy' && <PolicyTab store={store} ar={ar} category={category} advanced={advanced} />}
             {tab === 'demand' && <DemandTab store={store} ar={ar} />}
             {tab === 'simulation' && <SimulationTab store={store} ar={ar} />}
+            {tab === 'bound' && <MathematicalBoundTab store={store} ar={ar} />}
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
           </div>
@@ -571,6 +574,30 @@ const SimulationTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) =
     })();
   };
   return <ScopeSimulationStudio arabic={ar} latest={history[0]} history={history} defaults={defaults} busy={busy} error={error} onRun={run} />;
+};
+
+/*
+ * تبويب الحدّ الرياضي.
+ *
+ * موضعه هنا لا في شاشةٍ جديدة: هو امتدادٌ لمنظومة العدالة القائمة (النطاق ← الازدحام ←
+ * المحاكاة ← الحدّ الرياضي ← النماذج ← الجاهزية)، لا لوحةٌ ثانية توازيها. والحلّال يُحمَّل
+ * عند الضغط لا عند فتح الشاشة، فلا يدخل حزمةَ ما يعمل يوم المسابقة.
+ */
+const MathematicalBoundTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) => {
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<Awaited<ReturnType<Store['runFairnessOracle']>> | null>(null);
+  const run = (participantCount?: number) => {
+    setBusy(true);
+    void (async () => {
+      try {
+        setOutcome(await store.runFairnessOracle({ participantCount }));
+      } catch (error) {
+        console.error('MIZAN fairness oracle failed:', error);
+        setOutcome({ ok: false as const, reason: 'ORACLE_FAILED' });
+      } finally { setBusy(false); }
+    })();
+  };
+  return <MathematicalBoundPanel ar={ar} busy={busy} outcome={outcome} onRun={run} />;
 };
 
 const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab) => void }> = ({ store, ar, onNavigate }) => {

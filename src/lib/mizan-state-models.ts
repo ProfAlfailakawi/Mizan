@@ -34,6 +34,19 @@ export interface ReservationWorld {
   /** متسابقون نُفِّذ لهم استبدالٌ طارئ. */
   replaced: string[];
   scope: { version: number; locked: boolean; ranges: string };
+  /*
+   * وقائع مرتّبة، تُسجَّل لحظة وقوعها ثم تلزم.
+   *
+   * كان تاريخ كل سجلّ داخلًا في تسلسل الحالة، فصار الفضاء لا نهائيًّا: سجلٌّ يدور بين
+   * «مخصَّص» و«مُطلق» يولّد تاريخًا جديدًا في كل دورة، فلا يُستنفد الفضاء أبدًا، ولا
+   * يخرج الفحص ببرهان قطّ.
+   *
+   * والترتيب مطلوبٌ في ثابتين فقط: كشفٌ بعد حجر، وحجبٌ بعد كشف. فيُحسبان لحظة الانتقال
+   * ويُثبَّتان هنا راية لا تنطفئ، ويخرج التاريخ من التسلسل. والفضاء يصير محدودًا بلا أن
+   * يفقد الفحص شيئًا: ما كان يُرى بالتاريخ يُرى بالراية.
+   */
+  revealedAfterQuarantine: boolean;
+  heldAfterReveal: boolean;
 }
 
 export interface ReservationModelOptions {
@@ -47,7 +60,11 @@ const DEFAULT_LOCI = ['2:255', '78:1'];
 const DEFAULT_PARTICIPANTS = ['p1', 'p2'];
 
 export function initialReservationWorld(): ReservationWorld {
-  return { tick: 0, records: [], revealed: [], replaced: [], scope: { version: 1, locked: false, ranges: '1-30' } };
+  return {
+    tick: 0, records: [], revealed: [], replaced: [],
+    scope: { version: 1, locked: false, ranges: '1-30' },
+    revealedAfterQuarantine: false, heldAfterReveal: false,
+  };
 }
 
 /*
@@ -62,13 +79,18 @@ export function initialReservationWorld(): ReservationWorld {
 export function canonicalReservationWorld(world: ReservationWorld): string {
   const now = isoAt(world.tick);
   const rows = world.records
-    .map(record => ({
-      locusKey: record.locusKey,
-      state: effectiveState(record, now),
-      participantId: record.participantId || '',
-      idempotencyKey: record.idempotencyKey,
-      path: record.history.map(entry => entry.state).join('>'),
-    }))
+    .map(record => {
+      const visited = new Set(record.history.map(entry => entry.state));
+      return {
+        locusKey: record.locusKey,
+        state: effectiveState(record, now),
+        participantId: record.participantId || '',
+        idempotencyKey: record.idempotencyKey,
+        everRevealed: visited.has('revealed'),
+        everQuarantined: visited.has('quarantined'),
+        everReleased: visited.has('released'),
+      };
+    })
     .sort((a, b) => canonicalState(a).localeCompare(canonicalState(b)));
   return canonicalState({
     tick: world.tick,
@@ -76,6 +98,8 @@ export function canonicalReservationWorld(world: ReservationWorld): string {
     revealed: [...world.revealed].sort(),
     replaced: [...world.replaced].sort(),
     scope: world.scope,
+    revealedAfterQuarantine: world.revealedAfterQuarantine,
+    heldAfterReveal: world.heldAfterReveal,
   });
 }
 
@@ -126,12 +150,21 @@ export function reservationActions(options: ReservationModelOptions = {}): Model
     for (const participantId of participants) {
       const transition = (to: QuestionReservationState) => (world: ReservationWorld): ReservationWorld => {
         const now = isoAt(world.tick);
+        const before = new Map(world.records.map(record => [record.id, record.history.map(entry => entry.state)]));
         const ids = recordsAt(world, locusKey)
           .filter(record => record.participantId === participantId && RESERVATION_TRANSITIONS[effectiveState(record, now)].includes(to))
           .map(record => record.id);
         const outcome = transitionReservations({ records: world.records, ids, to, actorId: 'ops', now });
         const revealed = to === 'revealed' && outcome.changed.length ? [...new Set([...world.revealed, locusKey])] : world.revealed;
-        return { ...world, records: outcome.records, revealed };
+        // الوقائع المرتّبة تُلتقط هنا لحظة وقوعها، فلا يحتاج التسلسل إلى التاريخ كله.
+        let revealedAfterQuarantine = world.revealedAfterQuarantine;
+        let heldAfterReveal = world.heldAfterReveal;
+        for (const changed of outcome.changed) {
+          const priorStates = before.get(changed.id) || [];
+          if (to === 'revealed' && priorStates.includes('quarantined')) revealedAfterQuarantine = true;
+          if ((to === 'temporarily_reserved' || to === 'assigned') && priorStates.includes('revealed')) heldAfterReveal = true;
+        }
+        return { ...world, records: outcome.records, revealed, revealedAfterQuarantine, heldAfterReveal };
       };
       for (const to of ['assigned', 'revealed', 'released', 'quarantined'] as QuestionReservationState[]) {
         actions.push({
@@ -211,12 +244,7 @@ export function reservationInvariants(): ModelInvariant<ReservationWorld>[] {
       id: 'no_reveal_after_invalidation',
       ar: 'لا يُكشف موضعٌ بعد أن حُجر. (والإطلاق ليس إبطالًا: الموضع يعود إلى المخزون.)',
       en: 'No locus is revealed after quarantine. (Release is not invalidation: the locus returns to stock.)',
-      holds: world => world.records.every(record => {
-        const path = record.history.map(entry => entry.state);
-        const revealAt = path.lastIndexOf('revealed');
-        if (revealAt < 0) return true;
-        return !path.slice(0, revealAt).includes('quarantined');
-      }),
+      holds: world => !world.revealedAfterQuarantine,
     },
     {
       id: 'retry_creates_no_second_record',
@@ -247,12 +275,7 @@ export function reservationInvariants(): ModelInvariant<ReservationWorld>[] {
       id: 'revealed_never_returns_to_held',
       ar: 'المكشوف لا يعود محجوزًا ولا مخصَّصًا.',
       en: 'A revealed locus never returns to a held state.',
-      holds: world => world.records.every(record => {
-        const path = record.history.map(entry => entry.state);
-        const revealAt = path.indexOf('revealed');
-        if (revealAt < 0) return true;
-        return !path.slice(revealAt + 1).some(state => state === 'temporarily_reserved' || state === 'assigned');
-      }),
+      holds: world => !world.heldAfterReveal,
     },
     {
       id: 'blocked_means_one_holder',

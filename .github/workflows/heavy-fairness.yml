@@ -1,0 +1,155 @@
+name: فحص العدالة الثقيل — ما لا يُشغَّل في كل دفعة
+
+# ثلاث مسارب لا واحد.
+#
+# فحصُ الدفعة (ci.yml) يجب أن يبقى سريعًا وإلا صار عبئًا يُتحايل عليه. والفحوص الثقيلة —
+# المِرصد الرياضي، والبحث الخصومي، والفحص الصوري، والمحاكاة بآلاف المتسابقين — تكلّف
+# دقائق لا ثواني، فلا تُشترط على كل دفعة.
+#
+# لكن «لا تُشترط على كل دفعة» شيء، و«موجودة في المستودع ولا تُشغَّل أبدًا» شيء آخر. والثانية
+# هي التي تقع فعلًا: يُكتب فحصٌ ثقيل مرة، ثم يُنسى، ثم يشيخ، ثم ينكسر بصمت، ثم يُكتشف أنه
+# لم يعمل منذ ستة أشهر — وهذا أسوأ من ألّا يكون موجودًا، لأنه يُطمئن بلا وجهٍ للطمأنينة.
+#
+# فهذا الملف يجعل تشغيلها مجدولًا: أسبوعيًّا، وعند كل وسم إصدار، وعند الطلب. وإصدارٌ رسمي
+# لا يُبنى على فحصٍ ثقيلٍ قديم.
+
+on:
+  schedule:
+    # كل أحدٍ في الثالثة صباحًا بتوقيت UTC — قبل أسبوع العمل، فيُرى العطب قبل أن يُبنى عليه.
+    - cron: '0 3 * * 0'
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: 'حجم المحاكاة (عدد المتسابقين في السيناريو الأكبر)'
+        required: false
+        default: '5000'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizan-heavy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── المِرصد الرياضي: المثالية المُثبَتة، والجدوى القاطعة، والفجوة، والندم.
+  oracle:
+    name: المِرصد الرياضي والمقايسة
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: مقايسة المِرصد
+        run: npm run oracle:benchmark
+
+  # ── البحث الخصومي والاستقرار: مونتي كارلو، وحساسية الترتيب، والاستئصال، والأوزان.
+  adversarial:
+    name: البحث الخصومي واستقرار العدالة
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: خصومة واستقرار
+        run: npm run fairness:adversarial -- --seeds=200 --iterations=40
+
+  # ── الفحص الصوري: يسقط إذا كُسر ثابت، ويسقط أيضًا إذا لم يُستنفد الفضاء.
+  model-check:
+    name: فحص النماذج الصوري
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: استكشاف كل التشابكات
+        run: npm run check:model
+
+  # ── المحاكاة الكبيرة وتمارين الأعطال: ما كان موجودًا ويُشغَّل الآن بانتظام.
+  simulation:
+    name: محاكاة العدالة الكبيرة وتمارين الأعطال
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - name: مختبر العدالة
+        run: npm run fairness:lab -- --scale=${{ github.event.inputs.scale || '5000' }}
+      - name: بروفة الحمل
+        run: npm run load:rehearsal
+      - name: تمرين الأعطال
+        run: npm run drill:failure
+
+  # ── قواعد Firestore على المحاكي: الحاجز الأخير، ولا يكفي فيه فحص الشيفرة.
+  rules:
+    name: قواعد Firestore على المحاكي
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: القواعد والمنع المنصوص
+        run: npm run qa:firestore-rules
+
+  # ── بوابة الميزانية: آخر ما يُشغَّل، ولا يُبنى إصدارٌ على فحصٍ ثقيلٍ قديم.
+  budget-gate:
+    name: بوابة ميزانية العدالة
+    needs: [oracle, adversarial, model-check, simulation, rules]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      MIZAN_RELEASE_VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      # لا عتبات اعتباطية: خطّ الأساس محفوظ في المستودع، والمقارنة به وحده.
+      - name: الحكم مقابل خطّ الأساس
+        run: npm run fairness:gate
+      - name: حفظ تاريخ الجبهة
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fairness-frontier-history
+          path: tests/fixtures/fairness-frontier-history.json
+          if-no-files-found: warn

@@ -39,7 +39,12 @@ test('audit create binds the uploader, and audit stays append-only', () => {
 
 test('judges may update their own submission (client rewrites the same doc id on commit)', () => {
   const block = rules.slice(rules.indexOf('match /judge_submissions/'), rules.indexOf('match /checkins/'));
-  assert.match(block, /allow update: if writeScope[\s\S]*resource\.data\.uploaderUid == request\.auth\.uid/);
+  /*
+   * صار الشرط مسبوقًا بـ`present()` — حارسُ وجود الوثيقة، حتى لا يكون المنع عند العدم
+   * رفضًا عَرَضيًّا بخطأ تقييم (انظر tests/firestore-rules-explicit-deny.test.ts).
+   * وعقد الصلاحيات لم يتغيّر: المحكّم يحدّث ورقته هو وحدها، وهو ما يُفحص هنا.
+   */
+  assert.match(block, /allow update: if (present\(\) && )?writeScope[\s\S]*resource\.data\.uploaderUid == request\.auth\.uid/);
   assert.ok(block.includes('allow delete: if false'));
 });
 

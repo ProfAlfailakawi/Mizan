@@ -417,6 +417,75 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     return { ok: true as const, record, result };
   };
 
+  /*
+   * سؤال المِرصد الرياضي — خارج مسار السحب الحيّ قطعًا.
+   *
+   * ثلاثة أشياء تحفظ ذلك ولا يجوز التساهل في واحدٍ منها:
+   *
+   *   ١) الاستيراد ديناميكي، فلا يدخل الحلّال حزمةَ الشاشات التي تعمل يوم المسابقة.
+   *   ٢) لا يُنادى إلا من زرٍّ يضغطه المنظّم في شاشة المختبر، ولا ينادى من محرّك ولا من سحبة.
+   *   ٣) ميزانيةٌ معلنة للزمن والحجم؛ فإن كبرت المسألة رُدَّت باسمها ولم تُقرَّب.
+   *
+   * والمخرَج يُسمّى بأسمائه: أمثلٌ مُثبَت، أو أفضلُ معروف، أو استحالةٌ مُثبَتة بشاهد.
+   */
+  const runFairnessOracle = async (options?: { participantCount?: number; questionCount?: number; timeBudgetMs?: number; maxLoci?: number }) => {
+    const [{ runOracleBenchmark, describeOracleStatus }, { syntheticParticipants }] = await Promise.all([
+      import('./oracle-benchmark'), import('./competition-twin'),
+    ]);
+    const policy = getCompetitionPolicy(S().competition);
+    const real = S().participants
+      .filter(p => !['rejected', 'draft'].includes(p.status))
+      .map(p => {
+        const resolution = participantEffectiveScope(p.id);
+        const category = S().competition.categories.find(c => c.id === p.categoryId);
+        if (!resolution || resolution.blocked) return null;
+        return {
+          participantId: p.id, categoryId: p.categoryId, scope: resolution.scope,
+          questionCount: options?.questionCount || resolveQuestionCount(category, policy),
+          reading: readingContextOf({ riwaya: p.riwaya }),
+          hallId: p.assignedCommitteeId,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+
+    const target = options?.participantCount || real.length;
+    const participants = real.length
+      ? Array.from({ length: Math.max(1, target) }, (_, i) => ({ ...real[i % real.length], participantId: `${real[i % real.length].participantId}#${Math.floor(i / real.length)}` }))
+      : syntheticParticipants({
+          count: Math.max(1, target),
+          categoryId: S().competition.categories[0]?.id || 'cat',
+          questionCount: options?.questionCount || resolveQuestionCount(S().competition.categories[0], policy),
+          scopes: S().competition.categories.length
+            ? S().competition.categories.map(c => ({ scope: categoryScopeOf(c), share: 1 })).filter(x => scopeAyahCount(x.scope) > 0)
+            : [{ scope: fullQuranScope(), share: 1 }],
+          reading: readingContextOf({ riwaya: S().competition.categories[0]?.riwaya }),
+        });
+    if (!participants.length) return { ok: false as const, reason: 'NO_PARTICIPANTS_TO_ANALYSE' };
+
+    const candidates = poolsForRows(participants.map(p => ({ scope: p.scope, categoryId: p.categoryId, reading: p.reading || {} })));
+    if (!candidates.length) return { ok: false as const, reason: 'NO_ELIGIBLE_POOL' };
+    /* حدُّ الحجم معلن: مسألةٌ أكبر منه تُردّ صراحةً، ولا يُدّعى لها أمثلٌ مقرَّب. */
+    const maxLoci = options?.maxLoci ?? 4000;
+    if (candidates.length > maxLoci) return { ok: false as const, reason: 'INSTANCE_TOO_LARGE', loci: candidates.length, maxLoci };
+
+    const baseRepeat = categoryRepeatPolicy(S().competition.categories[0], policy);
+    const result = runOracleBenchmark({
+      competitionId: S().competition.id,
+      participants, candidates,
+      distributionPlanByCategory: Object.fromEntries(S().competition.categories.map(c => [c.id, categoryDistribution(c, resolveQuestionCount(c, policy))])),
+      defaultPlan: categoryDistribution(S().competition.categories[0], options?.questionCount || policy.questions.questionsPerParticipant),
+      repeatPolicy: baseRepeat,
+      targetDifficulty: policy.questions.targetDifficulty,
+      seed: `${S().competition.id}:oracle`,
+      withRegret: true,
+      budget: { timeBudgetMs: options?.timeBudgetMs ?? 20_000, maxEdges: 3_000_000 },
+    });
+    host.audit('FAIRNESS_ORACLE_RUN', 'ScopeSimulation', S().competition.id,
+      `سؤال المِرصد الرياضي على ${participants.length} متسابقًا: ${describeOracleStatus(result.minMaxReuse)}`,
+      `Asked the mathematical oracle over ${participants.length} participants: ${result.minMaxReuse.status}`);
+    return { ok: true as const, result, headline: describeOracleStatus(result.minMaxReuse), syntheticData: !real.length };
+  };
+
   /** أثر تغيير الإعداد بعد التجميد: من تأثر، وكم نموذجًا بطل، وهل تلزم إعادة المحاكاة. */
   const scopeSealImpact = () => {
     const seal = S().scopeEngineSeals.find(x => x.status === 'active');
@@ -894,7 +963,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     setCategoryScope, setCategorySelectionRule, setCategoryDistribution, setCategoryRepeatPolicy,
     setCategoryQuestionCount, categoryScopeMigrationPlan,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope,
-    scopeCandidatePool, poolsForRows, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation,
+    scopeCandidatePool, poolsForRows, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle,
     scopeSealImpact, sealScopeEngine,
     exposureProfiles, batchRowsFor,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant,

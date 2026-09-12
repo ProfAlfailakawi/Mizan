@@ -15,6 +15,7 @@
  * رقمٍ واحد أخفى أيَّها تدهور.
  */
 
+import { COST_SCALE } from './optimization/flow';
 import {
   BALANCED_OBJECTIVE, measureAssignments, minimizeCost, proveFeasibility, proveMinimumMaxReuse,
   type OracleAssignment, type OracleBudget, type OracleInstance, type OracleMetrics,
@@ -33,6 +34,17 @@ export interface DimensionGap {
   /** المحقَّق ناقص الأمثل. موجبٌ = تخلُّف، صفر = بلوغ الحدّ، سالبٌ مستحيل إن صحّ الحلّال. */
   gap: number | null;
   status: OracleStatus;
+  /*
+   * سماحية التدوير.
+   *
+   * حلّال التدفّق يعمل بتكاليف صحيحة (انظر `COST_SCALE`)، فيُدوَّر وزنُ كل قوسٍ إلى أقرب
+   * جزءٍ من ألف. وأثر ذلك تراكميّ: مسألةٌ بثلاثمئة تخصيص قد يختلف فيها المقيس عن الأمثل
+   * الحقيقي بجزءٍ من عشرة — فيخرج «فرقٌ سالب»، أي أن ميزان دون الأمثل، وهو محال.
+   *
+   * والسالب هنا ليس اكتشافًا بل حدُّ دقّةٍ معلن. فتُحسب السماحية صراحةً، ويُعدّ ما دونها
+   * بلوغًا للحدّ لا تجاوزًا له ولا تقصيرًا عنه. وإخفاء هذا أسهل، وذكرُه أصدق.
+   */
+  toleranceFromRounding?: number;
   /** تعريف البُعد بلغةٍ لا تحتمل التأويل. */
   ar: string;
 }
@@ -112,11 +124,16 @@ export function optimalityGap(input: {
     if (dimension === 'aggregate_cost') {
       const solved = minimizeCost(input.instance, { maxUses: ceiling, objective, budget: input.budget });
       const achievedCost = aggregateCost(input.instance, achievedMetrics, objective);
+      /* كل قوسٍ حامل تكلفة يخطئ بنصف وحدة تدوير على الأكثر: التخصيصات، والتكرارات، وإعادات القاعة. */
+      const costBearingArcs = achievedMetrics.assignments + achievedMetrics.totalRepeats + achievedMetrics.sameHallReuses;
+      const tolerance = Number(((0.5 / COST_SCALE) * Math.max(1, costBearingArcs)).toFixed(6));
+      const raw = solved.cost === null ? null : Number((achievedCost - solved.cost).toFixed(4));
       out.push({
         dimension, status: solved.status,
         optimum: solved.cost,
         achieved: achievedCost,
-        gap: solved.cost === null ? null : Number((achievedCost - solved.cost).toFixed(4)),
+        gap: raw === null ? null : (Math.abs(raw) <= tolerance ? 0 : raw),
+        toleranceFromRounding: tolerance,
         ar: DIMENSION_LABELS[dimension],
       });
       continue;

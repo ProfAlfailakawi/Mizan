@@ -28,6 +28,19 @@ service cloud.firestore {
     }
     function scoped(orgId, competitionId) { return sameOrg(orgId) && compScope(competitionId); }
 
+    /*
+     * وجود الوثيقة شرطٌ منصوص، لا مسكوتٌ عنه.
+     *
+     * حين لا توجد الوثيقة يكون `resource` عدمًا، فقراءة `resource.data` منه خطأُ تقييم.
+     * والمنصة ترفض عند خطأ التقييم، فالنتيجة رفضٌ — لكنه رفضٌ عَرَضيّ لا منصوص: قاعدةٌ
+     * تعتمد في منعها على أن تنكسر ليست قاعدة منع، وهي تنكسر إذا تغيّر ترتيب الشروط أو
+     * أُضيف شرطٌ يسبقها أو تغيّرت دلالة الخطأ في نسخةٍ قادمة من المنصة.
+     *
+     * فيُكتب الشرط صراحةً: وثيقةٌ معدومة ⇒ منعٌ منصوص. ولا يتغيّر بهذا عقدُ الصلاحيات
+     * قيد أنملة — الوثيقة الموجودة تُحكم بما كانت تُحكم به حرفًا بحرف.
+     */
+    function present() { return resource != null; }
+
     function competitionExists(orgId, competitionId) {
       return exists(/databases/$(database)/documents/organizations/$(orgId)/competitions/$(competitionId));
     }
@@ -69,6 +82,7 @@ service cloud.firestore {
         && request.resource.data.competition.id == competitionId
         && (roleIs(['super_admin','org_admin']) || !(request.resource.data.competition.status in ['completed','archived']));
       allow update: if signedIn()
+        && present()
         && roleIs(['super_admin','org_admin','comp_admin'])
         && competitionId != 'comp-pending-setup'
         && request.resource.data.organizationId != 'org-pending-setup'
@@ -80,7 +94,7 @@ service cloud.firestore {
           || (!(resource.data.competition.status in ['completed','archived'])
             && !(request.resource.data.competition.status in ['completed','archived']))
         );
-      allow delete: if signedIn() && roleIs(['super_admin','org_admin'])
+      allow delete: if signedIn() && present() && roleIs(['super_admin','org_admin'])
         && (platformAdmin() || resource.data.organizationId == request.auth.token.org_id);
     }
 
@@ -104,6 +118,7 @@ service cloud.firestore {
         && request.resource.data.board.competitionId == competitionId
         && request.resource.data.board.privacyMode == 'CODES_ONLY';
       allow update: if signedIn()
+        && present()
         && roleIs(['super_admin','org_admin','comp_admin','ops_manager'])
         && scoped(request.resource.data.organizationId, competitionId)
         && request.resource.data.organizationId == resource.data.organizationId
@@ -111,6 +126,7 @@ service cloud.firestore {
         && request.resource.data.board.privacyMode == 'CODES_ONLY';
       // انتهت المسابقة أو أُوقفت الشاشات ⇒ تُحذف الوثيقة فتنطفئ كل الشاشات دفعةً واحدة.
       allow delete: if signedIn()
+        && present()
         && roleIs(['super_admin','org_admin','comp_admin'])
         && sameOrg(resource.data.organizationId);
     }
@@ -122,6 +138,7 @@ service cloud.firestore {
       // Student and guardian access is resolved by the server API. Anonymous
       // clients cannot read even a hashed capability document directly.
       allow get: if signedIn()
+        && present()
         && scoped(resource.data.organizationId, resource.data.competitionId)
         && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
         && resource.data.revoked != true
@@ -135,6 +152,7 @@ service cloud.firestore {
         && compScope(request.resource.data.competitionId)
         && competitionOpen(request.resource.data.organizationId, request.resource.data.competitionId);
       allow update: if signedIn()
+        && present()
         && roleIs(['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'])
         && request.resource.data.competitionId != 'comp-pending-setup'
         && request.resource.data.organizationId != 'org-pending-setup'
@@ -175,11 +193,11 @@ service cloud.firestore {
         }
         match /judge_submissions/{submissionId} {
           allow read: if (readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']))
-            || (readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.uploaderUid == request.auth.uid);
+            || (present() && readableScope(orgId,competitionId) && roleIs(['judge']) && resource.data.uploaderUid == request.auth.uid);
           allow create: if writeScope(orgId,competitionId) && roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid;
           // The client rewrites the same document id when a draft becomes committed,
           // so the owning judge may update their own submission while the competition is open.
-          allow update: if writeScope(orgId,competitionId) && roleIs(['judge'])
+          allow update: if present() && writeScope(orgId,competitionId) && roleIs(['judge'])
             && resource.data.uploaderUid == request.auth.uid
             && request.resource.data.uploaderUid == request.auth.uid;
           allow delete: if false;
@@ -212,7 +230,7 @@ service cloud.firestore {
         match /appeals/{appealId} {
           allow read: if readableScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor','support_agent'])
-              || (roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
+              || (present() && roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent'])
               || (roleIs(['participant','guardian']) && request.resource.data.uploaderUid == request.auth.uid));
@@ -220,7 +238,7 @@ service cloud.firestore {
           // rewritten under the same doc id; without this clause every re-sync is denied.
           allow update: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge'])
-              || (roleIs(['participant','guardian','support_agent'])
+              || (present() && roleIs(['participant','guardian','support_agent'])
                 && resource.data.uploaderUid == request.auth.uid
                 && request.resource.data.uploaderUid == request.auth.uid));
           allow delete: if false;
@@ -236,13 +254,13 @@ service cloud.firestore {
         match /participant_scopes/{scopeId} {
           allow read: if readableScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','delegation_manager','auditor'])
-              || (roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
+              || (present() && roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','delegation_manager'])
               || (roleIs(['participant']) && request.resource.data.uploaderUid == request.auth.uid));
           allow update: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','delegation_manager'])
-              || (roleIs(['participant'])
+              || (present() && roleIs(['participant'])
                 && resource.data.uploaderUid == request.auth.uid
                 && request.resource.data.uploaderUid == request.auth.uid
                 && resource.data.status in ['draft','submitted','rejected']));

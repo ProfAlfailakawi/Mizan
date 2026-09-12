@@ -6,6 +6,9 @@ import {
 } from '../src/lib/fairness-oracle';
 import { bruteForceOptimum } from '../src/lib/brute-force-oracle';
 import { FlowNetwork } from '../src/lib/optimization/flow';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 /*
  * محاكمة المِرصد.
@@ -234,4 +237,35 @@ test('بنكٌ ضخم لا يعني إمكانًا: التداخل وحده يح
   assert.equal(witness?.participantIds.length, 80);
   assert.equal(witness?.demand, 400);
   assert.equal(witness?.supply, 300);
+});
+
+
+test('عزل الأداء: لا يدخل الحلّال مسار السحب الحيّ بحال', () => {
+  /*
+   * الحلّال ثقيل بطبعه — ثوانٍ لا أجزاء من ثانية. ومسار السحب الحيّ يجب أن يبقى سريعًا.
+   *
+   * والقاعدة سهلة القول صعبة الحفظ: يكفي استيرادٌ واحد في ملفٍ يستورده المحرّك ليصير
+   * الحلّال في حزمة يوم المسابقة، ثم لا يُكتشف ذلك إلا في قاعةٍ فيها ثلاثة آلاف متسابق.
+   * فتُحرس القاعدة بفحصٍ نصّي لا بالانتباه.
+   */
+  const here = dirname(fileURLToPath(import.meta.url));
+  const forbidden = ['fairness-oracle', 'optimality-analysis', 'oracle-benchmark', 'brute-force-oracle', 'optimization/flow', 'counterfactual-inspector'];
+  const liveFiles = ['question-engine.ts', 'fairdraw.ts', 'question-reservation.ts', 'question-zones.ts', 'repeat-policy.ts', 'scope-demand.ts', 'competition-twin.ts'];
+  for (const file of liveFiles) {
+    const source = readFileSync(join(here, '..', 'src', 'lib', file), 'utf8');
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const imports = [...code.matchAll(/from\s+'([^']+)'/g)].map(match => match[1]);
+    for (const name of forbidden) {
+      assert.ok(!imports.some(path => path.includes(name)), `${file} يستورد ${name} — دخل الحلّال مسار السحب`);
+    }
+  }
+});
+
+test('المِرصد يُستدعى من المختبر وحده: الاستيراد في المخزن ديناميكيّ لا ساكن', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(join(here, '..', 'src', 'lib', 'store-scope-actions.ts'), 'utf8');
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const staticImports = [...code.matchAll(/^import[\s\S]*?from\s+'([^']+)';/gm)].map(match => match[1]);
+  assert.ok(!staticImports.some(path => path.includes('oracle-benchmark')), 'المِرصد مستورَد استيرادًا ساكنًا في المخزن');
+  assert.ok(code.includes("import('./oracle-benchmark')"), 'المِرصد يجب أن يُحمَّل عند الطلب لا عند تحميل الشاشة');
 });

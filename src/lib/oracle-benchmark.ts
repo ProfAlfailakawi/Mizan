@@ -37,8 +37,8 @@ export interface OracleBenchmarkResult {
   minMaxReuse: MinMaxReuseResult;
   /** الحدّ الأدنى السريع الموجود في ميزان — يُنقل كما هو للمقارنة، لا يُستبدل. */
   fastLowerBound: number;
-  /** الحدّ الأدنى القويّ بإرخاء التدفّق. */
-  strongLowerBound: { bound: number; proven: boolean; probes: number };
+  /** الحدّ الأدنى القويّ بإرخاء التدفّق. و`infeasible` تعني أنه لا حدَّ أدنى أصلًا: لا حلّ. */
+  strongLowerBound: ReturnType<typeof strongReuseLowerBound>;
   gap: OptimalityGapReport;
   regret: FairnessRegretReport | null;
   elapsedMs: number;

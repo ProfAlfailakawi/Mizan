@@ -524,16 +524,16 @@ export function analyticLowerBound(instance: OracleInstance): number {
  * ويبقى الأمر الذي لا يُكسر: حدٌّ أدنى يعلو على الأمثل الحقيقي ليس حدًّا أدنى بل خطأ
  * (انظر tests/fairness-oracle.test.ts).
  */
-export function strongReuseLowerBound(instance: OracleInstance, options?: { budget?: OracleBudget }): { bound: number; proven: boolean; probes: number } {
+export function strongReuseLowerBound(instance: OracleInstance, options?: { budget?: OracleBudget }): { bound: number; proven: boolean; probes: number; infeasible: boolean } {
   const budget = { ...DEFAULT_BUDGET, ...(options?.budget || {}) };
   const analytic = analyticLowerBound(instance);
-  if (!instance.totalDemand) return { bound: 0, proven: true, probes: 0 };
+  if (!instance.totalDemand) return { bound: 0, proven: true, probes: 0, infeasible: false };
   const ceiling = Number.isFinite(instance.policyMaxUses) ? instance.policyMaxUses : Math.max(1, instance.totalDemand);
 
   const groupCount = instance.groups.length, locusCount = instance.loci.length;
   let estimate = groupCount + locusCount;
   for (const group of instance.groups) estimate += group.eligible.length;
-  if (estimate > budget.maxEdges) return { bound: analytic, proven: false, probes: 0 };
+  if (estimate > budget.maxEdges) return { bound: analytic, proven: false, probes: 0, infeasible: false };
 
   const source = 0, sink = 1;
   const feasibleAt = (maxUses: number) => {
@@ -553,14 +553,18 @@ export function strongReuseLowerBound(instance: OracleInstance, options?: { budg
   };
 
   let low = Math.max(1, analytic), high = ceiling, probes = 0;
-  if (!feasibleAt(high)) return { bound: high, proven: true, probes: 1 };
+  /*
+   * مستحيلٌ حتى عند السقف الأعلى: لا معنى لحدٍّ أدنى هنا، فلا يوجد حلٌّ يُحدّ. ويُقال ذلك
+   * صراحةً بدل أن يُعاد السقفُ رقمًا يُظنّ حدًّا أدنى وهو ليس كذلك.
+   */
+  if (!feasibleAt(high)) return { bound: high, proven: true, probes: 1, infeasible: true };
   probes = 1;
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
     probes++;
     if (feasibleAt(mid)) high = mid; else low = mid + 1;
   }
-  return { bound: low, proven: true, probes };
+  return { bound: low, proven: true, probes, infeasible: false };
 }
 
 /* ───────────────────────── أقلّ تكلفة ───────────────────────── */
