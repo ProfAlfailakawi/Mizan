@@ -56,13 +56,14 @@ test('the board can be switched off everywhere at once', () => {
 
 const publisher = read('src/lib/use-board-publisher.ts');
 const board = read('src/lib/display-board.ts');
+const lease = read('src/lib/board-lease.ts');
 
 test('a quiet hall does not make every screen claim it stopped', () => {
   /*
    * الشاشة تُعلن توقّفها بعد BOARD_LAGGING_MS. فلو نُشر عند التغيّر وحده لأعلنت قاعةٌ
    * هادئة — وهي حالة طبيعية — توقّفًا لا وجود له. النبضة الهادئة تمنع هذه الكذبة.
    */
-  const heartbeat = Number(/const HEARTBEAT_MS = ([\d_]+)/.exec(publisher)?.[1]?.replace(/_/g, ''));
+  const heartbeat = Number(/const RENEW_MS = ([\d_]+)/.exec(lease)?.[1]?.replace(/_/g, ''));
   const lagging = Number(/BOARD_LAGGING_MS = ([\d_]+)/.exec(board)?.[1]?.replace(/_/g, ''));
   assert.ok(Number.isFinite(heartbeat) && Number.isFinite(lagging), 'both cadences must be declared');
   assert.ok(heartbeat < lagging, `a heartbeat of ${heartbeat}ms must stay under the ${lagging}ms lag threshold`);
@@ -74,8 +75,42 @@ test('the publish cadence is driven by content, not by a blind timer', () => {
 });
 
 test('a failed publish is retried, and a slow network does not stack requests', () => {
-  assert.match(publisher, /if \(out\.ok\) \{ lastSignature = signature/, 'only a successful publish records what was sent');
+  assert.match(publisher, /if \(out\.ok\) publishedSignature = signature/, 'only a successful publish records what was sent');
   assert.match(publisher, /inFlight/, 'one publish at a time');
+});
+
+/* ── لا شاشةَ معلّقةٍ بتبويبٍ واحد ───────────────────────────────────────── */
+
+test('the hall does not go dark because one admin closed a tab', () => {
+  /*
+   * هذا كان أخطر ما في التصميم: عشرُ شاشاتٍ تتوقّف معًا لأن تبويبًا أُغلق، والشاشات تقول
+   * الصدق ولا أحد يعرف أن السبب عنده. فصار كل جهازٍ مؤهَّل مرشَّحًا، ويتولّى أحدهم إن صمت
+   * الناشر — والقرار كلّه في وحدةٍ نقيّة تُختبر بالأرقام، لا في خطّاف لا يُشغَّل في فحص.
+   */
+  assert.match(lease, /export function decidePublish/, 'the takeover rule must be a pure, testable decision');
+  assert.match(publisher, /decidePublish\(/, 'and the hook must actually route through it');
+  assert.match(publisher, /readBoardLease/, 'a standby learns the publisher is alive by reading, not by guessing');
+});
+
+test('the lease is measured on one clock, so a skewed device cannot start a stampede', () => {
+  /*
+   * لو قيس عمرُ العقد بطرح ختمٍ كتبه جهازٌ من ساعة جهازٍ آخر، لكفى تأخُّرُ ساعةٍ دقيقةً
+   * ليرى الجميع عقدًا منتهيًا أبدًا فيتخاطفوه بلا توقّف — وهو عطبٌ لا يظهر إلا في قاعة.
+   */
+  assert.match(lease, /previous\.stamp === lease\.stamp/, 'the stamp is compared as text, never parsed as a time');
+  assert.doesNotMatch(lease, /Date\.parse|new Date\(/, 'nothing in the lease may interpret another device’s clock');
+});
+
+test('an ineligible device neither writes nor claims to be the publisher', () => {
+  /* وإلّا قال لمن أمامه إن الشاشات معلّقة بجهازه — وهي ليست، فيُطمئنه إلى خطأ. */
+  assert.match(publisher, /if \(!portRef\.current\.canPublishDisplayBoard\(\)\)/, 'eligibility is asked every tick, not once');
+  assert.match(lease, /if \(!eligible\) return \{ publish: false, role: 'INELIGIBLE'/, 'and the decision says so plainly');
+});
+
+test('the operator is told the screens hang on their device', () => {
+  const surface = read('src/components/operations/HallScreenPublisher.tsx');
+  assert.match(surface, /describePublisherRole/, 'the publishing device must show its own role');
+  assert.match(surface, /useBoardPublisherStatus/, 'read from the one publisher, not a second one');
 });
 
 /* ── ما يصل الشاشة ──────────────────────────────────────────────────────── */

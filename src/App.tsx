@@ -309,7 +309,7 @@ export default function App() {
  const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
  /* جهازٌ واحد مصرَّح ينشر ما تعرضه كل شاشات القاعة، فتبقى الشاشات بلا حساب ولا امتياز.
     الأهلية تُفحص داخل المخزن، فالنداء هنا غير مشروط ولا يخالف ترتيب الخطّافات. */
- useBoardPublisher(signedIn, store);
+ void useBoardPublisher(signedIn, store);
  /* تعثّر المستخدم كان يموت عند شاشته: يُعرض له ولا يبلغ أحدًا. هذه النبضة تُعلم لوحة
     المالك بالجلسات المتعثّرة والصامتة، ولا تعطّل شيئًا إن تعذّرت أو لم يُهيَّأ التتبّع. */
  useOpsHeartbeat({

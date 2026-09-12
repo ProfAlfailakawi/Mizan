@@ -1,7 +1,7 @@
 
 declare namespace React { type ReactNode=any; type FC<P={}>=any; type ComponentType<P={}>=any; type MouseEvent<T=any>=any; type KeyboardEvent<T=any>=any; type TouchEvent<T=any>=any; type ChangeEvent<T=any>=any; type ButtonHTMLAttributes<T=any>=any; type CSSProperties=any; type ElementType<P=any>=any; }
 declare namespace JSX { interface IntrinsicAttributes { key?: any } interface IntrinsicElements { [elemName:string]: any } }
-declare module 'react' { const React:any; export default React; export const StrictMode:any; export function useState<T=any>(initial?:T|(()=>T)):[T,(value:any)=>void]; export function useEffect(fn:any,deps?:any[]):void; export function useMemo<T=any>(fn:()=>T,deps:any[]):T; export function useRef<T=any>(initial?:T):{current:T}; export function useCallback<T extends (...args:any[])=>any>(fn:T,deps:any[]):T; export const Suspense:any; export function lazy(loader:()=>Promise<any>):any; export type FC<P={}>=any; }
+declare module 'react' { const React:any; export default React; export const StrictMode:any; export function useState<T=any>(initial?:T|(()=>T)):[T,(value:any)=>void]; export function useEffect(fn:any,deps?:any[]):void; export function useMemo<T=any>(fn:()=>T,deps:any[]):T; export function useRef<T=any>(initial?:T):{current:T}; export function useCallback<T extends (...args:any[])=>any>(fn:T,deps:any[]):T; export function useSyncExternalStore<T=any>(subscribe:(fn:()=>void)=>()=>void,getSnapshot:()=>T,getServerSnapshot?:()=>T):T; export const Suspense:any; export function lazy(loader:()=>Promise<any>):any; export type FC<P={}>=any; }
 declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any; export const Fragment:any; }
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
@@ -151,6 +151,8 @@ declare module 'lucide-react' {
  export const MonitorX: any;
  export const MonitorDot: any;
  export const Siren: any;
+ export const History: any;
+ export const Lightbulb: any;
 }
 declare module 'firebase/app' { export const initializeApp:any; export const getApps:any; export const getApp:any; }
 declare module 'firebase/firestore' { export type Firestore=any; export const getFirestore:any; export const initializeFirestore:any; export const deleteField:any; export const doc:any; export const getDoc:any; export const setDoc:any; export const updateDoc:any; export const deleteDoc:any; export const onSnapshot:any; export const collection:any; export const getDocs:any; }

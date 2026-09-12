@@ -22,15 +22,18 @@ export const WaveDistribution: React.FC = () => {
   const ar = s.language === 'ar';
   const [plan, setPlan] = useState<DistributionPlan | null>(null);
   const [busy, setBusy] = useState(false);
+  const [allowException, setAllowException] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const waitingUnrouted = s.participants.filter(p => p.competitionId === s.competition.id && p.status === 'in_queue' && !p.assignedCommitteeId);
+  /* في نمط الموجات البوابة لا تُسند بالتصميم، فكلُّ منتظرٍ هنا مؤجَّلٌ لا متعثّر. */
+  const byDesign = s.competition.policy?.operations?.distributionMode === 'WAVES';
   if (!waitingUnrouted.length && !plan) return null;
 
   const build = async () => {
     setBusy(true); setResult(null);
     try {
-      const next = await s.buildDistributionPlan();
+      const next = await s.buildDistributionPlan(undefined, { allowCategoryException: allowException });
       setPlan(next);
       if (!next) setResult({ ok: false, message: ar ? 'لا يوجد من ينتظر بلا لجنة الآن.' : 'Nobody is waiting without a panel right now.' });
     } finally { setBusy(false) }
@@ -66,14 +69,34 @@ export const WaveDistribution: React.FC = () => {
     </div>
 
     <div className="mt-5 flex flex-wrap items-center gap-3">
-      <div className="rounded-2xl bg-[#F2EADC] text-[#725630] px-4 py-3 flex items-center gap-2.5">
-        <TriangleAlert className="w-4 h-4 shrink-0" aria-hidden />
-        <span className="text-xs font-black">{ar ? `${waitingUnrouted.length} في الانتظار بلا لجنة` : `${waitingUnrouted.length} waiting without a panel`}</span>
+      {/* نمطٌ يعمل كما أُريد لا يُعرض بلون التحذير: التنبيه الذي يُرفع بلا سبب يُهمَل حين يصدق. */}
+      <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 ${byDesign ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#F2EADC] text-[#725630]'}`}>
+        {byDesign ? <Shuffle className="w-4 h-4 shrink-0" aria-hidden /> : <TriangleAlert className="w-4 h-4 shrink-0" aria-hidden />}
+        <span className="text-xs font-black">{ar
+          ? (byDesign ? `${waitingUnrouted.length} ينتظرون التوزيع — نمط الموجات` : `${waitingUnrouted.length} في الانتظار بلا لجنة`)
+          : (byDesign ? `${waitingUnrouted.length} awaiting distribution — waves mode` : `${waitingUnrouted.length} waiting without a panel`)}</span>
       </div>
       <Button onClick={() => void build()} loading={busy} disabled={!waitingUnrouted.length} icon={<ListChecks className="w-4 h-4" />}>
         {ar ? 'ابنِ خطة التوزيع' : 'Build distribution plan'}
       </Button>
     </div>
+
+    {/*
+      من لا لجنة لفئته لا تصله «عدالة الطابور» أصلًا — تحتاج لجنةَ مصدر وهو بلا لجنة.
+      فهذا هو الباب الوحيد إليه: استثناءٌ يُطلب صراحةً، وأسئلته تبقى أسئلة فئته، وتُوسَم
+      حالته فتعلم اللجنة أنها تحكم من ليس من فئتها.
+    */}
+    <label className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#e0d3b8] bg-[#fffaf0] p-3.5 cursor-pointer">
+      <input type="checkbox" checked={allowException} onChange={e => setAllowException(e.target.checked)} className="mt-0.5" />
+      <span>
+        <span className="block text-xs font-black text-[#604724]">{ar ? 'اسمح بلجان لا تحكم فئتهم حين لا تبقى لجنة مؤهَّلة' : 'Allow panels outside their category when no qualifying panel remains'}</span>
+        <span className="block text-[10px] text-[#6b5b45] mt-1 leading-5">
+          {ar
+            ? 'يُستعمل حين تتعطّل لجان فئتهم كلها. يبقون يُسألون في نطاق فئتهم هم — لا في تخصّص اللجنة — وتُوسَم حالتهم للمحكّمين. وبدون هذا الإذن يبقون بلا لجنة ويُقال السبب.'
+            : 'For when every panel of their category is down. They are still questioned within their own scope, and the panel is warned. Without this they stay unrouted, and the plan says why.'}
+        </span>
+      </span>
+    </label>
 
     {plan && <div className="mt-4 rounded-2xl border border-[#dfddd6] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
