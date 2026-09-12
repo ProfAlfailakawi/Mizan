@@ -480,6 +480,17 @@ export class QuestionAllocationEngine {
   }
 }
 
+/*
+ * مطابقة سياق القراءة — شرطٌ قاطع.
+ *
+ * مُصدَّرة كي يبني عليها المِرصد الرياضي أهليّته نفسها، فلا يقيس المِرصد مسألةً غير التي
+ * يحلّها المحرّك. (والمدقّق المستقل في `allocation-verifier` لا يستوردها عمدًا: استقلاله
+ * هو فائدته، ويُختبر تطابقه بها لا بناؤه عليها.)
+ */
+export function candidateReadingMatches(candidate: QuestionCandidate, reading?: ReadingContext) {
+  return readingMatches(candidate, reading);
+}
+
 function readingMatches(candidate: QuestionCandidate, reading?: ReadingContext) {
   if (!reading) return true;
   if (reading.qiraahId && candidate.qiraahId && candidate.qiraahId !== reading.qiraahId) return false;
