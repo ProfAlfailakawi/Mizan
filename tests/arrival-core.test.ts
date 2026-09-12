@@ -197,3 +197,75 @@ test('a code is matched whatever case it is typed or scanned in', () => {
   assert.equal(findByIdOrCode([p], ''), undefined, 'an empty scan matches nobody');
   assert.equal(findByIdOrCode([p], 'A-999'), undefined);
 });
+
+/* ── أنماط التوزيع: متى تُسنَد اللجنة ──────────────────────────────────── */
+
+/*
+ * `distributionMode` كان حقلًا معرَّفًا في الأنواع، مضبوطًا في الإعداد الافتراضي، يؤكّده
+ * اختبار — **ولا سطرَ واحدٌ يفرّع عليه**. حقلٌ يَعِد بنمطٍ ولا يُغيّر شيئًا أسوأ من غيابه:
+ * يُقرأ في الوثيقة فيُظنّ أن الخيار موجود.
+ */
+
+test('the default mode routes at the gate, exactly as the gate behaved before the field existed', () => {
+  const out = decideArrival({
+    participant: participant(), roster: [participant()], competitionId: COMP,
+    eligibleCommittees: [committee('c1')],
+  });
+  assert.equal(out.kind, 'admit');
+  assert.equal((out as { assignedCommitteeId?: string }).assignedCommitteeId, 'c1');
+});
+
+test('in WAVES the gate gives the number and withholds the panel — on purpose, not by failure', () => {
+  const out = decideArrival({
+    participant: participant(), roster: [participant()], competitionId: COMP,
+    eligibleCommittees: [committee('c1'), committee('c2')], mode: 'WAVES',
+  });
+  assert.equal(out.kind, 'admit-unrouted');
+  assert.equal((out as { reason: string }).reason, 'awaiting-wave', 'the reason must separate design from defect');
+  assert.equal((out as { originalQueueNumber: number }).originalQueueNumber, 1, 'priority is earned at the door in every mode');
+});
+
+test('in PRE_ASSIGNED an arrival with no prior panel is a setup gap, and says which one', () => {
+  const out = decideArrival({
+    participant: participant(), roster: [participant()], competitionId: COMP,
+    eligibleCommittees: [committee('c1')], mode: 'PRE_ASSIGNED',
+  });
+  assert.equal(out.kind, 'admit-unrouted');
+  assert.equal((out as { reason: string }).reason, 'missing-pre-assignment');
+});
+
+test('a panel already assigned is honoured in every mode — the gate never overrides a signed decision', () => {
+  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED'] as const) {
+    const p = { ...participant(), assignedCommitteeId: 'c9' };
+    const out = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [committee('c1')], mode });
+    assert.equal(out.kind, 'admit', mode);
+    assert.equal((out as { assignedCommitteeId?: string }).assignedCommitteeId, 'c9', mode);
+  }
+});
+
+test('WAVES never routes, not even when exactly one panel qualifies', () => {
+  /* وإلّا صار النمط اقتراحًا يُنقض عند أول حالةٍ سهلة، فلا يُوثق به في التخطيط. */
+  const out = decideArrival({
+    participant: participant(), roster: [participant()], competitionId: COMP,
+    eligibleCommittees: [committee('c1')], fallbackCommittees: [committee('c1')],
+    unmatchedPolicy: 'ANY_AVAILABLE', mode: 'WAVES',
+  });
+  assert.equal(out.kind, 'admit-unrouted');
+});
+
+test('every mode still refuses a duplicate scan', () => {
+  for (const mode of ['ON_ARRIVAL', 'WAVES', 'PRE_ASSIGNED'] as const) {
+    const p = { ...participant(), status: 'in_queue' as const };
+    const out = decideArrival({ participant: p, roster: [p], competitionId: COMP, eligibleCommittees: [committee('c1')], mode });
+    assert.equal(out.kind, 'duplicate', mode);
+  }
+});
+
+test('numbering runs on from the roster in WAVES too, so a wave does not restart the queue', () => {
+  const early = { ...participant({ id: 'p-0', code: 'A-100' }), status: 'in_queue' as const, originalQueueNumber: 7, queueOrderKey: 7 };
+  const out = decideArrival({
+    participant: participant(), roster: [early, participant()], competitionId: COMP,
+    eligibleCommittees: [committee('c1')], mode: 'WAVES',
+  });
+  assert.equal((out as { originalQueueNumber: number }).originalQueueNumber, 8);
+});

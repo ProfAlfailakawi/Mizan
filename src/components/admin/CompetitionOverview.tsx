@@ -222,7 +222,65 @@ const ShareRegistration:React.FC<{c:Competition;ar:boolean}>=({c,ar})=>{
   <div className="mt-4 grid sm:grid-cols-[1fr_auto] gap-4 items-center"><div className="min-w-0"><div dir="ltr" className="rounded-xl border border-[#dcdad2] bg-white px-3 py-2.5 text-xs font-mono truncate">{link}</div><div className="flex gap-2 mt-3"><Button size="sm" onClick={()=>void copy()}>{copied?(ar?'تم النسخ':'Copied'):(ar?'انسخ الرابط':'Copy link')}</Button><a href={link} className="inline-flex items-center rounded-xl border border-[#dcdad2] px-3 py-2 text-xs font-bold text-[#214C40]">{ar?'فتح':'Open'}</a></div>{copyFailed&&<p role="alert" className="text-[10px] font-bold text-[#874b43] mt-2">{ar?'المتصفح منع النسخ التلقائي. حدّد الرابط أعلاه وانسخه يدويًا.':'The browser blocked copying. Select the link above and copy it manually.'}</p>}<p className="text-[10px] text-[#696f6b] mt-3">{ar?'أرسل هذا الرابط للمتسابقين؛ يفتح نموذج تسجيل هذه المسابقة مباشرة.':'Send this link to participants; it opens this competition’s registration form directly.'}</p></div><div className="bg-white p-2 rounded-2xl border border-[#deddd6] justify-self-center"><RealQRCode value={link} size={120}/></div></div></div>;
 };
 
-const OperationsPolicySection=({ar,policy,patch}:{ar:boolean;policy:CompetitionPolicy;patch:(fn:(p:CompetitionPolicy)=>void)=>void})=><div className="space-y-5"><SectionTitle title={ar?'سياسة التشغيل':'Operations policy'} subtitle={ar?'حدد إلى أي مدى تعمل المسابقة بلا موظفي استقبال أو توزيع يدوي.':'Choose how far the competition can run without reception or manual routing.'}/><div className="grid xl:grid-cols-2 gap-3 items-start [&>*]:min-w-0"><div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] overflow-hidden"><div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]"><div className="text-[11px] font-black text-[#48514c]">{ar?'الاستقبال والحضور':'Reception & arrival'}</div><p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'كيف يصل المتسابق إلى مقعده دون طابور يدوي.':'How a participant reaches their seat without a manual queue.'}</p></div><div className="mizan-surface-soft px-4"><Toggle value={policy.operations.selfCheckIn} onChange={v=>patch(p=>{p.operations.selfCheckIn=v})} label={ar?'حضور ذاتي من الهاتف':'Mobile self check-in'}/><Toggle value={policy.operations.kioskCheckIn} onChange={v=>patch(p=>{p.operations.kioskCheckIn=v})} label={ar?'تسجيل ذاتي':'Self-service kiosk'}/><Toggle value={policy.operations.exceptionDesk} onChange={v=>patch(p=>{p.operations.exceptionDesk=v})} label={ar?'مكتب استثناء للحالات النادرة':'Exception desk'}/><Toggle value={policy.operations.smartArrivalSlots} onChange={v=>patch(p=>{p.operations.smartArrivalSlots=v})} label={ar?'مواعيد حضور ذكية':'Smart arrival slots'}/></div></div><div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] overflow-hidden"><div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]"><div className="text-[11px] font-black text-[#48514c]">{ar?'القاعة والاستمرارية':'Hall & continuity'}</div><p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'ما يحكم شاشات القاعة والتوزيع وبقاء العمل عند انقطاع الشبكة.':'What governs hall screens, routing and staying operational offline.'}</p></div><div className="mizan-surface-soft px-4"><Toggle value={policy.operations.autoRouting} onChange={v=>patch(p=>{p.operations.autoRouting=v})} label={ar?'توزيع تلقائي على اللجان':'Automatic committee routing'}/><Toggle value={policy.operations.publicQueueUsesCodesOnly} onChange={v=>patch(p=>{p.operations.publicQueueUsesCodesOnly=v})} label={ar?'الشاشات العامة تستخدم الأكواد':'Public queue uses codes only'}/><Toggle value={policy.operations.offlineContinuity} onChange={v=>patch(p=>{p.operations.offlineContinuity=v})} label={ar?'استمرارية دون إنترنت':'Offline continuity'}/></div></div></div><div className="grid sm:grid-cols-2 gap-4"><NumberControl label={ar?'مهلة التأخر بالدقائق':'Late grace minutes'} value={policy.operations.lateArrivalGraceMinutes} onChange={v=>patch(p=>{p.operations.lateArrivalGraceMinutes=v})}/><Control label={ar?'البطاقة':'Badge'}><TinySelect value={policy.operations.badgeMode} onChange={v=>patch(p=>{p.operations.badgeMode=v as any})}><option value="digital">{ar?'رقمية':'Digital'}</option><option value="print">{ar?'مطبوعة':'Print'}</option><option value="both">{ar?'الاثنان':'Both'}</option><option value="none">{ar?'بدون':'None'}</option></TinySelect></Control></div></div>;
+const OperationsPolicySection=({ar,policy,patch}:{ar:boolean;policy:CompetitionPolicy;patch:(fn:(p:CompetitionPolicy)=>void)=>void})=><div className="space-y-5"><SectionTitle title={ar?'سياسة التشغيل':'Operations policy'} subtitle={ar?'حدد إلى أي مدى تعمل المسابقة بلا موظفي استقبال أو توزيع يدوي.':'Choose how far the competition can run without reception or manual routing.'}/><div className="grid xl:grid-cols-2 gap-3 items-start [&>*]:min-w-0"><div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] overflow-hidden"><div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]"><div className="text-[11px] font-black text-[#48514c]">{ar?'الاستقبال والحضور':'Reception & arrival'}</div><p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'كيف يصل المتسابق إلى مقعده دون طابور يدوي.':'How a participant reaches their seat without a manual queue.'}</p></div><div className="mizan-surface-soft px-4"><Toggle value={policy.operations.selfCheckIn} onChange={v=>patch(p=>{p.operations.selfCheckIn=v})} label={ar?'حضور ذاتي من الهاتف':'Mobile self check-in'}/><Toggle value={policy.operations.kioskCheckIn} onChange={v=>patch(p=>{p.operations.kioskCheckIn=v})} label={ar?'تسجيل ذاتي':'Self-service kiosk'}/><Toggle value={policy.operations.exceptionDesk} onChange={v=>patch(p=>{p.operations.exceptionDesk=v})} label={ar?'مكتب استثناء للحالات النادرة':'Exception desk'}/><Toggle value={policy.operations.smartArrivalSlots} onChange={v=>patch(p=>{p.operations.smartArrivalSlots=v})} label={ar?'مواعيد حضور ذكية':'Smart arrival slots'}/></div></div><div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] overflow-hidden"><div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]"><div className="text-[11px] font-black text-[#48514c]">{ar?'القاعة والاستمرارية':'Hall & continuity'}</div><p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'ما يحكم شاشات القاعة والتوزيع وبقاء العمل عند انقطاع الشبكة.':'What governs hall screens, routing and staying operational offline.'}</p></div><div className="mizan-surface-soft px-4"><Toggle value={policy.operations.autoRouting} onChange={v=>patch(p=>{p.operations.autoRouting=v})} label={ar?'توزيع تلقائي على اللجان':'Automatic committee routing'}/><Toggle value={policy.operations.publicQueueUsesCodesOnly} onChange={v=>patch(p=>{p.operations.publicQueueUsesCodesOnly=v})} label={ar?'الشاشات العامة تستخدم الأكواد':'Public queue uses codes only'}/><Toggle value={policy.operations.offlineContinuity} onChange={v=>patch(p=>{p.operations.offlineContinuity=v})} label={ar?'استمرارية دون إنترنت':'Offline continuity'}/></div></div></div><div className="grid sm:grid-cols-2 gap-4"><NumberControl label={ar?'مهلة التأخر بالدقائق':'Late grace minutes'} value={policy.operations.lateArrivalGraceMinutes} onChange={v=>patch(p=>{p.operations.lateArrivalGraceMinutes=v})}/><Control label={ar?'البطاقة':'Badge'}><TinySelect value={policy.operations.badgeMode} onChange={v=>patch(p=>{p.operations.badgeMode=v as any})}><option value="digital">{ar?'رقمية':'Digital'}</option><option value="print">{ar?'مطبوعة':'Print'}</option><option value="both">{ar?'الاثنان':'Both'}</option><option value="none">{ar?'بدون':'None'}</option></TinySelect></Control></div><DistributionPolicyBlock ar={ar} policy={policy} patch={patch}/></div>;
+
+/*
+ * قرارات التوزيع.
+ *
+ * هذه الخمسة كان المحرّك يقرؤها ولا واجهةَ تكتبها: مجمَّدةً على الافتراضات، فبابُ
+ * «قرارات تحتاج توقيع الجهة» لا يُوقَّع فيه شيء. وكلٌّ منها يمسّ عدل القاعة مباشرةً —
+ * أين يجلس المتسابق، ومن يُقدَّم، وهل يُحكَّم في غير فئته — فبقاؤها بلا محرّرٍ يعني أن
+ * الجهة تُحاسَب على قرارٍ لم تتّخذه.
+ *
+ * وكلّ ضابطٍ هنا يقول أثره بالعبارة، لا باسم الحقل: من يضبطه مسؤولُ مسابقة لا مبرمج.
+ */
+const DistributionPolicyBlock=({ar,policy,patch}:{ar:boolean;policy:CompetitionPolicy;patch:(fn:(p:CompetitionPolicy)=>void)=>void})=>{
+ const ops=policy.operations;
+ const cap=Math.round((ops.delegationShareCap??0.4)*100);
+ return <div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] overflow-hidden">
+  <div className="px-4 pt-3 pb-2 border-b border-[#eae8e0]">
+   <div className="text-[11px] font-black text-[#48514c]">{ar?'التوزيع على اللجان':'Routing to panels'}</div>
+   <p className="text-[10px] leading-5 text-[#656b66] mt-0.5">{ar?'متى يُسنَد المتسابق، وبأيّ قيود عدالة، وماذا يحدث حين لا تؤهّله لجنة.':'When a participant is routed, under which fairness limits, and what happens when no panel qualifies.'}</p>
+  </div>
+  <div className="p-4 space-y-4">
+   <Control label={ar?'متى تُسنَد اللجنة':'When the panel is assigned'}>
+    <TinySelect value={ops.distributionMode??'ON_ARRIVAL'} onChange={v=>patch(p=>{p.operations.distributionMode=v as any})}>
+     <option value="ON_ARRIVAL">{ar?'عند الوصول — البوابة تُسند كل واصل':'On arrival — the gate routes each person'}</option>
+     <option value="WAVES">{ar?'موجات — تُوزَّع الدفعة كلها مرة واحدة':'Waves — the whole batch is routed at once'}</option>
+     <option value="PRE_ASSIGNED">{ar?'إسناد مسبق — اللجان تُحدَّد قبل اليوم':'Pre-assigned — panels are set before the day'}</option>
+    </TinySelect>
+    <span className="block text-[10px] text-[#656b66] mt-2 leading-5">{ar
+     ?'«عند الوصول» أبسطها وأسرعها. و«الموجات» ترى التركيبة كلّها فتمنع وقوع وفدٍ كامل تحت لجنة واحدة، لكنها تحتاج من يضغط زر التوزيع. والرقم يُمنح عند الباب في الأنماط الثلاثة.'
+     :'“On arrival” is simplest. “Waves” sees the whole intake and stops one delegation filling a panel, but someone must run the distribution. The queue number is granted at the door in all three.'}</span>
+   </Control>
+
+   <Control label={ar?'حين لا تؤهّله أيُّ لجنة':'When no panel qualifies'}>
+    <TinySelect value={ops.unmatchedArrivalPolicy??'INCIDENT'} onChange={v=>patch(p=>{p.operations.unmatchedArrivalPolicy=v as any})}>
+     <option value="INCIDENT">{ar?'يدخل الطابور بلا إسناد وتُفتح حادثة':'Queue without a panel, and open an incident'}</option>
+     <option value="ANY_AVAILABLE">{ar?'يُسنَد إلى أي لجنة متاحة':'Route to any available panel'}</option>
+    </TinySelect>
+    <span className="block text-[10px] text-[#656b66] mt-2 leading-5">{ar
+     ?'«أي لجنة متاحة» لا يفحص الفئة، فيُكتشف الخطأ عند بدء الجلسة — وهو أسوأ موضع. والأول يُبقي رقمه ويُعلن الحاجة.'
+     :'“Any available” does not check the category, so the mistake surfaces when the session starts — the worst place. The first keeps the number and states the need.'}</span>
+   </Control>
+
+   <div className="mizan-surface-soft px-4 -mx-1">
+    <Toggle value={ops.requireReadingQualifiedPanel===true} onChange={v=>patch(p=>{p.operations.requireReadingQualifiedPanel=v})} label={ar?'اشترط لجنة مؤهَّلة في الرواية':'Require a reading-qualified panel'}/>
+   </div>
+   <p className="text-[10px] text-[#656b66] -mt-2 leading-5">{ar
+    ?'يمنع إسناد متسابقٍ إلى لجنةٍ لا يُجيز محكّموها روايته. يضيّق الخيارات وقد يُبقي بعضهم بلا لجنة، فلا يُفعَّل إلا حيث تُحكَّم روايات متعددة.'
+    :'Stops routing someone to a panel whose judges are not certified in their reading. It narrows the options and can leave people unrouted, so enable it only where multiple readings are judged.'}</p>
+
+   <div className="grid sm:grid-cols-2 gap-4">
+    <NumberControl label={ar?'سقف حصة الوفد في اللجنة (٪)':'Delegation share cap per panel (%)'} value={cap} min={10} max={100} step={5} onChange={v=>patch(p=>{p.operations.delegationShareCap=Math.min(1,Math.max(0.1,v/100))})}/>
+    <NumberControl label={ar?'أقصى عمق للطابور (٠ = بلا حد)':'Max queue depth (0 = no limit)'} value={ops.maxQueueDepth??0} min={0} max={200} onChange={v=>patch(p=>{p.operations.maxQueueDepth=v})}/>
+   </div>
+   <p className="text-[10px] text-[#656b66] -mt-1 leading-5">{ar
+    ?`السقف يمنع وقوع وفدٍ كامل تحت لجنة واحدة؛ و${cap}٪ رقمٌ مقترح لا مُثبت، تضبطه الجهة. ولكل وفدٍ مقعدٌ واحد على الأقل مهما ضاق السقف. والعمق قيدٌ تفضيلي يُخفَّف قبل أن يبقى أحدٌ بلا لجنة.`
+    :`The cap keeps one delegation from filling a panel; ${cap}% is a proposal, not a proven number — the organization sets it. Every delegation still gets at least one seat. Depth is a preference, relaxed before anyone is left unrouted.`}</p>
+  </div>
+ </div>;
+};
 
 const QuestionsSection=({ar,policy,patch}:{ar:boolean;policy:CompetitionPolicy;patch:(fn:(p:CompetitionPolicy)=>void)=>void})=>{
  const [questionsTab,setQuestionsTab]=useState<'draw'|'closing'>('draw');

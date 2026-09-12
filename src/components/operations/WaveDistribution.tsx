@@ -26,6 +26,8 @@ export const WaveDistribution: React.FC = () => {
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const waitingUnrouted = s.participants.filter(p => p.competitionId === s.competition.id && p.status === 'in_queue' && !p.assignedCommitteeId);
+  /* في نمط الموجات البوابة لا تُسند بالتصميم، فكلُّ منتظرٍ هنا مؤجَّلٌ لا متعثّر. */
+  const byDesign = s.competition.policy?.operations?.distributionMode === 'WAVES';
   if (!waitingUnrouted.length && !plan) return null;
 
   const build = async () => {
@@ -67,9 +69,12 @@ export const WaveDistribution: React.FC = () => {
     </div>
 
     <div className="mt-5 flex flex-wrap items-center gap-3">
-      <div className="rounded-2xl bg-[#F2EADC] text-[#725630] px-4 py-3 flex items-center gap-2.5">
-        <TriangleAlert className="w-4 h-4 shrink-0" aria-hidden />
-        <span className="text-xs font-black">{ar ? `${waitingUnrouted.length} في الانتظار بلا لجنة` : `${waitingUnrouted.length} waiting without a panel`}</span>
+      {/* نمطٌ يعمل كما أُريد لا يُعرض بلون التحذير: التنبيه الذي يُرفع بلا سبب يُهمَل حين يصدق. */}
+      <div className={`rounded-2xl px-4 py-3 flex items-center gap-2.5 ${byDesign ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#F2EADC] text-[#725630]'}`}>
+        {byDesign ? <Shuffle className="w-4 h-4 shrink-0" aria-hidden /> : <TriangleAlert className="w-4 h-4 shrink-0" aria-hidden />}
+        <span className="text-xs font-black">{ar
+          ? (byDesign ? `${waitingUnrouted.length} ينتظرون التوزيع — نمط الموجات` : `${waitingUnrouted.length} في الانتظار بلا لجنة`)
+          : (byDesign ? `${waitingUnrouted.length} awaiting distribution — waves mode` : `${waitingUnrouted.length} waiting without a panel`)}</span>
       </div>
       <Button onClick={() => void build()} loading={busy} disabled={!waitingUnrouted.length} icon={<ListChecks className="w-4 h-4" />}>
         {ar ? 'ابنِ خطة التوزيع' : 'Build distribution plan'}
