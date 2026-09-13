@@ -5,10 +5,13 @@
  * معنىً ثالثًا. من هنا يُجاب سؤال واحد: ما نطاق هذا المتسابق الآن، وكم سؤالًا له، ومن أين؟
  */
 
-import type { Category, CompetitionPolicy, Participant, QuestionModelRecord, QuestionPoolItem } from '../types';
+import type {
+  Category, CompetitionPolicy, Participant, QuestionGovernanceRecord, QuestionModelRecord,
+  QuestionPoolItem, QuranSourceContentRecord, QuranSourceManifestRecord,
+} from '../types';
 export type { QuestionPoolItem };
 import { describeScope, fullQuranScope, normalizeScope, scopeAyahCount, scopeSignature, type QuranScope } from './quran-scope';
-import { ayahOrdinal } from './quran-canon';
+import { ayahOrdinal, surahNameArabic } from './quran-canon';
 import { DEFAULT_SELECTION_RULE, buildEffectiveScope, scopeRecordIsUsable, type ParticipantScopeRecord, type ParticipantScopeSelectionRule } from './participant-scope';
 import { autoBalancedPlan, freeDistributionPlan, resolveZoneSlots, type QuestionDistributionPlan, type ZoneSlot } from './question-zones';
 import { DEFAULT_REPEAT_POLICY, type RepeatPolicy } from './repeat-policy';
@@ -226,3 +229,72 @@ export function staleModels(models: QuestionModelRecord[], scopes: ParticipantSc
     return category !== undefined && category !== model.categoryScopeVersion;
   });
 }
+
+/** تقدير نافذة آيات المقطع حسب إعدادات الفئة */
+export function calculateCategoryPassageRange(category: Category | undefined): { minAyahCount?: number; maxAyahCount?: number; targetAyahCount?: number } {
+  const mode = category?.passageMode || 'exact_ayat';
+  if (mode === 'exact_ayat') {
+    const n = Math.max(1, Math.min(20, Math.round(category?.ayatPerQuestion || 3)));
+    return { minAyahCount: n, maxAyahCount: n, targetAyahCount: n };
+  }
+  const units = Math.max(1, Math.min(4, Math.round(category?.pageQuarterUnits || 1)));
+  const presets: Record<number, { minAyahCount: number; maxAyahCount: number }> = {
+    1: { minAyahCount: 1, maxAyahCount: 3 },
+    2: { minAyahCount: 3, maxAyahCount: 5 },
+    3: { minAyahCount: 4, maxAyahCount: 7 },
+    4: { minAyahCount: 6, maxAyahCount: 9 },
+  };
+  const range = presets[Math.round(units)] || { minAyahCount: Math.max(1, Math.round(units * 1.5)), maxAyahCount: Math.max(2, Math.round(units * 2.25)) };
+  return { ...range, targetAyahCount: Math.max(1, Math.round((range.minAyahCount + range.maxAyahCount) / 2)) };
+}
+
+/**
+ * اشتقاق بنك الأسئلة للمتسابق اعتماداً على الحزمة القرآنية المعتمدة وسجلات الحوكمة المقبولة فقط.
+ */
+export function resolveSourceQuestionPool(args: {
+  participant: Participant;
+  category?: Category;
+  effectiveScope?: QuranScope;
+  source: QuranSourceManifestRecord;
+  content: QuranSourceContentRecord;
+  governanceRecords: QuestionGovernanceRecord[];
+  competitionId: string;
+}): QuestionPoolItem[] {
+  const { participant, category, effectiveScope, source, content, governanceRecords, competitionId } = args;
+  const reading = resolveReading({ riwaya: participant.riwaya });
+  if (!reading || !effectiveScope || scopeAyahCount(effectiveScope) === 0) return [];
+  const passage = calculateCategoryPassageRange(category);
+  const approved = new Map((governanceRecords || [])
+    .filter(g => g.competitionId === competitionId && g.status === 'approved' && g.sourceManifestId === source.id)
+    .map(g => [g.questionId, g]));
+  if (!approved.size) return [];
+  const rows = new Map(content.rows.map(v => [`${v.surah}:${v.ayah}`, v.text]));
+  const candidates = buildCandidatePool({ scope: effectiveScope, category, reading: readingContextOf({ riwaya: participant.riwaya }) })
+    .filter(q => approved.has(q.id) && (!passage.minAyahCount || (q.endAyah - q.startAyah + 1) >= passage.minAyahCount));
+  return candidates.flatMap(q => {
+    const target = passage.targetAyahCount ? Math.min(q.endAyah, q.startAyah + passage.targetAyahCount - 1) : q.endAyah;
+    const verses: string[] = [];
+    for (let ayah = q.startAyah; ayah <= target; ayah++) {
+      const text = rows.get(`${q.surahNumber}:${ayah}`);
+      if (!text) return [];
+      verses.push(text);
+    }
+    const governance = approved.get(q.id)!;
+    return [{
+      id: q.id,
+      surahNumber: q.surahNumber,
+      surahNameArabic: surahNameArabic(q.surahNumber),
+      surahNameEnglish: '',
+      startAyah: q.startAyah,
+      endAyah: target,
+      juzNumber: q.juzNumber || 1,
+      riwaya: participant.riwaya,
+      expectedTextArabic: verses.join(' '),
+      difficultyRating: governance.expertDifficulty,
+      mutashabihatDensity: q.mutashabihatScore === undefined ? 'none' : q.mutashabihatScore >= 0.75 ? 'high' : q.mutashabihatScore >= 0.4 ? 'medium' : 'low',
+      tajweedComplexity: q.tajweedComplexity || 'intermediate',
+      timesUsed: q.priorUsageCount || 0,
+    }];
+  });
+}
+
