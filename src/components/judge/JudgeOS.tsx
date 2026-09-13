@@ -30,6 +30,13 @@ const iconFor=(kind?:string)=> kind==='error'?AlertTriangle:kind==='open'?Corner
 
 const passageSizeLabel = (category: any, ar: boolean) => {
   const range = calculateCategoryPassageRange(category);
+  if (range.minAyahCount && range.maxAyahCount) {
+    if (range.minAyahCount === range.maxAyahCount) {
+      const n = range.minAyahCount;
+      return ar ? `${n} ${n === 1 ? 'آية' : n <= 10 ? 'آيات' : 'آية'}` : `${n} ayah${n === 1 ? '' : 's'}`;
+    }
+    return ar ? `${range.minAyahCount}–${range.maxAyahCount} آيات` : `${range.minAyahCount}–${range.maxAyahCount} ayat`;
+  }
   const target = range.targetAyahCount || 0;
   if (target > 0) {
     if (ar) {
