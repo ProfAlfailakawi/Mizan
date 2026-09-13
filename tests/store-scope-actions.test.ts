@@ -5,7 +5,7 @@ import type { AppStoreState } from '../src/lib/store-state';
 import type { Category, Participant } from '../src/types';
 import { DEFAULT_SELECTION_RULE, buildParticipantScopeRecord } from '../src/lib/participant-scope';
 import { fullQuranScope, scopeAyahCount, scopeFromJuz, scopeSignature } from '../src/lib/quran-scope';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/lib/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from './fixtures/seed-data';
 
 /*
  * السلوك يُختبر هنا لا في المتصفح.

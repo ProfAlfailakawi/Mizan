@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { composeVenue } from '../src/lib/deployment-planner';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 
 test('venue composer reuses owned devices before requiring new hardware',()=>{
  const result=composeVenue(SEED_COMPETITION,{laptops:12,desktops:1,tablets:2,tvs:3,printers:1,usbScanners:0,edgeMiniPcs:1,wifi:true});

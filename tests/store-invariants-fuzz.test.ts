@@ -6,7 +6,7 @@ import type { Category, Participant } from '../src/types';
 import { DEFAULT_SELECTION_RULE } from '../src/lib/participant-scope';
 import { fullQuranScope, scopeFromJuz, scopeSignature } from '../src/lib/quran-scope';
 import { RESERVATION_TRANSITIONS } from '../src/lib/question-reservation';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/lib/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from './fixtures/seed-data';
 
 /*
  * فحصٌ بالثوابت لا بالأمثلة.

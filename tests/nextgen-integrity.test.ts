@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Certificate, DeviceRecord, FederationAttestationRecord, FederationTrustRecord } from '../src/types';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 import {
  buildDisasterPack, canApplyDeviceReassignment, certificateProofPackage, developmentFederationSignature, federationAttestationDigest,
  fatigueRecommendation, generateEncryptionKey, generateSigningKeyPair, issueSignedPass, privacySafeBenchmark, proposeDeviceReassignment,

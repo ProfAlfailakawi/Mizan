@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BASE_POLICY, getCompetitionPolicy } from '../src/lib/competition-config';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 
 test('competition policy belongs to the competition instance', () => {
   const a={...SEED_COMPETITION,id:'a',policy:getCompetitionPolicy(SEED_COMPETITION)};

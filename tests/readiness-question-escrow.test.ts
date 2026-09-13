@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPreflight } from '../src/lib/readiness';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 
 const input=(status:'draft'|'live',assurance:'operational_panel_gate'|'production_server_escrow')=>{
  const competition=structuredClone(SEED_COMPETITION);

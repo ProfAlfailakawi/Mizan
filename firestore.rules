@@ -76,6 +76,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if signedIn()
         && roleIs(['super_admin','org_admin','comp_admin'])
+        && compScope(competitionId)
         && competitionId != 'comp-pending-setup'
         && request.resource.data.organizationId != 'org-pending-setup'
         && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)
@@ -84,6 +85,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && present()
         && roleIs(['super_admin','org_admin','comp_admin'])
+        && compScope(competitionId)
         && competitionId != 'comp-pending-setup'
         && request.resource.data.organizationId != 'org-pending-setup'
         && (request.auth.token.role == 'super_admin' || request.resource.data.organizationId == request.auth.token.org_id)

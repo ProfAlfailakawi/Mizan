@@ -11,7 +11,7 @@
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "check": "npm run secret-scan && npm run source-audit && npm run lint && npm run test && npm run build",
+    "check": "npm run secret-scan && npm run source-audit && npm run production-audit && npm run lint && npm run test && npm run build",
     "secret-scan": "node scripts/scan-secrets.mjs",
     "source-audit": "node scripts/source-audit.mjs",
     "arabic-ui-audit": "node scripts/arabic-ui-audit.mjs",
@@ -32,7 +32,8 @@
     "qa:live-day": "tsx scripts/live-day.ts",
     "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs",
     "qa:venue-legibility": "node scripts/venue-legibility-audit.mjs --panels=10",
-    "qa:firestore-rules": "firebase emulators:exec --only firestore --project mizan-rules-test \"tsx --test tests/firestore-rules-*.test.ts tests/firestore-rest-adapter.test.ts\""
+    "qa:firestore-rules": "firebase emulators:exec --only firestore --project mizan-rules-test \"tsx --test tests/firestore-rules-*.test.ts tests/firestore-rest-adapter.test.ts\"",
+    "production-audit": "node scripts/production-runtime-audit.mjs"
   },
   "engines": {
     "node": ">=22.20.0 <23",

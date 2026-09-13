@@ -1,0 +1,5 @@
+# Remove these paths from the project before/after overlaying this patch.
+src/components/public/DemoReturn.tsx
+src/components/public/ExperienceHub.tsx
+src/lib/seed-data.ts
+tests/demo-single-judge-fixture.test.ts

@@ -3,7 +3,7 @@ import { Award, BadgeCheck, Gavel, Plus, ShieldCheck, UserRound } from 'lucide-r
 import { MizanMark } from '../design-system/MizanLogo';
 
 /*
- * ExperienceHub signature overture — «الميزان يتزن» (the scale balances), ~3.2s.
+ * MIZAN signature overture — «الميزان يتزن» (the scale balances), ~3.2s.
  *
  * A full-viewport veil. An abstract balance scale — a beam and two pans, drawn
  * as simple strokes in the site's palette — appears centered. The six moments

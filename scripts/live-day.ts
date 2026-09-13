@@ -31,7 +31,7 @@ import type { AppStoreState } from '../src/lib/store-state';
 import type { Category, Participant } from '../src/types';
 import { DEFAULT_SELECTION_RULE } from '../src/lib/participant-scope';
 import { fullQuranScope, scopeFromJuz, scopeSignature } from '../src/lib/quran-scope';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/lib/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../tests/fixtures/seed-data';
 
 const arg = (name: string, fallback: number) => {
   const hit = process.argv.find(a => a.startsWith(`--${name}=`));

@@ -197,10 +197,12 @@ async function startServer() {
 
   const getPublicCompetitionRecord=async(id:string):Promise<Competition|null>=>{
     const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
-    if(!cleanId||cleanId==='latest'||cleanId==='current'||cleanId==='default'||cleanId==='comp-pending-setup'){
+    if(!cleanId||cleanId==='latest'||cleanId==='current'||cleanId==='default'){
       return await getLatestOrActiveCompetition();
     }
-    if(RETIRED_SEED_COMPETITION_IDS.has(cleanId))return null;
+    /* معرّف التهيئة ليس alias عامًا: إظهاره لمسابقـة أخرى يجعل رابطًا قديمًا يبدو صحيحًا
+       وهو يشير إلى حدث مختلف. النشر يرقّي المسودة إلى معرّف حقيقي قبل أن تُشارك. */
+    if(cleanId==='comp-pending-setup'||RETIRED_SEED_COMPETITION_IDS.has(cleanId))return null;
     if(firestoreRepository){
       try{
         const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
@@ -689,16 +691,24 @@ async function startServer() {
       return res.status(400).json({code:'INVALID_COMPETITION_PAYLOAD'});
     }
     const cleanId=competitionId.replace(/[^a-zA-Z0-9_-]/g,'');
-    if(!cleanId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
-    const orgId=String(req.body?.organizationId||comp.organizationId||'').trim().slice(0,120);
+    if(!cleanId||cleanId!==competitionId||cleanId==='comp-pending-setup')return res.status(400).json({code:'INVALID_COMPETITION_ID'});
+    const bodyOrgId=String(req.body?.organizationId||'').trim().slice(0,120);
+    const compOrgId=String(comp.organizationId||'').trim().slice(0,120);
+    if(!bodyOrgId||bodyOrgId==='org-pending-setup'||bodyOrgId!==compOrgId)return res.status(400).json({code:'INVALID_ORGANIZATION_SCOPE'});
+    const actor=(req as any).mizanIdentity as {role?:string;organizationId?:string;competitionId?:string}|undefined;
+    if(!actor)return res.status(401).json({code:'IDENTITY_REQUIRED'});
+    if(actor.role!=='super_admin'&&actor.organizationId!==bodyOrgId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
+    if(actor.role==='comp_admin'&&actor.competitionId&&actor.competitionId!==cleanId)return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
+    const updatedAt=new Date().toISOString();
     try{
       const file=path.join(publicCompDir,`${cleanId}.json`);
-      fs.writeFileSync(file,JSON.stringify({organizationId:orgId,competition:comp,updatedAt:new Date().toISOString()},null,2),'utf8');
+      fs.writeFileSync(file,JSON.stringify({organizationId:bodyOrgId,competition:comp,updatedAt},null,2),'utf8');
     }catch(err){
       console.error('[public-competitions] disk write failed:',err);
       return res.status(500).json({code:'SERVER_STORAGE_ERROR'});
     }
-    return res.json({ok:true,competitionId:cleanId,updatedAt:new Date().toISOString()});
+    res.setHeader('Cache-Control','no-store');
+    return res.json({ok:true,competitionId:cleanId,updatedAt});
   });
   app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}

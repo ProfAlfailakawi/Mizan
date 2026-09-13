@@ -33,10 +33,11 @@ test('committee state is automatic and organization manager starts with competit
  const competitions=portals.indexOf('مسابقات الجهة'),permissions=portals.indexOf('فريق وصلاحيات المسابقة');assert.ok(competitions>=0&&permissions>competitions);
 });
 
-test('six requested feature-flag names are not seeded as pretend runtime controls',()=>{
- const seed=s('src/lib/seed-data.ts');const block=seed.slice(seed.indexOf('SEED_FEATURE_FLAGS'),seed.indexOf('SEED_FEATURE_FLAGS')+500);
- for(const key of ['ai_integrity','shadow_mode','hospitality','remote_rounds','broadcast','benchmark'])assert.doesNotMatch(block,new RegExp(key));
- assert.match(seed,/SEED_FEATURE_FLAGS\s*:\s*FeatureFlagRecord\[\]\s*=\s*\[\s*\]/);
+test('retired runtime feature seeds are absent rather than pretending to be production controls',()=>{
+ assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);
+ const app=s('src/App.tsx'),store=s('src/lib/store.ts');
+ assert.doesNotMatch(app,/seed-data|MIZAN_ENABLE_DEMO_SEED/);
+ assert.doesNotMatch(store,/from ['"][^'"]*seed-data['"]/);
 });
 
 test('real MFA and QR rendering remain wired',()=>{
@@ -46,7 +47,7 @@ test('real MFA and QR rendering remain wired',()=>{
 
 
 test('all September 9 UX fixes are wired to real state rather than cosmetic placeholders',()=>{
- const app=s('src/App.tsx');const overview=s('src/components/admin/CompetitionOverview.tsx');const enterprise=s('src/components/admin/EnterpriseWorkspace.tsx');const deployment=s('src/components/admin/DeploymentStudio.tsx');const readiness=s('src/components/admin/ReadinessLab.tsx');const identity=s('src/components/admin/IdentityGovernance.tsx');const store=s('src/lib/store.ts');const types=s('src/types/index.ts');const seed=s('src/lib/seed-data.ts');const rules=s('firestore.rules');const official=s('server/kfgqpc-official-library.ts');
+ const app=s('src/App.tsx');const overview=s('src/components/admin/CompetitionOverview.tsx');const enterprise=s('src/components/admin/EnterpriseWorkspace.tsx');const deployment=s('src/components/admin/DeploymentStudio.tsx');const readiness=s('src/components/admin/ReadinessLab.tsx');const identity=s('src/components/admin/IdentityGovernance.tsx');const store=s('src/lib/store.ts');const types=s('src/types/index.ts');const rules=s('firestore.rules');const official=s('server/kfgqpc-official-library.ts');
  // Public registration always refreshes the published copy so newly-created categories appear.
  assert.match(app,/const publicRoute=hash\.startsWith\('#register'\)\|\|hash\.startsWith\('#competition'\)/);
  assert.match(app,/loadPublicCompetition\(requestedComp\)/);assert.match(store,/public_competitions/);assert.match(rules,/match \/public_competitions\/\{competitionId\}/);
@@ -63,7 +64,7 @@ test('all September 9 UX fixes are wired to real state rather than cosmetic plac
  // Deployment has no artificial economic/balanced/expanded choice.
  assert.doesNotMatch(deployment,/اقتصادي|متوازن|موسّع|economic|balanced|expanded/i);
  // No fake flight is shown/seeded, and CSV has a downloadable template.
- assert.doesNotMatch(seed,/MZ 417/);assert.match(enterprise,/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
+ assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);assert.doesNotMatch(store,/flightNumber:\s*['"]MZ 417['"]/);assert.match(enterprise,/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
  // Recovery/export/support utilities are centralized once; regulation-to-policy import card is removed from readiness UI.
  assert.match(enterprise,/أدوات الإدارة/);assert.equal((enterprise.match(/<Governance /g)||[]).length,1);assert.doesNotMatch(readiness,/استيراد لائحة|حوّل اللائحة إلى سياسة مسابقة/);
  // The official Madinah Mushaf visual master is already accepted, not shown as missing.

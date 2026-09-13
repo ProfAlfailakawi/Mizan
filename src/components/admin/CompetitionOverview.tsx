@@ -218,7 +218,7 @@ const ShareRegistration:React.FC<{c:Competition;ar:boolean}>=({c,ar})=>{
  /* لا تربط الفحص بهوية الدالة القادمة من المتجر: تتغيّر مع كل notify فتدخل البطاقة في
     حلقة «نفحص…/منشور» مرئية كرجفة على الجوال. نعيد الفحص فقط عند تغيير المسابقة أو بطلب المستخدم. */
  useEffect(()=>{let alive=true;setPub('checking');setPubNote('');void checkPublicCompetitionPublished().then(out=>{if(alive){setPub(out.state);setPubNote(out.reason)}});return()=>{alive=false}},[c.id]);
- const republish=async()=>{setPublishing(true);setPubNote('');const out=await republishPublicCompetition();setPublishing(false);if(out.ok){setPub('published')}else{setPubNote(out.reason);setPub('missing')}};
+ const republish=async()=>{setPublishing(true);setPubNote('');try{const out=await republishPublicCompetition();if(out.ok){setPub('published');setPubNote(ar?'تم الحفظ والنشر والتحقق من النسخة العامة.':'Saved, published, and verified against the public record.')}else{setPubNote(out.reason);setPub('missing')}}finally{setPublishing(false)}};
  /* ثلاث حالات تُقال كما هي: منشور، وغير منشور، ولا نعلم. والثالثة لا تُلبس ثوب الثانية. */
  const pubTone=pub==='published'?'ok':pub==='missing'?'warn':'quiet';
  const pubLine=pub==='checking'?(ar?'نفحص حالة النشر…':'Checking publication…')
@@ -226,13 +226,14 @@ const ShareRegistration:React.FC<{c:Competition;ar:boolean}>=({c,ar})=>{
   :pub==='missing'?(ar?'الرابط غير منشور بعد على الخادم':'Not published to the server yet')
   :(ar?'تعذّر التأكّد من حالة النشر الآن':'Publication status could not be confirmed right now');
  return <div className="mizan-surface p-5"><div className="mizan-kicker">{ar?'مشاركة التسجيل':'SHARE REGISTRATION'}</div><h2 className="font-extrabold mt-1">{ar?'رابط تسجيل هذه المسابقة':'This competition’s registration link'}</h2>
-  <div className={`mt-3 min-h-[74px] rounded-2xl border p-3.5 ${pubTone==='warn'?'border-[#E2D6BE] bg-[#F3EFE6]':'border-[#dcdad2] bg-[#f8f7f2]'}`}><div className="flex flex-wrap items-center gap-2.5">
-   <span className={`w-2.5 h-2.5 rounded-full ${pubTone==='ok'?'bg-[#2F6555]':pubTone==='warn'?'bg-[#9B7542]':'bg-[#b9b6ad]'}`}/>
-   <span className="text-xs font-black text-[#3f4742]">{pubLine}</span>
-   {pub!=='published'&&pub!=='checking'&&<Button size="sm" variant="secondary" onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ النشر…':'Publishing…'):(ar?'انشر الآن':'Publish now')}</Button>}
-   {pub==='published'&&<Button size="sm" variant="ghost" onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ النشر…':'Publishing…'):(ar?'إعادة النشر':'Re-publish')}</Button>}
-    {pub!=='checking'&&<button type="button" onClick={refreshPub} className="text-[11px] font-bold text-[#214C40] underline">{ar?'أعد الفحص':'Re-check'}</button>}
+  <div className={`mt-3 min-h-[82px] rounded-2xl border p-3.5 transition-all ${pubTone==='ok'?'border-[#CFE0D7] bg-[linear-gradient(135deg,#F4F8F5_0%,#EDF4F0_100%)]':pubTone==='warn'?'border-[#E2D6BE] bg-[linear-gradient(135deg,#F8F4EB_0%,#F1ECE1_100%)]':'border-[#dcdad2] bg-[#f8f7f2]'}`}><div className="flex flex-wrap items-center gap-2.5">
+   <span className={`w-8 h-8 rounded-xl grid place-items-center shrink-0 ${pubTone==='ok'?'bg-[#DCEBE3] text-[#214C40]':pubTone==='warn'?'bg-[#E9DFC9] text-[#805F32]':'bg-[#eceae4] text-[#616864]'}`}>{pubTone==='ok'?<BadgeCheck className="w-4 h-4"/>:<RadioTower className={`w-4 h-4 ${pub==='checking'?'animate-pulse':''}`}/>}</span>
+   <div className="min-w-[180px] flex-1"><div className="text-xs font-black text-[#3f4742]">{pubLine}</div><div className="text-[9px] text-[#656b66] mt-0.5">{pub==='published'?(ar?'تمت مطابقة النسخة العامة بعد الكتابة.':'Public record verified after write.'):(ar?'لن نعرض الرابط كمنشور قبل نجاح التحقق.':'The link is never marked published before verification succeeds.')}</div></div>
+   {pub!=='published'&&pub!=='checking'&&<Button size="sm" icon={<RadioTower className="w-4 h-4"/>} onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ الحفظ والنشر…':'Saving & publishing…'):(ar?'انشر الآن':'Publish now')}</Button>}
+   {pub==='published'&&<Button size="sm" variant="ghost" onClick={()=>void republish()} disabled={publishing}>{publishing?(ar?'جارٍ إعادة النشر…':'Re-publishing…'):(ar?'إعادة النشر':'Re-publish')}</Button>}
+    {pub!=='checking'&&<button type="button" disabled={publishing} onClick={refreshPub} className="text-[11px] font-bold text-[#214C40] underline disabled:opacity-40">{ar?'أعد الفحص':'Re-check'}</button>}
   </div>
+  {pub==='published'&&!!pubNote&&<p className="text-[10px] font-bold text-[#356151] mt-2 leading-5">{pubNote}</p>}
   {pub==='unknown'&&!!pubNote&&<p className="text-[11px] font-bold text-[#5f6763] mt-2 leading-6">{pubNote}</p>}
   {pub==='missing'&&!!pubNote&&<p role="alert" className="text-[11px] font-bold text-[#874b43] mt-2 leading-6">{pubNote}</p>}
   </div>

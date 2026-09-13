@@ -15,7 +15,8 @@ const overview = fs.readFileSync('src/components/admin/CompetitionOverview.tsx',
 
 test('opening registration publishes the public record explicitly and awaits it', () => {
   assert.match(store, /const publishPublicCompetitionRecord=async\(\)/);
-  assert.match(store, /setDoc\(doc\(db,'public_competitions',globalState\.competition\.id\)/);
+  assert.match(store, /const publicRef=doc\(db,'public_competitions',publishedCompetition\.id\)/);
+  assert.match(store, /await setDoc\(publicRef,/);
   assert.match(store, /const published=await publishPublicCompetitionRecord\(\)/);
   // النشر لم يعد أثرًا جانبيًا مؤجَّلًا يسبق التحقق.
   assert.ok(store.indexOf('const published=await publishPublicCompetitionRecord()') < store.indexOf('markCompetitionConfigChanged();\n    globalState.auditLogs'));
@@ -26,12 +27,14 @@ test('a failed publish never leaves the competition open on the admin device alo
   assert.match(store, /return \{ok:false,issues:\[published\.reason\]/);
 });
 
-test('every reason a publish can be skipped is reported to the person who published', () => {
+test('every publication blocker is surfaced and success is verified after the authoritative write', () => {
   const publisher = store.slice(store.indexOf('const publishPublicCompetitionRecord'), store.indexOf('const publishCompetition'));
-  for (const guard of ['launchPlaceholderActive', 'isOffline', 'auth.currentUser', 'currentUser.role']) {
-    assert.ok(publisher.includes(guard) && publisher.includes('return {ok:false,reason:'), guard);
+  for (const guard of ['materializePendingCompetitionForPublish', 'launchPlaceholderActive', 'isOffline', 'auth.currentUser', 'currentUser.role']) {
+    assert.ok(publisher.includes(guard), guard);
   }
-  assert.equal((publisher.match(/return \{ok:false,reason:/g) || []).length, 7, 'كل مانعٍ يقول سببه');
+  assert.match(publisher, /verification=await getDoc\(publicRef\)/, 'النشر لا يعلن النجاح قبل قراءة السجل العام بعد الكتابة');
+  assert.match(publisher, /verified\.competition\?\.id!==publishedCompetition\.id/);
+  assert.match(publisher, /return \{ok:false,reason:/, 'كل فشل يملك رسالة للمستخدم');
   // والواجهة تنتظر النتيجة بدل أن تمضي متفائلة.
   assert.match(overview, /const publish=async\(\)=>\{[\s\S]*?await store\.publishCompetition\(\)/);
 });

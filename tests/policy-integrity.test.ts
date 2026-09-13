@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
 import { applyApprovedCompilation, compilePolicyText, detectContradictions, policyCompilerSummary } from '../src/lib/policy-compiler';
 

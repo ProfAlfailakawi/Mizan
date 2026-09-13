@@ -33,7 +33,8 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  const canApprove=allowedRoles.includes(currentUser.role)&&currentUser.role!=='super_admin'&&!approved&&reveal?.status!=='executed';
  const canExecute=reveal?.status==='ready'&&['head_judge','comp_admin','org_admin'].includes(currentUser.role)&&currentUser.role!=='super_admin';
  /* الختم يُنشئ نصاب الكشف ويكتب سجلًّا؛ من يقف عند جهاز العرض ليس صاحبه. */
- const canSeal=['head_judge','comp_admin','org_admin'].includes(currentUser.role);
+ const localVaultAdapterAvailable=import.meta.env.PROD!==true;
+ const canSeal=localVaultAdapterAvailable&&['head_judge','comp_admin','org_admin'].includes(currentUser.role);
  const request=async()=>{setBusy(true);try{await s.sealCeremonyVault()}finally{setBusy(false)}};
  const PrevIcon=ar?ChevronRight:ChevronLeft; const NextIcon=ar?ChevronLeft:ChevronRight;
 
@@ -53,7 +54,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
         <Approval ar={ar} ok={!!reveal?.approvals.some(a=>a.actorRole==='org_admin')} label={ar?'الجهة':'Organization'}/>
       </div>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {!vault&&(canSeal?<Button loading={busy} onClick={request} icon={<LockKeyhole className="w-4 h-4"/>}>{ar?'ختم الحزمة':'Seal package'}</Button>:<div className="text-[11px] mizan-venue-muted">{ar?'ختم الحزمة من صلاحية رئيس التحكيم أو إدارة المسابقة.':'Sealing the package is for the head judge or competition administration.'}</div>)}
+        {!vault&&(canSeal?<Button loading={busy} onClick={request} icon={<LockKeyhole className="w-4 h-4"/>}>{ar?'ختم الحزمة':'Seal package'}</Button>:<div className="text-[11px] mizan-venue-muted max-w-md leading-6">{!localVaultAdapterAvailable?(ar?'ختم خزنة الحفل عبر مفتاح متصفح غير مسموح في الإنتاج. استخدم النتائج المختومة خادميًا حتى تُربط إدارة مفاتيح خارجية.':'Browser-key ceremony sealing is disabled in production. Use server-sealed results until external key management is connected.'):(ar?'ختم الحزمة من صلاحية رئيس التحكيم أو إدارة المسابقة.':'Sealing the package is for the head judge or competition administration.')}</div>)}
         {canApprove&&<Button onClick={()=>reveal&&s.approveQuorumAction(reveal.id)} icon={<BadgeCheck className="w-4 h-4"/>}>{ar?'اعتماد':'Approve'}</Button>}
         {canExecute&&<Button onClick={()=>reveal&&s.executeQuorumAction(reveal.id)} icon={<ShieldCheck className="w-4 h-4"/>}>{ar?'كشف النتائج':'REVEAL'}</Button>}
       </div>

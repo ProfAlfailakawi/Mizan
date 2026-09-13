@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateFairDraw } from '../src/lib/fairdraw';
-import { DEVELOPMENT_QUESTION_BANK } from '../src/lib/quran-vault';
+import { DEVELOPMENT_QUESTION_BANK } from './fixtures/development-question-bank';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/lib/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from './fixtures/seed-data';
 
 test('FairDraw respects configured question count and writes commitment',async()=>{
  const policy=getCompetitionPolicy(SEED_COMPETITION); const participant=SEED_PARTICIPANTS[0];

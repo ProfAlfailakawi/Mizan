@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FirestoreRestRepository, firestoreRestCodec, firestoreRestRoot } from '../server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from '../server/public-registration';
-import { SEED_COMPETITION } from '../src/lib/seed-data';
+import { SEED_COMPETITION } from './fixtures/seed-data';
 import { scopeFromJuz, scopeSignature } from '../src/lib/quran-scope';
 import type { Competition } from '../src/types';
 

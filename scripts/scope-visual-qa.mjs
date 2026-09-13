@@ -166,7 +166,7 @@ for (const [width, height, label] of [VIEWPORTS[0], VIEWPORTS[2]]) {
   try {
     await page.goto(`${BASE}/#register?comp=comp-dubai-2027`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2200);
-    for (const [labelText, value] of [['الاسم بالعربية', 'تجربة تجريبية'], ['الاسم بالإنجليزية', 'Demo Reciter'], ['البريد', 'demo@example.org'], ['الهاتف', '+96550000000'], ['رقم الهوية', '123456789']]) {
+    for (const [labelText, value] of [['الاسم بالعربية', 'تجربة تجريبية'], ['الاسم بالإنجليزية', 'QA Reciter'], ['البريد', 'qa-reciter@example.org'], ['الهاتف', '+96550000000'], ['رقم الهوية', '123456789']]) {
       const field = page.locator('label:visible', { hasText: labelText }).first();
       if (await field.count()) await field.locator('input').first().fill(value).catch(() => {});
     }

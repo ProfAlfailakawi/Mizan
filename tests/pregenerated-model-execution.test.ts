@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/lib/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from './fixtures/seed-data';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
 import { generateFairDraw, validateScopedSelection, FAIRDRAW_SCOPE_ALGORITHM_VERSION } from '../src/lib/fairdraw';
 import { QuestionAllocationEngine } from '../src/lib/question-engine';
