@@ -136,11 +136,8 @@ export function readingContextOf(input: { riwaya?: string; qiraah?: string }): R
 
 /** طول المقطع بالآيات كما يحدده المنظم في الفئة. */
 export function passageAyahCount(category: Category | undefined): number {
-  if (category?.passageMode === 'page_quarters') {
-    // تقدير تقريبي: ربع الوجه ≈ آيتان في المتوسط. الرقم للعرض والتوليد التطويري فقط.
-    return Math.max(1, Math.min(20, Math.round(Math.max(1, category.pageQuarterUnits || 1) * 2)));
-  }
-  return Math.max(1, Math.min(20, Math.round(category?.ayatPerQuestion || 3)));
+  const range = calculateCategoryPassageRange(category);
+  return Math.max(1, Math.min(20, range.targetAyahCount || 3));
 }
 
 export interface CandidatePoolOptions {
