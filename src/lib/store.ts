@@ -2130,7 +2130,7 @@ export function useAppStore() {
     setCategoryScope, setCategorySelectionRule, setCategoryDistribution, setCategoryRepeatPolicy,
     setCategoryQuestionCount, categoryScopeMigrationPlan,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope,
-    scopeCandidatePool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle,
+    scopeCandidatePool, sourceResolvedQuestionPool, categoryPassageAyahRange, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle,
     scopeSealImpact, sealScopeEngine, exposureProfiles,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant,
     quarantineQuestionLoci, liftQuestionQuarantine, recoverQuarantinedLoci,
@@ -2434,42 +2434,6 @@ export function useAppStore() {
     markCompetitionConfigChanged();
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return {ok:true,issues:[],warnings:laterStageWarnings,scientificBlockers,contradictions};
-  };
-
-  const categoryPassageAyahRange=(category:Category|undefined)=>{
-    if(!category)return {} as {minAyahCount?:number;maxAyahCount?:number;targetAyahCount?:number};
-    if(category.passageMode==='ayat'&&category.ayatPerQuestion&&category.ayatPerQuestion>0){const n=Math.max(1,Math.round(category.ayatPerQuestion));return {minAyahCount:n,maxAyahCount:n,targetAyahCount:n};}
-    const legacyUnits=category.pagePortion==='quarter'?1:category.pagePortion==='half'?2:category.pagePortion==='third'?Math.max(1,Math.round(4/3)):category.pagePortion==='full'?4:undefined;
-    const units=category.pageQuarterUnits&&category.pageQuarterUnits>0?category.pageQuarterUnits:legacyUnits;
-    if(!units)return category.ayatPerQuestion&&category.ayatPerQuestion>0?{minAyahCount:category.ayatPerQuestion,maxAyahCount:category.ayatPerQuestion,targetAyahCount:category.ayatPerQuestion}:{};
-    // تقدير تشغيلي فقط: طول الآية متغير، لذلك يحدد «ربع/نصف/وجه» نافذة آيات لا رقمًا نصيًا جامدًا.
-    const presets:Record<number,{minAyahCount:number;maxAyahCount:number}>={1:{minAyahCount:1,maxAyahCount:3},2:{minAyahCount:3,maxAyahCount:5},3:{minAyahCount:4,maxAyahCount:7},4:{minAyahCount:6,maxAyahCount:9}};
-    const range=presets[Math.round(units)]||{minAyahCount:Math.max(1,Math.round(units*1.5)),maxAyahCount:Math.max(2,Math.round(units*2.25))};
-    return {...range,targetAyahCount:Math.max(1,Math.round((range.minAyahCount+range.maxAyahCount)/2))};
-  };
-
-  const sourceResolvedQuestionPool = (participant:Participant, source:QuranSourceManifestRecord, content:QuranSourceContentRecord):QuestionPoolItem[] => {
-    const reading=resolveReading({riwaya:participant.riwaya});
-    const resolution=participantEffectiveScope(participant.id);
-    if(!reading||!resolution||resolution.blocked)return [];
-    const category=globalState.competition.categories.find(c=>c.id===participant.categoryId);
-    const passage=categoryPassageAyahRange(category);
-    const approved=new Map(globalState.questionGovernance
-      .filter(g=>g.competitionId===globalState.competition.id&&g.status==='approved'&&g.sourceManifestId===source.id)
-      .map(g=>[g.questionId,g]));
-    if(!approved.size)return [];
-    const rows=new Map(content.rows.map(v=>[`${v.surah}:${v.ayah}`,v.text]));
-    /* لا توجد fixtures في مسار التشغيل. المرشحون يُشتقون من النطاق القانوني ثم لا يدخل
-       البنك المعتمد إلا موضع وافق عليه سجل الحوكمة المرتبط بالحزمة القرآنية نفسها. */
-    const candidates=buildCandidatePool({scope:resolution.scope,category,reading:readingContextOf({riwaya:participant.riwaya})})
-      .filter(q=>approved.has(q.id)&&(!passage.minAyahCount||(q.endAyah-q.startAyah+1)>=passage.minAyahCount));
-    return candidates.flatMap(q=>{
-      const target=passage.targetAyahCount?Math.min(q.endAyah,q.startAyah+passage.targetAyahCount-1):q.endAyah;
-      const verses:string[]=[];
-      for(let ayah=q.startAyah;ayah<=target;ayah++){const text=rows.get(`${q.surahNumber}:${ayah}`);if(!text)return [];verses.push(text);}
-      const governance=approved.get(q.id)!;
-      return [{id:q.id,surahNumber:q.surahNumber,surahNameArabic:surahNameArabic(q.surahNumber),surahNameEnglish:'',startAyah:q.startAyah,endAyah:target,juzNumber:q.juzNumber||1,riwaya:participant.riwaya,expectedTextArabic:verses.join(' '),difficultyRating:governance.expertDifficulty,mutashabihatDensity:q.mutashabihatScore===undefined?'none':q.mutashabihatScore>=0.75?'high':q.mutashabihatScore>=0.4?'medium':'low',tajweedComplexity:q.tajweedComplexity||'intermediate',timesUsed:q.priorUsageCount||0}];
-    });
   };
 
   /*

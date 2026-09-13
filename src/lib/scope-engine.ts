@@ -5,7 +5,8 @@
  * معنىً ثالثًا. من هنا يُجاب سؤال واحد: ما نطاق هذا المتسابق الآن، وكم سؤالًا له، ومن أين؟
  */
 
-import type { Category, CompetitionPolicy, Participant, QuestionModelRecord } from '../types';
+import type { Category, CompetitionPolicy, Participant, QuestionModelRecord, QuestionPoolItem } from '../types';
+export type { QuestionPoolItem };
 import { describeScope, fullQuranScope, normalizeScope, scopeAyahCount, scopeSignature, type QuranScope } from './quran-scope';
 import { ayahOrdinal } from './quran-canon';
 import { DEFAULT_SELECTION_RULE, buildEffectiveScope, scopeRecordIsUsable, type ParticipantScopeRecord, type ParticipantScopeSelectionRule } from './participant-scope';

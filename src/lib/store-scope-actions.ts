@@ -14,9 +14,11 @@
  */
 
 import type {
-  Category, QuestionModelBatchRecord, QuestionQuarantineRecord, QuestionReservationRecord,
+  Category, Participant, QuestionModelBatchRecord, QuestionPoolItem, QuestionQuarantineRecord, QuestionReservationRecord,
+  QuranSourceContentRecord, QuranSourceManifestRecord,
   ScopeEngineSealRecord, ScopeSimulationRecord,
 } from '../types';
+export type { QuestionPoolItem };
 import type { AppStoreState } from './store-state';
 import { getCompetitionPolicy } from './competition-config';
 import { hashCanonical } from './trust-protocol';
@@ -31,6 +33,8 @@ import type { QuestionCandidate } from './question-engine';
 import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations, type ReservationScope } from './question-reservation';
 import { adoptReferenceTime, competitionClockStatus, competitionNow, selfAsReference } from './competition-clock';
 import type { QuestionDistributionPlan } from './question-zones';
+import { surahNameArabic } from './quran-canon';
+import { resolveReading } from './scientific-core';
 import {
   derivedLegacyJuzCount, describeScope, fullQuranScope, normalizeScope, scopeAyahCount,
   scopeSignature, validateScope, type QuranScope,
@@ -251,6 +255,65 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
       category: S().competition.categories.find(c => c.id === participant.categoryId),
       scopes: S().participantScopes,
       tenant: { organizationId: S().competition.organizationId, competitionId: S().competition.id },
+    });
+  };
+
+  const categoryPassageAyahRange = (category: Category | undefined) => {
+    const mode = category?.passageMode || 'exact_ayat';
+    if (mode === 'exact_ayat') {
+      const n = Math.max(1, Math.min(20, Math.round(category?.ayatPerQuestion || 3)));
+      return { minAyahCount: n, maxAyahCount: n, targetAyahCount: n };
+    }
+    const units = Math.max(1, Math.min(4, Math.round(category?.pageQuarterUnits || 1)));
+    const presets: Record<number, { minAyahCount: number; maxAyahCount: number }> = {
+      1: { minAyahCount: 1, maxAyahCount: 3 },
+      2: { minAyahCount: 3, maxAyahCount: 5 },
+      3: { minAyahCount: 4, maxAyahCount: 7 },
+      4: { minAyahCount: 6, maxAyahCount: 9 },
+    };
+    const range = presets[Math.round(units)] || { minAyahCount: Math.max(1, Math.round(units * 1.5)), maxAyahCount: Math.max(2, Math.round(units * 2.25)) };
+    return { ...range, targetAyahCount: Math.max(1, Math.round((range.minAyahCount + range.maxAyahCount) / 2)) };
+  };
+
+  const sourceResolvedQuestionPool = (participant: Participant, source: QuranSourceManifestRecord, content: QuranSourceContentRecord): QuestionPoolItem[] => {
+    const reading = resolveReading({ riwaya: participant.riwaya });
+    const resolution = participantEffectiveScope(participant.id);
+    if (!reading || !resolution || resolution.blocked) return [];
+    const category = S().competition.categories.find(c => c.id === participant.categoryId);
+    const passage = categoryPassageAyahRange(category);
+    const approved = new Map((S().questionGovernance || [])
+      .filter(g => g.competitionId === S().competition.id && g.status === 'approved' && g.sourceManifestId === source.id)
+      .map(g => [g.questionId, g]));
+    if (!approved.size) return [];
+    const rows = new Map(content.rows.map(v => [`${v.surah}:${v.ayah}`, v.text]));
+    /* لا توجد fixtures في مسار التشغيل. المرشحون يُشتقون من النطاق القانوني ثم لا يدخل
+       البنك المعتمد إلا موضع وافق عليه سجل الحوكمة المرتبط بالحزمة القرآنية نفسها. */
+    const candidates = buildCandidatePool({ scope: resolution.scope, category, reading: readingContextOf({ riwaya: participant.riwaya }) })
+      .filter(q => approved.has(q.id) && (!passage.minAyahCount || (q.endAyah - q.startAyah + 1) >= passage.minAyahCount));
+    return candidates.flatMap(q => {
+      const target = passage.targetAyahCount ? Math.min(q.endAyah, q.startAyah + passage.targetAyahCount - 1) : q.endAyah;
+      const verses: string[] = [];
+      for (let ayah = q.startAyah; ayah <= target; ayah++) {
+        const text = rows.get(`${q.surahNumber}:${ayah}`);
+        if (!text) return [];
+        verses.push(text);
+      }
+      const governance = approved.get(q.id)!;
+      return [{
+        id: q.id,
+        surahNumber: q.surahNumber,
+        surahNameArabic: surahNameArabic(q.surahNumber),
+        surahNameEnglish: '',
+        startAyah: q.startAyah,
+        endAyah: target,
+        juzNumber: q.juzNumber || 1,
+        riwaya: participant.riwaya,
+        expectedTextArabic: verses.join(' '),
+        difficultyRating: governance.expertDifficulty,
+        mutashabihatDensity: q.mutashabihatScore === undefined ? 'none' : q.mutashabihatScore >= 0.75 ? 'high' : q.mutashabihatScore >= 0.4 ? 'medium' : 'low',
+        tajweedComplexity: q.tajweedComplexity || 'intermediate',
+        timesUsed: q.priorUsageCount || 0,
+      }];
     });
   };
 
@@ -1027,7 +1090,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     setCategoryScope, setCategorySelectionRule, setCategoryDistribution, setCategoryRepeatPolicy,
     setCategoryQuestionCount, categoryScopeMigrationPlan,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope,
-    scopeCandidatePool, poolsForRows, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle,
+    scopeCandidatePool, sourceResolvedQuestionPool, categoryPassageAyahRange, poolsForRows, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle,
     scopeSealImpact, sealScopeEngine,
     exposureProfiles, batchRowsFor,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant,

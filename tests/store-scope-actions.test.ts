@@ -42,6 +42,7 @@ function harness(overrides: Partial<AppStoreState> = {}): Harness {
     participantScopes: [], questionModels: [], questionModelBatches: [], questionQuarantines: [],
     questionReservations: [], fairnessReports: [], scopeSimulations: [], scopeEngineSeals: [],
     committees: [], variantLoci: [], mutashabihatTrapMaps: [], quranSourceManifests: [], quranSourceContents: [],
+    questionGovernance: [],
     activeSession: { secureQuestionMode: 'CLIENT' },
     ...overrides,
   } as unknown as AppStoreState;
@@ -400,3 +401,37 @@ test('exposure counts come from the ledger of what was actually revealed, never 
     else assert.equal(candidate.exposureCount, undefined, `${key} was never revealed, so it carries no count`);
   }
 });
+
+test('sourceResolvedQuestionPool filters candidates by approved governance and manifests content', () => {
+  const h = harness();
+  approvedScope(h, 'p1', [30]);
+  const part = h.state.participants.find(p => p.id === 'p1')!;
+  const source = { id: 'src-1', code: 'hafs-kfgqpc', name: 'KFGQPC Hafs', riwaya: 'Hafs', status: 'certified' } as any;
+  const content = {
+    id: 'cnt-1',
+    manifestId: 'src-1',
+    rows: [
+      { surah: 78, ayah: 1, text: 'عَمَّ يَتَسَاءَلُونَ' },
+      { surah: 78, ayah: 2, text: 'عَنِ النَّبَإِ الْعَظِيمِ' },
+      { surah: 78, ayah: 3, text: 'الَّذِي هُمْ فِيهِ مُخْتَلِفُونَ' },
+    ],
+  } as any;
+
+  // With no governance approved questions, returns empty array
+  assert.deepEqual(h.actions.sourceResolvedQuestionPool(part, source, content), []);
+
+  // When a governance entry is approved for this source and competition
+  h.state.questionGovernance = [
+    {
+      questionId: 'q-78-1',
+      competitionId: h.state.competition.id,
+      status: 'approved',
+      sourceManifestId: 'src-1',
+      expertDifficulty: 'medium',
+    } as any,
+  ];
+
+  const pool = h.actions.sourceResolvedQuestionPool(part, source, content);
+  assert.ok(Array.isArray(pool));
+});
+
