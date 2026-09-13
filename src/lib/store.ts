@@ -34,6 +34,7 @@ import {
   JudgeEventType,
   JudgeSubmission,
   QuestionSelection,
+  QuestionPoolItem,
   IncidentRecord,
   SimulationResult,
   AppealRecord,
@@ -2446,7 +2447,7 @@ export function useAppStore() {
     return {...range,targetAyahCount:Math.max(1,Math.round((range.minAyahCount+range.maxAyahCount)/2))};
   };
 
-  const sourceResolvedQuestionPool = (participant:Participant, source:QuranSourceManifestRecord, content:QuranSourceContentRecord) => {
+  const sourceResolvedQuestionPool = (participant:Participant, source:QuranSourceManifestRecord, content:QuranSourceContentRecord):QuestionPoolItem[] => {
     const reading=resolveReading({riwaya:participant.riwaya});
     const resolution=participantEffectiveScope(participant.id);
     if(!reading||!resolution||resolution.blocked)return [];
