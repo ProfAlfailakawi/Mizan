@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Check, ChevronDown, Layers, ListChecks, MapPin, Search, Sparkles, Trash2, X } from 'lucide-react';
 import {
-  QURAN_JUZ_TOTAL, QURAN_SURAH_TOTAL, ayahCountOf, juzBounds, surahNameArabic, surahNameEnglish,
+  QURAN_JUZ_TOTAL, QURAN_SURAH_TOTAL, ayahCountOf, juzBounds, juzOfLocus, surahNameArabic, surahNameEnglish,
 } from '../../lib/quran-canon';
 import {
   SCOPE_PRESETS, describeScope, describeSegment, emptyScope, makeScope, normalizeScope, scopeAyahCount,
@@ -39,6 +39,46 @@ export interface QuranScopePickerProps {
   idPrefix?: string;
 }
 
+type AyahRange = readonly [number, number];
+
+/**
+ * إذا كان النطاق الحالي مكوّنًا من أجزاء كاملة فقط، نحفظ «مظلّة الأجزاء» مستقلة عن
+ * المقاطع الدقيقة. بهذه الطريقة لا يضيع حدّ الجزء بعد أول تعديل لآية داخل حدوده.
+ */
+function exactJuzGuard(scope: QuranScope): QuranScope | null {
+  const normalized = normalizeScope(scope);
+  const m = scopeMetrics(normalized);
+  if (!m.fullJuz.length || m.partialJuz.length) return null;
+  const built = scopeFromJuz(m.fullJuz);
+  const same = scopeAyahCount(scopeSubtract(normalized, built)) === 0 && scopeAyahCount(scopeSubtract(built, normalized)) === 0;
+  return same ? built : null;
+}
+
+function ayahRangesWithin(scope: QuranScope | null, surah: number): AyahRange[] {
+  if (!scope) return [[1, ayahCountOf(surah)]];
+  const ranges: AyahRange[] = [];
+  for (const segment of normalizeScope(scope).segments) {
+    if (surah < segment.start.surah || surah > segment.end.surah) continue;
+    const from = segment.start.surah === surah ? segment.start.ayah : 1;
+    const to = segment.end.surah === surah ? segment.end.ayah : ayahCountOf(surah);
+    if (from <= to) ranges.push([from, to]);
+  }
+  return ranges;
+}
+
+function clampToRanges(value: number, ranges: AyahRange[]): number {
+  if (!ranges.length) return 1;
+  for (const [from, to] of ranges) if (value >= from && value <= to) return value;
+  let best = ranges[0][0], distance = Math.abs(value - best);
+  for (const [from, to] of ranges) {
+    for (const candidate of [from, to]) {
+      const d = Math.abs(value - candidate);
+      if (d < distance) { best = candidate; distance = d; }
+    }
+  }
+  return best;
+}
+
 const cellTone = (selected: boolean, allowed: boolean) =>
   !allowed ? 'border-[#e6e4dd] bg-[#f4f2ec] text-[#b3b1a9] cursor-not-allowed'
     : selected ? 'border-[#214C40] bg-[#214C40] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18)]'
@@ -49,6 +89,8 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
   const [rangeAnchor, setRangeAnchor] = useState<number | null>(null);
   const [surahQuery, setSurahQuery] = useState('');
   const [surahOpen, setSurahOpen] = useState(false);
+  const [juzGuard, setJuzGuard] = useState<QuranScope | null>(() => exactJuzGuard(normalizeScope(value)));
+  const [rangeError, setRangeError] = useState('');
 
   const scope = normalizeScope(value);
   const metrics = useMemo(() => scopeMetrics(scope), [scope]);
@@ -59,43 +101,94 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
   const locked = !!disabled || !!readOnly;
   const heatByJuz = useMemo(() => new Map<number, ScopeHeat>((heat || []).map(h => [h.juz, h] as const)), [heat]);
   const maxHeat = useMemo(() => Math.max(1, ...(heat || []).map(h => h.participants)), [heat]);
+  const guardMetrics = useMemo(() => juzGuard ? scopeMetrics(juzGuard) : null, [juzGuard]);
+  const guardSurahs = useMemo(() => guardMetrics ? new Set(guardMetrics.surahs) : null, [guardMetrics]);
+
+  // initialAdvanced كان يُقرأ مرة واحدة فقط؛ لذلك زر «الوضع المتقدم» الخارجي لم يكن يفعل شيئًا بعد التحميل.
+  useEffect(() => setAdvanced(!!initialAdvanced), [initialAdvanced]);
+  // عند الانتقال إلى فئة أخرى لا تحمل قيود الجزء القديم معها.
+  useEffect(() => { setJuzGuard(exactJuzGuard(normalizeScope(value))); setRangeError(''); }, [idPrefix]);
 
   const emit = (next: QuranScope) => { if (!locked) onChange(normalizeScope(next)); };
   const clipToParent = (next: QuranScope) => (parentScope && scopeAyahCount(parentScope) > 0 ? scopeSubtract(next, scopeSubtract(next, parentScope)) : next);
+  const emitJuzSelection = (next: QuranScope) => {
+    const clipped = clipToParent(next);
+    setJuzGuard(exactJuzGuard(clipped));
+    setRangeError('');
+    emit(clipped);
+  };
 
   const toggleJuz = (juz: number, withRange: boolean) => {
     if (locked || (allowedJuz && !allowedJuz.has(juz))) return;
     if (withRange && rangeAnchor !== null) {
       const from = Math.min(rangeAnchor, juz), to = Math.max(rangeAnchor, juz);
       const list = Array.from({ length: to - from + 1 }, (_, i) => from + i).filter(n => !allowedJuz || allowedJuz.has(n));
-      emit(clipToParent(scopeUnion(scope, scopeFromJuz(list))));
+      emitJuzSelection(scopeUnion(scope, scopeFromJuz(list)));
       setRangeAnchor(null);
       return;
     }
     setRangeAnchor(juz);
-    emit(clipToParent(completeJuz.has(juz) ? scopeSubtract(scope, scopeFromJuz([juz])) : scopeUnion(scope, scopeFromJuz([juz]))));
+    emitJuzSelection(completeJuz.has(juz) ? scopeSubtract(scope, scopeFromJuz([juz])) : scopeUnion(scope, scopeFromJuz([juz])));
   };
 
   const toggleSurah = (surah: number) => {
     if (locked) return;
-    emit(clipToParent(selectedSurahs.has(surah) ? scopeSubtract(scope, scopeFromSurahs([surah])) : scopeUnion(scope, scopeFromSurahs([surah]))));
+    setRangeError('');
+    const wholeSurah=scopeFromSurahs([surah]);
+    if(juzGuard){
+      // في وضع الجزء، «اختيار بالسور» يعني الجزء الواقع من السورة داخل الجزء المختار فقط.
+      // لا يجوز لسورة حدودية (مثل البقرة) أن توسّع النطاق خلسةً إلى جزءٍ آخر.
+      const bounded=scopeSubtract(wholeSurah,scopeSubtract(wholeSurah,juzGuard));
+      const boundedSelected=scopeAyahCount(bounded)>0&&scopeAyahCount(scopeSubtract(bounded,scope))===0;
+      emit(boundedSelected?scopeSubtract(scope,bounded):scopeUnion(scope,bounded));
+      return;
+    }
+    emit(clipToParent(selectedSurahs.has(surah) ? scopeSubtract(scope, wholeSurah) : scopeUnion(scope, wholeSurah)));
   };
 
   const updateSegment = (index: number, patch: Partial<QuranScopeSegment>) => {
     const segments = scope.segments.map((segment, i) => (i === index ? { ...segment, ...patch } : segment));
     emit(makeScope(segments));
   };
-  const removeSegment = (index: number) => emit(makeScope(scope.segments.filter((_, i) => i !== index)));
-  const addSegment = () => emit(makeScope([...scope.segments, { start: { surah: 1, ayah: 1 }, end: { surah: 1, ayah: 7 } }]));
+  const removeSegment = (index: number) => { setRangeError(''); emit(makeScope(scope.segments.filter((_, i) => i !== index))); };
+  const addSegment = () => {
+    const first = juzGuard ? scopeMetrics(juzGuard).firstLocus : null;
+    const start = first || { surah: 1, ayah: 1 };
+    const ranges = ayahRangesWithin(juzGuard, start.surah);
+    const end = { surah: start.surah, ayah: Math.min(ranges[0]?.[1] || ayahCountOf(start.surah), start.ayah + 6) };
+    setRangeError('');
+    emit(makeScope([...scope.segments, { start, end }]));
+  };
 
+  const editableSurahs = useMemo(
+    () => Array.from({ length: QURAN_SURAH_TOTAL }, (_, i) => i + 1).filter(surah => !guardSurahs || guardSurahs.has(surah)),
+    [guardSurahs],
+  );
   const surahOptions = useMemo(() => {
     const query = surahQuery.trim();
-    return Array.from({ length: QURAN_SURAH_TOTAL }, (_, i) => i + 1).filter(surah => {
+    return editableSurahs.filter(surah => {
       if (!query) return true;
       const name = arabic ? surahNameArabic(surah) : surahNameEnglish(surah);
       return name.includes(query) || String(surah) === query;
     });
-  }, [surahQuery, arabic]);
+  }, [surahQuery, arabic, editableSurahs]);
+  const guardLabel = guardMetrics?.fullJuz.length
+    ? (arabic ? `الجزء ${guardMetrics.fullJuz.join('، ')}` : `juz ${guardMetrics.fullJuz.join(', ')}`)
+    : '';
+  const reportOutOfGuard = (surah: number, attempted: number, ranges: AyahRange[]) => {
+    const max = ayahCountOf(surah);
+    if (attempted < 1 || attempted > max) {
+      setRangeError(arabic
+        ? `الآية ${attempted} خارج سورة ${surahNameArabic(surah)}؛ آخر آية في السورة هي ${max}.`
+        : `Ayah ${attempted} is outside Surat ${surahNameEnglish(surah)}; the surah ends at ${max}.`);
+      return;
+    }
+    const actualJuz = juzOfLocus({ surah, ayah: attempted });
+    const allowed = ranges.map(([a, b]) => a === b ? `${a}` : `${a}–${b}`).join('، ');
+    setRangeError(arabic
+      ? `الآية ${attempted} من سورة ${surahNameArabic(surah)} تقع في الجزء ${actualJuz} وهي خارج ${guardLabel} المحدد. المسموح داخل السورة ضمن النطاق المحدد: ${allowed}.`
+      : `Ayah ${attempted} of Surat ${surahNameEnglish(surah)} is in juz ${actualJuz}, outside the selected ${guardLabel}. Allowed here: ${allowed}.`);
+  };
 
   const issues = validateScope(scope);
 
@@ -110,7 +203,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
               const built = preset.build();
               const active = scopeAyahCount(scopeSubtract(built, scope)) === 0 && scopeAyahCount(scopeSubtract(scope, built)) === 0;
               return (
-                <button key={preset.id} type="button" disabled={locked} onClick={() => emit(clipToParent(built))} aria-pressed={active}
+                <button key={preset.id} type="button" disabled={locked} onClick={() => { const clipped = clipToParent(built); setJuzGuard(exactJuzGuard(clipped)); setRangeError(''); emit(clipped); }} aria-pressed={active}
                   className={`min-h-10 rounded-xl border px-3.5 text-xs font-black transition disabled:opacity-45 ${active ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dcdad2] bg-white text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
                   {arabic ? preset.ar : preset.en}
                 </button>
@@ -150,10 +243,10 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
         </div>
         {!readOnly && (
           <div className="mt-2 flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" disabled={locked} onClick={() => emit(clipToParent(scopeFromJuz(Array.from({ length: QURAN_JUZ_TOTAL }, (_, i) => i + 1))))} icon={<ListChecks className="w-4 h-4" />}>
+            <Button size="sm" variant="ghost" disabled={locked} onClick={() => emitJuzSelection(scopeFromJuz(Array.from({ length: QURAN_JUZ_TOTAL }, (_, i) => i + 1)))} icon={<ListChecks className="w-4 h-4" />}>
               {arabic ? 'تحديد الكل' : 'Select all'}
             </Button>
-            <Button size="sm" variant="ghost" disabled={locked || !scope.segments.length} onClick={() => emit(emptyScope())} icon={<X className="w-4 h-4" />}>
+            <Button size="sm" variant="ghost" disabled={locked || !scope.segments.length} onClick={() => { setJuzGuard(null); setRangeError(''); emit(emptyScope()); }} icon={<X className="w-4 h-4" />}>
               {arabic ? 'إلغاء التحديد' : 'Deselect all'}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setAdvanced(v => !v)} icon={advanced ? <ChevronDown className="w-4 h-4" /> : <Layers className="w-4 h-4" />}>
@@ -166,6 +259,14 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
       {/* الوضع المتقدم: سور ومقاطع بحدود آيات */}
       {advanced && !readOnly && (
         <div className="space-y-4 rounded-2xl border border-[#e4e2da] bg-[#fbfaf7] p-4">
+          {juzGuard && guardMetrics && (
+            <div className="rounded-xl border border-[#cddbd3] bg-[#F7FAF8] px-3 py-2 text-[10px] font-bold leading-5 text-[#214C40]">
+              {arabic
+                ? `التفاصيل الدقيقة مقيدة بـ ${guardLabel}. السور والآيات الخارجة عن الجزء المحدد مخفية ولن يقبلها النظام.`
+                : `Fine editing is constrained to the selected ${guardLabel}. Out-of-range surahs and ayat are hidden and rejected.`}
+            </div>
+          )}
+          {rangeError && <div role="alert" className="rounded-xl border border-[#e0c6c1] bg-[#F9F0EE] px-3 py-2 text-[11px] font-bold leading-5 text-[#8a3f34]">{rangeError}</div>}
           <div>
             <button type="button" onClick={() => setSurahOpen(v => !v)} className="flex w-full items-center justify-between gap-3 text-start">
               <span className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><BookOpen className="w-4 h-4" />{arabic ? 'اختيار بالسور' : 'By surah'}</span>
@@ -208,14 +309,16 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
                     <Button size="sm" shape="square" variant="ghost" aria-label={arabic ? 'حذف المقطع' : 'Remove segment'} onClick={() => removeSegment(index)} icon={<Trash2 className="w-4 h-4" />} />
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <LocusField label={arabic ? 'من سورة' : 'From surah'} kind="surah" value={segment.start.surah} arabic={arabic}
-                      onChange={v => updateSegment(index, { start: { surah: v, ayah: Math.min(segment.start.ayah, ayahCountOf(v)) } })} />
+                    <LocusField label={arabic ? 'من سورة' : 'From surah'} kind="surah" value={segment.start.surah} arabic={arabic} surahOptions={editableSurahs}
+                      onChange={v => { const ranges = ayahRangesWithin(juzGuard, v); setRangeError(''); updateSegment(index, { start: { surah: v, ayah: clampToRanges(segment.start.ayah, ranges) } }); }} />
                     <LocusField label={arabic ? 'من آية' : 'From ayah'} kind="ayah" max={ayahCountOf(segment.start.surah)} value={segment.start.ayah} arabic={arabic}
-                      onChange={v => updateSegment(index, { start: { ...segment.start, ayah: v } })} />
-                    <LocusField label={arabic ? 'إلى سورة' : 'To surah'} kind="surah" value={segment.end.surah} arabic={arabic}
-                      onChange={v => updateSegment(index, { end: { surah: v, ayah: Math.min(segment.end.ayah, ayahCountOf(v)) } })} />
+                      ayahRanges={ayahRangesWithin(juzGuard, segment.start.surah)} onInvalid={v => reportOutOfGuard(segment.start.surah, v, ayahRangesWithin(juzGuard, segment.start.surah))}
+                      onChange={v => { setRangeError(''); updateSegment(index, { start: { ...segment.start, ayah: v } }); }} />
+                    <LocusField label={arabic ? 'إلى سورة' : 'To surah'} kind="surah" value={segment.end.surah} arabic={arabic} surahOptions={editableSurahs}
+                      onChange={v => { const ranges = ayahRangesWithin(juzGuard, v); setRangeError(''); updateSegment(index, { end: { surah: v, ayah: clampToRanges(segment.end.ayah, ranges) } }); }} />
                     <LocusField label={arabic ? 'إلى آية' : 'To ayah'} kind="ayah" max={ayahCountOf(segment.end.surah)} value={segment.end.ayah} arabic={arabic}
-                      onChange={v => updateSegment(index, { end: { ...segment.end, ayah: v } })} />
+                      ayahRanges={ayahRangesWithin(juzGuard, segment.end.surah)} onInvalid={v => reportOutOfGuard(segment.end.surah, v, ayahRangesWithin(juzGuard, segment.end.surah))}
+                      onChange={v => { setRangeError(''); updateSegment(index, { end: { ...segment.end, ayah: v } }); }} />
                   </div>
                 </div>
               ))}
@@ -241,21 +344,40 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
   );
 };
 
-const LocusField: React.FC<{ label: string; kind: 'surah' | 'ayah'; value: number; max?: number; arabic: boolean; onChange: (value: number) => void }> = ({ label, kind, value, max, arabic, onChange }) => {
+const LocusField: React.FC<{
+  label: string; kind: 'surah' | 'ayah'; value: number; max?: number; arabic: boolean;
+  surahOptions?: number[]; ayahRanges?: AyahRange[]; onInvalid?: (value: number) => void;
+  onChange: (value: number) => void;
+}> = ({ label, kind, value, max, arabic, surahOptions, ayahRanges, onInvalid, onChange }) => {
   const ceiling = kind === 'surah' ? QURAN_SURAH_TOTAL : Math.max(1, max || 1);
+  const options = surahOptions?.length ? surahOptions : Array.from({ length: QURAN_SURAH_TOTAL }, (_, i) => i + 1);
+  const ranges = ayahRanges?.length ? ayahRanges : ([[1, ceiling]] as AyahRange[]);
+  const floor = Math.min(...ranges.map(([from]) => from));
+  const rangeCeiling = Math.max(...ranges.map(([, to]) => to));
+  const allowedText = ranges.map(([from, to]) => from === to ? `${from}` : `${from}–${to}`).join('، ');
+  const acceptAyah = (attempted: number) => {
+    if (!Number.isFinite(attempted)) return;
+    const canonical = attempted >= 1 && attempted <= ceiling;
+    const inSelectedRange = ranges.some(([from, to]) => attempted >= from && attempted <= to);
+    if (!canonical || !inSelectedRange) { onInvalid?.(attempted); return; }
+    onChange(attempted);
+  };
   return (
     <label className="block min-w-0">
       <span className="block text-[9px] font-black tracking-[.1em] text-[#696f6b]">{label}</span>
       {kind === 'surah' ? (
         <select value={value} onChange={e => onChange(Number(e.target.value))} className="mizan-input mt-1 text-[11px]">
-          {Array.from({ length: QURAN_SURAH_TOTAL }, (_, i) => i + 1).map(surah => (
+          {options.map(surah => (
             <option key={surah} value={surah}>{surah}. {arabic ? surahNameArabic(surah) : surahNameEnglish(surah)}</option>
           ))}
         </select>
       ) : (
-        <input type="number" inputMode="numeric" min={1} max={ceiling} value={value}
-          onChange={e => onChange(Math.max(1, Math.min(ceiling, Number(e.target.value) || 1)))}
-          className="mizan-input mt-1 text-[11px] tabular-nums" />
+        <>
+          <input type="number" inputMode="numeric" min={floor} max={rangeCeiling} value={value}
+            onChange={e => acceptAyah(Number(e.target.value))}
+            className="mizan-input mt-1 text-[11px] tabular-nums" />
+          {ayahRanges && <span className="mt-1 block text-[8px] font-bold leading-4 text-[#696f6b]">{arabic ? `المسموح: ${allowedText}` : `Allowed: ${allowedText}`}</span>}
+        </>
       )}
     </label>
   );

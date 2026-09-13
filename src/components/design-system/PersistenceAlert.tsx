@@ -22,7 +22,12 @@ const GUIDANCE: Record<string, { ar: string; en: string }> = {
 
 export const PersistenceAlert: React.FC = () => {
   const { persistenceError, language } = useAppStore();
-  if (!persistenceError) return null;
+  /* أخطاء مزامنة الإدارة لا تُعرَض أبدًا للطالب/ولي الأمر في الواجهات العامة. كانت الحالة
+     العالمية تبقى في المتصفح، فيظهر شريط صلاحيات إداري فوق نموذج التسجيل حتى لو كان
+     التسجيل نفسه سليمًا. يظل التنبيه ظاهرًا بلا إخفاء داخل شاشات الإدارة حيث يمكن إصلاحه. */
+  const hash = typeof window === 'undefined' ? '' : window.location.hash;
+  const publicSurface = ['#register', '#competition', '#journey', '#guardian', '#verify', '#board'].some(prefix => hash.startsWith(prefix));
+  if (!persistenceError || publicSurface) return null;
   const ar = language === 'ar';
   const guidance = GUIDANCE[persistenceError.code] || GUIDANCE.CLOUD_WRITE_FAILED;
   // انقطاع الشبكة مؤقّت ومتوقّع؛ أما الصلاحية والحجم والحفظ المحلي فأعطال تحتاج تدخّلًا.

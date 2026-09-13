@@ -22,17 +22,25 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
  const [form,setForm]=useState({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:initialCategory?.riwaya||'حفص عن عاصم'});
 
  useEffect(()=>{
-  if(!competition.categories?.length||competition.id==='comp-pending-setup'){
-   void store.loadPublicCompetition(competition.id==='comp-pending-setup'?'':competition.id);
-  }
- },[competition.id,competition.categories?.length]);
+  // App يحمل الإسقاط المنشور في المسارات العامة. لا نطلب latest من داخل النموذج ولا
+  // نستبدل الفئات أثناء تعبئة الطالب. إعادة الجلب هنا مسموحة فقط لمعاينة محلية صريحة.
+  if(!localPreview||competition.categories?.length||competition.id==='comp-pending-setup')return;
+  void store.loadPublicCompetition(competition.id);
+ },[localPreview,competition.id,competition.categories?.length]);
 
  useEffect(()=>{
-  if(!form.categoryId&&competition.categories?.length>0){
-   const cat=competition.categories.find(c=>c.id===requestedCategory)||competition.categories[0];
-   if(cat) setForm(f=>({...f,categoryId:cat.id,riwaya:cat.riwaya}));
+  const categories=competition.categories||[];
+  const currentIsValid=categories.some(c=>c.id===form.categoryId);
+  if(!categories.length){
+   if(form.categoryId)setForm(f=>({...f,categoryId:''}));
+   return;
   }
- },[competition.categories,requestedCategory,form.categoryId]);
+  // لا نُبقي معرّف فئة من نسخة قديمة إذا وصلت نسخة منشورة مختلفة للمسابقة.
+  if(!currentIsValid){
+   const cat=categories.find(c=>c.id===requestedCategory)||categories[0];
+   setForm(f=>({...f,categoryId:cat.id,riwaya:cat.riwaya}));
+  }
+ },[competition.id,competition.categories,requestedCategory,form.categoryId]);
  const [scope,setScope]=useState<QuranScope>(emptyScope());
  const category=competition.categories.find(c=>c.id===form.categoryId); const age=Math.floor((Date.now()-new Date(form.dateOfBirth).getTime())/31557600000); const minor=Number.isFinite(age)&&age<18; const guardianRequired=minor&&policy.registration.requireGuardianForMinors;
  /* الفئة الثابتة لا تُعرض على المتسابق أي اختيار: لا خطوة زائدة ولا سؤال بلا معنى. */

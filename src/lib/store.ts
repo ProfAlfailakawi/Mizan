@@ -465,11 +465,19 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
     const write=()=>setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
     try{await write();}
     catch(err){
-      /* رفض صلاحية ورمز المصادقة أقدم من آخر مزامنة مطالبات؟ نجدّد الرمز مرة ونعيد الكتابة
-         مرة — فتلتئم الجلسات القائمة بعد مزامنة الصلاحيات بلا خروجٍ ودخول. */
-      if(classifyCloudError(err)!=='CLOUD_PERMISSION_DENIED'||!refreshAuthTokenOnce())throw err;
-      await auth.currentUser.getIdToken(true);
-      await write();
+      /* رفض صلاحية ورمز المصادقة أقدم من آخر مزامنة مطالبات؟ نجدّد الرمز إن حان التجديد،
+         ثم نطلب إصلاح المطالبات من التخويل الموثوق. لا نجعل الإصلاح رهينة مؤقّت الدقيقتين:
+         أكثر من كتابة قد تُرفض في الدفعة نفسها، وكلها يجب أن تلتئم بلا خروجٍ ودخول. */
+      if(classifyCloudError(err)!=='CLOUD_PERMISSION_DENIED')throw err;
+      let retryErr:unknown=err;
+      if(refreshAuthTokenOnce()){
+        await auth.currentUser.getIdToken(true);
+        try{await write();retryErr=null;}catch(nextErr){retryErr=nextErr;}
+      }
+      if(retryErr){
+        if(classifyCloudError(retryErr)!=='CLOUD_PERMISSION_DENIED'||!await repairCurrentIdentityClaims())throw retryErr;
+        await write();
+      }
     }
     clearPendingWrite(collectionName,id);
     resolveCloudScope(collectionName);
@@ -495,7 +503,22 @@ async function persistCompetitionConfiguration(updatedAt=globalState.competition
       const localUpdatedAt=Date.parse(updatedAt)||0;
       if(!configWriteAllowed(cloudUpdatedAt,localUpdatedAt)){resolveCloudScope('competition');return 'stale';}
     }catch{/* If the preflight read fails, the write below still reports the authoritative outcome. */}
-    await setDoc(docRef,configuration,{merge:true});
+    const write=()=>setDoc(docRef,configuration,{merge:true});
+    try{await write();}
+    catch(err){
+      /* نفس آلية التعافي للسجلات الفرعية. مؤقّت تجديد الرمز يمنع طلبات refresh المتكررة،
+         لكنه لا يمنع إصلاح المطالبات الموثوق إذا كانت كتابة أخرى قد استهلكت التجديد للتو. */
+      if(classifyCloudError(err)!=='CLOUD_PERMISSION_DENIED')throw err;
+      let retryErr:unknown=err;
+      if(refreshAuthTokenOnce()){
+        await auth.currentUser.getIdToken(true);
+        try{await write();retryErr=null;}catch(nextErr){retryErr=nextErr;}
+      }
+      if(retryErr){
+        if(classifyCloudError(retryErr)!=='CLOUD_PERMISSION_DENIED'||!await repairCurrentIdentityClaims())throw retryErr;
+        await write();
+      }
+    }
     resolveCloudScope('competition');
     return 'written';
   }catch(err){
@@ -525,6 +548,22 @@ function reportLostCloudSession(scope:string){
 
 let lastAuthTokenRefreshAt=0;
 function refreshAuthTokenOnce(){const now=Date.now();if(now-lastAuthTokenRefreshAt<120_000)return false;lastAuthTokenRefreshAt=now;return true;}
+
+/*
+ * حسابات قديمة قد يكون تخويلها صحيحًا في Identity Governance بينما مطالبات Firebase
+ * لم تُكتب قط. عند رفض Firestore نطلب من الخادم إعادة كتابة مطالبات *هذا الحساب فقط*
+ * من التخويل الموثوق، ثم نأخذ ID token جديدًا. لا يرسل العميل دورًا ولا نطاقًا.
+ */
+async function repairCurrentIdentityClaims(){
+  const user=auth.currentUser;if(!user)return false;
+  try{
+    const token=await user.getIdToken();
+    const response=await fetch('/api/identity/refresh-claims',{method:'POST',headers:{authorization:`Bearer ${token}`}});
+    if(!response.ok)return false;
+    await user.getIdToken(true);
+    return true;
+  }catch{return false}
+}
 
 
 async function deleteScopedDocument(collectionName:string,id:string){
@@ -1794,29 +1833,33 @@ export function useAppStore() {
     const isPlaceholder = !competitionId || competitionId === 'comp-pending-setup';
     const effectiveId = isPlaceholder ? '' : competitionId;
 
-    if(globalState.isOffline){
-      const cached = effectiveId ? (globalState.competitions.find(c=>c.id===effectiveId)||(globalState.competition?.id===effectiveId?globalState.competition:null)) : (globalState.competitions.find(c=>c.id!=='comp-pending-setup'&&c.categories?.length)||globalState.competition);
-      if(cached && cached.categories?.length){
-        globalState.competition={...cached,policy:getCompetitionPolicy(cached),ruleSets:cached.ruleSets||[cached.ruleSet]};
-        persistLocalSnapshot();listeners.forEach(l=>l());
-        return 'loaded';
-      }
-      return 'unavailable';
-    }
+    /*
+     * قاعدة أمان للواجهة العامة: لا يجوز أن تستعير فئات من حالة الإدارة، ولا من fixtures،
+     * ولا أن تنشر نسخةً محلية تلقائيًا لمجرد أن طالبًا فتح رابط التسجيل. المصدر العام
+     * الوحيد هو public_competitions أو واجهة /api/public. بهذا يختفي تسرب فئات تجريبية
+     * أو فئات مسابقة أخرى إلى نموذج الطالب جذريًا.
+     */
+    if(globalState.isOffline) return 'unavailable';
+
+    const installPublicCompetition=(competition:Competition,updatedAt?:string)=>{
+      const target={...competition,policy:getCompetitionPolicy(competition),ruleSets:competition.ruleSets||[competition.ruleSet]};
+      globalState.competition=target;
+      const existing=globalState.competitions.findIndex(c=>c.id===target.id);
+      globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
+      if(updatedAt)globalState.competitionConfigUpdatedAt=updatedAt;
+      persistLocalSnapshot();listeners.forEach(l=>l());
+    };
 
     if(effectiveId){
+      let sourceReached=false;
       try{
         const {db,doc,getDoc}=await getFirestoreClient();
         const snap=await getDoc(doc(db,'public_competitions',effectiveId));
+        sourceReached=true;
         if(snap.exists()){
           const data=snap.data() as {competition?:Competition;updatedAt?:string};
           if(data.competition&&data.competition.id===effectiveId&&Array.isArray(data.competition.categories)&&data.competition.categories.length>0){
-            const target={...data.competition,policy:getCompetitionPolicy(data.competition),ruleSets:data.competition.ruleSets||[data.competition.ruleSet]};
-            globalState.competition=target;
-            const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-            globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-            if(data.updatedAt)globalState.competitionConfigUpdatedAt=data.updatedAt;
-            persistLocalSnapshot();listeners.forEach(l=>l());
+            installPublicCompetition(data.competition,data.updatedAt);
             return 'loaded';
           }
         }
@@ -1824,71 +1867,30 @@ export function useAppStore() {
 
       try{
         const resp=await fetch(`/api/public/competitions/${encodeURIComponent(effectiveId)}`);
+        sourceReached=true;
         if(resp.ok){
           const payload=await resp.json();
-          if(payload?.competition&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
-            const target={...payload.competition,policy:getCompetitionPolicy(payload.competition),ruleSets:payload.competition.ruleSets||[payload.competition.ruleSet]};
-            globalState.competition=target;
-            const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-            globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-            if(payload.updatedAt)globalState.competitionConfigUpdatedAt=payload.updatedAt;
-            persistLocalSnapshot();listeners.forEach(l=>l());
+          if(payload?.competition&&payload.competition.id===effectiveId&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
+            installPublicCompetition(payload.competition,payload.updatedAt);
             return 'loaded';
           }
         }
       }catch(err){console.warn('Public competition server API load failed:',err)}
 
-      const localComp=globalState.competitions.find(c=>c.id===effectiveId)||(globalState.competition?.id===effectiveId?globalState.competition:null);
-      if(localComp && Array.isArray(localComp.categories) && localComp.categories.length>0){
-        try{
-          await fetch(`/api/public/competitions/${encodeURIComponent(effectiveId)}/publish`,{
-            method:'POST',
-            headers:{'content-type':'application/json'},
-            body:JSON.stringify({organizationId:localComp.organizationId,competition:localComp})
-          });
-        }catch{/* ignore */}
-        const target={...localComp,policy:getCompetitionPolicy(localComp),ruleSets:localComp.ruleSets||[localComp.ruleSet]};
-        globalState.competition=target;
-        persistLocalSnapshot();listeners.forEach(l=>l());
-        return 'loaded';
-      }
-
-      if(effectiveId===SEED_COMPETITION.id||effectiveId==='comp-dubai-2027'){
-        const target={...SEED_COMPETITION,policy:getCompetitionPolicy(SEED_COMPETITION),ruleSets:SEED_COMPETITION.ruleSets||[SEED_COMPETITION.ruleSet]};
-        globalState.competition=target;
-        const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-        globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-        persistLocalSnapshot();listeners.forEach(l=>l());
-        return 'loaded';
-      }
-
-      return 'missing';
+      return sourceReached?'missing':'unavailable';
     }
 
-    // Default / latest when competitionId is empty or placeholder
+    // Default / latest: لا fallback إلى أي مسابقة محلية أو بيانات تجريبية.
     try{
       const resp=await fetch('/api/public/competitions/latest');
-      if(resp.ok){
-        const payload=await resp.json();
-        if(payload?.competition&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
-          const target={...payload.competition,policy:getCompetitionPolicy(payload.competition),ruleSets:payload.competition.ruleSets||[payload.competition.ruleSet]};
-          globalState.competition=target;
-          const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-          globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-          if(payload.updatedAt)globalState.competitionConfigUpdatedAt=payload.updatedAt;
-          persistLocalSnapshot();listeners.forEach(l=>l());
-          return 'loaded';
-        }
+      if(!resp.ok)return resp.status===404?'missing':'unavailable';
+      const payload=await resp.json();
+      if(payload?.competition&&Array.isArray(payload.competition.categories)&&payload.competition.categories.length>0){
+        installPublicCompetition(payload.competition,payload.updatedAt);
+        return 'loaded';
       }
-    }catch(err){console.warn('Public competition latest load failed:',err)}
-
-    const anyValid=globalState.competitions.find(c=>c.id!=='comp-pending-setup'&&Array.isArray(c.categories)&&c.categories.length>0)||SEED_COMPETITION;
-    const target={...anyValid,status:'registration_open' as const,policy:getCompetitionPolicy(anyValid),ruleSets:anyValid.ruleSets||[anyValid.ruleSet]};
-    globalState.competition=target;
-    const existing=globalState.competitions.findIndex(c=>c.id===target.id);
-    globalState.competitions=existing>=0?globalState.competitions.map(c=>c.id===target.id?target:c):[target,...globalState.competitions];
-    persistLocalSnapshot();listeners.forEach(l=>l());
-    return 'loaded';
+      return 'missing';
+    }catch(err){console.warn('Public competition latest load failed:',err);return 'unavailable'}
   };
 
   const provisionOrganization = (nameArabic:string, nameEnglish:string, code?:string) => {

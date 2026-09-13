@@ -28,6 +28,7 @@ import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { EmptyState } from '../design-system/EmptyState';
 import { useConfirm } from '../design-system/ConfirmDialog';
+import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-capabilities';
 
 /*
  * مساحة عمل محرك النطاق والأسئلة.
@@ -602,10 +603,21 @@ const MathematicalBoundTab: React.FC<{ store: Store; ar: boolean }> = ({ store, 
 
 const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab) => void }> = ({ store, ar, onNavigate }) => {
   const { confirm, confirmDialog } = useConfirm(ar);
-  const readiness = useMemo(() => store.getScopeReadiness(), [store.competition.categories, store.participantScopes.length, store.participants.length, store.questionModels.length]);
-  const impact = store.scopeSealImpact();
+  const [runtimeHealth, setRuntimeHealth] = useState<MizanRuntimeHealth>();
+  const [runtimeChecking, setRuntimeChecking] = useState(false);
   const [sealError, setSealError] = useState<string | null>(null);
-  const fixTab: Record<string, Tab> = { category_scope: 'scope', selection_rules: 'selection', zones: 'distribution', question_policy: 'policy', participant_scopes: 'selection', pool: 'demand', models: 'simulation', seal: 'readiness' };
+  const refreshRuntime = async () => {
+    setRuntimeChecking(true);
+    try { setRuntimeHealth(await fetchRuntimeHealth()); } finally { setRuntimeChecking(false); }
+  };
+  useEffect(() => { void refreshRuntime(); }, []);
+  const escrowOverride = runtimeHealth?.source === 'server' ? runtimeHealth.secureQuestionRuntimeConfigured : undefined;
+  const readiness = useMemo(
+    () => store.getScopeReadiness(escrowOverride),
+    [store.competition.categories, store.participantScopes.length, store.participants.length, store.questionModels.length, store.questionQuarantines.length, escrowOverride],
+  );
+  const impact = store.scopeSealImpact();
+  const fixTab: Record<string, Tab> = { category_scope: 'scope', selection_rules: 'selection', zones: 'distribution', question_policy: 'policy', participant_scopes: 'selection', pool: 'demand', models: 'models', seal: 'readiness' };
 
   const seal = async () => {
     if (!(await confirm({
@@ -615,7 +627,7 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
         : 'Every category range and every approved participant range is locked. A later change creates a new version, invalidates models built on the old one, and shows you how many participants were affected.',
       confirmLabel: ar ? 'تجميد الإعداد' : 'Freeze configuration',
     }))) return;
-    const result = await store.sealScopeEngine();
+    const result = await store.sealScopeEngine(undefined, escrowOverride);
     setSealError(result.ok ? null : (ar ? 'لا يمكن التجميد قبل معالجة المشكلات الحرجة أعلاه.' : 'Freezing is blocked until the critical issues above are resolved.'));
   };
 
@@ -638,6 +650,12 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
         {sealError && <p role="alert" className="mt-3 rounded-xl bg-[#F6E7E7] px-3 py-2 text-[11px] font-bold text-[#7A2E2E]">{sealError}</p>}
       </div>
 
+      {runtimeHealth && runtimeHealth.source !== 'server' && (
+        <div className="rounded-xl border border-[#e6d9c2] bg-[#FBF7F0] px-3 py-2 text-[10px] font-bold leading-5 text-[#7a5a2f]">
+          {ar ? 'تعذّر التحقق من قدرات الخادم الآن؛ لن يعتبر ميزان الحجز الخادمي جاهزًا اعتمادًا على حالة جهاز المحكّم فقط.' : 'Server capabilities could not be verified. Mizan will not mark escrow ready based only on a judge device state.'}
+        </div>
+      )}
+
       <ul className="space-y-2">
         {readiness.checks.map(check => (
           <li key={check.id} className={`rounded-2xl border p-4 ${check.severity === 'critical' ? 'border-[#e0c6c1] bg-[#F9F0EE]' : check.severity === 'warning' ? 'border-[#e6d9c2] bg-[#FBF7F0]' : check.severity === 'recommendation' ? 'border-[#dfe6ea] bg-[#F4F7F9]' : 'border-[#e4e2da] bg-white'}`}>
@@ -650,7 +668,9 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
                 <p className="mt-1.5 text-[11px] leading-6 text-[#4f5752]">{ar ? check.detailAr : check.detailEn}</p>
               </div>
               {check.severity !== 'passed' && check.fix !== 'none' && (
-                <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{ar ? 'إصلاح' : 'Fix'}</Button>
+                check.id === 'escrow'
+                  ? <Button size="sm" variant="outline" disabled={runtimeChecking} icon={<ChevronLeft className="h-4 w-4" />} onClick={() => void refreshRuntime()}>{runtimeChecking ? (ar ? 'جارٍ الفحص…' : 'Checking…') : (ar ? 'إعادة فحص الخادم' : 'Recheck server')}</Button>
+                  : <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{ar ? 'إصلاح' : 'Fix'}</Button>
               )}
             </div>
           </li>

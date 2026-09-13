@@ -61,7 +61,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
     return events.length ? analyzeCommitteeIntegrity(events) : null;
   }, [judgeSubmissions, participants, competition.ruleSet]);
 
-  const measured = report?.committees.filter(c => c.synchrony !== 'INSUFFICIENT' || c.regionalEvenness !== 'INSUFFICIENT') || [];
+  const measured = (report?.committees || []).filter(c => c.synchrony !== 'INSUFFICIENT' || c.regionalEvenness !== 'INSUFFICIENT');
   // قبل أن تكفي العيّنة لا توجد إشارة، والصمت أصدق من لوحةٍ فارغة.
   if (!measured.length) return null;
 

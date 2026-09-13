@@ -207,8 +207,8 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
     checks.push(input.reserveModelCount > 0
       ? pass('reserve_models', 'النماذج الاحتياطية', 'Reserve models', `${input.reserveModelCount} نموذجًا احتياطيًا جاهزًا، مولَّدًا بالمحرك نفسه ومربوطًا ببصمة نطاقه.`, `${input.reserveModelCount} reserve models are ready, engine-generated and bound to their range signature.`)
       : { id: 'reserve_models', severity: 'recommendation', titleAr: 'النماذج الاحتياطية', titleEn: 'Reserve models', fix: 'models',
-          detailAr: 'لا نموذج احتياطي جاهز. لو سقط سؤال يوم المسابقة فلا بديل مولَّدًا بالمحرك نفسه، ويصير الخيار انتظارًا أو اختيارًا بشريًا.',
-          detailEn: 'No reserve model is ready. If a question drops on the day there is no engine-generated substitute, leaving a wait or a human pick.' });
+          detailAr: 'توصية تشغيلية لا تمنع الجاهزية: لا نموذج احتياطي جاهز بعد. أنشئ نموذجًا احتياطيًا من «النماذج والعدالة» ليكون البديل مولَّدًا بالمحرك نفسه ومربوطًا ببصمة النطاق.',
+          detailEn: 'Operational recommendation only; it does not block readiness. Create a reserve in Models & fairness so a dropped question has an engine-generated, scope-bound substitute.' });
   }
 
   if (input.escrowRequired) {

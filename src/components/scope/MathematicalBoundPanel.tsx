@@ -66,7 +66,7 @@ export const MathematicalBoundPanel: React.FC<{
               onChange={event => setSample(Math.max(0, Number(event.target.value) || 0))}
               className="w-20 rounded-lg border border-[#dcdad2] px-2 py-1 text-center text-xs font-bold" />
           </label>
-          <Button onClick={() => onRun(sample || undefined)} disabled={busy} icon={Sigma}>
+          <Button onClick={() => onRun(sample || undefined)} disabled={busy} icon={<Sigma className="h-4 w-4" />}>
             {busy ? (ar ? 'يُحلّ…' : 'Solving…') : (ar ? 'اسأل المِرصد' : 'Ask the oracle')}
           </Button>
         </div>

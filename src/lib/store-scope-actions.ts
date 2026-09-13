@@ -347,7 +347,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     return analyzeDemand({ participants: rows.map(({ reading, ...rest }) => { void reading; return rest; }), candidates: unique });
   };
 
-  const getScopeReadiness = () => {
+  const getScopeReadiness = (escrowReadyOverride?: boolean) => {
     const policy = getCompetitionPolicy(S().competition);
     return buildScopeReadiness({
       categories: S().competition.categories,
@@ -363,7 +363,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
         .map(q => ({ locusCount: q.locusKeys.length, canContinue: q.canContinue, summaryAr: q.summaryArabic, summaryEn: q.summaryEnglish })),
       reserveModelCount: S().questionModels.filter(m => !m.participantId && m.status === 'draft' && m.competitionId === S().competition.id).length,
       escrowRequired: policy.questions.secureReveal?.requireParticipantPresence !== false,
-      escrowReady: S().activeSession.secureQuestionMode === 'SERVER' || !isLaunchDeployment(),
+      escrowReady: !isLaunchDeployment() || (escrowReadyOverride ?? S().activeSession.secureQuestionMode === 'SERVER'),
       strictDifficultyRequired: S().competition.categories.some(c => c.requireReviewedDifficulty),
     });
   };
@@ -530,8 +530,8 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     };
   };
 
-  const sealScopeEngine = async (reason?: string) => {
-    const readiness = getScopeReadiness();
+  const sealScopeEngine = async (reason?: string, escrowReadyOverride?: boolean) => {
+    const readiness = getScopeReadiness(escrowReadyOverride);
     if (!readiness.ready) return { ok: false as const, reason: 'READINESS_BLOCKED', checks: readiness.checks.filter(x => x.severity === 'critical') };
     const policy = getCompetitionPolicy(S().competition);
     const now = new Date().toISOString();

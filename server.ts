@@ -494,6 +494,22 @@ async function startServer() {
     if(uid)void syncIdentityClaims(uid);
   };
 
+  /*
+   * إصلاح ذاتي آمن لمطالبات الحساب الحالي. لا يمنح هذا المسار أي دور جديد: المصدر
+   * الوحيد هو grant الموجود أصلًا في Identity Governance، والمستخدم لا يستطيع اختيار
+   * الدور أو الجهة أو المسابقة. فائدته للحسابات القديمة التي فُعّلت قبل جسر Firestore.
+   */
+  app.post('/api/identity/refresh-claims',sensitiveIdentityRateLimit,requireFirebaseBase,async(req,res)=>{
+    if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});
+    const base=(req as any).firebaseBase as {uid:string};
+    const grant=identityGovernance.claimsForUid(base.uid);
+    if(!grant)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});
+    const outcome=await writeIdentityClaims(base.uid,claimsFromGrant(grant));
+    if(outcome.status==='NOT_CONFIGURED')return res.status(503).json({code:'IDENTITY_CLAIMS_NOT_CONFIGURED'});
+    if(outcome.status==='FAILED')return res.status(503).json({code:'IDENTITY_CLAIMS_SYNC_FAILED',reason:outcome.reason});
+    return res.json({ok:true,status:outcome.status});
+  });
+
   app.post('/api/identity/activate',sensitiveIdentityRateLimit,requireFirebaseBase,async(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});const base=(req as any).firebaseBase as {uid:string;email?:string};try{const result=identityGovernance.activate(base,String(req.body?.activationToken||''));
     /* تُنتظر كتابة المطالبات قبل الردّ: العميل يُجدّد رمزه فور نجاح التفعيل، فلو كُتبت بعده
        لعاد برمزٍ بلا مطالبات وظلّ مرفوضًا حتى انتهاء صلاحيته. */

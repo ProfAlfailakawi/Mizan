@@ -370,11 +370,10 @@ export default function App() {
    let alive=true;
    const publicRoute=hash.startsWith('#register')||hash.startsWith('#competition')||hash.startsWith('#journey')||hash.startsWith('#guardian');
    if(!requestedComp&&!publicRoute){setCompMissing(false);setCompLoading(false);return()=>{alive=false}}
-   const localExists=requestedComp?competitions.some(c=>c.id===requestedComp):false;
    // الروابط العامة تعيد جلب النسخة المنشورة أولًا حتى لا تعرض ذاكرة المتصفح فئات قديمة.
    if(publicRoute){
     setCompLoading(true);setCompMissing(false);
-    void loadPublicCompetition(requestedComp).then(state=>{if(!alive)return;const ok=state==='loaded';if(!ok&&localExists&&requestedComp)selectCompetition(requestedComp);setCompMissing(!ok&&!localExists&&!!requestedComp);setCompLoading(false)});
+    void loadPublicCompetition(requestedComp).then(state=>{if(!alive)return;setCompMissing(state!=='loaded');setCompLoading(false)});
     return()=>{alive=false};
    }
    // شاشة الإدارة تفضّل النسخة المحلية الأحدث ولا تستبدلها بنسخة نشر قديمة.
