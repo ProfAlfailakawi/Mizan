@@ -406,7 +406,7 @@ test('calculateCategoryPassageRange calculates exact ayat and page quarter units
   const h = harness();
   
   // Exact ayat mode
-  const exactCat = { passageMode: 'exact_ayat', ayatPerQuestion: 5 } as any;
+  const exactCat = { passageMode: 'ayat', ayatPerQuestion: 5 } as any;
   assert.deepEqual(h.actions.categoryPassageAyahRange(exactCat), {
     minAyahCount: 5,
     maxAyahCount: 5,
@@ -430,10 +430,22 @@ test('calculateCategoryPassageRange calculates exact ayat and page quarter units
   });
 
   // Default fallback when category is undefined
-  assert.deepEqual(h.actions.categoryPassageAyahRange(undefined), {
+  assert.deepEqual(h.actions.categoryPassageAyahRange(undefined), {});
+
+  // Legacy page portion fallback
+  const legacyHalf = { pagePortion: 'half' } as any;
+  assert.deepEqual(h.actions.categoryPassageAyahRange(legacyHalf), {
     minAyahCount: 3,
-    maxAyahCount: 3,
-    targetAyahCount: 3,
+    maxAyahCount: 5,
+    targetAyahCount: 4,
+  });
+
+  // Legacy ayatPerQuestion fallback (when no units or passageMode='ayat')
+  const legacyAyat = { ayatPerQuestion: 4 } as any;
+  assert.deepEqual(h.actions.categoryPassageAyahRange(legacyAyat), {
+    minAyahCount: 4,
+    maxAyahCount: 4,
+    targetAyahCount: 4,
   });
 });
 

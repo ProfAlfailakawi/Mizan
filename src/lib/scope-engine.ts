@@ -232,19 +232,40 @@ export function staleModels(models: QuestionModelRecord[], scopes: ParticipantSc
 
 /** تقدير نافذة آيات المقطع حسب إعدادات الفئة */
 export function calculateCategoryPassageRange(category: Category | undefined): { minAyahCount?: number; maxAyahCount?: number; targetAyahCount?: number } {
-  const mode = category?.passageMode || 'exact_ayat';
-  if (mode === 'exact_ayat') {
-    const n = Math.max(1, Math.min(20, Math.round(category?.ayatPerQuestion || 3)));
+  if (!category) return {};
+
+  if (category.passageMode === 'ayat' && category.ayatPerQuestion && category.ayatPerQuestion > 0) {
+    const n = Math.max(1, Math.round(category.ayatPerQuestion));
     return { minAyahCount: n, maxAyahCount: n, targetAyahCount: n };
   }
-  const units = Math.max(1, Math.min(4, Math.round(category?.pageQuarterUnits || 1)));
+
+  const legacyUnits = category.pagePortion === 'quarter' ? 1 
+                    : category.pagePortion === 'half' ? 2 
+                    : category.pagePortion === 'third' ? Math.max(1, Math.round(4 / 3)) 
+                    : category.pagePortion === 'full' ? 4 
+                    : undefined;
+
+  const units = category.pageQuarterUnits && category.pageQuarterUnits > 0 ? category.pageQuarterUnits : legacyUnits;
+
+  if (!units) {
+    return category.ayatPerQuestion && category.ayatPerQuestion > 0 
+      ? { minAyahCount: category.ayatPerQuestion, maxAyahCount: category.ayatPerQuestion, targetAyahCount: category.ayatPerQuestion } 
+      : {};
+  }
+
+  // تقدير تشغيلي فقط: طول الآية متغير، لذلك يحدد «ربع/نصف/وجه» نافذة آيات لا رقمًا نصيًا جامدًا.
   const presets: Record<number, { minAyahCount: number; maxAyahCount: number }> = {
     1: { minAyahCount: 1, maxAyahCount: 3 },
     2: { minAyahCount: 3, maxAyahCount: 5 },
     3: { minAyahCount: 4, maxAyahCount: 7 },
     4: { minAyahCount: 6, maxAyahCount: 9 },
   };
-  const range = presets[Math.round(units)] || { minAyahCount: Math.max(1, Math.round(units * 1.5)), maxAyahCount: Math.max(2, Math.round(units * 2.25)) };
+
+  const range = presets[Math.round(units)] || { 
+    minAyahCount: Math.max(1, Math.round(units * 1.5)), 
+    maxAyahCount: Math.max(2, Math.round(units * 2.25)) 
+  };
+
   return { ...range, targetAyahCount: Math.max(1, Math.round((range.minAyahCount + range.maxAyahCount) / 2)) };
 }
 
