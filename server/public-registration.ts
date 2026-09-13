@@ -107,7 +107,8 @@ export class PublicRegistrationService{
     if(journey.competitionId!==competitionId||journey.audience!==audience)throw new Error('JOURNEY_TOKEN_INVALID');
     if(journey.revoked)throw new Error('JOURNEY_REVOKED');
     const competition=await this.store.getCompetition(competitionId);if(!competition)throw new Error('COMPETITION_NOT_FOUND');
-    if(['completed','archived'].includes(competition.status))throw new Error('COMPETITION_ACCESS_CLOSED');
+    /* انتهاء المنافسة لا يبطل رحلة المشارك: النتائج والشهادة والحفل تأتي بعدها.
+       الإبطال قرار صريح محفوظ في journey.revoked، لا أثر جانبي لحالة المسابقة. */
     return journey;
   }
 }

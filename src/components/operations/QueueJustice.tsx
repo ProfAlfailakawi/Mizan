@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { ArrowLeftRight, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -9,16 +9,23 @@ import { Badge } from '../design-system/Badge';
 
 export const QueueJustice:React.FC=()=>{
  const s=useAppStore(),ar=s.language==='ar';
- const panels=s.committees.filter(c=>c.status!=='offline');
- const defaultSource=panels.find(c=>s.participants.some(p=>p.status==='in_queue'&&p.assignedCommitteeId===c.id))?.id||panels[0]?.id||'';
+ const competitionId=s.competition.id;
+ const participants=useMemo(()=>s.participants.filter(p=>p.competitionId===competitionId),[s.participants,competitionId]);
+ const panels=useMemo(()=>s.committees.filter(c=>c.competitionId===competitionId&&c.status!=='offline'),[s.committees,competitionId]);
+ const defaultSource=panels.find(c=>participants.some(p=>p.status==='in_queue'&&p.assignedCommitteeId===c.id))?.id||panels[0]?.id||'';
  const [source,setSource]=useState(defaultSource),[target,setTarget]=useState(panels.find(c=>c.id!==defaultSource)?.id||'');
  const [scope,setScope]=useState<'all'|'one'>('all'),[participantId,setParticipantId]=useState('');
  const [mode,setMode]=useState<'PRESERVE_ORIGINAL_TURN'|'MOVE_TO_END'|'EQUITY_BY_WAITING_TIME'>('PRESERVE_ORIGINAL_TURN');
  const [allowCrossCategory,setAllowCrossCategory]=useState(false);
  const [reason,setReason]=useState(''),[result,setResult]=useState<{ok:boolean;message:string}|null>(null);
- const queue=useMemo(()=>s.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===source).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)),[s.participants,source]);
- const targetQueue=useMemo(()=>s.participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===target).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)),[s.participants,target]);
- const impact=useMemo(()=>queueTransferImpact({participants:s.participants,sourceCommitteeId:source,targetCommitteeId:target,participantIds:scope==='one'&&participantId?[participantId]:undefined,mode}),[s.participants,source,target,scope,participantId,mode]);
+ useEffect(()=>{
+  if(!panels.length){if(source)setSource('');if(target)setTarget('');return;}
+  if(!panels.some(c=>c.id===source)){const next=defaultSource;setSource(next);setTarget(panels.find(c=>c.id!==next)?.id||'');setParticipantId('');return;}
+  if(!panels.some(c=>c.id===target)||target===source)setTarget(panels.find(c=>c.id!==source)?.id||'');
+ },[competitionId,panels,defaultSource,source,target]);
+ const queue=useMemo(()=>participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===source).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)),[participants,source]);
+ const targetQueue=useMemo(()=>participants.filter(p=>p.status==='in_queue'&&p.assignedCommitteeId===target).sort((a,b)=>queueOrderValue(a)-queueOrderValue(b)),[participants,target]);
+ const impact=useMemo(()=>queueTransferImpact({participants,sourceCommitteeId:source,targetCommitteeId:target,participantIds:scope==='one'&&participantId?[participantId]:undefined,mode}),[participants,source,target,scope,participantId,mode]);
  /* ما يستردّه العدل، بالأرقام، قبل التنفيذ — فلا يُطبَّق استثناءٌ على ترتيب الوصول بلا أن يُرى أثره. */
  const equity=useMemo(()=>{
   const movers=scope==='one'&&participantId?queue.filter(p=>p.id===participantId):queue;

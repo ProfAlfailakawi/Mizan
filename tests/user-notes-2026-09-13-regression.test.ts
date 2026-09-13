@@ -4,15 +4,18 @@ import fs from 'node:fs';
 
 const text=(path:string)=>fs.readFileSync(path,'utf8');
 
-test('mathematical bound renders the Sigma icon as an element, never as a component function child',()=>{
-  const src=text('src/components/scope/MathematicalBoundPanel.tsx');
-  assert.doesNotMatch(src,/icon=\{Sigma\}/);
-  assert.match(src,/icon=\{<Sigma className="h-4 w-4" \/>\}/);
+test('mathematical bound and duplicate advanced-mode entry are removed from the question workspace',()=>{
+  const workspace=text('src/components/admin/QuestionEngineWorkspace.tsx');
+  assert.doesNotMatch(workspace,/MathematicalBoundPanel/);
+  assert.doesNotMatch(workspace,/الحد الرياضي/);
+  assert.doesNotMatch(workspace,/الوضع المتقدم/);
 });
 
-test('the workspace advanced switch propagates after mount',()=>{
+test('ayah inputs keep a local draft so typing does not fight range normalization',()=>{
   const picker=text('src/components/scope/QuranScopePicker.tsx');
-  assert.match(picker,/useEffect\(\(\) => setAdvanced\(!!initialAdvanced\), \[initialAdvanced\]\)/);
+  assert.match(picker,/inputMode="numeric"/);
+  assert.match(picker,/draft/);
+  assert.match(picker,/onBlur/);
 });
 
 test('juz-based fine editing is guarded to the chosen juz and rejects an out-of-range ayah',()=>{
@@ -41,6 +44,16 @@ test('registration drops stale category ids when the published category set chan
   assert.match(registration,/categoryId:''/);
 });
 
+test('server registration requires authoritative Firestore and cannot report a disk-only phantom success',()=>{
+  const server=text('server.ts');
+  const start=server.indexOf('const publicRegistration=new PublicRegistrationService');
+  const end=server.indexOf('const identityDir=',start);
+  const registration=server.slice(start,end);
+  assert.match(registration,/public_competitions\/\$\{cleanId\}/);
+  assert.match(registration,/if\(!firestoreRepository\)throw new Error\('FIRESTORE_UNAVAILABLE'\)/);
+  assert.match(registration,/createAtomically\(documents\)/);
+});
+
 test('permission denial self-heals stale Firebase claims before surfacing a permanent failure',()=>{
   const store=text('src/lib/store.ts');
   const server=text('server.ts');
@@ -63,4 +76,12 @@ test('scope readiness checks real server capability and freeze uses the same ver
   assert.match(workspace,/secureQuestionRuntimeConfigured/);
   assert.match(workspace,/sealScopeEngine\(undefined, escrowOverride\)/);
   assert.match(actions,/getScopeReadiness = \(escrowReadyOverride\?: boolean\)/);
+});
+
+test('student lifecycle public journey remains available through result, certificate and ceremony',()=>{
+  const journey=text('src/components/public/JourneyAccess.tsx');
+  assert.doesNotMatch(journey,/competition\.status.*completed/);
+  assert.match(journey,/JOURNEY_REVOKED/);
+  assert.match(journey,/certificate/);
+  assert.match(journey,/setInterval/);
 });

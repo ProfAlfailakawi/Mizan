@@ -45,7 +45,7 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  };
  useEffect(()=>()=>stopCamera(),[]);
  useEffect(()=>{if(!done)return;const t=setTimeout(()=>{setDone(null);setCode('');setError(false)},4500);return()=>clearTimeout(t)},[done]);
- const committee=done?committees.find(c=>c.id===done.assignedCommitteeId):null;
+ const committee=done?committees.find(c=>c.competitionId===done.competitionId&&c.id===done.assignedCommitteeId):null;
  // A kiosk stands in front of families: a fabricated ticket number is worse than
  // no ticket, and a raw enum tells them nothing. Both are stated or omitted honestly.
  const ticketNumber=done?(done.originalQueueNumber||done.queueNumber||0):0;

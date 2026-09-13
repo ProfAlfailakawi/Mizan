@@ -39,7 +39,7 @@ type Tab='journey'|'prepare'|'record';
 export const ParticipantDashboard: React.FC = () => {
  const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant}=store; const ar=language==='ar';
  // يُحلّ المتسابق قبل الخطّافات: الفئة تُشتق منه، والخروج المبكر بعدها لا يجوز أن يتخطّى خطّافًا.
- const participant=participants.find(p=>String(p.email||'').toLowerCase()===currentUser.email.toLowerCase());
+ const participant=participants.find(p=>p.competitionId===competition.id&&String(p.email||'').toLowerCase()===currentUser.email.toLowerCase());
  const category=competition.categories.find(c=>c.id===participant?.categoryId);
  /*
   * نطاق التدرّب = النطاق الذي سيُسأل فيه بعينه.
@@ -81,18 +81,18 @@ export const ParticipantDashboard: React.FC = () => {
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
  const [showRegistration,setShowRegistration]=useState(false); const [showAppeal,setShowAppeal]=useState(false); const [appealText,setAppealText]=useState(''); const [showCert,setShowCert]=useState(false);
  const policy=getCompetitionPolicy(competition);
- const result=results.find(r=>r.participantId===participant?.id);
- const cert=certificates.find(c=>c.participantId===participant?.id);
+ const result=results.find(r=>r.competitionId===competition.id&&r.participantId===participant?.id);
+ const cert=certificates.find(c=>c.competitionId===competition.id&&c.participantId===participant?.id);
  if(showRegistration) return <RegistrationFlow onSuccess={()=>setShowRegistration(false)}/>;
  if(!participant) return <div className="max-w-xl mx-auto px-4 py-16 text-center"><h1 className="text-2xl font-black">{ar?'ابدأ مشاركتك':'Start your participation'}</h1><Button className="mt-5" onClick={()=>setShowRegistration(true)}>{ar?'تسجيل':'Register'}</Button></div>;
  const step=statusStep(participant.status);
- const committee=store.committees.find(c=>c.id===participant.assignedCommitteeId);
+ const committee=store.committees.find(c=>c.competitionId===competition.id&&c.id===participant.assignedCommitteeId);
  const resultVisible=policy.results.visibility==='immediate'||policy.results.visibility==='private_only'||result?.status==='published'||result?.status==='sealed';
  const passPayload=makeMizanPassPayload(participant.code);
  const queueEstimate=store.getQueueEstimate(participant.id);
  // التدرّب يكون على رواية المتسابق نفسها؛ رواية بلا حزمة تسليم لا تفتح الاستوديو أصلًا.
  const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
- const passportRows=participantPassport.filter(x=>x.participantId===participant.id);
+ const passportRows=participantPassport.filter(x=>x.participantId===participant.id&&x.competitionId===competition.id);
 
  const beforeSession=['approved','checked_in','in_queue'].includes(participant.status);
  const canPrepare=beforeSession; const hasRecord=passportRows.length>0||!!cert;

@@ -35,7 +35,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
     const events: ScoreEvent[] = [];
     for (const s of judgeSubmissions) {
-      const participant = participants.find(p => p.id === s.participantId);
+      const participant = participants.find(p => p.id === s.participantId && p.competitionId === competition.id);
       const committeeId = participant?.assignedCommitteeId;
       if (!committeeId) continue;
       // الخصم = ما نقص عن الحدّ الأعلى في المعايير التي رصدها هذا المحكّم وحده،
@@ -59,7 +59,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
       });
     }
     return events.length ? analyzeCommitteeIntegrity(events) : null;
-  }, [judgeSubmissions, participants, competition.ruleSet]);
+  }, [judgeSubmissions, participants, competition.id, competition.ruleSet]);
 
   const measured = (report?.committees || []).filter(c => c.synchrony !== 'INSUFFICIENT' || c.regionalEvenness !== 'INSUFFICIENT');
   // قبل أن تكفي العيّنة لا توجد إشارة، والصمت أصدق من لوحةٍ فارغة.
@@ -67,7 +67,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   const flagged = measured.filter(c => c.status === 'REVIEW');
   const nameOf = (id: string) => {
-    const c = committees.find(x => x.id === id);
+    const c = committees.find(x => x.id === id && x.competitionId === competition.id);
     return c ? `${c.code} · ${(ar ? c.nameArabic : c.name) || c.code}` : id;
   };
 

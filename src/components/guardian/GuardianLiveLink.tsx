@@ -33,11 +33,11 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
 
   const consent = store.consents.some((c) => c.participantId === child.id && c.kind === 'guardian' && c.accepted);
 
-  const queue = useMemo(() => store.participants.filter((p) => p.status === 'in_queue').sort((a, b) => queueOrderValue(a) - queueOrderValue(b)), [store.participants]);
+  const queue = useMemo(() => store.participants.filter((p) => p.competitionId === child.competitionId && p.status === 'in_queue').sort((a, b) => queueOrderValue(a) - queueOrderValue(b)), [store.participants, child.competitionId]);
   const position = queue.findIndex((p) => p.id === child.id) + 1;
-  const committee = store.committees.find((c) => c.id === child.assignedCommitteeId);
-  const result = store.results.find((r) => r.participantId === child.id);
-  const sealed = !!result && store.sealApprovals.length > 0;
+  const committee = store.committees.find((c) => c.competitionId === child.competitionId && c.id === child.assignedCommitteeId);
+  const result = store.results.find((r) => r.competitionId === child.competitionId && r.participantId === child.id);
+  const sealed = !!result && ['sealed', 'published'].includes(result.status);
 
   const stage: Stage = result ? 'result' : child.status === 'in_session' ? 'in_committee' : child.status === 'in_queue' ? 'queued' : child.checkedInAt ? 'arrived' : 'registered';
 

@@ -63,28 +63,11 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
     setSubmitting(true);
     setSubmitError('');
     try{
-      let response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
+      const response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
         method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify({...form,...(needsScope?{memorizationScope:scope}:{}),guardianName,website:'',consents:{terms:consentAccepted,privacy:consentAccepted,guardian:guardianAccepted,audioRecording:policy.judging.requireAudioRecording?consentAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?consentAccepted:false}})
       });
-      if(response.status===404){
-        const errBody=await response.clone().json().catch(()=>({}));
-        if(errBody?.code==='COMPETITION_NOT_FOUND'){
-          try{
-            await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/publish`,{
-              method:'POST',
-              headers:{'content-type':'application/json'},
-              body:JSON.stringify({organizationId:competition.organizationId,competition})
-            });
-            response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
-              method:'POST',
-              headers:{'content-type':'application/json'},
-              body:JSON.stringify({...form,...(needsScope?{memorizationScope:scope}:{}),guardianName,website:'',consents:{terms:consentAccepted,privacy:consentAccepted,guardian:guardianAccepted,audioRecording:policy.judging.requireAudioRecording?consentAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?consentAccepted:false}})
-            });
-          }catch{/* ignore */}
-        }
-      }
       const body=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(String(body.code||`HTTP_${response.status}`));
       setSubmitted({...body.participant,journeyAccessToken:body.journeyAccessToken,guardianAccessToken:body.guardianAccessToken,journeyUrl:body.journeyUrl,guardianUrl:body.guardianUrl})
@@ -119,7 +102,7 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
   </div>
  </div>
 }
-const registrationError=(code:string,ar:boolean)=>{const key=code.split(':')[0];const labels:Record<string,[string,string]>={COMPETITION_NOT_FOUND:['لم نعثر على المسابقة.','Competition not found.'],COMPETITION_REGISTRATION_CLOSED:['التسجيل مغلق لهذه المسابقة.','Registration is closed for this competition.'],REGISTRATION_IDENTITY_REQUIRED:['رقم الهوية أو الجواز مطلوب وفق سياسة المسابقة.','ID or passport number is required by competition policy.'],REGISTRATION_CATEGORY_INVALID:['الفئة المختارة لم تعد متاحة. حدّث الصفحة واختر من جديد.','The selected category is no longer available.'],REGISTRATION_AGE_NOT_ELIGIBLE:['العمر لا يطابق شروط الفئة المختارة.','Age does not meet the selected category rules.'],REGISTRATION_GENDER_NOT_ELIGIBLE:['الفئة المختارة لا تطابق شروط المشاركة.','The selected category does not match the entry rules.'],REGISTRATION_CONSENT_REQUIRED:['يلزم قبول الشروط والخصوصية.','Terms and privacy consent are required.'],REGISTRATION_AUDIO_CONSENT_REQUIRED:['يلزم قبول تسجيل التلاوة صوتيًا لهذه المسابقة.','Audio recording consent is required for this competition.'],REGISTRATION_GUARDIAN_REQUIRED:['يلزم اسم وموافقة ولي الأمر.','Guardian name and consent are required.'],REGISTRATION_NOT_ELIGIBLE:['الطلب لا يطابق شروط الأهلية المنشورة.','The application does not meet published eligibility rules.'],REGISTRATION_POLICY_REQUIRES_REVIEW:['هذه الحالة تحتاج تسجيلًا بمراجعة الجهة.','This case requires organizer-assisted registration.'],RATE_LIMITED:['تكررت المحاولات سريعًا. انتظر قليلًا ثم حاول.','Too many attempts. Please wait and retry.'],PUBLIC_REGISTRATION_NOT_CONFIGURED:['خدمة التسجيل غير مهيأة على الخادم.','Registration service is not configured.'],FIRESTORE_PERMISSION_DENIED:['تعذر الحفظ بسبب صلاحيات الخادم. تواصل مع الجهة.','The server could not save due to a permission error.'],
+const registrationError=(code:string,ar:boolean)=>{const key=code.split(':')[0];const labels:Record<string,[string,string]>={COMPETITION_NOT_FOUND:['لم نعثر على المسابقة.','Competition not found.'],COMPETITION_REGISTRATION_CLOSED:['التسجيل مغلق لهذه المسابقة.','Registration is closed for this competition.'],REGISTRATION_IDENTITY_REQUIRED:['رقم الهوية أو الجواز مطلوب وفق سياسة المسابقة.','ID or passport number is required by competition policy.'],REGISTRATION_CATEGORY_INVALID:['الفئة المختارة لم تعد متاحة. حدّث الصفحة واختر من جديد.','The selected category is no longer available.'],REGISTRATION_AGE_NOT_ELIGIBLE:['العمر لا يطابق شروط الفئة المختارة.','Age does not meet the selected category rules.'],REGISTRATION_GENDER_NOT_ELIGIBLE:['الفئة المختارة لا تطابق شروط المشاركة.','The selected category does not match the entry rules.'],REGISTRATION_CONSENT_REQUIRED:['يلزم قبول الشروط والخصوصية.','Terms and privacy consent are required.'],REGISTRATION_AUDIO_CONSENT_REQUIRED:['يلزم قبول تسجيل التلاوة صوتيًا لهذه المسابقة.','Audio recording consent is required for this competition.'],REGISTRATION_GUARDIAN_REQUIRED:['يلزم اسم وموافقة ولي الأمر.','Guardian name and consent are required.'],REGISTRATION_NOT_ELIGIBLE:['الطلب لا يطابق شروط الأهلية المنشورة.','The application does not meet published eligibility rules.'],REGISTRATION_POLICY_REQUIRES_REVIEW:['هذه الحالة تحتاج تسجيلًا بمراجعة الجهة.','This case requires organizer-assisted registration.'],RATE_LIMITED:['تكررت المحاولات سريعًا. انتظر قليلًا ثم حاول.','Too many attempts. Please wait and retry.'],PUBLIC_REGISTRATION_NOT_CONFIGURED:['خدمة التسجيل غير مهيأة على الخادم.','Registration service is not configured.'],FIRESTORE_UNAVAILABLE:['تعذّر الوصول إلى سجل المسابقة الرسمي الآن. لم يُنشأ تسجيل ناقص أو مخفي؛ حاول مجددًا بعد قليل.','The official competition store is unavailable right now. No hidden or partial registration was created; please try again shortly.'],FIRESTORE_PERMISSION_DENIED:['تعذر الحفظ بسبب صلاحيات الخادم. تواصل مع الجهة.','The server could not save due to a permission error.'],
  /* هذه رفضاتٌ يستطيع مقدّم الطلب إصلاحها بنفسه، وكانت كلها تسقط على «حدث خطأ في الخادم» —
     فيُقال له إن العطل من المنصة وهو في الحقيقة حقلٌ ينقصه رقم أو تاريخ. */
  REGISTRATION_EMAIL_INVALID:['صيغة البريد الإلكتروني غير صحيحة.','The email address is not valid.'],

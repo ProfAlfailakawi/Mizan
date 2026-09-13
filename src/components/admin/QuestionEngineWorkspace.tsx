@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, UsersRound, Wand2,
-  Layers3, Sigma,
+  Layers3,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -22,7 +22,6 @@ import { QuranScopePicker, ScopeSummary } from '../scope/QuranScopePicker';
 import { ScopeHeatMap } from '../scope/ScopeHeatMap';
 import type { DemandAnalysis } from '../../lib/scope-demand';
 import { ScopeSimulationStudio, type WhatIfState } from '../scope/ScopeSimulationStudio';
-import { MathematicalBoundPanel } from '../scope/MathematicalBoundPanel';
 import { ModelFairnessStudio } from '../scope/ModelFairnessStudio';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -42,7 +41,7 @@ import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-c
  * والوضع البسيط يكفي مسابقة مدرسة في دقائق؛ والمتقدّم لمن يحتاج مقاطع ومناطق وقواعد.
  */
 
-type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'bound' | 'models' | 'readiness';
+type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -50,7 +49,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
   const ar = store.language === 'ar';
   const policy = getCompetitionPolicy(store.competition);
   const [tab, setTab] = useState<Tab>('scope');
-  const [advanced, setAdvanced] = useState(false);
   const [selectedId, setSelectedId] = useState(store.competition.categories[0]?.id || '');
   const category = store.competition.categories.find(c => c.id === selectedId) || store.competition.categories[0];
 
@@ -61,7 +59,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['policy', Settings2, ar ? 'سياسة الأسئلة' : 'Question policy'],
     ['demand', Flame, ar ? 'الازدحام' : 'Demand'],
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
-    ['bound', Sigma, ar ? 'الحدّ الرياضي' : 'Mathematical bound'],
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
   ];
@@ -78,10 +75,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
               : 'Name the category anything. Mizan infers nothing from the name; it works on the real Quranic range and its rules.'}
           </p>
         </div>
-        <label className="inline-flex items-center gap-2 rounded-full border border-[#dcdad2] bg-white px-3 py-2 text-[11px] font-black text-[#5b6460]">
-          <input type="checkbox" checked={advanced} onChange={e => setAdvanced(e.target.checked)} className="h-4 w-4 accent-[#214C40]" />
-          {ar ? 'الوضع المتقدم' : 'Advanced mode'}
-        </label>
       </header>
 
       {store.competition.categories.length === 0 ? (
@@ -100,13 +93,12 @@ export const QuestionEngineWorkspace: React.FC = () => {
             ))}
           </div>
           <div className="mizan-surface p-5 sm:p-7">
-            {tab === 'scope' && <ScopeTab store={store} ar={ar} category={category} advanced={advanced} />}
-            {tab === 'selection' && <SelectionTab store={store} ar={ar} category={category} advanced={advanced} />}
-            {tab === 'distribution' && <DistributionTab store={store} ar={ar} category={category} advanced={advanced} />}
-            {tab === 'policy' && <PolicyTab store={store} ar={ar} category={category} advanced={advanced} />}
+            {tab === 'scope' && <ScopeTab store={store} ar={ar} category={category} />}
+            {tab === 'selection' && <SelectionTab store={store} ar={ar} category={category} />}
+            {tab === 'distribution' && <DistributionTab store={store} ar={ar} category={category} />}
+            {tab === 'policy' && <PolicyTab store={store} ar={ar} category={category} />}
             {tab === 'demand' && <DemandTab store={store} ar={ar} />}
             {tab === 'simulation' && <SimulationTab store={store} ar={ar} />}
-            {tab === 'bound' && <MathematicalBoundTab store={store} ar={ar} />}
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
           </div>
@@ -133,7 +125,7 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
           </div>
           <p className="mt-1.5 truncate text-[11px] font-bold text-[#5b6460]">{needsScope ? (ar ? 'يحتاج تحديد نطاق' : 'Needs a range') : describeScope(scope, ar)}</p>
           <p className="mt-1 text-[10px] text-[#696f6b]">
-            {ar ? `${resolveQuestionCount(category, policy)} أسئلة · ${store.participants.filter(p => p.categoryId === category.id).length} متسابقًا` : `${resolveQuestionCount(category, policy)} questions · ${store.participants.filter(p => p.categoryId === category.id).length} participants`}
+            {ar ? `${resolveQuestionCount(category, policy)} أسئلة · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} متسابقًا` : `${resolveQuestionCount(category, policy)} questions · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} participants`}
           </p>
         </button>
       );
@@ -149,7 +141,7 @@ const SectionHead: React.FC<{ ar: boolean; kicker: string; title: string; hint: 
   </div>
 );
 
-const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category; advanced: boolean }> = ({ store, ar, category, advanced }) => {
+const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
   const [draft, setDraft] = useState<QuranScope | null>(null);
   const [saved, setSaved] = useState(false);
   const migration = useMemo(() => store.categoryScopeMigrationPlan().find(x => x.categoryId === category?.id), [store, category?.id]);
@@ -181,7 +173,7 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category; advan
         </div>
       )}
 
-      <QuranScopePicker value={scope} onChange={setDraft} arabic={ar} initialAdvanced={advanced} idPrefix={`cat-${category.id}`} />
+      <QuranScopePicker value={scope} onChange={setDraft} arabic={ar} idPrefix={`cat-${category.id}`} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efeee8] pt-4">
         <p className="text-[11px] text-[#696f6b]">
@@ -197,13 +189,13 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category; advan
   );
 };
 
-const SelectionTab: React.FC<{ store: Store; ar: boolean; category?: Category; advanced: boolean }> = ({ store, ar, category, advanced }) => {
+const SelectionTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
   const [rule, setRule] = useState<ParticipantScopeSelectionRule | null>(null);
   if (!category) return null;
   const current = categorySelectionRule(category);
   const draft = rule ?? current;
   const patch = (next: Partial<ParticipantScopeSelectionRule>) => setRule({ ...draft, ...next });
-  const members = store.participants.filter(p => p.categoryId === category.id && !['rejected', 'draft'].includes(p.status));
+  const members = store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id && !['rejected', 'draft'].includes(p.status));
 
   return (
     <div className="space-y-5">
@@ -243,12 +235,10 @@ const SelectionTab: React.FC<{ store: Store; ar: boolean; category?: Category; a
             <Toggle ar={ar} checked={!!draft.mustBeConsecutive} onChange={v => patch({ mustBeConsecutive: v })} label={ar ? 'يجب أن يكون النطاق متصلًا' : 'Range must be continuous'} />
             <Toggle ar={ar} checked={draft.approval === 'committee'} onChange={v => patch({ approval: v ? 'committee' : 'auto' })} label={ar ? 'يحتاج اعتماد اللجنة' : 'Requires committee approval'} />
           </div>
-          {advanced && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <NumberBox ar={ar} label={ar ? 'أقصى عدد مقاطع منفصلة' : 'Max separate segments'} value={draft.maxSegments ?? 0} min={0} max={20} onChange={v => patch({ maxSegments: v || undefined })} hint={ar ? 'صفر = بلا حد' : '0 = unlimited'} />
-              <NumberBox ar={ar} label={ar ? 'أقل عدد آيات في النطاق' : 'Minimum ayat in range'} value={draft.coverage?.minAyah ?? 0} min={0} max={6236} step={50} onChange={v => patch({ coverage: { ...draft.coverage, minAyah: v || undefined } })} />
-            </div>
-          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <NumberBox ar={ar} label={ar ? 'أقصى عدد مقاطع منفصلة' : 'Max separate segments'} value={draft.maxSegments ?? 0} min={0} max={20} onChange={v => patch({ maxSegments: v || undefined })} hint={ar ? 'صفر = بلا حد' : '0 = unlimited'} />
+            <NumberBox ar={ar} label={ar ? 'أقل عدد آيات في النطاق' : 'Minimum ayat in range'} value={draft.coverage?.minAyah ?? 0} min={0} max={6236} step={50} onChange={v => patch({ coverage: { ...draft.coverage, minAyah: v || undefined } })} />
+          </div>
           <p className="rounded-xl bg-[#f1efe9] px-3 py-2 text-[11px] leading-6 text-[#5b6460]">
             {ar
               ? `سيُطلب من المتسابق اختيار ${draft.exactUnits ? `${draft.exactUnits} ${unitLabelArabic(draft.selectionUnit, draft.exactUnits)}` : draft.minUnits || draft.maxUnits ? `بين ${draft.minUnits || 1} و${draft.maxUnits || '—'} ${unitLabelArabic(draft.selectionUnit, draft.maxUnits || 3)}` : unitLabelArabic(draft.selectionUnit, 3)} من داخل ${describeScope(categoryScopeOf(category), true)}.`
@@ -362,7 +352,7 @@ const scopeStatusLabel = (status: string, ar: boolean) => {
   return ar ? row[0] : row[1];
 };
 
-const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category; advanced: boolean }> = ({ store, ar, category, advanced }) => {
+const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
   const policy = getCompetitionPolicy(store.competition);
   const [plan, setPlan] = useState<QuestionDistributionPlan | null>(null);
   if (!category) return null;
@@ -417,11 +407,9 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                 onClick={() => setPlan({ ...draft, zones: autoBalancedZones(scope, draft.zones.length || questionCount) })}>
                 {ar ? 'اقترح قسمة متوازنة' : 'Suggest a balanced split'}
               </Button>
-              {advanced && (
-                <Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: [...draft.zones, emptyZone(draft.zones.length + 1)] })}>
-                  {ar ? 'منطقة جديدة' : 'Add zone'}
-                </Button>
-              )}
+              <Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: [...draft.zones, emptyZone(draft.zones.length + 1)] })}>
+                {ar ? 'منطقة جديدة' : 'Add zone'}
+              </Button>
             </div>
           </div>
 
@@ -434,16 +422,14 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                     className="min-w-0 flex-1 border-0 bg-transparent text-sm font-black text-[#24302b] outline-none" />
                   <div className="flex items-center gap-2">
                     <NumberBox ar={ar} compact label={ar ? 'أسئلة' : 'Questions'} value={zone.requiredQuestionCount} min={0} max={20} onChange={v => patchZone(index, { requiredQuestionCount: v })} />
-                    {advanced && <Button size="sm" shape="square" variant="ghost" aria-label={ar ? 'حذف المنطقة' : 'Remove zone'} icon={<Trash2 className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: draft.zones.filter((_, i) => i !== index) })} />}
+                    <Button size="sm" shape="square" variant="ghost" aria-label={ar ? 'حذف المنطقة' : 'Remove zone'} icon={<Trash2 className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: draft.zones.filter((_, i) => i !== index) })} />
                   </div>
                 </div>
                 <p className="mt-1 text-[11px] font-bold text-[#5b6460]">{describeZone(zone, ar)}</p>
-                {advanced && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-[10px] font-black text-[#2F6555]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
-                    <div className="mt-3"><QuranScopePicker value={zone.scope} onChange={next => patchZone(index, { scope: next })} arabic={ar} parentScope={scope} idPrefix={`zone-${zone.id}`} /></div>
-                  </details>
-                )}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[10px] font-black text-[#2F6555]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
+                  <div className="mt-3"><QuranScopePicker value={zone.scope} onChange={next => patchZone(index, { scope: next })} arabic={ar} parentScope={scope} idPrefix={`zone-${zone.id}`} /></div>
+                </details>
               </li>
             ))}
           </ul>
@@ -471,7 +457,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
   );
 };
 
-const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category; advanced: boolean }> = ({ store, ar, category, advanced }) => {
+const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
   const policy = getCompetitionPolicy(store.competition);
   const [draft, setDraft] = useState<RepeatPolicy | null>(null);
   if (!category) return null;
@@ -503,9 +489,9 @@ const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category; adva
         <Toggle ar={ar} checked={value.noRepeatWithinParticipant} onChange={v => patch({ noRepeatWithinParticipant: v })}
           label={ar ? 'لا يُعاد الموضع للمتسابق نفسه أبدًا' : 'Never return a locus to the same participant'} />
         <Toggle ar={ar} checked={value.roomAware} onChange={v => patch({ roomAware: v })} label={ar ? 'تجنّب إعادة الاستعمال في القاعة نفسها' : 'Avoid reuse inside the same hall'} />
-        {advanced && <Toggle ar={ar} checked={value.dayAware} onChange={v => patch({ dayAware: v })} label={ar ? 'تجنّب إعادة الاستعمال في اليوم نفسه' : 'Avoid reuse on the same day'} />}
-        {advanced && <Toggle ar={ar} checked={!value.allowUnreviewedDifficulty} onChange={v => patch({ allowUnreviewedDifficulty: !v })}
-          label={ar ? 'اشترط مراجعة علمية لتقدير صعوبة السؤال' : 'Require reviewed difficulty ratings'} />}
+        <Toggle ar={ar} checked={value.dayAware} onChange={v => patch({ dayAware: v })} label={ar ? 'تجنّب إعادة الاستعمال في اليوم نفسه' : 'Avoid reuse on the same day'} />
+        <Toggle ar={ar} checked={!value.allowUnreviewedDifficulty} onChange={v => patch({ allowUnreviewedDifficulty: !v })}
+          label={ar ? 'اشترط مراجعة علمية لتقدير صعوبة السؤال' : 'Require reviewed difficulty ratings'} />
       </div>
 
       <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
@@ -556,7 +542,7 @@ const SimulationTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) =
   const [error, setError] = useState<string | null>(null);
   const history = store.scopeSimulations as ScopeSimulationRecord[];
   const defaults: WhatIfState = {
-    participantCount: Math.max(1, store.participants.filter(p => !['rejected', 'draft'].includes(p.status)).length),
+    participantCount: Math.max(1, store.participants.filter(p => p.competitionId === store.competition.id && !['rejected', 'draft'].includes(p.status)).length),
     questionCount: resolveQuestionCount(store.competition.categories[0], policy),
     poolMultiplier: 1,
     repeatMode: categoryRepeatPolicy(store.competition.categories[0], policy).mode,
@@ -575,30 +561,6 @@ const SimulationTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) =
     })();
   };
   return <ScopeSimulationStudio arabic={ar} latest={history[0]} history={history} defaults={defaults} busy={busy} error={error} onRun={run} />;
-};
-
-/*
- * تبويب الحدّ الرياضي.
- *
- * موضعه هنا لا في شاشةٍ جديدة: هو امتدادٌ لمنظومة العدالة القائمة (النطاق ← الازدحام ←
- * المحاكاة ← الحدّ الرياضي ← النماذج ← الجاهزية)، لا لوحةٌ ثانية توازيها. والحلّال يُحمَّل
- * عند الضغط لا عند فتح الشاشة، فلا يدخل حزمةَ ما يعمل يوم المسابقة.
- */
-const MathematicalBoundTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) => {
-  const [busy, setBusy] = useState(false);
-  const [outcome, setOutcome] = useState<Awaited<ReturnType<Store['runFairnessOracle']>> | null>(null);
-  const run = (participantCount?: number) => {
-    setBusy(true);
-    void (async () => {
-      try {
-        setOutcome(await store.runFairnessOracle({ participantCount }));
-      } catch (error) {
-        console.error('MIZAN fairness oracle failed:', error);
-        setOutcome({ ok: false as const, reason: 'ORACLE_FAILED' });
-      } finally { setBusy(false); }
-    })();
-  };
-  return <MathematicalBoundPanel ar={ar} busy={busy} outcome={outcome} onRun={run} />;
 };
 
 const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab) => void }> = ({ store, ar, onNavigate }) => {

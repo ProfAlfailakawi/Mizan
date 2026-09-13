@@ -34,8 +34,6 @@ export interface QuranScopePickerProps {
   readOnly?: boolean;
   /** حرارة التسجيل لكل جزء — تُعرض للمنظّم لا للمتسابق. */
   heat?: ScopeHeat[];
-  /** فتح الوضع المتقدم مباشرة. */
-  initialAdvanced?: boolean;
   idPrefix?: string;
 }
 
@@ -84,8 +82,8 @@ const cellTone = (selected: boolean, allowed: boolean) =>
     : selected ? 'border-[#214C40] bg-[#214C40] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18)]'
       : 'border-[#dcdad2] bg-white text-[#39423d] hover:border-[#2F6555] hover:bg-[#f2f7f4]';
 
-export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onChange, arabic, parentScope, disabled, readOnly, heat, initialAdvanced, idPrefix = 'scope' }) => {
-  const [advanced, setAdvanced] = useState(!!initialAdvanced);
+export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onChange, arabic, parentScope, disabled, readOnly, heat, idPrefix = 'scope' }) => {
+  const [advanced, setAdvanced] = useState(false);
   const [rangeAnchor, setRangeAnchor] = useState<number | null>(null);
   const [surahQuery, setSurahQuery] = useState('');
   const [surahOpen, setSurahOpen] = useState(false);
@@ -104,8 +102,6 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
   const guardMetrics = useMemo(() => juzGuard ? scopeMetrics(juzGuard) : null, [juzGuard]);
   const guardSurahs = useMemo(() => guardMetrics ? new Set(guardMetrics.surahs) : null, [guardMetrics]);
 
-  // initialAdvanced كان يُقرأ مرة واحدة فقط؛ لذلك زر «الوضع المتقدم» الخارجي لم يكن يفعل شيئًا بعد التحميل.
-  useEffect(() => setAdvanced(!!initialAdvanced), [initialAdvanced]);
   // عند الانتقال إلى فئة أخرى لا تحمل قيود الجزء القديم معها.
   useEffect(() => { setJuzGuard(exactJuzGuard(normalizeScope(value))); setRangeError(''); }, [idPrefix]);
 
@@ -256,7 +252,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
         )}
       </div>
 
-      {/* الوضع المتقدم: سور ومقاطع بحدود آيات */}
+      {/* التفاصيل الدقيقة: سور ومقاطع بحدود آيات */}
       {advanced && !readOnly && (
         <div className="space-y-4 rounded-2xl border border-[#e4e2da] bg-[#fbfaf7] p-4">
           {juzGuard && guardMetrics && (
@@ -303,7 +299,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
             <div className="mt-2 space-y-2">
               {scope.segments.length === 0 && <p className="rounded-xl bg-[#f1efe9] p-3 text-[11px] text-[#6a706c]">{arabic ? 'لا مقاطع بعد. اختر أجزاء أو سورًا أعلاه، أو أضف مقطعًا بحدود آيات دقيقة.' : 'No segments yet. Pick juz or surahs above, or add a precise ayah segment.'}</p>}
               {scope.segments.map((segment, index) => (
-                <div key={`${segment.start.surah}-${segment.start.ayah}-${index}`} className="rounded-xl border border-[#e4e2da] bg-white p-3">
+                <div key={`${idPrefix}-segment-${index}`} className="rounded-xl border border-[#e4e2da] bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-black text-[#39423d]">{describeSegment(segment, arabic)}</span>
                     <Button size="sm" shape="square" variant="ghost" aria-label={arabic ? 'حذف المقطع' : 'Remove segment'} onClick={() => removeSegment(index)} icon={<Trash2 className="w-4 h-4" />} />
@@ -337,12 +333,17 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
       {metrics.assurance === 'DERIVED_PROPORTIONAL' && (
         <p className="flex items-start gap-2 text-[10px] leading-5 text-[#696f6b]">
           <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {arabic ? 'حدود الأحزاب والأرباع والصفحات مشتقة تناسبيًا من جدول الأجزاء، ويمكن ضبطها على آية بعينها في الوضع المتقدم.' : 'Hizb, rub and page bounds are derived proportionally; adjust them to an exact ayah in the advanced view.'}
+          {arabic ? 'حدود الأحزاب والأرباع والصفحات مشتقة تناسبيًا من جدول الأجزاء، ويمكن ضبطها على آية بعينها من «سور ومقاطع وآيات».' : 'Hizb, rub and page bounds are derived proportionally; adjust them to an exact ayah from “Surahs, segments and ayat”.'}
         </p>
       )}
     </div>
   );
 };
+
+const normalizeNumericDraft = (raw: string) => raw
+  .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+  .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+  .replace(/[^0-9]/g, '');
 
 const LocusField: React.FC<{
   label: string; kind: 'surah' | 'ayah'; value: number; max?: number; arabic: boolean;
@@ -355,12 +356,17 @@ const LocusField: React.FC<{
   const floor = Math.min(...ranges.map(([from]) => from));
   const rangeCeiling = Math.max(...ranges.map(([, to]) => to));
   const allowedText = ranges.map(([from, to]) => from === to ? `${from}` : `${from}–${to}`).join('، ');
-  const acceptAyah = (attempted: number) => {
-    if (!Number.isFinite(attempted)) return;
-    const canonical = attempted >= 1 && attempted <= ceiling;
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commitAyah = () => {
+    const clean = normalizeNumericDraft(draft);
+    if (!clean) { setDraft(String(value)); return; }
+    const attempted = Number(clean);
+    const canonical = Number.isInteger(attempted) && attempted >= 1 && attempted <= ceiling;
     const inSelectedRange = ranges.some(([from, to]) => attempted >= from && attempted <= to);
-    if (!canonical || !inSelectedRange) { onInvalid?.(attempted); return; }
-    onChange(attempted);
+    if (!canonical || !inSelectedRange) { onInvalid?.(attempted); setDraft(String(value)); return; }
+    setDraft(String(attempted));
+    if (attempted !== value) onChange(attempted);
   };
   return (
     <label className="block min-w-0">
@@ -373,8 +379,12 @@ const LocusField: React.FC<{
         </select>
       ) : (
         <>
-          <input type="number" inputMode="numeric" min={floor} max={rangeCeiling} value={value}
-            onChange={e => acceptAyah(Number(e.target.value))}
+          <input type="text" inputMode="numeric" pattern="[0-9]*" value={draft}
+            onFocus={e => e.currentTarget.select()}
+            onChange={e => setDraft(normalizeNumericDraft(e.target.value))}
+            onBlur={commitAyah}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitAyah(); e.currentTarget.blur(); } }}
+            aria-valuemin={floor} aria-valuemax={rangeCeiling}
             className="mizan-input mt-1 text-[11px] tabular-nums" />
           {ayahRanges && <span className="mt-1 block text-[8px] font-bold leading-4 text-[#696f6b]">{arabic ? `المسموح: ${allowedText}` : `Allowed: ${allowedText}`}</span>}
         </>

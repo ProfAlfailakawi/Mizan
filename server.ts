@@ -147,12 +147,15 @@ async function startServer() {
   const publicDataDir=process.env.MIZAN_PUBLIC_DATA_DIR||path.resolve('.mizan-data/public-data');
   try{fs.mkdirSync(publicCompDir,{recursive:true,mode:0o700})}catch{/* ignore */}
   try{fs.mkdirSync(publicDataDir,{recursive:true,mode:0o700})}catch{/* ignore */}
-  try{
-    const seedFile=path.join(publicCompDir,`${SEED_COMPETITION.id}.json`);
-    if(!fs.existsSync(seedFile)){
-      fs.writeFileSync(seedFile,JSON.stringify({organizationId:SEED_COMPETITION.organizationId,competition:{...SEED_COMPETITION,status:'registration_open'},updatedAt:new Date().toISOString()},null,2),'utf8');
-    }
-  }catch{/* ignore */}
+  const demoSeedEnabled=!isProd&&process.env.MIZAN_ENABLE_DEMO_SEED!=='false';
+  if(demoSeedEnabled){
+    try{
+      const seedFile=path.join(publicCompDir,`${SEED_COMPETITION.id}.json`);
+      if(!fs.existsSync(seedFile)){
+        fs.writeFileSync(seedFile,JSON.stringify({organizationId:SEED_COMPETITION.organizationId,competition:{...SEED_COMPETITION,status:'registration_open'},updatedAt:new Date().toISOString()},null,2),'utf8');
+      }
+    }catch{/* ignore */}
+  }
 
   const getLatestOrActiveCompetition=async():Promise<any>=>{
     try{
@@ -179,7 +182,7 @@ async function startServer() {
     }catch(err){
       console.warn('[public-competitions] Failed to get latest from disk:',err);
     }
-    return {...SEED_COMPETITION,status:'registration_open'};
+    return demoSeedEnabled?{...SEED_COMPETITION,status:'registration_open'}:null;
   };
 
   const getPublicCompetitionRecord=async(id:string):Promise<any>=>{
@@ -207,22 +210,33 @@ async function startServer() {
     }catch(err){
       console.warn(`[public-competitions] Disk read failed for ${cleanId}:`,err);
     }
-    if(cleanId===SEED_COMPETITION.id||cleanId==='comp-dubai-2027'){
+    if(demoSeedEnabled&&(cleanId===SEED_COMPETITION.id||cleanId==='comp-dubai-2027')){
       return {...SEED_COMPETITION,status:'registration_open'};
     }
     return null;
   };
 
   const publicRegistration=new PublicRegistrationService({
-    getCompetition:async(id)=>getPublicCompetitionRecord(id),
-    create:async(documents)=>{
-      if(firestoreRepository){
-        try{
-          await firestoreRepository.createAtomically(documents);
-        }catch(err){
-          console.warn('[public-registration] firestore createAtomically failed, saving locally:',err);
-        }
+    /* التسجيل عملية كتابة رسمية، لذلك لا نقبل نسخة القرص كسلطة للفئات. شاشة الطالب
+       تسجّل فقط مقابل الإسقاط المنشور فعليًا في Firestore؛ إذا كانت السحابة غير متاحة
+       نرفض بوضوح بدل قبول فئة قديمة أو إنشاء تسجيل شبح لا يظهر في «المشاركون». */
+    getCompetition:async(id)=>{
+      const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
+      if(!cleanId||['latest','current','default','comp-pending-setup'].includes(cleanId))throw new Error('COMPETITION_ID_REQUIRED');
+      if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
+      try{
+        const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
+        const comp=row?.competition;
+        return comp&&typeof comp==='object'?comp:null;
+      }catch(err){
+        console.error(`[public-registration] authoritative competition read failed for ${cleanId}:`,err);
+        throw new Error('FIRESTORE_UNAVAILABLE');
       }
+    },
+    create:async(documents)=>{
+      /* لا نجاح محلي وهمي: سجل الإدارة في Firestore شرط لإتمام التسجيل. */
+      if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
+      await firestoreRepository.createAtomically(documents);
       try{
         for(const doc of documents){
           const safeKey=crypto.createHash('sha256').update(doc.path).digest('hex');
@@ -641,11 +655,13 @@ async function startServer() {
   const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
   app.get('/api/public/competition',async(req,res)=>{
     const comp=await getLatestOrActiveCompetition();
+    if(!comp)return res.status(404).json({code:'COMPETITION_NOT_FOUND'});
     res.setHeader('Cache-Control','public, max-age=60');
     return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
   });
   app.get('/api/public/competitions',async(req,res)=>{
     const comp=await getLatestOrActiveCompetition();
+    if(!comp)return res.status(404).json({code:'COMPETITION_NOT_FOUND'});
     res.setHeader('Cache-Control','public, max-age=60');
     return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
   });
@@ -658,7 +674,7 @@ async function startServer() {
     res.setHeader('Cache-Control','public, max-age=60');
     return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
   });
-  app.post('/api/public/competitions/:competitionId/publish',publicRegistrationRateLimit,async(req,res)=>{
+  app.post('/api/public/competitions/:competitionId/publish',publicRegistrationRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     const comp=req.body?.competition;
     if(!comp||typeof comp!=='object'||String(comp.id||'').trim().slice(0,120)!==competitionId){

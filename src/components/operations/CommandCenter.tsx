@@ -27,7 +27,13 @@ const ALERT_KIND:Record<string,{ar:string;en:string}>={
 };
 
 export const CommandCenter: React.FC = () => {
- const s=useAppStore(); const {language,participants,committees,incidents,isOffline,reviewCases,notifications,devices,runSimulation}=s; const ar=language==='ar';
+ const s=useAppStore(); const {language,participants:allParticipants,committees:allCommittees,incidents:allIncidents,isOffline,reviewCases:allReviewCases,notifications:allNotifications,devices:allDevices,runSimulation,competition}=s; const ar=language==='ar';
+ const participants=useMemo(()=>allParticipants.filter(p=>p.competitionId===competition.id),[allParticipants,competition.id]);
+ const committees=useMemo(()=>allCommittees.filter(c=>c.competitionId===competition.id),[allCommittees,competition.id]);
+ const incidents=useMemo(()=>allIncidents.filter(i=>i.competitionId===competition.id),[allIncidents,competition.id]);
+ const reviewCases=useMemo(()=>allReviewCases.filter(r=>r.competitionId===competition.id),[allReviewCases,competition.id]);
+ const notifications=useMemo(()=>allNotifications.filter(n=>n.competitionId===competition.id),[allNotifications,competition.id]);
+ const devices=useMemo(()=>allDevices.filter(d=>d.competitionId===competition.id),[allDevices,competition.id]);
  const [expanded,setExpanded]=useState(false); const [opsTab,setOpsTab]=useState<'pulse'|'panels'|'insight'>('pulse');
  const opsTabAnchor=useTabAnchor(opsTab); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
  const [corridor,setCorridor]=useState<QuestionCustodyCorridorSnapshot|null>(null);
@@ -35,7 +41,7 @@ export const CommandCenter: React.FC = () => {
  const waiting=participants.filter(p=>p.status==='in_queue').length; const testing=participants.filter(p=>p.status==='in_session').length; const done=participants.filter(p=>p.status==='tested'||p.status==='certified').length;
  const sim=useMemo(()=>runSimulation(committees.length,30),[committees.length,participants.length]);
  const alerts=[...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,title:i.title,kind:'incident'})),...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,title:d.name,kind:'device'}))];
- const elastic=s.elasticityRecommendations[0];
+ const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);
  /* 1450px تترك صفوف «عنوان … زر» ممتدّةً على عرض الشاشة، فيسافر النظر ألف بكسل بين شيئين
    مرتبطين. العرض هنا يطابق بقيّة البوابات (1250) فتبقى العلاقة بين الطرفين مقروءة. */
  return <div className="max-w-[1250px] mx-auto px-4 sm:px-6 py-7 space-y-4">
