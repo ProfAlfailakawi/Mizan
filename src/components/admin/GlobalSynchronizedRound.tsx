@@ -28,7 +28,7 @@ export const GlobalSynchronizedRound: React.FC = () => {
         <span className="mx-auto w-14 h-14 rounded-2xl bg-white/10 grid place-items-center text-[#bfe0d3]"><CircleDot className="w-6 h-6"/></span>
         <div className="text-[10px] font-black tracking-[.2em] text-[#a9c6ba] mt-5">{ar?'الجولة المتزامنة':'SYNCHRONIZED ROUND'}</div>
         <h2 className="text-2xl font-black mt-2">{ar?'لا توجد قاعات أو لجان تشغيلية بعد':'No operational halls or panels yet'}</h2>
-        <p className="text-xs text-white/55 leading-6 mt-3">{ar?'عند إنشاء اللجان وتوزيع المتسابقين ستظهر هنا الحالة الحقيقية فقط. لن يعرض ميزان مدنًا أو أرقامًا أو تقدمًا تجريبيًا.':'Once panels and participants are actually assigned, their real state appears here. MIZAN never invents demo cities, counts or progress.'}</p>
+        <p className="text-xs text-white/55 leading-6 mt-3">{ar?'عند إنشاء اللجان وتوزيع المتسابقين ستظهر هنا الحالة الحقيقية فقط. لن يعرض ميزان مدنًا أو أرقامًا أو تقدمًا تجريبيًا.':'Once panels and participants are actually assigned, their real state appears here. MIZAN never invents cities, counts, or progress.'}</p>
       </div>
     </section>;
   }
@@ -77,7 +77,7 @@ export const GlobalSynchronizedRound: React.FC = () => {
         </div>)}
       </div>
 
-      <div className="mt-5 flex items-start gap-2 text-[11px] text-white/40 leading-6"><ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#a9c6ba]"/>{ar?'هذه الشاشة لا تحتوي وضع عرض أو مولّد محاكاة؛ أي رقم يظهر فيها له سجل فعلي في المسابقة الحالية.':'This screen contains no demo generator or simulation mode; every displayed number has a real record in the active competition.'}</div>
+      <div className="mt-5 flex items-start gap-2 text-[11px] text-white/40 leading-6"><ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#a9c6ba]"/>{ar?'هذه الشاشة لا تحتوي وضع عرض أو مولّد محاكاة؛ أي رقم يظهر فيها له سجل فعلي في المسابقة الحالية.':'This screen contains no synthetic-data generator; every displayed number has a real record in the active competition.'}</div>
     </div>
   </section>;
 };

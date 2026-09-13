@@ -184,8 +184,8 @@ export const OrganizationHome: React.FC = () => {
 export const DelegationPortal: React.FC = () => {
  const store=useAppStore(); const {language,participants,competition,registerParticipant,currentUser,travelRecords,federationAttestations}=store; const ar=isAr(language);
  const [q,setQ]=useState(''); const [adding,setAdding]=useState(false); const [name,setName]=useState(''); const [email,setEmail]=useState(''); const [selectedId,setSelectedId]=useState(''); const [passportMsg,setPassportMsg]=useState('');
- const demoMode=import.meta.env.VITE_REQUIRE_AUTH!=='true'; const delegationId='delegation-current';
- const scoped=participants.filter(p=>p.delegationId===delegationId||(demoMode&&!p.delegationId));
+ const delegationId='delegation-current';
+ const scoped=participants.filter(p=>p.competitionId===competition.id&&p.delegationId===delegationId);
  const list=scoped.filter(p=>`${p.fullName} ${p.fullNameArabic} ${p.code}`.toLowerCase().includes(q.toLowerCase())).slice(0,12);
  const selected=scoped.find(p=>p.id===selectedId)||list[0]; const travel=selected?travelRecords.find(r=>r.participantId===selected.id):undefined; const claims=selected?federationAttestations.filter(a=>a.subjectRef===selected.id&&a.status==='valid'):[];
  const addNominee=()=>{ if(!name.trim()||!email.trim()) return; const c=competition.categories[0]; registerParticipant({competitionId:competition.id,organizationId:competition.organizationId,fullName:name,fullNameArabic:name,email,phone:'',country:'',nationality:'',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male',categoryId:c?.id||'',riwaya:c?.riwaya||'',delegationId,institution:'',specialNeeds:false,documents:[]} as any); setName('');setEmail('');setAdding(false); };

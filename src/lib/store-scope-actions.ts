@@ -19,7 +19,6 @@ import type {
 } from '../types';
 import type { AppStoreState } from './store-state';
 import { getCompetitionPolicy } from './competition-config';
-import { isLaunchDeployment } from './launch-state';
 import { hashCanonical } from './trust-protocol';
 import { buildExposureProfiles } from './exposure-risk';
 import { applyQuarantine, claimReserveModel, generateModelBatch, recoverFromQuarantine } from './model-batch';
@@ -363,7 +362,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
         .map(q => ({ locusCount: q.locusKeys.length, canContinue: q.canContinue, summaryAr: q.summaryArabic, summaryEn: q.summaryEnglish })),
       reserveModelCount: S().questionModels.filter(m => !m.participantId && m.status === 'draft' && m.competitionId === S().competition.id).length,
       escrowRequired: policy.questions.secureReveal?.requireParticipantPresence !== false,
-      escrowReady: !isLaunchDeployment() || (escrowReadyOverride ?? S().activeSession.secureQuestionMode === 'SERVER'),
+      escrowReady: escrowReadyOverride ?? S().activeSession.secureQuestionMode === 'SERVER',
       strictDifficultyRequired: S().competition.categories.some(c => c.requireReviewedDifficulty),
     });
   };

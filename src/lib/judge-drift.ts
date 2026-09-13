@@ -83,35 +83,6 @@ export function computeJudgeDrift(events: JudgeEventLike[], options: JudgeDriftO
   };
 }
 
-/**
- * DEMO ONLY — deterministic intraday penalty timeline per judge.
- * Real deployments feed computeAllJudgeDrift from the actual judging Flight Recorder. For
- * local review there is no full day of events, so we synthesize a stable timeline from each
- * judge's id and readiness. It is a projection to exercise the monitor, never a record of any
- * real judging. One judge is given a late-day harshening so the Head Judge can see a live alert.
- */
-export function deriveDemoJudgeEvents(
-  judges: { id: string; userId?: string; calibrationScore?: number; isReady?: boolean }[],
-  eventsPerJudge = 16,
-): JudgeEventLike[] {
-  const out: JudgeEventLike[] = [];
-  const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; };
-  judges.forEach((j, jIdx) => {
-    const id = j.userId || j.id;
-    const base = 0.35 + hash(id) * 0.4;               // this judge's steady morning severity
-    const wobble = 0.12 + hash(`${id}:w`) * 0.1;      // their natural variability
-    const driftsLate = jIdx % 3 === 1;                 // ~1/3 of judges tire late in the day
-    for (let i = 0; i < eventsPerJudge; i++) {
-      const t = i / (eventsPerJudge - 1);              // 0..1 across the day
-      const noise = (hash(`${id}:${i}`) - 0.5) * 2 * wobble;
-      const afternoon = driftsLate && t > 0.5 ? (t - 0.5) * 1.8 : 0; // harsher after midday (fatigue)
-      const penalty = Math.max(0, Math.round((base + noise + afternoon) * 4) / 4);
-      out.push({ judgeId: id, relativeSeconds: Math.round(t * 6 * 3600), penalty });
-    }
-  });
-  return out;
-}
-
 /** Group raw events by judge and compute a drift signal per judge that has enough activity. */
 export function computeAllJudgeDrift(events: JudgeEventLike[], options: JudgeDriftOptions = {}): JudgeDriftSignal[] {
   const byJudge = new Map<string, JudgeEventLike[]>();

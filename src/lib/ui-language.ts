@@ -125,7 +125,7 @@ export function capabilityLabel(value:AICapability,ar:boolean){return ar?(AR_CAP
 /*
  * Country values are stored bilingually in one string, e.g. "Jordan (الأردن)". Rendering
  * them raw shows the Latin name inside an Arabic surface. Split by locale, and degrade
- * gracefully for values with no parenthetical (e.g. "Demo").
+ * gracefully for values with no parenthetical (for example a single-word value).
  */
 export function localizedCountry(raw: string | undefined, ar: boolean): string {
   if (!raw) return '';
@@ -152,7 +152,7 @@ export function arCount(
 
 /*
  * Server clients throw coded errors (e.g. "IDENTITY_REQUIRED"). Several consoles printed
- * the raw code to the screen. In demo mode with no backend, the common ones are expected
+ * the raw code to the screen. When the live backend is unavailable, the common ones are expected
  * and benefit from a plain-language line; genuinely diagnostic codes fall through
  * unchanged so support can still read them.
  */
@@ -208,17 +208,17 @@ const SERVER_ERROR_AR: Record<string, string> = {
   NOTIFICATION_SEND_FAILED: 'تعذّر إرسال الإشعار. تحقّق من الاتصال وأعد المحاولة.',
 };
 const SERVER_ERROR_EN: Record<string, string> = {
-  IDENTITY_REQUIRED: 'This service requires sign-in and the live server (unavailable in demo).',
+  IDENTITY_REQUIRED: 'This service requires sign-in and the live server.',
   KFGQPC_LIBRARY_UNAVAILABLE: 'The official source library is currently unavailable.',
   KFGQPC_DELIVERY_STATUS_UNAVAILABLE: 'Official source delivery status is currently unavailable.',
   SOURCE_NOT_CERTIFIED: 'The source is not scientifically certified yet.',
   SOURCE_NOT_FOUND: 'Source not found.',
   READING_NOT_RESOLVED: 'The reading could not be resolved.',
   POLICY_HUMAN_APPROVAL_REQUIRED: 'This action requires human approval.',
-  RUNTIME_NOT_FOUND: 'No server-held question session for this participant (unavailable in demo).',
+  RUNTIME_NOT_FOUND: 'No server-held question session exists for this participant.',
   AUTHORIZATION_FAILED: 'Authorization failed.',
   REVOKE_FAILED: 'Could not revoke authorization.',
-  SECURE_RUNTIME_UNAVAILABLE: 'The secure question server is unavailable (unavailable in demo).',
+  SECURE_RUNTIME_UNAVAILABLE: 'The secure question server is unavailable.',
   NOTIFICATION_CENTER_UNAVAILABLE: 'Notifications could not be loaded. Check the connection and try again.',
   NOTIFICATION_RECIPIENTS_FAILED: 'The recipient list could not be loaded. Try again shortly.',
   NOTIFICATION_UPDATE_FAILED: 'The notification could not be updated. Try again shortly.',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
 import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
-import { isDemoResidue, isLaunchDeployment, toLaunchState } from './launch-state';
+import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
@@ -39,42 +39,7 @@ import {
   AppealRecord,
   IntegrationConfig, NotificationRecord, WebhookSubscription, DeviceRecord, DelegationTravelRecord, ConsentRecord, ImportJobRecord, ShadowRun, ParticipantPassportEntry, JudgePassportEntry, TrainingRun, BackupRecord, RetentionJob, SupportSession, RemoteSessionCheck, AudioRecordingRecord, FeatureFlagRecord, QuranSourceManifestRecord, QuestionGovernanceRecord, AICapabilityValidationRecord, OperatingCostModel, TimeMachineScenarioRecord, QuorumActionRecord, QuorumActionType, InvariantCheckResult, InvariantViolationRecord, ScientificEvidenceNode, ScientificEvidenceEdge, PublicResultRootRecord, PublicResultProofRecord, LocalMeshSessionRecord, FederationAttestationRecord, MizanProtocolPackageRecord, FlightRecorderEntry, IntegrityEnvelopeRecord, ChaosDrillRecord, AccessibilityProfileRecord, CommitteeElasticityRecommendation, JourneyPassRecord, PolicyCompilationRecord, ContradictionIssueRecord, DisasterPackRecord, DeviceReassignmentRecord, JudgeFatigueRecommendationRecord, CompetitionBenchmarkRecord, RehearsalRecord, RehearsalCheckRecord, ScientificDatasetRecord, BenchmarkRunRecord, VariantLocusRecord, QuranReferenceAudioRecord, FederationTrustRecord, CeremonyVaultRecord, FairDrawProofRecord, QuranSourceContentRecord, QuranCrossCheckRecord, ScientificAdjudicationCaseRecord, ScientificImpactReportRecord, QuestionRevealGateRecord, QueueTransferRecord, QueueTransferMode, IdentityAccountRecord, RoleGrantRecord, IdentityInvitationRecord, AuthSessionRecord, PassReissueRecord, ParticipantCredentialLineageRecord, SessionCheckpointRecord, ContinuityIncidentRecord, SessionRecoveryRecord, AuditLedgerSealRecord, CompetitionBlackBoxRecord, FairnessConstitutionalCourtRecord, AcousticVenuePassportRecord, RecitationDigitalTwinRecord, MutashabihatTrapRecord, MultiRiwayahRoutingDecisionRecord, AppealCapsuleRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord, ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord, CertifiedVenueSealRecord
 } from '../types';
-import {
-  SEED_ORGANIZATION,
-  SEED_COMPETITION,
-  SEED_USERS,
-  SEED_COMMITTEES,
-  SEED_JUDGES,
-  SEED_PARTICIPANTS,
-  SEED_PARTICIPANT_SCOPES,
-  SEED_REVIEW_CASES,
-  SEED_MUTASHABIHAT_TRAPS,
-  SEED_AI_OBSERVATIONS,
-  SEED_FAIRDRAW_PROOFS,
-  SEED_RESULTS,
-  SEED_CERTIFICATE,
-  SEED_AUDIT_LOGS,
-  SEED_INCIDENTS,
-  SEED_APPEALS,
-  SEED_JUDGE_SUBMISSIONS,
-  SEED_SESSION_CHECKPOINTS,
-  SEED_CONTINUITY_INCIDENTS,
-  SEED_SESSION_RECOVERIES,
-  SEED_AUTH_SESSIONS,
-  SEED_PASS_REISSUES,
-  SEED_AUDIT_LEDGER_SEALS,
-  SEED_NOTIFICATIONS,
-  SEED_WEBHOOKS,
-  SEED_INTEGRATIONS,
-  SEED_SUPPORT_SESSIONS,
-  SEED_IDENTITY_INVITATIONS,
-  SEED_TRAVEL_RECORDS,
-  SEED_FEDERATION_ATTESTATIONS,
-  SEED_PARTICIPANT_PASSPORT,
-  SEED_CONSENTS,
-  SEED_QUORUM_ACTIONS,
-  SEED_FEATURE_FLAGS
-} from './seed-data';
+
 import { DEVELOPMENT_QUESTION_BANK } from './quran-vault';
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
@@ -125,25 +90,24 @@ const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_
  * الحسابات والأدوار لا تُزرع في نشرٍ حقيقي — مصدرها حوكمة الهوية الخادمية وحدها.
  */
 function hydrateSavedState(parsed: AppStoreState): AppStoreState {
-  const launch = isLaunchDeployment();
   /* عطل الحفظ حالةٌ حيّة تُكتشف عند وقوعها، لا أثرٌ يُبعث من اللقطة المحفوظة: لقطةٌ حملت
      الشريط مرةً كانت تُعيده إلى الأبد بعد زوال سببه، ولا شيء يمسحه في صفحةٍ لا تكتب للسحابة. */
   parsed.persistenceError = null;
-  // يسبق الترقية: وإلا لملأ احتياطُ الحسابات المزروعة الفراغَ قبل أن يصل الحارس.
-  if (launch) { parsed.identityAccounts = parsed.identityAccounts ?? []; parsed.roleGrants = parsed.roleGrants ?? []; }
-      parsed.organization = parsed.organization || SEED_ORGANIZATION;
+  // يسبق الترقية: حسابات الهوية لا تُستعاد إلا من الحالة المحفوظة أو المصدر الخادمي الموثوق.
+  parsed.identityAccounts = parsed.identityAccounts ?? []; parsed.roleGrants = parsed.roleGrants ?? [];
+      parsed.organization = parsed.organization || INITIAL_ORGANIZATION;
       parsed.organizations = parsed.organizations?.length ? parsed.organizations : [parsed.organization];
       parsed.competition = { ...parsed.competition, policy: getCompetitionPolicy(parsed.competition), ruleSets: parsed.competition.ruleSets || [parsed.competition.ruleSet] };
       parsed.competitions = parsed.competitions?.length ? parsed.competitions.map(c => ({ ...c, policy: getCompetitionPolicy(c), ruleSets: c.ruleSets || [c.ruleSet] })) : [parsed.competition];
-      // Legacy local demo data is migrated into the active competition scope so no record can leak across competitions.
+      // تُنسب السجلات المحلية القديمة التي لم تحمل competitionId إلى مسابقتها المحفوظة حتى لا تتسرب بين المسابقات.
       parsed.reviewCases = (parsed.reviewCases || []).map(r => ({ ...r, competitionId: r.competitionId || parsed.competition.id }));
-      parsed.aiObservations = (parsed.aiObservations || (launch ? [] : SEED_AI_OBSERVATIONS)).map(o => ({ ...o, competitionId: o.competitionId || parsed.competition.id }));
+      parsed.aiObservations = (parsed.aiObservations || []).map(o => ({ ...o, competitionId: o.competitionId || parsed.competition.id }));
       parsed.appeals = parsed.appeals || [];
       parsed.sealApprovals = parsed.sealApprovals || [];
       parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
       parsed.travelRecords = (parsed.travelRecords || []).filter(r=>!['trv-1','trv-2','trv-3'].includes(r.id)&&r.flightNumber!=='MZ 417'); parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
       parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
-      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||(launch?[]:DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:parsed.competition.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()}))); parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||(launch?{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0}:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2}); parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||(launch?[]:SEED_FAIRDRAW_PROOFS); parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||(launch?[]:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'}))); parsed.roleGrants=parsed.roleGrants||(launch?[]:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false}))); parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||(launch?[]:SEED_MUTASHABIHAT_TRAPS); parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
+      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||[]; parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||[]; parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||[]; parsed.roleGrants=parsed.roleGrants||[]; parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||[]; parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
   // Preserve history, revoke authority: no legacy role is remapped to an active role.
   parsed.roleGrants=(parsed.roleGrants||[]).map(grant=>isRetiredIdentityRole((grant as unknown as {role?:unknown}).role)?{...grant,status:'REVOKED' as const,reason:[grant.reason,'Retired identity authority'].filter(Boolean).join(' · ')}:grant);
   parsed.identityInvitations=(parsed.identityInvitations||[]).map(invitation=>isRetiredIdentityRole((invitation as unknown as {requestedRole?:unknown}).requestedRole)?{...invitation,status:'REVOKED' as const,activationTokenHash:undefined}:invitation);
@@ -152,112 +116,68 @@ function hydrateSavedState(parsed: AppStoreState): AppStoreState {
 }
 
 /*
- * بوابة كشف مزروعة للجلسة التجريبية النشطة.
- *
- * منظومة الكشف الآمن جعلت الجلسة تبدأ "مختومة"، فصار المحكم في وضع العرض يرى شاشة انتظار
- * بدل أن يهبط مباشرة على سطح التحكيم للمتسابق أمامه كما كان قبلها. نزرع هنا بوابةً مكتملة
- * (حضور مؤكَّد + موافقة المحكم المكلّف) للجلسة sess-active-001 حتى يظهر سطح التحكيم فورًا في
- * العرض. البوابة خاصة بالعرض فقط؛ الجلسات الحقيقية تُنشئ بواباتها بنفسها، ووضع الإطلاق يمسحها.
+ * قالب تشغيل محايد فقط — بلا متسابقين، ولا لجان، ولا نتائج، ولا حسابات اصطناعية.
+ * هذه القيم البنيوية تمنع كسر الواجهات قبل أن تُحمَّل بيانات الجهة الحقيقية من السلطة السحابية.
  */
-const SEED_ACTIVE_REVEAL_GATE: QuestionRevealGateRecord = {
-  id: 'qgate-active-001',
-  competitionId: SEED_COMPETITION.id,
-  sessionId: 'sess-active-001',
-  participantId: SEED_PARTICIPANTS[0].id,
-  committeeId: SEED_COMMITTEES[0].id,
-  questionIndex: 0,
-  participantPresence: { verified: true, verifiedAt: new Date().toISOString(), verifiedBy: 'usr-judge-1', method: 'manual_visual_confirmation' },
-  requiredJudgeIds: [...new Set(SEED_COMMITTEES[0].judgeIds)],
-  approvals: SEED_COMMITTEES[0].judgeIds.map(judgeId => ({ judgeId, judgeName: 'Dr. Kamal Isa Al-Masarawi', approvedAt: new Date().toISOString() })),
-  status: 'REVEALED',
-  createdAt: new Date().toISOString(),
-  revealedAt: new Date().toISOString(),
-  questionCommitmentHash: 'DEMO:active-session-reveal-gate',
-  revealAssurance: 'development_client_gate',
+const INITIAL_ORGANIZATION: Organization = {
+  id: 'org-pending-setup',
+  name: 'Organization pending setup',
+  nameArabic: 'جهة قيد الإعداد',
+  code: 'ORG',
+  brand: {
+    name: 'MIZAN', nameArabic: 'ميزان', primaryColor: '#183b31', accentColor: '#b98c4a',
+    headerBackground: '#183b31', subdomain: 'mizan',
+  },
+  plan: 'standard', dataResidency: 'configured-by-organization', status: 'active', createdAt: '1970-01-01T00:00:00.000Z',
 };
 
-function seededInitialState(): AppStoreState {
+const INITIAL_RULESET: RuleSet = {
+  id: 'rule-pending-setup', version: '1.0.0', name: 'Competition scoring rules',
+  judgesCountPerPanel: 1, dropExtremes: false,
+  criteria: [
+    {id:'crit-memorization',name:'Memorization',nameArabic:'الحفظ والضبط',maxScore:70,weight:0.7,assignedJudgeType:'memorization'},
+    {id:'crit-tajweed',name:'Tajweed',nameArabic:'التجويد',maxScore:25,weight:0.25,assignedJudgeType:'tajweed'},
+    {id:'crit-performance',name:'Performance',nameArabic:'حسن الأداء',maxScore:5,weight:0.05,assignedJudgeType:'performance'},
+  ],
+  penalties:{mistake:0.5,promptOpening:1,repetition:0.25,tajweedMinor:0.25,tajweedMajor:0.5,hesitationStop:0.5},
+  questionsPerParticipant:3,questionDurationMinutes:8,minimumPassingScore:80,
+  tieBreakRules:['memorization_priority','tajweed_priority','fewest_penalties'],
+  appealsAllowed:true,appealWindowHours:12,silentAIGuardianEnabled:true,
+};
 
-  const defaultUser = SEED_USERS.find((u) => u.role === 'comp_admin') || SEED_USERS[0];
+const INITIAL_COMPETITION: Competition = {
+  id:'comp-pending-setup',organizationId:INITIAL_ORGANIZATION.id,
+  name:'Competition pending setup',nameArabic:'مسابقة قيد الإعداد',edition:'',country:'',timezone:'',
+  status:'draft',automationLevel:'assisted',startDate:'',endDate:'',registrationStartDate:'',registrationEndDate:'',
+  categories:[],ruleSet:INITIAL_RULESET,ruleSets:[INITIAL_RULESET],venueName:'',venuesCount:0,
+  totalRegistered:0,totalApproved:0,totalAttended:0,currentDay:0,totalDays:0,
+  readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false},
+};
 
+function emptyInitialState(): AppStoreState {
+  const competition={...INITIAL_COMPETITION,policy:getCompetitionPolicy(INITIAL_COMPETITION),ruleSets:[INITIAL_RULESET]};
   return {
-    currentUser: defaultUser,
-    organization: SEED_ORGANIZATION,
-    organizations: [SEED_ORGANIZATION],
-    language: 'ar',
-    competition: { ...SEED_COMPETITION, policy: getCompetitionPolicy(SEED_COMPETITION), ruleSets: SEED_COMPETITION.ruleSets || [SEED_COMPETITION.ruleSet] },
-    competitions: [{ ...SEED_COMPETITION, policy: getCompetitionPolicy(SEED_COMPETITION), ruleSets: SEED_COMPETITION.ruleSets || [SEED_COMPETITION.ruleSet] }],
-    participants: SEED_PARTICIPANTS,
-    committees: SEED_COMMITTEES,
-    judges: SEED_JUDGES,
-    results: SEED_RESULTS,
-    reviewCases: SEED_REVIEW_CASES,
-    aiObservations: SEED_AI_OBSERVATIONS,
-    judgeSubmissions: SEED_JUDGE_SUBMISSIONS,
-    certificates: [SEED_CERTIFICATE],
-    auditLogs: SEED_AUDIT_LOGS,
-    incidents: SEED_INCIDENTS,
-    appeals: SEED_APPEALS,
-    isOffline: false,
-    emergencyFrozen: false,
-    sealApprovals: [],
-    integrations: SEED_INTEGRATIONS, notifications: SEED_NOTIFICATIONS, webhooks: SEED_WEBHOOKS,
-    devices: [
-      {id:'dev-kiosk-1',competitionId:SEED_COMPETITION.id,name:'Gate Kiosk 01',type:'kiosk',zone:'Gate',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'},
-      {id:'dev-edge-1',competitionId:SEED_COMPETITION.id,name:'MIZAN Edge Primary',type:'edge_server',zone:'Control',status:'online',lastSeenAt:new Date().toISOString(),softwareVersion:'1.0.0'}
-    ],
-    travelRecords: SEED_TRAVEL_RECORDS, consents: SEED_CONSENTS, importJobs: [], shadowRuns: [], participantPassport: SEED_PARTICIPANT_PASSPORT, judgePassport: [], trainingRuns: [], backups: [], retentionJobs: [], supportSessions: SEED_SUPPORT_SESSIONS, remoteChecks: [], audioRecordings: [], featureFlags: SEED_FEATURE_FLAGS, quranSourceManifests: [], quranSourceContents: [], questionGovernance: DEVELOPMENT_QUESTION_BANK.map(q=>({questionId:q.id,competitionId:SEED_COMPETITION.id,expertDifficulty:q.difficultyRating,status:'fixture',updatedAt:new Date().toISOString()})), aiCapabilityValidations: [], operatingCostModel:{baselineStaff:24,mizanStaff:6,hoursPerDay:8,days:2},
-    sessionTempoSamples:[], queueWaitSamples:[],
-    timeMachineScenarios:[], quorumActions:SEED_QUORUM_ACTIONS, invariantViolations:[], evidenceNodes:[], evidenceEdges:[], publicResultRoots:[], publicResultProofs:[], localMeshSessions:[], federationAttestations:SEED_FEDERATION_ATTESTATIONS, protocolPackages:[], flightRecorderEntries:[], integrityEnvelopes:[], chaosDrills:[], accessibilityProfiles:[], elasticityRecommendations:[], journeyPasses:[], policyCompilations:[], contradictionIssues:[], disasterPacks:[], deviceReassignments:[], fatigueRecommendations:[], competitionBenchmarks:[], rehearsals:[], scientificDatasets:[], benchmarkRuns:[], variantLoci:[], quranReferenceAudio:[], quranCrossChecks:[], scientificAdjudications:[], scientificImpactReports:[], federationTrust:[], ceremonyVaults:[], fairDrawProofs:SEED_FAIRDRAW_PROOFS, questionRevealGates:[SEED_ACTIVE_REVEAL_GATE], participantScopes:SEED_PARTICIPANT_SCOPES, questionModels:[], questionModelBatches:[], scopeSimulations:[], scopeEngineSeals:[], questionQuarantines:[], questionReservations:[], fairnessReports:[], queueTransfers:[], identityAccounts:SEED_USERS.map(u=>({id:`acct-${u.id}`,firebaseUid:u.id,email:u.email,displayName:u.name,organizationId:u.organizationId,status:'ACTIVE',createdAt:new Date().toISOString(),createdBy:'seed',activatedAt:new Date().toISOString(),mfaRequired:['super_admin','org_admin','comp_admin','head_judge','judge','auditor'].includes(u.role),identityAssurance:'DEMO'})), roleGrants:SEED_USERS.map(u=>({id:`grant-${u.id}`,accountId:`acct-${u.id}`,role:u.role,organizationId:u.organizationId,competitionId:u.competitionId,status:'ACTIVE',requestedAt:new Date().toISOString(),requestedBy:'seed',approvedAt:new Date().toISOString(),approvedBy:'seed',reason:'Development seed role',dualApprovalRequired:false})), identityInvitations:SEED_IDENTITY_INVITATIONS, authSessions:SEED_AUTH_SESSIONS, passReissues:SEED_PASS_REISSUES, credentialLineages:[], sessionCheckpoints:SEED_SESSION_CHECKPOINTS, continuityIncidents:SEED_CONTINUITY_INCIDENTS, sessionRecoveries:SEED_SESSION_RECOVERIES, auditLedgerSeals:SEED_AUDIT_LEDGER_SEALS, competitionBlackBoxes:[], fairnessCourtRecords:[], acousticVenuePassports:[], recitationDigitalTwins:[], mutashabihatTrapMaps:SEED_MUTASHABIHAT_TRAPS, smartRoutingDecisions:[], appealCapsules:[], blindChamberLifts:[], blindAnchorCalibrations:[], integrityEntropySignals:[], scientificCircuitBreakers:[], mizanIntegrityPassports:[], integrityCinemaRecords:[], certifiedVenueSeals:[],
-    activeSession: {
-      sessionId: 'sess-active-001',
-      participant: SEED_PARTICIPANTS[0], // Bilal Yusuf (A-104)
-      committee: SEED_COMMITTEES[0],
-      questionSelection: {
-        questionSetId: 'qset-104-fairdraw',
-        participantId: 'part-104',
-        // ثلاثة أسئلة مختلفة ومقاطع قصيرة (٣ آيات) حتى لا تبدو مكررة ولا يتمدّد المقطع على وجهين في العرض.
-        questions: [
-          { ...DEVELOPMENT_QUESTION_BANK[0], endAyah: DEVELOPMENT_QUESTION_BANK[0].startAyah + 2 },
-          { ...DEVELOPMENT_QUESTION_BANK[1], endAyah: DEVELOPMENT_QUESTION_BANK[1].startAyah + 2 },
-          { ...DEVELOPMENT_QUESTION_BANK[3], endAyah: DEVELOPMENT_QUESTION_BANK[3].startAyah + 2 },
-        ],
-        difficultyVectorScore: 2.33,
-        seedCommitmentHash: 'DEMO:generated-at-runtime-in-live-sessions',
-        fairnessToleranceDelta: 0.04,
-        generatedAt: new Date().toISOString()
-      },
-      currentQuestionIndex: 0,
-      isReciting: true,
-      durationSeconds: 142,
-      secureQuestionMode:'CLIENT',
-      events: [
-        {
-          id: 'ev-1',
-          sessionId: 'sess-active-001',
-          questionIndex: 0,
-          judgeId: 'usr-judge-1',
-          judgeName: 'Dr. Kamal Isa Al-Masarawi',
-          timestamp: new Date().toISOString(),
-          relativeSeconds: 45,
-          type: 'tajweed_minor',
-          criterion: 'tajweed',
-          penalty: 0.25
-        }
-      ],
-      isLocked: false,
-      audioLevel: 78,
-      // كُشف السؤال في العرض عبر البوابة المزروعة، فتظهر منصة التحكيم مباشرة كما كانت قبل منظومة الكشف الآمن.
-      questionPhase: 'RECITING'
-    }
+    currentUser:{id:'unauthenticated',name:'—',email:'',role:'participant',organizationId:INITIAL_ORGANIZATION.id},
+    organization:INITIAL_ORGANIZATION,organizations:[INITIAL_ORGANIZATION],language:'ar',competition,competitions:[competition],
+    participants:[],committees:[],judges:[],results:[],reviewCases:[],aiObservations:[],judgeSubmissions:[],certificates:[],auditLogs:[],incidents:[],appeals:[],
+    isOffline:false,emergencyFrozen:false,persistenceError:null,sealApprovals:[],
+    integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],supportSessions:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
+    quranSourceManifests:[],quranSourceContents:[],questionGovernance:[],aiCapabilityValidations:[],operatingCostModel:{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0},
+    timeMachineScenarios:[],quorumActions:[],invariantViolations:[],evidenceNodes:[],evidenceEdges:[],publicResultRoots:[],publicResultProofs:[],localMeshSessions:[],federationAttestations:[],protocolPackages:[],flightRecorderEntries:[],integrityEnvelopes:[],chaosDrills:[],accessibilityProfiles:[],elasticityRecommendations:[],journeyPasses:[],policyCompilations:[],contradictionIssues:[],disasterPacks:[],deviceReassignments:[],fatigueRecommendations:[],competitionBenchmarks:[],rehearsals:[],scientificDatasets:[],benchmarkRuns:[],variantLoci:[],quranReferenceAudio:[],quranCrossChecks:[],scientificAdjudications:[],scientificImpactReports:[],federationTrust:[],ceremonyVaults:[],fairDrawProofs:[],questionRevealGates:[],
+    participantScopes:[],questionModels:[],questionModelBatches:[],scopeSimulations:[],scopeEngineSeals:[],questionQuarantines:[],questionReservations:[],fairnessReports:[],queueTransfers:[],
+    identityAccounts:[],roleGrants:[],identityInvitations:[],authSessions:[],passReissues:[],credentialLineages:[],
+    sessionCheckpoints:[],continuityIncidents:[],sessionRecoveries:[],auditLedgerSeals:[],competitionBlackBoxes:[],
+    fairnessCourtRecords:[],acousticVenuePassports:[],recitationDigitalTwins:[],mutashabihatTrapMaps:[],smartRoutingDecisions:[],appealCapsules:[],blindChamberLifts:[],blindAnchorCalibrations:[],integrityEntropySignals:[],scientificCircuitBreakers:[],mizanIntegrityPassports:[],integrityCinemaRecords:[],certifiedVenueSeals:[],
+    sessionTempoSamples:[],queueWaitSamples:[],
+    activeSession:{sessionId:'',participant:null,committee:null,questionSelection:null,currentQuestionIndex:0,isReciting:false,durationSeconds:0,secureQuestionMode:'SERVER',events:[],isLocked:false,audioLevel:0,questionPhase:'SEALED'},
   };
 }
 
 /*
  * الحالة الابتدائية.
  *
- * في نشرٍ حقيقي لا تُزرع بيانات عرض إطلاقًا، ولا تُحيا حالةٌ محفوظة تعود لبيانات العرض: متصفّح
- * جرّب النسخة التجريبية ثم وُجّه إلى الإنتاج كان سيستعيد المتسابقين المخترعين من تخزينه المحلي.
+ * لا تُزرع بيانات افتراضية ولا تُحيا حالةٌ محفوظة تعود لقالب التطوير القديم؛ أي متصفح
+ * يحمل ذلك القالب يبدأ بحالة نظيفة بدل استعادة سجلات غير حقيقية من التخزين المحلي.
  */
 function getInitialState(): AppStoreState {
   const launch = isLaunchDeployment();
@@ -265,7 +185,7 @@ function getInitialState(): AppStoreState {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as AppStoreState;
-      if (launch && isDemoResidue(parsed?.organization?.id, SEED_ORGANIZATION.id)) {
+      if (isRetiredSeedResidue(parsed?.organization?.id, 'org-gqa-global')) {
         localStorage.removeItem(STORAGE_KEY);
       } else {
         /* جهاز يحمل نسخة سابقة للترقية يبقى حاملًا لأرقام الهوية إلى أن يُكتب شيء جديد — وقد
@@ -278,8 +198,9 @@ function getInitialState(): AppStoreState {
   } catch {
     // fallback below
   }
-  const seeded = seededInitialState();
-  return launch ? toLaunchState(seeded) : seeded;
+  const initial = emptyInitialState();
+  void launch;
+  return toLaunchState(initial);
 }
 
 let globalState = getInitialState();
@@ -564,7 +485,7 @@ async function persistCompetitionConfiguration(updatedAt=globalState.competition
  * انقطاع الجلسة أثناء التحكيم كان صامتًا تمامًا: الكتابة تخرج من الدالة عند غياب
  * auth.currentUser دون شكوى، فيرصد المحكّم درجاته وهي لا تغادر الجهاز، ولا يعلم
  * إلا بعد إعادة التحميل. نتذكّر أن جلسة سحابية قامت فعلًا، فإن غابت والجهاز متصل
- * فهذا انقطاعٌ يستحق شريطًا ظاهرًا لا صمتًا. (لا يُطلق قبل أول دخول ولا في وضع العرض.)
+ * فهذا انقطاعٌ يستحق شريطًا ظاهرًا لا صمتًا. (لا يُطلق قبل أول دخول موثّق.)
  */
 let cloudSessionEverEstablished=false;
 function noteCloudSessionState(){ if(auth.currentUser)cloudSessionEverEstablished=true; }
@@ -884,7 +805,7 @@ export function useAppStore() {
     listeners.add(listener);
 
     /*
-     * الاشتراك بعد مصادقة حقيقية فقط؛ وضع العرض المحلي يبقى محليًا بالكامل.
+     * الاشتراك السحابي لا يبدأ إلا بعد مصادقة حقيقية.
      *
      * كان الاستماع على وثيقة المسابقة وحدها يقرأ مصفوفاتٍ لم تعد تُكتب فيها. صار لكل مجموعة
      * فرعية مستمعٌ خاص، فيصل عمل كل جهاز إلى بقية الأجهزة: درجات المحكّم إلى رئيس اللجنة،
@@ -976,22 +897,8 @@ export function useAppStore() {
     notify();
   };
 
-  const switchRole = (role: Role) => {
-    const matchedUser = SEED_USERS.find((u) => u.role === role);
-    if (matchedUser) {
-      globalState.currentUser = matchedUser;
-    } else {
-      globalState.currentUser = {
-        id: `usr-${role}`,
-        name: `User (${role})`,
-        nameArabic: `مستخدم (${role})`,
-        email: `${role}@mizan.org`,
-        role,
-        organizationId: globalState.competition.organizationId
-      };
-    }
-    notify();
-  };
+  /* تبديل الأدوار محليًا متقاعد: الدور لا يتغير إلا من هوية موثقة وصلاحية خادمية. */
+  const switchRole = (_role: Role) => false;
 
   const toggleOffline = () => {
     const wasOffline=globalState.isOffline; globalState.isOffline = !globalState.isOffline;
@@ -1636,7 +1543,7 @@ export function useAppStore() {
     /* الاكتمال الطبيعي يبقي رحلة المتسابق والنتيجة والشهادة مفتوحة. الإغلاق الدائم
        حالة مستقلة يثبتها closedAt؛ لذلك يمكن إغلاق مسابقة مكتملة بعد انتهاء الحفل فعلًا. */
     if(globalState.competition.closedAt)return{ok:true,alreadyClosed:true};
-    if(isLaunchDeployment()){
+    {
       const u=auth.currentUser;if(!u)return{ok:false,code:'IDENTITY_REQUIRED'};
       try{
         const token=await u.getIdToken();
@@ -2062,7 +1969,7 @@ export function useAppStore() {
       categories: [],
       readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
     };
-    // New competitions start as the buyer's empty configuration, not one of MIZAN's demo templates.
+    // New competitions start as the buyer's empty configuration, not a prefilled template.
     base.displayName=undefined;base.displayNameArabic=undefined;base.logoUrl=undefined;
     base.country='';base.timezone='';base.venueName='';base.venuesCount=0;base.totalDays=0;
     base.ruleSet={...base.ruleSet,id:newId('ruleset'),name:'',criteria:[],frozenAt:undefined};base.ruleSets=[base.ruleSet];
@@ -2986,7 +2893,7 @@ export function useAppStore() {
 
   // ---- MIZAN Trust 8 --------------------------------------------------------------------
   const auditTrustAction=(action:string,entityType:string,entityId:string,ar:string,en:string)=>{
-    const event:AuditEvent={id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action,entityType,entityId,humanSummaryArabic:ar,humanSummaryEnglish:en,currentStateHash:`PENDING:${newId('audit')}`,sessionId:globalState.activeSession?.sessionId||undefined,authenticationMethod:globalState.currentUser.identityAssurance==='firebase'||globalState.currentUser.identityAssurance==='firebase_managed'?'password':globalState.currentUser.identityAssurance==='federated_sso'?'sso':'demo',authenticationAssurance:globalState.currentUser.mfaEnabled?'mfa':globalState.currentUser.identityAssurance==='federated_sso'?'federated':globalState.currentUser.identityAssurance==='demo'?'demo':'single_factor',assurance:'client_hash_chain'};
+    const event:AuditEvent={id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action,entityType,entityId,humanSummaryArabic:ar,humanSummaryEnglish:en,currentStateHash:`PENDING:${newId('audit')}`,sessionId:globalState.activeSession?.sessionId||undefined,authenticationMethod:globalState.currentUser.identityAssurance==='firebase'||globalState.currentUser.identityAssurance==='firebase_managed'?'password':globalState.currentUser.identityAssurance==='federated_sso'?'sso':'unknown',authenticationAssurance:globalState.currentUser.mfaEnabled?'mfa':globalState.currentUser.identityAssurance==='federated_sso'?'federated':'single_factor',assurance:'client_hash_chain'};
     globalState.auditLogs=[event,...globalState.auditLogs];mirrorAuditEventToServer(event);
   };
 
@@ -3431,14 +3338,14 @@ export function useAppStore() {
     const pass=(id:string,name:string,ok:boolean,impact:string,evidence:string[],fix:string,warning=false):RehearsalCheckRecord=>({id,name,status:ok?'PASS':warning?'WARNING':'FAIL',impact,evidence,fix});
     const checks:(()=>Promise<RehearsalCheckRecord>)[]=[
       async()=>pass('gate-scan','Gate scan',globalState.devices.some(d=>d.role==='Gate'||d.type==='kiosk'),'Participant arrival',['Gate/Kiosk device discovery executed'],'Assign at least one authorized Gate/Kiosk device.'),
-      async()=>{const keys=await generateSigningKeyPair();const now=new Date(),expiry=new Date(now.getTime()+60000);const compact=await issueSignedPass({v:'MZP1',competition:rehearsalId,participantToken:'REHEARSAL',categoryEntitlement:'demo',validFrom:new Date(now.getTime()-1000).toISOString(),expiry:expiry.toISOString(),credentialId:newId('rehcred'),issuer:'MIZAN REHEARSAL'},keys.privateKey);const verified=await verifySignedPass(compact,keys.publicKey,{competition:rehearsalId,now});return pass('offline-pass','Offline signed pass verification',verified.valid,'Offline gate continuity',[verified.valid?'Signature verified offline':`Verification failed: ${verified.reason}`],'Repair offline credential verification.');},
-      async()=>pass('participant-checkin','Participant check-in',!!sampleParticipant,'Arrival workflow',[sampleParticipant?`Demo candidate=${sampleParticipant.code}`:'No rehearsal candidate available'],'Load DEMO/REHEARSAL participant data.',!sampleParticipant),
+      async()=>{const keys=await generateSigningKeyPair();const now=new Date(),expiry=new Date(now.getTime()+60000);const compact=await issueSignedPass({v:'MZP1',competition:rehearsalId,participantToken:'REHEARSAL',categoryEntitlement:'rehearsal',validFrom:new Date(now.getTime()-1000).toISOString(),expiry:expiry.toISOString(),credentialId:newId('rehcred'),issuer:'MIZAN REHEARSAL'},keys.privateKey);const verified=await verifySignedPass(compact,keys.publicKey,{competition:rehearsalId,now});return pass('offline-pass','Offline signed pass verification',verified.valid,'Offline gate continuity',[verified.valid?'Signature verified offline':`Verification failed: ${verified.reason}`],'Repair offline credential verification.');},
+      async()=>pass('participant-checkin','Participant check-in',!!sampleParticipant,'Arrival workflow',[sampleParticipant?`Rehearsal candidate=${sampleParticipant.code}`:'No rehearsal candidate available'],'Load rehearsal participant data.',!sampleParticipant),
       async()=>pass('queue','Queue',activeCommittees.length>0,'Queue continuity',[`activeCommittees=${activeCommittees.length}`],'Configure at least one operational committee.'),
       async()=>pass('routing','Routing',activeCommittees.length>0&&globalState.competition.categories.length>0,'Participant routing',[`categories=${globalState.competition.categories.length}`,`committees=${activeCommittees.length}`],'Complete category and committee routing configuration.'),
       async()=>pass('judge-session','Judge session',readyJudges.length>0&&activeCommittees.length>0,'Human judging',[`readyJudges=${readyJudges.length}`],'Assign and qualify at least one judge.'),
       async()=>pass('judge-lock','Independent judge lock',policy.judging.independentUntilLock!==false,'Judge independence',[`independentUntilLock=${String(policy.judging.independentUntilLock)}`],'Require independent lock before review evidence.'),
       async()=>pass('head-judge-review','Head Judge review',globalState.judges.some(j=>j.isReady&&j.specialty==='all'),'Escalated human review',['Head Judge qualification lookup executed'],'Assign a ready Head Judge / all-specialty reviewer.',true),
-      async()=>{if(!sampleParticipant)return pass('fairdraw','FairDraw',false,'Question selection',['No rehearsal participant'],'Load a DEMO/REHEARSAL participant.',true);try{const category=globalState.competition.categories.find(c=>c.id===sampleParticipant.categoryId);const resolution=participantEffectiveScope(sampleParticipant.id);if(!resolution||resolution.blocked)return pass('fairdraw','FairDraw',false,'Deterministic constrained draw',[resolution?.reasonEnglish||'participant scope unavailable'],'Approve the participant memorization scope, or give the category a fixed range.');const scoped=DEVELOPMENT_QUESTION_BANK.filter(q=>scopeContainsRange(resolution.scope,{surah:q.surahNumber,ayah:q.startAyah},{surah:q.surahNumber,ayah:q.endAyah}));const rehearsalPool=scoped.length?scoped:buildCandidatePool({scope:resolution.scope,category,reading:readingContextOf({riwaya:sampleParticipant.riwaya})}).slice(0,40).map(c=>({id:c.id,surahNumber:c.surahNumber,surahNameArabic:surahNameArabic(c.surahNumber),surahNameEnglish:'',startAyah:c.startAyah,endAyah:c.endAyah,juzNumber:c.juzNumber||1,riwaya:sampleParticipant.riwaya,expectedTextArabic:'',difficultyRating:c.difficultyRating,mutashabihatDensity:'none' as const,tajweedComplexity:'intermediate' as const,timesUsed:0}));const allocation=planAllocation({category,policy,effectiveScope:resolution.scope});const scopedContext={scope:resolution.scope,participantScopeVersion:resolution.version,slots:allocation.slots,engine:new QuestionAllocationEngine({policy:categoryRepeatPolicy(category,policy),seed:`rehearsal:${sampleParticipant.id}`,defaultTargetDifficulty:policy.questions.targetDifficulty}),reading:readingContextOf({riwaya:sampleParticipant.riwaya}),sequencePosition:0};const draw=await generateFairDraw({pool:rehearsalPool,participant:sampleParticipant,policy,scoped:scopedContext});const verified=await verifyFairDrawSelection({selection:draw,pool:rehearsalPool,participant:sampleParticipant,policy,scoped:{...scopedContext,engine:new QuestionAllocationEngine({policy:categoryRepeatPolicy(category,policy),seed:`rehearsal:${sampleParticipant.id}`,defaultTargetDifficulty:policy.questions.targetDifficulty})}});return pass('fairdraw','FairDraw',verified.valid,'Deterministic constrained draw inside the participant scope',[verified.valid?'Commitment/reveal reproduced inside the approved scope':verified.reason||'verification failed'],'Repair FairDraw constraints or reading-scoped pool.')}catch(e){return pass('fairdraw','FairDraw',false,'Deterministic constrained draw',[e instanceof Error?e.message:String(e)],'Repair FairDraw configuration.',true)}},
+      async()=>{if(!sampleParticipant)return pass('fairdraw','FairDraw',false,'Question selection',['No rehearsal participant'],'Load a rehearsal participant.',true);try{const category=globalState.competition.categories.find(c=>c.id===sampleParticipant.categoryId);const resolution=participantEffectiveScope(sampleParticipant.id);if(!resolution||resolution.blocked)return pass('fairdraw','FairDraw',false,'Deterministic constrained draw',[resolution?.reasonEnglish||'participant scope unavailable'],'Approve the participant memorization scope, or give the category a fixed range.');const scoped=DEVELOPMENT_QUESTION_BANK.filter(q=>scopeContainsRange(resolution.scope,{surah:q.surahNumber,ayah:q.startAyah},{surah:q.surahNumber,ayah:q.endAyah}));const rehearsalPool=scoped.length?scoped:buildCandidatePool({scope:resolution.scope,category,reading:readingContextOf({riwaya:sampleParticipant.riwaya})}).slice(0,40).map(c=>({id:c.id,surahNumber:c.surahNumber,surahNameArabic:surahNameArabic(c.surahNumber),surahNameEnglish:'',startAyah:c.startAyah,endAyah:c.endAyah,juzNumber:c.juzNumber||1,riwaya:sampleParticipant.riwaya,expectedTextArabic:'',difficultyRating:c.difficultyRating,mutashabihatDensity:'none' as const,tajweedComplexity:'intermediate' as const,timesUsed:0}));const allocation=planAllocation({category,policy,effectiveScope:resolution.scope});const scopedContext={scope:resolution.scope,participantScopeVersion:resolution.version,slots:allocation.slots,engine:new QuestionAllocationEngine({policy:categoryRepeatPolicy(category,policy),seed:`rehearsal:${sampleParticipant.id}`,defaultTargetDifficulty:policy.questions.targetDifficulty}),reading:readingContextOf({riwaya:sampleParticipant.riwaya}),sequencePosition:0};const draw=await generateFairDraw({pool:rehearsalPool,participant:sampleParticipant,policy,scoped:scopedContext});const verified=await verifyFairDrawSelection({selection:draw,pool:rehearsalPool,participant:sampleParticipant,policy,scoped:{...scopedContext,engine:new QuestionAllocationEngine({policy:categoryRepeatPolicy(category,policy),seed:`rehearsal:${sampleParticipant.id}`,defaultTargetDifficulty:policy.questions.targetDifficulty})}});return pass('fairdraw','FairDraw',verified.valid,'Deterministic constrained draw inside the participant scope',[verified.valid?'Commitment/reveal reproduced inside the approved scope':verified.reason||'verification failed'],'Repair FairDraw constraints or reading-scoped pool.')}catch(e){return pass('fairdraw','FairDraw',false,'Deterministic constrained draw',[e instanceof Error?e.message:String(e)],'Repair FairDraw configuration.',true)}},
       async()=>pass('network-interruption','Network interruption',policy.operations.offlineContinuity===true,'Network loss',['Offline continuity policy evaluated'],'Enable offline continuity and Edge planning.'),
       async()=>pass('offline-continuation','Offline event continuation',policy.operations.offlineContinuity===true,'Offline operations',['Idempotent offline journal path configured'],'Enable the offline event journal.'),
       async()=>pass('reconnect','Reconnect',policy.operations.offlineContinuity===true,'Connectivity restoration',['Reconciliation path evaluated'],'Configure reconnect reconciliation.'),
@@ -3454,7 +3361,7 @@ export function useAppStore() {
       async()=>pass('quorum','Quorum',policy.results.requireDualApprovalToSeal===true,'Multi-authority authorization',['Quorum policy evaluated'],'Enable quorum for protected actions when required.',true),
       async()=>pass('appeal','Appeal',policy.appeals.enabled&&policy.appeals.windowHours>0,'Appeal workflow',[`windowHours=${policy.appeals.windowHours}`],'Configure an appeal window.'),
       async()=>pass('certificate-issuance','Certificate issuance',policy.certificates.enabled===true,'Proof-carrying certificate',['certificateAfterSeal policy evaluated'],'Require sealed result before issuance.'),
-      async()=>{const cert=globalState.certificates.find(c=>c.competitionId===globalState.competition.id);if(!cert)return pass('certificate-verification','Certificate verification',false,'Public verification',['No existing certificate; verifier path not mutated'],'Issue a DEMO proof-carrying certificate in rehearsal data.',true);const verified=await verifyCertificateEvidence(cert.id);return pass('certificate-verification','Certificate verification',verified.state==='AUTHENTIC'||verified.state==='REVOKED','Public verification',[`state=${verified.state}`],'Repair certificate proof chain.',verified.state==='NOT_FOUND')},
+      async()=>{const cert=globalState.certificates.find(c=>c.competitionId===globalState.competition.id);if(!cert)return pass('certificate-verification','Certificate verification',false,'Public verification',['No existing certificate; verifier path not mutated'],'Issue a proof-carrying certificate in rehearsal data.',true);const verified=await verifyCertificateEvidence(cert.id);return pass('certificate-verification','Certificate verification',verified.state==='AUTHENTIC'||verified.state==='REVOKED','Public verification',[`state=${verified.state}`],'Repair certificate proof chain.',verified.state==='NOT_FOUND')},
       async()=>{const pack=globalState.disasterPacks.find(p=>p.status==='RESTORE_TESTED');return pass('disaster-restore','Disaster Box restore test',!!pack,'Severe infrastructure recovery',[pack?`restoreTested=${pack.id}`:`packs=${globalState.disasterPacks.length}`],'Export, verify, and test-restore an Emergency Pack before event day.',true)}
     ];
     const rec=await runRehearsal({competitionId:globalState.competition.id,createdBy:globalState.currentUser.id,checks,requiredCheckIds:REQUIRED_REHEARSAL_CHECK_IDS});
@@ -3506,9 +3413,7 @@ export function useAppStore() {
     const account:IdentityAccountRecord={id:newId('account'),firebaseUid,email:inv.email,displayName:inv.displayName,organizationId:inv.organizationId,status:'ACTIVE',createdAt:inv.createdAt,createdBy:inv.createdBy,activatedAt:new Date().toISOString(),mfaRequired:roleGrantRequiresDualApproval(inv.requestedRole),identityAssurance:'FIREBASE'};const grant:RoleGrantRecord={id:newId('grant'),accountId:account.id,role:inv.requestedRole,organizationId:inv.organizationId,competitionId:inv.competitionId,committeeId:inv.committeeId,status:'ACTIVE',requestedAt:inv.createdAt,requestedBy:inv.createdBy,approvedAt:inv.approvedAt||new Date().toISOString(),approvedBy:inv.approvedBy||inv.createdBy,reason:'Activated from approved invitation',dualApprovalRequired:roleGrantRequiresDualApproval(inv.requestedRole)};globalState.identityAccounts=[account,...globalState.identityAccounts];globalState.roleGrants=[grant,...globalState.roleGrants];globalState.identityInvitations[i]={...inv,status:'ACCEPTED',acceptedAt:new Date().toISOString(),accountId:account.id,activationTokenHash:undefined};auditTrustAction('IDENTITY_ACCOUNT_ACTIVATED','IdentityAccount',account.id,'تفعيل حساب شخصي وربطه بصلاحية محددة النطاق','Activated named account and bound it to a scoped role grant');notify();return {ok:true,account,grant} as const;
   };
   const suspendIdentityAccount=(accountId:string,reason:string)=>{if(!['org_admin','super_admin','comp_admin'].includes(globalState.currentUser.role)||reason.trim().length<3)return false;const i=globalState.identityAccounts.findIndex(x=>x.id===accountId&&x.organizationId===globalState.organization.id);if(i<0)return false;const target=globalState.identityAccounts[i];if(target.firebaseUid===globalState.currentUser.id)return false;globalState.identityAccounts[i]={...target,status:'SUSPENDED',suspendedAt:new Date().toISOString()};globalState.roleGrants=globalState.roleGrants.map(g=>g.accountId===accountId&&g.status==='ACTIVE'?{...g,status:'SUSPENDED'}:g);globalState.authSessions=globalState.authSessions.map(a=>a.accountId===accountId&&a.status==='ACTIVE'?{...a,status:'REVOKED'}:a);auditTrustAction('IDENTITY_ACCOUNT_SUSPENDED','IdentityAccount',accountId,'تعليق الحساب وإبطال جلساته النشطة','Suspended identity account and revoked active sessions');notify();return true;};
-  // Demo-mode identity mutations. In production these go to the identity server; in demo/preview
-  // (no auth server) the governance UI has no backend, so these operate on local seeded state and
-  // keep the same buttons (approve, delete, reissue, freeze) fully functional.
+  // هذه الطفرات تحدّث مرآة الحالة في الواجهة بعد القرار المصرّح؛ سلطة الهوية الفعلية تبقى خادمية.
   const resumeIdentityAccount=(accountId:string)=>{const i=globalState.identityAccounts.findIndex(x=>x.id===accountId);if(i<0)return false;globalState.identityAccounts[i]={...globalState.identityAccounts[i],status:'ACTIVE',suspendedAt:undefined};globalState.roleGrants=globalState.roleGrants.map(g=>g.accountId===accountId&&g.status==='SUSPENDED'?{...g,status:'ACTIVE'}:g);auditTrustAction('IDENTITY_ACCOUNT_RESTORED','IdentityAccount',accountId,'إعادة تفعيل الحساب وصلاحياته','Restored identity account and its grants');notify();return true;};
   const removeIdentityAccount=(accountId:string,reason:string)=>{const before=globalState.identityAccounts.length;globalState.identityAccounts=globalState.identityAccounts.filter(x=>x.id!==accountId);if(globalState.identityAccounts.length===before)return false;globalState.roleGrants=globalState.roleGrants.filter(g=>g.accountId!==accountId);globalState.authSessions=globalState.authSessions.map(a=>a.accountId===accountId&&a.status==='ACTIVE'?{...a,status:'REVOKED'}:a);auditTrustAction('IDENTITY_ACCOUNT_ACCESS_REMOVED','IdentityAccount',accountId,reason||'إلغاء وصول الحساب بالكامل','Removed account access');notify();return true;};
   const removeRoleGrant=(grantId:string,reason:string)=>{const before=globalState.roleGrants.length;globalState.roleGrants=globalState.roleGrants.filter(g=>g.id!==grantId);if(globalState.roleGrants.length===before)return false;auditTrustAction('ROLE_GRANT_REMOVED','RoleGrant',grantId,reason||'إلغاء الصلاحية المحددة','Removed scoped grant');notify();return true;};
@@ -3518,7 +3423,7 @@ export function useAppStore() {
   const updateRoleGrantRole=(grantId:string,role:Role)=>{const i=globalState.roleGrants.findIndex(x=>x.id===grantId);if(i<0)return false;globalState.roleGrants[i]={...globalState.roleGrants[i],role};auditTrustAction('ROLE_GRANT_UPDATED','RoleGrant',grantId,`تعديل الدور إلى ${role}`,`Updated grant role to ${role}`);notify();return true;};
   const updateIdentityInvitationDetails=(id:string,patch:{displayName?:string;email?:string;requestedRole?:Role})=>{const i=globalState.identityInvitations.findIndex(x=>x.id===id);if(i<0)return false;globalState.identityInvitations[i]={...globalState.identityInvitations[i],...patch};auditTrustAction('IDENTITY_INVITATION_UPDATED','IdentityInvitation',id,'تعديل الدعوة المعلّقة','Updated pending invitation');notify();return true;};
   const reissueIdentityInvitation=async(id:string)=>{const i=globalState.identityInvitations.findIndex(x=>x.id===id);if(i<0)return {ok:false,reason:'NOT_FOUND'} as const;const token=randomInviteToken();const activationTokenHash=await invitationTokenHash(token);globalState.identityInvitations[i]={...globalState.identityInvitations[i],status:'READY',activationTokenHash,expiresAt:new Date(Date.now()+7*86400_000).toISOString()};auditTrustAction('IDENTITY_INVITATION_REISSUED','IdentityInvitation',id,'إصدار رمز تفعيل جديد للدعوة','Reissued one-time activation token');notify();return {ok:true,activationToken:token} as const;};
-  const openCurrentAuthSession=(deviceId:string,deviceName?:string,assurance:AuthSessionRecord['authenticationAssurance']='DEMO')=>{if(['completed','archived'].includes(globalState.competition.status)&&!['super_admin','org_admin','auditor'].includes(globalState.currentUser.role))return {ok:false,reason:'COMPETITION_ACCESS_CLOSED'} as const;const account=globalState.identityAccounts.find(a=>a.firebaseUid===globalState.currentUser.id||normalizedIdentityEmail(a.email)===normalizedIdentityEmail(globalState.currentUser.email));if(!account||account.status!=='ACTIVE')return {ok:false,reason:'ACCOUNT_NOT_ACTIVE'} as const;const conflict=detectConcurrentPrivilegedSession({role:globalState.currentUser.role,newDeviceId:deviceId,sessions:globalState.authSessions.filter(s=>s.accountId===account.id)});if(conflict.blocked){const blocked:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'CONFLICT_BLOCKED',authenticationAssurance:assurance};globalState.authSessions=[blocked,...globalState.authSessions];auditTrustAction('CONCURRENT_PRIVILEGED_SESSION_BLOCKED','AuthSession',blocked.id,'منع جلسة متزامنة لحساب حساس على جهاز آخر','Blocked concurrent privileged account session on another device');notify();return {ok:false,reason:conflict.reason,session:blocked} as const;}const session:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'ACTIVE',authenticationAssurance:assurance};globalState.authSessions=[session,...globalState.authSessions];auditTrustAction('AUTH_SESSION_OPENED','AuthSession',session.id,'فتح جلسة مستخدم مسماة مرتبطة بجهاز ودور محدد','Opened named user session bound to a device and scoped role');notify();return {ok:true,session} as const;};
+  const openCurrentAuthSession=(deviceId:string,deviceName?:string,assurance:AuthSessionRecord['authenticationAssurance']='SINGLE_FACTOR')=>{if(['completed','archived'].includes(globalState.competition.status)&&!['super_admin','org_admin','auditor'].includes(globalState.currentUser.role))return {ok:false,reason:'COMPETITION_ACCESS_CLOSED'} as const;const account=globalState.identityAccounts.find(a=>a.firebaseUid===globalState.currentUser.id||normalizedIdentityEmail(a.email)===normalizedIdentityEmail(globalState.currentUser.email));if(!account||account.status!=='ACTIVE')return {ok:false,reason:'ACCOUNT_NOT_ACTIVE'} as const;const conflict=detectConcurrentPrivilegedSession({role:globalState.currentUser.role,newDeviceId:deviceId,sessions:globalState.authSessions.filter(s=>s.accountId===account.id)});if(conflict.blocked){const blocked:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'CONFLICT_BLOCKED',authenticationAssurance:assurance};globalState.authSessions=[blocked,...globalState.authSessions];auditTrustAction('CONCURRENT_PRIVILEGED_SESSION_BLOCKED','AuthSession',blocked.id,'منع جلسة متزامنة لحساب حساس على جهاز آخر','Blocked concurrent privileged account session on another device');notify();return {ok:false,reason:conflict.reason,session:blocked} as const;}const session:AuthSessionRecord={id:newId('authsess'),accountId:account.id,firebaseUid:globalState.currentUser.id,organizationId:globalState.organization.id,competitionId:globalState.competition.id,role:globalState.currentUser.role,deviceId,deviceName,openedAt:new Date().toISOString(),lastSeenAt:new Date().toISOString(),expiresAt:new Date(Date.now()+8*60*60*1000).toISOString(),status:'ACTIVE',authenticationAssurance:assurance};globalState.authSessions=[session,...globalState.authSessions];auditTrustAction('AUTH_SESSION_OPENED','AuthSession',session.id,'فتح جلسة مستخدم مسماة مرتبطة بجهاز ودور محدد','Opened named user session bound to a device and scoped role');notify();return {ok:true,session} as const;};
 
   const createContinuityCheckpoint=async(reason='automatic')=>{const a=globalState.activeSession;if(!a.participant||!a.committee||!a.sessionId)return null;const gate=globalState.questionRevealGates.find(g=>g.sessionId===a.sessionId&&g.questionIndex===a.currentQuestionIndex);const locked=globalState.judgeSubmissions.filter(x=>x.sessionId===a.sessionId&&x.locked);const panelComplete=locked.length>=activeRuleSetForCategory(a.participant.categoryId).judgesCountPerPanel;let phase:SessionCheckpointRecord['phase']=a.questionPhase==='SEALED'?'BEFORE_REVEAL':a.questionPhase==='RECITING'?'RECITING':a.questionPhase==='TRANSITION'?'BETWEEN_QUESTIONS':a.isLocked?(panelComplete?'PANEL_LOCKED':'JUDGES_LOCKING'):(gate?.status==='REVEALED'?'REVEALED_NOT_STARTED':'BEFORE_REVEAL');if(panelComplete)phase='PANEL_LOCKED';const previous=globalState.sessionCheckpoints.filter(x=>x.sessionId===a.sessionId).sort((x,y)=>y.sequence-x.sequence)[0];const base={competitionId:globalState.competition.id,sessionId:a.sessionId,participantId:a.participant.id,committeeId:a.committee.id,phase,questionIndex:a.currentQuestionIndex,questionCommitmentHash:gate?.questionCommitmentHash,questionRevealed:gate?.status==='REVEALED',durationSeconds:a.durationSeconds,eventIds:a.events.map(e=>e.id),lockedJudgeIds:locked.map(x=>x.judgeId),sequence:(previous?.sequence||0)+1,createdBy:globalState.currentUser.id,previousCheckpointHash:previous?.checkpointHash};let cp=await buildSessionCheckpoint({...base,assurance:(!globalState.isOffline&&auth.currentUser)?'server_persisted':'client_hash_chain'});let persisted=false;if(cp.assurance==='server_persisted')persisted=await persistScopedDocument('session_checkpoints',cp.id,cp as unknown as Record<string,unknown>);if(cp.assurance==='server_persisted'&&!persisted)cp=await buildSessionCheckpoint({...base,assurance:'client_hash_chain'});globalState.sessionCheckpoints=[cp,...globalState.sessionCheckpoints];if(cp.assurance!=='server_persisted')void persistScopedDocument('session_checkpoints',cp.id,cp as unknown as Record<string,unknown>);auditTrustAction('SESSION_CHECKPOINT_CREATED','JudgingSession',a.sessionId,`حفظ نقطة استمرارية (${reason}) بمستوى ${cp.assurance} دون تغيير السؤال أو الأحكام المقفلة`,`Saved continuity checkpoint (${reason}) at ${cp.assurance} assurance without changing the revealed question or locked human submissions`);notify();return cp;};
   const reportSessionInterruption=async(type:ContinuityIncidentRecord['type'],notes='')=>{const a=globalState.activeSession;if(!a.participant)return null;const cp=await createContinuityCheckpoint(`interruption:${type}`);const incident:ContinuityIncidentRecord={id:newId('continuity'),competitionId:globalState.competition.id,sessionId:a.sessionId,participantId:a.participant.id,type,occurredAt:new Date().toISOString(),reportedBy:globalState.currentUser.id,lastCheckpointId:cp?.id,status:'OPEN',notes};globalState.continuityIncidents=[incident,...globalState.continuityIncidents];auditTrustAction('SESSION_INTERRUPTED','JudgingSession',a.sessionId,'تسجيل انقطاع مع تجميد آخر حالة موثقة؛ لا إعادة تلقائية ولا سحب سؤال جديد','Recorded interruption and froze the last trustworthy state; no automatic restart and no question redraw');notify();return incident;};

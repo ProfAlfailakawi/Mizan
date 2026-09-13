@@ -172,7 +172,7 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
     navCopilot: 'المساعد الذكي والمحاكاة',
     navCeremony: 'حفل الختام',
     navKiosk: 'بوابة الحضور الذاتي',
-    navSwitchRole: 'تبديل الدور (تجريبي)',
+    navSwitchRole: 'تبديل الدور',
 
     roleSuperAdmin: 'المدير العام للمنصة',
     roleOrgAdmin: 'مدير المؤسسة / الوزارة',
@@ -287,7 +287,7 @@ const coreTranslations: Record<'ar'|'en', TranslationDictionary> = {
     navCopilot: 'Copilot & Simulation',
     navCeremony: 'Ceremony Stage',
     navKiosk: 'Self Check-in Kiosk',
-    navSwitchRole: 'Switch Role (Demo)',
+    navSwitchRole: 'Switch Role',
 
     roleSuperAdmin: 'Platform Super Admin',
     roleOrgAdmin: 'Organization Admin',

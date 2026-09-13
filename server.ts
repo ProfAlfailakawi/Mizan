@@ -55,7 +55,7 @@ import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
-import { SEED_COMPETITION } from './src/lib/seed-data';
+import type { Competition } from './src/types';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
 const fromB64=(x:string)=>Buffer.from(x,'base64url').toString('utf8');
@@ -69,6 +69,21 @@ const canonicalStringify=(value:unknown):string=>{if(value===null||typeof value!
    بناء المفتاح في الحالة الثانية ويبقى توقيع الثقة معطّلًا بصمت. */
 const trustSigner=()=>{const pem=decodePemFromEnv(process.env.MIZAN_TRUST_SIGNING_PRIVATE_KEY_PEM);if(!pem)return null;try{const privateKey=crypto.createPrivateKey(pem);const publicKey=crypto.createPublicKey(privateKey);const spki=publicKey.export({format:'der',type:'spki'}).toString('base64url');const keyId=process.env.MIZAN_TRUST_KEY_ID||`ed25519:${crypto.createHash('sha256').update(spki).digest('hex').slice(0,16)}`;return {privateKey,publicKey,spki,keyId}}catch{return null}};
 const safeSegment=(v:string)=>v.replace(/[^a-zA-Z0-9._-]/g,'_').slice(0,120);
+const asCompetition=(value:unknown):Competition|null=>{
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const candidate=value as Partial<Competition>;
+  if(typeof candidate.id!=='string'||!candidate.id.trim())return null;
+  if(typeof candidate.organizationId!=='string'||!candidate.organizationId.trim())return null;
+  if(!Array.isArray(candidate.categories)||!candidate.ruleSet||typeof candidate.ruleSet!=='object')return null;
+  return candidate as Competition;
+};
+
+/* إصدارات قديمة من التطوير كانت تزرع سجلاً ثابتًا على القرص. لا يجوز أن يصبح ذلك
+   السجل مسابقة عامة حقيقية بعد الترقية، حتى لو بقي ملفه من تثبيت سابق. */
+const RETIRED_SEED_COMPETITION_IDS=new Set(['comp-dubai-2027']);
+const RETIRED_SEED_ORGANIZATION_IDS=new Set(['org-gqa-global']);
+const isRetiredSeedCompetition=(competition:Competition)=>
+  RETIRED_SEED_COMPETITION_IDS.has(competition.id)||RETIRED_SEED_ORGANIZATION_IDS.has(competition.organizationId);
 
 async function startServer() {
   const app = express();
@@ -147,17 +162,12 @@ async function startServer() {
   const publicDataDir=process.env.MIZAN_PUBLIC_DATA_DIR||path.resolve('.mizan-data/public-data');
   try{fs.mkdirSync(publicCompDir,{recursive:true,mode:0o700})}catch{/* ignore */}
   try{fs.mkdirSync(publicDataDir,{recursive:true,mode:0o700})}catch{/* ignore */}
-  const demoSeedEnabled=!isProd&&process.env.MIZAN_ENABLE_DEMO_SEED!=='false';
-  if(demoSeedEnabled){
-    try{
-      const seedFile=path.join(publicCompDir,`${SEED_COMPETITION.id}.json`);
-      if(!fs.existsSync(seedFile)){
-        fs.writeFileSync(seedFile,JSON.stringify({organizationId:SEED_COMPETITION.organizationId,competition:{...SEED_COMPETITION,status:'registration_open'},updatedAt:new Date().toISOString()},null,2),'utf8');
-      }
-    }catch{/* ignore */}
+  /* تنظيف أثر النسخة القديمة مرة واحدة. لا ينشئ الخادم أي مسابقة تلقائيًا. */
+  for(const retiredId of RETIRED_SEED_COMPETITION_IDS){
+    try{const stale=path.join(publicCompDir,`${retiredId}.json`);if(fs.existsSync(stale))fs.rmSync(stale,{force:true})}catch{/* ignore */}
   }
 
-  const getLatestOrActiveCompetition=async():Promise<any>=>{
+  const getLatestOrActiveCompetition=async():Promise<Competition|null>=>{
     try{
       if(fs.existsSync(publicCompDir)){
         const files=fs.readdirSync(publicCompDir).filter(f=>f.endsWith('.json')&&!f.startsWith('comp-pending-setup'));
@@ -171,9 +181,9 @@ async function startServer() {
             try{
               const raw=fs.readFileSync(path.join(publicCompDir,f),'utf8');
               const parsed=JSON.parse(raw);
-              const comp=parsed?.competition||parsed;
-              if(comp&&typeof comp==='object'&&Array.isArray(comp.categories)&&comp.categories.length>0){
-                return {...comp,status:comp.status==='draft'?'registration_open':comp.status};
+              const comp=asCompetition(parsed?.competition||parsed);
+              if(comp&&!isRetiredSeedCompetition(comp)&&comp.categories.length>0&&!['draft','configured'].includes(comp.status)){
+                return comp;
               }
             }catch{/* ignore */}
           }
@@ -182,19 +192,20 @@ async function startServer() {
     }catch(err){
       console.warn('[public-competitions] Failed to get latest from disk:',err);
     }
-    return demoSeedEnabled?{...SEED_COMPETITION,status:'registration_open'}:null;
+    return null;
   };
 
-  const getPublicCompetitionRecord=async(id:string):Promise<any>=>{
+  const getPublicCompetitionRecord=async(id:string):Promise<Competition|null>=>{
     const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
     if(!cleanId||cleanId==='latest'||cleanId==='current'||cleanId==='default'||cleanId==='comp-pending-setup'){
       return await getLatestOrActiveCompetition();
     }
+    if(RETIRED_SEED_COMPETITION_IDS.has(cleanId))return null;
     if(firestoreRepository){
       try{
         const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
-        const comp=row?.competition;
-        if(comp&&typeof comp==='object') return comp;
+        const comp=asCompetition(row?.competition);
+        if(comp&&!isRetiredSeedCompetition(comp)) return comp;
       }catch(err){
         console.warn(`[public-competitions] Firestore read failed for ${cleanId}:`,err);
       }
@@ -204,14 +215,11 @@ async function startServer() {
       if(fs.existsSync(file)){
         const raw=fs.readFileSync(file,'utf8');
         const parsed=JSON.parse(raw);
-        const comp=parsed?.competition||parsed;
-        if(comp&&typeof comp==='object') return comp;
+        const comp=asCompetition(parsed?.competition||parsed);
+        if(comp&&!isRetiredSeedCompetition(comp)) return comp;
       }
     }catch(err){
       console.warn(`[public-competitions] Disk read failed for ${cleanId}:`,err);
-    }
-    if(demoSeedEnabled&&(cleanId===SEED_COMPETITION.id||cleanId==='comp-dubai-2027')){
-      return {...SEED_COMPETITION,status:'registration_open'};
     }
     return null;
   };
@@ -220,14 +228,14 @@ async function startServer() {
     /* التسجيل عملية كتابة رسمية، لذلك لا نقبل نسخة القرص كسلطة للفئات. شاشة الطالب
        تسجّل فقط مقابل الإسقاط المنشور فعليًا في Firestore؛ إذا كانت السحابة غير متاحة
        نرفض بوضوح بدل قبول فئة قديمة أو إنشاء تسجيل شبح لا يظهر في «المشاركون». */
-    getCompetition:async(id)=>{
+    getCompetition:async(id):Promise<Competition|null>=>{
       const cleanId=String(id||'').trim().replace(/[^a-zA-Z0-9_-]/g,'');
       if(!cleanId||['latest','current','default','comp-pending-setup'].includes(cleanId))throw new Error('COMPETITION_ID_REQUIRED');
       if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
       try{
         const row=await firestoreRepository.get(`public_competitions/${cleanId}`);
-        const comp=row?.competition;
-        return comp&&typeof comp==='object'?comp:null;
+        const competition=asCompetition(row?.competition);
+        return competition&&!isRetiredSeedCompetition(competition)?competition:null;
       }catch(err){
         console.error(`[public-registration] authoritative competition read failed for ${cleanId}:`,err);
         throw new Error('FIRESTORE_UNAVAILABLE');

@@ -46,12 +46,9 @@ export const JudgeOS: React.FC = () => {
  const visibleCriteria=ruleSet.criteria.filter(c=> judgeCanScore(effectiveJudge,c.assignedJudgeType,policy.judging.mode) || (policy.judging.mode==='hybrid' && c.assignedJudgeType==='all'));
  const [directScores,setDirectScores]=useState<Record<string,number>>({});
  const [audioState,setAudioState]=useState<'not_ready'|'requesting'|'ready'|'failed'>(policy.judging.requireAudioRecording?'not_ready':'ready');
- // في وضع العرض لا يوجد ميكروفون بالضرورة؛ لا نحجب سطح التحكيم خلف تسجيل الصوت كما في الإنتاج،
- // وإلا اختفت الدرجات عن المحكم في العرض. التسجيل يبقى إلزاميًا في النشر الحقيقي.
- const demoMode=import.meta.env.VITE_REQUIRE_AUTH!=='true';
- /* مؤشر الميكروفون يخصّ تسجيل الجلسة، لا تلاوة المصدر المعتمد. يظهر فقط حين يكون
-    التسجيل مطلوبًا فعلًا؛ وفي وضع العرض لا يُطلب، فإظهاره كان يوهم بنقصٍ لا وجود له. */
- const micGateApplies=policy.judging.requireAudioRecording&&!demoMode;
+ /* مؤشر الميكروفون يخصّ تسجيل الجلسة، لا تلاوة المصدر المعتمد. إذا كانت اللائحة
+    تشترط التسجيل فهو بوابة تشغيل حقيقية ولا توجد طريقة عرض تتجاوزها. */
+ const micGateApplies=policy.judging.requireAudioRecording;
  /* لا يكفي أن يُمنح الميكروفون: لا بد أن نسمع صوتًا فعلًا قبل الدخول على الأسئلة،
     وإلا دخل المحكم بميكروفون صامت واكتُشف العطل بعد ضياع التلاوة. */
  const [micLevel,setMicLevel]=useState(0);
@@ -187,15 +184,6 @@ export const JudgeOS: React.FC = () => {
  const storedCue=()=>playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue);
  storedCue()};
 
- // انتقال سلس في العرض: بعد السؤال الأول (الذي يعرض بوابة الكشف)، تُكشف الأسئلة التالية
- // تلقائيًا في وضع العرض حتى لا يعلق المحكم على شاشة «مختوم». الكشف الآمن الحقيقي غير متأثر.
- useEffect(()=>{
-  if(!demoMode||secureMode||!participant||activeSession.isLocked)return;
-  if(activeSession.currentQuestionIndex===0||questionRevealed||activeSession.questionPhase==='RECITING')return;
-  let cancelled=false;
-  void (async()=>{const pr=await confirmPresence();if(cancelled||!pr.ok)return;await approveReveal();})();
-  return ()=>{cancelled=true};
- },[demoMode,secureMode,activeSession.sessionId,activeSession.currentQuestionIndex,questionRevealed,activeSession.isLocked]);
  useEffect(()=>{if(questionRevealed&&q&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),80)},[questionRevealed,(q as any)?.questionId,(q as any)?.id,openingReference?.id,activeSession.currentQuestionIndex]);
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastJudgeEvent();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);

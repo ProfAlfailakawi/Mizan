@@ -25,7 +25,7 @@ const roleName=(role:string,ar:boolean)=>({super_admin:ar?'مدير المنصة
 const timeText=(iso:string,ar:boolean)=>{const d=new Date(iso);if(Number.isNaN(d.getTime()))return '—';return new Intl.DateTimeFormat(ar?'ar-KW-u-nu-latn':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(d)};
 
 export const NotificationCenter:React.FC=()=>{
- const {language,currentUser,competition}=useAppStore();const ar=language==='ar';const production=(import.meta.env as Record<string,string|undefined>).VITE_REQUIRE_AUTH==='true';
+ const {language,currentUser,competition}=useAppStore();const ar=language==='ar';const production=true;
  const [open,setOpen]=useState(false),[composeOpen,setComposeOpen]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [allRows,setAllRows]=useState<NotificationRow[]>([]),[unread,setUnread]=useState(0),[tab,setTab]=useState<Tab>('all'),[query,setQuery]=useState(''),[contextKey,setContextKey]=useState('');
  const [title,setTitle]=useState(''),[body,setBody]=useState(''),[category,setCategory]=useState<Category>('admin'),[priority,setPriority]=useState<Priority>('normal'),[targetType,setTargetType]=useState<TargetType>('organization'),[targetValue,setTargetValue]=useState(''),[targetRole,setTargetRole]=useState('judge'),[sending,setSending]=useState(false);

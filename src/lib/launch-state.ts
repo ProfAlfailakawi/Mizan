@@ -18,7 +18,7 @@ import type { Competition, Organization, User } from '../types';
  */
 
 /*
- * يُميّز النشر الحقيقي عن عرض المنتج. المصادقة الإلزامية هي علامة النشر الحقيقي.
+ * يُميّز النشر الحقيقي عن بيانات أولية. المصادقة الإلزامية هي علامة النشر الحقيقي.
  *
  * و`import.meta.env` قد لا يوجد أصلًا: في Node، وفي عاملٍ خلفي، وفي أي تشغيلٍ خارج حزمة
  * Vite. وكان غيابُه يرمي عند قراءة الحقل منه — أي أن دالةً تجيب بنعم أو لا كانت تُسقط ما
@@ -106,7 +106,7 @@ export function toLaunchState(seeded: AppStoreState): AppStoreState {
   const competition = launchCompetition(seeded.competition, organization.id);
 
   // Any top-level array in the seed is a record collection. A production launch must never
-  // inherit it: devices, demo halls, scientific fixtures, support rows and "preview" metrics
+  // inherit it: devices, sample halls, scientific fixtures, support rows and "preview" metrics
   // are just as misleading as fake participants. Start every collection empty, then restore
   // only the two structural lists that identify the active tenant and competition.
   const clean = { ...seeded } as AppStoreState;
@@ -146,7 +146,7 @@ export function toLaunchState(seeded: AppStoreState): AppStoreState {
   };
 }
 
-/** حالة محفوظة تحمل هوية بيانات العرض لا يجوز إحياؤها في نشرٍ حقيقي. */
-export function isDemoResidue(savedOrganizationId: string | undefined, demoOrganizationId: string): boolean {
-  return !!savedOrganizationId && savedOrganizationId === demoOrganizationId;
+/** حالة محفوظة من قالب التطوير القديم لا يجوز إحياؤها في التشغيل الحقيقي. */
+export function isRetiredSeedResidue(savedOrganizationId: string | undefined, retiredOrganizationId: string): boolean {
+  return !!savedOrganizationId && savedOrganizationId === retiredOrganizationId;
 }

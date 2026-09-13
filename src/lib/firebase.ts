@@ -21,17 +21,16 @@ type AppletConfig = Partial<{
 const config: AppletConfig = rawConfig;
 
 const env=import.meta.env as Record<string,string|undefined>;
-const authRequired=env.VITE_REQUIRE_AUTH==='true';
 const apiKey=env.VITE_FIREBASE_API_KEY;
-if(authRequired&&!apiKey) throw new Error('VITE_FIREBASE_API_KEY is required when production authentication is enabled. Rotate any key that was ever exposed publicly.');
+if(!apiKey) throw new Error('VITE_FIREBASE_API_KEY is required. MIZAN has no unauthenticated staff runtime.');
 
 const firebaseConfig = {
-  apiKey: apiKey || 'development-only-no-real-key',
+  apiKey,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain || undefined,
   projectId: env.VITE_FIREBASE_PROJECT_ID || config.projectId,
   storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || config.storageBucket || undefined,
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.messagingSenderId || undefined,
-  appId: env.VITE_FIREBASE_APP_ID || config.appId || 'development-app',
+  appId: env.VITE_FIREBASE_APP_ID || config.appId,
 };
 
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -40,8 +39,8 @@ export const auth = getAuth(app);
 /*
  * Firestore is loaded on demand, not at module scope.
  *
- * Every Firestore path in the app is already gated on `auth.currentUser`, so demo and
- * local-only sessions never touch the cloud — yet the 132 kB (gzipped) Firestore client
+ * Every Firestore path in the app is gated on `auth.currentUser`, so signed-out public routes
+ * never touch the cloud — yet the 132 kB (gzipped) Firestore client
  * was still downloaded, parsed and initialised before the first screen painted. Deferring
  * it removes that cost from everyone who is not signed in, and changes nothing for anyone
  * who is: the first call still awaits a fully initialised client.

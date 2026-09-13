@@ -1,10 +1,9 @@
 import React,{useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
-import { Wifi, WifiOff, Search, LayoutDashboard, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
+import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { useAppStore } from '../../lib/store';
-import { RoleSwitcher } from '../design-system/RoleSwitcher';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
 import { EmergencyControl } from '../design-system/EmergencyControl';
@@ -14,13 +13,9 @@ import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
 import { NotificationCenter } from './NotificationCenter';
 import { Button } from '../design-system/Button';
 
-interface HeaderProps { onOpenExperienceHome?:()=>void; }
-
-
-export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
+export const Header: React.FC = () => {
  const {language,competition,isOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
  const brandInfo = useBrandInfo();
- const production=(import.meta.env as Record<string,string|undefined>).VITE_REQUIRE_AUTH==='true';
  const superAdmin=currentUser.role==='super_admin';
  const logout=()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())};
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
@@ -46,13 +41,11 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       </div>
     </div>
     <div className="flex items-center gap-1 shrink-0">
-      {!superAdmin&&onOpenExperienceHome&&<span className="hidden sm:inline-flex"><Button shape="square" variant="ghost" onClick={onOpenExperienceHome} aria-label={language==='ar'?'كل التجارب':'All experiences'}><LayoutDashboard className="w-4 h-4"/></Button></span>}
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
         <summary className="list-none w-11 h-11 grid place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a] cursor-pointer" aria-label={language==='ar'?'المزيد':'More'}><Menu className="w-4 h-4"/></summary>
         <div className="absolute right-0 top-12 z-50 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-[#e2e0d8] bg-white p-1.5 shadow-[0_18px_45px_rgba(25,39,33,.16)]">
-          {!superAdmin&&onOpenExperienceHome&&<button onClick={onOpenExperienceHome} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><LayoutDashboard className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'كل التجارب':'All experiences'}</button>}
           <button onClick={()=>setSearchOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><Search className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'بحث سريع':'Quick search'}</button>
           {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
         </div>
@@ -61,8 +54,7 @@ export const Header: React.FC<HeaderProps> = ({onOpenExperienceHome}) => {
       {!superAdmin&&<EmergencyControl iconOnly/>}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
-      {!superAdmin&&<RoleSwitcher/>}
-      {production&&<button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>}
+      <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
     </div>
   </div>
   <CommandPalette open={searchOpen} onOpenChange={setSearchOpen}/><ClarityGuide open={helpOpen} onClose={()=>setHelpOpen(false)} role={currentUser.role} ar={language==='ar'}/>

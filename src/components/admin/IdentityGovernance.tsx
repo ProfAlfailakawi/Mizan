@@ -47,7 +47,7 @@ const resetStatus=(status:string,ar:boolean)=>({PENDING:ar?'طلب جديد':'Ne
 const identityHashParams=()=>{if(typeof window==='undefined'||!window.location.hash.startsWith('#identity'))return null;return new URLSearchParams(window.location.hash.split('?')[1]||'')};
 
 export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:string;operatorId?:string;operatorName?:string}>=({competitionId,organizationId,operatorId,operatorName})=>{
- const s=useAppStore();const ar=s.language==='ar';const production=import.meta.env.VITE_REQUIRE_AUTH==='true';
+ const s=useAppStore();const ar=s.language==='ar';const production=true;
  const operatorScoped=Boolean(operatorId);
  const operatorManagingOrganization=!operatorScoped&&Boolean(organizationId)&&['operator_owner','operator_admin'].includes(s.currentUser.role);
  const competitionScoped=Boolean(competitionId)&&!operatorScoped;

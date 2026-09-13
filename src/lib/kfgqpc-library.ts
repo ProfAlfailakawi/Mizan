@@ -11,7 +11,7 @@ const VENUE_CACHE='mizan-quran-venue-v1';
  * Official Mushaf page image.
  *
  * Order: signed-in governance route first (keeps venue-cache behaviour and per-role auditing),
- * then the public delivery route so an unauthenticated venue/demo screen still renders the real
+ * then the public delivery route so an unauthenticated venue screen still renders the real
  * printed page instead of falling back to plain text, then the offline venue cache.
  */
 export async function fetchOfficialMushafPage(packageId:string,page:number):Promise<string|null>{
