@@ -23,9 +23,22 @@ const marksAr=(n:number)=> n===1?'مرة واحدة' : n===2?'مرتين' : n<=1
 // نفس قاعدة العدد العربي، بلفظ «ملاحظة»: مفرد، مثنّى، جمع قلة، ثم تمييز مفرد.
 const notesAr=(n:number)=> n===0?'لا ملاحظات' : n===1?'ملاحظة واحدة' : n===2?'ملاحظتان' : n<=10?`${n} ملاحظات` : `${n} ملاحظة`;
 // Criterion names were only ever available in English, inside an Arabic-first surface.
+import { calculateCategoryPassageRange } from '../../lib/scope-engine';
+
 const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
 const iconFor=(kind?:string)=> kind==='error'?AlertTriangle:kind==='open'?CornerDownLeft:kind==='repeat'?RotateCcw:kind==='tajweed'?Sparkles:kind==='stop'?CircleDot:AlertTriangle;
-const passageSizeLabel=(category:any,ar:boolean)=>{const units=Number(category?.pageQuarterUnits||0);if(category?.passageMode==='page_quarters'||units>0||category?.pagePortion){const u=units||(category?.pagePortion==='quarter'?1:category?.pagePortion==='half'?2:category?.pagePortion==='third'?1.5:category?.pagePortion==='full'?4:0);const arLabels:Record<string,string>={'1':'ربع وجه','1.5':'ثلث وجه','2':'نصف وجه','3':'ثلاثة أرباع وجه','4':'وجه كامل','5':'وجه وربع','6':'وجه ونصف','7':'وجه وثلاثة أرباع','8':'وجهان'};return ar?(arLabels[String(u)]||`${u} ربع وجه`):`${u} page quarter${u===1?'':'s'}`;}const ayat=Number(category?.ayatPerQuestion||0);return ayat>0?(ar?`${ayat} ${ayat===1?'آية':'آيات'}`:`${ayat} ayah${ayat===1?'':'s'}`):(ar?'حسب إعداد الفئة':'Category default');};
+
+const passageSizeLabel = (category: any, ar: boolean) => {
+  const range = calculateCategoryPassageRange(category);
+  const target = range.targetAyahCount || 0;
+  if (target > 0) {
+    if (ar) {
+      return `${target} ${target === 1 ? 'آية' : target <= 10 ? 'آيات' : 'آية'}`;
+    }
+    return `${target} ayah${target === 1 ? '' : 's'}`;
+  }
+  return ar ? 'حسب إعداد الفئة' : 'Category default';
+};
 const judgeSpecialties=(judge?:{specialty?:string;specialties?:string[]}|null)=>[...new Set((judge?.specialties?.length?judge.specialties:[judge?.specialty||'all']).filter(Boolean))];
 const judgeCanScore=(judge:{specialty?:string;specialties?:string[]}|undefined,assigned:string|undefined,mode:string)=>mode==='all_judges_all_criteria'||!judge||judgeSpecialties(judge).includes('all')||!assigned||assigned==='all'||judgeSpecialties(judge).includes(assigned);
 
