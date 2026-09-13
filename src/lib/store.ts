@@ -181,11 +181,12 @@ function emptyInitialState(): AppStoreState {
  */
 function getInitialState(): AppStoreState {
   const launch = isLaunchDeployment();
+  const isDemoResidue = isRetiredSeedResidue;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as AppStoreState;
-      if (isRetiredSeedResidue(parsed?.organization?.id, 'org-gqa-global')) {
+      if (isDemoResidue(parsed?.organization?.id, 'org-gqa-global')) {
         localStorage.removeItem(STORAGE_KEY);
       } else {
         /* جهاز يحمل نسخة سابقة للترقية يبقى حاملًا لأرقام الهوية إلى أن يُكتب شيء جديد — وقد
@@ -198,9 +199,9 @@ function getInitialState(): AppStoreState {
   } catch {
     // fallback below
   }
-  const initial = emptyInitialState();
+  const seeded = emptyInitialState();
   void launch;
-  return toLaunchState(initial);
+  return toLaunchState(seeded);
 }
 
 let globalState = getInitialState();
@@ -3181,7 +3182,7 @@ export function useAppStore() {
   /** لجانٌ بإيقاعها المقيس — تُمرَّر لكل ما يحسب بالدقائق بدل القيمة المُعدّة. */
   const atMeasuredTempo = (list: Committee[], byId = tempoMinutes()) =>
     list.map(c => byId[c.id] ? { ...c, averageSessionMinutes: byId[c.id] } : c);
-  const committeesAtMeasuredTempo = () => atMeasuredTempo(globalState.committees.filter(c=>c.competitionId===globalState.competition.id));
+  const committeesAtMeasuredTempo = () => atMeasuredTempo(globalState.committees);
 
   const distributionConstraints = () => {
     const ops = getCompetitionPolicy(globalState.competition).operations;

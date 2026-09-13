@@ -483,6 +483,8 @@ export interface Competition {
   closedAt?: string;
   closedBy?: string;
   closureReason?: string;
+  /** Revision timestamp of the published/public projection when a competition is read through that projection. */
+  updatedAt?: string;
   readinessChecklist: {
     datesConfigured: boolean;
     categoriesConfigured: boolean;
