@@ -402,6 +402,41 @@ test('exposure counts come from the ledger of what was actually revealed, never 
   }
 });
 
+test('calculateCategoryPassageRange calculates exact ayat and page quarter units accurately', () => {
+  const h = harness();
+  
+  // Exact ayat mode
+  const exactCat = { passageMode: 'exact_ayat', ayatPerQuestion: 5 } as any;
+  assert.deepEqual(h.actions.categoryPassageAyahRange(exactCat), {
+    minAyahCount: 5,
+    maxAyahCount: 5,
+    targetAyahCount: 5,
+  });
+
+  // Page quarter presets (1 quarter = 1-3 ayat, target 2)
+  const quarter1 = { passageMode: 'page_quarters', pageQuarterUnits: 1 } as any;
+  assert.deepEqual(h.actions.categoryPassageAyahRange(quarter1), {
+    minAyahCount: 1,
+    maxAyahCount: 3,
+    targetAyahCount: 2,
+  });
+
+  // Page quarter presets (2 quarters / half page = 3-5 ayat, target 4)
+  const quarter2 = { passageMode: 'page_quarters', pageQuarterUnits: 2 } as any;
+  assert.deepEqual(h.actions.categoryPassageAyahRange(quarter2), {
+    minAyahCount: 3,
+    maxAyahCount: 5,
+    targetAyahCount: 4,
+  });
+
+  // Default fallback when category is undefined
+  assert.deepEqual(h.actions.categoryPassageAyahRange(undefined), {
+    minAyahCount: 3,
+    maxAyahCount: 3,
+    targetAyahCount: 3,
+  });
+});
+
 test('sourceResolvedQuestionPool filters candidates by approved governance and manifests content', () => {
   const h = harness();
   approvedScope(h, 'p1', [30]);
@@ -434,4 +469,5 @@ test('sourceResolvedQuestionPool filters candidates by approved governance and m
   const pool = h.actions.sourceResolvedQuestionPool(part, source, content);
   assert.ok(Array.isArray(pool));
 });
+
 
