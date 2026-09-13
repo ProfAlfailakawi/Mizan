@@ -381,6 +381,7 @@ function clearPendingDelete(collection: string, id: string) {
 }
 const rowHasPendingWrite = (collection: string, rowId: string) => pendingRegister.rowHasWrite(pendingScope(), collection, rowId);
 const rowHasPendingDelete = (collection: string, rowId: string) => pendingRegister.rowHasDelete(pendingScope(), collection, rowId);
+export type { QuestionPoolItem };
 export function pendingCloudWriteCount() { return pendingRegister.size; }
 
 /* الدمج الوارد بقواعده الخالصة؛ الغلاف هنا يمرّر حارسي المعلَّق لهذه المجموعة وحدها. */
@@ -3626,7 +3627,7 @@ export function useAppStore() {
     setCategoryScope, setCategorySelectionRule, setCategoryDistribution, setCategoryRepeatPolicy, setCategoryQuestionCount,
     categoryScopeMigrationPlan,
     saveParticipantScope, decideParticipantScope, participantEffectiveScope, activeParticipantScope,
-    scopeCandidatePool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle, sealScopeEngine, scopeSealImpact,
+    scopeCandidatePool, sourceResolvedQuestionPool, scopeDemandAnalysis, getScopeReadiness, runScopeSimulation, runFairnessOracle, sealScopeEngine, scopeSealImpact,
     generateQuestionModelBatch, decideModelBatch, preGeneratedModelFor, claimReserveForParticipant, exposureProfiles,
     quarantineQuestionLoci, liftQuestionQuarantine, recoverQuarantinedLoci, participantScopeHistory,
     reserveQuestionsForParticipant, advanceReservations, sweepExpiredReservations, reservationBlockedLoci,
