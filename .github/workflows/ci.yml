@@ -74,4 +74,17 @@ jobs:
       # Cloud Run لا يشغّل ناتج npm run build مباشرة؛ يشغّل صورة Dockerfile.
       # لذلك لا يكفي أن ينجح Vite/TypeScript: نبني نفس صورة الإنتاج قبل السماح للنشر.
       - name: بناء صورة Cloud Run الفعلية
-        run: docker build --tag "mizan-ci:${GITHUB_SHA}" .
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --tag "mizan-ci:${GITHUB_SHA}" . 2>&1 | tee docker-build.log
+
+      # يبقى سجل Docker متاحاً عند الفشل حتى يكون سبب الانكسار مرئياً ولا نعالج بالتخمين.
+      - name: حفظ سجل Docker عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-run-docker-build-${{ github.sha }}
+          path: docker-build.log
+          if-no-files-found: error
+          retention-days: 3
