@@ -38,6 +38,9 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   secretmanager.googleapis.com \
   firebaserules.googleapis.com \
+  firestore.googleapis.com \
+  firebase.googleapis.com \
+  storage.googleapis.com \
   serviceusage.googleapis.com \
   --project="$PROJECT_ID" --quiet
 
