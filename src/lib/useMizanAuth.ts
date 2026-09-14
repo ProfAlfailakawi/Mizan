@@ -149,11 +149,19 @@ export function useMizanAuth(requireAuth: boolean) {
           { id: user.uid, role, organizationId, operatorId, competitionId },
           appStore,
         );
-        if (scopePreparation === 'reload') { window.location.reload(); return; }
+        let effectiveCompetitionId = competitionId;
+        if (scopePreparation) {
+          const otherOrganizations = appStore.competitions.filter(c => c.organizationId !== organizationId);
+          // The store exposes its current arrays by reference. Updating this array before
+          // applyAuthenticatedIdentity lets that authoritative action select the cloud competition
+          // without creating a second browser-storage writer or a reload loop.
+          appStore.competitions.splice(0, appStore.competitions.length, ...scopePreparation.competitions, ...otherOrganizations);
+          effectiveCompetitionId ||= scopePreparation.selectedCompetitionId;
+        }
 
         applyAuthenticatedIdentity({
           id: user.uid, email: user.email || '', name: user.displayName || user.email || user.uid,
-          role, organizationId, operatorId, competitionId, mfaEnabled: secondFactor,
+          role, organizationId, operatorId, competitionId: effectiveCompetitionId, mfaEnabled: secondFactor,
           identityAssurance: serverManaged ? 'firebase_managed' : 'firebase',
         });
         setAccessError(''); setSignedIn(true);
