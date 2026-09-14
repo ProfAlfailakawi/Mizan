@@ -14,6 +14,7 @@ REPOSITORY_OWNER_ID="${GITHUB_REPOSITORY_OWNER_ID:-276768958}"
 POOL_ID="${POOL_ID:-mizan-github}"
 PROVIDER_ID="${PROVIDER_ID:-github-actions}"
 DEPLOY_SA_NAME="${DEPLOY_SA_NAME:-mizan-github-deployer}"
+BUILD_SA_NAME="${BUILD_SA_NAME:-mizan-cloud-build}"
 ARTIFACT_REPOSITORY="${ARTIFACT_REPOSITORY:-cloud-run-source-deploy}"
 SOURCE_BUCKET="${SOURCE_BUCKET:-${PROJECT_ID}-github-deploy-source}"
 
@@ -33,6 +34,7 @@ if [[ ! "$REPOSITORY_ID" =~ ^[0-9]+$ || ! "$REPOSITORY_OWNER_ID" =~ ^[0-9]+$ ]];
   exit 1
 fi
 DEPLOY_SA_EMAIL="${DEPLOY_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+BUILD_SA_EMAIL="${BUILD_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 echo 'Enabling required Google Cloud APIs...'
 gcloud services enable \
@@ -74,7 +76,6 @@ if ! gcloud storage buckets describe "gs://${SOURCE_BUCKET}" --project="$PROJECT
     --public-access-prevention \
     --quiet
 else
-  # Re-running the bootstrap also repairs accidental weakening of the staging bucket.
   gcloud storage buckets update "gs://${SOURCE_BUCKET}" \
     --uniform-bucket-level-access \
     --public-access-prevention \
@@ -86,7 +87,16 @@ if ! gcloud iam service-accounts describe "$DEPLOY_SA_EMAIL" --project="$PROJECT
   gcloud iam service-accounts create "$DEPLOY_SA_NAME" \
     --project="$PROJECT_ID" \
     --display-name='MIZAN GitHub production deployer' \
-    --description='OIDC-only identity that may submit verified main commits to Cloud Build' \
+    --description='OIDC-only identity that submits verified main commits to Cloud Build' \
+    --quiet
+fi
+
+echo 'Ensuring dedicated Cloud Build service account exists...'
+if ! gcloud iam service-accounts describe "$BUILD_SA_EMAIL" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  gcloud iam service-accounts create "$BUILD_SA_NAME" \
+    --project="$PROJECT_ID" \
+    --display-name='MIZAN production Cloud Build' \
+    --description='Least-privilege build identity for MIZAN production deployment' \
     --quiet
 fi
 
@@ -100,8 +110,8 @@ if ! gcloud iam workload-identity-pools describe "$POOL_ID" --project="$PROJECT_
     --quiet
 fi
 
-# GitHub names are mutable. Bind the Google principal to GitHub's immutable numeric IDs so a
-# repository rename/transfer cannot accidentally hand deployment authority to a reused name.
+# GitHub names are mutable. Bind Google authority to immutable numeric IDs so a repository
+# rename/transfer cannot accidentally hand deployment authority to a reused repository name.
 ATTRIBUTE_MAPPING='google.subject=assertion.sub,attribute.repository_id=assertion.repository_id,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref'
 ATTRIBUTE_CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.repository_owner_id=='${REPOSITORY_OWNER_ID}' && assertion.ref=='refs/heads/main'"
 
@@ -138,8 +148,7 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
   --member="$WIF_MEMBER" \
   --quiet >/dev/null
 
-# The GitHub identity can submit builds and inspect the dedicated staging bucket, but cannot deploy
-# Cloud Run directly. The Cloud Build execution identity below owns the privileged deployment steps.
+# GitHub may submit builds and stage source, but may not deploy Cloud Run directly.
 for role in roles/cloudbuild.builds.editor roles/serviceusage.serviceUsageConsumer roles/storage.bucketViewer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
@@ -153,32 +162,30 @@ gcloud storage buckets add-iam-policy-binding "gs://${SOURCE_BUCKET}" \
   --role='roles/storage.objectAdmin' \
   --quiet >/dev/null
 
-echo 'Resolving the actual Cloud Build execution identity...'
-BUILD_SA="$(gcloud builds get-default-service-account --project="$PROJECT_ID" 2>/dev/null || true)"
-if [[ -z "$BUILD_SA" ]]; then
-  echo 'Cloud Build did not report a default service account. Run a trivial build once, then rerun this script.' >&2
-  exit 1
-fi
-BUILD_SA="${BUILD_SA#serviceAccount:}"
-echo "Cloud Build service account: $BUILD_SA"
+# Submitting a build with a user-specified identity requires iam.serviceAccounts.actAs.
+gcloud iam service-accounts add-iam-policy-binding "$BUILD_SA_EMAIL" \
+  --project="$PROJECT_ID" \
+  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
+  --role='roles/iam.serviceAccountUser' \
+  --quiet >/dev/null
 
+echo "Dedicated Cloud Build service account: $BUILD_SA_EMAIL"
 for role in \
   roles/cloudbuild.builds.builder \
   roles/run.admin \
   roles/artifactregistry.writer \
   roles/firebaserules.admin \
-  roles/secretmanager.secretAccessor \
   roles/logging.logWriter \
   roles/serviceusage.serviceUsageConsumer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:${BUILD_SA}" \
+    --member="serviceAccount:${BUILD_SA_EMAIL}" \
     --role="$role" \
     --condition=None \
     --quiet >/dev/null
 done
 
 gcloud storage buckets add-iam-policy-binding "gs://${SOURCE_BUCKET}" \
-  --member="serviceAccount:${BUILD_SA}" \
+  --member="serviceAccount:${BUILD_SA_EMAIL}" \
   --role='roles/storage.objectViewer' \
   --quiet >/dev/null
 
@@ -192,11 +199,12 @@ fi
 echo "Cloud Run runtime service account: $RUNTIME_SA"
 gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
   --project="$PROJECT_ID" \
-  --member="serviceAccount:${BUILD_SA}" \
+  --member="serviceAccount:${BUILD_SA_EMAIL}" \
   --role='roles/iam.serviceAccountUser' \
   --quiet >/dev/null
 
-# Deployment must fail early if the existing production secrets disappeared.
+# Deployment must fail early if the existing production secrets disappeared. The build identity
+# does not receive secret payload access; only the Cloud Run runtime identity can read them.
 for secret in R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
   if ! gcloud secrets describe "$secret" --project="$PROJECT_ID" >/dev/null 2>&1; then
     echo "Required production secret is missing: $secret" >&2
@@ -214,8 +222,10 @@ cat <<EOF
 Google Cloud side is configured.
 Workload Identity Provider:
   ${PROVIDER_NAME}
-Deployment service account:
+GitHub deployment service account:
   ${DEPLOY_SA_EMAIL}
+Cloud Build execution service account:
+  ${BUILD_SA_EMAIL}
 
 EOF
 
