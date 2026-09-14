@@ -9,6 +9,8 @@ PROJECT_ID="${PROJECT_ID:-mizan-f2ce3}"
 REGION="${REGION:-me-central1}"
 SERVICE_NAME="${SERVICE_NAME:-mizan}"
 REPOSITORY="${GITHUB_REPOSITORY:-ProfAlfailakawi/Mizan}"
+REPOSITORY_ID="${GITHUB_REPOSITORY_ID:-1353999541}"
+REPOSITORY_OWNER_ID="${GITHUB_REPOSITORY_OWNER_ID:-276768958}"
 POOL_ID="${POOL_ID:-mizan-github}"
 PROVIDER_ID="${PROVIDER_ID:-github-actions}"
 DEPLOY_SA_NAME="${DEPLOY_SA_NAME:-mizan-github-deployer}"
@@ -18,12 +20,16 @@ SOURCE_BUCKET="${SOURCE_BUCKET:-${PROJECT_ID}-github-deploy-source}"
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1" >&2; exit 1; }; }
 need gcloud
 
-echo "Configuring production deployment for ${REPOSITORY} -> ${PROJECT_ID}/${REGION}/${SERVICE_NAME}"
+echo "Configuring production deployment for ${REPOSITORY} (${REPOSITORY_ID}) -> ${PROJECT_ID}/${REGION}/${SERVICE_NAME}"
 gcloud config set project "$PROJECT_ID" --quiet
 
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 if [[ ! "$PROJECT_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "Could not resolve Google Cloud project number for $PROJECT_ID" >&2
+  exit 1
+fi
+if [[ ! "$REPOSITORY_ID" =~ ^[0-9]+$ || ! "$REPOSITORY_OWNER_ID" =~ ^[0-9]+$ ]]; then
+  echo 'GitHub repository/owner IDs must be immutable numeric IDs.' >&2
   exit 1
 fi
 DEPLOY_SA_EMAIL="${DEPLOY_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -94,10 +100,12 @@ if ! gcloud iam workload-identity-pools describe "$POOL_ID" --project="$PROJECT_
     --quiet
 fi
 
-ATTRIBUTE_MAPPING='google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref'
-ATTRIBUTE_CONDITION="assertion.repository=='${REPOSITORY}' && assertion.ref=='refs/heads/main'"
+# GitHub names are mutable. Bind the Google principal to GitHub's immutable numeric IDs so a
+# repository rename/transfer cannot accidentally hand deployment authority to a reused name.
+ATTRIBUTE_MAPPING='google.subject=assertion.sub,attribute.repository_id=assertion.repository_id,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref'
+ATTRIBUTE_CONDITION="assertion.repository_id=='${REPOSITORY_ID}' && assertion.repository_owner_id=='${REPOSITORY_OWNER_ID}' && assertion.ref=='refs/heads/main'"
 
-echo 'Ensuring GitHub OIDC provider exists and is restricted to main...'
+echo 'Ensuring GitHub OIDC provider exists and is restricted to this repository ID on main...'
 if gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" --project="$PROJECT_ID" --location=global --workload-identity-pool="$POOL_ID" >/dev/null 2>&1; then
   gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
     --project="$PROJECT_ID" \
@@ -121,9 +129,9 @@ fi
 
 POOL_NAME="$(gcloud iam workload-identity-pools describe "$POOL_ID" --project="$PROJECT_ID" --location=global --format='value(name)')"
 PROVIDER_NAME="$(gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" --project="$PROJECT_ID" --location=global --workload-identity-pool="$POOL_ID" --format='value(name)')"
-WIF_MEMBER="principalSet://iam.googleapis.com/${POOL_NAME}/attribute.repository/${REPOSITORY}"
+WIF_MEMBER="principalSet://iam.googleapis.com/${POOL_NAME}/attribute.repository_id/${REPOSITORY_ID}"
 
-echo 'Binding GitHub repository identity to the deployer service account...'
+echo 'Binding immutable GitHub repository identity to the deployer service account...'
 gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
   --project="$PROJECT_ID" \
   --role='roles/iam.workloadIdentityUser' \
