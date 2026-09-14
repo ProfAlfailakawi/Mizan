@@ -1,13 +1,12 @@
 name: نشر ميزان إلى Cloud Run
 
-# النشر لا يعتمد على trigger خارجي غير مرئي. بعد نجاح فحص main فقط،
-# هذا الـworkflow يرسل الـcommit نفسه إلى Cloud Build عبر OIDC/WIF بلا مفاتيح JSON طويلة العمر.
+# النشر مملوك للمستودع نفسه، لكنه لا يعمل إلا بعد نجاح CI على push إلى main.
+# لا يوجد workflow_dispatch متجاوز للحارس، ولا checkout لـSHA مأخوذ من workflow_run.
 on:
   workflow_run:
     workflows:
       - فحص ميزان — لا نشر فوق فحص أحمر
     types: [completed]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,45 +25,46 @@ env:
 
 jobs:
   deploy:
-    # لا نشر من PR ولا من فرع جانبي. workflow_run يجب أن يكون push ناجحًا على main.
-    # التشغيل اليدوي مسموح فقط عندما يكون الـworkflow نفسه على main.
+    # workflow_run يستطيع أن يكون ذا صلاحيات مرتفعة، لذلك نسمح فقط بنتيجة CI ناجحة
+    # ناتجة من push إلى main. PRs والفروع الجانبية لا تدخل هذا المسار.
     if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - name: تثبيت SHA الذي اجتاز الفحص
+      # مهم أمنيًا: لا نستخدم workflow_run.head_sha كـref للـcheckout في workflow مميز.
+      # نأخذ main الموثوق فقط، ثم نثبت أنه ما زال نفس الـSHA الذي اجتاز CI.
+      - name: جلب main الموثوق
+        uses: actions/checkout@v5
+        with:
+          ref: refs/heads/main
+          fetch-depth: 1
+
+      - name: إثبات أن main الحالي هو الـcommit الذي اجتاز CI
         id: source
         shell: bash
         env:
-          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
-          DISPATCH_SHA: ${{ github.sha }}
+          CI_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
-            sha="$WORKFLOW_RUN_SHA"
-          else
-            sha="$DISPATCH_SHA"
-          fi
-          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Invalid deployment SHA: $sha" >&2
+          if [[ ! "$CI_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid CI SHA" >&2
             exit 1
           fi
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Deploying verified commit: $sha"
-
-      - name: جلب الـcommit الموثق نفسه
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ steps.source.outputs.sha }}
-          fetch-depth: 1
+          checked_sha="$(git rev-parse HEAD)"
+          if [[ "$checked_sha" != "$CI_SHA" ]]; then
+            echo "main moved after this CI run; refusing a stale privileged deployment." >&2
+            echo "CI SHA:      $CI_SHA" >&2
+            echo "current main: $checked_sha" >&2
+            exit 1
+          fi
+          echo "sha=$checked_sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying verified trusted main commit: $checked_sha"
 
       - name: التحقق من إعداد هوية النشر
         shell: bash
