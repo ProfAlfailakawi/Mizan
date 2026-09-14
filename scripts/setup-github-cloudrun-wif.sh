@@ -203,8 +203,9 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
   --role='roles/iam.serviceAccountUser' \
   --quiet >/dev/null
 
-# Deployment must fail early if the existing production secrets disappeared. The build identity
-# does not receive secret payload access; only the Cloud Run runtime identity can read them.
+# Deployment fails early if production secrets disappeared. Secret payload access is granted only
+# on the two named R2 secrets to the Cloud Run runtime identity; neither GitHub nor the build
+# identity receives project-wide Secret Manager accessor permissions.
 for secret in R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
   if ! gcloud secrets describe "$secret" --project="$PROJECT_ID" >/dev/null 2>&1; then
     echo "Required production secret is missing: $secret" >&2
@@ -247,6 +248,7 @@ fi
 cat <<'EOF'
 
 Important: Google IAM / Workload Identity changes can take a few minutes to propagate.
-After propagation, open GitHub Actions and run "نشر ميزان إلى Cloud Run" manually once,
-or push a verified commit to main. The workflow itself verifies the deployed SHA.
+After propagation, re-run the latest CI run whose original event was a push to main, or push a new
+commit to main. A successful push CI triggers Cloud Run deployment automatically; there is no manual
+deployment bypass around the green-main gate.
 EOF
