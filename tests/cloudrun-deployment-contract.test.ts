@@ -12,6 +12,11 @@ test('production deployment is repository-owned and gated by green main CI',()=>
   assert.match(deploy,/workflow_run\.event == 'push'/);
   assert.match(deploy,/workflow_run\.conclusion == 'success'/);
   assert.match(deploy,/workflow_run\.head_branch == 'main'/);
+  assert.doesNotMatch(deploy,/workflow_dispatch:/);
+  assert.match(deploy,/ref:\s*refs\/heads\/main/);
+  assert.doesNotMatch(deploy,/ref:\s*\$\{\{\s*steps\.source\.outputs\.sha\s*\}\}/);
+  assert.match(deploy,/checked_sha="\$\(git rev-parse HEAD\)"/);
+  assert.match(deploy,/"\$checked_sha" != "\$CI_SHA"/);
   assert.match(deploy,/id-token:\s*write/);
   assert.match(deploy,/google-github-actions\/auth@v3/);
   assert.match(deploy,/google-github-actions\/setup-gcloud@v3/);
@@ -62,6 +67,7 @@ test('bootstrap uses keyless GitHub OIDC, immutable identity claims, and a dedic
   assert.doesNotMatch(bootstrap,/gcloud builds get-default-service-account/);
   assert.doesNotMatch(bootstrap,/gcloud iam service-accounts keys create/);
   assert.doesNotMatch(bootstrap,/credentials_json/);
+  assert.doesNotMatch(bootstrap,/serviceAccount:.*@cloudbuild\.gserviceaccount\.com[\s\S]{0,160}roles\/secretmanager\.secretAccessor/);
 });
 
 test('deployment documentation no longer claims production is not deployed',()=>{
