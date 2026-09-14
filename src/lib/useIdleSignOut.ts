@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { durableSignOut } from './cloud-session-durability';
 
 /*
  * تسجيل خروج تلقائي عند الخمول.
@@ -33,7 +32,7 @@ export function useIdleSignOut(active: boolean): number | null {
 
     const signOutNow = () => {
       window.clearInterval(tick);
-      void signOut(auth).catch(() => {}).finally(() => window.location.reload());
+      void durableSignOut().catch(() => {}).finally(() => window.location.reload());
     };
 
     const schedule = () => {
