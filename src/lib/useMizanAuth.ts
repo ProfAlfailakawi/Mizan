@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getIdTokenResult, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import { useAppStore } from './store';
+import { prepareAuthenticatedCloudScope } from './auth-cloud-rehydration';
 import { Role } from '../types';
 
 /** Roles MIZAN will admit. Unknown or retired claims fail closed. */
@@ -98,7 +99,8 @@ async function resolveServerIdentity(
 }
 
 export function useMizanAuth(requireAuth: boolean) {
-  const { applyAuthenticatedIdentity } = useAppStore();
+  const appStore = useAppStore();
+  const { applyAuthenticatedIdentity } = appStore;
   const qrTokenAtLoad = activationTokenFromLocation();
   const [signedIn, setSignedIn] = useState(!requireAuth);
   const [authReady, setAuthReady] = useState(!requireAuth);
@@ -142,6 +144,12 @@ export function useMizanAuth(requireAuth: boolean) {
         const staffMfaRequired = import.meta.env.VITE_REQUIRE_MFA_FOR_SENSITIVE === 'true';
         const mfaRequired = (role === 'super_admin' && ownerMfaRequired) || (staffMfaRequired && OPTIONAL_STAFF_MFA_ROLES.includes(role));
         if (mfaRequired && !secondFactor) { setAccessError('MFA_REQUIRED'); setSignedIn(false); setAuthReady(true); return; }
+
+        const scopePreparation = await prepareAuthenticatedCloudScope(
+          { id: user.uid, role, organizationId, operatorId, competitionId },
+          appStore,
+        );
+        if (scopePreparation === 'reload') { window.location.reload(); return; }
 
         applyAuthenticatedIdentity({
           id: user.uid, email: user.email || '', name: user.displayName || user.email || user.uid,
