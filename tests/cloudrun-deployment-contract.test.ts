@@ -41,12 +41,14 @@ test('cloudbuild deploys a traceable single-writer production revision',()=>{
   assert.match(cloudbuild,/R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest/);
 });
 
-test('bootstrap uses keyless GitHub OIDC and discovers Cloud Build identity',()=>{
+test('bootstrap uses keyless GitHub OIDC, immutable identity claims, and the actual Cloud Build identity',()=>{
   const bootstrap=read('scripts/setup-github-cloudrun-wif.sh');
 
   assert.match(bootstrap,/token\.actions\.githubusercontent\.com/);
   assert.match(bootstrap,/workload-identity-pools providers/);
-  assert.match(bootstrap,/assertion\.repository/);
+  assert.match(bootstrap,/assertion\.repository_id/);
+  assert.match(bootstrap,/assertion\.repository_owner_id/);
+  assert.match(bootstrap,/attribute\.repository_id\/\$\{REPOSITORY_ID\}/);
   assert.match(bootstrap,/assertion\.ref=='refs\/heads\/main'/);
   assert.match(bootstrap,/gcloud builds get-default-service-account/);
   assert.match(bootstrap,/roles\/firebaserules\.admin/);
