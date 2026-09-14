@@ -14,11 +14,12 @@ The path is:
 1. `.github/workflows/ci.yml` verifies a push to `main`, including building the actual Docker image used by Cloud Run.
 2. `.github/workflows/deploy-cloud-run.yml` starts only after that `main` push finishes successfully.
 3. GitHub authenticates to Google Cloud with OIDC Workload Identity Federation; no long-lived service-account JSON key is stored in GitHub.
-4. The workflow checks out the exact SHA that passed CI and submits it to Cloud Build using the dedicated `mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com` build identity.
-5. Cloud Build builds and pushes the image, deploys Firestore rules, then deploys Cloud Run.
-6. Cloud Run is labelled with `mizan-git-sha=<verified commit>` and the GitHub workflow verifies the newest created revision is the ready revision, the SHA matches, and `/api/health` returns success.
+4. The privileged deployment workflow checks out trusted `refs/heads/main` only, then verifies that its local HEAD exactly matches the SHA reported by the successful CI run. It never checks out a `workflow_run`-supplied SHA directly.
+5. The verified local SHA is submitted to Cloud Build using the dedicated `mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com` build identity.
+6. Cloud Build builds and pushes the image, deploys Firestore rules, then deploys Cloud Run.
+7. Cloud Run is labelled with `mizan-git-sha=<verified commit>` and the GitHub workflow verifies the newest created revision is the ready revision, the SHA matches, and `/api/health` returns success.
 
-A failed CI run never deploys. A pull request never deploys. A successful build that does not become the ready Cloud Run revision is reported as a deployment failure rather than a false green.
+A failed CI run never deploys. A pull request never deploys. There is no manual deployment bypass around the green-main gate. A successful build that does not become the ready Cloud Run revision is reported as a deployment failure rather than a false green.
 
 ## One-time Google Cloud / GitHub bootstrap
 
@@ -49,7 +50,7 @@ GCP_DEPLOY_SERVICE_ACCOUNT
 
 These are identifiers, not secrets.
 
-Google IAM / Workload Identity changes can take a few minutes to propagate. After bootstrap, use GitHub Actions -> `نشر ميزان إلى Cloud Run` -> Run workflow once, or push a new verified commit to `main`.
+Google IAM / Workload Identity changes can take a few minutes to propagate. After bootstrap, re-run the latest CI run whose original event was a push to `main`, or push a new commit to `main`; when that push CI succeeds, the deployment workflow starts automatically.
 
 ## Production invariants
 
