@@ -18,21 +18,22 @@ test('authenticated scope is discovered from Firestore instead of browser memory
     'competition-scoped accounts must read the exact competition named by the authenticated identity');
   assert.match(rehydrate,/getDocs\(collection\(db, 'organizations', identity\.organizationId, 'competitions'\)\)/,
     'organization admins must rediscover competitions from Firestore');
-  assert.match(rehydrate,/base\.competitions = \[\.\.\.selectedFirst, \.\.\.otherLocal\]/,
-    'the selected cloud competition must become the hydrated browser scope');
-  assert.match(rehydrate,/return liveMatches \? 'ready' : 'reload'/,
-    'a mismatched in-memory scope must reload once before normal subscriptions mount');
+  assert.match(rehydrate,/selectedCompetitionId: selected\.competition\.id/,
+    'the authoritative selected competition must be returned to auth bootstrap');
+  assert.doesNotMatch(rehydrate,/localStorage\.setItem|sessionStorage\.setItem|writeDurableLocalSnapshot/,
+    'cloud payloads must not create a second browser-storage writer during authentication');
 });
 
 
-test('auth waits for cloud scope preparation before rendering staff UI',()=>{
+test('auth applies cloud scope before rendering staff UI',()=>{
   const prepareAt=auth.indexOf('await prepareAuthenticatedCloudScope(');
+  const spliceAt=auth.indexOf('appStore.competitions.splice(',prepareAt);
   const applyAt=auth.indexOf('applyAuthenticatedIdentity({',prepareAt);
   const signedInAt=auth.indexOf("setAccessError(''); setSignedIn(true);",applyAt);
-  assert.ok(prepareAt>=0&&applyAt>prepareAt&&signedInAt>applyAt,
-    'cloud scope preparation must happen before applying identity and marking the session signed in');
-  assert.match(auth,/if \(scopePreparation === 'reload'\) \{ window\.location\.reload\(\); return; \}/,
-    'staff UI must not continue on a stale placeholder scope');
+  assert.ok(prepareAt>=0&&spliceAt>prepareAt&&applyAt>spliceAt&&signedInAt>applyAt,
+    'cloud scope must be inserted before applying identity and marking the session signed in');
+  assert.match(auth,/effectiveCompetitionId \|\|= scopePreparation\.selectedCompetitionId/,
+    'an organization admin without a competition claim must select the discovered cloud competition');
 });
 
 
@@ -44,6 +45,7 @@ test('sign-out is an explicit durability boundary for category/config edits',()=
   const flushAt=durability.indexOf('await persistDurableCompetitionSnapshot();');
   const signOutAt=durability.indexOf('await signOut(auth);',flushAt);
   assert.ok(flushAt>=0&&signOutAt>flushAt,'Firebase sign-out must happen after the awaited cloud flush');
+  assert.doesNotMatch(durability,/localStorage\.setItem/,'durability helper must not add a clear-text browser storage sink');
 });
 
 
