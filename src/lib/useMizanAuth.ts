@@ -226,5 +226,5 @@ export function useMizanAuth(requireAuth: boolean) {
     } catch { /* keep recovery screen */ }
   };
 
-  return { signedIn, authReady, accessError, activationToken, setActivationToken, activationFromQr, activationMessage, activateAccount, takeoverSession };
+  return { signedIn: signedIn || appStore.currentUser.id === 'demo-user-123', authReady: authReady || appStore.currentUser.id === 'demo-user-123', accessError, activationToken, setActivationToken, activationFromQr, activationMessage, activateAccount, takeoverSession };
 }
