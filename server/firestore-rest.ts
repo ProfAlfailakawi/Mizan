@@ -53,6 +53,25 @@ export class FirestoreRestRepository{
     if(!response.ok)throw new Error(response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE');
     const document=await response.json() as FirestoreDocument;return decodeFields(document.fields||{});
   }
+  async commitAtomically(input: { upserts?: Array<{ path: string; data: Record<string, unknown> }>; deletes?: string[] }) {
+    const writes = [
+      ...(input.upserts || []).map(({ path, data }) => ({ update: { name: this.name(path), fields: encodeFields(data) } })),
+      ...(input.deletes || []).map((docPath) => ({ delete: this.name(docPath) })),
+    ];
+    if (!writes.length) return;
+    const token = await this.tokenProvider();
+    const response = await fetch(`${this.root}:commit`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ writes }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) {
+      const code = response.status === 409 ? 'FIRESTORE_CONFLICT' : response.status === 401 || response.status === 403 ? 'FIRESTORE_PERMISSION_DENIED' : 'FIRESTORE_UNAVAILABLE';
+      throw new Error(code);
+    }
+  }
+
   async createAtomically(documents:{path:string;data:Record<string,unknown>}[]){
     const token=await this.tokenProvider();const writes=documents.map(document=>({update:{name:this.name(document.path),fields:encodeFields(document.data)},currentDocument:{exists:false}}));
     const response=await fetch(`${this.root}:commit`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({writes}),signal:AbortSignal.timeout(12000)});

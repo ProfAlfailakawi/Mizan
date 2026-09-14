@@ -48,9 +48,14 @@ const replaceOnce=(src,from,to,label)=>{ const i=src.indexOf(from); assert(i>=0,
     const fn=`const reissueParticipantJourneyAccess=async(participantId:string)=>{\n  const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);\n  if(idx<0||!auth.currentUser||globalState.isOffline)return null;\n  try{\n    const idToken=await auth.currentUser.getIdToken();\n    const response=await fetch(\`/api/competitions/\${encodeURIComponent(globalState.competition.id)}/participants/\${encodeURIComponent(participantId)}/journey-access/reissue\`,{method:'POST',headers:{Authorization:\`Bearer \${idToken}\`,'Content-Type':'application/json'}});\n    if(!response.ok)return null;\n    const body=await response.json() as {journeyAccessToken?:string;guardianAccessToken?:string};\n    if(!/^mz_journey_[A-Za-z0-9_-]+$/.test(body.journeyAccessToken||'')||!/^mz_guardian_[A-Za-z0-9_-]+$/.test(body.guardianAccessToken||''))return null;\n    const next={...globalState.participants[idx],journeyAccessToken:body.journeyAccessToken!,guardianAccessToken:body.guardianAccessToken!,journeyAccessTokenHash:await sha256(body.journeyAccessToken!),guardianAccessTokenHash:await sha256(body.guardianAccessToken!)};\n    globalState.participants[idx]=next;\n    notify();\n    return next;\n  }catch{return null}\n};\n`;
     s=s.slice(0,i)+fn+s.slice(i);
     // expose alongside existing methods by inserting next to ensureParticipantJourneyAccess occurrence in returned API object where possible.
-    const exportAnchor='ensureParticipantJourneyAccess,prepareJourneyAccessBatch';
+    const exportAnchor = s.includes('ensureParticipantJourneyAccess, prepareJourneyAccessBatch')
+      ? 'ensureParticipantJourneyAccess, prepareJourneyAccessBatch'
+      : 'ensureParticipantJourneyAccess,prepareJourneyAccessBatch';
     assert(s.includes(exportAnchor),'لم أجد تصدير دوال journey access في store');
-    s=s.replace(exportAnchor,'ensureParticipantJourneyAccess,reissueParticipantJourneyAccess,prepareJourneyAccessBatch');
+    const replacement = exportAnchor.includes(' ')
+      ? 'ensureParticipantJourneyAccess, reissueParticipantJourneyAccess, prepareJourneyAccessBatch'
+      : 'ensureParticipantJourneyAccess,reissueParticipantJourneyAccess,prepareJourneyAccessBatch';
+    s=s.replace(exportAnchor, replacement);
     write(f,s);
   }
 }

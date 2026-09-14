@@ -724,7 +724,63 @@ async function startServer() {
    * Firestore نفسه: وجود متسابق واحد يقفل الحذف حتى لو كانت نسخة جهاز الإدارة قديمة.
    * وعند السماح يُحذف الجذر وكل مجموعاته الفرعية حتى لا تبقى سجلات يتيمة تعود لاحقًا.
    */
-  app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
+  app.post('/api/competitions/:competitionId/participants/:participantId/journey-access/reissue', requireGovernanceRoles(['super_admin', 'org_admin', 'comp_admin']), async (req, res) => {
+  try {
+    const actor = (req as any).mizanIdentity as ServerIdentity;
+    const competitionId = String(req.params.competitionId || '');
+    const participantId = String(req.params.participantId || '');
+    const safe = /^[A-Za-z0-9_-]{1,160}$/;
+    if (!safe.test(competitionId) || !safe.test(participantId)) return res.status(400).json({ error: 'invalid_id' });
+    if (!firestoreRepository) return res.status(503).json({ error: 'firestore_unavailable' });
+
+    const organizationId = String((actor as any).organizationId || (actor as any).orgId || '');
+    if (!safe.test(organizationId)) return res.status(403).json({ error: 'organization_scope_required' });
+    const actorCompetitionId = String((actor as any).competitionId || '');
+    if ((actor as any).role === 'comp_admin' && actorCompetitionId && actorCompetitionId !== competitionId) return res.status(403).json({ error: 'competition_scope_mismatch' });
+
+    const participantPath = `settings/active/organizations/${organizationId}/competitions/${competitionId}/participants/${participantId}`;
+    const participant = await firestoreRepository.get(participantPath);
+    if (!participant) return res.status(404).json({ error: 'participant_not_found' });
+
+    const makeToken = (audience: 'journey' | 'guardian') => `mz_${audience}_${crypto.randomBytes(32).toString('base64url')}`;
+    const digest = (value: string) => crypto.createHash('sha256').update(value).digest('hex');
+    const journeyAccessToken = makeToken('journey');
+    const guardianAccessToken = makeToken('guardian');
+    const journeyAccessTokenHash = digest(journeyAccessToken);
+    const guardianAccessTokenHash = digest(guardianAccessToken);
+    const oldJourneyHash = String((participant as any).journeyAccessTokenHash || '');
+    const oldGuardianHash = String((participant as any).guardianAccessTokenHash || '');
+
+    const cloneOrFallback = async (oldHash: string, audience: 'journey' | 'guardian') => {
+      const old = oldHash ? await firestoreRepository.get(`public_journeys/${oldHash}`) : null;
+      return old || { organizationId, competitionId, participantId, audience, active: true };
+    };
+    const [journeyPublic, guardianPublic] = await Promise.all([cloneOrFallback(oldJourneyHash, 'journey'), cloneOrFallback(oldGuardianHash, 'guardian')]);
+    const updatedParticipant = {
+      ...(participant as Record<string, unknown>),
+      journeyAccessTokenHash, guardianAccessTokenHash,
+      journeyAccessReissuedAt: new Date().toISOString(),
+    };
+    delete (updatedParticipant as any).journeyAccessToken;
+    delete (updatedParticipant as any).guardianAccessToken;
+
+    await firestoreRepository.commitAtomically({
+      upserts: [
+        { path: participantPath, data: updatedParticipant },
+        { path: `public_journeys/${journeyAccessTokenHash}`, data: { ...(journeyPublic as any), organizationId, competitionId, participantId, audience: 'journey', active: true } },
+        { path: `public_journeys/${guardianAccessTokenHash}`, data: { ...(guardianPublic as any), organizationId, competitionId, participantId, audience: 'guardian', active: true } },
+      ],
+      deletes: [oldJourneyHash, oldGuardianHash].filter(Boolean).filter((h) => h !== journeyAccessTokenHash && h !== guardianAccessTokenHash).map((h) => `public_journeys/${h}`),
+    });
+
+    return res.json({ journeyAccessToken, guardianAccessToken });
+  } catch (error) {
+    console.error('journey-access reissue failed', error);
+    return res.status(500).json({ error: 'journey_access_reissue_failed' });
+  }
+});
+
+app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     if(!competitionId||competitionId==='comp-pending-setup'||competitionId.replace(/[^a-zA-Z0-9_-]/g,'')!==competitionId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
     const actor=(req as any).mizanIdentity as ServerIdentity;

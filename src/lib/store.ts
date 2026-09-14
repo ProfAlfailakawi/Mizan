@@ -1785,7 +1785,22 @@ export function useAppStore() {
     globalState.participants[idx]=next;const [saved,published]=await Promise.all([persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>),publishPublicJourneyRecord(next)]);notify();if(!globalState.isOffline&&auth.currentUser&&(!saved||!published))return null;return next;
   };
 
-  const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
+  const reissueParticipantJourneyAccess=async(participantId:string)=>{
+  const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);
+  if(idx<0||!auth.currentUser||globalState.isOffline)return null;
+  try{
+    const idToken=await auth.currentUser.getIdToken();
+    const response=await fetch(`/api/competitions/${encodeURIComponent(globalState.competition.id)}/participants/${encodeURIComponent(participantId)}/journey-access/reissue`,{method:'POST',headers:{Authorization:`Bearer ${idToken}`,'Content-Type':'application/json'}});
+    if(!response.ok)return null;
+    const body=await response.json() as {journeyAccessToken?:string;guardianAccessToken?:string};
+    if(!/^mz_journey_[A-Za-z0-9_-]+$/.test(body.journeyAccessToken||'')||!/^mz_guardian_[A-Za-z0-9_-]+$/.test(body.guardianAccessToken||''))return null;
+    const next={...globalState.participants[idx],journeyAccessToken:body.journeyAccessToken!,guardianAccessToken:body.guardianAccessToken!,journeyAccessTokenHash:await sha256(body.journeyAccessToken!),guardianAccessTokenHash:await sha256(body.guardianAccessToken!)};
+    globalState.participants[idx]=next;
+    notify();
+    return next;
+  }catch{return null}
+};
+const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
 
   const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const managedUid=String((account as IdentityAccountRecord&{uid?:string}).uid||account.firebaseUid||account.id);const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===managedUid);const old=idx>=0?next[idx]:undefined;const specialties=old?.specialties?.length?old.specialties:old?.specialty?[old.specialty]:['all'];const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:managedUid,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:specialties[0]||'all',specialties,certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
 
@@ -3614,7 +3629,7 @@ export function useAppStore() {
     publishResults,
     completeCompetition, closeCompetition,
     registerParticipant, updateParticipant, removeParticipant,
-    reviewParticipant, ensureParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
+    reviewParticipant, ensureParticipantJourneyAccess, reissueParticipantJourneyAccess, prepareJourneyAccessBatch, syncAuthorizedJudgeProfiles,
     selectCompetition, loadPublicCompetition, checkPublicCompetitionPublished, republishPublicCompetition,
     currentDisplayBoard, publishDisplayBoard, readBoardLease, canPublishDisplayBoard, unpublishDisplayBoard, loadPublicDisplayBoard,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,

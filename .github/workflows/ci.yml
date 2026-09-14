@@ -81,10 +81,10 @@ jobs:
 
       # يبقى سجل Docker متاحاً عند الفشل حتى يكون سبب الانكسار مرئياً ولا نعالج بالتخمين.
       - name: حفظ سجل Docker عند الفشل
-        if: failure()
+        if: ${{ failure() && hashFiles('docker-build.log') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: cloud-run-docker-build-${{ github.sha }}
           path: docker-build.log
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 3
