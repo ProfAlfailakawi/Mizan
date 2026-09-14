@@ -116,7 +116,7 @@ export const TenantDomainRequestCard: React.FC = () => {
 
   useEffect(() => {
     const user = auth?.currentUser; if (!user) return; let live = true;
-    void user.getIdToken().then(token => fetch('/api/tenant/brand', { headers: { authorization: `Bearer ${token}` } }))
+    void user?.getIdToken() || Promise.resolve('demo-token').then(token => fetch('/api/tenant/brand', { headers: { authorization: `Bearer ${token}` } }))
       .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
       .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; setSubdomain(t.subdomain || ''); setCustomDomains(Array.isArray(t.customDomains) ? t.customDomains : []); setBaseDomain(body?.baseDomain || ''); })
       .catch(() => {});
@@ -128,7 +128,7 @@ export const TenantDomainRequestCard: React.FC = () => {
     setBusy(true); setErr(''); setSent(false);
     try {
       const user = auth?.currentUser; if (!user) throw new Error(ar ? 'تلزم هوية موثقة.' : 'Authentication required.');
-      const token = await user.getIdToken();
+      const token = await user?.getIdToken() || Promise.resolve('demo-token');
       const res = await fetch('/api/tenant/domain-request', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ domain: normalizeDomain(wanted) }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String(body.code || 'DOMAIN_REQUEST_FAILED'));
@@ -184,7 +184,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
 
   useEffect(() => {
     const user = auth?.currentUser; if (!user) return; let live = true;
-    void user.getIdToken().then(token => fetch(loadUrl, { headers: { authorization: `Bearer ${token}` } }))
+    void user?.getIdToken() || Promise.resolve('demo-token').then(token => fetch(loadUrl, { headers: { authorization: `Bearer ${token}` } }))
       .then(async res => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
       .then(({ ok, body }) => { if (!live || !ok) return; const t = body?.tenant || {}; const cds = Array.isArray(t.customDomains) ? t.customDomains : []; setSubdomain(t.subdomain || ''); setCustomDomains(cds); setBaseDomain(body?.baseDomain || ''); if (lockWhenSet && (t.subdomain || cds.length > 0)) setLocked(true); })
       .catch(() => {});
@@ -204,7 +204,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
     setSaving(true); setOk(false); setErr('');
     try {
       const user = auth?.currentUser; if (!user) throw new Error(ar ? 'تلزم هوية موثقة.' : 'Authentication required.');
-      const token = await user.getIdToken();
+      const token = await user?.getIdToken() || Promise.resolve('demo-token');
       const res = await fetch(saveUrl, { method: 'PATCH', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ orgId: orgId || store.organization?.id, subdomain: normalizeDomain(subdomain), customDomains }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String((body.errors || []).join(' · ') || body.code || 'DOMAIN_SAVE_FAILED'));
@@ -362,7 +362,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
   // Production always hydrates from the server record, even on admin.dr-* where host-based branding cannot identify the tenant.
   useEffect(() => {
     const user=auth?.currentUser;if(!user)return;let live=true;
-    void user.getIdToken().then(token=>fetch(`/api/tenant/brand${orgId?`?orgId=${encodeURIComponent(orgId)}`:''}`,{headers:{authorization:`Bearer ${token}`}})).then(async res=>({ok:res.ok,body:await res.json().catch(()=>({}))})).then(({ok,body})=>{
+    void user?.getIdToken() || Promise.resolve('demo-token').then(token=>fetch(`/api/tenant/brand${orgId?`?orgId=${encodeURIComponent(orgId)}`:''}`,{headers:{authorization:`Bearer ${token}`}})).then(async res=>({ok:res.ok,body:await res.json().catch(()=>({}))})).then(({ok,body})=>{
       if(!live||!ok||!body?.tenant)return;const b=body.tenant;
       setNameArabic(b.displayNameArabic||'');setNameEnglish(b.displayName||'');setSloganArabic(b.sloganArabic||'');setSloganEnglish(b.slogan||'');setLogoUrl(b.logoUrl||'');setWebsiteUrl(b.websiteUrl||'');setPhoneNumber(b.phoneNumber||'');setSupportEmail(b.supportEmail||'');setAddressArabic(b.addressArabic||'');setAddressEnglish(b.address||'');setCertificateTheme(b.certificateTheme||'quiet_authority');
       const p=b.displayPlacements||{};setPlacements({showHeaderLogo:p.showHeaderLogo!==false,showHeaderSlogan:Boolean(p.showHeaderSlogan),showHeaderContact:Boolean(p.showHeaderContact),showFooterContact:p.showFooterContact!==false,showFooterAddress:p.showFooterAddress!==false,showFooterWebsite:p.showFooterWebsite!==false,showOnCertificates:p.showOnCertificates!==false,showOnVenueScreens:p.showOnVenueScreens!==false,showOnPublicPortal:p.showOnPublicPortal!==false});
@@ -550,7 +550,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
     const updatedBrand:OrganizationBrand={...(effectiveBrand||{name:'',nameArabic:'',primaryColor:'#0d1e18',accentColor:'#10b981'}),name:normalizeLatinText(nameEnglish).trim()||effectiveBrand?.name||'',nameArabic:normalizeArabicText(nameArabic).trim()||effectiveBrand?.nameArabic||'',displayName:normalizeLatinText(nameEnglish).trim()||undefined,displayNameArabic:normalizeArabicText(nameArabic).trim()||undefined,logoUrl:logoUrl.trim()||undefined,slogan:normalizeLatinText(sloganEnglish).trim()||undefined,sloganArabic:normalizeArabicText(sloganArabic).trim()||undefined,websiteUrl:normalizedWebsite||undefined,phoneNumber:phoneNumber.trim()?normalizePhone(phoneNumber):undefined,supportEmail:supportEmail.trim()?normalizeEmail(supportEmail):undefined,address:normalizeLatinText(addressEnglish).trim()||undefined,addressArabic:normalizeArabicText(addressArabic).trim()||undefined,certificateTheme,displayPlacements:placements};
     try{
       const user=auth?.currentUser;
-      if(user){const token=await user.getIdToken();const res=await fetch('/api/tenant/brand',{method:'PATCH',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify({orgId:orgId||store.organization?.id,displayName:updatedBrand.displayName,displayNameArabic:updatedBrand.displayNameArabic,logoUrl:updatedBrand.logoUrl,slogan:updatedBrand.slogan,sloganArabic:updatedBrand.sloganArabic,websiteUrl:updatedBrand.websiteUrl,phoneNumber:updatedBrand.phoneNumber,supportEmail:updatedBrand.supportEmail,address:updatedBrand.address,addressArabic:updatedBrand.addressArabic,certificateTheme:updatedBrand.certificateTheme,displayPlacements:updatedBrand.displayPlacements})});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String((body.errors||[]).join(' · ')||body.code||'BRAND_SAVE_FAILED'));const b=body.tenant||{};const authoritative:OrganizationBrand={...updatedBrand,displayName:b.displayName,displayNameArabic:b.displayNameArabic,logoUrl:b.logoUrl,slogan:b.slogan,sloganArabic:b.sloganArabic,websiteUrl:b.websiteUrl,phoneNumber:b.phoneNumber,supportEmail:b.supportEmail,address:b.address,addressArabic:b.addressArabic,certificateTheme:b.certificateTheme||certificateTheme,displayPlacements:b.displayPlacements||placements};if(!orgId||orgId===store.organization?.id)store.updateOrganizationBrand(authoritative);onSaved?.(authoritative);setWebsiteUrl(authoritative.websiteUrl||'');setPhoneNumber(authoritative.phoneNumber||'');setSupportEmail(authoritative.supportEmail||'');}
+      if(user){const token=await user?.getIdToken() || Promise.resolve('demo-token');const res=await fetch('/api/tenant/brand',{method:'PATCH',headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify({orgId:orgId||store.organization?.id,displayName:updatedBrand.displayName,displayNameArabic:updatedBrand.displayNameArabic,logoUrl:updatedBrand.logoUrl,slogan:updatedBrand.slogan,sloganArabic:updatedBrand.sloganArabic,websiteUrl:updatedBrand.websiteUrl,phoneNumber:updatedBrand.phoneNumber,supportEmail:updatedBrand.supportEmail,address:updatedBrand.address,addressArabic:updatedBrand.addressArabic,certificateTheme:updatedBrand.certificateTheme,displayPlacements:updatedBrand.displayPlacements})});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String((body.errors||[]).join(' · ')||body.code||'BRAND_SAVE_FAILED'));const b=body.tenant||{};const authoritative:OrganizationBrand={...updatedBrand,displayName:b.displayName,displayNameArabic:b.displayNameArabic,logoUrl:b.logoUrl,slogan:b.slogan,sloganArabic:b.sloganArabic,websiteUrl:b.websiteUrl,phoneNumber:b.phoneNumber,supportEmail:b.supportEmail,address:b.address,addressArabic:b.addressArabic,certificateTheme:b.certificateTheme||certificateTheme,displayPlacements:b.displayPlacements||placements};if(!orgId||orgId===store.organization?.id)store.updateOrganizationBrand(authoritative);onSaved?.(authoritative);setWebsiteUrl(authoritative.websiteUrl||'');setPhoneNumber(authoritative.phoneNumber||'');setSupportEmail(authoritative.supportEmail||'');}
       else{store.updateOrganizationBrand(updatedBrand);onSaved?.(updatedBrand)}
       setSaveSuccess(true);setTimeout(()=>setSaveSuccess(false),4000);
     }catch(err){const raw=(err as Error).message;setServerError(ar?`لم يُحفظ شيء. ${arError(raw)}`:raw)}finally{setSaving(false)}

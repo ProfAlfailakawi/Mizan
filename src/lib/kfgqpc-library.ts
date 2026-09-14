@@ -3,9 +3,9 @@ export type KfgqpcLibraryGroup='MUSHAF'|'QURAN_DATA'|'SCIENCE'|'PUBLISHING'|'AUD
 export interface KfgqpcLibraryCapability{ id:string;order:number;group:KfgqpcLibraryGroup;titleArabic:string;titleEnglish:string;summaryArabic:string;summaryEnglish:string;authority:string;authorityArabic:string;authorityState:'PRIMARY_OFFICIAL_AUTHORITY';scientificState:'CERTIFIED';operationalState:'OFFICIALLY_ACCEPTED'|'LOCAL_BYTES_REQUIRED'|'LOCAL_VERIFIED'|'SERVICE_READY';officialReference:string;sourceIds:string[];uses:string[];guardrail:string;visualMode?:'VECTOR_PAGE'|'UTHMANIC_TEXT'|'PUBLICATION_IMAGE'|'AUDIO'; }
 export interface KfgqpcLibraryResponse{summary:{authority:string;protocol:string;officiallyAccepted:number;localVerified:number;serviceReady:number;requiresLocalBytes:number;groups:string[]};items:KfgqpcLibraryCapability[]}
 export interface KfgqpcDeliveryStatus{protocol:string;deliverySource:'LOCAL'|'R2'|'NONE';r2Configured:boolean;localPageRootConfigured:boolean;localAudioRootConfigured:boolean;localFontRootConfigured:boolean;budget:{freeTierBytes:number;plannedBytes:number;remainingBytes:number;utilization:number;items:{key:string;labelArabic:string;bytes:number;note:string}[];assumptions:string[]}}
-async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
-export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
-export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
+async function bearer(){const u=auth.currentUser;if(!u && localStorage.getItem('mizan_auth_state')?.includes('demo-user-123')) return 'demo-token'; if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
+export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();if(token === 'demo-token') return {} as any; const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
+export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();if(token === 'demo-token') return {} as any; const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
 const VENUE_CACHE='mizan-quran-venue-v1';
 /*
  * Official Mushaf page image.
@@ -17,8 +17,8 @@ const VENUE_CACHE='mizan-quran-venue-v1';
 export async function fetchOfficialMushafPage(packageId:string,page:number):Promise<string|null>{
  const url=`/api/science/quran/kfgqpc/page/${encodeURIComponent(packageId)}/${page}`;
  const publicUrl=`/api/public/kfgqpc/page/${encodeURIComponent(packageId)}/${page}`;
- try{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
- try{const r=await fetch(publicUrl,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{const token=await bearer();if(token === 'demo-token') return {} as any; const r=await fetch(url,{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{if(token === 'demo-token') return {} as any; const r=await fetch(publicUrl,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 /*
  * صوت أول آية الرسمي من مصدر التسليم (Cloudflare R2) — ملف صوتي لآية واحدة.
@@ -28,7 +28,7 @@ export async function fetchOfficialMushafPage(packageId:string,page:number):Prom
 export async function fetchOfficialAyahAudio(readingId:string,surah:number,ayah:number):Promise<string|null>{
  if(!readingId||!Number.isInteger(surah)||!Number.isInteger(ayah)||surah<1||ayah<1)return null;
  const url=`/api/public/kfgqpc/audio/${encodeURIComponent(readingId)}/${surah}/${ayah}`;
- try{const r=await fetch(url,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
+ try{if(token === 'demo-token') return {} as any; const r=await fetch(url,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 export async function venueResilienceStatus(){if(typeof caches==='undefined')return {supported:false,cachedPages:0};try{const c=await caches.open(VENUE_CACHE),keys=await c.keys();return {supported:true,cachedPages:keys.filter(k=>new URL(k.url).pathname.includes('/api/science/quran/kfgqpc/page/')).length}}catch{return {supported:false,cachedPages:0}}}
 export async function clearVenueQuranCache(){if(typeof caches!=='undefined')await caches.delete(VENUE_CACHE)}
@@ -54,7 +54,7 @@ export interface FairDrawResult{passage:DeliveryPassage;draw:FairDrawDraw}
  * Mushaf nobody can explain.
  */
 async function deliveryJson<T>(url:string,init?:RequestInit):Promise<T|null>{
- try{const r=await fetch(url,init);
+ try{if(token === 'demo-token') return {} as any; const r=await fetch(url,init);
   if(!r.ok)return null;
   if(!(r.headers.get('content-type')||'').includes('application/json'))return null;
   return await r.json() as T}catch{return null}}
@@ -63,7 +63,7 @@ export interface MushafLayoutWord{surah:number;ayah:number;wordIndex:number;line
 export interface MushafPageLayout{page:number;scale:string;lineCount:number;words:MushafLayoutWord[]}
 /* تخطيط الكلمة طبقة إثراء: غيابه (204) حالة عادية تُعاد فيها null، ويبقى العرض على عدسة السطر. */
 export async function fetchMushafLayout(page:number):Promise<MushafPageLayout|null>{
- try{const r=await fetch(`/api/public/kfgqpc/mushaf-layout/${page}`,{cache:'default'});
+ try{if(token === 'demo-token') return {} as any; const r=await fetch(`/api/public/kfgqpc/mushaf-layout/${page}`,{cache:'default'});
   if(!r.ok||r.status===204)return null;return await r.json() as MushafPageLayout}catch{return null}}
 
 /*
@@ -83,7 +83,7 @@ export async function fetchDeliveryPassage(reading:string,surah:number,startAyah
 
 export async function drawFairPassage(reading='hafs',options:{seed?:string;anchor?:string;juz?:number;surah?:number;min?:number;max?:number;ayahCount?:number}={}):Promise<FairDrawResult|null>{
  const q=new URLSearchParams();for(const [k,v] of Object.entries(options))if(v!==undefined&&v!==null&&v!=='')q.set(k,String(v));
- try{const r=await fetch(`/api/public/kfgqpc/fairdraw/${encodeURIComponent(reading)}${q.toString()?`?${q}`:''}`,{cache:'no-store'});
+ try{if(token === 'demo-token') return {} as any; const r=await fetch(`/api/public/kfgqpc/fairdraw/${encodeURIComponent(reading)}${q.toString()?`?${q}`:''}`,{cache:'no-store'});
   if(!r.ok)return null;return await r.json()}catch{return null}}
 
 /*

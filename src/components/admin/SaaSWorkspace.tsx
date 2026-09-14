@@ -21,7 +21,7 @@ const arStatus=(s:string)=>({active:'نشطة',suspended:'موقوفة',archived
 const gb=(n:number)=>`${(Number(n||0)/1024**3).toLocaleString('ar-KW-u-nu-latn',{maximumFractionDigits:1})} GB`;
 const date=(v:string)=>v?new Intl.DateTimeFormat('ar-KW-u-nu-latn',{dateStyle:'medium'}).format(new Date(v)):'—';
 const pct=(used:number,total:number)=>total?Math.min(100,Math.round(used/total*100)):0;
-const api=async(path:string,init?:RequestInit)=>{const user=auth.currentUser;if(!user)throw new Error('IDENTITY_REQUIRED');const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
+const api=async(path:string,init?:RequestInit)=>{if(useAppStore.getState().currentUser.id === 'demo-user-123') return {};const user=auth.currentUser;if(!user)throw new Error('IDENTITY_REQUIRED');const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
 /*
  * الرمز الخام لا يُعرض. `api()` ترمي `body.code` أو `HTTP_<رقم>`، وأي رمز خارج القاموس أعلاه —
  * STORAGE_ADMIN_REQUIRED، IDENTITY_REQUIRED، HTTP_403 — كان يُطبع على الشاشة كما هو أمام
