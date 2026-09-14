@@ -126,14 +126,23 @@ jobs:
           EXPECTED_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
-          service_args=(--project="$GCP_PROJECT_ID" --region="$GCP_REGION" --platform=managed)
+          service_json="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --platform=managed \
+            --format=json)"
 
-          ready_revision="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(status.latestReadyRevisionName)')"
-          service_url="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(status.url)')"
-          deployed_sha="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(metadata.labels.mizan-git-sha)')"
+          ready_revision="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
+          created_revision="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
+          service_url="$(jq -r '.status.url // empty' <<<"$service_json")"
+          deployed_sha="$(jq -r '.metadata.labels["mizan-git-sha"] // empty' <<<"$service_json")"
 
           if [[ -z "$ready_revision" || -z "$service_url" ]]; then
             echo 'Cloud Run has no ready revision or service URL after deployment.' >&2
+            exit 1
+          fi
+          if [[ "$created_revision" != "$ready_revision" ]]; then
+            echo "Newest Cloud Run revision is not ready: created=$created_revision ready=$ready_revision" >&2
             exit 1
           fi
           if [[ "$deployed_sha" != "$EXPECTED_SHA" ]]; then
@@ -142,17 +151,19 @@ jobs:
           fi
 
           http_ok=false
+          health_url="${service_url%/}/api/health"
           for attempt in $(seq 1 12); do
-            code="$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 15 "$service_url/" || true)"
-            if [[ "$code" =~ ^[23] ]]; then
+            code="$(curl -L -sS -o /tmp/mizan-health.json -w '%{http_code}' --max-time 15 "$health_url" || true)"
+            if [[ "$code" =~ ^2 ]]; then
               http_ok=true
+              cat /tmp/mizan-health.json || true
               break
             fi
-            echo "HTTP readiness attempt $attempt/12 returned ${code:-network-error}; retrying..."
+            echo "Health attempt $attempt/12 returned ${code:-network-error}; retrying..."
             sleep 5
           done
           if [[ "$http_ok" != true ]]; then
-            echo "Cloud Run revision is ready but the public HTTP endpoint did not return 2xx/3xx." >&2
+            echo "Cloud Run revision is ready but /api/health did not return 2xx." >&2
             exit 1
           fi
 
@@ -172,5 +183,5 @@ jobs:
             echo "- Commit: \`$VERIFIED_SHA\`"
             echo "- Revision: \`$READY_REVISION\`"
             echo "- URL: $SERVICE_URL"
-            echo '- Result: build, deploy, revision identity, and HTTP readiness all passed.'
+            echo '- Result: build, deploy, revision identity, and /api/health readiness all passed.'
           } >> "$GITHUB_STEP_SUMMARY"
