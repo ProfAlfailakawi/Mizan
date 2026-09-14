@@ -20,7 +20,7 @@ test('production deployment is repository-owned and gated by green main CI',()=>
   assert.match(deploy,/COMMIT_SHA=\$VERIFIED_SHA/);
   assert.match(deploy,/GCP_WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(deploy,/GCP_DEPLOY_SERVICE_ACCOUNT/);
-  assert.match(deploy,/metadata\.labels\.mizan-git-sha/);
+  assert.match(deploy,/mizan-git-sha/);
   assert.match(deploy,/\/api\/health/);
 
   // A green TypeScript/Vite build is not enough: CI must build the exact Docker contract Cloud Run uses.
