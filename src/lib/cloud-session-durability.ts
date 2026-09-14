@@ -2,7 +2,6 @@ import { signOut } from 'firebase/auth';
 import type { Role } from '../types';
 import { configWriteAllowed } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
-import { redactStateForLocalSnapshot } from './local-snapshot-privacy';
 import { STORAGE_KEY, type AppStoreState } from './store-state';
 
 const CONFIG_WRITERS: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
@@ -19,17 +18,6 @@ export function readDurableLocalSnapshot(): AppStoreState | null {
   }
 }
 
-export function writeDurableLocalSnapshot(state: AppStoreState): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(state)));
-    return true;
-  } catch (error) {
-    console.error('MIZAN durable local snapshot write failed', error);
-    return false;
-  }
-}
-
 /**
  * Persist the latest competition configuration synchronously with an explicit user action.
  *
@@ -37,7 +25,7 @@ export function writeDurableLocalSnapshot(state: AppStoreState): boolean {
  * Firebase removes the credential immediately, so a category edited milliseconds before logout
  * used to remain only in the browser while the UI still reported the edit as successful.
  *
- * The local snapshot is written synchronously by every store notification, therefore it is the
+ * The local snapshot is written synchronously by the existing store path, therefore it is the
  * safest source for this final pre-signout write. We retain the same optimistic-concurrency rule
  * used by the store and verify the authoritative Firestore document before allowing sign-out to
  * continue.
@@ -99,8 +87,8 @@ export async function durableSignOut(): Promise<void> {
   try {
     await persistDurableCompetitionSnapshot();
   } catch (error) {
-    // Sign-out must remain available even during a cloud outage. The synchronous local snapshot
-    // stays intact, and the next authenticated bootstrap will attempt to reconcile it again.
+    // Sign-out must remain available even during a cloud outage. The existing redacted local
+    // snapshot stays intact, and the next authenticated bootstrap will reconcile it if needed.
     console.error('MIZAN final cloud flush before sign-out failed', error);
   }
   await signOut(auth);
