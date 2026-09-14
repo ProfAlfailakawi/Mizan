@@ -76,11 +76,11 @@ export interface SecureQuestionCapabilities {
 }
 
 async function token(){
-  const u=auth.currentUser;if(!u && localStorage.getItem('mizan_auth_state')?.includes('demo-user-123')) return 'demo-token'; if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken();
+  const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken();
 }
 async function api(path:string,init:RequestInit={}){
   const bearer=await token();
-  if(bearer === 'demo-token') return {}; const r=await fetch(path,{...init,headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json',...(init.headers||{})},cache:'no-store'});
+  const r=await fetch(path,{...init,headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json',...(init.headers||{})},cache:'no-store'});
   const body=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
   return body;
@@ -88,7 +88,7 @@ async function api(path:string,init:RequestInit={}){
 
 export async function fetchSecureQuestionCapabilities():Promise<SecureQuestionCapabilities>{
   try{
-    if(bearer === 'demo-token') return {}; const r=await fetch('/api/capabilities',{cache:'no-store',headers:{Accept:'application/json'}});if(!r.ok)return {ready:false,serverFairDraw:false,serverQuranResolution:false,silentQuestionCapsule:false};
+    const r=await fetch('/api/capabilities',{cache:'no-store',headers:{Accept:'application/json'}});if(!r.ok)return {ready:false,serverFairDraw:false,serverQuranResolution:false,silentQuestionCapsule:false};
     const body=await r.json();const x=body?.externalDependencies||{};const serverFairDraw=x.serverFairDraw===true,serverQuranResolution=x.serverQuranResolution===true,silentQuestionCapsule=x.silentQuestionCapsule===true;
     return {ready:serverFairDraw&&serverQuranResolution&&silentQuestionCapsule,serverFairDraw,serverQuranResolution,silentQuestionCapsule};
   }catch{return {ready:false,serverFairDraw:false,serverQuranResolution:false,silentQuestionCapsule:false}}

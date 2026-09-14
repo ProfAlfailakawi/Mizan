@@ -29,13 +29,13 @@ export function validateBrandLogoFile(file: File): BrandLogoType {
 
 const token = async () => {
   const user = auth.currentUser;
-  if (!user && localStorage.getItem('mizan_auth_state')?.includes('demo-user-123')) return 'demo-token'; if (!user) throw new Error('IDENTITY_REQUIRED');
+  if (!user) throw new Error('IDENTITY_REQUIRED');
   return user.getIdToken();
 };
 
 const request = async (path: string, init: RequestInit) => {
   const bearer = await token();
-  if(bearer === 'demo-token') return {}; const res = await fetch(path, {
+  const res = await fetch(path, {
     ...init,
     headers: {
       authorization: `Bearer ${bearer}`,

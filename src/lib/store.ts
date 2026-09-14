@@ -1546,7 +1546,7 @@ export function useAppStore() {
        حالة مستقلة يثبتها closedAt؛ لذلك يمكن إغلاق مسابقة مكتملة بعد انتهاء الحفل فعلًا. */
     if(globalState.competition.closedAt)return{ok:true,alreadyClosed:true};
     {
-      const u=auth.currentUser;if(!u && globalState.currentUser.id === 'demo-user-123') return {ok:true}; if(!u)return{ok:false,code:'IDENTITY_REQUIRED'};
+      const u=auth.currentUser;if(!u)return{ok:false,code:'IDENTITY_REQUIRED'};
       try{
         const token=await u.getIdToken();
         const response=await fetch(`/api/identity/competitions/${encodeURIComponent(globalState.competition.id)}/close`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({reason:clean,organizationId:globalState.competition.organizationId})});
