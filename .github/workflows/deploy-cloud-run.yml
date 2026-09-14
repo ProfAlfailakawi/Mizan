@@ -1,0 +1,176 @@
+name: نشر ميزان إلى Cloud Run
+
+# النشر لا يعتمد على trigger خارجي غير مرئي. بعد نجاح فحص main فقط،
+# هذا الـworkflow يرسل الـcommit نفسه إلى Cloud Build عبر OIDC/WIF بلا مفاتيح JSON طويلة العمر.
+on:
+  workflow_run:
+    workflows:
+      - فحص ميزان — لا نشر فوق فحص أحمر
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mizan-production-deploy
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: mizan-f2ce3
+  GCP_REGION: me-central1
+  CLOUD_RUN_SERVICE: mizan
+  SOURCE_STAGING_BUCKET: gs://mizan-f2ce3-github-deploy-source/source
+
+jobs:
+  deploy:
+    # لا نشر من PR ولا من فرع جانبي. workflow_run يجب أن يكون push ناجحًا على main.
+    # التشغيل اليدوي مسموح فقط عندما يكون الـworkflow نفسه على main.
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: تثبيت SHA الذي اجتاز الفحص
+        id: source
+        shell: bash
+        env:
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            sha="$WORKFLOW_RUN_SHA"
+          else
+            sha="$DISPATCH_SHA"
+          fi
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid deployment SHA: $sha" >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying verified commit: $sha"
+
+      - name: جلب الـcommit الموثق نفسه
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 1
+
+      - name: التحقق من إعداد هوية النشر
+        shell: bash
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$WIF_PROVIDER" || -z "$DEPLOY_SERVICE_ACCOUNT" ]]; then
+            cat >&2 <<'EOF'
+          Cloud Run deployment identity is not configured.
+          Run this once from Google Cloud Shell after this PR is merged:
+            bash scripts/setup-github-cloudrun-wif.sh
+          The script prints (and, when gh is authenticated, sets) these repository variables:
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            GCP_DEPLOY_SERVICE_ACCOUNT
+          EOF
+            exit 1
+          fi
+
+      - name: مصادقة Google Cloud بلا مفتاح دائم
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: تجهيز gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          version: '>= 500.0.0'
+
+      - name: إثبات هوية النشر
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcloud auth list --filter=status:ACTIVE --format='value(account)'
+          gcloud config set project "$GCP_PROJECT_ID" --quiet
+
+      - name: بناء ونشر النسخة إلى Cloud Run
+        shell: bash
+        env:
+          VERIFIED_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gcloud builds submit . \
+            --project="$GCP_PROJECT_ID" \
+            --config=cloudbuild.yaml \
+            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" \
+            --substitutions="COMMIT_SHA=$VERIFIED_SHA" \
+            --quiet
+
+      - name: التحقق من أن Cloud Run يخدم الـcommit نفسه
+        id: verify
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          service_args=(--project="$GCP_PROJECT_ID" --region="$GCP_REGION" --platform=managed)
+
+          ready_revision="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(status.latestReadyRevisionName)')"
+          service_url="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(status.url)')"
+          deployed_sha="$(gcloud run services describe "$CLOUD_RUN_SERVICE" "${service_args[@]}" --format='value(metadata.labels.mizan-git-sha)')"
+
+          if [[ -z "$ready_revision" || -z "$service_url" ]]; then
+            echo 'Cloud Run has no ready revision or service URL after deployment.' >&2
+            exit 1
+          fi
+          if [[ "$deployed_sha" != "$EXPECTED_SHA" ]]; then
+            echo "Cloud Run SHA mismatch: expected=$EXPECTED_SHA deployed=$deployed_sha" >&2
+            exit 1
+          fi
+
+          http_ok=false
+          for attempt in $(seq 1 12); do
+            code="$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 15 "$service_url/" || true)"
+            if [[ "$code" =~ ^[23] ]]; then
+              http_ok=true
+              break
+            fi
+            echo "HTTP readiness attempt $attempt/12 returned ${code:-network-error}; retrying..."
+            sleep 5
+          done
+          if [[ "$http_ok" != true ]]; then
+            echo "Cloud Run revision is ready but the public HTTP endpoint did not return 2xx/3xx." >&2
+            exit 1
+          fi
+
+          echo "revision=$ready_revision" >> "$GITHUB_OUTPUT"
+          echo "url=$service_url" >> "$GITHUB_OUTPUT"
+
+      - name: ملخص النشر
+        shell: bash
+        env:
+          VERIFIED_SHA: ${{ steps.source.outputs.sha }}
+          READY_REVISION: ${{ steps.verify.outputs.revision }}
+          SERVICE_URL: ${{ steps.verify.outputs.url }}
+        run: |
+          {
+            echo '## Cloud Run deployment verified'
+            echo
+            echo "- Commit: \`$VERIFIED_SHA\`"
+            echo "- Revision: \`$READY_REVISION\`"
+            echo "- URL: $SERVICE_URL"
+            echo '- Result: build, deploy, revision identity, and HTTP readiness all passed.'
+          } >> "$GITHUB_STEP_SUMMARY"
