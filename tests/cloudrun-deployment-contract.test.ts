@@ -17,9 +17,11 @@ test('production deployment is repository-owned and gated by green main CI',()=>
   assert.match(deploy,/google-github-actions\/setup-gcloud@v3/);
   assert.match(deploy,/gcloud builds submit/);
   assert.match(deploy,/--config=cloudbuild\.yaml/);
+  assert.match(deploy,/--service-account="\$GCP_BUILD_SERVICE_ACCOUNT"/);
   assert.match(deploy,/COMMIT_SHA=\$VERIFIED_SHA/);
   assert.match(deploy,/GCP_WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(deploy,/GCP_DEPLOY_SERVICE_ACCOUNT/);
+  assert.match(deploy,/mizan-cloud-build@mizan-f2ce3\.iam\.gserviceaccount\.com/);
   assert.match(deploy,/mizan-git-sha/);
   assert.match(deploy,/\/api\/health/);
 
@@ -41,7 +43,7 @@ test('cloudbuild deploys a traceable single-writer production revision',()=>{
   assert.match(cloudbuild,/R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest/);
 });
 
-test('bootstrap uses keyless GitHub OIDC, immutable identity claims, and the actual Cloud Build identity',()=>{
+test('bootstrap uses keyless GitHub OIDC, immutable identity claims, and a dedicated Cloud Build identity',()=>{
   const bootstrap=read('scripts/setup-github-cloudrun-wif.sh');
 
   assert.match(bootstrap,/token\.actions\.githubusercontent\.com/);
@@ -50,11 +52,14 @@ test('bootstrap uses keyless GitHub OIDC, immutable identity claims, and the act
   assert.match(bootstrap,/assertion\.repository_owner_id/);
   assert.match(bootstrap,/attribute\.repository_id\/\$\{REPOSITORY_ID\}/);
   assert.match(bootstrap,/assertion\.ref=='refs\/heads\/main'/);
-  assert.match(bootstrap,/gcloud builds get-default-service-account/);
+  assert.match(bootstrap,/BUILD_SA_NAME="\$\{BUILD_SA_NAME:-mizan-cloud-build\}"/);
+  assert.match(bootstrap,/Dedicated Cloud Build service account/);
+  assert.match(bootstrap,/member="serviceAccount:\$\{DEPLOY_SA_EMAIL\}"[\s\S]{0,200}roles\/iam\.serviceAccountUser/);
   assert.match(bootstrap,/roles\/firebaserules\.admin/);
   assert.match(bootstrap,/roles\/run\.admin/);
   assert.match(bootstrap,/roles\/artifactregistry\.writer/);
   assert.match(bootstrap,/roles\/iam\.serviceAccountUser/);
+  assert.doesNotMatch(bootstrap,/gcloud builds get-default-service-account/);
   assert.doesNotMatch(bootstrap,/gcloud iam service-accounts keys create/);
   assert.doesNotMatch(bootstrap,/credentials_json/);
 });
