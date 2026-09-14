@@ -22,6 +22,7 @@ env:
   GCP_REGION: me-central1
   CLOUD_RUN_SERVICE: mizan
   SOURCE_STAGING_BUCKET: gs://mizan-f2ce3-github-deploy-source/source
+  GCP_BUILD_SERVICE_ACCOUNT: mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -105,6 +106,7 @@ jobs:
           set -euo pipefail
           gcloud auth list --filter=status:ACTIVE --format='value(account)'
           gcloud config set project "$GCP_PROJECT_ID" --quiet
+          gcloud iam service-accounts describe "$GCP_BUILD_SERVICE_ACCOUNT" --project="$GCP_PROJECT_ID" --quiet >/dev/null
 
       - name: بناء ونشر النسخة إلى Cloud Run
         shell: bash
@@ -115,6 +117,7 @@ jobs:
           gcloud builds submit . \
             --project="$GCP_PROJECT_ID" \
             --config=cloudbuild.yaml \
+            --service-account="$GCP_BUILD_SERVICE_ACCOUNT" \
             --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" \
             --substitutions="COMMIT_SHA=$VERIFIED_SHA" \
             --quiet
