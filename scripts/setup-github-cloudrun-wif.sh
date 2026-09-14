@@ -50,6 +50,11 @@ if ! gcloud artifacts repositories describe "$ARTIFACT_REPOSITORY" --project="$P
     --description='MIZAN production Cloud Run images' \
     --quiet
 fi
+ARTIFACT_FORMAT="$(gcloud artifacts repositories describe "$ARTIFACT_REPOSITORY" --project="$PROJECT_ID" --location="$REGION" --format='value(format)')"
+if [[ "$ARTIFACT_FORMAT" != 'DOCKER' ]]; then
+  echo "Artifact Registry repository ${ARTIFACT_REPOSITORY} exists but is not a Docker repository." >&2
+  exit 1
+fi
 
 echo 'Ensuring private source-staging bucket exists...'
 if ! gcloud storage buckets describe "gs://${SOURCE_BUCKET}" --project="$PROJECT_ID" >/dev/null 2>&1; then
@@ -59,6 +64,12 @@ if ! gcloud storage buckets describe "gs://${SOURCE_BUCKET}" --project="$PROJECT
     --uniform-bucket-level-access \
     --public-access-prevention \
     --quiet
+else
+  # Re-running the bootstrap also repairs accidental weakening of the staging bucket.
+  gcloud storage buckets update "gs://${SOURCE_BUCKET}" \
+    --uniform-bucket-level-access \
+    --public-access-prevention \
+    --quiet >/dev/null
 fi
 
 echo 'Ensuring GitHub deployment service account exists...'
@@ -116,7 +127,9 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
   --member="$WIF_MEMBER" \
   --quiet >/dev/null
 
-for role in roles/cloudbuild.builds.editor roles/serviceusage.serviceUsageConsumer; do
+# The GitHub identity can submit builds and inspect the dedicated staging bucket, but cannot deploy
+# Cloud Run directly. The Cloud Build execution identity below owns the privileged deployment steps.
+for role in roles/cloudbuild.builds.editor roles/serviceusage.serviceUsageConsumer roles/storage.bucketViewer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
     --role="$role" \
