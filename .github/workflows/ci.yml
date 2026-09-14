@@ -70,3 +70,8 @@ jobs:
 
       - name: البناء
         run: npm run build
+
+      # Cloud Run لا يشغّل ناتج npm run build مباشرة؛ يشغّل صورة Dockerfile.
+      # لذلك لا يكفي أن ينجح Vite/TypeScript: نبني نفس صورة الإنتاج قبل السماح للنشر.
+      - name: بناء صورة Cloud Run الفعلية
+        run: docker build --tag "mizan-ci:${GITHUB_SHA}" .
