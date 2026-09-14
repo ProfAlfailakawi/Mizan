@@ -120,7 +120,7 @@ jobs:
           node-version-file: package.json
           cache: npm
       - run: npm ci
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -148,7 +148,7 @@ jobs:
         run: npm run fairness:gate
       - name: حفظ تاريخ الجبهة
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: fairness-frontier-history
           path: tests/fixtures/fairness-frontier-history.json
