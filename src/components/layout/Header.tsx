@@ -1,9 +1,8 @@
 import React,{useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
 import { useAppStore } from '../../lib/store';
+import { durableSignOut } from '../../lib/cloud-session-durability';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
 import { EmergencyControl } from '../design-system/EmergencyControl';
@@ -17,7 +16,7 @@ export const Header: React.FC = () => {
  const {language,competition,isOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
  const brandInfo = useBrandInfo();
  const superAdmin=currentUser.role==='super_admin';
- const logout=()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())};
+ const logout=()=>{void durableSignOut().catch(()=>{}).finally(()=>window.location.reload())};
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
