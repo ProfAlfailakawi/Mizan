@@ -6,6 +6,21 @@ import {defineConfig} from 'vite';
 // @ts-ignore -- إضافة بلا أنواع: تحقن بصمة البناء وتطبعها في dist/build-id.json و sw.js
 import {buildStamp} from './scripts/build-stamp.mjs';
 
+// Default Firebase Web config matching Dockerfile / Cloud Build for local development
+const DEFAULT_FIREBASE_WEB_CONFIG: Record<string, string> = {
+  VITE_FIREBASE_API_KEY: 'AIzaSyAU13efq58hCJirGDyu9dZf8lzRatbhwcY',
+  VITE_FIREBASE_AUTH_DOMAIN: 'mizan-f2ce3.firebaseapp.com',
+  VITE_FIREBASE_PROJECT_ID: 'mizan-f2ce3',
+  VITE_FIREBASE_STORAGE_BUCKET: 'mizan-f2ce3.firebasestorage.app',
+  VITE_FIREBASE_MESSAGING_SENDER_ID: '993698501419',
+  VITE_FIREBASE_APP_ID: '1:993698501419:web:47a25e46ccbacccb17ab6e',
+};
+for (const [key, value] of Object.entries(DEFAULT_FIREBASE_WEB_CONFIG)) {
+  if (!process.env[key]) {
+    process.env[key] = value;
+  }
+}
+
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss(), buildStamp()],
