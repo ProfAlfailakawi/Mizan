@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
-  LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, UsersRound, Wand2,
+  LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, Wand2,
   Layers3,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -11,13 +11,12 @@ import type { Category, ScopeSimulationRecord } from '../../types';
 import {
   describeScope, fullQuranScope, scopeAyahCount, scopeFromJuzRange, scopeSignature, type QuranScope,
 } from '../../lib/quran-scope';
-import { DEFAULT_SELECTION_RULE, unitLabelArabic, type ParticipantScopeSelectionRule } from '../../lib/participant-scope';
 import {
   autoBalancedZones, describeZone, emptyZone, validateDistributionPlan, zoneQuestionTotal,
   type QuestionDistributionPlan, type QuestionZone,
 } from '../../lib/question-zones';
 import { DEFAULT_REPEAT_POLICY, describeRepeatPolicy, type RepeatPolicy } from '../../lib/repeat-policy';
-import { categoryDistribution, categoryRepeatPolicy, categoryScopeOf, categorySelectionRule, resolveQuestionCount } from '../../lib/scope-engine';
+import { categoryDistribution, categoryRepeatPolicy, categoryScopeOf, resolveQuestionCount } from '../../lib/scope-engine';
 import { QuranScopePicker, ScopeSummary } from '../scope/QuranScopePicker';
 import { ScopeHeatMap } from '../scope/ScopeHeatMap';
 import type { DemandAnalysis } from '../../lib/scope-demand';
@@ -41,7 +40,7 @@ import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-c
  * والوضع البسيط يكفي مسابقة مدرسة في دقائق؛ والمتقدّم لمن يحتاج مقاطع ومناطق وقواعد.
  */
 
-type Tab = 'scope' | 'selection' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
+type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -54,7 +53,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
 
   const tabs: [Tab, React.ComponentType<{ className?: string }>, string][] = [
     ['scope', BookMarked, ar ? 'النطاق' : 'Scope'],
-    ['selection', UsersRound, ar ? 'اختيار المتسابق' : 'Participant choice'],
     ['distribution', Layers, ar ? 'توزيع الأسئلة' : 'Distribution'],
     ['policy', Settings2, ar ? 'سياسة الأسئلة' : 'Question policy'],
     ['demand', Flame, ar ? 'الازدحام' : 'Demand'],
@@ -94,7 +92,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
           </div>
           <div className="mizan-surface p-5 sm:p-7">
             {tab === 'scope' && <ScopeTab store={store} ar={ar} category={category} />}
-            {tab === 'selection' && <SelectionTab store={store} ar={ar} category={category} />}
             {tab === 'distribution' && <DistributionTab store={store} ar={ar} category={category} />}
             {tab === 'policy' && <PolicyTab store={store} ar={ar} category={category} />}
             {tab === 'demand' && <DemandTab store={store} ar={ar} />}
@@ -113,7 +110,6 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
     {store.competition.categories.map(category => {
       const scope = categoryScopeOf(category);
       const needsScope = scopeAyahCount(scope) === 0;
-      const selectable = category.scopeMode === 'participant_selected';
       return (
         <button key={category.id} type="button" onClick={() => onSelect(category.id)} aria-pressed={selectedId === category.id}
           className={`min-w-[200px] shrink-0 rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:bg-[#f7f5ef]'}`}>
@@ -121,7 +117,7 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
             <span className="min-w-0 truncate text-sm font-black text-[#24302b]">{bilingualName(category, ar)}</span>
             {needsScope
               ? <Badge variant="amber">{ar ? 'بلا نطاق' : 'No range'}</Badge>
-              : selectable ? <Badge variant="blue">{ar ? 'اختياري' : 'Chosen'}</Badge> : <Badge>{ar ? 'ثابت' : 'Fixed'}</Badge>}
+              : <Badge>{ar ? 'ثابت للفئة' : 'Category range'}</Badge>}
           </div>
           <p className="mt-1.5 truncate text-[11px] font-bold text-[#5b6460]">{needsScope ? (ar ? 'يحتاج تحديد نطاق' : 'Needs a range') : describeScope(scope, ar)}</p>
           <p className="mt-1 text-[10px] text-[#696f6b]">
@@ -187,169 +183,6 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = (
       </div>
     </div>
   );
-};
-
-const SelectionTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
-  const [rule, setRule] = useState<ParticipantScopeSelectionRule | null>(null);
-  if (!category) return null;
-  const current = categorySelectionRule(category);
-  const draft = rule ?? current;
-  const patch = (next: Partial<ParticipantScopeSelectionRule>) => setRule({ ...draft, ...next });
-  const members = store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id && !['rejected', 'draft'].includes(p.status));
-
-  return (
-    <div className="space-y-5">
-      <SectionHead ar={ar} kicker={ar ? 'من يختار النطاق؟' : 'WHO CHOOSES THE RANGE?'} title={ar ? 'الجهة تحدّده، أم المتسابق يختاره؟' : 'Fixed by the organiser, or chosen by the participant?'}
-        hint={ar ? 'إن كان ثابتًا فلا يُعرض على المتسابق أي اختيار. وإن كان اختياريًا فحدِّد ما يجوز له أن يختاره.' : 'If fixed, the participant is shown no choice at all. If selectable, define what they may choose.'} />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ModeCard active={!draft.enabled} ar={ar} title={ar ? 'نطاق ثابت للجميع' : 'One fixed range'}
-          body={ar ? 'كل متسابق في هذه الفئة يُسأل من نطاق الفئة نفسه. لا شاشة اختيار ولا اعتماد.' : 'Every participant is drawn from the category range. No choice screen, no approval.'}
-          onClick={() => patch({ enabled: false })} />
-        <ModeCard active={draft.enabled} ar={ar} title={ar ? 'المتسابق يختار نطاقه' : 'The participant chooses'}
-          body={ar ? 'يختار كل متسابق نطاقه داخل حدود تضعها، ويُعتمد قبل المسابقة. السحب يقع على نطاقه هو لا على نطاق الفئة.' : 'Each participant picks a range inside bounds you set; the draw then uses their range, not the category range.'}
-          onClick={() => patch({ enabled: true })} />
-      </div>
-
-      {draft.enabled && (
-        <div className="space-y-4 rounded-2xl border border-[#e4e2da] bg-[#fbfaf7] p-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block">
-              <span className="block text-[10px] font-black tracking-[.1em] text-[#696f6b]">{ar ? 'وحدة الاختيار' : 'Selection unit'}</span>
-              <select value={draft.selectionUnit} onChange={e => patch({ selectionUnit: e.target.value as ParticipantScopeSelectionRule['selectionUnit'] })} className="mizan-input mt-1 text-xs">
-                <option value="juz">{ar ? 'أجزاء' : 'Juz'}</option>
-                <option value="hizb">{ar ? 'أحزاب' : 'Hizb'}</option>
-                <option value="rub">{ar ? 'أرباع' : 'Rub'}</option>
-                <option value="surah">{ar ? 'سور' : 'Surahs'}</option>
-                <option value="page">{ar ? 'أوجه' : 'Pages'}</option>
-                <option value="ayah_range">{ar ? 'مقاطع حرة' : 'Free segments'}</option>
-              </select>
-            </label>
-            <NumberBox ar={ar} label={ar ? 'العدد المطلوب بالضبط' : 'Exactly'} value={draft.exactUnits ?? 0} min={0} max={120} onChange={v => patch({ exactUnits: v || undefined })} hint={ar ? 'صفر = بلا عدد ثابت' : '0 = no exact count'} />
-            <div className="grid grid-cols-2 gap-2">
-              <NumberBox ar={ar} label={ar ? 'الأدنى' : 'Min'} value={draft.minUnits ?? 0} min={0} max={120} onChange={v => patch({ minUnits: v || undefined })} />
-              <NumberBox ar={ar} label={ar ? 'الأعلى' : 'Max'} value={draft.maxUnits ?? 0} min={0} max={120} onChange={v => patch({ maxUnits: v || undefined })} />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-4">
-            <Toggle ar={ar} checked={!!draft.mustBeConsecutive} onChange={v => patch({ mustBeConsecutive: v })} label={ar ? 'يجب أن يكون النطاق متصلًا' : 'Range must be continuous'} />
-            <Toggle ar={ar} checked={draft.approval === 'committee'} onChange={v => patch({ approval: v ? 'committee' : 'auto' })} label={ar ? 'يحتاج اعتماد اللجنة' : 'Requires committee approval'} />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <NumberBox ar={ar} label={ar ? 'أقصى عدد مقاطع منفصلة' : 'Max separate segments'} value={draft.maxSegments ?? 0} min={0} max={20} onChange={v => patch({ maxSegments: v || undefined })} hint={ar ? 'صفر = بلا حد' : '0 = unlimited'} />
-            <NumberBox ar={ar} label={ar ? 'أقل عدد آيات في النطاق' : 'Minimum ayat in range'} value={draft.coverage?.minAyah ?? 0} min={0} max={6236} step={50} onChange={v => patch({ coverage: { ...draft.coverage, minAyah: v || undefined } })} />
-          </div>
-          <p className="rounded-xl bg-[#f1efe9] px-3 py-2 text-[11px] leading-6 text-[#5b6460]">
-            {ar
-              ? `سيُطلب من المتسابق اختيار ${draft.exactUnits ? `${draft.exactUnits} ${unitLabelArabic(draft.selectionUnit, draft.exactUnits)}` : draft.minUnits || draft.maxUnits ? `بين ${draft.minUnits || 1} و${draft.maxUnits || '—'} ${unitLabelArabic(draft.selectionUnit, draft.maxUnits || 3)}` : unitLabelArabic(draft.selectionUnit, 3)} من داخل ${describeScope(categoryScopeOf(category), true)}.`
-              : `Participants will choose from ${describeScope(categoryScopeOf(category), false)}.`}
-          </p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-end gap-2 border-t border-[#efeee8] pt-4">
-        {rule && <Button size="sm" variant="ghost" onClick={() => setRule(null)}>{ar ? 'تراجع' : 'Revert'}</Button>}
-        <Button size="sm" disabled={!rule} onClick={() => { store.setCategorySelectionRule(category.id, draft); setRule(null); }}>{ar ? 'حفظ القاعدة' : 'Save rule'}</Button>
-      </div>
-
-      {draft.enabled && <ParticipantScopeReview store={store} ar={ar} category={category} members={members} />}
-    </div>
-  );
-};
-
-const ParticipantScopeReview: React.FC<{ store: Store; ar: boolean; category: Category; members: Store['participants'] }> = ({ store, ar, category, members }) => {
-  const rows = members.map(participant => ({ participant, record: store.activeParticipantScope(participant.id) }));
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const pending = rows.filter(r => r.record && ['submitted', 'under_review'].includes(r.record.status));
-  const missing = rows.filter(r => !r.record || r.record.status === 'draft');
-  return (
-    <div className="space-y-3 border-t border-[#efeee8] pt-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-black">{ar ? 'نطاقات المتسابقين' : 'Participant ranges'}</h3>
-        <div className="flex gap-2 text-[10px] font-black">
-          <Badge variant={pending.length ? 'amber' : 'emerald'}>{ar ? `${pending.length} بانتظار الاعتماد` : `${pending.length} awaiting approval`}</Badge>
-          <Badge variant={missing.length ? 'rose' : 'emerald'}>{ar ? `${missing.length} بلا نطاق` : `${missing.length} without a range`}</Badge>
-        </div>
-      </div>
-      {rows.length === 0 ? (
-        <EmptyState icon={UsersRound} title={ar ? 'لا متسابقين في هذه الفئة بعد' : 'No participants in this category yet'}
-          hint={ar ? 'تظهر نطاقاتهم هنا بمجرد تسجيلهم واختيارهم.' : 'Their chosen ranges appear here once they register.'} />
-      ) : (
-        <ul className="divide-y divide-[#efeee8]">
-          {rows.slice(0, 40).map(({ participant, record }) => {
-            const history = store.participantScopeHistory(participant.id);
-            const previous = history.filter(x => x.status === 'superseded');
-            return (
-            <li key={participant.id} className="py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-black text-[#24302b]">{participant.code} · {bilingualName({ name: participant.fullName, nameArabic: participant.fullNameArabic }, ar)}</div>
-                  <div className="text-[10px] text-[#696f6b]">
-                    {record ? `${describeScope(record.scope, ar)} · ${ar ? `النسخة ${record.version}` : `v${record.version}`}` : (ar ? 'لم يختر نطاقه بعد' : 'Has not chosen a range yet')}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {record && <Badge variant={record.status === 'approved' || record.status === 'locked' ? 'emerald' : record.status === 'rejected' ? 'rose' : 'amber'}>{scopeStatusLabel(record.status, ar)}</Badge>}
-                  {record && ['submitted', 'under_review', 'draft'].includes(record.status) && (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => store.decideParticipantScope(participant.id, 'approved')}>{ar ? 'اعتماد' : 'Approve'}</Button>
-                      {/* الرفض يحتاج سببًا يقرأه المتسابق. رفضٌ بلا سبب يترك صاحبه يخمّن. */}
-                      <Button size="sm" variant="ghost" onClick={() => setRejecting(rejecting === participant.id ? null : participant.id)}>{ar ? 'رفض' : 'Reject'}</Button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {rejecting === participant.id && (
-                <div className="mt-2 flex flex-wrap items-end gap-2 rounded-xl border border-[#e8d6b8] bg-[#fdf6e8] p-3">
-                  <label className="min-w-0 flex-1">
-                    <span className="block text-[10px] font-black tracking-[.1em] text-[#6b4f18]">{ar ? 'سبب الرفض — يقرأه المتسابق' : 'Rejection reason — the participant reads it'}</span>
-                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)}
-                      placeholder={ar ? 'النطاق المختار أقل من المطلوب في اللائحة' : 'The chosen range is below the rule minimum'}
-                      className="mizan-control mt-1 w-full px-3 py-2 text-[12px]" />
-                  </label>
-                  <Button size="sm" variant="danger" disabled={!rejectReason.trim()} onClick={() => {
-                    const outcome = store.decideParticipantScope(participant.id, 'rejected', rejectReason.trim());
-                    if (outcome.ok) { setRejecting(null); setRejectReason(''); }
-                  }}>{ar ? 'أرسل الرفض' : 'Send rejection'}</Button>
-                </div>
-              )}
-              {/* النسخ السابقة تُعرض لا تُدفن: من غيّر نطاقه ومتى ولماذا سؤالٌ للجنة لا للتخزين. */}
-              {previous.length > 0 && (
-                <details className="mizan-collapse mt-2 rounded-xl border border-[#e9e7e0] bg-[#fbfaf6]">
-                  <summary className="cursor-pointer select-none list-none px-3 py-2 text-[10px] font-black text-[#5b6460]">
-                    {ar ? `${previous.length} نسخة سابقة` : `${previous.length} earlier versions`}
-                  </summary>
-                  <ol className="space-y-1.5 px-3 pb-3">
-                    {previous.map(entry => (
-                      <li key={entry.id} className="rounded-lg border border-[#e9e7e0] bg-white px-2.5 py-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[10px] font-black text-[#24302b]">{ar ? `النسخة ${entry.version}` : `v${entry.version}`} · {describeScope(entry.scope, ar)}</span>
-                          <span className="text-[9px] text-[#696f6b]">{entry.supersededAt ? new Date(entry.supersededAt).toLocaleString(ar ? 'ar' : 'en') : ''}</span>
-                        </div>
-                        {entry.changeReason && <p className="mt-1 text-[10px] leading-5 text-[#5b6460]">{ar ? 'سبب التغيير: ' : 'Change reason: '}{entry.changeReason}</p>}
-                        {entry.rejectionReason && <p className="mt-1 text-[10px] leading-5 text-[#7a5a2f]">{ar ? 'سبب الرفض: ' : 'Rejection reason: '}{entry.rejectionReason}</p>}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-            </li>
-          );})}
-        </ul>
-      )}
-      <p className="text-[10px] text-[#696f6b]">{ar ? `الفئة: ${bilingualName(category, ar)}` : `Category: ${bilingualName(category, ar)}`}</p>
-    </div>
-  );
-};
-
-const scopeStatusLabel = (status: string, ar: boolean) => {
-  const map: Record<string, [string, string]> = {
-    draft: ['مسوّدة', 'Draft'], submitted: ['بانتظار المراجعة', 'Submitted'], under_review: ['قيد المراجعة', 'Under review'],
-    approved: ['معتمد', 'Approved'], rejected: ['مرفوض', 'Rejected'], locked: ['مقفل', 'Locked'], superseded: ['نسخة سابقة', 'Superseded'],
-  };
-  const row = map[status] || [status, status];
-  return ar ? row[0] : row[1];
 };
 
 const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
@@ -579,7 +412,7 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
     [store.competition.categories, store.participantScopes.length, store.participants.length, store.questionModels.length, store.questionQuarantines.length, escrowOverride],
   );
   const impact = store.scopeSealImpact();
-  const fixTab: Record<string, Tab> = { category_scope: 'scope', selection_rules: 'selection', zones: 'distribution', question_policy: 'policy', participant_scopes: 'selection', pool: 'demand', models: 'models', seal: 'readiness' };
+  const fixTab: Record<string, Tab> = { category_scope: 'scope', selection_rules: 'scope', zones: 'distribution', question_policy: 'policy', participant_scopes: 'scope', pool: 'demand', models: 'models', seal: 'readiness' };
 
   const seal = async () => {
     if (!(await confirm({

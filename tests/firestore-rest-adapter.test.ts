@@ -73,7 +73,7 @@ test('the write is atomic: a clash on one document leaves none of the others beh
   assert.deepEqual(await store.get(taken), { first: true }, 'and the existing document is untouched');
 });
 
-test('a whole public registration lands in Firestore as one atomic batch, scope record and all', { skip: HOST ? false : 'المحاكي غير مشغّل' }, async () => {
+test('a whole public registration lands in Firestore as one atomic batch with category-owned scope', { skip: HOST ? false : 'المحاكي غير مشغّل' }, async () => {
   const store = repo();
   const competition = openCompetition();
   const quarter = competition.categories.find(c => c.scopeMode === 'participant_selected')!;
@@ -86,21 +86,19 @@ test('a whole public registration lands in Firestore as one atomic batch, scope 
     getJourney: (hash) => store.get(`public_journeys/${hash}`),
   }, () => new Date('2026-09-09T08:00:00Z'));
 
-  const chosen = scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8]);
   const input: PublicRegistrationInput = {
     fullNameArabic: 'مسجّل تجريبي', fullName: 'Probe Registrant', email: `probe-${Date.now()}@example.com`,
     phone: '+96550000000', country: 'Kuwait (الكويت)', nationality: 'كويتي', nationalIdOrPassport: `P${Date.now()}`,
     dateOfBirth: '2005-01-01', gender: 'male', categoryId: quarter.id, riwaya: quarter.riwaya,
     guardianName: 'ولي التجربة', consents: { terms: true, privacy: true, guardian: true, audioRecording: true, aiProcessing: true },
-    memorizationScope: chosen,
-  } as PublicRegistrationInput;
+  };
 
   const result = await service.register(competition.id, input, 'https://mizan.example');
   const participant = await store.get(`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${result.participant.id}`);
   assert.ok(participant, 'the participant document is really in Firestore');
   assert.equal(participant!.categoryId, quarter.id);
 
-  /* والنطاق: مكتوبٌ في مساره، بحالته، وببصمته، ومختومًا بصاحبه. */
+  /* لا participant_scopes هنا: الفئة نفسها هي مصدر النطاق، والرحلة تبقى قابلة للحل. */
   const journey = await service.resolve(competition.id, 'participant', result.journeyAccessToken);
   assert.equal(journey.participantId, result.participant.id, 'the journey capability resolves through a real read');
 });

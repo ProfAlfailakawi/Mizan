@@ -58,6 +58,46 @@ export class FirestoreRestRepository{
     const response=await fetch(`${this.root}:commit`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({writes}),signal:AbortSignal.timeout(12000)});
     if(!response.ok){const code=response.status===409?'FIRESTORE_CONFLICT':response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE';throw new Error(code)}
   }
+
+  /*
+   * Server-authoritative cleanup helpers.
+   *
+   * Competition deletion cannot be a browser-only delete: Firestore rules intentionally do not
+   * let an organization administrator erase an arbitrary competition tree, and a root document
+   * deletion does not recursively remove subcollections. These helpers are therefore used only by
+   * the authenticated server route that first proves the competition has no participants.
+   */
+  async listDocumentPaths(collectionPath:string,limit?:number):Promise<string[]>{
+    const token=await this.tokenProvider();const out:string[]=[];let pageToken='';
+    do{
+      const remaining=limit===undefined?1000:Math.max(1,Math.min(1000,limit-out.length));
+      const url=new URL(this.url(collectionPath));url.searchParams.set('pageSize',String(remaining));if(pageToken)url.searchParams.set('pageToken',pageToken);
+      const response=await fetch(url,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(12000)});
+      if(!response.ok)throw new Error(response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE');
+      const body=await response.json() as {documents?:FirestoreDocument[];nextPageToken?:string};
+      for(const document of body.documents||[]){
+        const marker='/documents/';const at=document.name.indexOf(marker);if(at<0)continue;
+        out.push(document.name.slice(at+marker.length).split('/').map(decodeURIComponent).join('/'));
+        if(limit!==undefined&&out.length>=limit)return out;
+      }
+      pageToken=String(body.nextPageToken||'');
+    }while(pageToken);
+    return out;
+  }
+  async listCollectionIds(documentPath:string):Promise<string[]>{
+    const token=await this.tokenProvider();const out:string[]=[];let pageToken='';
+    do{
+      const response=await fetch(`${this.url(documentPath)}:listCollectionIds`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({pageSize:1000,...(pageToken?{pageToken}: {})}),signal:AbortSignal.timeout(12000)});
+      if(!response.ok){if(response.status===404)return out;throw new Error(response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE')}
+      const body=await response.json() as {collectionIds?:string[];nextPageToken?:string};out.push(...(body.collectionIds||[]));pageToken=String(body.nextPageToken||'');
+    }while(pageToken);
+    return [...new Set(out)];
+  }
+  async delete(path:string):Promise<void>{
+    const token=await this.tokenProvider();const response=await fetch(this.url(path),{method:'DELETE',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(12000)});
+    if(response.status===404)return;
+    if(!response.ok)throw new Error(response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE');
+  }
 }
 
 export const firestoreRestCodec={encodeFields,decodeFields};

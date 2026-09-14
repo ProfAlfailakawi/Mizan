@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BadgeCheck, BookMarked, Check, FileCheck2, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, FileCheck2, UserRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Button } from '../design-system/Button';
@@ -7,10 +7,8 @@ import { normalizeFieldValue, isValidEmail } from '../../lib/input-normalize';
 import { searchCountries, countryStoredValue } from '../../lib/countries';
 import {bilingualName,  localizedCountry } from '../../lib/ui-language';
 import type { Participant } from '../../types';
-import { QuranScopePicker } from '../scope/QuranScopePicker';
-import { describeScope, emptyScope, scopeAyahCount, type QuranScope } from '../../lib/quran-scope';
-import { categorySelectionRule, categoryScopeOf } from '../../lib/scope-engine';
-import { selectionIsValid, unitLabelArabic, validateParticipantSelection } from '../../lib/participant-scope';
+import { describeScope } from '../../lib/quran-scope';
+import { categoryScopeOf } from '../../lib/scope-engine';
 
 const hashParam=(name:string)=>{if(typeof window==='undefined')return '';const raw=window.location.hash.split('?')[1]||'';return new URLSearchParams(raw).get(name)||''};
 
@@ -19,7 +17,7 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
  const [step,setStep]=useState(0); const [submitted,setSubmitted]=useState<any>(null); const [submitting,setSubmitting]=useState(false); const [submitError,setSubmitError]=useState(''); const [consentAccepted,setConsentAccepted]=useState(false); const [guardianAccepted,setGuardianAccepted]=useState(false); const [guardianName,setGuardianName]=useState('');
  const requestedCategory=hashParam('category');
  const initialCategory=competition.categories.find(c=>c.id===requestedCategory)||competition.categories[0];
- const [form,setForm]=useState({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:initialCategory?.riwaya||'حفص عن عاصم'});
+ const [form,setForm]=useState({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:''});
 
  useEffect(()=>{
   // App يحمل الإسقاط المنشور في المسارات العامة. لا نطلب latest من داخل النموذج ولا
@@ -38,35 +36,30 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
   // لا نُبقي معرّف فئة من نسخة قديمة إذا وصلت نسخة منشورة مختلفة للمسابقة.
   if(!currentIsValid){
    const cat=categories.find(c=>c.id===requestedCategory)||categories[0];
-   setForm(f=>({...f,categoryId:cat.id,riwaya:cat.riwaya}));
+   setForm(f=>({...f,categoryId:cat.id,riwaya:''}));
   }
  },[competition.id,competition.categories,requestedCategory,form.categoryId]);
- const [scope,setScope]=useState<QuranScope>(emptyScope());
  const category=competition.categories.find(c=>c.id===form.categoryId); const age=Math.floor((Date.now()-new Date(form.dateOfBirth).getTime())/31557600000); const minor=Number.isFinite(age)&&age<18; const guardianRequired=minor&&policy.registration.requireGuardianForMinors;
- /* الفئة الثابتة لا تُعرض على المتسابق أي اختيار: لا خطوة زائدة ولا سؤال بلا معنى. */
- const selectionRule=useMemo(()=>category?categorySelectionRule(category):null,[category?.id,category?.selectionRule]);
- const needsScope=!!selectionRule?.enabled&&category?.scopeMode==='participant_selected';
- const scopeIssues=useMemo(()=>(needsScope&&selectionRule?validateParticipantSelection(selectionRule,scope):[]),[needsScope,selectionRule,scope]);
- const scopeOk=!needsScope||(scopeAyahCount(scope)>0&&selectionIsValid(scopeIssues));
- const steps=needsScope
-  ?[{ar:'بياناتي',en:'Profile'},{ar:'مشاركتي',en:'Entry'},{ar:'نطاق حفظي',en:'My range'},{ar:'مراجعة',en:'Review'}]
-  :[{ar:'بياناتي',en:'Profile'},{ar:'مشاركتي',en:'Entry'},{ar:'مراجعة',en:'Review'}];
+ /* النطاق مصدره الفئة وحدها. المتسابق لا يعيد اختيار نطاق سبق أن حددته الجهة. */
+ const categoryReading=String(category?.riwaya||'').trim();
+ const readingOk=!!category&&!!categoryReading&&form.riwaya.trim()===categoryReading;
+ const steps=[{ar:'بياناتي',en:'Profile'},{ar:'مشاركتي',en:'Entry'},{ar:'مراجعة',en:'Review'}];
  const reviewStep=steps.length-1;
  const fieldValue=(id:string)=>({fullNameArabic:form.fullNameArabic,fullName:form.fullName,email:form.email,phone:form.phone,country:form.country,nationality:form.nationality,dateOfBirth:form.dateOfBirth,gender:form.gender,identity:form.nationalIdOrPassport} as Record<string,string>)[id]??'';
  const requiredProfileFields=policy.registration.fields.filter(f=>f.visible&&f.required);
  // البريد (إن كان ظاهرًا وله قيمة) لا يُقبل إلا بصيغة صحيحة قبل المتابعة.
  const emailField=policy.registration.fields.find(f=>f.visible&&f.type==='email');
  const emailOk=!emailField||(!emailField.required&&!form.email.trim())||isValidEmail(form.email);
- const canNext=step===0?(requiredProfileFields.every(f=>String(fieldValue(f.id)).trim().length>0)&&emailOk):step===1?!!form.categoryId:step===2&&needsScope?scopeOk:true;
+ const canNext=step===0?(requiredProfileFields.every(f=>String(fieldValue(f.id)).trim().length>0)&&emailOk):step===1?readingOk:true;
   const submit=async()=>{
-    if(submitting||!consentAccepted||!scopeOk||(guardianRequired&&(!guardianAccepted||!guardianName.trim())))return;
+    if(submitting||!consentAccepted||!readingOk||(guardianRequired&&(!guardianAccepted||!guardianName.trim())))return;
     setSubmitting(true);
     setSubmitError('');
     try{
       const response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({...form,...(needsScope?{memorizationScope:scope}:{}),guardianName,website:'',consents:{terms:consentAccepted,privacy:consentAccepted,guardian:guardianAccepted,audioRecording:policy.judging.requireAudioRecording?consentAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?consentAccepted:false}})
+        body:JSON.stringify({...form,guardianName,website:'',consents:{terms:consentAccepted,privacy:consentAccepted,guardian:guardianAccepted,audioRecording:policy.judging.requireAudioRecording?consentAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?consentAccepted:false}})
       });
       const body=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(String(body.code||`HTTP_${response.status}`));
@@ -90,15 +83,10 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
  const invalid=f.type==='email'&&f.required&&value.trim().length>0&&!isValidEmail(value);
  return <div key={f.id}><Input label={label} type={f.type==='email'?'email':f.type==='date'?'date':f.type==='phone'?'tel':'text'} value={value} onChange={set} dir={f.id==='fullNameArabic'?'rtl':f.id==='fullName'||f.type==='email'?'ltr':undefined}/>{invalid&&<span className="mt-1 block text-[10px] font-bold text-[#A34D43]">{ar?'صيغة البريد غير صحيحة':'Invalid email format'}</span>}</div>;
  })}</div></div>}
-   {step===1&&<div className="space-y-5"><Title icon={FileCheck2} title={ar?'اختر مشاركتك':'Choose your entry'} sub={ar?'الفئة هي التي تحدد النطاق والرواية وشروط الأهلية.':'Category controls scope, riwaya and eligibility.'}/><div className="space-y-2">{competition.categories.length?competition.categories.map(c=><button key={c.id} onClick={()=>setForm({...form,categoryId:c.id,riwaya:c.riwaya})} className={`w-full p-4 rounded-2xl border text-start transition ${form.categoryId===c.id?'border-[#214C40] bg-[#E7EEE9]':'border-[#deddd6] bg-white hover:bg-[#f7f5ef]'}`}><div className="font-black text-sm">{bilingualName(c,ar)}</div><div className="text-[11px] text-[#636864] mt-1">{describeScope(categoryScopeOf(c),ar)} · {c.riwaya}</div>{c.scopeMode==='participant_selected'&&<div className="text-[10px] font-bold text-[#2F6555] mt-1">{ar?'تختار نطاق حفظك بنفسك في الخطوة التالية':'You will choose your own range next'}</div>}</button>):<div role="status" className="rounded-2xl border border-[#e0cfb4] bg-[#F5EDE2] p-5 text-center"><div className="text-sm font-black text-[#725630]">{ar?'لم تُنشر فئات التسجيل بعد':'Registration categories are not published yet'}</div><p className="text-xs text-[#77654a] mt-2">{ar?'راجع رابط المسابقة لاحقًا أو تواصل مع الجهة المنظمة.':'Please check this competition link later or contact the organizer.'}</p></div>}</div><div className="rounded-xl bg-[#f1efe9] p-3 text-xs text-[#656d68]">{policy.registration.autoApproveEligible?(ar?'إذا استوفيت الشروط الموضوعية يمكن اعتمادك تلقائيًا.':'Eligible applications may be auto-approved.'):(ar?'كل الطلبات تمر على مراجعة بشرية في هذه المسابقة.':'This competition requires human application review.')}</div></div>}
-   {step===2&&needsScope&&category&&selectionRule&&<div className="space-y-5"><Title icon={BookMarked} title={ar?'اختر نطاق حفظك':'Choose your memorization range'} sub={ar?`تُطرح عليك الأسئلة من هذا النطاق وحده. ${ruleHint(selectionRule,ar)}`:`Your questions will come only from this range. ${ruleHint(selectionRule,ar)}`}/>
-    <QuranScopePicker value={scope} onChange={setScope} arabic={ar} parentScope={selectionRule.parentScope||categoryScopeOf(category)} idPrefix="registration"/>
-    {scopeIssues.length>0&&<ul role="status" className={`space-y-1 rounded-xl p-3 text-[11px] font-bold ${selectionIsValid(scopeIssues)?'bg-[#F5EDE2] text-[#7a5a2f]':'bg-[#F4E6E3] text-[#87483f]'}`}>{scopeIssues.map(issue=><li key={issue.code}>{ar?issue.ar:issue.en}</li>)}</ul>}
-    {scopeOk&&scopeAyahCount(scope)>0&&<div role="status" className="rounded-xl bg-[#E7EEE9] p-3 text-[11px] font-black text-[#214C40]">{ar?'اختيارك مطابق للائحة هذه الفئة.':'Your selection matches this category rule.'}</div>}
-   </div>}
-   {step===reviewStep&&<div className="space-y-5"><Title icon={BadgeCheck} title={ar?'مراجعة واحدة':'One final review'} sub={ar?'لن تعيد إدخال هذه البيانات في الاستقبال أو اللجنة أو الشهادة.':'These details will not be re-entered at gate, committee or certificate.'}/><div className="divide-y divide-[#e5e3dc]"><ReviewRow label={ar?'الاسم':'Name'} value={ar?form.fullNameArabic:form.fullName}/><ReviewRow label={ar?'الفئة':'Category'} value={ar?category?.nameArabic||'—':category?.name||'—'}/><ReviewRow label={ar?'الرواية':'Riwaya'} value={form.riwaya}/>{needsScope&&<ReviewRow label={ar?'نطاق حفظي':'My range'} value={describeScope(scope,ar)}/>}<ReviewRow label={ar?'البريد':'Email'} value={form.email}/></div><div className="rounded-2xl bg-[#f3f1eb] p-4 space-y-3"><Consent checked={consentAccepted} onChange={setConsentAccepted} label={ar?'أوافق على شروط المشاركة وسياسة الخصوصية، بما يشمل تسجيل التلاوة واستخدامها للتحكيم والمعالجة التقنية المساندة عند تفعيلها.':'I accept the participation terms and privacy policy, including recitation recording for judging and enabled assistive technical processing.'}/> {guardianRequired&&<div className="pt-2 border-t border-[#ddd] space-y-3"><input value={guardianName} onChange={e=>setGuardianName(e.target.value)} placeholder={ar?'اسم ولي الأمر':'Guardian name'} className="mizan-input text-sm"/><Consent checked={guardianAccepted} onChange={setGuardianAccepted} label={ar?'موافقة ولي الأمر على المشاركة.':'Guardian consent to participate.'}/></div>}</div></div>}
+   {step===1&&<div className="space-y-5"><Title icon={FileCheck2} title={ar?'اختر مشاركتك':'Choose your entry'} sub={ar?'الفئة تحدد نطاق الحفظ وشروط الأهلية، ثم تختار الرواية المعتمدة صراحةً قبل المتابعة.':'The category defines the memorization scope and eligibility; then explicitly confirm its approved reading before continuing.'}/><div className="space-y-2">{competition.categories.length?competition.categories.map(c=><button key={c.id} type="button" onClick={()=>setForm({...form,categoryId:c.id,riwaya:''})} className={`w-full p-4 rounded-2xl border text-start transition ${form.categoryId===c.id?'border-[#214C40] bg-[#E7EEE9]':'border-[#deddd6] bg-white hover:bg-[#f7f5ef]'}`}><div className="font-black text-sm">{bilingualName(c,ar)}</div><div className="text-[11px] text-[#636864] mt-1">{describeScope(categoryScopeOf(c),ar)}</div></button>):<div role="status" className="rounded-2xl border border-[#e0cfb4] bg-[#F5EDE2] p-5 text-center"><div className="text-sm font-black text-[#725630]">{ar?'لم تُنشر فئات التسجيل بعد':'Registration categories are not published yet'}</div><p className="text-xs text-[#77654a] mt-2">{ar?'راجع رابط المسابقة لاحقًا أو تواصل مع الجهة المنظمة.':'Please check this competition link later or contact the organizer.'}</p></div>}</div>{category&&<div className="rounded-2xl border border-[#dcdad2] bg-white p-4"><div className="text-xs font-black text-[#4e5752]">{ar?'الرواية':'Riwaya / reading'}</div>{categoryReading?<button type="button" onClick={()=>setForm(f=>({...f,riwaya:categoryReading}))} aria-pressed={readingOk} className={`mt-3 w-full rounded-xl border px-4 py-3 text-start transition ${readingOk?'border-[#214C40] bg-[#E7EEE9] text-[#214C40]':'border-[#deddd6] hover:bg-[#f7f5ef]'}`}><span className="inline-flex items-center gap-2 text-sm font-black"><span className={`w-5 h-5 rounded-full border grid place-items-center ${readingOk?'border-[#214C40] bg-[#214C40] text-white':'border-[#bfc2be]'}`}>{readingOk?<Check className="w-3.5 h-3.5"/>:null}</span>{categoryReading}</span></button>:<div role="alert" className="mt-3 rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{ar?'هذه الفئة لم تُضبط لها رواية بعد. تواصل مع الجهة المنظمة.':'This category does not have an approved reading yet. Contact the organizer.'}</div>}{categoryReading&&!readingOk&&<div role="status" className="mt-2 text-[11px] font-bold text-[#8a6536]">{ar?'اختر الرواية أعلاه للمتابعة.':'Select the reading above to continue.'}</div>}</div>}<div className="rounded-xl bg-[#f1efe9] p-3 text-xs text-[#656d68]">{policy.registration.autoApproveEligible?(ar?'إذا استوفيت الشروط الموضوعية يمكن اعتمادك تلقائيًا.':'Eligible applications may be auto-approved.'):(ar?'كل الطلبات تمر على مراجعة بشرية في هذه المسابقة.':'This competition requires human application review.')}</div></div>}
+   {step===reviewStep&&<div className="space-y-5"><Title icon={BadgeCheck} title={ar?'مراجعة واحدة':'One final review'} sub={ar?'لن تعيد إدخال هذه البيانات في الاستقبال أو اللجنة أو الشهادة.':'These details will not be re-entered at gate, committee or certificate.'}/><div className="divide-y divide-[#e5e3dc]"><ReviewRow label={ar?'الاسم':'Name'} value={ar?form.fullNameArabic:form.fullName}/><ReviewRow label={ar?'الفئة':'Category'} value={ar?category?.nameArabic||'—':category?.name||'—'}/><ReviewRow label={ar?'الرواية':'Riwaya'} value={form.riwaya||'—'}/><ReviewRow label={ar?'البريد':'Email'} value={form.email}/></div><div className="rounded-2xl bg-[#f3f1eb] p-4 space-y-3"><Consent checked={consentAccepted} onChange={setConsentAccepted} label={ar?'أوافق على شروط المشاركة وسياسة الخصوصية، بما يشمل تسجيل التلاوة واستخدامها للتحكيم والمعالجة التقنية المساندة عند تفعيلها.':'I accept the participation terms and privacy policy, including recitation recording for judging and enabled assistive technical processing.'}/> {guardianRequired&&<div className="pt-2 border-t border-[#ddd] space-y-3"><input value={guardianName} onChange={e=>setGuardianName(e.target.value)} placeholder={ar?'اسم ولي الأمر':'Guardian name'} className="mizan-input text-sm"/><Consent checked={guardianAccepted} onChange={setGuardianAccepted} label={ar?'موافقة ولي الأمر على المشاركة.':'Guardian consent to participate.'}/></div>}</div></div>}
    {submitError&&<div role="alert" className="mt-5 rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{submitError}</div>}
-   <div className="mt-8 pt-5 border-t border-[#e5e3dc] flex items-center justify-between"><Button variant="ghost" disabled={step===0||submitting} onClick={()=>setStep(s=>Math.max(0,s-1))} icon={ar?<ArrowRight className="w-4 h-4"/>:<ArrowLeft className="w-4 h-4"/>}>{ar?'رجوع':'Back'}</Button>{step<reviewStep?<Button disabled={!canNext} onClick={()=>setStep(s=>s+1)} icon={ar?<ArrowLeft className="w-4 h-4"/>:<ArrowRight className="w-4 h-4"/>}>{ar?'التالي':'Next'}</Button>:<Button disabled={submitting||!consentAccepted||!scopeOk||(guardianRequired&&(!guardianAccepted||!guardianName.trim()))} onClick={()=>void submit()}>{submitting?'…':(ar?'إرسال الطلب':'Submit')}</Button>}</div>
+   <div className="mt-8 pt-5 border-t border-[#e5e3dc] flex items-center justify-between"><Button variant="ghost" disabled={step===0||submitting} onClick={()=>setStep(s=>Math.max(0,s-1))} icon={ar?<ArrowRight className="w-4 h-4"/>:<ArrowLeft className="w-4 h-4"/>}>{ar?'رجوع':'Back'}</Button>{step<reviewStep?<Button disabled={!canNext} onClick={()=>setStep(s=>s+1)} icon={ar?<ArrowLeft className="w-4 h-4"/>:<ArrowRight className="w-4 h-4"/>}>{ar?'التالي':'Next'}</Button>:<Button disabled={submitting||!consentAccepted||!readingOk||(guardianRequired&&(!guardianAccepted||!guardianName.trim()))} onClick={()=>void submit()}>{submitting?'…':(ar?'إرسال الطلب':'Submit')}</Button>}</div>
   </div>
  </div>
 }
@@ -135,16 +123,6 @@ const CountryField:React.FC<{label:string;value:string;ar:boolean;onChange:(v:st
   </div>}
  </label>;
 };
-/* جملة واحدة تقول للمتسابق ما المطلوب منه بالضبط، بلغته لا بلغة المحرك. */
-const ruleHint=(rule:import('../../lib/participant-scope').ParticipantScopeSelectionRule,ar:boolean)=>{
- const unit=ar?unitLabelArabic(rule.selectionUnit,rule.exactUnits||rule.maxUnits||3):rule.selectionUnit;
- if(rule.exactUnits)return ar?`اختر ${rule.exactUnits} ${unit} بالضبط.`:`Choose exactly ${rule.exactUnits}.`;
- if(rule.minUnits&&rule.maxUnits)return ar?`اختر من ${rule.minUnits} إلى ${rule.maxUnits} ${unit}.`:`Choose between ${rule.minUnits} and ${rule.maxUnits}.`;
- if(rule.minUnits)return ar?`اختر ${rule.minUnits} ${unit} على الأقل.`:`Choose at least ${rule.minUnits}.`;
- if(rule.maxUnits)return ar?`لا تتجاوز ${rule.maxUnits} ${unit}.`:`Choose no more than ${rule.maxUnits}.`;
- return ar?'اختر ما تحفظه فعلًا.':'Choose what you have actually memorized.';
-};
-
 const Title=({icon:Icon,title,sub}:{icon:React.ComponentType<{className?:string}>;title:string;sub:string})=><div className="flex items-start gap-3"><span className="w-10 h-10 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><Icon className="w-5 h-5"/></span><div><h2 className="text-xl font-black">{title}</h2><p className="text-xs text-[#646965] mt-1">{sub}</p></div></div>;
 const ReviewRow=({label,value}:{label:string;value:string})=><div className="py-3 flex items-center justify-between gap-4"><span className="text-xs text-[#646965]">{label}</span><span className="text-sm font-bold text-end">{value}</span></div>;
 

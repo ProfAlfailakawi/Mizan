@@ -2002,7 +2002,7 @@ export function useAppStore() {
   const createCompetition = (nameArabic: string, nameEnglish = '') => {
     if(!can(globalState.currentUser.role,'competition.create')||globalState.organization.id==='org-pending-setup')return null;
     const base: Competition = {
-      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish.trim(), nameArabic:nameArabic.trim(), edition:'', status:'draft',
+      ...JSON.parse(JSON.stringify(globalState.competition)), id:newId('comp'), name:nameEnglish.trim(), nameArabic:nameArabic.trim(), edition:'', status:'draft', automationLevel:'autopilot',
       startDate:'', endDate:'', registrationStartDate:'', registrationEndDate:'', totalRegistered:0, totalApproved:0, totalAttended:0, currentDay:0,
       categories: [],
       readinessChecklist:{datesConfigured:false,categoriesConfigured:false,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false}
@@ -2015,6 +2015,48 @@ export function useAppStore() {
     globalState.competitions = [base, ...globalState.competitions];
     globalState.competition = base;
     markCompetitionConfigChanged(); notify(); return base;
+  };
+
+  const deleteCompetition = async (competitionId:string) => {
+    const target=globalState.competitions.find(c=>c.id===competitionId);
+    if(!target)return {ok:false,reason:'NOT_FOUND' as const};
+    if(!['super_admin','org_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'NOT_AUTHORIZED' as const};
+    if(target.id==='comp-pending-setup'||target.organizationId==='org-pending-setup')return {ok:false,reason:'PLACEHOLDER_NOT_DELETABLE' as const};
+    if(globalState.currentUser.role!=='super_admin'&&target.organizationId!==globalState.currentUser.organizationId)return {ok:false,reason:'ORGANIZATION_SCOPE_MISMATCH' as const};
+    const localParticipantCount=globalState.participants.filter(p=>p.competitionId===target.id).length;
+    if(localParticipantCount)return {ok:false,reason:'HAS_PARTICIPANTS' as const,participantCount:localParticipantCount};
+    const user=auth.currentUser;if(!user)return {ok:false,reason:'AUTH_REQUIRED' as const};
+    try{
+      const token=await user.getIdToken();
+      const response=await fetch(`/api/competitions/${encodeURIComponent(target.id)}`,{method:'DELETE',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({organizationId:target.organizationId})});
+      const body=await response.json().catch(()=>({}));
+      if(response.status===409&&body?.code==='COMPETITION_HAS_PARTICIPANTS')return {ok:false,reason:'HAS_PARTICIPANTS' as const,participantCount:1};
+      if(!response.ok)return {ok:false,reason:'SERVER_DELETE_FAILED' as const,code:String(body?.code||`HTTP_${response.status}`)};
+    }catch(err){return {ok:false,reason:'SERVER_DELETE_FAILED' as const,code:err instanceof Error?err.message:'NETWORK_ERROR'};}
+
+    /* أي حفظة مؤجلة للمسابقة المحذوفة تُلغى قبل تبديل النطاق؛ وإلا قد تعيد إنشاء الجذر بعد الحذف. */
+    if(firestoreSyncTimeout){clearTimeout(firestoreSyncTimeout);firestoreSyncTimeout=null;}
+    const mutable=globalState as unknown as Record<string,unknown>;
+    for(const [key,value] of Object.entries(mutable)){
+      if(key==='competitions'||!Array.isArray(value))continue;
+      mutable[key]=value.filter(item=>!item||typeof item!=='object'||(item as Record<string,unknown>).competitionId!==target.id);
+    }
+    const remaining=globalState.competitions.filter(c=>c.id!==target.id);
+    globalState.competitions=remaining;
+    if(globalState.competition.id===target.id){
+      const next=remaining.find(c=>c.organizationId===target.organizationId&&c.id!=='comp-pending-setup');
+      if(next)globalState.competition={...next,policy:getCompetitionPolicy(next),ruleSets:next.ruleSets||[next.ruleSet]};
+      else{
+        const seed=JSON.parse(JSON.stringify(INITIAL_COMPETITION)) as Competition;
+        seed.organizationId=target.organizationId;seed.automationLevel='autopilot';seed.policy=getCompetitionPolicy(seed);seed.ruleSets=[seed.ruleSet];
+        globalState.competition=seed;
+      }
+      globalState.activeSession=emptyInitialState().activeSession;
+      globalState.currentUser={...globalState.currentUser,competitionId:next?.id};
+    }
+    globalState.competitionConfigUpdatedAt=new Date().toISOString();
+    notify();
+    return {ok:true,reason:'DELETED' as const};
   };
 
   const applyTemplate = (templateId: string) => {
@@ -3576,7 +3618,7 @@ export function useAppStore() {
     selectCompetition, loadPublicCompetition, checkPublicCompetitionPublished, republishPublicCompetition,
     currentDisplayBoard, publishDisplayBoard, readBoardLease, canPublishDisplayBoard, unpublishDisplayBoard, loadPublicDisplayBoard,
     updateOrganizationBrand, provisionOrganization, setFeatureFlag, registerQuranSourceManifest, reviewQuranSource, certifyQuranSource, revokeQuranSource, advanceQuranSource, runQuranSourceCrossCheck, registerVariantLocus, setVariantLocusState, registerQuranReferenceAudio, setQuranReferenceAudioState, updateQuestionGovernance, registerAiValidation, approveAiCapability, advanceAiValidationStage, suspendAiCapability, revalidateAiProviderModel, registerScientificDataset, revokeScientificDataset, openScientificAdjudication, recordAdjudicationLabel, adjudicateScientificCase, registerBenchmarkRun, updateOperatingCostModel, getOperatingSavings,
-    createCompetition,
+    createCompetition, deleteCompetition,
     submitAppeal,
     resolveAppeal,
     applyTemplate,

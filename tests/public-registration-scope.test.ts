@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import { SEED_COMPETITION } from './fixtures/seed-data';
 import { PublicRegistrationService, type PublicRegistrationInput, type PublicRegistrationStore } from '../server/public-registration';
 import type { Competition } from '../src/types';
-import { fullQuranScope, scopeAyahCount, scopeFromJuz, scopeSignature } from '../src/lib/quran-scope';
+import { scopeFromJuz } from '../src/lib/quran-scope';
 
 /*
- * التسجيل العامّ مفتوح لمن لا حساب له.
+ * النطاق قرار الفئة، لا قرار المتسابق.
  *
- * فما تتحقق منه الواجهة تحسينٌ للتجربة وحده، وما يتحقق منه الخادم هو القانون. وقد قلتُ من
- * قبل إن هذا المسار «مسدودٌ بالبيئة» لأنه يحتاج اعتمادًا سحابيًا — وكان قولًا خاطئًا:
- * الخدمة تأخذ مخزنها حقنًا، والمسدود هو مُهايئ Firestore وحده. فما يلي مُختبَرٌ كاملًا.
+ * بقيت في بيانات التطوير فئات تاريخية تحمل scopeMode=participant_selected لاختبار التوافق
+ * مع السجلات القديمة، لكن التسجيل العام الجديد لا يقبل memorizationScope من العميل أصلًا.
+ * هذا الملف يثبت حدّ الخادم: حتى عميل قديم أو معدل لا يستطيع إنشاء نطاق ثانٍ ينافس الفئة.
  */
 
-const QUARTER = SEED_COMPETITION.categories.find(c => c.scopeMode === 'participant_selected')!;
+const LEGACY_SELECTABLE = SEED_COMPETITION.categories.find(c => c.scopeMode === 'participant_selected')!;
 const FIXED = SEED_COMPETITION.categories.find(c => c.scopeMode !== 'participant_selected')!;
 
 const openCompetition = (): Competition => ({
@@ -36,96 +36,57 @@ const baseInput = (categoryId: string): PublicRegistrationInput => ({
   fullNameArabic: 'أحمد محمد', fullName: 'Ahmad Mohammed', email: 'ahmad@example.com',
   phone: '+96555555555', country: 'Kuwait (الكويت)', nationality: 'كويتي',
   nationalIdOrPassport: 'P123456', dateOfBirth: '2005-01-01', gender: 'male',
-  /* الرواية تُؤخذ من الفئة المقصودة نفسها؛ روايةٌ من فئة أخرى تُرفض قبل أن يُنظر في النطاق. */
   categoryId, riwaya: SEED_COMPETITION.categories.find(c => c.id === categoryId)!.riwaya, guardianName: 'محمد أحمد',
   consents: { terms: true, privacy: true, guardian: true, audioRecording: true, aiProcessing: true },
 });
 
 const service = (store = new MemoryStore()) => ({ store, api: new PublicRegistrationService(store, () => new Date('2026-09-09T08:00:00Z')) });
-const scopeDocs = (store: MemoryStore) => [...store.documents.entries()].filter(([path]) => path.includes('/participant_scopes/'));
+const scopeDocs = (store: MemoryStore) => [...store.documents.keys()].filter(path => path.includes('/participant_scopes/'));
+const participantDocs = (store: MemoryStore) => [...store.documents.entries()].filter(([path]) => path.includes('/participants/'));
 
-test('a participant-selected category refuses a registration that carries no range at all', async () => {
-  const { api } = service();
-  await assert.rejects(() => api.register(SEED_COMPETITION.id, baseInput(QUARTER.id), 'https://mizan.example'), /REGISTRATION_SCOPE_REQUIRED/);
-});
-
-test('a malformed or empty range is refused before it can enter the system', async () => {
-  const { api } = service();
-  await assert.rejects(
-    () => api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: { version: 1, segments: [], assurance: 'CANONICAL_TABLE' } } as PublicRegistrationInput, 'https://mizan.example'),
-    /REGISTRATION_SCOPE_REQUIRED/);
-  await assert.rejects(
-    () => api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: { version: 1, assurance: 'CANONICAL_TABLE', segments: [{ start: { surah: 999, ayah: 1 }, end: { surah: 999, ayah: 2 } }] } } as unknown as PublicRegistrationInput, 'https://mizan.example'),
-    /REGISTRATION_SCOPE_INVALID/);
-});
-
-test('a range that breaks the category rule is refused by the server, and the broken rule is named', async () => {
-  const { api } = service();
-  /* اللائحة تشترط ثمانية أجزاء بالضبط؛ ثلاثةٌ لا تمرّ ولو قبلتها الواجهة. */
-  await assert.rejects(
-    () => api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: scopeFromJuz([1, 2, 3]) } as PublicRegistrationInput, 'https://mizan.example'),
-    /REGISTRATION_SCOPE_RULE_VIOLATION:/);
-});
-
-test('a valid range is written as a submitted scope record, awaiting the committee — never auto-approved', async () => {
+test('registration needs no participant-selected range because the category is the only scope source', async () => {
   const { store, api } = service();
-  const chosen = scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8]);
-  const result = await api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: chosen } as PublicRegistrationInput, 'https://mizan.example');
-
-  const docs = scopeDocs(store);
-  assert.equal(docs.length, 1, 'exactly one scope record is written');
-  const [path, record] = docs[0];
-  assert.match(path, new RegExp(`^organizations/${SEED_COMPETITION.organizationId}/competitions/${SEED_COMPETITION.id}/participant_scopes/`),
-    'the record lives inside its own organization and competition path');
-  assert.equal(record.participantId, result.participant.id);
-  assert.equal(record.version, 1);
-  assert.equal(record.status, 'submitted', 'a committee-approval rule must not be auto-approved at registration');
-  assert.equal(record.approvedAt, undefined);
-  assert.equal(record.scopeSignature, scopeSignature(chosen));
-  assert.equal(record.uploaderUid, result.participant.id, 'the rules let a participant reach only their own record');
-  assert.ok(record.submittedAt);
+  const result = await api.register(SEED_COMPETITION.id, baseInput(LEGACY_SELECTABLE.id), 'https://mizan.example');
+  assert.ok(result.participant.id);
+  assert.equal(scopeDocs(store).length, 0, 'registration never creates a second participant scope');
 });
 
-test('an auto-approval rule is honoured, and only then is the record approved at registration', async () => {
-  const competition = openCompetition();
-  competition.categories = competition.categories.map(c => c.id === QUARTER.id
-    ? { ...c, selectionRule: { ...c.selectionRule!, approval: 'auto' as const } } : c);
-  const { store, api } = service(new MemoryStore(competition));
-  await api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8]) } as PublicRegistrationInput, 'https://mizan.example');
-  const [, record] = scopeDocs(store)[0];
-  assert.equal(record.status, 'approved');
-  assert.equal(record.approvedBy, 'auto_policy');
-  assert.ok(record.approvedAt);
-});
-
-test('a fixed-scope category writes no scope record at all, and ignores a range a client sends anyway', async () => {
+test('a modified old client cannot inject memorizationScope into registration', async () => {
   const { store, api } = service();
-  await api.register(SEED_COMPETITION.id, { ...baseInput(FIXED.id), memorizationScope: fullQuranScope() } as PublicRegistrationInput, 'https://mizan.example');
-  assert.equal(scopeDocs(store).length, 0, 'a category that does not let the participant choose stores no choice');
+  const injected = { ...baseInput(LEGACY_SELECTABLE.id), memorizationScope: scopeFromJuz([1, 2, 3]) } as PublicRegistrationInput & { memorizationScope: unknown };
+  await api.register(SEED_COMPETITION.id, injected, 'https://mizan.example');
+  assert.equal(scopeDocs(store).length, 0, 'unrecognized client scope is ignored rather than persisted');
+  const [, participant] = participantDocs(store)[0];
+  assert.equal('memorizationScope' in participant, false, 'the injected field never reaches the participant record');
 });
 
-test('the stored range is the normalized one, so an overlapping or reversed choice is repaired before it is trusted', async () => {
-  const { store, api } = service();
-  /* مقاطع متداخلة ومقلوبة: تُطبَّع قبل أن تُحفظ، فلا يدخل النظام نطاقٌ غير مطبَّع. */
-  const messy = {
-    version: 1 as const, assurance: 'CANONICAL_TABLE' as const,
-    segments: [
-      ...scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8]).segments,
-      ...scopeFromJuz([3, 4]).segments,
-    ],
-  };
-  await api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: messy } as PublicRegistrationInput, 'https://mizan.example');
-  const [, record] = scopeDocs(store)[0];
-  const stored = record.scope as ReturnType<typeof scopeFromJuz>;
-  assert.equal(record.scopeSignature, scopeSignature(scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8])),
-    'the duplicate segments collapse into the same range');
-  assert.equal(scopeAyahCount(stored), scopeAyahCount(scopeFromJuz([1, 2, 3, 4, 5, 6, 7, 8])));
-});
-
-test('a failed registration writes nothing — not the participant, not the journey, not the scope', async () => {
+test('the approved reading must be chosen explicitly and must match the selected category', async () => {
   const { store, api } = service();
   await assert.rejects(
-    () => api.register(SEED_COMPETITION.id, { ...baseInput(QUARTER.id), memorizationScope: scopeFromJuz([1, 2]) } as PublicRegistrationInput, 'https://mizan.example'),
-    /REGISTRATION_SCOPE_RULE_VIOLATION/);
-  assert.equal(store.documents.size, 0, 'a refused registration leaves no half-written trail');
+    () => api.register(SEED_COMPETITION.id, { ...baseInput(FIXED.id), riwaya: '' }, 'https://mizan.example'),
+    /REGISTRATION_READING_INVALID/,
+  );
+  await assert.rejects(
+    () => api.register(SEED_COMPETITION.id, { ...baseInput(FIXED.id), riwaya: 'رواية غير معتمدة' }, 'https://mizan.example'),
+    /REGISTRATION_READING_INVALID/,
+  );
+  assert.equal(store.documents.size, 0, 'a refused reading leaves no half-written registration');
+});
+
+test('a valid fixed-category registration stores the category reading and no participant scope', async () => {
+  const { store, api } = service();
+  const result = await api.register(SEED_COMPETITION.id, baseInput(FIXED.id), 'https://mizan.example');
+  const participant = store.documents.get(`organizations/${SEED_COMPETITION.organizationId}/competitions/${SEED_COMPETITION.id}/participants/${result.participant.id}`)!;
+  assert.equal(participant.categoryId, FIXED.id);
+  assert.equal(participant.riwaya, FIXED.riwaya);
+  assert.equal(scopeDocs(store).length, 0);
+});
+
+test('registration remains atomic when category validation fails', async () => {
+  const { store, api } = service();
+  await assert.rejects(
+    () => api.register(SEED_COMPETITION.id, { ...baseInput(FIXED.id), categoryId: 'missing-category' }, 'https://mizan.example'),
+    /REGISTRATION_CATEGORY_INVALID/,
+  );
+  assert.equal(store.documents.size, 0, 'participant, journey and consent documents are all absent after rejection');
 });

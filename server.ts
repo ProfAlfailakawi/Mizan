@@ -160,6 +160,15 @@ async function startServer() {
   const firestoreRepository=firebaseProjectId?new FirestoreRestRepository(firebaseProjectId):null;
   const publicCompDir=process.env.MIZAN_PUBLIC_COMPETITIONS_DIR||path.resolve('.mizan-data/public-competitions');
   const publicDataDir=process.env.MIZAN_PUBLIC_DATA_DIR||path.resolve('.mizan-data/public-data');
+  const deleteFirestoreTree=async(documentPath:string):Promise<void>=>{
+    if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
+    const childCollections=await firestoreRepository.listCollectionIds(documentPath);
+    for(const collectionId of childCollections){
+      const children=await firestoreRepository.listDocumentPaths(`${documentPath}/${collectionId}`);
+      for(const child of children)await deleteFirestoreTree(child);
+    }
+    await firestoreRepository.delete(documentPath);
+  };
   try{fs.mkdirSync(publicCompDir,{recursive:true,mode:0o700})}catch{/* ignore */}
   try{fs.mkdirSync(publicDataDir,{recursive:true,mode:0o700})}catch{/* ignore */}
   /* تنظيف أثر النسخة القديمة مرة واحدة. لا ينشئ الخادم أي مسابقة تلقائيًا. */
@@ -710,6 +719,39 @@ async function startServer() {
     res.setHeader('Cache-Control','no-store');
     return res.json({ok:true,competitionId:cleanId,updatedAt});
   });
+  /*
+   * حذف مسابقة أُنشئت بالخطأ قرارٌ من الخادم، لا من المتصفح. الشرط الحاسم يُفحص من
+   * Firestore نفسه: وجود متسابق واحد يقفل الحذف حتى لو كانت نسخة جهاز الإدارة قديمة.
+   * وعند السماح يُحذف الجذر وكل مجموعاته الفرعية حتى لا تبقى سجلات يتيمة تعود لاحقًا.
+   */
+  app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
+    const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
+    if(!competitionId||competitionId==='comp-pending-setup'||competitionId.replace(/[^a-zA-Z0-9_-]/g,'')!==competitionId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    const requestedOrganizationId=String(req.body?.organizationId||'').trim().slice(0,120);
+    const organizationId=actor.role==='super_admin'?requestedOrganizationId:actor.organizationId;
+    if(!organizationId||organizationId==='org-pending-setup'||!/^[a-zA-Z0-9_-]+$/.test(organizationId))return res.status(400).json({code:'INVALID_ORGANIZATION_SCOPE'});
+    if(actor.role!=='super_admin'&&requestedOrganizationId&&requestedOrganizationId!==actor.organizationId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
+    if(!firestoreRepository)return res.status(503).json({code:'FIRESTORE_UNAVAILABLE'});
+    const root=`organizations/${organizationId}/competitions/${competitionId}`;
+    try{
+      const participants=await firestoreRepository.listDocumentPaths(`${root}/participants`,1);
+      if(participants.length)return res.status(409).json({code:'COMPETITION_HAS_PARTICIPANTS'});
+      const existing=await firestoreRepository.get(root);
+      if(existing){
+        const stored=asCompetition(existing.competition);
+        if(stored&&stored.organizationId!==organizationId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
+      }
+      await deleteFirestoreTree(root);
+      await Promise.all([firestoreRepository.delete(`public_competitions/${competitionId}`),firestoreRepository.delete(`public_boards/${competitionId}`)]);
+      try{fs.rmSync(path.join(publicCompDir,`${competitionId}.json`),{force:true})}catch{/* Firestore remains authoritative. */}
+      return res.json({ok:true,competitionId});
+    }catch(err){
+      const code=err instanceof Error?err.message:'COMPETITION_DELETE_FAILED';
+      return res.status(code==='FIRESTORE_PERMISSION_DENIED'?403:503).json({code});
+    }
+  });
+
   app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}
     try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
