@@ -14,9 +14,9 @@ The path is:
 1. `.github/workflows/ci.yml` verifies a push to `main`, including building the actual Docker image used by Cloud Run.
 2. `.github/workflows/deploy-cloud-run.yml` starts only after that `main` push finishes successfully.
 3. GitHub authenticates to Google Cloud with OIDC Workload Identity Federation; no long-lived service-account JSON key is stored in GitHub.
-4. The workflow checks out the exact SHA that passed CI and runs `gcloud builds submit --config=cloudbuild.yaml` with that SHA as `COMMIT_SHA`.
+4. The workflow checks out the exact SHA that passed CI and submits it to Cloud Build using the dedicated `mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com` build identity.
 5. Cloud Build builds and pushes the image, deploys Firestore rules, then deploys Cloud Run.
-6. Cloud Run is labelled with `mizan-git-sha=<verified commit>` and the GitHub workflow verifies the ready revision and `/api/health` before declaring deployment successful.
+6. Cloud Run is labelled with `mizan-git-sha=<verified commit>` and the GitHub workflow verifies the newest created revision is the ready revision, the SHA matches, and `/api/health` returns success.
 
 A failed CI run never deploys. A pull request never deploys. A successful build that does not become the ready Cloud Run revision is reported as a deployment failure rather than a false green.
 
@@ -30,14 +30,14 @@ bash scripts/setup-github-cloudrun-wif.sh
 
 The script is idempotent. It:
 
-- enables the required APIs;
+- enables the required IAM, STS, Cloud Build, Cloud Run, Artifact Registry, Firebase/Firestore, Storage and Secret Manager APIs;
 - ensures the Docker Artifact Registry repository and private source-staging bucket exist;
-- creates the keyless GitHub deployer service account;
-- creates/updates a GitHub OIDC Workload Identity provider restricted to `ProfAlfailakawi/Mizan` on `refs/heads/main`;
-- discovers the **actual** Cloud Build default service account instead of assuming its name;
-- grants the Cloud Build identity the Cloud Run, Artifact Registry, Firestore Rules, logging and Secret Manager permissions required by `cloudbuild.yaml`;
-- grants `iam.serviceAccountUser` only on the Cloud Run runtime service account;
-- checks that the required R2 secrets exist and grants the runtime identity access to them;
+- creates a keyless GitHub deployer service account and a separate least-privilege Cloud Build execution service account;
+- creates/updates a GitHub OIDC Workload Identity provider restricted to the immutable GitHub repository/owner IDs and `refs/heads/main`;
+- lets the GitHub deployer submit builds and act as the dedicated build identity, but does not let GitHub deploy Cloud Run directly;
+- grants the dedicated build identity only the build/deploy roles needed for Artifact Registry, Firestore Rules, Cloud Run, logging and service usage;
+- grants that build identity `iam.serviceAccountUser` only on the Cloud Run runtime service account;
+- checks that the required R2 secrets exist and grants secret payload access to the Cloud Run runtime identity, not the build identity;
 - configures the repository variables automatically when GitHub CLI is authenticated, or prints their exact values otherwise.
 
 Required GitHub Actions repository variables:
