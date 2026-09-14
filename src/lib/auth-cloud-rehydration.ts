@@ -1,6 +1,6 @@
 import type { Competition, Role } from '../types';
 import { auth, getFirestoreClient } from './firebase';
-import { persistDurableCompetitionSnapshot, readDurableLocalSnapshot, writeDurableLocalSnapshot } from './cloud-session-durability';
+import { persistDurableCompetitionSnapshot } from './cloud-session-durability';
 import type { AppStoreState } from './store-state';
 
 const CONFIG_WRITERS: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
@@ -11,6 +11,12 @@ export interface AuthScopeIdentity {
   organizationId: string;
   operatorId?: string;
   competitionId?: string;
+}
+
+export interface PreparedCloudScope {
+  selectedCompetitionId: string;
+  competitions: Competition[];
+  updatedAt?: string;
 }
 
 type CloudCompetition = { competition: Competition; updatedAt?: string };
@@ -24,26 +30,16 @@ function newestFirst(a: CloudCompetition, b: CloudCompetition) {
   return bt - at;
 }
 
-function sameIdSet(a: Competition[], b: Competition[]) {
-  const left = [...new Set(a.map(c => c.id))].sort();
-  const right = [...new Set(b.map(c => c.id))].sort();
-  return left.length === right.length && left.every((id, i) => id === right[i]);
-}
-
 /**
- * Discover the authoritative competition scope before the authenticated app mounts its listeners.
- *
- * Previously applyAuthenticatedIdentity() could only choose from competitions already present in
- * that browser's localStorage. After logout, a clean browser (or a browser whose local snapshot
- * pointed at another competition) therefore subscribed to `comp-pending-setup` and showed no
- * categories or registrations even though Firestore had them. This bootstrap resolves the exact
- * cloud scope, stores it locally, and asks for one reload before the normal store subscriptions run.
+ * Resolve the authoritative competition scope before normal Firestore listeners are attached.
+ * No cloud payload is copied into browser storage here: the store applies the verified scope in
+ * memory and its existing redacted snapshot path remains the only client-storage writer.
  */
 export async function prepareAuthenticatedCloudScope(
   identity: AuthScopeIdentity,
   liveState: AppStoreState,
-): Promise<'ready' | 'reload'> {
-  if (!auth.currentUser || identity.operatorId || identity.role === 'super_admin' || !identity.organizationId) return 'ready';
+): Promise<PreparedCloudScope | null> {
+  if (!auth.currentUser || identity.operatorId || identity.role === 'super_admin' || !identity.organizationId) return null;
 
   const { db, doc, getDoc, collection } = await getFirestoreClient();
   const cloudRows: CloudCompetition[] = [];
@@ -69,15 +65,12 @@ export async function prepareAuthenticatedCloudScope(
 
   cloudRows.sort(newestFirst);
 
-  const persisted = readDurableLocalSnapshot();
-  // useAppStore() also returns action functions. JSON cloning intentionally keeps only serializable
-  // state fields, whereas structuredClone would throw DataCloneError on those functions.
-  const base = JSON.parse(JSON.stringify(persisted || liveState)) as AppStoreState;
-  const liveScoped = (liveState.competitions || []).filter(c => c.organizationId === identity.organizationId);
+  // useAppStore() also exposes actions; JSON cloning deliberately keeps only serializable state.
+  const base = JSON.parse(JSON.stringify(liveState)) as AppStoreState;
   const localCurrent = base.competition?.organizationId === identity.organizationId ? base.competition : undefined;
 
-  // Repair the old logout race on the next login when this is the same user and their local config
-  // is newer than the root document. This never overwrites a newer cloud version.
+  // Repair the old logout race on next login, but only for the same authenticated user and only
+  // when this browser's configuration is newer than the authoritative root document.
   if (
     localCurrent
     && base.currentUser?.id === identity.id
@@ -103,33 +96,20 @@ export async function prepareAuthenticatedCloudScope(
     }
   }
 
-  if (!cloudRows.length) return 'ready';
+  if (!cloudRows.length) return null;
 
   let selected: CloudCompetition | undefined;
   if (identity.competitionId) selected = cloudRows.find(row => row.competition.id === identity.competitionId);
   else if (localCurrent && realCompetition(localCurrent)) selected = cloudRows.find(row => row.competition.id === localCurrent.id);
   selected ||= cloudRows.find(row => realCompetition(row.competition)) || cloudRows[0];
-  if (!selected) return 'ready';
+  if (!selected) return null;
 
-  const cloudCompetitions = cloudRows.map(row => row.competition);
-  const otherLocal = (base.competitions || []).filter(c => c.organizationId !== identity.organizationId);
-  const selectedFirst = [
-    selected.competition,
-    ...cloudCompetitions.filter(c => c.id !== selected!.competition.id),
-  ];
-
-  base.competition = selected.competition;
-  base.competitions = [...selectedFirst, ...otherLocal];
-  base.competitionConfigUpdatedAt = selected.updatedAt || selected.competition.updatedAt;
-
-  const wrote = writeDurableLocalSnapshot(base);
-  if (!wrote) return 'ready';
-
-  // Existing store logic is intentionally kept small and synchronous. Reload once only when the
-  // live in-memory scope differs; the next boot hydrates the snapshot above before authentication.
-  const liveSelected = identity.competitionId
-    ? liveScoped.find(c => c.id === identity.competitionId)
-    : liveScoped[0];
-  const liveMatches = liveSelected?.id === selected.competition.id && sameIdSet(liveScoped, cloudCompetitions);
-  return liveMatches ? 'ready' : 'reload';
+  return {
+    selectedCompetitionId: selected.competition.id,
+    competitions: [
+      selected.competition,
+      ...cloudRows.map(row => row.competition).filter(c => c.id !== selected!.competition.id),
+    ],
+    updatedAt: selected.updatedAt || selected.competition.updatedAt,
+  };
 }
