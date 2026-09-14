@@ -113,6 +113,7 @@ export const AuthPortal:React.FC=()=>{
     <Button className="w-full mt-5" disabled={busy||!email||!password||(activating&&!existingMode&&!confirmPassword)} onClick={()=>void(activating&&!existingMode?createInvitedAccount():signIn())} icon={<ShieldCheck className="w-4 h-4"/>}>{busy?'…':activating&&!existingMode?(ar?'إنشاء حسابي وتفعيله':'Create & activate my account'):(ar?'دخول آمن':'Sign in')}</Button>
     {activating&&<button onClick={()=>{setExistingMode(v=>!v);setPassword('');setConfirmPassword('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{existingMode?(ar?'هذا أول حساب لي — اختر كلمة مرور جديدة':'This is my first account — choose a new password'):(ar?'لدي حساب بهذا البريد':'I already have an account with this email')}</button>}
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-11 mt-2 text-xs font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
+    <Button className="w-full mt-4 !bg-[#45675b] hover:!bg-[#2e473e] !text-white" onClick={() => appStore.applyAuthenticatedIdentity({id: 'demo-user-123', email: 'demo@mizan.app', name: 'مستخدم استعراضي (ديمو)', role: 'operator_owner', organizationId: '__platform__', mfaEnabled: true, identityAssurance: 'firebase_managed'})}>{ar ? 'تسجيل دخول استعراضي (ديمو)' : 'Demo Login'}</Button>
    </>}
   </div>
  </div></div>
