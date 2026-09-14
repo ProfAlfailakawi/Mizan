@@ -1,7 +1,9 @@
 node_modules
 dist
 .git
-.github
+# Keep .github in the build context: npm run check executes deployment-contract tests
+# that read workflow files. The final runtime stage copies only dist + package files,
+# so GitHub workflow metadata is never shipped in the production image.
 .env
 .env.*
 npm-debug.log*
