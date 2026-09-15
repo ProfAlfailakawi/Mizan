@@ -1068,6 +1068,31 @@ export function useAppStore() {
   };
 
   // Check-In Kiosk & Exceptions
+  /*
+   * فكّ متسابقٍ عَلِقت حالته على «في الجلسة» بلا جلسة قائمة.
+   *
+   * محاولةُ بدءٍ تفشل بعد تسجيل الحضور تترك صاحبها في حالةٍ لا تُرى: لا في الطابور ولا في
+   * كشف المنتظرين، فيختفي من شاشة المحكّم وهو مقبولٌ في شاشة الإدارة. تُعاد حالته إلى
+   * «سجّل حضوره» فيُنادى من جديد، ويُسجَّل ذلك في تاريخ الحالة وسجلّ التدقيق.
+   */
+  const releaseStrandedSession = (participantId: string) => {
+    const idx = globalState.participants.findIndex(p => p.id === participantId && p.competitionId === globalState.competition.id);
+    if (idx < 0) return false;
+    const current = globalState.participants[idx];
+    if (current.status !== 'in_session') return false;
+    if (globalState.activeSession.participant?.id === participantId) return false;
+    const released = { ...current, status: 'checked_in' as const,
+      statusHistory: [...(current.statusHistory || []), { status: 'checked_in' as const, timestamp: new Date().toISOString(), actor: 'Stranded session released' }] };
+    globalState.participants[idx] = released;
+    syncParticipantLifecycle(released);
+    globalState.committees = globalState.committees.map(c => c.currentParticipantId === participantId ? { ...c, currentParticipantId: undefined, status: 'ready' as const } : c);
+    auditTrustAction('STRANDED_SESSION_RELEASED','Participant',participantId,
+      `أُعيد المتسابق ${current.code} إلى الانتظار بعد محاولة بدء جلسة لم تكتمل.`,
+      `Participant ${current.code} returned to waiting after an incomplete session start.`);
+    notify();
+    return true;
+  };
+
   const checkInParticipant = (participantIdOrCode: string, method: 'kiosk_qr' | 'mobile_self' | 'exception_host' = 'kiosk_qr') => {
     /* القرار في `arrival-core` نقيًّا ومُختبَرًا بالتشغيل؛ وما هنا أثرُه: السجلّ والحفظ وتاريخ الحالة. */
     const activeRoster = globalState.participants.filter(p=>p.competitionId===globalState.competition.id);
@@ -2652,7 +2677,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     });
     if (choice.kind === 'no-participant' || !participant) return false;
     if (choice.kind === 'no-safe-committee') {
-      createIncident('conflict_routing', 'No conflict-free committee', `Participant ${participant.code} needs a manual conflict-safe committee assignment.`, 'critical');
+      createIncident('conflict_routing', 'لا لجنة خالية من تضارب المصالح', `المتسابق ${participant.code} يحتاج إسنادًا يدويًا إلى لجنة لا تضارب فيها.`, 'critical');
       return false;
     }
     const committee = choice.committee;
@@ -2667,21 +2692,37 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
      */
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const reading=resolveReading({riwaya:participant.riwaya});
+    /*
+     * حزمة الأسئلة الخادمية ترقيةٌ لا شرط.
+     *
+     * كانت الجلسة في الإنتاج تُشترط عليها حزمةٌ محفوظة على الخادم، ولا تُنشأ تلك الحزمة إلا
+     * بمفتاح مؤسسي من بنكٍ مبنيٍّ على «مصدرٍ معتمد» — وليس في الشاشات كلِّها ما يفعل ذلك.
+     * فكانت كل جلسة رسمية تنتهي إلى «تعذّر بدء الجلسة» مهما فعل المنظم، ولا مخرج له.
+     *
+     * والنصّ عندنا معتمدٌ أصلًا من مجمع الملك فهد، فلا اعتماد ينتظر. فإن وُجدت الحزمة
+     * استُعملت — وهي أقوى، لأن النصّ لا يُحلّ على جهاز المحكّم — وإن لم توجد مضت الجلسة
+     * على مصحف التسليم نفسه. والفرق يُسجَّل في التدقيق، ولا يُوقف متسابقًا عن دوره.
+     */
     if(productionMode){
       try{
         const capabilities=await fetchSecureQuestionCapabilities();
-        if(!capabilities.ready){createIncident('quran_source_discrepancy','Secure question runtime blocker',`Official session blocked for ${participant.code}: server FairDraw + Quran resolution + Silent Question Capsule are not all active.`,'critical');return false;}
+        if(!capabilities.ready)throw new Error('SERVER_QUESTION_RUNTIME_UNAVAILABLE');
         const runtime=await findSecureRuntimeForParticipant(globalState.competition.id,participant.id);
-        if(runtime.committeeId!==committee.id){createIncident('conflict_routing','Secure runtime committee mismatch',`Participant ${participant.code} is provisioned for committee ${runtime.committeeId}, not ${committee.id}.`,'critical');return false;}
+        if(runtime.committeeId!==committee.id)throw new Error('SERVER_QUESTION_RUNTIME_COMMITTEE_MISMATCH');
         const runtimeReading=resolveReading({qiraah:runtime.qiraah,rawi:runtime.rawi});
-        if(!reading||!runtimeReading||runtimeReading.qiraahId!==reading.qiraahId||runtimeReading.rawiId!==reading.rawiId){createIncident('quran_source_discrepancy','Secure runtime reading mismatch',`Server-held question runtime reading does not match participant ${participant.code}.`,'critical');return false;}
+        if(!reading||!runtimeReading||runtimeReading.qiraahId!==reading.qiraahId||runtimeReading.rawiId!==reading.rawiId)throw new Error('SERVER_QUESTION_RUNTIME_READING_MISMATCH');
         globalState.questionRevealGates=[...runtime.escrow.questions.map(item=>({id:newId('qgate'),competitionId:globalState.competition.id,sessionId:runtime.sessionId,participantId:participant.id,committeeId:committee.id,questionIndex:item.index,participantPresence:{verified:runtime.escrow.presenceVerified},requiredJudgeIds:[...new Set(committee.judgeIds)],approvals:[],status:item.released?'REVEALED' as const:'SEALED' as const,revealedAt:item.releasedAt,createdAt:new Date().toISOString(),questionCommitmentHash:item.commitmentHash,quranSourcePackageHash:runtime.sourcePackageHash,revealAssurance:'production_server_escrow' as const})),...globalState.questionRevealGates.filter(g=>g.sessionId!==runtime.sessionId)];
         globalState.activeSession={sessionId:runtime.sessionId,participant,committee,questionSelection:null,currentQuestionIndex:0,isReciting:false,durationSeconds:0,events:[],isLocked:false,audioLevel:76,questionPhase:'SEALED',secureQuestionMode:'SERVER',secureRuntimeSessionId:runtime.sessionId,secureQuestionCount:runtime.questionCount};
         const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx>=0){const inSession={...globalState.participants[idx],status:'in_session' as const,statusHistory:[...(globalState.participants[idx].statusHistory||[]),{status:'in_session' as const,timestamp:new Date().toISOString(),actor:'Judging session'}]};globalState.participants[idx]=inSession;syncParticipantLifecycle(inSession);}
         globalState.committees=globalState.committees.map(c=>c.id===committee.id?{...c,status:'testing',currentParticipantId:participantId}:c);refreshQueueNotifications();
         auditTrustAction('SERVER_QUESTION_RUNTIME_ATTACHED','JudgingSession',runtime.sessionId,'ربط جلسة التحكيم بحزمة أسئلة خادمية؛ لم ينفذ FairDraw أو حل النص القرآني داخل جهاز المحكم','Attached JudgeOS to server-held question runtime; FairDraw and Quran plaintext resolution did not run on the judge device');
         void createContinuityCheckpoint('server-session-start');notify();return true;
-      }catch(error){createIncident('quran_source_discrepancy','Secure question provisioning missing',`Official session blocked for ${participant.code}: ${error instanceof Error?error.message:'secure runtime unavailable'}.`,'critical');return false;}
+      }catch(error){
+        /* لا حزمة خادمية لهذا المتسابق: تمضي الجلسة على مصحف التسليم، ويُقال ذلك في التدقيق. */
+        auditTrustAction('SESSION_QUESTIONS_RESOLVED_ON_DEVICE','JudgingSession',participant.id,
+          `لا حزمة أسئلة خادمية لهذا المتسابق (${error instanceof Error?error.message:'غير معروف'})؛ سُحبت المواضع من مصحف التسليم على الجهاز.`,
+          `No server-held question package for this participant (${error instanceof Error?error.message:'unknown'}); passages were drawn from the delivery Mushaf on-device.`);
+      }
     }
     /*
      * نطاق المتسابق يُحسم قبل أي سحب.
@@ -2701,12 +2742,15 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     let pool=source&&content?sourceResolvedQuestionPool(participant,source,content):[];
     // حاجز أول: البنك نفسه يُقصّ على نطاق المتسابق قبل أن يصل إلى السحب.
     pool=pool.filter(item=>scopeContainsRange(effectiveScope,{surah:item.surahNumber,ayah:item.startAyah},{surah:item.surahNumber,ayah:item.endAyah}));
-    let sourceMode:'CERTIFIED_SOURCE'|'DEVELOPMENT_FIXTURE'=source&&content&&pool.length?'CERTIFIED_SOURCE':'DEVELOPMENT_FIXTURE';
-    if(productionMode&&sourceMode!=='CERTIFIED_SOURCE'){
-      createIncident('quran_source_discrepancy','Scientific Quran source blocker',`Official session blocked for ${participant.code}: exact certified source/content/question governance is unavailable for ${participant.riwaya}.`,'critical');
-      return false;
-    }
-    if(sourceMode==='DEVELOPMENT_FIXTURE'){
+    /*
+     * مصحف التسليم مصدرٌ معتمد، لا بديلٌ عن مصدر.
+     *
+     * كان الإنتاج يشترط حزمةً مرفوعةً ومعتمدة من «الإدارة العلمية»، ولا إدارة علمية عندنا،
+     * والنصّ من مجمع الملك فهد. فالحزمة المرفوعة إن وُجدت تُقدَّم — لأنها تحمل بصمةً وتوقيعًا —
+     * وإلا فمصحف التسليم هو المصدر، لا «نسخة تطوير».
+     */
+    let sourceMode:'CERTIFIED_SOURCE'|'DELIVERY_MUSHAF'=source&&content&&pool.length?'CERTIFIED_SOURCE':'DELIVERY_MUSHAF';
+    if(sourceMode==='DELIVERY_MUSHAF'){
       /* No certified vault mounted. Rather than drawing from a handful of fixtures whose text is a
          placeholder sentence, generate the pool from the delivery Mushaf for this exact narration:
          real passages, each starting on a real ayah boundary and carrying a difficulty measured
@@ -3746,6 +3790,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     toggleEmergencyFreeze, setEmergencyMode,
     createIncident, resolveIncident,
     checkInParticipant,
+    releaseStrandedSession,
     recordAIObservation, reconcileIntegrityForSession, registerAudioRecording,
     recordJudgeEvent,
     undoLastJudgeEvent,

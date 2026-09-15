@@ -648,7 +648,7 @@ export interface QuestionSelection {
   seedCommitmentHash: string;
   fairnessToleranceDelta: number;
   generatedAt: string;
-  algorithmVersion?:string; poolVersion?:string; poolSnapshotHash?:string; ruleVersion?:string; constraintHash?:string; publicCommitmentHash?:string; seedReveal?:string; quranSourceManifestId?:string; quranSourceVersion?:string; quranSourcePackageHash?:string; sourceMode?:'CERTIFIED_SOURCE'|'DEVELOPMENT_FIXTURE'; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string;
+  algorithmVersion?:string; poolVersion?:string; poolSnapshotHash?:string; ruleVersion?:string; constraintHash?:string; publicCommitmentHash?:string; seedReveal?:string; quranSourceManifestId?:string; quranSourceVersion?:string; quranSourcePackageHash?:string; sourceMode?:'CERTIFIED_SOURCE'|'DELIVERY_MUSHAF'; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string;
   /* ---- وضع النطاق (MIZAN-FAIRDRAW-SCOPE-1) ----
      يُملأ حين يقود محرك النطاق السحب. القرعة القديمة تترك هذه الحقول فارغة، وإثباتاتها
      تُتحقَّق بالفرع الموروث كما هي. */

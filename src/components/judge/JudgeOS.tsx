@@ -19,10 +19,16 @@ import { fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetc
 
 // Arabic counts do not pluralise the way English does: 1 takes the singular, 2 takes the
 // dual, 3-10 take the plural, and 11+ return to the singular. "4 مرة" is simply wrong.
+/* حالة المنتظر بلغة المحكّم: ما الذي ينتظره هذا الاسم الآن. */
+const PARTICIPANT_WAIT_LABEL:Record<string,string>={
+ in_queue:'في الطابور', checked_in:'سجّل حضوره', approved:'لم يسجّل حضوره',
+ in_session:'جلسة معلّقة', appealed:'اعتراض',
+};
 const marksAr=(n:number)=> n===1?'مرة واحدة' : n===2?'مرتين' : n<=10?`${n} مرات` : `${n} مرة`;
 // نفس قاعدة العدد العربي، بلفظ «ملاحظة»: مفرد، مثنّى، جمع قلة، ثم تمييز مفرد.
 const notesAr=(n:number)=> n===0?'لا ملاحظات' : n===1?'ملاحظة واحدة' : n===2?'ملاحظتان' : n<=10?`${n} ملاحظات` : `${n} ملاحظة`;
 // Criterion names were only ever available in English, inside an Arabic-first surface.
+import type { RegistrationStatus } from '../../types';
 import { calculateCategoryPassageRange } from '../../lib/scope-engine';
 
 const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
@@ -154,16 +160,32 @@ export const JudgeOS: React.FC = () => {
   * المتسابق الحاضر أمامه إلى الطابور مباشرة بدل أن يقف الجميع.
   */
  const rosterForCompetition=participants.filter(p=>p.competitionId===competition.id);
+ /*
+  * كل من يمكن نداؤه يُعرض باسمه.
+  *
+  * كان الكشف يقتصر على «معتمد» و«سجّل حضوره»، فمتسابقٌ عَلِقت حالته على «في الجلسة» بعد
+  * محاولةٍ فاشلة يختفي من الشاشة كلها: لا هو في الطابور ولا في الكشف، والعدّاد يقول صفرًا
+  * والجهة ترى في إدارتها متسابقًا مقبولًا. فصار يُعرض كل من له دور لم يُقيَّم بعد، وتُقال
+  * حالته بجانب اسمه، ويُنادى مباشرة — ومن عَلِق تُفكّ حالته أولًا ثم يُنادى.
+  */
+ const CALLABLE:RegistrationStatus[]=['approved','checked_in','in_session','appealed'];
+ const strandedInSession=(p:{status:RegistrationStatus;id:string})=>
+  p.status==='in_session'&&p.id!==participant?.id;
  const awaitingArrival=rosterForCompetition
-  .filter(p=>['approved','checked_in'].includes(p.status))
-  .sort((a,b)=>a.code.localeCompare(b.code));
+  .filter(p=>CALLABLE.includes(p.status)&&p.id!==participant?.id)
+  .filter(p=>!committeeQueue.some(q=>q.id===p.id))
+  .sort((a,b)=>(a.queueNumber??999999)-(b.queueNumber??999999)||a.code.localeCompare(b.code));
  const rosterCounts={
   total:rosterForCompetition.filter(p=>!['rejected','draft'].includes(p.status)).length,
   queued:committeeQueue.length,
   awaiting:awaitingArrival.length,
   pending:rosterForCompetition.filter(p=>['submitted','under_review'].includes(p.status)).length,
  };
- const admitAndCall=async(id:string)=>{setStartError('');const arrival=store.checkInParticipant(id,'exception_host');
+ const admitAndCall=async(id:string)=>{setStartError('');
+  /* من عَلِقت حالته على «في الجلسة» بلا جلسة قائمة تُفكّ حالته أولًا، وإلا رفضه الاستقبال أبدًا. */
+  const target=rosterForCompetition.find(p=>p.id===id);
+  if(target&&strandedInSession(target))store.releaseStrandedSession(id);
+  const arrival=store.checkInParticipant(id,'exception_host');
   if(!arrival){setStartError(ar?'تعذّر إدخال هذا المتسابق إلى الطابور. راجع غرفة العمليات.':'This participant could not be admitted to the queue. Check the operations room.');return}
   await callParticipant(id)};
  const deductions=activeSession.events.filter(e=>!e.reversed).reduce((s,e)=>s+e.penalty,0);
@@ -240,18 +262,19 @@ export const JudgeOS: React.FC = () => {
   {nextQueued&&<Button className="mt-5" onClick={()=>void callParticipant(nextQueued.id)}>{ar?'استقبال المتسابق التالي':'Call next participant'}</Button>}
   {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-5">{startError}</div>}
  </div>
- {!nextQueued&&!!awaitingArrival.length&&<div className="mizan-surface mt-7 p-5 text-start">
-  <div className="mizan-kicker">{ar?'لم يُسجَّل حضورهم بعد':'NOT CHECKED IN YET'}</div>
-  <h2 className="mt-1 text-sm font-black">{ar?'المتسابق واقفٌ أمامك؟ أدخله إلى الطابور ونادِه':'Is a participant standing in front of you? Admit and call them'}</h2>
-  <p className="mt-1.5 text-[11px] leading-6 text-[#646965]">{ar?'الطابور يمتلئ بتسجيل الحضور من الكشك أو من هاتف المتسابق. وما دام الاستقبال لم يعمل، يمكنك إدخال الحاضر بنفسك — ويُسجَّل ذلك باسمك في سجل التدقيق.':'The queue fills from the kiosk or the participant’s phone. While reception is not running you may admit someone yourself — it is recorded under your name in the audit log.'}</p>
+ {(!!committeeQueue.length||!!awaitingArrival.length)&&<div className="mizan-surface mt-7 p-5 text-start">
+  <div className="mizan-kicker">{ar?'من ينتظر دوره':'WAITING'}</div>
+  <h2 className="mt-1 text-sm font-black">{ar?'ناد من أمامك مباشرة':'Call whoever is in front of you'}</h2>
+  <p className="mt-1.5 text-[11px] leading-6 text-[#646965]">{ar?'هؤلاء كل من لم يُقيَّم بعد في هذه المسابقة. من سجّل حضوره يظهر في الطابور، ومن لم يسجّل تستطيع إدخاله بنفسك — ويُسجَّل ذلك باسمك في سجل التدقيق.':'Everyone not yet assessed in this competition. Those checked in appear in the queue; you may admit the rest yourself — recorded under your name in the audit log.'}</p>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
-   {awaitingArrival.slice(0,12).map(p=><li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
+   {[...committeeQueue.map(p=>({p,queued:true})),...awaitingArrival.map(p=>({p,queued:false}))].slice(0,24).map(({p,queued})=><li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
     <span className="font-mono text-[11px] font-black text-[#656b66]">{p.code}</span>
     <span className="min-w-0 flex-1 truncate text-sm font-bold">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
-    <Button size="sm" variant="outline" onClick={()=>void admitAndCall(p.id)}>{ar?'إدخال ونداء':'Admit & call'}</Button>
+    <span className="shrink-0 text-[10px] font-black text-[#7a817c]">{ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':''}</span>
+    <Button size="sm" variant={queued?'primary':'outline'} onClick={()=>void(queued?callParticipant(p.id):admitAndCall(p.id))}>{ar?(queued?'نادِه':'إدخال ونداء'):(queued?'Call':'Admit & call')}</Button>
    </li>)}
   </ul>
-  {awaitingArrival.length>12&&<p className="mt-2 text-[10px] text-[#696f6b]">{ar?`و${awaitingArrival.length-12} غيرهم. افتح غرفة العمليات لعرض الكشف كاملًا.`:`And ${awaitingArrival.length-12} more. Open the operations room for the full roster.`}</p>}
+  {committeeQueue.length+awaitingArrival.length>24&&<p className="mt-2 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length+awaitingArrival.length-24} غيرهم.`:`And ${committeeQueue.length+awaitingArrival.length-24} more.`}</p>}
  </div>}
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}

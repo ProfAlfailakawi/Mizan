@@ -22,7 +22,10 @@ import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
  */
 
 /** رواية MIZAN القانونية → مفتاح حزمة التسليم. ما لا حزمة له لا يُولَّد له بنك. */
-const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr'};
+export const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr','al-bazzi':'bazzi',qunbul:'qunbul'};
+
+/** الرواة الذين نملك لهم حزمة تسليم فعلًا — تقرأها شاشات الإعداد لتعرض ما يمكن تشغيله. */
+export const DELIVERED_RAWI_IDS:readonly string[]=Object.keys(DELIVERY_READING_BY_RAWI);
 
 export function deliveryReadingKey(riwaya?:string,qiraah?:string):string|null{
  const reading=resolveReading({rawi:riwaya,riwaya,qiraah});

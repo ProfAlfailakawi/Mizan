@@ -9,7 +9,7 @@
  * يحمل مصدره وسلطته ورابطه. وحفصٌ عن عاصم هو الافتراضي الوحيد في بداية كل مقطع: عليه
  * حزمة مجمع الملك فهد المعتمدة، وهو ما تعمل به المسابقات عندنا إلا استثناءً.
  *
- * وبقية الروايات مصدرها المعتمد «موقع الوحي» (alwa7y.com/downloads) — يُسحب منه النص
+ * وبقية الروايات نصُّها يُسحب من مصادرنا المعتمدة
  * ويُختم بمعالمه (السلطة، الإصدار، البصمة) قبل أن تصير الرواية صالحة للتشغيل. وحتى
  * تكتمل حزمتها تبقى معروضةً لكن غير قابلة للاختيار، ويُقال سببُ ذلك صراحةً بدل أن
  * تختفي فيظنّها المسؤول غير موجودة.
@@ -80,7 +80,7 @@ const OTHERS: [string, string, string, string][] = [
 ];
 
 /**
- * الروايات مرتّبةً: حفص أولًا لأنه الافتراضي، ثم البقية بمصدر «موقع الوحي».
+ * الروايات مرتّبةً: حفص أولًا لأنه الافتراضي، ثم البقية.
  *
  * `readyRawiIds` يأتي من حزم التسليم المتوفرة فعلًا في هذا التشغيل؛ فحفصٌ جاهز دائمًا،
  * وغيرُه يصير جاهزًا حين تصل حزمته المعتمدة ولا يُفترض جاهزًا قبل ذلك.
@@ -105,9 +105,14 @@ export function findReadingOption(value: string | undefined, readyRawiIds?: Iter
 }
 
 /** سبب تعطيل رواية غير جاهزة، بلغة المسؤول لا بلغة الحزمة. */
-export function readingUnavailableReason(option: ReadingOption, arabic: boolean) {
-  const authority = READING_SOURCE_AUTHORITIES[option.authority];
+/*
+ * سبب التعطيل يُقال للجهة بلا ذكر مصادرنا.
+ *
+ * كان النصّ يعرض اسم الموقع الذي نسحب منه ورابطه في شاشة المنظّم — وهذا شأنٌ بيننا وبين
+ * مورّدنا لا بينه وبين الجهات. فيُقال ما يعني الجهةَ وحده: النصّ لم يصل بعد، ويُفعَّل وحده.
+ */
+export function readingUnavailableReason(_option: ReadingOption, arabic: boolean) {
   return arabic
-    ? `لم تصل بعدُ حزمة النص المعتمدة لهذه الرواية من ${authority.nameArabic} (${authority.downloadsUrl}). تُفعَّل تلقائيًا فور اعتماد حزمتها.`
-    : `The certified text package for this reading has not arrived yet from ${authority.nameEnglish} (${authority.downloadsUrl}). It activates automatically once its package is approved.`;
+    ? 'نصّ هذه الرواية لم يصل بعد. تُفتح وحدها فور وصوله، بلا أي إعداد منك.'
+    : 'The text for this reading has not arrived yet. It opens by itself once it does, with no setup from you.';
 }
