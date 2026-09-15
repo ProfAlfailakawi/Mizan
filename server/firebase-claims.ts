@@ -80,8 +80,8 @@ function adminAuth(): Promise<AdminAuth | null> {
  * ٢) أن تُجرَّب صلاحيةٌ غير المطلوبة. قراءة المستخدمين وتعديلهم صلاحيتان مختلفتان في
  *    IAM: اعتمادٌ للقراءة فقط ينجح في القراءة ويفشل في الكتابة، واعتمادٌ للكتابة فقط
  *    يقع العكس — فيُمنع من تعبئةٍ هو قادر عليها. فتُجرَّب هنا **العملية نفسها**:
- *    setCustomUserClaims على معرّفٍ محجوزٍ لا وجود له. فإن كانت الصلاحية قائمة عاد
- *    الجواب «لا مستخدم بهذا المعرّف» — وهو نجاحُ الفحص؛ وإن لم تكن عاد «لا صلاحية».
+ *    setCustomUserClaims على معرّفٍ عشوائيٍّ يُولَّد في كل مرة. فإن كانت الصلاحية قائمة
+ *    عاد الجواب «لا مستخدم بهذا المعرّف» — وهو نجاحُ الفحص؛ وإن لم تكن عاد «لا صلاحية».
  *    ولا يُمسّ حسابٌ حقيقي بحرف.
  *
  * ٣) أن يُخزَّن عطلٌ عارض بوصفه سوءَ تهيئة. انقطاع شبكةٍ أو حصّةٌ منفدة ليسا رفضَ
@@ -93,33 +93,69 @@ function adminAuth(): Promise<AdminAuth | null> {
  */
 export type ClaimsWritability = 'WRITABLE' | 'DENIED' | 'NOT_CONFIGURED' | 'UNKNOWN';
 
-/* معرّف محجوز لا يُنشأ حسابٌ به: الفحص لا يلمس هوية أحد. */
-const PROBE_UID = 'mizan-claims-permission-probe-000000000000';
 const CLAIMS_PROBE_TTL_MS = 5 * 60_000;
 
 let claimsProbe: { at: number; writability: ClaimsWritability } | null = null;
 let claimsProbeInFlight: Promise<ClaimsWritability> | null = null;
 
-/** رسائل «لا صلاحية» كما تردّها المنصّة. ما عداها لا يُحسب رفضًا. */
-const DENIED = /permission|insufficient|unauthorized|forbidden|iam|access.?denied/i;
-/** «لا مستخدم بهذا المعرّف» هو نجاح الفحص: النداء وصل ونُفِّذ وردّ على غيابه. */
-const USER_ABSENT = /user-not-found|no user record|not.?found/i;
+/*
+ * معرّف الفحص يُولَّد عشوائيًا في كل مرة، ولا يُثبَّت.
+ *
+ * Firebase لا يحجز معرّفًا باصطلاح تسمية: أي معرّفٍ نكتبه ثابتًا يستطيع أحدٌ أن يُنشئ
+ * به حسابًا (أو يستورده)، فيصير الفحص الذي وُصف بأنه «لا يمسّ أحدًا» ماسحًا لمطالبات
+ * ذلك الحساب كلّما انتهت مهلة التخزين — أي نزعَ صلاحيةِ حسابٍ حقيقي كل خمس دقائق.
+ * ومعرّفٌ عشوائي بمئة وثمانية وعشرين بتًّا لا يقع عليه حسابٌ عمليًا، ولا يُثبَّت فيُستهدَف.
+ */
+const probeUid = () => `mizan-claims-probe-${globalThis.crypto.randomUUID()}`;
+
+/*
+ * التصنيف بالرموز المنصوصة وحدها، لا بمطابقة نصوص.
+ *
+ * مطابقة النصّ تُخرج جوابًا واثقًا عن عطلٍ لا تعرفه: «auth/project-not-found» يحوي
+ * «not-found» فيُقرأ نجاحًا ويُخزَّن — فيمرّ نشرٌ مكسور من بوابة الصحة ويُعرض زرُّ إصلاحٍ
+ * تفشل كلُّ كتابةٍ بعده. وعطلُ اعتمادٍ عارض يحمل عنوان iamcredentials.googleapis.com
+ * يحوي «iam» فيُقرأ رفضَ صلاحية ويُخزَّن، فيُتَّهم نشرٌ سليم.
+ *
+ * فما لم يكن رمزًا منصوصًا في هذين الجدولين فهو «غير معلوم»: لا يُدَّعى فيه علم ولا
+ * يُخزَّن. والجدولان يُوسَّعان عند الحاجة برمزٍ موثَّق، لا بنمطٍ يلتقط ما لم يُقصد.
+ */
+const WRITABLE_CODES = new Set([
+  /* النداء وصل ونُفِّذ وردّ على غياب الحساب: هذا هو نجاح الفحص. */
+  'auth/user-not-found',
+]);
+const DENIED_CODES = new Set([
+  'auth/insufficient-permission',
+  'auth/forbidden',
+  'auth/invalid-credential',
+  'auth/insufficient-permissions',
+]);
+const NOT_CONFIGURED_CODES = new Set([
+  'auth/project-not-found',
+  'auth/configuration-not-found',
+]);
+
+/** رمز الخطأ كما تُصدره حزمة الإدارة، وإلا فرمز حالة المنصّة تحته. */
+function errorCode(err: unknown): string {
+  const direct = (err as { code?: unknown })?.code;
+  if (typeof direct === 'string' && direct) return direct;
+  const info = (err as { errorInfo?: { code?: unknown } })?.errorInfo?.code;
+  return typeof info === 'string' ? info : '';
+}
 
 async function probeClaimsWritability(): Promise<ClaimsWritability> {
   const auth = await adminAuth();
   if (!auth) return 'NOT_CONFIGURED';
   try {
-    await auth.setCustomUserClaims(PROBE_UID, {});
+    await auth.setCustomUserClaims(probeUid(), {});
     /* لا يُتوقّع النجاح — لا حساب بهذا المعرّف — لكنه لو وقع فالصلاحية قائمة قطعًا. */
     return 'WRITABLE';
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err || '');
-    const code = String((err as { code?: string })?.code || '');
-    const text = `${code} ${message}`;
-    if (USER_ABSENT.test(text)) return 'WRITABLE';
-    if (DENIED.test(text)) return 'DENIED';
-    /* شبكةٌ أو حصّة أو عطلٌ غير معروف: لا يُتّهم به النشر ولا يُخزَّن. */
-    console.error('MIZAN identity claims: permission probe inconclusive:', message);
+    const code = errorCode(err);
+    if (WRITABLE_CODES.has(code)) return 'WRITABLE';
+    if (DENIED_CODES.has(code)) return 'DENIED';
+    if (NOT_CONFIGURED_CODES.has(code)) return 'NOT_CONFIGURED';
+    /* شبكةٌ أو حصّة أو رمزٌ لم يُصنَّف بعد: لا يُتّهم به النشر ولا يُخزَّن. */
+    console.error('MIZAN identity claims: permission probe inconclusive', { code, reason: err instanceof Error ? err.message : String(err || '') });
     return 'UNKNOWN';
   }
 }
@@ -140,9 +176,13 @@ export async function claimsWritability(now = Date.now()): Promise<ClaimsWritabi
 /**
  * جوابٌ ثنائي لمن لا يحتمل الثلاثي. «غير معلوم» يُقرأ هنا قدرةً لا عجزًا عمدًا: منعُ
  * تعبئةٍ يملكها صاحبها لأن الشبكة تعثّرت لحظةً أسوأ من محاولةٍ تفشل فتُقال بسببها.
+ *
+ * والنتيجة تُقرأ مرة واحدة: قراءتها مرتين تُطلق فحصًا مخوَّلًا ثانيًا حين يكون الأول
+ * «غير معلوم» — فيُضاعَف الحمل في اللحظة التي يمثّلها ذلك الجواب بعينها.
  */
 export async function claimsWritable(now = Date.now()): Promise<boolean> {
-  return (await claimsWritability(now)) !== 'DENIED' && (await claimsWritability(now)) !== 'NOT_CONFIGURED';
+  const writability = await claimsWritability(now);
+  return writability !== 'DENIED' && writability !== 'NOT_CONFIGURED';
 }
 
 /** للاختبار وإعادة الفحص بعد تغيير الاعتماد. */

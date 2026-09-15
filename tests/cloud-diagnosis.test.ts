@@ -100,13 +100,37 @@ test('no repair is offered while the server cannot write claims at all', () => {
 test('claim writability is proven by exercising the very permission it reports on', () => {
   const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
   /* القراءة والكتابة صلاحيتان مختلفتان في IAM: اعتمادٌ للقراءة فقط ينجح في listUsers ويفشل
-     في كل كتابة. فتُجرَّب العملية نفسها على معرّفٍ محجوز لا وجود له. */
+     في كل كتابة. فتُجرَّب العملية نفسها. */
   assert.doesNotMatch(claims, /listUsers/, 'listing is a different IAM permission from updating');
-  assert.match(claims, /await auth\.setCustomUserClaims\(PROBE_UID, \{\}\)/);
-  assert.match(claims, /const PROBE_UID = 'mizan-claims-permission-probe/,
-    'and it is a reserved id, so no real account is ever touched');
-  assert.match(claims, /USER_ABSENT.test\(text\)\) return 'WRITABLE'/,
+  assert.match(claims, /await auth\.setCustomUserClaims\(probeUid\(\), \{\}\)/);
+  assert.match(claims, /'auth\/user-not-found'/,
     '“no such user” means the call was authorized and executed — that is the passing case');
+});
+
+test('the probe uid is generated per call, so it can never own a real account', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  /* Firebase لا يحجز معرّفًا باصطلاح تسمية: معرّفٌ ثابت يستطيع أحدٌ أن يُنشئ به حسابًا،
+     فيصير الفحص ماسحًا لمطالباته كلّما انتهت المهلة — نزعُ صلاحيةِ حسابٍ حقيقي كل خمس دقائق. */
+  assert.match(claims, /const probeUid = \(\) => `mizan-claims-probe-\$\{globalThis\.crypto\.randomUUID\(\)\}`/);
+  assert.doesNotMatch(claims, /const PROBE_UID =/, 'no fixed id remains to be squatted on');
+});
+
+test('probe errors are classified by documented codes, never by substring', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  /* «auth/project-not-found» يحوي not-found فيُقرأ نجاحًا، وعطلُ اعتمادٍ يحمل عنوان
+     iamcredentials.googleapis.com يحوي iam فيُقرأ رفضًا. كلاهما جوابٌ واثقٌ كاذب. */
+  assert.doesNotMatch(claims, /USER_ABSENT|const DENIED = \//, 'the substring matchers are gone');
+  assert.match(claims, /const WRITABLE_CODES = new Set/);
+  assert.match(claims, /const DENIED_CODES = new Set/);
+  assert.match(claims, /const NOT_CONFIGURED_CODES = new Set\(\[\s*\n\s*'auth\/project-not-found'/,
+    'a missing project is a deployment fault, not a passing probe');
+  assert.match(claims, /return 'UNKNOWN';/, 'anything uncatalogued stays unknown rather than guessed');
+});
+
+test('a single await decides writability, so an unknown result is not probed twice', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  assert.match(claims, /const writability = await claimsWritability\(now\);\s*\n\s*return writability !== 'DENIED' && writability !== 'NOT_CONFIGURED';/,
+    'reading it twice relaunches the privileged probe in exactly the degraded moment it represents');
 });
 
 test('a transient probe failure is never cached as misconfiguration', () => {
@@ -116,7 +140,7 @@ test('a transient probe failure is never cached as misconfiguration', () => {
   assert.match(claims, /if \(writability !== 'UNKNOWN'\) claimsProbe =/,
     'only a definitive answer is cached; an inconclusive one is re-probed next request');
   /* «غير معلوم» يُقرأ قدرةً: حبس المالك عن تعبئةٍ يملكها لأن الشبكة تعثّرت أسوأ من محاولةٍ تُقال بسببها. */
-  assert.match(claims, /!== 'DENIED' &&.*!== 'NOT_CONFIGURED'/s);
+  assert.match(claims, /writability !== 'DENIED' && writability !== 'NOT_CONFIGURED'/);
 
   const server = fs.readFileSync('server.ts', 'utf8');
   assert.match(server, /claimsState==='UNKNOWN'\?null:claimsState==='WRITABLE'/,
