@@ -695,6 +695,16 @@ export interface JudgeSubmission {
   locked: boolean;
   /** Criterion ids this judge was actually responsible for scoring (specialized/hybrid panels). */
   scoredCriterionIds?: string[];
+  /**
+   * نسخة المعايير التي قُيِّم بها هذا الإرسال بعينه.
+   *
+   * المعايير تُعدَّل أثناء المسابقة، وإرسالٌ قُفل على جدولٍ سابق لا يجوز أن يُجمَع بجدولٍ
+   * لاحق: حذفُ معيارٍ يُسقط درجةً مُنحت، وإضافةُ معيارٍ تمنح صاحبَ إرسالٍ قديم درجةً
+   * كاملة عن بندٍ لم يُقيَّم فيه قط. فتُثبَّت النسخة هنا ويُجمَع كلُّ إرسالٍ بجدوله.
+   * غيابها يعني بيانات سابقة لهذا الربط، فتُقرأ بالجدول الحاضر كما كانت تُقرأ.
+   */
+  ruleSetId?: string;
+  ruleSetVersion?: string;
   /** Count of non-reversed penalty events in the session at lock time (used for tie-breaks). */
   sessionPenaltyCount?: number;
   independenceCommitmentHash?: string;
@@ -731,7 +741,7 @@ export interface ReviewCase {
   participantId: string;
   participantCode: string;
   committeeId: string;
-  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier' | 'sealed_result_protection';
+  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier' | 'sealed_result_protection' | 'panel_revision_mixed';
   severity: 'high' | 'medium' | 'low';
   timestampSec: number;
   details: string;

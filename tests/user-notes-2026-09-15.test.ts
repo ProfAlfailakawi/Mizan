@@ -87,14 +87,54 @@ test('judging criteria stay editable: there is no freeze anywhere', () => {
   assert.match(store, /const updateRuleSet = \(patch: Partial<Competition\['ruleSet'\]>/);
   assert.doesNotMatch(store, /if \(frozen && !opts\?\.allowWhenFrozen\) return false;/,
     'a criteria edit is never refused');
-  /* الأثر يبقى: نسخة ترتفع عند كل تعديل، وسجلّ التدقيق يحفظ من غيّر ومتى. */
-  assert.match(store, /version: `\$\{globalState\.competition\.ruleSet\.version\}-rev`/);
+  /* الأثر يبقى: نسخة ترتفع عند كل تعديل. */
+  assert.match(store, /version: `\$\{previous\.version\}-rev`/);
 
   const overview = read('src/components/admin/CompetitionOverview.tsx');
   assert.doesNotMatch(overview, /frozenAt/, 'the screen no longer reads a freeze that cannot happen');
   assert.doesNotMatch(overview, /لائحة هذه المسابقة مجمَّدة|فكّ التجميد/,
     'and no longer speaks of a frozen rulebook, nor offers to unfreeze one');
   assert.match(overview, /<button type="button" onClick=\{addCriterion\}/, 'the add button is never disabled');
+});
+
+test('a criteria edit preserves the revision each locked submission was judged under', () => {
+  /*
+   * المعايير صارت تُعدَّل بلا تجميد — وهذا يفتح بابًا: إرسالٌ قُفل على جدولٍ سابق لو جُمع
+   * بجدولٍ لاحق، أسقط حذفُ معيارٍ درجةً مُنحت، ومنحت إضافةُ معيارٍ درجةً كاملة عن بندٍ
+   * لم يُقيَّم فيه صاحبه قط. فلا يكفي رفع النسخة: لا بدّ من حفظ ما قبلها وربط كل إرسال بها.
+   */
+  const store = read('src/lib/store.ts');
+  assert.match(store, /const snapshot = \{ \.\.\.previous, id: ruleSetSnapshotId\(previous\) \}/,
+    'the previous revision is kept, not overwritten');
+  assert.match(store, /ruleSets: \[next, snapshot, \.\.\.history\]/);
+  assert.match(store, /ruleSetId: sessionRuleSet\.id, ruleSetVersion: sessionRuleSet\.version/,
+    'and every submission records the table it was judged against');
+
+  /*
+   * والنسخة تُستخرج بالهوية والرقم معًا: الأرقام ليست فريدة عبر `ruleSets`، ففئتان بجدولين
+   * مستقلّين قد تحملان الرقم نفسه، وبحثٌ بالرقم وحده يُجمِّع متسابقًا بمعايير فئةٍ أخرى.
+   */
+  assert.match(store, /function ruleSetRevision\(id\?: string, version\?: string\)/);
+  assert.match(store, /pool\.find\(r => r\.id === id && r\.version === version\)/,
+    'a revision is resolved by identity and version together, never by version alone');
+  assert.doesNotMatch(store, /\.find\(r => r\.version === panelRevision\)/,
+    'the ambiguous version-only lookup is gone');
+
+  /* الجلسة تُثبَّت عند أوّل قفل، فلا يقفل محكّمان على نسختين مختلفتين أصلًا. */
+  assert.match(store, /function pinnedRuleSetForSession\(sessionId: string, fallback: RuleSet\): RuleSet/);
+  assert.match(store, /const sessionRuleSet = pinnedRuleSetForSession\(/);
+  assert.match(store, /const panelRuleSet = pinnedRuleSetForSession\(submission\.sessionId, sessionRuleSet\)/);
+
+  /* وما اختلط قبل هذا الربط يُرفع إلى المراجعة البشرية، ولا يُجمَع بتخمين. */
+  assert.match(store, /recordInvariantBlock\('panel_revision_mixed'/);
+
+  /* والختم يأخذ الجدول كاملًا لا معاييره وحدها: `dropExtremes` يتبع نسخة الإرسال. */
+  assert.match(store, /const sealRuleSet = ruleSetOfSubmission\(/);
+  assert.match(store, /criteria: sealRuleSet\.criteria,\s*\n\s*mode: policy\.judging\.mode, dropExtremes: sealRuleSet\.dropExtremes/,
+    'the historical revision decides drop-extremes too, not the live table');
+
+  const types = read('src/types/index.ts');
+  assert.match(types, /ruleSetId\?: string;\s*\n\s*ruleSetVersion\?: string;/);
 });
 
 test('the product speaks of judging criteria, not of a rulebook the organiser does not have', () => {
