@@ -2147,6 +2147,66 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     return true;
   };
 
+  /*
+   * فكّ تجميد اللائحة — قبل أن يُقاس بها أحدٌ قياسًا رسميًا، لا بعده.
+   *
+   * التجميد يقع تلقائيًا عند أول جلسة تحكيم، ولم يكن له فكٌّ إطلاقًا. والنيّة صحيحة —
+   * مسطرةٌ تُعدَّل بعد أن حُكم بها تُبطل ما قبلها — لكنها كانت تُطبَّق على لحظةٍ خاطئة:
+   * جلسةُ تجربةٍ واحدة في مسابقةٍ مسودّة تقفل اللائحة إلى الأبد، فيجد المسؤول نفسه بعد
+   * أول اختبارٍ للنظام عاجزًا عن إضافة معيار، بلا سببٍ معلن ولا مخرج.
+   *
+   * فالحدّ الصحيح ليس «هل جرت جلسة؟» بل «هل قِيس أحدٌ قياسًا رسميًا؟» — والقياس الرسمي
+   * أثرُه خارج النظام: نتيجةٌ مختومة أو منشورة، أو شهادةٌ صدرت. فما دام لم يقع شيءٌ من
+   * ذلك فلا مقياسَ يُبطَل بالتعديل، ويبقى المنع بعده كما كان: قاطعًا لا يُفكّ.
+   *
+   * وما حُسب من نتائج على اللائحة القديمة يُطرح صراحةً: درجةٌ قيست بمسطرةٍ لم تعد قائمة
+   * لا معنى لها، وإبقاؤها يخلط مقياسين في جدول واحد. والعدد يُقال في السجل لا يُبتلع.
+   */
+  const ruleSetUnfreezeBlockers = () => {
+    const scoped = globalState.results.filter(r => r.competitionId === globalState.competition.id);
+    return {
+      sealedResults: scoped.filter(r => r.status === 'sealed' || r.status === 'published').length,
+      certificates: globalState.certificates.filter(c => c.competitionId === globalState.competition.id).length,
+      discardableResults: scoped.filter(r => r.status !== 'sealed' && r.status !== 'published').length,
+    };
+  };
+
+  const canUnfreezeRuleSet = () => {
+    const blockers = ruleSetUnfreezeBlockers();
+    return blockers.sealedResults === 0 && blockers.certificates === 0;
+  };
+
+  const unfreezeRuleSet = (reason: string) => {
+    if (!['super_admin', 'org_admin', 'comp_admin'].includes(globalState.currentUser.role)) return { ok: false, reason: 'FORBIDDEN' as const };
+    const justification = String(reason || '').trim();
+    if (justification.length < 5) return { ok: false, reason: 'REASON_REQUIRED' as const };
+    const blockers = ruleSetUnfreezeBlockers();
+    if (blockers.sealedResults > 0 || blockers.certificates > 0) {
+      recordInvariantBlock('rule_set_immutable_after_official_measurement', 'unfreezeRuleSet', 'RuleSet', globalState.competition.ruleSet.id,
+        `نتائج مختومة: ${blockers.sealedResults}، شهادات: ${blockers.certificates}`,
+        { sealedResults: blockers.sealedResults, certificates: blockers.certificates });
+      return { ok: false, reason: 'OFFICIAL_RESULTS_EXIST' as const, ...blockers };
+    }
+    const now = new Date().toISOString();
+    const rule = { ...globalState.competition.ruleSet, frozenAt: undefined, version: `${globalState.competition.ruleSet.version}-unfrozen` };
+    const policy = { ...getCompetitionPolicy(globalState.competition), frozenAt: undefined, updatedAt: now };
+    globalState.competition = {
+      ...globalState.competition,
+      ruleSet: rule,
+      ruleSets: [rule, ...(globalState.competition.ruleSets || []).filter(r => r.id !== rule.id)],
+      policy,
+      readinessChecklist: { ...globalState.competition.readinessChecklist, ruleSetFrozen: false },
+    };
+    /* نتائج التجربة تُطرح: قيست بمسطرةٍ لم تعد قائمة. */
+    const discarded = blockers.discardableResults;
+    globalState.results = globalState.results.filter(r => r.competitionId !== globalState.competition.id);
+    auditTrustAction('RULE_SET_UNFROZEN', 'RuleSet', rule.id,
+      `فُكّ تجميد اللائحة قبل أي قياس رسمي (لا نتائج مختومة ولا شهادات). طُرحت ${discarded} نتيجة تجربة حُسبت على اللائحة السابقة. السبب: ${justification}`,
+      `Rulebook unfrozen before any official measurement (no sealed results, no certificates). ${discarded} trial results computed on the previous rubric were discarded. Reason: ${justification}`);
+    markCompetitionConfigChanged(); notify();
+    return { ok: true as const, discardedResults: discarded };
+  };
+
   const getCompetitionReadiness = () => getReadinessIssues(globalState.competition);
 
   const updateCompetitionDetails = (patch: Partial<Competition>) => {
@@ -3681,7 +3741,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     resolveAppeal,
     applyTemplate,
     updateCompetitionPolicy,
-    updateRuleSet,
+    updateRuleSet, unfreezeRuleSet, canUnfreezeRuleSet, ruleSetUnfreezeBlockers,
     getCompetitionReadiness,
     updateCompetitionDetails,
     addCategory,

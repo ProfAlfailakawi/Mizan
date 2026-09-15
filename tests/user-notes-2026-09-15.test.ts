@@ -86,13 +86,38 @@ test('a frozen rulebook refuses criterion edits out loud instead of swallowing t
   /* لا يوجد في ميزان رفع تجميد إطلاقًا: التجميد يقع عند أول جلسة، ولا مسار يرفعه. فإحالة
      المسؤول إلى شاشةٍ لا تملك ما أُرسل إليها أسوأ من الصمت — يجرّبها فتضيع ثقته بالرسالة كلها. */
   assert.doesNotMatch(overview, /راجع «الجاهزية والإطلاق»/,
-    'no screen offers an unfreeze, so none may be named as if it did');
-  assert.match(overview, /ولا يوجد رفع تجميد/);
+    'that screen offers no unfreeze, so it may not be named as if it did');
   assert.match(overview, /ولا يكفي حذف المعايير أو إفراغ اللائحة لأن القفل على المسابقة نفسها/,
     'emptying the rulebook is the obvious thing to try, and it does not work — so it is answered before it is tried');
-  assert.match(overview, /أدوات الإدارة ← إصدار جديد من المسابقة/, 'and the one real way forward is named exactly');
+  assert.match(overview, /أدوات الإدارة ← إصدار جديد من المسابقة/, 'and the way forward is named exactly');
   assert.match(overview, /disabled=\{!!frozenAt\} onClick=\{addCriterion\}/,
     'and the add button is visibly disabled rather than dead');
+});
+
+test('the freeze binds to official measurement, not to the first trial session', () => {
+  /*
+   * التجميد كان يقع عند أول جلسة ولا يُفكّ أبدًا، فجلسةُ تجربةٍ واحدة في مسابقةٍ مسودّة
+   * تقفل اللائحة إلى الأبد — وهو أصل الملاحظة الرابعة أصلًا.
+   */
+  const store = read('src/lib/store.ts');
+  assert.match(store, /const unfreezeRuleSet = \(reason: string\)/);
+  /* الحدّ هو الأثر الخارج عن النظام: نتيجةٌ مختومة أو شهادة — لا مجرّد وقوع جلسة. */
+  assert.match(store, /sealedResults: scoped\.filter\(r => r\.status === 'sealed' \|\| r\.status === 'published'\)\.length/);
+  assert.match(store, /if \(blockers\.sealedResults > 0 \|\| blockers\.certificates > 0\)/,
+    'once anything official exists the block stays absolute');
+  assert.match(store, /recordInvariantBlock\('rule_set_immutable_after_official_measurement'/,
+    'and a refused attempt is recorded, not silently dropped');
+  assert.match(store, /if \(justification\.length < 5\) return \{ ok: false, reason: 'REASON_REQUIRED'/,
+    'an unfreeze without a written reason leaves no account of itself');
+  assert.match(store, /auditTrustAction\('RULE_SET_UNFROZEN'/);
+  /* درجةٌ قيست بمسطرةٍ لم تعد قائمة لا معنى لها، فتُطرح صراحةً ويُقال عددها. */
+  assert.match(store, /globalState\.results = globalState\.results\.filter\(r => r\.competitionId !== globalState\.competition\.id\)/);
+
+  const overview = read('src/components/admin/CompetitionOverview.tsx');
+  assert.match(overview, /store\.unfreezeRuleSet\(unfreezeReason\.trim\(\)\)/);
+  assert.match(overview, /disabled=\{unfreezeReason\.trim\(\)\.length<5\}/, 'the button cannot fire without a reason');
+  assert.match(overview, /ستُطرح \$\{unfreezeBlockers\.discardableResults\} نتيجة تجربة/,
+    'and what will be discarded is stated before the click, not after');
 });
 
 test('an empty rulebook is called out where it is edited, not only at the readiness gate', () => {
