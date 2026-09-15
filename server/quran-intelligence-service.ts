@@ -54,13 +54,37 @@ export class QuranIntelligenceService{
   }
   private bootstrapOfficialWaqf(){for(const r of QURAN_READINGS)this.ensureOfficialWaqf(r.id)}
 
-  async processAlignmentChunk(input:{actorId:string;sessionId:string;reading:string;surah:unknown;startAyah:unknown;endAyah:unknown;sourcePackageId:string;contentType:string;bytes:Buffer}){
+  /*
+   * `practice` يفصل تدريب المتسابق عن سجلّ الجلسة.
+   *
+   * المحرّك نفسه، والنصّ نفسه، والحزمة نفسها — لكن ما يقرؤه المتسابق وهو ينتظر دوره لا
+   * يدخل دفتر الأدلّة ولا يُبنى عليه هاش جلسة. تمرينه له وحده: لا يُسجَّل، ولا تصل اللجنة
+   * منه كلمة، ولا يمسّ درجته بحرف.
+   */
+  async processAlignmentChunk(input:{actorId:string;sessionId:string;reading:string;surah:unknown;startAyah:unknown;endAyah:unknown;sourcePackageId:string;contentType:string;bytes:Buffer;practice?:boolean}){
     if(!this.alignmentBackend.url)throw new Error('QURAN_ALIGNMENT_BACKEND_NOT_CONFIGURED');
     if(!input.actorId.trim()||!input.sessionId.trim())throw new Error('QURAN_ALIGNMENT_SESSION_IDENTITY_REQUIRED');
     const id=readingId(input.reading),def=quranReadingDefinition(id)!;if(input.sourcePackageId!==def.packageId)throw new Error('QURAN_ALIGNMENT_SOURCE_READING_MISMATCH');
     const benchmarkReport=this.benchmarks.load(id),benchmark=this.benchmarks.status(id);if(!benchmarkReport||!benchmark.passed)throw new Error('QURAN_ALIGNMENT_BENCHMARK_NOT_APPROVED');
     const surah=boundedInt(input.surah,1,114,'QURAN_SURAH_INVALID'),startAyah=boundedInt(input.startAyah,1,1000,'QURAN_AYAH_INVALID'),endAyah=boundedInt(input.endAyah,startAyah,1000,'QURAN_AYAH_INVALID');const passage=this.quran.resolvePassage({packageId:def.packageId,surah,startAyah,endAyah});
-    if(!input.bytes.length||input.bytes.length>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+    /*
+     * الخدمة تتحقّق من حمولتها بنفسها، وتستبعد النوعين الخطرين بالاسم.
+     *
+     * يناديها مساران، والنوع المكتوب يزول عند التشغيل — فاشتراطُ `Buffer` في التوقيع لا
+     * يمنع ناديًا ثالثًا من تمرير ما ليس كذلك. والخطر ليس في أي نوعٍ غريب، بل في نوعين
+     * بعينهما: النصّ والمصفوفة. كلاهما يملك `length`، فيمرّ فحصُ الحجم ناجحًا وهو يقيس
+     * عدد المحارف أو العناصر لا عدد البايتات — ويصل إلى الشبكة ما ليس صوتًا.
+     *
+     * ومصدرهما ليس افتراضيًّا: `express.raw` لا يلتقط إلا أنواع المحتوى المذكورة، وما
+     * سواها يصل `req.body` من محلّل سابق — فجسمٌ بترويسة JSON يصل مصفوفةً حقيقية.
+     *
+     * فيُستبعدان صراحةً، ثم يُشترط `Uint8Array` (و`Buffer` منه) — بنيةُ بايتاتٍ حقيقية لا
+     * شيء يشبهها. ويُقرأ الطول مرة واحدة بعد ذلك.
+     */
+    if(Array.isArray(input.bytes)||typeof input.bytes==='string'||!(input.bytes instanceof Uint8Array))
+      throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+    const chunkSize=input.bytes.length;
+    if(!chunkSize||chunkSize>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
     const backend=new URL(this.alignmentBackend.url);backend.searchParams.set('reading',id);backend.searchParams.set('surah',String(surah));backend.searchParams.set('startAyah',String(startAyah));backend.searchParams.set('endAyah',String(endAyah));
     const headers:Record<string,string>={'content-type':input.contentType||'application/octet-stream','x-mizan-mode':'shadow','x-mizan-source-package':def.packageId,'x-mizan-source-hash':passage.package.packageHash};if(this.alignmentBackend.bearerToken)headers.authorization=`Bearer ${this.alignmentBackend.bearerToken}`;
     const response=await fetch(backend,{method:'POST',headers,body:new Uint8Array(input.bytes)});if(!response.ok)throw new Error(`QURAN_ALIGNMENT_BACKEND_HTTP_${response.status}`);const raw=await response.json() as any;
@@ -70,8 +94,10 @@ export class QuranIntelligenceService{
     if(observation.candidate&&(observation.candidate.surah!==surah||observation.candidate.ayah<startAyah||observation.candidate.ayah>endAyah||!Number.isInteger(observation.candidate.wordIndex)||observation.candidate.wordIndex<1))throw new Error('QURAN_ALIGNMENT_CANDIDATE_OUTSIDE_EXPECTED_PASSAGE');
     const k=[input.actorId,input.sessionId,id,surah,startAyah,endAyah].join('|');this.cleanupEngines();let entry=this.engines.get(k);if(!entry){entry={engine:new QuranStreamingAlignmentEngine(id),updatedAt:Date.now()};this.engines.set(k,entry)}entry.updatedAt=Date.now();const output=entry.engine.step(observation);
     let visualLocation=null,wordVector=null,waqfEvidence:unknown[]=[],waqfAyahContext:unknown[]=[];if(output.ayah){visualLocation=this.quran.canonicalLocation({reading:id,surah:output.surah!,ayah:output.ayah});if(output.wordIndex)wordVector=this.vector.resolveWord({reading:id,surah:output.surah!,ayah:output.ayah,wordIndex:output.wordIndex});waqfAyahContext=this.knowledge.waqfForAyah(id,output.surah!,output.ayah);waqfEvidence=output.wordIndex?waqfAyahContext.filter((x:any)=>x.wordIndex!==undefined&&x.wordIndex===output.wordIndex):[]}
+    const base={...output,visualLocation,wordVector,waqfEvidence,waqfAyahContext,backendEvidence:{modelVersion:backendModelVersion,acousticQuality:observation.acousticQuality},scoreAuthority:'HUMAN_ONLY' as const,scoreDelta:0 as const,shadowMode:true as const};
+    if(input.practice)return {...base,practice:true as const};
     const timeline=this.evidence.appendAlignment({actorId:input.actorId,sessionId:input.sessionId,timestamp:output.timestamp,reading:id,surah:output.surah,ayah:output.ayah,wordIndex:output.wordIndex,alignmentState:output.alignmentState,recoveryState:output.recoveryState,confidence:output.smoothedConfidence,acousticQuality:observation.acousticQuality});
-    return {...output,visualLocation,wordVector,waqfEvidence,waqfAyahContext,backendEvidence:{modelVersion:backendModelVersion,acousticQuality:observation.acousticQuality},sessionEvidence:{eventCount:timeline.events.length,integritySha256:timeline.integrity.sha256},scoreAuthority:'HUMAN_ONLY' as const,scoreDelta:0 as const,shadowMode:true as const};
+    return {...base,sessionEvidence:{eventCount:timeline.events.length,integritySha256:timeline.integrity.sha256}};
   }
   resetAlignment(actorId:string,sessionId:string){for(const k of this.engines.keys())if(k.startsWith(`${actorId}|${sessionId}|`))this.engines.delete(k);this.evidence.reset(actorId,sessionId)}
   private cleanupEngines(){const cutoff=Date.now()-20*60_000;for(const [k,v] of this.engines)if(v.updatedAt<cutoff)this.engines.delete(k)}

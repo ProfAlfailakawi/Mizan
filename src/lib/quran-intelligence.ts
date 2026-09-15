@@ -30,6 +30,24 @@ const PACKAGE_READING:Record<string,QuranReadingId>={
   'kfgqpc-hafs-uthmanic-v13':'hafs','kfgqpc-warsh-uthmanic-v6':'warsh','kfgqpc-shubah-uthmanic-v4':'shubah','kfgqpc-qaloun-uthmanic-v5':'qaloun','kfgqpc-douri-abu-amr-uthmanic-v3':'douri-abu-amr','kfgqpc-sousi-abu-amr-uthmanic-v3':'sousi-abu-amr'
 };
 export function quranReadingIdForPackage(packageId?:string){return packageId?PACKAGE_READING[packageId]:undefined}
+
+/*
+ * جسرٌ صريح بين مفتاح حزمة التسليم ومعرّف رواية محرّك التتبّع.
+ *
+ * الطبقتان تكتبان أسماء الرواة بهجاءين مختلفين (qalun مقابل qaloun، duri-abi-amr مقابل
+ * douri-abu-amr)، واشتقاقُ أحدهما من الآخر بالتخمين يُرسل تلاوةً إلى رواية أخرى. والجدول
+ * هنا منصوصٌ: ما لا مقابل له يعود undefined، فيُقال «الاستماع غير متاح لروايتك» بدل أن
+ * يُقاس المتسابق بحزمة ليست حزمته.
+ */
+const DELIVERY_TO_INTELLIGENCE:Record<string,{reading:QuranReadingId;sourcePackageId:string}>={
+  hafs:{reading:'hafs',sourcePackageId:'kfgqpc-hafs-uthmanic-v13'},
+  warsh:{reading:'warsh',sourcePackageId:'kfgqpc-warsh-uthmanic-v6'},
+  shubah:{reading:'shubah',sourcePackageId:'kfgqpc-shubah-uthmanic-v4'},
+  qalun:{reading:'qaloun',sourcePackageId:'kfgqpc-qaloun-uthmanic-v5'},
+  'duri-abi-amr':{reading:'douri-abu-amr',sourcePackageId:'kfgqpc-douri-abu-amr-uthmanic-v3'},
+  'susi-abi-amr':{reading:'sousi-abu-amr',sourcePackageId:'kfgqpc-sousi-abu-amr-uthmanic-v3'},
+};
+export function practiceReadingFor(deliveryKey?:string){return deliveryKey?DELIVERY_TO_INTELLIGENCE[deliveryKey]:undefined}
 async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
 async function getJson<T>(url:string):Promise<T>{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`,accept:'application/json'},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as T}
 export async function fetchQuranIntelligenceCapabilities(){return getJson<{streamingAlignment:{mode:'SHADOW_ONLY';backendConfigured:boolean;scoreAuthority:'HUMAN_ONLY';canAffectScore:false}} & Record<string,unknown>>('/api/quran/intelligence/capabilities')}
@@ -38,6 +56,19 @@ export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:strin
   const token=await bearer();const qs=new URLSearchParams({sessionId:input.sessionId,reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
   const r=await fetch(`/api/quran/alignment/shadow/audio?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult;
 }
+/*
+ * تدريب المتسابق: نفس المحرّك، بلا دفتر أدلّة.
+ *
+ * يعود بلا `sessionEvidence` لأن التمرين لا يُقيَّد في سجلّ، ويحمل `practice:true` حتى لا
+ * تُخلط نتيجته بنتيجة جلسةٍ حقيقية في أي شاشة.
+ */
+export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}){
+  const token=await bearer();const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
+  const r=await fetch(`/api/quran/practice/align?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});
+  const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
+  return body as QuranAlignmentResult&{practice:true};
+}
+
 export async function resetQuranAlignment(sessionId:string){const token=await bearer();const r=await fetch('/api/quran/alignment/shadow/reset',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({sessionId}),cache:'no-store'});if(!r.ok)throw new Error('QURAN_ALIGNMENT_RESET_FAILED')}
 
 export async function fetchQuranSessionEvidence(sessionId:string){return getJson<QuranSessionEvidence>(`/api/quran/alignment/shadow/session/${encodeURIComponent(sessionId)}`)}

@@ -118,14 +118,25 @@ test('the live draw path actually consults the holds — not only the store API'
  * ووحدةٌ لا يستدعيها أحد ليست ميزةً بل تعليقٌ طويل. هذه الفحوص تحرس الوصول نفسه.
  */
 
-test('the exposure model is shown to the organiser, not only consumed by the engine', () => {
-  const studio = fs.readFileSync('src/components/scope/ModelFairnessStudio.tsx', 'utf8');
-  assert.match(studio, /topExposedLoci\(/, 'the most-exposed loci must reach a screen');
-  assert.match(studio, /exposureProfiles\(\)/, 'the profiles are read from the store, not recomputed in the view');
-  assert.match(studio, /أعلى المواضع انكشافًا/, 'named plainly in Arabic');
-  assert.match(studio, /لا يُدَّعى هنا معرفةُ من حفظه ممن سمعه/, 'the screen states the limit of the claim');
+/*
+ * نموذج الانكشاف يغذّي المحرّك، ولا يُعرض على الجهة.
+ *
+ * كان معروضًا في شاشة النماذج مع دفعات التوليد والاحتياط وحجر المواضع. وقال صاحب
+ * المسابقة إن هذه المفاهيم تُخربط عليه ولا يحتاجها — وهو محقّ: كلُّها تطلب منه قرارًا
+ * لا يملك أساسه، والتوليد يعمل في وقته بلا شيء منها. فحُذفت الشاشة، وبقي ما يعمل:
+ * المفاضلة تؤخّر الموضع المنكشف في القرعة نفسها.
+ */
+test('the exposure model still feeds the draw, and is no longer a screen the organiser must read', () => {
   const store = fs.readFileSync('src/lib/store.ts', 'utf8');
   assert.match(store, /exposureProfiles,/, 'the store must export it');
+  assert.match(store, /buildExposureOracle\(exposureProfiles\(\)\)/, 'and the draw engine must consume it');
+
+  /* التعليق الذي يوثّق الحذف يذكر الأسماء المحذوفة، فيُقرأ المعروض وحده لا شرحُه. */
+  const studio = fs.readFileSync('src/components/scope/ModelFairnessStudio.tsx', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const gone of ['أعلى المواضع انكشافًا', 'حجر المواضع', 'دورة حياة الحجز', 'دفعة النماذج', 'topExposedLoci(']) {
+    assert.ok(!studio.includes(gone), `${gone} was removed from the organiser's screen`);
+  }
 });
 
 test('there is exactly one path that applies a legacy scope migration', () => {

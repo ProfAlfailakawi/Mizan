@@ -22,7 +22,6 @@ for(const file of retiredRuntimeFiles){
 const read=(file)=>fs.readFileSync(file,'utf8');
 const app=read('src/App.tsx');
 const store=read('src/lib/store.ts');
-const scientific=read('src/components/admin/ScientificGovernance.tsx');
 const portals=read('src/components/admin/RolePortals.tsx');
 const server=read('server.ts');
 
@@ -30,13 +29,13 @@ const assert=(condition,message)=>{if(!condition)failures.push(message)};
 assert(/const requireAuth=true/.test(app),'staff runtime must require authentication unconditionally');
 assert(!/DemoReturn|ExperienceHub|demoMode/.test(app),'App.tsx still references a demo/preview surface');
 assert(!/from ['"]\.\/seed-data['"]/.test(store),'store imports development seed data');
-assert(!/DEVELOPMENT_QUESTION_BANK|QURAN_SOURCE_FIXTURES/.test(scientific+portals+store),'production runtime imports development Quran fixtures');
 assert(!/DEVELOPMENT_QUESTION_BANK|QURAN_SOURCE_FIXTURES/.test(read('src/lib/quran-vault.ts')),'Quran vault contains development/demo fixtures');
 
 const sessionStart=store.indexOf('const startSessionForParticipant');
 const productionGuard=store.indexOf('if(productionMode){',sessionStart);
-const devFallback=store.indexOf("sourceMode:'CERTIFIED_SOURCE'|'DEVELOPMENT_FIXTURE'",sessionStart);
-assert(sessionStart>=0&&productionGuard>sessionStart&&devFallback>productionGuard,'official judging must enter the server-held production question path before any development fallback');
+/* حزمة الخادم تُجرَّب أولًا دائمًا، ومصحف التسليم بعدها — لا قبلها ولا بدلًا منها. */
+const deliveryFallback=store.indexOf("sourceMode:'CERTIFIED_SOURCE'|'DELIVERY_MUSHAF'",sessionStart);
+assert(sessionStart>=0&&productionGuard>sessionStart&&deliveryFallback>productionGuard,'official judging must attempt the server-held question path before falling back to the delivery Mushaf');
 
 const checkStart=store.indexOf('const checkPublicCompetitionPublished');
 const checkEnd=store.indexOf('const republishPublicCompetition',checkStart);
@@ -66,7 +65,6 @@ assert(!/\.\.\/src\/lib\/seed-data/.test(read('scripts/live-day.ts')),'live-day 
 /* Scan executable source imports/references, but intentionally exclude compatibility type unions. */
 const runtimeRoots=['src/components','src/lib','server'];
 const allowedFiles=new Set([
-  'src/lib/counterexample-fixtures.ts', // adversarial scientific test vectors, not demo application data
   'src/lib/nextgen-integrity.ts',        // explicitly typed adapters; no seed/demo surface
 ]);
 const walk=(dir)=>{

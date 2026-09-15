@@ -4,6 +4,7 @@ import { Ratio } from '../design-system/Ratio';
 import {bilingualName,  arCount } from '../../lib/ui-language';
 import { AlertTriangle, BadgeCheck, Clock3, Gauge, Mic2, RadioTower, Server, UsersRound, WifiOff, Sparkles, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { incidentTitle } from '../../lib/incident-language';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { Pictogram } from '../design-system/Pictogram';
@@ -40,7 +41,7 @@ export const CommandCenter: React.FC = () => {
  useEffect(()=>{let live=true;const id=s.activeSession.secureRuntimeSessionId;if(!id){setCorridor(null);return}const load=()=>void fetchCustodyCorridor(id).then(x=>live&&setCorridor(x)).catch(()=>live&&setCorridor(null));load();const timer=window.setInterval(load,5000);return()=>{live=false;window.clearInterval(timer)}},[s.activeSession.secureRuntimeSessionId]);
  const waiting=participants.filter(p=>p.status==='in_queue').length; const testing=participants.filter(p=>p.status==='in_session').length; const done=participants.filter(p=>p.status==='tested'||p.status==='certified').length;
  const sim=useMemo(()=>runSimulation(committees.length,30),[committees.length,participants.length]);
- const alerts=[...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,title:i.title,kind:'incident'})),...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,title:d.name,kind:'device'}))];
+ const alerts=[...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,title:incidentTitle(i,ar),kind:'incident'})),...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,title:d.name,kind:'device'}))];
  const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);
  /* 1450px تترك صفوف «عنوان … زر» ممتدّةً على عرض الشاشة، فيسافر النظر ألف بكسل بين شيئين
    مرتبطين. العرض هنا يطابق بقيّة البوابات (1250) فتبقى العلاقة بين الطرفين مقروءة. */

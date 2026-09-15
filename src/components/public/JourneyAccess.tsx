@@ -100,6 +100,19 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   }, [ar, audience, competition.id, storageKey]);
 
   /* المسابقة قد تتغير في رابط عام داخل نفس الجلسة؛ لا نسمح لبطاقة مسابقة سابقة بالتسرّب. */
+  /* الإدخال اليدوي يُفحص شكله أولًا، فلا يُرسل رقم متسابق إلى الخادم ليعود بخطأ عامّ. */
+  const submit = useCallback(() => {
+    const clean = input.trim();
+    if (!clean) return;
+    if (!looksLikeJourneyToken(clean) && looksLikeParticipantCode(clean)) {
+      setJourney(null);
+      setError(journeyError('PARTICIPANT_CODE_NOT_A_JOURNEY_CODE', ar));
+      return;
+    }
+    void load(clean);
+  }, [input, ar, load]);
+
+
   useEffect(() => {
     const fromHash = tokenFromHash();
     const remembered = localStorage.getItem(storageKey) || '';
@@ -152,7 +165,20 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         <div className="mizan-kicker mt-5">{audience === 'guardian' ? (ar ? 'دخول ولي الأمر' : 'GUARDIAN ACCESS') : (ar ? 'رحلة المتسابق' : 'PARTICIPANT JOURNEY')}</div>
         <h1 className="text-2xl font-black mt-2">{audience === 'guardian' ? (ar ? 'تابع ابنك بلا حساب وكلمة مرور' : 'Follow the journey without an account') : (ar ? 'وين وصلت؟ كل شيء هنا' : 'See exactly where you are')}</h1>
         <p className="text-xs text-[#636864] leading-6 mt-3">{ar ? 'استخدم رمز الرحلة الخاص الذي أرسلته الجهة. الجهاز يتذكره بعد أول مرة، ولا تحتاج إلى إنشاء حساب أو كلمة مرور.' : 'Use the private journey code sent by the organizer. This device remembers it after the first use; no account or password is required.'}</p>
-        <div className="mt-6 flex gap-2"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void load(input); }} className="mizan-input flex-1" dir="ltr" placeholder={ar ? 'رمز الرحلة الخاص' : 'Private journey code'} /><Button disabled={!input.trim() || loading} onClick={() => void load(input)}>{loading ? '…' : (ar ? 'دخول' : 'Open')}</Button></div>
+        {/*
+          * «من أين آتي بالرمز؟» سؤالٌ كان بلا جواب في الشاشة.
+          *
+          * وليّ الأمر يصل إلى هنا ومعه رقم ابنه فقط، فيكتبه ويفشل. ورقم المتسابق معلنٌ في
+          * الكشوف، فلو فُتحت به المتابعة لاطّلع كل أحدٍ على رحلة كل أحد. فالرمز خاصٌّ
+          * بالضرورة، ويُقال هنا من أين يأتي بدل أن يُترك يُخمّن.
+          */}
+        {audience === 'guardian' && <div className="mt-4 rounded-2xl border border-[#e3e6e0] bg-[#f7f9f6] p-4 text-start">
+          <div className="text-[11px] font-black text-[#24463a]">{ar ? 'من أين آتي بالرمز؟' : 'Where do I get the code?'}</div>
+          <p className="mt-1.5 text-[11px] leading-6 text-[#5b6460]">{ar
+            ? 'ترسله الجهة بعد اعتماد طلب ابنك: رابطٌ خاص أو رمز QR في رسالة التسجيل. افتح الرابط مباشرة ولا حاجة إلى كتابة شيء. ولا يصلح رقم المتسابق هنا — لأنه معلن في الكشوف، ولو فُتحت به المتابعة لاطّلع عليها كل من يعرف الرقم.'
+            : 'The organizer sends it once the application is approved: a private link or QR in the registration message. Open the link directly. The participant number does not work here — it is public on the roster, so anyone knowing it could read the journey.'}</p>
+        </div>}
+        <div className="mt-6 flex gap-2"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void submit(); }} className="mizan-input flex-1" dir="ltr" placeholder={ar ? 'رمز الرحلة الخاص' : 'Private journey code'} /><Button disabled={!input.trim() || loading} onClick={() => void submit()}>{loading ? '…' : (ar ? 'دخول' : 'Open')}</Button></div>
         {error && <div role="alert" className="mt-4 rounded-xl bg-[#F4E6E3] text-[#87483f] p-3 text-xs font-bold">{error}</div>}
         <div className="mt-5 flex items-center justify-center gap-2 text-[10px] text-[#68706b]"><LockKeyhole className="w-4 h-4" />{ar ? 'الرمز طويل وغير قابل للتخمين ويمكن للجهة إلغاؤه وإصدار بديل.' : 'The opaque code can be revoked and replaced by the organizer.'}</div>
       </section> : <div className="space-y-4">
@@ -171,8 +197,19 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   </div>;
 };
 
+/*
+ * رقم المتسابق ليس رمز رحلة.
+ *
+ * وليّ الأمر يجد أمامه رقم ابنه (A-2064326) فيكتبه، والخادم يردّ برمز خطأ عامّ فيُقال له
+ * «حدث خطأ في الخادم» — فيظنّ النظام معطلًا وهو لم يُعطَ الرمز الصحيح أصلًا. والشكل
+ * يُعرف قبل أي نداء: رمز الرحلة يبدأ بـ mz_guardian_ أو mz_journey_.
+ */
+export const looksLikeParticipantCode = (value: string) => /^[A-Za-z]{0,3}-?\d{3,12}$/.test(value.trim());
+export const looksLikeJourneyToken = (value: string) => /^mz_(journey|guardian)_[A-Za-z0-9_-]+$/.test(value.trim());
+
 const journeyError = (code: string, ar: boolean) => {
   const labels: Record<string, [string, string]> = {
+    PARTICIPANT_CODE_NOT_A_JOURNEY_CODE: ['هذا رقم المتسابق، وليس رمز الرحلة. رمز الرحلة رابطٌ خاص أو رمز QR ترسله الجهة لوليّ الأمر بعد اعتماد الطلب — اطلبه منها.', 'That is the participant number, not a journey code. Ask the organizer for the private link or QR they issue to guardians.'],
     JOURNEY_TOKEN_INVALID: ['الرمز غير صحيح. استخدم الرابط كاملًا كما أرسلته الجهة.', 'The code is invalid. Use the full link sent by the organizer.'],
     JOURNEY_NOT_FOUND: ['الرحلة غير موجودة أو لم يكتمل إنشاؤها. اطلب رابطًا جديدًا من الجهة.', 'The journey was not found or was not created. Ask the organizer for a new link.'],
     JOURNEY_REVOKED: ['هذا الرابط أُلغي ولم يعد صالحًا.', 'This link was revoked and is no longer valid.'],

@@ -26,7 +26,7 @@ const EXACT:Record<string,string>={
   'FAIRDRAW DIVERSITY':'تنويع السحب العادل','REVIEW AVAILABLE':'مراجعة متاحة','LIVE INTEGRITY':'النزاهة الحية',
   'INTEGRITY SPINE':'سلسلة أدلة النزاهة','PLAINTEXT INCLUDED: NO':'نص السؤال: غير متاح',
   'Question integrity':'نزاهة السؤال','Source Vault':'خزنة المصادر','Reference audio':'الصوت المرجعي','AI capabilities':'قدرات الذكاء الاصطناعي',
-  'Qiraat':'القراءات','Questions':'الأسئلة','Evidence':'الأدلة','Scientific Governance':'الحوكمة العلمية',
+  'Qiraat':'القراءات','Questions':'الأسئلة','Evidence':'الأدلة',
 };
 
 

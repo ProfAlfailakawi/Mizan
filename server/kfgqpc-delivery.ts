@@ -88,7 +88,9 @@ const QURAN_DATA_PREFIX:Record<string,string>={
   'shubah':'delivery/quran-data/shubah/v4','kfgqpc-shubah-uthmanic-v4':'delivery/quran-data/shubah/v4',
   'qalun':'delivery/quran-data/qalun/v5','kfgqpc-qaloun-uthmanic-v5':'delivery/quran-data/qalun/v5',
   'duri-abi-amr':'delivery/quran-data/duri-abi-amr/v3','kfgqpc-douri-abu-amr-uthmanic-v3':'delivery/quran-data/duri-abi-amr/v3',
-  'susi-abi-amr':'delivery/quran-data/susi-abi-amr/v3','kfgqpc-sousi-abu-amr-uthmanic-v3':'delivery/quran-data/susi-abi-amr/v3'
+  'susi-abi-amr':'delivery/quran-data/susi-abi-amr/v3','kfgqpc-sousi-abu-amr-uthmanic-v3':'delivery/quran-data/susi-abi-amr/v3',
+  'bazzi':'delivery/quran-data/bazzi/v7','kfgqpc-bazzi-uthmanic-v7':'delivery/quran-data/bazzi/v7',
+  'qunbul':'delivery/quran-data/qunbul/v7','kfgqpc-qumbul-uthmanic-v7':'delivery/quran-data/qunbul/v7'
 };
 export function kfgqpcQuranDataKey(readingId:string){if(!safe(readingId))return null;const prefix=QURAN_DATA_PREFIX[readingId];return prefix?`${prefix}/data.json`:null}
 
@@ -100,7 +102,7 @@ export function kfgqpcQuranDataKey(readingId:string){if(!safe(readingId))return 
  */
 const OPEN_AUDIO_RECITER:Record<string,string>={'hafs-muaiqly':'Maher_AlMuaiqly_64kbps','kfgqpc-audio-hafs-muaiqly':'Maher_AlMuaiqly_64kbps'};
 const OPEN_PAGE_HAFS=new Set(['kfgqpc-hafs-uthmanic-v13']);
-const OPEN_DATA_DIR:Record<string,string>={'hafs':'hafs','kfgqpc-hafs-uthmanic-v13':'hafs','warsh':'warsh','kfgqpc-warsh-uthmanic-v6':'warsh','shubah':'shouba','kfgqpc-shubah-uthmanic-v4':'shouba','qalun':'qaloon','kfgqpc-qaloun-uthmanic-v5':'qaloon','duri-abi-amr':'doori','kfgqpc-douri-abu-amr-uthmanic-v3':'doori','susi-abi-amr':'soosi','kfgqpc-sousi-abu-amr-uthmanic-v3':'soosi'};
+const OPEN_DATA_DIR:Record<string,string>={'hafs':'hafs','kfgqpc-hafs-uthmanic-v13':'hafs','warsh':'warsh','kfgqpc-warsh-uthmanic-v6':'warsh','shubah':'shouba','kfgqpc-shubah-uthmanic-v4':'shouba','qalun':'qaloon','kfgqpc-qaloun-uthmanic-v5':'qaloon','duri-abi-amr':'doori','kfgqpc-douri-abu-amr-uthmanic-v3':'doori','susi-abi-amr':'soosi','kfgqpc-sousi-abu-amr-uthmanic-v3':'soosi','bazzi':'bazzi','kfgqpc-bazzi-uthmanic-v7':'bazzi','qunbul':'qumbul','kfgqpc-qumbul-uthmanic-v7':'qumbul'};
 const OPEN_DATA_REPO='thetruetruth/quran-data-kfgqpc';
 export function openDeliveryEnabled(env:NodeJS.ProcessEnv=process.env){return env.MIZAN_DISABLE_RUNTIME_MIRROR!=='true'}
 

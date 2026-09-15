@@ -2,7 +2,7 @@ import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeP
 import { sourceUsableForCompetition, certifiedCapabilityFor, isKfgqpcOfficialReading } from './scientific-core';
 
 export type PreflightStatus='ready'|'warning'|'blocker';
-export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'scientific'|'field'|'integrations'|'backup'|'none'}
+export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'field'|'integrations'|'backup'|'none'}
 
 export function buildPreflight(input:{competition:Competition;policy:CompetitionPolicy;integrations:IntegrationConfig[];devices:DeviceRecord[];judges:JudgeProfile[];committees:Committee[];quranSources:QuranSourceManifestRecord[];aiValidations?:AICapabilityValidationRecord[];backups:BackupRecord[];isOffline:boolean;questionEscrowAssurance?:'development_client_gate'|'operational_panel_gate'|'production_server_escrow'}){
  const {competition:c,policy:p,integrations,devices,judges,committees,quranSources,aiValidations=[],backups,isOffline,questionEscrowAssurance='operational_panel_gate'}=input;
@@ -26,10 +26,10 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
   check('policy',!!p.version,false,'سياسة المسابقة','Competition policy','لا يمكن تشغيل مسابقة بلا نسخة قواعد محددة.','A competition cannot run without a defined policy version.','competition_dna'),
   check('registration',p.registration.fields.some(f=>f.visible&&f.required),!live,'التسجيل','Registration','قد تصل طلبات ناقصة أو غير قابلة للتحقق.','Registrations may arrive without required verifiable data.','competition_dna'),
   check('categories',c.categories.length>0,false,'الفئات','Categories','لا يمكن توجيه أو تحكيم المشاركين.','Participants cannot be routed or judged.','competition_dna'),
-  check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','لا يوجد لهذه الفئة مصدر قرآني رسمي أو مصدر داخلي معتمد مطابق للرواية.','No official or internally certified Quran source matches this category reading.','scientific'),
+  check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','لا يوجد نصٌّ مُسلَّم لرواية هذه الفئة، فلا تُسحب لها مواضع. اختر لها رواية نصُّها متاح.','No delivered text exists for this category reading, so no passages can be drawn.','competition_dna'),
   check('fairdraw',p.questions.questionsPerParticipant>0&&p.questions.difficultyTolerance>=0,false,'FairDraw','FairDraw','السحب لا يملك قيودًا صالحة.','The draw has invalid fairness constraints.','competition_dna'),
   check('question_escrow',serverEscrowReady,!live,'حجز السؤال خارج جهاز المحكم','Server-held question escrow','بوابة اللجنة تمنع الكشف المبكر تشغيليًا، لكن السؤال ما زال يحتاج حجزًا خادميًا حتى لا يمكن استخراجه من جهاز المحكم قبل النصاب.','The panel gate blocks early operational reveal, but true anti-leak security requires the question plaintext to remain server-held until quorum.','none'),
-  check('ai_scope',aiScopeOk,true,'نطاق الذكاء الاصطناعي','AI scope','قدرة الذكاء الاصطناعي غير معتمدة لكل رواية مطلوبة؛ التحكيم البشري يبقى يعمل بالكامل.','An AI capability is not certified for every required reading; human judging remains fully operational.','scientific'),
+  check('ai_scope',aiScopeOk,true,'نطاق الذكاء الاصطناعي','AI scope','قدرة الذكاء الاصطناعي غير معتمدة لكل رواية مطلوبة؛ التحكيم البشري يبقى يعمل بالكامل.','An AI capability is not certified for every required reading; human judging remains fully operational.','none'),
   check('judging',c.ruleSet.criteria.length>0&&c.ruleSet.judgesCountPerPanel>0,false,'التحكيم','Judging','لا يمكن حساب نتيجة قابلة لإعادة الإنتاج.','A reproducible score cannot be calculated.','competition_dna'),
   check('judges',readyJudges.length>=Math.max(1,c.ruleSet.judgesCountPerPanel),!live,'المحكمون','Judges','عدد المحكمين الجاهزين أقل من الحد المطلوب للجنة.','Ready judges are below the panel requirement.','field'),
   check('committees',committees.some(x=>x.status!=='offline'),!live,'اللجان','Committees','لا توجد لجنة متاحة لاستقبال جلسة.','No committee is available to receive a session.','field'),

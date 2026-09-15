@@ -1,3 +1,4 @@
+import { DELIVERED_RAWI_IDS } from './delivered-readings';
 import type {
   AICapability,
   AICapabilityValidationRecord,
@@ -80,7 +81,13 @@ export function isDuriKisai(record:{qiraah?:string;rawi?:string;riwaya?:string})
 
 // الروايات التي نشر لها مجمع الملك فهد حزمًا رسمية مستقلة في مكتبة ميزان.
 // هذا يثبت سلطة المصدر العلمية؛ توفر البايتات محليًا يبقى شرطًا تشغيليًا لاحقًا للسحب/العرض، لا لفتح التسجيل.
-const KFGQPC_OFFICIAL_RAWI_IDS=new Set(['hafs','warsh','shubah','qalun','al-duri-abu-amr','al-susi']);
+/*
+ * الرواة الذين نملك نصّهم — قائمة واحدة.
+ *
+ * كانت هذه نسخةً ثالثة من الجدول نفسه، فوصلُ البزي وقنبل في طبقة التسليم ترك الجاهزية
+ * خلفه: فئةٌ بإحداهما تُعلَن «بلا مصدر قرآني» وهي تعمل. فتُقرأ من مصدرها.
+ */
+const KFGQPC_OFFICIAL_RAWI_IDS=new Set<string>(DELIVERED_RAWI_IDS);
 export function isKfgqpcOfficialReading(input:{qiraah?:string;rawi?:string;riwaya?:string}){const r=resolveReading(input);return !!r&&KFGQPC_OFFICIAL_RAWI_IDS.has(r.rawiId)}
 
 export async function computeQuranPackageHash(record:QuranSourceManifestRecord){
