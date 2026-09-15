@@ -345,7 +345,11 @@ test('both routes into the alignment engine are rate-limited, not just the new o
 test('the alignment service checks its own payload rather than trusting its callers', () => {
   /* التوقيع يزول عند التشغيل، فقياس `length` على نصٍّ أو مصفوفة يبدو فحصًا ناجحًا وهو ليس. */
   const service = read('server/quran-intelligence-service.ts');
-  assert.match(service, /if\(!Buffer\.isBuffer\(input\.bytes\)\)throw new Error\('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID'\);/);
+  /*
+   * النصّ والمصفوفة يُستبعدان بالاسم: كلاهما يملك `length`، فيمرّ فحصُ الحجم ناجحًا وهو
+   * يقيس محارف أو عناصر لا بايتات. ثم يُشترط `Uint8Array` — بنيةُ بايتاتٍ حقيقية.
+   */
+  assert.match(service, /if\(Array\.isArray\(input\.bytes\)\|\|typeof input\.bytes==='string'\|\|!\(input\.bytes instanceof Uint8Array\)\)/);
   assert.match(service, /const chunkSize=input\.bytes\.length;/);
   assert.doesNotMatch(service, /if\(!input\.bytes\.length\|\|input\.bytes\.length>2_000_000\)/,
     'the unguarded double read of .length is gone');

@@ -68,13 +68,21 @@ export class QuranIntelligenceService{
     const benchmarkReport=this.benchmarks.load(id),benchmark=this.benchmarks.status(id);if(!benchmarkReport||!benchmark.passed)throw new Error('QURAN_ALIGNMENT_BENCHMARK_NOT_APPROVED');
     const surah=boundedInt(input.surah,1,114,'QURAN_SURAH_INVALID'),startAyah=boundedInt(input.startAyah,1,1000,'QURAN_AYAH_INVALID'),endAyah=boundedInt(input.endAyah,startAyah,1000,'QURAN_AYAH_INVALID');const passage=this.quran.resolvePassage({packageId:def.packageId,surah,startAyah,endAyah});
     /*
-     * الخدمة تتحقّق من حمولتها بنفسها.
+     * الخدمة تتحقّق من حمولتها بنفسها، وتستبعد النوعين الخطرين بالاسم.
      *
      * يناديها مساران، والنوع المكتوب يزول عند التشغيل — فاشتراطُ `Buffer` في التوقيع لا
-     * يمنع ناديًا ثالثًا من تمرير ما ليس كذلك، ولا يمنع قياسَ `length` على نصٍّ أو مصفوفة
-     * فيبدو الفحص ناجحًا وهو يقيس شيئًا آخر. فيُفحص النوع هنا، عند الاستعمال.
+     * يمنع ناديًا ثالثًا من تمرير ما ليس كذلك. والخطر ليس في أي نوعٍ غريب، بل في نوعين
+     * بعينهما: النصّ والمصفوفة. كلاهما يملك `length`، فيمرّ فحصُ الحجم ناجحًا وهو يقيس
+     * عدد المحارف أو العناصر لا عدد البايتات — ويصل إلى الشبكة ما ليس صوتًا.
+     *
+     * ومصدرهما ليس افتراضيًّا: `express.raw` لا يلتقط إلا أنواع المحتوى المذكورة، وما
+     * سواها يصل `req.body` من محلّل سابق — فجسمٌ بترويسة JSON يصل مصفوفةً حقيقية.
+     *
+     * فيُستبعدان صراحةً، ثم يُشترط `Uint8Array` (و`Buffer` منه) — بنيةُ بايتاتٍ حقيقية لا
+     * شيء يشبهها. ويُقرأ الطول مرة واحدة بعد ذلك.
      */
-    if(!Buffer.isBuffer(input.bytes))throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+    if(Array.isArray(input.bytes)||typeof input.bytes==='string'||!(input.bytes instanceof Uint8Array))
+      throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
     const chunkSize=input.bytes.length;
     if(!chunkSize||chunkSize>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
     const backend=new URL(this.alignmentBackend.url);backend.searchParams.set('reading',id);backend.searchParams.set('surah',String(surah));backend.searchParams.set('startAyah',String(startAyah));backend.searchParams.set('endAyah',String(endAyah));
