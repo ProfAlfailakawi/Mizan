@@ -113,6 +113,15 @@ test('the freeze binds to official measurement, not to the first trial session',
   /* درجةٌ قيست بمسطرةٍ لم تعد قائمة لا معنى لها، فتُطرح صراحةً ويُقال عددها. */
   assert.match(store, /globalState\.results = globalState\.results\.filter\(r => r\.competitionId !== globalState\.competition\.id\)/);
 
+  /*
+   * والتجميد يقع حين تبدأ الجلسة فعلًا لا حين يُحاول بدؤها: كان يُطبَّق قبل سبعة مخارج
+   * ترفض البدء (قدرات خادمية، لجنة لا تطابق، رواية لا تطابق، نطاق بلا اعتماد، مصدر غير
+   * معتمد…)، فمحاولةٌ فاشلة لم تُنشئ جلسةً قط كانت تقفل اللائحة إلى الأبد.
+   */
+  assert.match(store, /const commitRuleFreeze = \(\) => \{/);
+  assert.equal((store.match(/commitRuleFreeze\(\);/g) || []).length, 2,
+    'the freeze is committed at each success point, never before the checks that can still refuse');
+
   const overview = read('src/components/admin/CompetitionOverview.tsx');
   assert.match(overview, /store\.unfreezeRuleSet\(unfreezeReason\.trim\(\)\)/);
   assert.match(overview, /disabled=\{unfreezeReason\.trim\(\)\.length<5\}/, 'the button cannot fire without a reason');

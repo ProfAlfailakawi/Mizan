@@ -2633,13 +2633,25 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     }
     const committee = choice.committee;
     const policy = getCompetitionPolicy(globalState.competition);
-    const frozen = freezeRulesOnce({
-      policy,
-      ruleSet: globalState.competition.ruleSet,
-      ruleSets: globalState.competition.ruleSets,
-      now: new Date().toISOString(),
-    });
-    if (frozen) globalState.competition = { ...globalState.competition, policy: frozen.policy, ruleSet: frozen.ruleSet, ruleSets: frozen.ruleSets };
+    /*
+     * التجميد يقع حين تبدأ الجلسة فعلًا، لا حين يُحاول بدؤها.
+     *
+     * كان يُطبَّق هنا — قبل سبعة مخارج ترفض البدء: قدرات الأسئلة الخادمية، ولجنةٌ لا
+     * تطابق التهيئة، وروايةٌ لا تطابقها، ونطاقٌ بلا اعتماد، ومصدرٌ غير معتمد… فمحاولةٌ
+     * فاشلة لم تُنشئ جلسةً قط كانت تقفل اللائحة إلى الأبد.
+     *
+     * والقفل يُبرَّر بأن أحدًا قِيس بالمسطرة؛ ومن رُفض بدء جلسته لم يُقَس بشيء. فيُؤجَّل
+     * إلى نقطة النجاح نفسها: حيث تُسنَد `activeSession` ويُعاد `true`.
+     */
+    const commitRuleFreeze = () => {
+      const frozen = freezeRulesOnce({
+        policy: getCompetitionPolicy(globalState.competition),
+        ruleSet: globalState.competition.ruleSet,
+        ruleSets: globalState.competition.ruleSets,
+        now: new Date().toISOString(),
+      });
+      if (frozen) globalState.competition = { ...globalState.competition, policy: frozen.policy, ruleSet: frozen.ruleSet, ruleSets: frozen.ruleSets };
+    };
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const reading=resolveReading({riwaya:participant.riwaya});
     if(productionMode){
@@ -2655,7 +2667,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
         const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx>=0){const inSession={...globalState.participants[idx],status:'in_session' as const,statusHistory:[...(globalState.participants[idx].statusHistory||[]),{status:'in_session' as const,timestamp:new Date().toISOString(),actor:'Judging session'}]};globalState.participants[idx]=inSession;syncParticipantLifecycle(inSession);}
         globalState.committees=globalState.committees.map(c=>c.id===committee.id?{...c,status:'testing',currentParticipantId:participantId}:c);refreshQueueNotifications();
         auditTrustAction('SERVER_QUESTION_RUNTIME_ATTACHED','JudgingSession',runtime.sessionId,'ربط جلسة التحكيم بحزمة أسئلة خادمية؛ لم ينفذ FairDraw أو حل النص القرآني داخل جهاز المحكم','Attached JudgeOS to server-held question runtime; FairDraw and Quran plaintext resolution did not run on the judge device');
-        void createContinuityCheckpoint('server-session-start');notify();return true;
+        commitRuleFreeze();void createContinuityCheckpoint('server-session-start');notify();return true;
       }catch(error){createIncident('quran_source_discrepancy','Secure question provisioning missing',`Official session blocked for ${participant.code}: ${error instanceof Error?error.message:'secure runtime unavailable'}.`,'critical');return false;}
     }
     /*
@@ -2804,6 +2816,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       refreshQueueNotifications();
       globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'FAIRDRAW_COMMITTED', entityType:'QuestionSelection', entityId:selection.questionSetId, humanSummaryArabic:sourceMode==='CERTIFIED_SOURCE'?`اعتماد حزمة أسئلة ${participant.code} من مصدر قرآني معتمد محدد النسخة`:`حزمة تطوير ${participant.code} — ليست مصدرًا قرآنيًا رسميًا`, humanSummaryEnglish:sourceMode==='CERTIFIED_SOURCE'?`Committed ${participant.code} question set from exact certified Quran source package`:`Development-only question fixture for ${participant.code}; not an official Quran source`, currentStateHash:selection.seedCommitmentHash }, ...globalState.auditLogs];
       void createContinuityCheckpoint('session-start');
+      commitRuleFreeze();
       notify(); return true;
     } catch (error) {
       console.error('FairDraw could not create an eligible set', error); return false;
