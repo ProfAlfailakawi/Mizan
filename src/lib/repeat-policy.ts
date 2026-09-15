@@ -43,6 +43,12 @@ export interface RepeatPolicy {
    * صفر يعطّل الاعتبار.
    */
   neighborhoodAyahRadius: number;
+  /**
+   * نصف قطر الجوار بالأجزاء: سؤالان في الجزء نفسه (أو على بعد جزءٍ أو جزأين) يجعلان
+   * نموذج المتسابق محصورًا في ركنٍ من نطاقه وإن تباعدت آياتهما مئات المواضع. صفرٌ
+   * يعطّل الاعتبار، وواحدٌ يعني «لا سؤالين في الجزء نفسه ما وُجد بديل».
+   */
+  neighborhoodJuzRadius?: number;
   /** هل يمتد منع التكرار إلى تاريخ المتسابق خارج هذه المسابقة؟ قرار تنظيمي وخصوصي. */
   participantHistoryScope: 'none' | 'competition' | 'organization';
   /** هل يُسمح باستعمال سؤال لم يُراجَع علميًا؟ */
@@ -60,6 +66,7 @@ export const DEFAULT_REPEAT_POLICY: RepeatPolicy = {
   dayAware: false,
   stageAware: false,
   neighborhoodAyahRadius: 3,
+  neighborhoodJuzRadius: 0,
   participantHistoryScope: 'competition',
   allowUnreviewedDifficulty: true,
 };
@@ -92,6 +99,7 @@ export function repeatConstraints(policy: RepeatPolicy): RepeatConstraint[] {
   if (policy.minimumParticipantGap) list.push({ id: 'participant_gap', rank: 'PREFER', ar: `مباعدة ${policy.minimumParticipantGap} متسابقًا على الأقل بين استعمالين`, en: `At least ${policy.minimumParticipantGap} participants between reuses` });
   if (policy.minimumMinutesGap) list.push({ id: 'time_gap', rank: 'PREFER', ar: `مباعدة ${policy.minimumMinutesGap} دقيقة على الأقل بين استعمالين`, en: `At least ${policy.minimumMinutesGap} minutes between reuses` });
   if (policy.neighborhoodAyahRadius > 0) list.push({ id: 'neighborhood', rank: 'PREFER', ar: `تجنّب بداية على بعد ${policy.neighborhoodAyahRadius} آيات أو أقل من موضع مستعمل`, en: `Avoid starts within ${policy.neighborhoodAyahRadius} ayat of a recently used locus` });
+  if ((policy.neighborhoodJuzRadius || 0) > 0) list.push({ id: 'neighborhood_juz', rank: 'PREFER', ar: policy.neighborhoodJuzRadius === 1 ? 'تجنّب سؤالين من الجزء نفسه في نموذج واحد' : `تجنّب سؤالين بينهما ${policy.neighborhoodJuzRadius} أجزاء أو أقل في نموذج واحد`, en: `Avoid two questions within ${policy.neighborhoodJuzRadius} juz of each other in one model` });
   if (policy.roomAware) list.push({ id: 'room_separation', rank: 'PREFER', ar: 'تجنّب إعادة الاستعمال في القاعة نفسها', en: 'Avoid reuse inside the same hall' });
   if (policy.dayAware) list.push({ id: 'day_separation', rank: 'PREFER', ar: 'تجنّب إعادة الاستعمال في اليوم نفسه', en: 'Avoid reuse on the same day' });
   list.push({ id: 'usage_balance', rank: 'PREFER', ar: 'توزيع الاستعمال بالتساوي على المواضع الصالحة', en: 'Spread usage evenly across eligible loci' });

@@ -12,10 +12,11 @@
  * تفكير نموذج ذكاء اصطناعي.
  */
 
-import { ayahOrdinal, ordinalToLocus, type QuranLocus } from './quran-canon';
+import { ayahOrdinal, juzOfLocus, ordinalToLocus, type QuranLocus } from './quran-canon';
 import { normalizeScope, scopeContainsRange, scopeRanges, type QuranScope } from './quran-scope';
 import type { RepeatPolicy } from './repeat-policy';
 import type { ZoneSlot } from './question-zones';
+import { topicOf, topicRepetitionPenalty, type QuestionTopic } from './question-topics';
 
 export const QUESTION_ENGINE_VERSION = 'MIZAN-QUESTION-ENGINE-1';
 
@@ -126,7 +127,7 @@ export interface SelectionResult {
   engineVersion: typeof QUESTION_ENGINE_VERSION;
 }
 
-interface EligibleRow { candidate: QuestionCandidate; uses: number; key: string; from: number; row?: LocusUsageRow }
+interface EligibleRow { candidate: QuestionCandidate; uses: number; key: string; from: number; juz: number; topic: QuestionTopic; row?: LocusUsageRow }
 
 export interface LocusUsageRow {
   uses: number;
@@ -140,7 +141,7 @@ export interface LocusUsageRow {
 export const locusKeyOf = (candidate: Pick<QuestionCandidate, 'surahNumber' | 'startAyah'>) => `${candidate.surahNumber}:${candidate.startAyah}`;
 
 /* ترتيب بداية المقطع ونهايته يُحسب مرة لكل مرشح ويُحفظ، فلا يُعاد حسابه في كل خانة سحب. */
-const ORDINAL_CACHE = new WeakMap<QuestionCandidate, { from: number; to: number; key: string }>();
+const ORDINAL_CACHE = new WeakMap<QuestionCandidate, { from: number; to: number; key: string; juz: number; topic: QuestionTopic }>();
 function candidateSpan(candidate: QuestionCandidate) {
   const hit = ORDINAL_CACHE.get(candidate);
   if (hit) return hit;
@@ -148,6 +149,9 @@ function candidateSpan(candidate: QuestionCandidate) {
     from: ayahOrdinal({ surah: candidate.surahNumber, ayah: candidate.startAyah }),
     to: ayahOrdinal({ surah: candidate.surahNumber, ayah: candidate.endAyah }),
     key: locusKeyOf(candidate),
+    /* الجزء يُقرأ من الجدول القاطع لا من حقلٍ اختياري قد يغيب أو يُنسخ خطأً. */
+    juz: candidate.juzNumber || juzOfLocus({ surah: candidate.surahNumber, ayah: candidate.startAyah }),
+    topic: topicOf({ surahNumber: candidate.surahNumber, startAyah: candidate.startAyah, endAyah: candidate.endAyah }),
   };
   ORDINAL_CACHE.set(candidate, span);
   return span;
@@ -173,6 +177,8 @@ const DEFAULT_WEIGHTS = {
   separation: 1.8,
   neighborhood: 1.2,
   diversity: 0.9,
+  /* تنويع الموضوعات: يميل ولا يحكم — دون وزن الصعوبة وموازنة الحمل عمدًا. */
+  topicDiversity: 0.8,
   jitter: 0.35,
 };
 export type EngineWeights = typeof DEFAULT_WEIGHTS;
@@ -295,7 +301,7 @@ export class QuestionAllocationEngine {
       const uses = (row?.uses || 0) + (candidate.priorUsageCount || 0);
       if (policy.mode === 'strict_no_repeat' && uses > 0) continue;
       if (policy.maxUsesPerQuestion && uses >= policy.maxUsesPerQuestion) continue;
-      out.push({ candidate, uses, key: span.key, from: span.from, row });
+      out.push({ candidate, uses, key: span.key, from: span.from, juz: span.juz, topic: span.topic, row });
     }
     return out;
   }
@@ -313,9 +319,13 @@ export class QuestionAllocationEngine {
    */
   private neighborhoodFilter(rows: EligibleRow[], chosen: SelectedQuestion[]) {
     const radius = this.policy.neighborhoodAyahRadius;
-    if (radius <= 0 || !chosen.length) return { rows, relaxed: false };
-    const picked = chosen.map(x => candidateSpan(x.candidate).from);
-    const kept = rows.filter(row => picked.every(from => Math.abs(row.from - from) > radius));
+    const juzRadius = Math.max(0, Math.round(this.policy.neighborhoodJuzRadius || 0));
+    if ((radius <= 0 && juzRadius <= 0) || !chosen.length) return { rows, relaxed: false };
+    const picked = chosen.map(x => candidateSpan(x.candidate));
+    const kept = rows.filter(row =>
+      picked.every(span =>
+        (radius <= 0 || Math.abs(row.from - span.from) > radius) &&
+        (juzRadius <= 0 || Math.abs(row.juz - span.juz) >= juzRadius)));
     return kept.length ? { rows: kept, relaxed: false } : { rows, relaxed: true };
   }
 
@@ -362,8 +372,21 @@ export class QuestionAllocationEngine {
       }
     }
 
+    const juzRadius = Math.max(0, Math.round(this.policy.neighborhoodJuzRadius || 0));
+    if (juzRadius > 0) {
+      const juz = entry.juz;
+      for (const picked of chosen) {
+        const distance = Math.abs(juz - candidateSpan(picked.candidate).juz);
+        if (distance < juzRadius) { neighborhood += (juzRadius - distance) / juzRadius; relaxed.push('neighborhood_juz'); }
+      }
+    }
+
     let diversity = 0;
     if (slot.preferDistinctSurah !== false && chosen.some(x => x.candidate.surahNumber === candidate.surahNumber)) { diversity += 1; relaxed.push('surah_diversity'); }
+
+    /* تنويع الموضوعات: خمسة أسئلة من لونٍ واحد تقيس ركنًا واحدًا مما حفظ. */
+    const topicPenalty = topicRepetitionPenalty(chosen.map(x => candidateSpan(x.candidate).topic), entry.topic);
+    if (topicPenalty > 0) relaxed.push('topic_diversity');
 
     /* حماية المتسابقين القادمين.
        العقوبة فرقيّة لا مطلقة: يُعاقب المرشح بما يزيد ضغطُه على ضغط نطاق صاحبه.
@@ -382,6 +405,7 @@ export class QuestionAllocationEngine {
       w.separation * separation +
       w.neighborhood * neighborhood +
       w.diversity * diversity +
+      w.topicDiversity * topicPenalty +
       w.jitter * seededUnit(this.seed, `${request.participantId}|${slot.index}|${candidate.id}`);
 
     return { score, uses, scarcityPressure, exposurePressure, relaxed, lastSequence: row?.lastSequence };
@@ -462,6 +486,16 @@ export class QuestionAllocationEngine {
     }
 
     this.sequence = position + 1;
+    /*
+     * ترتيب العرض للمتسابق يتبع ترتيب المصحف، لا ترتيب المناطق ولا ترتيب السحب.
+     *
+     * المتسابق يقرأ من أول نطاقه إلى آخره، فتنقُّلٌ من الجزء الثامن إلى الثاني ثم
+     * الحادي والعشرين يُربكه بلا فائدة تحكيمية. والسحب نفسه لا يتغيّر — القرعة كما
+     * جرت وبإثباتها — إنما يُعاد ترتيب ما خرج قبل عرضه. و`slotIndex` يبقى كما هو
+     * لأنه يشير إلى المنطقة التي جاء منها السؤال، وهو ما يقرؤه التدقيق.
+     */
+    chosen.sort((a, b) => candidateSpan(a.candidate).from - candidateSpan(b.candidate).from
+      || a.candidate.id.localeCompare(b.candidate.id));
     const difficulties = chosen.map(x => x.candidate.difficultyRating);
     const mean = difficulties.length ? difficulties.reduce((a, b) => a + b, 0) / difficulties.length : 0;
     const variance = difficulties.length ? difficulties.reduce((a, b) => a + (b - mean) ** 2, 0) / difficulties.length : 0;

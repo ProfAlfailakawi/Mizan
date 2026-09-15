@@ -44,7 +44,7 @@ test('difficulty, passing score and age stay inside their real domains', () => {
     for (const hit of hits) assert.match(hit, expected, `${label} is unbounded: ${hit}`);
   };
   bounded('الصعوبة المستهدفة', /min=\{1\} max=\{5\}/);
-  bounded('هامش الصعوبة', /min=\{0\} max=\{4\}/);
+  bounded('هامش الصعوبة المسموح', /min=\{0\} max=\{4\}/);
   bounded('الحد الأدنى للنجاح', /min=\{0\} max=\{100\}/);
   bounded('العمر الأدنى', /max=\{100\}/);
   bounded('العمر الأعلى', /max=\{100\}/);

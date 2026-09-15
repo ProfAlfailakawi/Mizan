@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Check, ChevronDown, Layers, ListChecks, MapPin, Search, Sparkles, Trash2, X } from 'lucide-react';
 import {
-  QURAN_JUZ_TOTAL, QURAN_SURAH_TOTAL, ayahCountOf, juzBounds, juzOfLocus, surahNameArabic, surahNameEnglish,
+  QURAN_HIZB_TOTAL, QURAN_JUZ_TOTAL, QURAN_SURAH_TOTAL, ayahCountOf, juzBounds, juzOfLocus, surahNameArabic, surahNameEnglish,
 } from '../../lib/quran-canon';
 import {
   SCOPE_PRESETS, describeScope, describeSegment, emptyScope, makeScope, normalizeScope, scopeAyahCount,
-  scopeFromJuz, scopeFromSurahs, scopeMetrics, scopeSubtract, scopeUnion, validateScope,
+  scopeFromJuz, scopeFromSurahs, scopeFromUnits, scopeMetrics, scopeSubtract, scopeUnion, validateScope,
   type QuranScope, type QuranScopeSegment,
 } from '../../lib/quran-scope';
 import { coveredUnitIndexes, touchedUnitIndexes } from '../../lib/participant-scope';
@@ -96,6 +96,11 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
   const completeJuz = useMemo(() => new Set(coveredUnitIndexes(scope, 'juz')), [scope]);
   const allowedJuz = useMemo(() => (parentScope && scopeAyahCount(parentScope) > 0 ? new Set(touchedUnitIndexes(parentScope, 'juz')) : null), [parentScope]);
   const selectedSurahs = useMemo(() => new Set(coveredUnitIndexes(scope, 'surah')), [scope]);
+  /* الحزب والسور وحدتا تحديد كاملتان إلى جانب الجزء: بعض المسابقات تُعلن نطاقها بالأحزاب،
+     وبعضها — نادرًا — بالسور. الجدول قائم في المصحف، فلا داعي لأن تُترجم اللجنة حزبها إلى آيات. */
+  const selectedHizb = useMemo(() => new Set(coveredUnitIndexes(scope, 'hizb')), [scope]);
+  const touchedHizb = useMemo(() => new Set(touchedUnitIndexes(scope, 'hizb')), [scope]);
+  const allowedHizb = useMemo(() => (parentScope && scopeAyahCount(parentScope) > 0 ? new Set(touchedUnitIndexes(parentScope, 'hizb')) : null), [parentScope]);
   const locked = !!disabled || !!readOnly;
   const heatByJuz = useMemo(() => new Map<number, ScopeHeat>((heat || []).map(h => [h.juz, h] as const)), [heat]);
   const maxHeat = useMemo(() => Math.max(1, ...(heat || []).map(h => h.participants)), [heat]);
@@ -125,6 +130,15 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
     }
     setRangeAnchor(juz);
     emitJuzSelection(completeJuz.has(juz) ? scopeSubtract(scope, scopeFromJuz([juz])) : scopeUnion(scope, scopeFromJuz([juz])));
+  };
+
+  const toggleHizb = (hizb: number) => {
+    if (locked || (allowedHizb && !allowedHizb.has(hizb))) return;
+    const unit = scopeFromUnits('hizb', [hizb]);
+    const next = selectedHizb.has(hizb) ? scopeSubtract(scope, unit) : scopeUnion(scope, unit);
+    setJuzGuard(exactJuzGuard(clipToParent(next)));
+    setRangeError('');
+    emit(clipToParent(next));
   };
 
   const toggleSurah = (surah: number) => {
@@ -246,7 +260,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
               {arabic ? 'إلغاء التحديد' : 'Deselect all'}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setAdvanced(v => !v)} icon={advanced ? <ChevronDown className="w-4 h-4" /> : <Layers className="w-4 h-4" />}>
-              {advanced ? (arabic ? 'إخفاء التفاصيل الدقيقة' : 'Hide fine detail') : (arabic ? 'سور ومقاطع وآيات' : 'Surahs, segments and ayat')}
+              {advanced ? (arabic ? 'إخفاء التفاصيل الدقيقة' : 'Hide fine detail') : (arabic ? 'أحزاب وسور ومقاطع' : 'Hizb, surahs and segments')}
             </Button>
           </div>
         )}
@@ -263,6 +277,29 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
             </div>
           )}
           {rangeError && <div role="alert" className="rounded-xl border border-[#e0c6c1] bg-[#F9F0EE] px-3 py-2 text-[11px] font-bold leading-5 text-[#8a3f34]">{rangeError}</div>}
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><Layers className="w-4 h-4" />{arabic ? 'اختيار بالأحزاب' : 'By hizb'}</span>
+              <span className="text-[10px] font-bold text-[#696f6b]">{selectedHizb.size ? (arabic ? `${selectedHizb.size} حزبًا كاملًا` : `${selectedHizb.size} complete`) : (arabic ? 'لا شيء' : 'none')}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-6 gap-1 sm:grid-cols-10 lg:grid-cols-12" role="group" aria-label={arabic ? 'اختيار الأحزاب' : 'Select hizb'}>
+              {Array.from({ length: QURAN_HIZB_TOTAL }, (_, i) => i + 1).map(hizb => {
+                const complete = selectedHizb.has(hizb), partial = !complete && touchedHizb.has(hizb);
+                const allowed = !allowedHizb || allowedHizb.has(hizb);
+                return (
+                  <button key={hizb} type="button" id={`${idPrefix}-hizb-${hizb}`} disabled={locked || !allowed}
+                    aria-pressed={complete || partial}
+                    aria-label={arabic ? `الحزب ${hizb}${partial ? ' (جزئي)' : ''}` : `Hizb ${hizb}${partial ? ' (partial)' : ''}`}
+                    onClick={() => toggleHizb(hizb)}
+                    className={`min-h-10 rounded-lg border text-[11px] font-black tabular-nums transition ${cellTone(complete, allowed)} ${partial ? '!border-[#9b7542] !bg-[#F2EADC] !text-[#7d5e34]' : ''}`}>
+                    {hizb}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[10px] leading-5 text-[#696f6b]">{arabic ? 'الحزب نصف الجزء؛ ستون حزبًا في المصحف. اختياره يعدّل النطاق نفسه الذي تعدّله الأجزاء.' : 'A hizb is half a juz; sixty in the Mushaf. Selecting one edits the same scope the juz grid edits.'}</p>
+          </div>
+
           <div>
             <button type="button" onClick={() => setSurahOpen(v => !v)} className="flex w-full items-center justify-between gap-3 text-start">
               <span className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><BookOpen className="w-4 h-4" />{arabic ? 'اختيار بالسور' : 'By surah'}</span>

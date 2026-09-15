@@ -45,7 +45,8 @@ async function selectWithSeed(args:{pool:QuestionPoolItem[];participant:{riwaya:
  const scored=await Promise.all(candidates.map(async q=>({q,delta:Math.abs(q.difficultyRating-policy.questions.targetDifficulty),rand:await tieValue(args.seed,q.id)})));scored.sort((a,b)=>a.delta-b.delta||a.rand-b.rand);
  const selected:QuestionPoolItem[]=[];for(const item of scored){if(selected.length>=policy.questions.questionsPerParticipant)break;if(policy.questions.diversity.acrossSurah&&selected.some(s=>s.surahNumber===item.q.surahNumber)&&scored.length>policy.questions.questionsPerParticipant)continue;if(policy.questions.diversity.acrossJuz&&selected.some(s=>s.juzNumber===item.q.juzNumber)&&scored.length>policy.questions.questionsPerParticipant)continue;selected.push(item.q)}
  if(selected.length<policy.questions.questionsPerParticipant){for(const item of scored){if(selected.length>=policy.questions.questionsPerParticipant)break;if(!selected.some(s=>s.id===item.q.id))selected.push(item.q)}}
- return selected;
+ /* ترتيب العرض يتبع المصحف: السحب كما جرى، والعرض من أول النطاق إلى آخره. */
+ return selected.sort((a,b)=>(a.surahNumber-b.surahNumber)||(a.startAyah-b.startAyah)||a.id.localeCompare(b.id));
 }
 
 export interface ScopedDrawContext{

@@ -1061,6 +1061,11 @@ export interface ResultPolicy {
   qualificationRule: 'top_n' | 'minimum_score' | 'custom';
   qualificationValue: number;
   tieBreakRules: string[];
+  /**
+   * المراكز ونِسَبها والحجب. راجع `lib/award-places.ts`.
+   * غيابها يعني الإعداد الافتراضي، ولا يعني غياب المراكز.
+   */
+  awards?: import('../lib/award-places').AwardPolicy;
 }
 
 export interface AppealPolicy {
