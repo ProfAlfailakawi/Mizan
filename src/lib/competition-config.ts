@@ -1,3 +1,4 @@
+import { DEFAULT_AWARD_POLICY } from './award-places';
 import {
   Competition,
   CompetitionPolicy,
@@ -99,7 +100,8 @@ export const BASE_POLICY: CompetitionPolicy = {
     requireDualApprovalToSeal: true,
     qualificationRule: 'top_n',
     qualificationValue: 20,
-    tieBreakRules: ['memorization_priority', 'tajweed_priority', 'fewest_penalties']
+    tieBreakRules: ['memorization_priority', 'tajweed_priority', 'fewest_penalties'],
+    awards: DEFAULT_AWARD_POLICY
   },
   appeals: {
     enabled: true,

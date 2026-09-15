@@ -205,10 +205,10 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
   /* ١١ — الاحتياط: ماذا لو سقط سؤال؟ */
   if (input.reserveModelCount !== undefined) {
     checks.push(input.reserveModelCount > 0
-      ? pass('reserve_models', 'النماذج الاحتياطية', 'Reserve models', `${input.reserveModelCount} نموذجًا احتياطيًا جاهزًا، مولَّدًا بالمحرك نفسه ومربوطًا ببصمة نطاقه.`, `${input.reserveModelCount} reserve models are ready, engine-generated and bound to their range signature.`)
-      : { id: 'reserve_models', severity: 'recommendation', titleAr: 'النماذج الاحتياطية', titleEn: 'Reserve models', fix: 'models',
-          detailAr: 'توصية تشغيلية لا تمنع الجاهزية: لا نموذج احتياطي جاهز بعد. أنشئ نموذجًا احتياطيًا من «النماذج والعدالة» ليكون البديل مولَّدًا بالمحرك نفسه ومربوطًا ببصمة النطاق.',
-          detailEn: 'Operational recommendation only; it does not block readiness. Create a reserve in Models & fairness so a dropped question has an engine-generated, scope-bound substitute.' });
+      ? pass('reserve_models', 'نموذج بديل جاهز', 'A spare model, ready', `${input.reserveModelCount} نموذجًا احتياطيًا جاهزًا، مولَّدًا بالمحرك نفسه ومربوطًا ببصمة نطاقه.`, `${input.reserveModelCount} reserve models are ready, engine-generated and bound to their range signature.`)
+      : { id: 'reserve_models', severity: 'recommendation', titleAr: 'نموذج بديل جاهز', titleEn: 'A spare model, ready', fix: 'models',
+          detailAr: 'لو سقط سؤال يوم المسابقة — لخطأٍ في نصّه أو لحجره — احتاج المتسابق بديلًا فورًا. لا يوجد بديلٌ جاهز الآن، فيُولَّد وقتها والقاعة تنتظر. اضغط «تجهيز البدائل» لفتح «النماذج والعدالة»، ثم اختر عدد البدائل واضغط «توليد دفعة». هذه توصية ولا تمنع تشغيل المسابقة.',
+          detailEn: 'If a question drops on the day — a text error, or a quarantine — the participant needs a substitute at once. None is ready now, so it would be generated while the hall waits. Use “Prepare spares” to open Models & fairness, choose how many spares per range, then generate a batch. This is a recommendation and does not block the competition.' });
   }
 
   if (input.escrowRequired) {

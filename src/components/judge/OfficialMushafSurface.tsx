@@ -13,6 +13,9 @@ import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
    delivery package appear here; anything else resolves to no delivery surface. */
 const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr'};
 
+/** الرواة الذين نملك لهم حزمة تسليم فعلًا — تقرأها شاشات الإعداد لتعرض ما يمكن تشغيله. */
+export const DELIVERED_RAWI_IDS:readonly string[]=Object.keys(DELIVERY_READING_BY_RAWI);
+
 /*
  * Narration name → delivery key, for the six narrations MIZAN actually delivers.
  *

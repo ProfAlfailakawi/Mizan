@@ -1,9 +1,11 @@
 import React from 'react';
 import { bilingualName } from '../../lib/ui-language';
+import { useMemo } from 'react';
 import {
   CalendarDays, MapPin, ShieldCheck, ArrowLeft, ArrowRight,
-  BookOpen, UserRound, UsersRound, BadgeCheck, Users, Clock3
+  BookOpen, UserRound, UsersRound, BadgeCheck, Users, Clock3, Trophy
 } from 'lucide-react';
+import { buildWinnersArchive } from '../../lib/winners-archive';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { Button } from '../design-system/Button';
@@ -32,7 +34,8 @@ const periodText = (start?: string, end?: string, ar = true) => {
 };
 
 export const CompetitionLanding: React.FC = () => {
-  const { competition, language } = useAppStore();
+  const store = useAppStore();
+  const { competition, language } = store;
   const ar = language === 'ar';
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const closed = competition.status === 'completed' || competition.status === 'archived';
@@ -54,6 +57,28 @@ export const CompetitionLanding: React.FC = () => {
     { key: 'guardian', icon: UsersRound, href: '#guardian', title: ar ? 'أنا ولي أمر' : 'I am a guardian', body: ar ? 'تابع متسابقك عبر رابطٍ خاص، دون إنشاء حساب.' : 'Follow your participant through a private link — no account needed.' },
     { key: 'verify', icon: BadgeCheck, href: '#verify', title: ar ? 'أتحقق من شهادة' : 'Verify a certificate', body: ar ? 'رقم الشهادة يكفي. خدمة عامة لا تتطلب دخولًا.' : 'The certificate number is enough. Public, no sign-in.' },
   ];
+
+  /*
+   * سجل الفائزين.
+   *
+   * يُبنى من النتائج المختومة وحدها، ومن الدورات السابقة دون الجارية: نتيجةٌ لم تُختم
+   * ليست تاريخًا بعد، والدورةُ الجارية لها شاشتها. والمركز المحجوب يُذكر محجوبًا بسببه،
+   * لأن حذفه من السجل يجعل «الأول» يبدو ممنوحًا في كل دورة وهو ليس كذلك.
+   */
+  const archive = useMemo(() => buildWinnersArchive({
+    competitions: (store.competitions || []).map(c => ({
+      id: c.id, name: c.name, nameArabic: c.nameArabic, edition: c.edition,
+      startDate: c.startDate, endDate: c.endDate, status: c.status,
+      categories: (c.categories || []).map(x => ({ id: x.id, name: x.name, nameArabic: x.nameArabic })),
+      awards: c.policy?.results?.awards,
+    })),
+    results: store.results.map(r => ({
+      competitionId: r.competitionId, categoryId: r.categoryId, participantId: r.participantId,
+      participantCode: r.participantCode, participantName: r.participantName,
+      participantNameArabic: r.participantNameArabic, finalScore: r.finalScore, status: r.status,
+    })),
+    excludeCompetitionId: competition.id,
+  }), [store.competitions, store.results, competition.id]);
 
   return (
     <div className="min-h-screen bg-[#FAF8F2] text-[#171B18] antialiased" dir={ar ? 'rtl' : 'ltr'}>
@@ -164,6 +189,57 @@ export const CompetitionLanding: React.FC = () => {
                   </article>
                 );
               })}
+            </div>
+          </section>
+        )}
+
+
+        {/* ── سجل الفائزين ──────────────────────────────────────────────────
+            الدورات السابقة بفائزيها ونِسَبهم. لا يُعرض القسم إن لم يكن خلفه تاريخ. */}
+        {archive.length > 0 && (
+          <section className="mt-16">
+            <div className="text-[11px] font-black tracking-[.16em] text-[#6f6a5c]">{ar ? 'الدورات السابقة' : 'PAST EDITIONS'}</div>
+            <h2 className="text-2xl sm:text-3xl font-black mt-1.5">{ar ? 'سجل الفائزين' : 'Roll of honour'}</h2>
+            <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[#6b675d]">
+              {ar
+                ? 'من نتائج مختومة، بنِسَبها كما تحققت. والمركز الذي لم يبلغ أحدٌ نسبته يُذكر محجوبًا — لأن حذفه يجعل المركز يبدو ممنوحًا في كل دورة.'
+                : 'Built from sealed results, with the percentages as they were achieved. A place nobody reached is listed as withheld rather than quietly dropped.'}
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {archive.map(edition => (
+                <article key={edition.competitionId} className="rounded-3xl border border-[#e7e2d6] bg-white p-6">
+                  <header className="flex flex-wrap items-baseline justify-between gap-3">
+                    <h3 className="text-lg font-black">{ar ? edition.titleArabic : edition.title}</h3>
+                    <span className="text-[12px] font-bold text-[#7c6f52]">{[edition.edition, edition.year].filter(Boolean).join(' · ')}</span>
+                  </header>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {edition.categories.map(category => (
+                      <div key={category.categoryId} className="rounded-2xl bg-[#FBF9F3] p-4">
+                        <div className="text-[12px] font-black text-[#3E4A43]">{ar ? category.categoryNameArabic : category.categoryName}</div>
+                        <ul className="mt-2.5 space-y-2">
+                          {category.winners.map(winner => (
+                            <li key={`${winner.rank}-${winner.participantCode}`} className="flex items-center gap-2.5 text-[13px]">
+                              <Trophy className="h-4 w-4 shrink-0 text-[#c9a227]" />
+                              <span className="min-w-0 flex-1 truncate font-bold">{ar ? winner.participantNameArabic : winner.participantName}</span>
+                              <span className="shrink-0 text-[11px] font-black text-[#67635a]">{ar ? winner.placeTitleArabic : winner.placeTitleEnglish}</span>
+                              <span className="shrink-0 text-[11px] font-black tabular-nums text-[#1b5346]">{winner.percentage}%</span>
+                            </li>
+                          ))}
+                          {category.withheld.map(entry => (
+                            <li key={`withheld-${entry.rank}`} className="text-[11px] font-bold leading-5 text-[#8a6536]">
+                              {ar ? entry.reasonArabic : entry.reasonEnglish}
+                            </li>
+                          ))}
+                          {!category.winners.length && !category.withheld.length && (
+                            <li className="text-[11px] text-[#6b675d]">{ar ? 'لا سجل معتمد لهذا الفرع.' : 'No sealed record for this branch.'}</li>
+                          )}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
             </div>
           </section>
         )}

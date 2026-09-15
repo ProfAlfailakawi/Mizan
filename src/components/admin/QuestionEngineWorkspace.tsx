@@ -9,7 +9,7 @@ import { getCompetitionPolicy } from '../../lib/competition-config';
 import { bilingualName } from '../../lib/ui-language';
 import type { Category, ScopeSimulationRecord } from '../../types';
 import {
-  describeScope, fullQuranScope, scopeAyahCount, scopeFromJuzRange, scopeSignature, type QuranScope,
+  describeScope, fullQuranScope, scopeAyahCount, scopeFromJuzRange, scopeSignature, scopeSubtract, scopeUnion, type QuranScope,
 } from '../../lib/quran-scope';
 import {
   autoBalancedZones, describeZone, emptyZone, validateDistributionPlan, zoneQuestionTotal,
@@ -196,8 +196,47 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
   const issues = validateDistributionPlan(draft, scope, questionCount);
   const errors = issues.filter(x => x.severity === 'error');
 
+  /*
+   * تحرير المناطق يُخرج الخطة من «القسمة التلقائية» إلى «مناطق تحددها اللجنة».
+   *
+   * كانت اللجنة تضيف منطقة أو تغيّر عددًا وهي في الوضع التلقائي، فيُعاد توليد المناطق
+   * عند السحب من النطاق نفسه ويُهمل ما كتبته — تعديلٌ يُقبل في الشاشة ولا أثر له في
+   * الواقع. فمن حرّر منطقة فقد قصد مناطق يحددها بنفسه، ويُقال له ذلك في الشاشة.
+   */
+  const asCommitteeZones = (next: QuestionDistributionPlan): QuestionDistributionPlan =>
+    next.mode === 'auto_balanced' ? { ...next, mode: 'custom_zones', autoZoneCount: undefined } : next;
+
   const patchZone = (index: number, patch: Partial<QuestionZone>) =>
-    setPlan({ ...draft, zones: draft.zones.map((zone, i) => (i === index ? { ...zone, ...patch } : zone)) });
+    setPlan(asCommitteeZones({ ...draft, zones: draft.zones.map((zone, i) => (i === index ? { ...zone, ...patch } : zone)) }));
+
+  /*
+   * المنطقة الجديدة تولد بنطاق حقيقي لا فارغ.
+   *
+   * «منطقة بلا نطاق» خطأٌ يمنع الحفظ، فكان زرّ الإضافة يبدو كأنه لا يعمل: تُضاف المنطقة
+   * ثم يُقفل الحفظ برسالةٍ في آخر الشاشة. الجديدة الآن تأخذ ما لم تغطّه المناطق من نطاق
+   * الفئة، فإن كان النطاق مغطّى كاملًا أخذت نطاق الفئة كله وللجنة أن تضيّقه.
+   */
+  const addZone = () => {
+    const order = draft.zones.length + 1;
+    const covered = draft.zones.reduce<QuranScope | null>((acc, zone) => acc ? scopeUnion(acc, zone.scope) : zone.scope, null);
+    const remainder = covered ? scopeSubtract(scope, covered) : scope;
+    const zoneScope = scopeAyahCount(remainder) > 0 ? remainder : scope;
+    setPlan(asCommitteeZones({ ...draft, zones: [...draft.zones, { ...emptyZone(order), scope: zoneScope, requiredQuestionCount: 0 }] }));
+  };
+
+  /*
+   * موازنة الأعداد: مجموع أسئلة المناطق يجب أن يساوي عدد أسئلة المتسابق تمامًا، وكان
+   * ضبط ذلك يدويًّا منطقةً منطقة. هذه توزّع الفارق بالتساوي والبقية على الأوائل.
+   */
+  const balanceCounts = () => {
+    const zones = draft.zones;
+    if (!zones.length) return;
+    const free = Math.max(0, Math.round(draft.freeQuestionCount || 0));
+    const forZones = Math.max(0, questionCount - (draft.mode === 'hybrid' ? free : 0));
+    const base = Math.floor(forZones / zones.length);
+    const remainder = forZones - base * zones.length;
+    setPlan(asCommitteeZones({ ...draft, zones: zones.map((zone, i) => ({ ...zone, requiredQuestionCount: base + (i < remainder ? 1 : 0) })) }));
+  };
 
   return (
     <div className="space-y-5">
@@ -240,11 +279,22 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                 onClick={() => setPlan({ ...draft, zones: autoBalancedZones(scope, draft.zones.length || questionCount) })}>
                 {ar ? 'اقترح قسمة متوازنة' : 'Suggest a balanced split'}
               </Button>
-              <Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: [...draft.zones, emptyZone(draft.zones.length + 1)] })}>
+              <Button size="sm" variant="ghost" icon={<ListChecks className="h-4 w-4" />} disabled={!draft.zones.length} onClick={balanceCounts}>
+                {ar ? 'وزّع الأعداد' : 'Balance counts'}
+              </Button>
+              <Button size="sm" variant="ghost" icon={<Plus className="h-4 w-4" />} onClick={addZone}>
                 {ar ? 'منطقة جديدة' : 'Add zone'}
               </Button>
             </div>
           </div>
+
+          {draft.mode === 'auto_balanced' && (
+            <p className="rounded-xl bg-[#F5EDE2] px-3.5 py-2.5 text-[11px] leading-6 text-[#7a5a2f]">
+              {ar
+                ? 'أنت في القسمة التلقائية: المناطق تُحسب عند السحب من نطاق كل متسابق، وما تعدّله هنا لا يُحفظ حتى تنتقل الخطة إلى «مناطق تحددها اللجنة» — وهو ما سيحدث تلقائيًا بأول تعديل.'
+                : 'This plan is on the automatic split: zones are recomputed per participant at draw time. The first edit here switches it to committee-defined zones so your changes take effect.'}
+            </p>
+          )}
 
           <ul className="space-y-2">
             {draft.zones.map((zone, index) => (
@@ -255,7 +305,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                     className="min-w-0 flex-1 border-0 bg-transparent text-sm font-black text-[#24302b] outline-none" />
                   <div className="flex items-center gap-2">
                     <NumberBox ar={ar} compact label={ar ? 'أسئلة' : 'Questions'} value={zone.requiredQuestionCount} min={0} max={20} onChange={v => patchZone(index, { requiredQuestionCount: v })} />
-                    <Button size="sm" shape="square" variant="ghost" aria-label={ar ? 'حذف المنطقة' : 'Remove zone'} icon={<Trash2 className="h-4 w-4" />} onClick={() => setPlan({ ...draft, zones: draft.zones.filter((_, i) => i !== index) })} />
+                    <Button size="sm" shape="square" variant="ghost" aria-label={ar ? 'حذف المنطقة' : 'Remove zone'} icon={<Trash2 className="h-4 w-4" />} onClick={() => setPlan(asCommitteeZones({ ...draft, zones: draft.zones.filter((_, i) => i !== index) }))} />
                   </div>
                 </div>
                 <p className="mt-1 text-[11px] font-bold text-[#5b6460]">{describeZone(zone, ar)}</p>
@@ -316,6 +366,8 @@ const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = 
         <NumberBox ar={ar} label={ar ? 'أقل مباعدة بين استعمالين (متسابقون)' : 'Minimum gap between reuses (participants)'} value={value.minimumParticipantGap || 0} min={0} max={2000} step={5} onChange={v => patch({ minimumParticipantGap: v })} />
         <NumberBox ar={ar} label={ar ? 'أقصى استعمال للسؤال الواحد' : 'Maximum uses per question'} value={value.maxUsesPerQuestion || 0} min={0} max={100} onChange={v => patch({ maxUsesPerQuestion: v || undefined })} hint={ar ? 'صفر = بلا سقف صريح' : '0 = no explicit ceiling'} />
         <NumberBox ar={ar} label={ar ? 'نصف قطر الجوار (آيات)' : 'Neighbourhood radius (ayat)'} value={value.neighborhoodAyahRadius} min={0} max={50} onChange={v => patch({ neighborhoodAyahRadius: v })} hint={ar ? 'سؤالان يبدآن من آيتين متجاورتين ليسا سؤالين.' : 'Two starts a few ayat apart are not two questions.'} />
+        <NumberBox ar={ar} label={ar ? 'نصف قطر الجوار (أجزاء)' : 'Neighbourhood radius (juz)'} value={value.neighborhoodJuzRadius || 0} min={0} max={30} onChange={v => patch({ neighborhoodJuzRadius: v })}
+          hint={ar ? 'صفر = بلا اعتبار. واحد = لا سؤالان من الجزء نفسه ما وُجد بديل. اثنان = يُباعَد بجزءٍ بينهما.' : '0 = off. 1 = no two questions from the same juz when an alternative exists. 2 = keep a juz between them.'} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -323,8 +375,6 @@ const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = 
           label={ar ? 'لا يُعاد الموضع للمتسابق نفسه أبدًا' : 'Never return a locus to the same participant'} />
         <Toggle ar={ar} checked={value.roomAware} onChange={v => patch({ roomAware: v })} label={ar ? 'تجنّب إعادة الاستعمال في القاعة نفسها' : 'Avoid reuse inside the same hall'} />
         <Toggle ar={ar} checked={value.dayAware} onChange={v => patch({ dayAware: v })} label={ar ? 'تجنّب إعادة الاستعمال في اليوم نفسه' : 'Avoid reuse on the same day'} />
-        <Toggle ar={ar} checked={!value.allowUnreviewedDifficulty} onChange={v => patch({ allowUnreviewedDifficulty: !v })}
-          label={ar ? 'اشترط مراجعة علمية لتقدير صعوبة السؤال' : 'Require reviewed difficulty ratings'} />
       </div>
 
       <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
@@ -465,7 +515,7 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
               {check.severity !== 'passed' && check.fix !== 'none' && (
                 check.id === 'escrow'
                   ? <Button size="sm" variant="outline" disabled={runtimeChecking} icon={<ChevronLeft className="h-4 w-4" />} onClick={() => void refreshRuntime()}>{runtimeChecking ? (ar ? 'جارٍ الفحص…' : 'Checking…') : (ar ? 'إعادة فحص الخادم' : 'Recheck server')}</Button>
-                  : <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{ar ? 'إصلاح' : 'Fix'}</Button>
+                  : <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{check.id === 'reserve_models' ? (ar ? 'تجهيز البدائل' : 'Prepare spares') : (ar ? 'إصلاح' : 'Fix')}</Button>
               )}
             </div>
           </li>
