@@ -347,6 +347,9 @@ const JudgingSection=({store,ar,policy,patch}:{store:Store;ar:boolean;policy:Com
   */
  const frozenAt=r.frozenAt||policy.frozenAt;
  const [ruleSetBlocked,setRuleSetBlocked]=useState(false);
+ const [unfreezeReason,setUnfreezeReason]=useState('');
+ const [unfreezeNote,setUnfreezeNote]=useState('');
+ const unfreezeBlockers=store.ruleSetUnfreezeBlockers();
  const setCriteria=(criteria:typeof r.criteria)=>{const ok=store.updateRuleSet({criteria});setRuleSetBlocked(!ok);return ok};
  const patchCriterion=(i:number,next:Partial<(typeof r.criteria)[number]>)=>{const criteria=[...r.criteria];criteria[i]={...criteria[i],...next};setCriteria(criteria)};
  const addCriterion=()=>setCriteria([...r.criteria,{id:`criterion-${Date.now()}`,name:'',nameArabic:'معيار جديد',maxScore:10,weight:0,assignedJudgeType:'all'}]);
@@ -369,10 +372,51 @@ const JudgingSection=({store,ar,policy,patch}:{store:Store;ar:boolean;policy:Com
    {judgingTabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={judgingTab===t.id} onClick={()=>setJudgingTab(t.id)} className={`mizan-tab ${judgingTab===t.id?'is-active':''}`}>{t.label}</button>)}
   </div>
   {judgingTab==='rubric'&&<div className="space-y-5">
-   {(frozenAt||ruleSetBlocked)&&<div role="status" className="rounded-2xl border border-[#e6d9c2] bg-[#FBF7F0] px-4 py-3 text-[11px] font-bold leading-6 text-[#7a5a2f]">
+   {/*
+     * التجميد يُفكّ قبل القياس الرسمي لا بعده.
+     *
+     * كان يقع عند أول جلسة ولا يُفكّ أبدًا، فجلسةُ تجربةٍ واحدة تقفل اللائحة إلى الأبد
+     * ويجد المسؤول نفسه بعد أول اختبارٍ للنظام عاجزًا عن إضافة معيار بلا مخرج. والحدّ
+     * الصحيح ليس «هل جرت جلسة؟» بل «هل قِيس أحدٌ رسميًا؟» — نتيجةٌ مختومة أو شهادة.
+     * فإن وقع ذلك بقي المنع قاطعًا، وإلا فُكّ بسببٍ مكتوب وأثرٍ مسجَّل في التدقيق.
+     */}
+   {(frozenAt||ruleSetBlocked)&&(unfreezeBlockers.sealedResults>0||unfreezeBlockers.certificates>0
+    ?<div role="status" className="rounded-2xl border border-[#e6d9c2] bg-[#FBF7F0] px-4 py-3 text-[11px] font-bold leading-6 text-[#7a5a2f]">
+      {ar
+       ?`لائحة هذه المسابقة مجمَّدة، وقد قِيس بها قياسٌ رسمي (${unfreezeBlockers.sealedResults} نتيجة مختومة، ${unfreezeBlockers.certificates} شهادة)، فلا تُفكّ: المسطرة التي حُكم بها لا تتغيّر بعد أن يُقاس عليها أحد. ولا يكفي حذف المعايير أو إفراغ اللائحة لأن القفل على المسابقة نفسها لا على محتواها. المخرج: «أدوات الإدارة ← إصدار جديد من المسابقة».`
+       :`This rulebook is frozen and has already carried official measurement (${unfreezeBlockers.sealedResults} sealed results, ${unfreezeBlockers.certificates} certificates), so it cannot be unfrozen: a rubric never moves once someone has been scored by it. Emptying the rulebook does not help — the lock sits on the competition, not its contents. The way forward is Admin tools → New competition from these settings.`}
+     </div>
+    :<div role="status" className="rounded-2xl border border-[#e6d9c2] bg-[#FBF7F0] px-4 py-3 text-[11px] font-bold leading-6 text-[#7a5a2f]">
+      <p>{ar
+       ?'لائحة هذه المسابقة مجمَّدة منذ أول جلسة تحكيم. ولم يُقَس بها أحدٌ قياسًا رسميًا بعد — لا نتيجة مختومة ولا شهادة صادرة — فيجوز فكّها بسببٍ مكتوب يُسجَّل في التدقيق.'
+       :'This rulebook froze at the first judging session. Nothing has been officially measured against it yet — no sealed result, no issued certificate — so it may be unfrozen with a written reason that is recorded in the audit log.'}</p>
+      {unfreezeBlockers.discardableResults>0&&<p className="mt-1.5">{ar
+       ?`تنبيه: ستُطرح ${unfreezeBlockers.discardableResults} نتيجة تجربة حُسبت على هذه اللائحة، لأن درجةً قيست بمسطرةٍ لم تعد قائمة لا معنى لها.`
+       :`Note: ${unfreezeBlockers.discardableResults} trial results computed on this rubric will be discarded — a score measured by a rubric that no longer exists means nothing.`}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+       <input value={unfreezeReason} onChange={e=>setUnfreezeReason(e.target.value)}
+        placeholder={ar?'سبب فكّ التجميد (يُسجَّل)':'Reason for unfreezing (recorded)'}
+        aria-label={ar?'سبب فكّ التجميد':'Reason for unfreezing'} className="mizan-input text-xs flex-1 min-w-[220px]"/>
+       <Button size="sm" variant="outline" disabled={unfreezeReason.trim().length<5} onClick={()=>{
+        const out=store.unfreezeRuleSet(unfreezeReason.trim());
+        setUnfreezeNote(out.ok
+         ?(ar?`فُكّ التجميد${out.discardedResults?` وطُرحت ${out.discardedResults} نتيجة تجربة`:''}. يمكنك تحرير اللائحة الآن.`:`Unfrozen${out.discardedResults?`; ${out.discardedResults} trial results discarded`:''}. You can edit the rulebook now.`)
+         :out.reason==='OFFICIAL_RESULTS_EXIST'?(ar?'تعذّر: توجد نتائج رسمية.':'Blocked: official results exist.')
+         :out.reason==='FORBIDDEN'?(ar?'صلاحيتك لا تسمح بفكّ التجميد.':'Your role may not unfreeze the rulebook.')
+         :(ar?'اكتب سببًا واضحًا أولًا.':'Write a clear reason first.'));
+        if(out.ok)setUnfreezeReason('');
+       }}>{ar?'فكّ التجميد':'Unfreeze'}</Button>
+      </div>
+      {unfreezeNote&&<p role="status" className="mt-2 text-[11px] font-black text-[#214C40]">{unfreezeNote}</p>}
+     </div>)}
+   {/*
+     * لائحةٌ بلا معايير لا يُحكَّم بها: المحكّم يجلس أمام سطحٍ لا درجة فيه. بوابة الجاهزية
+     * تمنع التشغيل، لكن المنع هناك يُكتشف متأخرًا — فيُقال هنا حيث تُحرَّر اللائحة.
+     */}
+   {!frozenAt&&!r.criteria.length&&<div role="alert" className="rounded-2xl border border-[#e0c6c1] bg-[#F9F0EE] px-4 py-3 text-[11px] font-bold leading-6 text-[#8a3f34]">
     {ar
-     ?'لائحة هذه المسابقة مجمَّدة، فلا تُضاف معايير ولا تُعدَّل درجاتها — وهذا مقصود: الدرجة التي حُكم بها لا تتغير بعد أن تبدأ المسابقة. لرفع التجميد راجع «الجاهزية والإطلاق» أو أنشئ نسخة لائحة جديدة.'
-     :'This competition’s rulebook is frozen, so criteria cannot be added or rescored — deliberately: a rubric must not move once judging has begun. Unfreeze it from Readiness & launch, or create a new rulebook revision.'}
+     ?'لا توجد معايير في هذه اللائحة، فلا شيء يُحتسب للمتسابق ولا يرى المحكّم درجةً يضعها. أضف معيارًا واحدًا على الأقل بزرّ «+ معيار» قبل أي جلسة.'
+     :'This rulebook has no criteria, so nothing can be scored and a judge sees no field to fill. Add at least one with “+ Criterion” before any session.'}
    </div>}
    <div className="rounded-2xl border border-[#dfddd6] overflow-hidden">
     <div className="px-4 py-3 bg-[#f7f5ef] flex items-center justify-between gap-3">
