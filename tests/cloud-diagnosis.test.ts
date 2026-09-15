@@ -35,11 +35,23 @@ test('a fully wired deployment reports every link connected', () => {
 });
 
 test('a build without Firebase keys is named as a build problem, not a sync problem', () => {
-  const result = diagnoseCloud({ ...healthy, clientConfigured: false });
+  const result = diagnoseCloud({ ...healthy, clientConfigured: false, clientProjectId: undefined });
   const check = result.checks.find(x => x.id === 'client_config')!;
   assert.equal(check.state, 'blocked');
   assert.match(check.detailAr, /VITE_FIREBASE_API_KEY/);
   assert.match(check.ownerAr, /الخادم/, 'and it is the deployer’s to fix, not the operator’s');
+});
+
+test('a key without a project id is a broken build, even though the app boots', () => {
+  /* firebase.ts يرفض غياب المفتاح ويسكت عن غياب المعرّف، فالبناء يُقلع ولا يكتب. */
+  const result = diagnoseCloud({ ...healthy, clientConfigured: true, clientProjectId: undefined });
+  const check = result.checks.find(x => x.id === 'client_config')!;
+  assert.equal(check.state, 'blocked', 'a half-configured build must not read as healthy');
+  assert.match(check.detailAr, /VITE_FIREBASE_PROJECT_ID/);
+  assert.match(check.detailEn, /still boots/);
+  const panel = fs.readFileSync('src/components/admin/CloudDiagnostics.tsx', 'utf8');
+  assert.match(panel, /clientConfigured: !!env\.VITE_FIREBASE_API_KEY/,
+    'and the screen reads the real build values rather than hard-coding “configured”');
 });
 
 test('a token without claims is the diagnosis, and it is repairable from the screen', () => {
@@ -57,6 +69,39 @@ test('a server that cannot write claims says so, so the repair button is not pre
   assert.equal(check.state, 'blocked');
   assert.match(check.detailAr, /FIREBASE_PROJECT_ID/);
   assert.match(check.detailAr, /لن يُصلح زرُّ الإصلاح شيئًا/);
+});
+
+test('no repair is offered while the server cannot write claims at all', () => {
+  /* زرٌّ يُعرض ليُضغط ثم يفشل حتمًا يُشغل المشغّل عن العلّة الحقيقية ويوهمه أنها في حسابه. */
+  const stuck = diagnoseCloud({ ...healthy, tokenClaims: {}, serverClaimsWritable: false });
+  assert.equal(stuck.checks.some(x => x.state === 'blocked' && x.repairable), false);
+  const claimCheck = stuck.checks.find(x => x.id === 'token_claims')!;
+  assert.match(claimCheck.detailAr, /عالِج النشر أولًا/);
+  assert.match(claimCheck.ownerAr, /الخادم/, 'and it is handed to the deployer, not left with the operator');
+
+  const scoped = diagnoseCloud({
+    ...healthy, serverClaimsWritable: false,
+    tokenClaims: { role: 'judge', org_id: 'org-1', competition_id: 'comp-9' },
+  });
+  assert.equal(scoped.checks.find(x => x.id === 'competition_scope')!.repairable, false);
+
+  const denied = diagnoseCloud({
+    ...healthy, serverClaimsWritable: false,
+    lastError: { code: 'CLOUD_PERMISSION_DENIED', message: 'رُفضت الكتابة.' },
+  });
+  assert.equal(denied.checks.find(x => x.id === 'last_write')!.repairable, false);
+
+  /* وما دام الخادم قادرًا (أو لم يُسأل بعد) يبقى الإصلاح معروضًا. */
+  assert.equal(diagnoseCloud({ ...healthy, tokenClaims: {} }).checks.some(x => x.repairable), true);
+  assert.equal(diagnoseCloud({ ...healthy, tokenClaims: {}, serverClaimsWritable: undefined }).checks.some(x => x.repairable), true);
+});
+
+test('claim writability is proven by an authorized call, not by an object being constructible', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  assert.match(claims, /await auth\.listUsers\(1\)/,
+    'credentials without the Firebase Authentication Admin role build an Auth object and then fail every write');
+  assert.match(claims, /CLAIMS_PROBE_TTL_MS/, 'and the probe is cached, so health polling does not bill an admin call per request');
+  assert.match(claims, /export function resetClaimsProbe/);
 });
 
 test('an unreachable server is never judged from the device state alone', () => {

@@ -41,8 +41,15 @@ export interface CloudCheck {
 }
 
 export interface CloudDiagnosisInput {
-  /** هل بُني التطبيق بمفتاح Firebase ومعرّف المشروع؟ */
+  /**
+   * هل بُني التطبيق بمفتاح Firebase **ومعرّف المشروع** معًا؟
+   *
+   * المفتاح وحده لا يكفي ولا يُوقِف الإقلاع: `firebase.ts` يرفض غياب المفتاح وحده، فبناءٌ
+   * فيه المفتاح بلا معرّف مشروع يُقلع سليمًا ظاهريًا بينما لا عنوان لفايرستور يُكتب إليه.
+   * وهذه بالضبط حالة البناء الناقص التي وُجد هذا الفحص ليكشفها، فلا يجوز أن يُمرّرها.
+   */
   clientConfigured: boolean;
+  /** معرّف المشروع كما بُني به، إن وُجد. غيابه وحده يكفي لإسقاط الفحص الأول. */
   clientProjectId?: string;
   /** وضع الانقطاع مُفعَّل يدويًا في «الاستمرارية». */
   offlineMode: boolean;
@@ -84,13 +91,19 @@ export function diagnoseCloud(input: CloudDiagnosisInput): { checks: CloudCheck[
   const checks: CloudCheck[] = [];
 
   // ١ — مفاتيح البناء
-  checks.push(input.clientConfigured
+  /* المفتاح والمعرّف كلاهما شرط. بناءٌ بأحدهما دون الآخر يُقلع ولا يكتب، فيُسمّى ناقصًا لا سليمًا. */
+  const configured = input.clientConfigured && !!input.clientProjectId;
+  checks.push(configured
     ? check('client_config', 'ok', 'مفاتيح Firebase', 'Firebase keys',
-        input.clientProjectId ? `التطبيق مبنيٌّ على المشروع ${input.clientProjectId}.` : 'التطبيق مبنيٌّ بمفاتيح Firebase صالحة.',
-        input.clientProjectId ? `Built against project ${input.clientProjectId}.` : 'Built with valid Firebase keys.', OPERATOR)
+        `التطبيق مبنيٌّ على المشروع ${input.clientProjectId}.`,
+        `Built against project ${input.clientProjectId}.`, OPERATOR)
     : check('client_config', 'blocked', 'مفاتيح Firebase', 'Firebase keys',
-        'لم يُبنَ هذا التطبيق بمفاتيح Firebase؛ لا سحابة أصلًا. تُضبط VITE_FIREBASE_API_KEY و VITE_FIREBASE_PROJECT_ID في بيئة البناء ثم يُعاد النشر — ولا ينفع ضبطها بعد البناء.',
-        'This build carries no Firebase keys, so there is no cloud to reach. Set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in the build environment and redeploy; setting them after the build has no effect.', OPERATOR));
+        input.clientConfigured
+          ? 'المفتاح موجود ومعرّف المشروع غائب، فلا عنوان لفايرستور يُكتب إليه — ويُقلع التطبيق رغم ذلك فيبدو سليمًا. اضبط VITE_FIREBASE_PROJECT_ID في بيئة البناء ثم أعد النشر؛ ضبطها بعد البناء لا ينفع.'
+          : 'لم يُبنَ هذا التطبيق بمفاتيح Firebase؛ لا سحابة أصلًا. تُضبط VITE_FIREBASE_API_KEY و VITE_FIREBASE_PROJECT_ID في بيئة البناء ثم يُعاد النشر — ولا ينفع ضبطها بعد البناء.',
+        input.clientConfigured
+          ? 'The API key is present but the project id is missing, so there is no Firestore project to address — and the app still boots, which makes it look healthy. Set VITE_FIREBASE_PROJECT_ID in the build environment and redeploy; setting it afterwards has no effect.'
+          : 'This build carries no Firebase keys, so there is no cloud to reach. Set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in the build environment and redeploy; setting them after the build has no effect.', OPERATOR));
 
   // ٢ — الاتصال
   checks.push(input.offlineMode
@@ -123,10 +136,22 @@ export function diagnoseCloud(input: CloudDiagnosisInput): { checks: CloudCheck[
       `رمز الدخول يحمل الدور «${claims!.role}» والجهة «${claims!.org_id}»${scope ? ` والمسابقة «${scope}»` : ''}.`,
       `The token carries role “${claims!.role}”, organization “${claims!.org_id}”${scope ? `, competition “${scope}”` : ''}.`, SELF));
   } else {
+    /*
+     * الإصلاح يُعرض فقط حين يكون ممكنًا.
+     *
+     * حين يكون الخادم عاجزًا عن كتابة المطالبات أصلًا، يعود كلُّ ضغطٍ على زرّ الإصلاح
+     * بـ IDENTITY_CLAIMS_NOT_CONFIGURED حتمًا. وزرٌّ يُعرض ليُضغط ثم يفشل دائمًا أسوأ من
+     * غيابه: يُشغل المشغّل عن العلّة الحقيقية — وهي في النشر — ويوهمه أن العطل في حسابه.
+     */
+    const repairPossible = input.serverClaimsWritable !== false;
     checks.push(check('token_claims', 'blocked', 'مطالبات الصلاحية', 'Permission claims',
-      'رمز دخولك لا يحمل الدور والجهة، وقواعد Firestore لا تقرأ إلا الرمز. فحسابك مخوَّل في سجلّ ميزان ومرفوضٌ عند السحابة في آنٍ واحد — وهذا سبب «تعذّرت المزامنة» في أغلب الحالات. يُصلَح بإعادة كتابة المطالبات من التخويل نفسه، دون منح أي صلاحية جديدة.',
-      'Your token carries no role or organization, and the Firestore rules read nothing but the token. So the account is authorized in Mizan’s registry and refused by the cloud at the same time — the usual cause of “sync failed”. Rewriting the claims from that same grant fixes it, granting nothing new.',
-      SELF, true));
+      repairPossible
+        ? 'رمز دخولك لا يحمل الدور والجهة، وقواعد Firestore لا تقرأ إلا الرمز. فحسابك مخوَّل في سجلّ ميزان ومرفوضٌ عند السحابة في آنٍ واحد — وهذا سبب «تعذّرت المزامنة» في أغلب الحالات. يُصلَح بإعادة كتابة المطالبات من التخويل نفسه، دون منح أي صلاحية جديدة.'
+        : 'رمز دخولك لا يحمل الدور والجهة، وقواعد Firestore لا تقرأ إلا الرمز. ولا يُصلح ذلك من هذه الشاشة ما دام الخادم عاجزًا عن كتابة المطالبات (انظر الفحص التالي): عالِج النشر أولًا ثم أعد المحاولة.',
+      repairPossible
+        ? 'Your token carries no role or organization, and the Firestore rules read nothing but the token. So the account is authorized in Mizan’s registry and refused by the cloud at the same time — the usual cause of “sync failed”. Rewriting the claims from that same grant fixes it, granting nothing new.'
+        : 'Your token carries no role or organization, and the Firestore rules read nothing but the token. This screen cannot fix it while the server cannot write claims at all (see the next check): fix the deployment first, then try again.',
+      repairPossible ? SELF : OPERATOR, repairPossible));
   }
 
   // ٥ — هل يستطيع الخادم كتابتها أصلًا؟
@@ -164,7 +189,7 @@ export function diagnoseCloud(input: CloudDiagnosisInput): { checks: CloudCheck[
       : check('competition_scope', 'blocked', 'نطاق المسابقة', 'Competition scope',
           `دورك «${role}» يشترط أن يسمّي رمزُك المسابقة، ورمزك لا يسمّي «${input.competitionId}». إن كان تخويلك على هذه المسابقة صحيحًا فإعادة كتابة المطالبات تكفي؛ وإلا فالتخويل نفسه على مسابقة أخرى.`,
           `Your role “${role}” requires the token to name the competition, and yours does not name “${input.competitionId}”. If your grant is on this competition, rewriting the claims is enough; otherwise the grant itself points elsewhere.`,
-          SELF, true));
+          input.serverClaimsWritable === false ? OPERATOR : SELF, input.serverClaimsWritable !== false));
   } else {
     checks.push(check('competition_scope', 'ok', 'نطاق المسابقة', 'Competition scope',
       'دورك لا يُقيَّد بمسابقة بعينها.', 'Your role is not restricted to a single competition.', ORG_ADMIN));
@@ -178,7 +203,7 @@ export function diagnoseCloud(input: CloudDiagnosisInput): { checks: CloudCheck[
         ? `تجاوزت الحمولة حدّ المستند في Firestore (1 ميغابايت). ${input.lastError.message}`
         : input.lastError.message,
       input.lastError.message,
-      size ? OPERATOR : SELF, input.lastError.code === 'CLOUD_PERMISSION_DENIED'));
+      size ? OPERATOR : SELF, input.lastError.code === 'CLOUD_PERMISSION_DENIED' && input.serverClaimsWritable !== false));
   } else {
     checks.push(check('last_write', 'ok', 'آخر محاولة رفع', 'Last upload attempt',
       'لا عطل مزامنة مسجَّل على هذا الجهاز.', 'No sync failure is recorded on this device.', SELF));
