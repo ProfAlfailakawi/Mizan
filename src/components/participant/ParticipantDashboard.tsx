@@ -18,6 +18,7 @@ import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 import { PracticeStudio } from './PracticeStudio';
 import { WarmupSanctuary } from './WarmupSanctuary';
 import { deliveryReadingKeyFor, surahNameArabic } from '../judge/OfficialMushafSurface';
+import { practiceReadingFor } from '../../lib/quran-intelligence';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
 const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Approve'},{ar:'الحضور',en:'Arrive'},{ar:'الاختبار',en:'Recite'},{ar:'الشهادة',en:'Certificate'}];
@@ -104,6 +105,18 @@ export const ParticipantDashboard: React.FC = () => {
  const maxAyah=surahAyahCount(surah)||1;
  const startAyah=Math.min(Math.max(1,pStart),maxAyah);
  const count=Math.max(1,Math.min(pCount,20,maxAyah-startAyah+1));
+ /*
+  * المقطع المختار للتدريب هو نفسه ما يُقيَّم عليه إلكترونيًّا.
+  *
+  * لو بُني للاستماع مقطعٌ آخر لاختلف ما يراه المتسابق عمّا يُسمع منه، وهو أسوأ من ألا
+  * يُقيَّم أصلًا. وحزمة الرواية تُشتقّ من روايته هو، فلا يُقاس بحزمة رواية أخرى.
+  */
+ const practiceEngine=practiceReadingFor(practiceReading);
+ const practicePassage=practiceEngine&&scopeSurahs.length?{
+  ...practiceEngine,
+  surah,startAyah,endAyah:startAyah+count-1,
+  label:ar?`${surahNameArabic(surah)||surah} · ${startAyah}–${startAyah+count-1}`:`${surah}:${startAyah}-${startAyah+count-1}`,
+ }:undefined;
 
  return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
   <section className="mizan-surface p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="mizan-code">{participant.code}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?participant.fullNameArabic:participant.fullName}</h1><p className="text-xs text-[#646965] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(participant.status,ar)}</Badge></div><div className="mt-7 flex items-start gap-1.5" role="list" aria-label={ar?'مراحل رحلتك':'Your journey'}>{[1,2,3,4,5].map(n=>{const state=n<step?'done':n===step?'current':'upcoming';return <React.Fragment key={n}><span role="listitem" aria-current={state==='current'?'step':undefined} aria-label={`${STEP_LABELS[n-1][ar?'ar':'en']} — ${ar?(state==='done'?'مكتملة':state==='current'?'أنت هنا':'لاحقًا'):(state==='done'?'done':state==='current'?'you are here':'upcoming')}`} className="flex flex-col items-center gap-2 shrink-0"><span className="mizan-step" data-state={state}>{state==='done'?<Check className="w-4 h-4"/>:n}</span><span className="mizan-step-label" data-state={state==='current'?'current':undefined}>{ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en}</span></span>{n<5&&<span className="mizan-step-rule mt-[17px]" data-done={n<step||undefined} aria-hidden="true"/>}</React.Fragment>})}</div></section>
@@ -150,6 +163,7 @@ export const ParticipantDashboard: React.FC = () => {
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
     zoneHints={warmupZoneHints}
     questionCount={resolveQuestionCount(category,policy)}
+    practicePassage={practicePassage}
     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
    {/* بلا نطاق معتمد لا يُفتح الاستوديو: التدرّب على ما لن يُسأل فيه أسوأ من ألا يتدرّب. */}
    {practiceReading&&scopeSurahs.length?<section className="space-y-3">

@@ -14,7 +14,7 @@ import { surahNameArabic, surahNumberFromName } from '../judge/OfficialMushafSur
  * ولماذا لرئيس التحكيم لا للمحكّم: إخبار من يضع الدرجة بأن الآية «فخّ» يوجّه حكمه قبل أن
  * يسمع. رئيس التحكيم يراجع ولا يرصد، فالإشارة عنده استدلال لا إيحاء.
  *
- * لا يُعرض إلا ما هو APPROVED من خريطة اللجنة العلمية، ولا يظهر أي شيء حين لا يوجد نظير:
+ * لا يُعرض إلا ما هو APPROVED من خريطة المتشابهات، ولا يظهر أي شيء حين لا يوجد نظير:
  * الصمت هو الحالة الطبيعية، فلا يضيف هذا سطرًا واحدًا إلى شاشةٍ هادئة بلا سبب.
  */
 
@@ -70,7 +70,7 @@ export const MutashabihatHint: React.FC<{ sessionId: string; ar: boolean }> = ({
       <div className="px-4 pb-4">
         <p className="text-[10px] leading-5 text-[#656b66]">
           {ar
-            ? 'من خريطة المتشابهات المعتمدة من اللجنة العلمية. استدلال للمراجعة فقط: لا يُغيّر درجة ولا يُعرض للمحكّم أثناء التلاوة.'
+            ? 'من خريطة المتشابهات المعتمدة. استدلال للمراجعة فقط: لا يُغيّر درجة ولا يُعرض للمحكّم أثناء التلاوة.'
             : 'From the scientific committee’s approved similarity map. Review context only: it changes no score and is never shown to the scoring judge.'}
         </p>
         <div className="mt-3 space-y-2">

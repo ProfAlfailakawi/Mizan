@@ -146,6 +146,7 @@ declare module 'lucide-react' {
  export const Ticket: any;
  export const Scissors: any;
  export const UserCheck: any;
+  export const Ear: any;
  export const Square: any;
  export const BatteryWarning: any;
  export const ShieldAlert: any;

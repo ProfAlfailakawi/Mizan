@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ListChecks, MapPin, RotateCcw, Timer, Wind } from 'lucide-react';
+import { Check, Ear, ListChecks, MapPin, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
+import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
 
 /*
  * التهيئة قبل دورك.
@@ -30,7 +31,7 @@ const PHASE_TEXT = {
   en: { in: 'Inhale…', hold: 'Hold…', out: 'Exhale…' },
 } as const;
 
-type Door = 'where' | 'breath' | 'rehearsal';
+type Door = 'where' | 'breath' | 'rehearsal' | 'listen';
 
 /** زلّات البروفة بأسمائها كما يسمّيها المحكّم، حتى لا يفاجئه المصطلح في القاعة. */
 const SLIPS = [
@@ -54,9 +55,21 @@ export interface WarmupSanctuaryProps {
   questionCount?: number;
   /** الدقائق المقرّرة للسؤال الواحد — يُبنى عليها مؤقّت البروفة. */
   minutesPerQuestion?: number;
+  /** المقطع الذي اختاره المتسابق للتدريب، بروايته وحزمتها — يُبنى عليه التقييم الإلكتروني. */
+  practicePassage?: PracticePassage;
 }
 
-export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, zoneHints, questionCount, minutesPerQuestion }) => {
+/** المقطع المعروض في استوديو التدريب: هو نفسه ما يُقيَّم عليه إلكترونيًّا. */
+export interface PracticePassage {
+  reading: QuranReadingId;
+  sourcePackageId: string;
+  surah: number;
+  startAyah: number;
+  endAyah: number;
+  label: string;
+}
+
+export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, zoneHints, questionCount, minutesPerQuestion, practicePassage }) => {
   const [open, setOpen] = useState(false);
   const [door, setDoor] = useState<Door>('where');
   return (
@@ -74,6 +87,7 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
             ['where', MapPin, ar ? 'أين أُختبر' : 'Where'],
             ['breath', Wind, ar ? 'نفَسي' : 'Breathe'],
             ['rehearsal', Timer, ar ? 'بروفة' : 'Rehearse'],
+            ['listen', Ear, ar ? 'يسمعك' : 'Listen'],
           ] as [Door, React.ComponentType<{ className?: string }>, string][]).map(([id, Icon, label]) => (
             <button key={id} type="button" role="tab" aria-selected={door === id} onClick={() => setDoor(id)} className={`mizan-tab ${door === id ? 'is-active' : ''}`}>
               <Icon className="h-4 w-4" />{label}
@@ -84,6 +98,7 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
         {door === 'where' && <WhereDoor ar={ar} scopeText={scopeText} zoneHints={zoneHints} questionCount={questionCount} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'breath' && <BreathDoor ar={ar} active={open} />}
         {door === 'rehearsal' && <RehearsalDoor ar={ar} minutesPerQuestion={minutesPerQuestion} />}
+        {door === 'listen' && <ListenDoor ar={ar} passage={practicePassage} />}
       </div>
     </details>
   );
@@ -262,3 +277,138 @@ const RehearsalDoor: React.FC<{ ar: boolean; minutesPerQuestion?: number }> = ({
 };
 
 export default WarmupSanctuary;
+
+/* ── يسمعك: تقييم إلكتروني للتدريب وحده ───────────────────────────────── */
+
+/*
+ * المحرّك الذي يتتبّع التلاوة في القاعة يتتبّعها هنا أيضًا، والفرق كلُّه في الأثر: لا يُكتب
+ * من هذا في دفتر أدلّة، ولا تصل اللجنة منه كلمة، ولا يمسّ الدرجة بحرف. والمقطع يختاره
+ * المتسابق من نطاقه، فلا يُكشف له ما لا يعرفه.
+ *
+ * وما يُعرض ثلاثة أشياء لا رقمٌ واحد مبهم: أين وصل الآن، وكم مرّة فقد المحرّكُ أثرَه
+ * (وهو ما يقابل التردّد والوقوف)، وجودة الصوت — لأن ضعف الإشارة ليس ضعف حفظ، وخلطُهما
+ * يظلم المتدرّب.
+ */
+const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, passage }) => {
+  const [state, setState] = useState<'idle' | 'asking' | 'live' | 'blocked'>('idle');
+  const [last, setLast] = useState<QuranAlignmentResult | null>(null);
+  const [lost, setLost] = useState(0);
+  const [heard, setHeard] = useState(0);
+  const [note, setNote] = useState('');
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const wasLost = useRef(false);
+
+  const stop = () => {
+    recorderRef.current?.state === 'recording' && recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    recorderRef.current = null; streamRef.current = null;
+    setState('idle');
+  };
+  useEffect(() => () => stop(), []);
+
+  const start = async () => {
+    if (!passage) return;
+    setNote(''); setLost(0); setHeard(0); setLast(null); wasLost.current = false;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setState('blocked');
+      setNote(ar ? 'هذا المتصفح لا يتيح الاستماع. جرّب متصفحًا آخر أو هاتفك.' : 'This browser cannot listen.');
+      return;
+    }
+    setState('asking');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      streamRef.current = stream;
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'].find(m => MediaRecorder.isTypeSupported(m));
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = async e => {
+        if (!e.data.size) return;
+        try {
+          const out = await submitPracticeAlignmentChunk({ blob: e.data, reading: passage.reading, sourcePackageId: passage.sourcePackageId, surah: passage.surah, startAyah: passage.startAyah, endAyah: passage.endAyah });
+          setLast(out); setHeard(n => n + 1);
+          const nowLost = out.alignmentState === 'LOST';
+          if (nowLost && !wasLost.current) setLost(n => n + 1);
+          wasLost.current = nowLost;
+        } catch (err) {
+          const code = err instanceof Error ? err.message : '';
+          setNote(practiceNote(code, ar));
+          if (/NOT_CONFIGURED|BENCHMARK|BACKEND/.test(code)) { stop(); setState('blocked'); }
+        }
+      };
+      recorder.start(2000);
+      setState('live');
+    } catch {
+      setState('blocked');
+      setNote(ar ? 'لم يُسمح بالميكروفون. اسمح به من إعدادات المتصفح ثم أعد المحاولة.' : 'Microphone permission was denied.');
+    }
+  };
+
+  if (!passage) return (
+    <div className="pt-4">
+      <div className="rounded-2xl border border-[#e4e2da] bg-white p-4 text-[11px] leading-6 text-[#5b6460]">
+        {ar ? 'اختر مقطعًا من استوديو التدريب أسفل الصفحة، ثم عد إلى هنا ليستمع إليك النظام وأنت تقرؤه.' : 'Pick a passage in the practice studio below, then come back here.'}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="pt-4 space-y-3">
+      <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
+        <div className="mizan-kicker">{ar ? 'يستمع إليك ويتابع موضعك' : 'IT LISTENS AND FOLLOWS'}</div>
+        <h3 className="mt-1 text-sm font-black text-[#214C40]">{passage.label}</h3>
+        <p className="mt-1.5 text-[11px] leading-6 text-[#3c4541]">
+          {ar
+            ? 'اقرأ المقطع بصوتك، ويتابع النظام أين وصلت. هذا تدريبك وحدك: لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك. الدرجة للمحكّم وحده.'
+            : 'Recite aloud and it follows your position. Practice only: nothing is stored, nothing reaches the panel, nothing counts toward your score.'}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {state !== 'live'
+          ? <button type="button" onClick={() => void start()} disabled={state === 'asking' || state === 'blocked'} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#214C40] px-4 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{state === 'asking' ? (ar ? 'جارٍ الإذن…' : 'Asking…') : (ar ? 'ابدأ القراءة' : 'Start')}</button>
+          : <button type="button" onClick={stop} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#d9dfdb] px-4 text-xs font-black text-[#214C40]"><Square className="h-4 w-4" />{ar ? 'أوقف' : 'Stop'}</button>}
+        {state === 'live' && <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#2F6555]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#2F6555]" />{ar ? 'يستمع' : 'listening'}</span>}
+      </div>
+
+      {(state === 'live' || last) && (
+        <div className="grid grid-cols-3 gap-2">
+          <Cell ar={ar} value={last?.ayah ? String(last.ayah) : '—'} label={ar ? 'الآية الآن' : 'Ayah'} />
+          <Cell ar={ar} value={String(lost)} label={ar ? 'فقد أثرك' : 'Lost you'} tone={lost ? 'warn' : 'calm'} />
+          <Cell ar={ar} value={last?.backendEvidence?.acousticQuality !== undefined ? `${Math.round((last.backendEvidence.acousticQuality || 0) * 100)}%` : '—'} label={ar ? 'وضوح الصوت' : 'Audio'} />
+        </div>
+      )}
+
+      {!!heard && state !== 'live' && (
+        <div className="rounded-2xl border border-[#e4e2da] bg-white p-4 text-[11px] leading-6 text-[#5b6460]">
+          {ar
+            ? (lost === 0
+              ? 'تابعك النظام من أول المقطع إلى آخره بلا انقطاع. هذا مؤشّر تمكّن، لا درجة.'
+              : `فقد أثرك ${countAr(lost)}. الانقطاع قد يكون تردّدًا أو وقوفًا، وقد يكون ضعف صوتٍ لا ضعف حفظ — انظر «وضوح الصوت» قبل أن تحكم على نفسك.`)
+            : (lost === 0 ? 'Followed you end to end.' : `Lost you ${lost} time(s).`)}
+        </div>
+      )}
+
+      {note && <div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</div>}
+    </div>
+  );
+};
+
+const Cell: React.FC<{ ar: boolean; value: string; label: string; tone?: 'calm' | 'warn' }> = ({ value, label, tone = 'calm' }) => (
+  <div className={`rounded-xl p-3 text-center ${tone === 'warn' ? 'bg-[#fdf1f1]' : 'bg-[#f1efe9]'}`}>
+    <div className="text-lg font-black tabular-nums">{value}</div>
+    <div className="mt-1 text-[10px] text-[#646965]">{label}</div>
+  </div>
+);
+
+/* رموز تعذّر الاستماع بلغة المتسابق — لا رمز خام في وجهه. */
+const practiceNote = (code: string, ar: boolean) => {
+  if (!ar) return `Listening is unavailable (${code}).`;
+  if (/NOT_CONFIGURED/.test(code)) return 'خدمة الاستماع غير مهيّأة في هذه المسابقة بعد. بقية أبواب التهيئة تعمل.';
+  if (/BENCHMARK/.test(code)) return 'خدمة الاستماع لم تُعتمد لهذه الرواية بعد.';
+  if (/SOURCE_READING_MISMATCH/.test(code)) return 'المقطع المختار لا يوافق روايتك. اختر مقطعًا من نطاقك.';
+  if (/OUTSIDE_EXPECTED_PASSAGE/.test(code)) return 'ما قرأتَه خارج المقطع المختار. ابدأ من أوّله.';
+  if (/AUDIO_CHUNK_INVALID/.test(code)) return 'لم يصل صوتٌ واضح. قرّب الميكروفون وأعد المحاولة.';
+  if (/IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) return 'انتهت جلسة دخولك. أعد الدخول ثم جرّب.';
+  return 'تعذّر الاستماع الآن. أعد المحاولة بعد قليل.';
+};

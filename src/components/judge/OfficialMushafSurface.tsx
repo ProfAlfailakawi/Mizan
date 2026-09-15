@@ -7,14 +7,16 @@ import {DivergenceRadar} from './DivergenceRadar';
 import {TajweedAyah,TajweedAyahWords,TajweedLegend} from './TajweedText';
 import {measuredWordTimings,splitAyahWords,wordAtTime,type MeasuredSegment} from '../../lib/word-timing';
 import {resolveReading} from '../../lib/scientific-core';
+import {DELIVERY_READING_BY_RAWI as DELIVERY_READING_BY_RAWI_MAP} from '../../lib/delivered-readings';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
 
-/* Canonical rawi id (scientific-core) → delivery reading key. Only narrations with an ingested
-   delivery package appear here; anything else resolves to no delivery surface. */
-const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr'};
-
-/** الرواة الذين نملك لهم حزمة تسليم فعلًا — تقرأها شاشات الإعداد لتعرض ما يمكن تشغيله. */
-export const DELIVERED_RAWI_IDS:readonly string[]=Object.keys(DELIVERY_READING_BY_RAWI);
+/*
+ * جدول الرواة المسلَّمين واحد لا اثنان.
+ *
+ * كانت هذه النسخة الثانية من الجدول نفسه، فإضافةُ روايةٍ في أحدهما تترك الآخر خلفه: يُسحب
+ * الموضع من رواية ولا يجد سطحُ المصحف نصًّا لها. فصار المصدر واحدًا يُستورد.
+ */
+export { DELIVERED_RAWI_IDS } from '../../lib/delivered-readings';
 
 /*
  * Narration name → delivery key, for the six narrations MIZAN actually delivers.
@@ -26,6 +28,7 @@ export const DELIVERED_RAWI_IDS:readonly string[]=Object.keys(DELIVERY_READING_B
  * list of the names we ship packages for; it never invents a narration, and a name outside it
  * still yields no delivery surface.
  */
+const DELIVERY_READING_BY_RAWI=DELIVERY_READING_BY_RAWI_MAP;
 const DELIVERY_READING_BY_NAME:Record<string,string>={
  hafs:'hafs','حفص':'hafs','hafsanasim':'hafs',
  warsh:'warsh','ورش':'warsh',
@@ -33,6 +36,8 @@ const DELIVERY_READING_BY_NAME:Record<string,string>={
  qalun:'qalun',qaloun:'qalun','قالون':'qalun',
  duri:'duri-abi-amr','aldurianabiamr':'duri-abi-amr','الدوري':'duri-abi-amr',
  susi:'susi-abi-amr',soosi:'susi-abi-amr','alsusi':'susi-abi-amr','السوسي':'susi-abi-amr',
+ bazzi:'bazzi','albazzi':'bazzi','البزي':'bazzi',
+ qunbul:'qunbul',qumbul:'qunbul','قنبل':'qunbul',
 };
 const readingNameKey=(v?:string)=>v?v.toLowerCase().replace(/['`’\-\s_]/g,'').replace(/[ًٌٍَُِّْ]/g,''):'';
 /* Delivery package id per reading — used only to address the delivery surface (pages/fonts). */
