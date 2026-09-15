@@ -40,8 +40,6 @@ export type ClaimSyncOutcome =
 
 type AdminAuth = {
   setCustomUserClaims(uid: string, claims: Record<string, unknown> | null): Promise<void>;
-  /** يُستعمل للفحص وحده: أرخص عمليةٍ مخوَّلة تُثبت أن للاعتماد صلاحية إدارة الهوية فعلًا. */
-  listUsers(maxResults?: number): Promise<unknown>;
 };
 
 let authPromise: Promise<AdminAuth | null> | null = null;
@@ -74,39 +72,81 @@ function adminAuth(): Promise<AdminAuth | null> {
 /*
  * للتشخيص: هل يستطيع هذا النشر كتابة المطالبات فعلًا؟
  *
- * وجود كائن الإدارة لا يعني الصلاحية. اعتمادٌ افتراضي موجودٌ بحساب خدمةٍ بلا دور
- * «Firebase Authentication Admin» يبني الكائن بلا اعتراض، ثم تفشل كلُّ
- * setCustomUserClaims عند أول نداء. فلو اكتُفي بوجود الكائن لأعلن التشخيص «يستطيع
- * الكتابة» وهو لا يستطيع — وهذا أسوأ من ألا يُعلن شيئًا: يرسل المشغّل إلى زرّ إصلاحٍ
- * لن يعمل، ويُبرّئ النشرَ من علّةٍ فيه.
+ * ثلاثة أخطاءٍ تُرتكب في هذا الفحص، وكلُّها تُخرج جوابًا واثقًا كاذبًا:
  *
- * فيُجرَّب هنا نداءٌ مخوَّل حقيقي وأرخصه — قراءة مستخدم واحد — فالرفض بعدم الصلاحية
- * يقع عنده لا عند أول كتابة. ولا يُقرأ من نتيجته شيءٌ ولا تُسجَّل أي بيانات.
+ * ١) أن يُكتفى ببناء كائن الإدارة. اعتمادٌ بحساب خدمةٍ بلا صلاحية يبني الكائن بلا
+ *    اعتراض ثم تفشل كلُّ كتابة — فيُعلَن «يستطيع» وهو لا يستطيع.
  *
- * والنتيجة تُخزَّن خمس دقائق: نقطة الصحة تُستدعى من كل جهاز في القاعة، ونداءٌ مخوَّل
- * لكل استدعاء ضريبةٌ بلا مقابل — والصلاحية لا تتبدّل في الثانية.
+ * ٢) أن تُجرَّب صلاحيةٌ غير المطلوبة. قراءة المستخدمين وتعديلهم صلاحيتان مختلفتان في
+ *    IAM: اعتمادٌ للقراءة فقط ينجح في القراءة ويفشل في الكتابة، واعتمادٌ للكتابة فقط
+ *    يقع العكس — فيُمنع من تعبئةٍ هو قادر عليها. فتُجرَّب هنا **العملية نفسها**:
+ *    setCustomUserClaims على معرّفٍ محجوزٍ لا وجود له. فإن كانت الصلاحية قائمة عاد
+ *    الجواب «لا مستخدم بهذا المعرّف» — وهو نجاحُ الفحص؛ وإن لم تكن عاد «لا صلاحية».
+ *    ولا يُمسّ حسابٌ حقيقي بحرف.
+ *
+ * ٣) أن يُخزَّن عطلٌ عارض بوصفه سوءَ تهيئة. انقطاع شبكةٍ أو حصّةٌ منفدة ليسا رفضَ
+ *    صلاحية، وتخزينهما «لا يستطيع» خمس دقائق يُخفي زرَّ الإصلاح بعد عودة الشبكة
+ *    ويتّهم نشرًا سليمًا. فلا يُخزَّن إلا الجواب القاطع، ويبقى العارض «غير معلوم».
+ *
+ * والنداء الواحد يُشارَك: أجهزة القاعة تفتح معًا فتستدعي نقطة الصحة في اللحظة نفسها،
+ * فلو لم يُحفظ الوعد الجاري لانطلق فحصٌ مخوَّل لكل طلب — وهو عكس المقصود تمامًا.
  */
-const CLAIMS_PROBE_TTL_MS = 5 * 60_000;
-let claimsProbe: { at: number; writable: boolean } | null = null;
+export type ClaimsWritability = 'WRITABLE' | 'DENIED' | 'NOT_CONFIGURED' | 'UNKNOWN';
 
-export async function claimsWritable(now = Date.now()): Promise<boolean> {
-  if (claimsProbe && now - claimsProbe.at < CLAIMS_PROBE_TTL_MS) return claimsProbe.writable;
+/* معرّف محجوز لا يُنشأ حسابٌ به: الفحص لا يلمس هوية أحد. */
+const PROBE_UID = 'mizan-claims-permission-probe-000000000000';
+const CLAIMS_PROBE_TTL_MS = 5 * 60_000;
+
+let claimsProbe: { at: number; writability: ClaimsWritability } | null = null;
+let claimsProbeInFlight: Promise<ClaimsWritability> | null = null;
+
+/** رسائل «لا صلاحية» كما تردّها المنصّة. ما عداها لا يُحسب رفضًا. */
+const DENIED = /permission|insufficient|unauthorized|forbidden|iam|access.?denied/i;
+/** «لا مستخدم بهذا المعرّف» هو نجاح الفحص: النداء وصل ونُفِّذ وردّ على غيابه. */
+const USER_ABSENT = /user-not-found|no user record|not.?found/i;
+
+async function probeClaimsWritability(): Promise<ClaimsWritability> {
   const auth = await adminAuth();
-  if (!auth) { claimsProbe = { at: now, writable: false }; return false; }
-  let writable = false;
+  if (!auth) return 'NOT_CONFIGURED';
   try {
-    await auth.listUsers(1);
-    writable = true;
+    await auth.setCustomUserClaims(PROBE_UID, {});
+    /* لا يُتوقّع النجاح — لا حساب بهذا المعرّف — لكنه لو وقع فالصلاحية قائمة قطعًا. */
+    return 'WRITABLE';
   } catch (err) {
-    /* الرفض بعدم الصلاحية هو المقصود رصده؛ وأي عطل آخر يُقال كذلك ولا يُحسب قدرةً. */
-    console.error('MIZAN identity claims: permission probe failed:', err instanceof Error ? err.message : err);
+    const message = err instanceof Error ? err.message : String(err || '');
+    const code = String((err as { code?: string })?.code || '');
+    const text = `${code} ${message}`;
+    if (USER_ABSENT.test(text)) return 'WRITABLE';
+    if (DENIED.test(text)) return 'DENIED';
+    /* شبكةٌ أو حصّة أو عطلٌ غير معروف: لا يُتّهم به النشر ولا يُخزَّن. */
+    console.error('MIZAN identity claims: permission probe inconclusive:', message);
+    return 'UNKNOWN';
   }
-  claimsProbe = { at: now, writable };
-  return writable;
+}
+
+export async function claimsWritability(now = Date.now()): Promise<ClaimsWritability> {
+  if (claimsProbe && now - claimsProbe.at < CLAIMS_PROBE_TTL_MS) return claimsProbe.writability;
+  if (claimsProbeInFlight) return claimsProbeInFlight;
+  claimsProbeInFlight = probeClaimsWritability()
+    .then(writability => {
+      /* القاطع وحده يُخزَّن؛ والعارض يُعاد فحصه عند الطلب التالي. */
+      if (writability !== 'UNKNOWN') claimsProbe = { at: Date.now(), writability };
+      return writability;
+    })
+    .finally(() => { claimsProbeInFlight = null; });
+  return claimsProbeInFlight;
+}
+
+/**
+ * جوابٌ ثنائي لمن لا يحتمل الثلاثي. «غير معلوم» يُقرأ هنا قدرةً لا عجزًا عمدًا: منعُ
+ * تعبئةٍ يملكها صاحبها لأن الشبكة تعثّرت لحظةً أسوأ من محاولةٍ تفشل فتُقال بسببها.
+ */
+export async function claimsWritable(now = Date.now()): Promise<boolean> {
+  return (await claimsWritability(now)) !== 'DENIED' && (await claimsWritability(now)) !== 'NOT_CONFIGURED';
 }
 
 /** للاختبار وإعادة الفحص بعد تغيير الاعتماد. */
-export function resetClaimsProbe() { claimsProbe = null; }
+export function resetClaimsProbe() { claimsProbe = null; claimsProbeInFlight = null; }
 
 /**
  * يكتب مطالبات حساب واحد، أو يمسحها حين لا يبقى له تخويل.

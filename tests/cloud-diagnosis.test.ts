@@ -93,14 +93,45 @@ test('no repair is offered while the server cannot write claims at all', () => {
 
   /* وما دام الخادم قادرًا (أو لم يُسأل بعد) يبقى الإصلاح معروضًا. */
   assert.equal(diagnoseCloud({ ...healthy, tokenClaims: {} }).checks.some(x => x.repairable), true);
-  assert.equal(diagnoseCloud({ ...healthy, tokenClaims: {}, serverClaimsWritable: undefined }).checks.some(x => x.repairable), true);
+  assert.equal(diagnoseCloud({ ...healthy, tokenClaims: {}, serverClaimsWritable: undefined }).checks.some(x => x.repairable), true,
+    'an inconclusive probe is not a denial: a repair that might work is still offered');
 });
 
-test('claim writability is proven by an authorized call, not by an object being constructible', () => {
+test('claim writability is proven by exercising the very permission it reports on', () => {
   const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
-  assert.match(claims, /await auth\.listUsers\(1\)/,
-    'credentials without the Firebase Authentication Admin role build an Auth object and then fail every write');
-  assert.match(claims, /CLAIMS_PROBE_TTL_MS/, 'and the probe is cached, so health polling does not bill an admin call per request');
+  /* القراءة والكتابة صلاحيتان مختلفتان في IAM: اعتمادٌ للقراءة فقط ينجح في listUsers ويفشل
+     في كل كتابة. فتُجرَّب العملية نفسها على معرّفٍ محجوز لا وجود له. */
+  assert.doesNotMatch(claims, /listUsers/, 'listing is a different IAM permission from updating');
+  assert.match(claims, /await auth\.setCustomUserClaims\(PROBE_UID, \{\}\)/);
+  assert.match(claims, /const PROBE_UID = 'mizan-claims-permission-probe/,
+    'and it is a reserved id, so no real account is ever touched');
+  assert.match(claims, /USER_ABSENT.test\(text\)\) return 'WRITABLE'/,
+    '“no such user” means the call was authorized and executed — that is the passing case');
+});
+
+test('a transient probe failure is never cached as misconfiguration', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  assert.match(claims, /export type ClaimsWritability = 'WRITABLE' \| 'DENIED' \| 'NOT_CONFIGURED' \| 'UNKNOWN'/,
+    'a network blip is not a permission denial and must not read as one');
+  assert.match(claims, /if \(writability !== 'UNKNOWN'\) claimsProbe =/,
+    'only a definitive answer is cached; an inconclusive one is re-probed next request');
+  /* «غير معلوم» يُقرأ قدرةً: حبس المالك عن تعبئةٍ يملكها لأن الشبكة تعثّرت أسوأ من محاولةٍ تُقال بسببها. */
+  assert.match(claims, /!== 'DENIED' &&.*!== 'NOT_CONFIGURED'/s);
+
+  const server = fs.readFileSync('server.ts', 'utf8');
+  assert.match(server, /claimsState==='UNKNOWN'\?null:claimsState==='WRITABLE'/,
+    'health reports unknown as null rather than flattening it to false');
+  const runtime = fs.readFileSync('src/lib/runtime-capabilities.ts', 'utf8');
+  assert.match(runtime, /typeof x\.identityClaimsWritable==='boolean'\?x\.identityClaimsWritable:undefined/);
+});
+
+test('concurrent health requests share one probe instead of each billing an admin call', () => {
+  const claims = fs.readFileSync('server/firebase-claims.ts', 'utf8');
+  assert.match(claims, /let claimsProbeInFlight: Promise<ClaimsWritability> \| null/);
+  assert.match(claims, /if \(claimsProbeInFlight\) return claimsProbeInFlight;/,
+    'venue devices load together, so the very first burst is exactly when dedupe matters');
+  assert.match(claims, /\.finally\(\(\) => \{ claimsProbeInFlight = null; \}\)/);
+  assert.match(claims, /CLAIMS_PROBE_TTL_MS/);
   assert.match(claims, /export function resetClaimsProbe/);
 });
 
@@ -152,9 +183,8 @@ test('an oversized payload is reported as a size problem with its own owner', ()
 test('the server reports whether it can write claims at all, and the client reads it', () => {
   const server = fs.readFileSync('server.ts', 'utf8');
   assert.match(server, /identityClaimsWritable/, 'health reports the one link no screen could see before');
-  assert.match(server, /await claimsWritable\(\)\.catch\(\(\)=>false\)/, 'and a probe failure never crashes the health endpoint');
-  const runtime = fs.readFileSync('src/lib/runtime-capabilities.ts', 'utf8');
-  assert.match(runtime, /identityClaimsWritable:x\.identityClaimsWritable===true/);
+  assert.match(server, /await claimsWritability\(\)\.catch\(\(\)=>'UNKNOWN' as const\)/,
+    'and a probe failure never crashes the health endpoint, nor reads as a denial');
 });
 
 test('the claim repair keeps the server’s reason instead of collapsing it to false', () => {
