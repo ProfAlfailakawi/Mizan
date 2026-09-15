@@ -7,6 +7,9 @@ export interface MizanRuntimeHealth {
   edgeRelayConfigured:boolean;
   serverQuranSourceVaultConfigured:boolean;
   secureQuestionRuntimeConfigured:boolean;
+  /** هل يستطيع الخادم كتابة مطالبات Firebase؟ بدونها لا يعمل الوضع السحابي لأي حساب. */
+  identityClaimsWritable:boolean;
+  firebaseProjectConfigured:boolean;
   checkedAt:string;
   source:'server'|'unavailable';
 }
@@ -22,6 +25,8 @@ export function normalizeRuntimeHealth(input:unknown):MizanRuntimeHealth{
     edgeRelayConfigured:x.edgeRelayConfigured===true,
     serverQuranSourceVaultConfigured:x.serverQuranSourceVaultConfigured===true,
     secureQuestionRuntimeConfigured:x.secureQuestionRuntimeConfigured===true,
+    identityClaimsWritable:x.identityClaimsWritable===true,
+    firebaseProjectConfigured:x.firebaseProjectConfigured===true,
     checkedAt:new Date().toISOString(),
     source:x.status==='ok'?'server':'unavailable'
   };

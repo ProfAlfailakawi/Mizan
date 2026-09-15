@@ -142,6 +142,7 @@ declare module 'lucide-react' {
  export const Database: any;
  export const AudioLines: any;
  export const CircleHelp: any;
+ export const CloudRain: any;
  export const Ticket: any;
  export const Scissors: any;
  export const UserCheck: any;
