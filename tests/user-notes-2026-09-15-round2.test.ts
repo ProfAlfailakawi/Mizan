@@ -310,3 +310,23 @@ test('a delivery-Mushaf draw is recorded as what it is', () => {
   assert.match(store, /حزمة أسئلة \$\{participant\.code\} من مصحف التسليم الرسمي/);
   assert.match(store, /difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'\?`QG:\$\{source!\.packageHash\}`:'DELIVERY_MUSHAF'/);
 });
+
+test('a repeated query parameter is refused, not quietly reinterpreted', () => {
+  /*
+   * `?surah=1&surah=2` يجعل Express يسلّم مصفوفةً حيث يتوقّع القارئ نصًّا. أكثر المواضع
+   * تنجو بالمصادفة — `Number(['1','2'])` يعطي NaN فيُرفض — والنجاة بالمصادفة ليست حراسة.
+   */
+  const server = read('server.ts');
+  assert.match(server, /const soleParam=\(value:unknown,name:string\):string=>\{/);
+  assert.match(server, /if\(Array\.isArray\(value\)\)throw new Error\(`QUERY_PARAM_REPEATED:\$\{name\}`\);/,
+    'a repeated parameter is refused outright — taking the first silently hides which one was used');
+
+  /* والمسارَان اللذان يغذّيان محرّك التتبّع يمرّان به، لا الجديد وحده. */
+  for (const param of ['reading', 'surah', 'startAyah', 'endAyah', 'sourcePackageId']) {
+    const uses = server.split(`soleParam(req.query.${param},'${param}')`).length - 1;
+    assert.equal(uses, 2, `${param} is normalised on both the practice and the judging route`);
+  }
+  assert.doesNotMatch(server, /surah:req\.query\.surah/, 'no raw query value reaches the service any more');
+  assert.match(server, /const bytes:Buffer=Buffer\.isBuffer\(req\.body\)\?req\.body:Buffer\.alloc\(0\);/,
+    'and the audio body is a definite Buffer before it is measured');
+});
