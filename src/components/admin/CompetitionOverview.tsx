@@ -369,10 +369,26 @@ const JudgingSection=({store,ar,policy,patch}:{store:Store;ar:boolean;policy:Com
    {judgingTabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={judgingTab===t.id} onClick={()=>setJudgingTab(t.id)} className={`mizan-tab ${judgingTab===t.id?'is-active':''}`}>{t.label}</button>)}
   </div>
   {judgingTab==='rubric'&&<div className="space-y-5">
+   {/*
+     * لا يوجد في ميزان «رفع تجميد».
+     *
+     * التجميد يقع تلقائيًا لحظة بدء أول جلسة تحكيم، ولا مسار في النظام كلِّه يرفعه —
+     * وهذا مقصود: مسطرةٌ تُعدَّل بعد أن حُكم بها تُبطل ما قبلها. والمخرج الوحيد إصدارٌ
+     * جديد مستقل. فيُقال ذلك بعينه، لا يُحال المسؤول إلى شاشةٍ لا تملك ما أُرسل إليها.
+     */}
    {(frozenAt||ruleSetBlocked)&&<div role="status" className="rounded-2xl border border-[#e6d9c2] bg-[#FBF7F0] px-4 py-3 text-[11px] font-bold leading-6 text-[#7a5a2f]">
     {ar
-     ?'لائحة هذه المسابقة مجمَّدة، فلا تُضاف معايير ولا تُعدَّل درجاتها — وهذا مقصود: الدرجة التي حُكم بها لا تتغير بعد أن تبدأ المسابقة. لرفع التجميد راجع «الجاهزية والإطلاق» أو أنشئ نسخة لائحة جديدة.'
-     :'This competition’s rulebook is frozen, so criteria cannot be added or rescored — deliberately: a rubric must not move once judging has begun. Unfreeze it from Readiness & launch, or create a new rulebook revision.'}
+     ?'لائحة هذه المسابقة مجمَّدة منذ أول جلسة تحكيم، فلا تُضاف معايير ولا تُعدَّل درجاتها — وهذا مقصود: المسطرة التي حُكم بها لا تتغيّر بعد أن يُقاس عليها أحد. ولا يوجد رفع تجميد؛ ولا يكفي حذف المعايير أو إفراغ اللائحة لأن القفل على المسابقة نفسها لا على محتواها. المخرج الوحيد إصدارٌ جديد مستقل: «أدوات الإدارة ← إصدار جديد من المسابقة».'
+     :'This rulebook froze when the first judging session began, so criteria cannot be added or rescored — deliberately: a rubric must not move once someone has been measured against it. There is no unfreeze, and emptying the rulebook does not help because the lock sits on the competition, not on its contents. The only way forward is a separate new edition: Admin tools → New competition from these settings.'}
+   </div>}
+   {/*
+     * لائحةٌ بلا معايير لا يُحكَّم بها: المحكّم يجلس أمام سطحٍ لا درجة فيه. بوابة الجاهزية
+     * تمنع التشغيل، لكن المنع هناك يُكتشف متأخرًا — فيُقال هنا حيث تُحرَّر اللائحة.
+     */}
+   {!frozenAt&&!r.criteria.length&&<div role="alert" className="rounded-2xl border border-[#e0c6c1] bg-[#F9F0EE] px-4 py-3 text-[11px] font-bold leading-6 text-[#8a3f34]">
+    {ar
+     ?'لا توجد معايير في هذه اللائحة، فلا شيء يُحتسب للمتسابق ولا يرى المحكّم درجةً يضعها. أضف معيارًا واحدًا على الأقل بزرّ «+ معيار» قبل أي جلسة.'
+     :'This rulebook has no criteria, so nothing can be scored and a judge sees no field to fill. Add at least one with “+ Criterion” before any session.'}
    </div>}
    <div className="rounded-2xl border border-[#dfddd6] overflow-hidden">
     <div className="px-4 py-3 bg-[#f7f5ef] flex items-center justify-between gap-3">

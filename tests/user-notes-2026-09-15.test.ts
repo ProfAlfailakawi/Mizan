@@ -82,9 +82,26 @@ test('a frozen rulebook refuses criterion edits out loud instead of swallowing t
     'the screen knows whether the rulebook is frozen');
   assert.match(overview, /setRuleSetBlocked\(!ok\)/,
     'and reads the answer updateRuleSet already returns instead of discarding it');
-  assert.match(overview, /لائحة هذه المسابقة مجمَّدة/, 'the reason is stated, with the way to lift it');
+  assert.match(overview, /لائحة هذه المسابقة مجمَّدة/, 'the reason is stated');
+  /* لا يوجد في ميزان رفع تجميد إطلاقًا: التجميد يقع عند أول جلسة، ولا مسار يرفعه. فإحالة
+     المسؤول إلى شاشةٍ لا تملك ما أُرسل إليها أسوأ من الصمت — يجرّبها فتضيع ثقته بالرسالة كلها. */
+  assert.doesNotMatch(overview, /راجع «الجاهزية والإطلاق»/,
+    'no screen offers an unfreeze, so none may be named as if it did');
+  assert.match(overview, /ولا يوجد رفع تجميد/);
+  assert.match(overview, /ولا يكفي حذف المعايير أو إفراغ اللائحة لأن القفل على المسابقة نفسها/,
+    'emptying the rulebook is the obvious thing to try, and it does not work — so it is answered before it is tried');
+  assert.match(overview, /أدوات الإدارة ← إصدار جديد من المسابقة/, 'and the one real way forward is named exactly');
   assert.match(overview, /disabled=\{!!frozenAt\} onClick=\{addCriterion\}/,
     'and the add button is visibly disabled rather than dead');
+});
+
+test('an empty rulebook is called out where it is edited, not only at the readiness gate', () => {
+  const overview = read('src/components/admin/CompetitionOverview.tsx');
+  /* لائحة بلا معايير: المحكّم يجلس أمام سطحٍ لا درجة فيه. البوابة تمنع التشغيل، لكن متأخرًا. */
+  assert.match(overview, /!frozenAt&&!r\.criteria\.length&&/);
+  assert.match(overview, /لا توجد معايير في هذه اللائحة/);
+  const readiness = read('src/lib/readiness.ts');
+  assert.match(readiness, /c\.ruleSet\.criteria\.length>0/, 'and the launch gate still blocks it independently');
 });
 
 /* ── ٩ — ترتيب الأسئلة تصاعدي حسب المصحف ──────────────────────────────── */
