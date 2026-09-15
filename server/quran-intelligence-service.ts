@@ -67,7 +67,16 @@ export class QuranIntelligenceService{
     const id=readingId(input.reading),def=quranReadingDefinition(id)!;if(input.sourcePackageId!==def.packageId)throw new Error('QURAN_ALIGNMENT_SOURCE_READING_MISMATCH');
     const benchmarkReport=this.benchmarks.load(id),benchmark=this.benchmarks.status(id);if(!benchmarkReport||!benchmark.passed)throw new Error('QURAN_ALIGNMENT_BENCHMARK_NOT_APPROVED');
     const surah=boundedInt(input.surah,1,114,'QURAN_SURAH_INVALID'),startAyah=boundedInt(input.startAyah,1,1000,'QURAN_AYAH_INVALID'),endAyah=boundedInt(input.endAyah,startAyah,1000,'QURAN_AYAH_INVALID');const passage=this.quran.resolvePassage({packageId:def.packageId,surah,startAyah,endAyah});
-    if(!input.bytes.length||input.bytes.length>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+    /*
+     * الخدمة تتحقّق من حمولتها بنفسها.
+     *
+     * يناديها مساران، والنوع المكتوب يزول عند التشغيل — فاشتراطُ `Buffer` في التوقيع لا
+     * يمنع ناديًا ثالثًا من تمرير ما ليس كذلك، ولا يمنع قياسَ `length` على نصٍّ أو مصفوفة
+     * فيبدو الفحص ناجحًا وهو يقيس شيئًا آخر. فيُفحص النوع هنا، عند الاستعمال.
+     */
+    if(!Buffer.isBuffer(input.bytes))throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+    const chunkSize=input.bytes.length;
+    if(!chunkSize||chunkSize>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
     const backend=new URL(this.alignmentBackend.url);backend.searchParams.set('reading',id);backend.searchParams.set('surah',String(surah));backend.searchParams.set('startAyah',String(startAyah));backend.searchParams.set('endAyah',String(endAyah));
     const headers:Record<string,string>={'content-type':input.contentType||'application/octet-stream','x-mizan-mode':'shadow','x-mizan-source-package':def.packageId,'x-mizan-source-hash':passage.package.packageHash};if(this.alignmentBackend.bearerToken)headers.authorization=`Bearer ${this.alignmentBackend.bearerToken}`;
     const response=await fetch(backend,{method:'POST',headers,body:new Uint8Array(input.bytes)});if(!response.ok)throw new Error(`QURAN_ALIGNMENT_BACKEND_HTTP_${response.status}`);const raw=await response.json() as any;

@@ -326,6 +326,25 @@ async function startServer() {
    *      مخوَّلٌ واحد — أو نصٌّ آلي معطوب بجلسته — يستنزف المحرّك وحده. والسقف من
    *      الاستعمال المشروع: مقطعٌ كل ثانيتين، فستّون في الدقيقتين تكفي قراءةً متصلة.
    */
+  /*
+   * ومسار المحكّم مثله: نفس الحمولة، ونفس نداء المحرّك، ونفس الكلفة لكل طلب.
+   *
+   * كان بلا حدّ منذ كُتب، ولم يظهر حتى لمس هذا التغيير سطره. وسقفه أوسع لأن قاعةً فيها
+   * عدّة لجان تقرأ معًا، وكلُّ لجنة ترسل مقطعًا كل ثانية ونصف.
+   */
+  const alignmentAudioIpRateLimit:RequestHandler=rateLimit({
+    windowMs:120_000,
+    limit:Number(process.env.MIZAN_ALIGNMENT_AUDIO_IP_RATE_LIMIT_MAX||1200),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    message:{code:'RATE_LIMITED'},
+  });
+  const alignmentAudioRateLimit:RequestHandler=rateLimit({
+    windowMs:120_000,
+    limit:Number(process.env.MIZAN_ALIGNMENT_AUDIO_RATE_LIMIT_MAX||120),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
+    message:{code:'RATE_LIMITED'},
+  });
   const practiceAlignmentIpRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
     limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_IP_RATE_LIMIT_MAX||600),
@@ -1502,7 +1521,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   app.post('/api/enterprise/quran/intelligence/waqf/derive/:reading',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({derived:true,...quranIntelligence.deriveOfficialWaqf(String(req.params.reading))})}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/enterprise/quran/intelligence/tajweed',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({registered:true,summary:quranIntelligence.registerTajweed(req.body)})}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/enterprise/quran/alignment/benchmark',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({registered:true,result:quranIntelligence.registerBenchmark(req.body)})}catch(err){return quranIntelligenceFailure(res,err)}});
-  app.post('/api/quran/alignment/shadow/audio',requireGovernanceRoles(['judge','head_judge',]),express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:actor.uid,sessionId:soleParam(req.query.sessionId,'sessionId'),reading:soleParam(req.query.reading,'reading'),surah:soleParam(req.query.surah,'surah'),startAyah:soleParam(req.query.startAyah,'startAyah'),endAyah:soleParam(req.query.endAyah,'endAyah'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return quranIntelligenceFailure(res,err)}});
+  app.post('/api/quran/alignment/shadow/audio',alignmentAudioIpRateLimit,requireGovernanceRoles(['judge','head_judge',]),alignmentAudioRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:actor.uid,sessionId:soleParam(req.query.sessionId,'sessionId'),reading:soleParam(req.query.reading,'reading'),surah:soleParam(req.query.surah,'surah'),startAyah:soleParam(req.query.startAyah,'startAyah'),endAyah:soleParam(req.query.endAyah,'endAyah'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return quranIntelligenceFailure(res,err)}});
   /*
    * تدريب المتسابق قبل دوره.
    *

@@ -330,3 +330,23 @@ test('a repeated query parameter is refused, not quietly reinterpreted', () => {
   assert.match(server, /const bytes:Buffer=Buffer\.isBuffer\(req\.body\)\?req\.body:Buffer\.alloc\(0\);/,
     'and the audio body is a definite Buffer before it is measured');
 });
+
+test('both routes into the alignment engine are rate-limited, not just the new one', () => {
+  /*
+   * مسار المحكّم يحمل نفس الحمولة وينادي المحرّك نفسه، وكان بلا حدّ منذ كُتب. لم يظهر
+   * حتى لمس هذا التغيير سطره — ومعالجةُ الجديد وتركُ القديم تُبقي الباب نفسه مفتوحًا.
+   */
+  const server = read('server.ts');
+  assert.match(server, /'\/api\/quran\/alignment\/shadow\/audio',alignmentAudioIpRateLimit,requireGovernanceRoles\(\['judge','head_judge',\]\),alignmentAudioRateLimit/);
+  assert.match(server, /const alignmentAudioIpRateLimit:RequestHandler=rateLimit\(\{/);
+  assert.match(server, /const alignmentAudioRateLimit:RequestHandler=rateLimit\(\{/);
+});
+
+test('the alignment service checks its own payload rather than trusting its callers', () => {
+  /* التوقيع يزول عند التشغيل، فقياس `length` على نصٍّ أو مصفوفة يبدو فحصًا ناجحًا وهو ليس. */
+  const service = read('server/quran-intelligence-service.ts');
+  assert.match(service, /if\(!Buffer\.isBuffer\(input\.bytes\)\)throw new Error\('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID'\);/);
+  assert.match(service, /const chunkSize=input\.bytes\.length;/);
+  assert.doesNotMatch(service, /if\(!input\.bytes\.length\|\|input\.bytes\.length>2_000_000\)/,
+    'the unguarded double read of .length is gone');
+});
