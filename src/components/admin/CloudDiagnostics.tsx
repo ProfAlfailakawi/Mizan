@@ -48,10 +48,19 @@ export const CloudDiagnostics: React.FC = () => {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  /*
+   * مفاتيح البناء تُقرأ من البيئة نفسها لا تُفترض.
+   *
+   * وجود كائن المصادقة يُثبت المفتاح وحده — `firebase.ts` يرفض غيابه ويسكت عن غياب معرّف
+   * المشروع — فبناءٌ بمفتاحٍ بلا معرّف يُقلع سليمًا ظاهريًا ولا يكتب شيئًا. ولو كُتب هنا
+   * «مهيَّأ» ثابتًا لأخفى الفحصُ الحالةَ التي وُجد ليكشفها.
+   */
+  const env = import.meta.env as Record<string, string | undefined>;
+  const clientProjectId = env.VITE_FIREBASE_PROJECT_ID;
+
   const result = diagnoseCloud({
-    /* مفاتيح البناء: وجود كائن المصادقة يعني أن التطبيق أُقلع بمفتاح صالح — ولولاه لتوقّف عند الاستيراد. */
-    clientConfigured: true,
-    clientProjectId: (import.meta.env as Record<string, string | undefined>).VITE_FIREBASE_PROJECT_ID,
+    clientConfigured: !!env.VITE_FIREBASE_API_KEY,
+    clientProjectId,
     offlineMode: store.isOffline,
     browserOnline: typeof navigator === 'undefined' ? undefined : navigator.onLine,
     signedIn: cloudSignedIn(),

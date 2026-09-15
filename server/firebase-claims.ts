@@ -38,7 +38,11 @@ export type ClaimSyncOutcome =
   | { status: 'NOT_CONFIGURED' }
   | { status: 'FAILED'; reason: string };
 
-type AdminAuth = { setCustomUserClaims(uid: string, claims: Record<string, unknown> | null): Promise<void> };
+type AdminAuth = {
+  setCustomUserClaims(uid: string, claims: Record<string, unknown> | null): Promise<void>;
+  /** يُستعمل للفحص وحده: أرخص عمليةٍ مخوَّلة تُثبت أن للاعتماد صلاحية إدارة الهوية فعلًا. */
+  listUsers(maxResults?: number): Promise<unknown>;
+};
 
 let authPromise: Promise<AdminAuth | null> | null = null;
 
@@ -67,10 +71,42 @@ function adminAuth(): Promise<AdminAuth | null> {
   return authPromise;
 }
 
-/** للتشخيص: هل يستطيع هذا النشر كتابة المطالبات أصلًا؟ */
-export async function claimsWritable(): Promise<boolean> {
-  return !!(await adminAuth());
+/*
+ * للتشخيص: هل يستطيع هذا النشر كتابة المطالبات فعلًا؟
+ *
+ * وجود كائن الإدارة لا يعني الصلاحية. اعتمادٌ افتراضي موجودٌ بحساب خدمةٍ بلا دور
+ * «Firebase Authentication Admin» يبني الكائن بلا اعتراض، ثم تفشل كلُّ
+ * setCustomUserClaims عند أول نداء. فلو اكتُفي بوجود الكائن لأعلن التشخيص «يستطيع
+ * الكتابة» وهو لا يستطيع — وهذا أسوأ من ألا يُعلن شيئًا: يرسل المشغّل إلى زرّ إصلاحٍ
+ * لن يعمل، ويُبرّئ النشرَ من علّةٍ فيه.
+ *
+ * فيُجرَّب هنا نداءٌ مخوَّل حقيقي وأرخصه — قراءة مستخدم واحد — فالرفض بعدم الصلاحية
+ * يقع عنده لا عند أول كتابة. ولا يُقرأ من نتيجته شيءٌ ولا تُسجَّل أي بيانات.
+ *
+ * والنتيجة تُخزَّن خمس دقائق: نقطة الصحة تُستدعى من كل جهاز في القاعة، ونداءٌ مخوَّل
+ * لكل استدعاء ضريبةٌ بلا مقابل — والصلاحية لا تتبدّل في الثانية.
+ */
+const CLAIMS_PROBE_TTL_MS = 5 * 60_000;
+let claimsProbe: { at: number; writable: boolean } | null = null;
+
+export async function claimsWritable(now = Date.now()): Promise<boolean> {
+  if (claimsProbe && now - claimsProbe.at < CLAIMS_PROBE_TTL_MS) return claimsProbe.writable;
+  const auth = await adminAuth();
+  if (!auth) { claimsProbe = { at: now, writable: false }; return false; }
+  let writable = false;
+  try {
+    await auth.listUsers(1);
+    writable = true;
+  } catch (err) {
+    /* الرفض بعدم الصلاحية هو المقصود رصده؛ وأي عطل آخر يُقال كذلك ولا يُحسب قدرةً. */
+    console.error('MIZAN identity claims: permission probe failed:', err instanceof Error ? err.message : err);
+  }
+  claimsProbe = { at: now, writable };
+  return writable;
 }
+
+/** للاختبار وإعادة الفحص بعد تغيير الاعتماد. */
+export function resetClaimsProbe() { claimsProbe = null; }
 
 /**
  * يكتب مطالبات حساب واحد، أو يمسحها حين لا يبقى له تخويل.
