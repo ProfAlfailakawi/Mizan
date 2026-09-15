@@ -1,3 +1,11 @@
+    /*
+     * لا تجميد.
+     *
+     * كانت اللائحة تُقفل تلقائيًا عند أول جلسة ولا تُفتح أبدًا، فجلسةُ تجربةٍ واحدة تحبس
+     * الجهة عن تعديل معاييرها إلى الأبد. والجهة صاحبةُ معاييرها: تضبطها متى شاءت، وأثرُ
+     * كل تعديل محفوظ في نسخة المعايير وفي سجلّ التدقيق — وهو ما يُحتجّ به عند المراجعة،
+     * لا قفلٌ يمنع التصحيح.
+     */
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
 import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
@@ -11,7 +19,7 @@ import { planDistribution, verifyDistributionPlan, type DistributionPlan } from 
 import { accruedWaitMinutes, equityWarranted, recommendFairPosition, type EquityRecommendation } from './queue-equity';
 import { tempoMinutesByCommittee, type QueueWaitSample, type SessionTempoSample } from './session-tempo';
 import { buildDayRetrospective, type DayRetrospective } from './day-retrospective';
-import { chooseSessionCommittee, freezeRulesOnce, estimateQueueWait } from './session-start-core';
+import { chooseSessionCommittee, estimateQueueWait } from './session-start-core';
 import { PendingRegister, decideUpload, configWriteAllowed, mergeRowsFromCloud, mergeRankedFromCloud, sameScope, type PendingScope } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
 import {
@@ -2124,7 +2132,6 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
 
   const updateCompetitionPolicy = (updater: (policy: ReturnType<typeof getCompetitionPolicy>) => ReturnType<typeof getCompetitionPolicy>) => {
     const current = getCompetitionPolicy(globalState.competition);
-    if (current.frozenAt) return false;
     const next = updater(JSON.parse(JSON.stringify(current)));
     next.version = current.version === next.version ? `${current.version.split('.')[0]}.${Number(current.version.split('.')[1] || 0) + 1}.0` : next.version;
     next.updatedAt = new Date().toISOString();
@@ -2133,78 +2140,12 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     return true;
   };
 
-  const updateRuleSet = (patch: Partial<Competition['ruleSet']>, opts?: { allowWhenFrozen?: boolean }) => {
-    // Panel capacity (judges per panel) is an operational setting, not a scoring rule, so it can be
-    // tuned even after the rulebook is frozen. Everything else stays locked once the event is live.
-    const frozen = globalState.competition.ruleSet.frozenAt || getCompetitionPolicy(globalState.competition).frozenAt;
-    if (frozen && !opts?.allowWhenFrozen) return false;
-    const version = frozen && opts?.allowWhenFrozen
-      ? globalState.competition.ruleSet.version
-      : `${globalState.competition.ruleSet.version}-rev`;
-    const next = { ...globalState.competition.ruleSet, ...patch, version };
+  const updateRuleSet = (patch: Partial<Competition['ruleSet']>, _opts?: { allowWhenFrozen?: boolean }) => {
+    /* معايير التحكيم تُعدَّل متى شاءت الجهة. النسخة تُرفع عند كل تعديل فيبقى الأثر مقروءًا. */
+    const next = { ...globalState.competition.ruleSet, ...patch, version: `${globalState.competition.ruleSet.version}-rev`, frozenAt: undefined };
     globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, ...(globalState.competition.ruleSets || []).filter(r => r.id !== next.id)] };
     markCompetitionConfigChanged(); notify();
     return true;
-  };
-
-  /*
-   * فكّ تجميد اللائحة — قبل أن يُقاس بها أحدٌ قياسًا رسميًا، لا بعده.
-   *
-   * التجميد يقع تلقائيًا عند أول جلسة تحكيم، ولم يكن له فكٌّ إطلاقًا. والنيّة صحيحة —
-   * مسطرةٌ تُعدَّل بعد أن حُكم بها تُبطل ما قبلها — لكنها كانت تُطبَّق على لحظةٍ خاطئة:
-   * جلسةُ تجربةٍ واحدة في مسابقةٍ مسودّة تقفل اللائحة إلى الأبد، فيجد المسؤول نفسه بعد
-   * أول اختبارٍ للنظام عاجزًا عن إضافة معيار، بلا سببٍ معلن ولا مخرج.
-   *
-   * فالحدّ الصحيح ليس «هل جرت جلسة؟» بل «هل قِيس أحدٌ قياسًا رسميًا؟» — والقياس الرسمي
-   * أثرُه خارج النظام: نتيجةٌ مختومة أو منشورة، أو شهادةٌ صدرت. فما دام لم يقع شيءٌ من
-   * ذلك فلا مقياسَ يُبطَل بالتعديل، ويبقى المنع بعده كما كان: قاطعًا لا يُفكّ.
-   *
-   * وما حُسب من نتائج على اللائحة القديمة يُطرح صراحةً: درجةٌ قيست بمسطرةٍ لم تعد قائمة
-   * لا معنى لها، وإبقاؤها يخلط مقياسين في جدول واحد. والعدد يُقال في السجل لا يُبتلع.
-   */
-  const ruleSetUnfreezeBlockers = () => {
-    const scoped = globalState.results.filter(r => r.competitionId === globalState.competition.id);
-    return {
-      sealedResults: scoped.filter(r => r.status === 'sealed' || r.status === 'published').length,
-      certificates: globalState.certificates.filter(c => c.competitionId === globalState.competition.id).length,
-      discardableResults: scoped.filter(r => r.status !== 'sealed' && r.status !== 'published').length,
-    };
-  };
-
-  const canUnfreezeRuleSet = () => {
-    const blockers = ruleSetUnfreezeBlockers();
-    return blockers.sealedResults === 0 && blockers.certificates === 0;
-  };
-
-  const unfreezeRuleSet = (reason: string) => {
-    if (!['super_admin', 'org_admin', 'comp_admin'].includes(globalState.currentUser.role)) return { ok: false, reason: 'FORBIDDEN' as const };
-    const justification = String(reason || '').trim();
-    if (justification.length < 5) return { ok: false, reason: 'REASON_REQUIRED' as const };
-    const blockers = ruleSetUnfreezeBlockers();
-    if (blockers.sealedResults > 0 || blockers.certificates > 0) {
-      recordInvariantBlock('rule_set_immutable_after_official_measurement', 'unfreezeRuleSet', 'RuleSet', globalState.competition.ruleSet.id,
-        `نتائج مختومة: ${blockers.sealedResults}، شهادات: ${blockers.certificates}`,
-        { sealedResults: blockers.sealedResults, certificates: blockers.certificates });
-      return { ok: false, reason: 'OFFICIAL_RESULTS_EXIST' as const, ...blockers };
-    }
-    const now = new Date().toISOString();
-    const rule = { ...globalState.competition.ruleSet, frozenAt: undefined, version: `${globalState.competition.ruleSet.version}-unfrozen` };
-    const policy = { ...getCompetitionPolicy(globalState.competition), frozenAt: undefined, updatedAt: now };
-    globalState.competition = {
-      ...globalState.competition,
-      ruleSet: rule,
-      ruleSets: [rule, ...(globalState.competition.ruleSets || []).filter(r => r.id !== rule.id)],
-      policy,
-      readinessChecklist: { ...globalState.competition.readinessChecklist, ruleSetFrozen: false },
-    };
-    /* نتائج التجربة تُطرح: قيست بمسطرةٍ لم تعد قائمة. */
-    const discarded = blockers.discardableResults;
-    globalState.results = globalState.results.filter(r => r.competitionId !== globalState.competition.id);
-    auditTrustAction('RULE_SET_UNFROZEN', 'RuleSet', rule.id,
-      `فُكّ تجميد اللائحة قبل أي قياس رسمي (لا نتائج مختومة ولا شهادات). طُرحت ${discarded} نتيجة تجربة حُسبت على اللائحة السابقة. السبب: ${justification}`,
-      `Rulebook unfrozen before any official measurement (no sealed results, no certificates). ${discarded} trial results computed on the previous rubric were discarded. Reason: ${justification}`);
-    markCompetitionConfigChanged(); notify();
-    return { ok: true as const, discardedResults: discarded };
   };
 
   const getCompetitionReadiness = () => getReadinessIssues(globalState.competition);
@@ -2634,24 +2575,13 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     const committee = choice.committee;
     const policy = getCompetitionPolicy(globalState.competition);
     /*
-     * التجميد يقع حين تبدأ الجلسة فعلًا، لا حين يُحاول بدؤها.
+     * لا تجميد.
      *
-     * كان يُطبَّق هنا — قبل سبعة مخارج ترفض البدء: قدرات الأسئلة الخادمية، ولجنةٌ لا
-     * تطابق التهيئة، وروايةٌ لا تطابقها، ونطاقٌ بلا اعتماد، ومصدرٌ غير معتمد… فمحاولةٌ
-     * فاشلة لم تُنشئ جلسةً قط كانت تقفل اللائحة إلى الأبد.
-     *
-     * والقفل يُبرَّر بأن أحدًا قِيس بالمسطرة؛ ومن رُفض بدء جلسته لم يُقَس بشيء. فيُؤجَّل
-     * إلى نقطة النجاح نفسها: حيث تُسنَد `activeSession` ويُعاد `true`.
+     * كانت اللائحة تُقفل تلقائيًا عند أول جلسة ولا تُفتح أبدًا، فجلسةُ تجربةٍ واحدة تحبس
+     * الجهة عن تعديل معاييرها إلى الأبد. والجهة صاحبةُ معاييرها: تضبطها متى شاءت، وأثرُ
+     * كل تعديل محفوظ في نسخة المعايير وفي سجلّ التدقيق — وهو ما يُحتجّ به عند المراجعة،
+     * لا قفلٌ يمنع التصحيح.
      */
-    const commitRuleFreeze = () => {
-      const frozen = freezeRulesOnce({
-        policy: getCompetitionPolicy(globalState.competition),
-        ruleSet: globalState.competition.ruleSet,
-        ruleSets: globalState.competition.ruleSets,
-        now: new Date().toISOString(),
-      });
-      if (frozen) globalState.competition = { ...globalState.competition, policy: frozen.policy, ruleSet: frozen.ruleSet, ruleSets: frozen.ruleSets };
-    };
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const reading=resolveReading({riwaya:participant.riwaya});
     if(productionMode){
@@ -2667,7 +2597,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
         const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx>=0){const inSession={...globalState.participants[idx],status:'in_session' as const,statusHistory:[...(globalState.participants[idx].statusHistory||[]),{status:'in_session' as const,timestamp:new Date().toISOString(),actor:'Judging session'}]};globalState.participants[idx]=inSession;syncParticipantLifecycle(inSession);}
         globalState.committees=globalState.committees.map(c=>c.id===committee.id?{...c,status:'testing',currentParticipantId:participantId}:c);refreshQueueNotifications();
         auditTrustAction('SERVER_QUESTION_RUNTIME_ATTACHED','JudgingSession',runtime.sessionId,'ربط جلسة التحكيم بحزمة أسئلة خادمية؛ لم ينفذ FairDraw أو حل النص القرآني داخل جهاز المحكم','Attached JudgeOS to server-held question runtime; FairDraw and Quran plaintext resolution did not run on the judge device');
-        commitRuleFreeze();void createContinuityCheckpoint('server-session-start');notify();return true;
+        void createContinuityCheckpoint('server-session-start');notify();return true;
       }catch(error){createIncident('quran_source_discrepancy','Secure question provisioning missing',`Official session blocked for ${participant.code}: ${error instanceof Error?error.message:'secure runtime unavailable'}.`,'critical');return false;}
     }
     /*
@@ -2816,7 +2746,6 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       refreshQueueNotifications();
       globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'FAIRDRAW_COMMITTED', entityType:'QuestionSelection', entityId:selection.questionSetId, humanSummaryArabic:sourceMode==='CERTIFIED_SOURCE'?`اعتماد حزمة أسئلة ${participant.code} من مصدر قرآني معتمد محدد النسخة`:`حزمة تطوير ${participant.code} — ليست مصدرًا قرآنيًا رسميًا`, humanSummaryEnglish:sourceMode==='CERTIFIED_SOURCE'?`Committed ${participant.code} question set from exact certified Quran source package`:`Development-only question fixture for ${participant.code}; not an official Quran source`, currentStateHash:selection.seedCommitmentHash }, ...globalState.auditLogs];
       void createContinuityCheckpoint('session-start');
-      commitRuleFreeze();
       notify(); return true;
     } catch (error) {
       console.error('FairDraw could not create an eligible set', error); return false;
@@ -3754,7 +3683,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     resolveAppeal,
     applyTemplate,
     updateCompetitionPolicy,
-    updateRuleSet, unfreezeRuleSet, canUnfreezeRuleSet, ruleSetUnfreezeBlockers,
+    updateRuleSet,
     getCompetitionReadiness,
     updateCompetitionDetails,
     addCategory,

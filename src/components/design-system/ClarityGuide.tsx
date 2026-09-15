@@ -29,7 +29,7 @@ const ROLE_GUIDE:Partial<Record<Role,{titleAr:string;titleEn:string;steps:Step[]
   {titleAr:'انقل بدون ظلم',titleEn:'Transfer fairly',noteAr:'يمكن نقل صف كامل أو متسابق واحد مع حفظ أسبقيته الأصلية أو إرساله لآخر الصف.',noteEn:'Move a whole queue or one participant while preserving original priority or placing them last.'},
   {titleAr:'كل نقل مدقق',titleEn:'Every move audited',noteAr:'السبب والمنفذ وترتيب ما قبل/بعد النقل محفوظ.',noteEn:'Reason, actor, and before/after ordering are recorded.'},
  ]},
- comp_admin:{titleAr:'من اللائحة إلى يوم المسابقة',titleEn:'From policy to event day',steps:[
+ comp_admin:{titleAr:'من المعايير إلى يوم المسابقة',titleEn:'From policy to event day',steps:[
   {titleAr:'اضبط السياسة',titleEn:'Set the policy',noteAr:'الفئات، السحب، التحكيم، النتائج، الخصوصية، والصوت.',noteEn:'Categories, draw, judging, results, privacy, and audio.'},
   {titleAr:'شغّل الجاهزية',titleEn:'Run readiness',noteAr:'المانع الأحمر يجب إصلاحه؛ التحذير يحتاج قرارًا واعيًا.',noteEn:'Red blockers must be fixed; warnings require an informed decision.'},
   {titleAr:'شغّل البروفة',titleEn:'Run rehearsal',noteAr:'سجلات البروفة منفصلة ولا تلوث النتائج الرسمية.',noteEn:'Rehearsal records stay isolated from official results.'},

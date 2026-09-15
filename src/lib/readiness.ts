@@ -23,7 +23,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
  const strictQuestionReveal=p.questions.secureReveal?.requireParticipantPresence!==false;
  const serverEscrowReady=!strictQuestionReveal||questionEscrowAssurance==='production_server_escrow';
  const checks:PreflightCheck[]=[
-  check('policy',!!p.version,false,'لائحة المسابقة','Competition policy','لا يمكن تشغيل مسابقة بلا نسخة قواعد محددة.','A competition cannot run without a defined policy version.','competition_dna'),
+  check('policy',!!p.version,false,'سياسة المسابقة','Competition policy','لا يمكن تشغيل مسابقة بلا نسخة قواعد محددة.','A competition cannot run without a defined policy version.','competition_dna'),
   check('registration',p.registration.fields.some(f=>f.visible&&f.required),!live,'التسجيل','Registration','قد تصل طلبات ناقصة أو غير قابلة للتحقق.','Registrations may arrive without required verifiable data.','competition_dna'),
   check('categories',c.categories.length>0,false,'الفئات','Categories','لا يمكن توجيه أو تحكيم المشاركين.','Participants cannot be routed or judged.','competition_dna'),
   check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','لا يوجد لهذه الفئة مصدر قرآني رسمي أو مصدر داخلي معتمد مطابق للرواية.','No official or internally certified Quran source matches this category reading.','scientific'),
@@ -44,7 +44,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
   check('privacy',p.privacy.audioRetentionDays>0&&p.privacy.documentRetentionDays>0,false,'الخصوصية والاحتفاظ','Privacy & retention','الاحتفاظ بالبيانات غير محدد.','Data retention is undefined.','competition_dna'),
   check('backup',backups.some(b=>b.competitionId===c.id&&b.status==='ready'),!live,'النسخ الاحتياطي','Backup','لا توجد نقطة استعادة موثقة لهذه المسابقة.','No verified restore point exists for this competition.','backup'),
   check('emergency',p.operations.exceptionDesk,true,'خطة الاستثناء','Emergency path','الحالات غير الطبيعية تحتاج مسارًا بشريًا واضحًا.','Exceptional cases need a defined human path.','competition_dna'),
-  check('identity',!p.registration.requireIdentityVerification||configured('identity'),!live,'الهوية','Identity','التحقق الخارجي مطلوب في اللائحة لكنه غير متصل.','External identity verification is required by policy but not connected.','integrations')
+  check('identity',!p.registration.requireIdentityVerification||configured('identity'),!live,'الهوية','Identity','التحقق الخارجي مطلوب في سياسة المسابقة لكنه غير متصل.','External identity verification is required by policy but not connected.','integrations')
  ];
  const blocker=checks.filter(x=>x.status==='blocker').length, warning=checks.filter(x=>x.status==='warning').length, ready=checks.length-blocker-warning;
  const score=Math.round(((ready+warning*.55)/checks.length)*100);

@@ -283,7 +283,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
                       <Badge variant="neutral" dot={false}>{batch.generationMode === 'pre_generated' ? (ar ? 'مسبق' : 'Pre') : batch.generationMode === 'hybrid' ? (ar ? 'مختلط' : 'Hybrid') : (ar ? 'في وقته' : 'JIT')}</Badge>
                     </div>
                     <p className="mt-1 text-[10px] text-[#696f6b]">
-                      {ar ? `العدالة ${pct(batch.aggregateFairness.score)} · اللائحة ${batch.policyVersion} · ${new Date(batch.createdAt).toLocaleString('ar')}` : `Fairness ${pct(batch.aggregateFairness.score)} · policy ${batch.policyVersion}`}
+                      {ar ? `العدالة ${pct(batch.aggregateFairness.score)} · السياسة ${batch.policyVersion} · ${new Date(batch.createdAt).toLocaleString('ar')}` : `Fairness ${pct(batch.aggregateFairness.score)} · policy ${batch.policyVersion}`}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

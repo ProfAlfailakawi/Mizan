@@ -33,7 +33,7 @@ export interface ScopeSelectionPartition {
 
 /**
  * محرك قواعد الاختيار — عام بقصد، لا عشرات الأعلام لكل حالة.
- * كل لائحة جديدة تُعبَّر عنها بتهيئة هذه الحقول، لا بتعديل الكود.
+ * كل شروطٍ جديدة تُعبَّر عنها بتهيئة هذه الحقول، لا بتعديل الكود.
  */
 export interface ParticipantScopeSelectionRule {
   version: number;
@@ -168,12 +168,12 @@ export function validateParticipantSelection(rule: ParticipantScopeSelectionRule
     issues.push({ code: 'SCOPE_UNIT_COUNT_MAX', ar: `الحد الأعلى ${rule.maxUnits} ${unitLabelArabic(rule.selectionUnit, rule.maxUnits)}، والمختار ${count}.`, en: `At most ${rule.maxUnits} allowed; ${count} selected.`, severity: 'error' });
   }
   if (unit && count < touchedUnitIndexes(scope, unit).length && rule.selectionUnit !== 'ayah_range') {
-    issues.push({ code: 'SCOPE_PARTIAL_UNIT', ar: `الاختيار يغطي ${unitLabel} جزئيًا. راجع الحدود إن كانت اللائحة تشترط وحدات كاملة.`, en: 'The selection covers a unit only partially. Review the bounds if whole units are required.', severity: 'warning' });
+    issues.push({ code: 'SCOPE_PARTIAL_UNIT', ar: `الاختيار يغطي ${unitLabel} جزئيًا. راجع الحدود إن كانت الشروط تشترط وحدات كاملة.`, en: 'The selection covers a unit only partially. Review the bounds if whole units are required.', severity: 'warning' });
   }
 
   const segments = scope.segments.length;
   if (rule.mustBeConsecutive && segments > 1) {
-    issues.push({ code: 'SCOPE_NOT_CONSECUTIVE', ar: 'اللائحة تشترط نطاقًا متصلًا، والاختيار مقسوم إلى مقاطع منفصلة.', en: 'This category requires one continuous range; the selection is split.', severity: 'error' });
+    issues.push({ code: 'SCOPE_NOT_CONSECUTIVE', ar: 'الشروط تشترط نطاقًا متصلًا، والاختيار مقسوم إلى مقاطع منفصلة.', en: 'This category requires one continuous range; the selection is split.', severity: 'error' });
   }
   if (rule.maxSegments !== undefined && segments > rule.maxSegments) {
     issues.push({ code: 'SCOPE_TOO_MANY_SEGMENTS', ar: `الحد الأعلى ${rule.maxSegments} مقاطع، والمختار ${segments}.`, en: `At most ${rule.maxSegments} segments allowed; ${segments} selected.`, severity: 'error' });

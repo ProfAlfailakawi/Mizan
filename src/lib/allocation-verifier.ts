@@ -10,7 +10,7 @@
  *
  * فمدقّقٌ يسأل المحرّك «هل أصبتَ؟» ثم يكتب «سليم» لم يدقّق شيئًا: كل خطأٍ في المحرّك ينتقل
  * إليه حرفًا بحرف فيصير شاهد زور. ولذلك يقرأ هذا الملف لقطةً تاريخية فيها كل ما يحتاجه —
- * النطاقات، والمناطق، والبنك، والحالات، والحجر، والحجز، وتاريخ المتسابقين، وبصمات اللائحة —
+ * النطاقات، والمناطق، والبنك، والحالات، والحجر، والحجز، وتاريخ المتسابقين، وبصمات السياسة —
  * ثم يعيد اشتقاق الأهلية بتنفيذٍ مختلف، ويحكم.
  *
  * (ويُختبر هذا الاستقلال نصًّا في tests/allocation-verifier.test.ts: يُقرأ هذا الملف
@@ -96,7 +96,7 @@ export interface AllocationSnapshot {
   organizationId?: string;
   engineVersion: string;
   policyVersion: string;
-  /** بصمة اللائحة كما أُعلنت وقت السحب — تُعاد حسابتها هنا وتُقارَن. */
+  /** بصمة السياسة كما أُعلنت وقت السحب — تُعاد حسابتها هنا وتُقارَن. */
   policyHash?: string;
   policy: SnapshotPolicy;
   participants: SnapshotParticipant[];
@@ -117,7 +117,7 @@ export interface VerificationReport {
   violations: number;
   warnings: number;
   passed: boolean;
-  /** بصمة اللائحة المُعاد حسابها — تُنشر مع التقرير ليُقارَن بها. */
+  /** بصمة السياسة المُعاد حسابها — تُنشر مع التقرير ليُقارَن بها. */
   recomputedPolicyHash: string;
   policyHashMatches: boolean | null;
   generatedAt: string;
@@ -131,7 +131,7 @@ function readingAgrees(item: SnapshotPoolItem, reading?: SnapshotParticipant['re
   if (reading.qiraahId && item.qiraahId && item.qiraahId !== reading.qiraahId) return false;
   if (reading.rawiId && item.rawiId && item.rawiId !== reading.rawiId) return false;
   if (reading.tariqId && item.tariqId && item.tariqId !== reading.tariqId) return false;
-  // موضعٌ بلا سياق قراءة لا يُعدّ مطابقًا حين يُطلب سياقٌ بعينه — كما هو حكم اللائحة.
+  // موضعٌ بلا سياق قراءة لا يُعدّ مطابقًا حين يُطلب سياقٌ بعينه — كما هو حكم السياسة.
   if (reading.rawiId && !item.rawiId) return false;
   return true;
 }
@@ -229,15 +229,15 @@ export async function verifyAllocationSnapshot(snapshot: AllocationSnapshot): Pr
     }
     if (policy.requireCertifiedSource && item.sourceCertified === false) {
       add({ code: 'SOURCE_NOT_CERTIFIED', severity: 'violation', participantId: participant.participantId, questionId: item.questionId,
-        ar: `مصدر السؤال ${item.questionId} غير معتمد واللائحة تشترط الاعتماد.`, en: `Question ${item.questionId} comes from an uncertified source while the policy requires certification.` });
+        ar: `مصدر السؤال ${item.questionId} غير معتمد والسياسة تشترط الاعتماد.`, en: `Question ${item.questionId} comes from an uncertified source while the policy requires certification.` });
     }
     if (policy.requireReviewedDifficulty && item.difficultyAssurance !== 'human_reviewed' && item.difficultyAssurance !== 'scientifically_approved') {
       add({ code: 'DIFFICULTY_NOT_REVIEWED', severity: 'violation', participantId: participant.participantId, questionId: item.questionId,
-        ar: `صعوبة السؤال ${item.questionId} غير مراجَعة واللائحة تشترط المراجعة.`, en: `Question ${item.questionId} has unreviewed difficulty while the policy requires review.` });
+        ar: `صعوبة السؤال ${item.questionId} غير مراجَعة والسياسة تشترط المراجعة.`, en: `Question ${item.questionId} has unreviewed difficulty while the policy requires review.` });
     }
     if (!policy.allowUnreviewedDifficulty && item.difficultyAssurance === 'unknown') {
       add({ code: 'DIFFICULTY_UNKNOWN', severity: 'violation', participantId: participant.participantId, questionId: item.questionId,
-        ar: `صعوبة السؤال ${item.questionId} مجهولة واللائحة تمنعها.`, en: `Question ${item.questionId} has unknown difficulty, which the policy forbids.` });
+        ar: `صعوبة السؤال ${item.questionId} مجهولة والسياسة تمنعها.`, en: `Question ${item.questionId} has unknown difficulty, which the policy forbids.` });
     }
 
     // ٦) الحجر والحجز.
@@ -299,7 +299,7 @@ export async function verifyAllocationSnapshot(snapshot: AllocationSnapshot): Pr
   const policyHashMatches = snapshot.policyHash ? snapshot.policyHash === recomputedPolicyHash : null;
   if (policyHashMatches === false) {
     add({ code: 'POLICY_HASH_MISMATCH', severity: 'violation',
-      ar: 'بصمة اللائحة المعلنة لا تطابق اللائحة المرفقة في اللقطة.', en: 'The declared policy hash does not match the policy carried in the snapshot.' });
+      ar: 'بصمة السياسة المعلنة لا تطابق السياسة المرفقة في اللقطة.', en: 'The declared policy hash does not match the policy carried in the snapshot.' });
   }
 
   const violations = findings.filter(f => f.severity === 'violation').length;
@@ -318,7 +318,7 @@ export async function verifyAllocationSnapshot(snapshot: AllocationSnapshot): Pr
   };
 }
 
-/** بصمة اللائحة كما يحسبها المدقّق — تُنشر مع اللقطة ليُقارَن بها لاحقًا. */
+/** بصمة السياسة كما يحسبها المدقّق — تُنشر مع اللقطة ليُقارَن بها لاحقًا. */
 export async function allocationPolicyHash(input: { policy: SnapshotPolicy; policyVersion: string; engineVersion: string }): Promise<string> {
   return hashCanonical({ policy: input.policy, policyVersion: input.policyVersion, engineVersion: input.engineVersion });
 }
