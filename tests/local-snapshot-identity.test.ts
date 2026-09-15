@@ -121,7 +121,8 @@ test('journey capability tokens are withheld, and a withheld one is never mistak
 
 test('issuing refuses rather than replacing a token that exists but is withheld locally',()=>{
  const src=fs.readFileSync(path.join(process.cwd(),'src/lib/store.ts'),'utf8');
- assert.match(src,/if\(journeyTokenWithheldLocally\(current\)\)return null;/);
+ /* الرفض باقٍ كما هو، ومعه الآن سببٌ يُقال للشاشة بدل null مجرّدة. */
+ assert.match(src,/if\(journeyTokenWithheldLocally\(current\)\)\{journeyAccessFailure='TOKEN_WITHHELD_ON_THIS_DEVICE';return null;\}/);
  // The guard must come before any replacement token is minted.
  const guard=src.indexOf('journeyTokenWithheldLocally(current)');
  const mint=src.indexOf("current.journeyAccessToken||newId('journey')");

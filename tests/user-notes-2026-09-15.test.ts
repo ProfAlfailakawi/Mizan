@@ -374,7 +374,17 @@ test('every passage starts on Hafs, and no other reading opens without a certifi
 test('an empty judging screen says why it is empty and offers the next real step', () => {
   const judge = read('src/components/judge/JudgeOS.tsx');
   assert.match(judge, /awaitingArrival/);
-  assert.match(judge, /لم يُسجَّل حضورهم بعد/);
+  assert.match(judge, /من ينتظر دوره/, 'the waiting list is shown by name, not as a bare counter');
   assert.match(judge, /admitAndCall/, 'a judge can admit the participant standing in front of them');
   assert.match(judge, /طلبًا تحت المراجعة/, 'and is told when the roster is pending approval instead');
+
+  /*
+   * كل من له دور لم يُقيَّم بعد يظهر، لا حالتان فقط.
+   *
+   * متسابقٌ عَلِقت حالته على «في الجلسة» بعد محاولة بدءٍ فاشلة كان يختفي من الشاشة كلها
+   * والعدّاد يقول صفرًا، بينما الإدارة تعرضه مقبولًا — فيظنّ المحكّم النظام معطلًا.
+   */
+  assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session','appealed'\]/);
+  assert.match(judge, /store\.releaseStrandedSession\(id\)/, 'a stranded participant is released before being called again');
+  assert.match(judge, /PARTICIPANT_WAIT_LABEL/, 'each waiting name carries what it is waiting for');
 });

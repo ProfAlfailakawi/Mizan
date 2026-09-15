@@ -62,11 +62,10 @@ test('public Firestore projection enforces exact competition scope for privilege
 });
 
 test('retired demo surfaces and seed data are absent from the production source tree',()=>{
-  for(const p of ['src/components/public/DemoReturn.tsx','src/components/public/ExperienceHub.tsx','src/lib/seed-data.ts']){
+  /* «الإدارة العلمية» حُذفت كاملة: لا جهة علمية في هذه المنظومة، والنصّ معتمد من مجمع الملك فهد. */
+  for(const p of ['src/components/public/DemoReturn.tsx','src/components/public/ExperienceHub.tsx','src/lib/seed-data.ts','src/components/admin/ScientificGovernance.tsx']){
     assert.equal(fs.existsSync(p),false,p);
   }
-  const science=text('src/components/admin/ScientificGovernance.tsx');
-  assert.doesNotMatch(science,/DEVELOPMENT_QUESTION_BANK|DEVELOPMENT QUESTION FIXTURES/);
   const pkg=JSON.parse(text('package.json'));
   assert.equal(pkg.scripts['production-audit'],'node scripts/production-runtime-audit.mjs');
   assert.match(pkg.scripts.check,/production-audit/);

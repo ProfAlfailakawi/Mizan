@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { BadgeCheck, Download, FileText } from 'lucide-react';
+import type { ExposureProfile } from '../../lib/exposure-risk';
 import type { FairnessReportRecord, QuestionModelBatchRecord, QuestionModelRecord, QuestionQuarantineRecord } from '../../types';
 import { RESERVATION_STATE_ARABIC, reservationSummary } from '../../lib/question-reservation';
-import { topExposedLoci, type ExposureProfile } from '../../lib/exposure-risk';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { EmptyState } from '../design-system/EmptyState';
@@ -209,13 +209,6 @@ const ReportView: React.FC<{ report: FairnessReportRecord; ar: boolean; onClose:
     </div>
   </div>
 );
-
-const exposureLevelLabel = (level: ExposureProfile['level'], ar: boolean) =>
-  level === 'critical' ? (ar ? 'انكشاف بالغ' : 'Critical')
-    : level === 'high' ? (ar ? 'انكشاف عالٍ' : 'High')
-      : level === 'medium' ? (ar ? 'انكشاف متوسط' : 'Medium')
-        : level === 'low' ? (ar ? 'انكشاف منخفض' : 'Low')
-          : (ar ? 'بلا انكشاف' : 'None');
 
 const severityLabel = (severity: string, ar: boolean) =>
   severity === 'critical' ? (ar ? 'حرج' : 'Critical')

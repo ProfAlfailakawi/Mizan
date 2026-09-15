@@ -9,10 +9,6 @@ ok('Arabic dictionary does not expose MIZAN Latin brand',!arBlock.includes('MIZA
 ok('Arabic dictionary does not expose FairDraw',!arBlock.includes('FairDraw'));
 ok('Arabic dictionary does not expose Digital Twin',!arBlock.includes('Digital Twin'));
 ok('Arabic dictionary does not expose Dual Approval',!arBlock.includes('Dual Approval'));
-const sci=read('src/components/admin/ScientificGovernance.tsx');
-ok('Qiraat screen resolves Arabic imam labels',sci.includes('qiraahLabel(x,ar)'));
-ok('Qiraat screen resolves Arabic rawi labels',sci.includes('rawiLabel(x,ar)'));
-ok('Reference audio resolves Arabic reading labels',sci.includes('readingDisplay(x.qiraah,x.rawi,ar)'));
 const mushaf=read('src/components/judge/OfficialMushafSurface.tsx');
 ok('Judge Mushaf surface includes focus lens',mushaf.includes('<FocusLens'));
 ok('Judge Mushaf surface localizes qiraah/rawi',mushaf.includes('qiraahLabel(reading,ar)')&&mushaf.includes('rawiLabel(reading,ar)'));

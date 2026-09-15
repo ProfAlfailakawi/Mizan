@@ -619,12 +619,23 @@ async function deleteScopedDocument(collectionName:string,id:string){
 
 const JOURNEY_PUBLISHERS:Role[]=['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'];
 const launchPlaceholderActive=()=>globalState.competition.id==='comp-pending-setup'||globalState.competition.organizationId==='org-pending-setup';
-async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<boolean>{
-  if(globalState.isOffline||!auth.currentUser||!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role)||launchPlaceholderActive())return false;
+/*
+ * سبب تعذّر النشر يُقال، لا يُبتلع.
+ *
+ * كان يعود `false` واحدًا عن خمس حالات مختلفة: بلا اتصال، بلا جلسة، بلا صلاحية نشر،
+ * أو رفضٌ من قواعد السحابة. فتصل الشاشةَ جملةٌ واحدة — «تحقق من الاتصال والصلاحيات» —
+ * ويقف صاحب المسابقة وهو مالكها أمام رسالةٍ لا تقول له أي الخمس وقعت.
+ */
+type JourneyPublishOutcome='PUBLISHED'|'OFFLINE'|'NOT_SIGNED_IN'|'ROLE_CANNOT_PUBLISH'|'LAUNCH_PLACEHOLDER'|'NO_TOKENS'|'CLOUD_REJECTED';
+async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<JourneyPublishOutcome>{
+  if(globalState.isOffline)return 'OFFLINE';
+  if(!auth.currentUser)return 'NOT_SIGNED_IN';
+  if(!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return 'ROLE_CANNOT_PUBLISH';
+  if(launchPlaceholderActive())return 'LAUNCH_PLACEHOLDER';
   const records:[string,'participant'|'guardian'][]=[];
   if(participant.journeyAccessToken)records.push([await sha256(participant.journeyAccessToken),'participant']);else if(participant.journeyAccessTokenHash)records.push([participant.journeyAccessTokenHash,'participant']);
   if(participant.guardianAccessToken)records.push([await sha256(participant.guardianAccessToken),'guardian']);else if(participant.guardianAccessTokenHash)records.push([participant.guardianAccessTokenHash,'guardian']);
-  if(!records.length)return false;
+  if(!records.length)return 'NO_TOKENS';
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
     await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt:new Date().toISOString()},{merge:true});
@@ -647,8 +658,8 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
     };
     for(const [key,audience] of records)await setDoc(doc(db,'public_journeys',key),{...base,audience},{merge:true});
     resolveCloudScope('public journey');
-    return true;
-  }catch(err){reportCloudError(classifyCloudError(err),'public journey');return false;}
+    return 'PUBLISHED';
+  }catch(err){reportCloudError(classifyCloudError(err),'public journey');return 'CLOUD_REJECTED';}
 }
 async function syncPublicJourneys(){
   if(!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return;
@@ -1918,7 +1929,11 @@ export function useAppStore() {
 
   const updateOrganizationBrand = (patch: Partial<OrganizationBrand>) => { globalState.organization={...globalState.organization,brand:{...globalState.organization.brand,...patch}}; notify(); };
 
+  /* آخر سببٍ لتعذّر إصدار بطاقة رحلة — تقرأه الشاشة لتقول للمنظّم ما وقع بالضبط. */
+  let journeyAccessFailure='';
+  const lastJourneyAccessFailure=()=>journeyAccessFailure;
   const ensureParticipantJourneyAccess=async(participantId:string)=>{
+    journeyAccessFailure='';
     const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);if(idx<0)return null;
     const current=globalState.participants[idx];
     /*
@@ -1926,9 +1941,19 @@ export function useAppStore() {
      * بوجوده. توليد بديل هنا كان سيُبطل بطاقة مطبوعة بيد المتسابق بلا أن يدري أحد — فيُرفض
      * الإصدار بدل أن يُتلف اعتمادًا قائمًا. المزامنة تُعيد التوكن الأصلي عند الاتصال.
      */
-    if(journeyTokenWithheldLocally(current))return null;
+    if(journeyTokenWithheldLocally(current)){journeyAccessFailure='TOKEN_WITHHELD_ON_THIS_DEVICE';return null;}
     const journeyAccessToken=current.journeyAccessToken||newId('journey'),guardianAccessToken=current.guardianAccessToken||newId('guardian');const next={...current,journeyAccessToken,guardianAccessToken,journeyAccessTokenHash:await sha256(journeyAccessToken),guardianAccessTokenHash:await sha256(guardianAccessToken)};
-    globalState.participants[idx]=next;const [saved,published]=await Promise.all([persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>),publishPublicJourneyRecord(next)]);notify();if(!globalState.isOffline&&auth.currentUser&&(!saved||!published))return null;return next;
+    globalState.participants[idx]=next;const [saved,published]=await Promise.all([persistScopedDocument('participants',next.id,next as unknown as Record<string,unknown>),publishPublicJourneyRecord(next)]);notify();
+    /*
+     * البطاقة تُفتح ولو تعذّر النشر، ويُقال أثر ذلك.
+     *
+     * كان تعذّر النشر يمنع فتح البطاقة أصلًا، فلا يرى المنظّم رمزًا ولا سببًا. والرمز
+     * موجودٌ على الجهاز، فالمنع كان يحجب ما يملكه. الآن يُفتح، ويُقال صراحةً: رمزٌ لم
+     * يصل السحابة لا يستطيع وليُّ الأمر ولا الكشك التحقّق منه حتى يصل.
+     */
+    if(globalState.isOffline||!auth.currentUser){journeyAccessFailure='';return next;}
+    journeyAccessFailure=!saved?'CLOUD_WRITE_DENIED':published!=='PUBLISHED'?published:'';
+    return next;
   };
 
   const reissueParticipantJourneyAccess=async(participantId:string)=>{
@@ -3791,6 +3816,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     createIncident, resolveIncident,
     checkInParticipant,
     releaseStrandedSession,
+    lastJourneyAccessFailure,
     recordAIObservation, reconcileIntegrityForSession, registerAudioRecording,
     recordJudgeEvent,
     undoLastJudgeEvent,
