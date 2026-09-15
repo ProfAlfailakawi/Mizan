@@ -87,14 +87,37 @@ test('judging criteria stay editable: there is no freeze anywhere', () => {
   assert.match(store, /const updateRuleSet = \(patch: Partial<Competition\['ruleSet'\]>/);
   assert.doesNotMatch(store, /if \(frozen && !opts\?\.allowWhenFrozen\) return false;/,
     'a criteria edit is never refused');
-  /* الأثر يبقى: نسخة ترتفع عند كل تعديل، وسجلّ التدقيق يحفظ من غيّر ومتى. */
-  assert.match(store, /version: `\$\{globalState\.competition\.ruleSet\.version\}-rev`/);
+  /* الأثر يبقى: نسخة ترتفع عند كل تعديل. */
+  assert.match(store, /version: `\$\{previous\.version\}-rev`/);
 
   const overview = read('src/components/admin/CompetitionOverview.tsx');
   assert.doesNotMatch(overview, /frozenAt/, 'the screen no longer reads a freeze that cannot happen');
   assert.doesNotMatch(overview, /لائحة هذه المسابقة مجمَّدة|فكّ التجميد/,
     'and no longer speaks of a frozen rulebook, nor offers to unfreeze one');
   assert.match(overview, /<button type="button" onClick=\{addCriterion\}/, 'the add button is never disabled');
+});
+
+test('a criteria edit preserves the revision each locked submission was judged under', () => {
+  /*
+   * المعايير صارت تُعدَّل بلا تجميد — وهذا يفتح بابًا: إرسالٌ قُفل على جدولٍ سابق لو جُمع
+   * بجدولٍ لاحق، أسقط حذفُ معيارٍ درجةً مُنحت، ومنحت إضافةُ معيارٍ درجةً كاملة عن بندٍ
+   * لم يُقيَّم فيه صاحبه قط. فلا يكفي رفع النسخة: لا بدّ من حفظ ما قبلها وربط كل إرسال بها.
+   */
+  const store = read('src/lib/store.ts');
+  assert.match(store, /const snapshot = \{ \.\.\.previous, id: ruleSetSnapshotId\(previous\) \}/,
+    'the previous revision is kept, not overwritten');
+  assert.match(store, /ruleSets: \[next, snapshot, \.\.\.history\]/);
+  assert.match(store, /ruleSetId: sessionRuleSet\.id, ruleSetVersion: sessionRuleSet\.version/,
+    'and every submission records the table it was judged against');
+
+  /* الجمع والختم يقرآن نسخة الإرسال لا الجدول الحاضر. */
+  assert.match(store, /const panelRevision = sessionSubs\.map\(x => x\.ruleSetVersion\)\.find\(Boolean\)/);
+  assert.match(store, /const criteriaOfRevision = \(version\?: string\) =>/);
+  assert.match(store, /\.find\(r => r\.version === version\)\?\.criteria \|\| ruleSet\.criteria/,
+    'legacy rows without a recorded revision still read the current table, as they always did');
+
+  const types = read('src/types/index.ts');
+  assert.match(types, /ruleSetId\?: string;\s*\n\s*ruleSetVersion\?: string;/);
 });
 
 test('the product speaks of judging criteria, not of a rulebook the organiser does not have', () => {

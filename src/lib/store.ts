@@ -1301,6 +1301,8 @@ export function useAppStore() {
       judgeId: globalState.currentUser.id, judgeName: globalState.currentUser.name, sessionId: globalState.activeSession.sessionId,
       criterionScores, totalScore: judgeScore, eventsCount: globalState.activeSession.events.length, submittedAt: new Date().toISOString(), locked: true,
       scoredCriterionIds: scoredCriteria.map(c => c.id),
+      /* الجدول الذي قُيِّم به هذا الإرسال، فيُجمَع به مهما تغيّر بعده. */
+      ruleSetId: sessionRuleSet.id, ruleSetVersion: sessionRuleSet.version,
       sessionPenaltyCount: globalState.activeSession.events.filter(e => !e.reversed).length
     };
     globalState.judgeSubmissions = [...globalState.judgeSubmissions.filter(s => !(s.sessionId === submission.sessionId && s.judgeId === submission.judgeId)), submission];
@@ -1340,8 +1342,19 @@ export function useAppStore() {
       // the whole rubric (all_judges_all_criteria). For specialized/hybrid panels each judge scores
       // only their own criteria, so the correct final score is the sum of every criterion's score
       // taken from the judge(s) responsible for it — never the mean of up-projected partial scores.
-      const rsCriteria = sessionRuleSet.criteria;
-      const panel = computePanelScore({ submissions: sessionSubs, criteria: rsCriteria, mode: policy.judging.mode, dropExtremes: sessionRuleSet.dropExtremes });
+      /*
+       * الجدول المعتمد للجمع هو جدول إرسالات هذه الجلسة، لا الجدول الحاضر.
+       *
+       * محكّمٌ قفّل تقييمه، ثم عُدِّلت المعايير قبل أن يُقفّل زميله: جمعُ الاثنين بالجدول
+       * الأخير يُسقط درجةً مُنحت أو يمنح درجةً كاملة عن بندٍ لم يُقيَّم فيه الأول قط.
+       * فيُؤخذ الجدول الذي حمله أوّل إرسال، ولا يُرجع إلى الحاضر إلا لبياناتٍ بلا نسخة.
+       */
+      const panelRevision = sessionSubs.map(x => x.ruleSetVersion).find(Boolean);
+      const panelRuleSet = (panelRevision && panelRevision !== sessionRuleSet.version
+        ? globalState.competition.ruleSets?.find(r => r.version === panelRevision)
+        : undefined) || sessionRuleSet;
+      const rsCriteria = panelRuleSet.criteria;
+      const panel = computePanelScore({ submissions: sessionSubs, criteria: rsCriteria, mode: policy.judging.mode, dropExtremes: panelRuleSet.dropExtremes });
       const aggregatedCriterionScores = panel.criterionScores;
       const finalScore = panel.finalScore;
       const sessionPenaltyCount = panelPenaltyCount(sessionSubs, globalState.activeSession.events.filter(e => !e.reversed).length);
@@ -1490,14 +1503,28 @@ export function useAppStore() {
      * الخادم يؤلّفها بنفسه، فلا يوجد رقم يمكن لهذا الجهاز أن يمليه.
      */
     const ruleSet = globalState.competition.ruleSet;
+    /*
+     * كل إرسال يُجمَع بجدوله هو.
+     *
+     * المعايير تُعدَّل أثناء المسابقة، وكان الختم يقرأ الجدول الحاضر لكل الإرسالات — فحذفُ
+     * معيارٍ يُسقط درجةً مُنحت فعلًا، وإضافةُ معيارٍ تمنح صاحبَ إرسالٍ قديم درجةً كاملة عن
+     * بندٍ لم يُقيَّم فيه قط. فتُقرأ النسخة المثبَّتة في الإرسال نفسه، ولا يُرجع إلى الحاضر
+     * إلا لبياناتٍ سابقة لهذا الربط لا تحمل نسخةً أصلًا.
+     */
+    const criteriaOfRevision = (version?: string) => {
+      if (!version || version === ruleSet.version) return ruleSet.criteria;
+      return (globalState.competition.ruleSets || []).find(r => r.version === version)?.criteria || ruleSet.criteria;
+    };
     const seals = new Map<string, SealedResultView>();
     for (const res of competitionResults) {
       const submissions = globalState.judgeSubmissions.filter(x => x.participantId === res.participantId && x.locked);
       const sessionId = submissions[0]?.sessionId || '';
+      /* إرسالات جلسةٍ واحدة تحمل نسخةً واحدة؛ ولو اختلفت فالأقدم هي التي قُيِّم بها أولًا. */
+      const revisions = [...new Set(submissions.map(x => x.ruleSetVersion).filter(Boolean))] as string[];
       const outcome = await sealResultOnServer({
         competitionId: globalState.competition.id, participantId: res.participantId, sessionId,
         categoryId: res.categoryId,
-        submissions, criteria: ruleSet.criteria,
+        submissions, criteria: criteriaOfRevision(revisions[0]),
         mode: policy.judging.mode, dropExtremes: ruleSet.dropExtremes,
         sessionEventCount: 0,
         previousSealSha256: res.sealMetadata?.serverSealSha256,
@@ -2140,10 +2167,23 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     return true;
   };
 
+  /*
+   * تعديل المعايير يحفظ ما قبله، لا يمحوه.
+   *
+   * الجدول يُعدَّل متى شاءت الجهة — لا تجميد. لكن إرسالًا قُفل على جدولٍ سابق لا يجوز أن
+   * يُجمَع بجدولٍ لاحق: حذفُ معيارٍ يُسقط درجةً مُنحت فعلًا، وإضافةُ معيارٍ في الوضع
+   * التخصصي أو المختلط تمنح صاحبَ إرسالٍ قديم درجةً كاملة عن بندٍ لم يُقيَّم فيه قط.
+   * فكلُّ تعديل يُودِع نسخةَ ما قبله في `ruleSets` بمعرّفٍ لقطةٍ مستقل، ويبقى المعرّف
+   * الحيّ كما هو فلا تنفصل عنه الفئات المرتبطة به. والإرسال يحمل نسخته، فيُجمَع بجدوله.
+   */
+  const ruleSetSnapshotId = (rule: Competition['ruleSet']) => `${rule.id}#${rule.version}`;
+
   const updateRuleSet = (patch: Partial<Competition['ruleSet']>, _opts?: { allowWhenFrozen?: boolean }) => {
-    /* معايير التحكيم تُعدَّل متى شاءت الجهة. النسخة تُرفع عند كل تعديل فيبقى الأثر مقروءًا. */
-    const next = { ...globalState.competition.ruleSet, ...patch, version: `${globalState.competition.ruleSet.version}-rev`, frozenAt: undefined };
-    globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, ...(globalState.competition.ruleSets || []).filter(r => r.id !== next.id)] };
+    const previous = globalState.competition.ruleSet;
+    const next = { ...previous, ...patch, version: `${previous.version}-rev`, frozenAt: undefined };
+    const snapshot = { ...previous, id: ruleSetSnapshotId(previous) };
+    const history = (globalState.competition.ruleSets || []).filter(r => r.id !== next.id && r.id !== snapshot.id);
+    globalState.competition = { ...globalState.competition, ruleSet: next, ruleSets: [next, snapshot, ...history] };
     markCompetitionConfigChanged(); notify();
     return true;
   };
