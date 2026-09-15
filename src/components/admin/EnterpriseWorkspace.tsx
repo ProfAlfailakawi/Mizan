@@ -24,6 +24,7 @@ const PANELS = {
   trustProtocolLab: () => import('./TrustProtocolLab'),
   beyondLab: () => import('./BeyondLab'),
   readinessLab: () => import('./ReadinessLab'),
+  cloudDiagnostics: () => import('./CloudDiagnostics'),
 };
 const panel = (loader: () => Promise<any>, name: string) =>
   lazy(() => loader().then((m: any) => ({ default: m[name] })));
@@ -33,6 +34,7 @@ const DeviceCenter = panel(PANELS.deviceCenter, 'DeviceCenter');
 const TrustProtocolLab = panel(PANELS.trustProtocolLab, 'TrustProtocolLab');
 const BeyondLab = panel(PANELS.beyondLab, 'BeyondLab');
 const ReadinessLab = panel(PANELS.readinessLab, 'ReadinessLab');
+const CloudDiagnostics = panel(PANELS.cloudDiagnostics, 'CloudDiagnostics');
 
 let panelsWarmed = false;
 function warmPanels(){
@@ -95,7 +97,10 @@ const FieldOperations=({s,ar,online}:{s:ReturnType<typeof useAppStore>;ar:boolea
   </div>
   {fieldTab==='deployment'&&<Suspense fallback={<PanelFallback/>}><DeploymentStudio/></Suspense>}
   {fieldTab==='devices'&&<Suspense fallback={<PanelFallback/>}><DeviceCenter/></Suspense>}
-  {fieldTab==='continuity'&&<div className="grid gap-4"><div className="mizan-surface p-5 h-fit"><div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستمرارية':'Continuity'}</h2></div><div className="mt-4 space-y-3"><State ar={ar} ok={!s.isOffline} label={ar?'السحابة':'Cloud'}/><State ar={ar} ok={s.devices.some(d=>d.type==='edge_server'&&d.status==='online')} label="MIZAN Edge"/><State ar={ar} ok={!s.emergencyFrozen} label={ar?'التوجيه':'Dispatch'}/></div><div className="mt-4 grid gap-2"><Button size="sm" variant="outline" onClick={s.toggleOffline}>{s.isOffline?(ar?'استعادة الاتصال':'Reconnect'):(ar?'محاكاة انقطاع':'Simulate outage')}</Button><EmergencyControl/></div></div></div>}
+  {fieldTab==='continuity'&&<div className="grid gap-4"><div className="mizan-surface p-5 h-fit"><div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستمرارية':'Continuity'}</h2></div><div className="mt-4 space-y-3"><State ar={ar} ok={!s.isOffline} label={ar?'السحابة':'Cloud'}/><State ar={ar} ok={s.devices.some(d=>d.type==='edge_server'&&d.status==='online')} label="MIZAN Edge"/><State ar={ar} ok={!s.emergencyFrozen} label={ar?'التوجيه':'Dispatch'}/></div><div className="mt-4 grid gap-2"><Button size="sm" variant="outline" onClick={s.toggleOffline}>{s.isOffline?(ar?'استعادة الاتصال':'Reconnect'):(ar?'محاكاة انقطاع':'Simulate outage')}</Button><EmergencyControl/></div></div>
+   {/* مؤشّر «السحابة» أعلاه يقول نعم أو لا، ولا يقول لماذا. هذه تقول لماذا ومن يصلحه. */}
+   <div className="mizan-surface p-5"><div className="mizan-kicker">{ar?'تشخيص السحابة':'CLOUD DIAGNOSIS'}</div><h2 className="font-extrabold mt-1 mb-4">{ar?'لماذا لا يعمل الرفع؟':'Why are uploads failing?'}</h2><Suspense fallback={<PanelFallback/>}><CloudDiagnostics/></Suspense></div>
+  </div>}
  </div>;
 };
 const International=({s,ar}:{s:ReturnType<typeof useAppStore>;ar:boolean})=>{

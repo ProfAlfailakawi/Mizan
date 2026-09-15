@@ -508,16 +508,59 @@ function refreshAuthTokenOnce(){const now=Date.now();if(now-lastAuthTokenRefresh
  * لم تُكتب قط. عند رفض Firestore نطلب من الخادم إعادة كتابة مطالبات *هذا الحساب فقط*
  * من التخويل الموثوق، ثم نأخذ ID token جديدًا. لا يرسل العميل دورًا ولا نطاقًا.
  */
-async function repairCurrentIdentityClaims(){
-  const user=auth.currentUser;if(!user)return false;
+/*
+ * الخادم يعرف سبب رفضه بالضبط — ACCOUNT_NOT_PROVISIONED أو IDENTITY_CLAIMS_NOT_CONFIGURED
+ * أو غيرهما — وكان هذا المسار يُسقط الجواب كلَّه ويعيد false، فتصل الشاشةَ «تعذّرت
+ * المزامنة» وحدها ويبقى السبب في سجلّ خادمٍ لا يفتحه صاحب المسابقة. السبب يُحفظ الآن
+ * ليُقرأ في شاشة التشخيص.
+ */
+export interface ClaimRepairOutcome{ok:boolean;code?:string;reason?:string}
+let lastClaimRepair:ClaimRepairOutcome|null=null;
+export const lastClaimRepairOutcome=()=>lastClaimRepair;
+
+export async function repairIdentityClaimsNow():Promise<ClaimRepairOutcome>{
+  const user=auth.currentUser;
+  if(!user){lastClaimRepair={ok:false,code:'NOT_SIGNED_IN'};return lastClaimRepair}
   try{
     const token=await user.getIdToken();
     const response=await fetch('/api/identity/refresh-claims',{method:'POST',headers:{authorization:`Bearer ${token}`}});
-    if(!response.ok)return false;
+    if(!response.ok){
+      const body=await response.json().catch(()=>({}))as{code?:string;reason?:string};
+      lastClaimRepair={ok:false,code:body.code||`HTTP_${response.status}`,reason:body.reason};
+      return lastClaimRepair;
+    }
+    /* الرمز يُجدَّد قسرًا: المطالبات الجديدة لا تصل القواعد قبل رمزٍ يحملها. */
     await user.getIdToken(true);
-    return true;
-  }catch{return false}
+    lastClaimRepair={ok:true};
+    return lastClaimRepair;
+  }catch(err){
+    lastClaimRepair={ok:false,code:'CLAIM_REPAIR_UNREACHABLE',reason:err instanceof Error?err.message:undefined};
+    return lastClaimRepair;
+  }
 }
+
+async function repairCurrentIdentityClaims(){
+  return (await repairIdentityClaimsNow()).ok;
+}
+
+/** مطالبات الرمز الحالي كما وصلت فعلًا — تُقرأ للتشخيص، ولا يُبنى عليها تخويل. */
+export async function currentTokenClaims():Promise<{role?:string;org_id?:string;competition_id?:string;competition_ids?:string[]}|undefined>{
+  const user=auth.currentUser;if(!user)return undefined;
+  try{
+    const {getIdTokenResult}=await import('firebase/auth');
+    const result=await getIdTokenResult(user);
+    const c=result.claims as Record<string,unknown>;
+    return {
+      role:typeof c.role==='string'?c.role:undefined,
+      org_id:typeof c.org_id==='string'?c.org_id:undefined,
+      competition_id:typeof c.competition_id==='string'?c.competition_id:undefined,
+      competition_ids:Array.isArray(c.competition_ids)?c.competition_ids.filter((x):x is string=>typeof x==='string'):undefined,
+    };
+  }catch{return undefined}
+}
+
+/** هل هناك جلسة دخول قائمة؟ سؤالٌ للتشخيص لا يفتح الوصول إلى كائن المصادقة نفسه. */
+export const cloudSignedIn=()=>!!auth.currentUser;
 
 
 async function deleteScopedDocument(collectionName:string,id:string){
