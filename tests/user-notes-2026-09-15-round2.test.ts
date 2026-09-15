@@ -181,7 +181,8 @@ test('a waiting participant can be listened to, without any of it touching the r
 
   /* والمسار على الخادم مستقلّ عن مسار المحكّم، ولا يكتب في دفتر الأدلّة. */
   const server = read('server.ts');
-  assert.match(server, /'\/api\/quran\/practice\/align',requireFirebaseRoles\(\['participant'\]\),practiceAlignmentRateLimit/);
+  assert.match(server, /'\/api\/quran\/practice\/align',practiceAlignmentIpRateLimit,requireFirebaseRoles\(\['participant'\]\),practiceAlignmentRateLimit/,
+    'the address limit runs before identity is verified, so a flood of bad tokens costs nothing');
 
   /*
    * وحدٌّ غير مشروط عليه: كل نداء يرفع صوتًا ويستدعي المحرّك، فالكلفة لكل نداء لا لكل
@@ -189,6 +190,7 @@ test('a waiting participant can be listened to, without any of it touching the r
    */
   assert.match(server, /const practiceAlignmentRateLimit:RequestHandler=rateLimit\(\{/,
     'the limit is declared outright, not behind the global-limiter escape hatch');
+  assert.match(server, /const practiceAlignmentIpRateLimit:RequestHandler=rateLimit\(\{/);
   assert.doesNotMatch(server, /const practiceAlignmentRateLimit:RequestHandler=rateLimiterIsGlobal/);
   assert.match(server, /keyGenerator:\(req\)=>String\(\(req as any\)\.mizanIdentity\?\.uid/,
     'counted per account, so one participant cannot spend everyone else\u2019s budget');
