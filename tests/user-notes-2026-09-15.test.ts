@@ -74,57 +74,51 @@ test('editing zones leaves the automatic split instead of being silently discard
   assert.match(workspace, /onClick=\{addZone\}/);
 });
 
-/* ── ٤ — لا تُضاف معايير: اللائحة مجمَّدة، وكان المنع أخرس ────────────── */
+/* ── ٤ — «ما عندنا لائحة»: لا تجميد ولا تسمية لا تخصّ الجهة ─────────────── */
 
-test('a frozen rulebook refuses criterion edits out loud instead of swallowing them', () => {
-  const overview = read('src/components/admin/CompetitionOverview.tsx');
-  assert.match(overview, /const frozenAt=r\.frozenAt\|\|policy\.frozenAt;/,
-    'the screen knows whether the rulebook is frozen');
-  assert.match(overview, /setRuleSetBlocked\(!ok\)/,
-    'and reads the answer updateRuleSet already returns instead of discarding it');
-  assert.match(overview, /لائحة هذه المسابقة مجمَّدة/, 'the reason is stated');
-  /* لا يوجد في ميزان رفع تجميد إطلاقًا: التجميد يقع عند أول جلسة، ولا مسار يرفعه. فإحالة
-     المسؤول إلى شاشةٍ لا تملك ما أُرسل إليها أسوأ من الصمت — يجرّبها فتضيع ثقته بالرسالة كلها. */
-  assert.doesNotMatch(overview, /راجع «الجاهزية والإطلاق»/,
-    'that screen offers no unfreeze, so it may not be named as if it did');
-  assert.match(overview, /ولا يكفي حذف المعايير أو إفراغ اللائحة لأن القفل على المسابقة نفسها/,
-    'emptying the rulebook is the obvious thing to try, and it does not work — so it is answered before it is tried');
-  assert.match(overview, /أدوات الإدارة ← إصدار جديد من المسابقة/, 'and the way forward is named exactly');
-  assert.match(overview, /disabled=\{!!frozenAt\} onClick=\{addCriterion\}/,
-    'and the add button is visibly disabled rather than dead');
-});
-
-test('the freeze binds to official measurement, not to the first trial session', () => {
+test('judging criteria stay editable: there is no freeze anywhere', () => {
   /*
-   * التجميد كان يقع عند أول جلسة ولا يُفكّ أبدًا، فجلسةُ تجربةٍ واحدة في مسابقةٍ مسودّة
-   * تقفل اللائحة إلى الأبد — وهو أصل الملاحظة الرابعة أصلًا.
+   * أصل الملاحظة الرابعة: المعايير كانت تُقفل تلقائيًا عند أول جلسة ولا تُفتح أبدًا،
+   * فجلسةُ تجربةٍ واحدة تحبس الجهة عن تعديل معاييرها إلى الأبد. والجهة صاحبةُ معاييرها.
    */
   const store = read('src/lib/store.ts');
-  assert.match(store, /const unfreezeRuleSet = \(reason: string\)/);
-  /* الحدّ هو الأثر الخارج عن النظام: نتيجةٌ مختومة أو شهادة — لا مجرّد وقوع جلسة. */
-  assert.match(store, /sealedResults: scoped\.filter\(r => r\.status === 'sealed' \|\| r\.status === 'published'\)\.length/);
-  assert.match(store, /if \(blockers\.sealedResults > 0 \|\| blockers\.certificates > 0\)/,
-    'once anything official exists the block stays absolute');
-  assert.match(store, /recordInvariantBlock\('rule_set_immutable_after_official_measurement'/,
-    'and a refused attempt is recorded, not silently dropped');
-  assert.match(store, /if \(justification\.length < 5\) return \{ ok: false, reason: 'REASON_REQUIRED'/,
-    'an unfreeze without a written reason leaves no account of itself');
-  assert.match(store, /auditTrustAction\('RULE_SET_UNFROZEN'/);
-  /* درجةٌ قيست بمسطرةٍ لم تعد قائمة لا معنى لها، فتُطرح صراحةً ويُقال عددها. */
-  assert.match(store, /globalState\.results = globalState\.results\.filter\(r => r\.competitionId !== globalState\.competition\.id\)/);
+  assert.doesNotMatch(store, /freezeRulesOnce/, 'nothing freezes the criteria any more');
+  assert.doesNotMatch(store, /if \(current\.frozenAt\) return false;/, 'and policy edits are not gated on it either');
+  assert.match(store, /const updateRuleSet = \(patch: Partial<Competition\['ruleSet'\]>/);
+  assert.doesNotMatch(store, /if \(frozen && !opts\?\.allowWhenFrozen\) return false;/,
+    'a criteria edit is never refused');
+  /* الأثر يبقى: نسخة ترتفع عند كل تعديل، وسجلّ التدقيق يحفظ من غيّر ومتى. */
+  assert.match(store, /version: `\$\{globalState\.competition\.ruleSet\.version\}-rev`/);
 
   const overview = read('src/components/admin/CompetitionOverview.tsx');
-  assert.match(overview, /store\.unfreezeRuleSet\(unfreezeReason\.trim\(\)\)/);
-  assert.match(overview, /disabled=\{unfreezeReason\.trim\(\)\.length<5\}/, 'the button cannot fire without a reason');
-  assert.match(overview, /ستُطرح \$\{unfreezeBlockers\.discardableResults\} نتيجة تجربة/,
-    'and what will be discarded is stated before the click, not after');
+  assert.doesNotMatch(overview, /frozenAt/, 'the screen no longer reads a freeze that cannot happen');
+  assert.doesNotMatch(overview, /لائحة هذه المسابقة مجمَّدة|فكّ التجميد/,
+    'and no longer speaks of a frozen rulebook, nor offers to unfreeze one');
+  assert.match(overview, /<button type="button" onClick=\{addCriterion\}/, 'the add button is never disabled');
 });
 
-test('an empty rulebook is called out where it is edited, not only at the readiness gate', () => {
+test('the product speaks of judging criteria, not of a rulebook the organiser does not have', () => {
   const overview = read('src/components/admin/CompetitionOverview.tsx');
-  /* لائحة بلا معايير: المحكّم يجلس أمام سطحٍ لا درجة فيه. البوابة تمنع التشغيل، لكن متأخرًا. */
-  assert.match(overview, /!frozenAt&&!r\.criteria\.length&&/);
-  assert.match(overview, /لا توجد معايير في هذه اللائحة/);
+  assert.match(overview, /ar\?'معايير التحكيم':'Judging criteria'/);
+  assert.doesNotMatch(overview, /لائحتها/, 'the screen no longer assumes the organiser has a written regulation');
+  for (const file of [
+    'src/components/admin/EnterpriseWorkspace.tsx',
+    'src/components/design-system/ClarityGuide.tsx',
+    'src/components/scope/ModelFairnessStudio.tsx',
+    'src/lib/readiness.ts',
+    'src/lib/competition-config.ts',
+    'src/lib/scope-readiness.ts',
+    'src/lib/participant-scope.ts',
+    'src/lib/allocation-verifier.ts',
+  ]) {
+    assert.doesNotMatch(read(file), /اللائحة|لائحة/, `${file} still shows the word to the user`);
+  }
+});
+
+test('empty criteria are called out where they are edited, not only at the readiness gate', () => {
+  const overview = read('src/components/admin/CompetitionOverview.tsx');
+  assert.match(overview, /\{!r\.criteria\.length&&/);
+  assert.match(overview, /لا توجد معايير تحكيم بعد/);
   const readiness = read('src/lib/readiness.ts');
   assert.match(readiness, /c\.ruleSet\.criteria\.length>0/, 'and the launch gate still blocks it independently');
 });

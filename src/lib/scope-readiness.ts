@@ -215,7 +215,7 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
     checks.push(input.escrowReady
       ? pass('escrow', 'حجز السؤال على الخادم', 'Server-held question escrow', 'نص السؤال محجوز على الخادم حتى اكتمال النصاب.', 'Question plaintext stays server-held until quorum.')
       : { id: 'escrow', severity: 'critical', titleAr: 'حجز السؤال على الخادم', titleEn: 'Server-held question escrow', fix: 'seal',
-          detailAr: 'اللائحة تشترط حجز السؤال خارج جهاز المحكم، والخزنة الخادمية غير مهيأة.', detailEn: 'Policy requires server-held escrow but it is not configured.' });
+          detailAr: 'سياسة المسابقة تشترط حجز السؤال خارج جهاز المحكم، والخزنة الخادمية غير مهيأة.', detailEn: 'Policy requires server-held escrow but it is not configured.' });
   }
 
   const critical = checks.filter(x => x.severity === 'critical').length;

@@ -119,7 +119,7 @@ export const BASE_POLICY: CompetitionPolicy = {
     publicVerification: true,
     titleArabic: 'شهادة مشاركة',
     titleEnglish: 'Participation Certificate',
-    awardTextArabic: 'تشهد الجهة المنظمة بإتمام المشاركة وفق لائحة المسابقة المعتمدة.',
+    awardTextArabic: 'تشهد الجهة المنظمة بإتمام المشاركة وفق معايير المسابقة المعتمدة.',
     awardTextEnglish: 'The organizer certifies completion of participation under the approved competition rules.',
     verificationBasePath: '/verify',
     signatories: []
