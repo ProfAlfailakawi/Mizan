@@ -110,11 +110,28 @@ test('a criteria edit preserves the revision each locked submission was judged u
   assert.match(store, /ruleSetId: sessionRuleSet\.id, ruleSetVersion: sessionRuleSet\.version/,
     'and every submission records the table it was judged against');
 
-  /* الجمع والختم يقرآن نسخة الإرسال لا الجدول الحاضر. */
-  assert.match(store, /const panelRevision = sessionSubs\.map\(x => x\.ruleSetVersion\)\.find\(Boolean\)/);
-  assert.match(store, /const criteriaOfRevision = \(version\?: string\) =>/);
-  assert.match(store, /\.find\(r => r\.version === version\)\?\.criteria \|\| ruleSet\.criteria/,
-    'legacy rows without a recorded revision still read the current table, as they always did');
+  /*
+   * والنسخة تُستخرج بالهوية والرقم معًا: الأرقام ليست فريدة عبر `ruleSets`، ففئتان بجدولين
+   * مستقلّين قد تحملان الرقم نفسه، وبحثٌ بالرقم وحده يُجمِّع متسابقًا بمعايير فئةٍ أخرى.
+   */
+  assert.match(store, /function ruleSetRevision\(id\?: string, version\?: string\)/);
+  assert.match(store, /pool\.find\(r => r\.id === id && r\.version === version\)/,
+    'a revision is resolved by identity and version together, never by version alone');
+  assert.doesNotMatch(store, /\.find\(r => r\.version === panelRevision\)/,
+    'the ambiguous version-only lookup is gone');
+
+  /* الجلسة تُثبَّت عند أوّل قفل، فلا يقفل محكّمان على نسختين مختلفتين أصلًا. */
+  assert.match(store, /function pinnedRuleSetForSession\(sessionId: string, fallback: RuleSet\): RuleSet/);
+  assert.match(store, /const sessionRuleSet = pinnedRuleSetForSession\(/);
+  assert.match(store, /const panelRuleSet = pinnedRuleSetForSession\(submission\.sessionId, sessionRuleSet\)/);
+
+  /* وما اختلط قبل هذا الربط يُرفع إلى المراجعة البشرية، ولا يُجمَع بتخمين. */
+  assert.match(store, /recordInvariantBlock\('panel_revision_mixed'/);
+
+  /* والختم يأخذ الجدول كاملًا لا معاييره وحدها: `dropExtremes` يتبع نسخة الإرسال. */
+  assert.match(store, /const sealRuleSet = ruleSetOfSubmission\(/);
+  assert.match(store, /criteria: sealRuleSet\.criteria,\s*\n\s*mode: policy\.judging\.mode, dropExtremes: sealRuleSet\.dropExtremes/,
+    'the historical revision decides drop-extremes too, not the live table');
 
   const types = read('src/types/index.ts');
   assert.match(types, /ruleSetId\?: string;\s*\n\s*ruleSetVersion\?: string;/);

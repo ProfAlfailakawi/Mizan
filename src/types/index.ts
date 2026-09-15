@@ -741,7 +741,7 @@ export interface ReviewCase {
   participantId: string;
   participantCode: string;
   committeeId: string;
-  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier' | 'sealed_result_protection';
+  reason: 'judge_variance' | 'ai_high_confidence_alert' | 'audio_dropout' | 'score_outlier' | 'sealed_result_protection' | 'panel_revision_mixed';
   severity: 'high' | 'medium' | 'low';
   timestampSec: number;
   details: string;
