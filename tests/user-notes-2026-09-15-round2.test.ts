@@ -179,7 +179,17 @@ test('a waiting participant can be listened to, without any of it touching the r
 
   /* والمسار على الخادم مستقلّ عن مسار المحكّم، ولا يكتب في دفتر الأدلّة. */
   const server = read('server.ts');
-  assert.match(server, /'\/api\/quran\/practice\/align',requireFirebaseRoles\(\['participant'\]\)/);
+  assert.match(server, /'\/api\/quran\/practice\/align',requireFirebaseRoles\(\['participant'\]\),practiceAlignmentRateLimit/);
+
+  /*
+   * وحدٌّ غير مشروط عليه: كل نداء يرفع صوتًا ويستدعي المحرّك، فالكلفة لكل نداء لا لكل
+   * جلسة. والتخويل يقول «من أنت» لا «كم مرة» — فحسابٌ واحد مخوَّل يستنزفه وحده.
+   */
+  assert.match(server, /const practiceAlignmentRateLimit:RequestHandler=rateLimit\(\{/,
+    'the limit is declared outright, not behind the global-limiter escape hatch');
+  assert.doesNotMatch(server, /const practiceAlignmentRateLimit:RequestHandler=rateLimiterIsGlobal/);
+  assert.match(server, /keyGenerator:\(req\)=>String\(\(req as any\)\.mizanIdentity\?\.uid/,
+    'counted per account, so one participant cannot spend everyone else\u2019s budget');
   const service = read('server/quran-intelligence-service.ts');
   assert.match(service, /if\(input\.practice\)return \{\.\.\.base,practice:true as const\}/,
     'practice returns before the evidence ledger is appended');
