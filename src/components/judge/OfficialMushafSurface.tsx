@@ -7,7 +7,7 @@ import {DivergenceRadar} from './DivergenceRadar';
 import {TajweedAyah,TajweedAyahWords,TajweedLegend} from './TajweedText';
 import {measuredWordTimings,splitAyahWords,wordAtTime,type MeasuredSegment} from '../../lib/word-timing';
 import {resolveReading} from '../../lib/scientific-core';
-import {DELIVERY_READING_BY_RAWI as DELIVERY_READING_BY_RAWI_MAP} from '../../lib/delivery-question-pool';
+import {DELIVERY_READING_BY_RAWI as DELIVERY_READING_BY_RAWI_MAP} from '../../lib/delivered-readings';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
 
 /*
@@ -16,7 +16,7 @@ import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
  * كانت هذه النسخة الثانية من الجدول نفسه، فإضافةُ روايةٍ في أحدهما تترك الآخر خلفه: يُسحب
  * الموضع من رواية ولا يجد سطحُ المصحف نصًّا لها. فصار المصدر واحدًا يُستورد.
  */
-export { DELIVERED_RAWI_IDS } from '../../lib/delivery-question-pool';
+export { DELIVERED_RAWI_IDS } from '../../lib/delivered-readings';
 
 /*
  * Narration name → delivery key, for the six narrations MIZAN actually delivers.

@@ -1085,13 +1085,32 @@ export function useAppStore() {
    * محاولةُ بدءٍ تفشل بعد تسجيل الحضور تترك صاحبها في حالةٍ لا تُرى: لا في الطابور ولا في
    * كشف المنتظرين، فيختفي من شاشة المحكّم وهو مقبولٌ في شاشة الإدارة. تُعاد حالته إلى
    * «سجّل حضوره» فيُنادى من جديد، ويُسجَّل ذلك في تاريخ الحالة وسجلّ التدقيق.
+   *
+   * والشاهد على «لا جلسة قائمة» لا يُؤخذ من هذا التبويب وحده: `activeSession` محليٌّ
+   * لهذا المتصفّح، بينما صفوف المتسابقين واللجان تُزامَن. فمتسابقٌ يُحكَّم الآن على جهاز
+   * محكّمٍ آخر يبدو من هنا «عالقًا»، وفكُّه يُعيد حالته المزامَنة ويحرّر لجنته، فتُفتح له
+   * جلسةٌ ثانية بينما الأولى جارية — وهذا أسوأ مما جاء الإصلاح ليعالجه.
+   *
+   * فالشواهد ثلاثة، ولا يُفكّ إلا باجتماعها:
+   *   ١) لا لجنة في المسابقة تُعلن أنها تحتكم إليه الآن (`currentParticipantId`) — وهذا
+   *      صفٌّ مزامَن يراه كل جهاز.
+   *   ٢) ولا جلسة هذا الجهاز له.
+   *   ٣) ومضى على ختم «في الجلسة» أكثر من ضعف زمن الجلسة المعتاد — فجلسةٌ بدأت قبل
+   *      دقيقة ليست عالقة مهما تأخّرت مزامنة اللجنة.
    */
+  const STRANDED_GRACE_MINUTES = 30;
   const releaseStrandedSession = (participantId: string) => {
     const idx = globalState.participants.findIndex(p => p.id === participantId && p.competitionId === globalState.competition.id);
     if (idx < 0) return false;
     const current = globalState.participants[idx];
     if (current.status !== 'in_session') return false;
     if (globalState.activeSession.participant?.id === participantId) return false;
+    /* لجنةٌ تحتكم إليه الآن: الجلسة قائمة على جهازٍ آخر، فلا تُفكّ. */
+    if (globalState.committees.some(c => c.competitionId === current.competitionId && c.currentParticipantId === participantId)) return false;
+    const enteredAt = [...(current.statusHistory || [])].reverse().find(h => h.status === 'in_session')?.timestamp;
+    const committee = globalState.committees.find(c => c.id === current.assignedCommitteeId);
+    const graceMs = Math.max(STRANDED_GRACE_MINUTES, (committee?.averageSessionMinutes || 8) * 2) * 60_000;
+    if (enteredAt && Date.now() - new Date(enteredAt).getTime() < graceMs) return false;
     const released = { ...current, status: 'checked_in' as const,
       statusHistory: [...(current.statusHistory || []), { status: 'checked_in' as const, timestamp: new Date().toISOString(), actor: 'Stranded session released' }] };
     globalState.participants[idx] = released;
@@ -1951,8 +1970,16 @@ export function useAppStore() {
      * موجودٌ على الجهاز، فالمنع كان يحجب ما يملكه. الآن يُفتح، ويُقال صراحةً: رمزٌ لم
      * يصل السحابة لا يستطيع وليُّ الأمر ولا الكشك التحقّق منه حتى يصل.
      */
-    if(globalState.isOffline||!auth.currentUser){journeyAccessFailure='';return next;}
-    journeyAccessFailure=!saved?'CLOUD_WRITE_DENIED':published!=='PUBLISHED'?published:'';
+    /*
+     * انقطاعُ الاتصال سببٌ يُقال، لا صمت.
+     *
+     * كان هذان يمحوان السبب، فتُعرض بطاقةٌ تبدو سليمة بلا تحذير — وهي لا تُحلّ عند وليّ
+     * الأمر ولا عند الكشك. ولـ`journeyIssueNote` نصٌّ لكلٍّ منهما، فيُترك ليُقال.
+     */
+    /* الترتيب مقصود: بلا اتصال ولا جلسة يفشل الحفظ أيضًا، فلو قُدّم لسُمّي «رفض صلاحية» وهو ليس كذلك. */
+    journeyAccessFailure=published==='OFFLINE'||published==='NOT_SIGNED_IN'?published
+      :!saved?'CLOUD_WRITE_DENIED'
+      :published!=='PUBLISHED'?published:'';
     return next;
   };
 
@@ -1971,7 +1998,15 @@ export function useAppStore() {
     return next;
   }catch{return null}
 };
-const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
+/*
+ * التصدير الجماعي لا يُخرج بطاقةً لا تُحلّ.
+ *
+ * البطاقة الفردية تُفتح ولو تعذّر رفعها — الرمز على الجهاز وصاحبه يراه ويُقال له أثر ذلك.
+ * أما الحزمة المطبوعة فتُوزَّع على الأهالي ولا أحد يقرأ تحذيرًا معها: رمزٌ لم يصل السحابة
+ * لا يستطيع وليُّ الأمر ولا الكشك التحقّق منه. فلا يدخل الحزمة إلا ما نُشر فعلًا، وما لم
+ * يُنشر يُعدّ متعذّرًا ويُقال عدده.
+ */
+const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out&&!journeyAccessFailure)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
 
   const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const managedUid=String((account as IdentityAccountRecord&{uid?:string}).uid||account.firebaseUid||account.id);const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===managedUid);const old=idx>=0?next[idx]:undefined;const specialties=old?.specialties?.length?old.specialties:old?.specialty?[old.specialty]:['all'];const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:managedUid,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:specialties[0]||'all',specialties,certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
 
@@ -2743,10 +2778,28 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
         auditTrustAction('SERVER_QUESTION_RUNTIME_ATTACHED','JudgingSession',runtime.sessionId,'ربط جلسة التحكيم بحزمة أسئلة خادمية؛ لم ينفذ FairDraw أو حل النص القرآني داخل جهاز المحكم','Attached JudgeOS to server-held question runtime; FairDraw and Quran plaintext resolution did not run on the judge device');
         void createContinuityCheckpoint('server-session-start');notify();return true;
       }catch(error){
+        /*
+         * الغياب يُرتدّ عنه، والتضارب يُوقف.
+         *
+         * «لا حزمة لهذا المتسابق» حالةٌ عادية تمضي معها الجلسة على مصحف التسليم. أما حزمةٌ
+         * موجودة تخصّ لجنةً أخرى أو روايةً أخرى فليست غيابًا بل تضارب: الارتداد عنها يترك
+         * الحزمة غير المطابقة قائمة ويتخطّى ضماناتها، فتُقرأ أسئلة لجنةٍ في لجنةٍ سواها.
+         * فيُوقف، ويُرفع عطلًا باسمه.
+         */
+        const reason=error instanceof Error?error.message:'غير معروف';
+        const mismatch=reason==='SERVER_QUESTION_RUNTIME_COMMITTEE_MISMATCH'||reason==='SERVER_QUESTION_RUNTIME_READING_MISMATCH';
+        if(mismatch){
+          createIncident('quran_source_discrepancy','حزمة الأسئلة الخادمية لا تطابق هذه الجلسة',
+            reason==='SERVER_QUESTION_RUNTIME_COMMITTEE_MISMATCH'
+              ? `حزمة أسئلة ${participant.code} مُعدّة للجنة أخرى. لا تبدأ الجلسة حتى تُصحَّح، ولا يُسحب على الجهاز بديلًا عنها.`
+              : `حزمة أسئلة ${participant.code} بروايةٍ غير روايته. لا تبدأ الجلسة حتى تُصحَّح، ولا يُسحب على الجهاز بديلًا عنها.`,
+            'critical');
+          notify();return false;
+        }
         /* لا حزمة خادمية لهذا المتسابق: تمضي الجلسة على مصحف التسليم، ويُقال ذلك في التدقيق. */
         auditTrustAction('SESSION_QUESTIONS_RESOLVED_ON_DEVICE','JudgingSession',participant.id,
-          `لا حزمة أسئلة خادمية لهذا المتسابق (${error instanceof Error?error.message:'غير معروف'})؛ سُحبت المواضع من مصحف التسليم على الجهاز.`,
-          `No server-held question package for this participant (${error instanceof Error?error.message:'unknown'}); passages were drawn from the delivery Mushaf on-device.`);
+          `لا حزمة أسئلة خادمية لهذا المتسابق (${reason})؛ سُحبت المواضع من مصحف التسليم على الجهاز.`,
+          `No server-held question package for this participant (${reason}); passages were drawn from the delivery Mushaf on-device.`);
       }
     }
     /*
@@ -2838,7 +2891,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       }
     }
     try {
-      const selection = await generateFairDraw({ pool, participant, policy:effPolicy, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DEVELOPMENT',
+      const selection = await generateFairDraw({ pool, participant, policy:effPolicy, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DELIVERY_MUSHAF',
         scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id, preGenerated, excludedLocusKeys:heldElsewhere } });
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
       const sessionId=newId('sess');
@@ -2896,7 +2949,8 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id); if(idx>=0){const inSession={...globalState.participants[idx],status:'in_session' as const,statusHistory:[...(globalState.participants[idx].statusHistory||[]),{status:'in_session' as const,timestamp:new Date().toISOString(),actor:'Judging session'}]};globalState.participants[idx]=inSession;syncParticipantLifecycle(inSession);}
       globalState.committees=globalState.committees.map(c=>c.id===committee.id?{...c,status:'testing',currentParticipantId:participantId}:c);
       refreshQueueNotifications();
-      globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'FAIRDRAW_COMMITTED', entityType:'QuestionSelection', entityId:selection.questionSetId, humanSummaryArabic:sourceMode==='CERTIFIED_SOURCE'?`اعتماد حزمة أسئلة ${participant.code} من مصدر قرآني معتمد محدد النسخة`:`حزمة تطوير ${participant.code} — ليست مصدرًا قرآنيًا رسميًا`, humanSummaryEnglish:sourceMode==='CERTIFIED_SOURCE'?`Committed ${participant.code} question set from exact certified Quran source package`:`Development-only question fixture for ${participant.code}; not an official Quran source`, currentStateHash:selection.seedCommitmentHash }, ...globalState.auditLogs];
+      globalState.auditLogs = [{ id:newId('aud'), timestamp:new Date().toISOString(), organizationId:globalState.competition.organizationId, competitionId:globalState.competition.id, actorId:globalState.currentUser.id, actorName:globalState.currentUser.name, actorRole:globalState.currentUser.role, action:'FAIRDRAW_COMMITTED', entityType:'QuestionSelection', entityId:selection.questionSetId, /* الأثر يصف ما وقع فعلًا: مصحف التسليم نصٌّ رسمي، ووصفُه «حزمة تطوير» يكذب على المدقّق. */
+        humanSummaryArabic:sourceMode==='CERTIFIED_SOURCE'?`اعتماد حزمة أسئلة ${participant.code} من حزمة مصدر مرفوعة محددة النسخة`:`حزمة أسئلة ${participant.code} من مصحف التسليم الرسمي`, humanSummaryEnglish:sourceMode==='CERTIFIED_SOURCE'?`Committed ${participant.code} question set from an uploaded, version-pinned source package`:`Committed ${participant.code} question set from the official delivery Mushaf`, currentStateHash:selection.seedCommitmentHash }, ...globalState.auditLogs];
       void createContinuityCheckpoint('session-start');
       notify(); return true;
     } catch (error) {

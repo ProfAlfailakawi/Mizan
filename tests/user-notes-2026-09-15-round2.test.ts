@@ -56,7 +56,9 @@ test('an official session is never blocked by a package the organiser cannot cre
 
 test('nobody awaiting a turn can vanish from the judging screen', () => {
   const judge = read('src/components/judge/JudgeOS.tsx');
-  assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session','appealed'\]/);
+  /* ما قبل التقييم وحده: «اعتراض» له مسار إعادةٍ محكوم، ونداؤه من هنا يتخطّاه. */
+  assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session'\]/);
+  assert.doesNotMatch(judge, /'in_session','appealed'/, 'an appeal is never turned into an unauthorized retest');
   assert.match(judge, /PARTICIPANT_WAIT_LABEL/);
   assert.match(judge, /store\.releaseStrandedSession\(id\)/);
 
@@ -100,10 +102,10 @@ test('the entities tab does not claim to be international', () => {
 
 test('al-Bazzi and Qunbul resolve to real delivery packages', () => {
   /* الوحدة تجرّ تهيئة المتصفح عند الاستيراد، فيُقرأ نصُّها كما تفعل بقية هذه المجموعة. */
-  const pool = read('src/lib/delivery-question-pool.ts');
-  assert.match(pool, /'al-bazzi':'bazzi'/);
-  assert.match(pool, /qunbul:'qunbul'/);
-  assert.match(pool, /export const DELIVERED_RAWI_IDS:readonly string\[\]=Object\.keys\(DELIVERY_READING_BY_RAWI\)/,
+  const table = read('src/lib/delivered-readings.ts');
+  assert.match(table, /'al-bazzi': 'bazzi'/);
+  assert.match(table, /qunbul: 'qunbul'/);
+  assert.match(table, /export const DELIVERED_RAWI_IDS: readonly string\[\] = Object\.keys\(DELIVERY_READING_BY_RAWI\)/,
     'the delivered list is derived from the table, so the two cannot disagree');
 
   /* والخادم يعرف أين يجدهما، في التسليم الخاص وفي المستودع المفتوح. */
@@ -233,4 +235,76 @@ test('the exceptions panel says what it is, in one screen and one table', () => 
   for (const file of ['src/components/admin/CompetitionOverview.tsx', 'src/components/operations/CommandCenter.tsx']) {
     assert.match(read(file), /import \{ incidentTitle \} from/, `${file} reads the shared table`);
   }
+});
+
+/* ── مراجعة Codex على #155 — كل ملاحظة تحرسها حالة ───────────────────────── */
+
+test('a stranded session is judged by shared state, never by this tab alone', () => {
+  /*
+   * `activeSession` محليٌّ لهذا المتصفّح، وصفوف المتسابقين واللجان مزامَنة. فمتسابقٌ
+   * يُحكَّم الآن على جهازٍ آخر كان يبدو «عالقًا» من هنا، وفكُّه يفتح له جلسةً ثانية
+   * بينما الأولى جارية — وهذا أسوأ مما جاء الإصلاح ليعالجه.
+   */
+  const store = read('src/lib/store.ts');
+  assert.match(store, /if \(globalState\.committees\.some\(c => c\.competitionId === current\.competitionId && c\.currentParticipantId === participantId\)\) return false;/,
+    'a committee that claims the participant is authoritative across devices');
+  assert.match(store, /const enteredAt = \[\.\.\.\(current\.statusHistory \|\| \[\]\)\]\.reverse\(\)\.find\(h => h\.status === 'in_session'\)\?\.timestamp;/);
+  assert.match(store, /if \(enteredAt && Date\.now\(\) - new Date\(enteredAt\)\.getTime\(\) < graceMs\) return false;/,
+    'a session that began a minute ago is not stranded, whatever the sync lag');
+});
+
+test('a server runtime that belongs to another panel or reading stops the session', () => {
+  /*
+   * الغياب يُرتدّ عنه، والتضارب يُوقف: حزمةٌ موجودة لكنها للجنةٍ أخرى ليست غيابًا،
+   * والارتداد عنها يتخطّى ضماناتها ويقرأ أسئلة لجنةٍ في لجنةٍ سواها.
+   */
+  const store = read('src/lib/store.ts');
+  assert.match(store, /const mismatch=reason==='SERVER_QUESTION_RUNTIME_COMMITTEE_MISMATCH'\|\|reason==='SERVER_QUESTION_RUNTIME_READING_MISMATCH';/);
+  /* يُقرأ ما بين بداية الفرع ونهايته المعلَّمة بتعليق الارتداد، لا حتى أول قوسٍ مغلق —
+     فأوّل قوسٍ هنا يقع داخل قالب نصّي. */
+  const start = store.indexOf('if(mismatch){');
+  const end = store.indexOf('لا حزمة خادمية لهذا المتسابق', start);
+  assert.ok(start >= 0 && end > start, 'the mismatch branch precedes the fallback');
+  assert.ok(store.slice(start, end).includes('return false;'),
+    'a mismatch returns false rather than falling through to the on-device draw');
+  assert.match(store, /حزمة الأسئلة الخادمية لا تطابق هذه الجلسة/, 'and is raised as an incident by name');
+});
+
+test('a bulk export never hands out a card the server cannot resolve', () => {
+  const store = read('src/lib/store.ts');
+  assert.match(store, /const out=await ensureParticipantJourneyAccess\(participant\.id\);if\(out&&!journeyAccessFailure\)ready\.push\(out\);else failed\.push\(participant\.id\)/,
+    'only a published record is exportable, even though the single card still opens locally');
+});
+
+test('an offline pass keeps its warning instead of looking healthy', () => {
+  const store = read('src/lib/store.ts');
+  assert.doesNotMatch(store, /\{journeyAccessFailure='';return next;\}/, 'the branch that erased the reason is gone');
+  assert.match(store, /journeyAccessFailure=published==='OFFLINE'\|\|published==='NOT_SIGNED_IN'\?published/,
+    'and offline is named as offline, not as a permission refusal — both fail the local write too');
+});
+
+test('the readiness gate knows every narration the delivery layer knows', () => {
+  /* ثلاث نسخ من جدول واحد كانت تفترق عند أول إضافة؛ صار في وحدة طرفية بلا استيراد. */
+  const core = read('src/lib/scientific-core.ts');
+  assert.match(core, /const KFGQPC_OFFICIAL_RAWI_IDS=new Set<string>\(DELIVERED_RAWI_IDS\);/);
+  assert.match(core, /import \{ DELIVERED_RAWI_IDS \} from '\.\/delivered-readings';/,
+    'read from the leaf module, not from the pool it already imports — that would be a cycle');
+
+  const table = read('src/lib/delivered-readings.ts');
+  assert.doesNotMatch(table, /^import /m, 'the shared table imports nothing, so no load order can empty it');
+});
+
+test('no readiness fix points at the deleted scientific screen', () => {
+  assert.doesNotMatch(read('src/components/admin/ReadinessLab.tsx'), /mizan:open-scientific/);
+  assert.doesNotMatch(read('src/types/index.ts'), /fixTarget:'competition_dna'\|'scientific'/);
+  assert.doesNotMatch(read('src/lib/policy-compiler.ts'), /fixTarget:'scientific'/);
+});
+
+test('a delivery-Mushaf draw is recorded as what it is', () => {
+  /* وصفُ نصٍّ رسمي بأنه «حزمة تطوير» يكذب على المدقّق في أثرٍ يُحتجّ به. */
+  const store = read('src/lib/store.ts');
+  assert.doesNotMatch(store, /Development-only question fixture/);
+  assert.doesNotMatch(store, /حزمة تطوير \$\{participant\.code\}/);
+  assert.match(store, /حزمة أسئلة \$\{participant\.code\} من مصحف التسليم الرسمي/);
+  assert.match(store, /difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'\?`QG:\$\{source!\.packageHash\}`:'DELIVERY_MUSHAF'/);
 });

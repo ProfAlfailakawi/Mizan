@@ -22,7 +22,7 @@ import { fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetc
 /* حالة المنتظر بلغة المحكّم: ما الذي ينتظره هذا الاسم الآن. */
 const PARTICIPANT_WAIT_LABEL:Record<string,string>={
  in_queue:'في الطابور', checked_in:'سجّل حضوره', approved:'لم يسجّل حضوره',
- in_session:'جلسة معلّقة', appealed:'اعتراض',
+ in_session:'جلسة معلّقة',
 };
 const marksAr=(n:number)=> n===1?'مرة واحدة' : n===2?'مرتين' : n<=10?`${n} مرات` : `${n} مرة`;
 // نفس قاعدة العدد العربي، بلفظ «ملاحظة»: مفرد، مثنّى، جمع قلة، ثم تمييز مفرد.
@@ -168,7 +168,14 @@ export const JudgeOS: React.FC = () => {
   * والجهة ترى في إدارتها متسابقًا مقبولًا. فصار يُعرض كل من له دور لم يُقيَّم بعد، وتُقال
   * حالته بجانب اسمه، ويُنادى مباشرة — ومن عَلِق تُفكّ حالته أولًا ثم يُنادى.
   */
- const CALLABLE:RegistrationStatus[]=['approved','checked_in','in_session','appealed'];
+ /*
+  * ما قبل التقييم وحده يُنادى.
+  *
+  * «اعتراض» حالةُ من فرغ تقييمه، وإعادةُ اختباره لها مسارها المحكوم (إعادة كاملة بقرار).
+  * ولو ظهر هنا بزرّ «إدخال ونداء» لفُتحت له جلسةٌ وسحبٌ جديد خارج ذلك المسار — فيصير
+  * الاعتراض بابًا لإعادةٍ غير مأذونة.
+  */
+ const CALLABLE:RegistrationStatus[]=['approved','checked_in','in_session'];
  const strandedInSession=(p:{status:RegistrationStatus;id:string})=>
   p.status==='in_session'&&p.id!==participant?.id;
  const awaitingArrival=rosterForCompetition

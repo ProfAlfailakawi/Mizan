@@ -384,7 +384,7 @@ test('an empty judging screen says why it is empty and offers the next real step
    * متسابقٌ عَلِقت حالته على «في الجلسة» بعد محاولة بدءٍ فاشلة كان يختفي من الشاشة كلها
    * والعدّاد يقول صفرًا، بينما الإدارة تعرضه مقبولًا — فيظنّ المحكّم النظام معطلًا.
    */
-  assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session','appealed'\]/);
+  assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session'\]/);
   assert.match(judge, /store\.releaseStrandedSession\(id\)/, 'a stranded participant is released before being called again');
   assert.match(judge, /PARTICIPANT_WAIT_LABEL/, 'each waiting name carries what it is waiting for');
 });

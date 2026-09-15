@@ -1,6 +1,7 @@
 import type {QuestionPoolItem} from '../types';
 import {drawFairPassage,fetchDifficulty} from './kfgqpc-library';
 import {resolveReading} from './scientific-core';
+import {DELIVERY_READING_BY_RAWI} from './delivered-readings';
 import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
 
 /*
@@ -21,11 +22,8 @@ import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
  * وهذه طبقة تسليم لا مصدر علمي: متى توفّرت خزنة المصدر المُصدّقة فهي المقدَّمة، ولا يحلّ هذا محلها.
  */
 
-/** رواية MIZAN القانونية → مفتاح حزمة التسليم. ما لا حزمة له لا يُولَّد له بنك. */
-export const DELIVERY_READING_BY_RAWI:Record<string,string>={hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qalun','al-duri-abu-amr':'duri-abi-amr','al-susi':'susi-abi-amr','al-bazzi':'bazzi',qunbul:'qunbul'};
-
-/** الرواة الذين نملك لهم حزمة تسليم فعلًا — تقرأها شاشات الإعداد لتعرض ما يمكن تشغيله. */
-export const DELIVERED_RAWI_IDS:readonly string[]=Object.keys(DELIVERY_READING_BY_RAWI);
+/* الجدول في وحدةٍ طرفية يقرأها هذا الملف والجاهزية معًا — انظر `delivered-readings.ts`. */
+export { DELIVERY_READING_BY_RAWI, DELIVERED_RAWI_IDS } from './delivered-readings';
 
 export function deliveryReadingKey(riwaya?:string,qiraah?:string):string|null{
  const reading=resolveReading({rawi:riwaya,riwaya,qiraah});
