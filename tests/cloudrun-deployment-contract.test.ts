@@ -22,7 +22,18 @@ test('production deployment is repository-owned and gated by green main CI',()=>
   assert.match(deploy,/google-github-actions\/setup-gcloud@v3/);
   assert.match(deploy,/gcloud builds submit/);
   assert.match(deploy,/--config=cloudbuild\.yaml/);
-  assert.match(deploy,/--service-account="\$GCP_BUILD_SERVICE_ACCOUNT"/);
+  /*
+   * حساب البناء يُمرَّر باسم المورد كاملًا.
+   *
+   * `builds submit --service-account` يريد `projects/<PROJECT>/serviceAccounts/<EMAIL>`،
+   * والبريد وحده يُردّ بـ INVALID_ARGUMENT بعد رفع المصدر مباشرةً — فلا يُنشأ بناءٌ أصلًا،
+   * ويبدو في GitHub كأن البناء فشل. وكان هذا الاختبار يثبّت الصيغة المكسورة نفسها.
+   */
+  assert.match(deploy,/--service-account="projects\/\$GCP_PROJECT_ID\/serviceAccounts\/\$GCP_BUILD_SERVICE_ACCOUNT"/);
+  assert.doesNotMatch(deploy,/--service-account="\$GCP_BUILD_SERVICE_ACCOUNT"/,
+    'the bare email is rejected by the Cloud Build API');
+  /* والخطوة التي تتحقق من وجوده تريد البريد لا اسم المورد، فالصيغتان تتعايشان عمدًا. */
+  assert.match(deploy,/gcloud iam service-accounts describe "\$GCP_BUILD_SERVICE_ACCOUNT"/);
   assert.match(deploy,/COMMIT_SHA=\$VERIFIED_SHA/);
   assert.match(deploy,/GCP_WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(deploy,/GCP_DEPLOY_SERVICE_ACCOUNT/);
