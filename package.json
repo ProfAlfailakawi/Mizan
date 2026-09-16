@@ -18,6 +18,7 @@
     "waqf:derive": "tsx scripts/kfgqpc-waqf-derive.ts",
     "quran:science-intake": "tsx scripts/kfgqpc-science-intake.ts",
     "quran:readiness": "tsx scripts/quran-intelligence-readiness.ts",
+    "quran:release-matrix": "tsx scripts/quran-release-matrix.ts",
     "verify:pwa": "node scripts/verify-pwa.mjs",
     "preflight": "node scripts/go-live-preflight.mjs",
     "load:rehearsal": "tsx scripts/load-rehearsal.ts",
