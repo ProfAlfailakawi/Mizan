@@ -8,6 +8,8 @@ import {
   readingCapability,
   readingCapabilityMatrix,
   readingReleaseSummary,
+  readingProductionReady,
+  readingProductionReadySummary,
   resolveCanonicalRawiId,
   AL_DURI_ABU_AMR,
   AL_DURI_KISAI,
@@ -64,37 +66,78 @@ test('every delivered rawi is a known canonical rawi — delivery cannot drift a
   }
 });
 
-test('the capability matrix reports real state, never a blanket 20/20', () => {
+test('the capability matrix reports only registry-knowable facts — no asserted readiness', () => {
   const matrix = readingCapabilityMatrix();
   assert.equal(matrix.length, 20);
-  // الهوية القانونية واعتماد اللجنة والصوت العالمي — للعشرين.
+  // الهوية القانونية واعتماد النطاق والصوت العالمي — للعشرين.
   assert.ok(matrix.every(r => r.canonicalIdentity), 'canonical identity for all 20');
-  assert.ok(matrix.every(r => r.committeeApproved), 'committee approval for all 20');
+  assert.ok(matrix.every(r => r.committeeScopeApproved), 'committee scope approval for all 20');
   assert.ok(matrix.every(r => r.globalHafsAudio), 'global Hafs audio for all 20');
-  // لكن الجاهزية للإنتاج تتبع حزمة التسليم الفعلية فقط.
+  // وجود المسار في الجدول ينعكس بأمانة، دون ادّعاء توفّرٍ وقت التشغيل.
   for (const row of matrix) {
-    const delivered = Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, row.rawiId);
-    assert.equal(row.productionReady, delivered, `production readiness matches delivery for ${row.rawiId}`);
-    assert.equal(row.deliveryState, delivered ? 'DELIVERY_READY' : 'PENDING_SOURCE');
+    const mapped = Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, row.rawiId);
+    assert.equal(row.deliveryMappingPresent, mapped, `delivery mapping reflected for ${row.rawiId}`);
+    assert.equal(row.deliveryState, mapped ? 'DELIVERY_MAPPED' : 'PENDING_SOURCE');
+    // لا حقل «جاهز للإنتاج» ثابت في الصفّ — الجاهزية تُركّب من أدلّة.
+    assert.equal((row as unknown as Record<string, unknown>).productionReady, undefined);
   }
 });
 
-test('the release summary is computed honestly from state', () => {
+test('production readiness is composed from evidence, never from key-presence alone', () => {
+  // Hafs له مسار، لكن بلا توفّرٍ وقت التشغيل يبقى غير جاهزٍ (فشلٌ مغلق).
+  const noRuntime = readingProductionReady('hafs', { deliveryAvailableAtRuntime: false });
+  assert.equal(noRuntime.productionReady, false);
+  assert.ok(noRuntime.blockers.includes('DELIVERY_TEXT_UNAVAILABLE_AT_RUNTIME'));
+
+  // مع التوفّر الفعلي وبلا نفيٍ للاعتماد → جاهز.
+  const ready = readingProductionReady('hafs', { deliveryAvailableAtRuntime: true });
+  assert.deepEqual(ready.blockers, []);
+  assert.equal(ready.productionReady, true);
+
+  // رواية بلا مسار تسليم لا تصير جاهزةً ولو ادّعى المُحقِن توفّرًا.
+  const pending = readingProductionReady('hisham', { deliveryAvailableAtRuntime: true });
+  assert.equal(pending.productionReady, false);
+  assert.ok(pending.blockers.includes('NO_DELIVERY_MAPPING'));
+
+  // مصدرٌ معلومُ عدمِ الاعتماد يمنع صراحةً.
+  const uncertified = readingProductionReady('hafs', { deliveryAvailableAtRuntime: true, sourceCertified: false });
+  assert.equal(uncertified.productionReady, false);
+  assert.ok(uncertified.blockers.includes('SOURCE_NOT_CERTIFIED'));
+
+  // راوٍ مجهول → فشلٌ مغلق.
+  assert.equal(readingProductionReady('not-a-rawi', { deliveryAvailableAtRuntime: true }).productionReady, false);
+});
+
+test('the release summary is computed honestly from state and omits asserted readiness', () => {
   const s = readingReleaseSummary();
   assert.equal(s.total, 20);
   assert.equal(s.canonicalIdentities, 20);
-  assert.equal(s.committeeApproved, 20);
+  assert.equal(s.committeeScopeApproved, 20);
   assert.equal(s.globalHafsAudio, 20);
-  // حزم التسليم = مفاتيح جدول التسليم فعلًا.
-  assert.equal(s.deliveryPackages, Object.keys(DELIVERY_READING_BY_RAWI).length);
-  assert.equal(s.productionReady, s.deliveryPackages);
-  // الروايات المعلّقة = 20 ناقص ذوات الحزم، ولا واحدة منها في جدول التسليم.
-  assert.equal(s.pendingSource.length, 20 - s.deliveryPackages);
+  // مسارات التسليم = مفاتيح جدول التسليم فعلًا.
+  assert.equal(s.deliveryMappings, Object.keys(DELIVERY_READING_BY_RAWI).length);
+  // لا حقل «جاهز للإنتاج» في الملخّص العام.
+  assert.equal((s as unknown as Record<string, unknown>).productionReady, undefined);
+  // الروايات المعلّقة = 20 ناقص ذوات المسارات، ولا واحدة منها في جدول التسليم.
+  assert.equal(s.pendingSource.length, 20 - s.deliveryMappings);
   for (const rawiId of s.pendingSource) {
     assert.ok(!Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, rawiId));
   }
-  // Hafs جاهزٌ دائمًا.
   assert.ok(!s.pendingSource.includes('hafs'), 'Hafs is never pending');
+});
+
+test('readingProductionReadySummary defaults missing evidence to not-ready (fail closed)', () => {
+  // بلا أي دليل → صفر جاهز، والجميع محجوبٌ بسبب انعدام التوفّر أو المسار.
+  const empty = readingProductionReadySummary({});
+  assert.equal(empty.total, 20);
+  assert.equal(empty.productionReady, 0);
+  assert.equal(Object.keys(empty.blockedByRawi).length, 20);
+
+  // مع حقن توفّرٍ فعلي لِمَن له مسار فقط → الجاهز = عدد المسارات.
+  const evidence: Record<string, { deliveryAvailableAtRuntime: boolean }> = {};
+  for (const rawiId of Object.keys(DELIVERY_READING_BY_RAWI)) evidence[rawiId] = { deliveryAvailableAtRuntime: true };
+  const withRuntime = readingProductionReadySummary(evidence);
+  assert.equal(withRuntime.productionReady, Object.keys(DELIVERY_READING_BY_RAWI).length);
 });
 
 test('al-Duri is never guessed: the two Duris are distinct and resolve unambiguously', () => {

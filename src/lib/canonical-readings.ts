@@ -22,10 +22,10 @@ import { readingOptions, DEFAULT_READING_VALUE } from './quran-reading-sources';
 /** اعتماد اللجنة العلمية لمشروع ميزان — قرارٌ من مالك المشروع واللجنة، لا تصديقٌ من جهةٍ خارجية. */
 export const MIZAN_SCIENTIFIC_COMMITTEE_APPROVAL = 'MIZAN_SCIENTIFIC_COMMITTEE_APPROVAL' as const;
 
-/** حالة توفّر حزمة التسليم النصّية لرواية بعينها — تُقرأ لا تُدّعى. */
+/** حالة مسار التسليم لرواية بعينها — وجودُ مسارٍ لا توفّرُ بايتات. */
 export type ReadingDeliveryState =
-  | 'DELIVERY_READY'   // له حزمة تسليم نصّية فعلية → يصلح لتشغيل مسابقة الآن.
-  | 'PENDING_SOURCE';  // معرّفٌ قانونيًا لكن حزمته النصّية لم تصل بعد → لا يُفتح للاختيار.
+  | 'DELIVERY_MAPPED'  // له مسار تسليم في الجدول — شرطٌ لازم لا كافٍ للتوفّر وقت التشغيل.
+  | 'PENDING_SOURCE';  // لا مسار تسليم بعد → لا يُفتح للاختيار.
 
 export interface CanonicalReading {
   /** المعرّف القانوني الوحيد للرواية = `rawiId` كما في `TEN_QIRAAT_GRAPH`. */
@@ -82,35 +82,42 @@ export interface ReadingCapabilityRow {
   qiraahId: string;
   /** هوية قانونية ثابتة في الرسم — صحيحة للعشرين جميعًا. */
   canonicalIdentity: boolean;
-  /** اعتماد اللجنة العلمية لميزان للمصادر والروايات — قرارٌ منصوص للعشرين. */
-  committeeApproved: boolean;
-  /** هل توجد حزمة تسليم نصّية فعلية لهذه الرواية؟ (مقروءة من طبقة التسليم) */
-  deliveryPackageAvailable: boolean;
+  /**
+   * اعتماد اللجنة العلمية لميزان لنطاق القراءات العشرين ومصادرها — قرارٌ إداري
+   * منصوص (ثابت). لا يُغني عن اعتماد المصدر المُصدّق لكلّ حزمة (البصمة، مراجعان
+   * مستقلّان) الذي يُتحقَّق منه في `canPromoteQuranSource` ووُصف في
+   * `QURAN_SOURCE_GOVERNANCE.md`. فهذا نطاقٌ، وذاك حزمة — ولا يُخلط بينهما.
+   */
+  committeeScopeApproved: boolean;
   /** الصوت لكل الروايات حفصٌ عالمي — هوية الصوت مستقلّة عن هوية النص. */
   globalHafsAudio: boolean;
-  /** حالة التسليم المقروءة. */
-  deliveryState: ReadingDeliveryState;
   /**
-   * جاهزٌ لتشغيل مسابقة = له حزمة تسليم نصّية. لا يُرفع هذا العلم بغير حزمة،
-   * فالعرضُ وعدٌ لا يجوز إخلافه يوم المسابقة.
+   * هل لهذه الرواية مسار تسليم في `DELIVERY_READING_BY_RAWI`؟ هذا وجودُ مسارٍ لا
+   * توفّرُ بايتات: قد يعود بنك الأسئلة فارغًا إن غاب النصّ محليًا وفي R2 وعُطّلت
+   * المرآة. فليست هذه «جاهزية إنتاج» بذاتها — انظر `readingProductionReady`.
    */
-  productionReady: boolean;
+  deliveryMappingPresent: boolean;
+  /** حالة مسار التسليم المقروءة. */
+  deliveryState: ReadingDeliveryState;
 }
 
-/** يبني صفّ القدرات لرواية واحدة من حالتها الحقيقية. */
+function hasDeliveryMapping(rawiId: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, rawiId);
+}
+
+/** يبني صفّ القدرات لرواية واحدة من حالتها الحقيقية (الحقائق المعروفة للسجلّ وحده). */
 export function readingCapability(rawiId: string): ReadingCapabilityRow | undefined {
   const reading = CANONICAL_READING_BY_RAWI.get(rawiId);
   if (!reading) return undefined;
-  const deliveryPackageAvailable = Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, rawiId);
+  const deliveryMappingPresent = hasDeliveryMapping(rawiId);
   return {
     rawiId: reading.rawiId,
     qiraahId: reading.qiraahId,
     canonicalIdentity: true,
-    committeeApproved: true,
-    deliveryPackageAvailable,
+    committeeScopeApproved: true,
     globalHafsAudio: true,
-    deliveryState: deliveryPackageAvailable ? 'DELIVERY_READY' : 'PENDING_SOURCE',
-    productionReady: deliveryPackageAvailable,
+    deliveryMappingPresent,
+    deliveryState: deliveryMappingPresent ? 'DELIVERY_MAPPED' : 'PENDING_SOURCE',
   };
 }
 
@@ -119,28 +126,82 @@ export function readingCapabilityMatrix(): ReadingCapabilityRow[] {
   return CANONICAL_READINGS.map(r => readingCapability(r.rawiId)!);
 }
 
-/** ملخّص صادق للإصدار: يُحسب من الحالة، فلا يطبع 20/20 إلا إن كانت 20 فعلًا. */
+/** أدلّة الجاهزية المُحقَّقة خارج السجلّ — يحقنها من يملك رؤية التشغيل. */
+export interface ReadingReadinessEvidence {
+  /** هل تُحقّق فعليًا من توفّر نصّ التسليم وقت التشغيل (جذر محلي/‏R2/‏مرآة)؟ */
+  deliveryAvailableAtRuntime: boolean;
+  /**
+   * هل يوجد سجلّ مصدرٍ مُصدّق مطابق (اعتماد بالبصمة ومراجعَين)؟ `undefined` = غير
+   * معلوم للسجلّ فلا يُحتسب مانعًا؛ و`false` = معلومٌ أنه غير مُصدّق فيُمنع.
+   */
+  sourceCertified?: boolean;
+}
+
+export interface ReadingProductionReadiness {
+  rawiId: string;
+  productionReady: boolean;
+  blockers: string[];
+}
+
+/**
+ * الجاهزية للإنتاج مركّبةٌ من أدلّة لا مُدّعاة: تتطلّب مسار تسليم + توفّرًا فعليًا
+ * وقت التشغيل + ألّا يكون المصدر المُصدّق غائبًا صراحةً. بلا دليل التوفّر تبقى غير
+ * جاهزة (فشلٌ مغلق)، فلا يعِد السجلّ بما لا يملك التحقّق منه.
+ */
+export function readingProductionReady(rawiId: string, evidence: ReadingReadinessEvidence): ReadingProductionReadiness {
+  const cap = readingCapability(rawiId);
+  if (!cap) return { rawiId, productionReady: false, blockers: ['UNKNOWN_READING'] };
+  const blockers: string[] = [];
+  if (!cap.deliveryMappingPresent) blockers.push('NO_DELIVERY_MAPPING');
+  if (!evidence.deliveryAvailableAtRuntime) blockers.push('DELIVERY_TEXT_UNAVAILABLE_AT_RUNTIME');
+  if (evidence.sourceCertified === false) blockers.push('SOURCE_NOT_CERTIFIED');
+  return { rawiId, productionReady: blockers.length === 0, blockers };
+}
+
+/**
+ * ملخّص صادق للإصدار: يُحسب من الحالة فقط، ويقتصر على ما يعرفه السجلّ وحده.
+ * الجاهزية للإنتاج ليست هنا لأنها تتطلّب دليل توفّرٍ وقت التشغيل — تُحسب عبر
+ * `readingProductionReadySummary(evidenceByRawi)` بعد حقن الأدلّة.
+ */
 export interface ReadingReleaseSummary {
   canonicalIdentities: number;      // من أصل 20
-  committeeApproved: number;        // من أصل 20
-  deliveryPackages: number;         // الروايات ذات حزمة تسليم نصّية
-  productionReady: number;
+  committeeScopeApproved: number;   // من أصل 20 (قرار نطاقٍ إداري، لا اعتماد حزمة)
+  deliveryMappings: number;         // الروايات ذات مسار تسليم في الجدول
   globalHafsAudio: number;
   total: number;
-  pendingSource: string[];          // معرّفات الرواة التي لم تصل حزمتها بعد
+  pendingSource: string[];          // معرّفات الرواة بلا مسار تسليم بعد
 }
 
 export function readingReleaseSummary(): ReadingReleaseSummary {
   const rows = readingCapabilityMatrix();
   return {
     canonicalIdentities: rows.filter(r => r.canonicalIdentity).length,
-    committeeApproved: rows.filter(r => r.committeeApproved).length,
-    deliveryPackages: rows.filter(r => r.deliveryPackageAvailable).length,
-    productionReady: rows.filter(r => r.productionReady).length,
+    committeeScopeApproved: rows.filter(r => r.committeeScopeApproved).length,
+    deliveryMappings: rows.filter(r => r.deliveryMappingPresent).length,
     globalHafsAudio: rows.filter(r => r.globalHafsAudio).length,
     total: rows.length,
-    pendingSource: rows.filter(r => !r.deliveryPackageAvailable).map(r => r.rawiId),
+    pendingSource: rows.filter(r => !r.deliveryMappingPresent).map(r => r.rawiId),
   };
+}
+
+/**
+ * عدد الروايات الجاهزة للإنتاج بحسب أدلّةٍ محقونة لكلّ راوٍ. ما لا دليل له يُعدّ
+ * غير جاهزٍ (فشلٌ مغلق)، فلا يُحتسب جاهزًا بمجرّد وجود مساره في الجدول.
+ */
+export function readingProductionReadySummary(evidenceByRawi: Record<string, ReadingReadinessEvidence>): {
+  productionReady: number;
+  total: number;
+  blockedByRawi: Record<string, string[]>;
+} {
+  const blockedByRawi: Record<string, string[]> = {};
+  let productionReady = 0;
+  for (const r of CANONICAL_READINGS) {
+    const evidence = evidenceByRawi[r.rawiId] ?? { deliveryAvailableAtRuntime: false };
+    const res = readingProductionReady(r.rawiId, evidence);
+    if (res.productionReady) productionReady++;
+    else blockedByRawi[r.rawiId] = res.blockers;
+  }
+  return { productionReady, total: CANONICAL_READINGS.length, blockedByRawi };
 }
 
 /**
