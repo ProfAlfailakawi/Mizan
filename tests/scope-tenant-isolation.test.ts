@@ -127,8 +127,8 @@ test('the firestore rules keep participant_scopes inside the org/competition pat
   assert.match(scoped, /resource\.data\.uploaderUid == request\.auth\.uid/, 'a participant only reaches their own record');
 });
 
-/* الجاهزية لا تُخفي حجرًا أفرغ البنك ولا غيابَ احتياط: الأول مانع، والثاني توصية. */
-test('readiness reports a pool-emptying quarantine as critical and a missing reserve as a recommendation', async () => {
+/* منظومة النماذج البديلة حُذفت بطلب الجهة، فلم يبقَ من هذا الباب إلا الحجر: أفرغ البنك فمنع. */
+test('readiness reports a pool-emptying quarantine as critical', async () => {
   const { buildScopeReadiness } = await import('../src/lib/scope-readiness');
   const { DEFAULT_REPEAT_POLICY: policy } = await import('../src/lib/repeat-policy');
   const category = { ...selectableCategory('comp-a'), scopeMode: 'fixed' as const, selectionRule: undefined };
@@ -142,25 +142,21 @@ test('readiness reports a pool-emptying quarantine as critical and a missing res
   const blocked = buildScopeReadiness({
     ...base,
     activeQuarantines: [{ locusCount: 12, canContinue: false, summaryAr: 'لم يبقَ موضع صالح.', summaryEn: 'No eligible locus remains.' }],
-    reserveModelCount: 0,
   });
   const quarantine = blocked.checks.find(c => c.id === 'quarantine')!;
   assert.equal(quarantine.severity, 'critical');
   assert.equal(blocked.ready, false);
-  const reserve = blocked.checks.find(c => c.id === 'reserve_models')!;
-  assert.equal(reserve.severity, 'recommendation', 'a missing reserve is a warning about the day, not a blocker');
+  assert.equal(blocked.checks.some(c => c.id === 'reserve_models'), false, 'the spare-model row is gone with the machinery behind it');
 
   const healthy = buildScopeReadiness({
     ...base,
     activeQuarantines: [{ locusCount: 2, canContinue: true, summaryAr: 'بقي مخزون كافٍ.', summaryEn: 'Enough remains.' }],
-    reserveModelCount: 4,
   });
   assert.equal(healthy.checks.find(c => c.id === 'quarantine')!.severity, 'warning');
-  assert.equal(healthy.checks.find(c => c.id === 'reserve_models')!.severity, 'passed');
   assert.equal(healthy.critical, 0);
 });
 
-test('readiness stays silent about quarantine and reserves when the caller knows nothing about them', async () => {
+test('readiness stays silent about quarantine when the caller knows nothing about it', async () => {
   const { buildScopeReadiness } = await import('../src/lib/scope-readiness');
   const { DEFAULT_REPEAT_POLICY: policy } = await import('../src/lib/repeat-policy');
   const category = { ...selectableCategory('comp-a'), scopeMode: 'fixed' as const, selectionRule: undefined };

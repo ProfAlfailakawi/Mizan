@@ -11,8 +11,13 @@ test('registration cannot advance with an implicit or stale riwaya',()=>{
   assert.match(flow,/step===1\?readingOk:true/);
   assert.match(flow,/اختر الرواية أعلاه للمتابعة/);
   assert.match(flow,/setForm\(\{\.\.\.form,categoryId:c\.id,riwaya:''\}\)/);
-  assert.match(api,/const categoryReading=clean\(category\.riwaya,120\)/);
-  assert.match(api,/if\(!categoryReading\|\|input\.riwaya!==categoryReading\)throw new Error\('REGISTRATION_READING_INVALID'\)/);
+  /*
+   * الفئة قد تُفتح على عدّة روايات، والاختيار يبقى صريحًا: الفراغ مرفوض، وما ليس في
+   * قائمة الفئة مرفوض. فالتعدّد وسّع المسموح ولم يُلغِ الاشتراط.
+   */
+  assert.match(api,/const allowedReadings=\[defaultReading,\.\.\.\(category\.allowedRiwayat\|\|\[\]\)\.map\(x=>clean\(x,120\)\)\]\.filter\(Boolean\)/);
+  assert.match(api,/const categoryReading=allowedReadings\.find\(x=>x===input\.riwaya\)/);
+  assert.match(api,/if\(!categoryReading\)throw new Error\('REGISTRATION_READING_INVALID'\)/);
 });
 
 test('participant review supports category filtering, row selection and safe bulk approval',()=>{

@@ -33,8 +33,24 @@ export class PublicRegistrationService{
     if(input.phone&&!/^\+?[0-9٠-٩۰-۹ -]{7,24}$/.test(input.phone))throw new Error('REGISTRATION_PHONE_INVALID');
     const age=ageOn(input.dateOfBirth,now);if(!Number.isInteger(age)||age<3||age>100)throw new Error('REGISTRATION_DATE_OF_BIRTH_INVALID');
     const category=competition.categories.find(x=>x.id===input.categoryId);if(!category)throw new Error('REGISTRATION_CATEGORY_INVALID');
-    const categoryReading=clean(category.riwaya,120);
-    if(!categoryReading||input.riwaya!==categoryReading)throw new Error('REGISTRATION_READING_INVALID');
+    /*
+     * الفئة تحدّ الروايات المسموحة، والمتسابق يختار منها.
+     *
+     * كانت الرواية تُفرض واحدةً، فمسابقةٌ تفتح فئتها لعدّة روايات لا تُمثَّل إلا بتكرار
+     * الفئة مرّةً لكل رواية — وهو تكرارٌ يفرّق المتسابقين في الترتيب بلا سبب. والخادم يبقى
+     * هو الحاكم: ما ليس في القائمة يُرفض، لا يُقبل ويُصحَّح صامتًا.
+     */
+    const defaultReading=clean(category.riwaya,120);
+    const allowedReadings=[defaultReading,...(category.allowedRiwayat||[]).map(x=>clean(x,120))].filter(Boolean);
+    /*
+     * الرواية تُختار صراحةً، ومن ضمن ما تسمح به الفئة.
+     *
+     * والشرطان منفصلان عمدًا: فتحُ الفئة على عدّة روايات لا يعني قبول تسجيلٍ بلا رواية —
+     * فالرواية تُحدّد ما يُسحب له وما يُحكَّم به، وافتراضُها عنه يجعله يكتشف يوم المسابقة
+     * أنه يُسأل بغير ما حفظ. فالفراغ مرفوض، وما ليس في القائمة مرفوض.
+     */
+    const categoryReading=allowedReadings.find(x=>x===input.riwaya);
+    if(!categoryReading)throw new Error('REGISTRATION_READING_INVALID');
     if((category.minAge!==undefined&&age<category.minAge)||(category.maxAge!==undefined&&age>category.maxAge))throw new Error('REGISTRATION_AGE_NOT_ELIGIBLE');
     if(category.genderConstraint&&category.genderConstraint!=='all'&&category.genderConstraint!==input.gender)throw new Error('REGISTRATION_GENDER_NOT_ELIGIBLE');
     // نطاق الحفظ تحدده الفئة وحدها؛ التسجيل العام لا يقبل نطاقًا بديلًا من المتسابق.

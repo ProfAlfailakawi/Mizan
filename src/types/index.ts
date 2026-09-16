@@ -182,6 +182,15 @@ export interface Category {
   nameArabic: string;
   description: string;
   riwaya: string; // legacy display string; scientific logic resolves exact canonical reading contexts.
+  /*
+   * الروايات المسموح بها لهذه الفئة حين تُفتح على أكثر من رواية.
+   *
+   * بعض المسابقات تفتح الفئة الواحدة لعدّة روايات ويختار المتسابق روايته عند التسجيل.
+   * و`riwaya` تبقى الافتراضية والأولى، فالفئات القديمة تعمل كما هي بلا هجرة بيانات.
+   * وكل متسابق يحمل روايته في `Participant.riwaya`، وعليها يجري السحب والتحكيم — فالفئة
+   * تحدّ المسموح، والمتسابق يختار منه.
+   */
+  allowedRiwayat?: string[];
   readingContexts?: { qiraahId:string; rawiId:string; tariqIds?:string[]; allowedWujuh?:string[] }[];
   memorizationScope: string; // e.g. "Full Quran", "20 Juz", "10 Juz", "5 Juz"
   juzCount: number;
@@ -908,6 +917,9 @@ export interface IncidentRecord {
   description: string;
   reportedBy: string;
   reportedAt: string;
+  /** كم مرة تكرّر هذا العطل بعينه وهو مفتوح. يُعرض مع العنوان بدل صفٍّ مكرَّر. */
+  occurrences?: number;
+  lastOccurredAt?: string;
   resolvedAt?: string;
   status: 'active' | 'investigating' | 'resolved';
 }

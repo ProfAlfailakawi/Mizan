@@ -23,7 +23,6 @@ const store = read('src/lib/store.ts');
 const SETTABLE = [
   'distributionMode',
   'unmatchedArrivalPolicy',
-  'requireReadingQualifiedPanel',
   'delegationShareCap',
   'maxQueueDepth',
 ] as const;
@@ -41,7 +40,6 @@ test('each control is reachable from the operations section, not stranded in the
 test('the engine still reads each one, so the editor is not writing into a void', () => {
   assert.match(store, /operations\.distributionMode/, 'the gate branches on the mode');
   assert.match(store, /operations\.unmatchedArrivalPolicy/);
-  assert.match(store, /ops\.requireReadingQualifiedPanel/);
   assert.match(store, /delegationShareCap: ops\.delegationShareCap/);
   assert.match(store, /maxQueueDepth: ops\.maxQueueDepth/);
 });
@@ -63,6 +61,6 @@ test('the defaults are unchanged, so an organization that signs nothing keeps to
 
 test('each control states its consequence in words, not only its field name', () => {
   /* من يضبط هذه مسؤولُ مسابقة لا مبرمج: «سقف حصة الوفد» يُفهم، و`delegationShareCap` لا. */
-  for (const phrase of ['متى تُسنَد اللجنة', 'حين لا تؤهّله أيُّ لجنة', 'سقف حصة الوفد', 'أقصى عمق للطابور', 'اشترط لجنة مؤهَّلة في الرواية'])
+  for (const phrase of ['متى تُسنَد اللجنة', 'حين لا تؤهّله أيُّ لجنة', 'سقف حصة الوفد', 'أقصى عمق للطابور'])
     assert.ok(editor.includes(phrase), `the editor must name the decision: ${phrase}`);
 });

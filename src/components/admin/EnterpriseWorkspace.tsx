@@ -91,6 +91,8 @@ const Integrations=({s,ar,pending}:{s:ReturnType<typeof useAppStore>;ar:boolean;
 const FieldOperations=({s,ar,online}:{s:ReturnType<typeof useAppStore>;ar:boolean;online:number})=>{
  /* ثلاث لوحات ثقيلة — النشر والأجهزة والاستمرارية — كانت تتراص في عمود واحد ولا تُقرأ معًا. */
  const [fieldTab,setFieldTab]=useState<'deployment'|'devices'|'continuity'>('deployment');
+ /* التشخيص لمالك المنصة وحده — نفس الحدّ المستعمل لأقسام الثقة وما بعد. */
+ const platformOwner=s.currentUser.role==='super_admin';
  return <div className="space-y-4">
   <div role="tablist" aria-label={ar?'أقسام البنية الميدانية':'Field sections'} className="mizan-tabs mizan-tabs-sub">
    {([['deployment',ar?'النشر':'Deployment'],['devices',ar?'الأجهزة':'Devices'],['continuity',ar?'الاستمرارية':'Continuity']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={fieldTab===id} onClick={()=>setFieldTab(id)} className={`mizan-tab ${fieldTab===id?'is-active':''}`}>{label}</button>)}
@@ -99,7 +101,13 @@ const FieldOperations=({s,ar,online}:{s:ReturnType<typeof useAppStore>;ar:boolea
   {fieldTab==='devices'&&<Suspense fallback={<PanelFallback/>}><DeviceCenter/></Suspense>}
   {fieldTab==='continuity'&&<div className="grid gap-4"><div className="mizan-surface p-5 h-fit"><div className="flex items-center gap-2"><Wifi className="w-4 h-4 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'الاستمرارية':'Continuity'}</h2></div><div className="mt-4 space-y-3"><State ar={ar} ok={!s.isOffline} label={ar?'السحابة':'Cloud'}/><State ar={ar} ok={s.devices.some(d=>d.type==='edge_server'&&d.status==='online')} label="MIZAN Edge"/><State ar={ar} ok={!s.emergencyFrozen} label={ar?'التوجيه':'Dispatch'}/></div><div className="mt-4 grid gap-2"><Button size="sm" variant="outline" onClick={s.toggleOffline}>{s.isOffline?(ar?'استعادة الاتصال':'Reconnect'):(ar?'محاكاة انقطاع':'Simulate outage')}</Button><EmergencyControl/></div></div>
    {/* مؤشّر «السحابة» أعلاه يقول نعم أو لا، ولا يقول لماذا. هذه تقول لماذا ومن يصلحه. */}
-   <div className="mizan-surface p-5"><div className="mizan-kicker">{ar?'تشخيص السحابة':'CLOUD DIAGNOSIS'}</div><h2 className="font-extrabold mt-1 mb-4">{ar?'لماذا لا يعمل الرفع؟':'Why are uploads failing?'}</h2><Suspense fallback={<PanelFallback/>}><CloudDiagnostics/></Suspense></div>
+   {/*
+     * التشخيص لمالك المنصة وحده.
+     *
+     * يعرض حلقات النشر ومطالبات الصلاحية وحالة الخادم — لغةُ من يشغّل المنصة لا من يقيم
+     * مسابقة. وعرضُه لكل جهة يُقلقها بما لا تملك إصلاحه، ويُظهر لها بنيةً ليست شأنها.
+     */}
+   {platformOwner&&<div className="mizan-surface p-5"><div className="mizan-kicker">{ar?'تشخيص السحابة':'CLOUD DIAGNOSIS'}</div><h2 className="font-extrabold mt-1 mb-4">{ar?'لماذا لا يعمل الرفع؟':'Why are uploads failing?'}</h2><Suspense fallback={<PanelFallback/>}><CloudDiagnostics/></Suspense></div>}
   </div>}
  </div>;
 };

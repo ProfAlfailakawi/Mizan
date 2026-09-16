@@ -46,14 +46,14 @@ test('the enterprise tab speaks of participating entities, not only internationa
   assert.doesNotMatch(enterprise, /ar\?'الدولي':'International'/);
 });
 
-/* ── ٦ — بطاقة البدائل تقول ما تريده وماذا يحدث بدونها ─────────────────── */
+/* ── ٦ — بطاقة البدائل حُذفت كاملةً بطلب الجهة: لا صف ولا زر ولا حقل ──── */
 
-test('the spare-model recommendation says what it is for and what the button does', () => {
+test('the spare-model card is gone, together with the machinery behind it', () => {
   const readiness = read('src/lib/scope-readiness.ts');
-  assert.match(readiness, /نموذج بديل جاهز/);
-  assert.match(readiness, /لو سقط سؤال يوم المسابقة/);
+  assert.doesNotMatch(readiness, /نموذج بديل جاهز/);
+  assert.doesNotMatch(readiness, /reserveModelCount/);
   const workspace = read('src/components/admin/QuestionEngineWorkspace.tsx');
-  assert.match(workspace, /تجهيز البدائل/, 'the fix button names the action it performs');
+  assert.doesNotMatch(workspace, /تجهيز البدائل/);
 });
 
 /* ── ٧ — لا اشتراط مراجعة علمية، فلا لجنة علمية ────────────────────────── */
