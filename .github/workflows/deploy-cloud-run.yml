@@ -114,10 +114,15 @@ jobs:
           VERIFIED_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
+          # `builds submit --service-account` يريد اسم المورد كاملًا لا البريد:
+          #   projects/<PROJECT>/serviceAccounts/<EMAIL>
+          # والبريد وحده يُردّ بـ INVALID_ARGUMENT «Failed to parse resource name» بعد رفع
+          # المصدر مباشرة — فيبدو كأن البناء فشل وهو لم يُنشأ أصلًا. والخطوة التي قبله
+          # (`iam service-accounts describe`) تريد البريد، فلا يصلح توحيدهما على صيغة واحدة.
           gcloud builds submit . \
             --project="$GCP_PROJECT_ID" \
             --config=cloudbuild.yaml \
-            --service-account="$GCP_BUILD_SERVICE_ACCOUNT" \
+            --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
             --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" \
             --substitutions="COMMIT_SHA=$VERIFIED_SHA" \
             --quiet
