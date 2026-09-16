@@ -44,14 +44,8 @@ export interface ScopeReadinessInput {
   questionsPerParticipant: (category: Category) => number;
   repeatPolicyFor: (category: Category) => RepeatPolicy;
   staleModelCount?: number;
-  /*
-   * حالة الحجر والاحتياط.
-   *
-   * حجرٌ أفرغ البنك يمنع المسابقة، وغيابُ احتياطٍ لا يمنعها لكنه يجعل سقوط سؤالٍ واحدٍ
-   * توقفًا في القاعة. فيُقال الأول حاسمًا والثاني توصيةً، ولا يُخلط بينهما.
-   */
+  /* حجرٌ أفرغ البنك يمنع المسابقة؛ وهو وحده ما يُقاس هنا بعد حذف منظومة النماذج البديلة. */
   activeQuarantines?: { locusCount: number; canContinue: boolean; summaryAr: string; summaryEn: string }[];
-  reserveModelCount?: number;
   sealed?: boolean;
   escrowRequired?: boolean;
   escrowReady?: boolean;
@@ -202,14 +196,12 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
           detailEn: `${quarantines.length} active quarantines remove ${quarantines.reduce((sum, q) => sum + q.locusCount, 0)} loci. The pool still suffices; invalidated models are regenerated.` });
   }
 
-  /* ١١ — الاحتياط: ماذا لو سقط سؤال؟ */
-  if (input.reserveModelCount !== undefined) {
-    checks.push(input.reserveModelCount > 0
-      ? pass('reserve_models', 'نموذج بديل جاهز', 'A spare model, ready', `${input.reserveModelCount} نموذجًا احتياطيًا جاهزًا، مولَّدًا بالمحرك نفسه ومربوطًا ببصمة نطاقه.`, `${input.reserveModelCount} reserve models are ready, engine-generated and bound to their range signature.`)
-      : { id: 'reserve_models', severity: 'recommendation', titleAr: 'نموذج بديل جاهز', titleEn: 'A spare model, ready', fix: 'models',
-          detailAr: 'لو سقط سؤال يوم المسابقة — لخطأٍ في نصّه أو لحجره — احتاج المتسابق بديلًا فورًا. لا يوجد بديلٌ جاهز الآن، فيُولَّد وقتها والقاعة تنتظر. اضغط «تجهيز البدائل» لفتح «النماذج والعدالة»، ثم اختر عدد البدائل واضغط «توليد دفعة». هذه توصية ولا تمنع تشغيل المسابقة.',
-          detailEn: 'If a question drops on the day — a text error, or a quarantine — the participant needs a substitute at once. None is ready now, so it would be generated while the hall waits. Use “Prepare spares” to open Models & fairness, choose how many spares per range, then generate a batch. This is a recommendation and does not block the competition.' });
-  }
+  /*
+   * حُذف فحصُ النماذج البديلة كاملًا مع منظومتها.
+   *
+   * كان يوصي بتجهيز بدائل ويُحيل إلى شاشةٍ حُذفت آلتُها، فبقيت توصيةً تشير إلى زرٍّ لا
+   * وجود له. والتوليد يعمل في وقته: لو سقط سؤال وُلّد بديله من المحرك نفسه لحظتَها.
+   */
 
   if (input.escrowRequired) {
     checks.push(input.escrowReady

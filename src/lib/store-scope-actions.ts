@@ -380,7 +380,6 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
       activeQuarantines: S().questionQuarantines
         .filter(q => q.status === 'active' && q.competitionId === S().competition.id)
         .map(q => ({ locusCount: q.locusKeys.length, canContinue: q.canContinue, summaryAr: q.summaryArabic, summaryEn: q.summaryEnglish })),
-      reserveModelCount: S().questionModels.filter(m => !m.participantId && m.status === 'draft' && m.competitionId === S().competition.id).length,
       escrowRequired: policy.questions.secureReveal?.requireParticipantPresence !== false,
       escrowReady: escrowReadyOverride ?? S().activeSession.secureQuestionMode === 'SERVER',
       strictDifficultyRequired: S().competition.categories.some(c => c.requireReviewedDifficulty),

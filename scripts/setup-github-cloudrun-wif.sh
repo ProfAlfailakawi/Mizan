@@ -149,7 +149,12 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
   --quiet >/dev/null
 
 # GitHub may submit builds and stage source, but may not deploy Cloud Run directly.
-for role in roles/cloudbuild.builds.editor roles/serviceusage.serviceUsageConsumer roles/storage.bucketViewer; do
+#
+# ويقرأ Cloud Run ولا يكتبه: خطوة التحقق بعد النشر تستدعي `run services describe` لتثبت أن
+# الخدمة تخدم الـcommit نفسه. وبلا `run.viewer` كانت تلك الخطوة تفشل في ثانيتين بعد بناءٍ
+# ونشرٍ ناجحين — فيبدو النشر فاشلًا وهو تمّ. و`run.viewer` قراءةٌ محضة، فلا تخرق القاعدة
+# أعلاه: النشر يبقى بيد حساب البناء وحده.
+for role in roles/cloudbuild.builds.editor roles/serviceusage.serviceUsageConsumer roles/storage.bucketViewer roles/run.viewer; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
     --role="$role" \

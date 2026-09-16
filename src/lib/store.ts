@@ -1019,7 +1019,27 @@ export function useAppStore() {
     }
   };
 
-  const createIncident = (type: IncidentRecord['type'], title:string, description:string, severity:IncidentRecord['severity']='moderate') => { const x:IncidentRecord={id:newId('inc'),competitionId:globalState.competition.id,type,severity,title,description,reportedBy:globalState.currentUser.name,reportedAt:new Date().toISOString(),status:'active'};globalState.incidents=[x,...globalState.incidents];notify();return x;};
+  /*
+   * العطل الواحد صفٌّ واحد، وتكرارُه عدد.
+   *
+   * كان كل نداء يُنشئ سجلًّا جديدًا، فمحاولةٌ فاشلة تُضغط مرّتين تُخرج سطرين متطابقين في
+   * «ما يحتاج تدخّلك» — لا يفيدان المشغّل بشيء، ويُغرقان ما يستحق نظره فعلًا.
+   *
+   * والتكرار نفسه معلومة: عطلٌ وقع عشر مرات أهمّ من عطلٍ وقع مرة. فيُحفظ عددًا مع وقت آخر
+   * وقوع، ولا يُنشأ صفٌّ ثانٍ ما دام الأول مفتوحًا ونصّه واحدًا. وإغلاقه يفتح صفحة جديدة:
+   * عودته بعد المعالجة حدثٌ جديد يستحق سطره.
+   */
+  const createIncident = (type: IncidentRecord['type'], title:string, description:string, severity:IncidentRecord['severity']='moderate') => {
+    const now=new Date().toISOString();
+    const open=globalState.incidents.find(i=>i.competitionId===globalState.competition.id&&i.status!=='resolved'&&i.type===type&&i.title===title&&i.description===description);
+    if(open){
+      const merged:IncidentRecord={...open,occurrences:(open.occurrences||1)+1,lastOccurredAt:now,severity:severity==='critical'?'critical':open.severity};
+      globalState.incidents=globalState.incidents.map(i=>i.id===open.id?merged:i);
+      notify();return merged;
+    }
+    const x:IncidentRecord={id:newId('inc'),competitionId:globalState.competition.id,type,severity,title,description,reportedBy:globalState.currentUser.name,reportedAt:now,status:'active',occurrences:1,lastOccurredAt:now};
+    globalState.incidents=[x,...globalState.incidents];notify();return x;
+  };
   const resolveIncident = (id:string) => { globalState.incidents=globalState.incidents.map(i=>i.id===id?{...i,status:'resolved',resolvedAt:new Date().toISOString()}:i);notify(); };
 
   const setEmergencyMode = (active:boolean, reason:string) => {
@@ -2970,7 +2990,8 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
 
   const verifyParticipantPresenceForQuestion=async(method:'participant_pass'|'manual_visual_confirmation'='manual_visual_confirmation')=>{
     const session=globalState.activeSession;if(!session.participant||!session.committee||session.isLocked)return {ok:false,reason:'NO_ACTIVE_SESSION'} as const;
-    if(!['judge','head_judge','ops_manager','comp_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'UNAUTHORIZED'} as const;
+    /* مدير الجهة يدير مسابقته بنفسه في الجهات الصغيرة، وهو فوق مدير المسابقة لا دونه. */
+    if(!['judge','head_judge','ops_manager','comp_admin','org_admin'].includes(globalState.currentUser.role))return {ok:false,reason:'UNAUTHORIZED'} as const;
     const now=new Date().toISOString();
     const sessionGates=globalState.questionRevealGates.filter(g=>g.sessionId===session.sessionId);
     if(!sessionGates.length)await ensureQuestionRevealGate();
@@ -2984,9 +3005,32 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     const gate=await ensureQuestionRevealGate();if(!gate)return {ok:false,reason:'NO_GATE'} as const;
     const judge=globalState.judges.find(j=>j.userId===globalState.currentUser.id||j.id===globalState.currentUser.id);
     const judgeId=judge?.userId||globalState.currentUser.id;
-    if(globalState.currentUser.role!=='judge'||!gate.requiredJudgeIds.includes(judgeId))return {ok:false,reason:'ASSIGNED_JUDGE_REQUIRED'} as const;
+    /*
+     * الإذن بفتح السؤال عضويةٌ في اللجنة، لا اسم دور.
+     *
+     * كان الشرط `role==='judge'` حرفيًّا، فيمنع **رئيس اللجنة** من فتح السؤال — وهو أوثق
+     * من المحكّم العادي لا أقلّ — ويمنع من يدير المسابقة بنفسه وقد أُسند إلى لجنتها محكّمًا،
+     * وهي الحال الغالبة في المسابقات الصغيرة (محكّم واحد هو رئيسها).
+     *
+     * والضمانة لم تكن في اسم الدور يومًا: هي `requiredJudgeIds` — من أُسند إلى هذه اللجنة
+     * بعينها. فمن ليس فيها لا يفتح شيئًا مهما كان دوره، ومن فيها يفتح مهما كان اسم دوره.
+     *
+     * والمطابقة بالمعرّفين معًا لأن `judgeIds` قد تحمل معرّف ملف المحكّم أو معرّف حسابه،
+     * وقد رأينا لجنةً تقول «٠/١» بينما صاحبها أمامها — لأن الطرفين يحملان معرّفين مختلفين
+     * للشخص نفسه.
+     */
+    const judgeIdentities=[judgeId,judge?.id,judge?.userId,globalState.currentUser.id].filter(Boolean) as string[];
+    const assignedId=gate.requiredJudgeIds.find(id=>judgeIdentities.includes(id));
+    if(!assignedId)return {ok:false,reason:'ASSIGNED_JUDGE_REQUIRED'} as const;
     if(!gate.participantPresence.verified)return {ok:false,reason:'PARTICIPANT_NOT_PRESENT'} as const;
-    const approvals=gate.approvals.some(a=>a.judgeId===judgeId)?gate.approvals:[...gate.approvals,{judgeId,judgeName:judge?.name||globalState.currentUser.name,approvedAt:new Date().toISOString()}];
+    /*
+     * الموافقة تُقيَّد بالمعرّف الذي تعرفه اللجنة، لا بالذي يعرفه الحساب.
+     *
+     * العدّ يطابق `requiredJudgeIds` مطابقةً حرفية، فموافقةٌ تُسجَّل بمعرّفٍ آخر للشخص نفسه
+     * لا تُحتسب أبدًا — فيضغط المحكّم ويبقى العدّاد «٠/١» بلا سبب ظاهر. فيُستعمل المعرّف
+     * الذي طابق في اللجنة.
+     */
+    const approvals=gate.approvals.some(a=>a.judgeId===assignedId)?gate.approvals:[...gate.approvals,{judgeId:assignedId,judgeName:judge?.name||globalState.currentUser.name,approvedAt:new Date().toISOString()}];
     const revealPolicy=getCompetitionPolicy(globalState.competition).questions.secureReveal||{requireParticipantPresence:true,judgeApprovalMode:'all_assigned' as const};
     const ready=questionRevealReady({participantPresent:gate.participantPresence.verified,requiredJudgeIds:gate.requiredJudgeIds,approvals,mode:revealPolicy.judgeApprovalMode,minimumApprovals:revealPolicy.minimumApprovals});
     const status=ready.ready?'REVEALED' as const:'SEALED' as const;const revealedAt=ready.ready?new Date().toISOString():undefined;

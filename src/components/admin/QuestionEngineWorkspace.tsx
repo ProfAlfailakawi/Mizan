@@ -515,7 +515,7 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
               {check.severity !== 'passed' && check.fix !== 'none' && (
                 check.id === 'escrow'
                   ? <Button size="sm" variant="outline" disabled={runtimeChecking} icon={<ChevronLeft className="h-4 w-4" />} onClick={() => void refreshRuntime()}>{runtimeChecking ? (ar ? 'جارٍ الفحص…' : 'Checking…') : (ar ? 'إعادة فحص الخادم' : 'Recheck server')}</Button>
-                  : <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{check.id === 'reserve_models' ? (ar ? 'تجهيز البدائل' : 'Prepare spares') : (ar ? 'إصلاح' : 'Fix')}</Button>
+                  : <Button size="sm" variant="outline" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => onNavigate(fixTab[check.fix] || 'scope')}>{ar ? 'إصلاح' : 'Fix'}</Button>
               )}
             </div>
           </li>

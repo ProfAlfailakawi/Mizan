@@ -19,6 +19,31 @@ import { fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetc
 
 // Arabic counts do not pluralise the way English does: 1 takes the singular, 2 takes the
 // dual, 3-10 take the plural, and 11+ return to the singular. "4 مرة" is simply wrong.
+/*
+ * سبب رفض فتح السؤال بلغة المحكّم، لا رمزًا خامًا في وجهه.
+ *
+ * وكلُّ سطر هنا يقول ما يُفعل، لا ما وقع فحسب: من قرأ «لست في هذه اللجنة» عرف أن يراجع
+ * توزيع اللجان، ومن قرأ رمزًا إنجليزيًّا لم يعرف شيئًا.
+ */
+const revealRefusalText=(reason:string|undefined,ar:boolean):string=>{
+ if(!ar)return `Could not open the question (${reason||'unknown'}).`;
+ switch(reason){
+  case 'ASSIGNED_JUDGE_REQUIRED':
+   return 'حسابك ليس ضمن محكّمي هذه اللجنة، فلا يفتح السؤال. أضِف نفسك إلى اللجنة من «التحكيم ← أعضاء اللجنة» ثم أعد المحاولة.';
+  case 'PARTICIPANT_NOT_PRESENT':
+   return 'أكّد حضور المتسابق أمام اللجنة أولًا، ثم افتح السؤال.';
+  case 'NO_ACTIVE_SESSION':
+   return 'لا جلسة مفتوحة الآن، أو أُقفل تقييمها.';
+  case 'NO_GATE':
+   return 'لم تُجهَّز بوابة هذا السؤال بعد. أعد استقبال المتسابق، وإن تكرّر فراجع «ما يحتاج تدخّلك».';
+  case 'UNAUTHORIZED':
+   return 'دور هذا الحساب لا يؤكّد حضور المتسابق. يؤكّده المحكّم أو رئيس اللجنة أو غرفة العمليات أو إدارة المسابقة.';
+  case 'NO_ELIGIBLE_JUDGES':
+   return 'لا محكّم مُسنَد إلى هذه اللجنة، فلا أحد يفتح السؤال. أسنِد محكّمًا إليها أولًا.';
+  default:
+   return `تعذّر فتح السؤال${reason?` (${reason})`:''}. أعد المحاولة، وإن تكرّر فراجع «ما يحتاج تدخّلك».`;
+ }
+};
 /* حالة المنتظر بلغة المحكّم: ما الذي ينتظره هذا الاسم الآن. */
 const PARTICIPANT_WAIT_LABEL:Record<string,string>={
  in_queue:'في الطابور', checked_in:'سجّل حضوره', approved:'لم يسجّل حضوره',
@@ -239,8 +264,16 @@ export const JudgeOS: React.FC = () => {
       قصيرًا حتى لا يُكمِل تلاوة الوجه كله بلا توقّف. */
    const limitMs=window.endMs!==undefined?window.endMs:window.startMs+7000;
    const stop=()=>{if(player.currentTime*1000>=limitMs){player.pause();player.removeEventListener('timeupdate',stop);setOpeningAudioState('idle')}};player.addEventListener('timeupdate',stop);player.onended=()=>setOpeningAudioState('idle');await player.play();openingPlayedKeyRef.current=playKey;store.markOpeningAudioPlayed(openingReference.id);return true}catch{setOpeningAudioState('failed');return false}};
- const confirmPresence=async()=>{if(!secureMode){return store.verifyParticipantPresenceForQuestion('manual_visual_confirmation')}if(!activeSession.secureRuntimeSessionId)return {ok:false,reason:'SECURE_RUNTIME_MISSING'} as const;try{const runtime=await confirmSecureParticipantPresence(activeSession.secureRuntimeSessionId);setSecureRuntime(runtime);setSecureError('');return {ok:true} as const}catch(e){setSecureError(e instanceof Error?e.message:'PRESENCE_FAILED');return {ok:false,reason:'PRESENCE_FAILED'} as const}};
- const approveReveal=async()=>{if(!secureMode){const result=await store.approveQuestionReveal();if(result.ok&&result.revealed&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),30);return}if(!activeSession.secureRuntimeSessionId)return;try{setMyRevealApproved(true);const runtime=await approveSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(runtime);const state=runtime.escrow.questions.find(x=>x.index===activeSession.currentQuestionIndex);if(state?.released){const revealed=await revealSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureQuestion(revealed.payload);setSecureError('')}}catch(e){setMyRevealApproved(false);setSecureError(e instanceof Error?e.message:'SECURE_APPROVAL_FAILED')}};
+ const confirmPresence=async()=>{if(!secureMode){setSecureError('');const out=await store.verifyParticipantPresenceForQuestion('manual_visual_confirmation');if(!out.ok)setSecureError(revealRefusalText(out.reason,ar));return out}if(!activeSession.secureRuntimeSessionId)return {ok:false,reason:'SECURE_RUNTIME_MISSING'} as const;try{const runtime=await confirmSecureParticipantPresence(activeSession.secureRuntimeSessionId);setSecureRuntime(runtime);setSecureError('');return {ok:true} as const}catch(e){setSecureError(e instanceof Error?e.message:'PRESENCE_FAILED');return {ok:false,reason:'PRESENCE_FAILED'} as const}};
+ /*
+  * رفضُ الفتح يُقال، لا يُبتلع.
+  *
+  * كان الرد يُهمَل ما لم يكن نجاحًا وكشفًا، فيضغط المحكّم الزرّ فلا يحدث شيء — لا سؤال
+  * ولا سبب. وأكثر أسباب الرفض شيءٌ يملك المشغّل إصلاحه بنفسه لو قيل له.
+  */
+ const approveReveal=async()=>{if(!secureMode){setSecureError('');const result=await store.approveQuestionReveal();
+   if(!result.ok){setSecureError(revealRefusalText(result.reason,ar));return}
+   if(result.revealed&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),30);return}if(!activeSession.secureRuntimeSessionId)return;try{setMyRevealApproved(true);const runtime=await approveSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(runtime);const state=runtime.escrow.questions.find(x=>x.index===activeSession.currentQuestionIndex);if(state?.released){const revealed=await revealSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureQuestion(revealed.payload);setSecureError('')}}catch(e){setMyRevealApproved(false);setSecureError(e instanceof Error?e.message:'SECURE_APPROVAL_FAILED')}};
  const approveReplacement=async()=>{if(!secureMode||!activeSession.secureRuntimeSessionId)return;setReplacementBusy(true);try{const result=await approveEmergencyQuestionReplacement(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(result);if(result.replacementReady){setSecureQuestion(null);setMyRevealApproved(false);setOpeningAudioState('idle')}setSecureError('')}catch(e){setSecureError(e instanceof Error?e.message:'QUESTION_REPLACEMENT_FAILED')}finally{setReplacementBusy(false)}};
  const speakTransition=()=>{if(!store.finishCurrentQuestionSegment())return;const transition=passageTransitionPlan({isLastQuestion,ar,cue:policy.questions.transitionCue,variantSeed:activeSession.currentQuestionIndex});const proceed=()=>{if(transition.autoAdvance)nextQuestion()};const afterCue=()=>window.setTimeout(proceed,transition.delayMs);if(!transition.enabled){afterCue();return;}let fallbackUsed=false;const speakFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if(typeof window!=='undefined'&&'speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(transition.phrase);u.lang=ar?'ar-SA':'en-US';
   /* صوت المتصفح الافتراضي يبدو آليًا؛ نختار أقرب صوت عربي طبيعي متاح (Natural/Enhanced/Premium)
@@ -272,13 +305,12 @@ export const JudgeOS: React.FC = () => {
  {(!!committeeQueue.length||!!awaitingArrival.length)&&<div className="mizan-surface mt-7 p-5 text-start">
   <div className="mizan-kicker">{ar?'من ينتظر دوره':'WAITING'}</div>
   <h2 className="mt-1 text-sm font-black">{ar?'ناد من أمامك مباشرة':'Call whoever is in front of you'}</h2>
-  <p className="mt-1.5 text-[11px] leading-6 text-[#646965]">{ar?'هؤلاء كل من لم يُقيَّم بعد في هذه المسابقة. من سجّل حضوره يظهر في الطابور، ومن لم يسجّل تستطيع إدخاله بنفسك — ويُسجَّل ذلك باسمك في سجل التدقيق.':'Everyone not yet assessed in this competition. Those checked in appear in the queue; you may admit the rest yourself — recorded under your name in the audit log.'}</p>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
    {[...committeeQueue.map(p=>({p,queued:true})),...awaitingArrival.map(p=>({p,queued:false}))].slice(0,24).map(({p,queued})=><li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
     <span className="font-mono text-[11px] font-black text-[#656b66]">{p.code}</span>
     <span className="min-w-0 flex-1 truncate text-sm font-bold">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
     <span className="shrink-0 text-[10px] font-black text-[#5f6663]">{ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':''}</span>
-    <Button size="sm" variant={queued?'primary':'outline'} onClick={()=>void(queued?callParticipant(p.id):admitAndCall(p.id))}>{ar?(queued?'نادِه':'إدخال ونداء'):(queued?'Call':'Admit & call')}</Button>
+    <Button size="sm" variant={queued?'primary':'outline'} onClick={()=>void(queued?callParticipant(p.id):admitAndCall(p.id))}>{ar?(queued?'ابدأ جلسته':'أدخِله وابدأ'):(queued?'Start':'Admit & start')}</Button>
    </li>)}
   </ul>
   {committeeQueue.length+awaitingArrival.length>24&&<p className="mt-2 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length+awaitingArrival.length-24} غيرهم.`:`And ${committeeQueue.length+awaitingArrival.length-24} more.`}</p>}
@@ -333,14 +365,20 @@ export const JudgeOS: React.FC = () => {
 
    {!questionRevealed&&!activeSession.isLocked&&<div className="py-3 sm:py-7"><div className="mx-auto max-w-xl text-center"><div className="w-16 h-16 rounded-2xl bg-[#f0eee7] text-[#313a35] grid place-items-center mx-auto"><LockKeyhole className="w-7 h-7"/></div><h2 className="text-2xl font-black mt-4">{ar?'السؤال لم يُكشف':'Question remains sealed'}</h2><p className="text-xs leading-6 text-[#636864] mt-2">{ar?'لا يظهر اسم السورة أو الآيات قبل وجود المتسابق أمام اللجنة وموافقة المحكمين المكلّفين.':'No passage details appear until the participant is present and assigned judges approve the reveal.'}</p>
     <div className="grid grid-cols-2 gap-3 mt-6"><GateState icon={UserCheck} ok={participantPresent} title={ar?'المتسابق أمام اللجنة':'Participant present'} value={participantPresent?(ar?'تم التحقق':'Verified'):(ar?'مطلوب':'Required')}/><GateState icon={UsersRound} ok={required>0&&approved>=required} title={ar?'موافقة المحكمين':'Judge approvals'} value={`${approved} / ${required}`}/></div>
-    {!participantPresent?<Button className="mt-5" icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>:<Button className="mt-5" disabled={approvedByMe||store.currentUser.role!=='judge'} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}
-    <div className="mt-3 text-[10px] text-[#696f6b]">{ar?((secureMode||gate?.revealAssurance==='production_server_escrow')?'الكشف مربوط بحجز خادمي فعلي.':gate?.revealAssurance==='operational_panel_gate'?'بوابة اللجنة تمنع الكشف المبكر داخل التشغيل، لكن منع فحص السؤال تقنيًا من الجهاز نفسه يتطلب حجزًا خادميًا منفصلًا.':'بوابة تطوير محلية؛ قبل الإنتاج يلزم حجز السؤال خارج جهاز المحكم لمنع التسرب التقني.'):((secureMode||gate?.revealAssurance==='production_server_escrow')?'Server-held question escrow is active.':gate?.revealAssurance==='operational_panel_gate'?'Panel gate blocks early operational reveal; adversarial device inspection still requires server-held escrow.':'Development client gate; production secrecy requires server-held escrow.')}</div>
+    {!participantPresent?<Button className="mt-5" icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>:<Button className="mt-5" disabled={approvedByMe} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}
+    {/* حُذف السطر الذي يشرح حدود البوابة تقنيًّا: كلامُ معماريةٍ لا يعني المحكّم، ولا يفعل بشأنه شيئًا. */}
    </div></div>}
 
    <div className="mb-4 space-y-2 empty:hidden">
     {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-4 h-4 shrink-0"/>{ar?'هذا المتصفح لا يعرض مؤشّر مستوى الصوت، فاعتُمد على بدء التسجيل وحده. تحقّق من وصول الصوت بعد أول تلاوة.':'This browser cannot show a live level meter, so verification relied on the recorder starting. Confirm the audio after the first recitation.'}</div>}
 
-   {secureMode&&secureError&&<div className="rounded-2xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0"/>{ar?'تعذر الوصول الآمن إلى كبسولة السؤال. لن يعرض ميزان نسخة محلية بديلة.':'Secure question capsule unavailable. MIZAN will not fall back to local question plaintext.'}{!ar&&<span className="opacity-60 font-mono">{secureError}</span>}</div>}
+   {/*
+     * الرسالة تُعرض في الوضعين، ونصُّها يختلف بحسب ما وقع.
+     *
+     * كانت مشروطة بالوضع الآمن، فرفضُ الفتح في الوضع العادي لا يظهر أصلًا — وهو الوضع
+     * الذي يعمل به أكثر المشغّلين. ونصُّها كان ثابتًا عن كبسولة السؤال مهما كان السبب.
+     */}
+   {secureError&&<div role="alert" className="rounded-2xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-6 flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5"/><span>{secureMode?(ar?'تعذر الوصول الآمن إلى كبسولة السؤال. لن يعرض ميزان نسخة محلية بديلة.':'Secure question capsule unavailable. MIZAN will not fall back to local question plaintext.'):secureError}{secureMode&&<span className="opacity-60 font-mono ms-1">{secureError}</span>}</span></div>}
    {secureMode&&secureRuntime?.diversityMetrics&&<div className="flex items-center justify-between gap-3 rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[10px] text-[#626a65]"><span className="font-black">{ar?'تنويع السحب العادل':'FAIRDRAW DIVERSITY'}</span><span>{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci} · يعاد الاستخدام فقط عند نفاد السعة`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci} · reuse only after capacity is exhausted`)}</span></div>}
    {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-4 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="text-sm font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[10px] text-[#806b4d] mt-1">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، ومسموح بتبديل سؤال واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required, and only one question may be replaced in this session.'}</div></div><Button variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على تبديل السؤال':'Approve question replacement')}</Button></div>}
    </div>
