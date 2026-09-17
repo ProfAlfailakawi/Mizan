@@ -62,6 +62,7 @@ const OWNED_SOURCES = [
   'src/lib/quran-text-integrity.ts',
   'server/r2-object-layout.ts',
   'server/production-config-guard.ts',
+  'server/cold-vault.ts',
 ];
 
 test('every error code thrown by our own modules is registered', () => {

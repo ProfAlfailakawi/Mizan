@@ -12,7 +12,7 @@
  * وحدة طرفية نقيّة: لا شبكة، لا حالة.
  */
 
-export type ErrorDomain = 'READING' | 'CROSSWALK' | 'STORAGE' | 'QURAN_TEXT' | 'CONFIG' | 'DRAW';
+export type ErrorDomain = 'READING' | 'CROSSWALK' | 'STORAGE' | 'QURAN_TEXT' | 'CONFIG' | 'DRAW' | 'RECOVERY';
 
 export interface ErrorDescription {
   code: string;
@@ -79,6 +79,15 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('IDENTITY_VERIFICATION_UNCONFIGURED', 'CONFIG', 'التحقّق من الهوية على الخادم غير مضبوط، فتصير الصلاحيات دعوى العميل.'),
   ENTRY('WEAK_SIGNING_SECRET', 'CONFIG', 'سرُّ توقيعٍ ضعيف. القيمة النائبة أسوأ من الغياب لأنها توهم بالحماية.'),
   ENTRY('SIGNING_SECRET_ABSENT', 'CONFIG', 'سرُّ توقيعٍ غير مضبوط: الميزة المعتمدة عليه تبقى معطَّلة.', false),
+
+  // — الخزنة الباردة والاستعادة —
+  ENTRY('COLD_VAULT_KEY_MUST_BE_32_BYTES', 'RECOVERY', 'مفتاح النقل يجب أن يكون ٣٢ بايتًا بالضبط (AES-256).'),
+  ENTRY('COLD_VAULT_COMPETITION_REQUIRED', 'RECOVERY', 'لا تُصدَّر خزنةٌ بلا تحديد المسابقة التي تُستعاد بها.'),
+  ENTRY('COLD_VAULT_FORBIDDEN_SECRET', 'RECOVERY', 'الحمولة تحمل حقلَ سرٍّ (مفتاح أو كلمة مرور أو اعتماد). الخزنة للاستمرارية لا للأسرار، والمفتاح يبقى خارجها.'),
+  ENTRY('COLD_VAULT_FORBIDDEN_SECRET_VALUE', 'RECOVERY', 'الحمولة تحمل قيمةً تُشبه مفتاحًا خاصًّا أو رمز وصول. تُنقّى الحمولة قبل التصدير.'),
+  ENTRY('COLD_VAULT_FORBIDDEN_HIGH_RISK_CONTENT', 'RECOVERY', 'الحمولة تحمل محتوًى بالغَ الحساسية (نصّ سؤالٍ مكشوف أو صوتَ تحكيمٍ خامًا أو بياناتٍ حيوية)، ولا يُصدَّر في خزنةٍ منقولة.'),
+  ENTRY('COLD_VAULT_PACKAGE_HASH_MISMATCH', 'RECOVERY', 'بصمة الخزنة تخالف محتواها: الحزمة مُعدَّلة أو تالفة، فلا تُستعاد.'),
+  ENTRY('COLD_VAULT_PAYLOAD_HASH_MISMATCH', 'RECOVERY', 'بصمة الحمولة بعد فكّ التشفير تخالف المسجَّلة، فلا تُستعاد.'),
 
   // — القرعة —
   ENTRY('FAIRDRAW_READING_SOURCE_MISMATCH', 'DRAW', 'لا موضعَ في البنك من رواية هذا المتسابق. لا يُسحب له من روايةٍ أخرى بحال؛ يلزم وصولُ نصّ روايته.'),
