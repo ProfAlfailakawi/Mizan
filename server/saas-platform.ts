@@ -42,6 +42,14 @@ export interface StorageObjectRecord{id:string;tenantId:string;organizationId:st
 export interface StorageAccountRecord{id:string;tenantId:string;organizationId:string;provider:Exclude<StorageProvider,'mizan'>;container:string;region?:string;endpoint?:string;connectionStatus:'pending_test'|'connected'|'degraded'|'disconnected'|'migrating';lastTestedAt?:string;lastTestResult?:string;secretReference:string;isPrimary:boolean;createdAt:string;updatedAt:string}
 export interface StorageMigrationRecord{id:string;tenantId:string;organizationId:string;source:StorageProvider;destination:StorageProvider;status:'queued'|'running'|'paused'|'completed'|'failed';totalFiles:number;completedFiles:number;failedFiles:number;sourceDeletionPolicy:'retain'|'delete_after_verification';createdAt:string;updatedAt:string}
 export interface ChangeRequestRecord{id:string;organizationId:string;tenantId:string;field:keyof Pick<OrganizationRecord,'officialName'|'country'|'operatorId'|'legalEmail'|'legalPhone'>;currentValue:string;requestedValue:string;reason:string;attachmentRef?:string;status:'pending'|'approved'|'rejected'|'needs_information';submittedBy:string;createdAt:string;decidedAt?:string;decidedBy?:string;decisionNote?:string}
+/*
+ * مرساةُ السجل: طولُه وتلبيدُه الأخير، محفوظان خارج ملفّ الحالة.
+ *
+ * سلسلةُ التلبيد تكشف تغييرَ سطرٍ وحذفَه من الوسط وقلبَ الرتبة — ولا تكشف قطعَ الذيل،
+ * لأن البادئةَ سلسلةٌ صحيحةٌ أقصر. فيلزمها شاهدٌ من خارجها يقول «كان الطولُ كذا».
+ */
+export interface AuditAnchor{rows:number;lastHash:string;updatedAt:string}
+
 export interface AuditRow{id:string;sequence:number;timestamp:string;actorId:string;actorRole:string;tenantId?:string;organizationId?:string;action:string;entityType:string;entityId:string;reason?:string;previousHash:string;hash:string}
 
 interface State{
@@ -77,7 +85,13 @@ export class SaaSPlatformRepository{
  constructor(private file:string,private vault?:SecretVault,private probe?:StorageProbe){fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});if(!fs.existsSync(file))this.write(this.empty())}
  private empty():State{return {version:1,sequence:0,plans:[],operators:[],organizations:[],licenses:[],creditLedger:[],participantUsage:[],competitions:[],storageObjects:[],storageAccounts:[],storageMigrations:[],changeRequests:[],audit:[],subscriptions:[],invoices:[]}}
  private read():State{try{const s=JSON.parse(fs.readFileSync(this.file,'utf8')) as State;return {...this.empty(),...s}}catch{return this.empty()}}
- private write(s:State){const tmp=`${this.file}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(s,null,2),{mode:0o600});fs.renameSync(tmp,this.file)}
+ private write(s:State){const tmp=`${this.file}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(s,null,2),{mode:0o600});fs.renameSync(tmp,this.file);this.writeAnchor(s)}
+ private get anchorFile(){return `${this.file}.audit-anchor.json`}
+ /* تُكتب المرساةُ مع كل حالة، فلا يبقى سجلٌّ بلا شاهدٍ على طوله. */
+ private writeAnchor(s:State){try{const anchor:AuditAnchor={rows:s.audit.length,lastHash:s.audit.at(-1)?.hash||'GENESIS',updatedAt:now()};const tmp=`${this.anchorFile}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(anchor,null,2),{mode:0o600});fs.renameSync(tmp,this.anchorFile)}catch{/* المرساةُ إضافةُ كشفٍ لا شرطَ كتابة: تعذّرُها لا يُسقط المعاملة */}}
+ private readAnchor():AuditAnchor|null{try{const a=JSON.parse(fs.readFileSync(this.anchorFile,'utf8')) as AuditAnchor;return Number.isInteger(a?.rows)&&typeof a?.lastHash==='string'?a:null}catch{return null}}
+ /** المرساةُ الحالية، لتُحفَظ خارج المضيف — وهذا وحده يحرس من عبثٍ يملك الملفّين. */
+ auditAnchor():AuditAnchor{const s=this.read();return {rows:s.audit.length,lastHash:s.audit.at(-1)?.hash||'GENESIS',updatedAt:now()}}
  private mutate<T>(fn:(s:State)=>T):T{const s=this.read(),out=fn(s);this.write(s);return out}
  private next(s:State,prefix:string){s.sequence++;return safeId(prefix,s.sequence)}
  private audit(s:State,actor:CommercialActor,input:{tenantId?:string;organizationId?:string;action:string;entityType:string;entityId:string;reason?:string}){const previous=s.audit.at(-1)?.hash||'GENESIS';const base={id:this.next(s,'AUD'),sequence:s.audit.length+1,timestamp:now(),actorId:actor.uid,actorRole:actor.role,...input,previousHash:previous};const row:AuditRow={...base,hash:hash(base)};s.audit.push(row);return row}
@@ -246,5 +260,20 @@ export class SaaSPlatformRepository{
   * الفوترة فتبقى على جهات ترخيصه وحدها — تلك ما يبيعه، وهذه ما يملكه.
   */
  operatorDashboard(actor:CommercialActor){if(!['operator_owner','operator_admin'].includes(actor.role)||!actor.operatorId)throw new Error('OPERATOR_REQUIRED');const s=this.read(),op=s.operators.find(x=>x.id===actor.operatorId);if(!op)throw new Error('OPERATOR_NOT_FOUND');const licensed=s.organizations.filter(x=>x.operatorId===op.id);const ownOrganization=actor.organizationId&&!licensed.some(x=>x.id===actor.organizationId)?s.organizations.filter(x=>x.id===actor.organizationId&&x.status!=='archived'):[];const organizations=[...licensed,...ownOrganization];const orgIds=new Set(licensed.map(o=>o.id));const sellable=s.plans.filter(x=>x.active&&(!x.ownerOperatorId||x.ownerOperatorId===op.id));const ownedPlans=s.plans.filter(x=>x.ownerOperatorId===op.id);const orgSubs=s.subscriptions.filter(x=>x.subjectType==='organization'&&orgIds.has(x.subjectId));const orgInvoices=s.invoices.filter(x=>x.subjectType==='organization'&&orgIds.has(x.subjectId));const mySub=s.subscriptions.filter(x=>x.subjectType==='operator'&&x.subjectId===op.id).map(x=>this.decorateSub(s,x));const myInvoices=s.invoices.filter(x=>x.subjectType==='operator'&&x.subjectId===op.id).map(x=>this.decorateInvoice(s,x));return {operator:op,creditBalance:this.creditBalance(s,op.id),plans:sellable.map(x=>({id:x.id,name:x.name,active:x.active,ownerOperatorId:x.ownerOperatorId})),ownedPlans,organizations:organizations.map(o=>({organization:o,license:s.licenses.find(x=>x.organizationId===o.id),linkedToOperator:o.operatorId===op.id,usage:this.usage({...actor,operatorId:op.id},o.id).usage})),creditLedger:s.creditLedger.filter(x=>x.operatorId===op.id).slice(-100).reverse(),billing:{subscriptions:orgSubs.slice().reverse().map(x=>this.decorateSub(s,x)),invoices:orgInvoices.slice(-200).reverse().map(x=>this.decorateInvoice(s,x)),summary:this.billingSummary(s,orgSubs,orgInvoices),mySubscription:mySub,myInvoices}}}
- verifyAudit(){const s=this.read();let previous='GENESIS';for(const row of s.audit){const {hash:rowHash,...base}=row;if(row.previousHash!==previous||hash(base)!==rowHash)return {valid:false,sequence:row.sequence};previous=row.hash}return {valid:true,rows:s.audit.length}}
+ /*
+  * يُفحص أمران: سلامةُ السلسلة، ثم مطابقتُها مرساةً من خارجها.
+  *
+  * و`expected` مرساةٌ يحملها المشغّل خارج المضيف، وهي الأقوى: مَن يملك الكتابةَ على
+  * القرص يملك الملفَّ ومرساتَه السيّارة معه، فلا تُعصمه المرساةُ المجاورة. فتُقدَّم
+  * المرساةُ الممرَّرة على المجاورة إن وُجدت.
+  *
+  * ويُعلَن `anchored` صراحةً: سجلٌّ بلا مرساةٍ تُفحَص سلسلتُه ولا يُدَّعى كشفُ القطع فيه.
+  */
+ verifyAudit(expected?:AuditAnchor){const s=this.read();let previous='GENESIS';
+  for(const row of s.audit){const {hash:rowHash,...base}=row;if(row.previousHash!==previous||hash(base)!==rowHash)return {valid:false,sequence:row.sequence,anchored:false as const};previous=row.hash}
+  const anchor=expected||this.readAnchor();
+  if(!anchor)return {valid:true,rows:s.audit.length,anchored:false as const};
+  if(s.audit.length<anchor.rows)return {valid:false,code:'AUDIT_LEDGER_TRUNCATED',expectedRows:anchor.rows,rows:s.audit.length,anchored:true as const};
+  if(s.audit.length===anchor.rows&&previous!==anchor.lastHash)return {valid:false,code:'AUDIT_LEDGER_ANCHOR_MISMATCH',rows:s.audit.length,anchored:true as const};
+  return {valid:true,rows:s.audit.length,anchored:true as const}}
 }

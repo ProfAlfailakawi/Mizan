@@ -81,6 +81,8 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('SIGNING_SECRET_ABSENT', 'CONFIG', 'سرُّ توقيعٍ غير مضبوط: الميزة المعتمدة عليه تبقى معطَّلة.', false),
 
   // — الخزنة الباردة والاستعادة —
+  ENTRY('AUDIT_LEDGER_TRUNCATED', 'RECOVERY', 'سجلُّ المراجعة أقصرُ من طوله المرصود: حُذفت سطورٌ من آخره. تُستعاد النسخةُ الاحتياطية ويُوقَف الاعتماد على السجل حتى تُراجَع.'),
+  ENTRY('AUDIT_LEDGER_ANCHOR_MISMATCH', 'RECOVERY', 'سجلُّ المراجعة لا يطابق مرساتَه المحفوظة خارجه: طولُه صحيحٌ وتلبيدُه الأخير مختلف. يُعدّ السجلُّ موضعَ شكٍّ حتى تُراجَع النسخُ.'),
   ENTRY('COLD_VAULT_KEY_MUST_BE_32_BYTES', 'RECOVERY', 'مفتاح النقل يجب أن يكون ٣٢ بايتًا بالضبط (AES-256).'),
   ENTRY('COLD_VAULT_COMPETITION_REQUIRED', 'RECOVERY', 'لا تُصدَّر خزنةٌ بلا تحديد المسابقة التي تُستعاد بها.'),
   ENTRY('COLD_VAULT_FORBIDDEN_SECRET', 'RECOVERY', 'الحمولة تحمل حقلَ سرٍّ (مفتاح أو كلمة مرور أو اعتماد). الخزنة للاستمرارية لا للأسرار، والمفتاح يبقى خارجها.'),
