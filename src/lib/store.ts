@@ -207,13 +207,18 @@ const DEMO_STATE_KEY = `${STORAGE_KEY}__demo_v1`;
  * يلبّي ذلك. والاسم مطابق لما تستعمله بقية البرامج المبنية على Vite حتى لا يختلف
  * الإجراء من برنامج لآخر.
  *
- * `import.meta.env` قد لا يوجد خارج حزمة Vite (في Node، أو عاملٍ خلفي)، وقراءته حينها
- * ترمي — والغياب ليس منعًا، فالافتراض متاح.
+ * يُقرأ المتغيّر بصيغته المباشرة `import.meta.env.VITE_DISABLE_DEMO_MODE` عن قصد، لا
+ * عبر متغيّرٍ وسيط: Vite يستبدل الصيغة المباشرة بقيمتها وقت البناء، فتصير الدالة
+ * ثابتًا يُحسب عند الترجمة، ويُسقط المُصغِّر مسار الديمو كلّه من الحزمة في أي نشرةٍ
+ * أُطفئ فيها — لا مجرّد إخفاء زر. والصيغة عبر متغيّرٍ وسيط تُبطل هذا الاستبدال فتبقى
+ * البيانات في الحزمة رغم الإطفاء.
+ *
+ * و`import.meta.env` لا وجود له خارج حزمة Vite (في Node، وفي الاختبارات التي تستورد
+ * هذا الملف)، فقراءته ترمي — ويلتقطها `catch`. والغياب ليس منعًا: الافتراض متاح.
  */
 function demoIsAvailable(): boolean {
   try {
-    const env = typeof import.meta !== 'undefined' ? (import.meta.env as unknown as Record<string, unknown>) : undefined;
-    return env?.VITE_DISABLE_DEMO_MODE !== 'true';
+    return import.meta.env.VITE_DISABLE_DEMO_MODE !== 'true';
   } catch {
     return true;
   }
