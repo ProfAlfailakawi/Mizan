@@ -38,6 +38,8 @@ async function tieValue(seed:string,id:string){return parseInt((await sha256(`${
 async function selectWithSeed(args:{pool:QuestionPoolItem[];participant:{riwaya:string};policy:CompetitionPolicy;seed:string;maxJuz?:number;excludedIds?:string[]}){
  const {participant,policy}=args;const excluded=new Set(args.excludedIds||[]);const participantRiwaya=normalizedRiwaya(participant.riwaya);
  let candidates=args.pool.filter(q=>!excluded.has(q.id));
+ // بنكٌ فارغ ليس اختلافَ رواية: تشخيصُه باسم الرواية يُرسل المسؤول يضيف مواضع والعائقُ غيرها.
+ if(!candidates.length)throw new Error('FAIRDRAW_NO_ELIGIBLE_QUESTIONS');
  // Exact reading isolation: if the pool has no matching reading, fail rather than silently falling back to Hafs.
  const riwayaMatches=candidates.filter(q=>{const qn=normalizedRiwaya(q.riwaya);return participantRiwaya===qn||participantRiwaya.includes(qn)||qn.includes(participantRiwaya)});
  if(!riwayaMatches.length)throw new Error('FAIRDRAW_READING_SOURCE_MISMATCH'); candidates=riwayaMatches;

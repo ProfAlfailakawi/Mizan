@@ -87,3 +87,29 @@ export function verifyIntegrity(expected: ObjectIntegrity, actual: { sizeBytes: 
   if (expected.sha256 && !actual.sha256) return { ok: false, code: 'R2_OBJECT_SHA256_UNVERIFIED' };
   return { ok: true };
 }
+
+/** ملفٌّ مذكورٌ في بيان الحزمة. */
+export interface PackageManifestFile { name: string; sha256: string; sizeBytes: number; contentType?: string }
+
+/**
+ * يقرأ قائمة ملفّات بيانِ حزمةٍ ويتحقّق منها. يُقبل أكثر من هجاءٍ للحقول (sourceFiles/files،
+ * sha256/contentSha256، sizeBytes/size) لأن البيانات تأتي من مولّداتٍ مختلفة.
+ *
+ * ويفشل مغلقًا: ملفٌّ بلا بصمةٍ صحيحة من ٦٤ خانة سِتّ عشرية، أو بلا حجمٍ صالح، أو بلا
+ * اسم — لا يُتحقَّق منه بحال، فلا يُقبل بيانٌ يذكره. إذ بيانٌ ناقصٌ يعني تحقُّقًا وهميًّا.
+ */
+export function readPackageManifestFiles(manifest: unknown): PackageManifestFile[] {
+  const m = manifest as Record<string, unknown> | null | undefined;
+  const raw = (m?.sourceFiles ?? m?.files) as unknown;
+  if (!Array.isArray(raw)) throw new R2KeyError('MANIFEST_FILES_MISSING');
+  return raw.map((entry, i) => {
+    const e = (entry ?? {}) as Record<string, unknown>;
+    const name = String(e.name ?? e.path ?? '').trim();
+    const sha256 = String(e.sha256 ?? e.contentSha256 ?? '').trim().toLowerCase();
+    const sizeBytes = Number(e.sizeBytes ?? e.size ?? NaN);
+    if (!name) throw new R2KeyError(`MANIFEST_FILE_NAME_MISSING_AT_${i}`);
+    if (!/^[0-9a-f]{64}$/.test(sha256)) throw new R2KeyError(`MANIFEST_FILE_SHA256_INVALID:${name}`);
+    if (!Number.isFinite(sizeBytes) || sizeBytes < 0) throw new R2KeyError(`MANIFEST_FILE_SIZE_INVALID:${name}`);
+    return { name, sha256, sizeBytes, ...(e.contentType ? { contentType: String(e.contentType) } : {}) };
+  });
+}
