@@ -115,12 +115,20 @@ export const AuthPortal:React.FC=()=>{
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-11 mt-2 text-xs font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
     {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
         تُفتح بضغطةٍ صريحة فقط، ولها مفتاح تخزينها الخاص داخل هذا التبويب. */}
-    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
-     <button type="button" onClick={()=>enterDemoSession()} className="w-full min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-[#d8b86a] bg-[#faf3e2] px-4 text-xs font-black text-[#8a6a1c] transition hover:bg-[#f6ebd3]">
-      <FlaskConical className="w-4 h-4"/>
-      <span>{ar?'استعراض النظام ببيانات تجريبية':'Explore with demo data'}</span>
+    {/* أيقونة صامتة لا لافتة: المدخل اختياريٌّ ثانوي، وشاشةُ الدخول لجهةٍ حقيقية
+        لا ينبغي أن يتصدّرها زرُّ عرض. والوصف باقٍ في `title`/`aria-label` فيبلغ
+        قارئَ الشاشة ومن يمرّ بالفأرة، ولا يزاحم العين. والحجم 44px كبقية أزرار
+        اللمس في ميزان. */}
+    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5] flex justify-center">
+     <button
+      type="button"
+      onClick={()=>enterDemoSession()}
+      title={ar?'استعراض النظام ببيانات تجريبية — بيئة معزولة لا تتصل بأي مسابقة حقيقية':'Explore with demo data — an isolated environment, not connected to any real competition'}
+      aria-label={ar?'استعراض النظام ببيانات تجريبية':'Explore with demo data'}
+      className="w-11 h-11 grid place-items-center rounded-xl border border-[#d8b86a] bg-[#faf3e2] text-[#8a6a1c] transition hover:bg-[#f6ebd3]"
+     >
+      <FlaskConical className="w-4 h-4" aria-hidden="true"/>
      </button>
-     <p className="mt-2 text-center text-[10px] font-semibold leading-5 text-[#636864]">{ar?'بيئة معزولة ببيانات مصطنعة — لا تتصل بأي مسابقة أو جهة حقيقية.':'An isolated environment of synthetic data — not connected to any real competition.'}</p>
     </div>}
    </>}
   </div>
