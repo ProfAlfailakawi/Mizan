@@ -590,6 +590,14 @@ export interface Participant {
   guardianAccessToken?: string;
   /** Server-created public registrations retain only capability hashes; raw tokens are returned once and never persisted. */
   journeyAccessTokenHash?: string;
+  /*
+   * عند مَن الرمز الأصلي.
+   *
+   * `holder_only`: سُلّم للمسجِّل عند التسجيل العام ولم يُحفظ عند الجهة ولا في السحابة —
+   * فلا شيء تنتظره مزامنة. `organizer`: أصدرته الجهة، فغيابه عن جهازٍ بعينه انتظارٌ في محلّه.
+   * وبدون هذا التمييز كانت الحالتان واحدة، فتُمنع الجهة من إصدار بطاقةٍ لا يملكها أحد سواها.
+   */
+  journeyTokenCustody?: 'holder_only' | 'organizer';
   guardianAccessTokenHash?: string;
   createdAt: string;
 }

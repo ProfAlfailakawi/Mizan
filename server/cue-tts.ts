@@ -41,7 +41,7 @@ export function cueTextAllowed(text: string): boolean {
 
 const CACHE_DIR = process.env.MIZAN_CUE_AUDIO_DIR || path.join(process.cwd(), '.mizan-cue-audio');
 const MODEL = process.env.MIZAN_CUE_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
-const VOICE = process.env.MIZAN_CUE_TTS_VOICE || 'Kore';
+const VOICE = process.env.MIZAN_CUE_TTS_VOICE || 'Charon';
 const API_KEY = process.env.MIZAN_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 
 export const cueTtsConfigured = () => !!API_KEY;

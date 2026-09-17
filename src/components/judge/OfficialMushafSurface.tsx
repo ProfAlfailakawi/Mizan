@@ -9,6 +9,7 @@ import {measuredWordTimings,splitAyahWords,wordAtTime,type MeasuredSegment} from
 import {resolveReading} from '../../lib/scientific-core';
 import {DELIVERY_READING_BY_RAWI as DELIVERY_READING_BY_RAWI_MAP} from '../../lib/delivered-readings';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
+import {bandsFromInkProfile,bandSpan,inkProfileFromImage,type LineBand} from '../../lib/mushaf-line-bands';
 
 /*
  * جدول الرواة المسلَّمين واحد لا اثنان.
@@ -234,7 +235,36 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
    onSeeked={e=>setPosMs(e.currentTarget.currentTime*1000)}/>
  </div>}
 
-const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;return <figure className="relative mx-auto w-fit"><div className="relative inline-block"><img src={url} alt={ar?`صفحة المصحف الرسمية ${locus.page}`:`Official Mushaf page ${locus.page}`} className="block max-h-[72vh] sm:max-h-[80vh] w-auto rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,.08)]"/>{/* تظليل واحد فقط في كل لحظة: أثناء تشغيل الصوت يظهر مؤشر الكلمة/السطر الجاري (كهرماني)،
+/*
+ * الأسطر تُقاس من الصفحة مرة واحدة ثم تُحفظ.
+ *
+ * القياس يقرأ بكسل الصفحة، وهو ثمنٌ يُدفع مرة لكل صورة لا مع كل رسم. وإن لم يتيقّن
+ * القياس رجع فارغًا، فتُستعمل النسبة التقريبية ويُقال إنها تقريبية.
+ */
+const bandsCache=new Map<string,LineBand[]>();
+const useLineBands=(url:string,expectedLines?:number)=>{
+ const [bands,setBands]=useState<LineBand[]|null>(()=>bandsCache.get(`${url}|${expectedLines||''}`)||null);
+ useEffect(()=>{
+  const key=`${url}|${expectedLines||''}`;
+  const cached=bandsCache.get(key);
+  if(cached){setBands(cached);return}
+  if(!url||typeof document==='undefined'){setBands(null);return}
+  let live=true;const img=new Image();
+  img.onload=()=>{
+   if(!live)return;
+   const ink=inkProfileFromImage(img,img.naturalWidth,img.naturalHeight);
+   const found=ink?bandsFromInkProfile(ink,{expectedLines}):[];
+   if(found.length)bandsCache.set(key,found);
+   setBands(found.length?found:null);
+  };
+  img.onerror=()=>{if(live)setBands(null)};
+  img.src=url;
+  return()=>{live=false};
+ },[url,expectedLines]);
+ return bands;
+};
+
+const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;return <figure className="relative mx-auto w-fit"><div className="relative inline-block"><img src={url} alt={ar?`صفحة المصحف الرسمية ${locus.page}`:`Official Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,.08)]"/>{/* تظليل واحد فقط في كل لحظة: أثناء تشغيل الصوت يظهر مؤشر الكلمة/السطر الجاري (كهرماني)،
     وفي غير ذلك تظهر عدسة موضع السؤال (خضراء). لا تتراكب عدستان أو ثلاث معًا. */}
   {audioSpot?.bbox
    ? <RecitingWordLens bbox={audioSpot.bbox}/>
@@ -247,7 +277,17 @@ const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking
           : word?<WordVectorLens bbox={word}/>:null)}</div><figcaption className="mt-2 text-center text-[9px] font-black text-[#606661]">{ar?'الصفحة':'Page'} {locus.page}{!focus.lineCount?<span className="ms-2 font-normal text-[#696f6b]">{ar?'هندسة الأسطر غير متاحة — بلا تخمين':'line geometry unavailable — no guess'}</span>:null}</figcaption></figure>}
 const MissingPage:React.FC<{page:number;ar:boolean}>=({page,ar})=><div className="min-h-44 rounded-2xl border border-dashed border-[#d1cec5] bg-[#f8f6f0] grid place-items-center text-center p-6"><div><FileSearch className="w-5 h-5 mx-auto text-[#646965]"/><div className="text-xs font-black mt-2">{ar?`الصفحة الرسمية ${page} غير مستوردة`:`Official page ${page} is not imported`}</div><div className="text-[9px] text-[#686d6a] mt-1">{ar?'لا يُستخدم بديل من رواية أخرى.':'No cross-riwayah visual fallback.'}</div></div></div>;
 
-const FocusLens:React.FC<{lineStart:number;lineEnd:number;lineCount:number;ar:boolean;tone?:'track'|'audio'}>=({lineStart,lineEnd,lineCount,ar,tone='track'})=>{const total=Math.max(1,lineCount),start=Math.max(1,Math.min(total,lineStart)),end=Math.max(start,Math.min(total,lineEnd));const textTop=8.5,textHeight=83;const top=textTop+((start-1)/total)*textHeight,height=Math.max(2.4,((end-start+1)/total)*textHeight);
+const FocusLens:React.FC<{lineStart:number;lineEnd:number;lineCount:number;ar:boolean;tone?:'track'|'audio';bands?:LineBand[]|null}>=({lineStart,lineEnd,lineCount,ar,tone='track',bands})=>{const total=Math.max(1,lineCount),start=Math.max(1,Math.min(total,lineStart)),end=Math.max(start,Math.min(total,lineEnd));
+ /*
+  * القياس أولًا، والتقدير عند تعذّره.
+  *
+  * الأشرطة المقيسة من الصفحة تضع العدسة على السطر بعينه. أما النسبة الثابتة (يبدأ النص
+  * عند ٨٫٥٪ ويشغل ٨٣٪) فتفترض صفحةً بلا عنوان سورة وبأسطرٍ متساوية، وهو ما لا يصحّ على
+  * كل صفحة — فتقع العدسة قريبًا من السطر لا عليه.
+  */
+ const measured=bands&&bands.length?bandSpan(bands,start,end):null;
+ const textTop=8.5,textHeight=83;
+ const top=measured?measured.top*100:textTop+((start-1)/total)*textHeight,height=measured?Math.max(1.6,measured.height*100):Math.max(2.4,((end-start+1)/total)*textHeight);
  // نبرة خضراء للتتبّع الحيّ، ونبرة كهرمانية للتلاوة المرجعية، ليُفرّق الحَكَم بينهما بلمحة.
  const c=tone==='audio'?{band:'border-[#8A5A2B]/30 bg-[#8A5A2B]/[0.05]',bar:'bg-[#8A5A2B]',glow:'rgba(138,90,43,.10)'}:{band:'border-[#2F6555]/25 bg-[#2F6555]/[0.035]',bar:'bg-[#2F6555]',glow:'rgba(47,101,85,.08)'};
  return <div aria-label={tone==='audio'?(ar?'عدسة الآية الجاري تلاوتها':'Reciting-ayah lens'):(ar?'عدسة موضع الاختبار':'Passage focus lens')} className="pointer-events-none absolute inset-0"><div className={`absolute start-[7%] end-[7%] rounded-md border-y ${c.band} transition-all duration-300`} style={{top:`${top}%`,height:`${height}%`}}/><div className={`absolute end-[3.5%] w-[3px] rounded-full ${c.bar} transition-all duration-300`} style={{top:`${top}%`,height:`${height}%`,boxShadow:`0 0 0 4px ${c.glow}`}}/></div>}

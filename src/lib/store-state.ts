@@ -44,6 +44,17 @@ export interface ActiveSessionState {
   questionSelection: QuestionSelection | null;
   currentQuestionIndex: number;
   isReciting: boolean;
+  /*
+   * لحظة بدء الجلسة هي الحقيقة، والزمن يُشتقّ منها.
+   *
+   * كان `durationSeconds` رقمًا لا يزيده شيء، فبقي صفرًا أبدًا — ولم يكذب على الشاشة
+   * وحدها: السجلّ يؤرّخ كل ملاحظة عند الصفر، ومتوسط زمن اللجنة يُحسب من أصفار. وعدّادٌ
+   * يزيد كل ثانية كان سيكذب كذبًا آخر: يتوقف مع نوم الجهاز فيقصر الزمن عن حقيقته.
+   * فالبداية تُسجَّل، والفارق يُحسب عند كل قراءة.
+   */
+  startedAt?: string;
+  /** ما تراكم قبل استعادةٍ من نقطة استمرارية، يُضاف إلى ما بعدها. */
+  carriedSeconds?: number;
   durationSeconds: number;
   events: JudgeEvent[];
   isLocked: boolean;

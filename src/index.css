@@ -769,10 +769,27 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-deck .mizan-judge-action{ min-height:104px; flex-direction:row; align-items:center; gap:1rem; padding:.9rem 1.1rem }
 .mizan-judge-deck .mizan-judge-head{ flex-direction:column; align-items:center; gap:.4rem }
 .mizan-judge-deck .mizan-judge-label{ margin-top:0 }
+/* ── الشاشة العريضة: اللوحة عمودٌ جانبي، والمصحف يملك ما تبقّى ─────────────
+   كانت اللوحة شريطًا أفقيًا يلتصق بالأسفل وارتفاع زرّه ١٥٠px، فتأكل ثلث الشاشة ويُقصّ
+   وجه المصحف من تحت. والفراغ عن يمين الصفحة ويسارها واسع، والمصحف مضغوطٌ رأسيًا لا
+   أفقيًا — فنقلُ اللوحة إلى العمود يستعمل مهدورًا ولا يأخذ من المصحف شيئًا، وتبقى
+   الأزرار كبيرة يصيبها الإبهام بلا تصويب كما هي الحاجة في القاعة. */
 @media (min-width:1024px){
-  .mizan-judge-deck .mizan-judge-grid[data-cols="3"]{ grid-template-columns:repeat(6,1fr) }
-  .mizan-judge-deck .mizan-judge-action{ min-height:150px; flex-direction:column; align-items:stretch; gap:.5rem }
-  .mizan-judge-deck .mizan-judge-head{ flex-direction:row; align-items:flex-start }
+  .mizan-judge-stage{ display:grid; grid-template-columns:1fr minmax(240px,300px); gap:1.25rem; align-items:start }
+  .mizan-judge-stage > .mizan-judge-page{ min-width:0 }
+  /* بطاقة الانتقال وبطاقة القفل بديلتان عن اللوحة لا جارتان لها، فتأخذان العرض كله. */
+  .mizan-judge-stage > *:not(.mizan-judge-page):not(.mizan-judge-deck){ grid-column:1 / -1 }
+  .mizan-judge-deck{
+    position:sticky; top:calc(64px + 5.5rem); bottom:auto; z-index:20;
+    margin-inline:0; padding:1rem; border-radius:var(--radius-lg);
+    border:1px solid #e5e3dc; border-top:1px solid #e5e3dc; box-shadow:var(--shadow-1);
+    max-height:calc(100dvh - 64px - 7rem); overflow-y:auto;
+  }
+  .mizan-judge-deck .mizan-judge-grid[data-cols="3"],
+  .mizan-judge-deck .mizan-judge-grid[data-cols="4"]{ grid-template-columns:1fr }
+  .mizan-judge-deck .mizan-judge-action{ min-height:66px; flex-direction:row; align-items:center; gap:.85rem; padding:.7rem .9rem }
+  .mizan-judge-deck .mizan-judge-head{ flex-direction:row; align-items:center; gap:.5rem }
+  .mizan-judge-deck .mizan-judge-icon svg{ width:1.5rem; height:1.5rem }
 }
 @media (prefers-reduced-motion:reduce){ .mizan-judge-strip, .mizan-judge-deck{ backdrop-filter:none; -webkit-backdrop-filter:none } }
 /* A judge marks with a thumb on a tablet, so the pressed state — not hover — is the
@@ -1268,3 +1285,13 @@ html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
 }
 html[data-mizan-motion="reduced"] .mizan-board-cell.is-stalled,
 html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
+
+/* ── وجه المصحف كامل دائمًا ──────────────────────────────────────────────────
+   كان سقف الصورة نسبةً ثابتة من الشاشة (٨٠vh) لا تعرف شيئًا عن الشريط العلوي ولا عن
+   اللوحة، فتُقصّ الصفحة من تحت متى كبرت اللوحة. فيُحسب المتاح: الشاشة ناقص ترويسة
+   التطبيق والشريط، وتتحجّم الصفحة لتدخل فيه كاملة. */
+/* الهاتف يبقى على النسبة ويُمرَّر: حسمُ ارتفاع اللوحة منه يترك وجهًا أصغر من أن يُقرأ،
+   وهو الأسوأ. ومن اللوحي فصاعدًا في الشاشة متّسع، فيُحسم ويظهر الوجه كاملًا بلا تمرير. */
+.mizan-mushaf-page{ max-height:80vh; }
+@media (min-width:640px){ .mizan-mushaf-page{ max-height:min(80vh, calc(100dvh - 64px - 26rem)) } }
+@media (min-width:1024px){ .mizan-mushaf-page{ max-height:calc(100dvh - 64px - 9.5rem) } }

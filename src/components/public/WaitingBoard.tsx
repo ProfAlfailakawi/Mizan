@@ -30,7 +30,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
   useScreenAwake(true);
 
-  const { language, participants, committees, competition, activeSession } = useAppStore();
+  const { language, participants, committees, competition, activeSession, sessionElapsedSeconds } = useAppStore();
   const ar = language !== 'en';
 
   const [now, setNow] = useState(() => new Date());
@@ -45,12 +45,12 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
     categories: competition.categories || [],
     fallbackSessionMinutes: competition.ruleSet?.questionDurationMinutes,
     elapsedSecondsByCommittee: activeSession.committee
-      ? { [activeSession.committee.id]: activeSession.durationSeconds }
+      ? { [activeSession.committee.id]: sessionElapsedSeconds() }
       : undefined,
     nextDepth: HALL_NEXT_DEPTH,
     ar,
     now,
-  }), [competition, participants, committees, activeSession.committee, activeSession.durationSeconds, ar, now]);
+  }), [competition, participants, committees, activeSession.committee, sessionElapsedSeconds, ar, now]);
 
   const board = externalBoard || localBoard;
   const age = boardAge(board.generatedAt, now);
