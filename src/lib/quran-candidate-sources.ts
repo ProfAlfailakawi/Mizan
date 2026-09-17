@@ -14,6 +14,7 @@
  */
 
 import type { QuranSourceAuthority } from './quran-source-authority';
+import type { QuranNativeCountSystemId } from './quran-native-count-systems';
 
 export type QuranCandidateReviewState =
   | 'PENDING_SCHOLAR_REVIEW'
@@ -22,7 +23,6 @@ export type QuranCandidateReviewState =
   | 'REJECTED';
 
 export type QuranCandidatePermissionState = 'OWNER_REPORTED_PERMISSION';
-export type QuranNativeCountFamily = 'KUFIC' | 'DIMASHQI' | 'MADANI_AWWAL' | 'BASRI_YAQUB';
 
 /**
  * قرارُ اللجنة العلمية مربوطًا بأثرٍ بعينه. لا يُقرأ هذا القرار وحده أبدًا: يُقرأ عبر
@@ -55,7 +55,8 @@ export interface QuranCandidateSource {
   expectedCompressedSha256: string;
   expectedSurahCount: 114;
   expectedVerseCount: number;
-  nativeCountFamily: QuranNativeCountFamily;
+  /** نظام العدّ الأصلي لهذه الرواية — مستخرجٌ من الأثر نفسه لا مفترضًا. */
+  nativeCountSystem: QuranNativeCountSystemId;
   permissionState: QuranCandidatePermissionState;
   committeeDecision: QuranCandidateCommitteeDecision;
   caveat?: string;
@@ -77,7 +78,7 @@ const candidate = (
   deliveryKey: string,
   filename: string,
   expectedVerseCount: number,
-  nativeCountFamily: QuranNativeCountFamily,
+  nativeCountSystem: QuranNativeCountSystemId,
   expectedCompressedSha256: string,
   caveat?: string,
 ): QuranCandidateSource => ({
@@ -92,7 +93,7 @@ const candidate = (
   expectedCompressedSha256,
   expectedSurahCount: 114,
   expectedVerseCount,
-  nativeCountFamily,
+  nativeCountSystem,
   permissionState: 'OWNER_REPORTED_PERMISSION',
   committeeDecision: {
     state: 'APPROVED',
@@ -127,9 +128,9 @@ export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
     '71b94c83b9983ef9770939d5e3a13713e532e2dcd8a3acc72d24e71c3bdb7678'),
   candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate', 6214, 'MADANI_AWWAL',
     '4ab22d6f5e01217318139266e3d409f30c2922faaa2d1d91d4be41c0fba0fdf1'),
-  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate', 6204, 'BASRI_YAQUB',
+  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate', 6204, 'BASRI_YAQUB_RUWAYS',
     'df236a65d32ce0a68b6326c1811628cf143283e2ec788d82c0521ce1ee0ac1c6'),
-  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate', 6206, 'BASRI_YAQUB',
+  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate', 6206, 'BASRI_YAQUB_RAWH',
     '01e680bf68fdfe050aa49097f253c628d8e3455836fbe63210b6ee95a689e036'),
   candidate(
     'ishaq',

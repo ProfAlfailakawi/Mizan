@@ -59,7 +59,7 @@ export interface CandidateQuranManifest {
   expectedCompressedSha256: string;
   expectedSurahCount: number;
   expectedVerseCount: number;
-  nativeCountFamily: string;
+  nativeCountSystem: string;
   actualSurahCount: number;
   actualVerseCount: number;
   compressedSha256: string;
@@ -190,7 +190,7 @@ function manifestHash(input: Omit<CandidateQuranManifest, 'packageHash' | 'revie
     permissionState: input.permissionState,
     expectedSurahCount: input.expectedSurahCount,
     expectedVerseCount: input.expectedVerseCount,
-    nativeCountFamily: input.nativeCountFamily,
+    nativeCountSystem: input.nativeCountSystem,
     actualSurahCount: input.actualSurahCount,
     actualVerseCount: input.actualVerseCount,
     compressedSha256: input.compressedSha256,
@@ -270,7 +270,7 @@ export class CandidateQuranSourceVault {
       expectedCompressedSha256: source.expectedCompressedSha256,
       expectedSurahCount: source.expectedSurahCount,
       expectedVerseCount: source.expectedVerseCount,
-      nativeCountFamily: source.nativeCountFamily,
+      nativeCountSystem: source.nativeCountSystem,
       actualSurahCount: new Set(rows.map(row => row.sura_no)).size,
       actualVerseCount: rows.length,
       compressedSha256,

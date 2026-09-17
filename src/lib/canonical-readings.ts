@@ -135,6 +135,14 @@ export interface ReadingReadinessEvidence {
    * معلوم للسجلّ فلا يُحتسب مانعًا؛ و`false` = معلومٌ أنه غير مُصدّق فيُمنع.
    */
   sourceCertified?: boolean;
+  /**
+   * هل يُحلّ إحداثي ميزان القانوني إلى ترقيم هذه الرواية الأصلي في كامل المصحف؟
+   *
+   * يُحقن من `isReadingQuestionSafe` في الطبقة التي تملك الجسر — والسجلّ لا يستورده
+   * لئلّا تنشأ حلقة استيراد. `undefined` = غير معلوم فلا يُحتسب مانعًا، و`false` =
+   * معلومٌ أن السحب منها يعطي موضعًا لا وجود له في الرواية فيُمنع.
+   */
+  locusMappingQuestionSafe?: boolean;
 }
 
 export interface ReadingProductionReadiness {
@@ -155,6 +163,7 @@ export function readingProductionReady(rawiId: string, evidence: ReadingReadines
   if (!cap.deliveryMappingPresent) blockers.push('NO_DELIVERY_MAPPING');
   if (!evidence.deliveryAvailableAtRuntime) blockers.push('DELIVERY_TEXT_UNAVAILABLE_AT_RUNTIME');
   if (evidence.sourceCertified === false) blockers.push('SOURCE_NOT_CERTIFIED');
+  if (evidence.locusMappingQuestionSafe === false) blockers.push('LOCUS_MAPPING_INCOMPLETE');
   return { rawiId, productionReady: blockers.length === 0, blockers };
 }
 

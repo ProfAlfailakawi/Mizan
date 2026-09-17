@@ -10,13 +10,20 @@
  *   - العرض يعمل على تمثيل الرواية الأصلي.
  *   - والانتقال بينهما يمرّ من هنا، ويُعلَن هل هو مبنيٌّ على دليلٍ أم على تطابقٍ افتراضي.
  *
- * مهمٌّ: هذا الملف لا يختلق صفوف جسرٍ لأي رواية. يبدأ الجدول فارغًا — أي تطابقٌ افتراضي
- * (`assumed:true`) — ولا يُقبل صفٌّ غيرُ تطابقي إلا بدليلٍ منصوص. فالصمتُ هنا أصدق من
- * جدولٍ مخمَّن يُقاس عليه متسابق.
+ * مهمٌّ: هذا الملف لا يختلق صفوف جسرٍ لأي رواية. يبدأ جدول الأدلّة فارغًا، ولا يُقبل صفٌّ
+ * غيرُ تطابقي إلا بدليلٍ منصوص. فالصمتُ هنا أصدق من جدولٍ مخمَّن يُقاس عليه متسابق.
+ *
+ * لكنّ الصمت لا يعني التطابق. فراغُ الجدول لا يُقرأ «كل شيء آيةٌ بآية»: يُسأل نظامُ العدّ
+ * الأصلي للرواية (`reading-count-systems`) أولًا، وهو مستخرجٌ من بايتات الحزم المثبَّتة.
+ * فإن طابق عددُ آيات السورة العدَّ القانوني فالتطابق نتيجةٌ متحقّقة، وإن خالفه — وهو واقعٌ
+ * في خمسين سورة من العدّ الدمشقي وستٍّ وأربعين من المدني الأول — فالموضع `UNRESOLVED`
+ * حتى يصل دليل، ولا تُسحب منه أسئلة.
  */
 
-import { CANONICAL_READING_BY_RAWI } from './canonical-readings';
-import { isValidLocus, type QuranLocus } from './quran-canon';
+import { CANONICAL_READING_BY_RAWI, CANONICAL_RAWI_IDS, resolveCanonicalRawiId } from './canonical-readings';
+import { QURAN_SURAH_TOTAL, ayahCountOf, isValidLocus, type QuranLocus } from './quran-canon';
+import { countSystemForReading } from './reading-count-systems';
+import { nativeAyahCountOf } from './quran-native-count-systems';
 
 /** نوع العلاقة بين الإحداثي القانوني وترقيم الرواية. */
 export type CrosswalkRelation =
@@ -39,14 +46,29 @@ export class CrosswalkError extends Error {
   constructor(code: string) { super(code); this.name = 'CrosswalkError'; this.code = code; }
 }
 
-/** نتيجة الانتقال: تُعلن صراحةً هل جاءت من دليلٍ أم من تطابقٍ افتراضي. */
+/**
+ * درجة توثيق الانتقال. الفرق بين الثالثة والرابعة هو الفرق بين «لا نعلم» و«نعلم أنه مختلف»:
+ * الأولى افتراضٌ معلَن قابلٌ للرفع بالفحص، والثانية رفضٌ قاطع لأن عدّ السورة مختلفٌ فعلًا
+ * فالتطابق آيةً بآية فيها خطأ مؤكَّد لا احتمالًا.
+ */
+export type CrosswalkAssurance =
+  | 'EVIDENCED_ROW'
+  | 'VERIFIED_COUNT_IDENTITY'
+  | 'UNVERIFIED_COUNT_IDENTITY'
+  | 'UNRESOLVED';
+
+/** نتيجة الانتقال: تُعلن صراحةً هل جاءت من دليلٍ أم من تطابقٍ مُتحقَّق أم لم تُحلّ أصلًا. */
 export interface NativeResolution {
   rawiId: string;
-  native: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
+  /** `undefined` حين `UNRESOLVED` — لا يُختلق موضعٌ أصلي. */
+  native?: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
   relation: CrosswalkRelation;
-  /** true = لا صفَّ دليلٍ لهذا الموضع، فاستُعمل التطابق الافتراضي آيةً بآية. */
+  assurance: CrosswalkAssurance;
+  /** true = لم يأتِ من صفّ دليلٍ منصوص. */
   assumed: boolean;
   evidence: string[];
+  /** سبب عدم الحلّ حين `UNRESOLVED` — قابلٌ للعرض في التقرير. */
+  reason?: string;
 }
 
 /** يتحقّق من صفّ جسرٍ واحد. يفشل مغلقًا — ولا يقبل دعوى اختلافٍ بلا دليل. */
@@ -100,19 +122,35 @@ export class QuranCrosswalkTable {
 
   /**
    * القانوني ← الأصلي. يفشل مغلقًا لراوٍ مجهول أو موضعٍ غير صحيح، ولا يعود إلى روايةٍ أخرى.
-   * بلا صفِّ دليلٍ يعود بالتطابق الافتراضي موسومًا `assumed:true`.
+   *
+   * بلا صفِّ دليلٍ لا يُقفز إلى التطابق: يُسأل نظامُ العدّ الأصلي للرواية أولًا. فإن كان
+   * عدد آيات هذه السورة متحقّقًا ومطابقًا للعدّ القانوني، فالتطابق آيةً بآية نتيجةٌ لا
+   * افتراض. وإن كان العدّ مختلفًا فعلًا — كخمسين سورة في العدّ الدمشقي — فالنتيجة
+   * `UNRESOLVED` بلا موضعٍ أصلي: لا يُسأل متسابقٌ عن موضعٍ لا نعرف أين يقع في روايته.
    */
   toNative(rawiId: string, canonical: QuranLocus): NativeResolution {
     if (!CANONICAL_READING_BY_RAWI.has(rawiId)) throw new CrosswalkError('CROSSWALK_UNKNOWN_RAWI');
     if (!isValidLocus(canonical)) throw new CrosswalkError('CROSSWALK_CANONICAL_LOCUS_INVALID');
     const row = this.rows.get(keyOf(rawiId, canonical.surah, canonical.ayah));
     if (row) {
-      return { rawiId, native: { ...row.native }, relation: row.relation, assumed: false, evidence: [...row.evidence] };
+      return { rawiId, native: { ...row.native }, relation: row.relation, assurance: 'EVIDENCED_ROW', assumed: false, evidence: [...row.evidence] };
+    }
+    const assurance = surahCountAssurance(rawiId, canonical.surah);
+    if (assurance === 'UNRESOLVED') {
+      return {
+        rawiId,
+        relation: 'BOUNDARY_SHIFT',
+        assurance,
+        assumed: true,
+        evidence: [],
+        reason: `NATIVE_COUNT_DIVERGES:${canonical.surah}:${ayahCountOf(canonical.surah)}:${nativeSurahCount(rawiId, canonical.surah)}`,
+      };
     }
     return {
       rawiId,
       native: { surah: canonical.surah, ayah: canonical.ayah },
       relation: 'EXACT',
+      assurance,
       assumed: true,
       evidence: [],
     };
@@ -138,6 +176,122 @@ export class QuranCrosswalkTable {
   rowsFor(rawiId: string): QuranLocusCrosswalk[] {
     return [...this.rows.values()].filter(r => r.rawiId === rawiId);
   }
+}
+
+/** عدد آيات سورةٍ في ترقيم الرواية الأصلي، أو `undefined` إن كان النظام غير معلوم. */
+function nativeSurahCount(rawiId: string, surah: number): number | undefined {
+  const system = countSystemForReading(rawiId);
+  if (!system?.system || system.assurance === 'UNVERIFIED') return undefined;
+  return nativeAyahCountOf(system.system, surah);
+}
+
+/**
+ * درجة التوثيق لسورةٍ واحدة بناءً على نظام العدّ وحده (قبل النظر في صفوف الدليل).
+ */
+export function surahCountAssurance(rawiId: string, surah: number): Exclude<CrosswalkAssurance, 'EVIDENCED_ROW'> {
+  const system = countSystemForReading(rawiId);
+  if (!system || !system.system || system.assurance === 'UNVERIFIED') return 'UNVERIFIED_COUNT_IDENTITY';
+  if (system.assurance === 'CANONICAL_BY_DEFINITION') return 'VERIFIED_COUNT_IDENTITY';
+  return nativeAyahCountOf(system.system, surah) === ayahCountOf(surah) ? 'VERIFIED_COUNT_IDENTITY' : 'UNRESOLVED';
+}
+
+/** تغطية الجسر لرواية واحدة — تُقرأ في الجاهزية والتقارير ولوحة الإدارة. */
+export interface CrosswalkCoverage {
+  rawiId: string;
+  countSystem?: string;
+  countAssurance: string;
+  canonicalAyahTotal: number;
+  /** مواضع قانونية يُعرف مقابلها الأصلي يقينًا (دليلٌ أو عدٌّ متحقّق مطابق). */
+  resolvedLoci: number;
+  /** مواضع لا يُعرف مقابلها — بسبب اختلاف عدٍّ متحقّق بلا صفّ دليل. */
+  unresolvedLoci: number;
+  /** مواضع محلولة بافتراضٍ معلَن لأن ترقيم الحزمة غير مفحوص. */
+  assumedLoci: number;
+  /** السور التي يلزمها دليلٌ صريح، بأسمائها الرقمية. */
+  surahsRequiringEvidence: number[];
+  /**
+   * هل الجسر مكتملٌ يقينًا لكامل المصحف؟ (لا مجهول ولا مفترض)
+   */
+  mappingComplete: boolean;
+  /**
+   * هل يجوز سحبُ سؤالٍ لهذه الرواية؟ الشرط ألّا يوجد موضعٌ **معلومُ الاختلاف** بلا دليل.
+   *
+   * الفرق عن `mappingComplete` مقصود: رواية لم يُفحص ترقيم حزمتها بعد تبقى على ما كانت
+   * عليه (تطابقٌ معلَن) فلا يُكسر ما يعمل اليوم بلا دليلٍ على عطله؛ أمّا رواية ثبت أن
+   * عدّها يخالف في سورةٍ فالسحبُ منها خطأٌ مؤكَّد، فيُمنع.
+   */
+  questionSafe: boolean;
+  blockers: string[];
+}
+
+/**
+ * يحسب التغطية من الحالة الحقيقية لا من عدّاد. ما لم يُحلّ يُسمّى بسورته وسببه، حتى يقرأ
+ * الإداري «المؤمنون: العدّ ١١٨ قانونيًّا و١١٩ أصليًّا، ولا صفّ دليل» بدل «غير جاهز».
+ */
+export function crosswalkCoverage(rawiId: string, table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): CrosswalkCoverage {
+  if (!CANONICAL_READING_BY_RAWI.has(rawiId)) throw new CrosswalkError('CROSSWALK_UNKNOWN_RAWI');
+  const system = countSystemForReading(rawiId);
+  let resolved = 0, unresolved = 0, assumed = 0, total = 0;
+  const surahsRequiringEvidence: number[] = [];
+  for (let surah = 1; surah <= QURAN_SURAH_TOTAL; surah++) {
+    const canonicalCount = ayahCountOf(surah);
+    total += canonicalCount;
+    const base = surahCountAssurance(rawiId, surah);
+    if (base === 'VERIFIED_COUNT_IDENTITY') { resolved += canonicalCount; continue; }
+    if (base === 'UNVERIFIED_COUNT_IDENTITY') { assumed += canonicalCount; continue; }
+    // العدّ مختلف: كل موضعٍ في هذه السورة يحتاج صفَّ دليلٍ خاصًّا به.
+    let evidenced = 0;
+    for (let ayah = 1; ayah <= canonicalCount; ayah++) {
+      if (table.hasEvidenceFor(rawiId, { surah, ayah })) evidenced++;
+    }
+    resolved += evidenced;
+    unresolved += canonicalCount - evidenced;
+    if (evidenced < canonicalCount) surahsRequiringEvidence.push(surah);
+  }
+  const blockers: string[] = [];
+  if (unresolved > 0) blockers.push(`CROSSWALK_UNRESOLVED_LOCI:${unresolved}`);
+  if (assumed > 0) blockers.push(`CROSSWALK_NATIVE_NUMBERING_UNVERIFIED:${assumed}`);
+  return {
+    rawiId,
+    countSystem: system?.system,
+    countAssurance: system?.assurance || 'UNVERIFIED',
+    canonicalAyahTotal: total,
+    resolvedLoci: resolved,
+    unresolvedLoci: unresolved,
+    assumedLoci: assumed,
+    surahsRequiringEvidence,
+    mappingComplete: unresolved === 0 && assumed === 0,
+    questionSafe: unresolved === 0,
+    blockers,
+  };
+}
+
+/**
+ * هل يجوز سحبُ سؤالٍ لهذه الرواية من إحداثي ميزان القانوني؟
+ *
+ * يُقرأ من الإدخال الحرّ (قيمة `category.riwaya`) فيحلّ الهوية أولًا. رواية لا تُحلّ هويتها
+ * ليست آمنة — لا يُخمَّن «الدوري».
+ */
+export function isReadingQuestionSafe(input: { qiraah?: string; rawi?: string; riwaya?: string } | string, table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): boolean {
+  const rawiId = typeof input === 'string'
+    ? (CANONICAL_READING_BY_RAWI.has(input) ? input : resolveCanonicalRawiId({ riwaya: input }))
+    : resolveCanonicalRawiId(input);
+  if (!rawiId) return false;
+  return crosswalkCoverage(rawiId, table).questionSafe;
+}
+
+/** سبب المنع مسمّى بسورته — للوحة الإدارة وفحص ما قبل الانطلاق والدعم. */
+export function readingQuestionBlockers(rawiId: string, table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): string[] {
+  const coverage = crosswalkCoverage(rawiId, table);
+  if (coverage.questionSafe) return [];
+  const head = coverage.surahsRequiringEvidence.slice(0, 6).join('، ');
+  const more = coverage.surahsRequiringEvidence.length > 6 ? ` و${coverage.surahsRequiringEvidence.length - 6} غيرها` : '';
+  return [`CROSSWALK_UNRESOLVED_SURAHS:${coverage.surahsRequiringEvidence.length}:${head}${more}`];
+}
+
+/** التغطية للعشرين جميعًا — مصدر مصفوفة الجاهزية، لا رقمٌ ثابت. */
+export function crosswalkCoverageMatrix(table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): CrosswalkCoverage[] {
+  return CANONICAL_RAWI_IDS.map(rawiId => crosswalkCoverage(rawiId, table));
 }
 
 /**

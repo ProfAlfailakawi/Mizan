@@ -25,6 +25,7 @@ import { PublicCertificateRegistry, certificateRegistryFromEnv } from './server/
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
+import { MizanQuranDelivery } from './server/quran-reading-delivery';
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
@@ -411,6 +412,9 @@ async function startServer() {
   const kfgqpcFontRoot=process.env.MIZAN_KFGQPC_FONT_ROOT||'';
   const kfgqpcAudioRoot=process.env.MIZAN_KFGQPC_AUDIO_ROOT||'';
   const kfgqpcDelivery=new KfgqpcDeliveryRepository({pageRoot:kfgqpcPageImageRoot,fontRoot:kfgqpcFontRoot,audioRoot:kfgqpcAudioRoot,r2BaseUrl:process.env.MIZAN_KFGQPC_R2_DELIVERY_BASE_URL||'',r2BearerToken:process.env.MIZAN_KFGQPC_R2_BEARER_TOKEN||''});
+  /* نصّ العشرين يمرّ من واجهةٍ واحدة تعرف مصدر كل رواية وإسنادَها؛ الصفحات والخطوط والصوت
+     تبقى على مستودع المجمع لأنها أصولُه فعلًا. */
+  const quranDelivery=new MizanQuranDelivery(kfgqpcDelivery);
   const questionPoolDir=process.env.MIZAN_SERVER_QUESTION_POOL_DIR||'';let serverQuestionPools:ServerQuestionPoolRepository|null=null;try{if(questionPoolDir)serverQuestionPools=new ServerQuestionPoolRepository(questionPoolDir)}catch(err){console.error('Server question pool disabled:',err)}
   const questionRuntimeDir=process.env.MIZAN_SECURE_QUESTION_RUNTIME_DIR||'';let secureQuestionRuntime:SecureQuestionRuntimeRepository|null=null;try{if(questionRuntimeDir&&serverQuranSources&&serverQuestionPools&&questionEscrow)secureQuestionRuntime=new SecureQuestionRuntimeRepository(questionRuntimeDir,serverQuranSources,serverQuestionPools,questionEscrow)}catch(err){console.error('Secure question runtime disabled:',err)}
   let certificateRegistry:PublicCertificateRegistry|null=null;try{certificateRegistry=certificateRegistryFromEnv()}catch(err){console.error('Public certificate registry disabled:',err)}
@@ -1196,7 +1200,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   app.get('/api/public/kfgqpc/passage/:readingId/:surah/:startAyah/:endAyah',async(req,res)=>{
     const readingId=safeSegment(String(req.params.readingId||''));
     const surah=Number(req.params.surah),startAyah=Number(req.params.startAyah),endAyah=Number(req.params.endAyah);
-    try{const passage=await kfgqpcDelivery.passage(readingId,surah,startAyah,endAyah);
+    try{const passage=await quranDelivery.passage(readingId,surah,startAyah,endAyah);
       if(!passage)return res.status(404).json({code:'OFFICIAL_PASSAGE_NOT_DELIVERED'});
       // Tajweed is derived from each ayah's own text, so the marks land on the very letters in
       // front of the reciter rather than on offsets computed against a different text.
@@ -1205,13 +1209,16 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
          after clients had already cached an hour-long copy, so the new layer stayed invisible to
          anyone who had opened the passage before. A short window with revalidation keeps the
          bandwidth saving while letting a schema change reach a judge on their next request. */
-      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');res.setHeader('X-MIZAN-Source-Authority','KFGQPC');
+      res.setHeader('Cache-Control','public, max-age=300, must-revalidate');
+      /* الترويسة تُختم من إسناد الرواية نفسها. ثابتٌ مكتوب هنا يجعل نصّ إسلام ويب يخرج
+         موسومًا KFGQPC — وهو كذبٌ في الإسناد لا خطأ عرض. */
+      res.setHeader('X-MIZAN-Source-Authority',passage.provenance.authority);
       return res.json(withTajweed)}catch{return res.status(502).json({code:'OFFICIAL_PASSAGE_DELIVERY_FAILED'})}});
 
   app.get('/api/public/kfgqpc/fairdraw/:readingId',async(req,res)=>{
     const readingId=safeSegment(String(req.params.readingId||'hafs'));
     const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
-    try{const out=await generativeFairDraw(kfgqpcDelivery,{reading:readingId,seed:req.query.seed?String(req.query.seed):undefined,
+    try{const out=await generativeFairDraw(quranDelivery,{reading:readingId,seed:req.query.seed?String(req.query.seed):undefined,
         anchor:req.query.anchor?String(req.query.anchor) as any:undefined,ayahCount:num(req.query.ayahCount),
         juz:num(req.query.juz),surah:num(req.query.surah),minAyahCount:num(req.query.min),maxAyahCount:num(req.query.max)});
       if(!out)return res.status(404).json({code:'FAIRDRAW_SOURCE_NOT_DELIVERED'});
@@ -1228,7 +1235,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     const readingId=safeSegment(String(req.body?.reading||'hafs'));
     const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
     try{const a=await analysisFor(readingId);if(!a)return res.status(404).json({code:'READING_NOT_DELIVERED'});
-      const out=await balancedFairDraw(kfgqpcDelivery,a.difficulty,{reading:readingId,
+      const out=await balancedFairDraw(quranDelivery,a.difficulty,{reading:readingId,
         contestants:Number(req.body?.contestants),seed:req.body?.seed?String(req.body.seed):undefined,
         anchor:req.body?.anchor?String(req.body.anchor) as any:undefined,ayahCount:num(req.body?.ayahCount),
         juz:num(req.body?.juz),surah:num(req.body?.surah),minAyahCount:num(req.body?.min),maxAyahCount:num(req.body?.max),
@@ -1247,7 +1254,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   const analysisCache=new Map<string,{mutashabihat:MutashabihatEngine;difficulty:DifficultyEngine;names:Map<number,string>}>();
   const analysisFor=async(readingId:string)=>{
     const cached=analysisCache.get(readingId);if(cached)return cached;
-    const rows=await kfgqpcDelivery.quranData(readingId);if(!rows)return null;
+    const rows=await quranDelivery.quranData(readingId);if(!rows)return null;
     const mutashabihat=new MutashabihatEngine(rows);
     const difficulty=new DifficultyEngine(rows,mutashabihat);
     const names=new Map<number,string>();for(const r of rows){const s=Number(r.sora);if(!names.has(s)&&r.sora_name_ar)names.set(s,String(r.sora_name_ar))}

@@ -64,6 +64,10 @@ test('delivery and KFGQPC authority are now separate questions', () => {
   assert.equal(isKfgqpcSourceAuthority({ sourceAuthority: 'QURANPEDIA' }), false);
   assert.equal(isKfgqpcSourceAuthority({ sourceAuthority: '' }), false);
   assert.equal(isKfgqpcSourceAuthority(undefined), false);
-  // a reading with no delivered text stays false, whatever the authority says
-  assert.equal(isReadingDelivered({ riwaya: 'هشام عن ابن عامر' }), false);
+  // هشام صار له نصٌّ مُسلَّم من أثرٍ مثبَّت — وهذا لا يجعل ناشره مجمع الملك فهد.
+  assert.equal(isReadingDelivered({ riwaya: 'هشام عن ابن عامر' }), true);
+  assert.equal(isKfgqpcSourceAuthority({ sourceAuthority: 'ISLAMWEB' }), false);
+  // وما لا تُحلّ هويته لا يُقال إنه مُسلَّم — لا تخمين لـ«الدوري» المجرّدة.
+  assert.equal(isReadingDelivered({ riwaya: 'الدوري' }), false);
+  assert.equal(isReadingDelivered({ riwaya: 'رواية لا وجود لها' }), false);
 });

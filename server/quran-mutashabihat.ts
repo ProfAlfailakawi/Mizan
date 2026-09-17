@@ -65,7 +65,8 @@ export interface IndexedWord { surah: number; ayah: number; wordIndex: number; p
 export function buildWordIndex(rows: any[]): IndexedWord[] {
   const out: IndexedWord[] = [];
   for (const r of rows) {
-    const surah = Number(r.sora), ayah = Number(r.aya_no), page = Number(r.page);
+    /* حزمٌ بلا صفحات مطبوعة موجودةٌ فعلًا؛ الصفحة تبقى غير معروفة بدل أن تصير NaN في الرد. */
+    const surah = Number(r.sora), ayah = Number(r.aya_no), page = Number.isFinite(Number(r.page)) ? Number(r.page) : undefined;
     const words = String(r.aya_text || '').split(/\s+/).filter(Boolean);
     let wi = 0;
     for (const w of words) {

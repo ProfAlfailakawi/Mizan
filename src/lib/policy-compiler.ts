@@ -2,6 +2,8 @@ import type { Competition, CompetitionPolicy, ContradictionIssueRecord, PolicyCo
 import { getCompetitionPolicy } from './competition-config';
 import { hashCanonical } from './trust-protocol';
 import { certifiedCapabilityFor, sourceUsableForCompetition, isReadingDelivered } from './scientific-core';
+import { isReadingQuestionSafe, readingQuestionBlockers } from './quran-locus-crosswalk';
+import { resolveCanonicalRawiId } from './canonical-readings';
 
 const lines=(text:string)=>text.replace(/\r/g,'').split('\n').map((text,i)=>({text:text.trim(),line:i+1})).filter(x=>x.text.length>0);
 const ruleMatchers:{category:string;path:string;re:RegExp;value:(m:RegExpMatchArray)=>unknown}[]=[
@@ -69,6 +71,8 @@ export function detectContradictions(input:{competition:Competition;quranSources
  const requiredJudgeSlots=c.ruleSet.judgesCountPerPanel*Math.max(1,input.committeeCount||1);if(requiredJudgeSlots>input.availableQualifiedJudges)push({severity:'BLOCKER',kind:'resource',title:'Qualified judge shortage',titleAr:'نقص في عدد المحكمين المؤهلين',why:'Required qualified judge slots exceed the available qualified judges.',whyAr:'عدد مقاعد المحكمين المطلوبة أكبر من عدد المحكمين المؤهلين المتاحين.',affectedWorkflow:'Committee assignment',flowAr:'توزيع اللجان',evidence:[`perCommittee=${c.ruleSet.judgesCountPerPanel}`,`committees=${Math.max(1,input.committeeCount||1)}`,`requiredSlots=${requiredJudgeSlots}`,`available=${input.availableQualifiedJudges}`],fixTarget:'field'});
  for(const cat of c.categories){
   const source=input.quranSources.find(s=>sourceUsableForCompetition(s,{riwaya:cat.riwaya}).ok);
+  /* نصٌّ موجود لكن جسر المواضع ناقص: السحب منه يعطي موضعًا لا وجود له في الرواية. */
+  if(!isReadingQuestionSafe({riwaya:cat.riwaya})){const rawiId=resolveCanonicalRawiId({riwaya:cat.riwaya});push({severity:'BLOCKER',kind:'scientific',title:`Incomplete canonical-to-native locus crosswalk for ${cat.riwaya}`,titleAr:`جسر المواضع غير مكتمل لرواية ${cat.riwaya}`,why:'A drawn canonical locus cannot be resolved to this reading own ayah numbering, so the passage shown would not be the passage asked.',whyAr:'الموضع القانوني المسحوب لا يُحلّ إلى ترقيم هذه الرواية، فالمقطع المعروض غير المقطع المطلوب.',affectedWorkflow:'FairDraw / JudgeOS',flowAr:'السحب العادل / منصة المحكم',evidence:rawiId?readingQuestionBlockers(rawiId):[cat.riwaya],fixTarget:'competition_dna'})}
   if(!source&&!isReadingDelivered({riwaya:cat.riwaya}))push({severity:'BLOCKER',kind:'scientific',title:`No certified Quran source for ${cat.riwaya}`,titleAr:`لا يوجد مصدر قرآني معتمد لرواية ${cat.riwaya}`,why:'Official passages must resolve to an immutable certified source for the exact reading.',whyAr:'يجب أن ترجع المواضع الرسمية إلى مصدر معتمد غير قابل للتعديل لنفس الرواية.',affectedWorkflow:'FairDraw / JudgeOS',flowAr:'السحب العادل / منصة المحكم',evidence:[cat.riwaya],fixTarget:'competition_dna'});
   if(p.judging.silentAiGuardian&&!certifiedCapabilityFor(input.aiValidations,{capability:'word_alignment',riwaya:cat.riwaya}))push({severity:'REVIEW',kind:'qiraah_ai',title:`AI unavailable for ${cat.riwaya}`,titleAr:`قدرة الذكاء الاصطناعي غير معتمدة لرواية ${cat.riwaya}`,why:'The competition remains operational, but this AI capability is not certified for the reading.',whyAr:'المسابقة تعمل بكامل طاقتها، لكن هذه القدرة غير معتمدة لهذه الرواية.',affectedWorkflow:'Post-lock AI review',flowAr:'مراجعة الذكاء بعد القفل',evidence:[cat.riwaya,'word_alignment'],fixTarget:'none'});
  }

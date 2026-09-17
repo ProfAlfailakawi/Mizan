@@ -26,12 +26,31 @@ test('the default Mizan crosswalk is deliberately empty — no invented mapping 
   }
 });
 
-test('an unmapped locus resolves by identity but is explicitly marked assumed', () => {
+/*
+ * فراغُ الجدول لا يعني «كل شيء آيةٌ بآية». البقرة في العدّ الدمشقي ٢٨٥ آية لا ٢٨٦، فموضعُ
+ * هشام المقابل للآية ١٠ قانونيًّا غير معلوم بلا دليل — ولا يجوز اختلاقه.
+ */
+test('a locus in a surah whose native count differs is refused, not silently mapped', () => {
   const res = MIZAN_IDENTITY_CROSSWALK.toNative('hisham', { surah: 2, ayah: 10 });
+  assert.equal(res.assurance, 'UNRESOLVED');
+  assert.equal(res.native, undefined, 'no native locus may be invented for a diverging count');
+  assert.match(String(res.reason), /^NATIVE_COUNT_DIVERGES:2:286:285$/);
+});
+
+test('a locus in a surah whose native count is verified equal maps one-to-one as a result', () => {
+  // الكوفي: عدّ كل سورة مطابق، ومستخرَجٌ من بايتات الحزمة المثبَّتة.
+  const res = MIZAN_IDENTITY_CROSSWALK.toNative('khalaf-hamzah', { surah: 2, ayah: 10 });
   assert.deepEqual(res.native, { surah: 2, ayah: 10 });
   assert.equal(res.relation, 'EXACT');
-  assert.equal(res.assumed, true, 'identity default must announce itself, never pose as evidence');
-  assert.deepEqual(res.evidence, []);
+  assert.equal(res.assurance, 'VERIFIED_COUNT_IDENTITY');
+  assert.equal(res.assumed, true, 'a verified count is still not an evidenced crosswalk row');
+});
+
+test('a delivered reading whose package numbering was never read stays an announced assumption', () => {
+  const res = MIZAN_IDENTITY_CROSSWALK.toNative('warsh', { surah: 2, ayah: 10 });
+  assert.deepEqual(res.native, { surah: 2, ayah: 10 });
+  assert.equal(res.assurance, 'UNVERIFIED_COUNT_IDENTITY');
+  assert.equal(res.assumed, true);
 });
 
 test('an evidenced row resolves as evidence, not assumption', () => {
