@@ -216,15 +216,18 @@ const useLineBands=(url:string,expectedLines?:number)=>{
  return bands;
 };
 
-const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;return <figure className="relative mx-auto w-fit"><div className="relative inline-block"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,.08)]"/>
+const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;
+ /* أشرطة الأسطر تُقاس من حبر الصفحة نفسها؛ متى تعذّر القياس بقيت العدسة على التقدير. */
+ const bands=useLineBands(url,audioSpot?.lineCount||focus.lineCount||15);
+ return <figure className="relative mx-auto w-fit"><div className="relative inline-block"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,.08)]"/>
   {audioSpot?.bbox
    ? <RecitingWordLens bbox={audioSpot.bbox}/>
    : audioSpot?.line
-     ? <FocusLens lineStart={audioSpot.line} lineEnd={audioSpot.line} lineCount={audioSpot.lineCount||15} ar={ar} tone="audio"/>
+     ? <FocusLens lineStart={audioSpot.line} lineEnd={audioSpot.line} lineCount={audioSpot.lineCount||15} ar={ar} tone="audio" bands={bands}/>
      : audioFocus
-       ? <FocusLens lineStart={audioFocus.lineStart} lineEnd={audioFocus.lineEnd} lineCount={15} ar={ar} tone="audio"/>
+       ? <FocusLens lineStart={audioFocus.lineStart} lineEnd={audioFocus.lineEnd} lineCount={15} ar={ar} tone="audio" bands={bands}/>
        : (focus.lineCount&&focus.lineCount>=focus.lineEnd
-          ? <FocusLens lineStart={focus.lineStart} lineEnd={focus.lineEnd} lineCount={focus.lineCount} ar={ar} tone="track"/>
+          ? <FocusLens lineStart={focus.lineStart} lineEnd={focus.lineEnd} lineCount={focus.lineCount} ar={ar} tone="track" bands={bands}/>
           : word?<WordVectorLens bbox={word}/>:null)}</div><figcaption className="mt-2 text-center text-[9px] font-black text-[#606661]">{ar?'الصفحة':'Page'} {locus.page}{!focus.lineCount?<span className="ms-2 font-normal text-[#696f6b]">{ar?'هندسة الأسطر غير متاحة — بلا تخمين':'line geometry unavailable — no guess'}</span>:null}</figcaption></figure>}
 const MissingPage:React.FC<{page:number;ar:boolean}>=({page,ar})=><div className="min-h-44 rounded-2xl border border-dashed border-[#d1cec5] bg-[#f8f6f0] grid place-items-center text-center p-6"><div><FileSearch className="w-5 h-5 mx-auto text-[#646965]"/><div className="text-xs font-black mt-2">{ar?`صفحة المصدر ${page} غير مستوردة`:`Source page ${page} is not imported`}</div><div className="text-[9px] text-[#686d6a] mt-1">{ar?'لا يُستخدم بديل من رواية أخرى.':'No cross-riwayah visual fallback.'}</div></div></div>;
 
