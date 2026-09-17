@@ -54,7 +54,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
   useScreenAwake(true);
 
-  const { language, participants, committees, competition, activeSession } = useAppStore();
+  const { language, participants, committees, competition, activeSession, sessionElapsedSeconds } = useAppStore();
   const ar = language !== 'en';
 
   const [now, setNow] = useState(() => new Date());
@@ -75,12 +75,12 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
     fallbackSessionMinutes: competition.ruleSet?.questionDurationMinutes,
     /* الجهاز يعرف بقيّة جلسته وحدها؛ وبقيّة اللجان تُقدَّر بنصف المتوسّط. */
     elapsedSecondsByCommittee: activeSession.committee
-      ? { [activeSession.committee.id]: activeSession.durationSeconds }
+      ? { [activeSession.committee.id]: sessionElapsedSeconds() }
       : undefined,
     nextDepth: PANEL_NEXT_DEPTH,
     ar,
     now,
-  }), [competition, participants, committees, activeSession.committee, activeSession.durationSeconds, ar, now]);
+  }), [competition, participants, committees, activeSession.committee, sessionElapsedSeconds, ar, now]);
 
   const board = externalBoard || localBoard;
   const slices = useMemo(() => selectCommitteeSlices(board, chosen), [board, chosen]);

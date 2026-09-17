@@ -29,7 +29,24 @@ export function redactParticipantForLocalSnapshot(participant: Participant): Par
  * الدليل على أن التوكن **موجود** وإن غاب عن هذا الجهاز.
  */
 export function journeyTokenWithheldLocally(participant: Participant): boolean {
-  return !participant.journeyAccessToken && !!participant.journeyAccessTokenHash;
+  if (!participant.journeyAccessTokenHash || participant.journeyAccessToken) return false;
+  /* ما كان عند صاحبه وحده لا يُنتظر: لا الجهة تملكه ولا السحابة، فالانتظار انتظارُ ما لا يأتي. */
+  return !journeyTokenHeldByHolderOnly(participant);
+}
+
+/*
+ * الرمز الذي لم تملكه الجهة قطّ.
+ *
+ * التسجيل العام يحفظ البصمة ويسلّم الرمز للمسجِّل مرة واحدة، فالسحابة لا تحمله. فبصمةٌ بلا
+ * رمزٍ هنا ليست «غائبًا عن هذا الجهاز» بل «ليس عند الجهة أصلًا»، والفرق بينهما عملي: الأول
+ * ينتظر مزامنة، والثاني يحتاج إصدارًا من الجهة لتملك بطاقةً تطبعها وتفحصها على البوابة.
+ *
+ * والسجلّات التي سبقت هذه العلامة تُعرف من أول سطرٍ في تاريخ حالتها، فلا تبقى معطّلة
+ * انتظارًا لترحيلٍ للبيانات.
+ */
+export function journeyTokenHeldByHolderOnly(participant: Participant): boolean {
+  if (participant.journeyTokenCustody) return participant.journeyTokenCustody === 'holder_only';
+  return participant.statusHistory?.[0]?.actor === 'Public registration API';
 }
 
 /**

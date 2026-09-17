@@ -553,7 +553,7 @@ const ParticipantsView=({store,ar,query,setQuery,filtered}:{store:Store;ar:boole
   title:ar?'حذف المتسابق؟':'Delete participant?',
   body:ar?`سيُحذف ${ar?p.fullNameArabic:p.fullName} (${p.code}) من هذه المسابقة. لا يمكن التراجع. ومن دخل لجنة أو له نتيجة لا يُحذف أصلًا؛ أوقفه بدل ذلك.`:`${p.fullName} (${p.code}) will be removed from this competition. This cannot be undone.`,
   confirmLabel:ar?'حذف':'Delete',tone:'destructive'})))return;const ok=store.removeParticipant(p.id);if(!ok)setPassError(ar?'لا يمكن حذف متسابق دخل لجنة أو له نتيجة. أوقفه بدل حذفه.':'Cannot delete a participant who entered a panel or has a result.')};
- const openPass=async(id:string)=>{setPassBusy(true);setPassError('');let p=await store.ensureParticipantJourneyAccess(id);if(!p){const ok=await confirm({title:ar?'إعادة إصدار البطاقة؟':'Reissue Pass?',body:ar?'رمز الرحلة الأصلي غير متاح على هذا الجهاز. إعادة الإصدار ستبطل QR السابق فورًا. هل تريد إعادة إصدار QR وفتح البطاقة؟':'The original journey token is unavailable on this device. Reissuing will invalidate the previous QR immediately. Reissue and open the pass?',confirmLabel:ar?'إعادة إصدار':'Reissue',tone:'destructive'});if(ok)p=await store.reissueParticipantJourneyAccess(id)}if(p){setPass(p);setPassError(journeyIssueNote(store.lastJourneyAccessFailure(),ar))}else setPassError(journeyIssueNote(store.lastJourneyAccessFailure()||'UNKNOWN',ar));setPassBusy(false)};
+ const openPass=async(id:string)=>{setPassBusy(true);setPassError('');let p=await store.ensureParticipantJourneyAccess(id);if(!p){const ok=await confirm({title:ar?'إعادة إصدار البطاقة؟':'Reissue Pass?',body:ar?'رمز الرحلة الأصلي غير متاح على هذا الجهاز. إعادة الإصدار ستبطل QR السابق فورًا. هل تريد إعادة إصدار QR وفتح البطاقة؟':'The original journey token is unavailable on this device. Reissuing will invalidate the previous QR immediately. Reissue and open the pass?',confirmLabel:ar?'إعادة إصدار':'Reissue',tone:'destructive'});if(ok)p=await store.reissueParticipantJourneyAccess(id)}if(p){setPass(p);setPassError(journeyIssueNote(store.lastJourneyAccessFailure(),ar)||journeyIssueNote(store.lastJourneyAccessNotice(),ar))}else setPassError(journeyIssueNote(store.lastJourneyAccessFailure()||'UNKNOWN',ar));setPassBusy(false)};
  const origin=typeof window!=='undefined'?window.location.origin:'';
  const participantUrl=pass?.journeyAccessToken?`${origin}/#journey?comp=${store.competition.id}&key=${encodeURIComponent(pass.journeyAccessToken)}`:'';
  const guardianUrl=pass?.guardianAccessToken?`${origin}/#guardian?comp=${store.competition.id}&key=${encodeURIComponent(pass.guardianAccessToken)}`:'';
@@ -810,6 +810,10 @@ const journeyIssueNote=(code:string,ar:boolean):string=>{
    return 'البطاقة مفتوحة، ولم تُرفع لأن دور هذا الحساب لا ينشر بطاقات الرحلة. يرفعها مدير الجهة أو مدير المسابقة.';
   case 'TOKEN_WITHHELD_ON_THIS_DEVICE':
    return 'رمز الرحلة الأصلي غير محفوظ على هذا الجهاز، وإعادة الإصدار تُبطل بطاقةً قد تكون بيد المتسابق. انتظر المزامنة، أو أعد الإصدار صراحةً إن كنت متأكدًا.';
+  case 'HOLDER_TOKEN_REPLACED':
+   return 'هذا المتسابق سجّل من الرابط العام، ورمزه لم يكن محفوظًا عند الجهة. أُصدرت له بطاقة جديدة من الخادم، والرابط الذي وصله عند التسجيل لم يعد يعمل — فأرسل له هذه البطاقة.';
+  case 'HOLDER_TOKEN_REISSUE_FAILED':
+   return 'تعذّر إصدار بطاقة من الخادم لهذا المتسابق. تأكد من الاتصال ومن صلاحية حسابك، ثم أعد المحاولة.';
   case 'LAUNCH_PLACEHOLDER':
    return 'البطاقة مفتوحة، ولم تُرفع لأن الموقع العام ما زال في وضع ما قبل الإطلاق.';
   default:

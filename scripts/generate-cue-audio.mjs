@@ -20,7 +20,7 @@ const PHRASES = [
 
 const KEY = process.env.MIZAN_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const MODEL = process.env.MIZAN_CUE_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
-const VOICE = process.env.MIZAN_CUE_TTS_VOICE || 'Kore';
+const VOICE = process.env.MIZAN_CUE_TTS_VOICE || 'Charon';
 const OUT = path.join(process.cwd(), 'public', 'audio', 'cues');
 
 if (!KEY) {
