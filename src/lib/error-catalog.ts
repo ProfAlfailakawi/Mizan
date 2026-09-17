@@ -46,6 +46,8 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('CROSSWALK_EVIDENCE_REQUIRED', 'CROSSWALK', 'دعوى اختلافٍ في الترقيم بلا دليل. لا يُقبل دمجٌ ولا تقسيمٌ ولا انزياحُ حدٍّ إلا بمرجعٍ منصوص.'),
   ENTRY('CROSSWALK_EXACT_REQUIRES_SINGLE_AYAH', 'CROSSWALK', 'علاقةُ التطابق تقتضي آيةً واحدة مقابلة لا مدى، فيُراجَع نوع العلاقة.'),
   ENTRY('CROSSWALK_SPLIT_REQUIRES_RANGE', 'CROSSWALK', 'علاقةُ التقسيم تقتضي مدى آياتٍ في ترقيم الرواية لا آيةً واحدة.'),
+  ENTRY('CROSSWALK_MERGED_REQUIRES_SINGLE_AYAH', 'CROSSWALK', 'علاقةُ الدمج تقتضي آيةً أصليةً واحدة تُقرأ فيها الآيتان، لا مدى.'),
+  ENTRY('CROSSWALK_MERGE_FLAG_CONTRADICTS_RELATION', 'CROSSWALK', 'إعلانُ الوصل بما بعده يناقض نوعَ العلاقة في الصفّ نفسه، فيُراجَع الصفّ لا يُمرَّر.'),
   ENTRY('CROSSWALK_DUPLICATE_CANONICAL_LOCUS', 'CROSSWALK', 'الموضع القانوني مذكورٌ مرتين لرواية واحدة، فيُحذف المكرّر.'),
 
   // — التخزين والنزاهة —

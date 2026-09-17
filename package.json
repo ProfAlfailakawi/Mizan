@@ -40,7 +40,9 @@
     "qa:firestore-rules": "firebase emulators:exec --only firestore --project mizan-rules-test \"tsx --test tests/firestore-rules-*.test.ts tests/firestore-rest-adapter.test.ts\"",
     "production-audit": "node scripts/production-runtime-audit.mjs",
     "config:validate": "tsx scripts/config-validate.ts",
-    "quran:crosswalk-propose": "tsx scripts/quran-crosswalk-propose.ts"
+    "quran:crosswalk-propose": "tsx scripts/quran-crosswalk-propose.ts",
+    "quran:crosswalk-activate": "tsx scripts/quran-crosswalk-activate.ts",
+    "quran:delivery-counts": "tsx scripts/quran-delivery-count-intake.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",

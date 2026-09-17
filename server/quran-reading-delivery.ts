@@ -17,8 +17,8 @@
  */
 
 import { QURAN_FULL_TEXT_CANDIDATES, candidateSourceForRawi } from '../src/lib/quran-candidate-sources';
-import { crosswalkCoverage } from '../src/lib/quran-locus-crosswalk';
-import { juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
+import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, surahCountAssurance } from '../src/lib/quran-locus-crosswalk';
+import { ayahCountOf, juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
 import { KfgqpcDeliveryRepository, type KfgqpcDeliveryPassage } from './kfgqpc-delivery';
 import { islamwebPackageStatus, loadIslamwebReadingPackage } from './islamweb-reading-packages';
 
@@ -131,16 +131,37 @@ export class MizanQuranDelivery {
     let pkg;
     try { pkg = loadIslamwebReadingPackage(rawiId, this.env); } catch { return null; }
 
-    const questionSafe = crosswalkCoverage(rawiId).questionSafe;
-    const rows: ReadingDeliveryRow[] = pkg.verses.map(v => ({
-      sora: v.sura_no,
-      aya_no: v.aya_no,
-      aya_text: v.aya_text,
-      // أسماء السور بيانٌ وصفيّ مشترك لا نصٌّ قرآني، فتؤخذ من المرجع القانوني.
-      sora_name_ar: surahNameArabic(v.sura_no),
-      sora_name_en: surahNameEnglish(v.sura_no),
-      ...(questionSafe ? { jozz: juzOfLocus({ surah: v.sura_no, ayah: v.aya_no }) } : {}),
-    }));
+    /*
+     * الجزء يُحسب على الإحداثي القانوني وحده.
+     *
+     * جدول الأجزاء كوفيٌّ، وترقيمُ هذه الصفوف أصليٌّ للرواية. وحقنُ الرقم الأصلي في الجدول
+     * القانوني خطأٌ مرّتين: يعطي جزءًا خاطئًا في السور المختلِفة عدًّا، ويرمي أصلًا حين
+     * يتجاوز الرقمُ الأصلي حدَّ السورة القانوني (٤:١٧٧ في الدمشقي مقابل ١٧٦ كوفيًّا).
+     *
+     * فالانتقال من الأصلي إلى القانوني يمرّ من صفوف الدليل صراحةً — ولا يُفترض دورانٌ
+     * عكسيٌّ متطابق، لأن العكس ناقصٌ عند التقسيم. وما لا يُحلّ لا يحمل جزءًا: حقلٌ غائب
+     * أصدق من جزءٍ مخترَع.
+     */
+    const juzForNative = (surah: number, nativeAyah: number): number | undefined => {
+      const canonical = nativeAyah <= ayahCountOf(surah) && surahCountAssurance(rawiId, surah) === 'VERIFIED_COUNT_IDENTITY'
+        ? { surah, ayah: nativeAyah }
+        : MIZAN_IDENTITY_CROSSWALK.toCanonicalFromEvidence(rawiId, { surah, ayah: nativeAyah });
+      if (!canonical) return undefined;
+      try { return juzOfLocus(canonical); } catch { return undefined; }
+    };
+
+    const rows: ReadingDeliveryRow[] = pkg.verses.map(v => {
+      const jozz = juzForNative(v.sura_no, v.aya_no);
+      return {
+        sora: v.sura_no,
+        aya_no: v.aya_no,
+        aya_text: v.aya_text,
+        // أسماء السور بيانٌ وصفيّ مشترك لا نصٌّ قرآني، فتؤخذ من المرجع القانوني.
+        sora_name_ar: surahNameArabic(v.sura_no),
+        sora_name_en: surahNameEnglish(v.sura_no),
+        ...(jozz !== undefined ? { jozz } : {}),
+      };
+    });
     this.rowCache.set(rawiId, rows);
     return rows;
   }

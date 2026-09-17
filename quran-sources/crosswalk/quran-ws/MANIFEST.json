@@ -1,0 +1,20 @@
+{
+  "protocol": "MIZAN-FROZEN-CROSSWALK-SOURCE-1",
+  "authority": "QURAN_WS_QIRAAT_AYAH_MAP",
+  "role": "AYAH_ALIGNMENT_AUTHORITY",
+  "upstreamRepository": "quran-ws/qiraat-ayah-map",
+  "upstreamCommit": "a9b4d345f3e1d0e9282711c5e09f24119b17e4e1",
+  "reason": "Competition runtime must never reach github.com. The pinned upstream bytes are frozen here so the canonical/native crosswalk can be rebuilt offline and re-verified byte-for-byte.",
+  "files": [
+    {
+      "localPath": "quran-sources/crosswalk/quran-ws/book-boundary-primitives.json",
+      "upstreamPath": "data/book-boundary-primitives.json",
+      "byteLength": 51714,
+      "sha256": "63f7bed237871b174a342d5a88688302c06929105af8dc3c3810b4e795a7e6f1",
+      "gitBlobSha1": "19d933f2dcb0778172923d44083aad1b4351816c",
+      "datasetVersion": "0.1.0",
+      "referenceSystem": "kufi"
+    }
+  ],
+  "rule": "Never repoint these bytes at main/latest. A new upstream commit requires a new pin, a fresh 114-surah count validation per rawi, and regeneration of the derived evidence module."
+}

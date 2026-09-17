@@ -6,6 +6,7 @@ import path from 'node:path';
 import { CROSSWALK_PROPOSAL_ALGORITHM, proposeForReading } from '../scripts/quran-crosswalk-propose';
 import { COMMITTEE_CROSSWALK_ROWS } from '../src/lib/quran-crosswalk-evidence';
 import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, isReadingQuestionSafe } from '../src/lib/quran-locus-crosswalk';
+import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 
 /*
  * المقترح الآليّ أخطر ما في هذه الطبقة، لأنه يبدو جاهزًا. فيُحرَس بابُه من الجهتين:
@@ -47,13 +48,28 @@ test('a surah enters the proposal only when every canonical boundary landed', ()
 });
 
 test('generating a proposal changes nothing about what may be asked', () => {
-  const before = crosswalkCoverage('hisham');
-  proposeForReading('hisham');
-  const after = crosswalkCoverage('hisham');
+  const before = crosswalkCoverage('rawh');
+  proposeForReading('rawh');
+  const after = crosswalkCoverage('rawh');
   assert.deepEqual(after, before, 'the working coverage is untouched by deriving a proposal');
-  assert.equal(isReadingQuestionSafe('hisham'), false);
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.size, 0);
-  assert.deepEqual([...COMMITTEE_CROSSWALK_ROWS], [], 'nothing was written into the committee evidence file');
+  // روحٌ محجوبٌ قبل الاشتقاق وبعده — والمقترحُ لا يفتح له بابًا.
+  assert.equal(isReadingQuestionSafe('rawh'), false);
+  assert.equal(MIZAN_IDENTITY_CROSSWALK.rowsFor('rawh').length, 0);
+  assert.equal(COMMITTEE_CROSSWALK_ROWS.some(r => r.rawiId === 'rawh'), false);
+});
+
+/*
+ * الجدول العامل لم يعد فارغًا، فلم يعد «الفراغ» هو ما يحرس بابَ المقترح. الحارسُ الآن
+ * أدقّ وأصدق: كلُّ صفٍّ فيه يحمل مرجعَ الأثر المثبَّت، ولا صفَّ واحدٌ يحمل توقيع خوارزمية
+ * الاقتراح. فلو تسرّب صفٌّ مشتقٌّ آليًّا يومًا، سقط هذا الاختبار باسمه.
+ */
+test('no row in the working table was ever authored by the proposal algorithm', () => {
+  for (const row of COMMITTEE_CROSSWALK_ROWS) {
+    const joined = row.evidence.join('\n');
+    assert.equal(joined.includes(CROSSWALK_PROPOSAL_ALGORITHM), false,
+      `${row.rawiId} ${row.canonical.surah}:${row.canonical.ayah} carries a proposal signature`);
+    assert.ok(joined.includes('quran-ws/qiraat-ayah-map@'), 'every row names the pinned boundary artifact instead');
+  }
 });
 
 test('the proposal is written to artifacts, which are never committed', () => {
@@ -61,10 +77,20 @@ test('the proposal is written to artifacts, which are never committed', () => {
   assert.match(ignore, /^artifacts\/$/m, 'proposals stay out of the repository');
 });
 
-test('the six blocked readings are exactly the ones a proposal is generated for', () => {
+test('every reading still blocked today is covered by the proposal targets', () => {
   const script = fs.readFileSync(path.join(process.cwd(), 'scripts', 'quran-crosswalk-propose.ts'), 'utf8');
   const targets = script.match(/const TARGETS = \[([^\]]*)\]/)![1]
     .split(',').map(s => s.trim().replace(/'/g, '')).filter(Boolean);
   assert.deepEqual(targets.sort(), ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'rawh', 'ruways']);
-  for (const rawiId of targets) assert.equal(isReadingQuestionSafe(rawiId), false, `${rawiId} is blocked today`);
+
+  /*
+   * خمسٌ من هذه الستّ حُسمت بأثرٍ مثبَّت لا بالمقترح، فبقاؤها في قائمة الأهداف لا يضرّ —
+   * المقترحُ ظِلٌّ لا يفعّل شيئًا. والذي يهمّ: ألّا تبقى روايةٌ محجوبةٌ خارج هذه القائمة،
+   * فلا يبقى حاجزٌ بلا أداةِ عرضٍ للجنة.
+   */
+  const blockedToday = CANONICAL_RAWI_IDS.filter(rawiId => !isReadingQuestionSafe(rawiId));
+  assert.deepEqual(blockedToday, ['rawh'], 'only Rawh remains without a proved boundary mapping');
+  for (const rawiId of blockedToday) {
+    assert.ok(targets.includes(rawiId), `${rawiId} is blocked but no proposal is produced for it`);
+  }
 });

@@ -109,9 +109,15 @@ test('an ambiguous reading is refused instead of guessed', () => {
 });
 
 test('a reading whose locus crosswalk is incomplete is refused at import, not on the day', () => {
-  const out = plan([row({ riwaya: 'هشام عن ابن عامر' })]);
+  // روحٌ هو الباقي بلا جسرٍ مكتمل، فهو الذي يُردّ عند الاستيراد.
+  const out = plan([row({ riwaya: 'روح عن يعقوب' })]);
   assert.deepEqual(codesOf(out), ['PARTICIPANT_IMPORT_READING_NOT_QUESTION_READY']);
   assert.match(out.errors[0].message, /جسر مواضع/);
+});
+
+test('a reading whose crosswalk was proved from the pinned artifact is accepted at import', () => {
+  // وهشامٌ كان مردودًا قبل وصول الدليل؛ يمرّ اليوم لأن جسره اكتمل، لا لأن الشرط لان.
+  assert.deepEqual(plan([row({ riwaya: 'هشام عن ابن عامر' })]).errors, []);
 });
 
 test('an unknown category is refused, and by code as well as by id', () => {

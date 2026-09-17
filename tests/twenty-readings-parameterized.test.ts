@@ -53,10 +53,20 @@ for (const reading of CANONICAL_READINGS) {
     assert.equal(ctx.rawiId, rawiId, 'text identity unchanged by audio');
     assert.equal(requiresAyahLevelSyncOnly(rawiId), rawiId !== 'hafs');
 
-    // 6) locus crosswalk stays within this reading and announces assumption honestly
+    /*
+     * 6) الجسر يبقى داخل هذه الرواية، ويُعلن مصدرَ جوابه بلا تجميل: إمّا صفُّ دليلٍ منصوص
+     *    (فـ`assumed:false` ومعه مرجعُه)، وإمّا تطابقٌ معلَنٌ كافتراض (فـ`assumed:true`
+     *    وبلا مرجع). والممنوع هو الثالثة: جوابٌ بلا دليلٍ يُقدَّم كأنه دليل.
+     */
     const res = MIZAN_IDENTITY_CROSSWALK.toNative(rawiId, { surah: 2, ayah: 20 });
     assert.equal(res.rawiId, rawiId);
-    assert.equal(res.assumed, true);
+    if (res.assumed) {
+      assert.deepEqual(res.evidence, [], `${rawiId} may not present an assumption as evidenced`);
+      assert.notEqual(res.assurance, 'EVIDENCED_ROW');
+    } else {
+      assert.equal(res.assurance, 'EVIDENCED_ROW');
+      assert.ok(res.evidence.length > 0, `${rawiId} evidenced row must carry its reference`);
+    }
 
     // 7) the storage key is scoped to this reading and version-immutable
     assert.equal(quranPackageKey(rawiId, 'v1'), `quran/packages/${rawiId}/v1/manifest.json`);

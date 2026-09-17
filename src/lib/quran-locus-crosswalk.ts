@@ -32,6 +32,7 @@ export type CrosswalkRelation =
   | 'EXACT'            // آيةٌ بآية.
   | 'MERGED'           // آياتٌ قانونية تُقرأ آيةً واحدة في الرواية.
   | 'SPLIT'            // آيةٌ قانونية تُقرأ آيتين أو أكثر.
+  | 'SPLIT_AND_MERGE'  // تُقسَّم داخليًّا **و** يُوصَل آخرُها بما بعده — حالةٌ مركّبة واقعة في الأثر.
   | 'BOUNDARY_SHIFT';  // الحدّ يتقدّم أو يتأخّر بلا دمجٍ ولا تقسيم.
 
 export interface QuranLocusCrosswalk {
@@ -39,6 +40,14 @@ export interface QuranLocusCrosswalk {
   canonical: { surah: number; ayah: number };
   native: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
   relation: CrosswalkRelation;
+  /**
+   * هل يُوصَل آخرُ موضعٍ أصليٍّ لهذه الآية بالآية القانونية التالية؟
+   *
+   * حقلٌ مستقلٌّ عن `relation` عمدًا: مصدر الحدود يمثّل القسمة والوصل بُعدين منفصلين، وقد
+   * يجتمعان على آيةٍ واحدة. وضغطُهما في قيمة enum واحدة يُفقد المعلومة اللازمة لتحديد
+   * موضع الآية الأصلي، فيبقى الحقل صريحًا. اختياريٌّ حفاظًا على توافق الصفوف السابقة.
+   */
+  mergesWithNext?: boolean;
   /** مرجع الدليل — إلزاميٌّ لكل علاقةٍ غير EXACT. */
   evidence: string[];
 }
@@ -65,6 +74,8 @@ export interface NativeResolution {
   /** `undefined` حين `UNRESOLVED` — لا يُختلق موضعٌ أصلي. */
   native?: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
   relation: CrosswalkRelation;
+  /** يُنقل كما هو من صفّ الدليل — لا يُشتقّ من `relation` ولا يُفقد. */
+  mergesWithNext?: boolean;
   assurance: CrosswalkAssurance;
   /** true = لم يأتِ من صفّ دليلٍ منصوص. */
   assumed: boolean;
@@ -92,6 +103,13 @@ export function validateCrosswalkRow(row: QuranLocusCrosswalk): void {
   }
   if (row.relation === 'EXACT' && !hasSingle) throw new CrosswalkError('CROSSWALK_EXACT_REQUIRES_SINGLE_AYAH');
   if (row.relation === 'SPLIT' && !hasRange) throw new CrosswalkError('CROSSWALK_SPLIT_REQUIRES_RANGE');
+  if (row.relation === 'SPLIT_AND_MERGE' && !hasRange) throw new CrosswalkError('CROSSWALK_SPLIT_REQUIRES_RANGE');
+  if (row.relation === 'MERGED' && !hasSingle) throw new CrosswalkError('CROSSWALK_MERGED_REQUIRES_SINGLE_AYAH');
+  // لا يُقبل وصلٌ مُعلَنٌ يناقض العلاقة، ولا علاقةُ وصلٍ بلا إعلانه.
+  if (row.mergesWithNext !== undefined) {
+    const relationMerges = row.relation === 'MERGED' || row.relation === 'SPLIT_AND_MERGE';
+    if (row.mergesWithNext !== relationMerges) throw new CrosswalkError('CROSSWALK_MERGE_FLAG_CONTRADICTS_RELATION');
+  }
 }
 
 const keyOf = (rawiId: string, surah: number, ayah: number) => `${rawiId}#${surah}:${ayah}`;
@@ -135,7 +153,15 @@ export class QuranCrosswalkTable {
     if (!isValidLocus(canonical)) throw new CrosswalkError('CROSSWALK_CANONICAL_LOCUS_INVALID');
     const row = this.rows.get(keyOf(rawiId, canonical.surah, canonical.ayah));
     if (row) {
-      return { rawiId, native: { ...row.native }, relation: row.relation, assurance: 'EVIDENCED_ROW', assumed: false, evidence: [...row.evidence] };
+      return {
+        rawiId,
+        native: { ...row.native },
+        relation: row.relation,
+        mergesWithNext: row.mergesWithNext,
+        assurance: 'EVIDENCED_ROW',
+        assumed: false,
+        evidence: [...row.evidence],
+      };
     }
     const assurance = surahCountAssurance(rawiId, canonical.surah);
     if (assurance === 'UNRESOLVED') {
