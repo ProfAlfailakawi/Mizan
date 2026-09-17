@@ -1,7 +1,7 @@
 import React,{useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
-import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy, FlaskConical, RefreshCw } from 'lucide-react';
-import { useAppStore, IS_DEMO_SESSION, exitDemoSession, resetDemoSession } from '../../lib/store';
+import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
+import { useAppStore, IS_DEMO_SESSION, exitDemoSession } from '../../lib/store';
 import { durableSignOut } from '../../lib/cloud-session-durability';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
@@ -52,13 +52,9 @@ export const Header: React.FC = () => {
       </details>
       {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'text-[#656b66]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
-      {/* الشارة وسمٌ للقراءة فقط، وإعادة التعيين زرٌّ مستقل بحجم اللمس الكامل (44px)
-          كبقية أزرار الشريط — لا أيقونة مصغّرة داخل الوسم. */}
-      {IS_DEMO_SESSION&&<span role="status" aria-label={language==='ar'?'بيئة تجريبية معزولة':'Isolated demo environment'} className="hidden sm:inline-flex items-center gap-1.5 h-9 px-2.5 rounded-full border border-[#d8b86a] bg-[#faf3e2] text-[10px] font-black tracking-wide text-[#8a6a1c]">
-        <FlaskConical className="w-3.5 h-3.5"/>
-        <span>{language==='ar'?'بيئة تجريبية':'DEMO'}</span>
-      </span>}
-      {IS_DEMO_SESSION&&<button type="button" onClick={()=>resetDemoSession()} title={language==='ar'?'إعادة تعيين البيانات التجريبية':'Reset demo data'} aria-label={language==='ar'?'إعادة تعيين البيانات التجريبية':'Reset demo data'} className="w-11 h-11 grid place-items-center rounded-xl text-[#8a6a1c] hover:bg-[#f6ebd3]"><RefreshCw className="w-4 h-4"/></button>}
+      {/* شارة البيئة التجريبية وأدواتها انتقلت إلى `DemoBar` على مستوى التطبيق:
+          الترويسة لا تُعرض لدور «مشغّل البثّ» أصلًا، فلا يصحّ أن يسكن فيها المخرج
+          الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
       <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>

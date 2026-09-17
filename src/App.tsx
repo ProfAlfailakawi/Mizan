@@ -3,9 +3,10 @@ import { LanguageSwitcher } from './components/design-system/LanguageSwitcher';
 import { PersistenceAlert } from './components/design-system/PersistenceAlert';
 import { VenueLockButton, VenueUnlockGuard, useVenueLockState } from './components/design-system/VenueLockControl';
 import { signOut } from 'firebase/auth';
-import { useAppStore } from './lib/store';
+import { useAppStore, IS_DEMO_SESSION, exitDemoSession } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
+import { DemoBar } from './components/layout/DemoBar';
 import { useIdleSignOut } from './lib/useIdleSignOut';
 import { useOpsHeartbeat } from './lib/ops-heartbeat';
 import { useBoardPublisher } from './lib/use-board-publisher';
@@ -398,7 +399,17 @@ export default function App() {
   * بالأكواد وحدها. ولو وقع هذا المسار بعد البوابة لطالبت شاشةَ تلفازٍ بتسجيل دخول.
   */
  if(hash.startsWith('#board')) return <BoardRoute {...boardParams(hash)} onExit={()=>{window.location.hash='';setHash('')}}/>;
- if(requireAuth&&!signedIn) return <AuthPortal/>;
+ /*
+  * البيئة التجريبية تمرّ من هنا، ولا شيء غيرها.
+  *
+  * `requireAuth` باقية `true` بلا استثناء: المصادقة ما زالت مفروضة على كل جلسة
+  * حقيقية، وحارس `production-runtime-audit` يتحقق من ذلك. لكن الصندوق التجريبي ليس
+  * جلسة هوية أصلًا — لا حساب ولا مطالبات ولا خادم — فلا يمكن أن «يسجّل دخوله»
+  * أبدًا. وبدون هذا السطر كان الزائر يضغط زر العرض فيعود إلى شاشة الدخول نفسها.
+  *
+  * والراية تُقرأ مرة واحدة عند التحميل من تخزين التبويب، ولا يرفعها إلا ضغطةٌ صريحة.
+  */
+ if(requireAuth&&!signedIn&&!IS_DEMO_SESSION) return <AuthPortal/>;
  if(onboardingOpen) return <OnboardingExperience onDone={()=>setOnboardingOpen(false)}/>;
  if(hash.startsWith('#trust-verify')) return <Page><TrustVerification/></Page>;
  const competitionClosed=['completed','archived'].includes((competitions.find(c=>c.id===requestedComp)||competitions[0])?.status||'');
@@ -435,9 +446,11 @@ export default function App() {
   {!isBroadcast&&<Header/>}
   {isBroadcast&&<div className="fixed top-3 inset-x-3 z-[190] flex items-center justify-between gap-2 pointer-events-none">
    <span className="pointer-events-auto rounded-xl bg-[#101a16]/85 backdrop-blur px-3 py-2 text-[11px] font-black text-white/80">{language==='ar'?'شاشة البثّ':'Broadcast surface'}</span>
-   <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<button onClick={()=>{void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
+   <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<button onClick={()=>{if(IS_DEMO_SESSION){exitDemoSession();return}void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
   </div>}
   <main><Page>{roleView()}</Page></main>
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
+  {/* خارج الترويسة عمدًا: شاشة البثّ لا ترويسة لها، ودون ذلك لا مخرج منها. */}
+  <DemoBar/>
  </div>
 }

@@ -126,7 +126,9 @@ test('the reader rebuilds the projection instead of trusting the document', () =
 test('the screen route is reachable without an account', () => {
   const app = read('src/App.tsx');
   const boardAt = app.indexOf("hash.startsWith('#board')");
-  const authGateAt = app.indexOf('if(requireAuth&&!signedIn) return <AuthPortal/>');
+  /* يُلتقط الحارس بمقدّمته لا بنصّه الكامل: شرطُ الاستثناء فيه قد يتغيّر (أُضيف
+     استثناء البيئة التجريبية)، والثابت المقصود هنا ترتيبُه لا صيغته. */
+  const authGateAt = app.search(/if\(requireAuth&&!signedIn[^)]*\) return <AuthPortal\/>/);
   assert.ok(boardAt > 0 && authGateAt > 0, 'both the route and the gate must exist');
   assert.ok(boardAt < authGateAt, 'a TV in a corridor must not be asked to sign in');
 });

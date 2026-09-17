@@ -149,12 +149,12 @@ function demoCommittees(): Committee[] {
     headJudgeId: `usr-demo-head-${index + 1}`,
     judgeIds: [`usr-demo-judge-${index * 2 + 1}`, `usr-demo-judge-${index * 2 + 2}`],
     // لجنةٌ واحدة خارج الخدمة وأخرى في استراحة: يومٌ بلا أي خلل لا يُظهر كيف يُدار الخلل.
-    status: index === 4 ? 'offline' : index === 7 ? 'paused' : index % 3 === 0 ? 'testing' : 'active',
+    status: index === 4 ? 'offline' : index === 7 ? 'paused' : index % 3 === 0 ? 'testing' : 'ready',
     completedCount: 8 + ((index * 7) % 26),
     averageSessionMinutes: Number((6 + (index % 5) * 0.9).toFixed(1)),
     audioInputOk: index !== 4,
     devicesConnected: index === 4 ? 0 : 3 + (index % 3),
-  } as Committee));
+  }));
 }
 
 function demoJudges(committees: Committee[]): JudgeProfile[] {
@@ -177,7 +177,7 @@ function demoJudges(committees: Committee[]): JudgeProfile[] {
         conflictsDeclared: [],
         calibrationScore: Number((88 + random() * 11).toFixed(1)),
         isReady: !(index === 4),
-      } as JudgeProfile);
+      });
     });
   });
   return judges;
@@ -222,7 +222,7 @@ function demoParticipants(committees: Committee[]): Participant[] {
       originalQueueNumber: inQueue ? 1 + (index % 20) : undefined,
       checkedInAt: status === 'submitted' || status === 'approved' ? undefined : '2027-02-11T08:45:12Z',
       promisedWaitMinutes: inQueue ? 5 + Math.floor(random() * 40) : undefined,
-    } as Participant;
+    };
   });
 }
 
@@ -246,11 +246,11 @@ function demoResults(participants: Participant[]): ResultRecord[] {
         finalScore: Number((72 + random() * 27.5).toFixed(2)),
         // أغلب النتائج مختومة، وبعضها ما زال في مرحلةٍ سابقة: شاشة الختم تحتاج
         // شيئًا تختمه، وشاشة الجودة تحتاج شيئًا تفحصه.
-        status: index % 9 === 0 ? 'calculated' : index % 7 === 0 ? 'quality_checked' : index % 11 === 0 ? 'approved' : 'sealed',
+        status: (index % 9 === 0 ? 'calculated' : index % 7 === 0 ? 'quality_checked' : index % 11 === 0 ? 'approved' : 'sealed') as ResultRecord['status'],
         rank: 0,
         awardTitle: undefined,
         awardTitleArabic: undefined,
-      } as ResultRecord;
+      };
     })
     .sort((a, b) => b.finalScore - a.finalScore)
     .map((result, index) => ({
@@ -282,7 +282,7 @@ function demoAuditLogs(participants: Participant[], committees: Committee[]): Au
       targetType: 'participant',
       timestamp: new Date(Date.UTC(2027, 1, 11, 6 + Math.floor(index / 32), (index * 7) % 60)).toISOString(),
       details: `${pick(actions, index)} — ${participant.fullNameArabic} (${participant.code})`,
-    } as AuditEvent;
+    };
   });
 }
 
@@ -296,12 +296,11 @@ function demoJudgeSubmissions(participants: Participant[], judges: JudgeProfile[
     panel.slice(0, 3).forEach((judge, j) => {
       submissions.push({
         ...clone(template),
-        id: `jsub-demo-${p + 1}-${j + 1}`,
         participantId: participant.id,
         judgeId: judge.userId,
         totalScore: Number((72 + random() * 27).toFixed(2)),
         submittedAt: new Date(Date.UTC(2027, 1, 11, 7 + (p % 9), (p * 5) % 60)).toISOString(),
-      } as JudgeSubmission);
+      });
     });
   });
   return submissions;
@@ -316,7 +315,7 @@ function demoAppeals(results: ResultRecord[]): AppealRecord[] {
     participantId: result.participantId,
     status: index % 4 === 0 ? 'submitted' : index % 4 === 1 ? 'under_review' : index % 4 === 2 ? 'accepted' : 'rejected',
     submittedAt: new Date(Date.UTC(2027, 1, 11, 14, index * 6)).toISOString(),
-  } as AppealRecord));
+  }));
 }
 
 function demoIncidents(committees: Committee[]): IncidentRecord[] {
@@ -338,7 +337,7 @@ function demoIncidents(committees: Committee[]): IncidentRecord[] {
     severity: index === 2 ? 'critical' : index % 2 === 0 ? 'moderate' : 'low',
     status: index === 0 ? 'active' : index === 1 ? 'investigating' : 'resolved',
     createdAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11)).toISOString(),
-  } as IncidentRecord));
+  }));
 }
 
 function demoReviewCases(results: ResultRecord[]): ReviewCase[] {
@@ -352,7 +351,7 @@ function demoReviewCases(results: ResultRecord[]): ReviewCase[] {
       id: `rc-demo-${index + 1}`,
       participantId: result.participantId,
       status: index % 3 === 0 ? 'pending' : index % 3 === 1 ? 'confirmed' : 'dismissed',
-    } as ReviewCase));
+    }));
 }
 
 function demoCertificates(results: ResultRecord[]): Certificate[] {
@@ -369,7 +368,7 @@ function demoCertificates(results: ResultRecord[]): Certificate[] {
       finalScore: result.finalScore,
       rank: result.rank,
       issuedAt: '2027-02-11T17:30:00Z',
-    } as Certificate));
+    }));
 }
 
 export interface DemoUniverse {
