@@ -73,6 +73,10 @@ const clickIf = async (label) => {
  * ويُبدَّل الدور من شريط البيئة التجريبية. وبقي هذا الفحص يضغط زرًّا لم يعد موجودًا،
  * فكان يقول «تعذّر الدخول» عن بابٍ سليم. فصار يدخل من الباب الحالي ويُبدّل الدور من منتقيه.
  */
+/*
+ * المدخل التجريبي صار أيقونةً صامتة بلا نصٍّ مرئي (بطلب صاحب المنتج)، ووصفُه في
+ * `aria-label`. فيُلتقط من الوصف لا من النصّ، ويبقى نصُّ الزرّ القديم مقبولًا إن عاد.
+ */
 const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
 const ROLE_OPTION = { 'المحكم': 'محكّم', 'المدقق': 'مدقّق' };
 
@@ -80,9 +84,11 @@ const enterRole = async (label) => {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
 
-  const demoEntry = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
-  if (await demoEntry.count()) {
-    await demoEntry.click();
+  const demoEntry = page.locator(`button:visible[aria-label="${DEMO_ENTRY}"]`).first();
+  const demoEntryByText = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
+  const entryButton = await demoEntry.count() ? demoEntry : (await demoEntryByText.count() ? demoEntryByText : null);
+  if (entryButton) {
+    await entryButton.click();
     await page.waitForTimeout(3000);
   }
 
