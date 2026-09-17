@@ -2,6 +2,7 @@ import type {QuestionPoolItem} from '../types';
 import {drawFairPassage,fetchDifficulty} from './kfgqpc-library';
 import {resolveReading} from './scientific-core';
 import {DELIVERY_READING_BY_RAWI} from './delivered-readings';
+import {isReadingQuestionSafe} from './quran-locus-crosswalk';
 import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
 
 /*
@@ -62,6 +63,9 @@ export interface DeliveryPoolOptions{
 export async function buildDeliveryQuestionPool(riwaya:string,options:DeliveryPoolOptions={}):Promise<QuestionPoolItem[]>{
  const reading=deliveryReadingKey(riwaya);
  if(!reading)return [];
+ /* لا يُولَّد موضعٌ لرواية لا يُحلّ إحداثيها القانوني إلى ترقيمها الأصلي. الفراغ هنا
+    مقصود ومكشوف: فحصُ ما قبل الانطلاق يمنع الفئة أصلًا ويسمّي السبب. */
+ if(!isReadingQuestionSafe({riwaya}))return [];
  const size=Math.max(1,Math.min(40,options.size??12));
  const seedBase=options.seedBase||`mizan-pool-${riwaya}`;
  const min=options.minAyahCount??4,max=options.maxAyahCount??8;

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { KfgqpcDeliveryRepository, KfgqpcDeliveryPassage } from './kfgqpc-delivery';
+import type { MizanQuranDelivery, ReadingPassage } from './quran-reading-delivery';
 import { DEFAULT_DIFFICULTY_WEIGHTS, balancePacks, type DifficultyEngine, type DifficultyVector, type DifficultyWeights } from './quran-difficulty';
 
 /**
@@ -37,7 +37,7 @@ export interface FairDrawRequest {
 }
 
 export interface FairDrawResult {
-  passage: KfgqpcDeliveryPassage;
+  passage: ReadingPassage;
   draw: {
     protocol: 'MIZAN-FAIRDRAW-GENERATIVE-1';
     reading: string;
@@ -75,6 +75,21 @@ function seededIndex(seed: string, domain: string, max: number): number {
 }
 
 interface Row { sora: number; aya_no: number; page: number; jozz: number }
+
+/**
+ * المراسي التي تسندها البيانات نفسها.
+ *
+ * تُقرأ من الصفوف لا من وصفٍ مجاور، لأن الوصف قد يكذب والبيانات لا. حزمةٌ بلا أرقام
+ * صفحات لا تُعرض عليها مرساة «بداية صفحة»: عرضُها يعني سحبًا يفشل صامتًا كلّما دارت
+ * العجلة عليها. والحزم الحاملة للحقول الأربعة تبقى على العجلة نفسها حرفًا بحرف، فلا
+ * تتبدّل قرعةٌ سابقة ولا تفقد إعادةُ إنتاجها معناها.
+ */
+function supportedAnchors(rows: any[]): Set<FairDrawAnchor> {
+  const out = new Set<FairDrawAnchor>(['AYAH_START', 'SURAH_START']);
+  if (rows.some(r => Number.isFinite(Number(r.jozz)) && Number(r.jozz) > 0)) out.add('JUZ_START');
+  if (rows.some(r => Number.isFinite(Number(r.page)) && Number(r.page) > 0)) out.add('PAGE_START');
+  return out;
+}
 
 /** ترشيح المراسي المؤهّلة: كل مرساة هي (سورة، آية) تصلح بداية بنيوية. */
 function eligibleAnchors(rows: any[], anchor: FairDrawAnchor, filter: { juz?: number; surah?: number }): Row[] {
@@ -114,7 +129,7 @@ export interface BalancedFairDrawRequest extends FairDrawRequest {
 
 export interface BalancedFairDrawAssignment {
   slot: number;
-  passage: KfgqpcDeliveryPassage;
+  passage: ReadingPassage;
   difficulty: DifficultyVector;
   anchorType: FairDrawAnchor;
 }
@@ -141,7 +156,7 @@ export interface BalancedFairDrawResult {
 }
 
 export async function balancedFairDraw(
-  delivery: KfgqpcDeliveryRepository,
+  delivery: MizanQuranDelivery,
   difficulty: DifficultyEngine,
   req: BalancedFairDrawRequest,
 ): Promise<BalancedFairDrawResult | null> {
@@ -153,7 +168,7 @@ export async function balancedFairDraw(
 
   // مرشّحون حتميون: كل واحد سحبٌ كامل ببذرة فرعية مشتقّة، فالطقم كله يُعاد بنفس البذرة الأم.
   const seen = new Set<string>();
-  const pool: { passage: KfgqpcDeliveryPassage; difficulty: DifficultyVector; anchorType: FairDrawAnchor }[] = [];
+  const pool: { passage: ReadingPassage; difficulty: DifficultyVector; anchorType: FairDrawAnchor }[] = [];
   for (let i = 0; i < poolTarget * 3 && pool.length < poolTarget; i++) {
     const one = await generativeFairDraw(delivery, { ...req, seed: `${seed}#${i}` });
     if (!one) continue;
@@ -203,7 +218,7 @@ export async function balancedFairDraw(
   };
 }
 
-export async function generativeFairDraw(delivery: KfgqpcDeliveryRepository, req: FairDrawRequest): Promise<FairDrawResult | null> {
+export async function generativeFairDraw(delivery: MizanQuranDelivery, req: FairDrawRequest): Promise<FairDrawResult | null> {
   const reading = String(req.reading || 'hafs');
   const rows = await delivery.quranData(reading);
   if (!rows) return null;
@@ -214,8 +229,17 @@ export async function generativeFairDraw(delivery: KfgqpcDeliveryRepository, req
   // الترجيح مقصود: الشرط التشغيلي هو «بداية موضع صحيح» أي حدّ آية حقيقي — وليس بالضرورة رأس
   // صفحة أو جزء. لذلك AYAH_START هو الغالب (تنوّع أوسع وأقرب لواقع الاختبار)، وتبقى بدايات
   // السورة/الجزء/الصفحة حاضرة لإثراء التنويع لا لتقييده.
-  const wheel: FairDrawAnchor[] = ['AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'PAGE_START', 'JUZ_START', 'SURAH_START'];
+  const FULL_WHEEL: FairDrawAnchor[] = ['AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'AYAH_START', 'PAGE_START', 'JUZ_START', 'SURAH_START'];
+  /*
+   * لا تُعرض مرساةٌ لا تملك الحزمةُ بياناتها. حزم بعض الروايات بلا أرقام صفحات، وبعضها بلا
+   * جزءٍ موثوق (لاختلاف ترقيمها عن القانوني)، فعرضُ «بداية صفحة» عليها سحبٌ يفشل صامتًا.
+   * والحزم التي تملك الأربع تبقى على العجلة نفسها حرفًا بحرف — فلا تتبدّل قرعةٌ قديمة.
+   */
+  const supported = supportedAnchors(rows);
+  const wheel: FairDrawAnchor[] = FULL_WHEEL.filter(a => supported.has(a));
+  if (!wheel.length) return null;
   const anchorType: FairDrawAnchor = req.anchor && req.anchor !== 'ANY' ? req.anchor : wheel[seededIndex(seed, 'anchor', wheel.length)];
+  if (!supported.has(anchorType)) return null;
 
   const candidates = eligibleAnchors(rows, anchorType, { juz: req.juz, surah: req.surah });
   if (!candidates.length) return null;

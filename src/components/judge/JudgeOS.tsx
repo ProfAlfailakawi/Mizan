@@ -4,6 +4,7 @@ import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamb
 import { Ratio } from '../design-system/Ratio';
 import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, UsersRound, ShieldCheck, Square, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
 import { openingAudioWindow, passageTransitionPlan, selectApprovedOpeningAudio } from '../../lib/judging-integrity';
 import { certifiedCapabilityFor, resolveReading } from '../../lib/scientific-core';
@@ -82,7 +83,7 @@ const judgeCanScore=(judge:{specialty?:string;specialties?:string[]}|undefined,a
 
 export const JudgeOS: React.FC = () => {
  const store=useAppStore();
- const {language,competition,activeSession,recordJudgeEvent,undoLastJudgeEvent,lockAndSubmitAssessment,nextQuestion,participants,startSessionForParticipant,registerAudioRecording}=store;
+ const {language,competition,activeSession,recordJudgeEvent,undoLastJudgeEvent,lockAndSubmitAssessment,nextQuestion,participants,startSessionForParticipant,sessionStartFailureCode,registerAudioRecording}=store;
  const ar=language==='ar'; const policy=getCompetitionPolicy(competition); const actions=getEnabledJudgeActions(competition);
  /*
   * المؤقّت يُقرأ من ساعة الحائط كل ثانية، لا من رقمٍ في الحالة العامة.
@@ -130,8 +131,20 @@ export const JudgeOS: React.FC = () => {
  // بدء جلسة المتسابق التالي قد يفشل (لا لجنة متوافقة، أو تعذّر سحب الأسئلة). كان يفشل بصمت
  // فيبدو الزر معطلًا؛ الآن يُقال السبب بدل أن يبتلع الزرّ الرفض.
  const [startError,setStartError]=useState('');
+ /*
+  * السبب الواحد لا احتمالان.
+  *
+  * كانت الرسالة تقول «لا لجنة متوافقة، أو تعذّر تجهيز أسئلته» — وحرفُ «أو» يرسل المنظّم
+  * يفتّش في غرفة العمليات بينما العطل في نطاق الحفظ، أو العكس. المخزن صار يسجّل رمز
+  * السبب عند كل فشل، فيُقرأ من فهرس الأعطال ويُعرض هو وحده.
+  */
  const callParticipant=async(id:string)=>{setStartError('');const ok=await startSessionForParticipant(id);
-  if(!ok)setStartError(ar?'تعذّر بدء الجلسة لهذا المتسابق: لا توجد لجنة متوافقة معه، أو تعذّر تجهيز أسئلته. راجع غرفة العمليات أو وزّعه على لجنة أخرى.':'Could not start this participant: no compatible committee, or question preparation failed.')};
+  if(ok)return;
+  const code=sessionStartFailureCode?.()||'';
+  const reason=code?errorMessageArabic(code):'';
+  setStartError(ar
+   ?`تعذّر بدء الجلسة لهذا المتسابق: ${reason||'راجع غرفة العمليات أو وزّعه على لجنة أخرى.'}`
+   :`Could not start this participant.${code?` (${code})`:''}`)};
  const recorderRef=useRef<MediaRecorder|null>(null); const streamRef=useRef<MediaStream|null>(null); const chunksRef=useRef<Blob[]>([]); const audioStartedAt=useRef<string>(''); const promptAudioRef=useRef<HTMLAudioElement|null>(null); const transitionAudioRef=useRef<HTMLAudioElement|null>(null); const openingPlayedKeyRef=useRef('');
  const alignmentContextRef=useRef<{sessionId:string;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}|null>(null); const alignmentBusyRef=useRef(false);
  useEffect(()=>{setDirectScores(Object.fromEntries(visibleCriteria.map(c=>[c.id,c.maxScore])))},[activeSession.sessionId,ruleSet.id,judge?.id]);

@@ -45,6 +45,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
+# نصّ الروايات الاثنتي عشرة أثرٌ مثبَّت يُقرأ من القرص وقت التشغيل، لا يُجلب من شبكة.
+# بدونه تفشل تلك الروايات مغلقةً باسمها — وهو فشلٌ صحيح، لكنه ليس ما نريد في الإنتاج.
+COPY --from=build /app/quran-sources ./quran-sources
 
 EXPOSE 8080
 CMD ["node", "dist/server.cjs"]

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';
+import { DELIVERED_RAWI_IDS, KFGQPC_DELIVERED_RAWI_IDS, PINNED_DELIVERY_READING_BY_RAWI } from '../src/lib/delivered-readings';
 import { TEN_QIRAAT_GRAPH } from '../src/lib/scientific-core';
 import { QURAN_SOURCE_AUTHORITIES, canServeAsReadingText } from '../src/lib/quran-source-authority';
 import {
@@ -11,16 +11,28 @@ import {
   resolveCandidateReviewState,
 } from '../src/lib/quran-candidate-sources';
 
-test('the candidate source register is exactly the twelve undelivered canonical rawis', () => {
-  const delivered = new Set(DELIVERED_RAWI_IDS);
-  const missing = TEN_QIRAAT_GRAPH.map(x => x.rawiId).filter(id => !delivered.has(id)).sort();
+test('the candidate source register is exactly the twelve rawis outside the KFGQPC mirror', () => {
+  const fromMirror = new Set(KFGQPC_DELIVERED_RAWI_IDS);
+  const rest = TEN_QIRAAT_GRAPH.map(x => x.rawiId).filter(id => !fromMirror.has(id)).sort();
   const candidates = QURAN_FULL_TEXT_CANDIDATES.map(x => x.rawiId).sort();
 
   assert.equal(TEN_QIRAAT_GRAPH.length, 20);
-  assert.equal(DELIVERED_RAWI_IDS.length, 8);
+  assert.equal(KFGQPC_DELIVERED_RAWI_IDS.length, 8);
   assert.equal(QURAN_FULL_TEXT_CANDIDATES.length, 12);
-  assert.deepEqual(candidates, missing);
+  assert.deepEqual(candidates, rest);
   assert.equal(new Set(candidates).size, 12);
+  // العشرون كلّها لها مسار تسليم الآن، بمصدرَين لا بمصدرٍ واحد.
+  assert.equal(DELIVERED_RAWI_IDS.length, 20);
+});
+
+/*
+ * جدول التسليم وحدةٌ طرفية لا تستورد السجلّ (لئلّا تنشأ حلقة استيراد)، فيحرس هذا الاختبار
+ * تطابقَهما: أي رواية تُضاف في أحدهما وتُنسى في الآخر تسقط هنا لا في الإنتاج.
+ */
+test('the pinned delivery table and the candidate register never drift apart', () => {
+  const registerKeys = Object.fromEntries(QURAN_FULL_TEXT_CANDIDATES.map(c => [c.rawiId, c.deliveryKey]));
+  assert.deepEqual(PINNED_DELIVERY_READING_BY_RAWI, registerKeys);
+  assert.equal(new Set(Object.values(PINNED_DELIVERY_READING_BY_RAWI)).size, 12, 'delivery keys must stay unique');
 });
 
 test('candidate Quran bytes are pinned by commit and digest, and never re-badged as KFGQPC', () => {
@@ -34,7 +46,7 @@ test('candidate Quran bytes are pinned by commit and digest, and never re-badged
     assert.equal(source.permissionState, 'OWNER_REPORTED_PERMISSION');
     assert.match(source.upstreamPath, /^Resources\/Data\/Quran\/Qiraah.+\.json\.deflate$/);
     assert.match(source.expectedCompressedSha256, /^[0-9a-f]{64}$/);
-    assert.ok(!DELIVERED_RAWI_IDS.includes(source.rawiId));
+    assert.ok(!KFGQPC_DELIVERED_RAWI_IDS.includes(source.rawiId));
     assert.equal(candidateRawUrl(source), `https://raw.githubusercontent.com/${source.upstreamRepository}/${AL_ISLAM_IOS_QIRAAT_COMMIT}/${source.upstreamPath}`);
   }
   // الناشر مسجَّل في فهرس السلطات العام وصالحٌ ليكون نصَّ رواية — بلا ادّعاء KFGQPC.
@@ -114,7 +126,7 @@ test('identical upstream bodies do not collapse Ishaq and Idris into one identit
 
 /* الدوريّان لا يلتقيان: أحدهما مُسلَّم عن أبي عمرو، والآخر مرشّح عن الكسائي. */
 test('the two Duri identities can never resolve to one candidate package', () => {
-  assert.ok(DELIVERED_RAWI_IDS.includes('al-duri-abu-amr'));
+  assert.ok(KFGQPC_DELIVERED_RAWI_IDS.includes('al-duri-abu-amr'));
   assert.equal(candidateSourceForRawi('al-duri-abu-amr'), undefined);
   const kisai = candidateSourceForRawi('al-duri-kisai');
   assert.ok(kisai);

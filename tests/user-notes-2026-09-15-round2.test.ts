@@ -267,8 +267,12 @@ test('a server runtime that belongs to another panel or reading stops the sessio
   const start = store.indexOf('if(mismatch){');
   const end = store.indexOf('لا حزمة خادمية لهذا المتسابق', start);
   assert.ok(start >= 0 && end > start, 'the mismatch branch precedes the fallback');
-  assert.ok(store.slice(start, end).includes('return false;'),
-    'a mismatch returns false rather than falling through to the on-device draw');
+  /* الرفض صار مسمّى الرمز، وهو رفضٌ لا ارتداد: يعود بالفشل ويسجّل سببه. */
+  const branch = store.slice(start, end);
+  assert.ok(branch.includes("failSessionStart('SESSION_START_SERVER_PACKAGE_MISMATCH')"),
+    'a mismatch fails the start by name rather than falling through to the on-device draw');
+  assert.match(store, /const failSessionStart = \(code: string\) => \{ globalState\.lastSessionStartFailure = code; notify\(\); return false; \};/,
+    'and that named failure really does return false');
   assert.match(store, /حزمة الأسئلة الخادمية لا تطابق هذه الجلسة/, 'and is raised as an incident by name');
 });
 

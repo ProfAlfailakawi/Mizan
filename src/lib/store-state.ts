@@ -213,6 +213,14 @@ export interface AppStoreState {
   /** ما وُعد به من انتظار وما وقع — فيُحاسَب التقدير بدل أن يَعِد ولا يُراجَع. */
   queueWaitSamples: QueueWaitSample[];
   activeSession: ActiveSessionState;
+  /**
+   * سببُ آخر محاولة بدء جلسةٍ فشلت — رمزٌ من فهرس الأعطال لا جملةٌ مكتوبة في الشاشة.
+   *
+   * كان الفشل يعود `false` وحدها، فتقول الشاشة «لا لجنة متوافقة، أو تعذّر تجهيز أسئلته»:
+   * احتمالان بحرف «أو» يُرسلان المنظّم يبحث في المكان الخطأ نصف الوقت. الرمز هنا يُقرأ
+   * فيُعرَض السبب الواحد الحقيقي.
+   */
+  lastSessionStartFailure?: string;
 }
 
 /** localStorage key for the persisted MIZAN runtime snapshot. */

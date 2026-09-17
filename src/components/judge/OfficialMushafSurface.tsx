@@ -93,7 +93,14 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
  },[q.pageLoci,q.pageNumber,q.lineStart,q.lineEnd,delivery]);
  const packageId=q.quranSourcePackageId||(delivery?PACKAGE_BY_READING[readingKey]:undefined);
  const isKfgqpcPackage=!!packageId?.startsWith('kfgqpc-');
- const surfaceAuthority=(q.officialSurfaceAuthority|| (isKfgqpcPackage?'KFGQPC':'')).trim();
+ /*
+  * سلطةُ المصدر تُقرأ من الحزمة التي جاء منها النصّ فعلًا.
+  *
+  * كان السطر يستنتجها من معرّف الحزمة وحده، فكل ما ليس KFGQPC يظهر بوسمٍ عامّ «مصدر
+  * مسجّل» — واسمُ الناشر الحقيقي مفقود. وميزان يُسلّم اليوم نصوصًا من ناشرَين، فالوسم
+  * العامّ يخفي أيّهما بين يدَي المحكّم. والتسليم يعيد إسنادَه مع كل مقطع، فيُقرأ منه.
+  */
+ const surfaceAuthority=(q.officialSurfaceAuthority||delivery?.provenance?.authority||(isKfgqpcPackage?'KFGQPC':'')).trim();
  const surfaceAuthorityLabel=surfaceAuthority|| (ar?'مصدر مسجّل':'REGISTERED SOURCE');
  const displayText=delivery?.text||q.expectedTextArabic;
  const [tajweedOn,setTajweedOn]=useState(false);

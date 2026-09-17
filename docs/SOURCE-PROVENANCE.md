@@ -60,6 +60,7 @@ type QuranAuthorityRole =
 | السلطة | نصٌّ للتسليم؟ |
 |---|---|
 | `KFGQPC` | ✅ |
+| `ISLAMWEB` | ✅ (مصاحف الروايات — مصدرُ نصّ الاثنتي عشرة) |
 | `ALWAHY` | ✅ |
 | `QURANPEDIA` | ❌ (معرفةُ قراءاتٍ وبياناتٌ وصفية) |
 | `TANZIL` | ❌ (بياناتٌ وصفية) |
@@ -114,6 +115,56 @@ publisherCertifiedMizan: false
 
 وحزمةٌ مُصدّقة **لا تُكتب فوق بايتاتها**: الإصدار الجديد `v2` مسارٌ جديد، لا تعديلُ `v1`
 (`server/r2-object-layout.ts`).
+
+---
+
+## 4-ب. الاعتمادُ مربوطٌ ببايتاتٍ بعينها — لا عَلَمٌ ثابت
+
+`src/lib/quran-candidate-sources.ts` · `tests/quran-candidate-sources.test.ts`
+
+كتابةُ `reviewState: 'APPROVED'` حقلًا ثابتًا في سجلّ المصادر تعني «معتمدٌ **مهما كانت
+البايتات**»: يكفي أن يُحدَّث الملف في upstream ليرث الاعتمادَ صامتًا. وهذا بالضبط ما
+يمنعه هذا البروتوكول، فحُذف الحقل.
+
+المكتوب اليوم **قرارُ لجنةٍ مقيَّد**:
+
+```ts
+committeeDecision: {
+  state: 'APPROVED',
+  authority: 'MIZAN_SCIENTIFIC_COMMITTEE',
+  reference: 'MIZAN-COMMITTEE-2026-09-17-TWELVE-CANDIDATE-SOURCES',
+  boundUpstreamCommit: '5b3bc321…',   // القرار لهذا الـcommit وحده
+  boundCompressedSha256: '399099…',   // ولهذه البايتات وحدها
+}
+```
+
+والحالةُ الفعلية **تُشتقّ** بمقابلة القرار بالبايتات الداخلة (`resolveCandidateReviewState`):
+
+| النتيجة | متى |
+|---|---|
+| `APPROVED` | البايتات تطابق الـcommit والبصمة المقيَّدَين |
+| `PENDING_SCHOLAR_REVIEW` + `ARTIFACT_DIGEST_MISMATCH` | بايتاتٌ أخرى، ولو لنفس الرواية |
+| `PENDING_SCHOLAR_REVIEW` + `UPSTREAM_COMMIT_MISMATCH` | الـpin تحرّك |
+| `PENDING_SCHOLAR_REVIEW` + `DECISION_NOT_BOUND_TO_PINNED_*` | القرار نفسه غير مقيَّد بما في السجلّ |
+
+### الأثر المثبَّت داخل المستودع
+
+بايتات الاثنتي عشرة ملتزَمة في `quran-sources/islamweb-derived/` (٣٫٤ م.ب) ولا تُجلب من
+شبكة وقت التشغيل: يومُ المسابقة لا يتعلّق بتوفّر موقعٍ خارجي. وكل تحميل يعيد حساب البصمة
+ويقابل القرار، ويفشل مغلقًا باسمه:
+
+`ISLAMWEB_PACKAGE_ARTIFACT_MISSING` · `ISLAMWEB_PACKAGE_DIGEST_MISMATCH` ·
+`ISLAMWEB_PACKAGE_NOT_APPROVED` — **ولا يعود بنصّ روايةٍ أخرى بحال.**
+
+وحارسُ الإقلاع يفرّق بين حالتين (`server/production-config-guard.ts`): أثرٌ **غائب**
+تنبيهٌ (نشرٌ ناقص، رواياته تفشل مغلقةً وبقية النظام يعمل)، وأثرٌ **حاضرٌ غير صالح** مانعُ
+إقلاع — فلا يبدأ خادمٌ على نصٍّ قرآنيٍّ مشكوكٍ فيه ثم يخدمه صامتًا.
+
+### تطابقُ إسحاق وإدريس
+
+المتنان متطابقان بايتًا ببايت في المصدر المنشور، فبصمتُهما واحدة. **لم يُختلق فرق**،
+وسُجّل القيد في `caveat`، ويُثبت `tests/twenty-readings-delivery.test.ts` أن الهويتين
+والمفتاحين والحزمتين تبقى منفصلة رغم تطابق البايتات.
 
 ---
 

@@ -94,10 +94,16 @@ test('production readiness is composed from evidence, never from key-presence al
   assert.deepEqual(ready.blockers, []);
   assert.equal(ready.productionReady, true);
 
-  // رواية بلا مسار تسليم لا تصير جاهزةً ولو ادّعى المُحقِن توفّرًا.
-  const pending = readingProductionReady('hisham', { deliveryAvailableAtRuntime: true });
-  assert.equal(pending.productionReady, false);
-  assert.ok(pending.blockers.includes('NO_DELIVERY_MAPPING'));
+  /*
+   * العشرون كلّها صار لها مسار تسليم، فالمانع الحقيقي انتقل إلى جسر المواضع: رواية
+   * نصُّها حاضرٌ وترقيمُها لا يُحلّ لا تصير جاهزةً ولو ادّعى المُحقِن توفّرًا.
+   */
+  const unmapped = readingProductionReady('hisham', { deliveryAvailableAtRuntime: true, locusMappingQuestionSafe: false });
+  assert.equal(unmapped.productionReady, false);
+  assert.ok(unmapped.blockers.includes('LOCUS_MAPPING_INCOMPLETE'));
+
+  // وجهلُ حال الجسر لا يُحتسب مانعًا — كحال المصدر المُصدّق، لا يُدّعى ولا يُتّهم.
+  assert.deepEqual(readingProductionReady('hisham', { deliveryAvailableAtRuntime: true }).blockers, []);
 
   // مصدرٌ معلومُ عدمِ الاعتماد يمنع صراحةً.
   const uncertified = readingProductionReady('hafs', { deliveryAvailableAtRuntime: true, sourceCertified: false });
@@ -118,7 +124,9 @@ test('the release summary is computed honestly from state and omits asserted rea
   assert.equal(s.deliveryMappings, Object.keys(DELIVERY_READING_BY_RAWI).length);
   // لا حقل «جاهز للإنتاج» في الملخّص العام.
   assert.equal((s as unknown as Record<string, unknown>).productionReady, undefined);
-  // الروايات المعلّقة = 20 ناقص ذوات المسارات، ولا واحدة منها في جدول التسليم.
+  // العشرون كلّها لها مسار تسليم الآن، فلا رواية معلّقة بلا مصدر.
+  assert.equal(s.deliveryMappings, 20);
+  assert.deepEqual(s.pendingSource, []);
   assert.equal(s.pendingSource.length, 20 - s.deliveryMappings);
   for (const rawiId of s.pendingSource) {
     assert.ok(!Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, rawiId));
