@@ -83,6 +83,8 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('SESSION_START_SERVER_PACKAGE_MISMATCH', 'RECOVERY', 'حزمة الأسئلة المحفوظة على الخادم لا تطابق هذه الجلسة. تُعاد تهيئة الحزمة قبل النداء.'),
   ENTRY('SESSION_START_SCOPE_UNRESOLVED', 'RECOVERY', 'نطاق حفظ المتسابق غير معتمد بعد، ولا تبدأ جلسةٌ بنطاقٍ مجهول. يُعتمد نطاقه ثم يُنادى.'),
   ENTRY('SESSION_START_DRAW_FAILED', 'RECOVERY', 'تعذّر تكوين مجموعة مواضع صالحة داخل نطاق المتسابق. يُوسَّع النطاق أو تُراجَع قيود القرعة.'),
+  ENTRY('SERVER_AUDIT_LEDGER_UNCONFIGURED', 'CONFIG', 'سجلّ التدقيق الخادمي غير مضبوط، فالأحداث الحسّاسة تُسجَّل من العميل وحده بلا سلسلة بصماتٍ خادمية. يُضبط MIZAN_AUDIT_LEDGER_DIR على مسارٍ دائم.'),
+  ENTRY('SERVER_AUDIT_LEDGER_EPHEMERAL', 'CONFIG', 'مسار سجلّ التدقيق داخل قرصٍ مؤقّت، فيضيع عند إعادة تشغيل الحاوية. يُوجَّه إلى تخزينٍ دائم.'),
   ENTRY('QURAN_PINNED_ARTIFACT_ABSENT', 'QURAN_TEXT', 'حزمة نصٍّ مثبَّتة غير منشورة مع النسخة. رواياتها تفشل مغلقةً باسمها ولا تعمل في مسابقة.'),
 
   // — إعدادات الإنتاج —

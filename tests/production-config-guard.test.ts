@@ -24,6 +24,12 @@ const prodBase = {
   MIZAN_PASS_SIGNING_SECRET: strongSecret,
   MIZAN_CERT_SIGNING_SECRET: strongSecret,
   MIZAN_WEBHOOK_SIGNING_SECRET: strongSecret,
+  /*
+   * إعدادٌ «كامل» صار يشمل سجلَّ التدقيق الخادمي على مسارٍ دائم. وهو تنبيهٌ لا منع —
+   * جهةٌ قد تشغّل بلا سجلٍّ خادمي عن قصد — لكنّ الفحص لا يمرّ صامتًا عليه: الظنُّ أن
+   * السجلّ موجود وهو غائبٌ أسوأ من غيابه المعلوم.
+   */
+  MIZAN_AUDIT_LEDGER_DIR: '/mnt/mizan/audit',
 };
 
 test('a complete production config may start with no findings', () => {
