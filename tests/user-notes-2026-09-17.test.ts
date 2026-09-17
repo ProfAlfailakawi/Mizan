@@ -115,8 +115,14 @@ test('a restored session keeps the time it had already spent', () => {
 /* ── ٥ — صوت النداء رجل ───────────────────────────────────────────────── */
 
 test('the spoken cue is a male voice everywhere it is produced', () => {
-  assert.match(read('server/cue-tts.ts'), /MIZAN_CUE_TTS_VOICE \|\| 'Charon'/);
-  assert.match(read('scripts/generate-cue-audio.mjs'), /MIZAN_CUE_TTS_VOICE \|\| 'Charon'/);
+  /*
+   * الصوت اختيارُ أذنٍ لا اجتهادُ مبرمج.
+   *
+   * كان الافتراض `Charon` على ترجيحٍ بأنه ذكوريّ، فسمعه صاحب المسابقة أنثويًّا. و`Algenib`
+   * هو ما سُمع فعلًا وأُقرّ، فهو المثبَّت — ولا يُبدَّل إلا بأذنٍ تسمع بديله أولًا.
+   */
+  assert.match(read('server/cue-tts.ts'), /MIZAN_CUE_TTS_VOICE \|\| 'Algenib'/);
+  assert.match(read('scripts/generate-cue-audio.mjs'), /MIZAN_CUE_TTS_VOICE \|\| 'Algenib'/);
   const judge = read('src/components/judge/JudgeOS.tsx');
   assert.match(judge, /const men=pool\.filter\(male\)/, 'the device fallback prefers a male voice before quality');
   assert.match(judge, /const best=men\.find\(fine\)\|\|men\[0\]\|\|pool\.find\(fine\)\|\|pool\[0\]/);
