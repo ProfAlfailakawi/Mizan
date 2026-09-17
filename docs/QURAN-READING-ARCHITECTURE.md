@@ -203,3 +203,21 @@ cross-reading fallback   : FORBIDDEN
 | `r2-object-layout` | منع الاجتياز، ثبات الإصدار، نزاهة SHA-256 |
 | `judge-never-selects-reading` | لا مُنتقي روايةٍ في شاشة المحكّم |
 | `twenty-readings-parameterized` | السلسلة كاملةً على **العشرين** لا على حفصٍ وورشٍ وحدهما |
+| `quran-source-authority` | فصلُ الإسناد عن التسليم عن اعتماد اللجنة |
+| `quran-text-integrity` | ثباتُ النصّ المعروض في نقاط الترميز، وكشفُ فساد الترميز |
+| `production-config-guard` | لا يبدأ خادمٌ نصف جاهز في الإنتاج |
+
+## 11. وثائقُ ذات صلة
+
+- `docs/SOURCE-PROVENANCE.md` — الأسئلة الأربعة للإسناد، وأدوار السلطة، وتفريقُ اعتماد
+  اللجنة عن تصديق الناشر عن اعتماد الحزمة.
+- `QURAN_SOURCE_GOVERNANCE.md` — اعتماد الحزمة بالبصمة والمراجعَين.
+
+## 12. أدواتٌ تشغيلية
+
+```bash
+npm run quran:release-matrix          # مصفوفة الإصدار الصادقة
+npm run quran:verify-r2 -- --all --deep   # تحقّق نزاهة الحزم في R2 (يلزمه اعتماد)
+npm run config:validate               # حارس إعدادات الإنتاج
+npm run check                         # البوابة المركّبة التي يشغّلها CI داخل الصورة
+```
