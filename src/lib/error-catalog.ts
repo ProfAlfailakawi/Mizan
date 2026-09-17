@@ -71,6 +71,13 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('MOJIBAKE_SUSPECTED', 'QURAN_TEXT', 'أثرُ ترميزٍ مزدوج: النصّ قُرئ بترميزٍ خاطئ.', true),
   ENTRY('NO_ARABIC_CONTENT', 'QURAN_TEXT', 'لا حرف عربي في النصّ: مصدرٌ مشكوكٌ فيه.', true),
   ENTRY('EMPTY_TEXT', 'QURAN_TEXT', 'النصّ فارغ، ولا يُعرض موضعٌ بلا نصّ.', true),
+  ENTRY('ISLAMWEB_PACKAGE_UNKNOWN_READING', 'QURAN_TEXT', 'هذه الرواية ليست من حزم الأثر المثبَّت، فلا تُقرأ منه.'),
+  ENTRY('ISLAMWEB_PACKAGE_PATH_INVALID', 'QURAN_TEXT', 'مسارُ حزمة الرواية خارج جذرها المعتمد، فلا يُقرأ.'),
+  ENTRY('ISLAMWEB_PACKAGE_ARTIFACT_MISSING', 'QURAN_TEXT', 'نصّ هذه الرواية غير منشور مع النسخة المشغَّلة. تُستكمل ملفات المصدر قبل استعمالها في مسابقة — ولا يُعرض نصّ روايةٍ أخرى مكانها.'),
+  ENTRY('ISLAMWEB_PACKAGE_DIGEST_MISMATCH', 'QURAN_TEXT', 'بايتات نصّ الرواية تخالف البصمة المعتمدة. الحزمة لا تُستعمل حتى تُستعاد نسختها المعتمدة.'),
+  ENTRY('ISLAMWEB_PACKAGE_NOT_APPROVED', 'QURAN_TEXT', 'قرار اللجنة لا يشمل هذه البايتات بعينها، فلا تُقرأ حتى يصدر قرارٌ مربوطٌ بها.'),
+  ENTRY('QURAN_PINNED_ARTIFACT_INVALID', 'QURAN_TEXT', 'حزمة نصٍّ مثبَّتة موجودةٌ لكنها غير صالحة. لا يُقلع الخادم على نصٍّ قرآنيٍّ مشكوكٍ فيه.'),
+  ENTRY('QURAN_PINNED_ARTIFACT_ABSENT', 'QURAN_TEXT', 'حزمة نصٍّ مثبَّتة غير منشورة مع النسخة. رواياتها تفشل مغلقةً باسمها ولا تعمل في مسابقة.'),
 
   // — إعدادات الإنتاج —
   ENTRY('PRODUCTION_CONFIG_INVALID', 'CONFIG', 'إعدادُ التشغيل ناقصٌ أو غير آمن، فلا يبدأ الخادم نصف جاهز.'),

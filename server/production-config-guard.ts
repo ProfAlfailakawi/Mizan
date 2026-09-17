@@ -17,6 +17,7 @@
  */
 
 import { errorMessageArabic } from '../src/lib/error-catalog';
+import { islamwebPackageStatus } from './islamweb-reading-packages';
 
 export type ConfigSeverity = 'BLOCKER' | 'WARNING';
 
@@ -106,7 +107,22 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
     });
   }
 
-  // 4) أسرار التوقيع: الموضوعُ الضعيف مانع، والغائب تنبيه.
+  /*
+   * 4) حزم النصّ المثبَّتة.
+   *
+   * التفريق مقصود: حزمةٌ **غائبة** نشرٌ ناقص — رواياتها تفشل مغلقةً باسمها وبقيةُ النظام
+   * تعمل، فهذا تنبيه. وحزمةٌ **حاضرة وغير صالحة** إنذارُ نزاهة: بايتاتٌ تخالف بصمتها أو
+   * قرارًا لا يشملها، ولا يُقلع خادمٌ على نصٍّ قرآنيٍّ مشكوكٍ فيه فيُمرّره صامتًا.
+   */
+  for (const pkg of islamwebPackageStatus(env as NodeJS.ProcessEnv)) {
+    if (!pkg.present) {
+      findings.push({ severity: 'WARNING', code: 'QURAN_PINNED_ARTIFACT_ABSENT', variable: pkg.rawiId });
+    } else if (!pkg.loadable) {
+      findings.push({ severity: 'BLOCKER', code: 'QURAN_PINNED_ARTIFACT_INVALID', variable: `${pkg.rawiId}: ${pkg.error || 'UNKNOWN'}` });
+    }
+  }
+
+  // 5) أسرار التوقيع: الموضوعُ الضعيف مانع، والغائب تنبيه.
   for (const variable of SIGNING_SECRET_VARS) {
     const raw = String(env[variable] || '');
     if (raw.trim() && isWeakSecret(raw)) {
