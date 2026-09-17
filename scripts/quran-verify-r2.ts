@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { R2PrivateClient, r2ConfigFromEnv } from '../server/r2-private';
 import { quranPackageKey, sha256Hex, verifyIntegrity, readPackageManifestFiles, type ObjectIntegrity, type PackageManifestFile } from '../server/r2-object-layout';
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
+import { errorMessageArabic } from '../src/lib/error-catalog';
 
 /*
  * تحقّقُ نزاهةِ حزم القرآن المرفوعة إلى R2.
@@ -62,7 +63,7 @@ async function main() {
   const cfg = r2ConfigFromEnv();
   if (!cfg) {
     console.error('R2_NOT_CONFIGURED: set R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY');
-    console.error('التحقّق يحتاج اعتمادًا حقيقيًا؛ ولا يُعتبر الرفع مُتحقَّقًا بلا ذلك.');
+    console.error(errorMessageArabic('R2_NOT_CONFIGURED'));
     process.exit(1);
   }
 
@@ -83,7 +84,9 @@ async function main() {
     try {
       files = readPackageManifestFiles(await res.json());
     } catch (err) {
-      console.error(`MANIFEST_UNREADABLE ${rawiId}: ${err instanceof Error ? err.message : String(err)}`);
+      const code = err instanceof Error ? err.message : String(err);
+      console.error(`MANIFEST_UNREADABLE ${rawiId}: ${code}`);
+      console.error(`  ${errorMessageArabic(code)}`);
       failures++;
       continue;
     }
@@ -111,6 +114,7 @@ async function main() {
       checked++;
       if (!verdict.ok) {
         console.error(`${verdict.code} ${rawiId}: ${key}`);
+        console.error(`  ${errorMessageArabic(verdict.code!)}`);
         failures++;
       }
     }

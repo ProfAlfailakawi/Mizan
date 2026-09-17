@@ -98,3 +98,25 @@ test('the operator report never prints secret values', () => {
   assert.doesNotMatch(report, /changeme/);
   assert.match(report, /الإقلاع ممنوع/);
 });
+
+/*
+ * جملةٌ واحدة لا نسختان: نصُّ الملاحظة يُقرأ من فهرس الأعطال ولا يُكتب في الحارس.
+ * كان مكتوبًا في الموضعين، وهما يفترقان عند أول تعديل.
+ */
+test('finding sentences come from the catalog, not a second copy in the guard', async () => {
+  const { configFindingMessage } = await import('../server/production-config-guard');
+  const { errorMessageArabic } = await import('../src/lib/error-catalog');
+
+  const finding = { severity: 'BLOCKER' as const, code: 'CLIENT_EXPOSED_SECRET', variable: 'VITE_R2_SECRET_ACCESS_KEY' };
+  // الجملة هي جملةُ الفهرس بعينها، ومعها اسمُ المتغيّر لأنه ما يبحث عنه المشغّل أولًا.
+  assert.ok(configFindingMessage(finding).startsWith(errorMessageArabic('CLIENT_EXPOSED_SECRET')));
+  assert.ok(configFindingMessage(finding).includes('VITE_R2_SECRET_ACCESS_KEY'));
+  // وبلا متغيّرٍ تبقى جملةَ الفهرس وحدها.
+  assert.equal(configFindingMessage({ severity: 'BLOCKER', code: 'PRODUCTION_CONFIG_INVALID' }), errorMessageArabic('PRODUCTION_CONFIG_INVALID'));
+
+  // والحارس لا يحمل نصًّا عربيًّا مكتوبًا للملاحظات (الفهرس هو المصدر).
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const guard = fs.readFileSync(path.join(process.cwd(), 'server/production-config-guard.ts'), 'utf8');
+  assert.doesNotMatch(guard, /messageArabic\s*:/, 'no inline finding message survives in the guard');
+});
