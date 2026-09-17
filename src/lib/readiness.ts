@@ -1,6 +1,8 @@
 import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
 import { sourceUsableForCompetition, certifiedCapabilityFor, isReadingDelivered } from './scientific-core';
 import { isReadingQuestionSafe } from './quran-locus-crosswalk';
+import { categoryScopeOf } from './scope-engine';
+import { scopeAyahCount } from './quran-scope';
 
 export type PreflightStatus='ready'|'warning'|'blocker';
 export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'field'|'integrations'|'backup'|'none'}
@@ -16,6 +18,14 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
  /* وجودُ النصّ ليس جوازَ السحب. رواية يختلف عدّ آياتها عن العدّ القانوني في سورةٍ ما لا
     يُعرف مقابلُ موضعها فيها، فالسحب منها موضعٌ خاطئ لا احتمالُ خطأ. يُكشف هنا قبل الحدث. */
  const locusMappingReady=c.categories.length>0&&c.categories.every(cat=>isReadingQuestionSafe({riwaya:cat.riwaya}));
+ /*
+  * فئةٌ بلا نطاقٍ محسوم لا تبدأ لها جلسة أبدًا.
+  *
+  * «عشرون جزءًا» لا تقول أيّ عشرين، فيرفض المُرحِّل اشتقاقها — وهو الصواب. لكن الرفض كان
+  * يظهر أول مرة أمام المحكّم وهو ينادي متسابقه: «تعذّر بدء الجلسة». فيُقرأ هنا قبل اليوم.
+  */
+ const categoriesWithoutScope=c.categories.filter(cat=>scopeAyahCount(categoryScopeOf(cat))===0);
+ const categoryScopesReady=c.categories.length>0&&categoriesWithoutScope.length===0;
  const aiEnabled=p.aiPolicy?.mode&&p.aiPolicy.mode!=='AI_DISABLED';
  const aiScopeOk=!aiEnabled||c.categories.every(cat=>!p.aiPolicy.enabledCapabilities.word_alignment||!!certifiedCapabilityFor(aiValidations,{capability:'word_alignment',riwaya:cat.riwaya}));
  const gateNeeded=p.operations.kioskCheckIn;
@@ -31,6 +41,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
   check('registration',p.registration.fields.some(f=>f.visible&&f.required),!live,'التسجيل','Registration','قد تصل طلبات ناقصة أو غير قابلة للتحقق.','Registrations may arrive without required verifiable data.','competition_dna'),
   check('categories',c.categories.length>0,false,'الفئات','Categories','لا يمكن توجيه أو تحكيم المشاركين.','Participants cannot be routed or judged.','competition_dna'),
   check('quran_source',exactQuranSourceReady,!live,'مصدر القرآن','Quran source','لا يوجد نصٌّ مُسلَّم لرواية هذه الفئة، فلا تُسحب لها مواضع. اختر لها رواية نصُّها متاح.','No delivered text exists for this category reading, so no passages can be drawn.','competition_dna'),
+  check('category_scope',categoryScopesReady,false,'نطاق الفئة','Category scope',`لا تبدأ جلسةٌ لفئةٍ بلا نطاقٍ محسوم؛ عبارةٌ مثل «عشرون جزءًا» لا تحدد أيّ أجزاء. الفئات المعلّقة: ${categoriesWithoutScope.map(x=>x.nameArabic||x.name).join('، ')||'—'}.`,`A session cannot start for a category whose scope is undecided; "20 juz" does not say which juz. Pending: ${categoriesWithoutScope.map(x=>x.name).join(', ')||'—'}.`,'competition_dna'),
   check('quran_locus_mapping',locusMappingReady,false,'جسر مواضع الرواية','Reading locus crosswalk','ترقيم آيات هذه الرواية يخالف العدّ القانوني في سورٍ لم يصل لها دليل جسر، فلا يُعرف الموضع المقابل ولا تُسحب منه أسئلة.','This reading numbers its ayat differently from the canonical count in surahs with no crosswalk evidence, so a drawn locus cannot be resolved.','competition_dna'),
   check('fairdraw',p.questions.questionsPerParticipant>0&&p.questions.difficultyTolerance>=0,false,'FairDraw','FairDraw','السحب لا يملك قيودًا صالحة.','The draw has invalid fairness constraints.','competition_dna'),
   check('question_escrow',serverEscrowReady,!live,'حجز السؤال خارج جهاز المحكم','Server-held question escrow','بوابة اللجنة تمنع الكشف المبكر تشغيليًا، لكن السؤال ما زال يحتاج حجزًا خادميًا حتى لا يمكن استخراجه من جهاز المحكم قبل النصاب.','The panel gate blocks early operational reveal, but true anti-leak security requires the question plaintext to remain server-held until quorum.','none'),

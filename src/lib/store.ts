@@ -3114,7 +3114,17 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     }, ...globalState.queueWaitSamples].slice(0, 500);
   };
 
+  /*
+   * الفشل يُسمّى. كل مخرجٍ غير ناجح من بدء الجلسة يسجّل رمزه في الحالة، فتعرض شاشة
+   * المحكّم السبب الواحد بدل احتمالين بحرف «أو».
+   */
+  const failSessionStart = (code: string) => { globalState.lastSessionStartFailure = code; notify(); return false; };
+
+  /** رمز سبب آخر فشلٍ في بدء جلسة — يُقرأ فور عودة المحاولة، قبل أي إعادة رسم. */
+  const sessionStartFailureCode = () => globalState.lastSessionStartFailure || '';
+
   const startSessionForParticipant = async (participantId: string) => {
+    globalState.lastSessionStartFailure = '';
     const participant = globalState.participants.find(p => p.id === participantId && p.competitionId===globalState.competition.id);
     if (participant) settleWaitPromise(participant);
     /* القراران في `session-start-core` مُختبَرين بالتشغيل؛ وما هنا أثرهما. */
@@ -3125,10 +3135,10 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       assignedHasHardConflict: !!(assignedCommittee && participant && committeeHasHardConflict(assignedCommittee, participant)),
       compatibleCommittees: participant ? compatibleCommitteesFor(participant) : [],
     });
-    if (choice.kind === 'no-participant' || !participant) return false;
+    if (choice.kind === 'no-participant' || !participant) return failSessionStart('SESSION_START_PARTICIPANT_NOT_FOUND');
     if (choice.kind === 'no-safe-committee') {
       createIncident('conflict_routing', 'لا لجنة خالية من تضارب المصالح', `المتسابق ${participant.code} يحتاج إسنادًا يدويًا إلى لجنة لا تضارب فيها.`, 'critical');
-      return false;
+      return failSessionStart('SESSION_START_NO_SAFE_COMMITTEE');
     }
     const committee = choice.committee;
     const policy = getCompetitionPolicy(globalState.competition);
@@ -3184,7 +3194,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
               ? `حزمة أسئلة ${participant.code} مُعدّة للجنة أخرى. لا تبدأ الجلسة حتى تُصحَّح، ولا يُسحب على الجهاز بديلًا عنها.`
               : `حزمة أسئلة ${participant.code} بروايةٍ غير روايته. لا تبدأ الجلسة حتى تُصحَّح، ولا يُسحب على الجهاز بديلًا عنها.`,
             'critical');
-          notify();return false;
+          return failSessionStart('SESSION_START_SERVER_PACKAGE_MISMATCH');
         }
         /* لا حزمة خادمية لهذا المتسابق: تمضي الجلسة على مصحف التسليم، ويُقال ذلك في التدقيق. */
         auditTrustAction('SESSION_QUESTIONS_RESOLVED_ON_DEVICE','JudgingSession',participant.id,
@@ -3202,7 +3212,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     const scopeResolution=participantEffectiveScope(participantId);
     if(!scopeResolution||scopeResolution.blocked){
       createIncident('conflict_routing','نطاق الحفظ يحتاج مراجعة',`تعذر بدء جلسة ${participant.code}: ${scopeResolution?.reasonArabic||'لا نطاق محددًا لهذا المتسابق.'}`,'critical');
-      return false;
+      return failSessionStart('SESSION_START_SCOPE_UNRESOLVED');
     }
     const effectiveScope=scopeResolution.scope;
     const source=reading?globalState.quranSourceManifests.find(q=>q.organizationId===globalState.competition.organizationId&&sourceUsableForCompetition(q,{qiraah:reading.qiraah,rawi:reading.rawi}).ok):undefined;
@@ -3344,7 +3354,8 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       void createContinuityCheckpoint('session-start');
       notify(); return true;
     } catch (error) {
-      console.error('FairDraw could not create an eligible set', error); return false;
+      console.error('FairDraw could not create an eligible set', error);
+      return failSessionStart(`SESSION_START_DRAW_FAILED:${error instanceof Error ? error.message : 'UNKNOWN'}`);
     }
   };
 
@@ -4343,7 +4354,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     updateCommittee, removeCommittee, updateJudgeSpecialties, updateCommitteeJudgeSpecialty,
     publishCompetition,
     setScientificReviewersRequired,
-    startSessionForParticipant, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
+    startSessionForParticipant, sessionStartFailureCode, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
     queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,

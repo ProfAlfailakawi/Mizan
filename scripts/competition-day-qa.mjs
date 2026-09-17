@@ -32,8 +32,19 @@ const note = (m) => { problems.push(m); console.log(`  ✗ ${m}`); };
 const ok = (m) => console.log(`  ✓ ${m}`);
 const offlineNoise = /ERR_(CONNECTION|TUNNEL|NAME_NOT_RESOLVED|INTERNET)|Could not reach|Failed to load resource: net::|404/;
 
-const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ar' });
+/*
+ * ميكروفون صناعي، لا بوابةٌ متجاوَزة.
+ *
+ * سياسة المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح موضعٌ قبل أن تسمع الشاشة صوتًا — وهي بوابة
+ * حقيقية يجب أن تُختبر لا أن تُطفأ. والمتصفّح في الخادم بلا جهاز صوت، فكان الطريق يقف
+ * عندها فيُقرأ ذلك «البوابات لم تُبلَغ» وكأن العطل في المنتَج. فيُعطى المتصفّح جهازًا
+ * صناعيًا وإذنًا مسبقًا: البوابة تعمل كما هي، ويمرّ الفحص منها كما يمرّ المحكّم.
+ */
+const browser = await chromium.launch({
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined,
+  args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+});
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ar', permissions: ['microphone'] });
 await ctx.addInitScript(() => {
   try { localStorage.setItem('mizan_onboarding_quiet_v2', '1'); sessionStorage.setItem('mizan_splash_seen', '1'); } catch { /* private mode */ }
 });
@@ -54,18 +65,48 @@ const clickIf = async (label) => {
   await page.waitForTimeout(900);
   return true;
 };
+/*
+ * الدخول صار بابين لا بابًا واحدًا.
+ *
+ * كانت الصفحة الأولى تعرض أزرار الأدوار مباشرة، فيكفي ضغطُ «المحكم». ثم أُغلق ذلك المسار
+ * قصدًا — لا دخول بلا هوية — وصار الاستعراض يبدأ من «استعراض النظام ببيانات تجريبية»
+ * ويُبدَّل الدور من شريط البيئة التجريبية. وبقي هذا الفحص يضغط زرًّا لم يعد موجودًا،
+ * فكان يقول «تعذّر الدخول» عن بابٍ سليم. فصار يدخل من الباب الحالي ويُبدّل الدور من منتقيه.
+ */
+const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+const ROLE_OPTION = { 'المحكم': 'محكّم', 'المدقق': 'مدقّق' };
+
 const enterRole = async (label) => {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
+
+  const demoEntry = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
+  if (await demoEntry.count()) {
+    await demoEntry.click();
+    await page.waitForTimeout(3000);
+  }
+
+  /* في الشريط منتقيان: اللغة ثم الدور. يُختار المنتقي الذي يحمل الدور فعلًا، لا أوّلَ ما يُصادَف. */
+  const option = ROLE_OPTION[label] || label;
+  const pickers = page.locator('select:visible');
+  for (let i = 0; i < await pickers.count(); i++) {
+    const picker = pickers.nth(i);
+    const options = await picker.locator('option').allInnerTexts();
+    if (!options.includes(option)) continue;
+    const chosen = await picker.selectOption({ label: option }).then(() => true).catch(() => false);
+    if (chosen) { await page.waitForTimeout(2500); return true; }
+  }
+
+  // مسار قديم: زرُّ دورٍ مباشر في الصفحة الأولى، إن عاد يومًا.
   const entry = page.locator('button:visible', { hasText: label }).first();
-  if (!await entry.count()) { note(`تعذّر الدخول بدور «${label}»`); return false; }
-  await entry.click();
-  await page.waitForTimeout(2500);
-  return true;
+  if (await entry.count()) { await entry.click(); await page.waitForTimeout(2500); return true; }
+
+  note(`تعذّر الدخول بدور «${label}»`);
+  return false;
 };
 
 /* البوابات بترتيبها. المحرّك يضغط أولَ ما يجده منها، فيتقدّم الطريق خطوةً واحدة في كل دورة. */
-const GATES = ['المتسابق أمامي — تأكيد الحضور', 'أوافق على فتح السؤال', 'إنهاء الموضع', 'إنهاء آخر موضع', 'السؤال التالي', 'اعتماد وقفل'];
+const GATES = ['المتسابق أمامي — تأكيد الحضور', 'أوافق على فتح السؤال', 'تجهيز الميكروفون', 'إنهاء الموضع', 'إنهاء آخر موضع', 'السؤال التالي', 'اعتماد وقفل'];
 
 async function walkSession(maxTicks = 24) {
   const seen = new Set();
@@ -87,9 +128,20 @@ async function walkSession(maxTicks = 24) {
 
 console.log('\n── يوم المسابقة: من الموضع الأول إلى قفل التقييم');
 if (await enterRole('المحكم')) {
-  const first = await body();
-  if (!/الموضع\s*1\/\d+/.test(first)) note('سطح التحكيم لم يفتح على الموضع الأول');
-  else ok('سطح التحكيم يفتح على جلسة حقيقية');
+  /*
+   * المحكّم يبدأ يومه على شاشةٍ بلا جلسة، ثم ينادي من أمامه. وكان هذا الفحص يفترض جلسةً
+   * مفتوحةً سلفًا فيعدّ الشاشة الفارغة عطلًا — وهي حالةُ البدء الصحيحة. فصار ينادي أولًا
+   * كما يفعل المحكّم، ثم يحكم على ما فُتح.
+   */
+  let first = await body();
+  if (!/الموضع\s*1\/\d+/.test(first)) {
+    if (await clickIf('المتسابق التالي')) { await page.waitForTimeout(3000); first = await body(); }
+  }
+  if (!/الموضع\s*1\/\d+/.test(first)) {
+    const why = first.match(/تعذّر بدء الجلسة[^\n]*/);
+    note(`سطح التحكيم لم يفتح على الموضع الأول${why ? ` — ${why[0].slice(0, 160)}` : ''}`);
+  }
+  else ok('سطح التحكيم يفتح على جلسة حقيقية بعد نداء المتسابق');
 
   const walk = await walkSession();
   if (walk.sealedTextLeaked) note('نصّ الموضع ظهر قبل الحضور وموافقة اللجنة');

@@ -77,6 +77,12 @@ export const ERROR_CATALOG: readonly ErrorDescription[] = [
   ENTRY('ISLAMWEB_PACKAGE_DIGEST_MISMATCH', 'QURAN_TEXT', 'بايتات نصّ الرواية تخالف البصمة المعتمدة. الحزمة لا تُستعمل حتى تُستعاد نسختها المعتمدة.'),
   ENTRY('ISLAMWEB_PACKAGE_NOT_APPROVED', 'QURAN_TEXT', 'قرار اللجنة لا يشمل هذه البايتات بعينها، فلا تُقرأ حتى يصدر قرارٌ مربوطٌ بها.'),
   ENTRY('QURAN_PINNED_ARTIFACT_INVALID', 'QURAN_TEXT', 'حزمة نصٍّ مثبَّتة موجودةٌ لكنها غير صالحة. لا يُقلع الخادم على نصٍّ قرآنيٍّ مشكوكٍ فيه.'),
+  // — بدء الجلسة —
+  ENTRY('SESSION_START_PARTICIPANT_NOT_FOUND', 'RECOVERY', 'المتسابق غير موجود في هذه المسابقة، فلا تُفتح له جلسة.'),
+  ENTRY('SESSION_START_NO_SAFE_COMMITTEE', 'RECOVERY', 'لا لجنة تخدم فئة هذا المتسابق بلا تضارب مصالح. يُسنَد إلى لجنة أخرى من غرفة العمليات.'),
+  ENTRY('SESSION_START_SERVER_PACKAGE_MISMATCH', 'RECOVERY', 'حزمة الأسئلة المحفوظة على الخادم لا تطابق هذه الجلسة. تُعاد تهيئة الحزمة قبل النداء.'),
+  ENTRY('SESSION_START_SCOPE_UNRESOLVED', 'RECOVERY', 'نطاق حفظ المتسابق غير معتمد بعد، ولا تبدأ جلسةٌ بنطاقٍ مجهول. يُعتمد نطاقه ثم يُنادى.'),
+  ENTRY('SESSION_START_DRAW_FAILED', 'RECOVERY', 'تعذّر تكوين مجموعة مواضع صالحة داخل نطاق المتسابق. يُوسَّع النطاق أو تُراجَع قيود القرعة.'),
   ENTRY('QURAN_PINNED_ARTIFACT_ABSENT', 'QURAN_TEXT', 'حزمة نصٍّ مثبَّتة غير منشورة مع النسخة. رواياتها تفشل مغلقةً باسمها ولا تعمل في مسابقة.'),
 
   // — إعدادات الإنتاج —

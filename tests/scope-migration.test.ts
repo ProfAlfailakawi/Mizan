@@ -57,7 +57,7 @@ test('an already-defined scope is left untouched by migration', () => {
 
 test('the shipped seed competition migrates without a single invented scope', () => {
   const plan = planCategoryMigration(SEED_COMPETITION.categories);
-  assert.ok(plan.length >= 3, 'the seed competition really does carry legacy categories');
+  assert.ok(plan.length >= 3, 'the seed competition really does carry categories');
   for (const row of plan) {
     assert.ok(['derived_from_legacy', 'needs_scope_confirmation', 'already_defined'].includes(row.outcome.status));
     if (row.outcome.status === 'needs_scope_confirmation') assert.equal(row.outcome.scope, null);
@@ -65,9 +65,25 @@ test('the shipped seed competition migrates without a single invented scope', ()
   }
   const full = plan.find(x => x.legacy.juzCount === 30);
   assert.equal(full?.outcome.status, 'derived_from_legacy', 'the full-Quran category migrates safely');
-  const ambiguous = plan.filter(x => x.outcome.status === 'needs_scope_confirmation');
-  assert.ok(ambiguous.length >= 1, 'the "20 juz" and "10 juz" categories wait for a human decision');
-  for (const row of ambiguous) assert.ok(row.outcome.basisArabic.length > 0, 'and each one explains why');
+  /*
+   * لا فئةً معلّقة في البيانات المنشورة.
+   *
+   * كان هذا الاختبار يشترط بقاء فئتين بلا نطاقٍ محسوم ليُثبت أن المُرحِّل لا يخمّن — أي
+   * أنه كان يحرس عطلًا لا ثابتة: تلك الفئتان لا تبدأ لهما جلسة أبدًا. فالثابتةُ تُختبر
+   * على فئةٍ معدّة لذلك، وتبقى البيانات المنشورة صالحةً للتشغيل.
+   */
+  assert.deepEqual(plan.filter(x => x.outcome.status === 'needs_scope_confirmation').map(x => x.categoryId), [],
+    'a shipped category whose scope is undecided can never start a session');
+});
+
+test('an undecided juz count waits for a human decision and says why', () => {
+  const plan = planCategoryMigration([
+    { id: 'cat-legacy-20', name: '20 Juz', nameArabic: 'عشرون جزءًا', memorizationScope: '20 جزءاً', juzCount: 20 },
+  ]);
+  assert.equal(plan[0].outcome.status, 'needs_scope_confirmation');
+  assert.equal(plan[0].outcome.scope, null, 'no scope is invented');
+  assert.ok(plan[0].outcome.suggestion, 'a suggestion is offered');
+  assert.ok(plan[0].outcome.basisArabic.length > 0, 'and it explains why it is only a suggestion');
 });
 
 test('Arabic-Indic digits and diacritics do not defeat the parser', () => {
