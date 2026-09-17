@@ -2057,6 +2057,16 @@ export function useAppStore() {
       auditTrustAction('RESULT_PUBLICATION_SOD_BLOCKED','Competition',globalState.competition.id,'منع ناشر النتائج من أن يكون هو نفس الشخص الذي ختمها','Blocked result publication because the publisher is the same person who sealed the results');
       notify();return false;
     }
+    /*
+     * النشر يقع مرّة.
+     *
+     * لم يكن هناك ما يمنع تكراره: ضغطةٌ مزدوجة أو إعادةُ محاولةٍ بعد انقطاعٍ تُعيد ختم
+     * `publishedAt` بوقتٍ جديد، وتكتب حدث `RESULTS_PUBLISHED` ثانيًا في السجلّ، وتُرسل
+     * إشعار «صدرت نتيجتك» إلى كل متسابقٍ مرّةً أخرى. والمتسابق لا يعرف أن الثانية صدى؛
+     * يقرأها نتيجةً جديدة. فالمنشورُ كلُّه يعود نجاحًا بلا أثرٍ جانبي — وهي دلالة idempotency
+     * الصحيحة: النداء الثاني يقول «تمّ» ولا يفعل شيئًا.
+     */
+    if(competitionResults.every(r=>r.status==='published')) return true;
     const publishedAt=new Date().toISOString();
     globalState.results=globalState.results.map(r=>r.competitionId===globalState.competition.id?({...r,status:'published',publishedById:globalState.currentUser.id,publishedAt}):r);
     for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) void persistScopedDocument('results',rr.id,rr as unknown as Record<string,unknown>);
