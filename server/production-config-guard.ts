@@ -16,6 +16,8 @@
  * بحجّة إعدادٍ لا تحتاجه.
  */
 
+import { errorMessageArabic } from '../src/lib/error-catalog';
+
 export type ConfigSeverity = 'BLOCKER' | 'WARNING';
 
 export interface ConfigFinding {
@@ -23,7 +25,18 @@ export interface ConfigFinding {
   code: string;
   /** المتغيّر المعنيّ إن كان محدّدًا. */
   variable?: string;
-  messageArabic: string;
+}
+
+/*
+ * الجملةُ تُقرأ من فهرس الأعطال ولا تُكتب هنا.
+ *
+ * كانت مكتوبةً في الموضعين — هنا وفي الفهرس — وهما نسختان تفترقان عند أول تعديل، وهو
+ * عينُ التجزئة التي يعالجها هذا المشروع. فالفهرس هو المصدر، ويُضاف إليه اسمُ المتغيّر
+ * المعنيّ لأنه ما يبحث عنه المشغّل أولًا.
+ */
+export function configFindingMessage(finding: ConfigFinding): string {
+  const sentence = errorMessageArabic(finding.code);
+  return finding.variable ? `${sentence} (${finding.variable})` : sentence;
 }
 
 export interface ConfigGuardResult {
@@ -76,7 +89,6 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
     if (!String(env[key] || '').trim()) continue;
     findings.push({
       severity: 'BLOCKER', code: 'CLIENT_EXPOSED_SECRET', variable: key,
-      messageArabic: `سرٌّ مكشوفٌ للمتصفّح: ${key}. كل Secret خادميٌّ فقط — يُنقل إلى متغيّرٍ بلا بادئة VITE_.`,
     });
   }
 
@@ -84,7 +96,6 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
   if (production && truthy(env.MIZAN_ENABLE_DEMO_SEED)) {
     findings.push({
       severity: 'BLOCKER', code: 'DEMO_SEED_ENABLED_IN_PRODUCTION', variable: 'MIZAN_ENABLE_DEMO_SEED',
-      messageArabic: 'بيانات العرض التجريبي مفعّلةٌ في الإنتاج. الديمو ببياناتٍ صناعية ولا يُخلط بمسابقةٍ حقيقية.',
     });
   }
 
@@ -92,7 +103,6 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
   if (production && !String(env.FIREBASE_PROJECT_ID || '').trim()) {
     findings.push({
       severity: 'BLOCKER', code: 'IDENTITY_VERIFICATION_UNCONFIGURED', variable: 'FIREBASE_PROJECT_ID',
-      messageArabic: 'بلا FIREBASE_PROJECT_ID لا تُتحقَّق رموز الهوية على الخادم، فتصير الصلاحيات دعوى العميل.',
     });
   }
 
@@ -102,12 +112,10 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
     if (raw.trim() && isWeakSecret(raw)) {
       findings.push({
         severity: 'BLOCKER', code: 'WEAK_SIGNING_SECRET', variable,
-        messageArabic: `سرُّ توقيعٍ ضعيف في ${variable}. القيمة النائبة أسوأ من الغياب لأنها توهم بالحماية.`,
       });
     } else if (production && !raw.trim()) {
       findings.push({
         severity: 'WARNING', code: 'SIGNING_SECRET_ABSENT', variable,
-        messageArabic: `${variable} غير مضبوط. الميزة المعتمدة عليه تبقى معطَّلة؛ اضبطه إن كانت مطلوبة.`,
       });
     }
   }
@@ -149,8 +157,8 @@ export function formatConfigReport(result: ConfigGuardResult): string {
   const lines: string[] = [];
   lines.push(`بيئة: ${result.production ? 'إنتاج' : 'غير إنتاج'}`);
   if (!result.findings.length) { lines.push('لا ملاحظات — الإعداد سليم.'); return lines.join('\n'); }
-  for (const f of result.blockers) lines.push(`[مانع] ${f.code}: ${f.messageArabic}`);
-  for (const f of result.warnings) lines.push(`[تنبيه] ${f.code}: ${f.messageArabic}`);
+  for (const f of result.blockers) lines.push(`[مانع] ${f.code}: ${configFindingMessage(f)}`);
+  for (const f of result.warnings) lines.push(`[تنبيه] ${f.code}: ${configFindingMessage(f)}`);
   lines.push(result.mayStart ? 'النتيجة: يُسمح بالإقلاع.' : 'النتيجة: الإقلاع ممنوع حتى تُرفع الموانع.');
   return lines.join('\n');
 }
