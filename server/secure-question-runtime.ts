@@ -6,6 +6,8 @@ import { ServerQuranSourceRepository } from './quran-source-repository';
 import { QuestionDiversityLedger, type StartLocusAssurance, type StartLocusClass } from './question-diversity-ledger';
 import { normalizeScope, scopeAyahCount, scopeRanges, scopeSignature, type QuranScope } from '../src/lib/quran-scope';
 import { ayahOrdinal } from '../src/lib/quran-canon';
+import { COMMITTEE_CROSSWALK_VERSION } from '../src/lib/quran-crosswalk-evidence';
+import { DELIVERY_COUNT_EVIDENCE_BUILD } from '../src/lib/quran-delivery-count-evidence.generated';
 
 export interface ServerQuestionBlueprint {
   id:string;poolId:string;qiraah:string;rawi:string;tariq?:string;surahNumber:number;startAyah:number;endAyah:number;juzNumber:number;difficultyRating:number;difficultyProvenance?:'EXPERT_APPROVED'|'UNRATED_NEUTRAL';mutashabihatDensity?:'low'|'medium'|'high';tajweedComplexity?:'basic'|'intermediate'|'advanced';enabled?:boolean;startLocusAssurance?:StartLocusAssurance;startClass?:StartLocusClass;pageNumber?:number;lineStart?:number;
@@ -38,6 +40,17 @@ export interface RuntimeRecord {
    */
   requestSignature?:string;
   participantScope?:QuranScope;participantScopeVersion?:number;participantScopeSignature?:string;
+  /*
+   * إصدارات ما فُسِّرت به هذه الجلسة.
+   *
+   * النتيجةُ تُقرأ بعد سنة، وقد تغيّر تحتها كلُّ شيء: أثرُ حدود الآي، وجدولُ الجسر،
+   * ونظامُ العدّ المقيس. وبلا تسجيل ما كان يعمل **يومها** يصير إعادةُ تفسير النتيجة
+   * تخمينًا، ويصير الدفاعُ عنها عند النزاع مستحيلًا.
+   *
+   * فتُسجَّل هنا مع الجلسة نفسها، لا في مكانٍ يُحدَّث لاحقًا.
+   */
+  crosswalkVersion?:string;
+  quranDataVersion?:string;
   qiraah:string;rawi:string;tariq?:string;algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2';ruleVersion:'SERVER_POLICY_V2';seedCommitmentHash:string;seedSecret:string;poolSnapshotHash:string;constraintHash:string;diversityMetrics:{eligibleUniqueStartLoci:number;previousParticipants:number;reusedLoci:number;pageOpeningCount:number;midPageCount:number;globalUniqueCoverageGuaranteed:boolean;requiredUniqueLociForFullField?:number};
   selectedBlueprintIds:string[];retiredBlueprintIds:string[];
   emergencyReplacement:{state:RuntimeReplacementState;authorizationId?:string;authorizedAt?:string;authorizedBy?:string;reason?:string;expiresAt?:string;questionIndex?:number;judgeApprovals?:{judgeId:string;approvedAt:string}[];consumedAt?:string;replacementBlueprintId?:string};
@@ -90,7 +103,7 @@ export class SecureQuestionRuntimeRepository {
   private write(r:RuntimeRecord){const f=this.file(r.sessionId),tmp=`${f}.${process.pid}.${Date.now()}.tmp`;fs.writeFileSync(tmp,JSON.stringify(r,null,2),{encoding:'utf8',mode:0o600});fs.renameSync(tmp,f)}
   private publicState(r:RuntimeRecord){
     const replacement={...r.emergencyReplacement,judgeApprovals:(r.emergencyReplacement.judgeApprovals||[]).length};
-    return {version:r.version,sessionId:r.sessionId,competitionId:r.competitionId,participantId:r.participantId,committeeId:r.committeeId,sourcePackageId:r.sourcePackageId,sourcePackageHash:r.sourcePackageHash,qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq,algorithmVersion:r.algorithmVersion,seedCommitmentHash:r.seedCommitmentHash,poolSnapshotHash:r.poolSnapshotHash,constraintHash:r.constraintHash,questionCount:r.selectedBlueprintIds.length,diversityMetrics:r.diversityMetrics,emergencyReplacement:replacement,escrow:this.escrow.publicState(this.escrow.internalRecord(r.sessionId))};
+    return {version:r.version,sessionId:r.sessionId,competitionId:r.competitionId,participantId:r.participantId,committeeId:r.committeeId,sourcePackageId:r.sourcePackageId,sourcePackageHash:r.sourcePackageHash,qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq,algorithmVersion:r.algorithmVersion,crosswalkVersion:r.crosswalkVersion,quranDataVersion:r.quranDataVersion,seedCommitmentHash:r.seedCommitmentHash,poolSnapshotHash:r.poolSnapshotHash,constraintHash:r.constraintHash,questionCount:r.selectedBlueprintIds.length,diversityMetrics:r.diversityMetrics,emergencyReplacement:replacement,escrow:this.escrow.publicState(this.escrow.internalRecord(r.sessionId))};
   }
   /*
    * ما يجعل الطلبَ هو هو.
@@ -154,7 +167,7 @@ export class SecureQuestionRuntimeRepository {
     const constraints={questionCount:input.questionCount,maxJuz:input.maxJuz,participantScopeSignature:input.participantScope?scopeSignature(input.participantScope):undefined,participantScopeVersion:input.participantScopeVersion,targetDifficulty:input.targetDifficulty,difficultyTolerance:input.difficultyTolerance,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,sourcePackageHash,poolSnapshotHash,expectedParticipantCount:input.expectedParticipantCount,diversityAlgorithm:'LEAST_USED_START_LOCUS_V1',requiredStartAssurance:input.requiredStartAssurance||'QURAN_AYAH_BOUNDARY'};const constraintHash=hash(canonical(constraints));const seedCommitmentHash=hash(`${secret}|${constraintHash}|${allocation.record.setSignature}`);
     const questions=selected.map((b,index)=>{const passage=this.quran.resolvePassage({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah});return {index,questionId:b.id,payload:{version:'MIZAN-SERVER-QUESTION-1',questionId:b.id,surahNumber:b.surahNumber,surahNameArabic:passage.verses[0]?.sura_name_ar,surahNameEnglish:passage.verses[0]?.sura_name_en,startAyah:b.startAyah,endAyah:b.endAyah,juzNumber:b.juzNumber,difficultyRating:b.difficultyRating,mutashabihatDensity:b.mutashabihatDensity,tajweedComplexity:b.tajweedComplexity,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,quranSourcePackageId:input.sourcePackageId,quranSourcePackageHash:sourcePackageHash,pageNumber:Number(passage.verses[0]?.page||0)||undefined,lineStart:passage.verses[0]?.line_start,lineEnd:passage.verses[passage.verses.length-1]?.line_end||passage.verses[0]?.line_end,pageLoci:this.quran.resolvePassageLoci({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah}),locationAssurance:'KFGQPC_OFFICIAL_METADATA',officialSurfaceAuthority:'King Fahd Glorious Quran Printing Complex',officialSurfaceMode:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR',startLocusClass:b.startClass,startLocusAssurance:b.startLocusAssurance||'QURAN_AYAH_BOUNDARY',expectedTextArabic:passage.text,openingAyahArabic:passage.verses[0]?.aya_text}}});
     this.escrow.create({organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,requiredJudgeIds:input.requiredJudgeIds,approvalMode:input.approvalMode,minimumApprovals:input.minimumApprovals,expiresAt:input.expiresAt,questions});
-    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,...(input.participantScope?{participantScope:normalizeScope(input.participantScope),participantScopeVersion:input.participantScopeVersion,participantScopeSignature:scopeSignature(input.participantScope)}:{}),qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'},requestSignature};this.write(r);return this.publicState(r)
+    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,...(input.participantScope?{participantScope:normalizeScope(input.participantScope),participantScopeVersion:input.participantScopeVersion,participantScopeSignature:scopeSignature(input.participantScope)}:{}),crosswalkVersion:COMMITTEE_CROSSWALK_VERSION,quranDataVersion:DELIVERY_COUNT_EVIDENCE_BUILD.generatedArtifactSha256,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'},requestSignature};this.write(r);return this.publicState(r)
   }
   private verifyScopedActor(r:RuntimeRecord,actor:EscrowActor,allowGovernance=false){
     if(actor.organizationId!==r.organizationId)throw new Error('QUESTION_RUNTIME_ORGANIZATION_MISMATCH');

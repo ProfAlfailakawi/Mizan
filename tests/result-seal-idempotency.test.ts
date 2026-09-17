@@ -110,7 +110,9 @@ test('one tenant never sees another tenant seals', () => {
   const registry = new ResultSealRegistry(new MemorySealRegistryStore());
   registry.record(recordFor(sealResult(request()), 'org-1'));
   registry.record(recordFor(sealResult(request()), 'org-2'));
-  assert.equal(registry.findByInputs('org-2', 'comp-1', 'p-1', sealResult(request()).sealed!.inputsSha256)!.organizationId, 'org-2');
+  const probe = sealResult(request());
+  assert.ok('sealed' in probe);
+  assert.equal(registry.findByInputs('org-2', 'comp-1', 'p-1', probe.sealed.inputsSha256)!.organizationId, 'org-2');
   assert.equal(registry.sealersOf('org-1', 'comp-1').size, 1);
   assert.equal(registry.latestFor('org-3', 'comp-1', 'p-1'), undefined, 'a tenant with no seals sees nothing');
 });
