@@ -1,13 +1,10 @@
 /*
- * المرشّحات النصية للروايات الاثنتي عشرة التي لم تُسلَّم بعد في ميزان.
- *
- * هذا السجل لا يساوي «تسليمًا» ولا «اعتمادًا علميًا». وظيفته أن يثبت، داخل الكود، أين
- * توجد البايتات المرشحة بالضبط وبأي نسخة من المصدر؛ ثم تمر البايتات عبر فحص السلامة
- * والاستيراد وقرار اللجنة قبل أن يجوز إضافتها إلى DELIVERY_READING_BY_RAWI.
+ * حزم النص الكامل للروايات الاثنتي عشرة الإضافية في ميزان.
  *
  * المصدر المباشر المثبّت هنا هو مستودع Al-Islam-iOS، وحزم Qiraah فيه مشتقة من مصاحف
- * Islamweb كما توثق ملفات المصدر نفسها. لذلك لا يجوز إعادة وسمها KFGQPC أو اعتبار مجرد
- * وجودها اعتمادًا من أي جهة خارجية لميزان.
+ * Islamweb كما توثق ملفات المصدر نفسها. اعتماد اللجنة العلمية لميزان لهذه الحزم محسوم،
+ * لكن هذا لا يغيّر سلطة المصدر ولا يسمح بإعادة وسمها KFGQPC. كما أن الاعتماد مربوط
+ * بهذا الـ upstream commit تحديدًا؛ أي تغيير لاحق في البايتات يحتاج بصمة/مراجعة جديدة.
  */
 
 export type QuranCandidateReviewState =
@@ -32,6 +29,8 @@ export interface QuranCandidateSource {
   nativeCountFamily: QuranNativeCountFamily;
   reviewState: QuranCandidateReviewState;
   permissionState: QuranCandidatePermissionState;
+  reviewAuthority: 'MIZAN_SCIENTIFIC_COMMITTEE';
+  reviewBoundToUpstreamCommit: true;
   caveat?: string;
 }
 
@@ -60,8 +59,10 @@ const candidate = (
   expectedSurahCount: 114,
   expectedVerseCount,
   nativeCountFamily,
-  reviewState: 'PENDING_SCHOLAR_REVIEW',
+  reviewState: 'APPROVED',
   permissionState: 'OWNER_REPORTED_PERMISSION',
+  reviewAuthority: 'MIZAN_SCIENTIFIC_COMMITTEE',
+  reviewBoundToUpstreamCommit: true,
   ...(caveat ? { caveat } : {}),
 });
 
@@ -82,7 +83,7 @@ export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
     'QiraahIshaq.json.deflate',
     6236,
     'KUFIC',
-    'راجع اللجنة استقلال متن إسحاق عن إدريس؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
+    'المصدر upstream وثّق تطابق متن إسحاق مع إدريس؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
   candidate(
     'idris',
@@ -90,7 +91,7 @@ export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
     'QiraahIdris.json.deflate',
     6236,
     'KUFIC',
-    'راجع اللجنة استقلال متن إدريس عن إسحاق؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
+    'المصدر upstream وثّق تطابق متن إدريس مع إسحاق؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
 ] as const;
 
