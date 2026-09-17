@@ -24,12 +24,15 @@ import type {
   JudgeProfile,
   JudgeSubmission,
   Participant,
+  Organization,
   ResultRecord,
   ReviewCase,
+  SupportSession,
 } from '../types';
 import type { AppStoreState } from '../lib/store-state';
 import {
   SEED_APPEALS,
+  SEED_ORGANIZATION,
   SEED_AUDIT_LOGS,
   SEED_CATEGORIES,
   SEED_CERTIFICATE,
@@ -220,6 +223,9 @@ function demoParticipants(committees: Committee[]): Participant[] {
       assignedCommitteeId: status === 'submitted' || status === 'approved' ? undefined : committee.id,
       queueNumber: inQueue ? 1 + (index % 20) : undefined,
       originalQueueNumber: inQueue ? 1 + (index % 20) : undefined,
+      /* وفدٌ قائم: بوابة مدير الوفد تُرشّح على `delegation-current`، فبلا إسنادٍ
+         هنا كانت تفتح على قائمةٍ فارغة رغم وجود مئتين وأربعين متسابقًا. */
+      delegationId: index % 13 === 0 ? 'delegation-current' : undefined,
       checkedInAt: status === 'submitted' || status === 'approved' ? undefined : '2027-02-11T08:45:12Z',
       promisedWaitMinutes: inQueue ? 5 + Math.floor(random() * 40) : undefined,
     };
@@ -413,11 +419,68 @@ export function buildDemoUniverse(): DemoUniverse {
  * وحدها، ويصل إليها المخزن باستيرادٍ ديناميكي لا يُنفَّذ إلا إذا كانت راية الديمو
  * مرفوعة — فلا تدخل هذه البيانات حزمة نشرٍ حقيقي أصلًا.
  */
+/*
+ * جلسات الدعم — الوحيدة المربوطة بالوقت الحاضر لا بتاريخ المسابقة.
+ *
+ * لوحة الدعم تصنّف بالزمن النسبي: «جديدة» ما طُلب خلال ربع ساعة، و«مفتوحة» ما لم
+ * تنتهِ صلاحيته بعد. فتواريخ ٢٠٢٧ الثابتة كانت تُسقط كل شيء في خانةٍ واحدة وتترك
+ * البقية أصفارًا. ولهذا وحده تُبنى هذه السجلات من `Date.now()`، ويبقى كل ما عداها
+ * حتميًا كما هو.
+ */
+function demoSupportSessions(competitionId: string, organizationId: string): SupportSession[] {
+  const now = Date.now();
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
+  const rows: Array<[string, SupportSession['status'], number, number]> = [
+    ['تعذّر على رئيس اللجنة 3 فتح قائمة الختم بعد انقطاع الشبكة', 'requested', -4, 90],
+    ['طلب تدقيق سبب رفض تسليم محكّم في اللجنة 7', 'requested', -9, 120],
+    ['استفسار عن إعادة إصدار بطاقة متسابق فُقدت في القاعة', 'requested', -52, 60],
+    ['مرافقة فنية أثناء ضبط أجهزة اللجنة 5 بعد عودتها للخدمة', 'approved', -95, 240],
+    ['جلسة دعم جارية: مراجعة تسلسل الطابور بعد نقل متسابقَين', 'active', -35, 180],
+    ['أُغلقت: إعادة ضبط صوت اللجنة 2 — تم التحقق مع المشغّل', 'ended', -320, -140],
+  ];
+  return rows.map(([reason, status, createdMinutes, expiresMinutes], index) => ({
+    id: `sup-demo-${index + 1}`,
+    organizationId,
+    competitionId,
+    requestedBy: index % 2 === 0 ? 'usr-demo-comp_admin' : `usr-demo-head-${index + 1}`,
+    approvedBy: status === 'approved' || status === 'active' || status === 'ended' ? 'usr-demo-support_agent' : undefined,
+    reason,
+    status,
+    createdAt: at(createdMinutes),
+    updatedAt: status === 'requested' ? undefined : at(createdMinutes + 5),
+    expiresAt: at(expiresMinutes),
+  }));
+}
+
+/*
+ * جهةُ العرض — بمعرّفٍ خاصٍّ بها.
+ *
+ * كانت البيئة تُبقي جهةَ الإطلاق الفارغة (`org-pending-setup`)، ولوحةُ «مسابقات
+ * الجهة» تُخفي عمدًا كل مسابقةٍ تتبعها لأنها مسوّدة الإقلاع. فمن دخل بدور مدير
+ * الجهة أو مدير الفرع رأى صفرًا وثلاثة أصفار، والمسابقة كاملةٌ خلف الشاشة.
+ *
+ * والمعرّف ليس معرّف البذرة المتقاعدة (`org-gqa-global`) ولا مسوّدة الإقلاع:
+ * معرّفٌ ثالث لا يلتبس بأيٍّ منهما، فلا يقع تحت حارس بقايا البذرة ولا تحت إخفاء
+ * المسوّدة.
+ */
+const DEMO_ORGANIZATION_ID = 'org-demo-mizan';
+
+function demoOrganization(): Organization {
+  return {
+    ...clone(SEED_ORGANIZATION),
+    id: DEMO_ORGANIZATION_ID,
+    name: 'MIZAN Demo Competition Authority',
+    nameArabic: 'جهة ميزان التجريبية للمسابقات القرآنية',
+  };
+}
+
 export function buildDemoInitialState(base: AppStoreState): AppStoreState {
   const universe = buildDemoUniverse();
+  const organization = demoOrganization();
   const competition = {
     ...base.competition,
     id: SEED_COMPETITION.id,
+    organizationId: organization.id,
     name: SEED_COMPETITION.name,
     nameArabic: SEED_COMPETITION.nameArabic,
     edition: SEED_COMPETITION.edition,
@@ -443,11 +506,14 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
       nameArabic: 'مدير المسابقة (بيئة تجريبية)',
       email: 'demo.director@mizan.test',
       role: 'comp_admin',
-      organizationId: base.organization.id,
+      organizationId: organization.id,
     } as AppStoreState['currentUser'],
+    organization,
+    organizations: [organization],
     competition,
     competitions: [competition],
-    participants: universe.participants,
+    // المتسابق يتبع جهة العرض لا جهة البذرة المتقاعدة.
+    participants: universe.participants.map(participant => ({ ...participant, organizationId: organization.id })),
     committees: universe.committees,
     judges: universe.judges,
     results: universe.results,
@@ -457,5 +523,6 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     incidents: universe.incidents,
     reviewCases: universe.reviewCases,
     certificates: universe.certificates,
+    supportSessions: demoSupportSessions(competition.id, organization.id),
   };
 }
