@@ -8,6 +8,9 @@
 MIZAN_GEMINI_API_KEY=<المفتاح> node scripts/generate-cue-audio.mjs
 ```
 
+الصوت الافتراضي `Algenib`، وهو صوت رجل سمعته الجهة وأقرّته. ويُبدَّل بمتغيّر البيئة
+`MIZAN_CUE_TTS_VOICE` — ولا يُثبَّت بديلٌ في الكود قبل أن يُسمع.
+
 تُحفظ باسم `cue-0.wav` … `cue-7.wav` بترتيب العبارات نفسه في
 `TRANSITION_PHRASES_AR` (src/lib/judging-integrity.ts)، فيوافق الصوتُ النصَّ المعروض.
 
