@@ -221,6 +221,13 @@ export interface AppStoreState {
    * فيُعرَض السبب الواحد الحقيقي.
    */
   lastSessionStartFailure?: string;
+  /**
+   * آخرُ مانعٍ تجاري بلّغ به الخادم (حدُّ متسابقين، حدُّ مسابقات نشطة، جهةٌ موقوفة).
+   *
+   * القياس لا يوقف تسجيلًا قائمًا، لكنه لا يُبتلع أيضًا: يُحفظ هنا ليقرأه فحصُ ما قبل
+   * الانطلاق ولوحةُ الإدارة، فيُعرف أن الجهة بلغت حدّها قبل يوم المسابقة لا بعده.
+   */
+  lastEntitlementIssue?: string;
 }
 
 /** localStorage key for the persisted MIZAN runtime snapshot. */
