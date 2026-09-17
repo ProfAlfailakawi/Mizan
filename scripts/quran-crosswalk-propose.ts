@@ -32,7 +32,15 @@ export const CROSSWALK_PROPOSAL_ALGORITHM = 'MIZAN-CROSSWALK-PROPOSAL-1/myers-wo
 const KUFIC_REFERENCE = 'khalaf-hamzah';
 const TARGETS = ['hisham', 'ibn-dhakwan', 'ibn-wardan', 'ibn-jammaz', 'ruways', 'rawh'] as const;
 
-const MARKS = /[ً-ٰٟۖ-ۭـ۟-۪ۨ-ࣰۭ-ࣿؖ-ؚ]/g;
+/*
+ * علامات الضبط التي تُجرَّد للمقارنة وحدها.
+ *
+ * تُكتب بترميز الوحدات لا بالمحارف نفسها: المحرف هنا غير مرئي في المحرِّر، فمديان
+ * متداخلان يمرّان بلا أن يراهما مراجع. وكان الصنف يحوي 06DF-06E8 و06EA-06ED وهما
+ * داخل 06D6-06ED أصلًا — زيادةٌ لا أثر لها في النتيجة (المجموعة 68 محرفًا قبل وبعد)
+ * لكنها تُوهم بقصدٍ ليس هناك. حُذفت، والمجموعة هي هي.
+ */
+const MARKS = /[\u0616-\u061A\u064B-\u065F\u0670\u0640\u06D6-\u06ED\u08F0-\u08FF]/g;
 /** طبقة مقارنة فقط — لا تمسّ نصّ العرض ولا تُخزَّن. */
 const skeleton = (value: string) => value.replace(MARKS, '')
   .replace(/[آأإاٱٲٳٵ]/g, 'ا')
