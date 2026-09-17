@@ -26,6 +26,17 @@ export interface RuntimeProvisionInput {
 export type RuntimeReplacementState='NONE'|'AUTHORIZED'|'PENDING_PANEL_QUORUM'|'CONSUMED'|'EXPIRED'|'REVOKED';
 export interface RuntimeRecord {
   version:3;organizationId:string;competitionId:string;sessionId:string;participantId:string;committeeId:string;createdAt:string;sourcePackageId:string;sourcePackageHash:string;poolId:string;
+  /*
+   * بصمةُ الطلب الذي أنشأ هذه الجلسة.
+   *
+   * نداءُ التهيئة قد يتكرّر بلا خطأٍ من أحد: انقطاعُ شبكةٍ بعد نجاح الخادم، أو إعادةُ
+   * محاولةٍ تلقائية، أو ضغطةٌ مزدوجة. وكان التكرار يرمي `SESSION_EXISTS` فيقف المنظّم
+   * أمام خطأٍ في قاعةٍ مفتوحة والجلسةُ في الحقيقة جاهزة.
+   *
+   * فالبصمةُ تفرّق بين الحالتين: نفسُ الطلب يعود بنفس الجلسة بلا سؤالٍ ثانٍ ولا ظرفٍ
+   * ثانٍ ولا حدثِ تدقيقٍ ثانٍ؛ وطلبٌ مختلفٌ بنفس المعرّف تعارضٌ حقيقي فيُردّ باسمه.
+   */
+  requestSignature?:string;
   participantScope?:QuranScope;participantScopeVersion?:number;participantScopeSignature?:string;
   qiraah:string;rawi:string;tariq?:string;algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2';ruleVersion:'SERVER_POLICY_V2';seedCommitmentHash:string;seedSecret:string;poolSnapshotHash:string;constraintHash:string;diversityMetrics:{eligibleUniqueStartLoci:number;previousParticipants:number;reusedLoci:number;pageOpeningCount:number;midPageCount:number;globalUniqueCoverageGuaranteed:boolean;requiredUniqueLociForFullField?:number};
   selectedBlueprintIds:string[];retiredBlueprintIds:string[];
@@ -81,8 +92,56 @@ export class SecureQuestionRuntimeRepository {
     const replacement={...r.emergencyReplacement,judgeApprovals:(r.emergencyReplacement.judgeApprovals||[]).length};
     return {version:r.version,sessionId:r.sessionId,competitionId:r.competitionId,participantId:r.participantId,committeeId:r.committeeId,sourcePackageId:r.sourcePackageId,sourcePackageHash:r.sourcePackageHash,qiraah:r.qiraah,rawi:r.rawi,tariq:r.tariq,algorithmVersion:r.algorithmVersion,seedCommitmentHash:r.seedCommitmentHash,poolSnapshotHash:r.poolSnapshotHash,constraintHash:r.constraintHash,questionCount:r.selectedBlueprintIds.length,diversityMetrics:r.diversityMetrics,emergencyReplacement:replacement,escrow:this.escrow.publicState(this.escrow.internalRecord(r.sessionId))};
   }
+  /*
+   * ما يجعل الطلبَ هو هو.
+   *
+   * `expiresAt` خارجُه عمدًا: إعادةُ المحاولة تحمل وقتًا أحدث بطبيعتها، وليست انتهاءُ
+   * الصلاحية جزءًا من هوية الجلسة. وما عداه داخلٌ، فتغيُّرُ أيِّ قيدٍ حقيقيّ — النطاق،
+   * الحزمة، عدد الأسئلة، المحكّمون — يجعله طلبًا آخر لا إعادةَ محاولة.
+   */
+  private requestSignature(input:RuntimeProvisionInput){
+    const {expiresAt:_ignored,...identity}=input;
+    return hash(canonical({...identity,participantScope:input.participantScope?normalizeScope(input.participantScope):undefined}));
+  }
+
+  private lockFile(sessionId:string){return `${this.file(sessionId)}.lock`}
+
   provision(input:RuntimeProvisionInput){
-    if(fs.existsSync(this.file(input.sessionId)))throw new Error('QUESTION_RUNTIME_SESSION_EXISTS');if(input.questionCount<1||input.questionCount>20)throw new Error('QUESTION_RUNTIME_INVALID_COUNT');
+    const signature=this.requestSignature(input);
+    const existing=this.provisionedOrNull(input.sessionId,signature);
+    if(existing)return existing;
+    /*
+     * قفلٌ حصريّ بين نداءين متزامنين بنفس المعرّف.
+     *
+     * بلا قفلٍ يمرّ الاثنان من فحص الوجود معًا فيكتب كلٌّ منهما ظرفًا وأسئلة، فتُخلق
+     * جلستان لمعرّفٍ واحد وتضيع إحداهما بلا أثر. والإنشاءُ بـ`wx` ذرّيٌّ على نظام الملفات.
+     */
+    const lock=this.lockFile(input.sessionId);
+    let handle:number;
+    try{handle=fs.openSync(lock,'wx',0o600)}
+    catch(err){
+      if((err as NodeJS.ErrnoException).code!=='EEXIST')throw err;
+      const concurrent=this.provisionedOrNull(input.sessionId,signature);
+      if(concurrent)return concurrent;
+      throw new Error('QUESTION_RUNTIME_SESSION_IN_PROGRESS');
+    }
+    try{return this.provisionLocked(input,signature)}
+    finally{fs.closeSync(handle);try{fs.unlinkSync(lock)}catch{/* أُزيل بالفعل */}}
+  }
+
+  /**
+   * الجلسة القائمة لهذا المعرّف إن كانت **نفسَ** الطلب. وإلا فتعارضٌ يُرمى باسمه، وسجلٌّ
+   * قديمٌ بلا بصمة لا يُدَّعى أنه نفس الطلب — لا يُثبت ما لا يُعرف.
+   */
+  private provisionedOrNull(sessionId:string,signature:string){
+    if(!fs.existsSync(this.file(sessionId)))return null;
+    const record=this.read(sessionId);
+    if(record.requestSignature&&record.requestSignature===signature)return this.publicState(record);
+    throw new Error('QUESTION_RUNTIME_SESSION_EXISTS');
+  }
+
+  private provisionLocked(input:RuntimeProvisionInput,requestSignature:string){
+    if(input.questionCount<1||input.questionCount>20)throw new Error('QUESTION_RUNTIME_INVALID_COUNT');
     const source=this.quran.manifest(input.sourcePackageId);if(source.scientificApproval.state!=='CERTIFIED')throw new Error('QUESTION_RUNTIME_SOURCE_NOT_CERTIFIED');if(!same(source.qiraah,input.qiraah)||!same(source.rawi,input.rawi)||!!input.tariq&&!same(source.tariq,input.tariq))throw new Error('QUESTION_RUNTIME_READING_SOURCE_MISMATCH');
     if(input.participantScope&&scopeAyahCount(input.participantScope)===0)throw new Error('QUESTION_RUNTIME_PARTICIPANT_SCOPE_EMPTY');
     const pool=this.pools.load(input.competitionId,input.poolId),eligibleRaw=eligiblePool(pool,input,new Set());if(eligibleRaw.length<input.questionCount)throw new Error('QUESTION_RUNTIME_INSUFFICIENT_ELIGIBLE_POOL');
@@ -95,7 +154,7 @@ export class SecureQuestionRuntimeRepository {
     const constraints={questionCount:input.questionCount,maxJuz:input.maxJuz,participantScopeSignature:input.participantScope?scopeSignature(input.participantScope):undefined,participantScopeVersion:input.participantScopeVersion,targetDifficulty:input.targetDifficulty,difficultyTolerance:input.difficultyTolerance,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,sourcePackageHash,poolSnapshotHash,expectedParticipantCount:input.expectedParticipantCount,diversityAlgorithm:'LEAST_USED_START_LOCUS_V1',requiredStartAssurance:input.requiredStartAssurance||'QURAN_AYAH_BOUNDARY'};const constraintHash=hash(canonical(constraints));const seedCommitmentHash=hash(`${secret}|${constraintHash}|${allocation.record.setSignature}`);
     const questions=selected.map((b,index)=>{const passage=this.quran.resolvePassage({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah});return {index,questionId:b.id,payload:{version:'MIZAN-SERVER-QUESTION-1',questionId:b.id,surahNumber:b.surahNumber,surahNameArabic:passage.verses[0]?.sura_name_ar,surahNameEnglish:passage.verses[0]?.sura_name_en,startAyah:b.startAyah,endAyah:b.endAyah,juzNumber:b.juzNumber,difficultyRating:b.difficultyRating,mutashabihatDensity:b.mutashabihatDensity,tajweedComplexity:b.tajweedComplexity,qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,quranSourcePackageId:input.sourcePackageId,quranSourcePackageHash:sourcePackageHash,pageNumber:Number(passage.verses[0]?.page||0)||undefined,lineStart:passage.verses[0]?.line_start,lineEnd:passage.verses[passage.verses.length-1]?.line_end||passage.verses[0]?.line_end,pageLoci:this.quran.resolvePassageLoci({packageId:input.sourcePackageId,surah:b.surahNumber,startAyah:b.startAyah,endAyah:b.endAyah}),locationAssurance:'KFGQPC_OFFICIAL_METADATA',officialSurfaceAuthority:'King Fahd Glorious Quran Printing Complex',officialSurfaceMode:'UTHMANIC_TEXT_WITH_PAGE_ANCHOR',startLocusClass:b.startClass,startLocusAssurance:b.startLocusAssurance||'QURAN_AYAH_BOUNDARY',expectedTextArabic:passage.text,openingAyahArabic:passage.verses[0]?.aya_text}}});
     this.escrow.create({organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,requiredJudgeIds:input.requiredJudgeIds,approvalMode:input.approvalMode,minimumApprovals:input.minimumApprovals,expiresAt:input.expiresAt,questions});
-    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,...(input.participantScope?{participantScope:normalizeScope(input.participantScope),participantScopeVersion:input.participantScopeVersion,participantScopeSignature:scopeSignature(input.participantScope)}:{}),qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'}};this.write(r);return this.publicState(r)
+    const r:RuntimeRecord={version:3,organizationId:input.organizationId,competitionId:input.competitionId,sessionId:input.sessionId,participantId:input.participantId,committeeId:input.committeeId,createdAt:new Date().toISOString(),sourcePackageId:input.sourcePackageId,sourcePackageHash,poolId:input.poolId,...(input.participantScope?{participantScope:normalizeScope(input.participantScope),participantScopeVersion:input.participantScopeVersion,participantScopeSignature:scopeSignature(input.participantScope)}:{}),qiraah:input.qiraah,rawi:input.rawi,tariq:input.tariq,algorithmVersion:'MIZAN-SERVER-FAIRDRAW-2',ruleVersion:'SERVER_POLICY_V2',seedCommitmentHash,seedSecret:secret,poolSnapshotHash,constraintHash,diversityMetrics:allocation.metrics,selectedBlueprintIds:selected.map(x=>x.id),retiredBlueprintIds:[],emergencyReplacement:{state:'NONE'},requestSignature};this.write(r);return this.publicState(r)
   }
   private verifyScopedActor(r:RuntimeRecord,actor:EscrowActor,allowGovernance=false){
     if(actor.organizationId!==r.organizationId)throw new Error('QUESTION_RUNTIME_ORGANIZATION_MISMATCH');

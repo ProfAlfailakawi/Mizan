@@ -812,6 +812,15 @@ export interface ResultRecord {
   sealMetadata?: {
     sealedBy: string;
     sealedById?: string;
+    /**
+     * هويةُ المصادقة التي ختمت — لا معرّف سجلّ ميزان.
+     *
+     * فصلُ المهامّ (من يختم لا ينشر) كان مفروضًا في العميل وحده، وحارسٌ في العميل ليس
+     * حارسًا: عميلٌ مزوَّر ينشر ما ختمه. وقواعد Firestore لا تستطيع مقارنة `sealedById`
+     * بهوية الطالب لأن الأول معرّف سجلّ (`usr-…`) والثانية `request.auth.uid`. فيُسجَّل
+     * الـuid هنا عند الختم، فتقارنه القاعدة وترفض النشرَ من الخاتم نفسه على الخادم.
+     */
+    sealedByUid?: string;
     sealedAt: string;
     cryptographicChecksum: string;
     dualApprovalBy?: string;
