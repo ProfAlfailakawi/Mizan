@@ -34,7 +34,8 @@
     "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs",
     "qa:venue-legibility": "node scripts/venue-legibility-audit.mjs --panels=10",
     "qa:firestore-rules": "firebase emulators:exec --only firestore --project mizan-rules-test \"tsx --test tests/firestore-rules-*.test.ts tests/firestore-rest-adapter.test.ts\"",
-    "production-audit": "node scripts/production-runtime-audit.mjs"
+    "production-audit": "node scripts/production-runtime-audit.mjs",
+    "config:validate": "tsx scripts/config-validate.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",
