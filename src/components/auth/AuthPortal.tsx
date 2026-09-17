@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
 import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, signInWithEmailAndPassword, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from 'firebase/auth';
-import { KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { FlaskConical, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, enterDemoSession } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { serverErrorLabel } from '../../lib/ui-language';
@@ -113,6 +113,15 @@ export const AuthPortal:React.FC=()=>{
     <Button className="w-full mt-5" disabled={busy||!email||!password||(activating&&!existingMode&&!confirmPassword)} onClick={()=>void(activating&&!existingMode?createInvitedAccount():signIn())} icon={<ShieldCheck className="w-4 h-4"/>}>{busy?'…':activating&&!existingMode?(ar?'إنشاء حسابي وتفعيله':'Create & activate my account'):(ar?'دخول آمن':'Sign in')}</Button>
     {activating&&<button onClick={()=>{setExistingMode(v=>!v);setPassword('');setConfirmPassword('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{existingMode?(ar?'هذا أول حساب لي — اختر كلمة مرور جديدة':'This is my first account — choose a new password'):(ar?'لدي حساب بهذا البريد':'I already have an account with this email')}</button>}
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-11 mt-2 text-xs font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
+    {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
+        تُفتح بضغطةٍ صريحة فقط، ولها مفتاح تخزينها الخاص داخل هذا التبويب. */}
+    {!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
+     <button type="button" onClick={()=>enterDemoSession()} className="w-full min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-[#d8b86a] bg-[#faf3e2] px-4 text-xs font-black text-[#8a6a1c] transition hover:bg-[#f6ebd3]">
+      <FlaskConical className="w-4 h-4"/>
+      <span>{ar?'استعراض النظام ببيانات تجريبية':'Explore with demo data'}</span>
+     </button>
+     <p className="mt-2 text-center text-[10px] font-semibold leading-5 text-[#636864]">{ar?'بيئة معزولة ببيانات مصطنعة — لا تتصل بأي مسابقة أو جهة حقيقية.':'An isolated environment of synthetic data — not connected to any real competition.'}</p>
+    </div>}
    </>}
   </div>
  </div></div>

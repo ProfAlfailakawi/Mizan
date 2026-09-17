@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { SEED_COMPETITION, SEED_PARTICIPANTS } from './fixtures/seed-data';
+import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/data/seed-data';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
 import type { Category, Participant, QuestionModelRecord } from '../src/types';
 import { fullQuranScope, scopeFromJuz, scopeFromJuzRange, scopeAyahCount, scopeSignature, describeScope, isScopeSubsetOf } from '../src/lib/quran-scope';

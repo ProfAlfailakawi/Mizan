@@ -34,9 +34,9 @@ import {
   FairDrawProofRecord,
   FeatureFlagRecord,
   User
-} from '../../src/types';
-import { fullQuranScope, scopeFromJuz, scopeSignature } from '../../src/lib/quran-scope';
-import type { ParticipantScopeRecord } from '../../src/lib/participant-scope';
+} from '../types';
+import { fullQuranScope, scopeFromJuz, scopeSignature } from '../lib/quran-scope';
+import type { ParticipantScopeRecord } from '../lib/participant-scope';
 import { DEVELOPMENT_QUESTION_BANK } from './development-question-bank';
 
 export const SEED_ORGANIZATION: Organization = {
