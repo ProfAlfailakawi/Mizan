@@ -26,6 +26,8 @@ import { audioProfileForReading, LISTEN_BUTTON_LABEL_AR } from '../src/lib/globa
 import { crosswalkCoverage, isReadingQuestionSafe, readingQuestionBlockers } from '../src/lib/quran-locus-crosswalk';
 import { countSystemForReading } from '../src/lib/reading-count-systems';
 import { candidateSourceForRawi, resolveCandidateReviewState } from '../src/lib/quran-candidate-sources';
+import { nativeAyahCountOf } from '../src/lib/quran-native-count-systems';
+import { ayahCountOf, surahNameArabic } from '../src/lib/quran-canon';
 import { KFGQPC_DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';
 import { islamwebArtifactPresent, loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 
@@ -162,10 +164,33 @@ function markdown(rows: ReadingRow[]): string {
   return [head, sep, ...body].join('\n');
 }
 
+/*
+ * قائمة عمل اللجنة: لا تقول «غير جاهز»، بل تقول أي سورةٍ بعينها تحتاج حسمًا، وكم آيةً
+ * في العدّين. هذه هي المسافة الدقيقة بين الحال وبين عشرينَ جاهزة.
+ */
+function worklist(rows: ReadingRow[]) {
+  const blocked = rows.filter(r => r.surahsRequiringEvidence.length);
+  console.log('جسر المواضع — ما يحتاج قرار اللجنة');
+  console.log(`الروايات المعلّقة: ${blocked.length}/${rows.length}\n`);
+  for (const row of blocked) {
+    console.log(`${row.labelArabic} (${row.rawiId}) — نظام العدّ ${row.countSystem}: ${row.surahsRequiringEvidence.length} سورة، ${row.crosswalkUnresolved} موضعًا`);
+    for (const surah of row.surahsRequiringEvidence) {
+      const canonical = ayahCountOf(surah);
+      const native = nativeAyahCountOf(row.countSystem as never, surah);
+      const delta = native - canonical;
+      console.log(`    سورة ${String(surah).padStart(3)} ${surahNameArabic(surah).padEnd(12)} قانوني ${String(canonical).padStart(3)} ← أصلي ${String(native).padStart(3)}  (${delta > 0 ? '+' : ''}${delta})`);
+    }
+    console.log('');
+  }
+  if (!blocked.length) console.log('  — لا شيء: الجسر مكتملٌ للعشرين.');
+  console.log('تُضاف القرارات إلى src/lib/quran-crosswalk-evidence.ts بمرجعٍ منصوص لكل صفّ.');
+}
+
 function main() {
   const report = build();
   const s = report.summary;
   if (process.argv.includes('--markdown')) { console.log(markdown(report.readings)); return; }
+  if (process.argv.includes('--worklist')) { worklist(report.readings); return; }
 
   console.log('MIZAN Quran Release — القراءات العشرون');
   console.log(`  canonical identities        : ${s.canonicalIdentities}/${s.total}`);

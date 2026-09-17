@@ -24,6 +24,7 @@ import { CANONICAL_READING_BY_RAWI, CANONICAL_RAWI_IDS, resolveCanonicalRawiId }
 import { QURAN_SURAH_TOTAL, ayahCountOf, isValidLocus, type QuranLocus } from './quran-canon';
 import { countSystemForReading } from './reading-count-systems';
 import { nativeAyahCountOf } from './quran-native-count-systems';
+import { COMMITTEE_CROSSWALK_ROWS, COMMITTEE_CROSSWALK_VERSION } from './quran-crosswalk-evidence';
 
 /** نوع العلاقة بين الإحداثي القانوني وترقيم الرواية. */
 export type CrosswalkRelation =
@@ -295,7 +296,11 @@ export function crosswalkCoverageMatrix(table: QuranCrosswalkTable = MIZAN_IDENT
 }
 
 /**
- * الجسر الافتراضي لميزان: فارغٌ قصدًا. لا يُختلق فيه صفٌّ لأي رواية؛ يُحمَّل من مصادر
- * اللجنة المعتمدة حين تصل، فيصير الانتقال مبنيًّا على دليلٍ لا على افتراض.
+ * جسر ميزان العامل: يُبنى من صفوف اللجنة المعتمدة في `quran-crosswalk-evidence`.
+ * وهي فارغةٌ اليوم، فما خالف عدُّه العدَّ القانوني يبقى `UNRESOLVED` — لا مختلَقًا.
+ * وبمجرّد وصول الصفوف بمراجعها تنتقل روايتها إلى «جاهزة للسؤال» بلا تعديل منطق.
  */
-export const MIZAN_IDENTITY_CROSSWALK = new QuranCrosswalkTable([], 'mizan-crosswalk-identity-v1');
+export const MIZAN_IDENTITY_CROSSWALK = new QuranCrosswalkTable(
+  [...COMMITTEE_CROSSWALK_ROWS],
+  COMMITTEE_CROSSWALK_VERSION,
+);

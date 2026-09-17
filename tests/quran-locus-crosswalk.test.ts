@@ -6,6 +6,7 @@ import {
   validateCrosswalkRow,
   MIZAN_IDENTITY_CROSSWALK,
   CrosswalkError,
+  crosswalkCoverage,
   type QuranLocusCrosswalk,
 } from '../src/lib/quran-locus-crosswalk';
 
@@ -20,7 +21,7 @@ const row = (over: Partial<QuranLocusCrosswalk> = {}): QuranLocusCrosswalk => ({
 
 test('the default Mizan crosswalk is deliberately empty — no invented mapping rows', () => {
   assert.equal(MIZAN_IDENTITY_CROSSWALK.size, 0);
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.mappingVersion, 'mizan-crosswalk-identity-v1');
+  assert.equal(MIZAN_IDENTITY_CROSSWALK.mappingVersion, 'mizan-crosswalk-committee-v0-empty');
   for (const rawiId of ['hafs', 'warsh', 'hisham', 'al-duri-kisai']) {
     assert.deepEqual(MIZAN_IDENTITY_CROSSWALK.rowsFor(rawiId), []);
   }
@@ -109,4 +110,47 @@ test('the reverse direction is never guessed — only evidence answers it', () =
 test('resolution fails closed for an unknown rawi — never falls back to another reading', () => {
   assert.throws(() => MIZAN_IDENTITY_CROSSWALK.toNative('not-a-rawi', { surah: 1, ayah: 1 }),
     (e: unknown) => e instanceof CrosswalkError && e.code === 'CROSSWALK_UNKNOWN_RAWI');
+});
+
+/*
+ * الطريق من «ست روايات معلّقة» إلى عشرينَ جاهزة يمرّ بقرار لجنةٍ لا بتعديل منطق. هذا
+ * الاختبار يثبت أن الآلة جاهزة للاستقبال: صفٌّ معتمدٌ واحد يحلّ موضعه فورًا، وصفٌّ بلا
+ * مرجع يُرفض، والملف اليوم فارغٌ قصدًا فلا يُدَّعى ما لم يصل.
+ */
+test('the committee evidence file is empty today and nothing pretends otherwise', async () => {
+  const { COMMITTEE_CROSSWALK_ROWS } = await import('../src/lib/quran-crosswalk-evidence');
+  assert.deepEqual([...COMMITTEE_CROSSWALK_ROWS], []);
+  assert.equal(MIZAN_IDENTITY_CROSSWALK.size, 0);
+  assert.equal(crosswalkCoverage('hisham').questionSafe, false);
+});
+
+test('one evidenced committee row resolves its own locus and only its own', () => {
+  const table = new QuranCrosswalkTable([
+    {
+      rawiId: 'hisham',
+      canonical: { surah: 99, ayah: 6 },
+      native: { surah: 99, ayahStart: 6, ayahEnd: 7 },
+      relation: 'SPLIT',
+      evidence: ['MIZAN-COMMITTEE-EXAMPLE-ROW'],
+    },
+  ], 'mizan-crosswalk-committee-test');
+
+  const resolved = table.toNative('hisham', { surah: 99, ayah: 6 });
+  assert.equal(resolved.assurance, 'EVIDENCED_ROW');
+  assert.equal(resolved.relation, 'SPLIT');
+  assert.deepEqual(resolved.native, { surah: 99, ayahStart: 6, ayahEnd: 7 });
+
+  // الجارُ في السورة نفسها يبقى مجهولًا: صفٌّ واحد لا يفتح سورةً كاملة.
+  assert.equal(table.toNative('hisham', { surah: 99, ayah: 7 }).assurance, 'UNRESOLVED');
+
+  // والتغطية تتحرّك بمقدار الصفّ الواحد لا أكثر، والسورة تبقى في قائمة ما يحتاج دليلًا.
+  const before = crosswalkCoverage('hisham');
+  const after = crosswalkCoverage('hisham', table);
+  assert.equal(after.resolvedLoci, before.resolvedLoci + 1);
+  assert.equal(after.unresolvedLoci, before.unresolvedLoci - 1);
+  assert.ok(after.surahsRequiringEvidence.includes(99));
+  assert.equal(after.questionSafe, false);
+
+  // ورواية أخرى لا تتأثّر بصفّ ليس لها.
+  assert.equal(table.toNative('ibn-dhakwan', { surah: 99, ayah: 6 }).assurance, 'UNRESOLVED');
 });
