@@ -79,16 +79,36 @@ export function sameReading(a:{qiraah?:string;rawi?:string;riwaya?:string},b:{qi
 export function isDuriAbuAmr(record:{qiraah?:string;rawi?:string;riwaya?:string}){return resolveReading(record)?.rawiId==='al-duri-abu-amr'}
 export function isDuriKisai(record:{qiraah?:string;rawi?:string;riwaya?:string}){return resolveReading(record)?.rawiId==='al-duri-kisai'}
 
-// الروايات التي نشر لها مجمع الملك فهد حزمًا رسمية مستقلة في مكتبة ميزان.
-// هذا يثبت سلطة المصدر العلمية؛ توفر البايتات محليًا يبقى شرطًا تشغيليًا لاحقًا للسحب/العرض، لا لفتح التسجيل.
 /*
- * الرواة الذين نملك نصّهم — قائمة واحدة.
+ * الرواة الذين نملك نصّهم مُسلَّمًا — قائمة واحدة.
  *
  * كانت هذه نسخةً ثالثة من الجدول نفسه، فوصلُ البزي وقنبل في طبقة التسليم ترك الجاهزية
  * خلفه: فئةٌ بإحداهما تُعلَن «بلا مصدر قرآني» وهي تعمل. فتُقرأ من مصدرها.
+ *
+ * وكان هذا السؤال يُسمّى `isKfgqpcOfficialReading` ويُقال في تعليقه إن وجودَ الحزمة
+ * «يثبت سلطة المصدر العلمية» — وهذا خلطٌ دلاليّ: وجودُ نصٍّ مُسلَّم عندنا لا يعني أن
+ * ناشره مجمع الملك فهد. التسليم شيء، وسلطةُ المصدر شيء، واعتمادُ الحزمة بالبصمة
+ * ومراجعَين شيء ثالث. فسُمّي السؤال باسم ما يقيسه فعلًا: هل نصّ هذه الرواية مُسلَّم؟
+ * وسؤالُ سلطةِ المصدر يُجاب من بيان المصدر نفسه لا من جدول التسليم.
  */
-const KFGQPC_OFFICIAL_RAWI_IDS=new Set<string>(DELIVERED_RAWI_IDS);
-export function isKfgqpcOfficialReading(input:{qiraah?:string;rawi?:string;riwaya?:string}){const r=resolveReading(input);return !!r&&KFGQPC_OFFICIAL_RAWI_IDS.has(r.rawiId)}
+const DELIVERED_TEXT_RAWI_IDS=new Set<string>(DELIVERED_RAWI_IDS);
+
+/** هل نملك نصًّا مُسلَّمًا لهذه الرواية؟ (لا يقول شيئًا عن ناشر المصدر ولا عن اعتماد الحزمة) */
+export function isReadingDelivered(input:{qiraah?:string;rawi?:string;riwaya?:string}){const r=resolveReading(input);return !!r&&DELIVERED_TEXT_RAWI_IDS.has(r.rawiId)}
+
+/**
+ * @deprecated اسمٌ موروث مضلّل: يقيس التسليم لا سلطةَ مجمع الملك فهد. استعمل
+ * `isReadingDelivered` للتسليم، و`isKfgqpcSourceAuthority` لسلطة المصدر.
+ */
+export const isKfgqpcOfficialReading=isReadingDelivered;
+
+/**
+ * سلطةُ المصدر تُقرأ من بيان المصدر نفسه — هذا هو السؤال الذي كان الاسم الموروث يوهم
+ * أنه يجيبه. لا علاقة له بجدول التسليم.
+ */
+export function isKfgqpcSourceAuthority(source:{sourceAuthority?:string}|undefined|null){
+  return String(source?.sourceAuthority||'').trim().toUpperCase()==='KFGQPC';
+}
 
 export async function computeQuranPackageHash(record:QuranSourceManifestRecord){
   return hashCanonical({

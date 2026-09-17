@@ -84,7 +84,7 @@ test('remaining requested clarity and responsive fixes are present',()=>{
  assert.doesNotMatch(portals,/ScientificGovernance/);
  assert.match(overview,/grid grid-cols-1 xl:grid-cols-2 gap-4 \[&>\*\]:min-w-0/);assert.match(overview,/grid grid-cols-1 xl:grid-cols-2 gap-3 \[&>\*\]:min-w-0/);
  /* الرسالة صارت تقول العائق الحقيقي: لا نصّ مُسلَّم لهذه الرواية، والمخرج اختيار رواية متاحة. */
- assert.match(readiness,/isKfgqpcOfficialReading/);assert.match(readiness,/لا يوجد نصٌّ مُسلَّم لرواية هذه الفئة/);
+ assert.match(readiness,/isReadingDelivered/);assert.match(readiness,/لا يوجد نصٌّ مُسلَّم لرواية هذه الفئة/);
  assert.doesNotMatch(readiness,/'scientific'/,'no check points at a screen that no longer exists');
- assert.match(compiler,/isKfgqpcOfficialReading/);
+ assert.match(compiler,/isReadingDelivered/);
 });

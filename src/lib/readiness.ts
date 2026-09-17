@@ -1,5 +1,5 @@
 import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
-import { sourceUsableForCompetition, certifiedCapabilityFor, isKfgqpcOfficialReading } from './scientific-core';
+import { sourceUsableForCompetition, certifiedCapabilityFor, isReadingDelivered } from './scientific-core';
 
 export type PreflightStatus='ready'|'warning'|'blocker';
 export interface PreflightCheck {id:string;labelAr:string;labelEn:string;consequenceAr:string;consequenceEn:string;status:PreflightStatus;fix:'competition_dna'|'field'|'integrations'|'backup'|'none'}
@@ -10,7 +10,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
  const configured=(kind:IntegrationConfig['kind'])=>integrations.some(i=>i.kind===kind&&i.enabled&&i.status==='configured');
  const check=(id:string,ok:boolean,warning:boolean,labelAr:string,labelEn:string,consequenceAr:string,consequenceEn:string,fix:PreflightCheck['fix']):PreflightCheck=>({id,labelAr,labelEn,consequenceAr,consequenceEn,status:ok?'ready':warning?'warning':'blocker',fix});
  const readyJudges=judges.filter(j=>j.isReady);
- const categoriesWithSource=c.categories.filter(cat=>isKfgqpcOfficialReading({riwaya:cat.riwaya})||quranSources.some(source=>sourceUsableForCompetition(source,{riwaya:cat.riwaya}).ok)).length;
+ const categoriesWithSource=c.categories.filter(cat=>isReadingDelivered({riwaya:cat.riwaya})||quranSources.some(source=>sourceUsableForCompetition(source,{riwaya:cat.riwaya}).ok)).length;
  const exactQuranSourceReady=c.categories.length>0&&categoriesWithSource===c.categories.length;
  const aiEnabled=p.aiPolicy?.mode&&p.aiPolicy.mode!=='AI_DISABLED';
  const aiScopeOk=!aiEnabled||c.categories.every(cat=>!p.aiPolicy.enabledCapabilities.word_alignment||!!certifiedCapabilityFor(aiValidations,{capability:'word_alignment',riwaya:cat.riwaya}));

@@ -78,7 +78,7 @@ import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
 import { can } from './permissions';
-import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isKfgqpcOfficialReading, detectModelChange, explicitConsentGranted } from './scientific-core';
+import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isReadingDelivered, detectModelChange, explicitConsentGranted } from './scientific-core';
 import { compilePolicyText, detectContradictions, policyCompilerSummary, applyApprovedCompilation } from './policy-compiler';
 import { validateVerseStructure, compareQuranRows, type QuranVerseRecord } from './quran-source-ingestion';
 import { buildJudgeIndependenceCommitment, buildParticipantFairnessEvidence, questionRevealReady, planQueueTransfer, queueOrderValue, recommendBalancedQueueMove } from './judging-integrity';
@@ -2700,7 +2700,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     const scientificBlockers=scientific.flatMap(({category,reading,source,content})=>{
       const out:{code:string;message:string;categoryId:string}[]=[];
       if(!reading)out.push({code:'CANONICAL_READING_MAPPING_REQUIRED',message:`${category.name}: reading is not mapped to the canonical qiraat graph.`,categoryId:category.id});
-      if(!source&&!isKfgqpcOfficialReading({riwaya:category.riwaya}))out.push({code:'CERTIFIED_QURAN_SOURCE_REQUIRED',message:`${category.name}: no official or internally certified Quran source for ${category.riwaya}.`,categoryId:category.id});
+      if(!source&&!isReadingDelivered({riwaya:category.riwaya}))out.push({code:'CERTIFIED_QURAN_SOURCE_REQUIRED',message:`${category.name}: no official or internally certified Quran source for ${category.riwaya}.`,categoryId:category.id});
       // فتح التسجيل لا يحتاج نص السؤال على جهاز الإدارة. توفر محتوى الحزمة يُفحص قبل FairDraw/جلسة التحكيم.
       if(source&&!content&&globalState.competition.status==='live')out.push({code:'CERTIFIED_QURAN_CONTENT_REQUIRED',message:`${category.name}: certified source content is not available for exact package ${source.packageHash||source.id}.`,categoryId:category.id});
       return out;
