@@ -3,7 +3,7 @@ import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, sig
 import { FlaskConical, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
-import { useAppStore, enterDemoSession } from '../../lib/store';
+import { useAppStore, enterDemoSession, DEMO_AVAILABLE } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { serverErrorLabel } from '../../lib/ui-language';
@@ -115,7 +115,7 @@ export const AuthPortal:React.FC=()=>{
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-11 mt-2 text-xs font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
     {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
         تُفتح بضغطةٍ صريحة فقط، ولها مفتاح تخزينها الخاص داخل هذا التبويب. */}
-    {!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
+    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
      <button type="button" onClick={()=>enterDemoSession()} className="w-full min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-[#d8b86a] bg-[#faf3e2] px-4 text-xs font-black text-[#8a6a1c] transition hover:bg-[#f6ebd3]">
       <FlaskConical className="w-4 h-4"/>
       <span>{ar?'استعراض النظام ببيانات تجريبية':'Explore with demo data'}</span>

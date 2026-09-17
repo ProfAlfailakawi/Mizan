@@ -198,6 +198,30 @@ function emptyInitialState(): AppStoreState {
 const DEMO_FLAG_KEY = 'mizan_demo_active_v1';
 const DEMO_STATE_KEY = `${STORAGE_KEY}__demo_v1`;
 
+/**
+ * هل يسمح هذا البناء بعرض الديمو أصلًا؟
+ *
+ * خيار إخراجٍ لا إدخال، وهذا مقصود: لا متغيّر بيئة يُشغّل الديمو — فلا يمكن لخطأٍ
+ * مطبعي في إعدادات نشرٍ أن يُظهره — وواحدٌ فقط يُخفيه. وميزان يُشغّل مسابقات حقيقية
+ * لجهات، وقد تشترط جهةٌ نشرةً لا يظهر فيها مدخل عرضٍ إطلاقًا؛ هذا هو المفتاح الذي
+ * يلبّي ذلك. والاسم مطابق لما تستعمله بقية البرامج المبنية على Vite حتى لا يختلف
+ * الإجراء من برنامج لآخر.
+ *
+ * `import.meta.env` قد لا يوجد خارج حزمة Vite (في Node، أو عاملٍ خلفي)، وقراءته حينها
+ * ترمي — والغياب ليس منعًا، فالافتراض متاح.
+ */
+function demoIsAvailable(): boolean {
+  try {
+    const env = typeof import.meta !== 'undefined' ? (import.meta.env as unknown as Record<string, unknown>) : undefined;
+    return env?.VITE_DISABLE_DEMO_MODE !== 'true';
+  } catch {
+    return true;
+  }
+}
+
+/** يسمح هذا النشر بعرض الديمو؟ تقرأه الواجهة لتُظهر المدخل أو تُخفيه. */
+export const DEMO_AVAILABLE = demoIsAvailable();
+
 function demoFlagIsSet(): boolean {
   try {
     return typeof window !== 'undefined' && window.sessionStorage.getItem(DEMO_FLAG_KEY) === 'true';
@@ -208,10 +232,12 @@ function demoFlagIsSet(): boolean {
 }
 
 /** هل هذا التبويب داخل البيئة التجريبية؟ يُقرأ مرة عند الإقلاع وتبقى الإجابة ثابتة. */
-export const IS_DEMO_SESSION = demoFlagIsSet();
+export const IS_DEMO_SESSION = DEMO_AVAILABLE && demoFlagIsSet();
 
 /** يفتح البيئة التجريبية في هذا التبويب. إعادة التحميل هي ما يجعل التحوّل كاملًا. */
 export function enterDemoSession(): boolean {
+  // نشرةٌ أُخفي فيها الديمو لا تفتحه ولو نُودي عليه برمجيًا.
+  if (!DEMO_AVAILABLE) return false;
   try {
     window.sessionStorage.setItem(DEMO_FLAG_KEY, 'true');
     window.sessionStorage.removeItem(DEMO_STATE_KEY);
