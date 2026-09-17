@@ -80,6 +80,19 @@ test('the lens prefers the measured band and keeps the estimate only as a fallba
   assert.match(surface, /const top=measured\?measured\.top\*100:textTop\+/);
 });
 
+test('the page actually measures its bands and hands them to every lens', () => {
+  /*
+   * القياس بلا توصيل تقديرٌ باسمٍ جديد: كانت `useLineBands` مبنيّة ولا يستدعيها أحد،
+   * فبقيت كل العدسات على الحساب الثابت والتظليل يقع قرب السطر لا عليه.
+   */
+  const surface = read('src/components/judge/OfficialMushafSurface.tsx');
+  assert.match(surface, /const bands=useLineBands\(url,audioSpot\?\.lineCount\|\|focus\.lineCount\|\|15\)/);
+  const lenses = surface.match(/<FocusLens /g) || [];
+  const wired = surface.match(/<FocusLens [^>]*bands=\{bands\}/g) || [];
+  assert.ok(lenses.length >= 3);
+  assert.equal(wired.length, lenses.length, 'a lens without bands falls back to the constant estimate silently');
+});
+
 /* ── ٣ — شاشة المحكّم بلا أدوات مراجعة ────────────────────────────────── */
 
 test('review and tracking tools are gone from the judge screen', () => {
