@@ -21,7 +21,17 @@ import { KfgqpcDeliveryRepository } from '../server/kfgqpc-delivery';
 import { MizanQuranDelivery } from '../server/quran-reading-delivery';
 import { QuranReadingSearch, QuranSearchError, type SearchRowSource } from '../server/quran-reading-search';
 
-/* طبقةُ تسليمٍ بلا شبكة: الروايات المثبَّتة تُقرأ من بايتاتها، والمرآة تعود null كما تعود فعلًا. */
+/*
+ * طبقةُ تسليمٍ بلا شبكة — **مضبوطةً لا مفترَضة**.
+ *
+ * `KfgqpcDeliveryRepository` يسقط إلى مرآةٍ مفتوحة على الشبكة حين لا يكون R2 مهيّأً. فما
+ * لم يُطفأ ذلك صراحةً، صار الاختبارُ يقيس بيئتَه لا شيفرتَه: يمرّ حيث لا شبكة ويسقط حيث
+ * توجد (أو العكس)، وهو أسوأ من اختبارٍ لا يوجد — لأنه يبدو حارسًا.
+ *
+ * فيُطفأ هنا، ويصير المُختبَر منصوصًا: **حين تتعذّر طبقة التسليم**، تفشل الرواية باسمها
+ * ولا يُسدّ مكانُها بنصِّ روايةٍ أخرى.
+ */
+process.env.MIZAN_DISABLE_RUNTIME_MIRROR = 'true';
 const offlineDelivery = () => new MizanQuranDelivery(new KfgqpcDeliveryRepository({}));
 const searchOver = (max = 2) => new QuranReadingSearch(offlineDelivery() as unknown as SearchRowSource, max);
 
@@ -93,6 +103,7 @@ test('display text is never normalised — normalisation belongs to matching onl
 });
 
 test('a reading whose package is unavailable fails by name — never with another reading text', async () => {
+  assert.equal(process.env.MIZAN_DISABLE_RUNTIME_MIRROR, 'true', 'this test is only meaningful with the mirror off');
   const search = searchOver(2);
   for (const rawiId of KFGQPC_DELIVERED_RAWI_IDS) {
     if (islamwebArtifactPresent(rawiId)) continue; // لا يُدَّعى نقصٌ حيث توجد بايتات
@@ -151,6 +162,7 @@ test('an empty query is refused rather than answered with everything', async () 
 });
 
 test('every one of the twenty readings has a defined search behaviour — found or named', async () => {
+  // بالمرآة مُطفأة: اثنتا عشرة تُبحث ببايتاتها، وثمانٍ تفشل باسمها. لا حالةَ ثالثة.
   const search = searchOver(2);
   const outcome: Record<string, 'SEARCHABLE' | 'UNAVAILABLE_BY_NAME'> = {};
   for (const rawiId of CANONICAL_RAWI_IDS) {
@@ -230,41 +242,30 @@ test('search results agree with the crosswalk about what is resolvable', async (
 
 test('a single-word search never builds phrase indexes it does not need', async () => {
   /*
-   * فهارسُ المقاطع أثقلُ ما في الطبقة: أربعُ خرائطَ بعشرات الآلاف من المفاتيح لكل رواية.
-   * وأكثرُ البحث كلمةٌ واحدة لا تحتاج منها شيئًا. فيُقاس هنا أثرُ ذلك على الذاكرة فعلًا،
-   * لا بالنيّة: تحميلُ الاثنتي عشرة ثم البحثُ بكلمةٍ واحدة يجب أن يبقى دون سقفٍ معقول.
+   * فهارسُ المقاطع أثقلُ ما في الطبقة: خريطةٌ بعشرات الآلاف من المفاتيح النصّية لكلِّ
+   * طول. وأكثرُ البحث كلمةٌ واحدة لا تحتاج منها شيئًا.
+   *
+   * ويُسأل الفهرسُ عن نفسه بدل قياس ذاكرةٍ يختلف من آلةٍ إلى آلة: بعد بحثٍ بكلمةٍ واحدة
+   * لا يكون قد بُني أيُّ فهرس مقاطع. حقيقةٌ حتمية لا رقمٌ يتأرجح.
    */
-  const { execFileSync } = await import('node:child_process');
-  const fsMod = await import('node:fs');
-  const pathMod = await import('node:path');
-  const root = process.cwd();
-  const probe = `
-import { CANONICAL_RAWI_IDS } from '${pathMod.join(root, 'src/lib/canonical-readings')}';
-import { islamwebArtifactPresent } from '${pathMod.join(root, 'server/islamweb-reading-packages')}';
-import { KfgqpcDeliveryRepository } from '${pathMod.join(root, 'server/kfgqpc-delivery')}';
-import { MizanQuranDelivery } from '${pathMod.join(root, 'server/quran-reading-delivery')}';
-import { QuranReadingSearch } from '${pathMod.join(root, 'server/quran-reading-search')}';
-async function main() {
-  const search = new QuranReadingSearch(new MizanQuranDelivery(new KfgqpcDeliveryRepository({})) as never, 2);
-  let searched = 0;
-  for (const rawiId of CANONICAL_RAWI_IDS) {
-    if (!islamwebArtifactPresent(rawiId)) continue;
-    await search.search(rawiId, 'الكتاب', { limit: 1 });
-    searched += 1;
-  }
-  console.log(JSON.stringify({ searched, rss: process.memoryUsage().rss, cached: search.cachedReadings().length }));
-}
-void main();
-`;
-  const file = pathMod.join(root, 'artifacts', 'search-memory-probe.ts');
-  fsMod.mkdirSync(pathMod.dirname(file), { recursive: true });
-  fsMod.writeFileSync(file, probe);
-  try {
-    const out = execFileSync('npx', ['tsx', file], { cwd: root, encoding: 'utf8', timeout: 300_000 });
-    const measured = JSON.parse(out.trim().split('\n').at(-1)!) as { searched: number; rss: number; cached: number };
-    assert.ok(measured.searched >= 12, `expected the twelve pinned readings, searched ${measured.searched}`);
-    assert.ok(measured.cached <= 2, 'the index cache stays bounded across every reading');
-    assert.ok(measured.rss < 900 * 1024 * 1024,
-      `searching all pinned readings must stay well under a gigabyte, measured ${(measured.rss / 1048576).toFixed(0)}MB`);
-  } finally { fsMod.rmSync(file, { force: true }); }
+  const rawiId = PINNED_WITH_BYTES[0];
+  const search = searchOver(1);
+  await search.search(rawiId, 'الكتاب', { limit: 1 });
+  assert.deepEqual(search.builtPhraseIndexSizes(rawiId), [], 'a one-word query builds no phrase index at all');
+
+  // ومقطعٌ من ثلاث كلمات يبني فهرس الثلاثة وحده — لا الأربعة ولا الخمسة.
+  const { phrase } = phraseFromOwnPackage(rawiId, 2, 2, 3);
+  await search.search(rawiId, phrase, { limit: 1 });
+  assert.deepEqual(search.builtPhraseIndexSizes(rawiId), [3], 'only the length actually asked for is indexed');
+
+  // ومقطعٌ من كلمتين يضيف فهرسَه ويبقي ما بُني.
+  const { phrase: two } = phraseFromOwnPackage(rawiId, 2, 2, 2);
+  await search.search(rawiId, two, { limit: 1 });
+  assert.deepEqual(search.builtPhraseIndexSizes(rawiId), [2, 3]);
+
+  // وتبديلُ الرواية يُسقط فهارسَها كلَّها، فلا تتراكم مصاحفُ من لا يُسأل عنه.
+  const other = PINNED_WITH_BYTES[1];
+  await search.search(other, phraseFromOwnPackage(other, 2, 2, 3).phrase, { limit: 1 });
+  assert.deepEqual(search.cachedReadings(), [other]);
+  assert.deepEqual(search.builtPhraseIndexSizes(rawiId), [], 'a released reading keeps nothing behind');
 });

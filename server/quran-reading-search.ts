@@ -94,6 +94,16 @@ export class QuranReadingSearch {
   /** الفهارس المحمَّلة الآن — تُقرأ في اختبارات الذاكرة ولوحة التشخيص. */
   cachedReadings(): string[] { return [...this.cache.keys()]; }
 
+  /**
+   * أطوالُ المقاطع التي بُني فهرسُها لهذه الرواية.
+   *
+   * تُقرأ لإثبات أن فهرسًا لم يُسأل عنه لم يُبنَ — وهي حقيقةٌ حتمية، بخلاف قياس ذاكرةٍ
+   * يختلف من آلةٍ إلى آلة ومن حِملٍ إلى حِمل.
+   */
+  builtPhraseIndexSizes(rawiId: string): number[] {
+    return [...(this.cache.get(rawiId)?.phraseIndexes.keys() ?? [])].sort((a, b) => a - b);
+  }
+
   /** يُسقط فهرس روايةٍ عند تبديل المتسابق، فلا تتراكم مصاحفُ من لا يُسأل عنه. */
   releaseReading(rawiId: string): boolean { return this.cache.delete(rawiId); }
   releaseAll(): void { this.cache.clear(); }

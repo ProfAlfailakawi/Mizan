@@ -91,3 +91,66 @@ export function breakTie(a: RankableResult, b: RankableResult, rules: readonly s
   }
   return 0;
 }
+
+export interface RankedOutcome<T extends RankableResult> {
+  result: T;
+  /** الرتبة التنافسية: المتساوون يتشاركون رتبةً واحدة، وتقفز التالية بعددهم (١، ١، ٣). */
+  rank: number;
+  /** `true` حين لم تحسم القواعدُ تساويَه مع غيره — تعادلٌ قائمٌ لا مفضوض. */
+  tied: boolean;
+}
+
+export interface UnresolvedTie {
+  /** الرتبة التي وقع عندها التعادل. */
+  rank: number;
+  /** الدرجة المتساوية. */
+  finalScore: number;
+  /** عدد المتعادلين عندها. */
+  count: number;
+}
+
+export interface RankingOutcome<T extends RankableResult> {
+  ranked: RankedOutcome<T>[];
+  /**
+   * التعادلاتُ التي لم تحسمها القواعد. تُعرض ولا تُفضّ بترتيب المصفوفة.
+   *
+   * وكان الترتيبُ يُسنَد بـ`i+1` بعد الفرز، فمتعادلان عند الصدارة يأخذ أحدُهما الأول
+   * والآخر الثاني — بحسب ترتيبهما في المصفوفة، أي بحسب ترتيب إدخالهما. وهذا حكمٌ
+   * صامتٌ على الصدارة لا سند له، ويظهر في شهادةٍ مطبوعة.
+   */
+  unresolvedTies: UnresolvedTie[];
+}
+
+/**
+ * يرتّب النتائج، ويُبقي ما لم تحسمه القواعد **معلنًا** بدل أن يفضّه بترتيب المصفوفة.
+ *
+ * القاعدةُ التي يحتاجها المالك (`additional_question`) لا تُخترع هنا: تُعامَل محايدةً في
+ * `breakTie`، فيظهر التعادلُ في `unresolvedTies` ليُحسم بإعادة اختبارٍ أو بقرارٍ مُسجَّل.
+ */
+export function rankResults<T extends RankableResult>(results: readonly T[], rules: readonly string[] = []): RankingOutcome<T> {
+  const sorted = [...results].sort((a, b) => (b.finalScore - a.finalScore) || breakTie(a, b, rules));
+  const ranked: RankedOutcome<T>[] = [];
+  const unresolvedTies: UnresolvedTie[] = [];
+
+  let index = 0;
+  while (index < sorted.length) {
+    // كلُّ من يساوي الأولَ في الدرجة ولا تحسمه القواعد ينتمي إلى هذه المجموعة.
+    let end = index + 1;
+    while (end < sorted.length
+      && Math.abs(sorted[end].finalScore - sorted[index].finalScore) < 1e-9
+      && breakTie(sorted[index], sorted[end], rules) === 0) end += 1;
+
+    const rank = index + 1;
+    const size = end - index;
+    for (let i = index; i < end; i += 1) ranked.push({ result: sorted[i], rank, tied: size > 1 });
+    if (size > 1) unresolvedTies.push({ rank, finalScore: sorted[index].finalScore, count: size });
+    index = end;
+  }
+
+  return { ranked, unresolvedTies };
+}
+
+/** هل يقع تعادلٌ غيرُ محسوم على مركزٍ من مراكز الصدارة؟ */
+export function topPositionTie(outcome: RankingOutcome<RankableResult>, topPositions = 3): UnresolvedTie | undefined {
+  return outcome.unresolvedTies.find(tie => tie.rank <= topPositions);
+}
