@@ -7,6 +7,7 @@ import {
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
 import { toWesternDigits } from '../../lib/input-normalize';
+import { GOVERNED_ROLES } from '../../lib/permissions';
 import {
   LiveJudgingSimulator,
   InteractiveEvolutionFlow,
@@ -250,7 +251,8 @@ export const MarketingSite: React.FC = () => {
       {/* ══ ٢) الأرقام: البرهان في سطر ══ */}
       <Section>
         <div className="mizan-hero grid grid-cols-2 md:grid-cols-4 gap-y-8 py-8">
-          <Stat value="14" label="دورًا بصلاحياتٍ مفصولة" />
+          {/* الرقم مشتقٌّ من ROLE_PERMISSIONS لا مكتوبٌ باليد — يحرسه marketing-claims.test.ts. */}
+          <Stat value={String(GOVERNED_ROLES.length)} label="دورًا بصلاحياتٍ مفصولة" />
           <Stat value="8" label="قدرات ذكاءٍ محكومة" />
           <Stat value="100%" label="قرارٍ مختوم في سجلٍّ متسلسل" />
           <Stat value="0" label="أوامر تكتبها لإطلاق جهة" />

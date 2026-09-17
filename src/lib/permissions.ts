@@ -21,5 +21,13 @@ const ROLE_PERMISSIONS: Partial<Record<Role, Permission[]>> = {
   support_agent: ['audit.read']
 };
 
+/*
+ * الأدوار التي لها مجموعة صلاحيات منصوصة — ومنها يُشتقّ الرقم المعروض في الموقع العام.
+ *
+ * كان الموقع يكتب «١٤ دورًا بصلاحياتٍ مفصولة» رقمًا محفورًا باليد، وصارت الأدوار ثمانية
+ * عشر فبقي الرقم يقول ما لم يبقَ صحيحًا. ورقمٌ في صفحةٍ تجارية لا يحرسه شيء يهرم وحده.
+ */
+export const GOVERNED_ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
+
 export function can(role: Role, permission: Permission) { return ROLE_PERMISSIONS[role]?.includes(permission) ?? false; }
 export function permissionsFor(role: Role) { return ROLE_PERMISSIONS[role] ?? []; }
