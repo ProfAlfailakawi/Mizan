@@ -5,8 +5,9 @@ import path from 'node:path';
 
 import { CROSSWALK_PROPOSAL_ALGORITHM, proposeForReading } from '../scripts/quran-crosswalk-propose';
 import { COMMITTEE_CROSSWALK_ROWS } from '../src/lib/quran-crosswalk-evidence';
-import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, isReadingQuestionSafe } from '../src/lib/quran-locus-crosswalk';
+import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, isReadingQuestionSafe, readingQuestionBlockers } from '../src/lib/quran-locus-crosswalk';
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
+import { PINNED_DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';
 
 /*
  * المقترح الآليّ أخطر ما في هذه الطبقة، لأنه يبدو جاهزًا. فيُحرَس بابُه من الجهتين:
@@ -85,12 +86,19 @@ test('every reading still blocked today is covered by the proposal targets', () 
 
   /*
    * خمسٌ من هذه الستّ حُسمت بأثرٍ مثبَّت لا بالمقترح، فبقاؤها في قائمة الأهداف لا يضرّ —
-   * المقترحُ ظِلٌّ لا يفعّل شيئًا. والذي يهمّ: ألّا تبقى روايةٌ محجوبةٌ خارج هذه القائمة،
-   * فلا يبقى حاجزٌ بلا أداةِ عرضٍ للجنة.
+   * المقترحُ ظِلٌّ لا يفعّل شيئًا.
+   *
+   * والمقترح لا يعمل إلا على روايةٍ نصُّها أثرٌ مثبَّتٌ داخل الشجرة، لأنه يحاذي نصَّين.
+   * فالروايات المخدومة من المرآة خارج مداه بنيويًّا، ولا يُدَّعى غير ذلك: المطلوب أن
+   * تكون **كلُّ** روايةٍ محجوبة إمّا مشمولةً بالمقترح وإمّا مسمّاةً بسببها في المصفوفة.
    */
   const blockedToday = CANONICAL_RAWI_IDS.filter(rawiId => !isReadingQuestionSafe(rawiId));
-  assert.deepEqual(blockedToday, ['rawh'], 'only Rawh remains without a proved boundary mapping');
+  assert.deepEqual(blockedToday.sort(),
+    ['al-bazzi', 'al-duri-abu-amr', 'al-susi', 'qunbul', 'rawh'].sort());
   for (const rawiId of blockedToday) {
-    assert.ok(targets.includes(rawiId), `${rawiId} is blocked but no proposal is produced for it`);
+    const covered = targets.includes(rawiId) || !PINNED_DELIVERED_RAWI_IDS.includes(rawiId);
+    assert.ok(covered, `${rawiId} is blocked, has a pinned artifact, and yet no proposal is produced for it`);
+    // ومهما كان سببُ الحجب فهو مسمًّى بسورته، لا «غير جاهز».
+    assert.match(readingQuestionBlockers(rawiId)[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
   }
 });

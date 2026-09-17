@@ -104,8 +104,14 @@ test('an ambiguous reading is refused instead of guessed', () => {
   const out = plan([row({ riwaya: 'الدوري' })]);
   assert.deepEqual(codesOf(out), ['PARTICIPANT_IMPORT_READING_UNRESOLVED']);
   assert.equal(out.errors[0].column, 'riwaya');
-  // والاسم الكامل يمرّ ويفرّق بين الدوريَّين.
-  assert.deepEqual(plan([row({ riwaya: 'الدوري عن أبي عمرو' })]).errors, []);
+  /*
+   * والاسم الكامل يفرّق بين الدوريَّين: الدوري عن أبي عمرو ≠ الدوري عن الكسائي. وهو اليوم
+   * محجوبٌ لسببٍ آخر (ترقيم حزمته المقيس لا يطابق أيَّ نظامٍ منشور)، فيُردّ بسبب الجسر
+   * لا بالغموض — والفرق بين السببين هو المقصود هنا.
+   */
+  const duriAbuAmr = plan([row({ riwaya: 'الدوري عن أبي عمرو' })]);
+  assert.deepEqual(codesOf(duriAbuAmr), ['PARTICIPANT_IMPORT_READING_NOT_QUESTION_READY']);
+  assert.deepEqual(codesOf(plan([row({ riwaya: 'الدوري عن الكسائي' })])), []);
 });
 
 test('a reading whose locus crosswalk is incomplete is refused at import, not on the day', () => {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 
 import {
   QuranCrosswalkTable,
@@ -26,9 +27,14 @@ const row = (over: Partial<QuranLocusCrosswalk> = {}): QuranLocusCrosswalk => ({
  */
 test('every row in the default Mizan crosswalk comes from pinned evidence — none is invented', () => {
   assert.match(MIZAN_IDENTITY_CROSSWALK.mappingVersion, /^mizan-crosswalk-quranws-[0-9a-f]{12}-[0-9a-f]{12}$/);
-  // روايةٌ عدُّها مطابقٌ للقانوني لا تحتاج صفًّا أصلًا، فلا يُصطنع لها.
-  for (const rawiId of ['hafs', 'warsh', 'al-duri-kisai']) {
-    assert.deepEqual(MIZAN_IDENTITY_CROSSWALK.rowsFor(rawiId), [], `${rawiId} needs no bridge rows`);
+  /*
+   * روايةٌ عدُّها مطابقٌ للقانوني لا تحتاج صفًّا أصلًا، فلا يُصطنع لها.
+   *
+   * وتُقاس بالعدد لا بمقارنةٍ عميقة مع مصفوفةٍ فارغة: مقارنةُ آلاف الصفوف بـ`[]` تبني
+   * نصَّ فرقٍ يلتهم الذاكرة قبل أن يُطبع، فيموت الفحص بـSIGKILL بدل أن يخبر بما وجد.
+   */
+  for (const rawiId of ['hafs', 'khalaf-hamzah', 'al-duri-kisai']) {
+    assert.equal(MIZAN_IDENTITY_CROSSWALK.rowsFor(rawiId).length, 0, `${rawiId} needs no bridge rows`);
   }
   const hisham = MIZAN_IDENTITY_CROSSWALK.rowsFor('hisham');
   assert.ok(hisham.length > 0, 'hisham is evidenced from the pinned boundary artifact');
@@ -67,11 +73,24 @@ test('a locus in a surah whose native count is verified equal maps one-to-one as
   assert.equal(res.assumed, true, 'a verified count is still not an evidenced crosswalk row');
 });
 
-test('a delivered reading whose package numbering was never read stays an announced assumption', () => {
+/*
+ * لم يبقَ في العشرين روايةٌ «لم يُقرأ ترقيمُها». ترقيمُ حزم المرآة قِيس من بايتاتها
+ * المثبَّتة، فظهر أن ورشًا مدنيُّ العدّ الأخير لا كوفيّه — وكان النظام يفترض الكوفي
+ * صامتًا ويعطي المتسابقَ موضعًا لا يبدأ عنده حدُّ آيةٍ في روايته.
+ */
+test('no delivered reading is resolved by an unread-numbering assumption any more', () => {
   const res = MIZAN_IDENTITY_CROSSWALK.toNative('warsh', { surah: 2, ayah: 10 });
-  assert.deepEqual(res.native, { surah: 2, ayah: 10 });
-  assert.equal(res.assurance, 'UNVERIFIED_COUNT_IDENTITY');
-  assert.equal(res.assumed, true);
+  assert.notEqual(res.assurance, 'UNVERIFIED_COUNT_IDENTITY');
+  assert.equal(res.assurance, 'EVIDENCED_ROW');
+  assert.equal(res.assumed, false);
+  assert.ok(res.evidence.length > 0);
+  for (const rawiId of CANONICAL_RAWI_IDS) {
+    assert.notEqual(
+      MIZAN_IDENTITY_CROSSWALK.toNative(rawiId, { surah: 2, ayah: 10 }).assurance,
+      'UNVERIFIED_COUNT_IDENTITY',
+      `${rawiId} still resolves by an unmeasured assumption`,
+    );
+  }
 });
 
 test('an evidenced row resolves as evidence, not assumption', () => {
@@ -141,7 +160,7 @@ test('the evidence file carries only what the pinned artifact proves, and says w
   const { COMMITTEE_CROSSWALK_ROWS, CROSSWALK_ACTIVATED_RAWIS } = await import('../src/lib/quran-crosswalk-evidence');
   assert.equal(COMMITTEE_CROSSWALK_ROWS.length, MIZAN_IDENTITY_CROSSWALK.size);
   assert.deepEqual([...CROSSWALK_ACTIVATED_RAWIS].sort(),
-    ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'ruways']);
+    ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'qalun', 'ruways', 'warsh'].sort());
   // وما لم يُثبت لا يدخل: روحٌ بلا صفٍّ واحد، فيبقى محجوبًا عن السؤال.
   assert.equal(COMMITTEE_CROSSWALK_ROWS.some(r => r.rawiId === 'rawh'), false);
   assert.equal(crosswalkCoverage('rawh').questionSafe, false);

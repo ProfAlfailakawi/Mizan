@@ -21,6 +21,19 @@ import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, surahCountAssurance } from
 import { ayahCountOf, juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
 import { KfgqpcDeliveryRepository, type KfgqpcDeliveryPassage } from './kfgqpc-delivery';
 import { islamwebPackageStatus, loadIslamwebReadingPackage } from './islamweb-reading-packages';
+import { verifyServedPackageNumbering } from '../src/lib/quran-delivery-count-guard';
+import { KFGQPC_DELIVERY_READING_BY_RAWI } from '../src/lib/delivered-readings';
+
+/**
+ * أيُّ هجاءٍ يصل ← الراوي، للروايات التي قِيس ترقيمُ حزمتها.
+ * يُقبل معرّفُ الراوي ومفتاحُ التسليم معًا، فلا يفلت الحارسُ من باب الهجاء الآخر.
+ */
+const MIRROR_RAWI_BY_DELIVERY_KEY = new Map<string, string>(
+  Object.entries(KFGQPC_DELIVERY_READING_BY_RAWI).flatMap(([rawiId, key]) => [
+    [key, rawiId] as [string, string],
+    [rawiId, rawiId] as [string, string],
+  ]),
+);
 
 export type ReadingDeliveryAnchor = 'SURAH_START' | 'JUZ_START' | 'PAGE_START' | 'AYAH_START';
 
@@ -119,12 +132,41 @@ export class MizanQuranDelivery {
     };
   }
 
+  /** سببُ رفض آخر حزمةِ مرآةٍ لاختلاف ترقيمها — للتشخيص وفحص ما قبل الانطلاق. */
+  private readonly numberingRejections = new Map<string, string>();
+
+  /** أسبابُ الرفض الترقيمي القائمة، بأسماء رواتها. */
+  numberingRejectionReasons(): Record<string, string> {
+    return Object.fromEntries(this.numberingRejections);
+  }
+
   /**
    * صفوف نصّ الرواية. تعود `null` — لا صفوف روايةٍ أخرى — متى تعذّرت الحزمة.
    */
   async quranData(readingId: string): Promise<ReadingDeliveryRow[] | null> {
     const rawiId = candidateRawiForDeliveryKey(readingId);
-    if (!rawiId) return (await this.kfgqpc.quranData(readingId)) as ReadingDeliveryRow[] | null;
+    if (!rawiId) {
+      const rows = (await this.kfgqpc.quranData(readingId)) as ReadingDeliveryRow[] | null;
+      if (!rows) return null;
+      /*
+       * حزمةُ المرآة تُقاس قبل أن تُخدَم.
+       *
+       * ترقيمُ هذه الروايات مُثبتٌ من بايتاتٍ مثبَّتة، وجسرُ مواضعها مبنيٌّ عليه. فلو خُدمت
+       * حزمةٌ ترقيمُها غير ذلك — نسخةٌ أحدث في R2، أو مفتاحٌ كُتب فوقه — لصار السؤال يُسحب
+       * بجسرٍ لا يصف النصَّ المعروض. فيُرفض النصّ ولا يُخدَم بترقيمٍ مجهول، ولا يُستعاض
+       * عنه بحزمة روايةٍ أخرى.
+       */
+      const mirrorRawi = MIRROR_RAWI_BY_DELIVERY_KEY.get(readingId);
+      if (mirrorRawi) {
+        const verdict = verifyServedPackageNumbering(mirrorRawi, rows as unknown as Record<string, unknown>[]);
+        if (!verdict.matches) {
+          this.numberingRejections.set(mirrorRawi, verdict.code || 'DELIVERY_PACKAGE_NUMBERING_MISMATCH');
+          return null;
+        }
+        this.numberingRejections.delete(mirrorRawi);
+      }
+      return rows;
+    }
 
     const cached = this.rowCache.get(rawiId);
     if (cached) return cached;

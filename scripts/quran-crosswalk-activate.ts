@@ -35,6 +35,14 @@ export const CROSSWALK_CANDIDATE_SYSTEMS = [
   { sourceSystem: 'madani-first', nativeSystem: 'MADANI_AWWAL' as QuranNativeCountSystemId, rawis: ['ibn-wardan', 'ibn-jammaz'] },
   { sourceSystem: 'basri', nativeSystem: 'BASRI_YAQUB_RUWAYS' as QuranNativeCountSystemId, rawis: ['ruways'] },
   { sourceSystem: 'basri', nativeSystem: 'BASRI_YAQUB_RAWH' as QuranNativeCountSystemId, rawis: ['rawh'] },
+  /*
+   * الروايات المُسلَّمة من مرآة المجمع: ترقيمُها مقيسٌ من بايتاتها، فتُجرَّب كلٌّ منها على
+   * النظام المنشور المتوقَّع لها. وما لم يطابق ١١٤/١١٤ لا يُفعَّل ولا يُقرَّب — ويُسمَّى
+   * في التقرير بسورته، فيعرف المالك ما الذي يلزمه بالضبط بدل «غير جاهز».
+   */
+  { sourceSystem: 'madani-last', nativeSystem: 'MADANI_AKHIR' as QuranNativeCountSystemId, rawis: ['warsh', 'qalun'] },
+  { sourceSystem: 'makki', nativeSystem: 'MAKKI_IBN_KATHIR_DELIVERY' as QuranNativeCountSystemId, rawis: ['al-bazzi', 'qunbul'] },
+  { sourceSystem: 'basri', nativeSystem: 'BASRI_ABU_AMR_DELIVERY' as QuranNativeCountSystemId, rawis: ['al-duri-abu-amr', 'al-susi'] },
 ] as const;
 
 export const GENERATED_EVIDENCE_PATH = 'src/lib/quran-crosswalk-boundary-evidence.generated.ts';

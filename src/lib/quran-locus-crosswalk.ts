@@ -190,14 +190,33 @@ export class QuranCrosswalkTable {
    */
   toCanonicalFromEvidence(rawiId: string, native: { surah: number; ayah: number }): QuranLocus | undefined {
     if (!CANONICAL_READING_BY_RAWI.has(rawiId)) throw new CrosswalkError('CROSSWALK_UNKNOWN_RAWI');
+    return this.reverseIndex().get(keyOf(rawiId, native.surah, native.ayah));
+  }
+
+  /*
+   * فهرسٌ عكسيّ يُبنى عند أول حاجة.
+   *
+   * كان العكس مسحًا خطّيًّا على كل الصفوف. وهو مقبولٌ وجدولُ الأدلّة فارغ، لكنه صار
+   * خمسةً وعشرين ألف صفّ بعد وصول الدليل، وتحويلُ حزمةٍ كاملة يناديه لكل آية — فيصير
+   * حاصلُ ضربٍ يُقاس بالدقائق. والبناءُ مرّةً واحدة يجعله بحثًا ثابت الكلفة.
+   *
+   * ولا يغيّر هذا دلالةَ العكس: ما لا صفَّ له يبقى `undefined` ولا يُخمَّن. وعند تعدّد
+   * الصفوف على موضعٍ أصليٍّ واحد — وهو واقعُ الدمج — يُحفظ أوّلها كما كان المسحُ يفعل.
+   */
+  private reverse?: Map<string, QuranLocus>;
+  private reverseIndex(): Map<string, QuranLocus> {
+    if (this.reverse) return this.reverse;
+    const index = new Map<string, QuranLocus>();
     for (const row of this.rows.values()) {
-      if (row.rawiId !== rawiId || row.native.surah !== native.surah) continue;
-      const single = row.native.ayah === native.ayah;
-      const inRange = row.native.ayahStart !== undefined && row.native.ayahEnd !== undefined
-        && native.ayah >= row.native.ayahStart && native.ayah <= row.native.ayahEnd;
-      if (single || inRange) return { surah: row.canonical.surah, ayah: row.canonical.ayah };
+      const start = row.native.ayahStart ?? row.native.ayah!;
+      const end = row.native.ayahEnd ?? row.native.ayah!;
+      for (let ayah = start; ayah <= end; ayah += 1) {
+        const key = keyOf(row.rawiId, row.native.surah, ayah);
+        if (!index.has(key)) index.set(key, { surah: row.canonical.surah, ayah: row.canonical.ayah });
+      }
     }
-    return undefined;
+    this.reverse = index;
+    return index;
   }
 
   /** صفوف رواية بعينها — للتقارير والتدقيق. */
