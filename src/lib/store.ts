@@ -277,6 +277,68 @@ export function resetDemoSession(): boolean {
   return true;
 }
 
+/*
+ * الأدوار داخل البيئة التجريبية.
+ *
+ * `switchRole` متقاعد في الجلسة الحقيقية عن عمد: الدور لا يتغيّر إلا من هوية موثّقة
+ * وصلاحية خادمية، وهذا لا يُمسّ. لكن البيئة التجريبية ليست جلسة هوية أصلًا — لا حساب
+ * ولا مطالبات ولا خادم — وعرضُ المنتج على جهةٍ يقتضي أن تُرى شاشةُ كل دور: المحكّم
+ * ورئيس اللجنة والمدقّق وولي الأمر لا لوحةَ الإدارة وحدها. فالتبديل هنا لا يرفع
+ * صلاحية: هو اختيار أيّ واجهةٍ من واجهات الصندوق المعزول تُعرض.
+ *
+ * ولهذا يرفض `setDemoRole` العمل خارج البيئة التجريبية رفضًا صريحًا، لا بالاتفاق.
+ */
+const DEMO_ROLE_KEY = 'mizan_demo_role_v1';
+
+/** أدوار المسابقة والجهة — لها بيانات كاملة في الصندوق التجريبي. */
+export const DEMO_TENANT_ROLES: Role[] = [
+  'comp_admin', 'head_judge', 'judge', 'ops_manager', 'exception_host',
+  'delegation_manager', 'participant', 'guardian', 'broadcast_operator',
+  'auditor', 'support_agent', 'org_admin', 'branch_admin',
+];
+
+/*
+ * أدوار المنصة والمشغّل. تُعرض كاملةً لأن السؤال كان «كل الأدوار»، ولأن إخفاءها
+ * يخفي وجود الطبقة أصلًا. لكنّ لوحاتها تقرأ من الخادم بهوية مالكٍ موثّقة
+ * (`/api/owner/...`)، ولا هوية كهذه في صندوقٍ بلا حساب — فتُظهر حالتها الفارغة.
+ * وهذا أصدق من إظهار أرقامٍ مخترعة في لوحة فوترة.
+ */
+export const DEMO_PLATFORM_ROLES: Role[] = [
+  'super_admin', 'operator_owner', 'operator_admin', 'storage_admin', 'billing_admin',
+];
+
+export const DEMO_ROLES: Role[] = [...DEMO_TENANT_ROLES, ...DEMO_PLATFORM_ROLES];
+
+/** الدور المختار في هذا التبويب، أو '' إن لم يُختر شيء بعد. */
+function storedDemoRole(): Role | '' {
+  if (!IS_DEMO_SESSION) return '';
+  try {
+    const value = window.sessionStorage.getItem(DEMO_ROLE_KEY) || '';
+    return (DEMO_ROLES as string[]).includes(value) ? (value as Role) : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * يبدّل دور العرض ويعيد التحميل.
+ *
+ * إعادة التحميل مقصودة: تبديل الدور في المنتج الحقيقي جلسةٌ أخرى، والشاشات تُبنى
+ * على الدور عند الإقلاع — فتبديلٌ في منتصف العمر يترك نصفَ واجهةٍ من دورٍ ونصفَها
+ * من آخر.
+ */
+export function setDemoRole(role: Role): boolean {
+  if (!IS_DEMO_SESSION) return false;
+  if (!(DEMO_ROLES as string[]).includes(role)) return false;
+  try {
+    window.sessionStorage.setItem(DEMO_ROLE_KEY, role);
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 function getInitialState(): AppStoreState {
   const launch = isLaunchDeployment();
   const isDemoResidue = isRetiredSeedResidue;
@@ -330,6 +392,105 @@ let globalState = getInitialState();
  * هذا التبويب: بناءٌ حقيقي لا يجلب القطعة قط. وثمن ذلك إطارٌ واحد بحالةٍ فارغة قبل
  * وصولها، وهو ثمنٌ مقبول في مسار عرضٍ اختياري.
  */
+/**
+ * هوية العرض للدور المطلوب، مبنيّةً من بيانات الصندوق نفسها لا من أسماء مخترعة.
+ *
+ * الشاشات تربط المستخدم ببياناته بطرقٍ مختلفة: `JudgeOS` يبحث عن محكّمٍ بـ
+ * `userId`، ولوحة المتسابق وبوابة ولي الأمر تبحثان بالبريد. فهويةٌ عامة لكل دور
+ * كانت ستُدخل الزائر شاشةً صحيحة بلا أي صفٍّ فيها — وهو أسوأ من عدم فتحها.
+ */
+function demoIdentityFor(role: Role): User {
+  const organizationId = globalState.organization.id;
+  const competitionId = globalState.competition.id;
+  const generic = (nameArabic: string, name: string): User => ({
+    id: `usr-demo-${role}`,
+    name,
+    nameArabic,
+    email: `demo.${role}@mizan.test`,
+    role,
+    organizationId,
+    competitionId,
+    accountStatus: 'active',
+    identityAssurance: 'demo',
+  });
+
+  /* لجنةٌ عاملة لا متوقّفة: من يدخل بدور محكّم يجب أن يجد عملًا أمامه. */
+  const committee = globalState.committees.find(c => c.status === 'ready') || globalState.committees[0];
+  const judgeByUserId = (userId?: string) => globalState.judges.find(j => j.userId === userId);
+
+  if (role === 'head_judge' || role === 'judge') {
+    const userId = role === 'head_judge' ? committee?.headJudgeId : committee?.judgeIds?.[0];
+    const judge = judgeByUserId(userId);
+    if (judge) {
+      return {
+        id: judge.userId || judge.id,
+        name: judge.name,
+        nameArabic: judge.nameArabic,
+        email: `demo.${role}@mizan.test`,
+        role,
+        organizationId,
+        competitionId,
+        accountStatus: 'active',
+        identityAssurance: 'demo',
+      };
+    }
+  }
+
+  if (role === 'participant' || role === 'guardian') {
+    /* متسابقٌ قطع شوطًا: شاشةٌ لمن لم يبدأ بعد لا تُري شيئًا. */
+    const participant =
+      globalState.participants.find(p => p.competitionId === competitionId && p.status === 'certified') ||
+      globalState.participants.find(p => p.competitionId === competitionId) ||
+      globalState.participants[0];
+    if (participant?.email) {
+      const childName = participant.fullNameArabic || participant.fullName;
+      return {
+        id: role === 'participant' ? participant.id : `usr-demo-guardian`,
+        name: role === 'participant' ? participant.fullName : `Guardian of ${participant.fullName}`,
+        nameArabic: role === 'participant' ? childName : `ولي أمر ${childName}`,
+        // البوابتان تربطان الشخص ببريده؛ فبريد الابن هو ما يفتح ملفه لوليّه.
+        email: participant.email,
+        role,
+        organizationId,
+        competitionId,
+        accountStatus: 'active',
+        identityAssurance: 'demo',
+      };
+    }
+  }
+
+  const labels: Partial<Record<Role, [string, string]>> = {
+    comp_admin: ['مدير المسابقة (بيئة تجريبية)', 'MIZAN Demo Director'],
+    ops_manager: ['مدير التشغيل (بيئة تجريبية)', 'Demo Operations Manager'],
+    exception_host: ['مسؤول الحالات الاستثنائية (بيئة تجريبية)', 'Demo Exception Host'],
+    delegation_manager: ['مدير الوفد (بيئة تجريبية)', 'Demo Delegation Manager'],
+    broadcast_operator: ['مشغّل البثّ (بيئة تجريبية)', 'Demo Broadcast Operator'],
+    auditor: ['المدقّق (بيئة تجريبية)', 'Demo Auditor'],
+    support_agent: ['الدعم (بيئة تجريبية)', 'Demo Support Agent'],
+    org_admin: ['مدير الجهة (بيئة تجريبية)', 'Demo Organization Admin'],
+    branch_admin: ['مدير الفرع (بيئة تجريبية)', 'Demo Branch Admin'],
+    super_admin: ['مالك المنصة (بيئة تجريبية)', 'Demo Platform Owner'],
+    operator_owner: ['مالك المشغّل (بيئة تجريبية)', 'Demo Operator Owner'],
+    operator_admin: ['مدير المشغّل (بيئة تجريبية)', 'Demo Operator Admin'],
+    storage_admin: ['مدير التخزين (بيئة تجريبية)', 'Demo Storage Admin'],
+    billing_admin: ['مدير الفوترة (بيئة تجريبية)', 'Demo Billing Admin'],
+    head_judge: ['رئيس اللجنة (بيئة تجريبية)', 'Demo Head Judge'],
+    judge: ['محكّم (بيئة تجريبية)', 'Demo Judge'],
+    participant: ['متسابق (بيئة تجريبية)', 'Demo Participant'],
+    guardian: ['ولي أمر (بيئة تجريبية)', 'Demo Guardian'],
+  };
+  const [nameArabic, name] = labels[role] || ['بيئة تجريبية', 'Demo User'];
+  return generic(nameArabic, name);
+}
+
+/** يطبّق الدور المختار على الحالة التجريبية القائمة. لا أثر له خارجها. */
+function applyStoredDemoRole(): void {
+  if (!IS_DEMO_SESSION) return;
+  const role = storedDemoRole();
+  if (!role) return;
+  globalState.currentUser = demoIdentityFor(role);
+}
+
 if (IS_DEMO_SESSION) {
   let alreadyHydrated = false;
   try {
@@ -337,10 +498,15 @@ if (IS_DEMO_SESSION) {
   } catch {
     alreadyHydrated = false;
   }
-  if (!alreadyHydrated) {
+  if (alreadyHydrated) {
+    /* لقطةٌ مستعادة: البيانات حاضرة بالفعل، فيُطبَّق الدور فورًا. */
+    applyStoredDemoRole();
+  } else {
     void import('../data/demo-universe')
       .then(({ buildDemoInitialState }) => {
         globalState = buildDemoInitialState(globalState);
+        // الدور بعد البيانات لا قبلها: هوية المحكّم تُقرأ من سجلّ محكّمٍ موجود.
+        applyStoredDemoRole();
         notify();
       })
       .catch(err => {
