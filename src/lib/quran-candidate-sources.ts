@@ -17,6 +17,7 @@ export type QuranCandidateReviewState =
   | 'REJECTED';
 
 export type QuranCandidatePermissionState = 'OWNER_REPORTED_PERMISSION';
+export type QuranNativeCountFamily = 'KUFIC' | 'DIMASHQI' | 'MADANI_AWWAL' | 'BASRI_YAQUB';
 
 export interface QuranCandidateSource {
   rawiId: string;
@@ -26,6 +27,9 @@ export interface QuranCandidateSource {
   upstreamRepository: 'TheAbubakrAbu/Al-Islam-iOS';
   upstreamCommit: string;
   upstreamPath: string;
+  expectedSurahCount: 114;
+  expectedVerseCount: number;
+  nativeCountFamily: QuranNativeCountFamily;
   reviewState: QuranCandidateReviewState;
   permissionState: QuranCandidatePermissionState;
   caveat?: string;
@@ -42,6 +46,8 @@ const candidate = (
   rawiId: string,
   deliveryKey: string,
   filename: string,
+  expectedVerseCount: number,
+  nativeCountFamily: QuranNativeCountFamily,
   caveat?: string,
 ): QuranCandidateSource => ({
   rawiId,
@@ -51,32 +57,39 @@ const candidate = (
   upstreamRepository: AL_ISLAM_IOS_QIRAAT_REPOSITORY,
   upstreamCommit: AL_ISLAM_IOS_QIRAAT_COMMIT,
   upstreamPath: `Resources/Data/Quran/${filename}`,
+  expectedSurahCount: 114,
+  expectedVerseCount,
+  nativeCountFamily,
   reviewState: 'PENDING_SCHOLAR_REVIEW',
   permissionState: 'OWNER_REPORTED_PERMISSION',
   ...(caveat ? { caveat } : {}),
 });
 
 export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
-  candidate('hisham', 'hisham', 'QiraahHisham.json.deflate'),
-  candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate'),
-  candidate('khalaf-hamzah', 'khalaf-hamzah', 'QiraahKhalaf.json.deflate'),
-  candidate('khallad', 'khallad', 'QiraahKhallad.json.deflate'),
-  candidate('abu-al-harith', 'abu-al-harith', 'QiraahAbuHarith.json.deflate'),
-  candidate('al-duri-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate'),
-  candidate('ibn-wardan', 'ibn-wardan', 'QiraahIbnWardan.json.deflate'),
-  candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate'),
-  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate'),
-  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate'),
+  candidate('hisham', 'hisham', 'QiraahHisham.json.deflate', 6226, 'DIMASHQI'),
+  candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate', 6226, 'DIMASHQI'),
+  candidate('khalaf-hamzah', 'khalaf-hamzah', 'QiraahKhalaf.json.deflate', 6236, 'KUFIC'),
+  candidate('khallad', 'khallad', 'QiraahKhallad.json.deflate', 6236, 'KUFIC'),
+  candidate('abu-al-harith', 'abu-al-harith', 'QiraahAbuHarith.json.deflate', 6236, 'KUFIC'),
+  candidate('al-duri-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate', 6236, 'KUFIC'),
+  candidate('ibn-wardan', 'ibn-wardan', 'QiraahIbnWardan.json.deflate', 6214, 'MADANI_AWWAL'),
+  candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate', 6214, 'MADANI_AWWAL'),
+  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate', 6204, 'BASRI_YAQUB'),
+  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate', 6206, 'BASRI_YAQUB'),
   candidate(
     'ishaq',
     'ishaq',
     'QiraahIshaq.json.deflate',
+    6236,
+    'KUFIC',
     'راجع اللجنة استقلال متن إسحاق عن إدريس؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
   ),
   candidate(
     'idris',
     'idris',
     'QiraahIdris.json.deflate',
+    6236,
+    'KUFIC',
     'راجع اللجنة استقلال متن إدريس عن إسحاق؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
   ),
 ] as const;
