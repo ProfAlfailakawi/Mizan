@@ -100,7 +100,11 @@ jobs:
           cache: npm
       - run: npm ci
       - name: مختبر العدالة
-        run: npm run fairness:lab -- --scale=${{ github.event.inputs.scale || '5000' }}
+        # المُدخَل يُمرَّر عبر متغيّر بيئة لا يُدمَج في سطر الأمر مباشرةً، فلا يصير
+        # مُدخَل التشغيل اليدوي حقنَ أوامر في الصَّدَفة (script injection).
+        env:
+          FAIRNESS_SCALE: ${{ github.event.inputs.scale || '5000' }}
+        run: npm run fairness:lab -- --scale="$FAIRNESS_SCALE"
       - name: بروفة الحمل
         run: npm run load:rehearsal
       - name: تمرين الأعطال
