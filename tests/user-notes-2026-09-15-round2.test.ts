@@ -288,7 +288,8 @@ test('an offline pass keeps its warning instead of looking healthy', () => {
 test('the readiness gate knows every narration the delivery layer knows', () => {
   /* ثلاث نسخ من جدول واحد كانت تفترق عند أول إضافة؛ صار في وحدة طرفية بلا استيراد. */
   const core = read('src/lib/scientific-core.ts');
-  assert.match(core, /const KFGQPC_OFFICIAL_RAWI_IDS=new Set<string>\(DELIVERED_RAWI_IDS\);/);
+  /* الاسم صار يقول ما يقيسه: تسليمُ النصّ لا سلطةُ الناشر. والاشتقاق من الوحدة الطرفية كما هو. */
+  assert.match(core, /const DELIVERED_TEXT_RAWI_IDS=new Set<string>\(DELIVERED_RAWI_IDS\);/);
   assert.match(core, /import \{ DELIVERED_RAWI_IDS \} from '\.\/delivered-readings';/,
     'read from the leaf module, not from the pool it already imports — that would be a cycle');
 
