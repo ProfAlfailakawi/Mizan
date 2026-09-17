@@ -187,9 +187,114 @@ function emptyInitialState(): AppStoreState {
  * لا تُزرع بيانات افتراضية ولا تُحيا حالةٌ محفوظة تعود لقالب التطوير القديم؛ أي متصفح
  * يحمل ذلك القالب يبدأ بحالة نظيفة بدل استعادة سجلات غير حقيقية من التخزين المحلي.
  */
+/*
+ * البيئة التجريبية — اختيارٌ صريح من الزائر، لا حالة إطلاق.
+ *
+ * حالة الإطلاق تبقى فارغة كما هي (انظر `launch-state.ts`): ما من نشرٍ حقيقي يستقبل
+ * منظّمه بمتسابقين لا وجود لهم، ولا متغيّر بيئة يشغّل الديمو. الطريق الوحيد إليه ضغطةٌ
+ * في هذا التبويب، وله مفتاح تخزينٍ مستقل، فما يكتبه الديمو لا يلامس حالة حسابٍ حقيقي
+ * أبدًا، ويختفي بإغلاق التبويب.
+ */
+const DEMO_FLAG_KEY = 'mizan_demo_active_v1';
+const DEMO_STATE_KEY = `${STORAGE_KEY}__demo_v1`;
+
+/**
+ * هل يسمح هذا البناء بعرض الديمو أصلًا؟
+ *
+ * خيار إخراجٍ لا إدخال، وهذا مقصود: لا متغيّر بيئة يُشغّل الديمو — فلا يمكن لخطأٍ
+ * مطبعي في إعدادات نشرٍ أن يُظهره — وواحدٌ فقط يُخفيه. وميزان يُشغّل مسابقات حقيقية
+ * لجهات، وقد تشترط جهةٌ نشرةً لا يظهر فيها مدخل عرضٍ إطلاقًا؛ هذا هو المفتاح الذي
+ * يلبّي ذلك. والاسم مطابق لما تستعمله بقية البرامج المبنية على Vite حتى لا يختلف
+ * الإجراء من برنامج لآخر.
+ *
+ * يُقرأ المتغيّر بصيغته المباشرة `import.meta.env.VITE_DISABLE_DEMO_MODE` عن قصد، لا
+ * عبر متغيّرٍ وسيط: Vite يستبدل الصيغة المباشرة بقيمتها وقت البناء، فتصير الدالة
+ * ثابتًا يُحسب عند الترجمة، ويُسقط المُصغِّر مسار الديمو كلّه من الحزمة في أي نشرةٍ
+ * أُطفئ فيها — لا مجرّد إخفاء زر. والصيغة عبر متغيّرٍ وسيط تُبطل هذا الاستبدال فتبقى
+ * البيانات في الحزمة رغم الإطفاء.
+ *
+ * و`import.meta.env` لا وجود له خارج حزمة Vite (في Node، وفي الاختبارات التي تستورد
+ * هذا الملف)، فقراءته ترمي — ويلتقطها `catch`. والغياب ليس منعًا: الافتراض متاح.
+ */
+function demoIsAvailable(): boolean {
+  try {
+    return import.meta.env.VITE_DISABLE_DEMO_MODE !== 'true';
+  } catch {
+    return true;
+  }
+}
+
+/** يسمح هذا النشر بعرض الديمو؟ تقرأه الواجهة لتُظهر المدخل أو تُخفيه. */
+export const DEMO_AVAILABLE = demoIsAvailable();
+
+function demoFlagIsSet(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.sessionStorage.getItem(DEMO_FLAG_KEY) === 'true';
+  } catch {
+    /* نافذةٌ خاصة أو تخزينٌ محجوب يرمي هنا. الفشل المغلق هو الجواب الآمن: لا علم، لا ديمو. */
+    return false;
+  }
+}
+
+/** هل هذا التبويب داخل البيئة التجريبية؟ يُقرأ مرة عند الإقلاع وتبقى الإجابة ثابتة. */
+export const IS_DEMO_SESSION = DEMO_AVAILABLE && demoFlagIsSet();
+
+/** يفتح البيئة التجريبية في هذا التبويب. إعادة التحميل هي ما يجعل التحوّل كاملًا. */
+export function enterDemoSession(): boolean {
+  // نشرةٌ أُخفي فيها الديمو لا تفتحه ولو نُودي عليه برمجيًا.
+  if (!DEMO_AVAILABLE) return false;
+  try {
+    window.sessionStorage.setItem(DEMO_FLAG_KEY, 'true');
+    window.sessionStorage.removeItem(DEMO_STATE_KEY);
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
+/** يخرج منها ويمحو كل ما كتبته في هذا التبويب. */
+export function exitDemoSession(): boolean {
+  try {
+    window.sessionStorage.removeItem(DEMO_FLAG_KEY);
+    window.sessionStorage.removeItem(DEMO_STATE_KEY);
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
+/** يعيد بناء البيانات التجريبية من الصفر دون مغادرة البيئة. */
+export function resetDemoSession(): boolean {
+  if (!IS_DEMO_SESSION) return false;
+  try {
+    window.sessionStorage.removeItem(DEMO_STATE_KEY);
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 function getInitialState(): AppStoreState {
   const launch = isLaunchDeployment();
   const isDemoResidue = isRetiredSeedResidue;
+
+  if (IS_DEMO_SESSION) {
+    /* الديمو لا يمرّ بحارس بقايا البذرة ولا بمفتاح الإنتاج إطلاقًا: تخزينه منفصل،
+       وما يُستعاد منه لا يمكن أن يتسرّب إلى حالة حقيقية.
+       ولقطةٌ محفوظة تُستعاد فورًا (متزامنة)، أما البناء الأول فيأتي من وحدةٍ تُحمَّل
+       كسولًا — انظر `bootstrapDemoUniverse` أدناه. */
+    try {
+      const savedDemo = window.sessionStorage.getItem(DEMO_STATE_KEY);
+      if (savedDemo) return hydrateSavedState(JSON.parse(savedDemo) as AppStoreState);
+    } catch {
+      /* حالةٌ تالفة تُستبدل ببناءٍ جديد بدل أن تُسقط الإقلاع. */
+    }
+    return emptyInitialState();
+  }
+
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -213,6 +318,36 @@ function getInitialState(): AppStoreState {
 }
 
 let globalState = getInitialState();
+
+/*
+ * تحميل بيانات العرض كسولًا — وهذا ليس تفصيلًا في الأداء بل شرطُ سلامة.
+ *
+ * `production-runtime-audit` يمنع أي ملف تشغيلي تحت `src/lib` من ذكر بيانات البذرة،
+ * حراسةً لقرار «حالة الإطلاق الفارغة»: نشرٌ حقيقي يجب ألّا تكون البذرة قابلة للوصول فيه
+ * أصلًا. والاستيراد الساكن كان يخرق ذلك ويضع البيانات في الحزمة الرئيسية لكل زائر.
+ *
+ * فالوحدة تُستورد ديناميكيًا، ولا يُنفَّذ الاستيراد إلا إذا كانت راية الديمو مرفوعة في
+ * هذا التبويب: بناءٌ حقيقي لا يجلب القطعة قط. وثمن ذلك إطارٌ واحد بحالةٍ فارغة قبل
+ * وصولها، وهو ثمنٌ مقبول في مسار عرضٍ اختياري.
+ */
+if (IS_DEMO_SESSION) {
+  let alreadyHydrated = false;
+  try {
+    alreadyHydrated = Boolean(window.sessionStorage.getItem(DEMO_STATE_KEY));
+  } catch {
+    alreadyHydrated = false;
+  }
+  if (!alreadyHydrated) {
+    void import('../data/demo-universe')
+      .then(({ buildDemoInitialState }) => {
+        globalState = buildDemoInitialState(globalState);
+        notify();
+      })
+      .catch(err => {
+        console.error('MIZAN demo universe failed to load:', err);
+      });
+  }
+}
 
 /*
  * الاسم كما يُحفَظ داخل مستند مُولَّد — شهادة، أو بطاقة رحلة، أو جواز مشاركة.
@@ -856,6 +991,13 @@ async function finalizeAuditChain(){
 // next refresh would silently roll back hours of work. Instead we record a surfaced error flag.
 function persistLocalSnapshot(): boolean {
   try {
+    if (IS_DEMO_SESSION) {
+      /* البيئة التجريبية تكتب إلى مفتاحها وحدها، وفي sessionStorage لا localStorage:
+         تبقى داخل التبويب، وتختفي بإغلاقه، ولا تلمس لقطة أي حساب حقيقي بأي حال. */
+      window.sessionStorage.setItem(DEMO_STATE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
+      if (globalState.persistenceError && !globalState.persistenceError.code.startsWith('CLOUD_')) globalState.persistenceError = null;
+      return true;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
     /*
      * كتابةٌ محلية ناجحة تمسح أعطال الكتابة المحلية وحدها.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { migrateLegacyScope, planCategoryMigration } from '../src/lib/scope-migration';
 import { describeScope, scopeAyahCount, scopeFromJuz, scopeFromJuzRange, fullQuranScope } from '../src/lib/quran-scope';
 import { QURAN_TOTAL_AYAHS } from '../src/lib/quran-canon';
-import { SEED_COMPETITION } from './fixtures/seed-data';
+import { SEED_COMPETITION } from '../src/data/seed-data';
 
 /*
  * قاعدة الترحيل: لا يُخترع نطاق. ما كان قاطعًا يُشتق، وما كان مبهمًا يُعلَّم ويُعرض على

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED_RULESET, SEED_COMMITTEES, SEED_JUDGES } from './fixtures/seed-data';
+import { SEED_RULESET, SEED_COMMITTEES, SEED_JUDGES } from '../src/data/seed-data';
 
 test('test fixture uses one judge without weakening production engine', () => {
   assert.equal(SEED_RULESET.judgesCountPerPanel, 1);

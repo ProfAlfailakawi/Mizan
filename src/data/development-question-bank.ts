@@ -1,4 +1,4 @@
-import type { QuestionPoolItem } from '../../src/types';
+import type { QuestionPoolItem } from '../types';
 
 export const DEVELOPMENT_QUESTION_BANK: QuestionPoolItem[] = [
   {

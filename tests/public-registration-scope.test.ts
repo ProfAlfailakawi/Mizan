@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEED_COMPETITION } from './fixtures/seed-data';
+import { SEED_COMPETITION } from '../src/data/seed-data';
 import { PublicRegistrationService, type PublicRegistrationInput, type PublicRegistrationStore } from '../server/public-registration';
 import type { Competition } from '../src/types';
 import { scopeFromJuz } from '../src/lib/quran-scope';
