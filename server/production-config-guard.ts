@@ -122,7 +122,25 @@ export function inspectProductionConfig(env: Record<string, string | undefined> 
     }
   }
 
-  // 5) أسرار التوقيع: الموضوعُ الضعيف مانع، والغائب تنبيه.
+  /*
+   * 5) سجلّ التدقيق الخادمي.
+   *
+   * سلسلةُ البصمات الخادمية هي الفرق بين سجلٍّ يُحتجّ به وسجلٍّ كتبه المتصفّح عن نفسه.
+   * وهو اختياريٌّ بالكامل: بلا `MIZAN_AUDIT_LEDGER_DIR` يصير كلُّ إلحاقٍ لا شيء بصمت،
+   * وتردّ نقاط قراءته 503 — فيظنّ المشغّل أن عنده سجلًّا خادميًّا وليس عنده.
+   *
+   * وتنبيهٌ لا منع: جهةٌ قد تشغّل بلا سجلٍّ خادمي عن قصد، والمنعُ يوقف نشرًا قائمًا.
+   * لكنه يُقال صراحةً بدل أن يُكتشف يوم يُطلب الدليل. والمسارُ المؤقّت أسوأ من الغياب:
+   * يبدو مضبوطًا ويضيع عند أول إعادة تشغيل للحاوية.
+   */
+  const auditLedgerDir = String(env.MIZAN_AUDIT_LEDGER_DIR || '').trim();
+  if (production && !auditLedgerDir) {
+    findings.push({ severity: 'WARNING', code: 'SERVER_AUDIT_LEDGER_UNCONFIGURED', variable: 'MIZAN_AUDIT_LEDGER_DIR' });
+  } else if (production && /^\/(tmp|var\/tmp|dev\/shm)(\/|$)/.test(auditLedgerDir)) {
+    findings.push({ severity: 'WARNING', code: 'SERVER_AUDIT_LEDGER_EPHEMERAL', variable: 'MIZAN_AUDIT_LEDGER_DIR' });
+  }
+
+  // 6) أسرار التوقيع: الموضوعُ الضعيف مانع، والغائب تنبيه.
   for (const variable of SIGNING_SECRET_VARS) {
     const raw = String(env[variable] || '');
     if (raw.trim() && isWeakSecret(raw)) {

@@ -79,6 +79,7 @@ import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merk
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
 import { can } from './permissions';
 import { nextParticipantCodes, planParticipantImport } from './participant-import';
+import { recordCompetitionState, recordParticipantBatchUsage, recordParticipantUsage } from './entitlements-client';
 import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isReadingDelivered, detectModelChange, explicitConsentGranted } from './scientific-core';
 import { compilePolicyText, detectContradictions, policyCompilerSummary, applyApprovedCompilation } from './policy-compiler';
 import { validateVerseStructure, compareQuranRows, type QuranVerseRecord } from './quran-source-ingestion';
@@ -2201,6 +2202,20 @@ export function useAppStore() {
   };
 
   // Register New Participant
+  /*
+   * إبلاغُ العدّاد التجاري: لا يوقف عملًا، ولا يُبتلع.
+   *
+   * حدودُ الترخيص كانت تُطبَّق على الخادم ولا ينادي أحدٌ نقاط القياس، فتبقى العدّادات
+   * صفرًا مهما جرى. والنداء هنا لا يُنتظر ولا يمنع تسجيلًا: ما يعود به من مانعٍ تجاري
+   * يُحفظ ليقرأه فحصُ ما قبل الانطلاق، فيُعرف الحدّ قبل اليوم لا فيه.
+   */
+  const noteEntitlement = (result: { ok: boolean; issue?: string; limitReached: boolean }) => {
+    if (result.ok) { if (globalState.lastEntitlementIssue) { globalState.lastEntitlementIssue = ''; notify(); } return; }
+    if (!result.limitReached) return;   // تعذّرٌ تقني لا يُعرض للمسؤول كأنه رفضُ ترخيص
+    globalState.lastEntitlementIssue = result.issue || '';
+    notify();
+  };
+
   const registerParticipant = (newP: Omit<Participant, 'id' | 'code' | 'status' | 'statusHistory' | 'createdAt'>) => {
     const policy = getCompetitionPolicy(globalState.competition);
     const competitionCount=globalState.participants.filter(p=>p.competitionId===globalState.competition.id).length;
@@ -2219,6 +2234,7 @@ export function useAppStore() {
     };
     globalState.participants = [...globalState.participants, participant];
     void persistScopedDocument('participants',participant.id,participant as unknown as Record<string,unknown>);
+    void recordParticipantUsage({ competitionId: globalState.competition.id, participantId: participant.id }).then(noteEntitlement);
     appendParticipantNotifications(participant,'registration.received');
     const category = globalState.competition.categories.find(c => c.id === participant.categoryId);
     const age = Math.floor((Date.now() - new Date(participant.dateOfBirth).getTime()) / 31557600000);
@@ -3093,6 +3109,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     globalState.contradictionIssues=contradictions;
     const previousStatus=globalState.competition.status;
     globalState.competition={...globalState.competition,status:'registration_open'};
+    void recordCompetitionState({ competitionId: globalState.competition.id, state: 'registration_open' }).then(noteEntitlement);
     const published=await publishPublicCompetitionRecord();
     if(!published.ok){
       /* لا تُترك المسابقة «مفتوحة» على جهاز الإدارة وحده: الحالة تعود كما كانت حتى ينجح النشر. */
@@ -3510,7 +3527,8 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     }):[];
     const headers=plan.headers;
     const job:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity:'participants',fileName,status:errors.length?'validated':'imported',totalRows:plan.totalRows,validRows:staged.length,invalidRows:errors.filter(e=>e.row>1).length,mapping:Object.fromEntries(headers.map(h=>[h,h])),errors,createdAt:new Date().toISOString()};
-    globalState.importJobs=[job,...globalState.importJobs]; if(!errors.length){globalState.participants=[...globalState.participants,...staged];for(const participant of staged){syncParticipantLifecycle(participant);appendParticipantNotifications(participant,'registration.received');}}
+    globalState.importJobs=[job,...globalState.importJobs]; if(!errors.length){globalState.participants=[...globalState.participants,...staged];for(const participant of staged){syncParticipantLifecycle(participant);appendParticipantNotifications(participant,'registration.received');}
+      void recordParticipantBatchUsage(globalState.competition.id,staged.map(p=>p.id)).then(noteEntitlement);}
     notify(); return job;
   };
   const startShadowRun=(mode:ShadowRun['mode'])=>{const s:ShadowRun={id:newId('shadow'),competitionId:globalState.competition.id,mode,status:'running',startedAt:new Date().toISOString(),observations:[]};globalState.shadowRuns=[s,...globalState.shadowRuns];notify();return s;};
