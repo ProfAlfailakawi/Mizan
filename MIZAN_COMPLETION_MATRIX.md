@@ -1,5 +1,7 @@
 # MIZAN — Master Prompt Completion Matrix
 
+> ما بقي إلى الإصدار التجاري 1.0 — بالاسم والسبب ومعيار القبول: [`docs/REMAINING-WORK.md`](./docs/REMAINING-WORK.md).
+
 ## 0. مصفوفة القراءات العشرين — مُولَّدة من الحالة لا مكتوبة يدًا
 
 الجدول أدناه مخرَجُ `npm run quran:release-matrix -- --markdown` حرفًا بحرف، ويحرسه اختبارُ
