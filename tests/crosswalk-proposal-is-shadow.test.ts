@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { CROSSWALK_PROPOSAL_ALGORITHM, proposeForReading } from '../scripts/quran-crosswalk-propose';
-import { COMMITTEE_CROSSWALK_ROWS } from '../src/lib/quran-crosswalk-evidence';
+import { committeeCrosswalkRows } from '../src/lib/quran-crosswalk-evidence';
+
+const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
 import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, isReadingQuestionSafe, readingQuestionBlockers } from '../src/lib/quran-locus-crosswalk';
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 import { PINNED_DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';

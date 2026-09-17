@@ -91,11 +91,19 @@ function expandGeneratedRows(): QuranLocusCrosswalk[] {
   return rows;
 }
 
+let cachedRows: readonly QuranLocusCrosswalk[] | undefined;
+
 /**
  * صفوف الجسر الفعّالة. كلُّ صفٍّ يحمل مرجعَ أثرٍ محدَّدًا (المستودع، الـcommit، المسار،
  * بصمتا المصدر والمولَّد، نظام العدّ، وكلمة الحدّ) — لا «معتمدٌ من اللجنة» وحدها.
+ *
+ * دالّةٌ لا ثابت: الصفوف خمسةٌ وعشرون ألفًا، وبناؤها عند الاستيراد يضع كلفتَها على كل
+ * صفحةٍ تحمّل هذه الوحدة ولو لم تسأل عن موضعٍ قطّ. تُبنى مرّةً عند أول نداء وتُحفظ.
  */
-export const COMMITTEE_CROSSWALK_ROWS: readonly QuranLocusCrosswalk[] = expandGeneratedRows();
+export function committeeCrosswalkRows(): readonly QuranLocusCrosswalk[] {
+  if (!cachedRows) cachedRows = expandGeneratedRows();
+  return cachedRows;
+}
 
 /** الروايات التي فُعّل جسرُها من هذا الأثر — للتقارير ولفحص ما قبل الانطلاق. */
 export const CROSSWALK_ACTIVATED_RAWIS: readonly string[] =

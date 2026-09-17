@@ -25,7 +25,7 @@ import { resolveReadings } from './scientific-core';
 import { QURAN_SURAH_TOTAL, ayahCountOf, isValidLocus, type QuranLocus } from './quran-canon';
 import { countSystemForReading } from './reading-count-systems';
 import { nativeAyahCountOf } from './quran-native-count-systems';
-import { COMMITTEE_CROSSWALK_ROWS, COMMITTEE_CROSSWALK_VERSION } from './quran-crosswalk-evidence';
+import { COMMITTEE_CROSSWALK_VERSION, committeeCrosswalkRows } from './quran-crosswalk-evidence';
 
 /** نوع العلاقة بين الإحداثي القانوني وترقيم الرواية. */
 export type CrosswalkRelation =
@@ -119,18 +119,48 @@ const keyOf = (rawiId: string, surah: number, ayah: number) => `${rawiId}#${sura
  * بالتطابق الافتراضي مع إعلان `assumed:true` — فلا يُخلط المعلومُ بالمفترض.
  */
 export class QuranCrosswalkTable {
-  private readonly rows = new Map<string, QuranLocusCrosswalk>();
+  /*
+   * الصفوف تُبنى عند أول حاجةٍ لا عند تحميل الوحدة.
+   *
+   * جدولُ ميزان العامل خمسةٌ وعشرون ألف صفّ. وبناؤها عند الاستيراد يضع نحوَ ٢٥ ميجابايت
+   * ووقفةً على الخيط الرئيسي في **كل** صفحةٍ تحمّل هذه الوحدة — بما فيها صفحةُ الدخول
+   * وصفحةُ التعريف، وهما لا تسألان عن موضعٍ قطّ. فالتأجيلُ يجعل الكلفةَ على من يستعمل.
+   *
+   * ولا تتغيّر بهذا أيُّ دلالة: الصفّ يُتحقَّق منه ويُرفض المكرَّر كما كان، لكن عند أول
+   * استعمالٍ فعليّ — فيظهر الخطأ لمن يسأل، لا لمن يفتح الصفحة.
+   */
+  private readonly source: QuranLocusCrosswalk[] | (() => QuranLocusCrosswalk[]);
+  private built?: Map<string, QuranLocusCrosswalk>;
   /** إصدار الجسر — يُسجَّل في الجلسة لإعادة تفسير النتيجة تاريخيًا. */
   readonly mappingVersion: string;
 
-  constructor(rows: QuranLocusCrosswalk[] = [], mappingVersion = 'mizan-crosswalk-identity-v1') {
+  constructor(
+    rows: QuranLocusCrosswalk[] | (() => QuranLocusCrosswalk[]) = [],
+    mappingVersion = 'mizan-crosswalk-identity-v1',
+  ) {
     this.mappingVersion = mappingVersion;
-    for (const row of rows) {
+    this.source = rows;
+    /*
+     * التأجيل للمولَّد الكبير وحده.
+     *
+     * جدولٌ يُبنى من صفوفٍ في اليد يُتحقَّق منه فورًا كما كان: كلفتُه لا تُذكر، وتأجيلُ
+     * الخطأ فيه يعني ظهورَه في منتصف جلسةٍ بدل ظهوره عند التركيب. أمّا المولَّد فيُمرَّر
+     * دالّةً، وهو وحده ما يُؤجَّل.
+     */
+    if (typeof rows !== 'function') void this.rows;
+  }
+
+  private get rows(): Map<string, QuranLocusCrosswalk> {
+    if (this.built) return this.built;
+    const built = new Map<string, QuranLocusCrosswalk>();
+    for (const row of typeof this.source === 'function' ? this.source() : this.source) {
       validateCrosswalkRow(row);
       const key = keyOf(row.rawiId, row.canonical.surah, row.canonical.ayah);
-      if (this.rows.has(key)) throw new CrosswalkError('CROSSWALK_DUPLICATE_CANONICAL_LOCUS');
-      this.rows.set(key, row);
+      if (built.has(key)) throw new CrosswalkError('CROSSWALK_DUPLICATE_CANONICAL_LOCUS');
+      built.set(key, row);
     }
+    this.built = built;
+    return built;
   }
 
   get size() { return this.rows.size; }
@@ -365,6 +395,6 @@ export function crosswalkCoverageMatrix(table: QuranCrosswalkTable = MIZAN_IDENT
  * وبمجرّد وصول الصفوف بمراجعها تنتقل روايتها إلى «جاهزة للسؤال» بلا تعديل منطق.
  */
 export const MIZAN_IDENTITY_CROSSWALK = new QuranCrosswalkTable(
-  [...COMMITTEE_CROSSWALK_ROWS],
+  () => [...committeeCrosswalkRows()],
   COMMITTEE_CROSSWALK_VERSION,
 );

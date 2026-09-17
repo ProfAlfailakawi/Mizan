@@ -157,7 +157,8 @@ test('resolution fails closed for an unknown rawi — never falls back to anothe
  * مرجع يُرفض، والملف اليوم فارغٌ قصدًا فلا يُدَّعى ما لم يصل.
  */
 test('the evidence file carries only what the pinned artifact proves, and says which readings', async () => {
-  const { COMMITTEE_CROSSWALK_ROWS, CROSSWALK_ACTIVATED_RAWIS } = await import('../src/lib/quran-crosswalk-evidence');
+  const { committeeCrosswalkRows, CROSSWALK_ACTIVATED_RAWIS } = await import('../src/lib/quran-crosswalk-evidence');
+  const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
   assert.equal(COMMITTEE_CROSSWALK_ROWS.length, MIZAN_IDENTITY_CROSSWALK.size);
   assert.deepEqual([...CROSSWALK_ACTIVATED_RAWIS].sort(),
     ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'qalun', 'ruways', 'warsh'].sort());

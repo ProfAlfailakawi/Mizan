@@ -31,10 +31,12 @@ import {
   GENERATED_BOUNDARY_SYSTEMS,
 } from '../src/lib/quran-crosswalk-boundary-evidence.generated';
 import {
-  COMMITTEE_CROSSWALK_ROWS,
   COMMITTEE_CROSSWALK_VERSION,
   CROSSWALK_ACTIVATED_RAWIS,
+  committeeCrosswalkRows,
 } from '../src/lib/quran-crosswalk-evidence';
+
+const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
 import {
   MIZAN_IDENTITY_CROSSWALK,
   crosswalkCoverage,
@@ -297,4 +299,36 @@ test('activation moved exactly the proved readings to question-ready', () => {
   const rawh = crosswalkCoverage('rawh');
   assert.equal(rawh.questionSafe, false);
   assert.ok(rawh.unresolvedLoci > 0);
+});
+
+// ── startup cost ─────────────────────────────────────────────────────────────────────────────
+
+test('the bridge table is not materialised just by importing it', async () => {
+  /*
+   * خمسةٌ وعشرون ألف صفّ. بناؤها عند الاستيراد يضع كلفتَها على كل صفحةٍ تحمّل الوحدة —
+   * صفحةُ الدخول وصفحةُ التعريف وهما لا تسألان عن موضعٍ قطّ. فيُثبت هنا أن البناء مؤجَّل،
+   * وأن أول استعمالٍ حقيقيّ هو ما يدفع الثمن.
+   *
+   * يُقاس في عمليةٍ مستقلّة: هذه العملية حمّلت الوحدة واستعملتها في اختباراتٍ سابقة.
+   */
+  const { execFileSync } = await import('node:child_process');
+  const probe = [
+    `import { MIZAN_IDENTITY_CROSSWALK } from '${path.join(process.cwd(), 'src/lib/quran-locus-crosswalk')}';`,
+    "const afterImport = process.memoryUsage().heapUsed;",
+    "const size = MIZAN_IDENTITY_CROSSWALK.size;",
+    "const afterUse = process.memoryUsage().heapUsed;",
+    "console.log(JSON.stringify({ afterImport, afterUse, size }));",
+  ].join('\n');
+  const file = path.join(process.cwd(), 'artifacts', 'crosswalk-lazy-probe.ts');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, probe);
+  try {
+    const out = execFileSync('npx', ['tsx', file], { cwd: process.cwd(), encoding: 'utf8', timeout: 180_000 });
+    const measured = JSON.parse(out.trim().split('\n').at(-1)!) as { afterImport: number; afterUse: number; size: number };
+    assert.equal(measured.size, COMMITTEE_CROSSWALK_ROWS.length, 'the same table is measured');
+    assert.ok(measured.afterUse > measured.afterImport,
+      'first use must be what allocates the table — otherwise the import already paid for it');
+    assert.ok(measured.afterImport < 16 * 1024 * 1024,
+      `importing the crosswalk must stay cheap, measured ${(measured.afterImport / 1048576).toFixed(1)}MB`);
+  } finally { fs.rmSync(file, { force: true }); }
 });
