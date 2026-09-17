@@ -47,3 +47,34 @@ test('a frozen context cannot be silently changed after session lock', () => {
   assert.throws(() => assertContextMatchesFrozen(frozen, readingContextForRawi('hafs')),
     (e: unknown) => e instanceof ReadingContextError && e.code === 'READING_CONTEXT_FROZEN_MISMATCH');
 });
+
+/*
+ * ضمانةٌ ضدّ تفرّع الأنواع: النوعُ الأساس في محرّك الأسئلة، وهذا مُشتقٌّ منه بتشديد
+ * الهوية. فما يُبنى هنا يمرّ إلى القرعة ومحرّك النطاق بلا تحويلٍ ولا نسخةٍ ثانية.
+ */
+test('the strengthened context is the engine context, not a parallel type', async () => {
+  const { poolItemToCandidate } = await import('../src/lib/fairdraw');
+  const ctx = readingContextForRawi('hisham', { sourcePackageId: 'pkg-hisham', packageVersion: 'v1' });
+
+  // يُمرَّر إلى المحرّك كما هو — لو كان نوعًا منافسًا لَما قُبل هنا (يحرسه tsc).
+  const candidate = poolItemToCandidate({
+    id: 'q1', surahNumber: 2, surahNameArabic: 'البقرة', surahNameEnglish: 'Al-Baqarah',
+    startAyah: 1, endAyah: 5, juzNumber: 1, riwaya: 'هشام عن ابن عامر',
+    expectedTextArabic: 'نص', difficultyRating: 3, mutashabihatDensity: 'low',
+    tajweedComplexity: 'intermediate', timesUsed: 0,
+  }, ctx);
+
+  // وهوية الرواية تنتقل إلى المرشّح، فلا يُسحب موضعٌ بلا راوٍ.
+  assert.equal(candidate.rawiId, 'hisham');
+  assert.equal(candidate.qiraahId, 'ibn-amir');
+});
+
+test('a source-package mismatch is visible in the context that travels with the session', () => {
+  const a = readingContextForRawi('warsh', { sourcePackageId: 'pkg-a', packageVersion: 'v1' });
+  assert.equal(a.sourcePackageId, 'pkg-a');
+  assert.equal(a.packageVersion, 'v1');
+  // والتجميد يحفظ الحزمة وإصدارها لإعادة تفسير النتيجة تاريخيًا.
+  const frozen = freezeReadingContext(a);
+  assert.equal(frozen.sourcePackageId, 'pkg-a');
+  assert.equal(frozen.packageVersion, 'v1');
+});

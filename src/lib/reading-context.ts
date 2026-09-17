@@ -10,9 +10,22 @@
  */
 
 import { CANONICAL_READING_BY_RAWI, resolveCanonicalRawiId, type CanonicalReading } from './canonical-readings';
+/*
+ * النوعُ الأساس واحد: `ReadingContext` في محرّك الأسئلة، وتقرأه القرعة ومحرّك النطاق
+ * والتوأم ومصفوفة النماذج. فلا يُنشأ هنا نوعٌ منافس — بل يُشتقّ منه بتشديد الهوية.
+ *
+ * واستيرادُ نوعٍ فقط (`import type`) يُمحى عند الترجمة، فلا حلقة استيرادٍ ولا كلفة تشغيل.
+ */
+import type { ReadingContext as EngineReadingContext } from './question-engine';
 
-/** الحدّ الأدنى لتشغيل النسخة الحالية = الراوي. الطريق والوجه مستقبليان لا يُخترعان. */
-export interface ReadingContext {
+/**
+ * سياقُ قراءةٍ مُشدَّد: هويةُ القراءة والراوي **إلزامية** لا اختيارية.
+ *
+ * محرّك الأسئلة يقبل السياق بحقولٍ اختيارية (لأنه يخدم مساراتٍ قديمة)، وسياقُ المتسابق
+ * لا يجوز أن يكون ناقص الهوية: موضعٌ بلا راوٍ يُسحب من أي حزمة. فهذا النوع يشدّ الاختياري
+ * إلى إلزامي، ويبقى صالحًا للتمرير إلى المحرّك كما هو.
+ */
+export interface ReadingContext extends EngineReadingContext {
   qiraahId: string;
   rawiId: string;
   /** الطريق — اختياري؛ لا يُخترع إن لم يكن معتمدًا في السجلّ. */
