@@ -12,6 +12,7 @@ import { claimsFromGrant, writeIdentityClaims, claimsWritable, claimsWritability
 import { ALL_GOVERNANCE_ROLES, IdentityGovernanceRepository, operatorIdentityOrganizationId, type GovernanceRole, type ServerIdentity } from './server/identity-governance';
 import { NotificationCenterRepository, type NotificationTarget } from './server/notification-center';
 import { ServerAuditLedgerRepository } from './server/audit-ledger';
+import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-registry';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -340,6 +341,16 @@ async function startServer() {
     console.error(`Integrity authority refused: ${authorityDurability.message}`);
   }
   const auditLedgerDir=process.env.MIZAN_AUDIT_LEDGER_DIR||'';let serverAuditLedger:ServerAuditLedgerRepository|null=null;try{if(auditLedgerDir)serverAuditLedger=new ServerAuditLedgerRepository(auditLedgerDir)}catch(err){console.error('Server audit ledger disabled:',err)}
+  /*
+   * سجلُّ الأختام — يسكن مع سجلّ التدقيق لأن كليهما أثرُ حدثٍ لا يُكرَّر.
+   *
+   * بدونه يخرج نداءان بنفس المدخلات ببصمتَي ختمٍ مختلفتين (لأن `sealedAt` يدخل البصمة)
+   * وبصفَّي تدقيقٍ لحدثٍ واحد، فيرى المدقّق ختمين لنفس المشارك بنفس الرقم ولا يعرف
+   * أيّهما المعتمَد. وغيابُه لا يعطّل الختم؛ يُعلَن في `/api/health` ولا يُدَّعى.
+   */
+  const sealRegistryDir=process.env.MIZAN_SEAL_REGISTRY_DIR||(auditLedgerDir?path.join(auditLedgerDir,'seal-registry'):'');
+  let resultSealRegistry:ResultSealRegistry|null=null;
+  try{if(sealRegistryDir)resultSealRegistry=new ResultSealRegistry(new FileSealRegistryStore(sealRegistryDir))}catch(err){console.error('Result seal registry disabled:',err)}
   /* مسارات الهوية الحسّاسة (الاستيلاء على الجلسة مثلًا) تُخنق كالحدّ الضيق للمالك:
      محاولة تخمين أو إغراق يجب أن تُوقف قبل حدّ /api الفسيح. تُترك للطبقة الخارجية متى أُسندت. */
   const sensitiveIdentityRateLimit:RequestHandler=rateLimiterIsGlobal
@@ -1413,6 +1424,17 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       // فحص بوجود الحقل لا بالراية: التضييق على راية منطقية لا يعمل خارج الوضع الصارم.
       if(!('sealed' in outcome))return res.status(422).json({code:outcome.code,message:outcome.message});
       const {sealed}=outcome;
+      /*
+       * إعادةُ المحاولة تعيد الختم نفسه، لا ختمًا ثانيًا.
+       *
+       * `sealedAt` يدخل بصمة الختم، فنداءان بنفس المدخلات يخرجان ببصمتين مختلفتين لنفس
+       * الدرجة. والمفتاحُ الصحيح للتمييز هو `inputsSha256` — بصمةُ ما حُسب منه. فإن كان
+       * مسجَّلًا أُعيد المسجَّل كما هو (200) بلا صفِّ تدقيقٍ ثانٍ؛ وإن تغيّرت المدخلات فهو
+       * إعادةُ ختمٍ حقيقية تُعلن ما نسخته في `supersedes` (201).
+       */
+      const existing=resultSealRegistry?.findByInputs(actor.organizationId,sealed.competitionId,sealed.participantId,sealed.inputsSha256);
+      if(existing)return res.status(200).json({...existing.sealed,idempotent:true});
+      resultSealRegistry?.record({organizationId:actor.organizationId,competitionId:sealed.competitionId,participantId:sealed.participantId,sessionId:sealed.sessionId,inputsSha256:sealed.inputsSha256,sealSha256:sealed.sealSha256,sealedBy:sealed.sealedBy,sealedAt:sealed.sealedAt,finalScore:sealed.finalScore,sealed:sealed as unknown as Record<string,unknown>});
       serverAuditLedger?.append(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:sealed.competitionId,action:'RESULT_SEALED',entityType:'Result',entityId:sealed.participantId,reason:`Sealed ${sealed.finalScore} from ${sealed.contributingJudges} judges · ${sealed.sealSha256.slice(0,12)}${sealed.supersedes?` · supersedes ${sealed.supersedes.previousSealSha256.slice(0,12)} (Δ${sealed.supersedes.delta})`:''}`,requestId:String(req.headers['x-request-id']||'')});
       return res.status(201).json(sealed);
     }catch{return res.status(400).json({code:'RESULT_SEALING_FAILED'})}});
