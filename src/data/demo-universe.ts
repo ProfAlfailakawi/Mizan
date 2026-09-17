@@ -30,6 +30,8 @@ import type {
   SupportSession,
 } from '../types';
 import type { AppStoreState } from '../lib/store-state';
+import { buildParticipantScopeRecord } from '../lib/participant-scope';
+import { scopeFromJuzRange } from '../lib/quran-scope';
 import {
   SEED_APPEALS,
   SEED_ORGANIZATION,
@@ -107,6 +109,12 @@ const COUNTRIES: ReadonlyArray<readonly [string, string]> = [
 
 const RIWAYAT = ['Hafs', 'Warsh', 'Qalun', 'Al-Duri'];
 
+/* مصدرٌ واحد لرواية اللجنة: يقرأ به متسابقوها ويُعتمد فيه محكّموها. اشتقاقان
+   مستقلان كانا سيفترقان بلا أن يظهر ذلك في أي جدول — ولا يظهر إلا حين تُرفض
+   جلسة. */
+const riwayaForCommittee = (committeeIndex: number): string =>
+  RIWAYAT[((committeeIndex % RIWAYAT.length) + RIWAYAT.length) % RIWAYAT.length];
+
 /* توزيعُ حالاتٍ يشبه يومًا حقيقيًا: الأغلبية أدّت اختبارها ومنهم من صدرت شهادته،
    وطابورٌ قائم، وجلساتٌ جارية، ومن لم يُعتمد بعد، وتظلّمٌ أو اثنان. لوحةٌ كلّها حالةٌ
    واحدة لا تُظهر إدارة اليوم إطلاقًا. القيم من `RegistrationStatus` حرفيًا. */
@@ -150,7 +158,17 @@ function demoCommittees(): Committee[] {
     venueHall: `قاعة ${String.fromCharCode(65 + (index % 6))}${Math.floor(index / 6) + 1}`,
     assignedCategories: [pick(categoryIds, index)],
     headJudgeId: `usr-demo-head-${index + 1}`,
-    judgeIds: [`usr-demo-judge-${index * 2 + 1}`, `usr-demo-judge-${index * 2 + 2}`],
+    /*
+     * محكّمٌ واحد لكل لجنة في البيئة التجريبية، لا اثنان.
+     *
+     * بوابة كشف السؤال تشترط موافقة كل محكّمي اللجنة (`requiredJudgeIds`)، فاثنان
+     * يعنيان «٠/٢» ولا يكتمل الكشف أبدًا — ومن يعرض المنتج شخصٌ واحد أمام الشاشة،
+     * لا اثنان يضغطان معًا. فيبقى العرض عالقًا عند سؤالٍ لا يُفتح.
+     *
+     * وهذا لا يمسّ شيئًا خارج الصندوق: القاعدة نفسها باقية، والبيانات وحدها تُبنى
+     * بلجانٍ من محكّمٍ واحد — وهي الحال الغالبة في المسابقات الصغيرة أصلًا.
+     */
+    judgeIds: [`usr-demo-judge-${index + 1}`],
     // لجنةٌ واحدة خارج الخدمة وأخرى في استراحة: يومٌ بلا أي خلل لا يُظهر كيف يُدار الخلل.
     status: index === 4 ? 'offline' : index === 7 ? 'paused' : index % 3 === 0 ? 'testing' : 'ready',
     completedCount: 8 + ((index * 7) % 26),
@@ -175,7 +193,10 @@ function demoJudges(committees: Committee[]): JudgeProfile[] {
         nameArabic: `${pick(FIRST_AR, index * 3 + j)} ${pick(FAMILY_AR, index * 5 + j)}`,
         title: isHead ? 'رئيس لجنة تحكيم' : 'محكّم',
         country: pick(COUNTRIES, index + j)[0],
-        certifiedRiwayat: [pick(RIWAYAT, index + j), 'Hafs'].filter((v, i, a) => a.indexOf(v) === i),
+        /* اللجنة مُعتمدةٌ في الرواية التي يقرأ بها متسابقوها (`riwayaForCommittee`)،
+           وفي حفص معها. واللائحة تشترط لجنةً مؤهّلةً لرواية المتسابق، فلجنةٌ تستقبل
+           ورشًا ومحكّمُها معتمدٌ في قالون وحفص لا تُفتح لها جلسةٌ أبدًا. */
+        certifiedRiwayat: [riwayaForCommittee(index), 'Hafs'].filter((v, i, a) => a.indexOf(v) === i),
         assignedCommitteeId: committee.id,
         conflictsDeclared: [],
         calibrationScore: Number((88 + random() * 11).toFixed(1)),
@@ -212,8 +233,17 @@ function demoParticipants(committees: Committee[]): Participant[] {
       identityLast4: String(1000 + (index * 13) % 9000).slice(-4),
       dateOfBirth: `${1998 + (index % 14)}-0${1 + (index % 9)}-1${index % 9}`,
       gender: female ? 'female' : 'male',
-      categoryId: pick(SEED_CATEGORIES, index).id,
-      riwaya: pick(RIWAYAT, index),
+      /*
+       * الفئة تتبع اللجنة، لا تُختار مستقلةً عنها.
+       *
+       * اللجنة لا تستقبل إلا فئاتها (`assignedCategories`)، فمتسابقٌ أُسند إلى لجنةٍ
+       * لا تخدم فئته لا تُفتح له جلسةٌ أبدًا: «لا توجد لجنة متوافقة معه». وكانت
+       * الفئة تُوزَّع بمعزلٍ عن اللجنة، فأغلب المتسابقين وقعوا في هذا التناقض —
+       * وهو لا يظهر في أي جدول، ولا يظهر إلا حين يحاول محكّمٌ أن يبدأ جلسة.
+       */
+      categoryId: committee.assignedCategories[0] || pick(SEED_CATEGORIES, index).id,
+      // الرواية تتبع اللجنة كما تتبعها الفئة — وإلا سقط التوافق عند بدء الجلسة.
+      riwaya: riwayaForCommittee(committees.indexOf(committee)),
       institution: `مركز تحفيظ القرآن الكريم — ${pick(COUNTRIES, index)[0].split(' (')[0]}`,
       status,
       statusHistory: [
@@ -474,6 +504,46 @@ function demoOrganization(): Organization {
   };
 }
 
+/*
+ * نطاق الحفظ المعتمد لكل متسابق في فئةٍ يختار نطاقها بنفسه.
+ *
+ * فئة «ربع القرآن» نمطها `participant_selected`: لا تبدأ جلسةُ متسابقٍ فيها حتى
+ * يوجد له نطاقٌ **معتمد**، وإلا رُفض البدء بـ«نطاق الحفظ يحتاج مراجعة». وكانت
+ * البيئة لا تولّد أي نطاق، فثُلث المتسابقين لا يمكن تحكيمهم إطلاقًا — ولا يظهر
+ * ذلك في أي شاشة حتى يحاول محكّمٌ أن يبدأ.
+ *
+ * والاختيار ثمانية أجزاء متتابعة تختلف نقطة بدئها بين متسابق وآخر، كما تقتضي
+ * قاعدة الفئة (`exactUnits: 8`).
+ */
+function demoParticipantScopes(
+  participants: Participant[],
+  categories: typeof SEED_CATEGORIES,
+  organizationId: string,
+  competitionId: string,
+): AppStoreState['participantScopes'] {
+  const rows: AppStoreState['participantScopes'] = [];
+  participants.forEach((participant, index) => {
+    const category = categories.find(c => c.id === participant.categoryId);
+    if (!category || category.scopeMode !== 'participant_selected' || !category.selectionRule) return;
+    const firstJuz = 1 + ((index * 3) % 23);
+    rows.push(
+      buildParticipantScopeRecord({
+        id: `pscope-demo-${index + 1}`,
+        organizationId,
+        competitionId,
+        categoryId: category.id,
+        participantId: participant.id,
+        rule: category.selectionRule,
+        selection: scopeFromJuzRange(firstJuz, firstJuz + 7),
+        version: 1,
+        status: 'approved',
+        now: '2027-02-09T09:00:00Z',
+      }),
+    );
+  });
+  return rows;
+}
+
 export function buildDemoInitialState(base: AppStoreState): AppStoreState {
   const universe = buildDemoUniverse();
   const organization = demoOrganization();
@@ -524,5 +594,6 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     reviewCases: universe.reviewCases,
     certificates: universe.certificates,
     supportSessions: demoSupportSessions(competition.id, organization.id),
+    participantScopes: demoParticipantScopes(universe.participants, SEED_CATEGORIES, organization.id, competition.id),
   };
 }

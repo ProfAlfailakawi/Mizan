@@ -182,7 +182,18 @@ export const JudgeOS: React.FC = () => {
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);resolve()};recorder.stop()})};
  const submitAndLock=async()=>{if(!micVerified)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
  const isLastQuestion=activeSession.currentQuestionIndex >= Math.max(1,totalQuestions)-1;
- const committeeQueue=[...participants].filter(p=>p.status==='in_queue' && p.id!==participant?.id && (!activeSession.committee||!p.assignedCommitteeId||p.assignedCommitteeId===activeSession.committee.id)).sort((a,b)=>(a.queueOrderKey??a.queueNumber??999999)-(b.queueOrderKey??b.queueNumber??999999));
+ /*
+  * الطابور لجنةُ المحكّم، سواءٌ أكانت هناك جلسة مفتوحة أم لا.
+  *
+  * كان النطاق يُؤخذ من الجلسة الجارية وحدها، فقبل فتح أي جلسة يرى المحكّم طابور
+  * المسابقة كلها — بما فيه متسابقو لجانٍ أخرى. فينادي أحدهم، ثم يُرفض فتح السؤال
+  * بـ`ASSIGNED_JUDGE_REQUIRED` لأنه ليس من محكّمي تلك اللجنة. والرفض صحيح؛ الخطأ
+  * أن نعرض عليه أسماءً لا يستطيع تحكيمها أصلاً.
+  *
+  * ومن لا لجنة له يرى الطابور كما كان — لا نحبس أحدًا خلف بيانات ناقصة.
+  */
+ const queueCommitteeId=activeSession.committee?.id||judge?.assignedCommitteeId;
+ const committeeQueue=[...participants].filter(p=>p.status==='in_queue' && p.id!==participant?.id && (!queueCommitteeId||!p.assignedCommitteeId||p.assignedCommitteeId===queueCommitteeId)).sort((a,b)=>(a.queueOrderKey??a.queueNumber??999999)-(b.queueOrderKey??b.queueNumber??999999));
  const nextQueued=committeeQueue[0];
  /*
   * «لا توجد جلسة الآن» وحدها كانت تُقال لمحكّمٍ في مسابقةٍ فيها مئة متسابق مسجَّل.
