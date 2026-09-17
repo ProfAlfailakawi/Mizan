@@ -4,6 +4,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import {
   candidateSourceForRawi,
+  resolveCandidateReviewState,
+  type CandidateApprovalBlocker,
   type QuranCandidateReviewState,
   type QuranCandidateSource,
 } from '../src/lib/quran-candidate-sources';
@@ -22,6 +24,21 @@ export interface CandidateReviewEvent {
   note?: string;
 }
 
+/**
+ * لماذا حالةُ المراجعة هي ما هي؟ يُسجَّل مع الحزمة حتى يقرأه الإداري والدعم والـCI
+ * بلا تخمين: قرارٌ مربوطٌ طابقته البايتات، أم قرارٌ لم تطابقه فسقط إلى قيد المراجعة.
+ */
+export interface CandidateApprovalBinding {
+  /** حالة المراجعة كما اشتُقّت من مقابلة القرار بالبايتات عند الإدخال. */
+  derivedState: QuranCandidateReviewState;
+  declaredDecisionState: string;
+  boundUpstreamCommit?: string;
+  boundCompressedSha256?: string;
+  blockers: CandidateApprovalBlocker[];
+  /** هل طابقت البايتات المُدخَلة البصمة المثبَّتة في السجلّ؟ */
+  pinnedDigestMatched: boolean;
+}
+
 export interface CandidateQuranManifest {
   version: 1;
   protocol: 'MIZAN-QURAN-CANDIDATE-SOURCE-1';
@@ -36,6 +53,10 @@ export interface CandidateQuranManifest {
   upstreamUrl: string;
   extractionRecordUrl: string;
   permissionState: 'OWNER_REPORTED_PERMISSION';
+  /** الناشر الأصل في فهرس السلطات العام — لا يُوسَم KFGQPC بحالٍ. */
+  publisherAuthority: string;
+  /** البصمة المثبَّتة في السجلّ التي يُقابَل بها الأثر الداخل. */
+  expectedCompressedSha256: string;
   expectedSurahCount: number;
   expectedVerseCount: number;
   nativeCountFamily: string;
@@ -64,6 +85,7 @@ export interface CandidateQuranManifest {
     state: QuranCandidateReviewState;
     history: CandidateReviewEvent[];
   };
+  approvalBinding: CandidateApprovalBinding;
   caveat?: string;
 }
 
@@ -157,7 +179,7 @@ export function parseCandidateRawDeflate(bytes: Buffer, source: QuranCandidateSo
   return rows;
 }
 
-function manifestHash(input: Omit<CandidateQuranManifest, 'packageHash' | 'review' | 'reviewPacketFile'>) {
+function manifestHash(input: Omit<CandidateQuranManifest, 'packageHash' | 'review' | 'reviewPacketFile' | 'approvalBinding'>) {
   return digest(canonical({
     rawiId: input.rawiId,
     deliveryKey: input.deliveryKey,
@@ -196,7 +218,14 @@ export class CandidateQuranSourceVault {
     return Object.values(requireCandidateRegistry()).map(source => {
       if (!fs.existsSync(this.manifestPath(source.rawiId))) return { rawiId: source.rawiId, state: 'NOT_INGESTED' as const };
       const manifest = this.manifest(source.rawiId);
-      return { rawiId: source.rawiId, state: manifest.review.state, packageHash: manifest.packageHash, normalizedSha256: manifest.normalizedSha256 };
+      return {
+        rawiId: source.rawiId,
+        state: manifest.review.state,
+        packageHash: manifest.packageHash,
+        normalizedSha256: manifest.normalizedSha256,
+        pinnedDigestMatched: manifest.approvalBinding?.pinnedDigestMatched ?? false,
+        blockers: manifest.approvalBinding?.blockers ?? [],
+      };
     });
   }
 
@@ -223,7 +252,7 @@ export class CandidateQuranSourceVault {
     const packageId = `islamweb-derived-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`;
     const sourceFile = path.basename(source.upstreamPath);
     const dataFile = 'verses.json';
-    const seed: Omit<CandidateQuranManifest, 'packageHash' | 'review' | 'reviewPacketFile'> = {
+    const seed: Omit<CandidateQuranManifest, 'packageHash' | 'review' | 'reviewPacketFile' | 'approvalBinding'> = {
       version: 1,
       protocol: 'MIZAN-QURAN-CANDIDATE-SOURCE-1',
       packageId,
@@ -237,6 +266,8 @@ export class CandidateQuranSourceVault {
       upstreamUrl: upstreamUrl(source),
       extractionRecordUrl: extractionRecordUrl(source),
       permissionState: source.permissionState,
+      publisherAuthority: source.publisherAuthority,
+      expectedCompressedSha256: source.expectedCompressedSha256,
       expectedSurahCount: source.expectedSurahCount,
       expectedVerseCount: source.expectedVerseCount,
       nativeCountFamily: source.nativeCountFamily,
@@ -262,11 +293,36 @@ export class CandidateQuranSourceVault {
       ...(source.caveat ? { caveat: source.caveat } : {}),
     };
     const packageHash = manifestHash(seed);
+    /*
+     * الحالة لا تُكتب يدًا. تُشتقّ من مقابلة قرار اللجنة المربوط بالبايتات الداخلة فعلًا:
+     * الأثر المثبَّت بعينه يدخل معتمدًا بقرارٍ مسجَّل، وأي بايتاتٍ أخرى — ولو كانت لنفس
+     * الرواية — تبقى قيد المراجعة مع سببٍ مسمّى. فلا يرث ملفٌ جديد اعتمادًا قديمًا صامتًا.
+     */
+    const resolution = resolveCandidateReviewState(source.rawiId, {
+      upstreamCommit: source.upstreamCommit,
+      compressedSha256,
+    });
+    const approvalBinding: CandidateApprovalBinding = {
+      derivedState: resolution.state,
+      declaredDecisionState: resolution.declaredDecisionState,
+      ...(resolution.boundUpstreamCommit ? { boundUpstreamCommit: resolution.boundUpstreamCommit } : {}),
+      ...(resolution.boundCompressedSha256 ? { boundCompressedSha256: resolution.boundCompressedSha256 } : {}),
+      blockers: resolution.blockers,
+      pinnedDigestMatched: compressedSha256 === source.expectedCompressedSha256,
+    };
+    const history: CandidateReviewEvent[] = resolution.state === 'PENDING_SCHOLAR_REVIEW' ? [] : [{
+      state: resolution.state,
+      reviewerId: `${source.committeeDecision.authority}:${source.committeeDecision.reference}`,
+      reviewedAt: source.committeeDecision.decidedAt,
+      packageHash,
+      note: 'قرار اللجنة المسجَّل، مربوطًا بالـcommit والبصمة المثبتين ومطابقًا للبايتات المُدخَلة.',
+    }];
     const manifest: CandidateQuranManifest = {
       ...seed,
       packageHash,
       reviewPacketFile: 'scholar-review-packet.json',
-      review: { state: 'PENDING_SCHOLAR_REVIEW', history: [] },
+      review: { state: resolution.state, history },
+      approvalBinding,
     };
 
     fs.writeFileSync(path.join(dir, sourceFile), sourceBytes, { mode: 0o600 });
