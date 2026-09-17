@@ -25,6 +25,7 @@ export type QuranAuthorityRole =
 
 export type QuranSourceAuthority =
   | 'KFGQPC'
+  | 'ISLAMWEB'
   | 'ALWAHY'
   | 'QURANPEDIA'
   | 'TANZIL'
@@ -57,6 +58,14 @@ export const QURAN_SOURCE_AUTHORITIES: Record<QuranSourceAuthority, QuranSourceA
     nameEnglish: 'King Fahd Glorious Quran Printing Complex',
     roles: ['FULL_TEXT_AUTHORITY', 'AUDIO_AUTHORITY', 'METADATA_AUTHORITY', 'VISUAL_REFERENCE_AUTHORITY'],
     referenceUrl: 'https://qurancomplex.gov.sa/',
+    primaryTextSource: true,
+  },
+  ISLAMWEB: {
+    id: 'ISLAMWEB',
+    nameArabic: 'إسلام ويب — مصاحف الروايات',
+    nameEnglish: 'IslamWeb — riwayat mushafs',
+    roles: ['FULL_TEXT_AUTHORITY', 'QIRAAT_KNOWLEDGE_AUTHORITY', 'VISUAL_REFERENCE_AUTHORITY'],
+    referenceUrl: 'https://www.islamweb.net/',
     primaryTextSource: true,
   },
   ALWAHY: {
