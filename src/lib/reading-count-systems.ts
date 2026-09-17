@@ -17,10 +17,17 @@
 import { CANONICAL_RAWI_IDS } from './canonical-readings';
 import { QURAN_FULL_TEXT_CANDIDATES } from './quran-candidate-sources';
 import type { QuranNativeCountSystemId } from './quran-native-count-systems';
+import { DELIVERY_COUNT_EVIDENCE_BUILD, DELIVERY_COUNT_SYSTEMS } from './quran-delivery-count-evidence.generated';
 
 export type CountSystemAssurance =
   | 'CANONICAL_BY_DEFINITION'
   | 'VERIFIED_FROM_PINNED_ARTIFACT'
+  /**
+   * عُدَّت آيات كل سورة من بايتات حزمة مرآة التسليم المثبَّتة عند commit معلوم وببصمتها.
+   * دليلٌ حقيقي، ونطاقُه مُسمًّى: يثبت ترقيمَ أثر المرآة الذي تخدمه هذه الطبقة فعلًا، لا
+   * ترقيمَ حزمةٍ خاصّة في R2 — وتلك يحرسها فحصٌ وقت التشغيل يفشل مغلقًا عند الاختلاف.
+   */
+  | 'VERIFIED_FROM_PINNED_MIRROR_ARTIFACT'
   | 'UNVERIFIED';
 
 export interface ReadingCountSystem {
@@ -51,11 +58,37 @@ const BASE: Record<string, ReadingCountSystem> = {
   },
 };
 
+/*
+ * الروايات المُسلَّمة من مرآة المجمع: عُدَّت آيات سورها من بايتات المرآة المثبَّتة.
+ *
+ * وكان الافتراض القديم أن الثماني كلَّها كوفيّةُ العدّ (٦٢٣٦)، فظهر بالقياس أنه خطأ في
+ * ستٍّ منها: ورشٌ وقالون ٦٢١٤، والبزّي وقنبل ٦٢٢٠، والدوري والسوسي ٦٢١٧، وشعبةُ وحده
+ * كوفيٌّ فعلًا. فالافتراضُ الصامت كان يضع متسابقَ ورشٍ أمام موضعٍ لا يبدأ عنده حدُّ آيةٍ
+ * في روايته — وهو بعينه ما بُني جسرُ المواضع لمنعه.
+ */
+const MIRROR_MEASURED: Record<string, ReadingCountSystem> = (() => {
+  const map: Record<string, ReadingCountSystem> = {};
+  for (const entry of DELIVERY_COUNT_SYSTEMS) {
+    for (const pkg of entry.packages) {
+      if (pkg.rawiId === 'hafs') continue; // حفصٌ قانونيٌّ بالتعريف، والقياس يؤكّده لا يغيّره.
+      map[pkg.rawiId] = {
+        rawiId: pkg.rawiId,
+        system: entry.system as QuranNativeCountSystemId,
+        assurance: 'VERIFIED_FROM_PINNED_MIRROR_ARTIFACT',
+        note: `عُدَّت آيات كل سورة من بايتات ${pkg.upstreamPath} في ${DELIVERY_COUNT_EVIDENCE_BUILD.upstreamRepository}@${DELIVERY_COUNT_EVIDENCE_BUILD.upstreamCommit.slice(0, 12)} (بصمة ${pkg.sha256.slice(0, 16)}، ${pkg.totalAyahs} آية). ${entry.note}`,
+      };
+    }
+  }
+  return map;
+})();
+
 export const READING_COUNT_SYSTEMS: ReadonlyMap<string, ReadingCountSystem> = (() => {
   const map = new Map<string, ReadingCountSystem>();
   for (const rawiId of CANONICAL_RAWI_IDS) {
     const base = BASE[rawiId];
     if (base) { map.set(rawiId, base); continue; }
+    const measured = MIRROR_MEASURED[rawiId];
+    if (measured) { map.set(rawiId, measured); continue; }
     const candidate = QURAN_FULL_TEXT_CANDIDATES.find(c => c.rawiId === rawiId);
     if (candidate) {
       map.set(rawiId, {

@@ -25,13 +25,14 @@ import { resolveReadings } from './scientific-core';
 import { QURAN_SURAH_TOTAL, ayahCountOf, isValidLocus, type QuranLocus } from './quran-canon';
 import { countSystemForReading } from './reading-count-systems';
 import { nativeAyahCountOf } from './quran-native-count-systems';
-import { COMMITTEE_CROSSWALK_ROWS, COMMITTEE_CROSSWALK_VERSION } from './quran-crosswalk-evidence';
+import { COMMITTEE_CROSSWALK_VERSION, committeeCrosswalkRows } from './quran-crosswalk-evidence';
 
 /** نوع العلاقة بين الإحداثي القانوني وترقيم الرواية. */
 export type CrosswalkRelation =
   | 'EXACT'            // آيةٌ بآية.
   | 'MERGED'           // آياتٌ قانونية تُقرأ آيةً واحدة في الرواية.
   | 'SPLIT'            // آيةٌ قانونية تُقرأ آيتين أو أكثر.
+  | 'SPLIT_AND_MERGE'  // تُقسَّم داخليًّا **و** يُوصَل آخرُها بما بعده — حالةٌ مركّبة واقعة في الأثر.
   | 'BOUNDARY_SHIFT';  // الحدّ يتقدّم أو يتأخّر بلا دمجٍ ولا تقسيم.
 
 export interface QuranLocusCrosswalk {
@@ -39,6 +40,14 @@ export interface QuranLocusCrosswalk {
   canonical: { surah: number; ayah: number };
   native: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
   relation: CrosswalkRelation;
+  /**
+   * هل يُوصَل آخرُ موضعٍ أصليٍّ لهذه الآية بالآية القانونية التالية؟
+   *
+   * حقلٌ مستقلٌّ عن `relation` عمدًا: مصدر الحدود يمثّل القسمة والوصل بُعدين منفصلين، وقد
+   * يجتمعان على آيةٍ واحدة. وضغطُهما في قيمة enum واحدة يُفقد المعلومة اللازمة لتحديد
+   * موضع الآية الأصلي، فيبقى الحقل صريحًا. اختياريٌّ حفاظًا على توافق الصفوف السابقة.
+   */
+  mergesWithNext?: boolean;
   /** مرجع الدليل — إلزاميٌّ لكل علاقةٍ غير EXACT. */
   evidence: string[];
 }
@@ -65,6 +74,8 @@ export interface NativeResolution {
   /** `undefined` حين `UNRESOLVED` — لا يُختلق موضعٌ أصلي. */
   native?: { surah: number; ayah?: number; ayahStart?: number; ayahEnd?: number };
   relation: CrosswalkRelation;
+  /** يُنقل كما هو من صفّ الدليل — لا يُشتقّ من `relation` ولا يُفقد. */
+  mergesWithNext?: boolean;
   assurance: CrosswalkAssurance;
   /** true = لم يأتِ من صفّ دليلٍ منصوص. */
   assumed: boolean;
@@ -92,6 +103,13 @@ export function validateCrosswalkRow(row: QuranLocusCrosswalk): void {
   }
   if (row.relation === 'EXACT' && !hasSingle) throw new CrosswalkError('CROSSWALK_EXACT_REQUIRES_SINGLE_AYAH');
   if (row.relation === 'SPLIT' && !hasRange) throw new CrosswalkError('CROSSWALK_SPLIT_REQUIRES_RANGE');
+  if (row.relation === 'SPLIT_AND_MERGE' && !hasRange) throw new CrosswalkError('CROSSWALK_SPLIT_REQUIRES_RANGE');
+  if (row.relation === 'MERGED' && !hasSingle) throw new CrosswalkError('CROSSWALK_MERGED_REQUIRES_SINGLE_AYAH');
+  // لا يُقبل وصلٌ مُعلَنٌ يناقض العلاقة، ولا علاقةُ وصلٍ بلا إعلانه.
+  if (row.mergesWithNext !== undefined) {
+    const relationMerges = row.relation === 'MERGED' || row.relation === 'SPLIT_AND_MERGE';
+    if (row.mergesWithNext !== relationMerges) throw new CrosswalkError('CROSSWALK_MERGE_FLAG_CONTRADICTS_RELATION');
+  }
 }
 
 const keyOf = (rawiId: string, surah: number, ayah: number) => `${rawiId}#${surah}:${ayah}`;
@@ -101,18 +119,48 @@ const keyOf = (rawiId: string, surah: number, ayah: number) => `${rawiId}#${sura
  * بالتطابق الافتراضي مع إعلان `assumed:true` — فلا يُخلط المعلومُ بالمفترض.
  */
 export class QuranCrosswalkTable {
-  private readonly rows = new Map<string, QuranLocusCrosswalk>();
+  /*
+   * الصفوف تُبنى عند أول حاجةٍ لا عند تحميل الوحدة.
+   *
+   * جدولُ ميزان العامل خمسةٌ وعشرون ألف صفّ. وبناؤها عند الاستيراد يضع نحوَ ٢٥ ميجابايت
+   * ووقفةً على الخيط الرئيسي في **كل** صفحةٍ تحمّل هذه الوحدة — بما فيها صفحةُ الدخول
+   * وصفحةُ التعريف، وهما لا تسألان عن موضعٍ قطّ. فالتأجيلُ يجعل الكلفةَ على من يستعمل.
+   *
+   * ولا تتغيّر بهذا أيُّ دلالة: الصفّ يُتحقَّق منه ويُرفض المكرَّر كما كان، لكن عند أول
+   * استعمالٍ فعليّ — فيظهر الخطأ لمن يسأل، لا لمن يفتح الصفحة.
+   */
+  private readonly source: QuranLocusCrosswalk[] | (() => QuranLocusCrosswalk[]);
+  private built?: Map<string, QuranLocusCrosswalk>;
   /** إصدار الجسر — يُسجَّل في الجلسة لإعادة تفسير النتيجة تاريخيًا. */
   readonly mappingVersion: string;
 
-  constructor(rows: QuranLocusCrosswalk[] = [], mappingVersion = 'mizan-crosswalk-identity-v1') {
+  constructor(
+    rows: QuranLocusCrosswalk[] | (() => QuranLocusCrosswalk[]) = [],
+    mappingVersion = 'mizan-crosswalk-identity-v1',
+  ) {
     this.mappingVersion = mappingVersion;
-    for (const row of rows) {
+    this.source = rows;
+    /*
+     * التأجيل للمولَّد الكبير وحده.
+     *
+     * جدولٌ يُبنى من صفوفٍ في اليد يُتحقَّق منه فورًا كما كان: كلفتُه لا تُذكر، وتأجيلُ
+     * الخطأ فيه يعني ظهورَه في منتصف جلسةٍ بدل ظهوره عند التركيب. أمّا المولَّد فيُمرَّر
+     * دالّةً، وهو وحده ما يُؤجَّل.
+     */
+    if (typeof rows !== 'function') void this.rows;
+  }
+
+  private get rows(): Map<string, QuranLocusCrosswalk> {
+    if (this.built) return this.built;
+    const built = new Map<string, QuranLocusCrosswalk>();
+    for (const row of typeof this.source === 'function' ? this.source() : this.source) {
       validateCrosswalkRow(row);
       const key = keyOf(row.rawiId, row.canonical.surah, row.canonical.ayah);
-      if (this.rows.has(key)) throw new CrosswalkError('CROSSWALK_DUPLICATE_CANONICAL_LOCUS');
-      this.rows.set(key, row);
+      if (built.has(key)) throw new CrosswalkError('CROSSWALK_DUPLICATE_CANONICAL_LOCUS');
+      built.set(key, row);
     }
+    this.built = built;
+    return built;
   }
 
   get size() { return this.rows.size; }
@@ -135,7 +183,15 @@ export class QuranCrosswalkTable {
     if (!isValidLocus(canonical)) throw new CrosswalkError('CROSSWALK_CANONICAL_LOCUS_INVALID');
     const row = this.rows.get(keyOf(rawiId, canonical.surah, canonical.ayah));
     if (row) {
-      return { rawiId, native: { ...row.native }, relation: row.relation, assurance: 'EVIDENCED_ROW', assumed: false, evidence: [...row.evidence] };
+      return {
+        rawiId,
+        native: { ...row.native },
+        relation: row.relation,
+        mergesWithNext: row.mergesWithNext,
+        assurance: 'EVIDENCED_ROW',
+        assumed: false,
+        evidence: [...row.evidence],
+      };
     }
     const assurance = surahCountAssurance(rawiId, canonical.surah);
     if (assurance === 'UNRESOLVED') {
@@ -164,14 +220,33 @@ export class QuranCrosswalkTable {
    */
   toCanonicalFromEvidence(rawiId: string, native: { surah: number; ayah: number }): QuranLocus | undefined {
     if (!CANONICAL_READING_BY_RAWI.has(rawiId)) throw new CrosswalkError('CROSSWALK_UNKNOWN_RAWI');
+    return this.reverseIndex().get(keyOf(rawiId, native.surah, native.ayah));
+  }
+
+  /*
+   * فهرسٌ عكسيّ يُبنى عند أول حاجة.
+   *
+   * كان العكس مسحًا خطّيًّا على كل الصفوف. وهو مقبولٌ وجدولُ الأدلّة فارغ، لكنه صار
+   * خمسةً وعشرين ألف صفّ بعد وصول الدليل، وتحويلُ حزمةٍ كاملة يناديه لكل آية — فيصير
+   * حاصلُ ضربٍ يُقاس بالدقائق. والبناءُ مرّةً واحدة يجعله بحثًا ثابت الكلفة.
+   *
+   * ولا يغيّر هذا دلالةَ العكس: ما لا صفَّ له يبقى `undefined` ولا يُخمَّن. وعند تعدّد
+   * الصفوف على موضعٍ أصليٍّ واحد — وهو واقعُ الدمج — يُحفظ أوّلها كما كان المسحُ يفعل.
+   */
+  private reverse?: Map<string, QuranLocus>;
+  private reverseIndex(): Map<string, QuranLocus> {
+    if (this.reverse) return this.reverse;
+    const index = new Map<string, QuranLocus>();
     for (const row of this.rows.values()) {
-      if (row.rawiId !== rawiId || row.native.surah !== native.surah) continue;
-      const single = row.native.ayah === native.ayah;
-      const inRange = row.native.ayahStart !== undefined && row.native.ayahEnd !== undefined
-        && native.ayah >= row.native.ayahStart && native.ayah <= row.native.ayahEnd;
-      if (single || inRange) return { surah: row.canonical.surah, ayah: row.canonical.ayah };
+      const start = row.native.ayahStart ?? row.native.ayah!;
+      const end = row.native.ayahEnd ?? row.native.ayah!;
+      for (let ayah = start; ayah <= end; ayah += 1) {
+        const key = keyOf(row.rawiId, row.native.surah, ayah);
+        if (!index.has(key)) index.set(key, { surah: row.canonical.surah, ayah: row.canonical.ayah });
+      }
     }
-    return undefined;
+    this.reverse = index;
+    return index;
   }
 
   /** صفوف رواية بعينها — للتقارير والتدقيق. */
@@ -320,6 +395,6 @@ export function crosswalkCoverageMatrix(table: QuranCrosswalkTable = MIZAN_IDENT
  * وبمجرّد وصول الصفوف بمراجعها تنتقل روايتها إلى «جاهزة للسؤال» بلا تعديل منطق.
  */
 export const MIZAN_IDENTITY_CROSSWALK = new QuranCrosswalkTable(
-  [...COMMITTEE_CROSSWALK_ROWS],
+  () => [...committeeCrosswalkRows()],
   COMMITTEE_CROSSWALK_VERSION,
 );

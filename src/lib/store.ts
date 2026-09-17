@@ -2023,6 +2023,8 @@ export function useAppStore() {
         sealMetadata: {
           sealedBy: globalState.currentUser.name,
           sealedById: globalState.currentUser.id,
+          // هوية المصادقة نفسها: هي وحدها ما تستطيع قاعدة الخادم مقارنته بطالب النشر.
+          sealedByUid: auth.currentUser?.uid,
           sealedAt: seal.sealedAt || sealedAt,
           cryptographicChecksum: `SHA256:${seal.sealSha256}`,
           dualApprovalBy: policy.results.requireDualApprovalToSeal ? approverNames.join(' + ') : undefined,

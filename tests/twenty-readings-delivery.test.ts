@@ -97,19 +97,54 @@ test('question safety is derived from real count evidence and names its blocked 
     assert.ok(isReadingQuestionSafe(rawiId), rawiId);
     assert.deepEqual(readingQuestionBlockers(rawiId), []);
   }
-  for (const rawiId of ['hisham', 'ibn-dhakwan', 'ibn-wardan', 'ibn-jammaz', 'ruways', 'rawh']) {
+  /*
+   * خمسٌ من الستّ المختلِفة عدًّا حُلَّت بأثرِ حدودٍ مثبَّتٍ ببصمته، فصارت مواضعُها كلُّها
+   * مدعومةً بصفّ دليل — لا مفترَضة. والحسم كان بالدليل لا بتخفيف الشرط.
+   */
+  for (const rawiId of ['hisham', 'ibn-dhakwan', 'ibn-wardan', 'ibn-jammaz', 'ruways']) {
+    const coverage = crosswalkCoverage(rawiId);
+    assert.equal(coverage.countAssurance, 'VERIFIED_FROM_PINNED_ARTIFACT', rawiId);
+    assert.equal(coverage.unresolvedLoci, 0, rawiId);
+    assert.deepEqual(coverage.surahsRequiringEvidence, [], rawiId);
+    assert.equal(isReadingQuestionSafe(rawiId), true, rawiId);
+    assert.deepEqual(readingQuestionBlockers(rawiId), [], rawiId);
+    assert.equal(coverage.resolvedLoci + coverage.unresolvedLoci + coverage.assumedLoci, coverage.canonicalAyahTotal);
+  }
+
+  // وروحٌ وحده باقٍ: سورةٌ واحدة تخالف أعدادَ حزمته، وواحدة تكفي للفشل المغلق.
+  for (const rawiId of ['rawh']) {
     const coverage = crosswalkCoverage(rawiId);
     assert.ok(coverage.unresolvedLoci > 0, rawiId);
     assert.ok(coverage.surahsRequiringEvidence.length > 0, rawiId);
     assert.equal(isReadingQuestionSafe(rawiId), false, rawiId);
     assert.match(readingQuestionBlockers(rawiId)[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
-    // والمواضع المحلولة + غير المحلولة = كامل المصحف، بلا موضعٍ ضائع بلا تصنيف.
     assert.equal(coverage.resolvedLoci + coverage.unresolvedLoci + coverage.assumedLoci, coverage.canonicalAyahTotal);
   }
-  // حفصٌ قانونيٌّ بالتعريف، والسبعة الباقية من مرآة المجمع لم يُقرأ ترقيمها هنا.
+  /*
+   * حفصٌ قانونيٌّ بالتعريف. والسبعة الباقية من مرآة المجمع قِيس ترقيمُها من بايتاتها
+   * المثبَّتة، فلم يبقَ في العشرين ادّعاءُ ترقيمٍ بلا قياس. وظهر بالقياس أن ستًّا منها
+   * ليست كوفيّةَ العدّ كما كان يُفترض صامتًا.
+   */
   assert.equal(countSystemForReading('hafs')!.assurance, 'CANONICAL_BY_DEFINITION');
   assert.ok(isReadingQuestionSafe('hafs'));
-  assert.equal(countSystemForReading('warsh')!.assurance, 'UNVERIFIED');
+  assert.equal(countSystemForReading('warsh')!.assurance, 'VERIFIED_FROM_PINNED_MIRROR_ARTIFACT');
+  assert.equal(countSystemForReading('warsh')!.system, 'MADANI_AKHIR');
+  assert.equal(countSystemForReading('shubah')!.system, 'KUFIC', 'Shubah really is Kufic — measured, not assumed');
+  for (const rawiId of CANONICAL_RAWI_IDS) {
+    assert.notEqual(countSystemForReading(rawiId)!.assurance, 'UNVERIFIED', rawiId);
+  }
+
+  /*
+   * وأربعٌ من المرآة قِيس ترقيمُها ولم يطابق أيَّ نظامٍ منشورٍ في المصدر المثبَّت، فتُحجب
+   * عن السؤال. حجبُها ليس تراجعًا: هو استبدالُ افتراضٍ صامتٍ خاطئ بمنعٍ مسمًّى بسورته.
+   */
+  for (const rawiId of ['al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi']) {
+    const coverage = crosswalkCoverage(rawiId);
+    assert.equal(coverage.assumedLoci, 0, `${rawiId} may not resolve any locus by assumption`);
+    assert.ok(coverage.unresolvedLoci > 0, rawiId);
+    assert.equal(isReadingQuestionSafe(rawiId), false, rawiId);
+    assert.match(readingQuestionBlockers(rawiId)[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
+  }
 });
 
 test('each reading serves its own text and no other', async () => {

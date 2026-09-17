@@ -14,6 +14,7 @@
  */
 
 import { QURAN_SURAH_TOTAL, ayahCountOf } from './quran-canon';
+import { DELIVERY_COUNT_SYSTEMS } from './quran-delivery-count-evidence.generated';
 
 /**
  * أنظمة العدّ المستعملة في ميزان. `KUFIC` هو عدّ المصحف المدني المعتمد canonical في ميزان،
@@ -24,7 +25,15 @@ export type QuranNativeCountSystemId =
   | 'DIMASHQI'
   | 'MADANI_AWWAL'
   | 'BASRI_YAQUB_RUWAYS'
-  | 'BASRI_YAQUB_RAWH';
+  | 'BASRI_YAQUB_RAWH'
+  /*
+   * الثلاثة التالية مقيسةٌ من بايتات حزم مرآة التسليم المثبَّتة، لا مفترَضة. وكان النظام
+   * يفترض أن الروايات الثماني المُسلَّمة من المرآة كلَّها كوفيّةُ العدّ — وهو خطأٌ مقيس في
+   * ستٍّ منها. واسمُ كلِّ نظامٍ يقول من أين جاء: ما فارق النظام المنشور لا يُسمَّى باسمه.
+   */
+  | 'MADANI_AKHIR'
+  | 'MAKKI_IBN_KATHIR_DELIVERY'
+  | 'BASRI_ABU_AMR_DELIVERY';
 
 /** عدد آيات كل سورة (١..١١٤) في كل نظام عدّ — مستخرجٌ من الأثر المثبَّت. */
 export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly number[]> = {
@@ -98,7 +107,32 @@ export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly
     8, 8, 3, 9, 5, 4, 7, 3, 6, 3,
     5, 4, 5, 6,
   ],
+  /*
+   * تُحقَن من الأثر المولَّد لا تُكتب يدًا، فلا تنحرف الأرقام هنا عن البايتات المقيسة.
+   * ويثبت اختبارٌ أنها ما زالت تطابق `quran-sources/delivery-counts/` حرفًا بحرف.
+   */
+  ...deliveryMeasuredCounts(),
 };
+
+type MeasuredDeliverySystemId = 'MADANI_AKHIR' | 'MAKKI_IBN_KATHIR_DELIVERY' | 'BASRI_ABU_AMR_DELIVERY';
+
+function deliveryMeasuredCounts(): Record<MeasuredDeliverySystemId, readonly number[]> {
+  const required: MeasuredDeliverySystemId[] = ['MADANI_AKHIR', 'MAKKI_IBN_KATHIR_DELIVERY', 'BASRI_ABU_AMR_DELIVERY'];
+  const out = {} as Record<MeasuredDeliverySystemId, readonly number[]>;
+  for (const entry of DELIVERY_COUNT_SYSTEMS) {
+    // الكوفي معرَّفٌ أصلًا في الجدول أعلاه؛ القياس يؤكّده ولا يعيد تعريفه.
+    if (entry.system === 'KUFIC') continue;
+    out[entry.system as MeasuredDeliverySystemId] = entry.perSurahAyahCounts;
+  }
+  // فشلٌ مغلق عند الإقلاع: نظامٌ مُعلَنٌ بلا أرقامٍ مقيسة خطأُ بناءٍ لا يُمرَّر صامتًا.
+  for (const system of required) {
+    const counts = out[system];
+    if (!counts || counts.length !== QURAN_SURAH_TOTAL) {
+      throw new Error(`NATIVE_COUNT_SYSTEM_EVIDENCE_MISSING:${system}`);
+    }
+  }
+  return out;
+}
 
 /** مجموع آيات كل نظام عدّ — يُحسب ولا يُكتب يدًا. */
 export function nativeTotalAyahs(system: QuranNativeCountSystemId): number {

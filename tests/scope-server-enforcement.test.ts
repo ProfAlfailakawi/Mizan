@@ -177,14 +177,28 @@ test('two concurrent sessions never receive the same locus twice from one ledger
   } finally { fs.rmSync(fixture.dir, { recursive: true, force: true }); }
 });
 
-test('a session id cannot be provisioned twice, so a retried request never doubles a model', () => {
+/*
+ * إعادةُ المحاولة ليست طلبًا ثانيًا.
+ *
+ * كان تكرارُ التهيئة يرمي `SESSION_EXISTS` دائمًا، فيقف المنظّم أمام خطأٍ في قاعةٍ مفتوحة
+ * والجلسةُ في الحقيقة جاهزة. والآن: نفسُ الطلب يعود بنفس الجلسة بلا نموذجٍ ثانٍ، وطلبٌ
+ * مختلفٌ بنفس المعرّف يبقى تعارضًا يُردّ.
+ */
+test('a retried provision returns the same session instead of creating or refusing a second one', () => {
   const pool = Array.from({ length: 12 }, (_, i) => blueprint(2, i + 1, i + 3, 1));
   const fixture = runtimeFixture(undefined, pool);
   try {
     const scope = scopeFromJuzRange(1, 1);
-    fixture.provision('s-idem', 'p-idem', scope);
-    assert.throws(() => fixture.provision('s-idem', 'p-idem', scope), /QUESTION_RUNTIME_SESSION_EXISTS/, 'a duplicate request is refused instead of creating a second model');
-    assert.equal(fixture.runtime.revealFairDrawSeed('s-idem').selectionIds.length, 2);
+    const first = fixture.provision('s-idem', 'p-idem', scope);
+    const retry = fixture.provision('s-idem', 'p-idem', scope);
+    // تُقارَن الصورةُ التي يراها العميل فعلًا: الأولى في الذاكرة والثانية مقروءةٌ من
+    // القرص، فمفتاحٌ قيمتُه `undefined` يسقط في الثانية ولا فرق في الردّ نفسه.
+    const overTheWire = (value: unknown) => JSON.parse(JSON.stringify(value));
+    assert.deepEqual(overTheWire(retry), overTheWire(first), 'the retry returns the identical model, not a new one');
+    assert.equal(fixture.runtime.revealFairDrawSeed('s-idem').selectionIds.length, 2, 'no second question set was drawn');
+
+    // ومتسابقٌ آخر بنفس معرّف الجلسة ليس إعادةَ محاولة — هو تعارضٌ يُسمَّى.
+    assert.throws(() => fixture.provision('s-idem', 'p-other', scope), /QUESTION_RUNTIME_SESSION_EXISTS/);
   } finally { fs.rmSync(fixture.dir, { recursive: true, force: true }); }
 });
 

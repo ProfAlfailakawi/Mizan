@@ -17,10 +17,23 @@
  */
 
 import { QURAN_FULL_TEXT_CANDIDATES, candidateSourceForRawi } from '../src/lib/quran-candidate-sources';
-import { crosswalkCoverage } from '../src/lib/quran-locus-crosswalk';
-import { juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
+import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, surahCountAssurance } from '../src/lib/quran-locus-crosswalk';
+import { ayahCountOf, juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
 import { KfgqpcDeliveryRepository, type KfgqpcDeliveryPassage } from './kfgqpc-delivery';
 import { islamwebPackageStatus, loadIslamwebReadingPackage } from './islamweb-reading-packages';
+import { verifyServedPackageNumbering } from '../src/lib/quran-delivery-count-guard';
+import { KFGQPC_DELIVERY_READING_BY_RAWI } from '../src/lib/delivered-readings';
+
+/**
+ * أيُّ هجاءٍ يصل ← الراوي، للروايات التي قِيس ترقيمُ حزمتها.
+ * يُقبل معرّفُ الراوي ومفتاحُ التسليم معًا، فلا يفلت الحارسُ من باب الهجاء الآخر.
+ */
+const MIRROR_RAWI_BY_DELIVERY_KEY = new Map<string, string>(
+  Object.entries(KFGQPC_DELIVERY_READING_BY_RAWI).flatMap(([rawiId, key]) => [
+    [key, rawiId] as [string, string],
+    [rawiId, rawiId] as [string, string],
+  ]),
+);
 
 export type ReadingDeliveryAnchor = 'SURAH_START' | 'JUZ_START' | 'PAGE_START' | 'AYAH_START';
 
@@ -119,28 +132,78 @@ export class MizanQuranDelivery {
     };
   }
 
+  /** سببُ رفض آخر حزمةِ مرآةٍ لاختلاف ترقيمها — للتشخيص وفحص ما قبل الانطلاق. */
+  private readonly numberingRejections = new Map<string, string>();
+
+  /** أسبابُ الرفض الترقيمي القائمة، بأسماء رواتها. */
+  numberingRejectionReasons(): Record<string, string> {
+    return Object.fromEntries(this.numberingRejections);
+  }
+
   /**
    * صفوف نصّ الرواية. تعود `null` — لا صفوف روايةٍ أخرى — متى تعذّرت الحزمة.
    */
   async quranData(readingId: string): Promise<ReadingDeliveryRow[] | null> {
     const rawiId = candidateRawiForDeliveryKey(readingId);
-    if (!rawiId) return (await this.kfgqpc.quranData(readingId)) as ReadingDeliveryRow[] | null;
+    if (!rawiId) {
+      const rows = (await this.kfgqpc.quranData(readingId)) as ReadingDeliveryRow[] | null;
+      if (!rows) return null;
+      /*
+       * حزمةُ المرآة تُقاس قبل أن تُخدَم.
+       *
+       * ترقيمُ هذه الروايات مُثبتٌ من بايتاتٍ مثبَّتة، وجسرُ مواضعها مبنيٌّ عليه. فلو خُدمت
+       * حزمةٌ ترقيمُها غير ذلك — نسخةٌ أحدث في R2، أو مفتاحٌ كُتب فوقه — لصار السؤال يُسحب
+       * بجسرٍ لا يصف النصَّ المعروض. فيُرفض النصّ ولا يُخدَم بترقيمٍ مجهول، ولا يُستعاض
+       * عنه بحزمة روايةٍ أخرى.
+       */
+      const mirrorRawi = MIRROR_RAWI_BY_DELIVERY_KEY.get(readingId);
+      if (mirrorRawi) {
+        const verdict = verifyServedPackageNumbering(mirrorRawi, rows as unknown as Record<string, unknown>[]);
+        if (!verdict.matches) {
+          this.numberingRejections.set(mirrorRawi, verdict.code || 'DELIVERY_PACKAGE_NUMBERING_MISMATCH');
+          return null;
+        }
+        this.numberingRejections.delete(mirrorRawi);
+      }
+      return rows;
+    }
 
     const cached = this.rowCache.get(rawiId);
     if (cached) return cached;
     let pkg;
     try { pkg = loadIslamwebReadingPackage(rawiId, this.env); } catch { return null; }
 
-    const questionSafe = crosswalkCoverage(rawiId).questionSafe;
-    const rows: ReadingDeliveryRow[] = pkg.verses.map(v => ({
-      sora: v.sura_no,
-      aya_no: v.aya_no,
-      aya_text: v.aya_text,
-      // أسماء السور بيانٌ وصفيّ مشترك لا نصٌّ قرآني، فتؤخذ من المرجع القانوني.
-      sora_name_ar: surahNameArabic(v.sura_no),
-      sora_name_en: surahNameEnglish(v.sura_no),
-      ...(questionSafe ? { jozz: juzOfLocus({ surah: v.sura_no, ayah: v.aya_no }) } : {}),
-    }));
+    /*
+     * الجزء يُحسب على الإحداثي القانوني وحده.
+     *
+     * جدول الأجزاء كوفيٌّ، وترقيمُ هذه الصفوف أصليٌّ للرواية. وحقنُ الرقم الأصلي في الجدول
+     * القانوني خطأٌ مرّتين: يعطي جزءًا خاطئًا في السور المختلِفة عدًّا، ويرمي أصلًا حين
+     * يتجاوز الرقمُ الأصلي حدَّ السورة القانوني (٤:١٧٧ في الدمشقي مقابل ١٧٦ كوفيًّا).
+     *
+     * فالانتقال من الأصلي إلى القانوني يمرّ من صفوف الدليل صراحةً — ولا يُفترض دورانٌ
+     * عكسيٌّ متطابق، لأن العكس ناقصٌ عند التقسيم. وما لا يُحلّ لا يحمل جزءًا: حقلٌ غائب
+     * أصدق من جزءٍ مخترَع.
+     */
+    const juzForNative = (surah: number, nativeAyah: number): number | undefined => {
+      const canonical = nativeAyah <= ayahCountOf(surah) && surahCountAssurance(rawiId, surah) === 'VERIFIED_COUNT_IDENTITY'
+        ? { surah, ayah: nativeAyah }
+        : MIZAN_IDENTITY_CROSSWALK.toCanonicalFromEvidence(rawiId, { surah, ayah: nativeAyah });
+      if (!canonical) return undefined;
+      try { return juzOfLocus(canonical); } catch { return undefined; }
+    };
+
+    const rows: ReadingDeliveryRow[] = pkg.verses.map(v => {
+      const jozz = juzForNative(v.sura_no, v.aya_no);
+      return {
+        sora: v.sura_no,
+        aya_no: v.aya_no,
+        aya_text: v.aya_text,
+        // أسماء السور بيانٌ وصفيّ مشترك لا نصٌّ قرآني، فتؤخذ من المرجع القانوني.
+        sora_name_ar: surahNameArabic(v.sura_no),
+        sora_name_en: surahNameEnglish(v.sura_no),
+        ...(jozz !== undefined ? { jozz } : {}),
+      };
+    });
     this.rowCache.set(rawiId, rows);
     return rows;
   }

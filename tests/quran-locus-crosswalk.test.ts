@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 
 import {
   QuranCrosswalkTable,
@@ -19,11 +20,27 @@ const row = (over: Partial<QuranLocusCrosswalk> = {}): QuranLocusCrosswalk => ({
   ...over,
 });
 
-test('the default Mizan crosswalk is deliberately empty — no invented mapping rows', () => {
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.size, 0);
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.mappingVersion, 'mizan-crosswalk-committee-v0-empty');
-  for (const rawiId of ['hafs', 'warsh', 'hisham', 'al-duri-kisai']) {
-    assert.deepEqual(MIZAN_IDENTITY_CROSSWALK.rowsFor(rawiId), []);
+/*
+ * الجدول لم يعد فارغًا، ولم يُملأ باجتهاد: صفوفه مولَّدةٌ من أثرِ حدودٍ مثبَّتٍ ببصمته،
+ * ولا تدخله روايةٌ إلا بعد مطابقة أعداد سورها الـ١١٤ لأعداد حزمتها. فالشرط لم يَلِن —
+ * تغيّر أن الدليل وصل. ولهذا يُحرَس هنا مصدرُ كل صفّ، لا عددُ الصفوف.
+ */
+test('every row in the default Mizan crosswalk comes from pinned evidence — none is invented', () => {
+  assert.match(MIZAN_IDENTITY_CROSSWALK.mappingVersion, /^mizan-crosswalk-quranws-[0-9a-f]{12}-[0-9a-f]{12}$/);
+  /*
+   * روايةٌ عدُّها مطابقٌ للقانوني لا تحتاج صفًّا أصلًا، فلا يُصطنع لها.
+   *
+   * وتُقاس بالعدد لا بمقارنةٍ عميقة مع مصفوفةٍ فارغة: مقارنةُ آلاف الصفوف بـ`[]` تبني
+   * نصَّ فرقٍ يلتهم الذاكرة قبل أن يُطبع، فيموت الفحص بـSIGKILL بدل أن يخبر بما وجد.
+   */
+  for (const rawiId of ['hafs', 'khalaf-hamzah', 'al-duri-kisai']) {
+    assert.equal(MIZAN_IDENTITY_CROSSWALK.rowsFor(rawiId).length, 0, `${rawiId} needs no bridge rows`);
+  }
+  const hisham = MIZAN_IDENTITY_CROSSWALK.rowsFor('hisham');
+  assert.ok(hisham.length > 0, 'hisham is evidenced from the pinned boundary artifact');
+  for (const row of hisham) {
+    assert.ok(row.evidence.some(e => e.includes('quran-ws/qiraat-ayah-map@')), 'each row names its pinned source');
+    assert.ok(row.evidence.some(e => /^sha256:[0-9a-f]{64}$/.test(e)), 'each row names the source digest');
   }
 });
 
@@ -31,11 +48,20 @@ test('the default Mizan crosswalk is deliberately empty — no invented mapping 
  * فراغُ الجدول لا يعني «كل شيء آيةٌ بآية». البقرة في العدّ الدمشقي ٢٨٥ آية لا ٢٨٦، فموضعُ
  * هشام المقابل للآية ١٠ قانونيًّا غير معلوم بلا دليل — ولا يجوز اختلاقه.
  */
-test('a locus in a surah whose native count differs is refused, not silently mapped', () => {
-  const res = MIZAN_IDENTITY_CROSSWALK.toNative('hisham', { surah: 2, ayah: 10 });
-  assert.equal(res.assurance, 'UNRESOLVED');
-  assert.equal(res.native, undefined, 'no native locus may be invented for a diverging count');
-  assert.match(String(res.reason), /^NATIVE_COUNT_DIVERGES:2:286:285$/);
+test('a locus in a surah whose native count differs is refused unless a row proves it', () => {
+  // روحٌ ما زال بلا دليل: سورةٌ واحدة تخالف، وواحدة تكفي لإبقاء الباب مغلقًا.
+  const blocked = MIZAN_IDENTITY_CROSSWALK.toNative('rawh', { surah: 2, ayah: 10 });
+  assert.equal(blocked.assurance, 'UNRESOLVED');
+  assert.equal(blocked.native, undefined, 'no native locus may be invented for a diverging count');
+  assert.match(String(blocked.reason), /^NATIVE_COUNT_DIVERGES:2:286:287$/);
+
+  // وهشامٌ محلولٌ بدليلٍ منصوص لا بافتراض: ٢:١٠ تُقسَم آيتين في العدّ الدمشقي.
+  const evidenced = MIZAN_IDENTITY_CROSSWALK.toNative('hisham', { surah: 2, ayah: 10 });
+  assert.equal(evidenced.assurance, 'EVIDENCED_ROW');
+  assert.equal(evidenced.assumed, false);
+  assert.deepEqual(evidenced.native, { surah: 2, ayahStart: 9, ayahEnd: 10 });
+  assert.equal(evidenced.relation, 'SPLIT');
+  assert.ok(evidenced.evidence.length > 0);
 });
 
 test('a locus in a surah whose native count is verified equal maps one-to-one as a result', () => {
@@ -47,11 +73,24 @@ test('a locus in a surah whose native count is verified equal maps one-to-one as
   assert.equal(res.assumed, true, 'a verified count is still not an evidenced crosswalk row');
 });
 
-test('a delivered reading whose package numbering was never read stays an announced assumption', () => {
+/*
+ * لم يبقَ في العشرين روايةٌ «لم يُقرأ ترقيمُها». ترقيمُ حزم المرآة قِيس من بايتاتها
+ * المثبَّتة، فظهر أن ورشًا مدنيُّ العدّ الأخير لا كوفيّه — وكان النظام يفترض الكوفي
+ * صامتًا ويعطي المتسابقَ موضعًا لا يبدأ عنده حدُّ آيةٍ في روايته.
+ */
+test('no delivered reading is resolved by an unread-numbering assumption any more', () => {
   const res = MIZAN_IDENTITY_CROSSWALK.toNative('warsh', { surah: 2, ayah: 10 });
-  assert.deepEqual(res.native, { surah: 2, ayah: 10 });
-  assert.equal(res.assurance, 'UNVERIFIED_COUNT_IDENTITY');
-  assert.equal(res.assumed, true);
+  assert.notEqual(res.assurance, 'UNVERIFIED_COUNT_IDENTITY');
+  assert.equal(res.assurance, 'EVIDENCED_ROW');
+  assert.equal(res.assumed, false);
+  assert.ok(res.evidence.length > 0);
+  for (const rawiId of CANONICAL_RAWI_IDS) {
+    assert.notEqual(
+      MIZAN_IDENTITY_CROSSWALK.toNative(rawiId, { surah: 2, ayah: 10 }).assurance,
+      'UNVERIFIED_COUNT_IDENTITY',
+      `${rawiId} still resolves by an unmeasured assumption`,
+    );
+  }
 });
 
 test('an evidenced row resolves as evidence, not assumption', () => {
@@ -117,11 +156,16 @@ test('resolution fails closed for an unknown rawi — never falls back to anothe
  * الاختبار يثبت أن الآلة جاهزة للاستقبال: صفٌّ معتمدٌ واحد يحلّ موضعه فورًا، وصفٌّ بلا
  * مرجع يُرفض، والملف اليوم فارغٌ قصدًا فلا يُدَّعى ما لم يصل.
  */
-test('the committee evidence file is empty today and nothing pretends otherwise', async () => {
-  const { COMMITTEE_CROSSWALK_ROWS } = await import('../src/lib/quran-crosswalk-evidence');
-  assert.deepEqual([...COMMITTEE_CROSSWALK_ROWS], []);
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.size, 0);
-  assert.equal(crosswalkCoverage('hisham').questionSafe, false);
+test('the evidence file carries only what the pinned artifact proves, and says which readings', async () => {
+  const { committeeCrosswalkRows, CROSSWALK_ACTIVATED_RAWIS } = await import('../src/lib/quran-crosswalk-evidence');
+  const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
+  assert.equal(COMMITTEE_CROSSWALK_ROWS.length, MIZAN_IDENTITY_CROSSWALK.size);
+  assert.deepEqual([...CROSSWALK_ACTIVATED_RAWIS].sort(),
+    ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'qalun', 'ruways', 'warsh'].sort());
+  // وما لم يُثبت لا يدخل: روحٌ بلا صفٍّ واحد، فيبقى محجوبًا عن السؤال.
+  assert.equal(COMMITTEE_CROSSWALK_ROWS.some(r => r.rawiId === 'rawh'), false);
+  assert.equal(crosswalkCoverage('rawh').questionSafe, false);
+  assert.equal(crosswalkCoverage('hisham').questionSafe, true);
 });
 
 test('one evidenced committee row resolves its own locus and only its own', () => {
@@ -144,7 +188,8 @@ test('one evidenced committee row resolves its own locus and only its own', () =
   assert.equal(table.toNative('hisham', { surah: 99, ayah: 7 }).assurance, 'UNRESOLVED');
 
   // والتغطية تتحرّك بمقدار الصفّ الواحد لا أكثر، والسورة تبقى في قائمة ما يحتاج دليلًا.
-  const before = crosswalkCoverage('hisham');
+  // تُقاس من جدولٍ فارغ لا من جدول ميزان العامل، فالمقصود أثرُ الصفّ الواحد وحده.
+  const before = crosswalkCoverage('hisham', new QuranCrosswalkTable([]));
   const after = crosswalkCoverage('hisham', table);
   assert.equal(after.resolvedLoci, before.resolvedLoci + 1);
   assert.equal(after.unresolvedLoci, before.unresolvedLoci - 1);

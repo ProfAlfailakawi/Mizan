@@ -214,9 +214,39 @@ service cloud.firestore {
           allow create, update: if writeScope(orgId,competitionId) && roleIs(['head_judge','comp_admin']);
           allow delete: if false;
         }
+        /*
+         * فصلُ المهامّ عند النشر — مفروضٌ هنا، لا في الواجهة.
+         *
+         * «من ختم النتيجة لا ينشرها» كان شرطًا في العميل وحده. وشرطٌ في العميل ليس شرطًا:
+         * عميلٌ مزوَّر أو نداءٌ مباشر على قاعدة البيانات يتخطّاه كأنه غير موجود. فالرفضُ
+         * هنا، عند الكتابة نفسها.
+         *
+         * ويُقاس بهوية المصادقة لا بمعرّف السجلّ: `sealedById` معرّف ميزان (`usr-…`) لا
+         * يساوي `request.auth.uid` أبدًا، فمقارنتُه به تمنع الجميع أو لا تمنع أحدًا.
+         * ولهذا يُسجَّل `sealedByUid` عند الختم، وتُقارَن به هذه القاعدة.
+         *
+         * وفشلٌ مغلق: نتيجةٌ بلا `sealedByUid` لا تُنشَر أصلًا — لا يُفترض الاختلاف حيث
+         * لا يُعرف الخاتم. ولا يُسمح بتعديل بيانات الختم في نفس الكتابة التي تنشر، وإلا
+         * كتب الناشرُ اسمَ غيره في `sealedByUid` ثم نشر.
+         */
+        function publishTransition() {
+          return present()
+            && request.resource.data.status == 'published'
+            && resource.data.status != 'published';
+        }
+        function publisherIsNotSealer() {
+          return ('sealMetadata' in resource.data)
+            && ('sealedByUid' in resource.data.sealMetadata)
+            && resource.data.sealMetadata.sealedByUid != request.auth.uid
+            && request.resource.data.uploaderUid == request.auth.uid
+            && request.resource.data.sealMetadata == resource.data.sealMetadata;
+        }
         match /results/{resultId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow update: if writeScope(orgId,competitionId)
+            && roleIs(['super_admin','org_admin','comp_admin','head_judge'])
+            && (!publishTransition() || publisherIsNotSealer());
           allow delete: if false;
         }
         match /certificates/{certificateId} {
