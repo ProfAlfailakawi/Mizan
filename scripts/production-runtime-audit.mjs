@@ -66,6 +66,9 @@ assert(!/\.\.\/src\/lib\/seed-data/.test(read('scripts/live-day.ts')),'live-day 
 const runtimeRoots=['src/components','src/lib','server'];
 const allowedFiles=new Set([
   'src/lib/nextgen-integrity.ts',        // explicitly typed adapters; no seed/demo surface
+  // يذكر MIZAN_ENABLE_DEMO_SEED ليمنعه: يقرأ الراية ويرفض الإقلاع في الإنتاج متى كانت
+  // مرفوعة. فهو نقيض سطح البذر لا سطحٌ منه، ولا يستورد بيانات بذرٍ ولا يولّدها.
+  'server/production-config-guard.ts',
 ]);
 const walk=(dir)=>{
   for(const name of fs.readdirSync(dir)){
