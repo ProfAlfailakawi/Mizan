@@ -78,6 +78,7 @@ import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
 import { can } from './permissions';
+import { nextParticipantCodes, planParticipantImport } from './participant-import';
 import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isReadingDelivered, detectModelChange, explicitConsentGranted } from './scientific-core';
 import { compilePolicyText, detectContradictions, policyCompilerSummary, applyApprovedCompilation } from './policy-compiler';
 import { validateVerseStructure, compareQuranRows, type QuranVerseRecord } from './quran-source-ingestion';
@@ -3491,13 +3492,24 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
   const recordConsent=(participantId:string,kind:ConsentRecord['kind'],version:string,accepted=true,guardianName?:string)=>{const c:ConsentRecord={id:newId('consent'),participantId,competitionId:globalState.competition.id,kind,version,accepted,acceptedAt:new Date().toISOString(),guardianName};globalState.consents=[c,...globalState.consents];notify();return c;};
   const createImportJob=(entity:ImportJobRecord['entity'],fileName:string,totalRows:number,invalidRows=0)=>{const j:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity,fileName,status:invalidRows?'validated':'imported',totalRows,validRows:Math.max(0,totalRows-invalidRows),invalidRows,mapping:{},errors:invalidRows?[{row:2,message:'Validation required before import'}]:[],createdAt:new Date().toISOString()};globalState.importJobs=[j,...globalState.importJobs];notify();return j;};
   const importParticipantsCsv=(fileName:string,csv:string)=>{
-    const lines=csv.replace(/\r/g,'').split('\n').filter(Boolean); if(!lines.length) return createImportJob('participants',fileName,0,0);
-    const parse=(line:string)=>{const out:string[]=[];let cur='';let quoted=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='\"'){if(quoted&&line[i+1]==='\"'){cur+='\"';i++;}else quoted=!quoted;}else if(ch===','&&!quoted){out.push(cur.trim());cur='';}else cur+=ch;}out.push(cur.trim());return out;};
-    const headers=parse(lines[0]).map(h=>h.trim()); const required=['fullName','email','dateOfBirth','categoryId']; const missing=required.filter(h=>!headers.includes(h));
-    const errors:{row:number;message:string}[]=[]; const staged:Participant[]=[];
-    if(missing.length) errors.push({row:1,message:`Missing columns: ${missing.join(', ')}`});
-    if(!missing.length) for(let i=1;i<lines.length;i++){const cells=parse(lines[i]);const row=Object.fromEntries(headers.map((h,idx)=>[h,cells[idx]||''])) as Record<string,string>; if(!row.fullName||!row.email||!row.dateOfBirth||!row.categoryId){errors.push({row:i+1,message:'Missing required participant fields'});continue;} const cat=globalState.competition.categories.find(c=>c.id===row.categoryId||c.code===row.categoryId); if(!cat){errors.push({row:i+1,message:`Unknown category: ${row.categoryId}`});continue;} const code=`A-${String(100+globalState.participants.filter(p=>p.competitionId===globalState.competition.id).length+staged.length+1).padStart(3,'0')}`; staged.push({id:newId('part'),code,competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,fullName:row.fullName,fullNameArabic:row.fullNameArabic||row.fullName,email:row.email,phone:row.phone||'',country:row.country||'',nationality:row.nationality||row.country||'',nationalIdOrPassport:row.identity||'',dateOfBirth:row.dateOfBirth,gender:row.gender==='female'?'female':'male',categoryId:cat.id,riwaya:row.riwaya||cat.riwaya,institution:row.institution||'',status:'under_review',statusHistory:[{status:'submitted',timestamp:new Date().toISOString(),actor:'CSV import'},{status:'under_review',timestamp:new Date().toISOString(),actor:'Import validator'}],journeyAccessToken:newId('journey'),guardianAccessToken:newId('guardian'),createdAt:new Date().toISOString()});}
-    const job:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity:'participants',fileName,status:errors.length?'validated':'imported',totalRows:Math.max(0,lines.length-1),validRows:staged.length,invalidRows:errors.filter(e=>e.row>1).length,mapping:Object.fromEntries(headers.map(h=>[h,h])),errors,createdAt:new Date().toISOString()};
+    /*
+     * التدقيق في وحدةٍ نقيّة مُختبَرة (`participant-import`)، وهذا موضع الأثر.
+     *
+     * كان التدقيق هنا أربعة أعمدة ووجودَ الفئة، فيمرّ بريدٌ مكرّر وتاريخُ ميلادٍ مستحيل
+     * وروايةٌ لا تُحلّ أو لا تُسحب لها أسئلة — ولا يظهر ذلك إلا يوم المسابقة، متسابقًا
+     * متسابقًا. والقاعدة كما كانت: الكل أو لا شيء، فلا يُدخَل نصف ملف.
+     */
+    const plan=planParticipantImport({csv,competition:globalState.competition,existingParticipants:globalState.participants});
+    const errors=plan.errors.map(e=>({row:e.row,message:e.column?`${e.column}: ${e.message}`:e.message}));
+    const taken=globalState.participants.filter(p=>p.competitionId===globalState.competition.id).map(p=>p.code);
+    const codes=nextParticipantCodes(taken,plan.rows.length);
+    const staged:Participant[]=plan.importable?plan.rows.map((row,index)=>{
+      const cat=globalState.competition.categories.find(c=>c.id===row.categoryId||c.code===row.categoryId)!;
+      const now=new Date().toISOString();
+      return {id:newId('part'),code:codes[index],competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,fullName:row.fullName,fullNameArabic:row.fullNameArabic||row.fullName,email:row.email,phone:row.phone||'',country:row.country||'',nationality:row.nationality||row.country||'',nationalIdOrPassport:row.identity||'',dateOfBirth:row.dateOfBirth,gender:row.gender==='female'?'female':'male',categoryId:cat.id,riwaya:row.riwaya||cat.riwaya,institution:row.institution||'',status:'under_review',statusHistory:[{status:'submitted' as const,timestamp:now,actor:'CSV import'},{status:'under_review' as const,timestamp:now,actor:'Import validator'}],journeyAccessToken:newId('journey'),guardianAccessToken:newId('guardian'),createdAt:now};
+    }):[];
+    const headers=plan.headers;
+    const job:ImportJobRecord={id:newId('imp'),competitionId:globalState.competition.id,entity:'participants',fileName,status:errors.length?'validated':'imported',totalRows:plan.totalRows,validRows:staged.length,invalidRows:errors.filter(e=>e.row>1).length,mapping:Object.fromEntries(headers.map(h=>[h,h])),errors,createdAt:new Date().toISOString()};
     globalState.importJobs=[job,...globalState.importJobs]; if(!errors.length){globalState.participants=[...globalState.participants,...staged];for(const participant of staged){syncParticipantLifecycle(participant);appendParticipantNotifications(participant,'registration.received');}}
     notify(); return job;
   };

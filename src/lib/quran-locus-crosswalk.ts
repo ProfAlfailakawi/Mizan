@@ -21,6 +21,7 @@
  */
 
 import { CANONICAL_READING_BY_RAWI, CANONICAL_RAWI_IDS, resolveCanonicalRawiId } from './canonical-readings';
+import { resolveReadings } from './scientific-core';
 import { QURAN_SURAH_TOTAL, ayahCountOf, isValidLocus, type QuranLocus } from './quran-canon';
 import { countSystemForReading } from './reading-count-systems';
 import { nativeAyahCountOf } from './quran-native-count-systems';
@@ -279,6 +280,24 @@ export function isReadingQuestionSafe(input: { qiraah?: string; rawi?: string; r
     : resolveCanonicalRawiId(input);
   if (!rawiId) return false;
   return crosswalkCoverage(rawiId, table).questionSafe;
+}
+
+/**
+ * فئةٌ قد تتيح أكثر من رواية («حفص عن عاصم / ورش / قالون»)، فالمتسابق يعلن روايته منها.
+ * وسلامتُها أن تكون **كلُّ** روايةٍ تتيحها قابلةً للسحب — فلا يُقبل متسابقٌ على واحدةٍ
+ * منها ثم لا تبدأ له جلسة. وقيمةٌ لا تُحلّ إلى رواية واحدة على الأقل ليست فئةً صالحة.
+ */
+export function categoryReadingsQuestionSafe(riwaya: string | undefined, table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): boolean {
+  const readings = resolveReadings({ riwaya, rawi: riwaya });
+  if (!readings.length) return false;
+  return readings.every(r => crosswalkCoverage(r.rawiId, table).questionSafe);
+}
+
+/** الروايات التي تتيحها فئةٌ ولا يكتمل جسر مواضعها — بأسمائها، للتقرير والمنع. */
+export function categoryUnsafeReadings(riwaya: string | undefined, table: QuranCrosswalkTable = MIZAN_IDENTITY_CROSSWALK): string[] {
+  return resolveReadings({ riwaya, rawi: riwaya })
+    .filter(r => !crosswalkCoverage(r.rawiId, table).questionSafe)
+    .map(r => r.rawiId);
 }
 
 /** سبب المنع مسمّى بسورته — للوحة الإدارة وفحص ما قبل الانطلاق والدعم. */

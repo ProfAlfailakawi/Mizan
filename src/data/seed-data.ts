@@ -1,4 +1,3 @@
-import { scopeFromJuzRange } from '../lib/quran-scope';
 import {
   Organization,
   Competition,
@@ -216,15 +215,7 @@ export const SEED_CATEGORIES: Category[] = [
     nameArabic: 'الفرع الثاني: حفظ عشرين جزءاً متتالية',
     description: 'Twenty consecutive parts with Tajweed mastery',
     riwaya: 'حفص عن عاصم',
-    /*
-     * «عشرون جزءًا» لا تقول أيّ عشرين، ولذلك يرفض مُرحِّل النطاق اشتقاقها ويطلب حسمًا —
-     * وهو الصواب، فنطاقُ المسابقة قرارُ الجهة لا تخمين النظام. لكن فئةً بلا نطاقٍ محسوم
-     * لا تبدأ لها جلسة أبدًا، فبقيت هذه الفئة في بيانات العرض معطَّلةً بصمت حتى يحاول
-     * محكّمٌ نداء متسابقها. والنطاق هنا محسومٌ صراحةً كما تُحسمه جهةٌ حقيقية عند الإعداد.
-     */
-    memorizationScope: 'من الجزء 1 إلى 20',
-    scope: scopeFromJuzRange(1, 20),
-    scopeVersion: 1,
+    memorizationScope: '20 جزءاً',
     juzCount: 20,
     maxAge: 20,
     targetParticipants: 45,
@@ -238,9 +229,7 @@ export const SEED_CATEGORIES: Category[] = [
     nameArabic: 'الفرع الثالث: حفظ عشرة أجزاء للناشئة',
     description: 'Youth category for emerging reciters',
     riwaya: 'حفص عن عاصم',
-    memorizationScope: 'من الجزء 21 إلى 30',
-    scope: scopeFromJuzRange(21, 30),
-    scopeVersion: 1,
+    memorizationScope: '10 أجزاء',
     juzCount: 10,
     maxAge: 15,
     targetParticipants: 50,

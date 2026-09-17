@@ -1,6 +1,6 @@
 import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
 import { sourceUsableForCompetition, certifiedCapabilityFor, isReadingDelivered } from './scientific-core';
-import { isReadingQuestionSafe } from './quran-locus-crosswalk';
+import { categoryReadingsQuestionSafe } from './quran-locus-crosswalk';
 import { categoryScopeOf } from './scope-engine';
 import { scopeAyahCount } from './quran-scope';
 
@@ -17,7 +17,7 @@ export function buildPreflight(input:{competition:Competition;policy:Competition
  const exactQuranSourceReady=c.categories.length>0&&categoriesWithSource===c.categories.length;
  /* وجودُ النصّ ليس جوازَ السحب. رواية يختلف عدّ آياتها عن العدّ القانوني في سورةٍ ما لا
     يُعرف مقابلُ موضعها فيها، فالسحب منها موضعٌ خاطئ لا احتمالُ خطأ. يُكشف هنا قبل الحدث. */
- const locusMappingReady=c.categories.length>0&&c.categories.every(cat=>isReadingQuestionSafe({riwaya:cat.riwaya}));
+ const locusMappingReady=c.categories.length>0&&c.categories.every(cat=>categoryReadingsQuestionSafe(cat.riwaya));
  /*
   * فئةٌ بلا نطاقٍ محسوم لا تبدأ لها جلسة أبدًا.
   *

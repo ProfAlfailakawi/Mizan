@@ -23,10 +23,18 @@ test('a legacy juz count is deliberately not enough to derive a scope', () => {
   assert.ok(outcome.suggestion, 'it may suggest, and a suggestion is not an application');
 });
 
-test('every seeded category carries a decided scope, so none of them is a session that cannot start', () => {
-  for (const category of SEED_CATEGORIES) {
-    const ayat = scopeAyahCount(categoryScopeOf(category));
-    assert.ok(ayat > 0, `${category.id} (${category.nameArabic}) must have a decided scope, not only a juz count`);
+/*
+ * البذرة المنشورة تُترك على حالها الصادق: فئةٌ تقول «عشرون جزءًا» بلا نطاقٍ مبنيّ تبقى
+ * غيرَ محسومة، لأن حسمها قرارُ الجهة لا اشتقاقُ النظام. وبيئةُ العرض وحدها تحسم نطاقها
+ * (`demoCategories`) لأن لا منظّم فيها ينتظرونه — ويحرس ذلك `tests/demo-session-start`.
+ *
+ * فالذي يُحرَس هنا شيءٌ آخر: ألّا تمرّ فئةٌ غير محسومة بلا أن يُقال ذلك قبل اليوم.
+ */
+test('the shipped seed keeps its undecided categories, and they are visibly undecided', () => {
+  const undecided = SEED_CATEGORIES.filter(c => scopeAyahCount(categoryScopeOf(c)) === 0);
+  assert.ok(undecided.length > 0, 'the seed still carries the legacy categories this guard exists for');
+  for (const category of undecided) {
+    assert.ok(Number(category.juzCount) > 0, `${category.id} declares a juz count but no decided scope`);
   }
 });
 
@@ -52,8 +60,10 @@ test('a category without a decided scope is blocked while configuring, not on th
   assert.ok(finding!.evidence.some(e => /juzCount=15/.test(e)), 'the evidence says what the category actually carries');
 
   // والفئة المحسومة لا تُرفع عليها هذه الملاحظة.
+  const settled = SEED_CATEGORIES.find(c => scopeAyahCount(categoryScopeOf(c)) > 0);
+  assert.ok(settled, 'the seed carries at least one decided category');
   const decided = detectContradictions({
-    competition: { ...SEED_COMPETITION, categories: [SEED_CATEGORIES[1]] },
+    competition: { ...SEED_COMPETITION, categories: [settled!] },
     quranSources: [], aiValidations: [], availableQualifiedJudges: 99, committeeCount: 1,
   });
   assert.ok(!decided.some(i => /no decided scope/i.test(i.title)));
