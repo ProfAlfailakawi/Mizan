@@ -328,7 +328,10 @@ export default function App() {
  // Deep links skip the splash, and so do repeat loads inside the same session: the
  // assembly is a 2.8s first-impression, not a per-reload toll for staff reopening the app.
  const [splashOpen,setSplashOpen]=useState(()=>!window.location.hash && !splashWasSeen());
- const [onboardingOpen,setOnboardingOpen]=useState(()=>!onboardingWasSeen());
+ /* جولةُ الإعداد الأولى لا تُعرض في البيئة التجريبية: من ضغط «استعراض النظام
+    ببيانات تجريبية» طلب النظام بالبيانات، لا معالجَ تهيئةٍ من أربع خطوات لجهةٍ
+    فارغة. وهي تُقاس بـ localStorage، فكل زائرٍ يراها — أي كل من يُعرض عليه المنتج. */
+ const [onboardingOpen,setOnboardingOpen]=useState(()=>IS_DEMO_SESSION?false:!onboardingWasSeen());
  const [tenantSuspended,setTenantSuspended]=useState(false);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [committeeBoard,setCommitteeBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [hash,setHash]=useState(window.location.hash);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
@@ -448,7 +451,9 @@ export default function App() {
    <span className="pointer-events-auto rounded-xl bg-[#101a16]/85 backdrop-blur px-3 py-2 text-[11px] font-black text-white/80">{language==='ar'?'شاشة البثّ':'Broadcast surface'}</span>
    <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<button onClick={()=>{if(IS_DEMO_SESSION){exitDemoSession();return}void signOut(auth).catch(()=>{}).finally(()=>window.location.reload())}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
   </div>}
-  <main><Page>{roleView()}</Page></main>
+  {/* مساحةٌ محجوزة أسفل الصفحة في البيئة التجريبية: الشريط ثابتٌ فوق المحتوى،
+      وبدونها كان يغطّي آخر صفٍّ في الجداول الطويلة. */}
+  <main className={IS_DEMO_SESSION?'pb-28':undefined}><Page>{roleView()}</Page></main>
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
   {/* خارج الترويسة عمدًا: شاشة البثّ لا ترويسة لها، ودون ذلك لا مخرج منها. */}
   <DemoBar/>
