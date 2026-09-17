@@ -6,7 +6,7 @@ import { getCompetitionPolicy } from '../../lib/competition-config';
 import { surahAyahCount } from '../../lib/mushaf-map';
 import { ScopeSummary } from '../scope/QuranScopePicker';
 import { describeScope, scopeMetrics } from '../../lib/quran-scope';
-import { categoryDistribution, resolveQuestionCount } from '../../lib/scope-engine';
+import { categoryDistribution, passageAyahCount, resolveQuestionCount } from '../../lib/scope-engine';
 import { describeZone } from '../../lib/question-zones';
 import { describeStanding, normalizeAwardPolicy, resolveAwards } from '../../lib/award-places';
 import { Badge } from '../design-system/Badge';
@@ -17,6 +17,7 @@ import { RealQRCode, makeMizanPassPayload } from '../design-system/RealQRCode';
 import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 import { PracticeStudio } from './PracticeStudio';
 import { WarmupSanctuary } from './WarmupSanctuary';
+import { TrialRun } from './TrialRun';
 import { deliveryReadingKeyFor, surahNameArabic } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
 
@@ -95,8 +96,15 @@ export const ParticipantDashboard: React.FC = () => {
  const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
  const passportRows=participantPassport.filter(x=>x.participantId===participant.id&&x.competitionId===competition.id);
 
- const beforeSession=['approved','checked_in','in_queue'].includes(participant.status);
- const canPrepare=beforeSession; const hasRecord=passportRows.length>0||!!cert;
+ /*
+  * الاستعداد لا يُغلق إلا لحظة وقوفه أمام اللجنة.
+  *
+  * كان مشروطًا بثلاث حالات (مقبول · حاضر · بالانتظار)، فكان المتسابق المسجَّل الذي لم يُقبل
+  * بعد — وهو أحوج الناس إلى التدرّب — لا يرى الباب أصلًا، ويختفي عمّن اختُبر فلم يعد يجد
+  * مواضعه ولا تجربته. والتهيئة والتجربة لا تكشفان شيئًا ولا تمسّان درجة، فلا سبب لحجبهما
+  * إلا اللحظة الوحيدة التي يضرّه فيها الانشغال: وهو داخل اللجنة.
+  */
+ const canPrepare=participant.status!=='in_session'; const hasRecord=passportRows.length>0||!!cert;
  // تبويبٌ اختاره ثم زال سببه (دخل اللجنة مثلًا) يعود إلى «دورك» بدل أن يترك فراغًا.
  const activeTab:Tab=(tab==='prepare'&&!canPrepare)||(tab==='record'&&!hasRecord)?'journey':tab;
 
@@ -159,6 +167,17 @@ export const ParticipantDashboard: React.FC = () => {
 
   {activeTab==='prepare'&&<>
    {/* التهيئة قبل الدخول فقط: بمجرد أن يصير المتسابق داخل اللجنة يختفي التبويب كله. */}
+   {/*
+     التجربة الكاملة أولًا: هي الجواب عن «كيف تجري اللحظة؟»، والتهيئة والاستوديو بعدها
+     لمن أراد أن يهدّئ نفَسه أو يسمع المقطع. ولا تُعرض بلا نطاق معتمد: مواضعها تُسحب منه.
+    */}
+   {scopeResolution&&!scopeResolution.blocked&&<TrialRun ar={ar}
+    scope={scopeResolution.scope}
+    questionCount={resolveQuestionCount(category,policy)}
+    minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}
+    passageAyahCount={passageAyahCount(category)}
+    deliveryReading={practiceReading}
+    listening={practiceEngine}/>}
    <WarmupSanctuary ar={ar}
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
     zoneHints={warmupZoneHints}
