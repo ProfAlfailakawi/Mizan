@@ -62,7 +62,7 @@ export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
   candidate('khalaf-hamzah', 'khalaf-hamzah', 'QiraahKhalaf.json.deflate'),
   candidate('khallad', 'khallad', 'QiraahKhallad.json.deflate'),
   candidate('abu-al-harith', 'abu-al-harith', 'QiraahAbuHarith.json.deflate'),
-  candidate('al-duri-al-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate'),
+  candidate('al-duri-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate'),
   candidate('ibn-wardan', 'ibn-wardan', 'QiraahIbnWardan.json.deflate'),
   candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate'),
   candidate('ruways', 'ruways', 'QiraahRuways.json.deflate'),
