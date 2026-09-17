@@ -62,7 +62,13 @@ test('public Firestore projection enforces exact competition scope for privilege
 });
 
 test('retired demo surfaces and seed data are absent from the production source tree',()=>{
-  /* «الإدارة العلمية» حُذفت كاملة: لا جهة علمية في هذه المنظومة، والنصّ معتمد من مجمع الملك فهد. */
+  /*
+   * «الإدارة العلمية» حُذفت كاملة: لا جهة علمية تُنشئها هذه المنظومة من عندها.
+   *
+   * ولا يُخلط الإسنادُ بالاعتماد: النصُّ مصدرُه مصحفُ مجمع الملك فهد المنشور — وهذا
+   * إسنادُ ناشرٍ لا شهادةَ جهةٍ لميزان. والاعتمادُ الوحيد المُدَّعى هو «اعتمدت اللجنة
+   * العلمية لمشروع ميزان»، وهو قرارُ نطاقٍ من مالك المشروع. انظر docs/SOURCE-PROVENANCE.md.
+   */
   for(const p of ['src/components/public/DemoReturn.tsx','src/components/public/ExperienceHub.tsx','src/lib/seed-data.ts','src/components/admin/ScientificGovernance.tsx']){
     assert.equal(fs.existsSync(p),false,p);
   }

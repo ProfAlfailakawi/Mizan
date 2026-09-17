@@ -102,16 +102,17 @@ test('a forged row with a self-consistent hash is still rejected', withTamperedL
   result => assert.equal(result.valid, false,
     'a per-row checksum is not a chain: an inserted row must still break it')));
 
-test('truncating the ledger to a prefix is detected', withTamperedLedger(
+test('truncating the ledger to a prefix is detected by the anchor', withTamperedLedger(
   /*
-   * حدُّ الدعوى بصدق: قطعُ الذيل يُنتج سلسلةً صحيحةً أقصر، وهذا لا تكشفه سلسلةُ
-   * تلبيدٍ وحدها — يلزمه مرساةٌ خارجية (طولٌ أو تلبيدٌ أخيرٌ محفوظ خارج الملف).
-   * فيُوثَّق السلوكُ كما هو بدل أن يُدَّعى ما لا تفعله الدالة.
+   * كان هذا حدًّا مُوثَّقًا: قطعُ الذيل يُنتج سلسلةً صحيحةً أقصر، ولا تكشفه سلسلةُ
+   * تلبيدٍ وحدها. وقد أُغلق الحدُّ بمرساةٍ خارج السلسلة تحفظ الطولَ والتلبيدَ الأخير.
+   *
+   * فالحالةُ هنا تنتقل من توثيقِ حدٍّ إلى فحصِ منعٍ. وتفصيلُ المرساة ومستوَيَي
+   * حمايتها في `saas-audit-anchor.test.ts`.
    */
   rows => rows.slice(0, 1),
   (result, before) => {
-    assert.equal(result.valid, true,
-      'a truncated prefix still verifies — documented limit, not a passing grade');
-    assert.ok(before.length > (result as { rows: number }).rows,
-      'and the row count is the only signal that rows went missing');
+    assert.equal(result.valid, false, 'a truncated prefix must no longer pass');
+    assert.equal((result as unknown as { code: string }).code, 'AUDIT_LEDGER_TRUNCATED');
+    assert.ok(before.length > 1, 'rows really were removed');
   }));
