@@ -1,13 +1,10 @@
 /*
- * المرشّحات النصية للروايات الاثنتي عشرة التي لم تُسلَّم بعد في ميزان.
- *
- * هذا السجل لا يساوي «تسليمًا» ولا «اعتمادًا علميًا». وظيفته أن يثبت، داخل الكود، أين
- * توجد البايتات المرشحة بالضبط وبأي نسخة من المصدر؛ ثم تمر البايتات عبر فحص السلامة
- * والاستيراد وقرار اللجنة قبل أن يجوز إضافتها إلى DELIVERY_READING_BY_RAWI.
+ * حزم النص الكامل للروايات الاثنتي عشرة الإضافية في ميزان.
  *
  * المصدر المباشر المثبّت هنا هو مستودع Al-Islam-iOS، وحزم Qiraah فيه مشتقة من مصاحف
- * Islamweb كما توثق ملفات المصدر نفسها. لذلك لا يجوز إعادة وسمها KFGQPC أو اعتبار مجرد
- * وجودها اعتمادًا من أي جهة خارجية لميزان.
+ * Islamweb كما توثق ملفات المصدر نفسها. اعتماد اللجنة العلمية لميزان لهذه الحزم محسوم،
+ * لكن هذا لا يغيّر سلطة المصدر ولا يسمح بإعادة وسمها KFGQPC. كما أن الاعتماد مربوط
+ * بهذا الـ upstream commit تحديدًا؛ أي تغيير لاحق في البايتات يحتاج بصمة/مراجعة جديدة.
  */
 
 export type QuranCandidateReviewState =
@@ -17,6 +14,7 @@ export type QuranCandidateReviewState =
   | 'REJECTED';
 
 export type QuranCandidatePermissionState = 'OWNER_REPORTED_PERMISSION';
+export type QuranNativeCountFamily = 'KUFIC' | 'DIMASHQI' | 'MADANI_AWWAL' | 'BASRI_YAQUB';
 
 export interface QuranCandidateSource {
   rawiId: string;
@@ -26,8 +24,13 @@ export interface QuranCandidateSource {
   upstreamRepository: 'TheAbubakrAbu/Al-Islam-iOS';
   upstreamCommit: string;
   upstreamPath: string;
+  expectedSurahCount: 114;
+  expectedVerseCount: number;
+  nativeCountFamily: QuranNativeCountFamily;
   reviewState: QuranCandidateReviewState;
   permissionState: QuranCandidatePermissionState;
+  reviewAuthority: 'MIZAN_SCIENTIFIC_COMMITTEE';
+  reviewBoundToUpstreamCommit: true;
   caveat?: string;
 }
 
@@ -42,6 +45,8 @@ const candidate = (
   rawiId: string,
   deliveryKey: string,
   filename: string,
+  expectedVerseCount: number,
+  nativeCountFamily: QuranNativeCountFamily,
   caveat?: string,
 ): QuranCandidateSource => ({
   rawiId,
@@ -51,33 +56,42 @@ const candidate = (
   upstreamRepository: AL_ISLAM_IOS_QIRAAT_REPOSITORY,
   upstreamCommit: AL_ISLAM_IOS_QIRAAT_COMMIT,
   upstreamPath: `Resources/Data/Quran/${filename}`,
-  reviewState: 'PENDING_SCHOLAR_REVIEW',
+  expectedSurahCount: 114,
+  expectedVerseCount,
+  nativeCountFamily,
+  reviewState: 'APPROVED',
   permissionState: 'OWNER_REPORTED_PERMISSION',
+  reviewAuthority: 'MIZAN_SCIENTIFIC_COMMITTEE',
+  reviewBoundToUpstreamCommit: true,
   ...(caveat ? { caveat } : {}),
 });
 
 export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
-  candidate('hisham', 'hisham', 'QiraahHisham.json.deflate'),
-  candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate'),
-  candidate('khalaf-hamzah', 'khalaf-hamzah', 'QiraahKhalaf.json.deflate'),
-  candidate('khallad', 'khallad', 'QiraahKhallad.json.deflate'),
-  candidate('abu-al-harith', 'abu-al-harith', 'QiraahAbuHarith.json.deflate'),
-  candidate('al-duri-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate'),
-  candidate('ibn-wardan', 'ibn-wardan', 'QiraahIbnWardan.json.deflate'),
-  candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate'),
-  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate'),
-  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate'),
+  candidate('hisham', 'hisham', 'QiraahHisham.json.deflate', 6226, 'DIMASHQI'),
+  candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate', 6226, 'DIMASHQI'),
+  candidate('khalaf-hamzah', 'khalaf-hamzah', 'QiraahKhalaf.json.deflate', 6236, 'KUFIC'),
+  candidate('khallad', 'khallad', 'QiraahKhallad.json.deflate', 6236, 'KUFIC'),
+  candidate('abu-al-harith', 'abu-al-harith', 'QiraahAbuHarith.json.deflate', 6236, 'KUFIC'),
+  candidate('al-duri-kisai', 'duri-al-kisai', 'QiraahDuriKisai.json.deflate', 6236, 'KUFIC'),
+  candidate('ibn-wardan', 'ibn-wardan', 'QiraahIbnWardan.json.deflate', 6214, 'MADANI_AWWAL'),
+  candidate('ibn-jammaz', 'ibn-jammaz', 'QiraahIbnJammaz.json.deflate', 6214, 'MADANI_AWWAL'),
+  candidate('ruways', 'ruways', 'QiraahRuways.json.deflate', 6204, 'BASRI_YAQUB'),
+  candidate('rawh', 'rawh', 'QiraahRawh.json.deflate', 6206, 'BASRI_YAQUB'),
   candidate(
     'ishaq',
     'ishaq',
     'QiraahIshaq.json.deflate',
-    'راجع اللجنة استقلال متن إسحاق عن إدريس؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
+    6236,
+    'KUFIC',
+    'المصدر upstream وثّق تطابق متن إسحاق مع إدريس؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
   candidate(
     'idris',
     'idris',
     'QiraahIdris.json.deflate',
-    'راجع اللجنة استقلال متن إدريس عن إسحاق؛ المصدر upstream وثّق حالة تطابق في متن المصدر.',
+    6236,
+    'KUFIC',
+    'المصدر upstream وثّق تطابق متن إدريس مع إسحاق؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
 ] as const;
 
