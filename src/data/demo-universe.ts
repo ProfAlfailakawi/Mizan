@@ -23,6 +23,7 @@ import type {
   IncidentRecord,
   JudgeProfile,
   JudgeSubmission,
+  Category,
   Participant,
   Organization,
   ResultRecord,
@@ -31,7 +32,7 @@ import type {
 } from '../types';
 import type { AppStoreState } from '../lib/store-state';
 import { buildParticipantScopeRecord } from '../lib/participant-scope';
-import { scopeFromJuzRange } from '../lib/quran-scope';
+import { fullQuranScope, scopeFromJuzRange } from '../lib/quran-scope';
 import {
   SEED_APPEALS,
   SEED_ORGANIZATION,
@@ -528,7 +529,7 @@ function demoOrganization(): Organization {
  * والاختيار ثمانية أجزاء متتابعة تختلف نقطة بدئها بين متسابق وآخر، كما تقتضي
  * قاعدة الفئة (`exactUnits: 8`).
  */
-function demoParticipantScopes(
+export function demoParticipantScopes(
   participants: Participant[],
   categories: typeof SEED_CATEGORIES,
   organizationId: string,
@@ -557,9 +558,46 @@ function demoParticipantScopes(
   return rows;
 }
 
+/*
+ * نطاق الفئة يُكتب صريحًا في بيئة العرض، ولا يُترك ليُخمَّن.
+ *
+ * ثلاث فئات في البذرة تقول نطاقها بعبارةٍ للقراءة — «20 جزءاً» ومعها
+ * `juzCount: 20` — بلا `scope` مبنيّ. و`migrateLegacyScope` يرفض أن يشتقّ منها
+ * نطاقًا عن حقّ: «عشرون جزءًا» لا تقول **أيّ** عشرين، واشتقاقُها تخمينًا يعني
+ * سؤال متسابقٍ عن أجزاء لم يحفظها. فيردّ `needs_scope_confirmation`، وينتظر أن
+ * يعتمد المنظّم النطاق بنفسه.
+ *
+ * وفي العرض لا منظّم ينتظرونه. فكانت كل جلسة تُردّ بـ«الفئة بلا نطاق محدد»،
+ * ولا يرى المحكّم إلا «تعذّر بدء الجلسة… أو تعذّر تجهيز أسئلته» — ولا يظهر
+ * السبب في أي جدول قبلها. فالعرض كله يقف عند أول ضغطة على «ابدأ جلسته».
+ *
+ * فيُعتمد النطاق هنا بدل تعطيل الحارس: الأجزاء الأولى بعدد ما تعلنه الفئة
+ * نفسها، وهو عُرف المسابقات الأشيع وهو الاقتراح الذي يعرضه المُرحِّل ذاته على
+ * المنظّم. والحارس يبقى كما هو لكل مسابقة حقيقية.
+ *
+ * و«ربع القرآن» تُترك كما هي: نطاقها يختاره المتسابق، ولكلٍّ سجلُّه المعتمد في
+ * `demoParticipantScopes`.
+ */
+export function demoCategories(): Category[] {
+  return clone(SEED_CATEGORIES).map(category => {
+    if (category.scopeMode === 'participant_selected') return category;
+    if (category.scope?.segments?.length) return category;
+    const juzCount = Math.round(Number(category.juzCount) || 0);
+    if (juzCount < 1) return category;
+    return {
+      ...category,
+      scope: juzCount >= 30 ? fullQuranScope() : scopeFromJuzRange(1, juzCount),
+      scopeMode: 'fixed' as const,
+      scopeVersion: category.scopeVersion || 1,
+      scopeMigration: 'derived_from_legacy' as const,
+    };
+  });
+}
+
 export function buildDemoInitialState(base: AppStoreState): AppStoreState {
   const universe = buildDemoUniverse();
   const organization = demoOrganization();
+  const categories = demoCategories();
   const competition = {
     ...base.competition,
     id: SEED_COMPETITION.id,
@@ -572,7 +610,7 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     startDate: SEED_COMPETITION.startDate,
     endDate: SEED_COMPETITION.endDate,
     status: SEED_COMPETITION.status,
-    categories: clone(SEED_CATEGORIES),
+    categories,
     venueName: SEED_COMPETITION.venueName,
     venuesCount: universe.committees.length,
     totalRegistered: universe.participants.length,
@@ -607,6 +645,7 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     reviewCases: universe.reviewCases,
     certificates: universe.certificates,
     supportSessions: demoSupportSessions(competition.id, organization.id),
-    participantScopes: demoParticipantScopes(universe.participants, SEED_CATEGORIES, organization.id, competition.id),
+    /* القائمة نفسها التي تدخل المسابقة — لا نسخة ثانية قد تفترق عنها. */
+    participantScopes: demoParticipantScopes(universe.participants, categories, organization.id, competition.id),
   };
 }
