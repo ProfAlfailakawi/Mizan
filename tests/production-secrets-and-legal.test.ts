@@ -22,7 +22,7 @@ const ROOT = process.cwd();
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const CLOUDBUILD = read('cloudbuild.yaml');
 
-const releaseEnv = () => ({
+const releaseEnv = (): NodeJS.ProcessEnv => ({
   ...process.env,
   VITE_REQUIRE_AUTH: 'true',
   VITE_FIREBASE_API_KEY: 'public-firebase-web-key-for-test',
