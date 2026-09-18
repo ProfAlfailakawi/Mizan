@@ -43,7 +43,8 @@
     "quran:crosswalk-propose": "tsx scripts/quran-crosswalk-propose.ts",
     "quran:crosswalk-activate": "tsx scripts/quran-crosswalk-activate.ts",
     "quran:delivery-counts": "tsx scripts/quran-delivery-count-intake.ts",
-    "quran:delivery-counts-generate": "tsx scripts/quran-delivery-count-generate.ts"
+    "quran:delivery-counts-generate": "tsx scripts/quran-delivery-count-generate.ts",
+    "qa:print-document": "node scripts/print-document-qa.mjs"
   },
   "engines": {
     "node": ">=22.20.0 <23",

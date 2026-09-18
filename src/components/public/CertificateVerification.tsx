@@ -137,7 +137,7 @@ export const CertificateVerification: React.FC = () => {
             <div className="text-center sm:text-start max-w-xs">
               <div className="text-[10px] font-black text-[#3f4744]">{ar?'امسح الرمز للتحقق مباشرة':'Scan to verify directly'}</div>
               <p className="text-[9px] leading-4 text-[#6b706c] mt-1.5">{ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}</p>
-              <Button className="mt-3" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
+              <Button className="mt-3 no-print" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
             </div>
           </div>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[#646965] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
@@ -150,7 +150,8 @@ const StatusCard:React.FC<{title:string;body:string;action?:React.ReactNode}>=({
 
 /* وبطاقتا النتيجة (العامة والكاملة) كانتا تعيدان بناء الإطار نفسه: الخلفية والدرع الغائر
    والشارة ورقم الشهادة. الإطار واحد، وما يختلف هو ما يُوضع داخله. */
-const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.ReactNode}>=({badge,number,children})=><section className="bg-[#fffefb] border border-[#e2e0d9] rounded-3xl p-7 sm:p-10 text-center relative overflow-hidden">
+/* وثيقةُ التحقّق هي ما يُطبع، لا الصفحةُ التي حولها. */
+const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.ReactNode}>=({badge,number,children})=><section data-mizan-print className="bg-[#fffefb] border border-[#e2e0d9] rounded-3xl p-7 sm:p-10 text-center relative overflow-hidden">
   <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
   <div className="relative">{badge}<div className="mizan-kicker mt-5">{number}</div>{children}</div>
 </section>;
