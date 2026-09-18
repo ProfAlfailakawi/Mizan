@@ -118,8 +118,23 @@ export const JudgeOS: React.FC = () => {
  const [micMeterUnavailable,setMicMeterUnavailable]=useState(false);
  const meterRef=useRef<{ctx:AudioContext;raf:number}|null>(null);
  const stopMeter=()=>{const m=meterRef.current;if(!m)return;cancelAnimationFrame(m.raf);void m.ctx.close().catch(()=>{});meterRef.current=null;setMicLevel(0)};
- const startMeter=(stream:MediaStream)=>{try{const Ctor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;if(!Ctor){setMicMeterUnavailable(true);setMicHeard(true);return}stopMeter();const ctx=new Ctor();const analyser=ctx.createAnalyser();analyser.fftSize=1024;ctx.createMediaStreamSource(stream).connect(analyser);const buf=new Uint8Array(analyser.fftSize);const tick=()=>{analyser.getByteTimeDomainData(buf);let peak=0;for(let i=0;i<buf.length;i+=1){const d=Math.abs(buf[i]-128)/128;if(d>peak)peak=d}setMicLevel(peak);if(peak>0.06)setMicHeard(true);const raf=requestAnimationFrame(tick);meterRef.current={ctx,raf}};tick()}catch{/* المتصفح بلا واجهة تحليل صوت: تبقى البوابة على حالة التسجيل وحدها، ويُعلَن ذلك للمحكم */setMicMeterUnavailable(true);setMicHeard(true)}};
+ const startMeter=(stream:MediaStream)=>{try{const Ctor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;if(!Ctor){setMicMeterUnavailable(true);setMicHeard(true);return}stopMeter();const ctx=new Ctor();/* سفاري على الجوال يبدأ سياق الصوت موقوفًا حتى يُستأنف بإيماءة مستخدم، فيقرأ المحلّل صمتًا أبديًّا: الشريط لا يتحرّك مهما قرأ المتسابق، والبوابة لا تُفتح. والاستئناف هنا يقع داخل ضغطة «تجهيز الميكروفون» نفسها، فهو إيماءةٌ صالحة. */void ctx.resume?.().catch(()=>{});const analyser=ctx.createAnalyser();analyser.fftSize=1024;ctx.createMediaStreamSource(stream).connect(analyser);const buf=new Uint8Array(analyser.fftSize);const tick=()=>{analyser.getByteTimeDomainData(buf);let peak=0;for(let i=0;i<buf.length;i+=1){const d=Math.abs(buf[i]-128)/128;if(d>peak)peak=d}setMicLevel(peak);if(peak>0.06)setMicHeard(true);const raf=requestAnimationFrame(tick);meterRef.current={ctx,raf}};tick()}catch{/* المتصفح بلا واجهة تحليل صوت: تبقى البوابة على حالة التسجيل وحدها، ويُعلَن ذلك للمحكم */setMicMeterUnavailable(true);setMicHeard(true)}};
  useEffect(()=>()=>stopMeter(),[]);
+ /*
+  * شرطان لا شرط واحد، وكلٌّ في موضعه.
+  *
+  * `micRecording` هو ما تشترطه اللائحة فعلًا: أن تكون الجلسة تُسجَّل. وهو يتحقّق بمجرّد
+  * أن يعمل المسجّل.
+  *
+  * و`micHeard` أقوى منه: أن يصل صوتٌ إلى الشريط. وهو نافعٌ لأنه يكشف ميكروفونًا مكتومًا
+  * أو مصروفًا إلى مدخلٍ آخر — لكنه **لا يصلح بوابةً قاطعة**: قاعةٌ هادئة، أو متصفّحٌ لا
+  * يمرّر مستوى الصوت، أو سياق صوتٍ لم يُستأنف، تترك المحكّم أمام جدار لا يتجاوزه أبدًا
+  * — والجلسة تُسجَّل طوال الوقت. فوقوف المسابقة على شريطٍ لم يتحرّك أسوأ مما جاء الشريط
+  * ليمنعه.
+  *
+  * فالبوابة على التسجيل، والتحذير يبقى ظاهرًا ما لم يصل صوت.
+  */
+ const micRecording=!micGateApplies||audioState==='ready';
  const micVerified=!micGateApplies||(audioState==='ready'&&micHeard);
  const [openingAudioState,setOpeningAudioState]=useState<'idle'|'playing'|'unavailable'|'failed'>('idle');
  const [quranIntelligence,setQuranIntelligence]=useState<QuranPassageIntelligence|null>(null); const [alignmentResult,setAlignmentResult]=useState<QuranAlignmentResult|null>(null); const [alignmentConfigured,setAlignmentConfigured]=useState(false); const [shadowMicActive,setShadowMicActive]=useState(false); const [tajweedEducation,setTajweedEducation]=useState(false); const [sessionEvidence,setSessionEvidence]=useState<QuranSessionEvidence|null>(null); const [readingGuard,setReadingGuard]=useState<QuranReadingGuard|null>(null);
@@ -193,7 +208,7 @@ export const JudgeOS: React.FC = () => {
   setMicHeard(false);setMicMeterUnavailable(false);setAudioState('idle');await prepareAudio()};
  const prepareAudio=async()=>{ if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;startMeter(stream);const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();recorder.ondataavailable=e=>{if(e.data.size){if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);resolve()};recorder.stop()})};
- const submitAndLock=async()=>{if(!micVerified)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
+ const submitAndLock=async()=>{if(!micRecording)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
  const isLastQuestion=activeSession.currentQuestionIndex >= Math.max(1,totalQuestions)-1;
  /*
   * الطابور لجنةُ المحكّم، سواءٌ أكانت هناك جلسة مفتوحة أم لا.
@@ -233,8 +248,6 @@ export const JudgeOS: React.FC = () => {
   * الاعتراض بابًا لإعادةٍ غير مأذونة.
   */
  const CALLABLE:RegistrationStatus[]=['approved','checked_in','in_session'];
- const strandedInSession=(p:{status:RegistrationStatus;id:string})=>
-  p.status==='in_session'&&p.id!==participant?.id;
  const awaitingArrival=rosterForCompetition
   .filter(p=>CALLABLE.includes(p.status)&&p.id!==participant?.id)
   .filter(p=>!committeeQueue.some(q=>q.id===p.id))
@@ -245,13 +258,6 @@ export const JudgeOS: React.FC = () => {
   awaiting:awaitingArrival.length,
   pending:rosterForCompetition.filter(p=>['submitted','under_review'].includes(p.status)).length,
  };
- const admitAndCall=async(id:string)=>{setStartError('');
-  /* من عَلِقت حالته على «في الجلسة» بلا جلسة قائمة تُفكّ حالته أولًا، وإلا رفضه الاستقبال أبدًا. */
-  const target=rosterForCompetition.find(p=>p.id===id);
-  if(target&&strandedInSession(target))store.releaseStrandedSession(id);
-  const arrival=store.checkInParticipant(id,'exception_host');
-  if(!arrival){setStartError(ar?'تعذّر إدخال هذا المتسابق إلى الطابور. راجع غرفة العمليات.':'This participant could not be admitted to the queue. Check the operations room.');return}
-  await callParticipant(id)};
  const deductions=activeSession.events.filter(e=>!e.reversed).reduce((s,e)=>s+e.penalty,0);
  const blindness=resolveBlindness(policy.judging);
  const masked=maskParticipantForJudge(participant,blindness,ar);
@@ -340,28 +346,34 @@ export const JudgeOS: React.FC = () => {
   {nextQueued&&<Button className="mt-5" onClick={()=>void callParticipant(nextQueued.id)}>{ar?'استقبال المتسابق التالي':'Call next participant'}</Button>}
   {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-5">{startError}</div>}
  </div>
- {(!!committeeQueue.length||!!awaitingArrival.length)&&<div className="mizan-surface mt-7 p-5 text-start">
+ {!!committeeQueue.length&&<div className="mizan-surface mt-7 p-5 text-start">
   <div className="mizan-kicker">{ar?'من ينتظر دوره':'WAITING'}</div>
   <h2 className="mt-1 text-sm font-black">{ar?'صاحب الدور أوّلًا — بالترتيب':'The next in line — in order'}</h2>
   {/*
-    * الترتيب مُلزم، والشاشة تقوله قبل أن يُردّ الخادم.
+    * شاشة المحكّم لا تعرض إلا طابور لجنته، بترتيبه.
     *
-    * كان لكل صفٍّ في الطابور زرُّ «ابدأ جلسته»، فيستطيع المحكّم أن ينادي الخامس قبل
-    * الأول. والقاعدة تُفرض عند بدء الجلسة (`SESSION_START_OUT_OF_TURN`)، لكنّ زرًّا
-    * يُضغط ثم يُردّ تجربةٌ رديئة وبابُ سوء فهم: فيُعطَّل هنا صراحةً ويُقال سببه.
+    * كانت تعرض قائمتين: الطابور، ومعه «من لم يصل بعد» وزرُّ «أدخِله وابدأ» لكل صفّ فيها.
+    * فيستطيع المحكّم أن يستقبل من لم يحضر ويبدأ به فورًا أمام عشرين منتظرًا — تخطٍّ أشدّ
+    * من التخطّي داخل الطابور، لأن صاحبه لا يظهر في الطابور أصلًا فلا يُرى أن أحدًا تُخطّي.
     *
-    * ومن لم يصل بعد يُدخَل ويُبدأ به كما كان: ذلك إجراء حضورٍ لا تخطٍّ للطابور.
+    * والاستقبال ليس عمل المحكّم أصلًا: هو إجراء حضورٍ يخصّ التشغيل ومكتب الاستثناء، ويُوثَّق
+    * هناك باسم فاعله وسببه. فبقي للمحكّم ما يخصّه وحده: من أمامه الآن، ومن يليه.
+    *
+    * وصاحب الدور وحده يُبدأ به. والقاعدة نفسها مفروضة عند بدء الجلسة لا في الشاشة وحدها
+    * (`SESSION_START_OUT_OF_TURN`)، فلا يفتحها مسارٌ آخر.
     */}
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
-   {[...committeeQueue.map((p,i)=>({p,queued:true,turn:i===0})),...awaitingArrival.map(p=>({p,queued:false,turn:true}))].slice(0,24).map(({p,queued,turn})=><li key={p.id} className={`flex items-center gap-3 px-3 py-2.5 ${queued&&!turn?'opacity-60':''}`}>
-    <span className="font-mono text-[11px] font-black text-[#656b66]">{p.code}</span>
+   {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex items-center gap-3 px-3 py-2.5 ${turn?'':'opacity-60'}`}>
+    <span className="w-6 shrink-0 text-[11px] font-black text-[#656b66] tabular-nums">{i+1}</span>
+    <span className="font-mono text-[11px] font-black text-[#656b66]" dir="ltr">{p.code}</span>
     <span className="min-w-0 flex-1 truncate text-sm font-bold">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
-    <span className="shrink-0 text-[10px] font-black text-[#5f6663]">{queued&&turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
-    <Button size="sm" variant={queued&&turn?'primary':'outline'} disabled={queued&&!turn} title={queued&&!turn?(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.'):undefined} onClick={()=>void(queued?callParticipant(p.id):admitAndCall(p.id))}>{ar?(queued?'ابدأ جلسته':'أدخِله وابدأ'):(queued?'Start':'Admit & start')}</Button>
-   </li>)}
+    <span className="shrink-0 text-[10px] font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
+    <Button size="sm" variant={turn?'primary':'outline'} disabled={!turn} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{ar?'ابدأ جلسته':'Start'}</Button>
+   </li>})}
   </ul>
-  <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">{ar?'الترتيب مُلزم ولا يُتخطّى من هذه الشاشة. من تأخّر أو تعذّر حضوره يُعاد ترتيبه من غرفة العمليات، فيصير التالي صاحبَ الدور.':'Order is binding and cannot be skipped here. A late or absent participant is re-ordered from operations.'}</p>
-  {committeeQueue.length+awaitingArrival.length>24&&<p className="mt-2 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length+awaitingArrival.length-24} غيرهم.`:`And ${committeeQueue.length+awaitingArrival.length-24} more.`}</p>}
+  <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">{ar?'الترتيب مُلزم ولا يُتخطّى من هذه الشاشة. واستقبال من لم يصل ليس من هذه الشاشة: يتم من غرفة العمليات أو مكتب الاستثناء، ثم يدخل الطابور بترتيبه.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
+  {!!awaitingArrival.length&&<p className="mt-1.5 text-[10px] leading-5 text-[#696f6b]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
+  {committeeQueue.length>24&&<p className="mt-1.5 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
  </div>}
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
@@ -416,21 +428,28 @@ export const JudgeOS: React.FC = () => {
      *
      * كانت البطاقتان تُعرضان معًا: بطاقة «السؤال لم يُكشف» ببوابتَي الحضور والموافقة،
      * وتحتها بطاقة الميكروفون. فيضغط المحكّم «المتسابق أمامي» ثم «أوافق»، ولا يظهر
-     * المصحف — لأن `micVerified` يحجبه — فيبدو الزرّان كأنهما لا يفعلان شيئًا، والسبب
-     * في بطاقةٍ أخرى أسفل الشاشة لا تقول إنها شرطٌ لما فوقها.
+     * المصحف — لأن بوابة الميكروفون تحجبه — فيبدو الزرّان كأنهما لا يفعلان شيئًا،
+     * والسبب في بطاقةٍ أخرى أسفل الشاشة لا تقول إنها شرطٌ لما فوقها.
      *
      * فصار شرطًا واحدًا في كل لحظة: ما دامت السياسة تُلزم بالتسجيل ولم يُتحقّق من
      * الميكروفون، فبطاقته وحدها — وهي تقول صراحةً ما يليها. وحين يُعطَّل التسجيل في
      * الإعدادات (`requireAudioRecording === false`) فلا بطاقة ميكروفون أصلًا، ولا
      * شرط، ويبدأ المحكّم من الحضور مباشرة كما ينبغي.
      */}
-   {!questionRevealed&&!activeSession.isLocked&&(!micGateApplies||micVerified)&&<div className="py-3 sm:py-7"><div className="mx-auto max-w-xl text-center"><div className="w-16 h-16 rounded-2xl bg-[#f0eee7] text-[#313a35] grid place-items-center mx-auto"><LockKeyhole className="w-7 h-7"/></div><h2 className="text-2xl font-black mt-4">{ar?'السؤال لم يُكشف':'Question remains sealed'}</h2><p className="text-xs leading-6 text-[#636864] mt-2">{ar?'لا يظهر اسم السورة أو الآيات قبل وجود المتسابق أمام اللجنة وموافقة المحكمين المكلّفين.':'No passage details appear until the participant is present and assigned judges approve the reveal.'}</p>
+   {!questionRevealed&&!activeSession.isLocked&&micRecording&&<div className="py-3 sm:py-7"><div className="mx-auto max-w-xl text-center"><div className="w-16 h-16 rounded-2xl bg-[#f0eee7] text-[#313a35] grid place-items-center mx-auto"><LockKeyhole className="w-7 h-7"/></div><h2 className="text-2xl font-black mt-4">{ar?'السؤال لم يُكشف':'Question remains sealed'}</h2><p className="text-xs leading-6 text-[#636864] mt-2">{ar?'لا يظهر اسم السورة أو الآيات قبل وجود المتسابق أمام اللجنة وموافقة المحكمين المكلّفين.':'No passage details appear until the participant is present and assigned judges approve the reveal.'}</p>
     <div className="grid grid-cols-2 gap-3 mt-6"><GateState icon={UserCheck} ok={participantPresent} title={ar?'المتسابق أمام اللجنة':'Participant present'} value={participantPresent?(ar?'تم التحقق':'Verified'):(ar?'مطلوب':'Required')}/><GateState icon={UsersRound} ok={required>0&&approved>=required} title={ar?'موافقة المحكمين':'Judge approvals'} value={`${approved} / ${required}`}/></div>
     {!participantPresent?<Button className="mt-5" icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>:<Button className="mt-5" disabled={approvedByMe} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}
     {/* حُذف السطر الذي يشرح حدود البوابة تقنيًّا: كلامُ معماريةٍ لا يعني المحكّم، ولا يفعل بشأنه شيئًا. */}
    </div></div>}
 
    <div className="mb-4 space-y-2 empty:hidden">
+    {/*
+      * تحذيرٌ يبقى حتى يصل صوت — ولا يمنع شيئًا.
+      *
+      * الجلسة تُسجَّل، فلا موجب لإيقاف المسابقة. لكن ميكروفونًا مكتومًا يُنتج تسجيلًا
+      * صامتًا لا يُحتجّ به عند مراجعة، فيُقال للمحكّم صراحةً ما لم يُسمع صوت.
+      */}
+    {micGateApplies&&micRecording&&!micHeard&&!micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] px-4 py-3 text-[11px] font-bold leading-5 text-[#6b4f18] flex flex-wrap items-center gap-2"><Mic className="w-4 h-4 shrink-0"/><span className="flex-1 min-w-0">{ar?'التسجيل يعمل، ولم يصل صوتٌ إلى الشريط بعد. تأكّد أن الميكروفون غير مكتوم قبل أن تعتمد التقييم — تسجيلٌ صامت لا يُحتجّ به.':'Recording is running but no level has registered yet. Confirm the microphone is not muted before you submit.'}</span><Button size="sm" variant="outline" onClick={()=>void restartAudio()}>{ar?'إعادة الفحص':'Re-check'}</Button></div>}
     {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-4 h-4 shrink-0"/>{ar?'هذا المتصفح لا يعرض مؤشّر مستوى الصوت، فاعتُمد على بدء التسجيل وحده. تحقّق من وصول الصوت بعد أول تلاوة.':'This browser cannot show a live level meter, so verification relied on the recorder starting. Confirm the audio after the first recitation.'}</div>}
 
    {/*
@@ -443,12 +462,19 @@ export const JudgeOS: React.FC = () => {
    {secureMode&&secureRuntime?.diversityMetrics&&<div className="flex items-center justify-between gap-3 rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[10px] text-[#626a65]"><span className="font-black">{ar?'تنويع السحب العادل':'FAIRDRAW DIVERSITY'}</span><span>{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci} · يعاد الاستخدام فقط عند نفاد السعة`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci} · reuse only after capacity is exhausted`)}</span></div>}
    {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-4 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><div className="text-sm font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[10px] text-[#806b4d] mt-1">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، ومسموح بتبديل سؤال واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required, and only one question may be replaced in this session.'}</div></div><Button variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على تبديل السؤال':'Approve question replacement')}</Button></div>}
    </div>
-   {micGateApplies&&!micVerified&&<div className="rounded-3xl border border-[#e5e3dc] bg-white p-7 sm:p-10 my-4 text-center shadow-[0_18px_45px_rgba(25,39,33,.07)]"><div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${audioState==='failed'?'bg-[#F4E6E3] text-[#A34D43]':'bg-[#EEF2EF] text-[#214C40]'}`}>{audioState==='failed'?<MicOff className="h-7 w-7"/>:<Mic className="h-7 w-7"/>}</div><h2 className="mt-5 text-lg font-black text-[#20241f]">{audioState==='failed'?(ar?'تعذّر تشغيل الميكروفون':'Microphone unavailable'):audioState==='ready'?(ar?'تحدَّث لتأكيد وصول الصوت':'Speak to confirm the microphone'):(ar?'تأكيد الميكروفون قبل بدء الأسئلة':'Confirm the microphone before questions')}</h2><p className="mx-auto mt-2 max-w-md text-xs leading-6 text-[#656b66]">{audioState==='failed'?(ar?'لا يمكن بدء التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):audioState==='ready'?(ar?'اطلب من المتسابق قراءة البسملة، وراقب الشريط. يفتح الموضع تلقائيًا بمجرد وصول صوته.':'Ask the participant to speak and watch the level. The question opens as soon as the voice registers.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل التأكد من عمل الميكروفون.':'This competition requires session recording; the question stays sealed until the microphone is verified.')}</p><div className="mx-auto mt-6 flex max-w-md items-end justify-center gap-[3px]" aria-hidden="true">{Array.from({length:28}).map((_,i)=>{const on=micLevel*28>i;return <span key={i} className={`w-2 rounded-full transition-[height,background-color] duration-75 ${on?(i>22?'bg-[#A34D43]':i>16?'bg-[#9B7542]':'bg-[#2F6555]'):'bg-[#e8e6df]'}`} style={{height:`${8+i*0.9}px`}}/>})}</div><div className="mt-3 text-[11px] font-black text-[#656b66]">{audioState!=='ready'?(ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'):micLevel>0.06?(ar?'الصوت يصل':'Voice detected'):(ar?'في انتظار الصوت…':'Waiting for voice…')}</div><div className="mt-6 flex flex-wrap items-center justify-center gap-2"><Button size="sm" onClick={()=>void (audioState==='ready'?restartAudio():prepareAudio())} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':audioState==='ready'?(ar?'إعادة الفحص':'Re-check'):(ar?'تجهيز الميكروفون':'Prepare microphone')}</Button></div><p className="mt-4 text-[10px] font-bold leading-5 text-[#656b66]">{ar?'بعد تأكيد الميكروفون يظهر تأكيد حضور المتسابق وموافقة المحكمين.':'Once the microphone is confirmed, participant presence and panel approval appear next.'}</p></div>}
+   {/*
+     * بطاقة الميكروفون: خطوة واحدة، وتنتهي بتشغيل التسجيل.
+     *
+     * كانت تحمل حالةً ثانية («تحدَّث لتأكيد وصول الصوت») تبقى معروضةً بعد أن يعمل
+     * المسجّل، فتحجب ما بعدها حتى يتحرّك الشريط. وصار انتظار الصوت تحذيرًا أعلى الشاشة
+     * لا بوابةً، فبقيت هذه البطاقة لما قبل التسجيل وحده.
+     */}
+   {micGateApplies&&!micRecording&&<div className="rounded-3xl border border-[#e5e3dc] bg-white p-7 sm:p-10 my-4 text-center shadow-[0_18px_45px_rgba(25,39,33,.07)]"><div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${audioState==='failed'?'bg-[#F4E6E3] text-[#A34D43]':'bg-[#EEF2EF] text-[#214C40]'}`}>{audioState==='failed'?<MicOff className="h-7 w-7"/>:<Mic className="h-7 w-7"/>}</div><h2 className="mt-5 text-lg font-black text-[#20241f]">{audioState==='failed'?(ar?'تعذّر تشغيل الميكروفون':'Microphone unavailable'):(ar?'تأكيد الميكروفون قبل بدء الأسئلة':'Confirm the microphone before questions')}</h2><p className="mx-auto mt-2 max-w-md text-xs leading-6 text-[#656b66]">{audioState==='failed'?(ar?'لا يمكن بدء التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل تشغيل الميكروفون.':'This competition requires session recording; the question stays sealed until the microphone is running.')}</p><div className="mx-auto mt-6 flex max-w-md items-end justify-center gap-[3px]" aria-hidden="true">{Array.from({length:28}).map((_,i)=>{const on=micLevel*28>i;return <span key={i} className={`w-2 rounded-full transition-[height,background-color] duration-75 ${on?(i>22?'bg-[#A34D43]':i>16?'bg-[#9B7542]':'bg-[#2F6555]'):'bg-[#e8e6df]'}`} style={{height:`${8+i*0.9}px`}}/>})}</div><div className="mt-3 text-[11px] font-black text-[#656b66]">{ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}</div><div className="mt-6 flex flex-wrap items-center justify-center gap-2"><Button size="sm" onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تجهيز الميكروفون':'Prepare microphone')}</Button></div><p className="mt-4 text-[10px] font-bold leading-5 text-[#656b66]">{ar?'بمجرد أن يعمل التسجيل يظهر تأكيد حضور المتسابق وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'As soon as recording is running, presence and panel approval appear next — they do not wait on the level meter.'}</p></div>}
    {/* المسرح: المصحف واللوحة جنبًا إلى جنب على الشاشة العريضة، وفوق بعضهما على الضيقة. */}
    <div className="mizan-judge-stage">
-   {micVerified&&questionRevealed&&q&&!activeSession.isLocked&&!(activeSession.questionPhase==='TRANSITION'&&isLastQuestion)&&<div className="mizan-judge-page py-3 sm:py-5"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/><div className="mt-4 flex flex-wrap items-center justify-center gap-2">{openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio()} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}{alignmentConfigured&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}{alignmentConfigured&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}</div></div>}
+   {micRecording&&questionRevealed&&q&&!activeSession.isLocked&&!(activeSession.questionPhase==='TRANSITION'&&isLastQuestion)&&<div className="mizan-judge-page py-3 sm:py-5"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/><div className="mt-4 flex flex-wrap items-center justify-center gap-2">{openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio()} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}{alignmentConfigured&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}{alignmentConfigured&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}</div></div>}
 
-   {questionRevealed&&!activeSession.isLocked&&micVerified?activeSession.questionPhase==='TRANSITION'?<div className="rounded-2xl bg-[#eef2ef] p-7 text-center"><Square className="w-6 h-6 mx-auto text-[#214C40]"/><div className="font-black mt-3">{isLastQuestion?(ar?'انتهى آخر موضع. اعتمد تقييمك عندما تكون جاهزًا.':'Final passage ended. Submit when ready.'):(ar?'تم إيقاف الموضع. انتقل إلى السؤال التالي.':'Passage stopped. Move to the next question.')}</div>{isLastQuestion?<Button className="mt-4" onClick={submitAndLock} icon={<Check className="w-4 h-4"/>}>{ar?'اعتماد وقفل':'Submit & lock'}</Button>:<Button className="mt-4" onClick={()=>nextQuestion()} icon={<SkipForward className="w-4 h-4"/>}>{ar?'السؤال التالي':'Next question'}</Button>}</div>:<>
+   {questionRevealed&&!activeSession.isLocked&&micRecording?activeSession.questionPhase==='TRANSITION'?<div className="rounded-2xl bg-[#eef2ef] p-7 text-center"><Square className="w-6 h-6 mx-auto text-[#214C40]"/><div className="font-black mt-3">{isLastQuestion?(ar?'انتهى آخر موضع. اعتمد تقييمك عندما تكون جاهزًا.':'Final passage ended. Submit when ready.'):(ar?'تم إيقاف الموضع. انتقل إلى السؤال التالي.':'Passage stopped. Move to the next question.')}</div>{isLastQuestion?<Button className="mt-4" onClick={submitAndLock} icon={<Check className="w-4 h-4"/>}>{ar?'اعتماد وقفل':'Submit & lock'}</Button>:<Button className="mt-4" onClick={()=>nextQuestion()} icon={<SkipForward className="w-4 h-4"/>}>{ar?'السؤال التالي':'Next question'}</Button>}</div>:<>
     <div className="mizan-judge-deck"><div className="mizan-judge-deck-inner">
     {policy.judging.scoreEntryMode!=='direct_score'&&<>
      <div className="mizan-judge-grid" data-cols={judgeActions.length<=4?'4':'3'} role="group" aria-label={ar?'أدوات تسجيل الملاحظات':'Scoring actions'}>{judgeActions.map(a=>{

@@ -60,7 +60,18 @@ test('nobody awaiting a turn can vanish from the judging screen', () => {
   assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session'\]/);
   assert.doesNotMatch(judge, /'in_session','appealed'/, 'an appeal is never turned into an unauthorized retest');
   assert.match(judge, /PARTICIPANT_WAIT_LABEL/);
-  assert.match(judge, /store\.releaseStrandedSession\(id\)/);
+
+  /*
+   * «لا يختفي أحد» لا تعني «يبدأ المحكّم بأيّهم شاء».
+   *
+   * كانت الشاشة تعرض من لم يصل بعدُ ومعه زرّ استقبالٍ وفكُّ جلسةٍ عالقة، فصار المحكّم
+   * يستقبل من يشاء ويبدأ به أمام طابورٍ قائم. والاستقبال إجراء حضورٍ يخصّ التشغيل ومكتب
+   * الاستثناء ويُوثَّق هناك باسم فاعله. فبقي الظهور — عددًا يُقال للمحكّم — وزال الفعل.
+   */
+  assert.match(judge, /لم يدخلوا الطابور بعد/, 'those not yet in the queue are still surfaced to the judge');
+  assert.doesNotMatch(judge, /store\.releaseStrandedSession\(id\)/, 'but the judge no longer releases or admits anyone');
+  const portals = read('src/components/admin/RolePortals.tsx');
+  assert.match(portals, /releaseStrandedSession/, 'the recovery moved to the exception desk, it was not dropped');
 
   const store = read('src/lib/store.ts');
   assert.match(store, /const releaseStrandedSession = \(participantId: string\)/);

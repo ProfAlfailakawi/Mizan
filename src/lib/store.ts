@@ -3325,7 +3325,25 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
      * موثَّق يُرى، لا تخطٍّ صامت. والأدوار التي تملك الاستثناء تمرّ.
      */
     const turnExempt = ['ops_manager', 'exception_host', 'comp_admin', 'org_admin'].includes(globalState.currentUser.role);
-    if (!turnExempt && participant.status === 'in_queue') {
+    /*
+     * استئنافُ جلسةٍ عَلِقت ليس تخطّيًا للطابور.
+     *
+     * من كان «داخل اللجنة» في هذه اللجنة بعينها قد نُودي فيها فعلًا ثم عَلِق — فإعادته
+     * استكمالٌ لدوره الذي بدأ، لا قفزٌ فوق من ينتظر.
+     */
+    const resumingOwnSession = participant.status === 'in_session' && participant.assignedCommitteeId === committee.id;
+    if (!turnExempt && !resumingOwnSession) {
+      /*
+       * الترتيب يُحرس عند الأثر، لا عند نوع الزرّ.
+       *
+       * كان الشرط `status === 'in_queue'` وحده، فمسارٌ آخر في شاشة المحكّم يتخطّاه كاملًا:
+       * «أدخِله وابدأ» يسجّل حضور من لم يصل بعد ثم يبدأ جلسته فورًا — فيقف أمام اللجنة
+       * قبل عشرين منتظرًا بلا أن يمرّ بالطابور أصلًا، ولا يظهر في أي سجلّ أن أحدًا تُخطّي.
+       *
+       * فالقاعدة صارت على حالة اللجنة لا على حالة المتسابق: ما دام في طابور هذه اللجنة
+       * منتظرٌ واحد، فلا يبدأ إلا صاحب الدور. وطابورٌ فارغ يعني أن لا أحد يُتخطّى، فيُستقبل
+       * من حضر متأخّرًا كما ينبغي.
+       */
       const committeeQueue = globalState.participants.filter(p =>
         p.competitionId === globalState.competition.id &&
         p.status === 'in_queue' &&
