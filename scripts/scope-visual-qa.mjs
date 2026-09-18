@@ -66,6 +66,33 @@ async function newPage(width, height, label) {
  * والانتظارُ بالظهور لا بالتوقيت: رقمٌ ثابت يمرّ أحيانًا ويسقط أحيانًا على الآلة نفسها.
  */
 const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+/*
+ * `networkidle` ليست ما ينتظره هذا الفحص.
+ *
+ * على عدّاء CI انتهت مهلةُ الثلاثين ثانية مرّتين على `#register` (سطح المكتب والهاتف)،
+ * وفي التشغيل نفسه مرّت بقيةُ الصفحات. وهنا يمرّ القسم كلُّه. ولم أستطع إعادةَ إنتاج
+ * الحالة في هذه البيئة، فلا أُسمّي لها سببًا لم أُثبته.
+ *
+ * والسببُ ليس شرطًا لتصحيح الانتظار: `networkidle` تعني «مضت نصفُ ثانيةٍ بلا طلبٍ
+ * معلّق»، وذاك شرطٌ على **الشبكة** لا على الصفحة. فتتعلّق البوّابةُ بكلّ ما تلمسه
+ * الصفحةُ ممّا لا يعنيها — عاملُ خدمةٍ يُهيّئ مخزونَه، أو خطٌّ يُجلب، أو نداءٌ خارجيّ
+ * يُحجب فيبقى معلّقًا حتى مهلته. أيُّ واحدٍ من هذه يُسقط الفحصَ والصفحةُ سليمة، ويُقرأ
+ * «انتهت المهلة» فلا يدلّ على شيء. ولهذا تنصح Playwright نفسُها بتركها.
+ *
+ * والمنتظَرُ الصحيح هو ما يُؤكَّد عليه فعلًا: أن تصير الصفحةُ صالحةً للاستعمال. أسرعُ،
+ * وأصدق، ويُسمّي ما لم يظهر بعينه حين لا يظهر.
+ */
+async function openPage(page, url, ready, label, what, timeout = 45000) {
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.locator(ready).first().waitFor({ state: 'visible', timeout });
+    return true;
+  } catch {
+    note(`[${label}] الصفحة فُتحت ولم يظهر ${what}`);
+    return false;
+  }
+}
+
 async function enterDemo(page, label) {
   const entry = page.locator(`button[aria-label="${DEMO_ENTRY}"]`).first();
   try { await entry.waitFor({ state: 'visible', timeout: 20000 }); } catch {
@@ -99,7 +126,7 @@ for (const [width, height, label] of VIEWPORTS) {
   console.log(`\n── ${label} ${width}×${height}`);
   const { ctx, page } = await newPage(width, height, label);
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     if (!await enterDemo(page, label)) { await ctx.close(); continue; }
 
     const engine = page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first();
@@ -202,8 +229,20 @@ for (const [width, height, label] of (apiServed ? [VIEWPORTS[0], VIEWPORTS[2]] :
   console.log(`\n── تسجيل ${label}`);
   const { ctx, page } = await newPage(width, height, `register-${label}`);
   try {
-    await page.goto(`${BASE}/#register?comp=${COMP}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2200);
+    /*
+     * والمنتظَرُ أوّلُ حقلٍ في النموذج، لا مهلةٌ ثابتة: الحقلُ هو شرطُ ما بعده.
+     * وصفحةُ «لم نعثر على المسابقة» تُقال باسمها — فهي تشخيصٌ آخر تمامًا (الخادمُ لم
+     * يخدم المسابقةَ المزروعة) لا «النموذج لم يُرسم».
+     */
+    if (!await openPage(page, `${BASE}/#register?comp=${COMP}`,
+      'label:has-text("الاسم بالعربية")', label, 'نموذجُ التسجيل')) {
+      const body = await page.locator('body').innerText().catch(() => '');
+      if (/لم نعثر على المسابقة|CompetitionNotFound/.test(body)) {
+        note(`[${label}] الخادم لم يخدم المسابقة المزروعة ${COMP} — تشخيصٌ غير «النموذج لم يُرسم»`);
+      }
+      await ctx.close();
+      continue;
+    }
     /*
      * وتاريخُ الميلاد منها.
      *
@@ -312,7 +351,7 @@ console.log('\n── نطاق المتسابق: قرارُ الفئة لا اخ
 {
   const { ctx, page } = await newPage(1440, 1100, 'scope-decision');
   try {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     if (!await enterDemo(page, 'scope-decision')) { /* enterDemo سجّل الملاحظة */ }
     else {
       await roleSwitch(page, 'participant');

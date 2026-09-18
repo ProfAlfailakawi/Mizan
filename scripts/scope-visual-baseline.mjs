@@ -50,9 +50,9 @@ for (const [width, height, label] of VIEWPORTS) {
     try { localStorage.setItem('mizan_onboarding_quiet_v2', '1'); sessionStorage.setItem('mizan_splash_seen', '1'); } catch { /* private mode */ }
   });
   const page = await ctx.newPage();
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1500);
-  await page.locator('button:visible', { hasText: 'مدير المسابقة' }).first().click();
+  /* النقرةُ التالية تنتظر عنصرَها بنفسها، فلا حاجة إلى سكون الشبكة ولا إلى مهلةٍ ثابتة. */
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await page.locator('button:visible', { hasText: 'مدير المسابقة' }).first().click({ timeout: 45000 });
   await page.waitForTimeout(1500);
   await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
   await page.waitForTimeout(1200);

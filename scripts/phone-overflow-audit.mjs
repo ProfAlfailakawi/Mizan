@@ -102,11 +102,15 @@ const findOverflow = () => page.evaluate((slack) => {
 
 console.log(`── التمدّد الأفقي على ${WIDTH}px`);
 
-await page.goto(BASE, { waitUntil: 'networkidle' });
-await page.waitForTimeout(1500);
+await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
 /* مدخل العرض أيقونةٌ صامتة بلا نصّ — فيُطلب بوسم الوصول لا بنصٍّ لا وجود له. */
 const entry = page.locator(`button:visible[aria-label="${DEMO_ENTRY}"]`).first();
+/*
+ * ويُنتظر ظهورُه بدل أن يُسأل `count()` بعد مهلةٍ ثابتة: صفحةٌ أبطأ قليلًا كانت تُقرأ
+ * «المدخل غير موجود» وهو موجودٌ لم يُرسم بعد. وسكونُ الشبكة لم يكن شرطًا صحيحًا أصلًا.
+ */
+await entry.waitFor({ state: 'visible', timeout: 45000 }).catch(() => {});
 if (!await entry.count()) { note('مدخل البيئة التجريبية غير موجود — لم يُفحص شيء'); await browser.close(); process.exit(1) }
 await entry.click();
 await page.waitForTimeout(3500);
