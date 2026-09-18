@@ -165,6 +165,14 @@ export class QuranCrosswalkTable {
 
   get size() { return this.rows.size; }
 
+  /**
+   * هل بُنيت الصفوف فعلًا؟
+   *
+   * يُقرأ في الاختبار لإثبات التأجيل بلا قياس ذاكرةٍ يختلف من آلةٍ إلى آلة: الصفةُ
+   * المقصودة أن الاستيراد لا يبني الجدول، وهذه حقيقةٌ حتمية تُسأل مباشرةً.
+   */
+  get materialised() { return this.built !== undefined; }
+
   /** هل لهذا الموضع صفُّ دليلٍ منصوص؟ */
   hasEvidenceFor(rawiId: string, canonical: QuranLocus): boolean {
     return this.rows.has(keyOf(rawiId, canonical.surah, canonical.ayah));

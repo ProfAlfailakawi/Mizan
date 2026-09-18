@@ -7,7 +7,7 @@
      * لا قفلٌ يمنع التصحيح.
      */
 import { useState, useEffect } from 'react';
-import { computePanelScore, panelPenaltyCount, breakTie as coreBreakTie } from './scoring-core';
+import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
 import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
@@ -1826,8 +1826,9 @@ export function useAppStore() {
       }
       const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||category?.nameArabic||'', categoryNameArabic:category?.nameArabic||category?.name||'', finalScore, criterionScores:aggregatedCriterionScores, penaltyCount:sessionPenaltyCount, rank:0, status:'calculated' };
       if(existing>=0) globalState.results[existing]=result; else globalState.results=[...globalState.results,result];
-      const ranked=globalState.results.filter(r=>r.competitionId===globalState.competition.id&&r.categoryId===participant.categoryId).sort((a,b)=>(b.finalScore-a.finalScore)||breakTie(a,b,sessionRuleSet.tieBreakRules));
-      ranked.forEach((r,i)=>{const x=globalState.results.findIndex(z=>z.id===r.id);if(x>=0){const rankedResult={...globalState.results[x],rank:i+1};globalState.results[x]=rankedResult;void persistScopedDocument('results',rankedResult.id,rankedResult as unknown as Record<string,unknown>);}});
+      // المتعادلون يتشاركون الرتبة (١، ١، ٣) ولا تُفضّ بترتيب المصفوفة — انظر `rankResults`.
+      const outcome=rankResults(globalState.results.filter(r=>r.competitionId===globalState.competition.id&&r.categoryId===participant.categoryId),sessionRuleSet.tieBreakRules as readonly string[]);
+      outcome.ranked.forEach(({result:r,rank})=>{const x=globalState.results.findIndex(z=>z.id===r.id);if(x>=0){const rankedResult={...globalState.results[x],rank};globalState.results[x]=rankedResult;void persistScopedDocument('results',rankedResult.id,rankedResult as unknown as Record<string,unknown>);}});
       const spread=Math.max(...sessionSubs.map(s=>s.totalScore))-Math.min(...sessionSubs.map(s=>s.totalScore));
       if(spread>=5 && !globalState.reviewCases.some(r=>r.sessionId===submission.sessionId && r.status==='pending')) globalState.reviewCases=[{ id:newId('review'), competitionId:globalState.competition.id, sessionId:submission.sessionId, participantId:participant.id, participantCode:participant.code, committeeId:globalState.activeSession.committee?.id||'', reason:'judge_variance', severity:spread>=10?'high':'medium', timestampSec:sessionElapsedSeconds(), details:`Panel spread ${spread.toFixed(2)} points`, status:'pending' },...globalState.reviewCases];
     }
@@ -2332,7 +2333,17 @@ export function useAppStore() {
       const rIdx=globalState.results.findIndex(r=>r.competitionId===globalState.competition.id&&r.participantId===appeal.participantId);
       if(rIdx>=0 && !['sealed','published'].includes(globalState.results[rIdx].status)){
         const r=globalState.results[rIdx]; globalState.results[rIdx]={...r,finalScore:Math.max(0,Number((r.finalScore+appliedDelta).toFixed(2)))};
-        const cat=r.categoryId; const tieRules=activeRuleSetForCategory(r.categoryId).tieBreakRules; const ranked=globalState.results.filter(x=>x.competitionId===globalState.competition.id&&x.categoryId===cat).sort((a,b)=>(b.finalScore-a.finalScore)||breakTie(a,b,tieRules)); ranked.forEach((rr,i)=>{const x=globalState.results.findIndex(z=>z.id===rr.id);if(x>=0){const rankedResult={...globalState.results[x],rank:i+1};globalState.results[x]=rankedResult;void persistScopedDocument('results',rankedResult.id,rankedResult as unknown as Record<string,unknown>);}});
+        const cat=r.categoryId; const tieRules=activeRuleSetForCategory(r.categoryId).tieBreakRules;
+        /*
+         * المتعادلون يتشاركون الرتبة، ولا تُفضّ بترتيب المصفوفة.
+         *
+         * كان الترتيب يُسنَد بـ`i+1` بعد الفرز، فمتعادلان عند الصدارة يأخذ أحدُهما الأول
+         * والآخر الثاني بحسب ترتيب إدخالهما — حكمٌ صامتٌ على الصدارة لا سند له، ويظهر في
+         * شهادةٍ مطبوعة. فصارت الرتبة تنافسية (١، ١، ٣)، والتعادلُ غير المحسوم يبقى معلنًا
+         * ليُحسم بإعادة اختبارٍ أو بقرارٍ مُسجَّل.
+         */
+        const outcome=rankResults(globalState.results.filter(x=>x.competitionId===globalState.competition.id&&x.categoryId===cat),tieRules as readonly string[]);
+        outcome.ranked.forEach(({result:rr,rank})=>{const x=globalState.results.findIndex(z=>z.id===rr.id);if(x>=0){const rankedResult={...globalState.results[x],rank};globalState.results[x]=rankedResult;void persistScopedDocument('results',rankedResult.id,rankedResult as unknown as Record<string,unknown>);}});
       }
     }
     const pIdx=globalState.participants.findIndex(p=>p.id===appeal.participantId&&p.competitionId===globalState.competition.id);

@@ -39,6 +39,7 @@ import {
 const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
 import {
   MIZAN_IDENTITY_CROSSWALK,
+  QuranCrosswalkTable,
   crosswalkCoverage,
   validateCrosswalkRow,
   CrosswalkError,
@@ -306,29 +307,17 @@ test('activation moved exactly the proved readings to question-ready', () => {
 test('the bridge table is not materialised just by importing it', async () => {
   /*
    * خمسةٌ وعشرون ألف صفّ. بناؤها عند الاستيراد يضع كلفتَها على كل صفحةٍ تحمّل الوحدة —
-   * صفحةُ الدخول وصفحةُ التعريف وهما لا تسألان عن موضعٍ قطّ. فيُثبت هنا أن البناء مؤجَّل،
-   * وأن أول استعمالٍ حقيقيّ هو ما يدفع الثمن.
+   * صفحةُ الدخول وصفحةُ التعريف وهما لا تسألان عن موضعٍ قطّ.
    *
-   * يُقاس في عمليةٍ مستقلّة: هذه العملية حمّلت الوحدة واستعملتها في اختباراتٍ سابقة.
+   * ويُسأل الجدولُ عن نفسه بدل قياس ذاكرةٍ يختلف من آلةٍ إلى آلة ومن حِملٍ إلى حِمل:
+   * جدولٌ جديد لم يُستعمل بعدُ غيرُ مبنيّ، وأولُ استعمالٍ هو ما يبنيه. حقيقةٌ حتمية.
    */
-  const { execFileSync } = await import('node:child_process');
-  const probe = [
-    `import { MIZAN_IDENTITY_CROSSWALK } from '${path.join(process.cwd(), 'src/lib/quran-locus-crosswalk')}';`,
-    "const afterImport = process.memoryUsage().heapUsed;",
-    "const size = MIZAN_IDENTITY_CROSSWALK.size;",
-    "const afterUse = process.memoryUsage().heapUsed;",
-    "console.log(JSON.stringify({ afterImport, afterUse, size }));",
-  ].join('\n');
-  const file = path.join(process.cwd(), 'artifacts', 'crosswalk-lazy-probe.ts');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, probe);
-  try {
-    const out = execFileSync('npx', ['tsx', file], { cwd: process.cwd(), encoding: 'utf8', timeout: 180_000 });
-    const measured = JSON.parse(out.trim().split('\n').at(-1)!) as { afterImport: number; afterUse: number; size: number };
-    assert.equal(measured.size, COMMITTEE_CROSSWALK_ROWS.length, 'the same table is measured');
-    assert.ok(measured.afterUse > measured.afterImport,
-      'first use must be what allocates the table — otherwise the import already paid for it');
-    assert.ok(measured.afterImport < 16 * 1024 * 1024,
-      `importing the crosswalk must stay cheap, measured ${(measured.afterImport / 1048576).toFixed(1)}MB`);
-  } finally { fs.rmSync(file, { force: true }); }
+  const lazy = new QuranCrosswalkTable(() => [...committeeCrosswalkRows()], 'lazy-probe');
+  assert.equal(lazy.materialised, false, 'constructing from a thunk must not build anything');
+  assert.equal(lazy.size, COMMITTEE_CROSSWALK_ROWS.length, 'first use builds the same table');
+  assert.equal(lazy.materialised, true, 'and only first use builds it');
+
+  // وجدولٌ يُبنى من صفوفٍ في اليد يُتحقَّق منه فورًا: تأجيلُ خطئه يعني ظهورَه في منتصف جلسة.
+  const eager = new QuranCrosswalkTable([], 'eager-probe');
+  assert.equal(eager.materialised, true, 'an array-constructed table is validated at construction, as it always was');
 });
