@@ -16,7 +16,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -95,4 +95,66 @@ test('the reader never builds a pattern out of what it is given', () => {
 test('a name that looks like a pattern is treated as text, not as one', () => {
   // ولو مرّ حرفٌ خاصّ يومًا، فلا مُفسِّرَ يستقبله.
   assert.throws(() => read('_VITE_.*'), /Command failed|status 2/);
+});
+
+/* ── وبيئةُ التشغيل تُقرأ من بيئة التشغيل ───────────────────────────────── */
+
+test('runtime settings are read where production sets them, not from the runner', () => {
+  /*
+   * العطلُ نفسُه في موضعٍ ثالث. أُصلح أوّلًا لـ`VITE_*` — كانت البوّابة تنتظر سرًّا لا
+   * وجودَ له بينما الإعدادُ في `substitutions`. وبقي `MIZAN_*` يُقرأ من بيئة العدّاء،
+   * وهي ليست بيئةَ الإنتاج: فحذّر التقريرُ من `MIZAN_SAAS_DATA_DIR` وهو مضبوطٌ في
+   * `--update-env-vars`، ومن `MIZAN_CERTIFICATE_REGISTRY_DIR` بعد ضبطه هناك بدقائق.
+   *
+   * وتحذيرٌ كاذب أسوأ من لا تحذير: يُقرأ التقريرُ فيُشكُّ في صحّته كلِّه، فيُتخطّى ما
+   * فيه من صدق — وفي هذا التقرير مانعان صادقان.
+   */
+  const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'release-gates.yml'), 'utf8');
+  assert.match(workflow, /cloudbuild-substitution\.mjs --env "\$name"/,
+    'runtime variables must be sourced from the deployment, not the runner');
+  assert.match(workflow, /for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do/,
+    'and the ones the deployment actually sets must be named');
+});
+
+test('the reader returns what production really deploys', () => {
+  const read = (...args: string[]) => spawnSync('node', [READER, ...args], { encoding: 'utf8' });
+  for (const [name, expected] of [
+    ['MIZAN_CERTIFICATE_REGISTRY_DIR', '/mnt/authority/certificates'],
+    ['MIZAN_SAAS_DATA_DIR', '/mnt/authority/saas'],
+  ]) {
+    const out = read('--env', name);
+    assert.equal(out.status, 0, `${name} must be readable from cloudbuild.yaml`);
+    assert.equal(out.stdout, expected, `${name} must be the value the service actually boots with`);
+  }
+});
+
+test('a variable production does not set stays absent — the warning is earned', () => {
+  /*
+   * الفرقُ كلُّه هنا: التصحيحُ أسكت تحذيرَين كاذبين، ولم يُسكت صادقًا. وسرّا التوقيع
+   * ليسا في سطر متغيّرات البيئة، فيبقى التحذيرُ منهما قائمًا حتى يُنشآ ويُربطا.
+   */
+  for (const secret of ['MIZAN_PASS_SIGNING_SECRET', 'MIZAN_CERT_SIGNING_SECRET']) {
+    const out = spawnSync('node', [READER, '--env', secret], { encoding: 'utf8' });
+    assert.notEqual(out.status, 0, `${secret} is not set in production, so the reader must not invent it`);
+    assert.match(out.stderr, /CLOUDBUILD_RUNTIME_ENV_NOT_FOUND/, 'and must say so by name');
+  }
+});
+
+test('the runtime reader cannot print a secret, by construction', () => {
+  /*
+   * يقرأ سطرَ `--update-env-vars` وحده. وسطرُ `--update-secrets` منفصل، ولا يحمل قيمةً
+   * أصلًا بل اسمَ سرٍّ في Secret Manager — فلا سبيل لهذا السكربت إلى قيمة سرّ.
+   */
+  const reader = fs.readFileSync(READER, 'utf8');
+  assert.match(reader, /line\.trim\(\) === "- '--update-env-vars'"/,
+    'it must anchor on the env-vars flag literally');
+  /*
+   * والتعليقاتُ تُنزع أوّلًا — وقد سقط هذا الحارسُ عليها أوّلَ تشغيل: التعليقُ يشرح
+   * أن `--update-secrets` سطرٌ منفصل، وأن `new RegExp` أُزيلت بعد رصد CodeQL. فقرأ
+   * الحارسُ شرحَ الغياب حضورًا. والشيفرةُ وحدها هي ما يُقاس.
+   */
+  const code = reader.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.equal(/update-secrets/.test(code), false, 'it must never read the secrets line');
+  // ولا تعبيرَ نمطيًّا يُبنى من وسيطٍ خارجيّ — الدرسُ الذي رصدته CodeQL مرّةً يبقى مطبَّقًا.
+  assert.equal(/new RegExp/.test(code), false, 'no regular expression is built from input');
 });

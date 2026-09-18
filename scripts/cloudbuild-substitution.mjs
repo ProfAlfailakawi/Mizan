@@ -14,14 +14,28 @@
  *
  * الاستعمال: node scripts/cloudbuild-substitution.mjs _VITE_FIREBASE_PROJECT_ID
  * ويعود بحالةٍ غير صفرية إن لم يوجد الاسم — فلا يُقرأ الفراغُ قيمةً.
+ *
+ * ── ومتغيّراتُ التشغيل كذلك ──────────────────────────────────────────────────
+ *
+ * والعطلُ نفسُه ظهر في موضعٍ ثالث: `preflight` يقرأ `MIZAN_*` من بيئة العدّاء، وهي
+ * ليست بيئةَ الإنتاج. فكان يحذّر «`MIZAN_SAAS_DATA_DIR` غير مضبوط» وهو مضبوطٌ في
+ * `--update-env-vars` من `cloudbuild.yaml`، ثم «`MIZAN_CERTIFICATE_REGISTRY_DIR` غير
+ * مضبوط» بعد ضبطه هناك بدقائق.
+ *
+ * وتحذيرٌ كاذب أسوأ من لا تحذير: يُقرأ التقريرُ فيُشكّ في صحّته كلِّه، فيُتخطّى ما فيه
+ * من صدق. فصار يُقرأ من حيث يُضبط فعلًا:
+ *
+ *   node scripts/cloudbuild-substitution.mjs --env MIZAN_SAAS_DATA_DIR
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
-const name = process.argv[2];
-if (!name || !/^_[A-Z][A-Z0-9_]*$/.test(name)) {
-  console.error('USAGE: cloudbuild-substitution.mjs _SUBSTITUTION_NAME');
+const runtimeMode = process.argv[2] === '--env';
+const name = runtimeMode ? process.argv[3] : process.argv[2];
+const NAME_SHAPE = runtimeMode ? /^[A-Z][A-Z0-9_]*$/ : /^_[A-Z][A-Z0-9_]*$/;
+if (!name || !NAME_SHAPE.test(name)) {
+  console.error('USAGE: cloudbuild-substitution.mjs _SUBSTITUTION_NAME | --env RUNTIME_NAME');
   process.exit(2);
 }
 
@@ -32,6 +46,33 @@ if (!fs.existsSync(file)) {
 }
 
 const source = fs.readFileSync(file, 'utf8');
+
+/*
+ * متغيّرُ تشغيلٍ يُقرأ من سطر `--update-env-vars` — وهو السطرُ الذي يحمل فعلًا ما
+ * تُقلع به الخدمة. والمقارنةُ حرفيّةٌ كما في الكتلة أدناه: لا تعبيرَ نمطيًّا يُبنى من
+ * وسيطٍ خارجيّ.
+ *
+ * والأسرارُ ليست هنا ولا تُقرأ منه: سطرُ `--update-secrets` منفصل، ولا يحمل قيمةً
+ * أصلًا بل اسمَ سرٍّ في Secret Manager. فلا يطبع هذا السكربت سرًّا ولو أُريد به ذلك.
+ */
+if (runtimeMode) {
+  const lines = source.split('\n');
+  const flag = lines.findIndex(line => line.trim() === "- '--update-env-vars'");
+  if (flag < 0) {
+    console.error('CLOUDBUILD_RUNTIME_ENV_LINE_MISSING');
+    process.exit(1);
+  }
+  const payload = (lines[flag + 1] || '').trim().replace(/^-\s*/, '').replace(/^'(.*)'$/, '$1');
+  const wantedRuntime = `${name}=`;
+  const entry = payload.split(',').find(part => part.startsWith(wantedRuntime));
+  if (entry === undefined) {
+    console.error(`CLOUDBUILD_RUNTIME_ENV_NOT_FOUND: ${name}`);
+    process.exit(1);
+  }
+  process.stdout.write(entry.slice(wantedRuntime.length));
+  process.exit(0);
+}
+
 /*
  * يُقرأ من كتلة `substitutions:` وحدها — لا من أيّ سطرٍ في الملفّ يصادف الاسمَ نفسه،
  * كسطرِ `--build-arg` الذي يذكر `${_VITE_...}` ولا يحمل قيمتَه.
