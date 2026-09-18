@@ -16,6 +16,7 @@ import test from 'node:test';
 
 import {
   SERVER_AUTHORED_AUDIT_ACTIONS,
+  canonicalAuditAction,
   isServerAuthoredAuditAction,
 } from '../server/audit-authority';
 
@@ -69,7 +70,8 @@ test('each server-authored action is actually written by the server somewhere', 
    */
   const notYetEmittedByTheServer = new Set([
     // هذه تقع اليوم في حالة العميل (`store.ts`) ولم تُنقل بعد إلى مسارٍ خادميّ.
-    'RESULT_PUBLISHED', 'RESULT_REOPENED', 'SCORE_CORRECTED', 'QUESTION_INVALIDATED',
+    // و`RESULT_PUBLISHED` خرجت من هنا: صار `/api/results/publish` يكتبها.
+    'RESULT_REOPENED', 'SCORE_CORRECTED', 'QUESTION_INVALIDATED',
     'QUESTION_REDRAWN', 'PARTICIPANT_READING_CHANGED', 'COMPETITION_POLICY_CHANGED',
     'PRIVILEGED_OVERRIDE', 'ROLE_CHANGED', 'LICENSE_ACTION', 'ENVELOPE_OPENED',
   ]);
@@ -107,4 +109,79 @@ test('no route appends to the ledger behind the helper back', () => {
     .filter(({ line }) => !line.includes('try{serverAuditLedger?.append(actor,input)}'));
   assert.deepEqual(direct.map(d => `server.ts:${d.index}`), [],
     'these lines append straight to the local ledger instead of going through auditAppend');
+});
+
+/*
+ * الهجاءُ الذي كان يفتح البابَ المُغلق.
+ *
+ * القائمةُ كُتبت بمفردات الطلب — `RESULT_SEALED` بالإفراد — والعميلُ يكتب
+ * `RESULTS_SEALED` و`RESULTS_PUBLISHED` بالجمع. فالمطابقةُ حرفًا بحرف كانت تمرّر
+ * **أخطرَ حدثين** من الباب الذي بُني ليمنعهما، والحارسُ قائمٌ يبدو عاملًا.
+ */
+const CLIENT_STORE = fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'store.ts'), 'utf8');
+
+/** مفرداتُ أحداث التدقيق كما يُصدرها العميل فعلًا — تُقرأ من الشيفرة لا من الذاكرة. */
+function clientAuditActions(): string[] {
+  const found = new Set<string>();
+  for (const m of CLIENT_STORE.matchAll(/action:\s*'([A-Z][A-Z0-9_]+)'/g)) found.add(m[1]);
+  for (const m of CLIENT_STORE.matchAll(/action:\s*[^,{}]*?\?\s*'([A-Z][A-Z0-9_]+)'\s*:\s*'([A-Z][A-Z0-9_]+)'/g)) { found.add(m[1]); found.add(m[2]); }
+  for (const m of CLIENT_STORE.matchAll(/auditTrustAction\(\s*'([A-Z][A-Z0-9_]+)'/g)) found.add(m[1]);
+  return [...found].sort();
+}
+
+test('the spellings the client actually emits for a guarded act are refused', () => {
+  for (const spelling of ['RESULTS_SEALED', 'RESULTS_PUBLISHED', 'RESULTS_REOPENED', 'SCORES_CORRECTED']) {
+    assert.ok(isServerAuthoredAuditAction(spelling), `${spelling} is the guarded act under another spelling`);
+  }
+  // والتطبيعُ يردّ الهجاءَ إلى فعله ولا يخترع فعلًا لما لا يعرفه.
+  assert.equal(canonicalAuditAction(' results_published '), 'RESULT_PUBLISHED');
+  assert.equal(canonicalAuditAction('PARTICIPANT_CHECKIN'), 'PARTICIPANT_CHECKIN');
+  assert.equal(canonicalAuditAction(undefined), '');
+});
+
+test('no client spelling of a guarded act can slip past the guard', () => {
+  /*
+   * هذا هو صنفُ العطل، لا حالتُه الواحدة: فعلٌ محروس يُكتب بهجاءٍ آخر فيمرّ. فكلُّ حدثٍ
+   * يُصدره العميل ويشترك مع فعلٍ محروس في صدره ونهايته يجب أن يُردّ — وإلا فالقائمةُ
+   * تحرس اسمًا لا يرسله أحد.
+   */
+  const emitted = clientAuditActions();
+  const escaped: string[] = [];
+  for (const guarded of SERVER_AUTHORED_AUDIT_ACTIONS) {
+    const [head, ...rest] = guarded.split('_');
+    const family = new RegExp(`^${head}S?_${rest.join('_')}$`);
+    for (const action of emitted) {
+      if (family.test(action) && !isServerAuthoredAuditAction(action)) escaped.push(`${action} (≡ ${guarded})`);
+    }
+  }
+  assert.deepEqual(escaped, [], 'these client events name a server-authored act but are not refused');
+});
+
+test('the client vocabulary is real, so this drift test is actually reading something', () => {
+  const emitted = clientAuditActions();
+  assert.ok(emitted.length > 100, `expected the full client vocabulary, found ${emitted.length}`);
+  assert.ok(emitted.includes('RESULTS_SEALED') && emitted.includes('RESULTS_PUBLISHED'),
+    'the two acts this guard exists for must be in the vocabulary it is checked against');
+});
+
+test('a role grant is a role change, and today no server route writes it — said plainly, not hidden', () => {
+  /*
+   * الحارسُ يمنع `ROLE_CHANGED`، والعميلُ لا يرسله قطّ: يرسل `ROLE_GRANT_UPDATED`
+   * و`ROLE_GRANT_REMOVED` و`ROLE_GRANT_STATUS_CHANGED`. وهي تغييرُ دورٍ بلا شكّ.
+   *
+   * ولم تُضَف إلى الحارس هنا، لأن منعَها اليوم يعني ضياعَها: لا مسار خادميّ يمنح الأدوار
+   * فيكتبها. فمنعُها يُخفي عن المدقّق **كلَّ** تغييرات الصلاحيات بدل أن يحميها. فتُقيَّد
+   * صراحةً بأنها مُقرَّة من العميل حتى يوجد مسارُها، ويفشل هذا الاختبار إن وُجد المسار
+   * ولم يُنقل المنع — فلا يُنسى.
+   */
+  const awaitingServerRoute = ['ROLE_GRANT_UPDATED', 'ROLE_GRANT_REMOVED', 'ROLE_GRANT_STATUS_CHANGED'];
+  const emitted = clientAuditActions();
+  for (const action of awaitingServerRoute) {
+    assert.ok(emitted.includes(action), `${action} must still be part of the client vocabulary`);
+    assert.equal(isServerAuthoredAuditAction(action), false,
+      `${action} is client-attested today; refusing it before a server route exists would lose it`);
+  }
+  const serverWritesRoleChange = SERVER.includes("action:'ROLE_CHANGED'") || /app\.(post|patch|put)\('\/api\/identity\/role-grants/.test(SERVER);
+  assert.equal(serverWritesRoleChange, false,
+    'a server route now writes role changes — move ROLE_GRANT_* onto the guard and delete this exemption');
 });

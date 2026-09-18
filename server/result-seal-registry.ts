@@ -115,6 +115,11 @@ export class ResultSealRegistry {
    * يُسجّل ختمًا. نفسُ المدخلات تعيد القائم بلا كتابةٍ جديدة — وهذه هي الدلالة الصحيحة:
    * النداء الثاني يقول «تمّ» ولا يفعل شيئًا.
    */
+  /** كم مشاركًا خُتمت نتيجتُه في هذه المسابقة — بالمشاركين لا بالصفوف، فإعادةُ الختم لا تضاعف العدد. */
+  countFor(organizationId: string, competitionId: string): number {
+    return new Set(this.store.read(organizationId, competitionId).map(row => row.participantId)).size;
+  }
+
   record(candidate: SealRegistryRecord): SealRecordOutcome {
     const existing = this.findByInputs(candidate.organizationId, candidate.competitionId, candidate.participantId, candidate.inputsSha256);
     if (existing) return { record: existing, idempotent: true };

@@ -16,6 +16,7 @@ import { DurableAuditLedger } from './server/durable-audit-ledger';
 import { FirestoreAuditStore } from './server/firestore-audit-store';
 import { isServerAuthoredAuditAction } from './server/audit-authority';
 import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-registry';
+import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -380,6 +381,9 @@ async function startServer() {
   const sealRegistryDir=process.env.MIZAN_SEAL_REGISTRY_DIR||(auditLedgerDir?path.join(auditLedgerDir,'seal-registry'):'');
   let resultSealRegistry:ResultSealRegistry|null=null;
   try{if(sealRegistryDir)resultSealRegistry=new ResultSealRegistry(new FileSealRegistryStore(sealRegistryDir))}catch(err){console.error('Result seal registry disabled:',err)}
+  const publicationDir=process.env.MIZAN_PUBLICATION_STORE_DIR||(auditLedgerDir?path.join(auditLedgerDir,'publications'):'');
+  let resultPublications:FilePublicationStore|null=null;
+  try{if(publicationDir)resultPublications=new FilePublicationStore(publicationDir,fs,path)}catch(err){console.error('Result publication store disabled:',err)}
   /* مسارات الهوية الحسّاسة (الاستيلاء على الجلسة مثلًا) تُخنق كالحدّ الضيق للمالك:
      محاولة تخمين أو إغراق يجب أن تُوقف قبل حدّ /api الفسيح. تُترك للطبقة الخارجية متى أُسندت. */
   const sensitiveIdentityRateLimit:RequestHandler=rateLimiterIsGlobal
@@ -1507,6 +1511,32 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:sealed.competitionId,action:'RESULT_SEALED',entityType:'Result',entityId:sealed.participantId,reason:`Sealed ${sealed.finalScore} from ${sealed.contributingJudges} judges · ${sealed.sealSha256.slice(0,12)}${sealed.supersedes?` · supersedes ${sealed.supersedes.previousSealSha256.slice(0,12)} (Δ${sealed.supersedes.delta})`:''}`,requestId:String(req.headers['x-request-id']||'')});
       return res.status(201).json(sealed);
     }catch{return res.status(400).json({code:'RESULT_SEALING_FAILED'})}});
+
+  /*
+   * نشرُ النتائج: الخادم يشهد، لا العميل.
+   *
+   * فصلُ المهامّ يُطبَّق هنا من سجلّ الأختام — لا من حقلٍ يرسله العميل عن نفسه — وهو
+   * نفسُ الشرط الذي تفرضه قاعدةُ Firestore على كلِّ وثيقة: من ختم لا ينشر. والنشرُ
+   * يقع مرّة: النداءُ الثاني يعيد المسجَّل (200) بلا أثرٍ ثانٍ.
+   */
+  app.post('/api/results/publish',auditRateLimit,requireGovernanceRoles(['comp_admin','org_admin','head_judge',]),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    const competitionId=String(req.body?.competitionId||actor.competitionId||'');
+    if(!competitionId)return res.status(400).json({code:'COMPETITION_REQUIRED'});
+    if(!resultSealRegistry||!resultPublications)return res.status(503).json({code:'RESULT_PUBLICATION_NOT_CONFIGURED'});
+    res.setHeader('Cache-Control','no-store');
+    try{
+      const sealers=resultSealRegistry.sealersOf(actor.organizationId,competitionId);
+      const sealCount=resultSealRegistry.countFor(actor.organizationId,competitionId);
+      const decision=publicationDecision({actorUid:String(actor.uid||''),sealers,sealCount,existing:resultPublications.read(actor.organizationId,competitionId)});
+      // فحصٌ بوجود الحقل لا بالراية — التضييق على راية منطقية لا يعمل خارج الوضع الصارم.
+      if('code' in decision)return res.status(decision.code==='RESULT_PUBLICATION_SOD_BLOCKED'?403:409).json({code:decision.code});
+      if('record' in decision)return res.status(200).json({...decision.record,idempotent:true});
+      const record:PublicationRecord={organizationId:actor.organizationId,competitionId,publishedBy:String(actor.uid||actor.email||''),publishedAt:new Date().toISOString(),sealCount:decision.sealCount};
+      resultPublications.write(record);
+      auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'RESULT_PUBLISHED',entityType:'Competition',entityId:competitionId,reason:`Published ${record.sealCount} sealed result(s)`,requestId:String(req.headers['x-request-id']||'')});
+      return res.status(201).json(record);
+    }catch{return res.status(400).json({code:'RESULT_PUBLICATION_FAILED'})}});
 
   /* التحقّق مفتوح لكل دور حاكم: من يشكّ في ختم يعيد حسابه هنا بلا وساطة. */
   app.post('/api/results/seal/verify',requireGovernanceRoles(['comp_admin','org_admin','head_judge','auditor',]),(req,res)=>{
