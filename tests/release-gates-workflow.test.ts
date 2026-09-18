@@ -75,11 +75,46 @@ test('the secret names match the ones the product documents', () => {
   }
 });
 
-test('the gate never runs on a fork pull request, where secrets are empty anyway', () => {
-  // يعمل على `main` و`pull_request` إلى main — والأسرار لا تُمنح لفرعٍ خارجيّ، فيتخطّى.
-  assert.ok(/on:\s*\n\s*push:\s*\n\s*branches: \[main\]/.test(workflow));
-  assert.ok(workflow.includes('pull_request:'));
+test('a gate about the storage runs where the storage lives, not on every pull request', () => {
+  /*
+   * موضوعُ هاتين البوّابتين حالةُ التخزين والبيئة، لا فرقُ الدفعة. ولا تغييرَ في شيفرة
+   * دفعةٍ يجعلهما خضراوين ما دامت الشجرةُ على R2 بلا كتالوج تحقّق — فكانت كلُّ دفعةٍ
+   * في المستودع تحمرّ أبدًا، ولو لم تمسّ R2 بحرف. وذلك يُعلّم الفريقَ تجاهلَ الأحمر.
+   *
+   * ولا يُقرأ هذا تعطيلًا: الاختباران التاليان يثبتان أنها ما زالت تعمل وما زال فشلُها
+   * فشلًا — على `main`، ويوميًّا، وعند الطلب.
+   */
+  assert.ok(/on:\s*\n\s*push:\s*\n\s*branches: \[main\]/.test(workflow), 'it must run on the release branch');
+  assert.ok(/schedule:/.test(workflow) && /cron: '[^']+'/.test(workflow),
+    'storage state changes from outside the repository, so merging alone is not enough');
+  assert.ok(workflow.includes('workflow_dispatch:'), 'and it must be runnable on demand');
+  assert.equal(/^\s*pull_request:/m.test(workflow), false,
+    'a check no diff can satisfy must not gate every diff');
   assert.ok(workflow.includes('permissions:\n  contents: read'), 'it needs nothing but read');
+});
+
+test('moving it off pull requests did not disable it or make it optional', () => {
+  /*
+   * الفرقُ بين «نُقلت إلى موضعها» و«أُسكتت» يُقاس هنا لا يُوعد به: الوظيفةُ قائمة،
+   * والأوامرُ تُشغَّل، ولا `continue-on-error` ولا `|| true` يبتلع نتيجة، ولا `exit 1`
+   * مُحوَّلٌ إلى نجاح.
+   */
+  assert.ok(workflow.includes('secret-backed-gates:'), 'the job must still exist');
+  assert.ok(workflow.includes('npm run preflight'), 'and still run the preflight gate');
+  assert.ok(workflow.includes('npm run quran:verify-r2 -- --all --deep'), 'and still run the deep R2 verification');
+  assert.equal(/continue-on-error/.test(workflow), false, 'its result must not be swallowed');
+  assert.equal(/if: \$\{\{ false \}\}|if: false/.test(workflow), false, 'it must not be switched off by condition');
+});
+
+test('the gate code itself is still covered on every pull request', () => {
+  /*
+   * القسمةُ صحيحة فقط إن بقيت الشيفرةُ مفحوصةً على الدفعات: حالةُ التخزين تُفحص على
+   * مسار الإصدار، والشيفرةُ التي تفحصها تُفحص مع كلّ تغيير.
+   */
+  for (const guard of ['quran-verify-r2-diagnosis.test.ts', 'r2-delivery-verification.test.ts']) {
+    assert.ok(fs.existsSync(path.join(process.cwd(), 'tests', guard)),
+      `${guard} must exist — it is what covers the gate's code on pull requests`);
+  }
 });
 
 test('the R2 tree is inventoried before it is judged, and the inventory only reads', () => {
