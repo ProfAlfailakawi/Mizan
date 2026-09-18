@@ -23,6 +23,13 @@ export const HallScreenPublisher: React.FC = () => {
   const ar = s.language === 'ar';
   const status = useBoardPublisherStatus();
   const [copied, setCopied] = useState('');
+  const [corridorPanels, setCorridorPanels] = useState<string[]>(['mushaf', 'khatmah', 'queue']);
+  const [corridorRotate, setCorridorRotate] = useState(25);
+  const togglePanel = (id: string) => setCorridorPanels(prev => {
+    const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+    /* لوحةٌ واحدة على الأقل: جدارٌ بلا لوحةٍ شاشةٌ سوداء. */
+    return next.length ? next : prev;
+  });
 
   if (status.role === 'INELIGIBLE') return null;
 
@@ -30,6 +37,13 @@ export const HallScreenPublisher: React.FC = () => {
   const base = `${window.location.origin}${window.location.pathname}`;
   const hallLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=hall`;
   const panelLink = (code: string) => `${base}#board?comp=${encodeURIComponent(s.competition.id)}&panel=${encodeURIComponent(code)}`;
+  /*
+   * شاشة الممرّ: جدارٌ يتناوب، ولوحاته يختارها المشرف قبل أن ينسخ الرابط.
+   *
+   * ولا تُعرض عليه أسماء معاملات: يضغط ما يريد عرضه، ويخرج الرابط بها. ورابطٌ بلا اختيار
+   * يعرضها كلها، فلا يقف جدارٌ فارغًا لأن أحدًا نسي معاملًا.
+   */
+  const corridorLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=corridor&panels=${corridorPanels.join(',')}&rotate=${corridorRotate}`;
 
   const copy = async (key: string, url: string) => {
     try { await navigator.clipboard.writeText(url); setCopied(key); setTimeout(() => setCopied(''), 2000) }
@@ -71,6 +85,46 @@ export const HallScreenPublisher: React.FC = () => {
       {!committees.length && <div className="rounded-xl bg-[#f1efe9] px-4 py-3 text-[11px] text-[#646965]">
         {ar ? 'لا لجان بعد — شاشة القاعة وحدها متاحة.' : 'No panels yet — only the hall screen is available.'}
       </div>}
+    </div>
+
+    {/* شاشة الممرّ — تُركَّب قبل أن تُنسخ، لأنها الوحيدة التي يختار المشرف محتواها. */}
+    <div className="mt-4 rounded-2xl border border-[#dfddd6] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-black">{ar ? 'شاشة الممرّ وقاعة الانتظار' : 'Corridor & waiting screen'}</div>
+          <p className="mt-1 text-[10px] leading-5 text-[#646965]">
+            {ar
+              ? 'جدارٌ يتناوب بين لوحاته. لا يعرض موضع جلسةٍ جارية ولا يخرج منه إلا الكود، كبقية شاشات القاعة.'
+              : 'A rotating wall. It never shows a live session’s passage, and like every hall screen it carries codes only.'}
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-[10px] font-black text-[#59615c]">
+          {ar ? 'كل' : 'every'}
+          <input type="number" min={10} max={120} value={corridorRotate}
+            onChange={e => setCorridorRotate(Math.max(10, Math.min(120, Number(e.target.value) || 25)))}
+            className="mizan-input !w-20 text-xs" aria-label={ar ? 'ثواني التناوب' : 'Rotation seconds'} />
+          {ar ? 'ثانية' : 'sec'}
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {([['mushaf', 'من المصحف', 'From the Mushaf'], ['khatmah', 'ختمة القاعة', 'Hall khatmah'], ['queue', 'دورك والطابور', 'Queue']] as const).map(([id, arLabel, enLabel]) => {
+          const on = corridorPanels.includes(id);
+          return <button key={id} type="button" onClick={() => togglePanel(id)} aria-pressed={on}
+            className={`min-h-10 rounded-xl border px-3 text-[11px] font-black transition ${on ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dedbd2] bg-white text-[#636965]'}`}>
+            {ar ? arLabel : enLabel}
+          </button>;
+        })}
+      </div>
+      <div className="mt-3">
+        <LinkRow
+          label={ar ? 'رابط شاشة الممرّ' : 'Corridor screen link'}
+          url={corridorLink} ar={ar} copied={copied === 'corridor'} onCopy={() => void copy('corridor', corridorLink)} />
+      </div>
+      <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">
+        {ar
+          ? '«من المصحف» و«ختمة القاعة» تعملان بعد أن تُنهي القاعة أول جلساتها، فمنها يُبنى ما يُعرض. وقبل ذلك يبقى «دورك» وحده.'
+          : '“From the Mushaf” and “Hall khatmah” start once the hall completes its first sessions; until then the queue panel runs alone.'}
+      </p>
     </div>
 
     {/* الشاشة تُقفل بالإيماءة والرمز من داخلها؛ يُقال هنا لئلّا يُبحث عنه في الممرّ. */}

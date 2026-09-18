@@ -2959,6 +2959,10 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
     elapsedSecondsByCommittee: globalState.activeSession.committee
       ? { [globalState.activeSession.committee.id]: sessionElapsedSeconds() }
       : undefined,
+    /* مواضع اليوم كما كُتبت عند اكتمال كل جلسة — تُنشر مجموعةً على الصفحة لا مفصَّلة. */
+    recited: globalState.recitationLedger
+      .filter(x => x.competitionId === globalState.competition.id)
+      .map(x => ({ surah: x.surah, startAyah: x.startAyah, endAyah: x.endAyah })),
     nextDepth: PANEL_NEXT_DEPTH,
   });
 
