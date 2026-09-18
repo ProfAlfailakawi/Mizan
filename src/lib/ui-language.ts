@@ -45,6 +45,7 @@ const AR_TOKENS:Record<string,string>={
   // تصنيفات إعادة المحاكاة/السجل، وأنواع القنوات، وأسباب الاعتراض وقواعد كسر التعادل، ورموز
   // كانت تُعرض خامًا بالإنجليزية داخل شاشة عربية. أي مفتاح غير معروف يبقى كما هو دون كسر.
   results:'النتائج', incidents:'الحوادث', operations:'العمليات', trust:'الثقة', devices:'الأجهزة',
+  appeals:'الاعتراضات', ai:'الذكاء الاصطناعي',
   storage:'التخزين', broadcast:'البث',
   audio_interruption:'انقطاع الصوت', scoring_miscalculation:'خطأ في احتساب الدرجة', question_scope_dispute:'خلاف على نطاق السؤال', procedural_error:'خطأ إجرائي', identity_dispute:'خلاف على الهوية',
   memorization_priority:'أولوية الحفظ', tajweed_priority:'أولوية التجويد', fewest_penalties:'الأقل أخطاءً', performance_priority:'أولوية الأداء', waqf_priority:'أولوية الوقف والابتداء', earliest_submission:'الأسبق تسليمًا',

@@ -34,6 +34,7 @@
     "check:model": "tsx scripts/model-check.ts",
     "qa:scope-visual": "node scripts/scope-visual-qa.mjs",
     "qa:competition-day": "node scripts/competition-day-qa.mjs",
+    "qa:phone-overflow": "node scripts/phone-overflow-audit.mjs",
     "qa:live-day": "tsx scripts/live-day.ts",
     "qa:visual-baseline": "node scripts/scope-visual-baseline.mjs",
     "qa:venue-legibility": "node scripts/venue-legibility-audit.mjs --panels=10",

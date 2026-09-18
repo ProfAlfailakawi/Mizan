@@ -7,17 +7,72 @@ import type { Participant } from '../src/types';
 
 const read = (p: string) => fs.readFileSync(p, 'utf8');
 
-/* ── ١ — الوجه كامل: اللوحة عمود، والصفحة تتحجّم لما تبقّى ─────────────── */
+/* ── ١ — القمرة: بارتفاع الشاشة، بلا شريطٍ علويّ، وأزرارٌ متناسقة ─────── */
 
-test('the judging deck becomes a side rail on a wide screen instead of eating the page', () => {
+/*
+ * هذا الاختبار كان يحرس تخطيطًا سابقًا: شريطٌ لاصق فوق، ولوحةٌ لاصقة تحت، وأزرارٌ ارتفاعها
+ * ١٥٢px «لأن المحكّم يعمل واقفًا ويصيبها بالإبهام». وقد رُفض ذلك التخطيط بعد رؤيته في
+ * القاعة: المصحف — وهو الشيء الوحيد الذي يُنظر إليه أثناء التلاوة — كان محصورًا بين
+ * شريطين ولا يُرى كاملًا إلا بتمرير، والمحكّم لا يملك يدًا فارغة للتمرير.
+ *
+ * فبقي الاختبار وتبدّل ما يحرسه: لا شكلٌ بعينه، بل ثلاثة شروطٍ قابلة للكسر — أن تملأ
+ * القمرة الشاشة مرّةً ولا تُمرَّر، وألّا يعود شريطٌ علويّ يقتطع من فوق المصحف، وأن يكون
+ * للأزرار مقاسٌ واحد. والإبهام يصيب ٥٨px بلا تصويب؛ وما زاد كان يُؤخذ من المصحف.
+ */
+
+test('the judge cockpit fills the screen exactly once and never scrolls as a page', () => {
   const css = read('src/index.css');
-  assert.match(css, /\.mizan-judge-stage\{ display:grid; grid-template-columns:1fr minmax\(240px,300px\)/);
-  assert.match(css, /\.mizan-judge-deck\{\s*\n\s*position:sticky; top:calc\(64px \+ 5\.5rem\); bottom:auto/);
-  /* الأزرار تبقى كبيرة: المحكّم يعمل واقفًا ويصيبها بالإبهام، فالتصغير ليس هو الحل. */
-  assert.match(css, /\.mizan-judge-deck \.mizan-judge-action\{ min-height:66px/);
+
+  assert.match(css, /\.mizan-judge-os\{\s*\n\s*height:calc\(100dvh - 64px - var\(--mizan-shell-pb, 0px\)\);/, 'the cockpit is exactly one screen tall');
+
+  /*
+   * وحشوةُ الهيكل تُطرح لأنها معلَنة، لا مخمَّنة.
+   *
+   * بيئة العرض تضيف `pb-28` لتُبعد المحتوى عن شريطها المثبَّت. وهي صحيحةٌ لصفحةٍ تُمرَّر،
+   * وخاطئةٌ لسطحٍ يقيس ارتفاعه بنفسه: قِيس فخرج ١١٢px تُمرَّر تحت قمرةٍ تظنّ أنها ملأت
+   * الشاشة. فيُنشر المقدار في متغيّر بدل أن يُنسخ رقمه في كل سطح.
+   */
+  const app = read('src/App.tsx');
+  assert.match(app, /'--mizan-shell-pb':IS_DEMO_SESSION\?'7rem':'0px'/, 'the shell publishes its own reserve');
+  assert.match(css, /\.mizan-judge-os\{[\s\S]{0,300}?overflow:hidden;/, 'and the page itself does not scroll');
+
+  /* `dvh` لا `vh`: شريط متصفّح الجوال يتمدّد، و`vh` يقيس الحالة الكبرى فتُقصّ اللوحة. */
+  assert.doesNotMatch(css, /\.mizan-judge-os\{\s*\n\s*height:calc\(100vh/, 'a mobile browser bar would crop a vh-sized cockpit');
+
+  /* ويُمرَّر ما بداخلها إن طال — وهذا ما يجعل الخارج ثابتًا. */
+  assert.match(css, /\.mizan-judge-page\{[^}]*min-height:0;[^}]*overflow:auto/, 'the Mushaf scrolls inside its own box');
+  assert.match(css, /\.mizan-judge-deck\{[^}]*min-height:0;[^}]*overflow:auto/, 'and so does the deck');
+});
+
+test('the top strip is gone, and nothing it carried was lost', () => {
+  const css = read('src/index.css');
   const judge = read('src/components/judge/JudgeOS.tsx');
-  assert.match(judge, /<div className="mizan-judge-stage">/);
-  assert.match(judge, /className="mizan-judge-page py-3 sm:py-5"/);
+
+  /* الشريط نفسه: لا صنفَ له ولا استعمال. */
+  assert.doesNotMatch(css, /\.mizan-judge-strip/, 'the sticky top strip is removed from the stylesheet');
+  assert.doesNotMatch(judge, /mizan-judge-strip/, 'and from the screen');
+
+  /* وما كان فيه انتقل إلى رأس اللوحة: الاسم، والحالة، والمؤقّت، وموضع السؤال. */
+  assert.match(judge, /mizan-judge-brief/, 'the deck carries a brief instead');
+  assert.match(judge, /\{formatTime\(elapsed\)\}/, 'the session clock survived');
+  assert.match(judge, /<Ratio value=\{activeSession\.currentQuestionIndex\+1\} of=\{totalQuestions\}\/>/, 'so did the passage counter');
+  assert.match(judge, /\{displayName\|\|'—'\}/, 'and who is in front of the judge');
+});
+
+test('every scoring button is the same size, and it is a thumb’s size — not a card', () => {
+  const css = read('src/index.css');
+
+  const action = css.match(/\.mizan-judge-action\{[\s\S]*?\}/)?.[0] || '';
+  const height = Number(action.match(/min-height:(\d+)px/)?.[1] || 0);
+  assert.ok(height >= 44, `a touch target must stay reachable (got ${height}px)`);
+  assert.ok(height <= 72, `a scoring button is not a card (got ${height}px)`);
+
+  /* مقاسٌ واحد لكل زرّ: الخصم يغيّر لون العمود وحجم رقمه، لا ارتفاع الزرّ. */
+  assert.doesNotMatch(css, /\.mizan-judge-action\[data-weight="high"\]\{[^}]*min-height/, 'severity must not change the button height');
+  assert.doesNotMatch(css, /\.mizan-judge-deck \.mizan-judge-action\{[^}]*min-height/, 'and neither does where it is rendered');
+
+  /* والعمود اللوني باقٍ: هو ما يقول أيَّ معيارٍ تسجّل وكم يكلّف، بلا تضخيم الزرّ. */
+  assert.match(css, /\.mizan-judge-action\[data-weight="high"\]\{ --ja-weight:\d+px/, 'the weight spine still encodes the penalty');
 });
 
 test('the Mushaf page is sized from what is left on screen, not a fixed share of it', () => {
@@ -25,6 +80,11 @@ test('the Mushaf page is sized from what is left on screen, not a fixed share of
   assert.match(css, /\.mizan-mushaf-page\{ max-height:80vh; \}/);
   assert.match(css, /@media \(min-width:640px\)\{ \.mizan-mushaf-page\{ max-height:min\(80vh, calc\(100dvh - 64px - 26rem\)\) \} \}/);
   assert.match(css, /@media \(min-width:1024px\)\{ \.mizan-mushaf-page\{ max-height:calc\(100dvh - 64px - 9\.5rem\) \} \}/);
+  /*
+   * وداخل القمرة يحكم الوعاء لا رقمٌ محسوب: الطرح الثابت أعلاه قِيس على تخطيطٍ فيه شريطٌ
+   * علويّ ولوحةٌ سفلية، وقد زالا — فصار يقتطع من المصحف ما لم يعد مشغولًا.
+   */
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-page\{ max-height:100%; \}/, 'inside the cockpit the container decides');
   const surface = read('src/components/judge/OfficialMushafSurface.tsx');
   assert.match(surface, /className="mizan-mushaf-page block w-auto/);
   assert.doesNotMatch(surface, /max-h-\[72vh\] sm:max-h-\[80vh\]/, 'the fixed viewport share is what cropped the page');

@@ -461,7 +461,17 @@ export default function App() {
   </div>}
   {/* مساحةٌ محجوزة أسفل الصفحة في البيئة التجريبية: الشريط ثابتٌ فوق المحتوى،
       وبدونها كان يغطّي آخر صفٍّ في الجداول الطويلة. */}
-  <main className={IS_DEMO_SESSION?'pb-28':undefined}><Page>{roleView()}</Page></main>
+  {/*
+    * حشوةُ شريط بيئة العرض تُعلَن لا تُخمَّن.
+    *
+    * `pb-28` تُبعد المحتوى عن الشريط المثبَّت أسفل الشاشة في بيئة العرض. وهي صحيحةٌ
+    * لصفحةٍ تُمرَّر، وخاطئةٌ لسطحٍ يقيس ارتفاعه بنفسه — كقمرة المحكّم: يحسب `100dvh`
+    * ناقص الترويسة فيخرج بالضبط، ثم تضيف الحشوةُ ١١٢px تحته فتعود الصفحة تُمرَّر.
+    *
+    * فتُنشر القيمة في متغيّر يقرؤه من يحتاجه، بدل أن يكتب كل سطحٍ رقمًا منسوخًا يبطل
+    * يوم يتغيّر الشريط.
+    */}
+  <main className={IS_DEMO_SESSION?'pb-28':undefined} style={{'--mizan-shell-pb':IS_DEMO_SESSION?'7rem':'0px'} as React.CSSProperties}><Page>{roleView()}</Page></main>
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
   {/* خارج الترويسة عمدًا: شاشة البثّ لا ترويسة لها، ودون ذلك لا مخرج منها. */}
   <DemoBar/>
