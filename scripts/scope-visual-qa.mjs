@@ -91,7 +91,7 @@ for (const [width, height, label] of VIEWPORTS) {
     await assertNoHorizontalScroll(page, label, 'النطاق');
     ok('شاشة النطاق');
 
-    for (const [tab, file] of [['اختيار المتسابق', 'selection'], ['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness']]) {
+    for (const [tab, file] of [['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness'], ['المكتبة الرسمية', 'library'], ['صحّة الذكاء', 'intelligence']]) {
       const target = page.locator('[role="tab"]:visible', { hasText: tab }).first();
       if (!await target.count()) { note(`[${label}] التبويب «${tab}» غير موجود`); continue; }
       await target.click({ timeout: 8000 }).catch(e => note(`[${label}] «${tab}»: ${String(e).slice(0, 80)}`));
@@ -271,8 +271,6 @@ console.log('\n── دورة حياة نطاق المتسابق');
     await page.waitForTimeout(1500);
     await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
     await page.waitForTimeout(1200);
-    await page.locator('[role="tab"]:visible', { hasText: 'اختيار المتسابق' }).first().click();
-    await page.waitForTimeout(900);
     await page.locator('button:visible', { hasText: 'ربع القرآن يختاره المتسابق' }).first().click().catch(() => {});
     await page.waitForTimeout(1200);
 

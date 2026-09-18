@@ -290,7 +290,9 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-black">{ar ? `المناطق (${draft.zones.length})` : `Zones (${draft.zones.length})`}</h3>
-            <div className="flex gap-2">
+            {/* ثلاثةُ أزرارٍ بلا التفاف: مجموعها ٣٦٠ بكسل، فتُخرج الصفحةَ عن عرض الهاتف
+                (٣٩٧ > ٣٧٥) فتنزلق الشاشةُ كلُّها أفقيًّا. والصفُّ الخارجي يلتفّ والداخلي لا. */}
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" icon={<Wand2 className="h-4 w-4" />}
                 onClick={() => setPlan({ ...draft, zones: autoBalancedZones(scope, draft.zones.length || questionCount) })}>
                 {ar ? 'اقترح قسمة متوازنة' : 'Suggest a balanced split'}
