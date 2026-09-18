@@ -1,0 +1,103 @@
+name: استيعابُ حزم المجمَّع ونشرُ كتالوج التحقّق
+
+# **هذا السيرُ يكتب في التخزين الإنتاجيّ. فلا يعمل من تلقاء نفسه.**
+#
+# لا `push`، ولا `schedule`، ولا `pull_request` — بالطلب اليدويّ وحده، ووضعُه الافتراضيّ
+# `dry-run`: يتحقّق ويُبلّغ ولا يكتب بايتًا واحدًا. والنشرُ اختيارٌ صريحٌ يتّخذه إنسان.
+#
+# ولماذا يوجد أصلًا: المنشورُ على `delivery/_mizan/catalog.json` اليومَ **جردٌ** لا كتالوجُ
+# تحقّق — بوادئُ وأعدادُ ملفّاتٍ بلا حالةِ تحقّقٍ ولا بصمة. فلا مرجعَ تُقاس إليه البايتات،
+# ولا تُكشف حزمةٌ موجودةٌ ببايتاتٍ أخرى. و`buildReadyDeliveryCatalog` وحده يُصدر الكتالوجَ
+# المُكتسَب، ويرفض الإصدارَ ما لم تكن الحزمُ المطلوبة كلُّها `VERIFIED` مقابل بصمات المجمَّع
+# الرسمية.
+#
+# والمصدرُ محصورٌ في `*.qurancomplex.gov.sa` — يفرضه السكربتُ نفسُه لا هذا الملفّ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run = تحقّقٌ وتقريرٌ بلا كتابة · publish = رفعٌ ونشرُ كتالوج التحقّق'
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - publish
+
+permissions:
+  contents: read
+
+concurrency:
+  # لا استيعابان معًا: كلاهما يكتب في المفاتيح نفسها.
+  group: mizan-kfgqpc-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: ${{ inputs.mode == 'publish' && 'رفعٌ ونشرُ الكتالوج' || 'تحقّقٌ بلا كتابة' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+
+      - name: أعلِن الوضع قبل أيّ شيء
+        shell: bash
+        run: |
+          echo "### وضعُ التشغيل: \`${{ inputs.mode }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ inputs.mode }}" == "publish" ]]; then
+            echo "- ⚠️ **يكتب في التخزين الإنتاجيّ**: يرفع الحزم المُتحقَّقة ويُصدر كتالوج التحقّق." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ✅ **لا يُكتب بايتٌ واحد.** تحقّقٌ محلّيٌّ وتقريرٌ فقط." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── الجلبُ من المصدر الرسميّ ──────────────────────────────────────────────
+      # لا يُقاس شيءٌ من غير مصدره: التحقّقُ يقابل البصماتِ الرسميةَ ببايتاتٍ أُنزلت الآن،
+      # لا بما هو مرفوعٌ على التخزين — وإلّا قِيس المرفوعُ بنفسه.
+      - name: جلبُ الحزم الخفيفة
+        run: npx tsx scripts/kfgqpc-acquire.ts
+      - name: جلبُ الأصول الثقيلة
+        run: npx tsx scripts/kfgqpc-heavy-acquire.ts --full
+
+      # ── التحقّق: يعمل في الوضعين ───────────────────────────────────────────────
+      - name: التحقّقُ من كل حزمة مقابل بصمة المجمَّع
+        run: npx tsx scripts/kfgqpc-ingest.ts --dry-run
+
+      # ── النشر: بالاختيار الصريح وحده ──────────────────────────────────────────
+      - name: الرفعُ ونشرُ كتالوج التحقّق
+        if: inputs.mode == 'publish'
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          missing=()
+          for name in R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            [[ -z "${!name:-}" ]] && missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "R2_NOT_CONFIGURED: لم تُضبط: ${missing[*]}"; exit 1
+          fi
+          # `--verify --upload`: لا يُرفع إلا ما تحقّق، ولا يُصدر الكتالوجُ إلا إن تحقّق المطلوبُ كلُّه.
+          npx tsx scripts/kfgqpc-ingest.ts --verify --upload
+          npx tsx scripts/kfgqpc-ingest.ts --report
+
+      # ── الأثرُ يُحفظ في الوضعين: القرارُ يُتّخذ على تقريرٍ يُقرأ، لا على ذاكرة ───────
+      - name: احفظ تقارير الاستيعاب
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: kfgqpc-ingest-reports-${{ inputs.mode }}
+          path: .mizan-ingest/reports
+          if-no-files-found: warn
