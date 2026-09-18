@@ -100,6 +100,22 @@ jobs:
             fi
           done
 
+          # ومتغيّراتُ التشغيل تُقرأ من حيث تُضبط فعلًا: سطرِ `--update-env-vars`.
+          #
+          # كانت تُقرأ من بيئة العدّاء — وهي ليست بيئةَ الإنتاج — فيحذّر التقريرُ من
+          # `MIZAN_SAAS_DATA_DIR` و`MIZAN_CERTIFICATE_REGISTRY_DIR` وهما مضبوطان في
+          # النشرة. وتحذيرٌ كاذب يُفقد التقريرَ كلَّه ثقتَه، فيُتخطّى ما فيه من صدق.
+          #
+          # وما ليس في ذلك السطر يبقى غائبًا بحقّ — كسرَّي التوقيع — فيُحذَّر منه.
+          for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do
+            if [[ -z "${!name:-}" ]]; then
+              if value="$(node scripts/cloudbuild-substitution.mjs --env "$name")"; then
+                printf -v "$name" '%s' "$value"; export "${name?}"
+                echo "  · $name مقروءٌ من cloudbuild.yaml"
+              fi
+            fi
+          done
+
           missing=()
           for name in VITE_REQUIRE_AUTH VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID; do
             [[ -z "${!name:-}" ]] && missing+=("$name")
