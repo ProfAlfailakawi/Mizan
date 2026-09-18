@@ -43,6 +43,7 @@ const VIEWS = {
   kioskMode: () => import('./components/gate/KioskMode'),
   ceremonyView: () => import('./components/public/CeremonyView'),
   waitingBoard: () => import('./components/public/WaitingBoard'),
+  corridorScreen: () => import('./components/public/CorridorScreen'),
   committeeDisplay: () => import('./components/public/CommitteeDisplay'),
   hallRecitationMap: () => import('./components/public/HallRecitationMap'),
   certificateVerification: () => import('./components/public/CertificateVerification'),
@@ -65,6 +66,7 @@ const ParticipantDashboard = pick(VIEWS.participantDashboard, 'ParticipantDashbo
 const KioskMode = pick(VIEWS.kioskMode, 'KioskMode');
 const CeremonyView = pick(VIEWS.ceremonyView, 'CeremonyView');
 const WaitingBoard = pick(VIEWS.waitingBoard, 'WaitingBoard');
+const CorridorScreen = pick(VIEWS.corridorScreen, 'CorridorScreen');
 const CommitteeDisplay = pick(VIEWS.committeeDisplay, 'CommitteeDisplay');
 const HallRecitationMap = pick(VIEWS.hallRecitationMap, 'HallRecitationMap');
 const CertificateVerification = pick(VIEWS.certificateVerification, 'CertificateVerification');
@@ -135,7 +137,7 @@ const NoRoleConsole: React.FC = () => (
  * ولا دور dialog — لأن السطح حينها ليس نافذةً فوق التطبيق بل هو الجهاز كله. وهذا يستعمل
  * التصميم القائم (شاشة بلا onClose = سطح دائم) بدل أن يضيف حارسًا يمكن تجاوزه.
  */
-const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',committeeBoard:'شاشة اللجنة',hallMap:'خريطة القاعة',ceremony:'شاشة الحفل'};
+const VENUE_LABEL:Record<string,string>={kiosk:'بوابة الحضور',waitingBoard:'لوحة الانتظار',committeeBoard:'شاشة اللجنة',corridorScreen:'شاشة الممرّ',hallMap:'خريطة القاعة',ceremony:'شاشة الحفل'};
 const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;committeeBoard:boolean;hallMap:boolean;ceremony:boolean;close:Record<string,()=>void>}>=({kiosk,waitingBoard,committeeBoard,hallMap,ceremony,close})=>{
  const {language}=useAppStore(); const ar=language==='ar';
  const {lock,apply}=useVenueLockState();
@@ -175,7 +177,7 @@ const VenueSurfaces:React.FC<{kiosk:boolean;waitingBoard:boolean;committeeBoard:
  */
 const BOARD_POLL_MS = 5_000;
 
-const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;competitionId:string|null;hallView:boolean;onExit:()=>void}>=({panelKeys,rotateSeconds,competitionId,hallView,onExit})=>{
+const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;competitionId:string|null;hallView:boolean;corridor:boolean;corridorPanels:string|null;reading:string;onExit:()=>void}>=({panelKeys,rotateSeconds,competitionId,hallView,corridor,corridorPanels,reading,onExit})=>{
  const {language,competition,loadPublicDisplayBoard}=useAppStore(); const ar=language!=='en';
  const {lock,apply}=useVenueLockState();
  const targetId=competitionId||competition.id;
@@ -202,7 +204,7 @@ const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;competitionId
  const lockSurface=async(next:Parameters<typeof apply>[0])=>{apply(next);try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen()}catch{/* قد يرفض سفاري ملء الشاشة؛ الشاشة تعمل بلا زخرفة التطبيق. */}};
  const unlockSurface=()=>{apply(null);if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})};
  const exit=locked?undefined:onExit;
- const surface=hallView?VENUE_LABEL.waitingBoard:VENUE_LABEL.committeeBoard;
+ const surface=corridor?VENUE_LABEL.corridorScreen:hallView?VENUE_LABEL.waitingBoard:VENUE_LABEL.committeeBoard;
 
  /* لا إسقاط منشورًا ولا مخزنَ مسابقةٍ مطابقًا ⇒ قل السبب بدل عرض مسابقةٍ أخرى. */
  const canFallBackToStore=competition.id===targetId;
@@ -211,9 +213,11 @@ const BoardRoute:React.FC<{panelKeys:string[];rotateSeconds:number;competitionId
 
  return <>
   <Overlay>
-   {hallView
-    ? <WaitingBoard board={published||undefined} onClose={exit}/>
-    : <CommitteeDisplay panelKeys={panelKeys} rotateSeconds={rotateSeconds} board={published||undefined} onClose={exit}/>}
+   {corridor
+    ? <CorridorScreen board={published||undefined} panelsRaw={corridorPanels} rotateSeconds={rotateSeconds||25} reading={reading} onClose={exit}/>
+    : hallView
+     ? <WaitingBoard board={published||undefined} onClose={exit}/>
+     : <CommitteeDisplay panelKeys={panelKeys} rotateSeconds={rotateSeconds} board={published||undefined} onClose={exit}/>}
   </Overlay>
   {locked
    ? <VenueUnlockGuard lock={lock} ar={ar} onUnlocked={unlockSurface}/>
@@ -259,9 +263,9 @@ const compParam = (h: string): string | null => {
  * الرابط هو ما يجعل الشاشة تعود وحدها. أسطح القاعة الأخرى تُفتح طبقةً بيد موظّفٍ مسجّل،
  * فإذا انقطعت الكهرباء عن تلفازٍ في الممر لم يعد إلى شيء. وهذه تعود إلى لجنتها بلا أحد.
  */
-type BoardParams = { panelKeys: string[]; rotateSeconds: number; competitionId: string | null; hallView: boolean };
+type BoardParams = { panelKeys: string[]; rotateSeconds: number; competitionId: string | null; hallView: boolean; corridor: boolean; corridorPanels: string | null; reading: string };
 const boardParams = (h: string): BoardParams => {
-  const empty: BoardParams = { panelKeys: [], rotateSeconds: 0, competitionId: null, hallView: true };
+  const empty: BoardParams = { panelKeys: [], rotateSeconds: 0, competitionId: null, hallView: true, corridor: false, corridorPanels: null, reading: 'hafs' };
   const i = h.indexOf('?');
   if (i === -1) return empty;
   try {
@@ -276,6 +280,10 @@ const boardParams = (h: string): BoardParams => {
       competitionId: q.get('comp'),
       /* لجنةٌ مسمّاة أو طلبٌ صريح للوحة اللجنة ⇒ عدسة اللجنة؛ وإلا فالقاعة كلها. */
       hallView: view === 'hall' ? true : !(panelKeys.length || view === 'panel'),
+      /* شاشة الممرّ: جدارٌ متناوب، لا لوحة نداء. تُطلب صراحةً ولا تُستنتج. */
+      corridor: view === 'corridor',
+      corridorPanels: q.get('panels'),
+      reading: String(q.get('reading') || 'hafs').toLowerCase(),
     };
   } catch { return empty; }
 };

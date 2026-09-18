@@ -1,5 +1,6 @@
 import type { Category, Committee, Participant } from '../types';
 import { queueOrderValue } from './judging-integrity';
+import { MUSHAF_TOTAL_PAGES, locusToPage } from './mushaf-map';
 
 /*
  * إسقاط شاشات القاعة.
@@ -96,6 +97,27 @@ export interface DisplayBoard {
   totalCompleted: number;
   /** لجانٌ شاغرة وأمامها منتظرون — يراها المشرف قبل أن يشتكي أحد. */
   stalledPanels: number;
+  /**
+   * ما تلته القاعة اليوم، مجموعًا على مستوى الصفحة.
+   *
+   * تخرج من قاعدة «لا يخرج إلا الكود» بلا أن تخرقها: لا اسم ولا كود ولا موضع متسابقٍ
+   * بعينه — عددُ مرات تلاوة كل صفحة من ٦٠٤، مجموعةً على القاعة كلها. لا يُستدلّ منها
+   * على من قرأ ماذا، ولا على ما سيُسأل عنه أحد.
+   *
+   * ومنها تُبنى «ختمة القاعة» على شاشات الممرّات، وتُختار منها آية العرض.
+   */
+  recitation?: BoardRecitationAggregate;
+}
+
+export interface BoardRecitationAggregate {
+  /** عدد مرات التلاوة لكل صفحة من صفحات المصحف الـ٦٠٤، بالترتيب. */
+  pages: number[];
+  /** كم صفحة تُليت مرّة فأكثر. */
+  coveredPages: number;
+  /** مجموع تلاوات المواضع اليوم. */
+  totalRecitations: number;
+  /** كم مرّة أتمّت القاعة المصحف كاملًا (أقلّ صفحةٍ تلاوةً). */
+  khatmatCompleted: number;
 }
 
 /* ── الفئة ───────────────────────────────────────────────────────────────── */
@@ -158,9 +180,36 @@ export interface DisplayBoardInput {
    * فما جهله يُقدَّر بنصف متوسّط الجلسة — وهو المتوقّع رياضيًا حين تُجهل البداية.
    */
   elapsedSecondsByCommittee?: Record<string, number>;
+  /** مواضع اليوم كما كُتبت عند اكتمال كل جلسة. منها يُبنى تجميع الختمة. */
+  recited?: { surah: number; startAyah: number; endAyah: number }[];
   nextDepth?: number;
   ar?: boolean;
   now?: Date;
+}
+
+/*
+ * تجميع ما تُلي اليوم على مستوى الصفحة.
+ *
+ * المواضع تدخل بأرقامها (سورة · من آية · إلى آية) وتخرج عددًا لكل صفحة. ولا يُحفظ هنا
+ * من أين جاء الموضع ولا لمن كان: الصفحة تعرف كم مرّة تُليت، ولا تعرف من تلاها.
+ */
+function recitedAggregate(recited?: { surah: number; startAyah: number; endAyah: number }[]): BoardRecitationAggregate | undefined {
+  if (!recited?.length) return undefined;
+  const pages = new Array<number>(MUSHAF_TOTAL_PAGES).fill(0);
+  for (const row of recited) {
+    const from = locusToPage(row.surah, row.startAyah);
+    const to = Math.max(from, locusToPage(row.surah, Math.max(row.startAyah, row.endAyah)));
+    for (let page = from; page <= to; page++) if (page >= 1 && page <= MUSHAF_TOTAL_PAGES) pages[page - 1] += 1;
+  }
+  const totalRecitations = pages.reduce((sum, n) => sum + n, 0);
+  if (!totalRecitations) return undefined;
+  return {
+    pages,
+    coveredPages: pages.filter(n => n > 0).length,
+    totalRecitations,
+    /* الختمة الكاملة هي أقلّ صفحةٍ تلاوةً: ما لم تُتلَ كل صفحة مرّة، لم تكتمل ختمة. */
+    khatmatCompleted: Math.min(...pages),
+  };
 }
 
 export function buildDisplayBoard(input: DisplayBoardInput): DisplayBoard {
@@ -171,6 +220,7 @@ export function buildDisplayBoard(input: DisplayBoardInput): DisplayBoard {
     categories,
     fallbackSessionMinutes,
     elapsedSecondsByCommittee,
+    recited,
     nextDepth = PANEL_NEXT_DEPTH,
     ar = true,
     now = new Date(),
@@ -233,6 +283,7 @@ export function buildDisplayBoard(input: DisplayBoardInput): DisplayBoard {
     competitionName: String(input.competitionName || ''),
     competitionNameArabic: String(input.competitionNameArabic || ''),
     generatedAt: now.toISOString(),
+    recitation: recitedAggregate(recited),
     privacyMode: 'CODES_ONLY',
     committees: slices,
     totalWaiting: waiting.length,
@@ -414,6 +465,25 @@ export function parseDisplayBoard(raw: unknown): DisplayBoard | null {
     activePanels: asCount(r.activePanels),
     totalCompleted: asCount(r.totalCompleted),
     stalledPanels: committees.filter((c) => c.stalled).length,
+    recitation: parseRecitation(r.recitation),
+  };
+}
+
+/* تجميعٌ وارد من الشبكة: يُقصّ على طول المصحف ويُقرأ عددًا، فلا تُصدَّق وثيقةٌ مشوَّهة. */
+function parseRecitation(raw: unknown): BoardRecitationAggregate | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const source = Array.isArray(r.pages) ? r.pages : [];
+  if (!source.length) return undefined;
+  const pages = new Array<number>(MUSHAF_TOTAL_PAGES).fill(0);
+  for (let i = 0; i < Math.min(source.length, MUSHAF_TOTAL_PAGES); i++) pages[i] = asCount(source[i]);
+  const totalRecitations = pages.reduce((sum, n) => sum + n, 0);
+  if (!totalRecitations) return undefined;
+  return {
+    pages,
+    coveredPages: pages.filter(n => n > 0).length,
+    totalRecitations,
+    khatmatCompleted: Math.min(...pages),
   };
 }
 
