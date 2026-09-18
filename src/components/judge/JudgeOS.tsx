@@ -116,9 +116,72 @@ export const JudgeOS: React.FC = () => {
  /* بعض المتصفحات لا تملك واجهة تحليل صوت. حينها يمرّ المحكم على حالة التسجيل وحدها — وهذا
     مقصود، فحبسه عن التحكيم أسوأ من فقد مؤشّرٍ مساعد — لكن المرور يجب أن يُقال لا أن يُسكت عنه. */
  const [micMeterUnavailable,setMicMeterUnavailable]=useState(false);
- const meterRef=useRef<{ctx:AudioContext;raf:number}|null>(null);
- const stopMeter=()=>{const m=meterRef.current;if(!m)return;cancelAnimationFrame(m.raf);void m.ctx.close().catch(()=>{});meterRef.current=null;setMicLevel(0)};
- const startMeter=(stream:MediaStream)=>{try{const Ctor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;if(!Ctor){setMicMeterUnavailable(true);setMicHeard(true);return}stopMeter();const ctx=new Ctor();/* سفاري على الجوال يبدأ سياق الصوت موقوفًا حتى يُستأنف بإيماءة مستخدم، فيقرأ المحلّل صمتًا أبديًّا: الشريط لا يتحرّك مهما قرأ المتسابق، والبوابة لا تُفتح. والاستئناف هنا يقع داخل ضغطة «تجهيز الميكروفون» نفسها، فهو إيماءةٌ صالحة. */void ctx.resume?.().catch(()=>{});const analyser=ctx.createAnalyser();analyser.fftSize=1024;ctx.createMediaStreamSource(stream).connect(analyser);const buf=new Uint8Array(analyser.fftSize);const tick=()=>{analyser.getByteTimeDomainData(buf);let peak=0;for(let i=0;i<buf.length;i+=1){const d=Math.abs(buf[i]-128)/128;if(d>peak)peak=d}setMicLevel(peak);if(peak>0.06)setMicHeard(true);const raf=requestAnimationFrame(tick);meterRef.current={ctx,raf}};tick()}catch{/* المتصفح بلا واجهة تحليل صوت: تبقى البوابة على حالة التسجيل وحدها، ويُعلَن ذلك للمحكم */setMicMeterUnavailable(true);setMicHeard(true)}};
+ /*
+  * مقياس الصوت في WebKit — ثلاثة أشياء تُسكته، وكلها معروفة.
+  *
+  *   ١) **سياقٌ يُنشأ بعد `await`.** إنشاء `AudioContext` بعد انتظار `getUserMedia` يقع
+  *      خارج إيماءة المستخدم، فيبقى موقوفًا ولا ينفع استئنافه بعدها. فيُنشأ الآن قبل
+  *      طلب الإذن، داخل الضغطة نفسها.
+  *   ٢) **مصدرُ تيّارٍ بلا عنصر وسائط.** في سفاري لا يُخرج `MediaStreamAudioSourceNode`
+  *      شيئًا ما لم يكن التيّار مُسندًا أيضًا إلى عنصر صوتٍ حيّ. فيُسند إلى عنصرٍ مكتوم
+  *      لا يُسمع منه شيء، ووجودُه وحده يفتح المسار.
+  *   ٣) **متصفّحٌ لا يقيس أصلًا.** فإن بقي القياس صفرًا مطلقًا — لا ضجيجَ أرضية ولا شيء —
+  *      طوال ثوانٍ والتسجيل يعمل، فالمقياس هو المعطّل لا الميكروفون. حينها يُعلن عن نفسه
+  *      عاطلًا بدل أن يتّهم الميكروفون بالصمت.
+  */
+ const meterRef=useRef<{ctx:AudioContext;raf:number;el:HTMLAudioElement|null}|null>(null);
+ const meterProbeRef=useRef<{startedAt:number;sawAny:boolean}|null>(null);
+ const stopMeter=()=>{const m=meterRef.current;if(!m)return;cancelAnimationFrame(m.raf);if(m.el){m.el.pause();m.el.srcObject=null}void m.ctx.close().catch(()=>{});meterRef.current=null;meterProbeRef.current=null;setMicLevel(0)};
+ /** يُنشأ السياق داخل الضغطة نفسها، قبل انتظار الإذن — وإلا وُلد موقوفًا في سفاري. */
+ const pendingCtxRef=useRef<AudioContext|null>(null);
+ const primeAudioContext=()=>{
+  try{
+   const Ctor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+   if(!Ctor)return null;
+   if(!pendingCtxRef.current||pendingCtxRef.current.state==='closed')pendingCtxRef.current=new Ctor();
+   void pendingCtxRef.current.resume?.().catch(()=>{});
+   return pendingCtxRef.current;
+  }catch{return null}
+ };
+ const startMeter=(stream:MediaStream)=>{
+  try{
+   const ctx=pendingCtxRef.current||primeAudioContext();
+   if(!ctx){setMicMeterUnavailable(true);setMicHeard(true);return}
+   stopMeter();
+   pendingCtxRef.current=ctx;
+   void ctx.resume?.().catch(()=>{});
+   /* عنصرٌ مكتوم يحمل التيّار: حيلة سفاري المعروفة، ولا يُسمع منه شيء ولا يظهر. */
+   let el:HTMLAudioElement|null=null;
+   try{el=new Audio();el.muted=true;el.srcObject=stream;el.play().catch(()=>{})}catch{el=null}
+   const analyser=ctx.createAnalyser();analyser.fftSize=1024;
+   ctx.createMediaStreamSource(stream).connect(analyser);
+   const buf=new Uint8Array(analyser.fftSize);
+   meterProbeRef.current={startedAt:Date.now(),sawAny:false};
+   const tick=()=>{
+    analyser.getByteTimeDomainData(buf);
+    let peak=0;
+    for(let i=0;i<buf.length;i+=1){const d=Math.abs(buf[i]-128)/128;if(d>peak)peak=d}
+    setMicLevel(peak);
+    if(peak>0.06)setMicHeard(true);
+    /*
+     * صفرٌ مطلق ليس هدوءًا: أيُّ ميكروفونٍ حيّ يُخرج ضجيج أرضية. فبقاء القياس صفرًا
+     * تمامًا ثماني ثوانٍ يعني أن هذا المتصفّح لا يمرّر القياس — فيُعلن المقياس عاطلًا،
+     * ولا يُقال للمحكّم إن ميكروفونه صامت وهو يعمل.
+     */
+    const probe=meterProbeRef.current;
+    if(probe){
+     if(peak>0)probe.sawAny=true;
+     else if(!probe.sawAny&&Date.now()-probe.startedAt>8000){meterProbeRef.current=null;setMicMeterUnavailable(true)}
+    }
+    const raf=requestAnimationFrame(tick);
+    meterRef.current={ctx,raf,el};
+   };
+   tick();
+  }catch{
+   /* المتصفح بلا واجهة تحليل صوت: تبقى البوابة على حالة التسجيل وحدها، ويُعلَن ذلك للمحكم */
+   setMicMeterUnavailable(true);setMicHeard(true);
+  }
+ };
  useEffect(()=>()=>stopMeter(),[]);
  /*
   * شرطان لا شرط واحد، وكلٌّ في موضعه.
@@ -206,7 +269,7 @@ export const JudgeOS: React.FC = () => {
  const restartAudio=async()=>{const recorder=recorderRef.current;if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch{/* مسجّل أُغلق مسبقًا */}
   streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();
   setMicHeard(false);setMicMeterUnavailable(false);setAudioState('idle');await prepareAudio()};
- const prepareAudio=async()=>{ if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;startMeter(stream);const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();recorder.ondataavailable=e=>{if(e.data.size){if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
+ const prepareAudio=async()=>{ /* السياق يُنشأ ويُستأنف هنا — قبل أي `await` — فهذه اللحظة وحدها هي إيماءة المستخدم. */ primeAudioContext(); if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;startMeter(stream);const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();recorder.ondataavailable=e=>{if(e.data.size){if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);resolve()};recorder.stop()})};
  const submitAndLock=async()=>{if(!micRecording)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
  const isLastQuestion=activeSession.currentQuestionIndex >= Math.max(1,totalQuestions)-1;
@@ -446,11 +509,12 @@ export const JudgeOS: React.FC = () => {
     {/*
       * تحذيرٌ يبقى حتى يصل صوت — ولا يمنع شيئًا.
       *
-      * الجلسة تُسجَّل، فلا موجب لإيقاف المسابقة. لكن ميكروفونًا مكتومًا يُنتج تسجيلًا
-      * صامتًا لا يُحتجّ به عند مراجعة، فيُقال للمحكّم صراحةً ما لم يُسمع صوت.
+      * الجلسة تُسجَّل، فلا موجب لإيقاف المسابقة. وسكونُ الشريط ليس دليلًا على كتمِ
+      * الميكروفون: قد لا تكون التلاوة بدأت، وقد يكون المتصفّح لا يمرّر المستوى أصلًا.
+      * فلا تتّهم الرسالةُ جهازًا لا تعرف حاله — تصف ما تراه، وتترك الحكم لأذن المحكّم.
       */}
-    {micGateApplies&&micRecording&&!micHeard&&!micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] px-4 py-3 text-[11px] font-bold leading-5 text-[#6b4f18] flex flex-wrap items-center gap-2"><Mic className="w-4 h-4 shrink-0"/><span className="flex-1 min-w-0">{ar?'التسجيل يعمل، ولم يصل صوتٌ إلى الشريط بعد. تأكّد أن الميكروفون غير مكتوم قبل أن تعتمد التقييم — تسجيلٌ صامت لا يُحتجّ به.':'Recording is running but no level has registered yet. Confirm the microphone is not muted before you submit.'}</span><Button size="sm" variant="outline" onClick={()=>void restartAudio()}>{ar?'إعادة الفحص':'Re-check'}</Button></div>}
-    {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-4 h-4 shrink-0"/>{ar?'هذا المتصفح لا يعرض مؤشّر مستوى الصوت، فاعتُمد على بدء التسجيل وحده. تحقّق من وصول الصوت بعد أول تلاوة.':'This browser cannot show a live level meter, so verification relied on the recorder starting. Confirm the audio after the first recitation.'}</div>}
+    {micGateApplies&&micRecording&&!micHeard&&!micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] px-4 py-3 text-[11px] font-bold leading-5 text-[#6b4f18] flex flex-wrap items-center gap-2"><Mic className="w-4 h-4 shrink-0"/><span className="flex-1 min-w-0">{ar?'التسجيل يعمل. ومؤشّر المستوى لم يتحرّك بعد — وقد يكون لأن التلاوة لم تبدأ، أو لأن هذا المتصفّح لا يعرض المستوى. إن كنت تسمع المتسابق فالجلسة تُسجَّل.':'Recording is running. The level meter has not moved yet — the recitation may not have started, or this browser may not report levels. If you can hear the participant, the session is being recorded.'}</span><Button size="sm" variant="outline" onClick={()=>void restartAudio()}>{ar?'إعادة الفحص':'Re-check'}</Button></div>}
+    {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-4 py-3 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-4 h-4 shrink-0"/>{ar?'هذا المتصفّح لا يعرض مؤشّر مستوى الصوت، والتسجيل يعمل. لا شيء مطلوب منك هنا — تحقّق من وضوح الصوت بعد أول تلاوة.':'This browser does not show a live level meter, and recording is running. Nothing is required of you here — check the audio after the first recitation.'}</div>}
 
    {/*
      * الرسالة تُعرض في الوضعين، ونصُّها يختلف بحسب ما وقع.

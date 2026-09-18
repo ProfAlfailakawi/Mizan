@@ -68,3 +68,18 @@ test('releasing a stranded session moved to the exception desk, it was not dropp
   assert.match(portals, /releaseStrandedSession/, 'the exception desk can release a stranded session');
   assert.match(portals, /فكّ جلسة عالقة/, 'and names the action plainly');
 });
+
+test('a still meter is described, never blamed on a microphone the screen cannot inspect', () => {
+  const judge = read('src/components/judge/JudgeOS.tsx');
+  const rendered = judge.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  /*
+   * شكا المحكّم أن الشريط ساكن والميكروفون يعمل، فقرأ في الرسالة اتّهامًا بالكتم.
+   * والشاشة لا تملك ما تعرف به ذلك: سكون الشريط قد يكون لأن التلاوة لم تبدأ، أو لأن
+   * المتصفّح لا يمرّر المستوى. فتصف الرسالة ما تراه، ولا تحكم على جهازٍ لم تفحصه.
+   */
+  assert.doesNotMatch(rendered, /غير مكتوم/, 'the warning must not tell the judge to un-mute a working microphone');
+  assert.doesNotMatch(rendered, /not muted/i, 'nor in English');
+  assert.match(rendered, /مؤشّر المستوى لم يتحرّك بعد/, 'it states the observation instead');
+  assert.match(rendered, /إن كنت تسمع المتسابق فالجلسة تُسجَّل/, 'and tells the judge what actually settles it');
+});

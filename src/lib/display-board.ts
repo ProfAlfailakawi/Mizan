@@ -502,3 +502,20 @@ export function venueClock(now: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
+
+/** أكثر ما يُعرض في لقطةٍ واحدة قبل أن يصغر الكود عن القراءة من آخر القاعة. */
+export const HALL_PAGE_CAPACITY = 12;
+/** زمن الصفحة: يكفي لقراءة الشبكة كلّها، ولا يُطيل غياب لجنةٍ عن عين من ينتظرها. */
+export const HALL_PAGE_SECONDS = 12;
+
+/** قسمة متوازنة: صفحاتٌ متقاربة العدد بدل صفحةٍ كاملة وأخرى بقيّة. */
+export function paginatePanels<T>(items: T[], capacity = HALL_PAGE_CAPACITY): T[][] {
+  if (items.length <= capacity) return items.length ? [items] : [];
+  const pages = Math.ceil(items.length / capacity);
+  const per = Math.ceil(items.length / pages);
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += per) out.push(items.slice(i, i + per));
+  return out;
+}
+
+/** `board` يأتي من وثيقةٍ منشورة على شاشةٍ بلا تسجيل دخول؛ وغيابه يبني الإسقاط من المخزن. */

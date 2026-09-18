@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, MonitorX, UsersRound, X } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle2, MonitorX, UsersRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
 import { useScreenAwake } from '../../lib/use-screen-awake';
@@ -98,7 +98,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
 
   /* لا لجنة مختارة بعد ⇒ اختيارٌ صريح بدل شاشةٍ فارغة يقف أمامها المشرف حائرًا. */
   if (!slice) {
-    return <Shell venueRef={venueRef} ar={ar} onClose={onClose}>
+    return <Shell venueRef={venueRef} ar={ar} onClose={onClose} floatingClose>
       <PanelChooser board={board} ar={ar} missing={chosen.length > 0} onPick={(id) => pick([id])} />
     </Shell>;
   }
@@ -114,19 +114,37 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
         <span className="shrink-0 grid place-items-center rounded-2xl bg-[#dbe7df] text-[#16372d] font-black tabular-nums w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] text-xl sm:text-3xl">{slice.code}</span>
         <div className="min-w-0">
           <h1 className="text-xl sm:text-3xl font-black truncate">{bilingualName(slice, ar)}</h1>
+          {/*
+            * اسم الفرع يُقرأ كاملًا أو لا يُقرأ.
+            *
+            * كان الوسم يُقصّ بنقاطٍ ثلاث، فيقف أمام الباب من يقرأ «حفظ القرآن الكريم كاملًا
+            * مع التجوي…» ولا يدري أهذه لجنته أم التي تليها. والقصّ نافعٌ في خليّةٍ من عشرين
+            * في شبكة القاعة؛ أمّا هنا فالشاشة كلّها للجنةٍ واحدة، والمساحة موجودة.
+            */}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             {slice.categories.length
-              ? slice.categories.map((tag) => <span key={tag.id} className="mizan-board-tag text-[11px]">
+              ? slice.categories.map((tag) => <span key={tag.id} className="mizan-board-tag is-full text-[11px] sm:text-[13px]">
                   {tag.label}{tag.scopeLabel && tag.scopeLabel !== tag.label ? ` · ${tag.scopeLabel}` : ''}
                 </span>)
-              : <span className="mizan-board-tag text-[11px] opacity-70">{categoryLine([], ar)}</span>}
+              : <span className="mizan-board-tag is-full text-[11px] opacity-70">{categoryLine([], ar)}</span>}
             {slice.venueHall && <span className="text-[11px] mizan-venue-faint">· {slice.venueHall}</span>}
           </div>
         </div>
       </div>
-      <div className="text-end shrink-0">
-        <div dir="ltr" className="text-lg sm:text-2xl font-black tabular-nums">{venueClock(now)}</div>
-        <FreshnessLine state={age.state} ageSeconds={age.ageSeconds} ar={ar} />
+      {/*
+        * الساعة والأزرار في صفٍّ واحد لا متراكبين.
+        *
+        * كان زرّ الإغلاق مثبّتًا في ركن الشاشة (`absolute … end-4`)، والساعة تُرسم في
+        * الركن نفسه — فيقع الزرّ فوق الأرقام ويُخفيها. فصارا جارين في الرأس.
+        */}
+      <div className="flex items-start gap-2 sm:gap-3 shrink-0">
+        <div className="text-end">
+          <div dir="ltr" className="text-lg sm:text-2xl font-black tabular-nums">{venueClock(now)}</div>
+          <FreshnessLine state={age.state} ageSeconds={age.ageSeconds} ar={ar} />
+        </div>
+        {/* الرجوع إلى الاختيار: شاشةٌ عُلّقت على لجنةٍ ثم نُقلت إلى غيرها تُضبط بلا مسح تخزين. */}
+        <Button shape="square" variant="venue" onClick={() => pick([])} aria-label={ar ? 'تغيير اللجنة المعروضة' : 'Change the displayed panel'} title={ar ? 'تغيير اللجنة' : 'Change panel'}><ArrowLeftRight className="w-5 h-5" /></Button>
+        {onClose && <Button shape="square" variant="venue" onClick={onClose} aria-label={ar ? 'إغلاق شاشة اللجنة' : 'Close committee display'}><X className="w-5 h-5" /></Button>}
       </div>
     </header>
 
@@ -197,7 +215,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
 
 /* ── الهيكل ─────────────────────────────────────────────────────────────── */
 
-const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolean; onClose?: () => void; stale?: boolean; children: React.ReactNode }> = ({ venueRef, ar, onClose, stale, children }) => (
+const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolean; onClose?: () => void; stale?: boolean; floatingClose?: boolean; children: React.ReactNode }> = ({ venueRef, ar, onClose, stale, floatingClose, children }) => (
   <div
     ref={venueRef}
     role={onClose?"dialog":undefined}
@@ -206,7 +224,7 @@ const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolea
     className={`fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto ${stale ? 'mizan-board-stale' : ''}`}
   >
     <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
-      {onClose && <div className="absolute top-4 end-4 z-10">
+      {onClose && floatingClose && <div className="absolute top-4 end-4 z-10">
         <Button shape="square" variant="venue" onClick={onClose} aria-label={ar ? 'إغلاق شاشة اللجنة' : 'Close committee display'}><X className="w-5 h-5" /></Button>
       </div>}
       {children}
