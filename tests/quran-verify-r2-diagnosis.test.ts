@@ -104,3 +104,33 @@ test('no reading-id mapping is invented to bridge the two layouts', () => {
   assert.ok(/لا تُسدّ الفجوة بمطابقةٍ مخترعة/.test(SCRIPT),
     'and it must say plainly that the gap is not closed by inventing one');
 });
+
+test('the gate verifies the tree the product actually uses, not only the declared one', () => {
+  /*
+   * حارسٌ على بابٍ ليس في الجدار أسوأ من لا حارس: يبقى أحمرَ أبدًا فيُعتاد تجاهلُه،
+   * وتمرّ الشجرةُ الحقيقيّة من تحته بلا تحقّقٍ من أحد. فصار يتحقّق من كتالوج التسليم
+   * وحزمِه المطلوبة — وهي ما يقرؤه المنتج فعلًا.
+   */
+  assert.ok(SCRIPT.includes('verifyDeliveryTree'), 'the live tree must be verified');
+  assert.ok(SCRIPT.includes('DELIVERY_CATALOG_KEY'), 'and measured against the catalog the product publishes');
+  assert.ok(SCRIPT.includes('deliveryDirectoryDigest'), 'by recomputed digest, not by existence');
+  assert.ok(SCRIPT.includes('requiredDatasetVerdicts'), 'over the required datasets the product itself declares');
+  // ولا يُخلط الاكتمالُ بالنزاهة مرّةً أخرى: العشرون شأنُ مصفوفة الإصدار لا شأنُ هذه البوّابة.
+  assert.ok(/quran:release-matrix/.test(SCRIPT),
+    'the header must point completeness at the matrix that owns it, so the two are not conflated again');
+});
+
+test('the unpublished layout is declared off, never deleted and never silently skipped', () => {
+  assert.ok(SCRIPT.includes('packageLayoutMode'), 'the layout must be a declared setting');
+  assert.ok(SCRIPT.includes('MIZAN_QURAN_PACKAGE_LAYOUT'), 'named by the variable that turns it on');
+  // ويُطبع في كلّ تشغيل: بوّابةٌ صامتةٌ عن حاجزٍ مفتوحٍ تُقرأ شهادةً بأن لا حاجز.
+  assert.ok(/ليس قيد الاستعمال/.test(SCRIPT), 'every run must say the layout is not in use');
+  assert.ok(/REMAINING-WORK/.test(SCRIPT), 'and point at the open decision');
+  // والشيفرةُ باقية: القرار متى اتُّخذ يُشغّلها بمتغيّرٍ واحد، ولا يُعاد كتابتها.
+  assert.ok(SCRIPT.includes('verifyPackageLayout'), 'the layout check itself must still exist');
+});
+
+test('a delivery failure still fails the run', () => {
+  assert.ok(/deliveryFailures\) process\.exit\(1\)/.test(SCRIPT), 'an unsound live tree must block the release');
+  assert.equal(/process\.exit\(0\)/.test(SCRIPT), false, 'no path may exit clean on a failure');
+});

@@ -4,9 +4,27 @@ import { R2PrivateClient, r2ConfigFromEnv } from '../server/r2-private';
 import { quranPackageKey, sha256Hex, verifyIntegrity, readPackageManifestFiles, type ObjectIntegrity, type PackageManifestFile } from '../server/r2-object-layout';
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 import { errorMessageArabic } from '../src/lib/error-catalog';
+import {
+  DELIVERY_CATALOG_KEY, datasetIntegrityVerdict, deliveryDirectoryDigest, packageLayoutMode,
+  readDeliveryCatalog, relativeKey, requiredDatasetVerdicts,
+} from '../server/r2-delivery-verification';
 
 /*
- * تحقّقُ نزاهةِ حزم القرآن المرفوعة إلى R2.
+ * تحقّقُ نزاهةِ ما هو مرفوعٌ على R2 فعلًا.
+ *
+ * **ما تغيّر ولماذا.** كان هذا السكربت يتحقّق من `quran/packages/<rawiId>/<v>/` وحدها.
+ * وجردٌ قرائيٌّ للدلو (18 سبتمبر 2026) أثبت أن تلك البادئة خاليةٌ تمامًا، وأن `delivery/`
+ * فيها ٧٤٧٢ كائنًا و٦٨٠ ميجابايت، وأن لا ملفَّ واحدًا تحت `server/` أو `src/` يستورد
+ * وحدةَ التخطيط تلك. فكان الحارسُ على بابٍ ليس في الجدار: أحمرُ أبدًا مهما صحّت الشجرة،
+ * والشجرةُ الحقيقيّةُ تمرّ من تحته بلا تحقّقٍ من أحد.
+ *
+ * فصار يتحقّق ممّا يعتمد عليه المنتج: كتالوجُ التسليم وحزمُه المطلوبة. وتخطيطُ الحزم
+ * صار **إعدادًا معلنًا** (`MIZAN_QURAN_PACKAGE_LAYOUT=enabled`) لا محذوفًا: يُطبع في كلّ
+ * تشغيلٍ أنه ليس قيدَ الاستعمال ويُذكر القرارُ المعلَّق.
+ *
+ * **ولم يسقط الاكتمال من الحساب:** أنّ ١٤ روايةً من العشرين بلا نصٍّ منشور شأنُ
+ * `npm run quran:release-matrix` (١١/٢٠ · يحجب الإصدار) لا شأنُ بوّابةِ نزاهة. وخلطُ
+ * النزاهة بالاكتمال هو الذي صنع بوّابةً لا تخضرّ أبدًا.
  *
  * الرفعُ الناجح ليس دليلَ سلامة: قد يُقطع النقل، أو يُكتب فوق المفتاح، أو يُرفع ملفٌّ
  * مكانَ ملفّ. فهذا السكربت يقرأ بيان الحزمة من R2 نفسه، ثم يطابق كل ملفٍّ مذكورٍ فيه
@@ -17,6 +35,7 @@ import { errorMessageArabic } from '../src/lib/error-catalog';
  * السكربت بحالةٍ غير صفرية بدل أن يمرّ.
  *
  * الاستعمال:
+ *   npm run quran:verify-r2 -- --all --deep          (شجرة التسليم، بالبصمات)
  *   npm run quran:verify-r2 -- --reading=hafs --version=v1
  *   npm run quran:verify-r2 -- --all --version=v1
  *   npm run quran:verify-r2 -- --all --version=v1 --deep     (ينزّل ويحسب البصمة)
@@ -51,7 +70,7 @@ for (const r of readings) {
   }
 }
 
-async function main() {
+async function verifyPackageLayout() {
   if (dryRun) {
     for (const rawiId of readings) {
       console.log(`[dry-run] ${quranPackageKey(rawiId, version)}`);
@@ -184,6 +203,98 @@ async function main() {
     if (missingManifests) console.error(`  ومنها ${missingManifests} روايةً لا بيانَ لها أصلًا — تلك تُرفع، ولا تُصلَح.`);
     process.exit(1);
   }
+}
+
+/*
+ * شجرةُ التسليم: الكتالوجُ أوّلًا، ثم كلُّ حزمةٍ مطلوبةٍ بعددها وحجمها وبصمتها.
+ *
+ * والبصمةُ تُعاد من بايتات R2 بالخوارزميّة التي كتبها بها `hashDirectory` — لا من وسمٍ
+ * ولا من ETag. فحزمةٌ موجودةٌ ببايتاتٍ أخرى لا تمرّ.
+ */
+async function verifyDeliveryTree(client: R2PrivateClient): Promise<number> {
+  const res = await client.getObject(DELIVERY_CATALOG_KEY);
+  if (!res) {
+    console.error(`DELIVERY_CATALOG_MISSING: ${DELIVERY_CATALOG_KEY}`);
+    console.error('  لا كتالوجَ تسليمٍ على R2 — فلا مرجعَ يُقاس إليه المرفوع.');
+    console.error('  يُنشر بـ `npx tsx scripts/kfgqpc-catalog-publish.ts` بعد الاستيعاب.');
+    return 1;
+  }
+
+  let catalog;
+  try { catalog = readDeliveryCatalog(await res.json()); }
+  catch (err) {
+    const code = err instanceof Error ? err.message : String(err);
+    console.error(`${code}`);
+    console.error('  كتالوجٌ بمخطّطٍ آخر لا يُتحقَّق منه — التحقّقُ منه تحقّقٌ وهميّ.');
+    return 1;
+  }
+
+  console.log(`كتالوج التسليم: ${catalog.datasets.length} حزمةً معلنة${catalog.generatedAt ? ` · وُلّد ${catalog.generatedAt}` : ''}`);
+  if (catalog.unavailableAudio.length) console.log(`  صوتٌ رسميٌّ غير متاح (معلنٌ في الكتالوج): ${catalog.unavailableAudio.join('، ')}`);
+  if (catalog.unverifiedAudio.length) console.log(`  صوتٌ غير مُتحقَّقٍ بعد (معلنٌ في الكتالوج): ${catalog.unverifiedAudio.join('، ')}`);
+
+  let failures = 0;
+  for (const requirement of requiredDatasetVerdicts(catalog)) {
+    if (!requirement.ok || !requirement.dataset) {
+      console.error(`${requirement.code} ${requirement.id}`);
+      failures++;
+      continue;
+    }
+    const declared = requirement.dataset;
+    const objects = await client.listAllObjects(`${declared.r2Prefix.replace(/\/+$/, '')}/`);
+    const totalBytes = objects.reduce((n, o) => n + (o.size || 0), 0);
+
+    let observedSha: string | undefined;
+    if (deep) {
+      const entries: { relativePath: string; bytes: Uint8Array }[] = [];
+      for (const object of objects) {
+        const body = await client.getObject(object.key);
+        if (!body) { console.error(`DATASET_OBJECT_VANISHED ${requirement.id}: ${object.key}`); failures++; continue; }
+        entries.push({ relativePath: relativeKey(declared.r2Prefix, object.key), bytes: new Uint8Array(await body.arrayBuffer()) });
+      }
+      observedSha = deliveryDirectoryDigest(entries).sha256;
+    }
+
+    const verdict = datasetIntegrityVerdict(declared, { fileCount: objects.length, totalBytes, sha256: observedSha });
+    if (!verdict.ok) {
+      console.error(`${verdict.code} ${requirement.id}: ${declared.r2Prefix}`);
+      failures++;
+    } else {
+      console.log(`${requirement.id}: ${objects.length} كائنًا · ${(totalBytes / 1048576).toFixed(1)} ميجابايت${observedSha ? ' · بصمة مطابقة' : ''}`);
+    }
+  }
+  return failures;
+}
+
+async function main() {
+  if (dryRun) { await verifyPackageLayout(); return; }
+
+  const cfg = r2ConfigFromEnv();
+  if (!cfg) {
+    console.error('R2_NOT_CONFIGURED: set R2_ENDPOINT/R2_BUCKET/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY');
+    console.error(errorMessageArabic('R2_NOT_CONFIGURED'));
+    process.exit(1);
+  }
+  const client = new R2PrivateClient(cfg);
+
+  const deliveryFailures = await verifyDeliveryTree(client);
+  console.log(`\nشجرة التسليم: ${deliveryFailures ? `${deliveryFailures} إخفاقًا` : 'كلُّ الحزم المطلوبة سليمة'}${deep ? ' · وضع البصمة العميقة' : ' · عدٌّ وحجمٌ بلا بصمة'}`);
+
+  /*
+   * وتخطيطُ الحزم يُذكر في كلّ تشغيل، مُشغَّلًا كان أو لا. فبوّابةٌ صامتةٌ عن حاجزٍ
+   * مفتوحٍ تُقرأ شهادةً بأن لا حاجز.
+   */
+  const layout = packageLayoutMode(process.env as Record<string, string | undefined>);
+  if (layout === 'not-in-use') {
+    console.log('\nتخطيط `quran/packages/`: ليس قيد الاستعمال — لا يكتب فيه شيءٌ في هذا المستودع، والبادئة خالية.');
+    console.log('  قرارٌ معلَّق على المالك (docs/REMAINING-WORK.md §2.2). يُشغَّل التحقّقُ منه بـ MIZAN_QURAN_PACKAGE_LAYOUT=enabled.');
+    if (deliveryFailures) process.exit(1);
+    return;
+  }
+
+  console.log('\nتخطيط `quran/packages/`: مُشغَّلٌ بالإعداد — يُتحقَّق منه الآن.');
+  await verifyPackageLayout();
+  if (deliveryFailures) process.exit(1);
 }
 
 main().catch(err => { console.error(err instanceof Error ? err.message : String(err)); process.exit(1); });
