@@ -21,3 +21,4 @@ tmp/
 
 # تقارير مُولَّدة — تُحسب عند الطلب ولا تُلتزَم
 artifacts/
+test-results.xml

@@ -279,9 +279,39 @@ duri-abi-amr · susi-abi-amr)، وبمعرّفاتٍ تخالف المعرّفا
 
 **إعادة الإنتاج:** `npm run r2:inventory -- --depth=3` (قراءةٌ محضة، لا تكتب ولا تحذف).
 
+#### و`preflight` كانت تنتظر سرًّا لا وجودَ له
+
+سُجِّلت في كل تقرير «محجوبة بإعداد Firebase خارجيّ». **ونصفُ ذلك خطأ.** الإعدادُ ليس
+غائبًا: هو في `substitutions` من `cloudbuild.yaml` منذ البداية —
+`_VITE_REQUIRE_AUTH: 'true'` و`_VITE_FIREBASE_API_KEY` و`_VITE_FIREBASE_PROJECT_ID` —
+ومنه يُبنى ما يُنشر فعلًا (Vite يُدمج `VITE_*` وقتَ البناء). وهي معرّفاتُ عميلٍ علنية
+بنصّ تعليق الملفّ («تحميها قيود النطاق لا الإخفاء»).
+
+فكانت البوّابة تنتظر **نسخةً ثانيةً** من إعدادٍ موجود، ولا أحدَ يضبطها — فتُتخطّى أبدًا
+وهي تبدو مضبوطة. وهو صنفُ العطل نفسُه الذي أُغلق في R2: حارسٌ مصوَّبٌ على موضعٍ لا يكتب
+فيه أحد.
+
+فوُصلت بمصدرها عبر `scripts/cloudbuild-substitution.mjs` (يقرأ بديلًا واحدًا بعينه من
+كتلة `substitutions` وحدها، ويفشل مغلقًا على اسمٍ غير موجود، ولا يطبع قيمة). والسرُّ —
+إن ضُبط — يبقى المقدَّم، فيوجّه المالكُ البوّابةَ إلى بيئةٍ أخرى بلا تعديل شيفرة.
+
+**ولم يُليّنها الوصل، بل أظهر حاجزًا كان مستورًا.** `preflight` تعمل الآن وتقول:
+
+```
+سليم: النشر مُعلَنٌ حقيقيًا · مفتاح Firebase مضبوط · معرّف المشروع مضبوط
+      · تبديل الأدوار للتجربة مُطفأ · ملف إعداد Firebase ملتزَم فارغًا
+
+موانع: ✗ شروط المشاركة غير منشورة   (MIZAN_LEGAL_TERMS_*  · MIZAN_LEGAL_ENTITY_NAME)
+       ✗ سياسة الخصوصية غير منشورة (MIZAN_LEGAL_PRIVACY_* · MIZAN_LEGAL_ENTITY_NAME)
+```
+
+فالحاجزُ الحقيقيّ ليس Firebase — هو **الوثائق القانونية**، وهي قرارُ مالكٍ ومحتوًى.
+**الدليل:** `tests/preflight-production-config.test.ts` (٥ اختبارات).
+
 | الحاجز | الأمر الذي يُظهره | ما ينقص |
 |---|---|---|
-| `BLOCKED_BY_EXTERNAL_FIREBASE_CONFIG` | `npm run preflight` | متغيّرات `VITE_FIREBASE_*` الإنتاجية |
+| ~~`BLOCKED_BY_EXTERNAL_FIREBASE_CONFIG`~~ **أُغلق** | `npm run preflight` | لا شيء — يُقرأ من `cloudbuild.yaml` |
+| الوثائق القانونية | `npm run preflight` | `MIZAN_LEGAL_TERMS_*` و`MIZAN_LEGAL_PRIVACY_*` و`MIZAN_LEGAL_ENTITY_NAME` |
 | `BLOCKED_BY_RUNTIME_SECRET` | `npm run quran:verify-r2 -- --all` | اعتمادات R2 (`R2_*`) |
 
 وكلاهما مذكورٌ بالاسم في `.env.example`، ويفشل الإقلاعُ عندهما بوضوح لا صامتًا.
