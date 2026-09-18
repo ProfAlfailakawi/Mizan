@@ -267,6 +267,7 @@ const SEAL_FAILURE_AR: Record<string, string> = {
   server_authority_required: 'تعذّر الوصول إلى خادم الاعتماد، فلم يُختم شيء. أعد المحاولة بعد استقرار الاتصال.',
   integrity_invariant: 'قاعدة نزاهة مانعة تمنع الختم. راجع لوحة النزاهة وعالج التنبيه قبل إعادة المحاولة.',
   no_results: 'لا توجد نتائج مكتملة لختمها بعد.',
+  undecided_tie: 'مركزٌ موقوف على تعادل لم تفصل فيه الإدارة بعد. سجّل القرار وسببه في «مراكز موقوفة على تعادل» أعلى الشاشة، ثم اختم — فالختم قبله يُخرج شهادةً بمركزٍ لم يُمنح.',
 };
 const SEAL_FAILURE_EN: Record<string, string> = {
   not_authorized: 'Only the head judge, competition manager or organization owner can seal.',
@@ -274,6 +275,7 @@ const SEAL_FAILURE_EN: Record<string, string> = {
   server_authority_required: 'The sealing authority was unreachable, so nothing was sealed. Try again once the connection is stable.',
   integrity_invariant: 'A blocking integrity rule prevents sealing. Clear it on the integrity board first.',
   no_results: 'There are no completed results to seal yet.',
+  undecided_tie: 'A place is on hold for a tie the administration has not decided. Record the decision and its reason in “Places on hold for a tie” above, then seal — sealing first would issue a certificate for a place nobody was given.',
 };
 /** يُعيد جملة عربية دائمًا: لا يُعرض `reason` خامًا، ولا تبقى الشاشة صامتة عند الرفض. */
 export function sealFailureLabel(outcome: { sealed?: boolean; reason?: string; message?: string } | null | undefined, ar: boolean): string {

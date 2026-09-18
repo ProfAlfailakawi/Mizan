@@ -34,6 +34,7 @@ import { deleteCompetitionLogo, isManagedBrandLogoUrl, uploadCompetitionLogo } f
 import { auth } from '../../lib/firebase';
 import { categoryResultsCsv, participantResultsCsv, resultsFileName } from '../../lib/results-report';
 import { AttentionBoard, type AttentionItem, type AttentionTone } from './AttentionBoard';
+import { TieDecisionPanel } from './TieDecisionPanel';
 
 const isAr=(language:string)=>language==='ar';
 type MainView='overview'|'design'|'engine'|'participants'|'operations'|'judging'|'results'|'enterprise';
@@ -793,7 +794,10 @@ const ResultsView=({store,ar}:{store:Store;ar:boolean})=>{const policy=getCompet
   .filter(r=>!statusFilter||r.status===statusFilter)
   .filter(r=>!needle||`${r.participantName} ${r.participantNameArabic} ${r.participantCode} ${r.country}`.toLowerCase().includes(needle))
   .sort((a,b)=>a.rank-b.rank);
- const pending=appeals.filter(a=>a.status==='submitted'||a.status==='under_review').length; const allSealed=results.length>0&&results.every(r=>r.status==='sealed'||r.status==='published');return <div className="space-y-4"><div className="flex flex-wrap items-end justify-between gap-4"><div><div className="mizan-kicker">{ar?'النتائج':'RESULTS'}</div><h1 className="text-3xl font-black mt-1">{ar?'اعتماد، ختم، نشر':'Approve · seal · publish'}</h1><p className="text-sm text-[#636965] mt-2">{ar?`الإظهار: ${uiToken(policy.results.visibility,true)}`:`Visibility: ${uiToken(policy.results.visibility,false)}`}</p></div>{/*
+ const pending=appeals.filter(a=>a.status==='submitted'||a.status==='under_review').length; const allSealed=results.length>0&&results.every(r=>r.status==='sealed'||r.status==='published');return <div className="space-y-4">
+ {/* المركز الموقوف على تعادل يُعرض هنا قبل الختم: ختمُ نتيجةٍ ومركزُها لم يُفصل فيه يُخرج
+     شهادةً ناقصة، والفصلُ بعد الختم أصعب. */}
+ <TieDecisionPanel ar={ar}/><div className="flex flex-wrap items-end justify-between gap-4"><div><div className="mizan-kicker">{ar?'النتائج':'RESULTS'}</div><h1 className="text-3xl font-black mt-1">{ar?'اعتماد، ختم، نشر':'Approve · seal · publish'}</h1><p className="text-sm text-[#636965] mt-2">{ar?`الإظهار: ${uiToken(policy.results.visibility,true)}`:`Visibility: ${uiToken(policy.results.visibility,false)}`}</p></div>{/*
    * خمسة أزرار في صفٍّ لا يلتفّ.
    *
    * على الهاتف كان مجموعها أعرض من الشاشة، والصفّ لا `flex-wrap` فيه ولا `shrink`، فيفيض

@@ -13,6 +13,15 @@
  * والنِّسب تُكتب مئويةً كما تكتبها اللجنة (٩٧ تعني ٩٧٪ من الدرجة الكاملة)، لا كسورًا.
  */
 
+import { breakTie } from './scoring-core';
+import {
+  decisionForTie,
+  tieNeedingDecision,
+  tieWinners,
+  type TieDecision,
+  type TieGroup,
+} from './tie-resolution';
+
 export interface AwardPlace {
   /** ١ = المركز الأول. */
   rank: number;
@@ -53,10 +62,16 @@ export interface AwardCandidate {
   finalScore: number;
   /** الدرجة الكاملة لهذه الفئة (عادةً ١٠٠). */
   maxScore: number;
+  /** درجاتُ المعايير — بها تعمل قواعدُ كسر التعادل المعلنة. بدونها لا تفصل قاعدة. */
+  criterionScores?: Record<string, number>;
+  /** عددُ المخالفات — لقاعدة `fewest_penalties`. */
+  penaltyCount?: number;
 }
 
 export type AwardStanding =
   | { kind: 'place'; place: AwardPlace; percentage: number }
+  /* تعادلٌ لم يُفصل فيه بعد. ليس مركزًا ولا حرمانًا منه — وقفٌ معلن. */
+  | { kind: 'contested'; place: AwardPlace; percentage: number }
   | { kind: 'competing'; percentage: number }
   | { kind: 'participant'; percentage: number };
 
@@ -65,7 +80,12 @@ export interface AwardOutcome {
   awarded: { place: AwardPlace; winners: (AwardCandidate & { percentage: number })[] }[];
   /** المراكز التي لم يبلغ عتبتَها أحد، مع سببها. */
   withheld: { place: AwardPlace; reasonArabic: string; reasonEnglish: string; bestPercentage: number | null }[];
-  /** حالة كل متسابق: مركزٌ، أو ضمن المنافسة، أو مشاركة. */
+  /**
+   * المراكز التي وقع فيها تعادلٌ يتجاوز المقاعد. ما لم يحمل قرارًا فهو موقوف: لا يُعلن
+   * ولا يُطبع في شهادة. راجع `lib/tie-resolution.ts`.
+   */
+  contested: { place: AwardPlace; group: TieGroup; decision: TieDecision | null }[];
+  /** حالة كل متسابق: مركزٌ، أو تعادلٌ موقوف، أو ضمن المنافسة، أو مشاركة. */
   standings: Map<string, AwardStanding>;
 }
 
@@ -123,30 +143,99 @@ export function validateAwardPolicy(policy: AwardPolicy, arabic: boolean): strin
  * الترتيب بالدرجة نزولًا، ثم تُمنح المراكز بالتتابع: من بلغ عتبة المركز المفتوح ناله،
  * ومن لم يبلغها لم يُنقل المركز إليه ولم يُطوَ المركز عمّن بعده — يُحجب ويُنتقل إلى ما
  * يليه، وتبقى بقية المتسابقين مرشّحين لما هو أدنى عتبةً.
+ *
+ * والتعادل الذي يتجاوز المقاعد لا يُحلّ هنا: يُرصد ويُوقف المركز حتى يُسجَّل قرار
+ * الإدارة بسببه. وكان يُحلّ صامتًا بأبجديّة رمز المتسابق في الترتيب أدناه — وتلك
+ * مسطرةٌ لا يعلم بها من يقرأ النتيجة.
  */
-export function resolveAwards(input: { policy: AwardPolicy; candidates: AwardCandidate[] }): AwardOutcome {
+export function resolveAwards(input: {
+  policy: AwardPolicy;
+  candidates: AwardCandidate[];
+  /**
+   * قواعدُ كسر التعادل المعلنة في رُبريك المسابقة (`ruleSet.tieBreakRules`). تُطبَّق قبل
+   * أيّ تصعيد: هي معايير اللجنة نفسها، معلنةٌ قبل المسابقة، ولم تُخترع هنا.
+   */
+  tieBreakRules?: readonly string[] | null;
+  /** قرارات الإدارة في التعادلات القائمة. بلا قرارٍ يبقى المركز موقوفًا. */
+  tieDecisions?: readonly TieDecision[] | null;
+}): AwardOutcome {
   const policy = normalizeAwardPolicy(input.policy);
+  const rules = (input.tieBreakRules || []).filter(Boolean);
+  /*
+   * الترتيب: الدرجة، ثم قواعدُ الرُبريك المعلنة، ثم المعرّف.
+   *
+   * وكان الأخيرُ `participantCode.localeCompare` — أبجديّةُ الرمز تفصل بين متساويين. وهي
+   * الآن ترتيبُ عرضٍ ثابتٌ بالمعرّف لا غير: من تساوى ولم تفصله قاعدةٌ معلنة يُرفع إلى
+   * `tieNeedingDecision` قبل أن يُمنح أحدٌ شيئًا.
+   */
   const ranked = input.candidates
     .map(c => ({ ...c, percentage: scorePercentage(c.finalScore, c.maxScore) }))
-    .sort((a, b) => b.percentage - a.percentage || a.participantCode.localeCompare(b.participantCode));
+    .sort((a, b) => b.percentage - a.percentage || breakTie(a, b, rules) || a.participantId.localeCompare(b.participantId));
 
   const awarded: AwardOutcome['awarded'] = [];
   const withheld: AwardOutcome['withheld'] = [];
+  const contested: AwardOutcome['contested'] = [];
   const standings = new Map<string, AwardStanding>();
   const taken = new Set<string>();
+
+  type Ranked = (typeof ranked)[number];
+  /** متساويان لا تفصل بينهما قاعدةٌ معلنة. */
+  const indistinguishable = (a: Ranked, b: Ranked) => a.percentage === b.percentage && breakTie(a, b, rules) === 0;
+
+  const win = (place: AwardPlace, winners: Ranked[]) => {
+    if (!winners.length) return;
+    winners.forEach(w => { taken.add(w.participantId); standings.set(w.participantId, { kind: 'place', place, percentage: w.percentage }); });
+    awarded.push({ place, winners });
+  };
+
+  /**
+   * يفصل الفائزين المؤكّدين عن المتعادلين على آخر مقعد، ويطبّق قرار الإدارة إن وُجد.
+   *
+   * `sorted` مرتّبةٌ بالفعل، و`boundary` موضعُ آخر مقعد. والمجموعة المتعادلة هي امتدادُ
+   * المتساوين حول ذلك الموضع — قد يبدأ قبله وينتهي بعده.
+   */
+  const settle = (place: AwardPlace, sorted: Ranked[]) => {
+    const boundary = Math.min(place.seats, sorted.length) - 1;
+    if (boundary < 0) return;
+    let start = boundary;
+    while (start > 0 && indistinguishable(sorted[start - 1], sorted[boundary])) start -= 1;
+    let end = boundary + 1;
+    while (end < sorted.length && indistinguishable(sorted[end], sorted[boundary])) end += 1;
+
+    const clear = sorted.slice(0, start);
+    const atCutoff = sorted.slice(start, end);
+    const group = tieNeedingDecision({
+      place,
+      seatsRemaining: Math.max(0, place.seats - clear.length),
+      percentage: sorted[boundary].percentage,
+      rulesTried: rules,
+      tied: atCutoff.map(c => ({ participantId: c.participantId, participantCode: c.participantCode })),
+    });
+    if (!group) { win(place, [...clear, ...atCutoff]); return; }
+
+    const decision = decisionForTie(group, input.tieDecisions);
+    contested.push({ place, group, decision });
+    if (!decision) {
+      /*
+       * المتعادلون يخرجون من مجموعة المراكز الأدنى ولا ينالون هذا: مركزُهم موقوف.
+       * وإنزالهم إلى ما دونه حكمٌ بالخسارة قبل أن يُنظر في تعادلهم.
+       */
+      win(place, clear);
+      atCutoff.forEach(c => { taken.add(c.participantId); standings.set(c.participantId, { kind: 'contested', place, percentage: c.percentage }); });
+      return;
+    }
+    const { winners } = tieWinners(group, decision);
+    const byId = new Map(atCutoff.map(c => [c.participantId, c]));
+    const decided = winners.map(id => byId.get(id)).filter((c): c is Ranked => !!c);
+    win(place, [...clear, ...decided]);
+    // ومن سقط بالقرار يبقى في مجموعة ما دون المركز، فينافس على ما تحته كأيّ متسابق.
+  };
 
   for (const place of policy.places) {
     const pool = ranked.filter(c => !taken.has(c.participantId));
     const qualified = pool.filter(c => c.percentage >= place.minimumPercentage);
     if (!qualified.length) {
-      if (place.whenUnmet === 'award_anyway' && pool.length) {
-        const top = pool[0];
-        // التعادل على الحد نفسه يُمنح معًا، ولو تجاوز عدد المقاعد.
-        const winners = pool.filter(c => c.percentage === top.percentage);
-        winners.forEach(w => { taken.add(w.participantId); standings.set(w.participantId, { kind: 'place', place, percentage: w.percentage }); });
-        awarded.push({ place, winners });
-        continue;
-      }
+      if (place.whenUnmet === 'award_anyway' && pool.length) { settle(place, pool); continue; }
       withheld.push({
         place,
         bestPercentage: pool.length ? pool[0].percentage : null,
@@ -159,10 +248,7 @@ export function resolveAwards(input: { policy: AwardPolicy; candidates: AwardCan
       });
       continue;
     }
-    const cutoff = qualified[Math.min(place.seats, qualified.length) - 1].percentage;
-    const winners = qualified.filter(c => c.percentage >= cutoff);
-    winners.forEach(w => { taken.add(w.participantId); standings.set(w.participantId, { kind: 'place', place, percentage: w.percentage }); });
-    awarded.push({ place, winners });
+    settle(place, qualified);
   }
 
   for (const candidate of ranked) {
@@ -172,13 +258,19 @@ export function resolveAwards(input: { policy: AwardPolicy; candidates: AwardCan
       : { kind: 'participant', percentage: candidate.percentage });
   }
 
-  return { awarded, withheld, standings };
+  return { awarded, withheld, contested, standings };
 }
 
 /** العبارة التي تُكتب للمتسابق في شهادته وفي صفحته. */
 export function describeStanding(standing: AwardStanding | undefined, arabic: boolean): string {
   if (!standing) return arabic ? 'شهادة مشاركة' : 'Certificate of participation';
   if (standing.kind === 'place') return arabic ? standing.place.titleArabic : standing.place.titleEnglish;
+  if (standing.kind === 'contested') {
+    /* لا يُقال «مركز» فيُطبع في شهادة، ولا «ضمن المنافسة» فيُقرأ سقوطًا. */
+    return arabic
+      ? `${standing.place.titleArabic} — تعادل عند ${standing.percentage}٪، بانتظار قرار الإدارة`
+      : `${standing.place.titleEnglish} — tied at ${standing.percentage}%, awaiting the administration's decision`;
+  }
   if (standing.kind === 'competing') {
     return arabic
       ? `ضمن المنافسة — بلغت ${standing.percentage}٪ من الدرجة الكاملة`

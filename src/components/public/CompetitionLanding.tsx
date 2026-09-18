@@ -71,11 +71,13 @@ export const CompetitionLanding: React.FC = () => {
       startDate: c.startDate, endDate: c.endDate, status: c.status,
       categories: (c.categories || []).map(x => ({ id: x.id, name: x.name, nameArabic: x.nameArabic })),
       awards: c.policy?.results?.awards,
+      tieBreakRules: c.ruleSet?.tieBreakRules,
     })),
     results: store.results.map(r => ({
       competitionId: r.competitionId, categoryId: r.categoryId, participantId: r.participantId,
       participantCode: r.participantCode, participantName: r.participantName,
       participantNameArabic: r.participantNameArabic, finalScore: r.finalScore, status: r.status,
+      criterionScores: r.criterionScores, penaltyCount: r.penaltyCount,
     })),
     excludeCompetitionId: competition.id,
   }), [store.competitions, store.results, competition.id]);
@@ -231,7 +233,12 @@ export const CompetitionLanding: React.FC = () => {
                               {ar ? entry.reasonArabic : entry.reasonEnglish}
                             </li>
                           ))}
-                          {!category.winners.length && !category.withheld.length && (
+                          {category.contested.map(entry => (
+                            <li key={`contested-${entry.rank}`} className={`text-[11px] font-bold leading-5 ${entry.decided ? 'text-[#1b5346]' : 'text-[#8a4b36]'}`}>
+                              {ar ? entry.noteArabic : entry.noteEnglish}
+                            </li>
+                          ))}
+                          {!category.winners.length && !category.withheld.length && !category.contested.length && (
                             <li className="text-[11px] text-[#6b675d]">{ar ? 'لا سجل معتمد لهذا الفرع.' : 'No sealed record for this branch.'}</li>
                           )}
                         </ul>

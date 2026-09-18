@@ -5,6 +5,7 @@
 // source of truth for what MIZAN keeps in local state; store.ts imports it and nothing here
 // carries logic. Grouping is by domain to keep the surface navigable.
 import type { CompetitionClockState } from './competition-clock';
+import type { TieDecision } from './tie-resolution';
 import type { QueueWaitSample, SessionTempoSample } from './session-tempo';
 import {
   User, Role, Organization, Competition, Participant, Committee, JudgeProfile, ResultRecord,
@@ -67,6 +68,14 @@ export interface ActiveSessionState {
   secureQuestionCount?: number;
 }
 
+/** قرارُ تعادلٍ كما يُحفظ: القرار نفسه، ومكانُه من المسابقة، واسمُ من اتّخذه. */
+export interface TieDecisionRecord extends TieDecision {
+  id: string;
+  competitionId: string;
+  categoryId: string;
+  decidedByName: string;
+}
+
 export interface AppStoreState {
   // Identity & tenancy
   currentUser: User;
@@ -91,6 +100,13 @@ export interface AppStoreState {
   auditLogs: AuditEvent[];
   incidents: IncidentRecord[];
   appeals: AppealRecord[];
+  /**
+   * قرارات الإدارة في التعادلات. راجع `lib/tie-resolution.ts`.
+   *
+   * تُحفظ سجلًّا لا حالةَ عرض: المركز الموقوف يبقى موقوفًا عبر الأجهزة والجلسات حتى
+   * يُسجَّل قرارٌ بسببه، ويبقى القرار منسوبًا إلى صاحبه بعد الإعلان.
+   */
+  tieDecisions: TieDecisionRecord[];
   // Runtime flags
   isOffline: boolean;
   emergencyFrozen: boolean;
