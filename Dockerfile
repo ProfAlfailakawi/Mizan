@@ -42,7 +42,10 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=8080 NPM_CONFIG_UPDATE_NOTIFIER=false
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
+# Firebase Auth declares a React-Native persistence adapter as a peer. npm may otherwise
+# auto-install the whole React Native/Metro toolchain into Cloud Run although Mizan never
+# executes it. Keep the runtime image equal to the audited web/server dependency surface.
+RUN npm ci --omit=dev --omit=peer --ignore-scripts --no-audit --no-fund && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
 # نصّ الروايات الاثنتي عشرة أثرٌ مثبَّت يُقرأ من القرص وقت التشغيل، لا يُجلب من شبكة.
