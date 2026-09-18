@@ -1,0 +1,135 @@
+name: فحوصُ الجودة المجدولة — ما كان يُشغَّل باليد
+
+# سبعةُ فحوصٍ كانت في المستودع ولا تعمل في أيّ سير عمل.
+#
+# وذلك أسوأ من ألّا تكون موجودة: تُكتب مرّة، ثم تُنسى، ثم تشيخ، ثم تنكسر بصمت، ثم
+# يُكتشف أنها لم تعمل منذ شهور — وهي تطمئن بلا وجهٍ للطمأنينة. وقد شُغِّلت كلُّها
+# باليد على `51d1d56` ونجحت، **لكنّ تشغيلًا يدويًّا على رأسٍ بعينه ليس جدولة**.
+#
+# فتُجدوَل هنا. ولا تدخل مسارَ الدفعات: فحصٌ يحتاج متصفّحًا وبناءً كاملًا يُبطّئ كلّ
+# دفعةٍ حتى يُتحايل عليه، وهذه الفحوصُ موضوعُها المنتجُ المبنيُّ لا فرقُ الدفعة.
+#
+# ولا سرَّ في هذا الملفّ: كلُّها تعمل على بياناتٍ تجريبية وعلى ما يُبنى هنا.
+
+on:
+  schedule:
+    # كل يومٍ في الخامسة صباحًا بتوقيت UTC — بعد بوّابات الإطلاق بساعة، فلا يتزاحمان.
+    - cron: '0 5 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizan-scheduled-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── ما لا يحتاج متصفّحًا ────────────────────────────────────────────────────
+  headless-checks:
+    name: المصفوفة والجاهزية ويومُ التشغيل
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+
+      # مصفوفةُ الإصدار هي مَن يحمل حكمَ الاكتمال (١١/٢٠ اليوم)، وبوّابةُ R2 تحمل
+      # النزاهةَ وحدها. فخلطُهما هو ما صنع بوّابةً لا تخضرّ أبدًا.
+      - name: مصفوفة إصدار العشرين
+        run: npm run quran:release-matrix
+      - name: جاهزية الذكاء القرآني
+        run: npm run quran:readiness
+      - name: يومُ التشغيل الكامل
+        run: npm run qa:live-day
+
+  # ── ما يحتاج متصفّحًا ولا يحتاج خادمًا ──────────────────────────────────────
+  browser-checks:
+    name: الوثيقة المطبوعة ووضوحُ القاعة
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+      - name: تثبيت Chromium
+        run: npx playwright install --with-deps chromium
+
+      # كلاهما يبني صفحتَه بـsetContent، فلا يحتاج خادمًا.
+      - name: الوثيقة العربية على الورق
+        run: npm run qa:print-document
+      - name: وضوحُ الشاشة من آخر القاعة
+        run: npm run qa:venue-legibility
+
+      - name: احفظ المخرجات عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: qa-browser-output
+          path: |
+            dist/print-document-qa
+          if-no-files-found: ignore
+
+  # ── ما يحتاج متصفّحًا وخادمَ معاينة ─────────────────────────────────────────
+  product-surface:
+    name: سطحُ المنتج ويومُ المسابقة في متصفّح
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+      - name: تثبيت Chromium
+        run: npx playwright install --with-deps chromium
+      - name: البناء
+        run: npm run build
+
+      # الانتظارُ بالاستجابة لا بالتوقيت: رقمٌ ثابت يمرّ أحيانًا ويسقط أحيانًا.
+      - name: تشغيل خادم المعاينة
+        run: |
+          npx vite preview --port 4173 --host 127.0.0.1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then echo "المعاينة جاهزة بعد ${i}ث"; exit 0; fi
+            sleep 1
+          done
+          echo "PREVIEW_DID_NOT_START: الخادم لم يستجب خلال ٦٠ ثانية"; exit 1
+
+      # هذان يقودان المنتجَ المبنيَّ في متصفّحٍ حقيقيّ. وقسمُ التسجيل في الأول يُتخطّى
+      # باسمه هنا: رابطُ التسجيل يجلب من الخادم دائمًا، ولا واجهة `/api/public` في المعاينة.
+      - name: سطحُ النطاق والأسئلة في ثلاثة مقاسات
+        run: npm run qa:scope-visual
+      - name: يومُ المسابقة من الموضع الأول إلى قفل التقييم
+        run: npm run qa:competition-day
+      # وثامنٌ لم يكن في القائمة أصلًا: كشفه الحارسُ حين اشتُقّت القائمةُ من
+      # `package.json` بدل أن تُكتب بيد. ويقيس ما لا يقيسه غيرُه: تمدّدَ الشاشات على
+      # عرض هاتفٍ ٣٩٠ بكسل.
+      - name: لا تمدّد أفقيّ على الهاتف
+        run: npm run qa:phone-overflow
+
+      - name: احفظ اللقطات عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: qa-surface-screenshots
+          path: |
+            dist/scope-visual-qa
+            dist/competition-day-qa
+          if-no-files-found: ignore
