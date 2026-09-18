@@ -2,7 +2,7 @@ import type { Competition, CompetitionPolicy, ContradictionIssueRecord, PolicyCo
 import { getCompetitionPolicy } from './competition-config';
 import { hashCanonical } from './trust-protocol';
 import { certifiedCapabilityFor, sourceUsableForCompetition, isReadingDelivered } from './scientific-core';
-import { categoryReadingsQuestionSafe, categoryUnsafeReadings, readingQuestionBlockers } from './quran-locus-crosswalk';
+import { categoryReadingsQuestionSafe, categoryUnsafeReadings, readingQuestionBlockers } from './quran-crosswalk-readiness';
 import { categoryScopeOf } from './scope-engine';
 import { scopeAyahCount } from './quran-scope';
 import { resolveCanonicalRawiId } from './canonical-readings';

@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { CONSENT_BACKED_DOCUMENTS, consentVersionFor, legalConfigFromEnv, type LegalDocumentKind } from '../src/lib/legal-documents';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
 
@@ -70,8 +71,20 @@ export class PublicRegistrationService{
     const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:categoryReading,institution:'',specialNeeds:false,documents:[],status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,journeyTokenCustody:'holder_only',createdAt};
     const journeyBase={organizationId:competition.organizationId,competitionId:competition.id,participantId,competitionName:competition.name,competitionNameArabic:competition.nameArabic,participantCode:code,participantName:participant.fullName,participantNameArabic:participant.fullNameArabic,status,arrivalSlot:null,queueNumber:null,venueName:competition.venueName||null,committee:null,result:null,certificate:null,revoked:false,updatedAt:createdAt};
     const documents=[{path:`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${participantId}`,data:participant as unknown as Record<string,unknown>},{path:`public_journeys/${journeyAccessTokenHash}`,data:{...journeyBase,audience:'participant',tokenHashVersion:'sha256-v1'}},{path:`public_journeys/${guardianAccessTokenHash}`,data:{...journeyBase,audience:'guardian',tokenHashVersion:'sha256-v1'}}];
+    /*
+     * نسخةُ الموافقة هي نسخةُ **الوثيقة** لا نسخةُ لائحة المسابقة.
+     *
+     * كانت تُكتب `policy.version`، فيقول الأثرُ إن فلانًا وافق على «الشروط نسخة ٧» —
+     * وسبعةٌ رقمُ اللائحة، ولا شروطَ منشورةً أصلًا. فالأثرُ يشهد بما لم يقع.
+     * وما لم يُنشر يُكتب باسمه صراحةً، ويرفعه فحصُ ما قبل الانطلاق حاجزًا.
+     */
+    const legal=legalConfigFromEnv(process.env as Record<string,string|undefined>);
+    const consentDocumentVersion=(kind:string)=>
+      (CONSENT_BACKED_DOCUMENTS as readonly string[]).includes(kind)
+        ? consentVersionFor(legal,kind as LegalDocumentKind)
+        : `policy:${policy.version}`;
     const consentKinds=['terms','privacy',...(policy.judging.requireAudioRecording&&input.consents.audioRecording?['audio_recording']:[]),...(policy.privacy.allowAiProcessing&&input.consents.aiProcessing?['ai_processing']:[]),...(guardianRequired?['guardian']:[])];
-    for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,version:policy.version,accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
+    for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,version:consentDocumentVersion(kind),accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
     await this.store.create(documents);
     const base=origin.replace(/\/$/,'');return {participant:{id:participant.id,code:participant.code,status:participant.status,competitionId:participant.competitionId,fullName:participant.fullName,fullNameArabic:participant.fullNameArabic},journeyUrl:`${base}/#journey?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(journeyToken)}`,guardianUrl:`${base}/#guardian?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(guardianToken)}`,journeyAccessToken:journeyToken,guardianAccessToken:guardianToken};
   }

@@ -6,6 +6,7 @@ declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
   export const FlaskConical: any;
+  export const BookCopy: any;
   export const Archive: any;
   export const Ban: any;
   export const ClipboardCheck: any;

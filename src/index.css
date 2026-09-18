@@ -119,10 +119,41 @@
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+/* ── الطباعة: وثيقةٌ عربية تُحفظ PDF من المتصفّح ─────────────────────────────────
+   لا مكتبةَ PDF عمدًا. مكتباتُ JavaScript تكسر وصلَ الحروف العربية وترتيبَها الثنائي،
+   فتخرج الشهادةُ بحروفٍ منفصلة أو مقلوبة — وشهادةٌ باسمٍ مكسور أسوأ من لا شهادة.
+   وطباعةُ المتصفّح تستعمل محرّكَ النصّ نفسَه الذي رسم الشاشة، فيخرج الاسمُ كما يُقرأ.
+
+   والمشكلةُ التي كانت: `window.print()` يطبع الصفحةَ كلَّها — الشهادةُ في نافذةٍ فوق
+   لوحةٍ كاملة، فتخرج الورقةُ وفيها القوائمُ والأزرار وما خلفها. فالطباعةُ صارت تقتصر
+   على ما يُعلَن وثيقةً بـ`data-mizan-print`. */
+@page { size: A4; margin: 18mm; }
+
 @media print {
   body { background: white !important; color: black !important; }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
+
+  /* ما لا يُعلَن وثيقةً لا يُطبع. و`visibility` لا `display` كي لا ينهار تخطيطُ الآباء. */
+  body:has([data-mizan-print]) * { visibility: hidden; }
+  body:has([data-mizan-print]) [data-mizan-print],
+  body:has([data-mizan-print]) [data-mizan-print] * { visibility: visible; }
+
+  [data-mizan-print] {
+    position: absolute; inset-block-start: 0; inset-inline-start: 0;
+    width: 100%; max-width: none; margin: 0; padding: 0;
+    background: white !important; color: black !important;
+    border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+    backdrop-filter: none !important;
+  }
+  /* الظلالُ والخلفياتُ الملوّنة تستهلك الحبر ولا تضيف معنًى على الورق. */
+  [data-mizan-print] * { box-shadow: none !important; }
+  [data-mizan-print] .mizan-surface,
+  [data-mizan-print] .mizan-panel { background: white !important; border-color: #999 !important; }
+
+  /* لا يُقطع صفٌّ ولا عنوانٌ بين صفحتين. */
+  [data-mizan-print] tr, [data-mizan-print] .mizan-print-keep { break-inside: avoid; }
+  [data-mizan-print] h1, [data-mizan-print] h2, [data-mizan-print] h3 { break-after: avoid; }
 }
 
 /* Quiet Authority — visual completion pass */
