@@ -30,7 +30,7 @@ import {
   RecitationDigitalTwinRecord, MutashabihatTrapRecord, MultiRiwayahRoutingDecisionRecord,
   AppealCapsuleRecord, BlindChamberLiftRecord, BlindAnchorCalibrationRecord, IntegrityEntropySignalRecord,
   ScientificCircuitBreakerRecord, MizanIntegrityPassportRecord, IntegrityCinemaRecord,
-  CertifiedVenueSealRecord, QuestionSelection, JudgeEvent,
+  CertifiedVenueSealRecord, QuestionSelection, JudgeEvent, RecitedPassageRecord,
   ParticipantScopeRecord, QuestionModelRecord, QuestionModelBatchRecord, ScopeSimulationRecord, ScopeEngineSealRecord,
   QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord,
 } from '../types';
@@ -114,6 +114,8 @@ export interface AppStoreState {
   backups: BackupRecord[];
   retentionJobs: RetentionJob[];
   supportSessions: SupportSession[];
+  /* أين تُليت مواضع اليوم — يُكتب عند اكتمال كل جلسة، وتُبنى منه خريطة القاعة. */
+  recitationLedger: RecitedPassageRecord[];
   remoteChecks: RemoteSessionCheck[];
   audioRecordings: AudioRecordingRecord[];
   featureFlags: FeatureFlagRecord[];

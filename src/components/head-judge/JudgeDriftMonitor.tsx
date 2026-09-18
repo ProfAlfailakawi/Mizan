@@ -15,13 +15,47 @@ export const JudgeDriftMonitor: React.FC = () => {
   const ar = store.language === 'ar';
   const [ackd, setAckd] = useState<Record<string, boolean>>({});
 
-  // Production truth only: no synthetic judges and no derived preview events. Drift is meaningful only
-  // after enough real judging events exist for the active panel; before that we show an explicit empty state.
-  const events: JudgeEventLike[] = useMemo(() => store.activeSession.events.map((e) => ({
+  /*
+   * الأحداث الحقيقية، لا أحداث الجلسة الجارية وحدها.
+   *
+   * كان العدّاد يقرأ `activeSession.events` فقط — وهي ملاحظات الجلسة القائمة في هذا
+   * الجهاز، تُمحى بانتهائها. فيوم عملٍ كامل بمئتَي جلسةٍ مقفلة لا يترك للعدّاد شيئًا،
+   * ويبقى «لا توجد بيانات تحكيم كافية» معروضًا إلى آخر النهار — وهو ما يقرؤه رئيس
+   * التحكيم أنه عطل، وهو في الحقيقة مصدرٌ ضيّق.
+   *
+   * وما أُضيف ليس بيانات مصطنعة: كل تسليمٍ مقفل حكمٌ بشريّ وقع فعلًا، وخصمه الكلي
+   * (الدرجة الكاملة ناقص ما مُنح) هو شدّة ذلك الحكم، ولحظته `submittedAt`. والمقارنة
+   * تبقى ذاتية كما هي: كل محكّم مع صباحه هو، ومرجع الزمن أول تسليمٍ له في يومه.
+   *
+   * وتُقدَّم ملاحظات الجلسة الجارية حين تكفي وحدها، فتبقى الإشارة لحظيةً في قاعةٍ تعمل.
+   */
+  const liveEvents: JudgeEventLike[] = useMemo(() => store.activeSession.events.map((e) => ({
     judgeId: e.judgeId,
     relativeSeconds: e.relativeSeconds,
     penalty: e.penalty,
   })), [store.activeSession.events]);
+
+  const submissionEvents: JudgeEventLike[] = useMemo(() => {
+    const locked = store.judgeSubmissions.filter(s => s.locked && s.submittedAt);
+    if (!locked.length) return [];
+    const maxScore = (store.competition.ruleSet?.criteria || []).reduce((sum, c) => sum + (Number(c.maxScore) || 0), 0) || 100;
+    const firstByJudge = new Map<string, number>();
+    for (const s of locked) {
+      const at = Date.parse(s.submittedAt);
+      if (!Number.isFinite(at)) continue;
+      const seen = firstByJudge.get(s.judgeId);
+      if (seen === undefined || at < seen) firstByJudge.set(s.judgeId, at);
+    }
+    return locked.flatMap(s => {
+      const at = Date.parse(s.submittedAt);
+      const base = firstByJudge.get(s.judgeId);
+      if (!Number.isFinite(at) || base === undefined) return [];
+      return [{ judgeId: s.judgeId, relativeSeconds: Math.round((at - base) / 1000), penalty: Math.max(0, maxScore - Number(s.totalScore || 0)) }];
+    }).sort((a, b) => a.relativeSeconds - b.relativeSeconds);
+  }, [store.judgeSubmissions, store.competition.ruleSet]);
+
+  const events = liveEvents.length >= 8 ? liveEvents : submissionEvents;
+  const source: 'live' | 'submissions' = events === liveEvents ? 'live' : 'submissions';
 
   const realJudgeIds = useMemo(() => new Set(events.map(e => e.judgeId)), [events]);
   const enoughRealEvidence = store.judges.length > 0 && realJudgeIds.size > 0 && events.length >= 8;
@@ -44,10 +78,14 @@ export const JudgeDriftMonitor: React.FC = () => {
             <p className="text-[11px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
           </div>
         </div>
-        <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
+        <div className="flex flex-col items-end gap-1.5">
+          <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
+          {/* من أين قُرئ هذا الرقم: ملاحظات الجلسة القائمة، أم أحكام اليوم المقفلة. */}
+          {enoughRealEvidence && <span className="text-[9px] font-bold text-[#6b706c]">{source === 'live' ? (ar ? 'من ملاحظات الجلسة الجارية' : 'from the live session') : (ar ? `من ${events.length} حكمًا مقفلًا اليوم` : `from ${events.length} locked scores today`)}</span>}
+        </div>
       </div>
 
-      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحداث فعلية من المحكمين. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judge events arrive. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
+      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحكام فعلية من المحكمين — من ملاحظات الجلسة الجارية أو من أحكام اليوم المقفلة. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judging arrives — live session marks or today’s locked scores. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
       {enoughRealEvidence && <div className="mt-5 grid md:grid-cols-2 gap-3">
         {signals.map((s) => {
           const judgeEvents = events.filter((e) => e.judgeId === s.judgeId).sort((a, b) => a.relativeSeconds - b.relativeSeconds);

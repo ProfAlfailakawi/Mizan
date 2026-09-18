@@ -18,6 +18,7 @@ import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 import { PracticeStudio } from './PracticeStudio';
 import { WarmupSanctuary } from './WarmupSanctuary';
 import { TrialRun } from './TrialRun';
+import { RecitationResultCard } from './RecitationResultCard';
 import { deliveryReadingKeyFor, surahNameArabic } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
 
@@ -95,6 +96,9 @@ export const ParticipantDashboard: React.FC = () => {
  // التدرّب يكون على رواية المتسابق نفسها؛ رواية بلا حزمة تسليم لا تفتح الاستوديو أصلًا.
  const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
  const passportRows=participantPassport.filter(x=>x.participantId===participant.id&&x.competitionId===competition.id);
+ /* أحكام محكّميه المستقلّين على جلسته — منها يُقاس وفاق اللجنة في بطاقة النتيجة. */
+ const panelScores=store.judgeSubmissions.filter(x=>x.participantId===participant.id&&x.locked).map(x=>Number(x.totalScore)).filter(Number.isFinite);
+ const panelMaxScore=(competition.ruleSet?.criteria||[]).reduce((sum,c)=>sum+(Number(c.maxScore)||0),0)||100;
 
  /*
   * الاستعداد لا يُغلق إلا لحظة وقوفه أمام اللجنة.
@@ -162,7 +166,25 @@ export const ParticipantDashboard: React.FC = () => {
 
   {participant.status==='in_session'&&<section className="mizan-surface p-7 text-center bg-[#fffefb]"><span className="inline-flex w-3 h-3 rounded-full bg-[#2F6555] animate-pulse"/><h2 className="text-2xl font-black mt-4">{ar?'اختبارك جارٍ الآن':'Your recitation is in progress'}</h2><p className="text-xs text-[#646965] mt-2">{ar?'المحكم يستمع. لا تحتاج إلى أي إجراء.':'The judges are listening. No action is required from you.'}</p></section>}
 
-  {(participant.status==='tested'||participant.status==='certified'||participant.status==='appealed')&&<section className="mizan-surface p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'بعد الاختبار':'AFTER RECITATION'}</div><h2 className="text-xl font-black mt-1">{resultVisible&&result?(ar?'نتيجتك':'Your result'):(ar?'تم حفظ تقييمك':'Assessment secured')}</h2></div><ShieldCheck className="w-6 h-6 text-[#2F6555]"/></div>{resultVisible&&result?<><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">{result.finalScore.toFixed(2)}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الدرجة':'Score'}</div></div><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">#{result.rank||'—'}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الترتيب':'Rank'}</div></div></div>{standing&&<div className="mt-3 rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4 text-center"><div className="text-sm font-black text-[#214C40]">{describeStanding(standing,ar)}</div><p className="mt-1 text-[10px] leading-5 text-[#3c4541]">{ar?'المركز يُنال بنسبة معلنة قبل المسابقة؛ ومن لم يبلغها لا يُمنح المركز ولا يُنقل إليه.':'A place is earned against a percentage published before the competition; nobody below it receives the place.'}</p></div>}</>:<p className="text-sm text-[#646965] mt-4">{ar?'سياسة هذه المسابقة تؤجل إظهار النتائج حتى الموعد المعتمد.':'This competition delays result visibility until the approved release point.'}</p>}<div className="mt-5 flex flex-wrap gap-4 text-xs font-bold text-[#214C40]">{policy.appeals.enabled&&resultVisible&&<button onClick={()=>setShowAppeal(true)} className="hover:underline">{ar?'تقديم اعتراض وفق اللائحة':'Appeal under competition policy'}</button>}<button onClick={()=>{const receipt=store.getFairnessReceipt(participant.id);if(!receipt)return;const blob=new Blob([JSON.stringify(receipt,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`mizan-fairness-${participant.code}.json`;a.click();URL.revokeObjectURL(a.href)}} className="hover:underline">{ar?'إيصال النزاهة':'Fairness receipt'}</button></div></section>}
+  {(participant.status==='tested'||participant.status==='certified'||participant.status==='appealed')&&<section className="mizan-surface p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'بعد الاختبار':'AFTER RECITATION'}</div><h2 className="text-xl font-black mt-1">{resultVisible&&result?(ar?'نتيجتك':'Your result'):(ar?'تم حفظ تقييمك':'Assessment secured')}</h2></div><ShieldCheck className="w-6 h-6 text-[#2F6555]"/></div>{resultVisible&&result?<>
+   {/*
+     * بطاقة النتيجة: الوجه الذي يخرج من ميزان إلى الناس.
+     *
+     * كانت النتيجة رقمين باهتين في صندوقين رماديين، ومعها أقوى ما تملكه المنظومة — وفاق
+     * اللجنة وختم السلسلة — لا يُقال أصلًا. وهذه اللحظة بعينها هي التي يُصوّرها المتسابق
+     * وأهله ويشاركونها، فتُقال فيها الحقيقة كاملةً وبشكلٍ يليق بها. ولا تُفتح قبل أن
+     * تصير النتيجة معلنةً بسياسة المسابقة، فلا تسبق البطاقةُ الإعلان.
+     */}
+   <div className="mt-6"><RecitationResultCard ar={ar}
+    participantName={ar?participant.fullNameArabic:participant.fullName}
+    participantCode={participant.code}
+    riwaya={participant.riwaya}
+    categoryName={ar?(category?.nameArabic||category?.name):category?.name}
+    finalScore={result.finalScore}
+    maxScore={panelMaxScore}
+    judgeScores={panelScores}
+    sealed={result.status==='sealed'||result.status==='published'}/></div>
+   <div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">{result.finalScore.toFixed(2)}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الدرجة':'Score'}</div></div><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">#{result.rank||'—'}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الترتيب':'Rank'}</div></div></div>{standing&&<div className="mt-3 rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4 text-center"><div className="text-sm font-black text-[#214C40]">{describeStanding(standing,ar)}</div><p className="mt-1 text-[10px] leading-5 text-[#3c4541]">{ar?'المركز يُنال بنسبة معلنة قبل المسابقة؛ ومن لم يبلغها لا يُمنح المركز ولا يُنقل إليه.':'A place is earned against a percentage published before the competition; nobody below it receives the place.'}</p></div>}</>:<p className="text-sm text-[#646965] mt-4">{ar?'سياسة هذه المسابقة تؤجل إظهار النتائج حتى الموعد المعتمد.':'This competition delays result visibility until the approved release point.'}</p>}<div className="mt-5 flex flex-wrap gap-4 text-xs font-bold text-[#214C40]">{policy.appeals.enabled&&resultVisible&&<button onClick={()=>setShowAppeal(true)} className="hover:underline">{ar?'تقديم اعتراض وفق اللائحة':'Appeal under competition policy'}</button>}<button onClick={()=>{const receipt=store.getFairnessReceipt(participant.id);if(!receipt)return;const blob=new Blob([JSON.stringify(receipt,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`mizan-fairness-${participant.code}.json`;a.click();URL.revokeObjectURL(a.href)}} className="hover:underline">{ar?'إيصال النزاهة':'Fairness receipt'}</button></div></section>}
   </>}
 
   {activeTab==='prepare'&&<>

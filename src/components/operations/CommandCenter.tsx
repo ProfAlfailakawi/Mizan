@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { Ratio } from '../design-system/Ratio';
-import {bilingualName,  arCount } from '../../lib/ui-language';
+import {bilingualName,  arCount, reviewReasonLabel, uiToken } from '../../lib/ui-language';
 import { AlertTriangle, BadgeCheck, Clock3, Gauge, Mic2, RadioTower, Server, UsersRound, WifiOff, Sparkles, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
-import { incidentTitle } from '../../lib/incident-language';
+import { INCIDENT_TYPE_ARABIC, incidentTitle } from '../../lib/incident-language';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { Pictogram } from '../design-system/Pictogram';
@@ -13,6 +13,7 @@ import { WaveDistribution } from './WaveDistribution';
 import { DayRetrospective } from './DayRetrospective';
 import { HallScreenPublisher } from './HallScreenPublisher';
 import { ContinuityRecovery } from './ContinuityRecovery';
+import { ExceptionBoard } from './ExceptionBoard';
 import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
 import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
@@ -41,14 +42,26 @@ export const CommandCenter: React.FC = () => {
  useEffect(()=>{let live=true;const id=s.activeSession.secureRuntimeSessionId;if(!id){setCorridor(null);return}const load=()=>void fetchCustodyCorridor(id).then(x=>live&&setCorridor(x)).catch(()=>live&&setCorridor(null));load();const timer=window.setInterval(load,5000);return()=>{live=false;window.clearInterval(timer)}},[s.activeSession.secureRuntimeSessionId]);
  const waiting=participants.filter(p=>p.status==='in_queue').length; const testing=participants.filter(p=>p.status==='in_session').length; const done=participants.filter(p=>p.status==='tested'||p.status==='certified').length;
  const sim=useMemo(()=>runSimulation(committees.length,30),[committees.length,participants.length]);
- const alerts=[...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,title:incidentTitle(i,ar),kind:'incident'})),...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,title:ar?`مراجعة ${r.participantCode}`:`Review ${r.participantCode}`,kind:'review'})),...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,title:d.name,kind:'device'}))];
+ /*
+  * كل حالةٍ باسمها وموضعها ووقتها.
+  *
+  * كانت المراجعات تُختصر إلى «مراجعة A-104» بلا سبب ولا لجنة ولا وقت، فثلاث مراجعات
+  * تبدو ثلاثة أسطر متطابقة لا يفرّق بينها شيء — ومدير التشغيل لا يستطيع أن يقرّر من
+  * سطرٍ كهذا شيئًا. وما يلزم للقرار: ما هي، وأين، ومتى، وكم شدّتها.
+  */
+ const committeeCode=(id?:string)=>committees.find(c=>c.id===id)?.code||'';
+ const alerts=[
+  ...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,kind:'incident' as const,title:incidentTitle(i,ar),where:ar?INCIDENT_TYPE_ARABIC[i.type]:i.type,at:i.lastOccurredAt||i.reportedAt,severity:i.severity})),
+  ...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,kind:'review' as const,title:ar?`${r.participantCode} — ${reviewReasonLabel(r.reason,ar)}`:`${r.participantCode} — ${reviewReasonLabel(r.reason,ar)}`,where:committeeCode(r.committeeId),at:undefined,severity:r.severity})),
+  ...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,kind:'device' as const,title:d.name,where:d.zone||committeeCode(d.committeeId),at:d.lastSeenAt,severity:d.status==='offline'?'critical':'moderate'})),
+ ];
  const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);
  /* 1450px تترك صفوف «عنوان … زر» ممتدّةً على عرض الشاشة، فيسافر النظر ألف بكسل بين شيئين
    مرتبطين. العرض هنا يطابق بقيّة البوابات (1250) فتبقى العلاقة بين الطرفين مقروءة. */
  return <div className="max-w-[1250px] mx-auto px-4 sm:px-6 py-7 space-y-4">
   <section className="mizan-surface p-6 sm:p-8"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5"><div className="flex items-center gap-4"><Pictogram icon={alerts.length?AlertTriangle:BadgeCheck} size="lg" tone={alerts.length?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز العمليات':'MIZAN COMMAND'}</div><h1 className="text-2xl sm:text-4xl font-black mt-1">{alerts.length?(ar?`${arCount(alerts.length,{one:'حالة واحدة تحتاجك',two:'حالتان تحتاجانك',plural:n=>`${n} حالات تحتاجك`,many:n=>`${n} حالة تحتاجك`})}`:`${alerts.length} exception${alerts.length===1?'':'s'} need you`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h1><p className="text-xs text-[#636864] mt-2">{alerts.length?(ar?'الروتين يعمل وحده. ركّز هنا.':'Routine is automated. Focus here.'):(ar?'لا تدخل مطلوب.':'No intervention required.')}</p></div></div><Button variant="outline" onClick={()=>setExpanded(v=>!v)} icon={<ChevronDown className={`w-4 h-4 transition ${expanded?'rotate-180':''}`}/>}>{ar?'التدفق':'Flow'}</Button></div></section>
 
-  {alerts.length>0&&<section className="mizan-surface p-5 sm:p-6"><div className="mizan-kicker">{ar?'الحالات الاستثنائية':'EXCEPTIONS'}</div><div className="mt-2 divide-y divide-[#e5e3dc]">{alerts.slice(0,8).map(x=><div key={`${x.kind}-${x.id}`} className="py-3 flex items-center gap-3"><span className={`w-2 h-2 rounded-full shrink-0 ${x.kind==='incident'?'bg-[#A34D43]':x.kind==='device'?'bg-[#496477]':'bg-[#9B7542]'}`}/><div className="text-sm font-bold flex-1 min-w-0 truncate">{x.title}</div><Badge variant={x.kind==='incident'?'rose':x.kind==='device'?'blue':'amber'}>{ALERT_KIND[x.kind]?.[ar?'ar':'en']||x.kind}</Badge></div>)}</div></section>}
+  <ExceptionBoard items={alerts} ar={ar} severityLabel={v=>uiToken(v,ar)}/>
 
   <ContinuityRecovery/>
 

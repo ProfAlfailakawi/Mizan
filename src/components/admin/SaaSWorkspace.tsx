@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import { Field } from '../design-system/Field';
 import {Activity,AlertTriangle,BadgeCheck,Building2,Check,ChevronLeft,Database,FileSearch,Globe2,HardDrive,KeyRound,Layers3,Pencil,Plus,Search,ShieldCheck,Trash2,UsersRound,WalletCards,X} from 'lucide-react';
 import {auth} from '../../lib/firebase';
-import {useAppStore} from '../../lib/store';
+import {IS_DEMO_SESSION, useAppStore} from '../../lib/store';
 import {Badge} from '../design-system/Badge';
 import {Button} from '../design-system/Button';
 import {EmptyState} from '../design-system/EmptyState';
@@ -21,7 +21,22 @@ const arStatus=(s:string)=>({active:'نشطة',suspended:'موقوفة',archived
 const gb=(n:number)=>`${(Number(n||0)/1024**3).toLocaleString('ar-KW-u-nu-latn',{maximumFractionDigits:1})} GB`;
 const date=(v:string)=>v?new Intl.DateTimeFormat('ar-KW-u-nu-latn',{dateStyle:'medium'}).format(new Date(v)):'—';
 const pct=(used:number,total:number)=>total?Math.min(100,Math.round(used/total*100)):0;
-const api=async(path:string,init?:RequestInit)=>{const user=auth.currentUser;if(!user)throw new Error('IDENTITY_REQUIRED');const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
+/*
+ * بيئة العرض: البيانات بدل الصفحة البيضاء.
+ *
+ * هذه اللوحات كلها تمرّ من هنا، وكلها تشترط هوية مالكٍ موثّقة — ولا هوية كهذه في صندوق
+ * العرض. فكان من يدخل بدور «مالك المشغّل» أو «مدير الفوترة» أو «مدير التخزين» يرى سطرًا
+ * أحمر وصفحةً فارغة، فيظنّ العطل في المنتج.
+ *
+ * والقراءة وحدها هي ما يُستبدل، وفي بيئة العرض وحدها (`IS_DEMO_SESSION`)، وبعد أن يثبت
+ * أنه لا هوية: أي كتابةٍ (`init`) أو مسارٍ لا حمولة له تمرّ إلى الخادم فتُردّ كما تُردّ
+ * اليوم. والحمولات في `src/data` تُستورد ديناميكيًّا، فلا تدخل حزمة نشرٍ حقيقي أصلًا.
+ */
+const demoCommercial=async(path:string)=>{
+  if(!IS_DEMO_SESSION)return null;
+  try{const mod=await import('../../data/demo-commercial');return mod.demoCommercialResponse(path)}catch{return null}
+};
+const api=async(path:string,init?:RequestInit)=>{const user=auth.currentUser;if(!user){if(!init){const demo=await demoCommercial(path);if(demo)return demo}throw new Error('IDENTITY_REQUIRED')}const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
 /*
  * الرمز الخام لا يُعرض. `api()` ترمي `body.code` أو `HTTP_<رقم>`، وأي رمز خارج القاموس أعلاه —
  * STORAGE_ADMIN_REQUIRED، IDENTITY_REQUIRED، HTTP_403 — كان يُطبع على الشاشة كما هو أمام

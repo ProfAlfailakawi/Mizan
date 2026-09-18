@@ -171,7 +171,7 @@ function emptyInitialState(): AppStoreState {
     organization:INITIAL_ORGANIZATION,organizations:[INITIAL_ORGANIZATION],language:'ar',competition,competitions:[competition],
     participants:[],committees:[],judges:[],results:[],reviewCases:[],aiObservations:[],judgeSubmissions:[],certificates:[],auditLogs:[],incidents:[],appeals:[],
     isOffline:false,emergencyFrozen:false,persistenceError:null,sealApprovals:[],
-    integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],supportSessions:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
+    integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],supportSessions:[],recitationLedger:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
     quranSourceManifests:[],quranSourceContents:[],questionGovernance:[],aiCapabilityValidations:[],operatingCostModel:{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0},
     timeMachineScenarios:[],quorumActions:[],invariantViolations:[],evidenceNodes:[],evidenceEdges:[],publicResultRoots:[],publicResultProofs:[],localMeshSessions:[],federationAttestations:[],protocolPackages:[],flightRecorderEntries:[],integrityEnvelopes:[],chaosDrills:[],accessibilityProfiles:[],elasticityRecommendations:[],journeyPasses:[],policyCompilations:[],contradictionIssues:[],disasterPacks:[],deviceReassignments:[],fatigueRecommendations:[],competitionBenchmarks:[],rehearsals:[],scientificDatasets:[],benchmarkRuns:[],variantLoci:[],quranReferenceAudio:[],quranCrossChecks:[],scientificAdjudications:[],scientificImpactReports:[],federationTrust:[],ceremonyVaults:[],fairDrawProofs:[],questionRevealGates:[],
     participantScopes:[],questionModels:[],questionModelBatches:[],scopeSimulations:[],scopeEngineSeals:[],questionQuarantines:[],questionReservations:[],fairnessReports:[],queueTransfers:[],
@@ -1813,6 +1813,29 @@ export function useAppStore() {
         if (pIndex !== -1) { const tested={ ...globalState.participants[pIndex], status:'tested' as const, statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested' as const,timestamp:new Date().toISOString(),actor:'Panel completion'}] }; globalState.participants[pIndex]=tested; syncParticipantLifecycle(tested); }
         globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
         /*
+         * يُكتب أثر التلاوة هنا، لا في شاشةٍ تقرأ الجلسة الجارية.
+         *
+         * خريطة القاعة كانت ترى الجلسة القائمة وحدها، فتعود إلى الصفر بانتهائها: مئتا
+         * جلسةٍ أُنجزت في اليوم ولا صفحة واحدة مضاءة. والموضع يُكتب مرّةً واحدة مع أول
+         * احتساب لنتيجة اللجنة (داخل `existing < 0`)، فلا يُضاعفه محكّمٌ احتياطي يعيد
+         * القفل. وما يُكتب أرقام مواضع فقط: لا نصّ ولا درجة ولا اسم محكّم.
+         */
+        const recitedAt=new Date().toISOString();
+        const recitedSession=globalState.activeSession;
+        const recitedLoci=(recitedSession.questionSelection?.questions||[]).map((q,qi)=>({
+          id:`recited-${recitedSession.sessionId}-${qi+1}`,
+          competitionId:globalState.competition.id,
+          committeeId:recitedSession.committee?.id||'',
+          participantId:participant.id,
+          sessionId:recitedSession.sessionId,
+          surah:q.surahNumber,startAyah:q.startAyah,endAyah:q.endAyah,
+          recordedAt:recitedAt,
+        }));
+        if(recitedLoci.length){
+          const known=new Set(globalState.recitationLedger.map(x=>x.id));
+          globalState.recitationLedger=[...globalState.recitationLedger,...recitedLoci.filter(x=>!known.has(x.id))];
+        }
+        /*
          * ما استغرقته الجلسة فعلًا. كان `averageSessionMinutes` يُكتب مرّة عند إنشاء
          * اللجنة ثم لا يتغيّر، ويُقرأ في كل موضعٍ يمسّ زمن المتسابق — فكل رقمٍ زمنيّ في
          * المنصّة كان مشتقًّا من قيمة إعداد لا من لجنةٍ تعمل اليوم.
@@ -3182,6 +3205,30 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       return failSessionStart('SESSION_START_NO_SAFE_COMMITTEE');
     }
     const committee = choice.committee;
+    /*
+     * الدور يُنادى بترتيبه، لا باختيار المحكّم.
+     *
+     * كانت شاشة المحكّم تعرض طابور لجنته وتفتح «ابدأ جلسته» لكل صفٍّ فيه، فيستطيع أن
+     * يتخطّى صاحب الدور إلى من بعده — بلا أثرٍ في أي سجل، وبلا أن يعلم المتخطَّى. وهذا
+     * أخطر ما يقع في قاعة: ترتيبُ الطابور هو العدل الوحيد الذي يراه المنتظرون بأعينهم.
+     *
+     * والحرس هنا لا في الشاشة وحدها: تعطيلُ زرٍّ يُرضي العين، والقاعدة تُفرض حيث يقع
+     * الأثر. وصاحبُ الدور هو أقلّ `queueOrderValue` بين منتظري هذه اللجنة بعينها.
+     *
+     * ولا يُقفل هذا بابَ الاستثناء: تأخّرُ متسابقٍ أو تعذّرُ حضوره يُعالَج من غرفة
+     * العمليات (إعادة ترتيب أو نقل)، فيصير التالي صاحبَ الدور ثم يُنادى — إجراءٌ
+     * موثَّق يُرى، لا تخطٍّ صامت. والأدوار التي تملك الاستثناء تمرّ.
+     */
+    const turnExempt = ['ops_manager', 'exception_host', 'comp_admin', 'org_admin'].includes(globalState.currentUser.role);
+    if (!turnExempt && participant.status === 'in_queue') {
+      const committeeQueue = globalState.participants.filter(p =>
+        p.competitionId === globalState.competition.id &&
+        p.status === 'in_queue' &&
+        p.assignedCommitteeId === committee.id);
+      const first = committeeQueue.reduce<typeof participant | undefined>(
+        (best, p) => (!best || queueOrderValue(p) < queueOrderValue(best) ? p : best), undefined);
+      if (first && first.id !== participant.id) return failSessionStart('SESSION_START_OUT_OF_TURN');
+    }
     const policy = getCompetitionPolicy(globalState.competition);
     /*
      * لا تجميد.
@@ -3676,7 +3723,7 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       const cal=byId.get(j.userId)||byId.get(j.id);
       const sessions=globalState.judgeSubmissions.filter(s=>s.judgeId===j.userId||s.judgeId===j.id).length;
       const avg=cal?.mean??0;
-      return {judgeId:j.id,name:j.name,sessions,averageScore:Math.round(avg*100)/100,calibrationScore:j.calibrationScore,isReady:j.isReady,
+      return {judgeId:j.id,name:j.name,/* الاسم العربي يخرج مع الإنجليزي: الشاشات عربية، وكانت تعرض أسماء المحكّمين بالإنجليزية وحدها لأن هذا كل ما كان يخرج من هنا. */nameArabic:j.nameArabic,committeeId:j.assignedCommitteeId,sessions,averageScore:Math.round(avg*100)/100,calibrationScore:j.calibrationScore,isReady:j.isReady,
         deviationFromPanel:Math.round((cal?.shrunkBias??0)*100)/100,
         tendency:cal?.tendency||'INSUFFICIENT_DATA',
         confidence:cal?.confidence??0,

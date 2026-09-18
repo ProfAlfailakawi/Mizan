@@ -32,6 +32,9 @@ const AR_TOKENS:Record<string,string>={
   registered:'مسجّل', in_queue:'في الانتظار', in_session:'داخل اللجنة', tested:'أنهى الاختبار',
   certified:'حاصل على شهادة', withdrawn:'منسحب', absent:'غائب',
   submitted:'مُقدَّم', under_review:'قيد المراجعة', accepted:'مقبول',
+  /* حالتان من `RegistrationStatus` سقطتا من الجدول، فكانتا تُطبعان بمفتاحهما البرمجي
+     الخام (`checked_in`) في شاشةٍ عربية أمام مدير الوفد وولي الأمر. */
+  checked_in:'سجّل الحضور', appealed:'قدّم اعتراضًا',
   confirmed:'مؤكَّد', dismissed:'مصروف', committee_escalation:'تصعيد إلى اللجنة',
   investigating:'قيد الفحص', resolved:'مُعالَج', open:'مفتوح',
   quality_checked:'فُحصت الجودة', recording:'قيد التسجيل',
@@ -78,6 +81,26 @@ const AR_FEATURES:Record<string,string>={
 const EN_FEATURES:Record<string,string>={
   ai_integrity:'AI integrity', shadow_mode:'Shadow mode', hospitality:'Hospitality', remote_rounds:'Remote rounds', broadcast:'Broadcast', benchmark:'Benchmark'
 };
+
+/*
+ * أسباب مراجعة التحكيم.
+ *
+ * كانت مكتوبة داخل صندوق رئيس التحكيم وحده، فمركز العمليات — وهو يعرض المراجعات نفسها —
+ * لم يكن يملك إلا رقم المتسابق: «مراجعة A-104»، ثلاث مرات بلا فرق. فصارت هنا ليقولها
+ * الاثنان بلفظٍ واحد.
+ */
+const REVIEW_REASON_AR:Record<string,string>={
+  judge_variance:'اختلاف المحكمين', ai_high_confidence_alert:'ملاحظة نزاهة آلية', audio_dropout:'مشكلة صوت',
+  score_outlier:'تباين درجة', sealed_result_protection:'حماية نتيجة مختومة', panel_revision_mixed:'اختلاف نسخة المعايير',
+};
+const REVIEW_REASON_EN:Record<string,string>={
+  judge_variance:'Judge variance', ai_high_confidence_alert:'AI integrity observation', audio_dropout:'Audio issue',
+  score_outlier:'Score outlier', sealed_result_protection:'Sealed result protected', panel_revision_mixed:'Mixed criteria revision',
+};
+export function reviewReasonLabel(reason:string|undefined|null, ar:boolean){
+  const key=String(reason||'');
+  return (ar?REVIEW_REASON_AR[key]:REVIEW_REASON_EN[key])||key;
+}
 
 export function uiToken(value:string|undefined|null, ar:boolean){
   if(value===undefined||value===null||value==='')return '—';

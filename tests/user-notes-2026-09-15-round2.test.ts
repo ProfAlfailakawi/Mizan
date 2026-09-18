@@ -235,7 +235,9 @@ test('the exceptions panel says what it is, in one screen and one table', () => 
 
   /* وجدول الأسماء واحد: شاشتان تعرضان الأعطال، ونسختان تفترقان عند أول نوعٍ يُضاف. */
   for (const file of ['src/components/admin/CompetitionOverview.tsx', 'src/components/operations/CommandCenter.tsx']) {
-    assert.match(read(file), /import \{ incidentTitle \} from/, `${file} reads the shared table`);
+    /* الشرط أن يُقرأ الجدول المشترك، لا أن تُطابَق قائمة المستورَدات حرفًا بحرف:
+       غرفة العمليات صارت تسمّي نوع العطل أيضًا فاستوردت `INCIDENT_TYPE_ARABIC` معه. */
+    assert.match(read(file), /incidentTitle[\s\S]{0,80}from '[^']*incident-language'/, `${file} reads the shared table`);
   }
 });
 
