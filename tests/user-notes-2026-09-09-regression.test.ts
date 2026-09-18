@@ -35,11 +35,15 @@ test('committee setup synchronizes governed judge names and uses a clean number 
   assert.match(css,/mizan-number-input::-webkit-outer-spin-button/);
 });
 
-test('registration uses one comprehensive consent instead of four separate checkboxes',()=>{
+test('registration keeps consent decisions explicit instead of collapsing distinct purposes into one bit',()=>{
   const src=read('src/components/public/RegistrationFlow.tsx');
-  assert.match(src,/consentAccepted/);
-  assert.match(src,/أوافق على شروط المشاركة وسياسة الخصوصية/);
-  assert.doesNotMatch(src,/termsAccepted|privacyAccepted|audioAccepted|aiAccepted/);
+  assert.doesNotMatch(src,/consentAccepted/);
+  for(const state of ['termsAccepted','privacyAccepted','audioAccepted','aiProcessingAccepted'])assert.match(src,new RegExp(state));
+  assert.match(src,/أوافق على شروط المشاركة/);
+  assert.match(src,/أوافق على سياسة الخصوصية/);
+  assert.match(src,/أوافق على تسجيل تلاوتي صوتيًا/);
+  assert.match(src,/أوافق اختياريًا على المعالجة التقنية المساندة/);
+  assert.match(src,/terms:termsAccepted,privacy:privacyAccepted/);
 });
 
 test('public competition page removes share buttons and the technical verification badge',()=>{
