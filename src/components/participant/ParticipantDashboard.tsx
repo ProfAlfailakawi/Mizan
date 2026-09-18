@@ -86,7 +86,8 @@ export const ParticipantDashboard: React.FC = () => {
   const peers=results.filter(r=>r.competitionId===competition.id&&r.categoryId===result.categoryId);
   const outcome=resolveAwards({
    policy:normalizeAwardPolicy(policy.results.awards),
-   candidates:peers.map(r=>({participantId:r.participantId,participantCode:r.participantCode,finalScore:r.finalScore,maxScore:100})),
+   tieBreakRules:competition.ruleSet?.tieBreakRules,
+   candidates:peers.map(r=>({participantId:r.participantId,participantCode:r.participantCode,finalScore:r.finalScore,maxScore:100,criterionScores:r.criterionScores,penaltyCount:r.penaltyCount})),
   });
   return outcome.standings.get(participant.id);
  },[result?.id,result?.finalScore,results.length,competition.id,participant?.id,policy.results.awards]);

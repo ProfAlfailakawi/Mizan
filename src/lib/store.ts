@@ -8,6 +8,8 @@
      */
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
+import { normalizeAwardPolicy, resolveAwards, type AwardPlace } from './award-places';
+import { tieDecision, type TieDecision, type TieGroup } from './tie-resolution';
 import { sealResultOnServer, publishResultsOnServer, attestPolicyChangeOnServer, attestScoreCorrectionOnServer, attestReadingChangeOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
@@ -91,7 +93,7 @@ import { fetchSecureQuestionCapabilities, findSecureRuntimeForParticipant } from
 import { buildIntegrityCinema, certifyVenue, verifyVenueBaseline } from './integrity-extensions';
 import { buildDisasterPack, generateEncryptionKey, encryptJson, privacySafeBenchmark, fatigueRecommendation, proposeDeviceReassignment, canApplyDeviceReassignment, runRehearsal, simulateNotificationFailureRecovery, verifyDisasterPack, generateSigningKeyPair, exportPublicJwk, issueSignedPass, importPublicJwk, verifySignedPass, compactCredentialToJourneyRecord, testRestoreDisasterPack, federationAttestationDigest, developmentFederationSignature, verifyFederationAttestationEvidence, REQUIRED_REHEARSAL_CHECK_IDS } from './nextgen-integrity';
 
-import { AppStoreState, STORAGE_KEY } from './store-state';
+import { AppStoreState, STORAGE_KEY, type TieDecisionRecord } from './store-state';
 
 const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
 const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_ROLE;
@@ -114,6 +116,7 @@ function hydrateSavedState(parsed: AppStoreState): AppStoreState {
       parsed.reviewCases = (parsed.reviewCases || []).map(r => ({ ...r, competitionId: r.competitionId || parsed.competition.id }));
       parsed.aiObservations = (parsed.aiObservations || []).map(o => ({ ...o, competitionId: o.competitionId || parsed.competition.id }));
       parsed.appeals = parsed.appeals || [];
+      parsed.tieDecisions = parsed.tieDecisions || [];
       parsed.sealApprovals = parsed.sealApprovals || [];
       parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
       parsed.travelRecords = (parsed.travelRecords || []).filter(r=>!['trv-1','trv-2','trv-3'].includes(r.id)&&r.flightNumber!=='MZ 417'); parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
@@ -170,7 +173,7 @@ function emptyInitialState(): AppStoreState {
   return {
     currentUser:{id:'unauthenticated',name:'—',email:'',role:'participant',organizationId:INITIAL_ORGANIZATION.id},
     organization:INITIAL_ORGANIZATION,organizations:[INITIAL_ORGANIZATION],language:'ar',competition,competitions:[competition],
-    participants:[],committees:[],judges:[],results:[],reviewCases:[],aiObservations:[],judgeSubmissions:[],certificates:[],auditLogs:[],incidents:[],appeals:[],
+    participants:[],committees:[],judges:[],results:[],reviewCases:[],aiObservations:[],judgeSubmissions:[],certificates:[],auditLogs:[],incidents:[],appeals:[],tieDecisions:[],
     isOffline:false,emergencyFrozen:false,persistenceError:null,sealApprovals:[],
     integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],supportSessions:[],recitationLedger:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
     quranSourceManifests:[],quranSourceContents:[],questionGovernance:[],aiCapabilityValidations:[],operatingCostModel:{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0},
@@ -1313,6 +1316,7 @@ export function useAppStore() {
         watch('certificates', rows => { globalState.certificates = mergeById(globalState.certificates, rows, 'certificates'); });
         watch('reviews', rows => { globalState.reviewCases = mergeById(globalState.reviewCases, rows, 'reviews'); });
         watch('appeals', rows => { globalState.appeals = mergeById(globalState.appeals, rows, 'appeals'); });
+        watch('tie_decisions', rows => { globalState.tieDecisions = mergeById(globalState.tieDecisions, rows, 'tie_decisions'); });
         watch('support_sessions', rows => { globalState.supportSessions = mergeById(globalState.supportSessions, rows, 'support_sessions'); });
       }
       // A late unmount that raced the import still gets cleaned up here.
@@ -2036,6 +2040,16 @@ export function useAppStore() {
     if (!competitionResults.length) return { sealed:false, reason:'no_results', approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size };
 
     /*
+     * مركزٌ موقوف على تعادل يمنع الختم.
+     *
+     * الختم يُنتج شهادةً ومركزًا معلنًا. ونتيجةٌ تُختم وفوقها مركزٌ لم تفصل فيه الإدارة
+     * تُخرج شهادةً بمركزٍ لم يُمنح لأحد — أو تُخرجه لاثنين لم يُقرَّر تشريكُه بينهما.
+     * والتصحيح بعد الختم أصعب من الانتظار قبله، فالختم لا رجعة فيه.
+     */
+    const undecided = contestedTies().filter(t => !t.decision);
+    if (undecided.length) return { sealed:false, reason:'undecided_tie' as const, approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size };
+
+    /*
      * كل نتيجة تُختم على حدة من إرسالات محكميها الخام. لا تُرسَل الدرجة المحسوبة هنا إطلاقًا؛
      * الخادم يؤلّفها بنفسه، فلا يوجد رقم يمكن لهذا الجهاز أن يمليه.
      */
@@ -2474,6 +2488,66 @@ export function useAppStore() {
     if(pIdx>=0){const current=globalState.participants[pIdx];const tested={...current,status:'tested' as const,statusHistory:[...current.statusHistory,{status:'tested' as const,timestamp:new Date().toISOString(),actor:globalState.currentUser.name,reason:accepted?'Appeal resolved — accepted':'Appeal resolved — rejected'}]};globalState.participants[pIdx]=tested;syncParticipantLifecycle(tested);}
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:accepted?'APPEAL_ACCEPTED':'APPEAL_REJECTED',entityType:'Appeal',entityId:appealId,humanSummaryArabic:`حسم اعتراض ${appeal.participantCode} بقرار بشري${appliedDelta?` وتعديل ${appliedDelta} نقطة`:''}`,humanSummaryEnglish:`Resolved ${appeal.participantCode} appeal by human decision${appliedDelta?` with ${appliedDelta} point adjustment`:''}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return true;
+  };
+
+  /*
+   * التعادل الموقوف — ومن يفصل فيه.
+   *
+   * يُحسب من النتائج الحاضرة لا يُخزَّن: تعديلُ درجةٍ باعتراضٍ يُنشئ تعادلًا أو يزيله،
+   * ولقطةٌ محفوظة كانت ستبقى تعرض تعادلًا زال. والمفتاح يحمل الدرجات، فقرارٌ على تعادلٍ
+   * قديم لا يُقرأ إذنًا لتعادلٍ جديد.
+   */
+  const contestedTies = () => {
+    const competitionId = globalState.competition.id;
+    const out: { categoryId: string; categoryName: string; place: AwardPlace; group: TieGroup; decision: TieDecision | null }[] = [];
+    for (const category of globalState.competition.categories) {
+      const members = globalState.results.filter(r => r.competitionId === competitionId && r.categoryId === category.id);
+      if (!members.length) continue;
+      const ruleSet = activeRuleSetForCategory(category.id);
+      const maxScore = (ruleSet.criteria || []).reduce((sum, c) => sum + (Number(c.maxScore) || 0), 0) || 100;
+      const outcome = resolveAwards({
+        policy: normalizeAwardPolicy(getCompetitionPolicy(globalState.competition).results.awards),
+        tieBreakRules: ruleSet.tieBreakRules as readonly string[],
+        tieDecisions: globalState.tieDecisions.filter(d => d.competitionId === competitionId && d.categoryId === category.id),
+        candidates: members.map(r => ({
+          participantId: r.participantId, participantCode: r.participantCode, finalScore: r.finalScore, maxScore,
+          criterionScores: r.criterionScores, penaltyCount: r.penaltyCount,
+        })),
+      });
+      for (const entry of outcome.contested) {
+        out.push({ categoryId: category.id, categoryName: category.nameArabic || category.name, place: entry.place, group: entry.group, decision: entry.decision });
+      }
+    }
+    return out;
+  };
+
+  /*
+   * تسجيل قرار الإدارة في تعادلٍ قائم.
+   *
+   * ولا يُقبل مفتاحٌ يأتي من الشاشة على علّاته: يُبحث عنه في التعادلات المحسوبة الآن،
+   * فمفتاحٌ لا يقابل تعادلًا حاضرًا لا يُسجَّل له قرار.
+   */
+  const decideTie = (input: { key: string; outcome: 'ordered' | 'shared'; orderedParticipantIds?: string[]; reason: string }) => {
+    const open = contestedTies().find(x => x.group.key === input.key);
+    if (!open) return { ok: false as const, code: 'TIE_DECISION_NO_TIE' as const, messageArabic: 'لا تعادل قائم بهذا المفتاح.', messageEnglish: 'No open tie carries this key.' };
+    if (open.decision) return { ok: false as const, code: 'TIE_DECISION_ALREADY_RECORDED' as const, messageArabic: 'فُصل في هذا التعادل من قبل.', messageEnglish: 'This tie has already been decided.' };
+    const verdict = tieDecision({
+      group: open.group, outcome: input.outcome, orderedParticipantIds: input.orderedParticipantIds,
+      reason: input.reason, decidedBy: { userId: globalState.currentUser.id, role: globalState.currentUser.role },
+    });
+    if (!verdict.ok) return verdict;
+    const record: TieDecisionRecord = {
+      ...verdict.decision,
+      id: newId('tie'),
+      competitionId: globalState.competition.id,
+      categoryId: open.categoryId,
+      decidedByName: globalState.currentUser.name,
+    };
+    globalState.tieDecisions = [record, ...globalState.tieDecisions];
+    void persistScopedDocument('tie_decisions', record.id, record as unknown as Record<string, unknown>);
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'TIE_DECIDED',entityType:'AwardPlace',entityId:record.id,humanSummaryArabic:`فصلت الإدارة في تعادل ${open.place.titleArabic} بين ${open.group.participants.length} متسابقين — ${record.outcome==='shared'?'تشريك المركز':'ترتيب معلن'} · ${record.reason}`,humanSummaryEnglish:`Administration decided the ${open.place.titleEnglish} tie among ${open.group.participants.length} participants — ${record.outcome==='shared'?'place shared':'explicit ordering'} · ${record.reason}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    notify();
+    return { ok: true as const, decision: record };
   };
 
   const updateOrganizationBrand = (patch: Partial<OrganizationBrand>) => { globalState.organization={...globalState.organization,brand:{...globalState.organization.brand,...patch}}; notify(); };
@@ -4513,6 +4587,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     auditLogs: state.auditLogs.filter(x=>x.competitionId===state.competition.id),
     incidents: state.incidents.filter(x=>x.competitionId===state.competition.id),
     appeals: state.appeals.filter(x=>x.competitionId===state.competition.id),
+    tieDecisions: state.tieDecisions.filter(x=>x.competitionId===state.competition.id),
     notifications: state.notifications.filter(x=>x.competitionId===state.competition.id),
     webhooks: state.webhooks.filter(x=>!x.competitionId||x.competitionId===state.competition.id),
     devices: state.devices.filter(x=>x.competitionId===state.competition.id),
@@ -4573,6 +4648,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     createCompetition, deleteCompetition,
     submitAppeal,
     resolveAppeal,
+    contestedTies, decideTie,
     applyTemplate,
     updateCompetitionPolicy,
     updateRuleSet,

@@ -7,10 +7,12 @@
  * قابلةً للمقارنة — وهو ما يعطي «المركز الأول» معناه.
  *
  * ولا يُبنى السجل إلا من نتائج مختومة أو منشورة: النتيجة قبل ختمها ليست تاريخًا بعد.
- * والمركز المحجوب يُذكر محجوبًا بسببه؛ حذفُه من السجل تزويرٌ صغيرٌ يتراكم.
+ * والمركز المحجوب يُذكر محجوبًا بسببه؛ حذفُه من السجل تزويرٌ صغيرٌ يتراكم. ومثلُه المركز
+ * الموقوف على تعادل: يُقال موقوفًا، فغيابُه عن السجل يُقرأ «لم يُمنح» وهو غير «لم يُفصل».
  */
 
 import { normalizeAwardPolicy, resolveAwards, scorePercentage, type AwardPolicy } from './award-places';
+import { describeTie } from './tie-resolution';
 
 export interface ArchiveResultInput {
   competitionId: string;
@@ -21,6 +23,9 @@ export interface ArchiveResultInput {
   participantNameArabic: string;
   finalScore: number;
   status: string;
+  /** درجاتُ المعايير وعددُ المخالفات — بهما تعمل قواعدُ كسر التعادل المعلنة. */
+  criterionScores?: Record<string, number>;
+  penaltyCount?: number;
 }
 
 export interface ArchiveCompetitionInput {
@@ -33,6 +38,8 @@ export interface ArchiveCompetitionInput {
   status?: string;
   categories: { id: string; name: string; nameArabic: string }[];
   awards?: AwardPolicy;
+  /** قواعدُ كسر التعادل المعلنة في رُبريك المسابقة. */
+  tieBreakRules?: readonly string[];
   /** الدرجة الكاملة لهذه المسابقة. الافتراضي مئة. */
   maxScore?: number;
 }
@@ -55,12 +62,23 @@ export interface ArchiveWithheld {
   reasonEnglish: string;
 }
 
+/** مركزٌ وقع فيه تعادل. `decided` يعني أن الإدارة فصلت فيه وسُجّل سببها. */
+export interface ArchiveContested {
+  placeTitleArabic: string;
+  placeTitleEnglish: string;
+  rank: number;
+  decided: boolean;
+  noteArabic: string;
+  noteEnglish: string;
+}
+
 export interface ArchiveCategoryEntry {
   categoryId: string;
   categoryName: string;
   categoryNameArabic: string;
   winners: ArchiveWinner[];
   withheld: ArchiveWithheld[];
+  contested: ArchiveContested[];
 }
 
 export interface ArchiveEdition {
@@ -112,7 +130,11 @@ export function buildWinnersArchive(input: {
       if (!members.length) continue;
       const outcome = resolveAwards({
         policy,
-        candidates: members.map(r => ({ participantId: r.participantId, participantCode: r.participantCode, finalScore: r.finalScore, maxScore })),
+        tieBreakRules: competition.tieBreakRules,
+        candidates: members.map(r => ({
+          participantId: r.participantId, participantCode: r.participantCode, finalScore: r.finalScore, maxScore,
+          criterionScores: r.criterionScores, penaltyCount: r.penaltyCount,
+        })),
       });
       const byId = new Map(members.map(r => [r.participantId, r]));
       categories.push({
@@ -137,6 +159,14 @@ export function buildWinnersArchive(input: {
           rank: entry.place.rank,
           reasonArabic: entry.reasonArabic,
           reasonEnglish: entry.reasonEnglish,
+        })),
+        contested: outcome.contested.map(entry => ({
+          placeTitleArabic: entry.place.titleArabic,
+          placeTitleEnglish: entry.place.titleEnglish,
+          rank: entry.place.rank,
+          decided: !!entry.decision,
+          noteArabic: describeTie(entry.group, entry.decision, true),
+          noteEnglish: describeTie(entry.group, entry.decision, false),
         })),
       });
     }
