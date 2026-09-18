@@ -89,6 +89,44 @@ export function publishResultsOnServer(competitionId: string) {
   return call<PublicationView>('/api/results/publish', {method: 'POST', body: {competitionId}});
 }
 
+/* ── الأفعال الحاكمة: يقرّرها الخادم ويكتب أثرها ─────────────────────────────── */
+
+export interface AttestedView { attested: true; summary: string }
+
+/**
+ * تغييرُ صلاحية. الفاعلُ هو الهويةُ المُصدَّقة — لا يُرسَل عن نفسه — ومصفوفةُ المنح
+ * تُطبَّق في الخادم، ومنها منعُ أن يغيّر أحدٌ صلاحيةَ نفسه.
+ */
+export function attestRoleChangeOnServer(input: {
+  targetAccountId: string; targetOrganizationId?: string; competitionId?: string;
+  change: 'GRANTED' | 'ROLE_UPDATED' | 'STATUS_CHANGED' | 'REMOVED';
+  toRole?: string; fromRole?: string; status?: string; reason?: string;
+}) {
+  return call<AttestedView>('/api/governance/role-change', {method: 'POST', body: input});
+}
+
+/** تغييرُ لائحة المسابقة. يُرسَل معه رقمُ النسخة وبصمتُها ليُقارن أثرٌ بأثر. */
+export function attestPolicyChangeOnServer(input: {
+  competitionId: string; policyVersion: string; policySha256: string; kind?: string; reason?: string;
+}) {
+  return call<AttestedView>('/api/governance/policy-change', {method: 'POST', body: input});
+}
+
+/** تصحيحُ درجة. الخادم يرفضه على نتيجةٍ مختومة، ويشترط اعتراضًا مُسجَّلًا يُحال إليه. */
+export function attestScoreCorrectionOnServer(input: {
+  competitionId: string; participantId: string; appealId: string; delta: number;
+  policyAllowsScoreChange: boolean; reason?: string;
+}) {
+  return call<AttestedView>('/api/results/score-correction', {method: 'POST', body: input});
+}
+
+/** تغييرُ روايةِ مشارك. الخادم يرفضه بعد سحب السؤال، ولا يخمّن اسمًا ملتبسًا. */
+export function attestReadingChangeOnServer(input: {
+  competitionId: string; participantId: string; fromRiwaya: string; toRiwaya: string; reason?: string;
+}) {
+  return call<AttestedView>('/api/participants/reading-change', {method: 'POST', body: input});
+}
+
 export function verifySealOnServer(sealed: unknown) {
   return call<{intact: boolean; signature: string; sealSha256: string}>('/api/results/seal/verify', {method: 'POST', body: {sealed}});
 }

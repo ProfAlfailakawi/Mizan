@@ -69,11 +69,20 @@ test('each server-authored action is actually written by the server somewhere', 
    * ويُستثنى صراحةً ما لم يصل بعدُ إلى مسارٍ خادميّ: يُذكر هنا بالاسم لا يُسكت عنه.
    */
   const notYetEmittedByTheServer = new Set([
-    // هذه تقع اليوم في حالة العميل (`store.ts`) ولم تُنقل بعد إلى مسارٍ خادميّ.
-    // و`RESULT_PUBLISHED` خرجت من هنا: صار `/api/results/publish` يكتبها.
-    'RESULT_REOPENED', 'SCORE_CORRECTED', 'QUESTION_INVALIDATED',
-    'QUESTION_REDRAWN', 'PARTICIPANT_READING_CHANGED', 'COMPETITION_POLICY_CHANGED',
-    'PRIVILEGED_OVERRIDE', 'ROLE_CHANGED', 'LICENSE_ACTION', 'ENVELOPE_OPENED',
+    /*
+     * ما بقي محجوبًا عن العميل ولا يكتبه الخادم — ولكلٍّ سببُه، مذكورًا لا مسكوتًا عنه.
+     *
+     * الخمسةُ الأولى **أفعالٌ لا وجود لها في المنتج بعد**: لا مسار يعيد فتح نتيجة، ولا
+     * تجاوزَ صلاحية، ولا فتحَ ظرف (الظرفُ يُختم ويُتحقّق منه ولا يُفتح)، ولا إبطالَ سؤالٍ
+     * ولا إعادةَ سحبه (وإبدالُ الطوارئ موجودٌ ويكتبه الخادمُ بالفعل). فالقائمةُ تحرسها
+     * سلفًا ليوم تُبنى، وليس فيها أثرٌ يضيع اليوم.
+     *
+     * و`LICENSE_ACTION` اسمُ صنفٍ لا فعل: أفعالُ الترخيص الستّةُ والعشرون يكتبها
+     * `server/saas-platform.ts` خادميًّا في سلسلته المُجزّأة.
+     */
+    'RESULT_REOPENED', 'PRIVILEGED_OVERRIDE', 'ENVELOPE_OPENED',
+    'QUESTION_INVALIDATED', 'QUESTION_REDRAWN',
+    'LICENSE_ACTION',
   ]);
 
   const emitted = SERVER_AUTHORED_AUDIT_ACTIONS.filter(action => SERVER.includes(`action:'${action}'`));
@@ -164,24 +173,31 @@ test('the client vocabulary is real, so this drift test is actually reading some
     'the two acts this guard exists for must be in the vocabulary it is checked against');
 });
 
-test('a role grant is a role change, and today no server route writes it — said plainly, not hidden', () => {
+test('a role grant is a role change, and the server now writes it into the ledger the auditor reads', () => {
   /*
-   * الحارسُ يمنع `ROLE_CHANGED`، والعميلُ لا يرسله قطّ: يرسل `ROLE_GRANT_UPDATED`
-   * و`ROLE_GRANT_REMOVED` و`ROLE_GRANT_STATUS_CHANGED`. وهي تغييرُ دورٍ بلا شكّ.
+   * كان الاستثناءُ هنا لأن منعَ `ROLE_GRANT_*` يعني ضياعَها: لا مسار خادميّ يكتبها.
+   * وكان ذلك **خطأً في القراءة**: `identity-governance` يفصل في التغيير منذ البداية —
+   * `updateGrant` و`suspendGrant` و`removeGrant` تفرض مصفوفةَ المنح وبقاءَ مدير الجهة
+   * وتُلغي الجلسات. والناقصُ كان الأثر لا القرار: تكتبه في سجلّ حوكمة الهوية وحده، فلا
+   * يرى من يفتح `/api/audit/ledger` تغييرَ صلاحيةٍ قطّ — وهو أوّلُ ما يُسأل عنه.
    *
-   * ولم تُضَف إلى الحارس هنا، لأن منعَها اليوم يعني ضياعَها: لا مسار خادميّ يمنح الأدوار
-   * فيكتبها. فمنعُها يُخفي عن المدقّق **كلَّ** تغييرات الصلاحيات بدل أن يحميها. فتُقيَّد
-   * صراحةً بأنها مُقرَّة من العميل حتى يوجد مسارُها، ويفشل هذا الاختبار إن وُجد المسار
-   * ولم يُنقل المنع — فلا يُنسى.
+   * فصارت تلك المسارات تكتب `ROLE_CHANGED` في السجلّ الرئيس أيضًا، وانتقل المنع.
    */
-  const awaitingServerRoute = ['ROLE_GRANT_UPDATED', 'ROLE_GRANT_REMOVED', 'ROLE_GRANT_STATUS_CHANGED'];
-  const emitted = clientAuditActions();
-  for (const action of awaitingServerRoute) {
-    assert.ok(emitted.includes(action), `${action} must still be part of the client vocabulary`);
-    assert.equal(isServerAuthoredAuditAction(action), false,
-      `${action} is client-attested today; refusing it before a server route exists would lose it`);
+  for (const spelling of ['ROLE_GRANT_UPDATED', 'ROLE_GRANT_REMOVED', 'ROLE_GRANT_STATUS_CHANGED']) {
+    assert.ok(isServerAuthoredAuditAction(spelling), `${spelling} is a role change and must be server-authored`);
   }
-  const serverWritesRoleChange = SERVER.includes("action:'ROLE_CHANGED'") || /app\.(post|patch|put)\('\/api\/identity\/role-grants/.test(SERVER);
-  assert.equal(serverWritesRoleChange, false,
-    'a server route now writes role changes — move ROLE_GRANT_* onto the guard and delete this exemption');
+  assert.ok(SERVER.includes("action:'ROLE_CHANGED'"), 'the server must write ROLE_CHANGED');
+
+  // ويُكتب من المسارات الأربعة التي تُغيّر منحةً فعلًا — لا من مسارٍ ثانٍ موازٍ.
+  assert.equal((SERVER.match(/auditRoleChange\(req,/g) || []).length, 4,
+    'every grant-mutating route must record the change');
+  for (const method of ['updateGrant', 'suspendGrant', 'resumeGrant', 'removeGrant']) {
+    const at = SERVER.indexOf(`identityGovernance.${method}(`);
+    assert.ok(at > 0, `${method} route must exist`);
+    const after = SERVER.slice(at, at + 400);
+    assert.ok(after.includes('auditRoleChange(req,'), `${method} must record the role change`);
+  }
+  // ولا مسار حوكمةٍ ثانٍ يقرّر تغيير الدور — مصدرا حقيقةٍ يفترقان بعد أوّل تعديل.
+  assert.equal(SERVER.includes("app.post('/api/governance/role-change'"), false,
+    'role changes are decided in identity-governance alone');
 });
