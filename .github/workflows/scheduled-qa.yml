@@ -97,6 +97,49 @@ jobs:
             dist/print-document-qa
           if-no-files-found: ignore
 
+  # ── بابُ المتسابق الأماميّ: خادمٌ حقيقيّ ومحاكي Firestore ───────────────────
+  #
+  # قسمُ التسجيل في `qa:scope-visual` كان يُتخطّى باسمه على خادم المعاينة الساكن، لأن
+  # الرابطَ العامّ **يُعيد الجلبَ من الخادم دائمًا ولا يقبل نسخةَ المتصفّح** — وهو مقصودٌ
+  # ومكتوبٌ في `src/App.tsx`: وإلّا نجحت التجربةُ على جهاز الإدارة وحده وفشلت عند المتسابق.
+  #
+  # فالتخطّي كان صادقًا، لكنّه يترك بابَ المتسابق الأماميَّ بلا فحصٍ في متصفّح. وهنا
+  # يُشغَّل على خادمٍ حقيقيٍّ ومحاكي Firestore: النموذجُ، وقاعدةُ الفئة، و**اختيارُ الرواية
+  # صراحةً** قبل المتابعة.
+  public-registration:
+    name: التسجيل العام على خادمٍ حقيقيّ
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+      - name: تثبيت Chromium
+        run: npx playwright install --with-deps chromium
+      - name: جافا للمحاكي
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: البناء
+        run: npm run build
+
+      # الزرعُ يرفض العملَ بلا `FIRESTORE_EMULATOR_HOST`، فلا يلمس Firestore حقيقيًّا بحال.
+      - name: التسجيل من أوّله إلى المراجعة
+        run: npm run qa:public-registration
+
+      - name: احفظ اللقطات عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: qa-public-registration
+          path: dist/scope-visual-qa
+          if-no-files-found: ignore
+
   # ── ما يحتاج متصفّحًا وخادمَ معاينة ─────────────────────────────────────────
   product-surface:
     name: سطحُ المنتج ويومُ المسابقة في متصفّح

@@ -57,6 +57,8 @@ const NOT_FOR_OPERATORS: Record<string, string> = {
   MIZAN_RELEASE_NOTE: 'مثلُه — يُكتب وقت البناء.',
   MIZAN_FIREBASE_PROJECT_ID: 'اسمٌ بديل لـ`FIREBASE_PROJECT_ID` المذكورة، يُقرأ للتوافق.',
   MIZAN_TENANTS: 'قائمةُ مستأجرين ثابتة للتطوير؛ الإنتاج يقرأ من سجلّ المستأجرين.',
+  MIZAN_QA_COMPETITION_ID: 'معرّفُ المسابقة المزروعة لفحص التسجيل على المحاكي — لا يقرؤه المنتج في نشرة.',
+  MIZAN_QA_ORGANIZATION_ID: 'مثلُه — جهةُ تلك المسابقة المزروعة.',
 };
 
 const EXAMPLE = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');

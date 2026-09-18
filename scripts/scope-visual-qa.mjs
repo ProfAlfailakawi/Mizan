@@ -20,6 +20,11 @@ const arg = (name, fallback) => {
   return hit ? hit.split('=').slice(1).join('=') : fallback;
 };
 const BASE = arg('base', 'http://127.0.0.1:4173');
+/*
+ * معرّفُ المسابقة وسيطٌ لا ثابت: الخادمُ العامّ يرفض مسابقةَ العرض صراحةً، فالفحصُ
+ * مقابل خادمٍ حقيقيّ يحتاج كيانًا مزروعًا باسمه.
+ */
+const COMP = arg('comp', 'comp-dubai-2027');
 const OUT = arg('out', path.join('dist', 'scope-visual-qa'));
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -170,7 +175,7 @@ for (const [width, height, label] of VIEWPORTS) {
 }
 
 /*
- * تدفق التسجيل: الخطوة تظهر للفئة الاختيارية وحدها، والقاعدة تُفرض قبل المتابعة.
+ * تدفق التسجيل: بياناتٌ، ثم فئةٌ وروايةٌ تُختار صراحةً، ثم مراجعة.
  *
  * ورابطُ التسجيل عامٌّ **يُعيد الجلبَ من الخادم دائمًا** ولا يقبل نسخةَ المتصفّح — وهذا
  * مقصودٌ ومكتوبٌ في `src/App.tsx`: وإلّا لعُرضت الصفحةُ كاملةً على جهاز الإدارة وحده
@@ -197,29 +202,88 @@ for (const [width, height, label] of (apiServed ? [VIEWPORTS[0], VIEWPORTS[2]] :
   console.log(`\n── تسجيل ${label}`);
   const { ctx, page } = await newPage(width, height, `register-${label}`);
   try {
-    await page.goto(`${BASE}/#register?comp=comp-dubai-2027`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/#register?comp=${COMP}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(2200);
-    for (const [labelText, value] of [['الاسم بالعربية', 'تجربة تجريبية'], ['الاسم بالإنجليزية', 'QA Reciter'], ['البريد', 'qa-reciter@example.org'], ['الهاتف', '+96550000000'], ['رقم الهوية', '123456789']]) {
+    /*
+     * وتاريخُ الميلاد منها.
+     *
+     * كان ناقصًا من هذه القائمة، ولم يظهر أثرُه ما دام القسمُ لا يعمل أصلًا. ولمّا عمل
+     * مقابل خادمٍ حقيقيّ، بقي «التالي» معطّلًا — فانتهت المهلةُ بعد ثماني ثوانٍ بلا سبب
+     * مقروء. والنموذجُ كان يعمل كما ينبغي: يمنع المتابعة بحقلٍ مطلوبٍ فارغ.
+     */
+    for (const [labelText, value] of [['الاسم بالعربية', 'تجربة تجريبية'], ['الاسم بالإنجليزية', 'QA Reciter'], ['البريد', 'qa-reciter@example.org'], ['الهاتف', '+96550000000'], ['تاريخ الميلاد', '2005-01-01'], ['رقم الهوية', '123456789']]) {
       const field = page.locator('label:visible', { hasText: labelText }).first();
       if (await field.count()) await field.locator('input').first().fill(value).catch(() => {});
     }
     const next = () => page.locator('button:visible', { hasText: /^التالي$/ }).first();
+
+    /*
+     * ويُسأل الزرُّ قبل أن يُضغط: نقرةٌ على زرٍّ معطّل تنتظر حتى تنتهي المهلة، فتُقرأ
+     * «الصفحة لا تستجيب» وهي تقول «أكمل حقلًا مطلوبًا». فيُقال أيُّ الحقول فارغ.
+     */
+    if (await next().isDisabled()) {
+      const empty = await page.locator('label:visible').evaluateAll(labels => labels
+        .filter(label => /\*/.test(label.textContent || ''))
+        .filter(label => { const input = label.querySelector('input'); return input instanceof HTMLInputElement && !input.value; })
+        .map(label => (label.textContent || '').replace(/\s+/g, ' ').trim()));
+      note(`[${label}] «التالي» معطّل بعد ملء النموذج — حقولٌ مطلوبةٌ فارغة: ${empty.join('، ') || '(لم تُعرف)'}`);
+      await ctx.close();
+      continue;
+    }
     await next().click({ timeout: 8000 });
     await page.waitForTimeout(900);
     const selectable = page.locator('button:visible', { hasText: 'ربع القرآن يختاره المتسابق' }).first();
     if (!await selectable.count()) { note(`[${label}] الفئة الاختيارية لا تظهر في التسجيل`); await ctx.close(); continue; }
     await selectable.click();
+    await page.waitForTimeout(600);
+
+    /*
+     * والروايةُ تُختار صراحةً، ولا تُستنتج.
+     *
+     * كان الفحصُ يمضي من الفئة إلى «التالي» مباشرةً فتنتهي المهلةُ بلا سبب مقروء —
+     * والنموذجُ كان يعمل كما ينبغي: «اختر الرواية أعلاه للمتابعة». وهي قاعدةٌ منصوصةٌ في
+     * `tests/user-notes-2026-09-14-regression.test.ts`: لا تقدُّمَ برواية ضمنيّة.
+     *
+     * والاختيارُ بدلالة `aria-pressed`: أزرارُ الرواية أزرارُ تبديل، والفئاتُ والتنقّلُ
+     * ليست كذلك. فهي دلالةٌ يحملها المنتجُ أصلًا لقارئ الشاشة، لا مِحدادٌ هشٌّ على نصّ
+     * يُترجَم أو يُصاغ.
+     */
+    const readingChoice = page.locator('button[aria-pressed]:visible').first();
+    if (!await readingChoice.count()) note(`[${label}] لا اختيارَ للرواية في خطوة الفئة`);
+    else {
+      await readingChoice.click();
+      await page.waitForTimeout(500);
+      if (await readingChoice.getAttribute('aria-pressed') !== 'true') note(`[${label}] اختيارُ الرواية لم يُثبَت`);
+      else ok('الرواية تُختار صراحةً قبل المتابعة');
+    }
+
+    if (await next().isDisabled()) {
+      note(`[${label}] «التالي» ما زال معطّلًا بعد اختيار الفئة والرواية`);
+      await ctx.close();
+      continue;
+    }
     await next().click({ timeout: 8000 });
     await page.waitForTimeout(1200);
-    if (!/اختر نطاق حفظك/.test(await page.locator('body').innerText())) note(`[${label}] خطوة اختيار النطاق لم تظهر`);
-    else ok('خطوة اختيار النطاق تظهر للفئة الاختيارية');
-    if (!(await next().isDisabled())) note(`[${label}] المتابعة متاحة قبل اختيار أي نطاق`); else ok('المتابعة موقوفة قبل الاختيار');
-    for (let juz = 1; juz <= 5; juz++) await page.locator(`#registration-juz-${juz}`).click({ timeout: 4000 }).catch(() => {});
-    await page.waitForTimeout(500);
-    if (!/المطلوب 8/.test(await page.locator('body').innerText())) note(`[${label}] اختيار ناقص لم يُرفض`); else ok('الاختيار الناقص مرفوض بنصّ يشرح المطلوب');
-    for (let juz = 6; juz <= 8; juz++) await page.locator(`#registration-juz-${juz}`).click({ timeout: 4000 }).catch(() => {});
-    await page.waitForTimeout(600);
-    if (!/اختيارك مطابق للائحة هذه الفئة/.test(await page.locator('body').innerText())) note(`[${label}] الاختيار المطابق لم يُقبل`); else ok('الاختيار المطابق مقبول');
+
+    /*
+     * وبعد الفئة والرواية: المراجعة، لا اختيارُ نطاق.
+     *
+     * كان هذا الفحصُ يقود بعدها خطوةَ «اختر نطاق حفظك» بمنتقي أجزاء (`#registration-juz-N`)
+     * ويشترط «المطلوب 8». وتلك الخطوةُ أُزيلت من التسجيل مع قرارك في ملاحظات 14 سبتمبر —
+     * نطاقُ الفئة تحدّده الجهة، ولا يختاره المتسابق.
+     *
+     * فالفحصُ يحرس القرارَ: المراجعةُ تُعرض، ولا يعود منتقي النطاق إلى باب المتسابق.
+     */
+    const reviewBody = await page.locator('body').innerText();
+    if (!/مراجعة واحدة/.test(reviewBody)) note(`[${label}] خطوة المراجعة لم تظهر بعد الفئة والرواية`);
+    else ok('المراجعة تظهر بعد اختيار الفئة والرواية');
+    for (const entered of ['تجربة تجريبية', 'qa-reciter@example.org']) {
+      if (!reviewBody.includes(entered)) note(`[${label}] المراجعة لا تعرض ما أُدخل: ${entered}`);
+    }
+    if (!/حفص|ورش|قالون|الدوري|السوسي/.test(reviewBody)) note(`[${label}] المراجعة لا تذكر الرواية المختارة`);
+    else ok('المراجعة تذكر الرواية التي اختارها المتسابق');
+    if (await page.locator('#registration-juz-1').count()) note(`[${label}] منتقي النطاق عاد إلى التسجيل بعد أن أُزيل بطلب المالك`);
+    if (/اختر نطاق حفظك/.test(reviewBody)) note(`[${label}] «اختر نطاق حفظك» عادت إلى التسجيل بعد أن أُزيلت بطلب المالك`);
     await assertNoHorizontalScroll(page, label, 'التسجيل');
     await page.screenshot({ path: path.join(OUT, `register-${label}.png`), fullPage: true });
   } catch (error) {
