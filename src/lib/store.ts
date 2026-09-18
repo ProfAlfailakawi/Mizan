@@ -1092,12 +1092,31 @@ const SERVER_AUDIT_REFUSED_KEY='mizan_server_audit_refused_v1';
  *
  * والاسمُ يُقصر على رمزٍ معروف الشكل قبل كتابته، فلا يركب معه شيءٌ من جسم الحدث.
  */
-type ServerAuditRefusal={action:string;status:number;code:string;count:number;firstAt:string;lastAt:string};
+type ServerAuditRefusal={status:number;code:string;count:number;firstAt:string;lastAt:string};
 const auditToken=(value:unknown,max:number)=>String(value??'').toUpperCase().replace(/[^A-Z0-9_]/g,'').slice(0,max);
+/*
+ * واسمُ الحدث يبقى في الذاكرة ولا يُكتب.
+ *
+ * الفحصُ الأمني تتبّع أرقامَ الشهادات ومعرّفاتها وهي تسري إلى صفّ التدقيق، فكتابةُ أيّ
+ * حقلٍ من ذلك الصفّ إلى تخزين المتصفّح تضع بياناتٍ لا حاجة إليها حيث لا تُحمى. والدائمُ
+ * هو ما يكفي وحده: الرمزُ والحالةُ والعددُ والوقت — ولا شيء منها من جسم الحدث.
+ *
+ * والاسمُ يفيد المشغّلَ في جلسته، فيبقى في الذاكرة مقصورًا على رمزٍ معروف الشكل، ويذهب
+ * بذهابها.
+ */
+const refusedActionsThisSession:string[]=[];
 function readServerAuditRefusals():ServerAuditRefusal[]{try{const raw=localStorage.getItem(SERVER_AUDIT_REFUSED_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-200):[]}catch{return []}}
-function recordServerAuditRefusal(row:ServerAuditMirror,status:number,code:string){try{const action=auditToken(row.action,64)||'UNNAMED';const named=auditToken(code,64)||`HTTP_${status}`;const at=new Date().toISOString();const rows=readServerAuditRefusals();const found=rows.find(x=>x.action===action&&x.code===named);if(found){found.count+=1;found.lastAt=at}else rows.push({action,status,code:named,count:1,firstAt:at,lastAt:at});localStorage.setItem(SERVER_AUDIT_REFUSED_KEY,JSON.stringify(rows.slice(-200)))}catch{}}
+function recordServerAuditRefusal(row:ServerAuditMirror,status:number,code:string){
+ const action=auditToken(row.action,64)||'UNNAMED';
+ if(!refusedActionsThisSession.includes(action)){refusedActionsThisSession.push(action);if(refusedActionsThisSession.length>50)refusedActionsThisSession.shift()}
+ // لا يُكتب إلى التخزين إلا ما لم يأتِ من جسم الحدث: الرمزُ من ردّ الخادم، والحالةُ رقم.
+ try{const named=auditToken(code,64)||`HTTP_${status}`;const at=new Date().toISOString();
+  const rows=readServerAuditRefusals();const found=rows.find(x=>x.code===named&&x.status===status);
+  if(found){found.count+=1;found.lastAt=at}else rows.push({status,code:named,count:1,firstAt:at,lastAt:at});
+  localStorage.setItem(SERVER_AUDIT_REFUSED_KEY,JSON.stringify(rows.slice(-200)))}catch{}
+}
 /** يُقرأ في الواجهة والاختبار: ما رفضه الخادمُ رفضًا دائمًا وبقي في السجلّ المحلّي وحده. */
-export function serverAuditRefusals(){return readServerAuditRefusals()}
+export function serverAuditRefusals(){return {counts:readServerAuditRefusals(),actionsThisSession:[...refusedActionsThisSession]}}
 function readServerAuditOutbox():ServerAuditMirror[]{try{const raw=localStorage.getItem(SERVER_AUDIT_OUTBOX_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-1000):[]}catch{return []}}
 function writeServerAuditOutbox(rows:ServerAuditMirror[]){try{localStorage.setItem(SERVER_AUDIT_OUTBOX_KEY,JSON.stringify(rows.slice(-1000)))}catch{}}
 async function flushServerAuditOutbox(){

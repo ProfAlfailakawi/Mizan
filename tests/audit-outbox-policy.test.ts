@@ -118,14 +118,17 @@ test('a permanently refused event is recorded locally, not silently dropped', ()
   assert.ok(store.includes('firstAt:at,lastAt:at'), 'with when it started and when it last happened');
 
   /*
-   * ولا تُنسخ هويةُ الحدث إلى تخزين المتصفّح: الحدثُ نفسه باقٍ في سجلّ التطبيق، والناقصُ
-   * خبرُ رفضِه. فنسخُ معرّفاته إلى `localStorage` يضع بياناتٍ لا حاجة إليها حيث لا تُحمى،
-   * وقد رصده الفحصُ الأمني بالفعل على هذا الملفّ.
+   * ولا يُكتب إلى تخزين المتصفّح شيءٌ من جسم الحدث.
+   *
+   * الفحصُ الأمني تتبّع أرقامَ الشهادات ومعرّفاتها وهي تسري إلى صفّ التدقيق، ورصد الكتابةَ
+   * هنا مرّتين. والدائمُ لا يحتاجها أصلًا: الرمزُ من ردّ الخادم، والحالةُ رقم، والعدّ عدّ.
+   * أمّا اسمُ الحدث فيبقى في الذاكرة ويذهب بذهاب الجلسة.
    */
   const record = store.slice(store.indexOf('function recordServerAuditRefusal'), store.indexOf('export function serverAuditRefusals'));
-  for (const identifier of ['row.eventId', 'row.entityId', 'row.competitionId', 'row.organizationId', 'row.reason']) {
-    assert.equal(record.includes(identifier), false, `${identifier} must not be written to browser storage`);
+  const persisted = record.slice(record.indexOf('try{'));
+  for (const fromTheEvent of ['row.action', 'row.eventId', 'row.entityId', 'row.competitionId', 'row.organizationId', 'row.reason']) {
+    assert.equal(persisted.includes(fromTheEvent), false, `${fromTheEvent} must not reach localStorage`);
   }
-  assert.ok(record.includes('auditToken(row.action,64)'),
-    'the action name is narrowed to a known-shape token before it is stored');
+  assert.ok(record.includes('refusedActionsThisSession'), 'the action name stays in memory for the operator');
+  assert.ok(record.includes('auditToken(code,64)'), 'and the stored code is narrowed to a known-shape token');
 });
