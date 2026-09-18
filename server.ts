@@ -17,6 +17,7 @@ import { FirestoreAuditStore } from './server/firestore-audit-store';
 import { isServerAuthoredAuditAction } from './server/audit-authority';
 import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-registry';
 import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
+import { policyChangeDecision, scoreCorrectionDecision, readingChangeDecision } from './server/governance-attestation';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -723,11 +724,22 @@ async function startServer() {
   app.post('/api/identity/accounts/:id/suspend',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.suspend(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'SUSPEND_FAILED'})}});
   app.post('/api/identity/accounts/:id/resume',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{return res.json(identityGovernance.resumeAccount(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')))}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'RESUME_FAILED'})}});
   app.delete('/api/identity/accounts/:id',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.remove(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'User removed by authorized administrator')))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'REMOVE_FAILED'})}});
-  app.patch('/api/identity/grants/:id',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{const id=String(req.params.id),body=req.body||{},role=String(body.role||'') as GovernanceRole,reason=String(body.reason||'Authorized grant role update'),actor=scopedMizanIdentity(req);const out=res.json(identityGovernance.updateGrant(actor,id,{role,reason}));syncClaimsForGrant(id);return out}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'GRANT_UPDATE_FAILED'})}});
-  app.post('/api/identity/grants/:id/suspend',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.suspendGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')));syncClaimsForGrant(String(req.params.id))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_SUSPEND_FAILED'})}});
-  app.post('/api/identity/grants/:id/resume',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.resumeGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')));syncClaimsForGrant(String(req.params.id))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_RESUME_FAILED'})}});
+  /*
+   * تغييرُ الصلاحية يُكتب في السجلّ الذي يقرؤه المدقّق.
+   *
+   * `identity-governance` يفصل في التغيير ويكتب أثرَه — لكن في سجلّ حوكمة الهوية وحده.
+   * فمن يفتح `/api/audit/ledger` عند النزاع لا يرى تغييرَ صلاحيةٍ قطّ، وهو أوّلُ ما
+   * يُسأل عنه: من أعطى فلانًا هذا الدور، ومتى. فيُكتب هنا أيضًا، من حيث يقع.
+   */
+  const auditRoleChange=(req:any,grantId:string,summary:string,reason?:string)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;
+    auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:String(actor.competitionId||actor.organizationId),action:'ROLE_CHANGED',entityType:'RoleGrant',entityId:grantId,reason:`${summary}${reason?` · ${String(reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});
+  };
+  app.patch('/api/identity/grants/:id',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{const id=String(req.params.id),body=req.body||{},role=String(body.role||'') as GovernanceRole,reason=String(body.reason||'Authorized grant role update'),actor=scopedMizanIdentity(req);const out=res.json(identityGovernance.updateGrant(actor,id,{role,reason}));syncClaimsForGrant(id);auditRoleChange(req,String(req.params.id),'GRANT_ROLE_UPDATED',req.body?.reason);return out}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'GRANT_UPDATE_FAILED'})}});
+  app.post('/api/identity/grants/:id/suspend',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.suspendGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')));syncClaimsForGrant(String(req.params.id));auditRoleChange(req,String(req.params.id),'GRANT_SUSPENDED',req.body?.reason)}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_SUSPEND_FAILED'})}});
+  app.post('/api/identity/grants/:id/resume',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.resumeGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')));syncClaimsForGrant(String(req.params.id));auditRoleChange(req,String(req.params.id),'GRANT_RESUMED',req.body?.reason)}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_RESUME_FAILED'})}});
   app.post('/api/identity/grants/:id/reissue-qr',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.reissueQr(scopedMizanIdentity(req),String(req.params.id)))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'QR_REISSUE_FAILED'})}});
-  app.delete('/api/identity/grants/:id',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.removeGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'Competition access removed by authorized administrator')));syncClaimsForGrant(String(req.params.id))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_REMOVE_FAILED'})}});
+  app.delete('/api/identity/grants/:id',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.removeGrant(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'Competition access removed by authorized administrator')));syncClaimsForGrant(String(req.params.id));auditRoleChange(req,String(req.params.id),'GRANT_REMOVED',req.body?.reason)}catch(err){res.status(400).json({code:err instanceof Error?err.message:'GRANT_REMOVE_FAILED'})}});
   app.post('/api/identity/grants/:id/revoke-sessions',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin','head_judge']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.revokeGrantSessions(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'SESSION_REVOKE_FAILED'})}});
   app.post('/api/identity/accounts/:id/revoke-sessions',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin','head_judge']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json(identityGovernance.revokeSessions(scopedMizanIdentity(req),String(req.params.id),String(req.body?.reason||'')))}catch(err){res.status(400).json({code:err instanceof Error?err.message:'SESSION_REVOKE_FAILED'})}});
   app.get('/api/identity/audit',requireGovernanceRoles(['super_admin','operator_owner','operator_admin','org_admin','comp_admin','auditor']),(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{res.json({rows:identityGovernance.audit((req as any).mizanIdentity,Number(req.query.limit||500)),verification:identityGovernance.verifyAudit((req as any).mizanIdentity.organizationId)})}catch(err){res.status(400).json({code:err instanceof Error?err.message:'AUDIT_FAILED'})}});
@@ -1537,6 +1549,74 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'RESULT_PUBLISHED',entityType:'Competition',entityId:competitionId,reason:`Published ${record.sealCount} sealed result(s)`,requestId:String(req.headers['x-request-id']||'')});
       return res.status(201).json(record);
     }catch{return res.status(400).json({code:'RESULT_PUBLICATION_FAILED'})}});
+
+  /*
+   * أربعةُ أفعالٍ حاكمة يشهد بها الخادم.
+   *
+   * كانت تقع في العميل: هو يفحص الصلاحية وهو يكتب الأثر. والفحصُ في جهازٍ يملكه صاحبُ
+   * المصلحة ليس فحصًا. فالقرارُ هنا من `server/governance-attestation`، والفاعلُ هو
+   * الهويةُ المُصدَّقة للطلب، والأثرُ يكتبه الخادمُ باسمه.
+   */
+  const attestationFailed=(res:any,decision:{code:string;detail?:string})=>
+    res.status(decision.code.endsWith('_NOT_AUTHORIZED')||decision.code.endsWith('_BLOCKED')?403:422).json(decision);
+
+  app.post('/api/governance/policy-change',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
+    const competitionId=String(b.competitionId||actor.competitionId||'');
+    res.setHeader('Cache-Control','no-store');
+    // عددُ الأختام يُقرأ من سجلّ الأختام الذي كتبه الخادم، لا من حقلٍ يرسله العميل.
+    const sealedResultCount=resultSealRegistry?resultSealRegistry.countFor(actor.organizationId,competitionId):0;
+    const decision=policyChangeDecision({
+      actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,
+      policyVersion:String(b.policyVersion||''),policySha256:String(b.policySha256||''),
+      kind:String(b.kind||'POLICY_UPDATED'),reason:b.reason?String(b.reason).slice(0,2000):undefined,
+      sealedResultCount,
+    });
+    if('code' in decision)return attestationFailed(res,decision);
+    auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'COMPETITION_POLICY_CHANGED',entityType:'Competition',entityId:competitionId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});
+    return res.status(201).json(decision);
+  });
+
+  app.post('/api/results/score-correction',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge']),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
+    const competitionId=String(b.competitionId||actor.competitionId||'');
+    const participantId=String(b.participantId||'');
+    res.setHeader('Cache-Control','no-store');
+    // «هل خُتمت؟» تُقرأ من سجلّ الأختام لا من الطلب — وإلا أعلن المصحّحُ أنها لم تُختم.
+    const resultSealed=!!resultSealRegistry?.latestFor(actor.organizationId,competitionId,participantId);
+    const decision=scoreCorrectionDecision({
+      actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
+      appealId:String(b.appealId||''),delta:Number(b.delta),
+      reason:b.reason?String(b.reason).slice(0,2000):undefined,
+      policyAllowsScoreChange:b.policyAllowsScoreChange===true,resultSealed,
+    });
+    if('code' in decision)return attestationFailed(res,decision);
+    auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'SCORE_CORRECTED',entityType:'Result',entityId:participantId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});
+    return res.status(201).json(decision);
+  });
+
+  app.post('/api/participants/reading-change',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
+    const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
+    const competitionId=String(b.competitionId||actor.competitionId||'');
+    const participantId=String(b.participantId||'');
+    res.setHeader('Cache-Control','no-store');
+    /*
+     * «هل سُحب سؤال؟» تُقرأ من محرّك الأسئلة الخادميّ. وغيابُ المحرّك لا يُقرأ «لم يُسحب»:
+     * ذلك يفتح البابَ الذي بُني ليُغلق، فيُعدّ مسحوبًا حتى يُثبت المحرّكُ خلافه.
+     */
+    let questionDrawn=true;
+    if(!secureQuestionRuntime)questionDrawn=false;
+    else{try{secureQuestionRuntime.findActiveForParticipant(competitionId,participantId,{uid:actor.uid,role:actor.role,organizationId:actor.organizationId,competitionId} as any);questionDrawn=true}
+      catch(err){questionDrawn=!(err instanceof Error&&err.message==='QUESTION_RUNTIME_ACTIVE_SESSION_NOT_FOUND')}}
+    const decision=readingChangeDecision({
+      actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
+      fromRiwaya:String(b.fromRiwaya||''),toRiwaya:String(b.toRiwaya||''),
+      reason:b.reason?String(b.reason).slice(0,2000):undefined,questionDrawn,
+    });
+    if('code' in decision)return attestationFailed(res,decision);
+    auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'PARTICIPANT_READING_CHANGED',entityType:'Participant',entityId:participantId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});
+    return res.status(201).json(decision);
+  });
 
   /* التحقّق مفتوح لكل دور حاكم: من يشكّ في ختم يعيد حسابه هنا بلا وساطة. */
   app.post('/api/results/seal/verify',requireGovernanceRoles(['comp_admin','org_admin','head_judge','auditor',]),(req,res)=>{

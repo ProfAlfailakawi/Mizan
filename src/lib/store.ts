@@ -8,7 +8,7 @@
      */
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
-import { sealResultOnServer, publishResultsOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
+import { sealResultOnServer, publishResultsOnServer, attestPolicyChangeOnServer, attestScoreCorrectionOnServer, attestReadingChangeOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
@@ -2368,10 +2368,28 @@ export function useAppStore() {
     notify(); return next;
   };
 
-  const updateParticipant = (participantId: string, patch: Partial<Participant>) => {
+  /*
+   * تعديلُ المشارك عامّ، وتغييرُ روايته ليس كذلك.
+   *
+   * السؤالُ يُسحب على الرواية: مقروءُها ومواضعُها ونصُّها. فتغييرُها بعد السحب يترك سؤالًا
+   * مسحوبًا على روايةٍ والمتسابقَ يُسمَّع بأخرى، ولا شيء في الشاشة يقول ذلك. فإذا مسّ
+   * التعديلُ الروايةَ وحدَها مرّ من الخادم: يرفض بعد السحب، ولا يخمّن اسمًا ملتبسًا،
+   * ويكتب `PARTICIPANT_READING_CHANGED` باسمه. وسائرُ الحقول تبقى كما كانت.
+   */
+  const updateParticipant = async (participantId: string, patch: Partial<Participant>) => {
     const idx = globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);
     if(idx<0) return null;
-    const next: Participant = { ...globalState.participants[idx], ...patch, id: participantId, competitionId:globalState.competition.id, organizationId:globalState.competition.organizationId };
+    const current = globalState.participants[idx];
+    if(patch.riwaya!==undefined && String(patch.riwaya)!==String(current.riwaya)){
+      const authority = await attestReadingChangeOnServer({competitionId:globalState.competition.id,participantId,fromRiwaya:String(current.riwaya||''),toRiwaya:String(patch.riwaya)});
+      if('failure' in authority){
+        auditTrustAction('PARTICIPANT_READING_CHANGE_REFUSED','Participant',participantId,
+          `تعذّر تغييرُ الرواية على الخادم (${authority.code||authority.failure})؛ لم يتغيّر شيء`,
+          `Server refused the reading change (${authority.code||authority.failure}); nothing changed`);
+        notify();return null;
+      }
+    }
+    const next: Participant = { ...current, ...patch, id: participantId, competitionId:globalState.competition.id, organizationId:globalState.competition.organizationId };
     globalState.participants[idx]=next;
     syncParticipantLifecycle(next);
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'PARTICIPANT_UPDATED',entityType:'Participant',entityId:participantId,humanSummaryArabic:`تعديل بيانات المتسابق ${next.code}`,humanSummaryEnglish:`Updated participant ${next.code}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
@@ -2409,12 +2427,29 @@ export function useAppStore() {
     notify(); return appeal;
   };
 
-  const resolveAppeal = (appealId: string, accepted: boolean, notes: string, scoreAdjustmentDelta = 0) => {
+  /*
+   * حسمُ الاعتراض قرارٌ بشريّ، وتحريكُ الدرجة شيءٌ آخر.
+   *
+   * فإن نتج عن الاعتراض تعديلُ درجة مرّ التعديلُ من الخادم: يتحقّق من الدور المُصدَّق،
+   * ويقرأ «هل خُتمت النتيجة؟» من سجلّ الأختام — لا من الطلب — فيرفض المساسَ برقمٍ مختوم،
+   * ويشترط اعتراضًا مُسجَّلًا يُحال إليه، ويكتب `SCORE_CORRECTED` باسمه. وامتناعُه يترك
+   * الاعتراضَ بلا تعديلِ درجة بدل أن يُعدَّل رقمٌ بلا سند.
+   */
+  const resolveAppeal = async (appealId: string, accepted: boolean, notes: string, scoreAdjustmentDelta = 0) => {
     const idx = globalState.appeals.findIndex(a => a.id === appealId && a.competitionId === globalState.competition.id);
     if (idx < 0) return false;
     const appeal=globalState.appeals[idx];
     const policy=getCompetitionPolicy(globalState.competition);
-    const appliedDelta = accepted && policy.appeals.allowScoreChange ? Number(scoreAdjustmentDelta||0) : 0;
+    let appliedDelta = accepted && policy.appeals.allowScoreChange ? Number(scoreAdjustmentDelta||0) : 0;
+    if(appliedDelta!==0){
+      const authority=await attestScoreCorrectionOnServer({competitionId:globalState.competition.id,participantId:appeal.participantId,appealId,delta:appliedDelta,policyAllowsScoreChange:policy.appeals.allowScoreChange,reason:notes});
+      if('failure' in authority){
+        auditTrustAction('SCORE_CORRECTION_AUTHORITY_UNAVAILABLE','Result',appeal.participantId,
+          `تعذّر اعتمادُ تصحيح الدرجة على الخادم (${authority.code||authority.failure})؛ حُسم الاعتراض بلا تعديل`,
+          `Server refused the score correction (${authority.code||authority.failure}); the appeal was resolved without a score change`);
+        appliedDelta=0;
+      }
+    }
     const resolvedAppeal={ ...appeal, status: accepted ? 'accepted' as const : 'rejected' as const, resolutionNotes: notes, resolvedBy: globalState.currentUser.name, resolvedAt: new Date().toISOString(), scoreAdjustmentDelta: appliedDelta };
     globalState.appeals[idx] = resolvedAppeal;
     void persistScopedDocument('appeals',resolvedAppeal.id,resolvedAppeal as unknown as Record<string,unknown>);
@@ -4266,7 +4301,24 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
   };
   const reviewPolicyCompilation=(id:string,approve:boolean)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role))return false;globalState.policyCompilations=globalState.policyCompilations.map(x=>x.id===id?{...x,state:approve?'REVIEWED':'REJECTED',humanApprovedBy:approve?globalState.currentUser.id:undefined}:x);auditTrustAction(approve?'POLICY_COMPILER_REVIEWED':'POLICY_COMPILER_REJECTED','PolicyCompilation',id,approve?'اعتماد بشري لمسودة اللائحة قبل المحاكاة':'رفض مسودة اللائحة','Human-approved policy draft before simulation');notify();return true;};
   const simulatePolicyCompilation=async(id:string)=>{const rec=globalState.policyCompilations.find(x=>x.id===id);if(!rec||rec.state!=='REVIEWED'||!rec.humanApprovedBy)return null;const candidate=applyApprovedCompilation(rec,globalState.competition);const issues=detectContradictions({competition:candidate,quranSources:globalState.quranSourceManifests,aiValidations:globalState.aiCapabilityValidations,availableQualifiedJudges:globalState.judges.filter(j=>j.isReady).length,committeeCount:globalState.committees.filter(c=>c.status!=='offline').length});const simulationSummary={blockers:issues.filter(x=>x.severity==='BLOCKER').length,reviews:issues.filter(x=>x.severity==='REVIEW').length,infos:issues.filter(x=>x.severity==='INFO').length};const simulatedAt=new Date().toISOString();const simulationHash=await hashCanonical({candidatePolicy:candidate.policy,candidateRuleSet:candidate.ruleSet,issues,simulatedAt});globalState.policyCompilations=globalState.policyCompilations.map(x=>x.id===id?{...x,state:'SIMULATED',simulatedAt,simulationHash,simulationSummary}:x);notify();return {candidate,issues,simulationSummary,simulationHash};};
-  const publishPolicyCompilation=(id:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role))return false;const rec=globalState.policyCompilations.find(x=>x.id===id);if(!rec||rec.state!=='SIMULATED'||!rec.humanApprovedBy||!rec.simulationHash)return false;if((rec.simulationSummary?.blockers||0)>0)return false;const next=applyApprovedCompilation({...rec,state:'REVIEWED'},globalState.competition);globalState.competition=next;globalState.competitions=globalState.competitions.map(c=>c.id===next.id?next:c);const publishedAt=new Date().toISOString();globalState.policyCompilations=globalState.policyCompilations.map(x=>x.id===id?{...x,state:'PUBLISHED',publishedAt,publishedGenomeVersion:getCompetitionPolicy(next).version}:x);auditTrustAction('POLICY_COMPILER_PUBLISHED','CompetitionGenome',next.id,'نشر نسخة Genome جديدة بعد مراجعة بشرية ومحاكاة بلا موانع','Published a new Genome version only after human review and blocker-free simulation');notify();return true;};
+  /*
+   * نشرُ لائحةٍ مُصرَّفة هو تغييرُ سياسة المسابقة بعينه.
+   *
+   * الفحصُ أعلاه يقع في الجهاز نفسه، والأثرُ كان يكتبه هو. فالقرارُ يُعاد إلى الخادم:
+   * يتحقّق من الدور المُصدَّق، ويقرأ عددَ الأختام من سجلّ الأختام — لا من الطلب — فيَسِم
+   * الأثرَ إن تغيّرت اللائحةُ بعد أن بُني عليها حكم. وامتناعُه امتناعٌ: لا تُنشر لائحةٌ
+   * محلّيًّا ليبدو النشرُ واقعًا.
+   */
+  const publishPolicyCompilation=async(id:string)=>{if(!['comp_admin','org_admin'].includes(globalState.currentUser.role))return false;const rec=globalState.policyCompilations.find(x=>x.id===id);if(!rec||rec.state!=='SIMULATED'||!rec.humanApprovedBy||!rec.simulationHash)return false;if((rec.simulationSummary?.blockers||0)>0)return false;const next=applyApprovedCompilation({...rec,state:'REVIEWED'},globalState.competition);
+    const nextVersion=getCompetitionPolicy(next).version;
+    const authority=await attestPolicyChangeOnServer({competitionId:next.id,policyVersion:String(nextVersion),policySha256:await hashCanonical(getCompetitionPolicy(next)),kind:'POLICY_COMPILATION_PUBLISHED',reason:rec.simulationHash});
+    if('failure' in authority){
+      auditTrustAction('POLICY_CHANGE_AUTHORITY_UNAVAILABLE','CompetitionGenome',next.id,
+        `تعذّر اعتمادُ تغيير اللائحة على الخادم (${authority.code||authority.failure})؛ لم تُنشر`,
+        `Server policy authority refused (${authority.code||authority.failure}); nothing was published`);
+      notify();return false;
+    }
+globalState.competition=next;globalState.competitions=globalState.competitions.map(c=>c.id===next.id?next:c);const publishedAt=new Date().toISOString();globalState.policyCompilations=globalState.policyCompilations.map(x=>x.id===id?{...x,state:'PUBLISHED',publishedAt,publishedGenomeVersion:getCompetitionPolicy(next).version}:x);auditTrustAction('POLICY_COMPILER_PUBLISHED','CompetitionGenome',next.id,'نشر نسخة Genome جديدة بعد مراجعة بشرية ومحاكاة بلا موانع','Published a new Genome version only after human review and blocker-free simulation');notify();return true;};
   const refreshContradictionRadar=()=>{const issues=detectContradictions({competition:globalState.competition,quranSources:globalState.quranSourceManifests,aiValidations:globalState.aiCapabilityValidations,availableQualifiedJudges:globalState.judges.filter(j=>j.isReady&&globalState.competition.categories.some(c=>j.certifiedRiwayat.some(r=>String(c.riwaya).toLowerCase().includes(String(r).toLowerCase().split(' ')[0])))).length,committeeCount:globalState.committees.filter(c=>c.status!=='offline').length,committeeSeesDelegation:false,certificateProofRequired:true});globalState.contradictionIssues=issues;auditTrustAction('CONTRADICTION_RADAR_RAN','Competition',globalState.competition.id,`رادار التعارض: ${issues.filter(x=>x.severity==='BLOCKER').length} مانع`,`Contradiction radar: ${issues.filter(x=>x.severity==='BLOCKER').length} blocker(s)`);notify();return issues;};
 
   const exportEmergencyPack=async()=>{if(productionMode)return null;if(!['org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role))return null;const key=await generateEncryptionKey();const keyId=`mizan-disaster-key:${globalState.competition.id}`;try{sessionStorage.setItem(keyId,Array.from(key).map(b=>b.toString(16).padStart(2,'0')).join(''))}catch{}

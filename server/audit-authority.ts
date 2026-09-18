@@ -51,6 +51,19 @@ const ACTION_ALIASES: Readonly<Record<string, ServerAuthoredAuditAction>> = {
   RESULTS_PUBLISHED: 'RESULT_PUBLISHED',
   RESULTS_REOPENED: 'RESULT_REOPENED',
   SCORES_CORRECTED: 'SCORE_CORRECTED',
+  /*
+   * تغييرُ صلاحيةٍ هو تغييرُ دور — ولم يُمنع قبل اليوم لأن منعَه كان يعني ضياعَه: لا
+   * مسار خادميّ يكتبه. وقد صار `/api/governance/role-change` يكتبه، فانتقل المنع.
+   */
+  ROLE_GRANT_UPDATED: 'ROLE_CHANGED',
+  ROLE_GRANT_REMOVED: 'ROLE_CHANGED',
+  ROLE_GRANT_STATUS_CHANGED: 'ROLE_CHANGED',
+  /*
+   * نشرُ لائحةٍ مُصرَّفة هو تغييرُ سياسة المسابقة بعينه، ويكتبه
+   * `/api/governance/policy-change`. أمّا `SCIENTIFIC_REVIEWERS_POLICY_SET` فسياسةُ
+   * جهةٍ لا سياسةُ مسابقة، فلا تُردّ إلى هذا الفعل — والتقريبُ هنا خطأٌ لا اختصار.
+   */
+  POLICY_COMPILER_PUBLISHED: 'COMPETITION_POLICY_CHANGED',
 };
 
 const SERVER_AUTHORED = new Set<string>(SERVER_AUTHORED_AUDIT_ACTIONS);
