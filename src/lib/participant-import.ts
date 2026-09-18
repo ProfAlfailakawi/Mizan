@@ -15,7 +15,7 @@
 
 import type { Category, Competition, Participant } from '../types';
 import { resolveCanonicalRawiId } from './canonical-readings';
-import { isReadingQuestionSafe } from './quran-locus-crosswalk';
+import { isReadingQuestionSafe } from './quran-crosswalk-readiness';
 import { resolveReadings } from './scientific-core';
 
 export const PARTICIPANT_IMPORT_REQUIRED_COLUMNS = ['fullName', 'email', 'dateOfBirth', 'categoryId'] as const;
