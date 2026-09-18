@@ -8,7 +8,7 @@
      */
 import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
-import { sealResultOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
+import { sealResultOnServer, publishResultsOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
 import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
@@ -84,6 +84,7 @@ import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed
 import { compilePolicyText, detectContradictions, policyCompilerSummary, applyApprovedCompilation } from './policy-compiler';
 import { validateVerseStructure, compareQuranRows, type QuranVerseRecord } from './quran-source-ingestion';
 import { buildJudgeIndependenceCommitment, buildParticipantFairnessEvidence, questionRevealReady, planQueueTransfer, queueOrderValue, recommendBalancedQueueMove } from './judging-integrity';
+import { auditRetryDecision, AUDIT_BACKOFF_TRANSIENT_MS } from './audit-outbox-policy';
 import { buildSessionCheckpoint, verifyCheckpointChain, recoveryDecisionFromCheckpoint, nextCredentialGeneration, credentialLineageFor, passReissueAllowed, roleGrantRequiresDualApproval, canGrantRole, invitationTokenHash, normalizedIdentityEmail, detectConcurrentPrivilegedSession, verifyAuditChain, appendAuditHash, passReissueJourneyStateAllowed, fullRetestProposalAllowed, fullRetestApprovalAllowed } from './operational-integrity';
 import { buildCompetitionBlackBox, runFairnessConstitutionalCourt, issueAcousticVenuePassport, buildRecitationDigitalTwin, mapMutashabihatTrap, multiRiwayahSmartRoute, buildAppealCapsule, verifyAppealCapsule, blindAnchorCalibration, integrityEntropyRadar, tripScientificCircuitBreaker, issueMizanIntegrityPassport } from './global-integrity-protocol';
 import { fetchSecureQuestionCapabilities, findSecureRuntimeForParticipant } from './server-question-client';
@@ -1070,13 +1071,34 @@ const auditEventsMirrored=new Set<string>();
 const SERVER_AUDIT_OUTBOX_KEY='mizan_server_audit_outbox_v1';
 type ServerAuditMirror={eventId:string;organizationId:string;competitionId:string;action:string;entityType:string;entityId:string;reason?:string;humanSummaryEnglish?:string;clientTimestamp:string;sessionId?:string;authenticationAssurance?:string};
 let serverAuditFlushRunning=false;let serverAuditBackoffUntil=0;
+const SERVER_AUDIT_REFUSED_KEY='mizan_server_audit_refused_v1';
+/*
+ * الرفضُ الدائم لا يُوقف الطابور.
+ *
+ * كان أيُّ ردٍّ غير ناجح يُبقي الصفَّ وما بعده ويكسر الحلقة. وهذا صحيحٌ لعطلٍ عابر،
+ * وكارثيٌّ لرفضٍ دائم: صفٌّ يردّه الخادم بـ403 لأنه حدثٌ يؤلّفه الخادم وحده لن ينجح
+ * أبدًا، فيسدّ رأسَ الطابور ولا يصل الخادمَ **أيُّ** حدثٍ بعده. فالحارسُ الذي بُني
+ * ليحمي السجلّ يُفرغه.
+ *
+ * فالتمييز بيّن: ما لن ينجح بإعادة المحاولة يُسقَط من الطابور ويُقيَّد بسببه في سجلٍّ
+ * محلّي يُقرأ — لا يُبتلع صامتًا — ويمضي الطابور. وما قد ينجح يبقى ويتراجع.
+ */
+type ServerAuditRefusal={eventId:string;action:string;status:number;code:string;refusedAt:string};
+function readServerAuditRefusals():ServerAuditRefusal[]{try{const raw=localStorage.getItem(SERVER_AUDIT_REFUSED_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-200):[]}catch{return []}}
+function recordServerAuditRefusal(row:ServerAuditMirror,status:number,code:string){try{const rows=readServerAuditRefusals();rows.push({eventId:row.eventId,action:row.action,status,code:code||'AUDIT_REFUSED',refusedAt:new Date().toISOString()});localStorage.setItem(SERVER_AUDIT_REFUSED_KEY,JSON.stringify(rows.slice(-200)))}catch{}}
+/** يُقرأ في الواجهة والاختبار: ما رفضه الخادمُ رفضًا دائمًا وبقي في السجلّ المحلّي وحده. */
+export function serverAuditRefusals(){return readServerAuditRefusals()}
 function readServerAuditOutbox():ServerAuditMirror[]{try{const raw=localStorage.getItem(SERVER_AUDIT_OUTBOX_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-1000):[]}catch{return []}}
 function writeServerAuditOutbox(rows:ServerAuditMirror[]){try{localStorage.setItem(SERVER_AUDIT_OUTBOX_KEY,JSON.stringify(rows.slice(-1000)))}catch{}}
 async function flushServerAuditOutbox(){
  if(serverAuditFlushRunning||Date.now()<serverAuditBackoffUntil||globalState.isOffline||!auth.currentUser)return;
  const pending=readServerAuditOutbox();if(!pending.length)return;serverAuditFlushRunning=true;
  try{const token=await auth.currentUser.getIdToken();let deviceId='';try{deviceId=localStorage.getItem('mizan_device_identity')||''}catch{}const keep:ServerAuditMirror[]=[];
-  for(let i=0;i<pending.length;i++){const row=pending[i];try{const response=await fetch('/api/audit/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json',...(deviceId?{'x-mizan-device-id':deviceId}:{})},body:JSON.stringify(row)});if(response.ok)continue;const body=await response.json().catch(()=>({}));keep.push(row,...pending.slice(i+1));serverAuditBackoffUntil=Date.now()+(response.status===503?60_000:10_000);if(body?.code==='MFA_REQUIRED')serverAuditBackoffUntil=Date.now()+60_000;break}catch{keep.push(row,...pending.slice(i+1));serverAuditBackoffUntil=Date.now()+10_000;break}}
+  for(let i=0;i<pending.length;i++){const row=pending[i];try{const response=await fetch('/api/audit/events',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json',...(deviceId?{'x-mizan-device-id':deviceId}:{})},body:JSON.stringify(row)});if(response.ok)continue;const body=await response.json().catch(()=>({}));
+   // رفضٌ دائم: لن ينجح بإعادة المحاولة، فيُقيَّد بسببه ويُسقَط كي لا يسدّ ما بعده.
+   const decision=auditRetryDecision(response.status,body?.code);
+   if(decision.kind==='REFUSED_PERMANENTLY'){recordServerAuditRefusal(row,response.status,decision.code);continue}
+   keep.push(row,...pending.slice(i+1));serverAuditBackoffUntil=Date.now()+(decision.kind==='RETRY_LATER'?decision.backoffMs:AUDIT_BACKOFF_TRANSIENT_MS);break}catch{keep.push(row,...pending.slice(i+1));serverAuditBackoffUntil=Date.now()+AUDIT_BACKOFF_TRANSIENT_MS;break}}
   writeServerAuditOutbox(keep);
  }finally{serverAuditFlushRunning=false}
 }
@@ -2054,7 +2076,7 @@ export function useAppStore() {
     return { sealed:true, approvals:new Set(globalState.sealApprovals.map(a=>a.actorId)).size, checksum };
   };
 
-  const publishResults = () => {
+  const publishResults = async () => {
     if(globalState.currentUser.role==='super_admin'||!can(globalState.currentUser.role,'result.publish'))return false;
     const competitionResults=globalState.results.filter(r=>r.competitionId===globalState.competition.id);
     if(!competitionResults.length || competitionResults.some(r=>r.status!=='sealed' && r.status!=='published')) return false;
@@ -2072,6 +2094,21 @@ export function useAppStore() {
      * الصحيحة: النداء الثاني يقول «تمّ» ولا يفعل شيئًا.
      */
     if(competitionResults.every(r=>r.status==='published')) return true;
+    /*
+     * سلطةُ النشر في الخادم، لا هنا.
+     *
+     * الفحصُ أعلاه يقع في الجهاز الذي يملكه صاحبُ المصلحة، ويكتب أثرَه بنفسه. فالقرارُ
+     * يُعاد إلى الخادم: يقرأ الخاتمين من سجلّ الأختام — لا من حقلٍ يرسله العميل — ويطبّق
+     * فصلَ المهامّ، ويكتب `RESULT_PUBLISHED` باسمه. وامتناعُه امتناعٌ: لا يُنشر شيءٌ محلّيًّا
+     * ليبدو النشرُ واقعًا، لأن نشرًا بلا سندٍ خادميّ أسوأ من لا نشر.
+     */
+    const authority=await publishResultsOnServer(globalState.competition.id);
+    if('failure' in authority){
+      auditTrustAction('RESULT_PUBLICATION_AUTHORITY_UNAVAILABLE','Competition',globalState.competition.id,
+        `تعذّر نشر النتائج على الخادم (${authority.code||authority.failure})؛ لم يُنشر شيء`,
+        `Server publication authority unavailable (${authority.code||authority.failure}); nothing was published`);
+      notify();return false;
+    }
     const publishedAt=new Date().toISOString();
     globalState.results=globalState.results.map(r=>r.competitionId===globalState.competition.id?({...r,status:'published',publishedById:globalState.currentUser.id,publishedAt}):r);
     for(const rr of globalState.results.filter(r=>r.competitionId===globalState.competition.id)) void persistScopedDocument('results',rr.id,rr as unknown as Record<string,unknown>);

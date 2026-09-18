@@ -17,7 +17,8 @@ import path from 'node:path';
 const STORE = fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'store.ts'), 'utf8');
 
 function publishBody(): string {
-  const start = STORE.indexOf('const publishResults = () => {');
+  // يُطابَق الاسمُ لا هجاءُ توقيعه: الدالةُ صارت غير متزامنة لأن سلطة النشر في الخادم.
+  const start = STORE.search(/const publishResults = (?:async )?\(\) => \{/);
   assert.ok(start > -1, 'publishResults is present');
   const end = STORE.indexOf('const completeCompetition', start);
   assert.ok(end > start, 'the function body is bounded');
@@ -73,4 +74,26 @@ test('a judge assessment cannot be locked or written twice', () => {
     'the submission is keyed by (session, judge) so a retry replaces rather than duplicates');
   assert.match(STORE, /persistScopedDocument\('judge_submissions',`\$\{submission\.sessionId\}_\$\{submission\.judgeId\}`/,
     'and it persists to that same natural key, never to a fresh id');
+});
+
+test('publication is decided by the server before anything is published locally', () => {
+  /*
+   * فصلُ المهامّ أعلاه يقع في الجهاز الذي يملكه صاحبُ المصلحة في النتيجة، وأثرُه يكتبه
+   * هو. فالقرارُ يُعاد إلى الخادم: يقرأ الخاتمين من سجلّ الأختام ويكتب الأثر باسمه.
+   * وامتناعُه امتناعٌ — لا يُنشر شيءٌ محلّيًّا ليبدو النشرُ واقعًا.
+   */
+  const body = publishBody();
+  const call = body.indexOf('await publishResultsOnServer(globalState.competition.id)');
+  assert.ok(call > -1, 'publication must ask the server authority');
+  assert.ok(body.includes("auditTrustAction('RESULT_PUBLICATION_AUTHORITY_UNAVAILABLE'"),
+    'an unreachable authority is recorded by name, not swallowed');
+  assert.ok(/if\('failure' in authority\)\{[\s\S]*?notify\(\);return false;/.test(body),
+    'a refusal publishes nothing at all');
+  for (const sideEffect of [
+    'const publishedAt=new Date().toISOString();',
+    "persistScopedDocument('results'",
+    "appendParticipantNotifications(p,'result.published')",
+  ]) {
+    assert.ok(call < body.indexOf(sideEffect), `the server decides before: ${sideEffect}`);
+  }
 });

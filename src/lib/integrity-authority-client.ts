@@ -74,6 +74,21 @@ export function sealResultOnServer(input: SealRequestInput) {
   return call<SealedResultView>('/api/results/seal', {method: 'POST', body: input});
 }
 
+export interface PublicationView {
+  organizationId: string; competitionId: string;
+  publishedBy: string; publishedAt: string; sealCount: number; idempotent?: boolean;
+}
+
+/**
+ * النشر يُقرَّر في الخادم.
+ *
+ * فصل المهامّ يُقرأ هناك من سجلّ الأختام لا من حقل يرسله العميل عن نفسه، والأثر يكتبه
+ * الخادم باسمه. ولا يُرسَل ناشرٌ ولا عددُ أختام: كلاهما ممّا يعرفه الخادم وحده.
+ */
+export function publishResultsOnServer(competitionId: string) {
+  return call<PublicationView>('/api/results/publish', {method: 'POST', body: {competitionId}});
+}
+
 export function verifySealOnServer(sealed: unknown) {
   return call<{intact: boolean; signature: string; sealSha256: string}>('/api/results/seal/verify', {method: 'POST', body: {sealed}});
 }
