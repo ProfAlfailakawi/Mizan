@@ -1083,9 +1083,19 @@ const SERVER_AUDIT_REFUSED_KEY='mizan_server_audit_refused_v1';
  * فالتمييز بيّن: ما لن ينجح بإعادة المحاولة يُسقَط من الطابور ويُقيَّد بسببه في سجلٍّ
  * محلّي يُقرأ — لا يُبتلع صامتًا — ويمضي الطابور. وما قد ينجح يبقى ويتراجع.
  */
-type ServerAuditRefusal={eventId:string;action:string;status:number;code:string;refusedAt:string};
+/*
+ * ما يُقيَّد عن الرفض: نوعُه وعددُه ووقتُه — لا الحدثُ نفسه.
+ *
+ * الحدثُ المرفوض باقٍ في سجلّ التطبيق (`globalState.auditLogs`)؛ الناقصُ هو **خبرُ**
+ * رفضِه. فلا حاجة إلى نسخ معرّفاته إلى تخزين المتصفّح: ما يفيد المشغّلَ أن يعرف أن
+ * أحداثًا من هذا النوع تُردّ بهذا الرمز ومنذ متى، وذلك عدّادٌ لا سجلُّ هويات.
+ *
+ * والاسمُ يُقصر على رمزٍ معروف الشكل قبل كتابته، فلا يركب معه شيءٌ من جسم الحدث.
+ */
+type ServerAuditRefusal={action:string;status:number;code:string;count:number;firstAt:string;lastAt:string};
+const auditToken=(value:unknown,max:number)=>String(value??'').toUpperCase().replace(/[^A-Z0-9_]/g,'').slice(0,max);
 function readServerAuditRefusals():ServerAuditRefusal[]{try{const raw=localStorage.getItem(SERVER_AUDIT_REFUSED_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-200):[]}catch{return []}}
-function recordServerAuditRefusal(row:ServerAuditMirror,status:number,code:string){try{const rows=readServerAuditRefusals();rows.push({eventId:row.eventId,action:row.action,status,code:code||'AUDIT_REFUSED',refusedAt:new Date().toISOString()});localStorage.setItem(SERVER_AUDIT_REFUSED_KEY,JSON.stringify(rows.slice(-200)))}catch{}}
+function recordServerAuditRefusal(row:ServerAuditMirror,status:number,code:string){try{const action=auditToken(row.action,64)||'UNNAMED';const named=auditToken(code,64)||`HTTP_${status}`;const at=new Date().toISOString();const rows=readServerAuditRefusals();const found=rows.find(x=>x.action===action&&x.code===named);if(found){found.count+=1;found.lastAt=at}else rows.push({action,status,code:named,count:1,firstAt:at,lastAt:at});localStorage.setItem(SERVER_AUDIT_REFUSED_KEY,JSON.stringify(rows.slice(-200)))}catch{}}
 /** يُقرأ في الواجهة والاختبار: ما رفضه الخادمُ رفضًا دائمًا وبقي في السجلّ المحلّي وحده. */
 export function serverAuditRefusals(){return readServerAuditRefusals()}
 function readServerAuditOutbox():ServerAuditMirror[]{try{const raw=localStorage.getItem(SERVER_AUDIT_OUTBOX_KEY);const rows=raw?JSON.parse(raw):[];return Array.isArray(rows)?rows.slice(-1000):[]}catch{return []}}

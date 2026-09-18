@@ -114,5 +114,18 @@ test('a permanently refused event is recorded locally, not silently dropped', ()
   const store = fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'store.ts'), 'utf8');
   assert.ok(store.includes('SERVER_AUDIT_REFUSED_KEY'), 'refusals need their own durable key');
   assert.ok(store.includes('export function serverAuditRefusals()'), 'and must be readable');
-  assert.ok(/refusedAt:new Date\(\)\.toISOString\(\)/.test(store), 'with the time it was refused');
+  assert.ok(store.includes('found.count+=1'), 'repeated refusals of the same kind are counted');
+  assert.ok(store.includes('firstAt:at,lastAt:at'), 'with when it started and when it last happened');
+
+  /*
+   * ولا تُنسخ هويةُ الحدث إلى تخزين المتصفّح: الحدثُ نفسه باقٍ في سجلّ التطبيق، والناقصُ
+   * خبرُ رفضِه. فنسخُ معرّفاته إلى `localStorage` يضع بياناتٍ لا حاجة إليها حيث لا تُحمى،
+   * وقد رصده الفحصُ الأمني بالفعل على هذا الملفّ.
+   */
+  const record = store.slice(store.indexOf('function recordServerAuditRefusal'), store.indexOf('export function serverAuditRefusals'));
+  for (const identifier of ['row.eventId', 'row.entityId', 'row.competitionId', 'row.organizationId', 'row.reason']) {
+    assert.equal(record.includes(identifier), false, `${identifier} must not be written to browser storage`);
+  }
+  assert.ok(record.includes('auditToken(row.action,64)'),
+    'the action name is narrowed to a known-shape token before it is stored');
 });
