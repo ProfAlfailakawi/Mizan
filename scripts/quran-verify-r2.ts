@@ -70,13 +70,24 @@ async function main() {
   const client = new R2PrivateClient(cfg);
   let failures = 0;
   let checked = 0;
+  /*
+   * «غائبٌ كلُّه» ليس «فاسدٌ بعضُه».
+   *
+   * كان الحكمُ واحدًا للحالتين: `R2_OBJECT_INTEGRITY_FAILED` — «الحزمة غير صالحة
+   * للاستعمال العلمي». وهو وصفٌ صحيحٌ لحزمةٍ موجودةٍ ببايتاتٍ تخالف المثبَّت، وخاطئٌ
+   * تمامًا لشجرةٍ لم تُرفع قطّ: ليس ثمّ ما هو غيرُ صالح، ليس ثمّ شيء.
+   *
+   * والفرقُ يقرّر مَن يُستدعى: الأولى تُحقَّق فيها كتابةٌ لم تُؤذن، والثانية يُشغَّل
+   * لها رفع. وخلطُهما يُرسل المسؤولَ إلى غير العطل.
+   */
+  let missingManifests = 0;
 
   for (const rawiId of readings) {
     const manifestKey = quranPackageKey(rawiId, version);
     const res = await client.getObject(manifestKey);
     if (!res) {
       console.error(`MISSING_MANIFEST ${rawiId}: ${manifestKey}`);
-      failures++;
+      failures++; missingManifests++;
       continue;
     }
 
@@ -122,8 +133,19 @@ async function main() {
   }
 
   console.log(`\nمُتحقَّق: ${checked} كائنًا · فاشل: ${failures}${deep ? ' · وضع البصمة العميقة' : ' · وسم البصمة'}`);
+  if (missingManifests === readings.length) {
+    /*
+     * لا رواية واحدة موجودة: الشجرةُ لم تُرفع، ولم يُفسد شيءٌ. ويُقال ذلك باسمه كي
+     * لا يُقرأ فسادَ بايتات، ويُذكر المفتاحُ المتوقَّع ليُعرف أين يُرفع.
+     */
+    console.error(`R2_QURAN_PACKAGES_NOT_PUBLISHED: لا حزمة واحدة من ${readings.length} موجودة على R2.`);
+    console.error(`  التخزين وصلته الأوامرُ واعتمادُه صحيح — الشجرةُ فارغة، لا فاسدة.`);
+    console.error(`  المفتاح المتوقَّع لكل رواية: ${quranPackageKey('<rawiId>', version)}`);
+    process.exit(1);
+  }
   if (failures) {
     console.error('R2_OBJECT_INTEGRITY_FAILED: الحزمة غير صالحة للاستعمال العلمي حتى تُصلَح.');
+    if (missingManifests) console.error(`  ومنها ${missingManifests} روايةً لا بيانَ لها أصلًا — تلك تُرفع، ولا تُصلَح.`);
     process.exit(1);
   }
 }
