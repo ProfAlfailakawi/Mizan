@@ -3,6 +3,7 @@ import { newId, sha256 } from './crypto';
 import { hashCanonical } from './trust-protocol';
 import { QUESTION_ENGINE_VERSION, QuestionAllocationEngine, locusKeyOf, type QuestionCandidate, type ReadingContext, type SelectionReason } from './question-engine';
 import { computeModelFairness } from './model-fairness';
+import { resolveReadings } from './scientific-core';
 import { scopeContainsRange, scopeSignature, type QuranScope } from './quran-scope';
 import type { ZoneSlot } from './question-zones';
 
@@ -31,17 +32,33 @@ export function poolItemToCandidate(item:QuestionPoolItem,reading?:ReadingContex
   ...(reading||{}),
  };
 }
-function normalizedRiwaya(value: string) { return value.toLowerCase().replace(/[^a-z\u0600-\u06ff]/g,''); }
 function secureSeed(){const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function tieValue(seed:string,id:string){return parseInt((await sha256(`${seed}|${id}`)).slice(0,13),16)/0x1fffffffffffff}
 
 async function selectWithSeed(args:{pool:QuestionPoolItem[];participant:{riwaya:string};policy:CompetitionPolicy;seed:string;maxJuz?:number;excludedIds?:string[]}){
- const {participant,policy}=args;const excluded=new Set(args.excludedIds||[]);const participantRiwaya=normalizedRiwaya(participant.riwaya);
+ const {participant,policy}=args;const excluded=new Set(args.excludedIds||[]);
  let candidates=args.pool.filter(q=>!excluded.has(q.id));
  // بنكٌ فارغ ليس اختلافَ رواية: تشخيصُه باسم الرواية يُرسل المسؤول يضيف مواضع والعائقُ غيرها.
  if(!candidates.length)throw new Error('FAIRDRAW_NO_ELIGIBLE_QUESTIONS');
  // Exact reading isolation: if the pool has no matching reading, fail rather than silently falling back to Hafs.
- const riwayaMatches=candidates.filter(q=>{const qn=normalizedRiwaya(q.riwaya);return participantRiwaya===qn||participantRiwaya.includes(qn)||qn.includes(participantRiwaya)});
+ /*
+  * عزلُ الرواية يقع على الهوية القانونية، لا على تشابه الحروف.
+  *
+  * كانت المطابقة `a.includes(b)||b.includes(a)` على نصّ العرض، وفيها ثلاثةُ منافذ تسرّب:
+  *
+  *   · متسابقٌ **بلا رواية** ينطبع اسمُه فراغًا، و`q.includes('')` صحيحةٌ دائمًا — فيطابق
+  *     كلَّ أسئلة البنك ويُسحب له سؤالٌ من أيّ روايةٍ كانت، بلا خطأٍ ولا أثر.
+  *   · «الدوري» المجرّدة تطابق **الدوري عن أبي عمرو** و**الدوري عن الكسائي** معًا.
+  *   · «خلف» المجرّدة تطابق **خلف عن حمزة** و**خلف العاشر** معًا.
+  *
+  * والأخيران هما التسرّبُ المنصوصُ على منعه بعينه. فصارت المطابقةُ على `rawiId` بعد الحلّ
+  * القانوني: اسمُ المتسابق يجب أن يُحلّ إلى **روايةٍ واحدة** بعينها، وإلا فشل الأمرُ باسمه
+  * ولم يُخمَّن؛ والسؤالُ يُطابق إذا كانت روايةُ المتسابق من بين رواياته المُحلّة.
+  */
+ const participantReadings=resolveReadings({riwaya:participant.riwaya});
+ if(participantReadings.length!==1)throw new Error('FAIRDRAW_PARTICIPANT_READING_UNRESOLVED');
+ const participantRawiId=participantReadings[0].rawiId;
+ const riwayaMatches=candidates.filter(q=>resolveReadings({riwaya:q.riwaya}).some(r=>r.rawiId===participantRawiId));
  if(!riwayaMatches.length)throw new Error('FAIRDRAW_READING_SOURCE_MISMATCH'); candidates=riwayaMatches;
  if(args.maxJuz)candidates=candidates.filter(q=>q.juzNumber<=args.maxJuz!);if(!candidates.length)throw new Error('FAIRDRAW_NO_ELIGIBLE_QUESTIONS');
  const scored=await Promise.all(candidates.map(async q=>({q,delta:Math.abs(q.difficultyRating-policy.questions.targetDifficulty),rand:await tieValue(args.seed,q.id)})));scored.sort((a,b)=>a.delta-b.delta||a.rand-b.rand);
