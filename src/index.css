@@ -1216,6 +1216,16 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
   background:rgba(232,203,147,.12); border:1px solid rgba(232,203,147,.22);
   color:#e8cb93; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+/*
+ * الوسم الكامل: حيث تتّسع الشاشة، يُقرأ اسم الفرع كلّه.
+ *
+ * القصّ أعلاه لخليّة القاعة، وفيها عشرون لجنة على لوحٍ واحد فلا بدّ منه. أمّا شاشة اللجنة
+ * الواحدة فمساحتها كلّها لها، واسمٌ مقصوصٌ هناك يترك الواقف لا يدري أهذه لجنته أم لا.
+ */
+.mizan-board-tag.is-full{
+  display:inline-block; white-space:normal; overflow:visible; text-overflow:clip;
+  border-radius:14px; padding:.3rem .7rem; line-height:1.65; text-align:start;
+}
 
 /* الشاشة المتأخّرة تُعلن تأخّرها، والمتوقّفة تُعتم صراحةً. بياناتٌ قديمة تُعرض كأنها حيّة
    تُفقد الجمهور ثقته في كل شاشةٍ بعدها. */

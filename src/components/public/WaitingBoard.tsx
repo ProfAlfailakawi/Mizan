@@ -7,7 +7,7 @@ import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
 import { QueueRibbon } from '../design-system/QueueRibbon';
 import {
-  HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait, venueClock,
+  HALL_NEXT_DEPTH, HALL_PAGE_CAPACITY, HALL_PAGE_SECONDS, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait, paginatePanels, venueClock,
   type CommitteeBoardSlice, type DisplayBoard,
 } from '../../lib/display-board';
 
@@ -22,9 +22,17 @@ import {
  * لقطةٍ واحدة بلا تمرير. ولكل خليّة هويّتها بفئتها، فيعرف الواقف أين يقف قبل أن يُنادى.
  *
  * والمعروض أكوادٌ فقط: هي عين ما ينادي به المنادي صوتًا، ولا اسم ولا سؤال ولا درجة.
+ *
+ * ثم جاء سؤال العشرين لجنة. الشبكة `auto-fit` تتّسع لها جميعًا — لكنها تتّسع بأن تُصغّر:
+ * عشرون خليّةً على تلفاز 55" تُنزل الكود إلى قياسٍ يُقرأ من مترين، وشاشة القاعة تُقرأ من
+ * آخرها. فلا يُحلّ الازدحام بالتصغير بل بالزمن: تُقسَّم اللجان صفحاتٍ لا تتجاوز الواحدة
+ * `HALL_PAGE_CAPACITY` خليّة، وتتناوب الصفحات كل `HALL_PAGE_SECONDS`. كل لجنةٍ تظهر
+ * بحجمٍ يُقرأ، وكلٌّ تعود خلال أقلّ من نصف دقيقة — وهو أقصر من أقصر جلسة.
+ *
+ * والقسمة متوازنة لا متتابعة: إحدى وعشرون لجنةً تصير ١١+١٠ لا ١٢+٩، فلا تُعرض صفحةٌ
+ * شبه فارغة بجوار صفحةٍ مكتظّة.
  */
 
-/** `board` يأتي من وثيقةٍ منشورة على شاشةٍ بلا تسجيل دخول؛ وغيابه يبني الإسقاط من المخزن. */
 export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void }> = ({ board: externalBoard, onClose }) => {
   const venueRef = useRef<HTMLDivElement | null>(null);
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
@@ -56,6 +64,16 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
   const age = boardAge(board.generatedAt, now);
   const calling = board.committees.filter((c) => c.nowCalling);
 
+  /* صفحات الشبكة وتناوبها. صفحةٌ واحدة ⇒ لا مؤقّت ولا مؤشّر ولا شيء يتحرّك. */
+  const pages = useMemo<CommitteeBoardSlice[][]>(() => paginatePanels(board.committees), [board.committees]);
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (pages.length < 2) { setPage(0); return }
+    const t = setInterval(() => setPage((n) => n + 1), HALL_PAGE_SECONDS * 1000);
+    return () => clearInterval(t);
+  }, [pages.length]);
+  const shown = pages.length ? pages[page % pages.length] : [];
+
   return <div
     ref={venueRef}
     role={onClose?"dialog":undefined}
@@ -81,7 +99,23 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
 
       <main className="my-auto py-7">
         {board.committees.length
-          ? <div className="mizan-board-grid">{board.committees.map((c) => <PanelCell key={c.committeeId} slice={c} ar={ar} />)}</div>
+          ? <>
+              <div className="mizan-board-grid">{shown.map((c) => <PanelCell key={c.committeeId} slice={c} ar={ar} />)}</div>
+              {/*
+                * مؤشّر الصفحات: لا يظهر إلا حين تكون هناك صفحاتٌ أصلًا. وهو يقول للواقف
+                * إنّ لجنته لم تختفِ بل ستعود — وإلّا ظنّ الشبكةَ كلَّ اللجان وقد غابت لجنته.
+                */}
+              {pages.length > 1 && <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <div className="flex items-center gap-1.5" aria-hidden>
+                  {pages.map((_, i) => <span key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === page % pages.length ? 'w-7 bg-[#e8cb93]' : 'w-1.5 bg-white/20'}`} />)}
+                </div>
+                <span className="text-[11px] font-bold mizan-venue-muted tabular-nums">
+                  {ar
+                    ? `اللجان ${board.committees.length} · تُعرض بالتناوب كل ${HALL_PAGE_SECONDS} ثانية`
+                    : `${board.committees.length} panels · rotating every ${HALL_PAGE_SECONDS}s`}
+                </span>
+              </div>}
+            </>
           : <div className="py-16 text-center mizan-venue-faint text-sm">{ar ? 'لا توجد لجان في هذه المسابقة بعد.' : 'This competition has no panels yet.'}</div>}
 
         {/* النداء نصًّا لقارئ الشاشة: الوميض وحده لا يصل الكفيف. */}
