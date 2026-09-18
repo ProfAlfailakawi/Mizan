@@ -67,6 +67,28 @@ jobs:
       - name: جلبُ الأصول الثقيلة
         run: npx tsx scripts/kfgqpc-heavy-acquire.ts --full
 
+      # سببُ التعذّر يُقرأ من الملخّص، لا من آخر سجلٍّ طويل. ولا يُبتلع الفشلُ هنا:
+      # الخطوةُ تعمل عند الفشل وحده، وتُبقيه فاشلًا — إنما تقول أين هو.
+      - name: لماذا تعذّر الجلب
+        if: failure()
+        shell: bash
+        run: |
+          set -uo pipefail
+          report='.mizan-ingest/reports/official-acquisition.json'
+          heavy='.mizan-ingest/reports/official-heavy-acquisition.json'
+          {
+            echo '### تعذّر الجلبُ من المصدر الرسميّ'
+            if [[ -f "$report" ]] && grep -q 'SOURCE_PAGE_UNREACHABLE' "$report"; then
+              echo '- ❌ **صفحةُ المجمَّع لم تُفتح من هذا العدّاء.** فلم تُستخرج روابطُ التنزيل ولا بصماتُ MD5 الرسمية، ولم يُتحقَّق من حزمةٍ واحدة.'
+              echo '- العطلُ في السبيل إلى المصدر لا في الحزم: يُشغَّل السكربت من شبكةٍ تصل إلى `qurancomplex.gov.sa`، أو يُنتظر عودةُ الموقع.'
+            elif [[ -f "$heavy" ]] && grep -q 'SOURCE_PAGES_UNREACHABLE' "$heavy"; then
+              echo '- ❌ **لم تُفتح صفحةٌ رسميةٌ واحدة** لأصلٍ ثقيلٍ فأكثر. راجع `pageFailures` في التقرير المرفق.'
+            else
+              echo '- الصفحاتُ فُتحت، ولم تُطابق حزمةٌ مطلوبةٌ بصمتَها الرسمية. راجع التقارير المرفقة.'
+            fi
+            echo '- التقارير مرفوعةٌ في `kfgqpc-ingest-reports-${{ inputs.mode }}`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # ── التحقّق: يعمل في الوضعين ───────────────────────────────────────────────
       - name: التحقّقُ من كل حزمة مقابل بصمة المجمَّع
         run: npx tsx scripts/kfgqpc-ingest.ts --dry-run

@@ -57,17 +57,41 @@ function scoreCandidate(t:Target,c:{url:string;text:string;context:string}){
   const hay=`${c.text} ${c.context}`;const matched=t.tokens.filter(token=>token.test(hay)).length;if(matched!==t.tokens.length)return 0;
   let score=isDownloadLike(c.url,c.text)?8:0;score+=matched*10;if(/\.(?:zip)(?:$|\?)/i.test(c.url))score+=5;if(/download\.qurancomplex|fonts\.qurancomplex|qc-dev\.qurancomplex/i.test(c.url))score+=2;return score;
 }
-async function discover(t:Target){
-  const override=process.env[t.overrideEnv];if(override){assertOfficialKfgqpcUrl(override);return [{url:new URL(override).toString(),score:999,via:'ENV_OFFICIAL_OVERRIDE'}]}
+/*
+ * «لم تُوجد حزمة» ليست «لم تُفتح صفحة».
+ *
+ * كان هنا `catch{continue}` — كلُّ صفحةٍ رسميةٍ تتعذّر تُطرح بلا أثر: انقطاعُ شبكة،
+ * و`HTTP_403`، ومهلةٌ تنتهي، وصفحةٌ أكبر من الحدّ — كلُّها سواء، وكلُّها صامتة. فإذا
+ * لم تُفتح صفحةٌ واحدة رجع البحثُ فارغًا، وقال التقرير «الأصلُ المطلوب لم يُستوعب»
+ * وأرسل المسؤولَ يبحث عن رابطِ تنزيلٍ انتقل — والحقيقةُ أن شبكتَه لم تصل إلى الموقع.
+ *
+ *   · صفحاتٌ فُتحت ولم يُطابق فيها شيء ⇒ الرابطُ انتقل أو تغيّرت التسمية. يُبحث.
+ *   · لم تُفتح صفحةٌ واحدة            ⇒ لا شيء يُبحث فيه أصلًا. تُصلَح السبيل.
+ *
+ * وهو الخلطُ نفسُه الذي أُصلح في «حزمةٌ فاسدة» مقابل «حزمةٌ لم تُرفع»، وفي «بنكٌ فارغ»
+ * مقابل «اختلافُ رواية». فيُحفظ سببُ كلّ صفحةٍ بنصّه، ويُعدّ كم صفحةً فُتحت فعلًا.
+ */
+export interface DiscoveryOutcome {
+  candidates:{url:string;score:number;via:string}[];
+  /** كم صفحةً رسميةً فُتحت وقُرئت. صفرٌ مع أعطالٍ يعني أن المصدر لم يُبلَغ. */
+  pagesRead:number;
+  pageFailures:{url:string;reason:string}[];
+}
+
+async function discover(t:Target):Promise<DiscoveryOutcome>{
+  const override=process.env[t.overrideEnv];if(override){assertOfficialKfgqpcUrl(override);return {candidates:[{url:new URL(override).toString(),score:999,via:'ENV_OFFICIAL_OVERRIDE'}],pagesRead:0,pageFailures:[]}}
   const queue=t.sourcePages.map(url=>({url,depth:0}));const seen=new Set<string>(),found=new Map<string,{url:string;score:number;via:string}>();
-  while(queue.length&&seen.size<30){const {url,depth}=queue.shift()!;if(seen.has(url))continue;seen.add(url);let page;try{page=await getText(url)}catch{continue}
+  const pageFailures:{url:string;reason:string}[]=[];let pagesRead=0;
+  while(queue.length&&seen.size<30){const {url,depth}=queue.shift()!;if(seen.has(url))continue;seen.add(url);let page;
+    try{page=await getText(url)}catch(e){pageFailures.push({url,reason:e instanceof Error?e.message:'UNKNOWN'});continue}
+    pagesRead+=1;
     for(const c of links(page.text,page.url)){const score=scoreCandidate(t,c);if(score>=16&&isDownloadLike(c.url,c.text))found.set(c.url,{url:c.url,score,via:page.url});
       if(depth<1&&score>=10&&!/\.(?:zip|rar|7z|mp3|m4a|ttf|otf|woff2?)(?:$|\?)/i.test(c.url)&&!seen.has(c.url))queue.push({url:c.url,depth:depth+1});
     }
   }
   const ranked=[...found.values()].sort((a,b)=>b.score-a.score).slice(0,8);
   if(ranked.length>1&&ranked[0].score===ranked[1].score&&ranked[0].url!==ranked[1].url)throw new Error(`AMBIGUOUS_OFFICIAL_CANDIDATES:${t.id}`);
-  return ranked;
+  return {candidates:ranked,pagesRead,pageFailures};
 }
 
 async function download(url:string,file:string,maxBytes:number){
@@ -104,14 +128,41 @@ function validateFonts(raw:string,payload:string){const files=walk(raw).filter(f
 function updateSource(t:Target,patch:Record<string,unknown>){const dir=path.join(root,t.id);fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,'source.json'),before=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{};fs.writeFileSync(file,JSON.stringify({...before,...patch},null,2)+'\n')}
 
 async function acquire(t:Target){
-  const candidates=await discover(t);if(!full)return {id:t.id,kind:t.kind,status:candidates.length?'OFFICIAL_CANDIDATES_FOUND':'NO_OFFICIAL_CANDIDATE',candidates};
+  const {candidates,pagesRead,pageFailures}=await discover(t);
+  /* لا صفحةَ فُتحت وهناك أعطال: المصدرُ لم يُبلَغ، فلا يُقال «لم تُوجد حزمة». */
+  const sourceUnreachable=pagesRead===0&&pageFailures.length>0;
+  const base={id:t.id,kind:t.kind,optional:!!t.optional,pagesRead,pageFailures};
+  if(!full)return {...base,status:sourceUnreachable?'SOURCE_PAGES_UNREACHABLE':candidates.length?'OFFICIAL_CANDIDATES_FOUND':'NO_OFFICIAL_CANDIDATE',candidates};
+  if(sourceUnreachable)return {...base,status:'SOURCE_PAGES_UNREACHABLE',attempts:[],candidates:[]};
   const attempts:any[]=[];for(const c of candidates){const dir=path.join(root,t.id),archive=path.join(dir,'source.zip'),raw=path.join(dir,'.raw'),payload=path.join(dir,'payload');try{
       const got=await download(c.url,archive,t.maxBytes);extract(archive,raw);const validation=t.kind==='MUSHAF'?validateMushaf(raw,payload):t.kind==='AUDIO'?validateAudio(raw,payload):validateFonts(raw,payload);fs.rmSync(raw,{recursive:true,force:true});
       updateSource(t,{sourceUrl:c.via==='ENV_OFFICIAL_OVERRIDE'?got.finalUrl:c.via,directUrl:got.finalUrl,downloadedAt:new Date().toISOString(),sourceArchive:'source.zip',directOfficialDownloadVerified:true,currentOfficialAyahPackageVerified:t.kind==='AUDIO'?true:undefined,officialAuthorityDomain:true,identityTokens:t.tokens.map(x=>x.source),discoveryPage:c.via,validation});
       return {id:t.id,kind:t.kind,status:'ACQUIRED_VERIFIED_STRUCTURE',directUrl:got.finalUrl,bytes:got.bytes,validation,attempts};
     }catch(e){attempts.push({url:c.url,reason:e instanceof Error?e.message:'UNKNOWN'});fs.rmSync(path.join(root,t.id,'.raw'),{recursive:true,force:true})}}
-  return {id:t.id,kind:t.kind,status:t.optional?'OPTIONAL_NOT_VERIFIED':'REQUIRED_NOT_ACQUIRED',attempts,candidates};
+  return {...base,status:t.optional?'OPTIONAL_NOT_VERIFIED':'REQUIRED_NOT_ACQUIRED',attempts,candidates};
 }
 
-async function main(){const startedAt=new Date().toISOString();const results=[];for(const t of selected){const r=await acquire(t);results.push(r);console.log(JSON.stringify(r))}const requiredFailures=results.filter((r:any)=>r.status==='REQUIRED_NOT_ACQUIRED');const report={protocol:'MIZAN-KFGQPC-HEAVY-ACQUISITION-2',mode:full?'FULL_ACQUIRE':'DISCOVERY_ONLY',startedAt,finishedAt:new Date().toISOString(),authorityRule:'HTTPS *.qurancomplex.gov.sa ONLY',results};fs.writeFileSync(path.join(reportDir,'official-heavy-acquisition.json'),JSON.stringify(report,null,2)+'\n');if(full&&requiredFailures.length){console.error(`REQUIRED_OFFICIAL_ASSETS_NOT_ACQUIRED:${requiredFailures.map((x:any)=>x.id).join(',')}`);process.exitCode=2}}
+async function main(){
+  const startedAt=new Date().toISOString();const results:any[]=[];
+  for(const t of selected){const r=await acquire(t);results.push(r);console.log(JSON.stringify(r))}
+  /* المانعُ هو ما كان مطلوبًا ولم يُبلَغ — سواءٌ لم تُوجد حزمتُه أو لم تُفتح صفحتُه. */
+  const blocked=results.filter(r=>!r.optional&&(r.status==='REQUIRED_NOT_ACQUIRED'||r.status==='SOURCE_PAGES_UNREACHABLE'));
+  const unreachable=results.filter(r=>r.status==='SOURCE_PAGES_UNREACHABLE');
+  const report={protocol:'MIZAN-KFGQPC-HEAVY-ACQUISITION-2',mode:full?'FULL_ACQUIRE':'DISCOVERY_ONLY',startedAt,finishedAt:new Date().toISOString(),authorityRule:'HTTPS *.qurancomplex.gov.sa ONLY',results};
+  fs.writeFileSync(path.join(reportDir,'official-heavy-acquisition.json'),JSON.stringify(report,null,2)+'\n');
+  if(!full||!blocked.length)return;
+  if(unreachable.length===results.length){
+    /*
+     * الحالةُ التي أرسلت المسؤولَ إلى غير العطل: لا صفحةَ فُتحت، فلم يُبحث عن حزمةٍ
+     * ولم تُقارَن بصمة. والأسبابُ تُذكر بنصّها كما ردّتها الشبكة، لا مُلخَّصةً.
+     */
+    const reasons=[...new Set(results.flatMap((r:any)=>r.pageFailures.map((f:any)=>f.reason)))].sort();
+    console.error(`KFGQPC_SOURCE_PAGES_UNREACHABLE:${reasons.join(',')}`);
+    console.error('لم تُفتح صفحةٌ رسميةٌ واحدة من هذه الشبكة، فلم يُبحث عن حزمةٍ ولم تُقارَن بصمة. العطلُ في السبيل إلى المصدر لا في الحزم.');
+  }else{
+    console.error(`REQUIRED_OFFICIAL_ASSETS_NOT_ACQUIRED:${blocked.map((x:any)=>x.id).join(',')}`);
+    if(unreachable.length)console.error(`ومنها ${unreachable.length} لم تُفتح صفحتُها أصلًا: ${unreachable.map((x:any)=>x.id).join(',')}`);
+  }
+  process.exitCode=2;
+}
 main().catch(e=>{console.error(e instanceof Error?e.message:'KFGQPC_HEAVY_ACQUISITION_FAILED');process.exitCode=1});
