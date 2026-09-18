@@ -120,8 +120,31 @@ test('the corridor screen never claims a live session and never reads a particip
   assert.doesNotMatch(rendered, /animate-pulse/, 'no live pulse on a wall that is not live');
   assert.match(rendered, /ليست تلاوة جارية/, 'it says plainly what it is not');
 
-  /* مصدر ما تعرضه هو التجميع المنشور وحده — لا سجلّ التلاوة المفصَّل ولا الجلسة الجارية. */
-  assert.doesNotMatch(rendered, /recitationLedger/, 'the screen must not read the detailed ledger');
-  assert.doesNotMatch(rendered, /activeSession/, 'the screen must not read the running session');
-  assert.match(rendered, /board\?\.recitation/, 'it reads the page-level aggregate');
+  /*
+   * الآية المعروضة تُنتقى من التجميع على مستوى الصفحة، لا من موضعٍ مفصَّل.
+   *
+   * والشاشة تبني إسقاطًا محليًّا حين لا يصلها منشور، فتمرّ بسجلّ التلاوة — لكن تمريرًا
+   * إلى `buildDisplayBoard` وحدها، وهي التي تجمعه على الصفحة وتُسقط المواضع. فالمحروس
+   * أن ما يُرسم مصدره التجميع، وألّا يُقرأ سؤال الجلسة الجارية بحال.
+   */
+  assert.doesNotMatch(rendered, /questionSelection/, 'the live question never reaches this wall');
+  assert.match(rendered, /recitation\?\.pages/, 'the displayed ayah is picked from the page-level aggregate');
+  assert.match(rendered, /pickLocus\(pages\)/, 'and only from it');
+});
+
+test('the corridor screen works before anything is published — and in the demo', () => {
+  const screen = read('src/components/public/CorridorScreen.tsx');
+  const publisher = read('src/components/operations/HallScreenPublisher.tsx');
+
+  /*
+   * الشاشة تُفتح من جهاز الإدارة قبل أن يُنشر شيء، وفي بيئة العرض حيث لا خادم ولا نشر.
+   * فبلا إسقاطٍ محليّ كانت جدارًا فارغًا هناك: لا لجان ولا ختمة ولا آية.
+   */
+  assert.match(screen, /buildDisplayBoard/, 'it builds a local projection when none is published');
+  assert.match(screen, /externalBoard \|\| localBoard/, 'a published projection still wins');
+  assert.match(screen, /recitationLedger/, 'the local projection carries today’s recitation too');
+
+  /* والبطاقة التي تحمل روابط شاشات القاعة تظهر في بيئة العرض، وتقول إن لا نشر فيها. */
+  assert.match(publisher, /IS_DEMO_SESSION/, 'the demo sees the hall-screen links');
+  assert.match(publisher, /بيئة عرض: لا نشر من هذا الجهاز/, 'and it says plainly that nothing is published there');
 });

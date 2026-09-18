@@ -6,7 +6,7 @@ import { useAppStore } from '../../lib/store';
 import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { locusToPage, pageToJuz, surahAyahCount } from '../../lib/mushaf-map';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
-import { boardAge, describeAge, venueClock, type DisplayBoard } from '../../lib/display-board';
+import { HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, describeAge, venueClock, type DisplayBoard } from '../../lib/display-board';
 
 /*
  * شاشة الممرّ.
@@ -56,23 +56,57 @@ export const CorridorScreen: React.FC<{
   rotateSeconds?: number;
   reading?: string;
   onClose?: () => void;
-}> = ({ board, panelsRaw, panels, rotateSeconds = 25, reading = 'hafs', onClose }) => {
+}> = ({ board: externalBoard, panelsRaw, panels, rotateSeconds = 25, reading = 'hafs', onClose }) => {
   const requested = useMemo(() => panels ?? parseCorridorPanels(panelsRaw ?? null), [panels, panelsRaw]);
   const venueRef = useRef<HTMLDivElement | null>(null);
   useDialogBehavior(!!onClose, onClose || (() => {}), venueRef, { autoFocus: false });
   useScreenAwake(true);
-  const { language, competition } = useAppStore();
+  const store = useAppStore();
+  const { language, competition } = store;
   const ar = language !== 'en';
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 5000); return () => clearInterval(t) }, []);
 
+  /*
+   * إسقاطٌ محليّ حين لا يصل المنشور — كما تفعل لوحة القاعة وشاشة اللجنة.
+   *
+   * الشاشة تُفتح برابطها على تلفازٍ بلا تسجيل دخول، فتقرأ ما ينشره جهاز الإدارة. لكنها
+   * تُفتح أيضًا من جهاز الإدارة نفسه — قبل أن يُنشر شيء، أو في بيئة العرض حيث لا خادم
+   * ولا نشر أصلًا — فكانت تظهر هناك جدارًا فارغًا: لا لجان ولا ختمة ولا آية، لأن كل ما
+   * تعرضه معلّقٌ بوثيقةٍ لم تصل.
+   *
+   * والبناء المحليّ يمرّ بالدالة نفسها التي يمرّ بها النشر (`buildDisplayBoard`)، فلا
+   * تفترق شاشةٌ عن شاشة ولا يخرج في المحليّ ما لا يخرج في المنشور: الحدّ واحد.
+   */
+  const localBoard = useMemo(() => buildDisplayBoard({
+    competitionId: competition.id,
+    competitionName: competition.name,
+    competitionNameArabic: competition.nameArabic,
+    participants: store.participants,
+    committees: store.committees,
+    categories: competition.categories || [],
+    fallbackSessionMinutes: competition.ruleSet?.questionDurationMinutes,
+    elapsedSecondsByCommittee: store.activeSession.committee
+      ? { [store.activeSession.committee.id]: store.sessionElapsedSeconds() }
+      : undefined,
+    recited: store.recitationLedger
+      .filter(x => x.competitionId === competition.id)
+      .map(x => ({ surah: x.surah, startAyah: x.startAyah, endAyah: x.endAyah })),
+    nextDepth: HALL_NEXT_DEPTH,
+    ar,
+    now,
+  }), [competition, store.participants, store.committees, store.recitationLedger, store.activeSession.committee, store.sessionElapsedSeconds, ar, now]);
+
+  /* المنشور مُقدَّم دائمًا: هو ما تراه بقية الشاشات، فلا يفترق جدارُ الممرّ عنها. */
+  const board = externalBoard || localBoard;
+
   /* اللوحة التي لا بيانات لها لا تدخل الدورة: جدارٌ يعرض خريطةً فارغة ربع دقيقة أسوأ من
      جدارٍ يعرض لوحتين تعملان. */
   const live = useMemo(() => requested.filter(panel => {
-    if (panel === 'khatmah' || panel === 'mushaf') return !!board?.recitation?.totalRecitations;
+    if (panel === 'khatmah' || panel === 'mushaf') return !!board.recitation?.totalRecitations;
     return true;
-  }), [requested, board?.recitation?.totalRecitations]);
+  }), [requested, board.recitation?.totalRecitations]);
   const shown = live.length ? live : (['queue'] as CorridorPanel[]);
 
   const [index, setIndex] = useState(0);
@@ -84,8 +118,8 @@ export const CorridorScreen: React.FC<{
   }, [shown.length, step]);
   const panel = shown[Math.min(index, shown.length - 1)];
 
-  const age = boardAge(board?.generatedAt || '', now);
-  const title = ar ? (board?.competitionNameArabic || competition.nameArabic) : (board?.competitionName || competition.name);
+  const age = boardAge(board.generatedAt, now);
+  const title = ar ? (board.competitionNameArabic || competition.nameArabic) : (board.competitionName || competition.name);
 
   return (
     <div ref={venueRef} className="fixed inset-0 z-50 mizan-venue-deep text-white font-arabic overflow-hidden" dir={ar ? 'rtl' : 'ltr'}>

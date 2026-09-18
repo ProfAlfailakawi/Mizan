@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MonitorDot, Copy, Check } from 'lucide-react';
-import { useAppStore } from '../../lib/store';
+import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { useBoardPublisherStatus } from '../../lib/use-board-publisher';
 import { describePublisherRole } from '../../lib/board-lease';
 import { Badge } from '../design-system/Badge';
@@ -31,7 +31,18 @@ export const HallScreenPublisher: React.FC = () => {
     return next.length ? next : prev;
   });
 
-  if (status.role === 'INELIGIBLE') return null;
+  /*
+   * بيئة العرض ترى البطاقة، وإن لم يكن فيها نشر.
+   *
+   * النشر معلّق بهوية موثّقة، ولا هوية في صندوق العرض — فكان `INELIGIBLE` يُخفي البطاقة
+   * كلها، ومعها روابط شاشات القاعة والممرّ واللجان. فلا يستطيع من يعرض المنتج أن يفتح
+   * شاشةً واحدة من شاشات القاعة، وهي من أظهر ما فيه.
+   *
+   * فتُعرض البطاقة، ويُقال صراحةً إن الجهاز لا ينشر هنا وإن الشاشة ستقرأ بيانات هذا
+   * الجهاز نفسه — لا يُدَّعى نشرٌ لا يقع، ولا يُحجب ما يمكن عرضه بصدق.
+   */
+  if (status.role === 'INELIGIBLE' && !IS_DEMO_SESSION) return null;
+  const demoOnly = IS_DEMO_SESSION && status.role === 'INELIGIBLE';
 
   const committees = s.committees.filter(c => c.competitionId === s.competition.id);
   const base = `${window.location.origin}${window.location.pathname}`;
@@ -66,12 +77,16 @@ export const HallScreenPublisher: React.FC = () => {
           </p>
         </div>
       </div>
-      <Badge variant={leading ? 'emerald' : 'neutral'}>{leading ? (ar ? 'ينشر من هنا' : 'Publishing here') : (ar ? 'احتياط جاهز' : 'Standby')}</Badge>
+      <Badge variant={leading ? 'emerald' : 'neutral'}>{demoOnly ? (ar ? 'بيئة عرض' : 'Demo') : leading ? (ar ? 'ينشر من هنا' : 'Publishing here') : (ar ? 'احتياط جاهز' : 'Standby')}</Badge>
     </div>
 
     {/* المحاسبة: من يقف أمام هذا الجهاز يستحقّ أن يعرف أن عشر شاشاتٍ معلّقة به. */}
     <div className={`mt-4 rounded-2xl px-4 py-3 text-[11px] font-bold leading-5 ${leading ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#f1efe9] text-[#4a4f4b]'}`}>
-      {describePublisherRole(status, ar)}
+      {demoOnly
+        ? (ar
+          ? 'بيئة عرض: لا نشر من هذا الجهاز. تُفتح الشاشات بروابطها وتقرأ بيانات هذا الجهاز نفسه، فتعمل كما تعمل في القاعة.'
+          : 'Demo environment: nothing is published from here. The screens open by their links and read this device’s own data.')
+        : describePublisherRole(status, ar)}
     </div>
 
     <div className="mt-4 space-y-2">
