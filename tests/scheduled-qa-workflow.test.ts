@@ -92,3 +92,66 @@ test('a scheduled gate result is not swallowed', () => {
   // ورفعُ اللقطات عند الفشل وحده — لا يُغيّر النتيجة، ويُبقي الدليل.
   assert.ok(/if: failure\(\)/.test(scheduled.body), 'evidence must be kept when a gate fails');
 });
+
+/**
+ * أوامرُ `run` مرتَّبةً داخل كل وظيفة — فالترتيبُ هو المقصود، لا مجرّد الحضور.
+ *
+ * وتُشتقّ من الملفّ بدل أن تُكتب: وظيفةٌ جديدةٌ تُضاف غدًا يشملها الشرطُ بلا أن يتذكّره أحد.
+ */
+function jobsWithCommands(body: string): { job: string; commands: string[] }[] {
+  const out: { job: string; commands: string[] }[] = [];
+  const lines = body.split('\n');
+  let current: { job: string; commands: string[] } | null = null;
+  for (const line of lines) {
+    const job = /^ {2}([a-z][a-z0-9-]*):\s*$/.exec(line);
+    if (job) { current = { job: job[1], commands: [] }; out.push(current); continue; }
+    if (!current) continue;
+    /*
+     * الشروحُ تُتجاوَز، وهذا ليس تجميلًا.
+     *
+     * كُتب هذا الحارسُ أوّلَ مرّةٍ بلا هذا السطر، فكان يقرأ `npm run build` من **تعليقٍ**
+     * يشرح القاعدة نفسها ويحسبه خطوةً. فجُرّب بإزالة خطوة البناء الحقيقية — ومرّ. أي
+     * أنه كان حارسًا يبدو حارسًا ولا يحرس، وهو أسوأ من لا حارس.
+     */
+    if (/^\s*#/.test(line)) continue;
+    for (const m of line.matchAll(/npm run ([a-z][a-z0-9:-]*)/g)) current.commands.push(m[1]);
+  }
+  return out;
+}
+
+test('a gate that reads the built product is built for, in the job that runs it', () => {
+  /*
+   * سقط `qa:print-document` و`qa:venue-legibility` في أوّل تشغيلٍ على `main` بلا ثانيةٍ
+   * واحدة: كلاهما يقرأ `dist/assets/*.css` — ورقةَ أنماط المنتج، وهي المقصودةُ بالقياس —
+   * ووظيفتُهما لم تكن تبني. كُتبت على أنهما «يبنيان صفحتَهما بـsetContent فلا يحتاجان
+   * خادمًا»، وهو صحيحٌ في الخادم وخطأٌ في البناء: فُحصت تبعيةٌ وافتُرضت أخرى.
+   *
+   * فالشرطُ هنا مُشتقٌّ من مصدر كل فحص، لا مكتوبٌ باليد: أيُّ فحصٍ يقرأ `dist/` يلزمه
+   * `npm run build` قبله في الوظيفة نفسها.
+   */
+  const scheduled = workflows.find(w => w.name === 'scheduled-qa.yml')!;
+  const readsBuiltOutput = (script: string) => {
+    const file = path.join(process.cwd(), 'scripts', (scripts[script] || '').replace(/^node\s+|^tsx\s+/, '').split(/\s/)[0].replace(/^scripts\//, ''));
+    if (!fs.existsSync(file)) return false;
+    return /['"`]dist\//.test(fs.readFileSync(file, 'utf8'));
+  };
+
+  const offenders: string[] = [];
+  for (const { job, commands } of jobsWithCommands(scheduled.body)) {
+    commands.forEach((command, index) => {
+      if (!command.startsWith('qa:') || !readsBuiltOutput(command)) return;
+      if (!commands.slice(0, index).includes('build')) offenders.push(`${job} → ${command}`);
+    });
+  }
+  assert.deepEqual(offenders, [],
+    'these gates read dist/ but their job never builds — they fail before a browser opens');
+});
+
+test('the scan can tell a built-output gate from one that needs none', () => {
+  // ولو عمي عن الفرق لمرّ الاختبارُ فارغًا وهو يبدو حارسًا.
+  const scheduled = workflows.find(w => w.name === 'scheduled-qa.yml')!;
+  const all = jobsWithCommands(scheduled.body).flatMap(j => j.commands);
+  assert.ok(all.includes('qa:print-document') && all.includes('qa:live-day'),
+    'the scan must see both kinds of gate in the workflow');
+  assert.ok(all.includes('build'), 'and must see a build step to check the ordering against');
+});
