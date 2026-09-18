@@ -74,16 +74,33 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          # إعدادُ Firebase ليس غائبًا: هو في `substitutions` من `cloudbuild.yaml`، ومنه
+          # يُبنى ما يُنشر فعلًا. وكانت البوّابة تنتظره سرًّا لا وجودَ له، فتُتخطّى أبدًا
+          # وهي تبدو مضبوطة. فيُقرأ من مصدره، ويبقى السرُّ — إن ضُبط — هو المقدَّم.
+          for pair in VITE_REQUIRE_AUTH:_VITE_REQUIRE_AUTH \
+                      VITE_FIREBASE_API_KEY:_VITE_FIREBASE_API_KEY \
+                      VITE_FIREBASE_PROJECT_ID:_VITE_FIREBASE_PROJECT_ID; do
+            name="${pair%%:*}"; substitution="${pair##*:}"
+            if [[ -z "${!name:-}" ]]; then
+              if value="$(node scripts/cloudbuild-substitution.mjs "$substitution")"; then
+                printf -v "$name" '%s' "$value"; export "${name?}"
+                echo "  · $name مقروءٌ من cloudbuild.yaml"
+              fi
+            else
+              echo "  · $name مضبوطٌ سرًّا"
+            fi
+          done
+
           missing=()
           for name in VITE_REQUIRE_AUTH VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID; do
             [[ -z "${!name:-}" ]] && missing+=("$name")
           done
           if (( ${#missing[@]} )); then
-            echo "::notice title=preflight متخطّى::لم تُضبط: ${missing[*]}"
+            echo "::notice title=preflight متخطّى::لم تُضبط ولا تُقرأ من cloudbuild.yaml: ${missing[*]}"
             echo "- ⏭️ **preflight** متخطّى — لم تُضبط: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "الأسرار حاضرة — تشغيل preflight" >> "$GITHUB_STEP_SUMMARY"
+          echo "الإعداد حاضر — تشغيل preflight" >> "$GITHUB_STEP_SUMMARY"
           npm run preflight
 
       # ── حزمةُ R2: جردٌ تشخيصيّ قبل الحكم ─────────────────────────────────────
