@@ -1,0 +1,94 @@
+name: بوّابات الإطلاق — ما يحتاج أسرارًا
+
+# البوّابتان هنا تحتاجان أسرارَ بيئةٍ حقيقية، فلا تعملان على جهاز التطوير.
+# وكانتا تُسجَّلان «محجوبة بإعداد خارجي» في كل تقرير — وهي حقيقة، لكنّها تبقى حقيقةً
+# إلى الأبد ما لم يُشغَّل شيءٌ حيث توجد الأسرار. فتُشغَّلان هنا.
+#
+# والقاعدة التي تحكم هذا الملف كلَّه:
+#
+#   · سرٌّ **غائب** ⇒ تُتخطّى البوّابة ويُذكر اسمُ ما ينقص. لا تحمرّ الدفعة لغياب سرّ:
+#     مساهمٌ من فرعٍ خارجيّ لا يملكه، وإحمرارُها عليه يمنعه من المساهمة بلا ذنب.
+#   · سرٌّ **حاضر** والبوّابة تفشل ⇒ تحمرّ الدفعة. فالسرُّ موجودٌ والفشلُ حقيقيّ.
+#
+# ولا تُطبع قيمةُ سرٍّ قطّ، ولا طولُها، ولا أوّلُ حروفها. المطبوعُ اسمٌ وحضورٌ أو غياب.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizan-release-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-backed-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: تثبيت من ملف القفل
+        run: npm ci
+
+      # ── حزمةُ الهوية: فحص ما قبل الانطلاق ───────────────────────────────────
+      - name: فحص ما قبل الانطلاق (يحتاج إعداد Firebase)
+        env:
+          VITE_REQUIRE_AUTH: ${{ secrets.VITE_REQUIRE_AUTH }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          MIZAN_LEGAL_ENTITY_NAME: ${{ secrets.MIZAN_LEGAL_ENTITY_NAME }}
+          MIZAN_LEGAL_TERMS_URL: ${{ secrets.MIZAN_LEGAL_TERMS_URL }}
+          MIZAN_LEGAL_TERMS_VERSION: ${{ secrets.MIZAN_LEGAL_TERMS_VERSION }}
+          MIZAN_LEGAL_TERMS_EFFECTIVE: ${{ secrets.MIZAN_LEGAL_TERMS_EFFECTIVE }}
+          MIZAN_LEGAL_PRIVACY_URL: ${{ secrets.MIZAN_LEGAL_PRIVACY_URL }}
+          MIZAN_LEGAL_PRIVACY_VERSION: ${{ secrets.MIZAN_LEGAL_PRIVACY_VERSION }}
+          MIZAN_LEGAL_PRIVACY_EFFECTIVE: ${{ secrets.MIZAN_LEGAL_PRIVACY_EFFECTIVE }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          missing=()
+          for name in VITE_REQUIRE_AUTH VITE_FIREBASE_API_KEY VITE_FIREBASE_PROJECT_ID; do
+            [[ -z "${!name:-}" ]] && missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::notice title=preflight متخطّى::لم تُضبط: ${missing[*]}"
+            echo "- ⏭️ **preflight** متخطّى — لم تُضبط: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "الأسرار حاضرة — تشغيل preflight" >> "$GITHUB_STEP_SUMMARY"
+          npm run preflight
+
+      # ── حزمةُ R2: التحقّق من حزم القرآن المرفوعة ─────────────────────────────
+      - name: التحقّق من حزم القرآن على R2
+        if: always()
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          missing=()
+          for name in R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            [[ -z "${!name:-}" ]] && missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::notice title=quran:verify-r2 متخطّى::لم تُضبط: ${missing[*]}"
+            echo "- ⏭️ **quran:verify-r2** متخطّى — لم تُضبط: \`${missing[*]}\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "الأسرار حاضرة — تشغيل التحقّق العميق من العشرين" >> "$GITHUB_STEP_SUMMARY"
+          # `--deep` يقارن البصمات لا الوجود: حزمةٌ موجودةٌ ببايتات أخرى تمرّ بلا هذا.
+          npm run quran:verify-r2 -- --all --deep
