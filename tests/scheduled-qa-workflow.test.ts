@@ -38,6 +38,8 @@ const NOT_SCHEDULED: Record<string, string> = {
     'مولِّدُ خطّ أساسٍ لا فحص. وجدولتُه تعيد ضبطَ الخطّ تلقائيًّا، فيُبتلع الانحرافُ بدل أن يُكشف — يُشغَّل بيدٍ وبقرار.',
   'qa:firestore-rules':
     'يعمل في كل دفعة ضمن `ci.yml` على المحاكي؛ جدولتُه مرّةً أخرى تكرارٌ بلا فائدة.',
+  'qa:seed-public':
+    'خطوةٌ داخل `qa:public-registration` لا فحصٌ بذاته: يزرع مسابقةً منشورةً على المحاكي قبل أن يبدأ الفحص، ويرفض العملَ بلا `FIRESTORE_EMULATOR_HOST`.',
 };
 
 test('the scan sees the workflows and the scripts — an empty list proves nothing', () => {

@@ -39,9 +39,26 @@ export function firestoreRestRoot(projectId:string,databaseId:string,emulatorHos
   return `${base}/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(databaseId)}/documents`;
 }
 
+/**
+ * الرمزُ الذي يُرسَل مع الطلب — ولا يُطلب اعتمادٌ سحابيٌّ حين يكون الوجهةُ محاكيًا.
+ *
+ * كان العنوانُ وحده يحترم `FIRESTORE_EMULATOR_HOST`، والرمزُ يُطلب من بيانات الاعتماد
+ * الافتراضية على كلّ حال. فيسقط الطلبُ قبل أن يُرسَل حيث لا اعتماد — وهو بالضبط
+ * الحالُ الذي فُتح الاصطلاحُ من أجله: **أن يعمل المطوّر ويعمل الفحصُ بلا سحابة.**
+ * فكان البابُ الأوّلُ المذكورُ أعلاه موصوفًا ولا يُفتح.
+ *
+ * والمحاكي لا يتحقّق من الرمز أصلًا؛ و`owner` اصطلاحُ حزم Google معه.
+ *
+ * ولا يُفتح هذا إلا بالإعلان الصريح نفسِه: غيابُ المتغيّر يعني السحابة، فيُطلب الرمزُ
+ * الحقيقيّ ولا يُهبَط إلى رمزٍ صوريٍّ صدفةً.
+ */
+export async function firestoreAccessToken(emulatorHost=process.env.FIRESTORE_EMULATOR_HOST){
+  return emulatorHost?'owner':googleAccessToken();
+}
+
 export class FirestoreRestRepository{
   private readonly root:string;
-  constructor(private readonly projectId:string,private readonly databaseId=process.env.FIRESTORE_DATABASE_ID||'(default)',private readonly tokenProvider=googleAccessToken){
+  constructor(private readonly projectId:string,private readonly databaseId=process.env.FIRESTORE_DATABASE_ID||'(default)',private readonly tokenProvider=firestoreAccessToken){
     if(!projectId)throw new Error('FIRESTORE_NOT_CONFIGURED');
     this.root=firestoreRestRoot(projectId,databaseId);
   }
