@@ -140,7 +140,12 @@ async function main() {
      */
     console.error(`R2_QURAN_PACKAGES_NOT_PUBLISHED: لا حزمة واحدة من ${readings.length} موجودة على R2.`);
     console.error(`  التخزين وصلته الأوامرُ واعتمادُه صحيح — الشجرةُ فارغة، لا فاسدة.`);
-    console.error(`  المفتاح المتوقَّع لكل رواية: ${quranPackageKey('<rawiId>', version)}`);
+    /*
+     * والمفتاحُ يُعرض بروايةٍ حقيقية لا بقالبٍ فيه `<>`: بانِي المفاتيح يرفض المحارف
+     * غير الآمنة فيرمي، فيُطبع `R2_KEY_UNSAFE_SEGMENT` مكانَ السطر الذي يُفترض أن
+     * يُرشد القارئ — وهو ما وقع في أوّل تشغيل.
+     */
+    console.error(`  المفتاح المتوقَّع لكل رواية، مثالًا: ${quranPackageKey(readings[0], version)}`);
     process.exit(1);
   }
   if (failures) {

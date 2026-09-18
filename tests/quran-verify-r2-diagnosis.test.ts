@@ -27,8 +27,14 @@ test('a tree that was never published is named as unpublished, not as corrupted'
   // وتُذكر الحقيقةُ التي تنفي الشبهة: الاتصالُ نجح، فالعطلُ ليس في الاعتماد.
   assert.ok(/التخزين وصلته الأوامرُ واعتمادُه صحيح/.test(SCRIPT),
     'it must say the credentials worked, so nobody hunts a permissions problem');
-  assert.ok(SCRIPT.includes("quranPackageKey('<rawiId>', version)"),
+  assert.ok(SCRIPT.includes('quranPackageKey(readings[0], version)'),
     'and print the expected key, so the reader knows where the upload belongs');
+  /*
+   * وبروايةٍ حقيقية لا بقالب: أوّلُ تشغيلٍ طبع `R2_KEY_UNSAFE_SEGMENT` مكانَ السطر
+   * المُرشِد، لأن `<rawiId>` مرّت على بانٍ يرفض المحارف غير الآمنة فرمى.
+   */
+  assert.equal(/quranPackageKey\('<[^']*>'/.test(SCRIPT), false,
+    'a placeholder with angle brackets throws in the key builder and swallows the guidance');
 });
 
 test('the unpublished case still exits non-zero — it is a release blocker, not a pass', () => {
