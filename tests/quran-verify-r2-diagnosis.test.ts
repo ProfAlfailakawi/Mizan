@@ -66,3 +66,41 @@ test('--deep is what compares bytes; a tag-only run proves less and says so', ()
   assert.ok(SCRIPT.includes("' · وضع البصمة العميقة' : ' · وسم البصمة'"),
     'the summary must say which of the two was run');
 });
+
+test('"nothing uploaded" and "this layout is unused" are two verdicts, not one', () => {
+  /*
+   * الجردُ القرائيّ للدلو ردّ حقيقةً تنفي التشخيصَ السابق: `quran/` خالية تمامًا،
+   * و«delivery/» فيها ٧٤٧٢ كائنًا. فقولُ «شغّل الرفع» لمن أمامه مئاتُ الميجابايتات
+   * مرفوعةً تحت مفتاحٍ آخر يُرسله إلى غير العطل — وهو نفسُ الخطأ مرّةً ثالثة.
+   *
+   * والفرقُ عملان مختلفان: الأوّلُ يُشغَّل له رفع، والثاني قرارُ مالكٍ في أيِّ
+   * التخطيطين هو التخطيط.
+   */
+  assert.ok(SCRIPT.includes('R2_QURAN_PACKAGES_PREFIX_UNUSED'),
+    'a bucket full under another prefix is not an upload that has not run');
+  // ولا يُخمَّن أيُّهما: يُسأل التخزينُ بطلبين محدودين قبل الحكم.
+  assert.ok(SCRIPT.includes("listObjects('quran/'"), 'it must ask whether the prefix is used at all');
+  assert.ok(SCRIPT.includes("listObjects(''"), 'and whether the bucket is empty or merely organised elsewhere');
+  assert.ok(SCRIPT.indexOf("listObjects('quran/'") < SCRIPT.indexOf('R2_QURAN_PACKAGES_PREFIX_UNUSED'),
+    'the verdict must follow the evidence, not precede it');
+});
+
+test('the unused-layout verdict blocks the release and names the decision, without making it', () => {
+  const block = SCRIPT.slice(SCRIPT.indexOf('R2_QURAN_PACKAGES_PREFIX_UNUSED'));
+  assert.ok(/process\.exit\(1\)/.test(block.slice(0, 1400)), 'it is a blocker, not a note');
+  // والقرارُ يُعرض ولا يُتّخذ: بناءُ ناشرٍ أو اعتمادُ الموجود — كلاهما قرارُ مالك.
+  assert.ok(/قرارُ مالكٍ لا إصلاحُ سكربت/.test(block), 'the script must not pick a layout on its own');
+});
+
+test('no reading-id mapping is invented to bridge the two layouts', () => {
+  /*
+   * «الدوري» وحدها ليست معرّفًا، ومعرّفُ روايةٍ في شجرة التسليم ليس بالضرورة معرّفَها
+   * القانونيّ. ومطابقةٌ تُكتب هنا لتمرير البوّابة مطابقةٌ مخترعة — وهي من المحظورات.
+   */
+  assert.equal(/duri-abi-amr|susi-abi-amr/.test(SCRIPT), false,
+    'a delivery-tree id must not be hard-coded here as if it were the canonical one');
+  assert.equal(/delivery\/quran-data/.test(SCRIPT), false,
+    'the verifier must not silently start reading the other tree instead');
+  assert.ok(/لا تُسدّ الفجوة بمطابقةٍ مخترعة/.test(SCRIPT),
+    'and it must say plainly that the gap is not closed by inventing one');
+});
