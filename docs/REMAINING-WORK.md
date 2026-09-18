@@ -594,8 +594,27 @@ duri-abi-amr · susi-abi-amr)، وبمعرّفاتٍ تخالف المعرّفا
 
 **أسبوعيًّا وعند كل وسم إصدار** (`.github/workflows/heavy-fairness.yml`): `oracle:benchmark` ·
 `fairness:lab` · `fairness:adversarial` · `fairness:gate` · `load:rehearsal` · `drill:failure` ·
-`check:model`. آخر تشغيلٍ ناجح: 13 سبتمبر 2026 على `cec47b0` — أي **قبل** ما دُمج بعدها.
-فأعِد تشغيله على رأس `main` قبل أيِّ إعلان إصدار؛ الفحصُ الثقيل القديم ليس فحصًا.
+`check:model`.
+
+**وقد شُغِّل على المرشَّح نفسه.** كان آخرُ تشغيلٍ ناجح 13 سبتمبر 2026 على `cec47b0` — أي
+**قبل** ما دُمج بعدها، والفحصُ الثقيل القديم ليس فحصًا. فشُغِّل بـ`workflow_dispatch` في
+18 سبتمبر 2026 على `669a20b` (رأسُ #201)، و**الوظائف الستُّ كلُّها خضراء**:
+
+| الوظيفة | النتيجة |
+|---|---|
+| المِرصد الرياضي والمقايسة (`oracle:benchmark`) | ✅ |
+| مختبر العدالة وبروفةُ الحمل وتمرينُ الأعطال (`fairness:lab` · `load:rehearsal` · `drill:failure`) | ✅ |
+| البحث الخصومي والاستقرار (`fairness:adversarial`) | ✅ |
+| فحص النماذج الصوري (`check:model`) | ✅ |
+| قواعد Firestore على المحاكي (`qa:firestore-rules`) | ✅ |
+| **بوّابة ميزانية العدالة** (`fairness:gate`) | ✅ |
+
+`https://github.com/ProfAlfailakawi/Mizan/actions/runs/35343996689`
+
+فبوّابةُ العدالة اجتازت على آلةِ CI لا على آلةٍ محلّيّةٍ وحدها — وهو ما كان ينقص الحكمَ
+في §4.0. ويبقى ما قيل هناك قائمًا: دقّةُ المقياس مِلّي ثانيةٍ واحدة، والسماحيةُ ٠٫٣، فقد
+يتقلّب الحكمُ بين تشغيلين بلا تغييرٍ في الشيفرة. **ولم يُعَد ضبطُ خطّ الأساس ولم تُوسَّع
+السماحية.**
 
 **لا يُشغَّل في أيِّ سير عمل:** `quran:readiness` · `quran:release-matrix` · `quran:verify-r2` ·
 `qa:live-day` · `qa:competition-day` · `qa:scope-visual` · `qa:visual-baseline` · `qa:venue-legibility`.
