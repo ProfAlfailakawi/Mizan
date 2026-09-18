@@ -5,8 +5,8 @@ import { quranPackageKey, sha256Hex, verifyIntegrity, readPackageManifestFiles, 
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 import { errorMessageArabic } from '../src/lib/error-catalog';
 import {
-  DELIVERY_CATALOG_KEY, datasetIntegrityVerdict, deliveryDirectoryDigest, packageLayoutMode,
-  readDeliveryCatalog, relativeKey, requiredDatasetVerdicts,
+  DELIVERY_CATALOG_KEY, classifyDeliveryDocument, datasetIntegrityVerdict, deliveryDirectoryDigest,
+  packageLayoutMode, relativeKey, requiredDatasetVerdicts,
 } from '../server/r2-delivery-verification';
 
 /*
@@ -220,14 +220,32 @@ async function verifyDeliveryTree(client: R2PrivateClient): Promise<number> {
     return 1;
   }
 
-  let catalog;
-  try { catalog = readDeliveryCatalog(await res.json()); }
+  let document;
+  try { document = classifyDeliveryDocument(await res.json()); }
   catch (err) {
     const code = err instanceof Error ? err.message : String(err);
     console.error(`${code}`);
-    console.error('  كتالوجٌ بمخطّطٍ آخر لا يُتحقَّق منه — التحقّقُ منه تحقّقٌ وهميّ.');
+    console.error('  مستندٌ لا يُقرأ على أنه كتالوج — والتحقّقُ منه تحقّقٌ وهميّ.');
     return 1;
   }
+
+  if (document.kind === 'inventory') {
+    /*
+     * المنشورُ جردٌ لا كتالوجُ تحقّق. والفرقُ ليس شكليًّا: الجردُ يسرد ما صادفه في
+     * الدلو بلا حالةِ تحقّقٍ لحزمة ولا بصمةِ مجلَّد — فلا مرجعَ تُقاس إليه البايتات،
+     * ولا سبيلَ إلى كشف حزمةٍ موجودةٍ ببايتاتٍ أخرى.
+     */
+    const totalFiles = document.groups.reduce((n, g) => n + (Number(g.files) || 0), 0);
+    console.error(`DELIVERY_CATALOG_IS_UNVERIFIED_INVENTORY: المنشورُ على ${DELIVERY_CATALOG_KEY} جردٌ لا كتالوجُ تحقّق.`);
+    console.error(`  مخطّطُه «${document.schemaVersion}»، وفيه ${document.groups.length} بادئةً و${totalFiles} ملفًّا${document.sourceMode ? ` · مصدرُه ${document.sourceMode}` : ''}.`);
+    console.error('  وليس فيه حالةُ تحقّقٍ لحزمة ولا بصمةُ مجلَّد — فلا مرجعَ تُقاس إليه البايتات،');
+    console.error('  ولا تُكشف حزمةٌ موجودةٌ ببايتاتٍ أخرى. والتحقّقُ بلا مرجعٍ تحقّقٌ وهميّ.');
+    console.error(`  يُصدره مسارُ الاستيعاب وحده بعد التحقّق: \`npx tsx scripts/kfgqpc-ingest.ts\` —`);
+    console.error('  و`buildReadyDeliveryCatalog` يرفض الإصدار ما لم تكن الحزمُ المطلوبة كلُّها VERIFIED.');
+    return 1;
+  }
+
+  const catalog = document.catalog;
 
   console.log(`كتالوج التسليم: ${catalog.datasets.length} حزمةً معلنة${catalog.generatedAt ? ` · وُلّد ${catalog.generatedAt}` : ''}`);
   if (catalog.unavailableAudio.length) console.log(`  صوتٌ رسميٌّ غير متاح (معلنٌ في الكتالوج): ${catalog.unavailableAudio.join('، ')}`);

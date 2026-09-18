@@ -148,10 +148,22 @@ export class R2PrivateClient {
     try{
       await this.listObjects('delivery/',undefined,1);
       const r=await this.getObject(key);if(!r)return {state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_MISSING'};
-      const body=await r.json() as {schemaVersion?:string;state?:string};
-      return body?.schemaVersion==='MIZAN-R2-CATALOG-1'&&body?.state==='READY'
-        ?{state:'READY' as const}
-        :{state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_NOT_READY'};
+      const body=await r.json() as {schemaVersion?:string;state?:string;datasets?:unknown};
+      /*
+       * «جاهز» تُكتسب بالتحقّق ولا تُعلن بالسرد.
+       *
+       * كان يكفي هنا حقلان: المخطّطُ والحالة. وعلى الدلو مستندٌ كتبه
+       * `scripts/kfgqpc-catalog-publish.ts` يحملهما وهو **جردٌ** لما صادفه في التخزين:
+       * لا حالةَ تحقّقٍ لحزمة، ولا بصمةَ مجلَّد. فكانت لوحةُ جاهزية التسليم تُعرض
+       * خضراءَ بناءً على مستندٍ لم يتحقّق من شيء.
+       *
+       * فصار المطلوبُ الأثرَ نفسَه: `datasets` — وهي ما لا يصدره إلا مسارُ الاستيعاب
+       * بعد التحقّق. والجردُ صار له مخطّطٌ خاصّ، ويُسمّى بالاسم لا يُخلط بالعطل.
+       */
+      if(body?.schemaVersion==='MIZAN-R2-INVENTORY-1')return {state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_UNVERIFIED_INVENTORY'};
+      if(body?.schemaVersion!=='MIZAN-R2-CATALOG-1'||body?.state!=='READY')return {state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_NOT_READY'};
+      if(!Array.isArray(body?.datasets))return {state:'UNAVAILABLE' as const,reason:'DELIVERY_CATALOG_UNVERIFIED_INVENTORY'};
+      return {state:'READY' as const};
     }catch{return {state:'UNAVAILABLE' as const,reason:'R2_READ_FAILED'}}
   }
 }

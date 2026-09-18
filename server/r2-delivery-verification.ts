@@ -65,6 +65,43 @@ export function readDeliveryCatalog(raw: unknown): DeliveryCatalog {
   };
 }
 
+export interface InventoryGroup { prefix: string; files: number; bytes: number }
+
+export type DeliveryDocument =
+  | { kind: 'verified'; catalog: DeliveryCatalog }
+  | { kind: 'inventory'; schemaVersion: string; groups: InventoryGroup[]; sourceMode?: string; generatedAt?: string };
+
+/**
+ * يميّز المستندَ المنشورَ على مفتاح الكتالوج، ولا يخلط بين نوعين تقاسما مفتاحًا واحدًا.
+ *
+ * فمسارُ الاستيعاب يصدر كتالوجًا **مُكتسَبًا**: لا يُصدر أصلًا ما لم تكن الحزمُ المطلوبة
+ * `VERIFIED`، ولكلٍّ بصمةُ مجلَّدٍ تُقاس إليها البايتات. و`kfgqpc-catalog-publish` يكتب
+ * **جردًا**: بوادئُ وأعدادٌ وأحجام، بلا حالةِ تحقّقٍ ولا بصمة.
+ *
+ * وكان الاثنان يحملان `MIZAN-R2-CATALOG-1` و`state:'READY'` معًا — فيُقرأ الجردُ شهادةَ
+ * جاهزية. والجردُ المنشورُ اليومَ على الدلو هو الثاني، ولا يزال يحمل الهويّة القديمة،
+ * فيُميَّز هنا بغياب `datasets` لا بالمخطّط وحده.
+ */
+export function classifyDeliveryDocument(raw: unknown): DeliveryDocument {
+  const c = raw as Record<string, unknown> | null | undefined;
+  if (!c || typeof c !== 'object') throw new DeliveryVerificationError('DELIVERY_CATALOG_UNREADABLE');
+
+  const isInventoryShape =
+    c.schemaVersion === 'MIZAN-R2-INVENTORY-1' ||
+    (c.schemaVersion === 'MIZAN-R2-CATALOG-1' && !Array.isArray(c.datasets) && Array.isArray(c.groups));
+
+  if (isInventoryShape) {
+    return {
+      kind: 'inventory',
+      schemaVersion: String(c.schemaVersion),
+      groups: (Array.isArray(c.groups) ? c.groups : []) as InventoryGroup[],
+      sourceMode: typeof c.sourceMode === 'string' ? c.sourceMode : undefined,
+      generatedAt: typeof c.generatedAt === 'string' ? c.generatedAt : undefined,
+    };
+  }
+  return { kind: 'verified', catalog: readDeliveryCatalog(raw) };
+}
+
 export interface DatasetRequirement {
   id: string;
   dataset?: KfgqpcDeliveryCatalogDataset;

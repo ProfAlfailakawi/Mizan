@@ -6,9 +6,21 @@ import { kfgqpcActualStorageReport } from '../server/kfgqpc-delivery';
 /**
  * MIZAN — نشر كتالوج جاهزية التسليم delivery/_mizan/catalog.json
  *
- * يفحص R2 الفعلي (ما هو مرفوع بالفعل) ويكتب كتالوجًا بـ schemaVersion:'MIZAN-R2-CATALOG-1'
- * و state:'READY' لتفعيل لوحة "جاهزية التسليم" في الإدارة. شفّاف: يذكر أن المصدر مرايا مفتوحة
- * (sourceMode:'OPEN_MIRROR') أصولها من مجمع الملك فهد، وليس حزم المجمع الموقّعة مباشرة.
+ * يفحص R2 الفعلي ويكتب **جردًا** لما هو مرفوع: البوادئُ وأعدادُ ملفّاتها وأحجامُها.
+ *
+ * **وهو جردٌ لا شهادةَ جاهزية.** كان يكتب `schemaVersion:'MIZAN-R2-CATALOG-1'` و
+ * `state:'READY'` — وهما هويّةُ الكتالوج الذي يصدره مسارُ الاستيعاب بعد التحقّق من
+ * البصمات (`buildReadyDeliveryCatalog`)، والذي يرفض أن يُصدر أصلًا ما لم تكن الحزمُ
+ * الأربعَ عشرةَ المطلوبة `VERIFIED`.
+ *
+ * فكان مستندان مختلفان تمامًا يتقاسمان مفتاحًا واحدًا وهويّةً واحدة: أحدهما يكسب
+ * «READY» بالتحقّق، والآخر **يعلنها بمجرّد سرد ما صادفه في الدلو**. و`health()` في
+ * `r2-private.ts` كانت تقرأ الحقلين فتقول «جاهز» — فتُعرض لوحةُ جاهزية التسليم خضراءَ
+ * بناءً على مستندٍ لم يتحقّق من شيء. وهذا اعتمادٌ زائف، ولو كان كلُّ حقلٍ فيه صادقًا.
+ *
+ * فصار للجرد هويّتُه: `MIZAN-R2-INVENTORY-1` و`state:'INVENTORY'`. ويبقى شفّافًا كما كان
+ * في مصدره (`sourceMode:'OPEN_MIRROR'`): أصولٌ من مجمع الملك فهد مُعادةُ النشر عبر مرايا
+ * مفتوحة، لا حزمُ المجمع الموقّعة مباشرة.
  */
 
 const cfg = r2ConfigFromEnv();
@@ -32,8 +44,8 @@ function summarize(objects: { key: string; size: number }[]) {
   const storage = kfgqpcActualStorageReport(objects);
   const groups = summarize(objects);
   const catalog = {
-    schemaVersion: 'MIZAN-R2-CATALOG-1' as const,
-    state: 'READY' as const,
+    schemaVersion: 'MIZAN-R2-INVENTORY-1' as const,
+    state: 'INVENTORY' as const,
     authority: 'King Fahd Glorious Quran Printing Complex',
     sourceMode: 'OPEN_MIRROR',
     provenanceNote: 'أصول مصدرها مجمع الملك فهد مُعادة النشر عبر مرايا مفتوحة (MIT) قابلة للوصول؛ ليست حزم المجمع الموقّعة مباشرة. التحقق العلمي/الاعتماد الرسمي مسار منفصل.',

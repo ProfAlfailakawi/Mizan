@@ -83,10 +83,52 @@ test('READY catalog is fail-closed and treats Warsh/Duri audio statuses explicit
   assert.throws(()=>buildReadyDeliveryCatalog({datasets:datasets.filter(x=>x.id!=='hafs'),storage}),/R2_DELIVERY_CATALOG_INCOMPLETE:hafs/);
 });
 
-test('R2 readiness is bound to permanent READY catalog, not disposable health.txt',async()=>{
+/*
+ * «جاهز» تُكتسب بالتحقّق ولا تُعلن بالسرد.
+ *
+ * كان هذا الاختبار يُمرّر `{schemaVersion,state}` بلا `datasets` ويتوقّع READY — وهي
+ * بالضبط صورةُ المستند الذي يكتبه `kfgqpc-catalog-publish`: جردٌ لما صادفه في الدلو،
+ * بلا حالةِ تحقّقٍ لحزمة ولا بصمةِ مجلَّد. فكان الاختبارُ يحرس السلوكَ الخاطئ.
+ *
+ * فصار يمرّر أثرَ التحقّق نفسَه، ويثبت أن الجردَ يُردّ باسمه.
+ */
+const catalogResponse=(body:unknown)=>async(input:any,init:any)=>{
+  if(String(init?.method)==='GET'&&String(input).includes('list-type=2'))return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>',{status:200});
+  return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
+};
+const healthClient=()=>new R2PrivateClient({endpoint:'https://acct.r2.cloudflarestorage.com',bucket:'mizan-quran-assets',accessKeyId:'A',secretAccessKey:'B'});
+
+test('R2 readiness is bound to a verified catalog, not to a disposable file',async()=>{
+  const original=globalThis.fetch;
+  globalThis.fetch=catalogResponse({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY',datasets:[{id:'hafs',status:'VERIFIED',r2Prefix:'delivery/quran-data/hafs/v13'}]}) as never;
+  try{
+    const result=await healthClient().health();
+    assert.equal(result.state,'READY');
+  }finally{globalThis.fetch=original}
+});
+
+test('an unverified inventory is never read as readiness',async()=>{
+  /*
+   * الضررُ ملموس: لوحةُ «جاهزية التسليم» كانت تُعرض خضراءَ بناءً على مستندٍ لم يتحقّق
+   * من شيء — اعتمادٌ زائفٌ ولو كان كلُّ حقلٍ فيه صادقًا.
+   */
+  const original=globalThis.fetch;
+  try{
+    // الجردُ بهويّته الجديدة.
+    globalThis.fetch=catalogResponse({schemaVersion:'MIZAN-R2-INVENTORY-1',state:'INVENTORY',groups:[{prefix:'delivery/quran-data/hafs/v13',files:1,bytes:10}]}) as never;
+    assert.deepEqual(await healthClient().health(),{state:'UNAVAILABLE',reason:'DELIVERY_CATALOG_UNVERIFIED_INVENTORY'});
+
+    // والجردُ القديمُ المنشورُ اليومَ على الدلو: يحمل هويّةَ الكتالوج ولا `datasets` فيه.
+    globalThis.fetch=catalogResponse({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY',groups:[{prefix:'delivery/quran-data/hafs/v13',files:1,bytes:10}]}) as never;
+    assert.deepEqual(await healthClient().health(),{state:'UNAVAILABLE',reason:'DELIVERY_CATALOG_UNVERIFIED_INVENTORY'},
+      'a document carrying the verified identity without the verification evidence must not pass');
+  }finally{globalThis.fetch=original}
+});
+
+test('the readiness check reads the catalog object, not something beside it',async()=>{
   const original=globalThis.fetch;let requested='';
-  globalThis.fetch=async(input:any,init:any)=>{requested=String(input);if(String(init?.method)==='GET'&&requested.includes('list-type=2'))return new Response('<ListBucketResult><IsTruncated>false</IsTruncated></ListBucketResult>',{status:200});return new Response(JSON.stringify({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY'}),{status:200,headers:{'content-type':'application/json'}})};
-  try{const client=new R2PrivateClient({endpoint:'https://acct.r2.cloudflarestorage.com',bucket:'mizan-quran-assets',accessKeyId:'A',secretAccessKey:'B'});const result=await client.health();assert.equal(result.state,'READY');assert.match(requested,/delivery\/_mizan\/catalog.json/)}finally{globalThis.fetch=original}
+  globalThis.fetch=(async(input:any,init:any)=>{requested=String(input);return catalogResponse({schemaVersion:'MIZAN-R2-CATALOG-1',state:'READY',datasets:[]})(input,init)}) as never;
+  try{await healthClient().health();assert.match(requested,/delivery\/_mizan\/catalog.json/)}finally{globalThis.fetch=original}
 });
 
 

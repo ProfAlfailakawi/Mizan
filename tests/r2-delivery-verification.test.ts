@@ -20,8 +20,8 @@ import test from 'node:test';
 
 import { hashDirectory, KFGQPC_REQUIRED_DELIVERY_DATASETS } from '../server/kfgqpc-ingest-core';
 import {
-  DELIVERY_CATALOG_KEY, DeliveryVerificationError, datasetIntegrityVerdict, deliveryDirectoryDigest,
-  packageLayoutMode, readDeliveryCatalog, relativeKey, requiredDatasetVerdicts,
+  DELIVERY_CATALOG_KEY, DeliveryVerificationError, classifyDeliveryDocument, datasetIntegrityVerdict,
+  deliveryDirectoryDigest, packageLayoutMode, readDeliveryCatalog, relativeKey, requiredDatasetVerdicts,
 } from '../server/r2-delivery-verification';
 
 const dataset = (id: string, over: Record<string, unknown> = {}) => ({
@@ -159,4 +159,46 @@ test('the catalog key is the one the product health check already reads', () => 
   const client = fs.readFileSync(path.join(process.cwd(), 'server', 'r2-private.ts'), 'utf8');
   assert.ok(client.includes(`'${DELIVERY_CATALOG_KEY}'`),
     'the verifier and the runtime health check must read the same catalog object');
+});
+
+test('an inventory is told apart from a verified catalog, even wearing its identity', () => {
+  /*
+   * مستندان كانا يتقاسمان مفتاحًا واحدًا وهويّةً واحدة: أحدهما يكسب «READY» بالتحقّق من
+   * البصمات، والآخر يعلنها بمجرّد سرد ما صادفه في الدلو. والمنشورُ اليومَ على الدلو هو
+   * الثاني — ولا يزال يحمل الهويّة القديمة. فالتمييزُ بالأثر لا بالترويسة.
+   */
+  const inventory = classifyDeliveryDocument({
+    schemaVersion: 'MIZAN-R2-CATALOG-1', state: 'READY', sourceMode: 'OPEN_MIRROR',
+    groups: [{ prefix: 'delivery/quran-data/hafs/v13', files: 1, bytes: 10 }],
+  });
+  assert.equal(inventory.kind, 'inventory');
+  assert.equal(inventory.kind === 'inventory' && inventory.sourceMode, 'OPEN_MIRROR',
+    'the provenance the inventory does disclose must survive the classification');
+
+  const renamed = classifyDeliveryDocument({ schemaVersion: 'MIZAN-R2-INVENTORY-1', state: 'INVENTORY', groups: [] });
+  assert.equal(renamed.kind, 'inventory');
+
+  const verified = classifyDeliveryDocument(catalogOf([dataset('hafs')]));
+  assert.equal(verified.kind, 'verified');
+  assert.equal(verified.kind === 'verified' && verified.catalog.datasets.length, 1);
+});
+
+test('the inventory publisher no longer claims the verified catalog identity', () => {
+  /*
+   * وهذا هو موضعُ العطل لا عَرَضُه: ما دام المنتِجُ يكتب الهويّةَ المكتسَبة على مستندٍ
+   * لم يتحقّق من شيء، فكلُّ قارئٍ بعده مخدوع — وقد كان `health()` كذلك بالفعل.
+   */
+  const publisher = fs.readFileSync(path.join(process.cwd(), 'scripts', 'kfgqpc-catalog-publish.ts'), 'utf8');
+  assert.ok(publisher.includes("schemaVersion: 'MIZAN-R2-INVENTORY-1'"), 'an inventory must say it is one');
+  assert.ok(publisher.includes("state: 'INVENTORY'"), 'and must not declare readiness it did not verify');
+  assert.equal(/state: 'READY'/.test(publisher), false, 'READY is earned by the ingest path alone');
+  // والشفافيّةُ التي كانت فيه تبقى: مصدرُ البايتات مرايا مفتوحة لا حزمٌ موقّعة.
+  assert.ok(publisher.includes("sourceMode: 'OPEN_MIRROR'"), 'the provenance disclosure must stay');
+});
+
+test('readiness in the runtime requires the verification evidence, not the header', () => {
+  const client = fs.readFileSync(path.join(process.cwd(), 'server', 'r2-private.ts'), 'utf8');
+  assert.ok(client.includes('DELIVERY_CATALOG_UNVERIFIED_INVENTORY'), 'an inventory must be refused by name');
+  assert.ok(client.includes('Array.isArray(body?.datasets)'),
+    'the evidence the ingest path alone produces is what readiness must turn on');
 });
