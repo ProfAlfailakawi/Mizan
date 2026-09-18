@@ -43,10 +43,11 @@ test('a missing secret skips the gate — it never fails the run', () => {
    * مساهمٌ من فرعٍ خارجيّ لا يملك أسرارَ المستودع. وإحمرارُ دفعته لغيابها يمنعه من
    * المساهمة بلا ذنب، ويُعلّم الفريقَ تجاهلَ الأحمر — وهو أسوأ ما يُصنع ببوّابة.
    */
-  const skips = [...workflow.matchAll(/if \(\( \$\{#missing\[@\]\} \)\); then[\s\S]{0,400?}?exit 0/g)];
-  assert.equal((workflow.match(/exit 0/g) || []).length, 2, 'both gates must skip cleanly when unset');
+  const guards = (workflow.match(/if \(\( \$\{#missing\[@\]\} \)\); then/g) || []).length;
+  assert.ok(guards >= 3, 'each secret-reading step guards on what is missing');
+  // لكلّ حارسٍ مخرجٌ نظيف، ولا مخرجَ نظيفٌ بلا حارس — فالعدّان متساويان لا رقمًا سحريًّا.
+  assert.equal((workflow.match(/exit 0/g) || []).length, guards, 'every guard must skip cleanly when unset');
   assert.equal(/exit 1/.test(workflow), false, 'a missing secret must never be turned into a failure');
-  assert.ok(skips.length >= 0);
 });
 
 test('when the secrets are present the gate really runs, and its failure is the run failure', () => {
@@ -79,4 +80,33 @@ test('the gate never runs on a fork pull request, where secrets are empty anyway
   assert.ok(/on:\s*\n\s*push:\s*\n\s*branches: \[main\]/.test(workflow));
   assert.ok(workflow.includes('pull_request:'));
   assert.ok(workflow.includes('permissions:\n  contents: read'), 'it needs nothing but read');
+});
+
+test('the R2 tree is inventoried before it is judged, and the inventory only reads', () => {
+  /*
+   * فشلُ `quran:verify-r2` لا يميّز بين ثلاثة: رفعٍ لم يجرِ، ومُرفِّعٍ لم يُبنَ، وتخطيطٍ
+   * مهجورٍ شجرتُه الحيّة تحت مفتاحٍ آخر. والفرقُ بينها يقرّر عملًا مختلفًا تمامًا، فلا
+   * يُترك للظنّ: يُسأل التخزينُ نفسه أوّلًا.
+   */
+  assert.ok(workflow.includes('npm run r2:inventory'), 'the inventory must run in the R2 group');
+  assert.ok(workflow.indexOf('npm run r2:inventory') < workflow.indexOf('npm run quran:verify-r2'),
+    'the inventory comes before the verdict — a diagnosis printed after the failure is read last, or not at all');
+
+  const script = fs.readFileSync(path.join(process.cwd(), 'scripts', 'r2-inventory.ts'), 'utf8');
+  for (const mutation of ['putObject', 'deleteObject', 'copyObject']) {
+    assert.equal(script.includes(mutation), false,
+      `the inventory is a diagnosis, not a change: it must never call ${mutation}`);
+  }
+  // ولا يطبع اسمَ الدلو ولا نقطةَ النهاية — وكلاهما سرٌّ مضبوط.
+  assert.equal(/console\.(log|error)\([^\n]*cfg\.(bucket|endpoint|accessKeyId|secretAccessKey)/.test(script), false,
+    'the inventory must not print the bucket, the endpoint, or a key');
+  assert.ok(script.includes("EXPECTED_PREFIXES"),
+    'an empty prefix must be reported by name — otherwise "nothing there" is indistinguishable from "not looked at"');
+});
+
+test('the verify step still runs even when the inventory step fails', () => {
+  // الجردُ قبل الحكم؛ ولو انقطع الجرد فالحكمُ هو البوّابة، فلا يُلغى بانقطاعه.
+  const verifyStep = workflow.slice(workflow.indexOf('التحقّق من حزم القرآن على R2'));
+  assert.ok(verifyStep.includes('if: always()'),
+    'the gate must not be skipped because a diagnostic step before it failed');
 });

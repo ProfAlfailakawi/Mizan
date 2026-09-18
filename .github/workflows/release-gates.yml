@@ -69,6 +69,29 @@ jobs:
           echo "الأسرار حاضرة — تشغيل preflight" >> "$GITHUB_STEP_SUMMARY"
           npm run preflight
 
+      # ── حزمةُ R2: جردٌ تشخيصيّ قبل الحكم ─────────────────────────────────────
+      # يُقرأ ولا يُكتب. سببُه أن فشلَ التحقّق أدناه لا يميّز بين: رفعٍ لم يجرِ بعد،
+      # ومُرفِّعٍ لم يُبنَ أصلًا، وتخطيطٍ مهجورٍ شجرتُه الحيّة تحت مفتاحٍ آخر. فيُسأل
+      # التخزينُ نفسه أوّلًا، ويُطبع عددُ الكائنات وحجمُها — لا مفتاحٌ ولا اسمُ دلوٍ ولا سرّ.
+      - name: جردُ شجرة R2 (قراءة محضة)
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          missing=()
+          for name in R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            [[ -z "${!name:-}" ]] && missing+=("$name")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::notice title=r2:inventory متخطّى::لم تُضبط: ${missing[*]}"
+            exit 0
+          fi
+          npm run r2:inventory -- --depth=3
+
       # ── حزمةُ R2: التحقّق من حزم القرآن المرفوعة ─────────────────────────────
       - name: التحقّق من حزم القرآن على R2
         if: always()
