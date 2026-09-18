@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { CONSENT_BACKED_DOCUMENTS, consentVersionFor, legalConfigFromEnv, type LegalDocumentKind } from '../src/lib/legal-documents';
+import { CONSENT_BACKED_DOCUMENTS, consentVersionFor, isPublished, legalConfigFromEnv, legalDocumentState, type LegalDocumentKind } from '../src/lib/legal-documents';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
 
@@ -16,52 +16,45 @@ export const publicTokenHash=(value:string)=>crypto.createHash('sha256').update(
 export const validPublicJourneyToken=(value:string)=>/^mz_(journey|guardian)_[A-Za-z0-9_-]{43}$/.test(value);
 
 export class PublicRegistrationService{
-  constructor(private readonly store:PublicRegistrationStore,private readonly now=()=>new Date()){}
+  constructor(
+    private readonly store:PublicRegistrationStore,
+    private readonly now=()=>new Date(),
+    private readonly legalEnvironment:Record<string,string|undefined>=process.env as Record<string,string|undefined>,
+  ){}
   async register(competitionId:string,raw:PublicRegistrationInput,origin:string){
     if(clean(raw.website,10))throw new Error('REGISTRATION_REJECTED');
     const competition=await this.store.getCompetition(clean(competitionId,120));if(!competition)throw new Error('COMPETITION_NOT_FOUND');
     const policy=getCompetitionPolicy(competition),now=this.now();
+    /*
+     * الموافقة لا تكون ذات معنى إن لم توجد الوثيقة التي وافق عليها الشخص. وكان هذا الشرط
+     * محصورًا في preflight؛ أي إن نشرًا سيئ التهيئة يستطيع مع ذلك قبول POST مباشر وكتابة
+     * سجل «وافق» على شروط/خصوصية غير منشورتين. التسجيل العام نفسه الآن يفشل مغلقًا.
+     */
+    const legal=legalConfigFromEnv(this.legalEnvironment);
+    for(const kind of CONSENT_BACKED_DOCUMENTS){
+      if(!isPublished(legalDocumentState(legal,kind)))throw new Error(`LEGAL_DOCUMENT_NOT_PUBLISHED:${kind}`);
+    }
     const ends=Date.parse(competition.registrationEndDate);
     if(competition.status!=='registration_open'&&competition.status!=='live')throw new Error('COMPETITION_REGISTRATION_CLOSED');
     if(!['public','hybrid'].includes(policy.registration.mode))throw new Error('COMPETITION_REGISTRATION_CLOSED');
     if(Number.isFinite(ends)&&now.getTime()>ends)throw new Error('COMPETITION_REGISTRATION_CLOSED');
     const input:PublicRegistrationInput={fullNameArabic:clean(raw.fullNameArabic,120),fullName:clean(raw.fullName,120),email:clean(raw.email,254).toLowerCase(),phone:clean(raw.phone,32),country:clean(raw.country,100),nationality:clean(raw.nationality,100),nationalIdOrPassport:clean(raw.nationalIdOrPassport,80),dateOfBirth:clean(raw.dateOfBirth,10),gender:raw.gender==='female'?'female':'male',categoryId:clean(raw.categoryId,120),riwaya:clean(raw.riwaya,120),guardianName:clean(raw.guardianName,120),consents:raw.consents||{}};
     for(const field of policy.registration.fields.filter(x=>x.visible&&x.required))if(!String(fieldValue(field,input)).trim())throw new Error(`REGISTRATION_FIELD_REQUIRED:${field.id}`);
-    // A competition may accidentally hide the identity field while keeping identity
-    // verification enabled. The server policy remains authoritative and fails closed.
     if(policy.registration.requireIdentityVerification&&!input.nationalIdOrPassport)throw new Error('REGISTRATION_IDENTITY_REQUIRED');
     if(input.email&&!emailOk(input.email))throw new Error('REGISTRATION_EMAIL_INVALID');
     if(input.phone&&!/^\+?[0-9٠-٩۰-۹ -]{7,24}$/.test(input.phone))throw new Error('REGISTRATION_PHONE_INVALID');
     const age=ageOn(input.dateOfBirth,now);if(!Number.isInteger(age)||age<3||age>100)throw new Error('REGISTRATION_DATE_OF_BIRTH_INVALID');
     const category=competition.categories.find(x=>x.id===input.categoryId);if(!category)throw new Error('REGISTRATION_CATEGORY_INVALID');
-    /*
-     * الفئة تحدّ الروايات المسموحة، والمتسابق يختار منها.
-     *
-     * كانت الرواية تُفرض واحدةً، فمسابقةٌ تفتح فئتها لعدّة روايات لا تُمثَّل إلا بتكرار
-     * الفئة مرّةً لكل رواية — وهو تكرارٌ يفرّق المتسابقين في الترتيب بلا سبب. والخادم يبقى
-     * هو الحاكم: ما ليس في القائمة يُرفض، لا يُقبل ويُصحَّح صامتًا.
-     */
     const defaultReading=clean(category.riwaya,120);
     const allowedReadings=[defaultReading,...(category.allowedRiwayat||[]).map(x=>clean(x,120))].filter(Boolean);
-    /*
-     * الرواية تُختار صراحةً، ومن ضمن ما تسمح به الفئة.
-     *
-     * والشرطان منفصلان عمدًا: فتحُ الفئة على عدّة روايات لا يعني قبول تسجيلٍ بلا رواية —
-     * فالرواية تُحدّد ما يُسحب له وما يُحكَّم به، وافتراضُها عنه يجعله يكتشف يوم المسابقة
-     * أنه يُسأل بغير ما حفظ. فالفراغ مرفوض، وما ليس في القائمة مرفوض.
-     */
     const categoryReading=allowedReadings.find(x=>x===input.riwaya);
     if(!categoryReading)throw new Error('REGISTRATION_READING_INVALID');
     if((category.minAge!==undefined&&age<category.minAge)||(category.maxAge!==undefined&&age>category.maxAge))throw new Error('REGISTRATION_AGE_NOT_ELIGIBLE');
     if(category.genderConstraint&&category.genderConstraint!=='all'&&category.genderConstraint!==input.gender)throw new Error('REGISTRATION_GENDER_NOT_ELIGIBLE');
-    // نطاق الحفظ تحدده الفئة وحدها؛ التسجيل العام لا يقبل نطاقًا بديلًا من المتسابق.
     const minor=age<18,guardianRequired=minor&&policy.registration.requireGuardianForMinors;
     if(!input.consents?.terms||!input.consents?.privacy)throw new Error('REGISTRATION_CONSENT_REQUIRED');
     if(policy.judging.requireAudioRecording&&!input.consents.audioRecording)throw new Error('REGISTRATION_AUDIO_CONSENT_REQUIRED');
     if(guardianRequired&&(!input.consents.guardian||!input.guardianName))throw new Error('REGISTRATION_GUARDIAN_REQUIRED');
-    // Until a certified identity provider is connected, collecting an identity number
-    // is not equivalent to verifying it. Keep the application usable, but require a
-    // human review instead of silently auto-approving it.
     let needsReview=policy.registration.requireIdentityVerification;
     for(const condition of policy.registration.eligibility){if(['previousWinner','document','custom'].includes(condition.field))throw new Error('REGISTRATION_POLICY_REQUIRES_REVIEW');const actual=condition.field==='age'?age:input[condition.field as 'country'|'nationality'|'gender'];if(compare(actual,condition)){if(condition.action==='reject')throw new Error('REGISTRATION_NOT_ELIGIBLE');needsReview=true}}
     const status:Participant['status']=policy.registration.autoApproveEligible&&!needsReview?'approved':'under_review';
@@ -71,14 +64,6 @@ export class PublicRegistrationService{
     const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:categoryReading,institution:'',specialNeeds:false,documents:[],status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,journeyTokenCustody:'holder_only',createdAt};
     const journeyBase={organizationId:competition.organizationId,competitionId:competition.id,participantId,competitionName:competition.name,competitionNameArabic:competition.nameArabic,participantCode:code,participantName:participant.fullName,participantNameArabic:participant.fullNameArabic,status,arrivalSlot:null,queueNumber:null,venueName:competition.venueName||null,committee:null,result:null,certificate:null,revoked:false,updatedAt:createdAt};
     const documents=[{path:`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${participantId}`,data:participant as unknown as Record<string,unknown>},{path:`public_journeys/${journeyAccessTokenHash}`,data:{...journeyBase,audience:'participant',tokenHashVersion:'sha256-v1'}},{path:`public_journeys/${guardianAccessTokenHash}`,data:{...journeyBase,audience:'guardian',tokenHashVersion:'sha256-v1'}}];
-    /*
-     * نسخةُ الموافقة هي نسخةُ **الوثيقة** لا نسخةُ لائحة المسابقة.
-     *
-     * كانت تُكتب `policy.version`، فيقول الأثرُ إن فلانًا وافق على «الشروط نسخة ٧» —
-     * وسبعةٌ رقمُ اللائحة، ولا شروطَ منشورةً أصلًا. فالأثرُ يشهد بما لم يقع.
-     * وما لم يُنشر يُكتب باسمه صراحةً، ويرفعه فحصُ ما قبل الانطلاق حاجزًا.
-     */
-    const legal=legalConfigFromEnv(process.env as Record<string,string|undefined>);
     const consentDocumentVersion=(kind:string)=>
       (CONSENT_BACKED_DOCUMENTS as readonly string[]).includes(kind)
         ? consentVersionFor(legal,kind as LegalDocumentKind)
@@ -94,8 +79,6 @@ export class PublicRegistrationService{
     if(journey.competitionId!==competitionId||journey.audience!==audience)throw new Error('JOURNEY_TOKEN_INVALID');
     if(journey.revoked)throw new Error('JOURNEY_REVOKED');
     const competition=await this.store.getCompetition(competitionId);if(!competition)throw new Error('COMPETITION_NOT_FOUND');
-    /* انتهاء المنافسة لا يبطل رحلة المشارك: النتائج والشهادة والحفل تأتي بعدها.
-       الإبطال قرار صريح محفوظ في journey.revoked، لا أثر جانبي لحالة المسابقة. */
     return journey;
   }
 }
