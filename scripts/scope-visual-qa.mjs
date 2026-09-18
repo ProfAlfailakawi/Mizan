@@ -191,7 +191,7 @@ const apiServed = await (async () => {
 if (!apiServed) {
   console.log('\n── تسجيل');
   console.log('  ⏭ متخطّى: لا واجهة `/api/public` على هذا الخادم. رابطُ التسجيل يجلب من الخادم دائمًا ولا يقبل نسخة المتصفّح.');
-  console.log('     يُشغَّل هذا القسم مقابل الخادم الحقيقي: `npm start` ثم MIZAN_QA_BASE=http://localhost:<port>.');
+  console.log('     يُشغَّل هذا القسم مقابل الخادم الحقيقي: `npm start` ثم --base=http://127.0.0.1:<port>.');
 }
 for (const [width, height, label] of (apiServed ? [VIEWPORTS[0], VIEWPORTS[2]] : [])) {
   console.log(`\n── تسجيل ${label}`);
