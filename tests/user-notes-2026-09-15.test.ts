@@ -375,7 +375,15 @@ test('an empty judging screen says why it is empty and offers the next real step
   const judge = read('src/components/judge/JudgeOS.tsx');
   assert.match(judge, /awaitingArrival/);
   assert.match(judge, /من ينتظر دوره/, 'the waiting list is shown by name, not as a bare counter');
-  assert.match(judge, /admitAndCall/, 'a judge can admit the participant standing in front of them');
+  /*
+   * والخطوة التالية الحقيقية ليست أن يستقبل المحكّم بنفسه.
+   *
+   * كان له زرُّ «أدخِله وابدأ» لكل من لم يصل، فيدخل متسابقًا ويبدأ به فورًا أمام عشرين
+   * منتظرًا — تخطٍّ لا يظهر في الطابور أصلًا لأن صاحبه ليس فيه. فصارت الخطوة التالية
+   * مقولةً لا مفعولة: من يستقبل، وأين.
+   */
+  assert.doesNotMatch(judge, /admitAndCall/, 'admitting a late arrival is not the judge’s action');
+  assert.match(judge, /استقبالهم من غرفة العمليات/, 'the judge is told who admits, and where');
   assert.match(judge, /طلبًا تحت المراجعة/, 'and is told when the roster is pending approval instead');
 
   /*
@@ -385,6 +393,7 @@ test('an empty judging screen says why it is empty and offers the next real step
    * والعدّاد يقول صفرًا، بينما الإدارة تعرضه مقبولًا — فيظنّ المحكّم النظام معطلًا.
    */
   assert.match(judge, /const CALLABLE:RegistrationStatus\[\]=\['approved','checked_in','in_session'\]/);
-  assert.match(judge, /store\.releaseStrandedSession\(id\)/, 'a stranded participant is released before being called again');
+  assert.match(read('src/components/admin/RolePortals.tsx'), /releaseStrandedSession/,
+    'a stranded participant is released from the exception desk, which is where such an exception belongs');
   assert.match(judge, /PARTICIPANT_WAIT_LABEL/, 'each waiting name carries what it is waiting for');
 });
