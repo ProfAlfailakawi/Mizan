@@ -1,44 +1,55 @@
 /*
- * ما يُقلع ناقصًا ولا يشكو.
+ * إعدادات الإنتاج التي لا يجوز أن تختفي بصمت.
  *
- * ثلاثةُ إعداداتٍ غائبةٌ عن كلّ نشرة، وكلُّها تُصنَّف تنبيهًا لا مانعًا — فتُقلع الخدمةُ
- * وتعمل، ثم تردّ `503` عند أوّل استعمال:
+ * سجلُّ الشهادات مسارٌ دائم وقد ضُبط في النشر. أمّا سرّا التوقيع فلا يجوز ربطهما في
+ * cloudbuild قبل أن يُنشئهما المالك في Secret Manager، لأن gcloud سيفشل النشر كله.
+ * وفي المقابل لا يجوز اعتبار غيابهما مجرد warning عند الحكم على الجاهزية التجارية:
  *
- *   · `MIZAN_PASS_SIGNING_SECRET` ⇒ البطاقات، و**حفظُ الأسئلة** مُطفأ.
- *   · `MIZAN_CERT_SIGNING_SECRET` ⇒ التحقّق من الشهادة.
- *   · `MIZAN_CERTIFICATE_REGISTRY_DIR` ⇒ سجلُّ الشهادات `null`.
+ *   · `MIZAN_PASS_SIGNING_SECRET` ⇒ بطاقات الدخول وQuestion Escrow غير متاحين.
+ *   · `MIZAN_CERT_SIGNING_SECRET` ⇒ التحقّق الموقّع من الشهادة غير متاح.
  *
- * والثالثُ مسارٌ لا سرّ، فضُبط. والأوّلان سرّان يُنشئهما المالك — ولا يُربطان قبل
- * وجودهما، فالنشرُ كلُّه يفشل على سرٍّ غير موجود.
- *
- * وهذه الحرّاس تُثبّت ثلاثة أشياء: أن المسار مضبوط، وأن السرّين **لم** يُربطا بعد،
- * وأن الوثيقتين القانونيتين موجودتان بمواضع الملء فيهما ظاهرة.
+ * لذلك تبقى الخدمة قادرةً على الإقلاع، لكن preflight يرفض وصفها جاهزة للإطلاق حتى
+ * يصبح السرّان موجودين ومربوطين.
  */
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const ROOT = process.cwd();
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const CLOUDBUILD = read('cloudbuild.yaml');
 
+const releaseEnv = () => ({
+  ...process.env,
+  VITE_REQUIRE_AUTH: 'true',
+  VITE_FIREBASE_API_KEY: 'public-firebase-web-key-for-test',
+  VITE_FIREBASE_PROJECT_ID: 'mizan-test',
+  MIZAN_LEGAL_ENTITY_NAME: 'Test Legal Entity',
+  MIZAN_LEGAL_TERMS_URL: 'https://example.invalid/terms',
+  MIZAN_LEGAL_TERMS_VERSION: '1.0',
+  MIZAN_LEGAL_TERMS_EFFECTIVE: '2026-10-01',
+  MIZAN_LEGAL_PRIVACY_URL: 'https://example.invalid/privacy',
+  MIZAN_LEGAL_PRIVACY_VERSION: '1.0',
+  MIZAN_LEGAL_PRIVACY_EFFECTIVE: '2026-10-01',
+  MIZAN_CERTIFICATE_REGISTRY_DIR: '/tmp/mizan-certificates-test',
+  MIZAN_SAAS_DATA_DIR: '/tmp/mizan-saas-test',
+});
+
 test('the certificate registry has a durable directory in production', () => {
   assert.match(CLOUDBUILD, /MIZAN_CERTIFICATE_REGISTRY_DIR=\/mnt\/authority\/certificates/,
     'without it certificateRegistryFromEnv() returns null and publishing a certificate is refused');
-  // وعلى الوحدة الدائمة نفسها التي تحمل سلطة النزاهة — لا على قرصٍ يزول مع النسخة.
   assert.match(CLOUDBUILD, /MIZAN_INTEGRITY_AUTHORITY_DIR=\/mnt\/authority/,
     'it must sit on the mounted authority volume, not on ephemeral container disk');
 });
 
 test('the two signing secrets are not wired before they exist', () => {
   /*
-   * حارسٌ يمنع خطأً محدَّدًا: ربطُ سرٍّ لم يُنشأ بعد يُفشل `gcloud run deploy` كلَّه،
-   * فيسقط النشر — بما لا علاقة له بالشهادات. فالترتيب: إنشاءٌ ثم ربط.
-   *
-   * ويسقط هذا الحارسُ عمدًا حين يُربطان. وإسقاطُه حينها **هو المطلوب**: يُقرأ فيُحذف
-   * مع الخطوة التي أتمّتها، لا يُلتفّ عليه.
+   * هذا الحارس يسقط عمدًا يوم ربط السرّين. عندها يكون المطلوب: تأكيد وجودهما في Secret
+   * Manager ثم حذف هذا الاختبار بالاسم، لا الالتفاف عليه. حتى ذلك الحين يمنع commit
+   * يبدو مكتملاً لكنه يجعل كل deploy يفشل على secret غير موجود.
    */
   const secretsLine = CLOUDBUILD.split('\n').find(l => l.includes('R2_ACCESS_KEY_ID=')) || '';
   assert.ok(secretsLine, 'the --update-secrets line must exist');
@@ -47,12 +58,30 @@ test('the two signing secrets are not wired before they exist', () => {
     'these are wired — so they must now exist in Secret Manager; confirm, then delete this guard by name');
 });
 
+test('commercial preflight fails closed when either signing secret is absent', () => {
+  const env = releaseEnv();
+  delete env.MIZAN_PASS_SIGNING_SECRET;
+  delete env.MIZAN_CERT_SIGNING_SECRET;
+  const result = spawnSync(process.execPath, ['scripts/go-live-preflight.mjs'], { cwd: ROOT, env, encoding: 'utf8' });
+  assert.notEqual(result.status, 0, 'commercial preflight must refuse launch without signing secrets');
+  assert.match(result.stdout, /MIZAN_PASS_SIGNING_SECRET غير مضبوط/);
+  assert.match(result.stdout, /MIZAN_CERT_SIGNING_SECRET غير مضبوط/);
+  assert.match(result.stdout, /Question Escrow/);
+});
+
+test('commercial preflight accepts signing configuration when both secrets are present', () => {
+  const env = releaseEnv();
+  env.MIZAN_PASS_SIGNING_SECRET = 'test-only-pass-signing-secret-32-bytes-minimum';
+  env.MIZAN_CERT_SIGNING_SECRET = 'test-only-cert-signing-secret-32-bytes-minimum';
+  const result = spawnSync(process.execPath, ['scripts/go-live-preflight.mjs'], { cwd: ROOT, env, encoding: 'utf8' });
+  assert.equal(result.status, 0, `preflight should pass this fully supplied test environment:\n${result.stdout}\n${result.stderr}`);
+});
+
 test('the runbook says which order, and why the order matters', () => {
   const book = read('docs/SIGNING-SECRETS.md');
   assert.match(book, /gcloud secrets create MIZAN_PASS_SIGNING_SECRET/, 'it must give the exact command');
   assert.match(book, /secretmanager\.secretAccessor/, 'and the IAM grant the runtime needs');
   assert.match(book, /ولا يُدفع هذا السطر قبل وجود السرّين/, 'and state the ordering constraint plainly');
-  // ولا يُكتب سرٌّ في المستودع — ولا مثالٌ يُشبه سرًّا فيُنسخ كما هو.
   assert.equal(/=\s*['"][A-Za-z0-9+\/]{24,}={0,2}['"]/.test(book), false,
     'no literal secret-shaped value may appear in a committed file');
 });
@@ -63,7 +92,6 @@ test('both legal drafts exist, and neither pretends to be final', () => {
     assert.match(text, /مسوّدة — لا تُنشر قبل مراجعة محامٍ/, `${file} must not read as a published document`);
     assert.ok(text.includes('⟦'), `${file} must keep the owner's blanks visible rather than inventing them`);
   }
-  // والخصوصيةُ تذكر المُدَد التي تقرؤها الشيفرة فعلًا، لا مدّةً مستعارة.
   const privacy = read('docs/legal/PRIVACY-AR.md');
   const config = read('src/lib/competition-config.ts');
   assert.match(config, /audioRetentionDays:\s*90/, 'the measured default');
@@ -81,6 +109,5 @@ test('the publishing guide names all seven variables preflight blocks on', () =>
   ]) {
     assert.ok(guide.includes(name), `${name} is required for publication and must be documented`);
   }
-  // والنقصُ الجزئيّ ليس نشرًا — تُقال القاعدةُ كي لا يُضبط نصفُها ويُظنّ الأمرُ تمّ.
   assert.match(guide, /النقصُ الجزئيّ ليس نشرًا/, 'partial configuration must be called out');
 });
