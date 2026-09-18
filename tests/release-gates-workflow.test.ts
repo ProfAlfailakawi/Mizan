@@ -75,21 +75,27 @@ test('the secret names match the ones the product documents', () => {
   }
 });
 
-test('a gate about the storage runs where the storage lives, not on every pull request', () => {
+test('a check no commit can satisfy is not stamped on commits', () => {
   /*
    * موضوعُ هاتين البوّابتين حالةُ التخزين والبيئة، لا فرقُ الدفعة. ولا تغييرَ في شيفرة
-   * دفعةٍ يجعلهما خضراوين ما دامت الشجرةُ على R2 بلا كتالوج تحقّق — فكانت كلُّ دفعةٍ
-   * في المستودع تحمرّ أبدًا، ولو لم تمسّ R2 بحرف. وذلك يُعلّم الفريقَ تجاهلَ الأحمر.
+   * دفعةٍ — ولا في دمجةٍ على `main` — يجعلهما خضراوين ما دامت الشجرةُ على R2 بلا كتالوج
+   * تحقّق، والوثيقتان غيرَ منشورتين.
    *
-   * ولا يُقرأ هذا تعطيلًا: الاختباران التاليان يثبتان أنها ما زالت تعمل وما زال فشلُها
-   * فشلًا — على `main`، ويوميًّا، وعند الطلب.
+   * وقد أُصلح هذا مرّتين. أُزيل `pull_request` أوّلًا بهذه الحجّة نفسها، ثم بقي
+   * `push: [main]` — وهو الحجّةُ نفسُها مرفوعةً درجة: كلُّ دمجةٍ تحمل علامةً حمراء عن
+   * حالةٍ لا تملك تغييرَها. والعلامةُ التي تظهر دائمًا لا تُخبر عن شيء، ويعتاد الناسُ
+   * تخطّيها، فتمرّ يومًا حمرةٌ حقيقية بينها بلا أن يلتفت أحد. ولم يُرَ ذلك حتى رآه
+   * المالكُ أربع مرّات.
+   *
+   * فلا يبقى إلا ما يقيس موضوعَها فعلًا: الزمنُ والطلب.
    */
-  assert.ok(/on:\s*\n\s*push:\s*\n\s*branches: \[main\]/.test(workflow), 'it must run on the release branch');
   assert.ok(/schedule:/.test(workflow) && /cron: '[^']+'/.test(workflow),
-    'storage state changes from outside the repository, so merging alone is not enough');
+    'storage state changes from outside the repository, so time is what measures it');
   assert.ok(workflow.includes('workflow_dispatch:'), 'and it must be runnable on demand');
   assert.equal(/^\s*pull_request:/m.test(workflow), false,
     'a check no diff can satisfy must not gate every diff');
+  assert.equal(/^\s*push:/m.test(workflow), false,
+    'nor stamp every merge — a merge cannot publish a catalog or a legal document either');
   assert.ok(workflow.includes('permissions:\n  contents: read'), 'it needs nothing but read');
 });
 
