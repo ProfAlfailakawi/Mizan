@@ -71,6 +71,20 @@ async function enterDemo(page, label) {
   return true;
 }
 
+/**
+ * يبدّل الدور المعروض في البيئة التجريبية بقيمته لا بعنوانه.
+ *
+ * القيمةُ (`participant`, `comp_admin`) عقدُ الشيفرة؛ والعنوانُ نصٌّ معروضٌ يُترجَم
+ * ويُصاغ، فالفحصُ المعلَّق عليه يسقط عند أوّل تحريرٍ لغويّ ويُقرأ عطلًا في المنتج.
+ */
+const ROLE_SWITCH = 'اختر الدور المعروض';
+async function roleSwitch(page, roleValue) {
+  const select = page.locator(`select[aria-label="${ROLE_SWITCH}"]`).first();
+  await select.waitFor({ state: 'visible', timeout: 20000 });
+  await select.selectOption(roleValue);
+  await page.waitForTimeout(2200);
+}
+
 async function assertNoHorizontalScroll(page, label, where) {
   const size = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, c: document.documentElement.clientWidth }));
   if (size.s > size.c + 2) note(`[${label}] ${where}: الصفحة تتمدّد أفقيًا (${size.s} > ${size.c})`);
@@ -116,50 +130,28 @@ for (const [width, height, label] of VIEWPORTS) {
     await page.screenshot({ path: path.join(OUT, `${label}-simulation-run.png`), fullPage: true });
 
     /*
-     * النماذج والعدالة: لا يكفي أن تظهر الأزرار. تُضغط فعلًا — تُولَّد دفعة، وتُعتمد، وتُختم،
-     * ويُحجر موضع، ويُصدر تقرير — ويُقرأ ما ظهر على الشاشة بعد كل خطوة.
+     * النماذج والعدالة.
+     *
+     * كان هذا الفحص يقود دورةَ حياة دفعات النماذج كاملةً: يولّد، ويعتمد، ويختم، ويحجر
+     * موضعًا، ويُطلق المنقضي. وكان يسقط بانتظار «ولّد دفعة» ثلاثين ثانية.
+     *
+     * والسببُ ليس عطلًا في المنتج: تلك الشاشة **حُذفت بطلب صاحب المسابقة** (الملاحظة ٧
+     * في `a1911a6`): «دفعات النماذج والاحتياط ودورة حياة الحجز وأعلى المواضع انكشافًا
+     * وحجر المواضع: مفاهيم داخلية تطلب من الجهة قرارًا لا تملك أساسه… حُذفت، وبقي ما
+     * يعنيها: تقرير عدالة التوزيع».
+     *
+     * فكان الفحصُ يقود واجهةً أُزيلت عمدًا، ويقرأ إزالتَها عطلًا. وهو يفحص الآن العقدَ
+     * القائم: التقريرُ يصدر، ولا يدّعي أنه شهادة علمية، ويذكر الحدَّ الأدنى الرياضي.
      */
     if (label === 'desktop') {
       await page.locator('[role="tab"]:visible', { hasText: 'النماذج والعدالة' }).first().click();
       await page.waitForTimeout(900);
-      const accept = async () => {
-        const confirmBtn = page.locator('[role="dialog"] button:visible, .mizan-confirm button:visible').filter({ hasText: /ولّد الآن|اعتماد|ختم|احجر|أصدر|تأكيد|نعم|Approve|Seal|Generate/ }).first();
-        if (await confirmBtn.count()) { await confirmBtn.click().catch(() => {}); await page.waitForTimeout(1400); return true; }
-        return false;
-      };
 
-      await page.locator('button:visible', { hasText: 'ولّد دفعة' }).first().click();
-      if (!await accept()) note(`[${label}] زر توليد الدفعة لم يفتح تأكيدًا`);
-      await page.waitForTimeout(1800);
       let body = await page.locator('body').innerText();
-      const generated = body.match(/وُلّد\s*(\d+)\s*نموذجًا\s*و(\d+)\s*احتياطيًا/);
-      if (!generated) note(`[${label}] لم يظهر أثر توليد الدفعة على الشاشة`);
-      else if (generated[1] === '0') note(`[${label}] الدفعة ولّدت صفر نموذج`);
-      else ok(`دفعة: ${generated[1]} نموذجًا و${generated[2]} احتياطيًا`);
-      await page.screenshot({ path: path.join(OUT, `${label}-models-generated.png`), fullPage: true });
-
-      await page.locator('button:visible', { hasText: /^اعتماد$/ }).first().click().catch(() => note(`[${label}] زر اعتماد الدفعة معطّل بعد التوليد`));
-      await accept();
-      await page.locator('button:visible', { hasText: /^ختم$/ }).first().click().catch(() => note(`[${label}] زر ختم الدفعة معطّل بعد الاعتماد`));
-      await accept();
-      body = await page.locator('body').innerText();
-      if (!/مختومة/.test(body)) note(`[${label}] الدفعة لم تصل إلى حالة «مختومة»`); else ok('الدفعة اعتُمدت ثم خُتمت');
-
-      const lociField = page.locator('input[placeholder="2:255، 36:1"]').first();
-      if (!await lociField.count()) note(`[${label}] حقل حجر المواضع غير موجود`);
-      else {
-        await lociField.fill('2:255');
-        await page.locator('input[placeholder="خطأ في ضبط النص"]').first().fill('فحص تشغيلي');
-        await page.locator('button:visible', { hasText: /^احجر$/ }).first().click();
-        await accept();
-        await page.waitForTimeout(1200);
-        body = await page.locator('body').innerText();
-        if (!/حُجر\s*1\s*موضعًا/.test(body)) note(`[${label}] الحجر لم يُظهر أثره بالأرقام`); else ok('الحجر يُظهر أثره: نماذج مُبطلة ومخزون متبقٍ');
-        if (!/ارفع الحجر/.test(body)) note(`[${label}] لا سبيل لرفع الحجر من الشاشة`);
+      // وما حُذف يبقى محذوفًا: عودتُه إلى وجه الجهة نكوصٌ عن قرارٍ مُتَّخَذ، لا ميزةٌ جديدة.
+      for (const removed of ['ولّد دفعة', 'أطلق المنقضي', 'أعلى المواضع انكشافًا']) {
+        if (body.includes(removed)) note(`[${label}] «${removed}» عادت إلى وجه الجهة بعد أن حُذفت بطلب المالك`);
       }
-
-      await page.locator('button:visible', { hasText: 'أطلق المنقضي' }).first().click().catch(() => note(`[${label}] زر إطلاق الحجوزات المنقضية لا يعمل`));
-      await page.waitForTimeout(800);
 
       await page.locator('button:visible', { hasText: 'أصدر التقرير' }).first().click();
       await page.waitForTimeout(2500);
@@ -177,8 +169,31 @@ for (const [width, height, label] of VIEWPORTS) {
   await ctx.close();
 }
 
-// تدفق التسجيل: الخطوة تظهر للفئة الاختيارية وحدها، والقاعدة تُفرض قبل المتابعة.
-for (const [width, height, label] of [VIEWPORTS[0], VIEWPORTS[2]]) {
+/*
+ * تدفق التسجيل: الخطوة تظهر للفئة الاختيارية وحدها، والقاعدة تُفرض قبل المتابعة.
+ *
+ * ورابطُ التسجيل عامٌّ **يُعيد الجلبَ من الخادم دائمًا** ولا يقبل نسخةَ المتصفّح — وهذا
+ * مقصودٌ ومكتوبٌ في `src/App.tsx`: وإلّا لعُرضت الصفحةُ كاملةً على جهاز الإدارة وحده
+ * فيختبرها المسؤولُ فتنجح، ويفتحها المتسابقُ فلا يجد شيئًا.
+ *
+ * فهذا القسمُ لا يعمل على خادمٍ ساكن: لا واجهةَ `/api/public` فيه، فتُعرض «هذه المسابقة
+ * غير متاحة» — وهو السلوكُ الصحيح، لا عطل. وكان الفحصُ يقرأه انتهاءَ مهلةٍ غامضًا.
+ *
+ * فيُسأل الخادمُ أوّلًا. والتخطّي **باسمه وسببه**: فحصٌ يُسكت نفسه بلا ذكرٍ أسوأ من فحصٍ
+ * لا يوجد — وهو الخطأ نفسُه الذي وقع في فحص البحث حين كان يمرّ حيث لا شبكة ويسقط حيث توجد.
+ */
+const apiServed = await (async () => {
+  try {
+    const res = await fetch(`${BASE}/api/public/legal/terms`, { headers: { accept: 'application/json' } });
+    return (res.headers.get('content-type') || '').includes('application/json');
+  } catch { return false; }
+})();
+if (!apiServed) {
+  console.log('\n── تسجيل');
+  console.log('  ⏭ متخطّى: لا واجهة `/api/public` على هذا الخادم. رابطُ التسجيل يجلب من الخادم دائمًا ولا يقبل نسخة المتصفّح.');
+  console.log('     يُشغَّل هذا القسم مقابل الخادم الحقيقي: `npm start` ثم MIZAN_QA_BASE=http://localhost:<port>.');
+}
+for (const [width, height, label] of (apiServed ? [VIEWPORTS[0], VIEWPORTS[2]] : [])) {
   console.log(`\n── تسجيل ${label}`);
   const { ctx, page } = await newPage(width, height, `register-${label}`);
   try {
@@ -214,90 +229,47 @@ for (const [width, height, label] of [VIEWPORTS[0], VIEWPORTS[2]]) {
 }
 
 /*
- * دورة حياة نطاق المتسابق، من بابها إلى سجلّها.
+ * نطاقُ المتسابق: الفئةُ تحدّده، ولا يختاره المتسابق — وهذا قرارٌ مُتَّخَذ.
  *
- * كانت `saveParticipantScope` مبنيّةً كاملةً ولا تستدعيها شاشة، فلا نسخة ثانية تُولد أصلًا،
- * فسجلُّ النسخ يُعرض فارغًا أبدًا. هذا الفحص يطرق الباب فعلًا: يغيّر النطاق، ويكتب السبب،
- * ويرسل، ثم يقرأ السجل، ثم ينتقل إلى اللجنة فيقرأ الطلب ويرفضه بسببٍ يقرأه صاحبه.
+ * كان هذا القسم يقود دورةَ حياةٍ كاملة: يفتح باب «اطلب تعديل نطاقي» في صفحة المتسابق،
+ * ويرسل إلى اللجنة، ويقرأ سجلَّ النسخ، ثم ينتقل إلى تبويب «اختيار المتسابق» فيرفض بسبب.
+ * وكان يسقط بأربع ملاحظات.
+ *
+ * **والملاحظاتُ كاذبة.** تلك الشاشات أُزيلت عمدًا استجابةً لملاحظات صاحب المسابقة في
+ * 14 سبتمبر 2026، ويحرس إزالتَها `tests/user-notes-2026-09-14-regression.test.ts`:
+ * «participant scope selection … are removed from active UI»، ويشترط أن تقول صفحةُ
+ * المتسابق «نطاق الفئة». وهو القرارُ نفسُه الذي أزال آلةَ النماذج: مفاهيمُ تطلب من
+ * الجهة أو من المتسابق قرارًا لا أساسَ له عندهما.
+ *
+ * فالفحصُ يحرس القرارَ لا يناقضه: نطاقُ الفئة يُعرض للمتسابق، ولا بابَ اختيارٍ يعود
+ * إلى وجهه، ولا تبويبَ «اختيار المتسابق» في ورشة المحرّك.
  */
-console.log('\n── دورة حياة نطاق المتسابق');
+console.log('\n── نطاق المتسابق: قرارُ الفئة لا اختيارُ المتسابق');
 {
-  const { ctx, page } = await newPage(1440, 1100, 'lifecycle');
+  const { ctx, page } = await newPage(1440, 1100, 'scope-decision');
   try {
     await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
-    await page.locator('button:visible', { hasText: 'المتسابق' }).first().click();
-    await page.waitForTimeout(2200);
-
-    const door = page.locator('button:visible', { hasText: 'اطلب تعديل نطاقي' }).first();
-    if (!await door.count()) note('لا باب لتعديل النطاق في صفحة المتسابق — دورة الحياة غير قابلة للوصول');
+    if (!await enterDemo(page, 'scope-decision')) { /* enterDemo سجّل الملاحظة */ }
     else {
-      ok('باب تعديل النطاق موجود للفئة التي يختار فيها المتسابق');
-      await door.click();
-      await page.waitForTimeout(1000);
-      if (!await page.locator('#participant-juz-1').count()) note('منتقي النطاق لم يظهر عند طلب التعديل');
+      await roleSwitch(page, 'participant');
+      const participantBody = await page.locator('body').innerText();
+      if (!/نطاق الفئة/.test(participantBody)) note('صفحة المتسابق لا تعرض نطاق فئته');
+      else ok('المتسابق يرى نطاق فئته قبل أن يدخل');
+      for (const returned of ['اطلب تعديل نطاقي', 'أرسل إلى اللجنة', 'سجل نطاقي']) {
+        if (participantBody.includes(returned)) note(`«${returned}» عادت إلى صفحة المتسابق بعد أن أُزيلت بطلب المالك`);
+      }
+      await assertNoHorizontalScroll(page, 'scope-decision', 'صفحة المتسابق');
+      await page.screenshot({ path: path.join(OUT, 'participant-scope.png'), fullPage: true });
 
-      await page.locator('button:visible', { hasText: 'أرسل إلى اللجنة' }).first().click();
-      await page.waitForTimeout(700);
-      if (!/اكتب سبب التغيير/.test(await page.locator('body').innerText())) note('أُرسل تغيير النطاق بلا سبب');
-      else ok('التغيير بلا سبب مرفوض بنصٍّ يشرح المطلوب');
-
-      /* نبدّل جزءًا بجزء فيبقى العدد مطابقًا للائحة، وإلا رُفض الاختيار نفسه. */
-      await page.locator('#participant-juz-1').click(); await page.waitForTimeout(250);
-      await page.locator('#participant-juz-9').click(); await page.waitForTimeout(400);
-      await page.locator('input[placeholder="أتقنت الجزء الخامس أكثر من الأول"]').fill('أتقن التاسع أكثر من الأول');
-      await page.locator('button:visible', { hasText: 'أرسل إلى اللجنة' }).first().click();
-      await page.waitForTimeout(1400);
-
-      const after = await page.locator('body').innerText();
-      if (!/أُرسل نطاقك الجديد إلى اللجنة/.test(after)) note('لم يُؤكَّد إرسال النطاق الجديد');
-      else ok('النطاق الجديد أُرسل إلى اللجنة والنسخة السابقة محفوظة');
-      const versions = after.match(/سجل نطاقي \((\d+) نسخة\)/);
-      if (!versions) note('سجل النسخ لم يظهر بعد التغيير');
-      else if (versions[1] === '1') note('سجل النسخ ما زال يعرض نسخة واحدة بعد التغيير');
-      else ok(`سجل النسخ يعرض ${versions[1]} نسخة`);
-      await page.locator('summary:visible', { hasText: 'سجل نطاقي' }).first().click().catch(() => {});
-      await page.waitForTimeout(500);
-      if (!/أتقن التاسع أكثر من الأول/.test(await page.locator('body').innerText())) note('سبب التغيير لا يظهر في سجل المتسابق');
-      else ok('سبب التغيير مكتوب في السجل لا مدفون في التخزين');
-      await assertNoHorizontalScroll(page, 'lifecycle', 'صفحة المتسابق');
-      await page.screenshot({ path: path.join(OUT, 'participant-scope-history.png'), fullPage: true });
-    }
-
-    /* اللجنة: ترى الطلب، وترى السجل، وترفض بسببٍ يقرأه صاحبه. */
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1200);
-    await page.locator('button:visible', { hasText: 'مدير المسابقة' }).first().click();
-    await page.waitForTimeout(1500);
-    await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
-    await page.waitForTimeout(1200);
-    await page.locator('button:visible', { hasText: 'ربع القرآن يختاره المتسابق' }).first().click().catch(() => {});
-    await page.waitForTimeout(1200);
-
-    let panel = await page.locator('body').innerText();
-    if (!/بانتظار المراجعة/.test(panel)) note('طلب تعديل النطاق لا يصل إلى شاشة اللجنة');
-    else ok('طلب التعديل يصل إلى اللجنة بحالة «بانتظار المراجعة»');
-    if (!/نسخة سابقة/.test(panel)) note('اللجنة لا ترى النسخ السابقة');
-    else ok('اللجنة ترى النسخ السابقة بتواريخها وأسبابها');
-
-    const reject = page.locator('button:visible', { hasText: /^رفض$/ }).first();
-    if (!await reject.count()) note('لا سبيل للجنة أن ترفض نطاقًا');
-    else {
-      await reject.click();
-      await page.waitForTimeout(600);
-      if (!await page.locator('button:visible', { hasText: 'أرسل الرفض' }).first().isDisabled()) note('الرفض قابل للإرسال بلا سبب');
-      else ok('الرفض بلا سبب موقوف');
-      await page.locator('input[placeholder="النطاق المختار أقل من المطلوب في اللائحة"]').fill('يرجى إبقاء الجزء الأول ضمن اختيارك');
-      await page.locator('button:visible', { hasText: 'أرسل الرفض' }).first().click();
+      await roleSwitch(page, 'comp_admin');
+      await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
       await page.waitForTimeout(1200);
-      panel = await page.locator('body').innerText();
-      if (!/مرفوض/.test(panel)) note('الرفض لم يُسجَّل');
-      else ok('الرفض سُجِّل بسببه');
+      if (/اختيار المتسابق/.test(await page.locator('body').innerText())) note('تبويب «اختيار المتسابق» عاد إلى ورشة المحرّك بعد أن أُزيل بطلب المالك');
+      else ok('ورشة المحرّك بلا تبويب اختيار المتسابق، كما قرّر المالك');
+      await assertNoHorizontalScroll(page, 'scope-decision', 'ورشة المحرّك');
     }
-    await assertNoHorizontalScroll(page, 'lifecycle', 'مراجعة اللجنة');
-    await page.screenshot({ path: path.join(OUT, 'committee-scope-review.png'), fullPage: true });
   } catch (error) {
-    note(`توقف فحص دورة الحياة: ${String(error).slice(0, 160)}`);
+    note(`توقف فحص نطاق المتسابق: ${String(error).slice(0, 160)}`);
   }
   await ctx.close();
 }

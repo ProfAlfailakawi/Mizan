@@ -46,7 +46,8 @@
     "quran:delivery-counts": "tsx scripts/quran-delivery-count-intake.ts",
     "quran:delivery-counts-generate": "tsx scripts/quran-delivery-count-generate.ts",
     "qa:print-document": "node scripts/print-document-qa.mjs",
-    "quran:crosswalk-coverage": "tsx scripts/quran-crosswalk-coverage-generate.ts"
+    "quran:crosswalk-coverage": "tsx scripts/quran-crosswalk-coverage-generate.ts",
+    "r2:inventory": "tsx scripts/r2-inventory.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",
