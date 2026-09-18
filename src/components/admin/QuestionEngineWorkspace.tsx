@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, Wand2,
-  Layers3,
+  Layers3, BookCopy, Activity,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { OfficialQuranLibrary } from './OfficialQuranLibrary';
+import { QuranIntelligenceHealthConsole } from './QuranIntelligenceHealthConsole';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { bilingualName } from '../../lib/ui-language';
 import type { Category, ScopeSimulationRecord } from '../../types';
@@ -40,7 +42,17 @@ import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-c
  * والوضع البسيط يكفي مسابقة مدرسة في دقائق؛ والمتقدّم لمن يحتاج مقاطع ومناطق وقواعد.
  */
 
-type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness';
+/*
+ * «المكتبة» و«صحّة الذكاء» كانتا مبنيّتين ولا تُفتحان.
+ *
+ * الشاشتان موجودتان منذ حين وتعرضان حالةً خادميّةً لا يعرضها غيرُهما — أصولُ المجمَّع
+ * المعتمدة وحالةُ تسليمها، وجاهزيةُ طبقات الذكاء لكلّ رواية — ولم يكن شيءٌ في المنتج
+ * يستوردهما. فكان المشغّلُ لا يستطيع فتحَهما بحال، وبدا الأمرُ كأن الميزة غيرُ موجودة.
+ *
+ * وموضعُهما هنا لا في مكانٍ آخر: من يسأل «على أيّ مصحفٍ تُبنى الأسئلة؟» و«أيُّ رواياتٍ
+ * جاهزة؟» يسألهما وهو في ورشة المحرّك.
+ */
+type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness' | 'library' | 'intelligence';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -59,6 +71,8 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
+    ['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'],
+    ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
   ];
 
   return (
@@ -98,6 +112,8 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'simulation' && <SimulationTab store={store} ar={ar} />}
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
+            {tab === 'library' && <OfficialQuranLibrary />}
+            {tab === 'intelligence' && <QuranIntelligenceHealthConsole ar={ar} />}
           </div>
         </>
       )}
@@ -274,7 +290,9 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-black">{ar ? `المناطق (${draft.zones.length})` : `Zones (${draft.zones.length})`}</h3>
-            <div className="flex gap-2">
+            {/* ثلاثةُ أزرارٍ بلا التفاف: مجموعها ٣٦٠ بكسل، فتُخرج الصفحةَ عن عرض الهاتف
+                (٣٩٧ > ٣٧٥) فتنزلق الشاشةُ كلُّها أفقيًّا. والصفُّ الخارجي يلتفّ والداخلي لا. */}
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="ghost" icon={<Wand2 className="h-4 w-4" />}
                 onClick={() => setPlan({ ...draft, zones: autoBalancedZones(scope, draft.zones.length || questionCount) })}>
                 {ar ? 'اقترح قسمة متوازنة' : 'Suggest a balanced split'}

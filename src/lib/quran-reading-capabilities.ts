@@ -20,7 +20,7 @@
 import { CANONICAL_RAWI_IDS, CANONICAL_READING_BY_RAWI } from './canonical-readings';
 import { KFGQPC_DELIVERED_RAWI_IDS, PINNED_DELIVERED_RAWI_IDS } from './delivered-readings';
 import { candidateSourceForRawi } from './quran-candidate-sources';
-import { crosswalkCoverage } from './quran-locus-crosswalk';
+import { readingCrosswalkCoverage } from './quran-crosswalk-readiness';
 import { countSystemForReading } from './reading-count-systems';
 import { audioProfileForReading } from './global-hafs-audio';
 
@@ -79,7 +79,9 @@ function textLayer(rawiId: string): Omit<CapabilityVerdict, 'layer'> {
 }
 
 function alignmentLayer(rawiId: string): Omit<CapabilityVerdict, 'layer'> {
-  const coverage = crosswalkCoverage(rawiId);
+  const coverage = readingCrosswalkCoverage(rawiId);
+  // هويةٌ لا يعرفها الجدولُ القانوني ليست «متاحة بلا دليل»: هي غيرُ معروفةٍ باسمها.
+  if (!coverage) return unavailable('UNAVAILABLE_CROSSWALK_UNKNOWN_RAWI');
   if (coverage.questionSafe) {
     const system = countSystemForReading(rawiId);
     return available(`${system?.system || 'UNKNOWN'}·${system?.assurance || 'UNVERIFIED'}`);

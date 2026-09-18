@@ -49,6 +49,28 @@ async function newPage(width, height, label) {
   return { ctx, page };
 }
 
+
+/*
+ * الدخول إلى التطبيق.
+ *
+ * كان الفحص ينتظر ١٥٠٠ مللي ثم يبحث عن «مدير المسابقة». وشاشةُ الافتتاح ما زالت ظاهرة
+ * عند تلك اللحظة، وبعدها تظهر شاشةُ الدخول لا الأدوار — فكان يخرج بـ«تعذّر الدخول»
+ * ويُقرأ ذلك حاجزَ Firebase. وهو ليس كذلك: صندوقُ العرض مدخلٌ لا يحتاج حسابًا، وهو ما
+ * يستعمله فحصُ يوم المسابقة وينجح به.
+ *
+ * والانتظارُ بالظهور لا بالتوقيت: رقمٌ ثابت يمرّ أحيانًا ويسقط أحيانًا على الآلة نفسها.
+ */
+const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+async function enterDemo(page, label) {
+  const entry = page.locator(`button[aria-label="${DEMO_ENTRY}"]`).first();
+  try { await entry.waitFor({ state: 'visible', timeout: 20000 }); } catch {
+    note(`[${label}] مدخل الاستعراض لم يظهر خلال ٢٠ ثانية`); return false;
+  }
+  await entry.click();
+  await page.waitForTimeout(3500);
+  return true;
+}
+
 async function assertNoHorizontalScroll(page, label, where) {
   const size = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, c: document.documentElement.clientWidth }));
   if (size.s > size.c + 2) note(`[${label}] ${where}: الصفحة تتمدّد أفقيًا (${size.s} > ${size.c})`);
@@ -59,11 +81,7 @@ for (const [width, height, label] of VIEWPORTS) {
   const { ctx, page } = await newPage(width, height, label);
   try {
     await page.goto(BASE, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1500);
-    const entry = page.locator(':visible', { hasText: /^مدير المسابقة$/ }).last();
-    if (!await entry.count()) { note(`[${label}] تعذّر الدخول بدور مدير المسابقة`); await ctx.close(); continue; }
-    await entry.click();
-    await page.waitForTimeout(1500);
+    if (!await enterDemo(page, label)) { await ctx.close(); continue; }
 
     const engine = page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first();
     if (!await engine.count()) { note(`[${label}] تبويب النطاق والأسئلة غير موجود`); await ctx.close(); continue; }
@@ -73,7 +91,7 @@ for (const [width, height, label] of VIEWPORTS) {
     await assertNoHorizontalScroll(page, label, 'النطاق');
     ok('شاشة النطاق');
 
-    for (const [tab, file] of [['اختيار المتسابق', 'selection'], ['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness']]) {
+    for (const [tab, file] of [['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness'], ['المكتبة الرسمية', 'library'], ['صحّة الذكاء', 'intelligence']]) {
       const target = page.locator('[role="tab"]:visible', { hasText: tab }).first();
       if (!await target.count()) { note(`[${label}] التبويب «${tab}» غير موجود`); continue; }
       await target.click({ timeout: 8000 }).catch(e => note(`[${label}] «${tab}»: ${String(e).slice(0, 80)}`));
@@ -253,8 +271,6 @@ console.log('\n── دورة حياة نطاق المتسابق');
     await page.waitForTimeout(1500);
     await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
     await page.waitForTimeout(1200);
-    await page.locator('[role="tab"]:visible', { hasText: 'اختيار المتسابق' }).first().click();
-    await page.waitForTimeout(900);
     await page.locator('button:visible', { hasText: 'ربع القرآن يختاره المتسابق' }).first().click().catch(() => {});
     await page.waitForTimeout(1200);
 

@@ -1,3 +1,10 @@
+import {
+  ONBOARDING_AUTO_ADVANCE_MS,
+  clampStep,
+  onboardingAutoAdvances,
+  onboardingKeyIntent,
+  onboardingSwipeIntent,
+} from '../../lib/onboarding-navigation';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ArrowLeft, ArrowRight, BadgeCheck, Building2, Check, Gavel, Headphones,
@@ -53,8 +60,12 @@ const SLIDES_EN: Slide[] = [
    lede: 'Scoring, appeals and approval are written to an immutable chain, and any party can verify a certificate independently.'},
 ];
 
-const AUTO_ADVANCE_MS = 7000;
 
+
+/*
+ * التنقّلُ نفسُه في `src/lib/onboarding-navigation.ts` — منطقٌ نقيّ يُختبر بلا DOM ولا
+ * مؤقّت. والمكوّنُ يقرؤه ولا ينسخه، فلا تفترق القاعدةُ عن تنفيذها.
+ */
 export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) => {
   const {language} = useAppStore();
   const ar = language === 'ar';
@@ -78,29 +89,27 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
   const last = step === slides.length - 1;
 
   const finish = useCallback(() => { markOnboardingSeen(); onDone(); }, [onDone]);
-  const go = useCallback((n: number) => setStep(Math.max(0, Math.min(slides.length - 1, n))), [slides.length]);
+  const go = useCallback((n: number) => setStep(clampStep(n, slides.length)), [slides.length]);
   const next = useCallback(() => (last ? finish() : go(step + 1)), [last, finish, go, step]);
 
   // Auto-advance keeps the rail honest: the animated bar is the actual timer, not decor.
   useEffect(() => {
-    if (last || held || manual) return;
-    const t = window.setTimeout(() => setStep(s => s + 1), AUTO_ADVANCE_MS);
+    if (!onboardingAutoAdvances({ step, slideCount: slides.length, held, reducedMotion: manual })) return;
+    const t = window.setTimeout(() => setStep(s => s + 1), ONBOARDING_AUTO_ADVANCE_MS);
     return () => window.clearTimeout(t);
-  }, [step, last, held, manual]);
+  }, [step, slides.length, held, manual]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return finish();
-      if (e.key === 'Enter') return next();
-      // In RTL the "forward" arrow points left.
-      const forward = ar ? 'ArrowLeft' : 'ArrowRight';
-      const back = ar ? 'ArrowRight' : 'ArrowLeft';
-      if (e.key === forward) { e.preventDefault(); next(); }
-      if (e.key === back) { e.preventDefault(); go(step - 1); }
+      const intent = onboardingKeyIntent(e.key, { step, slideCount: slides.length, rtl: ar });
+      if (intent.kind === 'IGNORE') return;
+      if (e.key !== 'Escape' && e.key !== 'Enter') e.preventDefault();
+      if (intent.kind === 'FINISH') return finish();
+      go(intent.step);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ar, next, go, step, finish]);
+  }, [ar, go, step, slides.length, finish]);
 
   const touch = useRef<number | null>(null);
   const onTouchStart = (e: React.TouchEvent) => { touch.current = e.touches[0].clientX; };
@@ -108,9 +117,10 @@ export const OnboardingExperience: React.FC<{onDone: () => void}> = ({onDone}) =
     if (touch.current === null) return;
     const dx = e.changedTouches[0].clientX - touch.current;
     touch.current = null;
-    if (Math.abs(dx) < 48) return;
-    const forward = ar ? dx > 0 : dx < 0;
-    forward ? next() : go(step - 1);
+    const intent = onboardingSwipeIntent(dx, { step, slideCount: slides.length, rtl: ar });
+    if (intent.kind === 'IGNORE') return;
+    if (intent.kind === 'FINISH') return finish();
+    go(intent.step);
   };
 
   const s = slides[step];

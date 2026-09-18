@@ -1,6 +1,6 @@
 import type {Competition,CompetitionPolicy,IntegrationConfig,DeviceRecord,JudgeProfile,Committee,QuranSourceManifestRecord,BackupRecord,AICapabilityValidationRecord} from '../types';
 import { sourceUsableForCompetition, certifiedCapabilityFor, isReadingDelivered } from './scientific-core';
-import { categoryReadingsQuestionSafe } from './quran-locus-crosswalk';
+import { categoryReadingsQuestionSafe } from './quran-crosswalk-readiness';
 import { categoryScopeOf } from './scope-engine';
 import { scopeAyahCount } from './quran-scope';
 

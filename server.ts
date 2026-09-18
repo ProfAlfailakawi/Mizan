@@ -18,6 +18,7 @@ import { isServerAuthoredAuditAction } from './server/audit-authority';
 import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-registry';
 import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
 import { policyChangeDecision, scoreCorrectionDecision, readingChangeDecision } from './server/governance-attestation';
+import { CONSENT_BACKED_DOCUMENTS, isPublished, legalConfigFromEnv, legalDocumentState, type LegalDocumentKind } from './src/lib/legal-documents';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -811,6 +812,20 @@ async function startServer() {
   const sendKfgqpcAsset=async(res:any,asset:any,cacheControl:string)=>{if(!asset)return false;res.setHeader('Cache-Control',cacheControl);res.setHeader('X-MIZAN-Source-Authority','KFGQPC');res.setHeader('X-MIZAN-Delivery-Source',asset.source);res.type(asset.type||'application/octet-stream');if(asset.file){res.sendFile(asset.file);return true}if(asset.response){const bytes=Buffer.from(await asset.response.arrayBuffer());res.send(bytes);return true}return false};
   app.get('/api/science/quran/kfgqpc/delivery-status',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge','auditor']),(req,res)=>res.json(kfgqpcDelivery.status()));
   app.get('/api/science/quran/kfgqpc/page/:packageId/:page',sensitiveIdentityRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']),async(req,res)=>{const packageId=safeSegment(String(req.params.packageId||'')),page=Number(req.params.page);if(!Number.isInteger(page)||page<1||page>700)return res.status(400).json({code:'MUSHAF_PAGE_INVALID'});try{const asset=await kfgqpcDelivery.page(packageId,page);if(await sendKfgqpcAsset(res,asset,'private, max-age=3600'))return;return res.status(404).json({code:'OFFICIAL_MUSHAF_PAGE_ASSET_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_MUSHAF_PAGE_DELIVERY_FAILED'})}});
+  /*
+   * الوثائقُ التي يوقّع عليها المتسابق — تُقرأ قبل التوقيع لا بعده.
+   *
+   * عامّةٌ بقصد: من يُطلب توقيعُه على شروطٍ يجب أن يقرأها بلا حساب. وما لم يُنشر يُردّ
+   * باسمه ومعه ما ينقصه، فلا يُقرأ الفراغُ موافقةً ضمنية.
+   */
+  app.get('/api/public/legal/:kind',(req,res)=>{
+    const kind=String(req.params.kind||'');
+    if(!(CONSENT_BACKED_DOCUMENTS as readonly string[]).includes(kind))return res.status(404).json({code:'LEGAL_DOCUMENT_UNKNOWN_KIND'});
+    const state=legalDocumentState(legalConfigFromEnv(process.env as Record<string,string|undefined>),kind as LegalDocumentKind);
+    res.setHeader('Cache-Control','public, max-age=300');
+    return res.status(isPublished(state)?200:503).json(state);
+  });
+
   // Public Mushaf page surface. Consistent with the existing public font and public ayah-audio
   // routes: the printed Madinah page is publicly published Quran content, not competition data.
   // Question secrecy is enforced by the FairDraw/escrow reveal flow, not by hiding the Mushaf.

@@ -25,6 +25,7 @@ const PANELS = {
   beyondLab: () => import('./BeyondLab'),
   readinessLab: () => import('./ReadinessLab'),
   cloudDiagnostics: () => import('./CloudDiagnostics'),
+  tenantConsole: () => import('./TenantConsole'),
 };
 const panel = (loader: () => Promise<any>, name: string) =>
   lazy(() => loader().then((m: any) => ({ default: m[name] })));
@@ -35,6 +36,7 @@ const TrustProtocolLab = panel(PANELS.trustProtocolLab, 'TrustProtocolLab');
 const BeyondLab = panel(PANELS.beyondLab, 'BeyondLab');
 const ReadinessLab = panel(PANELS.readinessLab, 'ReadinessLab');
 const CloudDiagnostics = panel(PANELS.cloudDiagnostics, 'CloudDiagnostics');
+const TenantConsole = panel(PANELS.tenantConsole, 'TenantConsole');
 
 let panelsWarmed = false;
 function warmPanels(){
@@ -55,7 +57,16 @@ const PanelFallback: React.FC = () => (
   </div>
 );
 
-type Section='integrations'|'operations'|'international'|'shadow'|'governance'|'tools'|'trust'|'beyond';
+/*
+ * «المستأجرون» كانت شاشةً مبنيّةً لا تُفتح.
+ *
+ * `TenantConsole` تقرأ `/api/owner/tenants` و`/api/owner/live-mirror` — سجلَّ المستأجرين
+ * ومرآةَ التشغيل الحيّة — ولم يكن شيءٌ في المنتج يستوردها. فكان مالكُ المنصّة لا يستطيع
+ * فتحَها بحال، وبدا الأمرُ كأن السجلّ لا واجهةَ له.
+ *
+ * وهي لمالك المنصّة وحده كأقسام الثقة وما بعد: لغةُ من يشغّل المنصّة لا من يدير مسابقة.
+ */
+type Section='integrations'|'operations'|'international'|'shadow'|'governance'|'tools'|'trust'|'beyond'|'tenants';
 const isAr=(l:string)=>l==='ar';
 export const EnterpriseWorkspace:React.FC=()=>{
  const s=useAppStore(); const ar=isAr(s.language); const [section,setSection]=useState<Section>('integrations');
@@ -64,8 +75,8 @@ export const EnterpriseWorkspace:React.FC=()=>{
  // الأدوات العميقة (الثقة/ما بعد/Shadow) خاصة بمالك المنصة؛ لا تظهر لعملاء الجهات حتى لا تُعقّد
  // واجهتهم بما لا يحتاجونه. غياب دور المالك ⇒ لا يظهر التبويب ولا يُعرض محتواه.
  const platformOwner=s.currentUser.role==='super_admin';
- const ownerOnly:Section[]=['shadow','trust','beyond'];
- const allSections:[Section,any,string][]=[['integrations',Cable,ar?'القنوات':'Channels'],['operations',RadioTower,ar?'البنية الميدانية':'Field'],['international',Building2,ar?'الجهات':'Entities'],['shadow',Radar,ar?'الظل':'Shadow'],['governance',ShieldCheck,ar?'الجاهزية':'Readiness'],['tools',DatabaseBackup,ar?'أدوات الإدارة':'Admin tools'],['trust',Fingerprint,ar?'الثقة':'Trust 8'],['beyond',WandSparkles,ar?'ما بعد':'Beyond']];
+ const ownerOnly:Section[]=['shadow','trust','beyond','tenants'];
+ const allSections:[Section,any,string][]=[['integrations',Cable,ar?'القنوات':'Channels'],['operations',RadioTower,ar?'البنية الميدانية':'Field'],['international',Building2,ar?'الجهات':'Entities'],['shadow',Radar,ar?'الظل':'Shadow'],['governance',ShieldCheck,ar?'الجاهزية':'Readiness'],['tools',DatabaseBackup,ar?'أدوات الإدارة':'Admin tools'],['trust',Fingerprint,ar?'الثقة':'Trust 8'],['beyond',WandSparkles,ar?'ما بعد':'Beyond'],['tenants',Building2,ar?'المستأجرون':'Tenants']];
  const sections=allSections.filter(([id])=>platformOwner||!ownerOnly.includes(id));
  const activeSection=(!platformOwner&&ownerOnly.includes(section))?'integrations':section;
  return <div className="space-y-4">
@@ -79,6 +90,7 @@ export const EnterpriseWorkspace:React.FC=()=>{
   {activeSection==='tools'&&<Governance s={s} ar={ar}/>}
   {activeSection==='trust'&&<Suspense fallback={<PanelFallback/>}><TrustProtocolLab/></Suspense>}
   {activeSection==='beyond'&&<Suspense fallback={<PanelFallback/>}><BeyondLab/></Suspense>}
+  {activeSection==='tenants'&&<Suspense fallback={<PanelFallback/>}><TenantConsole/></Suspense>}
  </div>
 }
 const Integrations=({s,ar,pending}:{s:ReturnType<typeof useAppStore>;ar:boolean;pending:number})=>{

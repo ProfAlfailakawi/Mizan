@@ -54,6 +54,26 @@ if (value('VITE_REQUIRE_AUTH') === 'true' && !has('VITE_FIREBASE_PROJECT_ID')) {
   blockers.push(['VITE_FIREBASE_PROJECT_ID غائب', 'بدونه لا يعرف التطبيق أي مشروع Firebase يخاطب.']);
 } else if (has('VITE_FIREBASE_PROJECT_ID')) passed.push('معرّف مشروع Firebase مضبوط');
 
+/*
+ * الموافقةُ على وثيقةٍ غير منشورة.
+ *
+ * صفحةُ التسجيل تعرض «أوافق على شروط المشاركة وسياسة الخصوصية»، ويُسجَّل قبولُه أثرًا.
+ * فإن لم تُنشر الوثيقتان فالمتسابقُ وقّع على ما لم يره، والأثرُ يشهد بموافقةٍ لا مرجع
+ * لها — وهو ما يُحتجّ به يوم النزاع.
+ *
+ * ولا يُعالَج باختراع نصّ: الكيانُ الناشر ومضمونُ الوثيقة قرارُ مالكٍ ومسؤوليتُه.
+ */
+for (const [kind, label] of [['TERMS', 'شروط المشاركة'], ['PRIVACY', 'سياسة الخصوصية']]) {
+  const parts = [`MIZAN_LEGAL_${kind}_URL`, `MIZAN_LEGAL_${kind}_VERSION`, `MIZAN_LEGAL_${kind}_EFFECTIVE`, 'MIZAN_LEGAL_ENTITY_NAME'];
+  const absent = parts.filter(name => !has(name));
+  if (absent.length) {
+    blockers.push([
+      `${label} غير منشورة (${absent.join('، ')})`,
+      'التسجيل يجمع موافقةً على هذه الوثيقة، فإن لم تُنشر وقّع المتسابق على ما لم يره وسُجّل الأثر بلا مرجع.',
+    ]);
+  } else passed.push(`${label} منشورة بنسختها وتاريخ سريانها وناشرها`);
+}
+
 // تبديل الأدوار أداة تطوير: تفتح أدوارًا لمن لا يملكها.
 if (value('VITE_ENABLE_ROLE_PREVIEW') === 'true') {
   blockers.push(['VITE_ENABLE_ROLE_PREVIEW مفعّلة', 'تتيح تبديل الأدوار داخل الواجهة. لا تُفعَّل في نشر حقيقي أبدًا.']);
