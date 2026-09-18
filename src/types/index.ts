@@ -657,6 +657,28 @@ export interface QuestionPoolItem {
   timesUsed: number;
 }
 
+/*
+ * سجلّ ما تُلي فعلًا في القاعة.
+ *
+ * خريطة «اليوم تُتلى في هذه القاعة» كانت تُبنى من الجلسة الجارية وحدها، فتبقى صفرًا في
+ * كل لحظة لا يكون فيها أحدٌ واقفًا أمام لجنة — وتُمحى تمامًا بانتهاء كل جلسة. ومئتا جلسةٍ
+ * أُنجزت في ذلك اليوم لم تترك أثرًا في أي خريطة، لأن أحدًا لم يكن يكتب أين تُليت.
+ *
+ * فيُكتب الموضع هنا لحظة اكتمال الجلسة: أرقام مواضع لا نصوص ولا درجات — وهو أقلّ ما يكفي
+ * لقول «هذه الصفحة تُليت اليوم» ولا يكفي لكشف سؤال أحد بعد انتهائه.
+ */
+export interface RecitedPassageRecord {
+  id: string;
+  competitionId: string;
+  committeeId: string;
+  participantId: string;
+  sessionId: string;
+  surah: number;
+  startAyah: number;
+  endAyah: number;
+  recordedAt: string;
+}
+
 export interface QuestionSelection {
   questionSetId: string;
   participantId: string;

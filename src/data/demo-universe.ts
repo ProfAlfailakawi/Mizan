@@ -21,18 +21,20 @@ import type {
   Certificate,
   Committee,
   IncidentRecord,
+  IntegrationConfig,
   JudgeProfile,
   JudgeSubmission,
   Category,
   Participant,
   Organization,
+  RecitedPassageRecord,
   ResultRecord,
   ReviewCase,
   SupportSession,
 } from '../types';
 import type { AppStoreState } from '../lib/store-state';
 import { buildParticipantScopeRecord } from '../lib/participant-scope';
-import { fullQuranScope, scopeFromJuzRange } from '../lib/quran-scope';
+import { ayahCountOf, fullQuranScope, ordinalToLocus, scopeFromJuzRange, scopeRanges } from '../lib/quran-scope';
 import {
   SEED_APPEALS,
   SEED_ORGANIZATION,
@@ -293,6 +295,9 @@ function demoResults(participants: Participant[]): ResultRecord[] {
         country: participant.country,
         categoryId: participant.categoryId,
         categoryName: category?.name || '',
+        /* الاسم العربي للفئة يُكتب مع الإنجليزي: شاشة النتائج تعرض العربي متى وُجد،
+           فكان غيابه يُظهر «Consecutive Juz 20» في شاشةٍ عربية بالكامل. */
+        categoryNameArabic: category?.nameArabic || '',
         finalScore: Number((72 + random() * 27.5).toFixed(2)),
         // أغلب النتائج مختومة، وبعضها ما زال في مرحلةٍ سابقة: شاشة الختم تحتاج
         // شيئًا تختمه، وشاشة الجودة تحتاج شيئًا تفحصه.
@@ -356,52 +361,109 @@ function demoJudgeSubmissions(participants: Participant[], judges: JudgeProfile[
   return submissions;
 }
 
-function demoAppeals(results: ResultRecord[]): AppealRecord[] {
+/*
+ * الاعتراضات: كلٌّ باسم صاحبه وسببه.
+ *
+ * كانت تُستنسخ من قالب البذرة ويُبدَّل `participantId` وحده، و`participantCode` يبقى كما
+ * هو في القالب — فتُعرض خمسة اعتراضاتٍ كلها «A-104» وكلها بالسبب نفسه. ولا يكشف ذلك
+ * خللًا في الشاشة: الشاشة تعرض ما أُعطيت. فيُبنى كل سجلٍّ من نتيجته هو.
+ */
+const APPEAL_GROUNDS: ReadonlyArray<readonly [AppealRecord['grounds'], string]> = [
+  ['scoring_miscalculation', 'يرى المتسابق أن خصم درجة الحفظ عند الدقيقة 02:22 احتُسب مرتين، ويطلب إعادة احتساب المجموع.'],
+  ['audio_interruption', 'انقطع الصوت في القاعة أثناء الموضع الثالث، ويطلب إعادة الاستماع إلى المقطع كاملًا.'],
+  ['question_scope_dispute', 'يرى أن الموضع الرابع خارج نطاق فئته المعتمد، ويطلب مراجعة حدود النطاق.'],
+  ['scoring_miscalculation', 'فارق بين ما رصده المحكّمان في موضعٍ واحد، ويطلب مراجعة السبب.'],
+  ['audio_interruption', 'تداخل صوتٌ من القاعة المجاورة في أثناء تلاوته، ويطلب تقدير أثره.'],
+];
+
+function demoAppeals(results: ResultRecord[], participants: Participant[]): AppealRecord[] {
   const template = SEED_APPEALS.length ? clone(SEED_APPEALS[0]) : null;
   if (!template) return [];
-  return results.slice(0, 9).map((result, index) => ({
-    ...clone(template),
-    id: `appeal-demo-${index + 1}`,
-    participantId: result.participantId,
-    status: index % 4 === 0 ? 'submitted' : index % 4 === 1 ? 'under_review' : index % 4 === 2 ? 'accepted' : 'rejected',
-    submittedAt: new Date(Date.UTC(2027, 1, 11, 14, index * 6)).toISOString(),
-  }));
+  const byId = new Map(participants.map(p => [p.id, p]));
+  return results.slice(0, 9).map((result, index) => {
+    const participant = byId.get(result.participantId);
+    const [grounds, reasonText] = pick(APPEAL_GROUNDS, index);
+    return {
+      ...clone(template),
+      id: `appeal-demo-${index + 1}`,
+      participantId: result.participantId,
+      participantCode: participant?.code || result.participantCode,
+      categoryName: result.categoryName,
+      grounds,
+      reasonText,
+      status: index % 4 === 0 ? 'submitted' : index % 4 === 1 ? 'under_review' : index % 4 === 2 ? 'accepted' : 'rejected',
+      createdAt: new Date(Date.UTC(2027, 1, 11, 14, index * 6)).toISOString(),
+    };
+  });
 }
 
 function demoIncidents(committees: Committee[]): IncidentRecord[] {
   const template = SEED_INCIDENTS.length ? clone(SEED_INCIDENTS[0]) : null;
   if (!template) return [];
-  const kinds: ReadonlyArray<readonly [string, string]> = [
-    ['انقطاع صوت في القاعة', 'تعذّر التقاط الصوت لمدة أربع دقائق؛ استُؤنفت الجلسة بعد إعادة التوصيل.'],
-    ['تأخر وصول متسابق', 'وصل بعد انقضاء حجزه فأُعيد جدولته في نهاية الطابور.'],
-    ['خلاف على درجة', 'فارق بين محكّمين تجاوز الحدّ المسموح فأُحيل إلى رئيس اللجنة.'],
-    ['عطل جهاز', 'جهاز لوحي توقف أثناء الإدخال؛ استُعيدت الدرجة من نقطة الحفظ.'],
-    ['انقطاع شبكة', 'عملت القاعة دون اتصال لسبع دقائق ثم زُوملت السجلات.'],
+  /* النوع يُكتب صريحًا: شاشة العمليات تسمّي العطل بنوعه، و`type` هو ما تقرؤه. */
+  const kinds: ReadonlyArray<readonly [IncidentRecord['type'], string, string]> = [
+    ['audio_mic', 'انقطاع صوت في القاعة', 'تعذّر التقاط الصوت لمدة أربع دقائق؛ استُؤنفت الجلسة بعد إعادة التوصيل.'],
+    ['participant_emergency', 'تأخر وصول متسابق', 'وصل بعد انقضاء حجزه فأُعيد جدولته في نهاية الطابور.'],
+    ['judge_absence', 'خلاف على درجة', 'فارق بين محكّمين تجاوز الحدّ المسموح فأُحيل إلى رئيس اللجنة.'],
+    ['device', 'عطل جهاز', 'جهاز لوحي توقف أثناء الإدخال؛ استُعيدت الدرجة من نقطة الحفظ.'],
+    ['network', 'انقطاع شبكة', 'عملت القاعة دون اتصال لسبع دقائق ثم زُوملت السجلات.'],
+    ['power', 'تذبذب كهرباء في القاعة B2', 'عملت الأجهزة على بطارياتها ثمانيَ دقائق ولم تسقط جلسة.'],
+    ['venue', 'ازدحام عند مدخل القاعة A1', 'أُعيد توجيه وفدين إلى المدخل الشمالي.'],
   ];
-  return kinds.map(([title, description], index) => ({
+  return kinds.map(([type, title, description], index) => ({
     ...clone(template),
     id: `inc-demo-${index + 1}`,
+    type,
     title,
     description,
-    committeeId: pick(committees, index + 2).id,
+    reportedBy: `usr-demo-head-${(index % committees.length) + 1}`,
     severity: index === 2 ? 'critical' : index % 2 === 0 ? 'moderate' : 'low',
-    status: index === 0 ? 'active' : index === 1 ? 'investigating' : 'resolved',
-    createdAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11)).toISOString(),
+    status: index === 0 ? 'active' : index === 1 ? 'investigating' : index === 5 ? 'investigating' : 'resolved',
+    occurrences: index === 0 ? 3 : 1,
+    reportedAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11)).toISOString(),
+    lastOccurredAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11 + 20)).toISOString(),
   }));
 }
 
-function demoReviewCases(results: ResultRecord[]): ReviewCase[] {
+/*
+ * مراجعات التحكيم: أسبابٌ مختلفة لمتسابقين مختلفين.
+ *
+ * كانت — كالاعتراضات — تحمل كود القالب وسببه، فيرى رئيس اللجنة ثلاث مراجعاتٍ متطابقة
+ * الظاهر لا يفرّق بينها شيء، ولا يظهر منها ما تصلح الشاشة لعرضه أصلًا.
+ */
+const REVIEW_REASONS: ReadonlyArray<readonly [ReviewCase['reason'], ReviewCase['severity'], string]> = [
+  ['judge_variance', 'medium', 'رصد المحكّم الأول خطأ حفظ (‎-0.5) عند الدقيقة 02:22، ورصد المحكّم الثاني ملاحظة تجويد (‎-0.25).'],
+  ['ai_high_confidence_alert', 'high', 'إشارة نزاهة آلية: احتمال انتقال إلى آية متشابهة عند الدقيقة 01:14، بثقة مرتفعة.'],
+  ['audio_dropout', 'low', 'انقطاع في الالتقاط دام إحدى عشرة ثانية أثناء الموضع الثاني؛ أُعيد الاستماع في القاعة.'],
+  ['score_outlier', 'high', 'درجة المحكّم الثالث تبعد عن متوسط لجنته على المتسابق نفسه بأكثر من الحد المسموح.'],
+  ['judge_variance', 'low', 'فارق ربع درجة في معيار الوقف والابتداء بين محكّمَي اللجنة.'],
+  ['ai_high_confidence_alert', 'medium', 'تردّد متكرر عند الموضع الرابع؛ رُصد آليًا ويُعرض للمراجعة البشرية.'],
+];
+
+function demoReviewCases(results: ResultRecord[], participants: Participant[]): ReviewCase[] {
   const template = SEED_REVIEW_CASES.length ? clone(SEED_REVIEW_CASES[0]) : null;
   if (!template) return [];
+  const byId = new Map(participants.map(p => [p.id, p]));
   return results
     .filter(result => result.status === 'calculated' || result.status === 'quality_checked')
     .slice(0, 8)
-    .map((result, index) => ({
-      ...clone(template),
-      id: `rc-demo-${index + 1}`,
-      participantId: result.participantId,
-      status: index % 3 === 0 ? 'pending' : index % 3 === 1 ? 'confirmed' : 'dismissed',
-    }));
+    .map((result, index) => {
+      const participant = byId.get(result.participantId);
+      const [reason, severity, details] = pick(REVIEW_REASONS, index);
+      return {
+        ...clone(template),
+        id: `rc-demo-${index + 1}`,
+        sessionId: `sess-demo-${index + 1}`,
+        participantId: result.participantId,
+        participantCode: participant?.code || result.participantCode,
+        committeeId: participant?.assignedCommitteeId || template.committeeId,
+        reason,
+        severity,
+        details,
+        timestampSec: 45 + index * 37,
+        status: index % 3 === 0 ? 'pending' : index % 3 === 1 ? 'confirmed' : 'dismissed',
+      };
+    });
 }
 
 function demoCertificates(results: ResultRecord[]): Certificate[] {
@@ -434,11 +496,87 @@ export interface DemoUniverse {
   certificates: Certificate[];
 }
 
+/*
+ * من تنادي كل لجنة الآن.
+ *
+ * شاشة اللجنة وقاعة الانتظار تقرآن النداء من `committee.currentParticipantId` — وهو
+ * الحقل نفسه الذي يكتبه بدء الجلسة ويمحوه اكتمالها. وكانت البيئة التجريبية تبني
+ * متسابقين بحالة «داخل اللجنة» ولا تخبر لجانهم بهم، فتقول كل شاشةٍ في القاعة «لا يوجد
+ * استدعاء — لم يُنادَ أحد بعد» بينما خمسة يقرؤون أمام لجانهم.
+ *
+ * والحالتان تُضبطان معًا: اللجنة تصير «تستقبل متسابقًا» ويُكتب فيها من تناديه، فلا تقول
+ * الشاشة حالةً وتقول البيانات غيرها.
+ */
+function wireLiveCalls(committees: Committee[], participants: Participant[]): void {
+  const called = new Set<string>();
+  for (const committee of committees) {
+    if (committee.status === 'offline') continue;
+    const inSession = participants.find(p =>
+      p.assignedCommitteeId === committee.id && p.status === 'in_session' && !called.has(p.id));
+    if (!inSession) continue;
+    called.add(inSession.id);
+    committee.currentParticipantId = inSession.id;
+    committee.status = 'testing';
+  }
+}
+
+/*
+ * سجلّ ما تُلي اليوم.
+ *
+ * خريطة «اليوم تُتلى في هذه القاعة» تُبنى من هذا السجلّ (انظر `hall-recitation.ts`)،
+ * وهو في المنتج الحقيقي يُكتب سطرًا سطرًا عند اكتمال كل جلسة. وهنا يُبنى بأثر رجعي عمّن
+ * أنهى اختباره في هذا اليوم التجريبي: لكل متسابقٍ أُدّي اختباره مواضعُ بعدد أسئلة يومه،
+ * موزّعة على نطاق فئته بالقسمة لا بالتكديس — فتُضيء الخريطة كما تُضيء بعد يومٍ حقيقي،
+ * ولا تُضيء صفحةٌ لم يقف أمامها أحد.
+ */
+function demoRecitationLedger(participants: Participant[], categories: Category[], competitionId: string): RecitedPassageRecord[] {
+  const random = makeRandom(0x7265_6369);
+  const rows: RecitedPassageRecord[] = [];
+  const done = participants.filter(p => HAS_RESULT.includes(p.status));
+  done.forEach((participant, index) => {
+    const category = categories.find(c => c.id === participant.categoryId);
+    const scope = category?.scope?.segments?.length ? category.scope : fullQuranScope();
+    const ranges = scopeRanges(scope);
+    const total = ranges.reduce((sum, [a, b]) => sum + (b - a + 1), 0);
+    if (!total) return;
+    const questions = Math.max(1, Math.min(8, Number(category?.questionsCount) || 4));
+    for (let q = 0; q < questions; q++) {
+      /* قسمةٌ على عدد الأسئلة ثم اختيارٌ داخل القسم: يومٌ كامل يغطّي النطاق بلا أن
+         تتكدّس كل المواضع في جزئه الأول. */
+      const bucket = total / questions;
+      const offset = Math.min(total - 1, Math.floor(q * bucket + random() * bucket));
+      let walked = 0;
+      for (const [a, b] of ranges) {
+        const size = b - a + 1;
+        if (offset < walked + size) {
+          const locus = ordinalToLocus(a + (offset - walked));
+          const surahEnd = ayahCountOf(locus.surah) || locus.ayah;
+          rows.push({
+            id: `recited-demo-${index + 1}-${q + 1}`,
+            competitionId,
+            committeeId: participant.assignedCommitteeId || '',
+            participantId: participant.id,
+            sessionId: `sess-demo-${participant.id}`,
+            surah: locus.surah,
+            startAyah: locus.ayah,
+            endAyah: Math.min(surahEnd, locus.ayah + 3),
+            recordedAt: new Date(Date.UTC(2027, 1, 11, 7 + (index % 9), (index * 5) % 60)).toISOString(),
+          });
+          break;
+        }
+        walked += size;
+      }
+    }
+  });
+  return rows;
+}
+
 /** يُبنى مرة واحدة لكل تحميل صفحة. */
 export function buildDemoUniverse(): DemoUniverse {
   const committees = demoCommittees();
   const judges = demoJudges(committees);
   const participants = demoParticipants(committees);
+  wireLiveCalls(committees, participants);
   const results = demoResults(participants);
   return {
     committees,
@@ -447,9 +585,9 @@ export function buildDemoUniverse(): DemoUniverse {
     results,
     judgeSubmissions: demoJudgeSubmissions(participants, judges),
     auditLogs: demoAuditLogs(participants, committees),
-    appeals: demoAppeals(results),
+    appeals: demoAppeals(results, participants),
     incidents: demoIncidents(committees),
-    reviewCases: demoReviewCases(results),
+    reviewCases: demoReviewCases(results, participants),
     certificates: demoCertificates(results),
   };
 }
@@ -645,7 +783,42 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     reviewCases: universe.reviewCases,
     certificates: universe.certificates,
     supportSessions: demoSupportSessions(competition.id, organization.id),
+    /* أثر يومٍ كامل من التلاوة: منه تُضيء خريطة القاعة، وبغيره تبقى ٦٠٤ صفحة مطفأة. */
+    recitationLedger: demoRecitationLedger(universe.participants, categories, competition.id),
+    /* قنوات الجهة مربوطة: شاشة «القنوات» بلا ربطٍ واحد تقول إن المنظومة لا تصل بأحد. */
+    integrations: demoIntegrations(organization.id),
     /* القائمة نفسها التي تدخل المسابقة — لا نسخة ثانية قد تفترق عنها. */
     participantScopes: demoParticipantScopes(universe.participants, categories, organization.id, competition.id),
   };
+}
+
+/*
+ * قنوات الجهة في بيئة العرض.
+ *
+ * الشاشة تقرأ `integrations` وتقول عن كل قناةٍ لا سجلَّ لها «غير مربوط»، فكانت الشاشة
+ * ستّ بطاقاتٍ رماديةٍ كلها — وهو وصفٌ صادق لجهةٍ لم تُهيَّأ، لا لجهةٍ تدير مسابقةً دولية.
+ * وهذه أسماء مزوّدين تجريبية لا أسرار: الأسرار لا تُكتب في المتصفّح أصلًا، والحقل الذي
+ * يحملها (`secretRef`) إشارةٌ إلى خزنة الخادم لا قيمةٌ فيها.
+ */
+function demoIntegrations(organizationId: string): IntegrationConfig[] {
+  const rows: Array<[IntegrationConfig['kind'], string, IntegrationConfig['status'], boolean, string]> = [
+    ['email', 'بوابة البريد الرسمية للجهة', 'configured', true, 'https://mail.demo.mizan.test/api'],
+    ['sms', 'مزوّد الرسائل القصيرة المعتمد', 'configured', true, 'https://sms.demo.mizan.test/api'],
+    ['whatsapp', 'حساب واتساب للأعمال — إشعارات المتسابقين', 'configured', true, 'https://wa.demo.mizan.test/api'],
+    ['storage', 'تخزين الجهة (Cloudflare R2 — منطقة أوروبا)', 'configured', true, 'https://r2.demo.mizan.test'],
+    ['identity', 'مزوّد الهوية الموحّدة للجهة', 'configured', true, 'https://id.demo.mizan.test'],
+    /* قناةٌ محفوظة ومتعثّرة عن قصد: يومٌ بلا أي خلل لا يُظهر كيف يُعرض الخلل. */
+    ['broadcast', 'مزوّد البثّ — قناة الحفل', 'degraded', true, 'https://live.demo.mizan.test'],
+  ];
+  return rows.map(([kind, name, status, enabled, endpoint], index) => ({
+    id: `integration-demo-${index + 1}`,
+    organizationId,
+    kind,
+    name,
+    enabled,
+    status,
+    endpoint,
+    secretRef: `vault://demo/${kind}`,
+    lastCheckedAt: new Date(Date.UTC(2027, 1, 11, 6, 30 + index)).toISOString(),
+  }));
 }

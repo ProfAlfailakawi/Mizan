@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { bilingualName } from '../../lib/ui-language';
+import { bilingualName, uiToken } from '../../lib/ui-language';
 import { createPortal } from 'react-dom';
 import { Award, Search, UserRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -23,7 +23,7 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
     const x = q.trim().toLowerCase();
     if (!x) return [];
     return [
-      ...s.participants.filter(p => `${p.code} ${p.fullName} ${p.fullNameArabic} ${p.email}`.toLowerCase().includes(x)).slice(0, 5).map(p => ({ id: p.id, kind: 'participant', title: ar ? p.fullNameArabic : p.fullName, meta: `${p.code} · ${p.status}` })),
+      ...s.participants.filter(p => `${p.code} ${p.fullName} ${p.fullNameArabic} ${p.email}`.toLowerCase().includes(x)).slice(0, 5).map(p => ({ id: p.id, kind: 'participant', title: ar ? p.fullNameArabic : p.fullName, meta: `${p.code} · ${uiToken(p.status, ar)}` })),
       ...s.competitions.filter(c => `${c.name} ${c.nameArabic} ${c.edition}`.toLowerCase().includes(x)).slice(0, 3).map(c => ({ id: c.id, kind: 'competition', title: bilingualName(c, ar), meta: c.edition })),
       ...s.certificates.filter(c => `${c.certificateNumber} ${c.participantName} ${c.participantNameArabic}`.toLowerCase().includes(x)).slice(0, 3).map(c => ({ id: c.id, kind: 'certificate', title: c.certificateNumber, meta: ar ? c.participantNameArabic : c.participantName })),
     ].slice(0, 9);

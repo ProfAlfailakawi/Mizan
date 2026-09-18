@@ -33,7 +33,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 20000); return () => clearInterval(t); }, []);
 
-  const agg = useMemo(() => buildHallRecitation(store), [store.participants, store.activeSession, store.competition, store.questionGovernance]);
+  const agg = useMemo(() => buildHallRecitation(store), [store.participants, store.activeSession, store.competition, store.questionGovernance, store.recitationLedger]);
   const max = agg.hottestPage.count || 1;
 
   /*
