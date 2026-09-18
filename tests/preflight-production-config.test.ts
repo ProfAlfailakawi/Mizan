@@ -74,3 +74,25 @@ test('no step prints the values it reads', () => {
   assert.equal(/echo[^\n]*\$\{?value\}?/.test(workflow), false, 'the value itself must never be echoed');
   assert.equal(/echo[^\n]*\$\{!name\}/.test(workflow), false, 'nor indirectly');
 });
+
+test('the reader never builds a pattern out of what it is given', () => {
+  /*
+   * رصدت CodeQL هنا حقنَ تعبيرٍ نمطيّ (خطورة عالية): كان الاسمُ القادمُ من سطر الأوامر
+   * يُركَّب داخل `new RegExp`. والحارسُ على شكل الاسم يمنع الحقنَ فعلًا — لكنّ أمانًا
+   * مشروطًا بحارسٍ في موضعٍ آخر يسقط بأوّل تحريرٍ يوسّع ذلك الحارس، ولا يراه من يحرّره.
+   *
+   * فصارت المطابقةُ نصّيّةً: المدخلُ يُقارَن ولا يُفسَّر، فلا يبقى شيءٌ ليُحقن.
+   */
+  const reader = fs.readFileSync(READER, 'utf8');
+  const live = reader
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // الشروحُ تذكر العطلَ المُصلَح، فلا تُحسب شيفرة
+    .replace(/^\s*\/\/.*$/gm, '');
+  assert.equal(/new RegExp/.test(live), false,
+    'a pattern built from an argument is a regular-expression injection, guard or no guard');
+  assert.ok(live.includes('startsWith(wanted)'), 'the lookup must compare text literally');
+});
+
+test('a name that looks like a pattern is treated as text, not as one', () => {
+  // ولو مرّ حرفٌ خاصّ يومًا، فلا مُفسِّرَ يستقبله.
+  assert.throws(() => read('_VITE_.*'), /Command failed|status 2/);
+});

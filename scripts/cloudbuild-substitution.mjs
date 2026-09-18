@@ -42,10 +42,28 @@ if (!block) {
   process.exit(1);
 }
 const body = block.split(/^[A-Za-z]/m)[0];
-const match = new RegExp(`^\\s+${name}:\\s*(.+?)\\s*$`, 'm').exec(body);
-if (!match) {
+
+/*
+ * المطابقةُ نصّيّةٌ حرفيّة، ولا يُبنى تعبيرٌ نمطيٌّ من وسيطٍ يأتي من سطر الأوامر.
+ *
+ * كانت هنا `new RegExp(\`^\\s+${name}:…\`)` — ورصدتها CodeQL حقنَ تعبيرٍ نمطيّ
+ * (خطورة عالية). والحارسُ أعلاه يقصر الاسمَ على `^_[A-Z][A-Z0-9_]*$` فيمنع الحقنَ
+ * فعلًا، لكنّ الأمانَ المشروطَ بحارسٍ في موضعٍ آخر يسقط بأوّل تحريرٍ يوسّع الحارس —
+ * ولا يراه من يحرّره. والقراءةُ سطرًا سطرًا لا تحتاج حارسًا أصلًا: المدخلُ يُقارَن
+ * ولا يُفسَّر.
+ */
+const wanted = `${name}:`;
+let raw = null;
+for (const line of body.split('\n')) {
+  if (!/^\s/.test(line)) continue;            // مفتاحٌ داخل الكتلة، لا سطرٌ في مستواها
+  const trimmed = line.trim();
+  if (!trimmed.startsWith(wanted)) continue;
+  raw = trimmed.slice(wanted.length).trim();
+  break;
+}
+if (raw === null) {
   console.error(`CLOUDBUILD_SUBSTITUTION_NOT_FOUND: ${name}`);
   process.exit(1);
 }
 
-process.stdout.write(match[1].replace(/^'(.*)'$/, '$1').replace(/^"(.*)"$/, '$1'));
+process.stdout.write(raw.replace(/^'(.*)'$/, '$1').replace(/^"(.*)"$/, '$1'));
