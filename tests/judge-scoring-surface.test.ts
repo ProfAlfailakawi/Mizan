@@ -84,6 +84,35 @@ test('criterion names exist in Arabic', () => {
   }
 });
 
+test('a scoring key stays a thumb-sized target, and severity never changes its height', () => {
+  /*
+   * هذا الحارسُ عاد بعد أن حُذف.
+   *
+   * قرارُ المالك في 17 سبتمبر 2026: «مقاسٌ واحد لكل زرّ، وهو مقاسُ الإبهام — لا بطاقة».
+   * وفي 19 سبتمبر أُعيدت كتابةُ شاشة التحكيم، فذهب الاختبارُ الذي يحرسه مع التصميم الذي
+   * كُتب له. والقيمةُ نفسها بقيت في الطبقة — لكنّ قيمةً لا يحرسها شيءٌ قيمةٌ مستأجَرة:
+   * تُزاح في أوّل إعادة تخطيطٍ قادمة ولا يسقط شيء.
+   *
+   * ولوحُ المحكّم آيباد أفقيّ، والصفوفُ تقتسم ما بقي (`minmax(0,1fr)`) كي لا تفيض
+   * اللوحة — فما يمنع المفتاحَ من النزول تحت أصغر هدفٍ يُصاب بالإبهام هو أرضيتُه هو.
+   */
+  const action = css.match(/^\.mizan-judge-action\{[\s\S]*?\n\}/m)?.[0] || '';
+  assert.ok(action, 'the scoring key rule must exist');
+  const floors = [...action.matchAll(/min-height:(\d+)px/g)].map(m => Number(m[1]));
+  assert.equal(floors.length, 1, 'declare the floor once — a dead first declaration reads as the live one');
+  assert.ok(floors[0] >= 44, `a touch target must stay reachable (got ${floors[0]}px)`);
+  assert.ok(floors[0] <= 72, `a scoring key is not a card (got ${floors[0]}px)`);
+
+  /* والخصمُ يغيّر لون العمود وحجم رقمه، لا ارتفاع الزرّ: المقاسُ واحدٌ مهما بلغت الشدّة. */
+  assert.doesNotMatch(css, /\.mizan-judge-action\[data-weight="[a-z]+"\]\{[^}]*min-height/,
+    'severity must not change the key height');
+  assert.doesNotMatch(css, /\.mizan-judge-deck \.mizan-judge-action\{[^}]*min-height/,
+    'and neither does where it is rendered');
+  /* والعمودُ اللوني باقٍ: هو ما يقول أيَّ معيارٍ تسجّل وكم يكلّف، بلا تضخيم الزرّ. */
+  assert.match(css, /\.mizan-judge-action\[data-weight="high"\]\{ --ja-weight:\d+px/,
+    'the weight spine still encodes the penalty');
+});
+
 test('the affordance works without a pointer that hovers', () => {
   assert.match(css, /\.mizan-judge-action:active\s*\{/, 'pressed state is the tablet affordance');
   assert.match(css, /@media \(hover:hover\)\s*\{\s*\.mizan-judge-action:hover/, 'hover styling is gated to hover-capable input');
