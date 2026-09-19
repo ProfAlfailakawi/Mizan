@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { classifyConsoleError } from './lib/qa-console-noise.mjs';
 
 const arg = (name, fallback) => {
   const hit = process.argv.find(a => a.startsWith(`--${name}=`));
@@ -30,7 +31,6 @@ fs.mkdirSync(OUT, { recursive: true });
 const problems = [];
 const note = (m) => { problems.push(m); console.log(`  ✗ ${m}`); };
 const ok = (m) => console.log(`  ✓ ${m}`);
-const offlineNoise = /ERR_(CONNECTION|TUNNEL|NAME_NOT_RESOLVED|INTERNET)|Could not reach|Failed to load resource: net::|404/;
 
 /*
  * ميكروفون صناعي، لا بوابةٌ متجاوَزة.
@@ -53,8 +53,11 @@ page.on('pageerror', e => note(`خطأ تشغيل: ${String(e).slice(0, 160)}`))
 page.on('console', m => {
   if (m.type() !== 'error') return;
   const text = m.text();
-  if (offlineNoise.test(text)) return;
-  note(`خطأ سجل: ${text.slice(0, 160)}`);
+  const url = m.location()?.url || '';
+  const verdict = classifyConsoleError({ text, url });
+  /* والمستثنى يُطبع. فكان يُبتلع هنا بلا ذكرٍ، واستثناءٌ لا يُرى لا يُراجَع. */
+  if (verdict.suppressed) { console.log(`  · (${verdict.ar}) ${url || text.slice(0, 90)}`); return; }
+  note(`خطأ سجل: ${text.slice(0, 160)}${url ? ` ← ${url}` : ''}`);
 });
 
 const body = () => page.locator('body').innerText();
