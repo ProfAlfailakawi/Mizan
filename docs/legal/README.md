@@ -41,7 +41,7 @@ audioRetentionDays: 90      documentRetentionDays: 365
 ### ٥) اضبط المتغيّرات السبعة
 
 ```bash
-MIZAN_LEGAL_ENTITY_NAME="الاسم القانونيّ الكامل"
+MIZAN_LEGAL_ENTITY_NAME="شركة سكاي جيت للإستشارات التربوية"
 
 MIZAN_LEGAL_TERMS_URL="https://.../terms"
 MIZAN_LEGAL_TERMS_VERSION="1.0"

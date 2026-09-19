@@ -100,6 +100,29 @@ test('both legal drafts exist, and neither pretends to be final', () => {
     'the policy must carry the same numbers the product actually applies');
 });
 
+/*
+ * سببُ وجود هذا الاختبار: الوثيقتان كانتا تحملان «شركة سكاي جيت» — اسمًا مختصرًا لا
+ * يطابق ما في شهادة السجلّ التجاريّ. ووثيقةٌ يُحتجّ بها باسمٍ مختصر، أو وثيقتان
+ * باسمين مختلفين، تُفسدان أثرَ الموافقة: المتسابق وقّع على وثيقة ناشرُها غيرُ محدَّد
+ * بدقّة. فيُشترط أن تحملا الاسمَ نفسَه ورقمَ السجلّ نفسَه وبريدَ تواصلٍ حقيقيًّا —
+ * وأن يكون الاسمُ الذي يُضبط في `MIZAN_LEGAL_ENTITY_NAME` هو ذاتَه لا مختصرَه.
+ */
+test('both drafts and the publishing guide name one identical legal entity', () => {
+  const ENTITY = 'شركة سكاي جيت للإستشارات التربوية';
+  const REGISTRATION = '544482';
+  const EMAIL = 'info@skygateeducation.com';
+  for (const file of ['docs/legal/TERMS-AR.md', 'docs/legal/PRIVACY-AR.md']) {
+    const text = read(file);
+    assert.ok(text.includes(ENTITY), `${file} must carry the full registered name, not a short form`);
+    assert.ok(text.includes(REGISTRATION), `${file} must carry the commercial registration number`);
+    assert.ok(text.includes(EMAIL), `${file} must give a contact channel the reader can actually use`);
+    assert.equal(/⟦[^⟧]*(بريد|هاتف|الاسم القانون)[^⟧]*⟧/.test(text), false,
+      `${file} must not still show a blank for a detail the owner has supplied`);
+  }
+  assert.ok(read('docs/legal/README.md').includes(`MIZAN_LEGAL_ENTITY_NAME="${ENTITY}"`),
+    'the value the owner is told to set must be the same name the documents carry');
+});
+
 test('the publishing guide names all seven variables preflight blocks on', () => {
   const guide = read('docs/legal/README.md');
   for (const name of [
