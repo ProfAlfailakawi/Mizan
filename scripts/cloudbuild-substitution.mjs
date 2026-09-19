@@ -32,10 +32,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const runtimeMode = process.argv[2] === '--env';
-const name = runtimeMode ? process.argv[3] : process.argv[2];
-const NAME_SHAPE = runtimeMode ? /^[A-Z][A-Z0-9_]*$/ : /^_[A-Z][A-Z0-9_]*$/;
+const secretMode = process.argv[2] === '--secret';
+const name = (runtimeMode || secretMode) ? process.argv[3] : process.argv[2];
+const NAME_SHAPE = (runtimeMode || secretMode) ? /^[A-Z][A-Z0-9_]*$/ : /^_[A-Z][A-Z0-9_]*$/;
 if (!name || !NAME_SHAPE.test(name)) {
-  console.error('USAGE: cloudbuild-substitution.mjs _SUBSTITUTION_NAME | --env RUNTIME_NAME');
+  console.error('USAGE: cloudbuild-substitution.mjs _SUBSTITUTION_NAME | --env RUNTIME_NAME | --secret SECRET_ENV_NAME');
   process.exit(2);
 }
 
@@ -55,6 +56,28 @@ const source = fs.readFileSync(file, 'utf8');
  * والأسرارُ ليست هنا ولا تُقرأ منه: سطرُ `--update-secrets` منفصل، ولا يحمل قيمةً
  * أصلًا بل اسمَ سرٍّ في Secret Manager. فلا يطبع هذا السكربت سرًّا ولو أُريد به ذلك.
  */
+
+// Secret bindings carry no secret value: only ENV_NAME=SECRET_MANAGER_NAME:version.
+// This mode returns the Secret Manager reference so release CI can verify the deployment
+// contract without copying secret material into GitHub.
+if (secretMode) {
+  const lines = source.split('\n');
+  const flag = lines.findIndex(line => line.trim() === "- '--update-secrets'");
+  if (flag < 0) {
+    console.error('CLOUDBUILD_SECRETS_LINE_MISSING');
+    process.exit(1);
+  }
+  const payload = (lines[flag + 1] || '').trim().replace(/^-\s*/, '').replace(/^'(.*)'$/, '$1');
+  const wantedSecret = `${name}=`;
+  const entry = payload.split(',').find(part => part.startsWith(wantedSecret));
+  if (entry === undefined) {
+    console.error(`CLOUDBUILD_SECRET_NOT_FOUND: ${name}`);
+    process.exit(1);
+  }
+  process.stdout.write(entry.slice(wantedSecret.length));
+  process.exit(0);
+}
+
 if (runtimeMode) {
   const lines = source.split('\n');
   const flag = lines.findIndex(line => line.trim() === "- '--update-env-vars'");
