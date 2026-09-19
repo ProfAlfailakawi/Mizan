@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { classifyConsoleError } from './lib/qa-console-noise.mjs';
 
 const arg = (name, fallback) => {
   const hit = process.argv.find(a => a.startsWith(`--${name}=`));
@@ -43,13 +44,14 @@ async function newPage(width, height, label) {
   });
   const page = await ctx.newPage();
   page.on('pageerror', e => note(`[${label}] خطأ تشغيل: ${String(e).slice(0, 160)}`));
-  /* تعذّر الوصول إلى خدمة خارجية ليس عيبًا في الشاشة: يُذكر ولا يُعدّ ملاحظة تحتاج معالجة. */
-  const offlineNoise = /ERR_(CONNECTION|TUNNEL|NAME_NOT_RESOLVED|INTERNET)|Could not reach|Failed to load resource: net::|404/;
+  /* ما غاب عن بيئة الفحص بحكم التصميم يُذكر ولا يُعدّ عطبًا — والحكمُ على العنوان لا على النصّ. */
   page.on('console', m => {
     if (m.type() !== 'error') return;
     const text = m.text();
-    if (offlineNoise.test(text)) { console.log(`  · (خدمة خارجية غير متاحة في بيئة الفحص) ${text.slice(0, 90)}`); return; }
-    note(`[${label}] خطأ سجل: ${text.slice(0, 160)}`);
+    const url = m.location()?.url || '';
+    const verdict = classifyConsoleError({ text, url });
+    if (verdict.suppressed) { console.log(`  · (${verdict.ar}) ${url || text.slice(0, 90)}`); return; }
+    note(`[${label}] خطأ سجل: ${text.slice(0, 160)}${url ? ` ← ${url}` : ''}`);
   });
   return { ctx, page };
 }
