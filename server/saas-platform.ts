@@ -17,17 +17,21 @@ export interface PlanRecord{
  overage?:PlanOverage;
  ownerOperatorId?:string;createdAt:string;updatedAt:string;
 }
+import type { LegalChainLink, LegalDocumentConfig } from '../src/lib/legal-documents';
+
 export type BillingSubjectType='operator'|'organization';
 export type SubscriptionStatus='trialing'|'active'|'past_due'|'canceled'|'unpaid';
 export type InvoiceStatus='draft'|'open'|'paid'|'void'|'uncollectible';
 export interface SubscriptionRecord{id:string;subjectType:BillingSubjectType;subjectId:string;ownerOperatorId?:string;planId:string;status:SubscriptionStatus;currency:string;amountMinor:number;billingPeriod:'monthly'|'annual'|'custom';currentPeriodStart:string;currentPeriodEnd:string;autoRenew?:boolean;/* شروط التجاوز تُثبَّت لحظة بدء الدورة: تعديل الباقة لاحقًا لا يغيّر فاتورة دورة انقضت. */overage?:PlanOverage;provider:string;externalRef?:string;createdAt:string;updatedAt:string;canceledAt?:string}
 export interface InvoiceLine{description:string;amountMinor:number;quantity?:number}
 export interface InvoiceRecord{id:string;number:string;subscriptionId?:string;lines?:InvoiceLine[];subjectType:BillingSubjectType;subjectId:string;ownerOperatorId?:string;currency:string;amountMinor:number;status:InvoiceStatus;periodStart?:string;periodEnd?:string;issuedAt:string;dueAt?:string;paidAt?:string;provider:string;externalRef?:string;method?:string;note?:string;createdAt:string;updatedAt:string}
-export interface OperatorRecord{id:string;name:string;status:'active'|'suspended';pricingTier:string;whiteLabelLevel:'mizan'|'co_branded'|'full';storageCapBytes?:number;createdAt:string}
+export interface OperatorRecord{id:string;name:string;status:'active'|'suspended';pricingTier:string;whiteLabelLevel:'mizan'|'co_branded'|'full';storageCapBytes?:number;createdAt:string;/** وثائق المشغّل باسمه هو. تُستعمل لجهاته التي لم تنشر وثائقها — ويُعلَن أنها وثائقُه. */legal?:LegalDocumentConfig}
 export interface OrganizationRecord{
  id:string;tenantId:string;licenseId:string;officialName:string;shortName:string;organizationType:string;country:string;
  legalEmail?:string;legalPhone?:string;website?:string;legalRegistration?:string;primaryContact?:string;operatorId?:string;
  operational:{phone?:string;notificationEmail?:string;contactName?:string;address?:string};status:'active'|'suspended'|'archived';createdAt:string;updatedAt:string;
+ /** وثائق الجهة نفسها. غيابُها ينزل بالسلسلة إلى المشغّل ثم المنصّة — باسم الناشر الحقيقي. */
+ legal?:LegalDocumentConfig;
 }
 export interface LicenseRecord{
  id:string;organizationId:string;planId:string;startsAt:string;expiresAt:string;status:LicenseState;graceUntil?:string;
@@ -103,6 +107,22 @@ export class SaaSPlatformRepository{
  operatorOrganizationIds(operatorId:string){return this.read().organizations.filter(x=>x.operatorId===operatorId&&x.status!=='archived').map(x=>x.id)}
  organizationBelongsToOperator(organizationId:string,operatorId:string){return this.read().organizations.some(x=>x.id===organizationId&&x.operatorId===operatorId&&x.status!=='archived')}
  operatorName(operatorId?:string){if(!operatorId)return undefined;return this.read().operators.find(x=>x.id===operatorId)?.name}
+ /*
+  * سلسلةُ ناشري الوثائق لهذه الجهة، من الأدنى إلى الأعلى وبلا طبقة المنصّة —
+  * فالمنصّة تُقرأ من بيئة التشغيل لا من هذا المخزن، ويضيفها المُنادي.
+  *
+  * وما لا وثيقةَ له لا يُمثَّل بحلقةٍ فارغة تُوهم أنه نشر شيئًا: يُترك، فتنزل السلسلة
+  * إلى من بعده، ويُعلَن اسمُه هو.
+  */
+ legalChainFor(organizationId:string):LegalChainLink[]{
+  const state=this.read();
+  const organization=state.organizations.find(x=>x.id===organizationId);
+  const chain:LegalChainLink[]=[];
+  if(organization?.legal)chain.push({level:'organization',config:organization.legal});
+  const operator=organization?.operatorId?state.operators.find(x=>x.id===organization.operatorId):undefined;
+  if(operator?.legal)chain.push({level:'operator',config:operator.legal});
+  return chain;
+ }
  // Owner-console tenants: every SaaS organization (operator-owned or direct) exposed as a tenant row
  // so Tenant 360, the live mirror and the owner list can see and diagnose it in one place.
  listOwnerTenants():{orgId:string;displayName:string;displayNameArabic:string;status:'active'|'suspended';operatorId?:string;operatorName?:string;source:'saas'}[]{const s=this.read();return s.organizations.filter(o=>o.status!=='archived').map(o=>({orgId:o.id,displayName:o.shortName||o.officialName,displayNameArabic:o.officialName||o.shortName||o.id,status:o.status==='suspended'?'suspended':'active',operatorId:o.operatorId,operatorName:o.operatorId?s.operators.find(x=>x.id===o.operatorId)?.name:undefined,source:'saas' as const}))}

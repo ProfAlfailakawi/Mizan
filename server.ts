@@ -18,7 +18,7 @@ import { isServerAuthoredAuditAction } from './server/audit-authority';
 import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-registry';
 import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
 import { policyChangeDecision, scoreCorrectionDecision, readingChangeDecision } from './server/governance-attestation';
-import { CONSENT_BACKED_DOCUMENTS, isPublished, legalConfigFromEnv, legalDocumentState, type LegalDocumentKind } from './src/lib/legal-documents';
+import { CONSENT_BACKED_DOCUMENTS, isPublished, isResolved, legalConfigFromEnv, legalDocumentState, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from './src/lib/legal-documents';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -277,6 +277,18 @@ async function startServer() {
     return null;
   };
 
+  /*
+   * سلسلةُ ناشري الوثائق: وثائقُ الجهة، فوثائقُ مشغّلها، فوثائقُ المنصّة. وتُبنى هنا
+   * لأن مخزن SaaS هو من يعرف مَن يملك مَن — والخدمةُ نفسها لا تعرف شيئًا عن التراخيص.
+   *
+   * وغيابُ المخزن يترك المنصّةَ وحدها، وهو الحال الصحيح قبل بيع النظام لمشغّلين: لا
+   * يُفترض ناشرٌ لا وجود له. ويشترك فيها مسارُ العرض ومسارُ التسجيل، فلا تفترق الوثيقةُ
+   * التي رآها المتسابق عن التي كُتبت في أثره.
+   */
+  const publicLegalChain=(organizationId:string):LegalChainLink[]=>[
+    ...(saasPlatform?saasPlatform.legalChainFor(organizationId):[]),
+    {level:'platform',config:legalConfigFromEnv(process.env as Record<string,string|undefined>)},
+  ];
   const publicRegistration=new PublicRegistrationService({
     /* التسجيل عملية كتابة رسمية، لذلك لا نقبل نسخة القرص كسلطة للفئات. شاشة الطالب
        تسجّل فقط مقابل الإسقاط المنشور فعليًا في Firestore؛ إذا كانت السحابة غير متاحة
@@ -329,7 +341,18 @@ async function startServer() {
       }
       return null;
     }
-  });
+  },
+  ()=>new Date(),
+  process.env as Record<string,string|undefined>,
+  /*
+   * سلسلةُ ناشري الوثائق: وثائقُ الجهة، فوثائقُ مشغّلها، فوثائقُ المنصّة. وتُبنى هنا
+   * لأن مخزن SaaS هو من يعرف مَن يملك مَن — والخدمةُ نفسها لا تعرف شيئًا عن التراخيص.
+   *
+   * وغيابُ المخزن يترك المنصّةَ وحدها، وهو الحال الصحيح قبل بيع النظام لمشغّلين: لا
+   * يُفترض ناشرٌ لا وجود له.
+   */
+  (organizationId)=>publicLegalChain(organizationId),
+);
   const identityDir=process.env.MIZAN_IDENTITY_GOVERNANCE_DIR||'';let identityGovernance:IdentityGovernanceRepository|null=null;try{if(identityDir)identityGovernance=new IdentityGovernanceRepository(identityDir)}catch(err){console.error('Identity governance disabled:',err)}
   const notificationDir=process.env.MIZAN_NOTIFICATION_CENTER_DIR||(identityDir?path.join(identityDir,'notifications'):(saasDir?path.join(saasDir,'notifications'):''));let notificationCenter:NotificationCenterRepository|null=null;try{if(notificationDir)notificationCenter=new NotificationCenterRepository(notificationDir)}catch(err){console.error('Notification center disabled:',err)}
   /*
@@ -878,17 +901,37 @@ async function startServer() {
     try{opsTelemetry.recordJob({id:`public_registration:${competitionId||'unknown'}:${code}`,competitionId:competitionId||undefined,jobType:'public_registration',status:'FAILED',errorCode:code})}catch{/* التتبّع لا يُفشل تسجيلًا ولا يُغيّر ردًّا */}
   };
   const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
+  /*
+   * ثلاثةُ مسارات كانت تبني الردَّ نفسه بثلاث نسخ. فاجتمعت في واحدة — لا اختصارًا، بل
+   * لأن الوثيقتين تُرسلان معه: ونسخةٌ تحملهما وأخرى لا تحملهما تجعل صفحةَ التسجيل
+   * تعرض ناشرًا أو لا تعرضه بحسب أيّ مسارٍ نادت، وهو فرقٌ لا يراه أحد حتى يقع.
+   *
+   * ومع كلِّ وثيقةٍ ناشرُها: فالمتسابق يوقّع على شروطٍ لها اسمٌ ورابط، لا على جملةٍ في
+   * الصفحة. و`inherited` تقول إن الوثيقة لطبقةٍ أعلى فتُعرَض باسم صاحبها لا باسم الجهة.
+   */
+  const publicCompetitionPayload=(comp:Competition)=>({
+    ok:true,
+    competition:comp,
+    organizationId:comp.organizationId,
+    legal:Object.fromEntries(CONSENT_BACKED_DOCUMENTS.map(kind=>{
+      const resolved=resolveLegalDocument(publicLegalChain(comp.organizationId),kind);
+      return [kind,isResolved(resolved)
+        ?{published:true,publisher:resolved.publisher,publisherLevel:resolved.level,inherited:resolved.inherited,version:resolved.version,effectiveDate:resolved.effectiveDate,url:resolved.url}
+        :{published:false,code:resolved.code}];
+    })),
+    updatedAt:comp.updatedAt||new Date().toISOString(),
+  });
   app.get('/api/public/competition',async(req,res)=>{
     const comp=await getLatestOrActiveCompetition();
     if(!comp)return res.status(404).json({code:'COMPETITION_NOT_FOUND'});
     res.setHeader('Cache-Control','public, max-age=60');
-    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+    return res.json(publicCompetitionPayload(comp));
   });
   app.get('/api/public/competitions',async(req,res)=>{
     const comp=await getLatestOrActiveCompetition();
     if(!comp)return res.status(404).json({code:'COMPETITION_NOT_FOUND'});
     res.setHeader('Cache-Control','public, max-age=60');
-    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+    return res.json(publicCompetitionPayload(comp));
   });
   app.get('/api/public/competitions/:competitionId',async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
@@ -897,7 +940,7 @@ async function startServer() {
       return res.status(404).json({code:'COMPETITION_NOT_FOUND',message:'لم نعثر على المسابقة في السجل العام'});
     }
     res.setHeader('Cache-Control','public, max-age=60');
-    return res.json({ok:true,competition:comp,organizationId:comp.organizationId,updatedAt:comp.updatedAt||new Date().toISOString()});
+    return res.json(publicCompetitionPayload(comp));
   });
   app.post('/api/public/competitions/:competitionId/publish',publicRegistrationRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);

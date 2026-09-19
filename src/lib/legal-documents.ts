@@ -82,8 +82,16 @@ export const isPublished = (state: LegalDocumentState): state is PublishedLegalD
  */
 export function consentVersionFor(config: LegalDocumentConfig, kind: LegalDocumentKind): string {
   const state = legalDocumentState(config, kind);
-  return isPublished(state) ? `${kind}:${state.version}` : UNPUBLISHED_CONSENT_VERSION;
+  return isPublished(state) ? consentVersionOf(kind, state.version) : UNPUBLISHED_CONSENT_VERSION;
 }
+
+/*
+ * صيغةُ نسخةِ الموافقة في موضعٍ واحد.
+ *
+ * فالكاتبُ (التسجيل) والقارئُ (المدقّق) يقرآن الصيغةَ نفسها. ولو كُتبت الصيغةُ مرّتين
+ * لافترقتا يومًا في نقطةٍ أو شرطة، فيقرأ المدقّقُ «terms:2.1» نسخةً غير التي كُتبت.
+ */
+export const consentVersionOf = (kind: LegalDocumentKind, version: string): string => `${kind}:${version}`;
 
 /** ما ينقص النشرةَ كي تجمع موافقةً يُحتجّ بها — فارغةٌ تعني أن كلَّ وثيقةٍ منشورة. */
 export function unpublishedConsentDocuments(config: LegalDocumentConfig): LegalDocumentState[] {
@@ -101,4 +109,78 @@ export function legalConfigFromEnv(env: Record<string, string | undefined>): Leg
       privacy: { version: env.MIZAN_LEGAL_PRIVACY_VERSION, effectiveDate: env.MIZAN_LEGAL_PRIVACY_EFFECTIVE, url: env.MIZAN_LEGAL_PRIVACY_URL },
     },
   };
+}
+
+/* ── سلسلةُ الناشرين: الجهة ← المشغّل ← المنصّة ─────────────────────────────── */
+
+/*
+ * ميزان يُباع على ثلاث طبقات: المنصّة، ومشغّلٌ يشتري ويسوّق لجهاته، وجهةٌ تنظّم
+ * المسابقة. وكلُّ واحدةٍ تريد اسمَها على وثائقها.
+ *
+ * والمتسابق يوقّع مرّةً واحدة، فلا بدّ أن يُعرف **على وثيقة مَن** وقّع. فإن لم تنشر
+ * الجهةُ وثيقتَها ونزلنا إلى وثيقة المشغّل، فذلك جائزٌ بشرطٍ واحد لا يُتنازل عنه:
+ * أن يُعرض اسمُ الناشر الحقيقيّ للمتسابق، ويُكتب في الأثر. أمّا أن تُلبَس وثيقةُ
+ * المشغّل اسمَ الجهة فهو عينُ ما نمنعه في النصّ القرآني: نسبةُ شيءٍ إلى غير أهله.
+ *
+ * ولذلك لا تُعيد هذه الدالّة وثيقةً بلا `publisher` و`level` — ومصدرُهما الحلقةُ
+ * التي فازت لا الحلقةُ التي طُلبت.
+ */
+
+/** ترتيبُ البحث. الأولى هي مَن يسجّل المتسابقُ عندها. */
+export const LEGAL_PUBLISHER_LEVELS = ['organization', 'operator', 'platform'] as const;
+export type LegalPublisherLevel = (typeof LEGAL_PUBLISHER_LEVELS)[number];
+
+export interface LegalChainLink {
+  level: LegalPublisherLevel;
+  config: LegalDocumentConfig;
+}
+
+export interface ResolvedLegalDocument extends PublishedLegalDocument {
+  /** الطبقةُ التي نُشرت عندها الوثيقة فعلًا. */
+  level: LegalPublisherLevel;
+  /** صحيحةٌ حين تكون الوثيقةُ لطبقةٍ أعلى من التي يسجّل عندها المتسابق. */
+  inherited: boolean;
+}
+
+export type LegalResolution =
+  | ResolvedLegalDocument
+  | {
+      kind: LegalDocumentKind;
+      code: 'LEGAL_DOCUMENT_NOT_PUBLISHED';
+      /** ما ينقص أدنى الطبقات — وهو ما يُعرض للمالك ليضبطه. */
+      missing: string[];
+      levelsTried: LegalPublisherLevel[];
+    };
+
+/**
+ * أوّلُ وثيقةٍ **منشورةٍ كاملةً** في السلسلة، ومعها ناشرُها وطبقتُه.
+ *
+ * والنقصُ الجزئيّ في طبقةٍ ليس نشرًا فيها، فيُمضى إلى ما بعدها؛ ولا تُخلط حقولُ
+ * طبقتين في وثيقةٍ واحدة — رابطٌ من هنا ونسخةٌ من هناك وثيقةٌ لم تُنشر قطّ.
+ */
+export function resolveLegalDocument(chain: readonly LegalChainLink[], kind: LegalDocumentKind): LegalResolution {
+  const ordered = [...chain].sort(
+    (a, b) => LEGAL_PUBLISHER_LEVELS.indexOf(a.level) - LEGAL_PUBLISHER_LEVELS.indexOf(b.level),
+  );
+  const levelsTried: LegalPublisherLevel[] = [];
+  let lowestMissing: string[] = [];
+
+  for (const link of ordered) {
+    levelsTried.push(link.level);
+    const state = legalDocumentState(link.config, kind);
+    if (isPublished(state)) {
+      return { ...state, level: link.level, inherited: link.level !== ordered[0].level };
+    }
+    if (!lowestMissing.length) lowestMissing = state.missing;
+  }
+
+  return { kind, code: 'LEGAL_DOCUMENT_NOT_PUBLISHED', missing: lowestMissing, levelsTried };
+}
+
+/** حارسُ نوعٍ للسلسلة — كالذي قبله، وبالسبب نفسه. */
+export const isResolved = (value: LegalResolution): value is ResolvedLegalDocument => 'version' in value;
+
+/** ما لم يُنشر في أيّ طبقة. فارغةٌ تعني أن كلَّ وثيقةِ موافقةٍ لها ناشرٌ مُعلَن. */
+export function unresolvedConsentDocuments(chain: readonly LegalChainLink[]): LegalResolution[] {
+  return CONSENT_BACKED_DOCUMENTS.map(kind => resolveLegalDocument(chain, kind)).filter(state => !isResolved(state));
 }

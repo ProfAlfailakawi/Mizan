@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { CONSENT_BACKED_DOCUMENTS, consentVersionFor, isPublished, legalConfigFromEnv, legalDocumentState, type LegalDocumentKind } from '../src/lib/legal-documents';
+import { CONSENT_BACKED_DOCUMENTS, consentVersionOf, isResolved, legalConfigFromEnv, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from '../src/lib/legal-documents';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
 
@@ -16,10 +16,15 @@ export const publicTokenHash=(value:string)=>crypto.createHash('sha256').update(
 export const validPublicJourneyToken=(value:string)=>/^mz_(journey|guardian)_[A-Za-z0-9_-]{43}$/.test(value);
 
 export class PublicRegistrationService{
+  /*
+   * `legalChainFor` يجلب سلسلةَ الناشرين لهذه الجهة: وثائقُها، فوثائقُ مشغّلها، فوثائقُ
+   * المنصّة. وغيابُه يعني المنصّةَ وحدها — وهو الحال قبل بيع النظام لمشغّلين.
+   */
   constructor(
     private readonly store:PublicRegistrationStore,
     private readonly now=()=>new Date(),
     private readonly legalEnvironment:Record<string,string|undefined>=process.env as Record<string,string|undefined>,
+    private readonly legalChainFor?:(organizationId:string)=>Promise<LegalChainLink[]>|LegalChainLink[],
   ){}
   async register(competitionId:string,raw:PublicRegistrationInput,origin:string){
     if(clean(raw.website,10))throw new Error('REGISTRATION_REJECTED');
@@ -30,9 +35,13 @@ export class PublicRegistrationService{
      * محصورًا في preflight؛ أي إن نشرًا سيئ التهيئة يستطيع مع ذلك قبول POST مباشر وكتابة
      * سجل «وافق» على شروط/خصوصية غير منشورتين. التسجيل العام نفسه الآن يفشل مغلقًا.
      */
-    const legal=legalConfigFromEnv(this.legalEnvironment);
+    const platform:LegalChainLink={level:'platform',config:legalConfigFromEnv(this.legalEnvironment)};
+    const chain=this.legalChainFor?await this.legalChainFor(competition.organizationId):[platform];
+    const consentDocuments=new Map<LegalDocumentKind,ReturnType<typeof resolveLegalDocument>>();
     for(const kind of CONSENT_BACKED_DOCUMENTS){
-      if(!isPublished(legalDocumentState(legal,kind)))throw new Error(`LEGAL_DOCUMENT_NOT_PUBLISHED:${kind}`);
+      const resolved=resolveLegalDocument(chain,kind);
+      if(!isResolved(resolved))throw new Error(`LEGAL_DOCUMENT_NOT_PUBLISHED:${kind}`);
+      consentDocuments.set(kind,resolved);
     }
     const ends=Date.parse(competition.registrationEndDate);
     if(competition.status!=='registration_open'&&competition.status!=='live')throw new Error('COMPETITION_REGISTRATION_CLOSED');
@@ -64,12 +73,23 @@ export class PublicRegistrationService{
     const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:categoryReading,institution:'',specialNeeds:false,documents:[],status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,journeyTokenCustody:'holder_only',createdAt};
     const journeyBase={organizationId:competition.organizationId,competitionId:competition.id,participantId,competitionName:competition.name,competitionNameArabic:competition.nameArabic,participantCode:code,participantName:participant.fullName,participantNameArabic:participant.fullNameArabic,status,arrivalSlot:null,queueNumber:null,venueName:competition.venueName||null,committee:null,result:null,certificate:null,revoked:false,updatedAt:createdAt};
     const documents=[{path:`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${participantId}`,data:participant as unknown as Record<string,unknown>},{path:`public_journeys/${journeyAccessTokenHash}`,data:{...journeyBase,audience:'participant',tokenHashVersion:'sha256-v1'}},{path:`public_journeys/${guardianAccessTokenHash}`,data:{...journeyBase,audience:'guardian',tokenHashVersion:'sha256-v1'}}];
-    const consentDocumentVersion=(kind:string)=>
-      (CONSENT_BACKED_DOCUMENTS as readonly string[]).includes(kind)
-        ? consentVersionFor(legal,kind as LegalDocumentKind)
-        : `policy:${policy.version}`;
+    /*
+     * الموافقةُ على وثيقةٍ تُكتب بناشرها لا برقمها وحده. وما ليس وثيقةً منشورة —
+     * كالتسجيل الصوتي وموافقة وليّ الأمر — يبقى منسوبًا إلى لائحة المسابقة صراحةً.
+     */
+    const consentProvenance=(kind:string)=>{
+      const resolved=consentDocuments.get(kind as LegalDocumentKind);
+      if(!resolved||!isResolved(resolved))return {version:`policy:${policy.version}`};
+      return {
+        version:consentVersionOf(kind as LegalDocumentKind,resolved.version),
+        publisher:resolved.publisher,
+        publisherLevel:resolved.level,
+        documentUrl:resolved.url,
+        documentEffectiveDate:resolved.effectiveDate,
+      };
+    };
     const consentKinds=['terms','privacy',...(policy.judging.requireAudioRecording&&input.consents.audioRecording?['audio_recording']:[]),...(policy.privacy.allowAiProcessing&&input.consents.aiProcessing?['ai_processing']:[]),...(guardianRequired?['guardian']:[])];
-    for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,version:consentDocumentVersion(kind),accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
+    for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,...consentProvenance(kind),accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
     await this.store.create(documents);
     const base=origin.replace(/\/$/,'');return {participant:{id:participant.id,code:participant.code,status:participant.status,competitionId:participant.competitionId,fullName:participant.fullName,fullNameArabic:participant.fullNameArabic},journeyUrl:`${base}/#journey?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(journeyToken)}`,guardianUrl:`${base}/#guardian?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(guardianToken)}`,journeyAccessToken:journeyToken,guardianAccessToken:guardianToken};
   }
