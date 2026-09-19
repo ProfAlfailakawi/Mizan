@@ -52,6 +52,34 @@ test('an unpublished organization falls to the operator — under the operator o
   assert.equal(resolved.inherited, true, 'and the record must say it is not the organization own');
 });
 
+/*
+ * سببُ وجود هذا الاختبار: الحرّاسُ فوقه تبني السلسلةَ بثلاث حلقاتٍ دائمًا، الفارغةُ
+ * منها `{}`. و`legalChainFor` في الإنتاج **لا يفعل ذلك**: مَن لم ينشر تُسقَط حلقتُه
+ * أصلًا. فكانت `inherited` تُقاس إلى أوّل حلقةٍ حاضرة، فتخرج وثيقةُ المشغّل — حين لا
+ * تنشر الجهةُ شيئًا — موسومةً `inherited: false`، أي «هذه وثيقةُ مَن سجّلتَ عنده».
+ *
+ * والاسمُ المعروض كان صحيحًا، لكنّ الأثر كان يكذب في الوصف. فتُقاس الآن إلى الطبقة
+ * التي سجّل عندها المتسابق، ويُثبّت هنا النموذجُ الذي يُنتجه الإنتاج لا نموذجُ الاختبار.
+ */
+test('a chain with the organization link absent — what legalChainFor really returns — still marks the document inherited', () => {
+  for (const kind of ['terms', 'privacy'] as const) {
+    const absent = resolveLegalDocument([{ level: 'operator', config: published('مشغّل', '1.0') }], kind);
+    assert.ok(isResolved(absent));
+    assert.equal(absent.publisher, 'مشغّل');
+    assert.equal(absent.level, 'operator');
+    assert.equal(absent.inherited, true,
+      'an absent organization link must read the same as an empty one — never as the participant own layer');
+
+    const empty = resolveLegalDocument(chainOf(undefined, published('مشغّل', '1.0')), kind);
+    assert.ok(isResolved(empty));
+    assert.equal(empty.inherited, absent.inherited, 'absent and empty must never disagree');
+  }
+
+  const platformOnly = resolveLegalDocument([{ level: 'platform', config: published('ميزان', '1.0') }], 'terms');
+  assert.ok(isResolved(platformOnly));
+  assert.equal(platformOnly.inherited, true, 'the platform document is never the organization own');
+});
+
 test('with neither below it, the platform document stands — under the platform own name', () => {
   const resolved = resolveLegalDocument(chainOf(undefined, undefined, published('ميزان', '1.0')), 'privacy');
   assert.ok(isResolved(resolved));
