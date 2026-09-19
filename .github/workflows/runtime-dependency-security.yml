@@ -25,10 +25,11 @@ jobs:
         with:
           node-version-file: package.json
           cache: npm
-      # Cloud Run لا يشحن peer-only mobile adapters. Firebase Auth يعلن AsyncStorage
-      # كـpeer، وnpm قد يجرّ وراءه React Native/Metro كاملًا رغم أن ميزان تطبيق ويب/خادم.
-      # نفحص هنا المجموعة نفسها التي تُثبَّت في مرحلة runtime داخل Dockerfile، لا build deps.
-      - name: تثبيت اعتماديات وقت التشغيل الفعلية من ملف القفل
-        run: npm ci --omit=dev --omit=peer
+      # لا نُسقط peer من شجرة npm قبل audit: npm 10 قد يرسل عندها شجرةً ناقصةً إلى
+      # quick-audit endpoint فيردّ 400 "Invalid package tree"، وهو عطلٌ في القياس لا
+      # تقريرُ ثغرة. نثبّت الشجرة المقفلة كاملةً، ثم نجعل audit نفسه يستبعد dev وpeer.
+      # هكذا يبقى الحكم على اعتماديات runtime فقط، لكن مدخل npm audit صالح ومتّسق.
+      - name: تثبيت الشجرة المقفلة الكاملة لتدقيق صالح
+        run: npm ci
       - name: منع الثغرات العالية/الحرجة في اعتماديات وقت التشغيل الفعلية
         run: npm audit --omit=dev --omit=peer --audit-level=high
