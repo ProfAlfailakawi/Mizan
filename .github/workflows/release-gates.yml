@@ -114,12 +114,29 @@ jobs:
           # `MIZAN_SAAS_DATA_DIR` و`MIZAN_CERTIFICATE_REGISTRY_DIR` وهما مضبوطان في
           # النشرة. وتحذيرٌ كاذب يُفقد التقريرَ كلَّه ثقتَه، فيُتخطّى ما فيه من صدق.
           #
-          # وما ليس في ذلك السطر يبقى غائبًا بحقّ — كسرَّي التوقيع — فيُحذَّر منه.
+          # وما ليس في عقد النشر يبقى غائبًا بحقّ؛ أسرار التوقيع تُقرأ كربطٍ اسميّ فقط بلا قراءة قيمها.
           for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do
             if [[ -z "${!name:-}" ]]; then
               if value="$(node scripts/cloudbuild-substitution.mjs --env "$name")"; then
                 printf -v "$name" '%s' "$value"; export "${name?}"
                 echo "  · $name مقروءٌ من cloudbuild.yaml"
+              fi
+            fi
+          done
+
+          # سرّا التوقيع لا يُنسخان إلى GitHub. البوابة تتحقق من عقد النشر نفسه:
+          # أن cloudbuild يربط متغير البيئة بالاسم الصحيح في Secret Manager. لا تُقرأ
+          # القيمة ولا تُطبع. وجود السر وصلاحية حساب Cloud Run تحقّق منهما المالك عند
+          # تهيئة الإنتاج؛ أما هذا الفحص فيمنع سقوط الربط من revision لاحق.
+          for name in MIZAN_PASS_SIGNING_SECRET MIZAN_CERT_SIGNING_SECRET; do
+            if reference="$(node scripts/cloudbuild-substitution.mjs --secret "$name")"; then
+              expected="$name:latest"
+              if [[ "$reference" == "$expected" ]]; then
+                printf -v "$name" '%s' 'configured-via-secret-manager'; export "${name?}"
+                echo "  · $name مربوط بـ Secret Manager في cloudbuild.yaml (القيمة لم تُقرأ)"
+              else
+                echo "::error title=ربط سرّ غير متوقع::$name لا يشير إلى $expected"
+                exit 1
               fi
             fi
           done
