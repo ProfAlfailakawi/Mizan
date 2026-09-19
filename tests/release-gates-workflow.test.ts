@@ -92,6 +92,16 @@ test('a check no commit can satisfy is not stamped on commits', () => {
   assert.ok(/schedule:/.test(workflow) && /cron: '[^']+'/.test(workflow),
     'storage state changes from outside the repository, so time is what measures it');
   assert.ok(workflow.includes('workflow_dispatch:'), 'and it must be runnable on demand');
+  /*
+   * والدقيقةُ ليست صفرًا.
+   *
+   * أوّلُ موعدٍ مجدولٍ لهذه البوّابة بعد نقلها — 19 سبتمبر 2026 الساعة 04:00 UTC — لم
+   * يُنشئ تشغيلًا أصلًا. وجدولةُ GitHub أفضلُ جهدٍ لا وعد: تتأخّر وتُسقَط عند الازدحام،
+   * ورأسُ الساعة أزحمُ ما فيها. فالإزاحةُ عن الصفر تُنقص الاحتمال، ولا تُلغيه — ولذلك
+   * يُشترط أن يذكرها دليلُ الإطلاق تشغيلًا يدويًّا أدناه.
+   */
+  const minute = /cron: '(\d+)/.exec(workflow)?.[1];
+  assert.notEqual(minute, '0', 'the busiest minute on GitHub is the one a dropped schedule hides in');
   assert.equal(/^\s*pull_request:/m.test(workflow), false,
     'a check no diff can satisfy must not gate every diff');
   assert.equal(/^\s*push:/m.test(workflow), false,
@@ -150,4 +160,18 @@ test('the verify step still runs even when the inventory step fails', () => {
   const verifyStep = workflow.slice(workflow.indexOf('التحقّق من حزم القرآن على R2'));
   assert.ok(verifyStep.includes('if: always()'),
     'the gate must not be skipped because a diagnostic step before it failed');
+});
+
+test('the launch runbook does not let a release depend on a schedule that may not fire', () => {
+  /*
+   * بوّابةٌ لا تعمل ولا يشكو أحد أسوأُ من بوّابةٍ حمراء: الحمراءُ تُقرأ، والصامتةُ
+   * تُحسب خضراء. وقد وقع هذا: `docs/GO-LIVE.md` لم يكن يذكر هذه البوّابة أصلًا، فلو
+   * سقط جدولُها شهرًا لَما لاحظ أحد.
+   *
+   * فالدليلُ يذكرها بالاسم، ويأمر بتشغيلها يدويًّا وقراءةِ سببِ حمرتها لا لونِها.
+   */
+  const runbook = fs.readFileSync(path.join(process.cwd(), 'docs', 'GO-LIVE.md'), 'utf8');
+  assert.ok(runbook.includes('release-gates.yml'), 'the runbook must name the gate a release depends on');
+  assert.ok(/workflow run release-gates\.yml|Run workflow/.test(runbook),
+    'and say how to run it on demand, because the schedule is best-effort');
 });
