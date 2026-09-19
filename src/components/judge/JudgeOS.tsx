@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
 import { Ratio } from '../design-system/Ratio';
@@ -58,7 +58,25 @@ import type { RegistrationStatus } from '../../types';
 import { calculateCategoryPassageRange } from '../../lib/scope-engine';
 
 const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
-const iconFor=(kind?:string)=> kind==='error'?AlertTriangle:kind==='open'?CornerDownLeft:kind==='repeat'?RotateCcw:kind==='tajweed'?Sparkles:kind==='stop'?CircleDot:AlertTriangle;
+/*
+ * نبرة المعيار تُقرأ من معرّفه بعد ردّه إلى أصله.
+ *
+ * `getEnabledJudgeActions` تُبدّل اسم المعيار بمعرّفه في اللائحة، فيصير «memorization»
+ * هو «crit-memorization». وكانت طبقة العرض تُسمّى بالاسم الخام (`ja-memorization`) بينما
+ * الزرّ يحمل `ja-crit-memorization`، فلم يطابق شيءٌ شيئًا: لا شريط لوني ولا عدّاد ملاحظات
+ * منذ أول يوم — والعدّاد هو التغذية الراجعة الوحيدة للمحكّم.
+ *
+ * والردّ هنا من وجهين حتى لا يتوقف اللون على شكل المعرّف في لائحة جهةٍ بعينها: نوع المحكّم
+ * المسنَد إلى المعيار إن وُجد، وإلا نزعُ سابقة المعرّف.
+ */
+const CRITERION_TONES=['memorization','tajweed','waqf_ibtida','performance'];
+const criterionTone=(criterionId:string|undefined,ruleSet?:{criteria?:{id:string;assignedJudgeType?:string}[]}):string=>{
+ const criterion=ruleSet?.criteria?.find(c=>c.id===criterionId);
+ const assigned=criterion?.assignedJudgeType;
+ const raw=(assigned&&assigned!=='all'?assigned:criterionId)||'custom';
+ const key=String(raw).replace(/^crit[-_]/,'');
+ return CRITERION_TONES.includes(key)?key:'custom';
+};
 
 const passageSizeLabel = (category: any, ar: boolean) => {
   const range = calculateCategoryPassageRange(category);
@@ -92,7 +110,10 @@ export const JudgeOS: React.FC = () => {
   * محليّة، وتصحّ بعد نوم الجهاز أو تبديل التبويب لأن الفارق بين لحظتين لا يتوقف.
   */
  const [elapsed,setElapsed]=useState(()=>store.sessionElapsedSeconds());
- useEffect(()=>{setElapsed(store.sessionElapsedSeconds());const t=window.setInterval(()=>setElapsed(store.sessionElapsedSeconds()),1000);return()=>window.clearInterval(t)},[store,activeSession.sessionId,activeSession.startedAt,activeSession.carriedSeconds]);
+ /* وبعد القفل يقف: عدّادٌ يواصل الزحف على جلسةٍ انتهت يقول زمنًا لم يُحكَّم فيه أحد. */
+ useEffect(()=>{setElapsed(store.sessionElapsedSeconds());
+  if(activeSession.isLocked)return;
+  const t=window.setInterval(()=>setElapsed(store.sessionElapsedSeconds()),1000);return()=>window.clearInterval(t)},[store,activeSession.sessionId,activeSession.startedAt,activeSession.carriedSeconds,activeSession.isLocked]);
  const participant=activeSession.participant; const participantCategory=competition.categories.find(c=>c.id===participant?.categoryId); const requestedPassageLabel=passageSizeLabel(participantCategory,ar); const secureMode=activeSession.secureQuestionMode==='SERVER'; const clientQuestion=activeSession.questionSelection?.questions[activeSession.currentQuestionIndex];
  const gate=store.questionRevealGates.find(g=>g.sessionId===activeSession.sessionId&&g.questionIndex===activeSession.currentQuestionIndex);
  const [secureRuntime,setSecureRuntime]=useState<SecureQuestionRuntimeState|null>(null); const [secureQuestion,setSecureQuestion]=useState<SecureQuestionPlaintext|null>(null); const [secureError,setSecureError]=useState(''); const [myRevealApproved,setMyRevealApproved]=useState(false); const [replacementBusy,setReplacementBusy]=useState(false);
@@ -211,6 +232,66 @@ export const JudgeOS: React.FC = () => {
  // screen-reader user needs the same fact spoken. Both are driven from here.
  const [markedAction,setMarkedAction]=useState<string|null>(null);
  const [markAnnounce,setMarkAnnounce]=useState('');
+ /*
+  * شريط البيانات: يُقرأ مرةً عند الاستقبال، فلا يأخذ مكانًا دائمًا أمام عينٍ على المصحف.
+  *
+  * يظهر وحده مع كل متسابق وكل موضع جديد ثم ينسحب، ويعود حين تقترب اليد من أعلى الشاشة أو
+  * تُلمس مقبضه. وتثبيته بضغطةٍ عليه لمن أراده مفتوحًا.
+  */
+ const [peek,setPeek]=useState(true);
+ const peekPinRef=useRef(false);
+ const peekTimerRef=useRef<number|undefined>(undefined);
+ const showStrip=(ms:number)=>{window.clearTimeout(peekTimerRef.current);setPeek(true);
+  if(ms)peekTimerRef.current=window.setTimeout(()=>{if(!peekPinRef.current)setPeek(false)},ms)};
+ useEffect(()=>{peekPinRef.current=false;showStrip(5000);return()=>window.clearTimeout(peekTimerRef.current)},[activeSession.sessionId,activeSession.currentQuestionIndex]);
+ useEffect(()=>{const onMove=(e:MouseEvent)=>{if(peekPinRef.current)return;
+   if(e.clientY<=112){window.clearTimeout(peekTimerRef.current);setPeek(true)}
+   else if(e.clientY>200)setPeek(false)};
+  window.addEventListener('mousemove',onMove);return()=>window.removeEventListener('mousemove',onMove)},[]);
+ /* إنهاء الموضع بضغطتين: لمسةٌ واحدة خاطئة في قاعةٍ مزدحمة تُنهي تلاوةً جارية. */
+ const [finishArmed,setFinishArmed]=useState(false);
+ const armTimerRef=useRef<number|undefined>(undefined);
+ useEffect(()=>{setFinishArmed(false);return()=>window.clearTimeout(armTimerRef.current)},[activeSession.sessionId,activeSession.currentQuestionIndex]);
+ const [undoSpin,setUndoSpin]=useState(false);
+ /*
+  * ارتفاع القمرة يُقاس، ولا يُخمَّن.
+  *
+  * كان مكتوبًا `100dvh - 64px` على أن ترويسة التطبيق 64px — وهي 65 بحدّها السفلي. فيفيض
+  * بكسلٌ واحد، ويظهر شريط تمرير على الشاشة التي كُتبت كلّها لئلا تُمرَّر. والبكسل الزائد
+  * سيعود كلّما تغيّرت الترويسة. فيُقرأ موضع القمرة من الصفحة نفسها ويُطرح، فتصحّ مهما
+  * تغيّر ما فوقها.
+  */
+ const osRef=useRef<HTMLDivElement|null>(null);
+ const [osTop,setOsTop]=useState<number|null>(null);
+ /*
+  * ويُقاس لحظة تركيب القمرة، لا لحظة تركيب المكوّن.
+  *
+  * المكوّن يخرج مبكرًا قبل أن تُركَّب القمرة (شاشة المعايرة، وشاشة «لا جلسة الآن»)، فأثرٌ
+  * بمصفوفة اعتماد فارغة يجري ومرجعُه فارغ، ثم لا يجري ثانيةً حين تُركَّب القمرة فعلًا.
+  * فيبقى المتغيّر غير مكتوب، ويُستعمل الاحتياطي 64 فيفيض بكسل. فالمرجع دالةٌ تقيس عند
+  * الإسناد.
+  */
+ const measureTop=useCallback(()=>{const el=osRef.current;if(!el)return;
+  const next=el.getBoundingClientRect().top+(window.scrollY||0);
+  setOsTop(prev=>prev!=null&&Math.abs(prev-next)<0.5?prev:next)},[]);
+ const attachOs=useCallback((node:HTMLDivElement|null)=>{osRef.current=node;if(node)measureTop()},[measureTop]);
+ useEffect(()=>{
+  /*
+   * بلا تقريب، وبعد أن يستقرّ ما فوقها.
+   *
+   * القياس عند التركيب وحده يقع قبل أن تُحمَّل الخطوط وتستقرّ الترويسة، فيخرج 64 بدل 65،
+   * ويبقى بكسلٌ واحد يفيض — وهو كلّ ما يلزم ليظهر شريط تمرير على شاشةٍ كُتبت لئلا تُمرَّر.
+   * فيُعاد القياس في الإطار التالي، ومع كل تغيّرٍ في حجم الصفحة.
+   *
+   * ولا يُكتب إلا إذا تجاوز الفارق نصف بكسل، فلا يتأرجح القياس بين 64.5 و65 بلا نهاية.
+   */
+  measureTop();
+  const raf=window.requestAnimationFrame(measureTop);
+  const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>measureTop()):null;
+  observer?.observe(document.body);
+  window.addEventListener('resize',measureTop);
+  return()=>{window.cancelAnimationFrame(raf);observer?.disconnect();window.removeEventListener('resize',measureTop)};
+ },[measureTop]);
  // بدء جلسة المتسابق التالي قد يفشل (لا لجنة متوافقة، أو تعذّر سحب الأسئلة). كان يفشل بصمت
  // فيبدو الزر معطلًا؛ الآن يُقال السبب بدل أن يبتلع الزرّ الرفض.
  const [startError,setStartError]=useState('');
@@ -278,6 +359,24 @@ export const JudgeOS: React.FC = () => {
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);resolve()};recorder.stop()})};
  const submitAndLock=async()=>{if(!micRecording)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
  const isLastQuestion=activeSession.currentQuestionIndex >= Math.max(1,totalQuestions)-1;
+ /*
+  * آخر ملاحظةٍ لم تُعكس: هي ما سيُلغيه زرّ التراجع.
+  *
+  * الزرّ أيقونةٌ بلا كلمة، فلا يقول اسمها نصًّا — لكنه يأخذ لون معيارها، وينطفئ حين لا شيء
+  * يُلغى، ويبقى الاسم في وصفه المنطوق وفي التلميح، ويُعلَن بعد الضغط في المنطقة الحيّة.
+  */
+ const lastEvent=[...activeSession.events].reverse().find(e=>!e.reversed);
+ const lastAction=lastEvent?actions.find(a=>a.eventType===lastEvent.type):undefined;
+ const lastTone=criterionTone(lastAction?.criterion,ruleSet);
+ const lastLabel=lastAction?(ar?lastAction.shortArabic:lastAction.shortEnglish):'';
+ const undoLastMark=()=>{
+  if(!lastEvent)return;
+  const label=lastLabel;
+  setUndoSpin(false);
+  window.setTimeout(()=>{setUndoSpin(true);window.setTimeout(()=>setUndoSpin(false),440)},0);
+  undoLastJudgeEvent();
+  setMarkAnnounce(ar?`أُلغيت ${label}.`:`${label} removed.`);
+ };
  /*
   * الطابور لجنةُ المحكّم، سواءٌ أكانت هناك جلسة مفتوحة أم لا.
   *
@@ -400,7 +499,7 @@ export const JudgeOS: React.FC = () => {
  storedCue()};
 
  useEffect(()=>{if(questionRevealed&&q&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),80)},[questionRevealed,(q as any)?.questionId,(q as any)?.id,openingReference?.id,activeSession.currentQuestionIndex]);
- useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastJudgeEvent();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
+ useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
  if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20"><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[#646965] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[#656b66] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[#696f6b] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
@@ -463,11 +562,38 @@ export const JudgeOS: React.FC = () => {
   * وترتيب البوابات كما كان: الميكروفون حين تُلزم به السياسة، ثم الحضور والموافقة، ثم
   * الموضع. لم يُمَسّ منها شيء؛ المتغيّر هو أين تُرسم لا متى تُفتح.
   */
- return <div className="mizan-judge-os bg-[#fbfaf6]">
+ return <div ref={attachOs} className="mizan-judge-os" data-peek={peek?'true':'false'}
+   style={osTop!=null?({'--mizan-judge-top':`${osTop}px`} as React.CSSProperties):undefined}>
 
-  {/* المصحف — الضوء كلّه عليه، وهو أوّل ما يُقرأ في اتجاه القراءة. */}
+  {/*
+    * شريط البيانات — يُقرأ مرةً ثم ينسحب.
+    *
+    * كان رأس اللوحة يحمل الاسم والحالة والمؤقّت وموضع السؤال طوال الجلسة، وكلّها ممّا
+    * يُقرأ عند الاستقبال لا أثناء التلاوة. فانتقلت إلى هنا: تظهر وحدها مع كل متسابق وكل
+    * موضع، ثم تنسحب فتبقى الشاشة ورقةً ولوحةً فقط. والاسم يخرج من قناع حجب الهوية نفسه،
+    * فما تحجبه سياسةُ التحكيم الأعمى يبقى محجوبًا هنا كما هو في كل مكان.
+    */}
+  <header className="mizan-judge-strip"
+    onClick={e=>{if((e.target as HTMLElement).closest('button'))return;
+      peekPinRef.current=!peekPinRef.current;if(!peekPinRef.current)showStrip(1400)}}>
+   <span className="js-who truncate">{displayName||'—'}</span>
+   {activeSession.committee?.code&&<><span className="js-div"/><span className="js-fact">{ar?'اللجنة':'Panel'} <b dir="ltr">{activeSession.committee.code}</b></span></>}
+   {participantCategory&&<><span className="js-div"/><span className="js-fact">{bilingualName(participantCategory,ar)}</span></>}
+   {questionRevealed&&q&&<><span className="js-div"/><span className="js-fact"><b>{q.surahNameArabic} {q.startAyah}–{q.endAyah}</b> · {requestedPassageLabel}</span></>}
+   <span className="js-div"/>
+   <span className="js-fact">{ar?'الموضع':'Q'} <Ratio value={activeSession.currentQuestionIndex+1} of={Math.max(1,totalQuestions)}/>
+    <span className="js-dots ms-2">{Array.from({length:Math.min(12,Math.max(1,totalQuestions))}).map((_,i)=><i key={i} data-on={i<=activeSession.currentQuestionIndex?'true':undefined}/>)}</span>
+   </span>
+   {!!visibleCriteria.length&&<><span className="js-div"/>
+    {visibleCriteria.slice(0,4).map(c=><span key={c.id} className={`js-rub jt-${criterionTone(c.id,ruleSet)}`}><i/>{bilingualName(c,ar)} · {c.maxScore}</span>)}</>}
+  </header>
+  <button type="button" className="mizan-judge-handle" aria-expanded={peek}
+    aria-label={ar?'إظهار بيانات الجلسة':'Show session details'}
+    onClick={()=>{peekPinRef.current=!peekPinRef.current;peekPinRef.current?showStrip(0):showStrip(1200)}}/>
+
+  {/* الورقة — الضوء كلّه عليها، وهي أوّل ما يُقرأ في اتجاه القراءة. */}
   <div className="mizan-judge-page">
-   <div className="mizan-surface h-full p-3 sm:p-5 flex flex-col">
+   <div className="mizan-judge-paper">
 
     {/*
      * استثناء عبر الفئات — يقف فوق كل شيء ولا يُطوى.
@@ -524,7 +650,7 @@ export const JudgeOS: React.FC = () => {
 
     {/* ── الموضع ─────────────────────────────────────────────────────────── */}
     {micRecording&&questionRevealed&&q&&!activeSession.isLocked&&!(activeSession.questionPhase==='TRANSITION'&&isLastQuestion)&&<>
-     <div className="min-h-0 flex-1 overflow-auto"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/></div>
+     <div className="min-h-0 flex-1 flex flex-col"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/></div>
      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 shrink-0">
       {openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio()} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}
       {alignmentConfigured&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
@@ -554,94 +680,91 @@ export const JudgeOS: React.FC = () => {
    </div>
   </div>
 
-  {/* ── اللوحة: رأسٌ يحمل ما كان في الشريط، ثم الأدوات ──────────────────── */}
-  <div className="mizan-judge-deck">
+  {/* ── اللوحة: حصيلةٌ ومؤقّت، ثم المفاتيح، ثم ذيلٌ مثبّت لا يُمرَّر ────── */}
+  <aside className="mizan-judge-deck" aria-label={ar?'لوحة المحكّم':'Judge panel'}>
 
-   {/*
-    * رأس اللوحة — بديل الشريط العلوي.
-    *
-    * ما كان شريطًا عرضيًّا فوق المصحف صار سطرين هنا: من أمامي وحالته، وكم مضى، وأين نحن
-    * من المواضع. ولم يسقط منه شيء — بل صار المصحف يملك عرض الشاشة كلَّه وارتفاعها.
-    */}
-   <div className="mizan-judge-brief shrink-0">
-    <div className="min-w-0">
-     <div className="truncate text-[15px] font-black leading-tight text-[#20241f]">{displayName||'—'}</div>
-     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-      <Badge variant={activeSession.isLocked?'neutral':questionRevealed?'emerald':'amber'}>{activeSession.isLocked?(ar?'مقفل':'Locked'):questionRevealed?(ar?'التلاوة جارية':'Reciting'):(ar?'مختوم':'Sealed')}</Badge>
-      <span className="text-[10px] font-bold text-[#6b716c]">{ar?'الموضع':'Q'} <Ratio value={activeSession.currentQuestionIndex+1} of={totalQuestions}/></span>
-      {activeSession.committee?.code&&<span className="text-[10px] font-black text-[#6b716c]" dir="ltr">{activeSession.committee.code}</span>}
-     </div>
+   <div className="mizan-judge-hud">
+    <div className="m" data-loss="true" data-zero={deductions===0?'true':undefined}>
+     <b dir="ltr">{showRunningScore?`−${deductions.toFixed(2)}`:String(activeSession.events.filter(e=>!e.reversed).length)}</b>
+     <span>{showRunningScore?(ar?'الخصم':'Deducted'):(ar?'الملاحظات':'Marks')}</span>
     </div>
-    <div className="shrink-0 text-end">
-     <div className="text-2xl font-black leading-none tabular-nums tracking-tight" dir="ltr">{formatTime(elapsed)}</div>
-     <div className="mt-1 text-[10px] font-bold text-[#6b716c]">{ar?'زمن الجلسة':'Session'}</div>
+    <div className="m">
+     <b dir="ltr">{formatTime(elapsed)}</b>
+     <span>{activeSession.isLocked?(ar?'زمن الجلسة · متوقف':'Session · stopped'):(ar?'زمن الجلسة':'Session')}</span>
     </div>
    </div>
 
-   {/* الموضع المعروض نصًّا: يُقرأ من رأس اللوحة بلا أن يُرفع البصر عن المصحف. */}
-   {questionRevealed&&q&&<div className="shrink-0 rounded-2xl border border-[#e5e3dc] bg-[#f6f5f0] px-3.5 py-2.5">
-    <div className="truncate text-[13px] font-black text-[#2c322e]">{q.surahNameArabic} · {q.startAyah}–{q.endAyah}</div>
-    <div className="mt-0.5 text-[10px] font-bold text-[#6b716c]">{requestedPassageLabel}</div>
-   </div>}
-
-   {/* الأدوات — لا تظهر إلا والموضع مفتوح، فلا يضغط أحدٌ على ما لا أثر له. */}
-   {questionRevealed&&!activeSession.isLocked&&micRecording&&activeSession.questionPhase!=='TRANSITION'&&<>
-    {policy.judging.scoreEntryMode!=='direct_score'&&<>
-     <div className="mizan-judge-grid" data-cols={judgeActions.length<=4?'4':'3'} role="group" aria-label={ar?'أدوات تسجيل الملاحظات':'Scoring actions'}>{judgeActions.map(a=>{
-      const Icon=iconFor(a.icon);
-      const tally=countFor(a.eventType);
-      const label=ar?a.shortArabic:a.shortEnglish;
-      const criterion=ruleSet.criteria.find(c=>c.id===a.criterion);const criterionName=criterion?(ar?criterion.nameArabic:criterion.name):(ar?(CRITERION_AR[a.criterion]||a.criterion):a.criterion);
-      return <button
-        key={a.id}
-        onClick={()=>recordJudgeEventWithEvidence(a.eventType,a)}
-        data-flash={markedAction===a.id||undefined}
-        className={`mizan-judge-action ja-${a.criterion}`}
-        data-weight={a.penalty>=1?'high':a.penalty>=0.5?'mid':'low'}
-        aria-label={ar
-          ?`${label} — ${criterionName} — خصم ${a.penalty}${tally?` — سُجِّل ${marksAr(tally)}`:''}`
-          :`${label} — ${a.criterion} — penalty ${a.penalty}${tally?` — logged ${tally} time${tally===1?'':'s'}`:''}`}
-      >
-        <span className="mizan-judge-icon"><Icon className="w-7 h-7"/></span>
-        <span className="min-w-0">
-          <span className="mizan-judge-label block truncate">{label}</span>
-          <span className="mizan-judge-cost block">−{a.penalty}</span>
-        </span>
-        <span className="mizan-judge-head">
-          {tally>0&&<span className="mizan-judge-count">{tally}</span>}
+   {questionRevealed&&!activeSession.isLocked&&micRecording&&activeSession.questionPhase!=='TRANSITION'
+    ?<>
+     <div className="mizan-judge-mid">
+      {policy.judging.scoreEntryMode!=='direct_score'&&
+       <div className="mizan-judge-pad" role="group" aria-label={ar?'أدوات تسجيل الملاحظات':'Scoring actions'}>{judgeActions.map(a=>{
+        const tally=countFor(a.eventType);
+        const label=ar?a.shortArabic:a.shortEnglish;
+        const tone=criterionTone(a.criterion,ruleSet);
+        const criterion=ruleSet.criteria.find(c=>c.id===a.criterion);
+        const criterionName=criterion?(ar?criterion.nameArabic:criterion.name):(ar?(CRITERION_AR[tone]||tone):tone);
+        return <button
+          key={a.id}
+          type="button"
+          onClick={()=>recordJudgeEventWithEvidence(a.eventType,a)}
+          data-flash={markedAction===a.id||undefined}
+          data-weight={a.penalty>=1?'high':a.penalty>=0.5?'mid':'low'}
+          data-n={String(tally)}
+          className={`mizan-judge-action jt-${tone}`}
+          aria-label={ar
+            ?`${label} — ${criterionName} — خصم ${a.penalty}${tally?` — سُجِّل ${marksAr(tally)}`:''}`
+            :`${label} — ${a.criterion} — penalty ${a.penalty}${tally?` — logged ${tally} time${tally===1?'':'s'}`:''}`}
+        >
           {a.shortcut&&<kbd className="mizan-judge-key">{a.shortcut}</kbd>}
-        </span>
-      </button>})}
+          <span className="mizan-judge-label block truncate">{label}</span>
+          <span className="mizan-judge-cost" dir="ltr">−{a.penalty}</span>
+          {/* العدّاد رقمٌ يُقرأ من بُعد ذراع، ويغيب عند الصفر فتبقى الصحيفة النظيفة نظيفة */}
+          <span className="mizan-judge-count" aria-hidden="true">{tally}</span>
+        </button>})}
+       </div>}
+
+      {directMode&&<div className="mizan-judge-direct">
+       <div className="text-[10px] font-black" style={{color:'var(--venue-faint)'}}>{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
+       {visibleCriteria.map(c=><label key={c.id} className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{border:'1px solid var(--venue-line)',background:'rgba(255,255,255,.022)'}}>
+        <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[10px] font-semibold" style={{color:'var(--venue-faint)'}}>{ar?'من':'of'} {c.maxScore}</span></span>
+        <input aria-label={bilingualName(c,ar)} type="number" min="0" max={c.maxScore} step={policy.judging.directScoreStep||.25} value={directScores[c.id]??c.maxScore} onChange={e=>setDirectScores(v=>({...v,[c.id]:Math.min(c.maxScore,Math.max(0,Number(e.target.value)))}))} className="w-20 min-h-11 shrink-0 rounded-xl px-2 text-center text-lg font-black" style={{border:'1px solid var(--venue-line)',background:'rgba(0,0,0,.25)',color:'var(--venue-ink)'}}/>
+       </label>)}
+       <div className="text-[10px] leading-5" style={{color:'var(--venue-faint)'}}>{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
+      </div>}
+
+      <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>
      </div>
-     <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>
+
+     {/* الذيل: آخرُ ما تقع عليه العين، وهو آخرُ ما يُفعل. ولا يغيب مهما ضاقت الشاشة. */}
+     <div className="mizan-judge-bottom" data-solo={allowUndo?undefined:'true'}>
+      <button type="button" className="mizan-judge-finish" data-armed={finishArmed?'true':undefined}
+        onClick={()=>{
+          if(!finishArmed){setFinishArmed(true);window.clearTimeout(armTimerRef.current);
+            armTimerRef.current=window.setTimeout(()=>setFinishArmed(false),2500);return}
+          window.clearTimeout(armTimerRef.current);setFinishArmed(false);speakTransition();
+        }}>
+       <Square className="w-4 h-4"/>{finishArmed?(ar?'تأكيد الإنهاء':'Confirm end'):isLastQuestion?(ar?'إنهاء آخر موضع':'End final passage'):(ar?'إنهاء الموضع':'End passage')}
+      </button>
+      {allowUndo&&<button type="button" className={`mizan-judge-undo jt-${lastTone}`}
+        data-live={lastEvent?'true':undefined} data-spin={undoSpin?'true':undefined}
+        disabled={!lastEvent} onClick={undoLastMark}
+        title={lastEvent?`${ar?'تراجع عن ':'Undo '}${lastLabel}`:undefined}
+        aria-label={lastEvent?`${ar?'تراجع عن ':'Undo '}${lastLabel}`:(ar?'تراجع عن آخر ملاحظة':'Undo last mark')}>
+       <RotateCcw/>
+      </button>}
+     </div>
+    </>
+    :<>
+     <div className="mizan-judge-mid"/>
+     {/* ما دام الموضع مغلقًا، تُقال حالةُ المنتظرين بدل لوحةٍ فارغة. */}
+     <div className="mizan-judge-note">
+      {micGateApplies&&!micRecording
+       ?(ar?'الأدوات تظهر بعد تشغيل التسجيل وفتح الموضع.':'The scoring tools appear once recording runs and the passage opens.')
+       :(ar?`الأدوات تظهر بعد فتح الموضع. ${committeeQueue.length} في طابور لجنتك.`:`Scoring tools appear once the passage opens. ${committeeQueue.length} waiting in your panel queue.`)}
+     </div>
     </>}
-
-    {directMode&&<div className="space-y-2">
-     <div className="text-[10px] font-black text-[#6b716c]">{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
-     {visibleCriteria.map(c=><label key={c.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#deddd6] bg-[#fffefb] px-3 py-2.5">
-      <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[10px] font-semibold text-[#6b716c]">{ar?'من':'of'} {c.maxScore}</span></span>
-      <input aria-label={bilingualName(c,ar)} type="number" min="0" max={c.maxScore} step={policy.judging.directScoreStep||.25} value={directScores[c.id]??c.maxScore} onChange={e=>setDirectScores(v=>({...v,[c.id]:Math.min(c.maxScore,Math.max(0,Number(e.target.value)))}))} className="w-20 min-h-11 shrink-0 rounded-xl border border-[#d9d7d0] bg-white px-2 text-center text-lg font-black"/>
-     </label>)}
-     <div className="text-[10px] leading-5 text-[#6b716c]">{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
-    </div>}
-
-    {/* الحصيلة ثم الإنهاء: آخرُ ما تقع عليه العين، وهو آخرُ ما يُفعل. */}
-    <div className="mt-auto shrink-0 space-y-2 pt-1">
-     <div className="flex items-center gap-2">
-      {allowUndo&&<Button shape="square" variant="outline" onClick={undoLastJudgeEvent} disabled={!activeSession.events.length} aria-label={ar?'تراجع عن آخر ملاحظة':'Undo last mark'}><RotateCcw className="w-4 h-4"/></Button>}
-      <span className="text-[11px] font-bold text-[#6b716c]">{ar?notesAr(activeSession.events.length):`${activeSession.events.length} events`}{showRunningScore?` · −${deductions.toFixed(2)}`:''}</span>
-     </div>
-     <Button className="w-full" onClick={speakTransition} icon={<Square className="w-4 h-4"/>}>{isLastQuestion?(ar?'إنهاء آخر موضع':'End final passage'):(ar?'إنهاء الموضع':'End passage')}</Button>
-    </div>
-   </>}
-
-   {/* ما دام الموضع مغلقًا، تُقال حالةُ المنتظرين بدل لوحةٍ فارغة. */}
-   {(!questionRevealed||activeSession.isLocked||!micRecording)&&<div className="mt-auto shrink-0 rounded-2xl border border-[#e5e3dc] bg-[#f6f5f0] px-3.5 py-3 text-[10px] font-bold leading-5 text-[#6b716c]">
-    {micGateApplies&&!micRecording
-     ?(ar?'الأدوات تظهر بعد تشغيل التسجيل وفتح الموضع.':'The scoring tools appear once recording runs and the passage opens.')
-     :(ar?`الأدوات تظهر بعد فتح الموضع. ${committeeQueue.length} في طابور لجنتك.`:`Scoring tools appear once the passage opens. ${committeeQueue.length} waiting in your panel queue.`)}
-   </div>}
-  </div>
+  </aside>
  </div>
 }
 

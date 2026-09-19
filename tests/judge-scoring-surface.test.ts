@@ -19,9 +19,19 @@ const judge = fs.readFileSync(path.join(root, 'src/components/judge/JudgeOS.tsx'
 const css = fs.readFileSync(path.join(root, 'src/index.css'), 'utf8');
 
 test('hue encodes the criterion being marked', () => {
-  assert.match(judge, /ja-\$\{a\.criterion\}/, 'each action carries its criterion tone');
+  /*
+   * والنبرة تُقرأ من معرّف المعيار بعد ردّه إلى أصله.
+   *
+   * كان الصنف يُبنى من `a.criterion` خامًا — و`getEnabledJudgeActions` تُبدّل اسم المعيار
+   * بمعرّفه في اللائحة، فيصير الصنف `ja-crit-memorization` والطبقة تعرّف `.ja-memorization`.
+   * فلم يظهر لونٌ ولا عدّاد قط منذ أول يوم. هذا ما يحرسه هذا الاختبار الآن.
+   */
+  assert.match(judge, /jt-\$\{tone\}/, 'each action carries its criterion tone');
+  assert.match(judge, /const criterionTone=/, 'the tone is resolved, not taken raw');
+  assert.match(judge, /replace\(\/\^crit\[-_\]\/,''\)/, 'a criterion id keeps its tone after the prefix is stripped');
+  assert.match(judge, /assignedJudgeType/, 'and the judge type the rule set assigns comes first');
   for (const criterion of ['memorization', 'tajweed', 'waqf_ibtida', 'performance', 'custom']) {
-    assert.match(css, new RegExp(`\\.ja-${criterion}\\s*\\{`), `missing tone for ${criterion}`);
+    assert.match(css, new RegExp(`\\.jt-${criterion}\\s*\\{`), `missing tone for ${criterion}`);
   }
 });
 
@@ -36,9 +46,14 @@ test('weight encodes what the mark costs', () => {
 
 test('a mark is confirmed visibly and audibly', () => {
   assert.match(judge, /data-flash=/, 'pressed action pulses');
-  assert.match(css, /@keyframes mzJudgeMark/);
+  /* شريطٌ ينحسر من حافة البداية: يُرى بطرف العين والبصر على المصحف، ثم يزول. */
+  assert.match(css, /@keyframes mzDrain/);
+  assert.match(css, /\.mizan-judge-action\[data-flash="true"\]::after/);
   assert.match(judge, /aria-live="polite"/, 'the mark is announced, not only drawn');
   assert.match(judge, /setMarkedAction/);
+  /* والعدّاد أثرٌ باقٍ لا وميضٌ عابر: كم مرة سُجِّلت هذه الملاحظة على هذا الموضع. */
+  assert.match(judge, /mizan-judge-count/, 'the tally stays on the key after the pulse fades');
+  assert.match(css, /\.mizan-judge-action\[data-n\]:not\(\[data-n="0"\]\) \.mizan-judge-count/, 'and it disappears at zero');
 });
 
 test('the tally is read before the store mutates', () => {
@@ -73,5 +88,7 @@ test('the affordance works without a pointer that hovers', () => {
   assert.match(css, /\.mizan-judge-action:active\s*\{/, 'pressed state is the tablet affordance');
   assert.match(css, /@media \(hover:hover\)\s*\{\s*\.mizan-judge-action:hover/, 'hover styling is gated to hover-capable input');
   assert.match(css, /\.mizan-judge-action:focus-visible\s*\{/);
-  assert.match(css, /grid-auto-rows:1fr/, 'severity tiers must not make rows uneven');
+  /* الصفوف تقتسم ما بقي بالتساوي — و`minmax(0,1fr)` يسمح لها بالنزول تحت مقاس محتواها،
+     وهو شرط ألّا تفيض اللوحة على شاشةٍ قصيرة. */
+  assert.match(css, /grid-auto-rows:minmax\(0,1fr\)/, 'severity tiers must not make rows uneven');
 });
