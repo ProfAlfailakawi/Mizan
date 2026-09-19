@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  BUDGET_METRICS, judgeReleaseBudget,
-  type BudgetMetric, type FairnessBaseline,
+  BUDGET_METRICS, FAIRNESS_BUDGET_VERSION, frontierTrend, judgeReleaseBudget,
+  type BudgetMetric, type FairnessBaseline, type FrontierHistory,
 } from '../src/lib/fairness-release-budget';
 
 /*
@@ -196,4 +196,39 @@ test('الأداةُ تقيس بدقّةٍ دون المِلّيثانية، و�
   assert.doesNotMatch(body, /durations\.push\(Date\.now\(\)/,
     'الساعةُ الصحيحة تُقرّب كلّ عيّنةٍ إلى ثلث قيمتها، فيتذبذب المئينُ بين ٣ و٤ بلا سببٍ في الشيفرة');
   assert.match(body, /durations\.push\(performance\.now\(\) - began\)/);
+});
+
+test('سلسلةُ الذاكرة لا تنقطع يوم انتقل الرقمُ من الحكم إلى الملاحظة', () => {
+  /*
+   * `heapUsedMb` كان يُكتب في `metrics` حين كان محكومًا، وصار يُكتب في `observations`
+   * حين تبيّن أنه لا يصلح للحكم. ولو قرأ قارئُ التاريخ موضعًا واحدًا لانقطعت السلسلة
+   * عند يوم التغيير — فيُسأل «كيف تطوّرت عبر السنة؟» فيُجاب بنصف تاريخ.
+   */
+  const history: FrontierHistory = {
+    historyVersion: FAIRNESS_BUDGET_VERSION,
+    entries: [
+      { recordedAt: '2026-09-12T01:27:39.231Z', engineVersion: 'MIZAN-QUESTION-ENGINE-1',
+        scenario: 'juz30-400x3-balanced', metrics: { heapUsedMb: 17.6 } as never },
+      { recordedAt: '2026-09-19T19:09:44.854Z', engineVersion: 'MIZAN-QUESTION-ENGINE-1',
+        scenario: 'juz30-400x3-balanced', metrics: {}, observations: { heapUsedMb: 11.6 } },
+    ],
+  };
+
+  const trend = frontierTrend(history, 'juz30-400x3-balanced', 'heapUsedMb');
+  assert.equal(trend.length, 2, 'النقطتان معًا: القديمةُ من `metrics` والجديدةُ من `observations`');
+  assert.deepEqual(trend.map(point => point.value), [17.6, 11.6]);
+});
+
+test('السيناريو الآخر لا يتسلّل إلى السلسلة، ولا الفراغُ يُقرأ صفرًا', () => {
+  const history: FrontierHistory = {
+    historyVersion: FAIRNESS_BUDGET_VERSION,
+    entries: [
+      { recordedAt: '2026-09-19T19:00:00.000Z', engineVersion: 'e', scenario: 'سيناريو آخر',
+        metrics: {}, observations: { heapUsedMb: 99 } },
+      { recordedAt: '2026-09-19T19:10:00.000Z', engineVersion: 'e', scenario: 'juz30-400x3-balanced',
+        metrics: {} },
+    ],
+  };
+  assert.deepEqual(frontierTrend(history, 'juz30-400x3-balanced', 'heapUsedMb'), [],
+    'قياسٌ غائبٌ يُحذف من السلسلة ولا يُلفَّق له رقم');
 });

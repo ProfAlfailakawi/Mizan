@@ -378,9 +378,23 @@ export function appendFrontierHistory(history: FrontierHistory | null, entry: Fr
   return { historyVersion: FAIRNESS_BUDGET_VERSION, entries };
 }
 
-/** تطوّر مقياسٍ واحد عبر التاريخ المسجَّل — للعرض في لوحة العدالة. */
-export function frontierTrend(history: FrontierHistory, scenario: string, metric: BudgetMetric) {
+/** ما يُرصد ولا يُحكم به. يُقرأ في التاريخ كما يُقرأ المقياسُ المحكوم، ولا فرق في السؤال. */
+export type ObservedMetric = 'heapUsedMb';
+
+/**
+ * تطوّر مقياسٍ واحد عبر التاريخ المسجَّل — للعرض في لوحة العدالة.
+ *
+ * ويقرأ الموضعين معًا عمدًا. فـ`heapUsedMb` كان مقياسًا محكومًا يُكتب في `metrics`، ثم
+ * صار ملاحظةً تُكتب في `observations` لمّا تبيّن أنه لا يصلح للحكم. ولو قُرئ الموضعُ
+ * الجديد وحده لانقطعت السلسلة عند يوم التغيير، ولو قُرئ القديمُ وحده لتوقّفت عنده —
+ * وفي الحالين يُسأل «كيف تطوّرت عدالة ميزان عبر السنة؟» فيُجاب بنصف تاريخ.
+ *
+ * وتغييرُ مكانِ الرقم ليس فقدانًا له. فالسلسلةُ واحدةٌ متّصلة عبر تغيّر الصيغة.
+ */
+export function frontierTrend(history: FrontierHistory, scenario: string, metric: BudgetMetric | ObservedMetric) {
+  const valueOf = (entry: FrontierHistoryEntry) =>
+    entry.metrics[metric as BudgetMetric] ?? entry.observations?.[metric];
   return history.entries
-    .filter(entry => entry.scenario === scenario && entry.metrics[metric] !== undefined)
-    .map(entry => ({ recordedAt: entry.recordedAt, engineVersion: entry.engineVersion, value: entry.metrics[metric] as number }));
+    .filter(entry => entry.scenario === scenario && valueOf(entry) !== undefined)
+    .map(entry => ({ recordedAt: entry.recordedAt, engineVersion: entry.engineVersion, value: valueOf(entry) as number }));
 }
