@@ -874,8 +874,15 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-pad{ flex:2 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
   display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); gap:.4rem }
 .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:1 / -1 }
+/*
+ * `min-height` مرّةً واحدة.
+ *
+ * كانت الكتلةُ تعلن `min-height:0` ثم `min-height:44px` بعدها بأربعة أسطر — والثانيةُ
+ * هي العاملة، والأولى ميّتة. وقد أوهمتني الأولى بأن الأرضية سقطت فأبلغتُ بعطبٍ لا وجود
+ * له. وما يُقرأ خطأً مرّةً يُقرأ خطأً مرّاتٍ، فتُحذف الميّتة ويبقى ما يعمل ظاهرًا وحده.
+ */
 .mizan-judge-action{
-  position:relative; overflow:hidden; min-height:0;
+  position:relative; overflow:hidden;
   border:1px solid var(--venue-line); border-radius:14px;
   background:rgba(255,255,255,.022); color:var(--venue-ink);
   min-height:44px; padding:.6rem .7rem; text-align:start; touch-action:manipulation;
