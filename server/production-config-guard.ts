@@ -53,6 +53,16 @@ export interface ConfigGuardResult {
 const PLACEHOLDER_SECRETS = new Set([
   'changeme', 'change-me', 'secret', 'password', 'placeholder', 'test', 'dev',
   'development', 'example', 'todo', 'xxx', 'dummy', 'sample', 'replace-me', 'none',
+  /*
+   * علامةُ بوّابة الإصدار. لا تُنسخ أسرارُ التوقيع إلى GitHub، فتضع البوّابةُ هذه
+   * السلسلةَ في المتغيّر لتقول «الربطُ قائم» دون قراءة قيمة. وهي في البوّابة وحدها
+   * ولا تبلغ الإنتاج — لكنّها **قيمةٌ نائبةٌ طولُها 29 حرفًا**، فلا يمسكها شرطُ
+   * القِصَر، ولو تسرّبت يومًا إلى بيئةِ تشغيلٍ لمرّت مرورَ سرٍّ سليم.
+   *
+   * وسجلُّ الأخطاء يقول: «القيمةُ النائبة أسوأ من الغياب لأنها توهم بالحماية».
+   * فتُسمّى هنا لتفشل فشلَ النائبات: `WEAK_SIGNING_SECRET` مانعٌ لا تنبيه.
+   */
+  'configured-via-secret-manager',
 ]);
 
 const SIGNING_SECRET_VARS = [

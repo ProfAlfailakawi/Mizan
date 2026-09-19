@@ -58,7 +58,29 @@ test('a missing secret skips the gate — it never fails the run', () => {
   assert.ok(guards >= 3, 'each secret-reading step guards on what is missing');
   // لكلّ حارسٍ مخرجٌ نظيف، ولا مخرجَ نظيفٌ بلا حارس — فالعدّان متساويان لا رقمًا سحريًّا.
   assert.equal((workflow.match(/exit 0/g) || []).length, guards, 'every guard must skip cleanly when unset');
-  assert.equal(/exit 1/.test(workflow), false, 'a missing secret must never be turned into a failure');
+  /*
+   * وكان الشرطُ هنا «لا `exit 1` في الملفّ أصلًا». وهو وكيلٌ عن المقصود لا المقصودُ
+   * نفسه، وقد منع في 19 سبتمبر 2026 فحصًا مشروعًا: أن يفشل السيرُ إن كان عقدُ النشر
+   * **الملتزَم** يربط سرَّ توقيعٍ بمرجعٍ غير متوقَّع. وذلك ليس سرًّا غائبًا — إنه ملفٌّ
+   * في المستودع يقرؤه المساهمُ الخارجيُّ كما يقرؤه المالك، وخطؤه خطأٌ للجميع.
+   *
+   * فيُقاس المقصودُ نفسُه: كلُّ كتلةِ «ما الذي ينقص» تخرج نظيفةً، ولا فشلَ داخلها.
+   */
+  for (const block of workflow.split(/if \(\( \$\{#missing\[@\]\} \)\); then/).slice(1)) {
+    const body = block.split(/\n\s*fi\b/)[0];
+    assert.ok(/exit 0/.test(body), 'a missing-secret guard must skip cleanly');
+    assert.equal(/exit 1/.test(body), false,
+      'a missing secret must never be turned into a failure');
+  }
+
+  /*
+   * وما بقي من `exit 1` لا يمرّ بلا بيان: لكلٍّ عنوانُ خطأٍ يُسمّي ما انكسر، كي لا
+   * يقف المساهمُ أمام أحمرَ بلا سبب — وهو ما يُعلّم الفريقَ تجاهلَ الأحمر.
+   */
+  const failures = (workflow.match(/exit 1/g) || []).length;
+  const annotated = (workflow.match(/::error title=/g) || []).length;
+  assert.ok(annotated >= failures,
+    `every failing exit must name its cause: ${failures} exits, ${annotated} annotations`);
 });
 
 test('when the secrets are present the gate really runs, and its failure is the run failure', () => {

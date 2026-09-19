@@ -90,6 +90,24 @@ test('weak-secret detection covers placeholders, short values and repeats', () =
   assert.equal(isWeakSecret(''), false, 'absence handled separately, not as weakness');
 });
 
+/*
+ * بوّابةُ الإصدار لا تنسخ أسرارَ التوقيع إلى GitHub — تضع بدلها علامةً غير سرّيّة
+ * تقول «الربطُ قائمٌ في عقد النشر» دون قراءة قيمة. وطولُ تلك العلامة 29 حرفًا،
+ * فلا يمسكها شرطُ القِصَر، ولو بلغت يومًا بيئةَ تشغيلٍ لمرّت مرورَ سرٍّ سليم.
+ *
+ * وسجلُّ الأخطاء يقول: «القيمةُ النائبة أسوأ من الغياب لأنها توهم بالحماية». فهذا
+ * الحارسُ يشدّ العلامةَ إلى ذلك الحكم: نائبةٌ تُعرف نائبةً، ومانعٌ لا تنبيه.
+ */
+test('the release-gate marker is a placeholder, and blocks like one', () => {
+  const MARKER = 'configured-via-secret-manager';
+  assert.equal(isWeakSecret(MARKER), true, 'the gate marker must never read as a real secret');
+  assert.equal(isWeakSecret(MARKER.toUpperCase()), true, 'and case must not evade it');
+
+  const result = inspectProductionConfig({...prodBase, MIZAN_PASS_SIGNING_SECRET: MARKER});
+  assert.ok(result.blockers.some(f => f.code === 'WEAK_SIGNING_SECRET' && f.variable === 'MIZAN_PASS_SIGNING_SECRET'),
+    'a marker reaching a runtime environment must block startup, not warn');
+});
+
 test('assertProductionConfig fails fast in production and never in development', () => {
   assert.throws(() => assertProductionConfig({ ...prodBase, MIZAN_ENABLE_DEMO_SEED: '1' }),
     (e: unknown) => e instanceof ProductionConfigError && e.code === 'PRODUCTION_CONFIG_INVALID');

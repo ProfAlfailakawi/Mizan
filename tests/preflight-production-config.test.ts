@@ -154,7 +154,55 @@ test('the runtime reader cannot print a secret, by construction', () => {
    * الحارسُ شرحَ الغياب حضورًا. والشيفرةُ وحدها هي ما يُقاس.
    */
   const code = reader.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  assert.equal(/update-secrets/.test(code), false, 'it must never read the secrets line');
   // ولا تعبيرَ نمطيًّا يُبنى من وسيطٍ خارجيّ — الدرسُ الذي رصدته CodeQL مرّةً يبقى مطبَّقًا.
   assert.equal(/new RegExp/.test(code), false, 'no regular expression is built from input');
+});
+
+/*
+ * كان الحارسُ أعلاه يمنع ذكرَ `--update-secrets` في الشيفرة أصلًا: ما لا يُقرأ لا
+ * يُطبع. وقد صار `--secret` يقرأ ذلك السطر ليُخرج **مرجعَ** Secret Manager للبوّابة.
+ *
+ * والمنعُ المطلق كان وكيلًا عن الحقيقة لا الحقيقةَ نفسها. والحقيقةُ أن ذلك السطر
+ * **لا يحمل قيمةَ سرٍّ أصلًا** — يحمل `ENV=SECRET_NAME:version` — فقراءتُه لا تبلغ
+ * سرًّا. فيُحرَس ما يجعل ذلك صحيحًا، لا ذكرُ الكلمة:
+ *
+ *   ١) ما يُخرجه الوضعُ لا يكون إلا مرجعًا بالشكل `NAME:version`.
+ *   ٢) وسطرُ `--update-secrets` في عقد النشر لا يحمل إلا مراجع.
+ *
+ * فإن أُدخلت يومًا قيمةٌ حرفيّةٌ هناك سقط (٢) قبل أن يطبعها أحد. وهذا أقوى من المنع
+ * الأول: ذاك كان يحمي بألّا نقرأ، وهذا يحمي بأن لا يكون هناك ما يُقرأ.
+ */
+test('the secret mode can only ever emit a Secret Manager reference, never a value', () => {
+  const REFERENCE = /^[A-Z][A-Z0-9_]*:[A-Za-z0-9._-]+$/;
+
+  for (const name of ['MIZAN_PASS_SIGNING_SECRET', 'MIZAN_CERT_SIGNING_SECRET']) {
+    const out = spawnSync(process.execPath, [READER, '--secret', name], {encoding: 'utf8'});
+    assert.equal(out.status, 0, `${name} is bound in the deployment, so the reader must resolve it`);
+    assert.match(out.stdout.trim(), REFERENCE,
+      `${name} must resolve to a bare reference — anything else would mean a value reached stdout`);
+  }
+
+  // واسمٌ غيرُ مربوطٍ يُقال بالاسم، ولا يُخترع له مرجع.
+  const absent = spawnSync(process.execPath, [READER, '--secret', 'MIZAN_NOT_BOUND_ANYWHERE'], {encoding: 'utf8'});
+  assert.notEqual(absent.status, 0, 'an unbound name must not resolve');
+  assert.match(absent.stderr, /CLOUDBUILD_SECRET_NOT_FOUND/, 'and must say so by name');
+  assert.equal(absent.stdout, '', 'nothing may reach stdout when the binding is absent');
+});
+
+test('the deployment secrets line carries references only — so reading it can reach no value', () => {
+  const cloudbuild = fs.readFileSync(path.join(process.cwd(), 'cloudbuild.yaml'), 'utf8');
+  const lines = cloudbuild.split('\n');
+  const flag = lines.findIndex(l => l.trim() === "- '--update-secrets'");
+  assert.ok(flag >= 0, 'the deployment must declare its secret bindings');
+
+  const payload = (lines[flag + 1] || '').trim().replace(/^-\s*/, '').replace(/^'(.*)'$/, '$1');
+  assert.ok(payload, 'the bindings payload must not be empty');
+
+  for (const entry of payload.split(',')) {
+    const [envName, reference, ...rest] = entry.split('=');
+    assert.equal(rest.length, 0, `${entry} must be a single ENV=REFERENCE pair`);
+    assert.match(envName, /^[A-Z][A-Z0-9_]*$/, `${envName} must be a plain environment name`);
+    assert.match(reference, /^[A-Z][A-Z0-9_]*:[A-Za-z0-9._-]+$/,
+      `${entry} must bind a Secret Manager reference — a literal value here would be readable`);
+  }
 });
