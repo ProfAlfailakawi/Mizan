@@ -21,6 +21,21 @@ const PROJECT = 'mizan-rest-test';
 /* المحاكي يقبل «owner» رمزًا للمالك، فتُتخطّى القواعد ويُفحص المُهايئ وحده. */
 const repo = () => new FirestoreRestRepository(PROJECT, '(default)', async () => 'owner');
 
+/*
+ * التسجيل العام يفشل مغلقًا إن لم تكن وثيقتا الموافقة منشورتين، وهو شرطٌ في الخادم لا في
+ * الفحص وحده. فيُمرَّر هنا إعدادٌ قانونيٌّ صريحٌ للاختبار بدل الاتكاء على بيئة المشغِّل —
+ * فبيئةُ العدّاء لا تحمل هذه المتغيّرات، والاتكاءُ عليها يجعل النتيجة تتبدّل بتبدّل الجهاز.
+ */
+const LEGAL_ENV: Record<string, string> = {
+  MIZAN_LEGAL_ENTITY_NAME: 'Mizan Test Entity',
+  MIZAN_LEGAL_TERMS_URL: 'https://example.invalid/terms',
+  MIZAN_LEGAL_TERMS_VERSION: '1.0',
+  MIZAN_LEGAL_TERMS_EFFECTIVE: '2026-09-01',
+  MIZAN_LEGAL_PRIVACY_URL: 'https://example.invalid/privacy',
+  MIZAN_LEGAL_PRIVACY_VERSION: '1.0',
+  MIZAN_LEGAL_PRIVACY_EFFECTIVE: '2026-09-01',
+};
+
 const openCompetition = (): Competition => ({
   ...structuredClone(SEED_COMPETITION), status: 'registration_open',
   registrationStartDate: '2026-01-01', registrationEndDate: '2027-12-31',
@@ -84,7 +99,7 @@ test('a whole public registration lands in Firestore as one atomic batch with ca
     getCompetition: async (id) => { const row = await store.get(`public_competitions/${id}`); const c = row?.competition; return c && typeof c === 'object' ? c as Competition : null; },
     create: (documents) => store.createAtomically(documents),
     getJourney: (hash) => store.get(`public_journeys/${hash}`),
-  }, () => new Date('2026-09-09T08:00:00Z'));
+  }, () => new Date('2026-09-09T08:00:00Z'), LEGAL_ENV);
 
   const input: PublicRegistrationInput = {
     fullNameArabic: 'مسجّل تجريبي', fullName: 'Probe Registrant', email: `probe-${Date.now()}@example.com`,
