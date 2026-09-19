@@ -44,6 +44,10 @@ jobs:
       - name: منع الثغرات العالية/الحرجة في اعتماديات وقت التشغيل الفعلية
         shell: bash
         run: |
+          # `shell: bash` يعني `bash -e` عند GitHub، و`set -uo pipefail` لا تُلغيها.
+          # فبدونِ `+e` يموت السكربتُ عند أوّل `npm audit` فاشل: لا محاولةَ ثانية ولا
+          # رسالةَ تشخيص — وهو ما وقع فعلًا في التشغيل على `039e846`.
+          set +e
           set -uo pipefail
           unreachable='audit endpoint returned an error'
           for attempt in 1 2 3; do
