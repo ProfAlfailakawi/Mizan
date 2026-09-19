@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { sealResult, type SealRequest } from '../server/result-sealing';
+import { sealResult, verifySeal, type SealRequest } from '../server/result-sealing';
 import {
   FileSealRegistryStore,
   MemorySealRegistryStore,
@@ -92,6 +92,30 @@ test('the same inputs produce a different digest each call — which is exactly 
   assert.notEqual(first.sealed.sealedAt, second.sealed.sealedAt, 'only the moment differs');
   // ...ومع ذلك تختلف بصمة الختم، لأن `sealedAt` جزءٌ منها. فالتمييز يجب أن يكون بالمدخلات.
   assert.notEqual(first.sealed.sealSha256, second.sealed.sealSha256);
+});
+
+/*
+ * وهذا الحدُّ يعزل `sealedAt` وحده.
+ *
+ * فقد نبّهت مراجعةُ Codex على #227 إلى أن الحدَّ السابق لا يُثبت ما يدّعيه: `sealResult`
+ * ينادي `attestResult` في طريقه، و`attestedAt` فيه من `new Date()` أيضًا. فتجميدُ الساعة
+ * على لحظتين يُحرّك الطابعين معًا، فاختلافُ البصمتين قد يكون من التصديق لا من الختم.
+ * وقيس ذلك: أُخرِج `sealedAt` من البصمة إخراجًا تامًّا فاجتازت الاختبارات التسعة كلُّها.
+ *
+ * فيُبدَّل طابعٌ واحد على ختمٍ قائم، ولا يُمسّ سواه، ويُسأل `verifySeal`. ولا مخرج له
+ * حينئذٍ: إن كان `sealedAt` داخل البصمة سقط التحقّق، وإن كان خارجها نجح — وهي الدعوى
+ * نفسُها، مقيسةً لا مستنتَجة.
+ */
+test('tampering with sealedAt alone breaks the digest — proving the stamp is inside it', () => {
+  const outcome = atFrozenTime('2026-05-01T09:00:00.000Z', () => sealResult(request()));
+  assert.ok('sealed' in outcome);
+  assert.equal(verifySeal(outcome.sealed), true, 'the untouched seal must verify first');
+
+  const tampered = { ...outcome.sealed, sealedAt: '2026-05-01T09:00:01.000Z' };
+  assert.equal(tampered.attestation.attestedAt, outcome.sealed.attestation.attestedAt,
+    'and nothing else may move — the attestation stamp is held fixed');
+  assert.equal(verifySeal(tampered), false,
+    'sealedAt is covered by sealSha256; a seal whose stamp was rewritten is no longer its own seal');
 });
 
 test('two seals stamped in the same instant share a digest — so the digest can never be the duplicate check', () => {

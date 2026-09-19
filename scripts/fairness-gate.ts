@@ -13,6 +13,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { arch, cpus, platform } from 'node:os';
 import { scopeFromJuz } from '../src/lib/quran-scope';
 import { projectCandidatesFromScope } from '../src/lib/question-corpus';
 import { syntheticParticipants, type TwinInput } from '../src/lib/competition-twin';
@@ -22,7 +23,7 @@ import { QUESTION_ENGINE_VERSION } from '../src/lib/question-engine';
 import { runOracleBenchmark } from '../src/lib/oracle-benchmark';
 import { monteCarloStability } from '../src/lib/fairness-experiments';
 import {
-  appendFrontierHistory, judgeReleaseBudget,
+  appendFrontierHistory, judgeReleaseBudget, BUDGET_METRICS,
   type BudgetMetric, type FairnessBaseline, type FrontierHistory,
 } from '../src/lib/fairness-release-budget';
 
@@ -31,6 +32,17 @@ const arg = (name: string, fallback: number) => {
   return hit ? Number(hit.split('=')[1]) || fallback : fallback;
 };
 const line = (label: string, value: unknown) => console.log(`  ${label.padEnd(42, '.')} ${value}`);
+
+/*
+ * وصفُ الآلة — خشنٌ عمدًا.
+ *
+ * يكفي ما يفسّر فروق الزمن: المنصّة والمعمار وطرازُ المعالج والإصدارُ الأكبر من Node. ولا
+ * يُدرج اسمُ الجهاز ولا شيءٌ يدلّ على صاحبه: الملفُّ يُدفع إلى مستودعٍ عامّ.
+ */
+const describeMachine = () => {
+  const model = cpus()[0]?.model?.replace(/\s+/g, ' ').trim() || 'معالج غير معروف';
+  return `${platform()}/${arch()} · ${model} · node${process.version.split('.')[0].replace('v', '')}`;
+};
 
 const BASELINE_PATH = join('tests', 'fixtures', 'fairness-baseline.json');
 const HISTORY_PATH = join('tests', 'fixtures', 'fairness-frontier-history.json');
@@ -70,7 +82,24 @@ const metrics: Partial<Record<BudgetMetric, number>> = {
   ...(benchmark.twin.metrics.heapUsedMb !== undefined ? { heapUsedMb: benchmark.twin.metrics.heapUsedMb } : {}),
 };
 
-const worstOf = (metric: string) => stability.distributions.find(d => d.metric === metric)?.worst;
+const distributionOf = (metric: string) => stability.distributions.find(d => d.metric === metric);
+const worstOf = (metric: string) => distributionOf(metric)?.worst;
+
+/*
+ * نطاقُ ضجيج الآلة، مقاسًا لا مُقدَّرًا.
+ *
+ * المقياسُ نفسه يُعاد على عشرات البذور على هذه الآلة في هذه التشغيلة، فالمدى بين أفضل ما
+ * رُصد وأسوأه هو ما تستطيع هذه الأداةُ التمييزَ فوقه. وما دونه قرعةٌ لا قياس. ولا يُحكم
+ * على زمنٍ بسماحيةٍ أضيق من هذا المدى.
+ */
+const noiseBandOf = (metric: string) => {
+  const distribution = distributionOf(metric);
+  return distribution ? Number((distribution.worst - distribution.min).toFixed(4)) : undefined;
+};
+const selectionNoiseBand = noiseBandOf('selectionMillisP95');
+const noiseBand: Partial<Record<BudgetMetric, number>> = {
+  ...(selectionNoiseBand !== undefined ? { selectionMillisP95: selectionNoiseBand } : {}),
+};
 const multiSeedWorst: Partial<Record<BudgetMetric, number>> = {
   maxUsesOfAnyQuestion: worstOf('maxUsesOfAnyQuestion'),
   excessOverLowerBound: worstOf('excessOverLowerBound'),
@@ -90,16 +119,25 @@ const candidate: FairnessBaseline = {
   metrics,
   multiSeedWorst,
   optimalityGap,
+  noiseBand,
+  machine: describeMachine(),
 };
 
 console.log('══ القياس');
 line('السيناريو', SCENARIO);
 line('نسخة المحرّك', candidate.engineVersion);
+line('الآلة', candidate.machine);
 for (const [key, value] of Object.entries(metrics)) line(key, value);
 console.log('  — أسوأ ما رُصد على عدة بذور:');
 for (const [key, value] of Object.entries(multiSeedWorst)) line(`  ${key}`, value);
 console.log('  — الفجوة عن الأمثل المُثبَت:');
 for (const [key, value] of Object.entries(optimalityGap)) line(`  ${key}`, value === null ? 'غير مُثبَت' : value);
+console.log('  — نطاق ضجيج الآلة المقاس (أسوأ − أفضل على البذور):');
+for (const key of Object.keys(BUDGET_METRICS) as BudgetMetric[]) {
+  if (!BUDGET_METRICS[key].machine) continue;
+  const measured = noiseBand[key];
+  line(`  ${key}`, measured === undefined ? 'غير مقاس — UNVERIFIED، فلا حكم عليه' : measured);
+}
 
 /* التاريخ يُحفظ عند كل قياس، حكمنا أو لم نحكم. */
 const history: FrontierHistory | null = existsSync(HISTORY_PATH) ? JSON.parse(readFileSync(HISTORY_PATH, 'utf8')) : null;
@@ -119,10 +157,16 @@ if (!existsSync(BASELINE_PATH) || process.argv.includes('--write-baseline')) {
   process.exitCode = 0;
 } else {
   const baseline: FairnessBaseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
-  const verdict = judgeReleaseBudget({ baseline, candidate, tolerance: { relative: 0.1, absolute: { maxUsesOfAnyQuestion: 0, excessOverLowerBound: 0 } } });
+  const verdict = judgeReleaseBudget({
+    baseline, candidate, noiseBand,
+    tolerance: { relative: 0.1, absolute: { maxUsesOfAnyQuestion: 0, excessOverLowerBound: 0 } },
+  });
   console.log(`\n══ الحكم مقابل خطّ الأساس (${baseline.version} · ${baseline.recordedAt})`);
   for (const finding of verdict.findings) {
-    const mark = finding.severity === 'blocking' ? '✗' : finding.severity === 'improvement' ? '↑' : finding.severity === 'warning' ? '·' : ' ';
+    const mark = finding.severity === 'blocking' ? '✗'
+      : finding.severity === 'improvement' ? '↑'
+      : finding.severity === 'unjudged' ? '?'
+      : finding.severity === 'warning' ? '·' : ' ';
     console.log(`  ${mark} ${finding.ar}`);
   }
   console.log(`\n${verdict.ar}`);

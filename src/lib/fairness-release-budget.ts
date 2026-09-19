@@ -19,19 +19,33 @@ import type { TwinMetrics } from './competition-twin';
 
 export const FAIRNESS_BUDGET_VERSION = 'MIZAN-FAIRNESS-BUDGET-1';
 
-/** المقاييس التي تُحكم بها البوابة، وهل الأقلّ فيها خيرٌ أم الأكثر. */
+/**
+ * المقاييس التي تُحكم بها البوابة، وهل الأقلّ فيها خيرٌ أم الأكثر.
+ *
+ * و`machine` تفرق بين صنفين لا يجوز الخلط بينهما:
+ *
+ *   · **مقياس خوارزمي** (`machine: false`) — دالّةٌ حتمية في الخوارزم والبذرة. يُعاد على
+ *     الآلة نفسها وعلى غيرها فيخرج الرقم نفسه. تغيُّره تغيُّرٌ في ميزان، فيُحكم به.
+ *   · **مقياس آلة** (`machine: true`) — زمنٌ أو ذاكرة. يتبع جدولةَ المعالج وكنسَ الذاكرة
+ *     وحِملَ الآلة، لا الخوارزمَ وحده. خطُّ أساسه قد يكون قد قيس على آلةٍ أخرى أصلًا.
+ *
+ * وقياسٌ من الصنف الثاني لا يُحكم به إلا بنطاقِ ضجيجٍ **مقاسٍ على الآلة نفسها في التشغيلة
+ * نفسها**. وعتبةٌ أضيق من ضجيج أداتها ليست عتبةً بل قرعة: تمنع الإصدار مرةً وتجيزه مرة
+ * على الشيفرة نفسها، فتُعلّم الفريق أن يعيد التشغيل حتى يخضرّ. ومن لم يقس الضجيج فليس له
+ * أن يحكم، ويقول `UNVERIFIED` ولا يسكت.
+ */
 export const BUDGET_METRICS = {
-  scopeViolations: { direction: 'lower', hard: true, ar: 'خروقات النطاق' },
-  readingViolations: { direction: 'lower', hard: true, ar: 'خروقات الرواية' },
-  duplicateWithinModelViolations: { direction: 'lower', hard: true, ar: 'تكرار داخل النموذج' },
-  duplicateForParticipantViolations: { direction: 'lower', hard: true, ar: 'تكرار على المتسابق نفسه' },
-  failedDraws: { direction: 'lower', hard: false, ar: 'سحوب فاشلة' },
-  excessOverLowerBound: { direction: 'lower', hard: false, ar: 'الزيادة على الحدّ الرياضي' },
-  maxUsesOfAnyQuestion: { direction: 'lower', hard: false, ar: 'أكثر موضع استعمالًا' },
-  totalRepeats: { direction: 'lower', hard: false, ar: 'مجموع التكرار' },
-  maxModelDifficultyDelta: { direction: 'lower', hard: false, ar: 'الفرق بين أصعب نموذج وأسهله' },
-  selectionMillisP95: { direction: 'lower', hard: false, ar: 'زمن الاختيار (المئين ٩٥)' },
-  heapUsedMb: { direction: 'lower', hard: false, ar: 'الذاكرة المستعملة' },
+  scopeViolations: { direction: 'lower', hard: true, machine: false, ar: 'خروقات النطاق' },
+  readingViolations: { direction: 'lower', hard: true, machine: false, ar: 'خروقات الرواية' },
+  duplicateWithinModelViolations: { direction: 'lower', hard: true, machine: false, ar: 'تكرار داخل النموذج' },
+  duplicateForParticipantViolations: { direction: 'lower', hard: true, machine: false, ar: 'تكرار على المتسابق نفسه' },
+  failedDraws: { direction: 'lower', hard: false, machine: false, ar: 'سحوب فاشلة' },
+  excessOverLowerBound: { direction: 'lower', hard: false, machine: false, ar: 'الزيادة على الحدّ الرياضي' },
+  maxUsesOfAnyQuestion: { direction: 'lower', hard: false, machine: false, ar: 'أكثر موضع استعمالًا' },
+  totalRepeats: { direction: 'lower', hard: false, machine: false, ar: 'مجموع التكرار' },
+  maxModelDifficultyDelta: { direction: 'lower', hard: false, machine: false, ar: 'الفرق بين أصعب نموذج وأسهله' },
+  selectionMillisP95: { direction: 'lower', hard: false, machine: true, ar: 'زمن الاختيار (المئين ٩٥)' },
+  heapUsedMb: { direction: 'lower', hard: false, machine: true, ar: 'الذاكرة المستعملة' },
 } as const;
 
 export type BudgetMetric = keyof typeof BUDGET_METRICS;
@@ -47,6 +61,18 @@ export interface FairnessBaseline {
   multiSeedWorst?: Partial<Record<BudgetMetric, number>>;
   /** الفجوة عن الأمثل المُثبَت، حيث أُثبت. */
   optimalityGap?: Record<string, number | null>;
+  /**
+   * نطاقُ ضجيج الآلة كما قيس في التشغيلة نفسها: المدى بين أفضل ما رُصد وأسوأه على البذور.
+   * يُحفظ ليُراجَع الحكمُ بعد سنة، فيُعرف بأي سماحيةٍ حُكم ولماذا.
+   */
+  noiseBand?: Partial<Record<BudgetMetric, number>>;
+  /**
+   * وصفُ الآلة التي قيس عليها: منصّةٌ ومعمارٌ ومعالجٌ ونسخةُ Node.
+   *
+   * زمنُ آلةٍ لا يحكم على زمن أخرى. وخطُّ أساسٍ قيس على حاسوب مطوِّرٍ ثم حُكم به على
+   * عامل CI مشترك ليس مقارنةً بل مصادفة. فيُسجَّل الوصفُ ويُقابَل، وإن اختلف فلا حكم.
+   */
+  machine?: string;
 }
 
 export interface BudgetTolerance {
@@ -58,7 +84,8 @@ export interface BudgetTolerance {
 
 export interface BudgetFinding {
   metric: BudgetMetric | 'optimality_gap' | 'multi_seed_worst';
-  severity: 'blocking' | 'warning' | 'improvement' | 'unchanged';
+  /** و`unjudged` ليست نجاحًا ولا سقوطًا: هي إقرارٌ بأن هذا المقياس لم يُحكم عليه، ولمَ. */
+  severity: 'blocking' | 'warning' | 'improvement' | 'unchanged' | 'unjudged';
   baseline: number | null;
   candidate: number | null;
   delta: number | null;
@@ -69,6 +96,8 @@ export interface BudgetVerdict {
   releasable: boolean;
   findings: BudgetFinding[];
   blocking: BudgetFinding[];
+  /** ما لم يُحكم عليه. يُذكر في نصّ الحكم دائمًا، فلا يُقرأ اجتيازٌ ناقصٌ اجتيازًا تامًّا. */
+  unjudged: BudgetFinding[];
   ar: string;
 }
 
@@ -84,6 +113,12 @@ export function judgeReleaseBudget(input: {
   baseline: FairnessBaseline;
   candidate: FairnessBaseline;
   tolerance?: BudgetTolerance;
+  /**
+   * نطاقُ ضجيجٍ **مقاس** لمقاييس الآلة — لا مُقدَّر ولا مُختار. يُشتقّ من توزيع المقياس
+   * على البذور في التشغيلة الحالية وعلى الآلة الحالية. وما لم يُعطَ لمقياسِ آلةٍ فلا حكم
+   * عليه، ويُعلَن ذلك صراحةً.
+   */
+  noiseBand?: Partial<Record<BudgetMetric, number>>;
 }): BudgetVerdict {
   const tolerance = { ...DEFAULT_TOLERANCE, ...(input.tolerance || {}) };
   const findings: BudgetFinding[] = [];
@@ -115,11 +150,50 @@ export function judgeReleaseBudget(input: {
     }
 
     const allowedAbsolute = input.tolerance?.absolute?.[key];
-    const allowed = allowedAbsolute !== undefined ? allowedAbsolute : Math.abs(before) * tolerance.relative;
+    const derived = allowedAbsolute !== undefined ? allowedAbsolute : Math.abs(before) * tolerance.relative;
+
+    /*
+     * مقاييس الآلة: السماحيةُ لا تكون أضيق من ضجيج الآلة المقاس.
+     *
+     * لا لأن التدهور يُغتفر، بل لأن أداةً ضجيجُها مِلّيثانيتان لا تشهد على فرقِ ثلاثةِ
+     * أعشار. والعتبةُ دون أرضية الضجيج تمنع الإصدار بالقرعة لا بالدليل. فتُؤخذ أوسعُ
+     * السماحيتين: المشتقّة من خطّ الأساس، أو الضجيجُ المقاسُ على الآلة نفسها.
+     */
+    let allowed = derived;
+    let band: number | undefined;
+    if (spec.machine) {
+      /* شرطان قبل الحكم على مقياس آلة، وسقوطُ أيّهما يعني «لم أقس» لا «لا بأس». */
+      const here = input.candidate.machine;
+      const there = input.baseline.machine;
+      if (!here || !there || here !== there) {
+        findings.push({
+          metric: key, severity: 'unjudged', baseline: before, candidate: after, delta,
+          ar: `${spec.ar}: ${after} (كان ${before}) — UNVERIFIED. خطُّ الأساس قيس على «${there || 'آلةٍ غير مسجَّلة'}» والقياسُ الآن على «${here || 'آلةٍ غير مسجَّلة'}»؛ وزمنُ آلةٍ لا يحكم على زمن أخرى. ولإعادة الحكم: سجّل خطَّ الأساس على آلة الحكم نفسها بـ\`npm run fairness:gate -- --write-baseline\`.`,
+        });
+        continue;
+      }
+      band = input.noiseBand?.[key];
+      if (band === undefined) {
+        findings.push({
+          metric: key, severity: 'unjudged', baseline: before, candidate: after, delta,
+          ar: `${spec.ar}: ${after} (كان ${before}) — UNVERIFIED. مقياسُ آلةٍ بلا نطاقِ ضجيجٍ مقاس؛ وعتبةٌ لا يُعرف ضجيجُ أداتها قرعةٌ لا حكم.`,
+        });
+        continue;
+      }
+      allowed = Math.max(derived, band);
+    }
+
     if (delta > allowed) {
       findings.push({
         metric: key, severity: 'blocking', baseline: before, candidate: after, delta,
-        ar: `${spec.ar} تدهور من ${before} إلى ${after} (المسموح ${Number(allowed.toFixed(4))} فوق خطّ الأساس).`,
+        ar: band === undefined
+          ? `${spec.ar} تدهور من ${before} إلى ${after} (المسموح ${Number(allowed.toFixed(4))} فوق خطّ الأساس).`
+          : `${spec.ar} تدهور من ${before} إلى ${after} (المسموح ${Number(allowed.toFixed(4))}: أوسعُ السماحيتين — المشتقّة ${Number(derived.toFixed(4))} وضجيجُ الآلة المقاس ${band}). والتدهور فوق الضجيج، فهو أثرُ شيفرةٍ لا أثرُ آلة.`,
+      });
+    } else if (band !== undefined && delta > 0) {
+      findings.push({
+        metric: key, severity: 'warning', baseline: before, candidate: after, delta,
+        ar: `${spec.ar}: ${after} (كان ${before}). داخل نطاق ضجيج الآلة المقاس (${band})، فلا تشهد الأداةُ بتدهور.`,
       });
     } else if (delta < 0) {
       findings.push({ metric: key, severity: 'improvement', baseline: before, candidate: after, delta, ar: `${spec.ar} تحسّن من ${before} إلى ${after}.` });
@@ -159,13 +233,18 @@ export function judgeReleaseBudget(input: {
   }
 
   const blocking = findings.filter(finding => finding.severity === 'blocking');
+  const unjudged = findings.filter(finding => finding.severity === 'unjudged');
+
+  /* اجتيازٌ ناقصٌ لا يُقال عنه تامّ: ما لم يُحكم عليه يُذكر في نصّ الحكم نفسه. */
+  const tail = unjudged.length ? ` ولم يُحكم على ${unjudged.length} مقياسِ آلة (UNVERIFIED): ${unjudged.map(f => BUDGET_METRICS[f.metric as BudgetMetric].ar).join('، ')}.` : '';
   return {
     releasable: blocking.length === 0,
     findings,
     blocking,
+    unjudged,
     ar: blocking.length === 0
-      ? 'الإصدار يجتاز ميزانية العدالة: لا خرقَ قاطعًا، ولا تدهورَ فوق السماحية المشتقّة من خطّ الأساس.'
-      : `الإصدار موقوف: ${blocking.length} مانعًا. ${blocking[0].ar}`,
+      ? `الإصدار يجتاز ميزانية العدالة: لا خرقَ قاطعًا، ولا تدهورَ فوق السماحية المشتقّة من خطّ الأساس.${tail}`
+      : `الإصدار موقوف: ${blocking.length} مانعًا. ${blocking[0].ar}${tail}`,
   };
 }
 
