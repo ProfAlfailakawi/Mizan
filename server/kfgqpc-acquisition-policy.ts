@@ -19,3 +19,25 @@ export function extractNearbyOfficialCandidates(html:string,checksum:string,base
 export function digestBuffer(data:Buffer){return {md5:crypto.createHash('md5').update(data).digest('hex').toUpperCase(),sha1:crypto.createHash('sha1').update(data).digest('hex').toUpperCase()}}
 export function matchesExpected(data:Buffer,spec:Pick<LightPackageSpec,'md5'|'sha1'>){const d=digestBuffer(data);return d.md5===spec.md5.toUpperCase()&&d.sha1===spec.sha1.toUpperCase()}
 export function hasZipMagic(data:Buffer){return data.length>=4&&data[0]===0x50&&data[1]===0x4b&&[0x03,0x05,0x07].includes(data[2])&&[0x04,0x06,0x08].includes(data[3])}
+
+/*
+ * حكمُ الجلب الخفيف: نجاحٌ أم فشل.
+ *
+ * كان `kfgqpc-acquire.ts` يخرج بالرمز **صفر** ولو لم يُفتح موقعُ المجمَّع أصلًا: يكتب
+ * تقريرًا فيه `SOURCE_PAGE_UNREACHABLE` ثم ينتهي هادئًا. فخطوةُ السير تُعرض **خضراء**
+ * وما اكتُسبت حزمةٌ واحدة — وهذا هو الفشلُ الصامت بعينه، والسيرُ نفسُه يحمل معالجًا
+ * يبحث عن `SOURCE_PAGE_UNREACHABLE` عند الفشل ولا يصل إليه أبدًا لأن الخطوة لا تفشل.
+ *
+ * والحزمُ الخفيفة كلُّها مطلوبة — لا اختياريَّ فيها. فالنجاحُ أن يُفتح المصدرُ وتتحقّق
+ * كلُّ حزمةٍ من بصمتها الرسمية؛ وما دون ذلك فشلٌ يُسمّى بما نقص منه.
+ *
+ * والرمزُ 2 هو ما يستعمله `kfgqpc-heavy-acquire.ts` لهذا المعنى نفسه، فلا يُخترع غيرُه.
+ */
+export interface AcquisitionVerdict {exitCode:0|2;reason?:string}
+export function lightAcquisitionVerdict(report:{status?:string;results?:{id?:string;status?:string}[]}):AcquisitionVerdict{
+ if(report.status!=='COMPLETE')return {exitCode:2,reason:report.status||'ACQUISITION_REPORT_STATUS_MISSING'};
+ const byId=new Map((report.results||[]).map(r=>[r.id,r.status]));
+ const missing=LIGHT_PACKAGES.filter(spec=>byId.get(spec.id)!=='ACQUIRED_VERIFIED').map(spec=>spec.id);
+ if(missing.length)return {exitCode:2,reason:`REQUIRED_LIGHT_PACKAGES_NOT_VERIFIED:${missing.join(',')}`};
+ return {exitCode:0};
+}

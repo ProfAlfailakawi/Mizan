@@ -3,7 +3,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {KFGQPC_DEV_PAGE,LIGHT_PACKAGES,extractNearbyOfficialCandidates,hasZipMagic,isOfficialKfgqpcUrl,matchesExpected} from '../server/kfgqpc-acquisition-policy';
+import {KFGQPC_DEV_PAGE,LIGHT_PACKAGES,extractNearbyOfficialCandidates,hasZipMagic,isOfficialKfgqpcUrl,lightAcquisitionVerdict,matchesExpected} from '../server/kfgqpc-acquisition-policy';
 
 const args=process.argv.slice(2);const value=(k:string)=>{const i=args.indexOf(k);return i>=0?args[i+1]:undefined};
 const root=path.resolve(value('--root')||'.mizan-ingest');const reportDir=path.join(root,'reports');fs.mkdirSync(reportDir,{recursive:true});
@@ -42,12 +42,22 @@ async function acquireOne(spec:(typeof LIGHT_PACKAGES)[number],html:string){
   return {id:spec.id,status:'NOT_ACQUIRED',reason:candidates.length?'NO_CANDIDATE_MATCHED_OFFICIAL_CHECKSUM':'CHECKSUM_SECTION_OR_DOWNLOAD_LINK_NOT_FOUND',attempts};
 }
 
+/*
+ * خطوةٌ خضراء لم تكتسب شيئًا كذبةٌ في السير — وسيرُ الاستيعاب نفسُه يحمل معالجًا يبحث
+ * عن `SOURCE_PAGE_UNREACHABLE` عند الفشل، ولم يكن يبلغه قطّ لأن هذه الخطوة لا تفشل.
+ */
+function finish(report:Parameters<typeof lightAcquisitionVerdict>[0]){
+  const verdict=lightAcquisitionVerdict(report);
+  if(verdict.exitCode!==0){console.error(verdict.reason);process.exitCode=verdict.exitCode}
+}
+
 async function main(){
-  const startedAt=new Date().toISOString();let html='';try{html=await text(KFGQPC_DEV_PAGE)}catch(e){const report={protocol:'MIZAN-KFGQPC-ACQUIRE-1',startedAt,finishedAt:new Date().toISOString(),source:KFGQPC_DEV_PAGE,status:'SOURCE_PAGE_UNREACHABLE',reason:e instanceof Error?e.message:'UNKNOWN',results:[]};fs.writeFileSync(path.join(reportDir,'official-acquisition.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));return}
+  const startedAt=new Date().toISOString();let html='';try{html=await text(KFGQPC_DEV_PAGE)}catch(e){const report={protocol:'MIZAN-KFGQPC-ACQUIRE-1',startedAt,finishedAt:new Date().toISOString(),source:KFGQPC_DEV_PAGE,status:'SOURCE_PAGE_UNREACHABLE',reason:e instanceof Error?e.message:'UNKNOWN',results:[]};fs.writeFileSync(path.join(reportDir,'official-acquisition.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));finish(report);return}
   const results=[];for(const spec of LIGHT_PACKAGES){const r=await acquireOne(spec,html);results.push(r);console.log(JSON.stringify(r))}
   results.push({id:'mushaf-pages',status:'DEFERRED',reason:'NO_CURRENT_OFFICIAL_604_PAGE_DELIVERY_ARCHIVE_IS_AUTO_SELECTED; MIZAN_WILL_NOT_RECONSTRUCT_OR_CROP_QURAN_PAGES'});
   for(const id of ['audio-hafs','audio-shubah','audio-qalun','audio-susi','audio-duri','audio-warsh'])results.push({id,status:'DEFERRED_HEAVY',reason:'HEAVY_AUDIO_DOWNLOAD_IS_NOT_RUN_IN_AUDIT_BUILD_AND_NOT_UPLOADED_TO_R2'});
   const report={protocol:'MIZAN-KFGQPC-ACQUIRE-1',startedAt,finishedAt:new Date().toISOString(),source:KFGQPC_DEV_PAGE,status:'COMPLETE',results};
   fs.writeFileSync(path.join(reportDir,'official-acquisition.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({mode:'ACQUISITION_AUDIT',report:path.join(reportDir,'official-acquisition.json')}));
+  finish(report);
 }
 main().catch(e=>{console.error(e instanceof Error?e.message:'ACQUISITION_FAILED');process.exitCode=1});
