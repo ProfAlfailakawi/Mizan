@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 import { arch, cpus, platform } from 'node:os';
 import { scopeFromJuz } from '../src/lib/quran-scope';
 import { projectCandidatesFromScope } from '../src/lib/question-corpus';
-import { syntheticParticipants, type TwinInput } from '../src/lib/competition-twin';
+import { runCompetitionTwin, syntheticParticipants, type TwinInput } from '../src/lib/competition-twin';
 import { DEFAULT_REPEAT_POLICY } from '../src/lib/repeat-policy';
 import { freeDistributionPlan } from '../src/lib/question-zones';
 import { QUESTION_ENGINE_VERSION } from '../src/lib/question-engine';
@@ -79,27 +79,39 @@ const metrics: Partial<Record<BudgetMetric, number>> = {
   totalRepeats: benchmark.twin.metrics.totalRepeats,
   maxModelDifficultyDelta: benchmark.twin.metrics.maxModelDifficultyDelta,
   selectionMillisP95: benchmark.twin.metrics.selectionMillisP95,
-  ...(benchmark.twin.metrics.heapUsedMb !== undefined ? { heapUsedMb: benchmark.twin.metrics.heapUsedMb } : {}),
 };
+const observedHeapMb = benchmark.twin.metrics.heapUsedMb;
 
 const distributionOf = (metric: string) => stability.distributions.find(d => d.metric === metric);
 const worstOf = (metric: string) => distributionOf(metric)?.worst;
 
 /*
- * نطاقُ ضجيج الآلة، مقاسًا لا مُقدَّرًا.
+ * قياسُ الزمن: إحماءٌ ثم إعاداتٌ للعمل نفسِه بالبذرة نفسِها.
  *
- * المقياسُ نفسه يُعاد على عشرات البذور على هذه الآلة في هذه التشغيلة، فالمدى بين أفضل ما
- * رُصد وأسوأه هو ما تستطيع هذه الأداةُ التمييزَ فوقه. وما دونه قرعةٌ لا قياس. ولا يُحكم
- * على زمنٍ بسماحيةٍ أضيق من هذا المدى.
+ * وسببُ كلِّ شرطٍ من هذين مقيس:
+ *
+ *   · **الإحماء** — الشيفرةُ الباردة أبطأ من الدافئة أكثرَ من ضعفين: ستّ عشرة إعادةً
+ *     للعمل نفسِه أعطت 3.726 في الأولى ثم استقرّت عند نحو 1.62. فقياسُ تشغيلةٍ واحدة
+ *     يقيس حالةَ تهيئة المحرّك (JIT) لا كلفةَ الخوارزم. وبعد أربع إحماءات يستقرّ
+ *     المدى عند ±٧٪، وهو قياسٌ يصحّ الحكمُ به.
+ *   · **البذرةُ نفسُها** — كان النطاقُ يُؤخذ من `monteCarloStability` وهي تبدّل البذرةَ
+ *     في كلّ عيّنة، فيدخل في «الضجيج» اختلافُ العمل نفسِه من بذرةٍ لأخرى. وذلك يوسّع
+ *     النطاقَ بما ليس ضجيجَ آلة، فيُغتفر به تدهورٌ حقيقي. والضجيجُ لا يُقاس إلا بإعادة
+ *     العمل نفسِه: بذرةٌ واحدة، مُدخلٌ واحد، آلةٌ واحدة، والفرقُ حينئذٍ هو الآلةُ وحدها.
  */
-const noiseBandOf = (metric: string) => {
-  const distribution = distributionOf(metric);
-  return distribution ? Number((distribution.worst - distribution.min).toFixed(4)) : undefined;
-};
-const selectionNoiseBand = noiseBandOf('selectionMillisP95');
-const noiseBand: Partial<Record<BudgetMetric, number>> = {
-  ...(selectionNoiseBand !== undefined ? { selectionMillisP95: selectionNoiseBand } : {}),
-};
+const TIMING_WARMUPS = arg('warmups', 4);
+const TIMING_TRIALS = arg('trials', 7);
+const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+for (let i = 0; i < TIMING_WARMUPS; i += 1) runCompetitionTwin(base);
+const timingTrials: number[] = [];
+for (let i = 0; i < TIMING_TRIALS; i += 1) timingTrials.push(runCompetitionTwin(base).metrics.selectionMillisP95);
+
+const warmSelectionP95 = Number(median(timingTrials).toFixed(3));
+const selectionNoiseBand = Number((Math.max(...timingTrials) - Math.min(...timingTrials)).toFixed(4));
+metrics.selectionMillisP95 = warmSelectionP95;
+
+const noiseBand: Partial<Record<BudgetMetric, number>> = { selectionMillisP95: selectionNoiseBand };
 const multiSeedWorst: Partial<Record<BudgetMetric, number>> = {
   maxUsesOfAnyQuestion: worstOf('maxUsesOfAnyQuestion'),
   excessOverLowerBound: worstOf('excessOverLowerBound'),
@@ -132,18 +144,18 @@ console.log('  — أسوأ ما رُصد على عدة بذور:');
 for (const [key, value] of Object.entries(multiSeedWorst)) line(`  ${key}`, value);
 console.log('  — الفجوة عن الأمثل المُثبَت:');
 for (const [key, value] of Object.entries(optimalityGap)) line(`  ${key}`, value === null ? 'غير مُثبَت' : value);
-console.log('  — نطاق ضجيج الآلة المقاس (أسوأ − أفضل على البذور):');
-for (const key of Object.keys(BUDGET_METRICS) as BudgetMetric[]) {
-  if (!BUDGET_METRICS[key].machine) continue;
-  const measured = noiseBand[key];
-  line(`  ${key}`, measured === undefined ? 'غير مقاس — UNVERIFIED، فلا حكم عليه' : measured);
-}
+console.log(`  — نطاق ضجيج الآلة (${TIMING_WARMUPS} إحماءات ثم ${TIMING_TRIALS} إعادات للعمل نفسِه):`);
+line('  selectionMillisP95', `${selectionNoiseBand}  [${timingTrials.join(' · ')}]`);
+console.log('  — ملاحظةٌ لا حكم:');
+line('  heapUsedMb', observedHeapMb === undefined ? 'غير متاح'
+  : `${observedHeapMb} — خارج الميزانية عمدًا: عيّنةُ كانسِ ذاكرةٍ لا قياسُ خوارزم`);
 
 /* التاريخ يُحفظ عند كل قياس، حكمنا أو لم نحكم. */
 const history: FrontierHistory | null = existsSync(HISTORY_PATH) ? JSON.parse(readFileSync(HISTORY_PATH, 'utf8')) : null;
 const nextHistory = appendFrontierHistory(history, {
   recordedAt: candidate.recordedAt, engineVersion: candidate.engineVersion,
   scenario: SCENARIO, metrics, optimalityGap,
+  ...(observedHeapMb !== undefined ? { observations: { heapUsedMb: observedHeapMb } } : {}),
   note: process.env.MIZAN_RELEASE_NOTE,
 });
 mkdirSync(dirname(HISTORY_PATH), { recursive: true });
@@ -170,5 +182,16 @@ if (!existsSync(BASELINE_PATH) || process.argv.includes('--write-baseline')) {
     console.log(`  ${mark} ${finding.ar}`);
   }
   console.log(`\n${verdict.ar}`);
+
+  /*
+   * ما لم يُحكم عليه يُرفع إلى ملخّص التشغيلة، لا يُترك في ذيل سجلّ.
+   *
+   * فاجتيازٌ ناقصٌ مكتوبٌ في السطر الألف يُقرأ اجتيازًا تامًّا من لوحة الفحوص. والتنبيهُ
+   * يظهر في الملخّص فيُرى، ولا يُحمّر البوّابة: أحمرُ على قياسٍ يتعذّر إجراؤه فسادٌ في
+   * الاتّجاه الآخر، يُعلّم الفريقَ تجاهلَ الأحمر كما يُعلّمه إعادةُ التشغيل.
+   */
+  for (const finding of verdict.unjudged) {
+    console.log(`::warning title=FAIRNESS_METRIC_UNJUDGED::${finding.ar}`);
+  }
   process.exitCode = verdict.releasable ? 0 : 1;
 }

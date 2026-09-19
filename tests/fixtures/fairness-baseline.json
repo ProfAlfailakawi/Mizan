@@ -1,7 +1,7 @@
 {
   "version": "working-tree",
   "engineVersion": "MIZAN-QUESTION-ENGINE-1",
-  "recordedAt": "2026-09-12T01:27:39.231Z",
+  "recordedAt": "2026-09-19T19:09:44.854Z",
   "scenario": "juz30-400x3-balanced",
   "metrics": {
     "scopeViolations": 0,
@@ -13,8 +13,7 @@
     "maxUsesOfAnyQuestion": 3,
     "totalRepeats": 710,
     "maxModelDifficultyDelta": 1.167,
-    "selectionMillisP95": 3,
-    "heapUsedMb": 17.6
+    "selectionMillisP95": 1.528
   },
   "multiSeedWorst": {
     "maxUsesOfAnyQuestion": 3,
@@ -29,7 +28,11 @@
     "difficulty_deviation": 280,
     "exposure_cost": 0,
     "scarcity_cost": 0,
-    "same_hall_reuses": 3,
-    "aggregate_cost": 535.5
-  }
+    "same_hall_reuses": 1,
+    "aggregate_cost": 531.5
+  },
+  "noiseBand": {
+    "selectionMillisP95": 0.148
+  },
+  "machine": "linux/x64 · Intel(R) Xeon(R) Processor @ 2.10GHz · node22"
 }
