@@ -1502,6 +1502,18 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     const actor=(req as any).mizanIdentity as ServerIdentity;const body=req.body||{};
     const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n:undefined};
     const sealSigner=trustSigner();
+    /*
+     * بلا سجلٍّ لا ختم — ويُقال صراحةً.
+     *
+     * كان السجلُّ يُنادى بـ`?.`: فإن لم يُهيَّأ مضى الختمُ وردّ 201 ولم يُكتب شيء. ويترتّب
+     * على ذلك ثلاثة أعطالٍ صامتة: لا صفَّ في سجلّ الأختام، ولا كشفَ لإعادة ختمٍ بنفس
+     * المدخلات (فكلُّ نداءٍ يُنشئ ختمًا جديدًا لأن `sealedAt` يدخل البصمة)، ولا أساسَ
+     * لفصل المهامّ عند النشر — وكلُّها تظهر يوم النزاع لا يوم النشر.
+     *
+     * والنشرُ أدناه يردّ 503 في الحال نفسها منذ البداية. فيُسوَّى البابان: ما لا يُسجَّل
+     * لا يُختم.
+     */
+    if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
     try{
       const outcome=sealResult({
         competitionId:String(body.competitionId||actor.competitionId||''),
@@ -1532,9 +1544,9 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
        * مسجَّلًا أُعيد المسجَّل كما هو (200) بلا صفِّ تدقيقٍ ثانٍ؛ وإن تغيّرت المدخلات فهو
        * إعادةُ ختمٍ حقيقية تُعلن ما نسخته في `supersedes` (201).
        */
-      const existing=resultSealRegistry?.findByInputs(actor.organizationId,sealed.competitionId,sealed.participantId,sealed.inputsSha256);
+      const existing=resultSealRegistry.findByInputs(actor.organizationId,sealed.competitionId,sealed.participantId,sealed.inputsSha256);
       if(existing)return res.status(200).json({...existing.sealed,idempotent:true});
-      resultSealRegistry?.record({organizationId:actor.organizationId,competitionId:sealed.competitionId,participantId:sealed.participantId,sessionId:sealed.sessionId,inputsSha256:sealed.inputsSha256,sealSha256:sealed.sealSha256,sealedBy:sealed.sealedBy,sealedAt:sealed.sealedAt,finalScore:sealed.finalScore,sealed:sealed as unknown as Record<string,unknown>});
+      resultSealRegistry.record({organizationId:actor.organizationId,competitionId:sealed.competitionId,participantId:sealed.participantId,sessionId:sealed.sessionId,inputsSha256:sealed.inputsSha256,sealSha256:sealed.sealSha256,sealedBy:sealed.sealedBy,sealedAt:sealed.sealedAt,finalScore:sealed.finalScore,sealed:sealed as unknown as Record<string,unknown>});
       auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId:sealed.competitionId,action:'RESULT_SEALED',entityType:'Result',entityId:sealed.participantId,reason:`Sealed ${sealed.finalScore} from ${sealed.contributingJudges} judges · ${sealed.sealSha256.slice(0,12)}${sealed.supersedes?` · supersedes ${sealed.supersedes.previousSealSha256.slice(0,12)} (Δ${sealed.supersedes.delta})`:''}`,requestId:String(req.headers['x-request-id']||'')});
       return res.status(201).json(sealed);
     }catch{return res.status(400).json({code:'RESULT_SEALING_FAILED'})}});
@@ -1597,8 +1609,16 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
     res.setHeader('Cache-Control','no-store');
-    // «هل خُتمت؟» تُقرأ من سجلّ الأختام لا من الطلب — وإلا أعلن المصحّحُ أنها لم تُختم.
-    const resultSealed=!!resultSealRegistry?.latestFor(actor.organizationId,competitionId,participantId);
+    /*
+     * «هل خُتمت؟» تُقرأ من سجلّ الأختام لا من الطلب — وإلا أعلن المصحّحُ أنها لم تُختم.
+     *
+     * وغيابُ السجلّ ليس جوابًا بالنفي: كان `?.` يجعل «لا سجلّ» تُقرأ «لم تُختم»، وهي أوسعُ
+     * البابين — فالتصحيح على نتيجةٍ غير مختومة أيسرُ منه على مختومة. أي أن عطلًا في
+     * التهيئة كان يفتح البابَ الأوسع صامتًا. فإن لم يوجد السجلُّ فالجواب «لا أعلم»،
+     * ولا يُبنى على «لا أعلم» قرار.
+     */
+    if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
+    const resultSealed=!!resultSealRegistry.latestFor(actor.organizationId,competitionId,participantId);
     const decision=scoreCorrectionDecision({
       actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
       appealId:String(b.appealId||''),delta:Number(b.delta),

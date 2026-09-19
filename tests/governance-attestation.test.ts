@@ -164,7 +164,9 @@ test('each attestation route reads its facts from server state, never from the r
   assert.equal(/sealedResultCount:\s*Number\(b\./.test(policy), false, 'never from the request body');
 
   const correction = routeBody('/api/results/score-correction');
-  assert.ok(correction.includes('resultSealRegistry?.latestFor('), '"is it sealed?" must come from the seal registry');
+  /* بلا `?.`: غيابُ السجلّ كان يُقرأ «لم تُختم» فيُفتح البابُ الأوسع — والمسار الآن
+     يردّ 503 قبل السؤال. انظر `tests/result-seal-registry-fail-closed.test.ts`. */
+  assert.ok(correction.includes('resultSealRegistry.latestFor('), '"is it sealed?" must come from the seal registry');
   assert.equal(/resultSealed:\s*b\./.test(correction), false, 'never from the request body');
 
   const reading = routeBody('/api/participants/reading-change');
