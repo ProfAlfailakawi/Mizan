@@ -26,6 +26,17 @@ test('the workflow exists and runs both secret-backed gates', () => {
     'R2 verification must be deep — a package present with different bytes passes a shallow check');
 });
 
+test('signing secrets are sourced from the Cloud Run deployment contract without copying values to GitHub', () => {
+  for (const name of ['MIZAN_PASS_SIGNING_SECRET', 'MIZAN_CERT_SIGNING_SECRET']) {
+    assert.ok(workflow.includes(`cloudbuild-substitution.mjs --secret "$name"`),
+      `${name} binding must be read from cloudbuild.yaml`);
+  }
+  assert.ok(workflow.includes('configured-via-secret-manager'),
+    'preflight receives only a non-secret presence marker after the binding is verified');
+  assert.equal(/secrets\.MIZAN_(PASS|CERT)_SIGNING_SECRET/.test(workflow), false,
+    'signing secret material must not be duplicated into GitHub Actions secrets');
+});
+
 test('no secret value is ever printed, not even its length or first characters', () => {
   /*
    * سجلُّ الدفعة عامّ ويبقى. وطبعُ القيمة «للتشخيص» مرّةً واحدة يكفي لنشرها، ولا
