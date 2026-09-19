@@ -5,7 +5,7 @@
 > محجوبٍ عن بيئة الوكيل.
 >
 > كُتبت في 19 سبتمبر 2026 على رأس `main` = `1479a4f`.
-> الحالة: **11/20** رواية جاهزة · **٤ موانع** · الحكم `NOT RELEASE READY`.
+> الحالة الموثقة للمصفوفة: **11/20** رواية جاهزة. سرّا التوقيع أُنجزا وربطا في الإنتاج وفي مسار النشر عبر PR #223؛ وتبقى موانع القرآن والوثائق القانونية. الحكم: `NOT RELEASE READY`.
 
 ---
 
@@ -79,54 +79,11 @@ cd ~/Mizan && npx --yes tsx scripts/kfgqpc-acquire.ts
 
 ---
 
-# ٢. المفتاحان — يرفعان مانعين
+# ٢. المفتاحان — ✅ أُنجزا وربطا
 
-## ما هما
+في 19 سبتمبر 2026 تحقّق المالك من وجود `MIZAN_PASS_SIGNING_SECRET` و`MIZAN_CERT_SIGNING_SECRET` في Secret Manager. خدمة Cloud Run الحالية `mizan` كانت مربوطة بالسرّين، ثم مُنح حساب تشغيلها `993698501419-compute@developer.gserviceaccount.com` دور `roles/secretmanager.secretAccessor` على كليهما.
 
-كلمتا سرٍّ عشوائيّتان يختم بهما الخادمُ ما لا يجوز تزويرُه.
-
-| المفتاح | ما يتعطّل بدونه |
-|---|---|
-| `MIZAN_PASS_SIGNING_SECRET` | بطاقاتُ دخول المتسابقين · **وحفظُ الأسئلة مغلقةً قبل المسابقة** |
-| `MIZAN_CERT_SIGNING_SECRET` | التحقّقُ من الشهادة — من يمسك شهادةً لا يستطيع إثباتَ صحّتها |
-
-وأخطرُهما الأول: **حفظُ الأسئلة مطفأٌ الآن**، وهو ما يمنع تسريبَ السؤال قبل موعده.
-
-## لماذا لا أفعله أنا
-
-لأنها **أسرار**. ولا أولّد سرًّا ولا أكتبه في المستودع أبدًا — لو كتبتُه صار مكشوفًا
-لكلِّ من يفتح الشيفرة، والمستودعُ عامّ.
-
-## الخطوات — من Cloud Shell
-
-```bash
-gcloud auth login
-```
-
-```bash
-openssl rand -base64 48 | gcloud secrets create MIZAN_PASS_SIGNING_SECRET --data-file=- --project=mizan-f2ce3
-```
-
-```bash
-openssl rand -base64 48 | gcloud secrets create MIZAN_CERT_SIGNING_SECRET --data-file=- --project=mizan-f2ce3
-```
-
-اعرف حسابَ الخدمة:
-
-```bash
-gcloud run services describe mizan --region=me-central1 --project=mizan-f2ce3 --format='value(spec.template.spec.serviceAccountName)'
-```
-
-خذ ناتجَه وضعه مكان `SA`:
-
-```bash
-for S in MIZAN_PASS_SIGNING_SECRET MIZAN_CERT_SIGNING_SECRET; do gcloud secrets add-iam-policy-binding "$S" --member="serviceAccount:SA" --role=roles/secretmanager.secretAccessor --project=mizan-f2ce3; done
-```
-
-**ثم قل لي حرفيًّا: «سويت الأسرار»** — وأنا أربطهما في النشر وأتحقّق.
-
-> **الترتيبُ مُلزِم ولا يُعكس:** تُنشئهما أنت أوّلًا، ثم أربطهما أنا. والربطُ قبل الإنشاء
-> يُسقط النشرَ كلَّه. ولا تربطهما أنت في `cloudbuild.yaml`.
+بعد ذلك دُمج PR #223، فأصبح `cloudbuild.yaml` يحافظ على ربط السرّين في `--update-secrets` لكل revision لاحق. لا تُعِد إنشاء السرّين ولا تدوّرهما لمجرد اتباع قائمة قديمة؛ راجع `docs/SIGNING-SECRETS.md` فقط للاستعادة أو التهيئة الجديدة.
 
 ---
 
