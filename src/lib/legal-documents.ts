@@ -124,6 +124,12 @@ export function legalConfigFromEnv(env: Record<string, string | undefined>): Leg
  *
  * ولذلك لا تُعيد هذه الدالّة وثيقةً بلا `publisher` و`level` — ومصدرُهما الحلقةُ
  * التي فازت لا الحلقةُ التي طُلبت.
+ *
+ * و`inherited` تُقاس إلى **الطبقة التي سجّل عندها المتسابق** (`registeredLevel`)، لا
+ * إلى أوّل حلقةٍ حاضرةٍ في السلسلة. والفرقُ ليس تجميلًا: `legalChainFor` لا يدفع حلقةً
+ * فارغة لمن لم ينشر — يُسقطها — فلو قيست إلى أوّل الحاضرين لصارت وثيقةُ المشغّل، حين
+ * لا تنشر الجهةُ شيئًا، تُقرأ `inherited: false` أي «هذه وثيقةُ من سجّلتَ عنده».
+ * وذلك هو الإلباسُ بعينه، وإن كان الاسمُ المعروضُ صحيحًا.
  */
 
 /** ترتيبُ البحث. الأولى هي مَن يسجّل المتسابقُ عندها. */
@@ -158,7 +164,11 @@ export type LegalResolution =
  * والنقصُ الجزئيّ في طبقةٍ ليس نشرًا فيها، فيُمضى إلى ما بعدها؛ ولا تُخلط حقولُ
  * طبقتين في وثيقةٍ واحدة — رابطٌ من هنا ونسخةٌ من هناك وثيقةٌ لم تُنشر قطّ.
  */
-export function resolveLegalDocument(chain: readonly LegalChainLink[], kind: LegalDocumentKind): LegalResolution {
+export function resolveLegalDocument(
+  chain: readonly LegalChainLink[],
+  kind: LegalDocumentKind,
+  registeredLevel: LegalPublisherLevel = LEGAL_PUBLISHER_LEVELS[0],
+): LegalResolution {
   const ordered = [...chain].sort(
     (a, b) => LEGAL_PUBLISHER_LEVELS.indexOf(a.level) - LEGAL_PUBLISHER_LEVELS.indexOf(b.level),
   );
@@ -169,7 +179,7 @@ export function resolveLegalDocument(chain: readonly LegalChainLink[], kind: Leg
     levelsTried.push(link.level);
     const state = legalDocumentState(link.config, kind);
     if (isPublished(state)) {
-      return { ...state, level: link.level, inherited: link.level !== ordered[0].level };
+      return { ...state, level: link.level, inherited: link.level !== registeredLevel };
     }
     if (!lowestMissing.length) lowestMissing = state.missing;
   }

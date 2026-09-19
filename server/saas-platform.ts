@@ -17,6 +17,7 @@ export interface PlanRecord{
  overage?:PlanOverage;
  ownerOperatorId?:string;createdAt:string;updatedAt:string;
 }
+import { CONSENT_BACKED_DOCUMENTS, isPublished, legalDocumentState } from '../src/lib/legal-documents';
 import type { LegalChainLink, LegalDocumentConfig } from '../src/lib/legal-documents';
 
 export type BillingSubjectType='operator'|'organization';
@@ -52,6 +53,35 @@ export interface ChangeRequestRecord{id:string;organizationId:string;tenantId:st
  * سلسلةُ التلبيد تكشف تغييرَ سطرٍ وحذفَه من الوسط وقلبَ الرتبة — ولا تكشف قطعَ الذيل،
  * لأن البادئةَ سلسلةٌ صحيحةٌ أقصر. فيلزمها شاهدٌ من خارجها يقول «كان الطولُ كذا».
  */
+/*
+ * اشتراكُ الجهة هو مدّةُ سريان وثائقها.
+ *
+ * قرارُ المالك في 19 سبتمبر 2026: «المشغّل أو الجهة مدّتُه سنة إلا إذا جدّدنا له،
+ * ويقف لمّا نوقف الاشتراك عليه». فوثيقةُ جهةٍ انتهى ترخيصُها أو أُوقف ليست وثيقةً
+ * سارية، ولا تُعرض على متسابقٍ ليوافق عليها.
+ *
+ * وإسقاطُها لا يُخفي شيئًا ولا يُلبس أحدًا ثوبَ أحد: السلسلةُ تنزل إلى المشغّل ثم
+ * المنصّة، و`resolveLegalDocument` تُرجع ناشرَ الحلقة الفائزة — فيقرأ المتسابق اسمَ
+ * من نشر الوثيقة فعلًا، ويُسجَّل في أثر موافقته.
+ *
+ * والمهلة (`grace_period`) سريان: الجهةُ ما زالت تعمل فيها، فوثيقتُها ما زالت وثيقتَها.
+ * وانقضاءُ `expiresAt` يُسقط السريان ولو بقيت الحالةُ مكتوبةً `active` — فالتاريخُ
+ * أصدقُ من حقلٍ لم يُحدَّث.
+ */
+export function licenseInForce(license:LicenseRecord|undefined,at:number=Date.now()):boolean{
+ if(!license)return false;
+ if(license.status!=='active'&&license.status!=='grace_period')return false;
+ const startsAt=Date.parse(license.startsAt),expiresAt=Date.parse(license.expiresAt);
+ if(!Number.isFinite(startsAt)||!Number.isFinite(expiresAt))return false;
+ if(at<startsAt)return false;
+ if(at>=expiresAt){
+  if(license.status!=='grace_period')return false;
+  const graceUntil=license.graceUntil?Date.parse(license.graceUntil):NaN;
+  if(!Number.isFinite(graceUntil)||at>=graceUntil)return false;
+ }
+ return true;
+}
+
 export interface AuditAnchor{rows:number;lastHash:string;updatedAt:string}
 
 export interface AuditRow{id:string;sequence:number;timestamp:string;actorId:string;actorRole:string;tenantId?:string;organizationId?:string;action:string;entityType:string;entityId:string;reason?:string;previousHash:string;hash:string}
@@ -114,13 +144,14 @@ export class SaaSPlatformRepository{
   * وما لا وثيقةَ له لا يُمثَّل بحلقةٍ فارغة تُوهم أنه نشر شيئًا: يُترك، فتنزل السلسلة
   * إلى من بعده، ويُعلَن اسمُه هو.
   */
- legalChainFor(organizationId:string):LegalChainLink[]{
+ legalChainFor(organizationId:string,at:number=Date.now()):LegalChainLink[]{
   const state=this.read();
   const organization=state.organizations.find(x=>x.id===organizationId);
   const chain:LegalChainLink[]=[];
-  if(organization?.legal)chain.push({level:'organization',config:organization.legal});
+  const license=organization?state.licenses.find(x=>x.organizationId===organization.id):undefined;
+  if(organization?.legal&&licenseInForce(license,at))chain.push({level:'organization',config:organization.legal});
   const operator=organization?.operatorId?state.operators.find(x=>x.id===organization.operatorId):undefined;
-  if(operator?.legal)chain.push({level:'operator',config:operator.legal});
+  if(operator?.legal&&operator.status==='active')chain.push({level:'operator',config:operator.legal});
   return chain;
  }
  // Owner-console tenants: every SaaS organization (operator-owned or direct) exposed as a tenant row
@@ -233,6 +264,36 @@ export class SaaSPlatformRepository{
   return {activeSubscriptions:subs.filter(x=>x.status==='active').length,canceledSubscriptions:subs.filter(x=>x.status==='canceled').length,paidInvoices:paid.length,openInvoices:open.length,overdueInvoices:overdue.length,collected:byCurrency(paid),outstanding:byCurrency(open),overdue:byCurrency(overdue),revenueByMonth:months}}
  createOperator(actor:CommercialActor,input:{name:string;pricingTier?:string;whiteLabelLevel?:OperatorRecord['whiteLabelLevel']}){this.super(actor);return this.mutate(s=>{const op:OperatorRecord={id:this.next(s,'OP'),name:clean(input.name,120),status:'active',pricingTier:clean(input.pricingTier||'standard',40),whiteLabelLevel:input.whiteLabelLevel||'mizan',createdAt:now()};if(!op.name)throw new Error('OPERATOR_NAME_REQUIRED');s.operators.push(op);this.audit(s,actor,{action:'OPERATOR_CREATED',entityType:'operator',entityId:op.id});return op})}
  updateOperator(actor:CommercialActor,operatorId:string,input:{name?:string;status?:OperatorRecord['status'];pricingTier?:string;whiteLabelLevel?:OperatorRecord['whiteLabelLevel'];storageCapBytes?:number}){this.super(actor);return this.mutate(s=>{const op=s.operators.find(x=>x.id===operatorId);if(!op)throw new Error('OPERATOR_NOT_FOUND');if(input.name!==undefined){const name=clean(input.name,120);if(!name)throw new Error('OPERATOR_NAME_REQUIRED');op.name=name}if(input.status&&['active','suspended'].includes(input.status))op.status=input.status;if(input.pricingTier!==undefined)op.pricingTier=clean(input.pricingTier,40)||'standard';if(input.whiteLabelLevel&&['mizan','co_branded','full'].includes(input.whiteLabelLevel))op.whiteLabelLevel=input.whiteLabelLevel;if(input.storageCapBytes!==undefined)op.storageCapBytes=positive(input.storageCapBytes)||undefined;this.audit(s,actor,{action:'OPERATOR_UPDATED',entityType:'operator',entityId:op.id,reason:`${op.name} · ${op.status} · ${op.pricingTier} · ${op.whiteLabelLevel}`});return op})}
+ /*
+  * نشرُ وثائق طبقةٍ باسمها.
+  *
+  * كانت الحقولُ (`OperatorRecord.legal` و`OrganizationRecord.legal`) موجودةً وقارئُها
+  * `legalChainFor` موجودًا — **ولا كاتبَ لهما أصلًا**. فكانت السلسلةُ تخرج فارغةً دائمًا
+  * ويسقط الجميعُ إلى وثيقة المنصّة: نموذجٌ ثلاثيُّ الطبقات لا يُستعمل منه إلا طبقةٌ واحدة.
+  *
+  * والنشرُ فعلٌ يُسأل عنه صاحبُه، فيُكتب في سجلّ التدقيق باسم فاعله. والتنظيفُ هنا
+  * يقتصر على القصّ، ولا يُكمل ناقصًا: صحّةُ الوثيقة يحكم بها `legalDocumentState`
+  * وحدَه عند القراءة، فالنقصُ الجزئيّ يبقى `LEGAL_DOCUMENT_NOT_PUBLISHED` ولا يُحتجّ به.
+  * و`null` سحبٌ للنشر — تنزل السلسلةُ بعده إلى من فوقه باسمه هو.
+  */
+ private normalizeLegal(input:LegalDocumentConfig|null|undefined):LegalDocumentConfig|undefined{
+  if(!input)return undefined;
+  const documents:LegalDocumentConfig['documents']={};
+  for(const kind of CONSENT_BACKED_DOCUMENTS){
+   const entry=input.documents?.[kind];if(!entry)continue;
+   documents[kind]={version:clean(entry.version,40)||undefined,effectiveDate:clean(entry.effectiveDate,10)||undefined,url:clean(entry.url,500)||undefined};
+  }
+  const entityName=clean(input.entityName,180)||undefined;
+  if(!entityName&&!Object.keys(documents).length)return undefined;
+  return {entityName,documents};
+ }
+ private legalAuditReason(config:LegalDocumentConfig|undefined){
+  if(!config)return 'legal documents withdrawn';
+  const published=CONSENT_BACKED_DOCUMENTS.filter(kind=>isPublished(legalDocumentState(config,kind)));
+  return `${config.entityName||'(no entity name)'} · published: ${published.join(', ')||'none'}`;
+ }
+ setOperatorLegal(actor:CommercialActor,operatorId:string,legal:LegalDocumentConfig|null){this.super(actor);return this.mutate(s=>{const op=s.operators.find(x=>x.id===operatorId);if(!op)throw new Error('OPERATOR_NOT_FOUND');op.legal=this.normalizeLegal(legal);this.audit(s,actor,{action:'OPERATOR_LEGAL_DOCUMENTS_SET',entityType:'operator',entityId:op.id,reason:this.legalAuditReason(op.legal)});return op})}
+ setOrganizationLegal(actor:CommercialActor,organizationId:string,legal:LegalDocumentConfig|null){this.super(actor);return this.mutate(s=>{const org=s.organizations.find(x=>x.id===organizationId);if(!org)throw new Error('ORGANIZATION_NOT_FOUND');org.legal=this.normalizeLegal(legal);this.audit(s,actor,{tenantId:org.tenantId,organizationId:org.id,action:'ORGANIZATION_LEGAL_DOCUMENTS_SET',entityType:'organization',entityId:org.id,reason:this.legalAuditReason(org.legal)});return org})}
  deleteOperator(actor:CommercialActor,operatorId:string){this.super(actor);return this.mutate(s=>{const index=s.operators.findIndex(x=>x.id===operatorId);if(index<0)throw new Error('OPERATOR_NOT_FOUND');if(s.organizations.some(x=>x.operatorId===operatorId))throw new Error('OPERATOR_HAS_ORGANIZATIONS');if(this.creditBalance(s,operatorId)!==0)throw new Error('OPERATOR_HAS_CREDIT_BALANCE');const op=s.operators[index];s.operators.splice(index,1);s.creditLedger=s.creditLedger.filter(x=>x.operatorId!==operatorId);this.audit(s,actor,{action:'OPERATOR_DELETED',entityType:'operator',entityId:operatorId,reason:op.name});return {id:operatorId,name:op.name}})}
  creditBalance(s:State,operatorId:string){return s.creditLedger.filter(x=>x.operatorId===operatorId).reduce((n,x)=>n+x.quantity,0)}
  adjustCredits(actor:CommercialActor,operatorId:string,quantity:number,reason:string,kind:CreditLedgerRow['kind']='admin_adjustment'){this.super(actor);if(!Number.isInteger(quantity)||quantity===0)throw new Error('CREDIT_QUANTITY_INVALID');if(clean(reason).length<3)throw new Error('REASON_REQUIRED');return this.mutate(s=>{const op=s.operators.find(x=>x.id===operatorId);if(!op)throw new Error('OPERATOR_NOT_FOUND');const balance=this.creditBalance(s,operatorId)+quantity;if(balance<0)throw new Error('INSUFFICIENT_LICENSE_CREDITS');const row:CreditLedgerRow={id:this.next(s,'CR'),operatorId,kind,quantity,balanceAfter:balance,reason:clean(reason,300),createdAt:now(),actorId:actor.uid};s.creditLedger.push(row);this.audit(s,actor,{action:'LICENSE_CREDITS_ADJUSTED',entityType:'operator',entityId:operatorId,reason});return row})}
