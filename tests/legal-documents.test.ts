@@ -104,12 +104,20 @@ test('the environment reader invents no default — an unset entity stays unset'
   assert.ok(isPublished(legalDocumentState(configured, 'privacy')));
 });
 
-test('registration writes the document version, and no longer the policy version', () => {
+test('registration writes the document version and its publisher, never the policy version', () => {
+  /*
+   * تغيّر الإملاء في 19 سبتمبر 2026 حين صارت الوثائقُ على ثلاث طبقات: `consentVersionFor`
+   * تأخذ إعدادًا واحدًا، والتسجيلُ صار يمرّ بسلسلةٍ فيُخرج ناشرًا مع النسخة. والقصدُ
+   * نفسُه لم يتغيّر، وزاد عليه أن الناشرَ يُكتب — فالنسخةُ وحدها لا تميّز جهتين.
+   */
   const registration = fs.readFileSync(path.join(process.cwd(), 'server', 'public-registration.ts'), 'utf8');
-  assert.ok(registration.includes('consentDocumentVersion(kind)'), 'consent must carry the document version');
+  assert.ok(registration.includes('consentProvenance(kind)'), 'consent must carry the document provenance');
   assert.equal(/kind,version:policy\.version/.test(registration), false,
     'the competition policy version must never be written as a consent version again');
-  assert.ok(registration.includes('consentVersionFor('), 'and it must come from the shared registry');
+  assert.ok(registration.includes('consentVersionOf('), 'and the version format must come from the shared registry');
+  for (const field of ['publisher:resolved.publisher', 'publisherLevel:resolved.level', 'documentUrl:resolved.url']) {
+    assert.ok(registration.includes(field), `the record must carry ${field} — a version alone cannot tell two publishers apart`);
+  }
 });
 
 test('go-live refuses to launch a deployment that collects consent for nothing', () => {
