@@ -22,8 +22,18 @@ const read = (p: string) => fs.readFileSync(p, 'utf8');
 
 test('the judge cockpit fills the screen exactly once and never scrolls as a page', () => {
   const css = read('src/index.css');
+  const judge = read('src/components/judge/JudgeOS.tsx');
 
-  assert.match(css, /\.mizan-judge-os\{\s*\n\s*height:calc\(100dvh - 64px - var\(--mizan-shell-pb, 0px\)\);/, 'the cockpit is exactly one screen tall');
+  /*
+   * وارتفاعها يُقاس، ولا يُخمَّن.
+   *
+   * كان مكتوبًا `100dvh - 64px` على أن ترويسة التطبيق 64px — وهي 65 بحدّها السفلي. فيفيض
+   * بكسلٌ واحد ويظهر شريط تمرير على الشاشة التي كُتبت كلّها لئلا تُمرَّر، ويعود الفيض
+   * كلّما تغيّرت الترويسة. فصار موضع القمرة يُقرأ من الصفحة ويُطرح.
+   */
+  assert.match(css, /\.mizan-judge-os\{[\s\S]{0,200}?height:calc\(100dvh - var\(--mizan-judge-top, 64px\) - var\(--mizan-shell-pb, 0px\)\);/, 'the cockpit measures its own top');
+  assert.match(judge, /getBoundingClientRect\(\)\.top/, 'and the measurement comes from the page itself');
+  assert.match(judge, /'--mizan-judge-top'/, 'published as the variable the stylesheet subtracts');
 
   /*
    * وحشوةُ الهيكل تُطرح لأنها معلَنة، لا مخمَّنة.
@@ -34,45 +44,82 @@ test('the judge cockpit fills the screen exactly once and never scrolls as a pag
    */
   const app = read('src/App.tsx');
   assert.match(app, /'--mizan-shell-pb':IS_DEMO_SESSION\?'7rem':'0px'/, 'the shell publishes its own reserve');
-  assert.match(css, /\.mizan-judge-os\{[\s\S]{0,300}?overflow:hidden;/, 'and the page itself does not scroll');
+  assert.match(css, /\.mizan-judge-os\{[\s\S]{0,400}?overflow:hidden;/, 'and the page itself does not scroll');
 
   /* `dvh` لا `vh`: شريط متصفّح الجوال يتمدّد، و`vh` يقيس الحالة الكبرى فتُقصّ اللوحة. */
   assert.doesNotMatch(css, /\.mizan-judge-os\{\s*\n\s*height:calc\(100vh/, 'a mobile browser bar would crop a vh-sized cockpit');
 
-  /* ويُمرَّر ما بداخلها إن طال — وهذا ما يجعل الخارج ثابتًا. */
-  assert.match(css, /\.mizan-judge-page\{[^}]*min-height:0;[^}]*overflow:auto/, 'the Mushaf scrolls inside its own box');
-  assert.match(css, /\.mizan-judge-deck\{[^}]*min-height:0;[^}]*overflow:auto/, 'and so does the deck');
+  /*
+   * وما يُمرَّر بداخلها شيءٌ واحد: جسم المصحف. واللوحة لا تُمرَّر بحال — صفوف المفاتيح
+   * تقتسم ما بقي بعد الرأس والذيل، فمهما زاد عددها أو قصرت الشاشة بقي زرّ الإنهاء ظاهرًا.
+   * وقد كانت تحتاج على آيباد أفقي 646px ولديها 560px، فيختفي الإنهاء تحت الطيّ.
+   */
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-body\{[\s\S]{0,200}?overflow:auto/, 'the Mushaf scrolls inside its own box');
+  assert.match(css, /\.mizan-judge-deck\{[\s\S]{0,300}?grid-template-rows:auto minmax\(0,1fr\) auto/, 'the deck gives its middle row all the slack');
+  assert.match(css, /\.mizan-judge-pad\{[\s\S]{0,260}?grid-auto-rows:minmax\(0,1fr\)/, 'and the keys divide it evenly instead of overflowing');
 });
 
-test('the top strip is gone, and nothing it carried was lost', () => {
+test('the data strip returns — but it never stands between the judge and the page', () => {
   const css = read('src/index.css');
   const judge = read('src/components/judge/JudgeOS.tsx');
 
-  /* الشريط نفسه: لا صنفَ له ولا استعمال. */
-  assert.doesNotMatch(css, /\.mizan-judge-strip/, 'the sticky top strip is removed from the stylesheet');
-  assert.doesNotMatch(judge, /mizan-judge-strip/, 'and from the screen');
+  /*
+   * الشريط عاد بطلب صاحب المنتج، ولم يعد الشريط القديم.
+   *
+   * القديم كان صفًّا لاصقًا يقتطع من ارتفاع المصحف طوال الجلسة ليعرض ما يُقرأ مرةً واحدة
+   * عند الاستقبال. والجديد طبقةٌ فوق الشاشة لا تأخذ من ارتفاعها شيئًا: تظهر وحدها مع كل
+   * متسابق وكل موضع، ثم تنسحب. وهذا ما يحرسه ما يلي — أن يبقى طبقةً لا صفًّا.
+   */
+  assert.match(css, /\.mizan-judge-strip\{[\s\S]{0,120}?position:absolute/, 'the strip is an overlay, not a row that steals height');
+  assert.match(css, /\.mizan-judge-strip\{[\s\S]{0,600}?transform:translateY\(-102%\);\s*opacity:0;\s*pointer-events:none;/, 'and it is withdrawn by default');
+  assert.match(css, /\.mizan-judge-os\[data-peek="true"\] \.mizan-judge-strip\{ transform:none/, 'revealed only when asked for');
 
-  /* وما كان فيه انتقل إلى رأس اللوحة: الاسم، والحالة، والمؤقّت، وموضع السؤال. */
-  assert.match(judge, /mizan-judge-brief/, 'the deck carries a brief instead');
-  assert.match(judge, /\{formatTime\(elapsed\)\}/, 'the session clock survived');
-  assert.match(judge, /<Ratio value=\{activeSession\.currentQuestionIndex\+1\} of=\{totalQuestions\}\/>/, 'so did the passage counter');
+  /* يظهر وحده عند الاستقبال، ويعود حين تقترب اليد من أعلى الشاشة. */
+  assert.match(judge, /showStrip\(5000\)/, 'it shows itself when a participant is received');
+  assert.match(judge, /clientY<=112/, 'and returns when the hand approaches the top edge');
+  /* وعلى لوحٍ لا مؤشّر فيه يبقى مقبضٌ يُلمس. */
+  assert.match(css, /\.mizan-judge-handle\{/, 'a handle exists for input that cannot hover');
+  assert.match(judge, /mizan-judge-handle/);
+
+  /* وما يُحتاج إليه أثناء التلاوة لا يدخل الشريط: المؤقّت والحصيلة يبقيان في اللوحة دائمًا. */
+  assert.match(judge, /\{formatTime\(elapsed\)\}/, 'the session clock stays permanently on the deck');
+  assert.match(css, /\.mizan-judge-hud\{/, 'beside the running deduction');
+
+  /* وما يُقرأ مرةً واحدة يدخله: من أمامي، وأين نحن من المواضع. */
+  assert.match(judge, /<Ratio value=\{activeSession\.currentQuestionIndex\+1\} of=\{Math\.max\(1,totalQuestions\)\}\/>/, 'the passage counter moved into it');
   assert.match(judge, /\{displayName\|\|'—'\}/, 'and who is in front of the judge');
+  /* والاسم يخرج من قناع حجب الهوية نفسه، فلا يكشف الشريط ما تحجبه سياسة التحكيم الأعمى. */
+  assert.match(judge, /const displayName=masked\.displayName;/, 'through the same blindness mask as everywhere else');
 });
 
-test('every scoring button is the same size, and it is a thumb’s size — not a card', () => {
+test('the timer stops when the assessment is locked', () => {
+  const judge = read('src/components/judge/JudgeOS.tsx');
+  /* عدّادٌ يواصل الزحف على جلسةٍ انتهت يقول زمنًا لم يُحكَّم فيه أحد. */
+  const effect = judge.match(/useEffect\(\(\)=>\{setElapsed\(store\.sessionElapsedSeconds\(\)\);[\s\S]*?\}\,\[store[^\]]*\]\);/)?.[0] || '';
+  assert.ok(effect.includes('if(activeSession.isLocked)return;'), 'no interval is armed once the session is locked');
+  assert.ok(effect.includes('activeSession.isLocked]'), 'and the effect re-runs when it locks');
+});
+
+test('ending a passage takes two presses, and undo says nothing but shows everything', () => {
   const css = read('src/index.css');
+  const judge = read('src/components/judge/JudgeOS.tsx');
 
-  const action = css.match(/\.mizan-judge-action\{[\s\S]*?\}/)?.[0] || '';
-  const height = Number(action.match(/min-height:(\d+)px/)?.[1] || 0);
-  assert.ok(height >= 44, `a touch target must stay reachable (got ${height}px)`);
-  assert.ok(height <= 72, `a scoring button is not a card (got ${height}px)`);
+  /* لمسةٌ واحدة خاطئة في قاعةٍ مزدحمة كانت تُنهي تلاوةً جارية. */
+  assert.match(judge, /setFinishArmed\(true\)/, 'the first press arms');
+  assert.match(judge, /'تأكيد الإنهاء'/, 'and says so');
+  assert.match(judge, /armTimerRef\.current=window\.setTimeout\(\(\)=>setFinishArmed\(false\),2500\)/, 'and disarms itself if left alone');
 
-  /* مقاسٌ واحد لكل زرّ: الخصم يغيّر لون العمود وحجم رقمه، لا ارتفاع الزرّ. */
-  assert.doesNotMatch(css, /\.mizan-judge-action\[data-weight="high"\]\{[^}]*min-height/, 'severity must not change the button height');
-  assert.doesNotMatch(css, /\.mizan-judge-deck \.mizan-judge-action\{[^}]*min-height/, 'and neither does where it is rendered');
-
-  /* والعمود اللوني باقٍ: هو ما يقول أيَّ معيارٍ تسجّل وكم يكلّف، بلا تضخيم الزرّ. */
-  assert.match(css, /\.mizan-judge-action\[data-weight="high"\]\{ --ja-weight:\d+px/, 'the weight spine still encodes the penalty');
+  /*
+   * والتراجع أيقونةٌ بلا كلمة — بطلب صاحب المنتج — لكنها ليست خرساء: تأخذ لون المعيار
+   * الذي سُجِّل آخرًا، وتنطفئ حين لا شيء يُلغى، ويبقى اسمُه في وصفها المنطوق. فلا يُلغى
+   * ما لم يُقصد، ولا يُحبس قارئ الشاشة خلف أيقونةٍ صامتة.
+   */
+  assert.match(judge, /className=\{`mizan-judge-undo jt-\$\{lastTone\}`\}/, 'undo wears the tone of the mark it would remove');
+  assert.match(judge, /disabled=\{!lastEvent\}/, 'and is dark when there is nothing to remove');
+  assert.match(judge, /aria-label=\{lastEvent\?`\$\{ar\?'تراجع عن ':'Undo '\}\$\{lastLabel\}`/, 'the name survives for anyone reading by voice');
+  assert.doesNotMatch(css, /\.mizan-judge-undo[^}]*content:/, 'no text is drawn on the button itself');
+  /* وينزل في الكومة ملاحظةً ملاحظة: `undoLastJudgeEvent` تعكس آخر غير معكوسة في كل مرة. */
+  assert.match(judge, /const lastEvent=\[\.\.\.activeSession\.events\]\.reverse\(\)\.find\(e=>!e\.reversed\);/, 'the stack is peeled one mark at a time');
 });
 
 test('the Mushaf page is sized from what is left on screen, not a fixed share of it', () => {

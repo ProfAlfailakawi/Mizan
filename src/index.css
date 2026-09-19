@@ -759,136 +759,238 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
      hue    = which criterion is being marked (stable, learnable by position)
      weight = what it costs (the penalty, promoted to the loudest figure)
    ═══════════════════════════════════════════════════════════════════════════ */
-/* grid-auto-rows:1fr keeps every card the same height across rows: the severity tiers
-   change the penalty's font size, which otherwise made one row 3px taller than another. */
-/* المحكّم يعمل واقفًا، والجهاز على مسافة ذراع، والمتسابق أمامه لا ينتظر. كل شيء هنا
-   مكبَّر عمدًا: الزرّ يُصاب بالإبهام دون تصويب، واسمه وخصمه يُقرآن بنظرةٍ واحدة. */
 /*
- * قمرة المحكّم — تملأ الشاشة مرّةً واحدة ولا تُمرَّر.
+ * قمرة المحكّم — سطحان لا أكثر: ورقةٌ تُقرأ، ولوحةٌ تُضغط.
  *
- * كانت صفحةً تُمرَّر: شريطٌ لاصق فوق يحمل الاسم والمؤقّت، ثم المصحف، ثم لوحةُ أزرارٍ
- * لاصقة تحت. والنتيجة أن المصحف — وهو الشيء الوحيد الذي يُنظر إليه فعلًا أثناء التلاوة —
- * يقع بين شريطين يأكلان من ارتفاعه، ويُمرَّر ليُرى تمامًا. والمحكّم لا يملك يدًا للتمرير:
- * إحداهما على الزرّ والأخرى على المصحف، وأمامه متسابقٌ يقرأ.
+ * كانت الشاشة كلها بيضاء بدرجة ورقة المصحف نفسها، فلا شيء يقود العين، والورقةُ — وهي بيت
+ * القصيد — قطعةٌ بيضاء وسط بياض. فصارت القمرة تخفت كإضاءة القاعة، ويبقى الضوء على الورقة
+ * وحدها: تملأ لوحها من حافة إلى حافة بلا بطاقة ولا إطار، وتحمل هالتها في وسطها.
  *
- * فصارت قمرةً بارتفاع الشاشة بالضبط (`100dvh` ناقص ترويسة التطبيق)، لا تُمرَّر بحال:
- * المصحف يأخذ ما بقي بعد اللوحة، ويُمرَّر هو وحده إن طال. والشريط العلوي حُذف ولم يُفقد
- * ما فيه: الاسم والمؤقّت وموضعُ السؤال انتقلت إلى رأس اللوحة، فبقيت مقروءةً دائمًا بلا
- * أن تقتطع شريطًا عرضيًّا من فوق المصحف.
+ * واللوحة عملٌ خالص، بثلاث طبقات لا تُمرَّر بحال: حصيلةٌ ومؤقّت فوق، ومفاتيحُ ترتفع بما بقي
+ * (`grid-auto-rows:minmax(0,1fr)` يقسّم المتاح مهما كان عددها)، وذيلٌ مثبّت فيه الإنهاء
+ * والتراجع. وكانت اللوحة تحتاج على آيباد أفقي 646px ولديها 560px، فيختفي زرّ الإنهاء تحت
+ * الطيّ في اللحظة التي يحتاجه فيها المحكّم.
  *
- * و`dvh` لا `vh`: شريط متصفّح الجوال يتمدّد وينكمش، و`vh` يقيس الحالة الكبرى فتُقصّ
- * اللوحة من تحت في اللحظة التي يحتاجها فيها المحكّم.
+ * وبيانات الجلسة كلها — من أمامي، ولجنته، وفئته، والمقطع، وأين نحن من المواضع — انتقلت إلى
+ * شريطٍ علويّ يظهر عند استقبال المتسابق ثم ينسحب. فما يُقرأ مرةً واحدة لا يأخذ مكانًا دائمًا
+ * أمام عينٍ مشغولة بالتلاوة.
+ *
+ * وألوان المعايير: الطبقة كانت تُعرّف `.ja-memorization` بينما الزرّ يحمل
+ * `ja-crit-memorization` — لأن `getEnabledJudgeActions` تُبدّل اسم المعيار بمعرّفه في
+ * اللائحة. فلم يظهر لونٌ ولا عدّاد قط. الطبقة الآن تُسمّى بنبرة المعيار بعد ردّها إلى أصلها.
  */
 .mizan-judge-os{
-  height:calc(100dvh - 64px - var(--mizan-shell-pb, 0px));
-  display:grid; grid-template-rows:minmax(0,1fr) auto; gap:.7rem;
-  padding:.7rem .85rem calc(.7rem + env(safe-area-inset-bottom));
-  overflow:hidden;
+  --jc-paper:#e9e2cf;
+  --jc-paper-ink:#26271f;
+  --jc-gold:#c7a968;
+  position:relative;
+  height:calc(100dvh - var(--mizan-judge-top, 64px) - var(--mizan-shell-pb, 0px));
+  display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto;
+  overflow:hidden; background:var(--venue-deep); color:var(--venue-ink);
 }
 @media (min-width:1024px){
-  /* على العريضة تصير اللوحة عمودًا: الفراغ الجانبي مهدورٌ أصلًا، والمصحف مضغوطٌ رأسيًا. */
-  .mizan-judge-os{ grid-template-columns:minmax(0,1fr) minmax(280px,330px); grid-template-rows:minmax(0,1fr); gap:1rem; padding:1rem 1.15rem }
-}
-/* كلٌّ منهما يُمرَّر داخل نفسه إن طال، ولا يُمرَّر ما حوله. `min-height:0` شرط ذلك في الشبكة. */
-.mizan-judge-page{ min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain }
-.mizan-judge-deck{ min-width:0; min-height:0; display:flex; flex-direction:column; gap:.55rem; overflow:auto; overscroll-behavior:contain }
-/*
- * على الهاتف تُحَدّ اللوحة بنصف الشاشة، لأن `auto` تأخذ ما تحتاجه فتُخنق صفحة المصحف.
- *
- * وستّة أزرارٍ في صفّين، ورأسٌ، وموضعٌ، وزرُّ إنهاء — مجموعها يفوق نصف شاشة الهاتف، فتبقى
- * للمصحف كفٌّ من ارتفاع. والمصحف هو ما يُقرأ، فله النصيب الأول؛ واللوحة تُمرَّر داخل حدّها.
- *
- * والحدّ بـ`dvh` لا بنسبةٍ مئوية: النسبة تُحسب على مساحةٍ في الشبكة ارتفاعُها `auto`، أي
- * على ما يقرّره المحتوى نفسه — دورٌ يحلّه المتصفّح بما لا يُتوقَّع. جُرِّب فخرجت اللوحة
- * مقصوصةً وتحتها فراغ. والوحدة المرئية لا تدور: نصفُ الشاشة نصفُها.
- */
-@media (max-width:1023px){ .mizan-judge-deck{ max-height:50dvh } }
-
-/* رأس اللوحة: ما كان في الشريط العلوي، في سطرٍ واحد لا يزاحم المصحف. */
-.mizan-judge-brief{
-  display:flex; align-items:center; justify-content:space-between; gap:.75rem;
-  padding:.6rem .8rem; border-radius:16px;
-  background:var(--surface); border:1px solid var(--line);
+  .mizan-judge-os{ grid-template-columns:minmax(0,1fr) clamp(272px,27vw,344px); grid-template-rows:minmax(0,1fr) }
 }
 
-/*
- * الأزرار: مقاسٌ واحد متناسق، لا بطاقاتٌ عملاقة.
- *
- * كانت ١٥٢px ارتفاعًا (١٧٢ على الواسعة) بأيقونة ٥٤px ورقمِ خصمٍ بحجم ٣٠px — فستّة منها
- * تأكل شاشةً كاملة، وتبقى ضخامتها بلا فائدة: الإبهام يصيب ٥٦px بلا تصويب، وما زاد عن ذلك
- * مساحةٌ تُؤخذ من المصحف بلا مقابل. والمقاس الآن واحدٌ لكل زرّ مهما اختلف خصمه، فالصفّ
- * مستوٍ تقرؤه العين دفعةً واحدة.
- */
-.mizan-judge-grid{ display:grid; gap:.5rem; grid-template-columns:repeat(2,1fr) }
-@media (min-width:1024px){ .mizan-judge-grid{ grid-template-columns:1fr } }
+/* ── الورقة: سطح القراءة، لا بطاقة ولا شريط يقتطع منها ───────────────── */
+.mizan-judge-page{
+  position:relative; min-width:0; min-height:0; overflow:hidden; color:var(--jc-paper-ink);
+  background:radial-gradient(ellipse at 50% 42%, rgba(255,255,255,.24), transparent 58%), var(--jc-paper);
+}
+/* ظلٌّ عند الدرز: الورقة تبدو منحنيةً نحو كعبها لا مقصوصةً بخط */
+.mizan-judge-page::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
+  box-shadow:inset 0 -18px 34px rgba(42,36,20,.06);
+}
+@media (min-width:1024px){ .mizan-judge-page::after{ box-shadow:inset -20px 0 40px rgba(42,36,20,.06) } }
+.mizan-judge-paper{
+  position:relative; z-index:1; height:100%; min-height:0; overflow:hidden;
+  display:flex; flex-direction:column; padding:.85rem .95rem 1rem;
+}
+
+/* ── الشريط العلوي: كل البيانات، يظهر عند الاستقبال ثم ينسحب ─────────── */
+.mizan-judge-strip{
+  position:absolute; z-index:20; top:0; inset-inline:0;
+  display:flex; align-items:center; gap:.65rem; flex-wrap:wrap;
+  padding:.5rem clamp(.85rem,2vw,1.35rem);
+  background:rgba(16,26,22,.93); backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--venue-line); color:var(--venue-ink);
+  transform:translateY(-102%); opacity:0; pointer-events:none;
+  transition:transform .42s var(--ease-brand), opacity .28s ease;
+}
+.mizan-judge-os[data-peek="true"] .mizan-judge-strip{ transform:none; opacity:1; pointer-events:auto }
+.mizan-judge-strip .js-who{ font-family:var(--font-display); font-size:calc(16px * var(--mizan-text-scale)); font-weight:800; letter-spacing:-.01em; min-width:0 }
+.mizan-judge-strip .js-fact{ font-size:calc(11.5px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-muted); white-space:nowrap }
+.mizan-judge-strip .js-fact b{ color:var(--venue-ink); font-weight:700 }
+.mizan-judge-strip .js-div{ width:1px; height:18px; background:var(--venue-line); flex:0 0 auto }
+.mizan-judge-strip .js-dots{ display:inline-flex; gap:3px; vertical-align:middle }
+.mizan-judge-strip .js-dots i{ width:15px; height:3px; border-radius:99px; background:var(--venue-line) }
+.mizan-judge-strip .js-dots i[data-on]{ background:#8ec5a8 }
+.mizan-judge-strip .js-rub{ display:inline-flex; align-items:center; gap:.3rem; font-size:calc(10.5px * var(--mizan-text-scale)); font-weight:700; color:var(--venue-muted) }
+.mizan-judge-strip .js-rub i{ width:7px; height:7px; border-radius:2px; background:var(--ja-ink,var(--venue-faint)) }
+/* المقبض: أثرٌ رفيع يقول أين تُلمس، ويغيب حين يظهر الشريط */
+.mizan-judge-handle{
+  position:absolute; z-index:21; top:0; left:50%; transform:translateX(-50%);
+  width:76px; height:20px; display:grid; place-items:start center; padding-top:5px;
+  background:transparent; border:0; opacity:.45; transition:opacity .25s ease;
+}
+.mizan-judge-handle::before{ content:""; width:38px; height:3px; border-radius:99px; background:var(--jc-gold) }
+.mizan-judge-handle:hover{ opacity:.95 }
+.mizan-judge-os[data-peek="true"] .mizan-judge-handle{ opacity:0; pointer-events:none }
+
+/* ── اللوحة: ثلاث طبقات، الوسطى وحدها تتمدّد ─────────────────────────── */
+.mizan-judge-deck{
+  min-width:0; min-height:0;
+  display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:.55rem;
+  background:linear-gradient(180deg,var(--venue),var(--venue-deep));
+  border-top:1px solid var(--venue-line);
+  padding:.8rem .75rem calc(.8rem + env(safe-area-inset-bottom));
+}
+@media (max-width:1023px){
+  .mizan-judge-deck{ max-height:52dvh }
+  /* لا مؤشّر على الهاتف ولا لوحة مفاتيح: الإبهام وحده، فيرتفع المفتاح عن أرضيته. */
+  .mizan-judge-action{ min-height:60px }
+}
+@media (min-width:1024px){ .mizan-judge-deck{ border-top:0; border-inline-start:1px solid rgba(0,0,0,.45) } }
+/* الوسطى وحدها تتمدّد: المفاتيح تأخذ ضعف ما تأخذه الدرجات المباشرة حين يجتمعان،
+   وكلٌّ منهما يأخذ المتاح كلّه حين ينفرد. */
+.mizan-judge-mid{ min-height:0; display:flex; flex-direction:column; gap:.5rem }
+.mizan-judge-direct{ flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; display:grid; gap:.4rem; align-content:start }
+
+/* الحصيلة والمؤقّت */
+.mizan-judge-hud{ display:flex; align-items:flex-end; justify-content:space-between; gap:.6rem; padding:0 .15rem .55rem; border-bottom:1px solid var(--venue-line) }
+.mizan-judge-hud .m{ display:flex; flex-direction:column; gap:.2rem; min-width:0 }
+.mizan-judge-hud .m:last-child{ align-items:flex-end }
+.mizan-judge-hud b{ font-family:var(--font-display); font-size:calc(26px * var(--mizan-text-scale)); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.03em }
+.mizan-judge-hud span{ font-size:calc(10px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-faint) }
+.mizan-judge-hud .m[data-loss] b{ color:var(--jc-gold) }
+.mizan-judge-hud .m[data-loss][data-zero] b{ color:var(--venue-faint) }
+
+/* المفاتيح: ترتفع بما بقي مهما كان عددها، فلا تُمرَّر أبدًا */
+/* الصفوف تقتسم ما بقي بالتساوي مهما كان عدد المفاتيح، فلا فيض ولا تمرير. و`overflow`
+   صمّام أخير لا طريقٌ معتاد: لا يعمل إلا على شاشةٍ تضيق عن أرضية الهدف اللمسي. */
+/* الأساس من المحتوى لا صفرًا: على الشاشة الضيّقة ارتفاع اللوحة يُحسب ممّا فيها، وأساسٌ
+   صفريّ يطوي المفاتيح إلى صفرٍ فتخرج من صندوقها وتقع تحت زرّ الإنهاء فلا تُضغط. */
+.mizan-judge-pad{ flex:2 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:minmax(0,1fr); gap:.4rem }
+.mizan-judge-pad > :last-child:nth-child(odd){ grid-column:1 / -1 }
 .mizan-judge-action{
-  position:relative; isolation:isolate; overflow:hidden;
-  min-height:58px; border-radius:15px; padding:.5rem .7rem .5rem .85rem;
-  text-align:start; display:flex; align-items:center; gap:.7rem;
-  background:var(--surface); border:1px solid var(--ja-line, var(--line));
-  box-shadow:var(--shadow-1);
-  transition:box-shadow .16s ease, transform .12s var(--ease-brand), border-color .16s ease;
+  position:relative; overflow:hidden; min-height:0;
+  border:1px solid var(--venue-line); border-radius:14px;
+  background:rgba(255,255,255,.022); color:var(--venue-ink);
+  min-height:44px; padding:.6rem .7rem; text-align:start; touch-action:manipulation;
+  display:flex; flex-direction:column; justify-content:space-between; align-items:flex-start;
+  transition:background .14s ease, border-color .14s ease;
 }
-.mizan-judge-head{ display:flex; align-items:center; gap:.45rem; order:2; margin-inline-start:auto }
-.mizan-judge-icon{ width:34px; height:34px; border-radius:11px; display:grid; place-items:center; flex:0 0 auto; background:var(--ja-soft); color:var(--ja-ink) }
-.mizan-judge-icon svg{ width:1.05rem; height:1.05rem }
-.mizan-judge-label{ margin-top:0; font-size:calc(14px * var(--mizan-text-scale)); font-weight:800; color:var(--ink); line-height:1.25; letter-spacing:-.01em }
-.mizan-judge-cost{ margin-top:.05rem; font-size:calc(15px * var(--mizan-text-scale)); font-weight:800; color:var(--ja-ink); font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1 }
-.mizan-judge-action[data-weight="high"] .mizan-judge-cost{ font-size:calc(16px * var(--mizan-text-scale)) }
-.mizan-judge-action[data-weight="low"]  .mizan-judge-cost{ font-size:calc(14px * var(--mizan-text-scale)); opacity:.85 }
-.mizan-judge-count{ min-width:24px; height:24px; padding-inline:.4rem; font-size:calc(12px * var(--mizan-text-scale)) }
-@media (prefers-reduced-motion:reduce){ .mizan-judge-os{ scroll-behavior:auto } }
-/* A judge marks with a thumb on a tablet, so the pressed state — not hover — is the
-   affordance that has to be unmistakable. */
-.mizan-judge-action:active{ transform:scale(.985); box-shadow:none; }
-@media (hover:hover){ .mizan-judge-action:hover{ border-color:var(--ja-edge); box-shadow:var(--shadow-3); } }
-.mizan-judge-action:focus-visible{ outline:3px solid var(--ja-ring); outline-offset:2px; }
-
-/* Left/leading spine carries the hue at a glance, even in peripheral vision. */
-/* The spine carries two readings at once: hue says which criterion, and thickness says
-   how much it costs. That second channel matters because most default actions share the
-   memorisation criterion — hue alone would render four of six cards identical. */
+/* المعيار خيطٌ شعري على حافة البداية: يُقرأ بطرف العين ولا يصنع صندوقًا */
 .mizan-judge-action::before{
-  content:""; position:absolute; inset-block:0; inset-inline-start:0;
-  background:var(--ja-ink);
-  width:var(--ja-weight, 3px); opacity:var(--ja-weight-o, .55);
+  content:""; position:absolute; inset-block:.6rem; inset-inline-start:0;
+  width:var(--ja-weight,2px); border-radius:99px; background:var(--ja-ink); opacity:var(--ja-weight-o,.6);
 }
-.mizan-judge-action[data-weight="high"]{ --ja-weight:6px; --ja-weight-o:1 }
-.mizan-judge-action[data-weight="mid"] { --ja-weight:4px; --ja-weight-o:.8 }
-.mizan-judge-action[data-weight="low"] { --ja-weight:3px; --ja-weight-o:.55 }
+.mizan-judge-action[data-weight="high"]{ --ja-weight:4px; --ja-weight-o:1 }
+.mizan-judge-action[data-weight="mid"] { --ja-weight:3px; --ja-weight-o:.8 }
+.mizan-judge-action[data-weight="low"] { --ja-weight:2px; --ja-weight-o:.55 }
+.mizan-judge-label{ font-size:calc(18px * var(--mizan-text-scale)); font-weight:700; line-height:1.15; position:relative; z-index:2 }
+.mizan-judge-cost{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-faint); font-variant-numeric:tabular-nums; position:relative; z-index:2 }
+/* العدّاد رقمٌ كبير بلون المعيار: يُقرأ من بُعد ذراع، ويغيب عند الصفر */
+.mizan-judge-count{
+  position:absolute; z-index:1; inset-inline-end:.7rem; bottom:.45rem; line-height:.86;
+  font-family:var(--font-display); font-size:calc(40px * var(--mizan-text-scale)); font-weight:800;
+  color:var(--ja-ink); font-variant-numeric:tabular-nums;
+  opacity:0; transform:translateY(6px);
+  transition:opacity .3s var(--ease-brand), transform .3s var(--ease-brand);
+}
+.mizan-judge-action[data-n]:not([data-n="0"]) .mizan-judge-count{ opacity:.62; transform:none }
+.mizan-judge-action:active{ background:rgba(199,169,104,.10); border-color:rgba(199,169,104,.28) }
+@media (hover:hover){ .mizan-judge-action:hover{ background:rgba(255,255,255,.05) } }
+.mizan-judge-action:focus-visible{ outline:3px solid var(--ja-ring); outline-offset:2px }
 .mizan-judge-key{
-  font-family:var(--font-sans); font-size:calc(11px * var(--mizan-text-scale)); font-weight:600;
-  color:var(--muted); border:1px solid var(--line); border-radius:8px; padding:.22rem .45rem;
-  line-height:1;
+  position:absolute; z-index:2; top:.5rem; inset-inline-end:.6rem;
+  font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:600;
+  color:var(--venue-faint); opacity:.55; line-height:1;
 }
-/* لا لوحة مفاتيح على جهاز اللجنة اللمسي، فلا داعي لشارةٍ تزاحم العين بما لا يُستعمل. */
 @media (hover:none){ .mizan-judge-key{ display:none } }
-.mizan-judge-cost small{ font-size:calc(13px * var(--mizan-text-scale)); font-weight:600; color:var(--muted); margin-inline-start:.3rem; letter-spacing:0; }
+/* تأكيد الضغطة: شريطٌ ذهبي ينحسر من حافة البداية، يُرى بطرف العين ثم يزول */
+.mizan-judge-action[data-flash="true"]{ background:rgba(199,169,104,.10); border-color:rgba(199,169,104,.28) }
+.mizan-judge-action[data-flash="true"]::after{
+  content:""; position:absolute; inset:auto 0 0 0; height:3px; background:var(--jc-gold);
+  transform-origin:100% 50%; animation:mzDrain .42s linear forwards;
+}
+@keyframes mzDrain{ from{ transform:scaleX(1) } to{ transform:scaleX(0) } }
 
-/* عدّاد ما سُجِّل — يغيب عند الصفر، فالصحيفة النظيفة تبقى نظيفة. */
-.mizan-judge-count{ border-radius:999px; display:inline-grid; place-items:center; flex:0 0 auto; background:var(--ja-ink); color:#fff; font-weight:800; font-variant-numeric:tabular-nums }
-/* Confirmation pulse: a tap in a noisy hall must be visibly acknowledged, or judges
-   double-tap and the score is wrong. */
-.mizan-judge-action[data-flash="true"]{ animation:mzJudgeMark .5s var(--ease-brand); }
-.mizan-judge-action[data-flash="true"] .mizan-judge-count{ animation:mzPop .4s var(--ease-brand); }
-@keyframes mzJudgeMark{
-  0%{ box-shadow:0 0 0 0 var(--ja-ring) }
-  35%{ box-shadow:0 0 0 6px var(--ja-ring) }
-  100%{ box-shadow:0 0 0 0 rgba(0,0,0,0) }
+/* ── الذيل: الإنهاء، وبجانبه التراجع صامتًا ──────────────────────────── */
+.mizan-judge-bottom{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.45rem; align-items:stretch }
+.mizan-judge-bottom[data-solo="true"]{ grid-template-columns:minmax(0,1fr) }
+.mizan-judge-finish{
+  min-height:54px; border-radius:14px; border:1px solid rgba(199,169,104,.3); background:transparent;
+  color:#dcc693; font-weight:700; font-size:calc(16px * var(--mizan-text-scale));
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  transition:background .2s ease, border-color .2s ease, color .2s ease;
+}
+.mizan-judge-finish[data-armed="true"]{ background:rgba(199,169,104,.15); border-color:var(--jc-gold); color:#f2da9f }
+.mizan-judge-finish:disabled{ opacity:.5; color:var(--venue-faint); border-color:var(--venue-line) }
+/*
+ * التراجع: أيقونة بلا كلمة، بطلب صاحب المنتج.
+ *
+ * وهي ليست خرساء: تأخذ لون المعيار الذي سُجِّل آخرًا، فتقول ما ستُلغيه بلا أن تنطق،
+ * وتنطفئ تمامًا حين لا شيء يُلغى. والاسم يبقى في `aria-label` و`title` لمن يقرأ بالصوت
+ * أو يقف عليها بالمؤشّر، والتأكيد المنطوق يأتي بعد الضغط في منطقة الإعلان الحيّة.
+ */
+.mizan-judge-undo{
+  width:54px; min-height:54px; border-radius:14px; border:1px solid var(--venue-line);
+  background:transparent; color:var(--venue-faint); display:grid; place-items:center;
+  transition:color .28s var(--ease-brand), border-color .28s var(--ease-brand), background .28s var(--ease-brand), opacity .28s ease;
+}
+.mizan-judge-undo svg{ width:21px; height:21px; transition:transform .42s var(--ease-brand) }
+.mizan-judge-undo:disabled{ opacity:.22; cursor:default }
+.mizan-judge-undo[data-live="true"]{
+  color:var(--ja-ink);
+  border-color:color-mix(in srgb, var(--ja-ink) 38%, transparent);
+  background:color-mix(in srgb, var(--ja-ink) 9%, transparent);
+}
+.mizan-judge-undo[data-spin="true"] svg{ transform:rotate(-360deg) }
+
+/* لوحةٌ ساكنة: يُقال سببها بدل أن تُترك فارغة */
+.mizan-judge-note{
+  align-self:end; border:1px solid var(--venue-line); border-radius:14px; background:rgba(255,255,255,.022);
+  padding:.7rem .8rem; font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; line-height:1.7; color:var(--venue-muted);
 }
 
-/* Criterion palette, drawn from the existing system tones so JudgeOS stays in family. */
-.ja-memorization{ --ja-ink:#a34d43; --ja-soft:#f4e6e3; --ja-line:#e8cfca; --ja-edge:#c98f86; --ja-ring:rgba(163,77,67,.24) }
-.ja-tajweed     { --ja-ink:#214c40; --ja-soft:#e7eee9; --ja-line:#cbdad2; --ja-edge:#8fab9f; --ja-ring:rgba(33,76,64,.22) }
-.ja-waqf_ibtida { --ja-ink:#496477; --ja-soft:#e8eef1; --ja-line:#d5e0e5; --ja-edge:#93aab7; --ja-ring:rgba(73,100,119,.22) }
-.ja-performance { --ja-ink:#89673a; --ja-soft:#f2eadc; --ja-line:#e4d5bd; --ja-edge:#c0a274; --ja-ring:rgba(137,103,58,.22) }
-.ja-custom      { --ja-ink:#59615c; --ja-soft:#efeee9; --ja-line:#deddd7; --ja-edge:#a8aeaa; --ja-ring:rgba(89,97,92,.2) }
+/*
+ * نبرة المعيار — قيمٌ مضيئة تصلح على أرضٍ معتمة.
+ *
+ * تُسنَد بعد ردّ معرّف المعيار إلى أصله (`crit-memorization` → `memorization`)، فلا يتوقف
+ * ظهور اللون على شكل المعرّف في لائحة المسابقة.
+ */
+.jt-memorization{ --ja-ink:#e0907f; --ja-ring:rgba(224,144,127,.30) }
+.jt-tajweed     { --ja-ink:#86c6a8; --ja-ring:rgba(134,198,168,.28) }
+.jt-waqf_ibtida { --ja-ink:#9ab8cc; --ja-ring:rgba(154,184,204,.28) }
+.jt-performance { --ja-ink:#d9b884; --ja-ring:rgba(217,184,132,.28) }
+.jt-custom      { --ja-ink:#a9b6ae; --ja-ring:rgba(169,182,174,.26) }
 
 @media (prefers-reduced-motion: reduce){
-  .mizan-judge-action[data-flash="true"],
-  .mizan-judge-action[data-flash="true"] .mizan-judge-count{ animation:none }
+  .mizan-judge-os *{ animation:none !important }
+  .mizan-judge-strip,.mizan-judge-undo svg{ transition:none !important }
 }
-html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:196px }
+html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
+
+/*
+ * سطح المصحف داخل القمرة: تذوب بطاقتُه.
+ *
+ * كان يُرسم بطاقةً بيضاء لها إطارٌ وزوايا وظلّ، موضوعةً فوق لوحٍ بلون الورق — فيصير على
+ * الشاشة سطحان متجاوران بنفس البياض تقريبًا، ولا شيء يقول للعين أيّهما المقصود. والورقة
+ * هي اللوح، لا شيءٌ موضوعٌ عليه. فتُنزع الخلفية والإطار والزوايا والظلّ هنا وحدها، ويبقى
+ * السطح كما هو في كل شاشةٍ فاتحة يُستعمل فيها (استوديو التدريب مثلًا).
+ */
+.mizan-judge-os .mizan-mushaf-surface{
+  flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+  background:transparent; border-color:transparent; border-radius:0; box-shadow:none;
+}
+.mizan-judge-os .mizan-mushaf-bar{ background:transparent; border-color:rgba(60,61,48,.16) }
+.mizan-judge-os .mizan-mushaf-body{
+  flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
+  background:transparent; display:grid; align-content:center;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives — Badge, Stat, Modal, Command palette, Role menu
