@@ -45,19 +45,6 @@ test('the certificate registry has a durable directory in production', () => {
     'it must sit on the mounted authority volume, not on ephemeral container disk');
 });
 
-test('the two signing secrets are not wired before they exist', () => {
-  /*
-   * هذا الحارس يسقط عمدًا يوم ربط السرّين. عندها يكون المطلوب: تأكيد وجودهما في Secret
-   * Manager ثم حذف هذا الاختبار بالاسم، لا الالتفاف عليه. حتى ذلك الحين يمنع commit
-   * يبدو مكتملاً لكنه يجعل كل deploy يفشل على secret غير موجود.
-   */
-  const secretsLine = CLOUDBUILD.split('\n').find(l => l.includes('R2_ACCESS_KEY_ID=')) || '';
-  assert.ok(secretsLine, 'the --update-secrets line must exist');
-  const wired = ['MIZAN_PASS_SIGNING_SECRET', 'MIZAN_CERT_SIGNING_SECRET'].filter(n => secretsLine.includes(n));
-  assert.deepEqual(wired, [],
-    'these are wired — so they must now exist in Secret Manager; confirm, then delete this guard by name');
-});
-
 test('commercial preflight fails closed when either signing secret is absent', () => {
   const env = releaseEnv();
   delete env.MIZAN_PASS_SIGNING_SECRET;
