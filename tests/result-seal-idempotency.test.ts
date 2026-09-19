@@ -51,14 +51,57 @@ const recordFor = (outcome: ReturnType<typeof sealResult>, organizationId = 'org
   };
 };
 
+/*
+ * تُضبط الساعةُ هنا ولا تُسابَق.
+ *
+ * كان هذا الاختبار ينادي `sealResult` مرّتين متتاليتين ويشترط اختلافَ البصمتين،
+ * واختلافُهما مصدرُه `sealedAt` وحده — وهو بدقّة الملّي. فعلى عدّاءٍ سريع يقع
+ * النداءان في الطرفة نفسها، فتتطابق البصمتان ويسقط التأكيد. وقد وقع ذلك فعلًا في
+ * 19 سبتمبر 2026: مرّةً على #225 ومرّةً على `main` عند `9bc8a69`، وفي الحالتين
+ * نجحت الحزمةُ كاملةً محليًّا. وأُعيد إنتاجُه حتميًّا بتجميد الساعة.
+ *
+ * و«تقطُّع» ليس سببًا جذريًّا، وإعادةُ التشغيل حتى يختفي هي كيف يُستأنس بالأحمر.
+ * فالعلّةُ في الاختبار لا في المنتج: الخاصّيةُ التي يريد إثباتَها صحيحةٌ ومهمّة،
+ * لكنّه كان يُثبتها بمصادفةِ توقيتٍ بدل أن يُصرّح بالآلية.
+ *
+ * فصارت الساعةُ مضبوطةً، ويُقال الحدّان معًا — وهما أقوى ممّا كان:
+ *
+ *   · طابعان مختلفان ⇒ بصمتا ختمٍ مختلفتان: `sealedAt` جزءٌ من البصمة حقًّا.
+ *   · والطابعُ نفسُه ⇒ **البصمةُ نفسُها**: فالبصمةُ وحدها لا تُميّز إعادةَ محاولةٍ
+ *     من ختمٍ جديد — وهذا بعينه سببُ وجوب السجلّ.
+ */
+const atFrozenTime = <T>(iso: string, body: () => T): T => {
+  const RealDate = Date;
+  const fixed = new RealDate(iso).getTime();
+  class FrozenDate extends RealDate {
+    constructor(...args: unknown[]) {
+      if (args.length) super(...(args as [])); else super(fixed);
+    }
+    static now() { return fixed; }
+  }
+  (globalThis as { Date: DateConstructor }).Date = FrozenDate as unknown as DateConstructor;
+  try { return body(); } finally { (globalThis as { Date: DateConstructor }).Date = RealDate; }
+};
+
 test('the same inputs produce a different digest each call — which is exactly why a registry is needed', () => {
-  const first = sealResult(request());
-  const second = sealResult(request());
+  const first = atFrozenTime('2026-05-01T09:00:00.000Z', () => sealResult(request()));
+  const second = atFrozenTime('2026-05-01T09:00:01.000Z', () => sealResult(request()));
   assert.ok('sealed' in first && 'sealed' in second);
   assert.equal(first.sealed.inputsSha256, second.sealed.inputsSha256, 'the inputs are identical');
   assert.equal(first.sealed.finalScore, second.sealed.finalScore, 'and so is the score');
+  assert.notEqual(first.sealed.sealedAt, second.sealed.sealedAt, 'only the moment differs');
   // ...ومع ذلك تختلف بصمة الختم، لأن `sealedAt` جزءٌ منها. فالتمييز يجب أن يكون بالمدخلات.
   assert.notEqual(first.sealed.sealSha256, second.sealed.sealSha256);
+});
+
+test('two seals stamped in the same instant share a digest — so the digest can never be the duplicate check', () => {
+  const [first, second] = atFrozenTime('2026-05-01T09:00:00.000Z',
+    () => [sealResult(request()), sealResult(request())] as const);
+  assert.ok('sealed' in first && 'sealed' in second);
+  assert.equal(first.sealed.sealedAt, second.sealed.sealedAt, 'the fixture must pin the instant');
+  assert.equal(first.sealed.sealSha256, second.sealed.sealSha256,
+    'identical inputs at an identical instant are indistinguishable by digest — ' +
+    'duplicate detection therefore belongs to the registry, never to sealSha256');
 });
 
 test('a retried seal returns the stored seal verbatim and records nothing new', () => {
