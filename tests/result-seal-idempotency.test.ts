@@ -150,9 +150,10 @@ test('the seal route returns the stored seal instead of minting a second one', (
   const end = server.indexOf("app.post('/api/results/seal/verify'");
   const body = server.slice(start, end > start ? end : start + 6000);
   assert.ok(route || body, 'the seal route must exist');
-  assert.ok(body.includes('resultSealRegistry?.findByInputs('), 'the route must look for an existing seal first');
+  /* بلا `?.`: السجلُّ الغائب كان يُسقط كشفَ التكرار صامتًا، فصار المسارُ يردّ 503 قبله. */
+  assert.ok(body.includes('resultSealRegistry.findByInputs('), 'the route must look for an existing seal first');
   assert.ok(body.includes('idempotent:true'), 'a repeat is reported as a repeat, not as a fresh seal');
   // وصفُّ التدقيق يأتي بعد الفحص، فلا يُكتب مرّتين لحدثٍ واحد.
-  assert.ok(body.indexOf('resultSealRegistry?.findByInputs(') < body.indexOf("action:'RESULT_SEALED'"),
+  assert.ok(body.indexOf('resultSealRegistry.findByInputs(') < body.indexOf("action:'RESULT_SEALED'"),
     'the idempotency check must come before the audit append, or the ledger gains a duplicate row');
 });
