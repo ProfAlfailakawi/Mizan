@@ -45,6 +45,31 @@ test('النصُّ وحدَه لا يفرّق، فلا يُحكم به', () => {
     'النصّان متطابقان حرفًا بحرف ويختلف الحكم — فالعنوانُ وحدَه هو الفاصل');
 });
 
+test('خطأُ خادمٍ حيٍّ على `/api/` يُبلَّغ — والعنوانُ وحدَه لا يُعذِر', () => {
+  /*
+   * `scripts/qa-public-registration.sh` يشغّل الفحصَ نفسَه على خادمٍ حقيقيّ
+   * (`node dist/server.cjs`) بعد أن يتثبّت أن `/api/public` يُخدَم. فهناك `/api/` حيٌّ،
+   * وخطؤه عطبٌ لا غياب. ولو اكتُفي بالعنوان لابتُلع 500 و401 — وهو أخطر ممّا كان.
+   */
+  for (const [status, label] of [[500, 'Internal Server Error'], [401, 'Unauthorized'], [403, 'Forbidden']] as const) {
+    const text = `Failed to load resource: the server responded with a status of ${status} (${label})`;
+    assert.equal(classifyConsoleError({ text, url: at('/api/public/competitions') }).suppressed, false,
+      `${status} على واجهةٍ حيّة عطبٌ لا غياب`);
+  }
+});
+
+test('الحالةُ والهُويّةُ يُشترطان معًا، ولا يكفي أحدُهما', () => {
+  const both = classifyConsoleError({ text: NOT_FOUND, url: at('/api/public/x') });
+  const statusOnly = classifyConsoleError({ text: NOT_FOUND, url: at('/assets/app.js') });
+  const identityOnly = classifyConsoleError({
+    text: 'Failed to load resource: the server responded with a status of 500 (Internal Server Error)',
+    url: at('/api/public/x'),
+  });
+  assert.equal(both.suppressed, true, 'الحالةُ والهُويّةُ معًا ⇒ غيابٌ مقصود');
+  assert.equal(statusOnly.suppressed, false, 'حالةٌ بلا هُويّة ⇒ عطبٌ في المنتج');
+  assert.equal(identityOnly.suppressed, false, 'هُويّةٌ بلا حالة ⇒ عطبٌ في الخادم');
+});
+
 test('عنوانٌ مجهول لا يُعذَر: الشكُّ يُقرأ عطبًا لا براءة', () => {
   assert.equal(classifyConsoleError({ text: NOT_FOUND, url: '' }).suppressed, false);
   assert.equal(classifyConsoleError({ text: NOT_FOUND }).suppressed, false);
