@@ -11,10 +11,23 @@ import { scopeFromJuz } from '../src/lib/quran-scope';
  * بقيت في بيانات التطوير فئات تاريخية تحمل scopeMode=participant_selected لاختبار التوافق
  * مع السجلات القديمة، لكن التسجيل العام الجديد لا يقبل memorizationScope من العميل أصلًا.
  * هذا الملف يثبت حدّ الخادم: حتى عميل قديم أو معدل لا يستطيع إنشاء نطاق ثانٍ ينافس الفئة.
+ *
+ * التسجيل العام يفشل مغلقًا إن لم تكن وثائق الموافقة منشورة. لذلك تستخدم هذه الاختبارات
+ * إعدادًا قانونيًا صريحًا صالحًا للاختبار بدل الاعتماد على process.env أو تجاوز بوابة الإنتاج.
  */
 
 const LEGACY_SELECTABLE = SEED_COMPETITION.categories.find(c => c.scopeMode === 'participant_selected')!;
 const FIXED = SEED_COMPETITION.categories.find(c => c.scopeMode !== 'participant_selected')!;
+
+const LEGAL_ENV: Record<string, string> = {
+  MIZAN_LEGAL_ENTITY_NAME: 'Mizan Test Entity',
+  MIZAN_LEGAL_TERMS_URL: 'https://example.invalid/terms',
+  MIZAN_LEGAL_TERMS_VERSION: '1.0',
+  MIZAN_LEGAL_TERMS_EFFECTIVE: '2026-09-01',
+  MIZAN_LEGAL_PRIVACY_URL: 'https://example.invalid/privacy',
+  MIZAN_LEGAL_PRIVACY_VERSION: '1.0',
+  MIZAN_LEGAL_PRIVACY_EFFECTIVE: '2026-09-01',
+};
 
 const openCompetition = (): Competition => ({
   ...structuredClone(SEED_COMPETITION), status: 'registration_open',
@@ -40,7 +53,10 @@ const baseInput = (categoryId: string): PublicRegistrationInput => ({
   consents: { terms: true, privacy: true, guardian: true, audioRecording: true, aiProcessing: true },
 });
 
-const service = (store = new MemoryStore()) => ({ store, api: new PublicRegistrationService(store, () => new Date('2026-09-09T08:00:00Z')) });
+const service = (store = new MemoryStore()) => ({
+  store,
+  api: new PublicRegistrationService(store, () => new Date('2026-09-09T08:00:00Z'), LEGAL_ENV),
+});
 const scopeDocs = (store: MemoryStore) => [...store.documents.keys()].filter(path => path.includes('/participant_scopes/'));
 const participantDocs = (store: MemoryStore) => [...store.documents.entries()].filter(([path]) => path.includes('/participants/'));
 

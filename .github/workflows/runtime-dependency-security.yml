@@ -1,0 +1,34 @@
+name: أمن اعتماديات الإنتاج
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mizan-runtime-dependency-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: package.json
+          cache: npm
+      # Cloud Run لا يشحن peer-only mobile adapters. Firebase Auth يعلن AsyncStorage
+      # كـpeer، وnpm قد يجرّ وراءه React Native/Metro كاملًا رغم أن ميزان تطبيق ويب/خادم.
+      # نفحص هنا المجموعة نفسها التي تُثبَّت في مرحلة runtime داخل Dockerfile، لا build deps.
+      - name: تثبيت اعتماديات وقت التشغيل الفعلية من ملف القفل
+        run: npm ci --omit=dev --omit=peer
+      - name: منع الثغرات العالية/الحرجة في اعتماديات وقت التشغيل الفعلية
+        run: npm audit --omit=dev --omit=peer --audit-level=high

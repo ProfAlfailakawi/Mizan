@@ -35,11 +35,26 @@ test('committee setup synchronizes governed judge names and uses a clean number 
   assert.match(css,/mizan-number-input::-webkit-outer-spin-button/);
 });
 
-test('registration uses one comprehensive consent instead of four separate checkboxes',()=>{
+/*
+ * قرارٌ نُقض بقرار، لا اختبارٌ أُعيدت كتابته ليمرّ.
+ *
+ * كان نصُّ هذا الاختبار في 9 سبتمبر 2026: «موافقةٌ واحدة جامعة بدل أربعة مربّعات» — طلبَه
+ * المالك يومها اختصارًا لشاشة التسجيل. وفي 19 سبتمبر 2026 نُقض في #214 لسببٍ قانوني لا
+ * جماليّ: الموافقةُ على المعالجة التقنية المساندة يجب أن تكون منفصلةً واختيارية، فإن
+ * جُمعت مع ما هو شرطٌ للمشاركة صار رفضُها مستحيلًا عمليًّا — والموافقةُ التي لا يمكن
+ * رفضُها ليست موافقة. وكذلك تسجيلُ الصوت: يُعرض حين تشترطه اللائحة، ويُسمّى باسمه.
+ *
+ * فالقرار الأول مذكورٌ هنا بتاريخه لا ممحوّ، وردُّه إلى ما كان قرارُ مالكٍ آخر يُكتب مثله.
+ */
+test('registration keeps consent decisions explicit instead of collapsing distinct purposes into one bit',()=>{
   const src=read('src/components/public/RegistrationFlow.tsx');
-  assert.match(src,/consentAccepted/);
-  assert.match(src,/أوافق على شروط المشاركة وسياسة الخصوصية/);
-  assert.doesNotMatch(src,/termsAccepted|privacyAccepted|audioAccepted|aiAccepted/);
+  assert.doesNotMatch(src,/consentAccepted/);
+  for(const state of ['termsAccepted','privacyAccepted','audioAccepted','aiProcessingAccepted'])assert.match(src,new RegExp(state));
+  assert.match(src,/أوافق على شروط المشاركة/);
+  assert.match(src,/أوافق على سياسة الخصوصية/);
+  assert.match(src,/أوافق على تسجيل تلاوتي صوتيًا/);
+  assert.match(src,/أوافق اختياريًا على المعالجة التقنية المساندة/);
+  assert.match(src,/terms:termsAccepted,privacy:privacyAccepted/);
 });
 
 test('public competition page removes share buttons and the technical verification badge',()=>{

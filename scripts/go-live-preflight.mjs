@@ -57,11 +57,8 @@ if (value('VITE_REQUIRE_AUTH') === 'true' && !has('VITE_FIREBASE_PROJECT_ID')) {
 /*
  * الموافقةُ على وثيقةٍ غير منشورة.
  *
- * صفحةُ التسجيل تعرض «أوافق على شروط المشاركة وسياسة الخصوصية»، ويُسجَّل قبولُه أثرًا.
- * فإن لم تُنشر الوثيقتان فالمتسابقُ وقّع على ما لم يره، والأثرُ يشهد بموافقةٍ لا مرجع
- * لها — وهو ما يُحتجّ به يوم النزاع.
- *
- * ولا يُعالَج باختراع نصّ: الكيانُ الناشر ومضمونُ الوثيقة قرارُ مالكٍ ومسؤوليتُه.
+ * صفحةُ التسجيل تجمع موافقةً صريحةً مستقلة على الشروط والخصوصية. فإن لم تُنشر الوثيقتان
+ * فالمتسابقُ وقّع على ما لم يره، والأثرُ يشهد بموافقةٍ لا مرجع لها.
  */
 for (const [kind, label] of [['TERMS', 'شروط المشاركة'], ['PRIVACY', 'سياسة الخصوصية']]) {
   const parts = [`MIZAN_LEGAL_${kind}_URL`, `MIZAN_LEGAL_${kind}_VERSION`, `MIZAN_LEGAL_${kind}_EFFECTIVE`, 'MIZAN_LEGAL_ENTITY_NAME'];
@@ -72,6 +69,19 @@ for (const [kind, label] of [['TERMS', 'شروط المشاركة'], ['PRIVACY',
       'التسجيل يجمع موافقةً على هذه الوثيقة، فإن لم تُنشر وقّع المتسابق على ما لم يره وسُجّل الأثر بلا مرجع.',
     ]);
   } else passed.push(`${label} منشورة بنسختها وتاريخ سريانها وناشرها`);
+}
+
+/*
+ * هذان السرّان لا يمنع غيابهما عملية Node من الإقلاع، لكنه يمنع إطلاقًا تجاريًا أمينًا:
+ * الأول شرطٌ لبطاقات الحضور ولـQuestion Escrow، والثاني شرط التحقق الموقّع من الشهادات.
+ * فرقٌ مقصود بين availability وrelease readiness: قد تكون الخدمة حيّة وهي غير صالحة للإطلاق.
+ */
+for (const [name, effect] of [
+  ['MIZAN_PASS_SIGNING_SECRET', 'بطاقات الدخول وQuestion Escrow غير متاحين؛ كشف الأسئلة الآمن يردّ 503.'],
+  ['MIZAN_CERT_SIGNING_SECRET', 'التحقق الموقّع من الشهادات غير متاح ويردّ 503.'],
+]) {
+  if (has(name)) passed.push(`${name} مضبوط`);
+  else blockers.push([`${name} غير مضبوط`, effect]);
 }
 
 // تبديل الأدوار أداة تطوير: تفتح أدوارًا لمن لا يملكها.
@@ -118,8 +128,6 @@ if (!existsSync(join(ROOT, 'firestore.rules'))) {
  * تقييد المفتاح بمُحيلات HTTP يمنع كل نطاق ليس في القائمة. وميزان يتيح لكل جهة نطاقها
  * الخاص، فجهةٌ ربطت نطاقها ولم يُضَف إلى القائمة يتعطّل نظامها كليًا بلا سبب ظاهر —
  * ولا يظهر ذلك في أي اختبار عندنا، لأن العطل عند Google لا في الكود.
- *
- * فتُقرأ النطاقات المسجّلة هنا وتُعرض ليطابقها الناشر بقائمة المُحيلات.
  */
 const tenantHosts = () => {
   const raw = has('MIZAN_TENANTS')
@@ -128,8 +136,6 @@ const tenantHosts = () => {
   if (!raw.trim()) return [];
   let parsed;
   try { parsed = JSON.parse(raw); } catch { return []; }
-  /* مخزن الجهات يكتب الملف بالشكل { tenants: [...] }، ويقبل السجلّ الشكلين معًا. قراءة
-     المصفوفة وحدها كانت تُخرج القائمة فارغة في الإعداد الحقيقي، فيصمت التنبيه الذي وُجد له. */
   const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.tenants) ? parsed.tenants : null;
   if (!rows) return [];
   const base = value('MIZAN_BASE_DOMAIN');
@@ -150,10 +156,8 @@ if (hosts.length) {
 }
 
 const optional = [
-  ['MIZAN_CERTIFICATE_REGISTRY_DIR', 'التحقق العام من الشهادات لن يعمل: من يمسك شهادة مطبوعة لن يجد لها سجلًا.'],
+  ['MIZAN_CERTIFICATE_REGISTRY_DIR', 'سجل الشهادات غير مهيّأ.'],
   ['MIZAN_SAAS_DATA_DIR', 'مسارات التراخيص والحصص والفوترة معطّلة.'],
-  ['MIZAN_PASS_SIGNING_SECRET', 'التحقق من بطاقات الدخول سيردّ 503.'],
-  ['MIZAN_CERT_SIGNING_SECRET', 'التحقق الموقّع من الشهادات سيردّ 503.'],
 ];
 for (const [name, effect] of optional) {
   if (has(name)) passed.push(`${name} مضبوط`);
