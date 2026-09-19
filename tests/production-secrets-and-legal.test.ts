@@ -1,9 +1,9 @@
 /*
  * إعدادات الإنتاج التي لا يجوز أن تختفي بصمت.
  *
- * سجلُّ الشهادات مسارٌ دائم وقد ضُبط في النشر. أمّا سرّا التوقيع فلا يجوز ربطهما في
- * cloudbuild قبل أن يُنشئهما المالك في Secret Manager، لأن gcloud سيفشل النشر كله.
- * وفي المقابل لا يجوز اعتبار غيابهما مجرد warning عند الحكم على الجاهزية التجارية:
+ * سجلُّ الشهادات مسارٌ دائم وقد ضُبط في النشر. وسرّا التوقيع موجودان في Secret Manager
+ * ومربوطان في cloudbuild بعد تحقق المالك من وجودهما ومن IAM. لا يجوز أن يسقط هذا الربط
+ * من revision لاحق، ولا يجوز اعتبار غيابهما مجرد warning عند الحكم على الجاهزية التجارية:
  *
  *   · `MIZAN_PASS_SIGNING_SECRET` ⇒ بطاقات الدخول وQuestion Escrow غير متاحين.
  *   · `MIZAN_CERT_SIGNING_SECRET` ⇒ التحقّق الموقّع من الشهادة غير متاح.
@@ -43,6 +43,15 @@ test('the certificate registry has a durable directory in production', () => {
     'without it certificateRegistryFromEnv() returns null and publishing a certificate is refused');
   assert.match(CLOUDBUILD, /MIZAN_INTEGRITY_AUTHORITY_DIR=\/mnt\/authority/,
     'it must sit on the mounted authority volume, not on ephemeral container disk');
+});
+
+test('both signing secrets stay bound from Secret Manager on every production deploy', () => {
+  const secretsLine = CLOUDBUILD.split('\n').find(l => l.includes('R2_ACCESS_KEY_ID=')) || '';
+  assert.ok(secretsLine, 'the --update-secrets payload must exist');
+  assert.ok(secretsLine.includes('MIZAN_PASS_SIGNING_SECRET=MIZAN_PASS_SIGNING_SECRET:latest'),
+    'pass signing must stay bound from Secret Manager');
+  assert.ok(secretsLine.includes('MIZAN_CERT_SIGNING_SECRET=MIZAN_CERT_SIGNING_SECRET:latest'),
+    'certificate signing must stay bound from Secret Manager');
 });
 
 test('commercial preflight fails closed when either signing secret is absent', () => {

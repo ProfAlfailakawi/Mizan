@@ -30,5 +30,36 @@ jobs:
       # نفحص هنا المجموعة نفسها التي تُثبَّت في مرحلة runtime داخل Dockerfile، لا build deps.
       - name: تثبيت اعتماديات وقت التشغيل الفعلية من ملف القفل
         run: npm ci --omit=dev --omit=peer
+      # ثغرةٌ وُجدت، وقياسٌ تعذّر — أحمران لا يُخلط أحدهما بالآخر.
+      #
+      # في 19 سبتمبر 2026 توقّفت خدمةُ تدقيق npm: نقطةُ `advisories/bulk` تردّ 503
+      # «صيانة»، و`audits/quick` تردّ 400 «Invalid package tree». والرسالةُ تقول
+      # «أعِد بناء package-lock» فتوهم أن العطل في الشجرة — وليس فيها: مشروعٌ جديدٌ
+      # باعتماديةٍ واحدة يفشل الفشلَ نفسه، والتشغيلُ 41 على `f8dc41c` نجح الساعة
+      # 16:58 بالأمر نفسه ثم فشل التشغيل 42 الساعة 17:15 بلا أيّ تغييرٍ في هذا الملفّ.
+      #
+      # فالخطوةُ تُعيد المحاولة — الخدمةُ تتذبذب أثناء الصيانة — ثم **تفشل في
+      # الحالتين**، ولا تمرّ أبدًا على تعذّرِ قياس: «لم يُقَس» ليست «لا ثغرة فيه».
+      # وإنما تُسمّى العلّةُ باسمها كي لا يُطارَد عطلُ مزوّدٍ بتعديلٍ في المستودع.
       - name: منع الثغرات العالية/الحرجة في اعتماديات وقت التشغيل الفعلية
-        run: npm audit --omit=dev --omit=peer --audit-level=high
+        shell: bash
+        run: |
+          # `shell: bash` يعني `bash -e` عند GitHub، و`set -uo pipefail` لا تُلغيها.
+          # فبدونِ `+e` يموت السكربتُ عند أوّل `npm audit` فاشل: لا محاولةَ ثانية ولا
+          # رسالةَ تشخيص — وهو ما وقع فعلًا في التشغيل على `039e846`.
+          set +e
+          set -uo pipefail
+          unreachable='audit endpoint returned an error'
+          for attempt in 1 2 3; do
+            output="$(npm audit --omit=dev --omit=peer --audit-level=high 2>&1)"
+            status=$?
+            grep -qF "$unreachable" <<<"$output" || break
+            echo "  · المحاولة $attempt: خدمةُ التدقيق لم تُجب بعد"
+            [[ $attempt -lt 3 ]] && sleep $(( attempt * 20 ))
+          done
+          echo "$output"
+          if grep -qF "$unreachable" <<<"$output"; then
+            echo "::error title=AUDIT_MEASUREMENT_UNAVAILABLE::تعذّر تدقيقُ اعتماديات وقت التشغيل: خدمةُ npm لم تُجب بعد ثلاث محاولات. هذا عطلُ قياسٍ لا تقريرُ ثغرة، ولا يُقرأ سلامةً. أعِد التشغيل بعد عودة الخدمة (https://status.npmjs.org)."
+            exit 1
+          fi
+          exit $status
