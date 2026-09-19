@@ -99,8 +99,8 @@ test('مقياسُ الآلة بلا ضجيجٍ مقاس لا يُحكم علي�
 
 test('«مقياسُ آلة» بابٌ ضيّق لا يتسلّل منه مقياسُ عدالة', () => {
   const machine = (Object.keys(BUDGET_METRICS) as BudgetMetric[]).filter(key => BUDGET_METRICS[key].machine);
-  assert.deepEqual(machine.sort(), ['heapUsedMb', 'selectionMillisP95'],
-    'الزمنُ والذاكرةُ وحدهما تابعان للآلة. وأيُّ مقياسِ عدالةٍ يُوسم بها يهرب من الحكم');
+  assert.deepEqual(machine.sort(), ['selectionMillisP95'],
+    'الزمنُ وحده تابعٌ للآلة ويُحكم به. وأيُّ مقياسِ عدالةٍ يُوسم بها يهرب من الحكم');
   for (const key of Object.keys(BUDGET_METRICS) as BudgetMetric[]) {
     if (!BUDGET_METRICS[key].machine) continue;
     assert.equal(BUDGET_METRICS[key].hard, false, 'ولا يكون القاطعُ تابعًا للآلة أبدًا');
@@ -132,8 +132,38 @@ test('البوّابةُ تُمرّر نطاقَ ضجيجٍ مقاسًا فعل�
   const gate = readFileSync(join(ROOT, 'scripts', 'fairness-gate.ts'), 'utf8');
   assert.match(gate, /judgeReleaseBudget\(\{[\s\S]*?noiseBand/,
     'وإلا صار كلُّ مقياسِ آلةٍ UNVERIFIED صامتًا فضاع الحرس');
-  assert.match(gate, /distribution\.worst - distribution\.min/,
-    'والنطاقُ يُشتقّ من توزيعِ البذور المقاس، لا يُختار رقمًا جميلًا');
+  assert.match(gate, /Math\.max\(\.\.\.timingTrials\) - Math\.min\(\.\.\.timingTrials\)/,
+    'والنطاقُ من مدى الإعادات المقاسة، لا رقمًا يُختار');
+});
+
+test('الضجيجُ يُقاس بإحماءٍ ثم بإعادةِ العمل نفسِه — لا بتبديل البذرة', () => {
+  const gate = readFileSync(join(ROOT, 'scripts', 'fairness-gate.ts'), 'utf8');
+
+  assert.match(gate, /for \(let i = 0; i < TIMING_WARMUPS; i \+= 1\) runCompetitionTwin\(base\)/,
+    'الشيفرةُ الباردة أبطأ من الدافئة ضعفين، فقياسٌ بلا إحماءٍ يقيس تهيئةَ المحرّك لا الخوارزم');
+  assert.match(gate, /timingTrials\.push\(runCompetitionTwin\(base\)\.metrics\.selectionMillisP95\)/,
+    'والإعاداتُ على `base` نفسِه ببذرته نفسِها: ضجيجُ الآلة لا يُقاس بعملٍ مختلف');
+
+  const bandBlock = gate.slice(gate.indexOf('const TIMING_WARMUPS'), gate.indexOf('const noiseBand'));
+  assert.doesNotMatch(bandBlock, /stability|monteCarlo/,
+    'ولو أُخذ النطاقُ من `monteCarloStability` لدخل فيه اختلافُ البذرة — وهو عملٌ مختلف لا ضجيجُ آلة، فيُغتفر به تدهورٌ حقيقي');
+});
+
+test('الذاكرةُ تُرصد ولا يُحكم بها — ومدًى أوسعُ من القيمة لا يشهد بشيء', () => {
+  assert.equal(Object.prototype.hasOwnProperty.call(BUDGET_METRICS, 'heapUsedMb'), false,
+    'عيّنةُ كومةٍ واحدة عند نهاية التشغيلة تصف كانسَ الذاكرة لا الخوارزم: قيست فخرجت ' +
+    'تصاعديًّا من 17.8 إلى 44.1 على العمل نفسِه، فلا عتبةَ تُشتقّ من ذلك');
+
+  const gate = readFileSync(join(ROOT, 'scripts', 'fairness-gate.ts'), 'utf8');
+  assert.match(gate, /observations: \{ heapUsedMb: observedHeapMb \}/,
+    'ولا تُحذف: تُسجَّل ملاحظةً في تاريخ الجبهة، فالاتّجاهُ عبر السنة يُسأل عنه');
+});
+
+test('ما لم يُحكم عليه يُرفع إلى ملخّص التشغيلة، ولا يُترك في ذيل سجلّ', () => {
+  const gate = readFileSync(join(ROOT, 'scripts', 'fairness-gate.ts'), 'utf8');
+  assert.match(gate, /::warning title=FAIRNESS_METRIC_UNJUDGED::/,
+    'اجتيازٌ ناقصٌ مكتوبٌ في السطر الألف يُقرأ اجتيازًا تامًّا من لوحة الفحوص');
+  assert.match(gate, /for \(const finding of verdict\.unjudged\)/);
 });
 
 test('زمنُ آلةٍ لا يحكم على زمن أخرى، ولو كان الضجيجُ مقاسًا', () => {

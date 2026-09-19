@@ -45,8 +45,23 @@ export const BUDGET_METRICS = {
   totalRepeats: { direction: 'lower', hard: false, machine: false, ar: 'مجموع التكرار' },
   maxModelDifficultyDelta: { direction: 'lower', hard: false, machine: false, ar: 'الفرق بين أصعب نموذج وأسهله' },
   selectionMillisP95: { direction: 'lower', hard: false, machine: true, ar: 'زمن الاختيار (المئين ٩٥)' },
-  heapUsedMb: { direction: 'lower', hard: false, machine: true, ar: 'الذاكرة المستعملة' },
 } as const;
+
+/*
+ * ولماذا خرجت `heapUsedMb` من الميزانية؟
+ *
+ * لأنها ليست قياسًا للخوارزم أصلًا. `process.memoryUsage().heapUsed` عيّنةٌ واحدة تُؤخذ
+ * عند نهاية التشغيلة، فتصف ما فعله كانسُ الذاكرة قُبيلها لا ما فعله المحرّك. وقيس ذلك:
+ * العملُ نفسُه بالبذرة نفسِها، ستّ عشرة إعادةً في العملية الواحدة، فخرجت القيمة
+ * **تصاعديًّا** من 17.8 إلى 44.1 — مدًى قدرُه 27.3 فوق قيمةٍ متوسّطها نحو 25.
+ *
+ * فمدًى أوسعُ من القيمة نفسِها لا يشهد بشيء: لا عتبةَ تُشتقّ منه، ولا تهيئةَ تُثبّته،
+ * لأنه يتبع عددَ ما شُغّل قبله لا ما شُغّل فيه. وإبقاؤه في الميزانية يجعل الحكم قرعةً
+ * — وهي بعينها العلّةُ التي جاء هذا الملفّ يعالجها.
+ *
+ * فهو يُقاس ويُسجَّل في تاريخ الجبهة ويُطبع، ولا يُحكم به. وقياسُ الذاكرة حكمًا يحتاج
+ * أداةً أخرى: لقطاتُ كومةٍ بعد كنسٍ مفروض، لا عيّنةً عابرة.
+ */
 
 export type BudgetMetric = keyof typeof BUDGET_METRICS;
 
@@ -337,6 +352,12 @@ export interface FrontierHistoryEntry {
   scenario: string;
   metrics: Partial<Record<BudgetMetric, number>>;
   optimalityGap?: Record<string, number | null>;
+  /**
+   * أرقامٌ تُرصد ولا يُحكم بها — `heapUsedMb` أوّلُها. تُحفظ لأن الاتّجاه عبر السنة
+   * يُسأل عنه ولو لم تصلح اللحظةُ الواحدة للحكم، ولتُفصل الملاحظةُ عن الحكم فصلًا
+   * ظاهرًا في الملفّ نفسِه.
+   */
+  observations?: Record<string, number>;
   note?: string;
 }
 
