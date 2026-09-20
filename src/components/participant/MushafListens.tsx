@@ -230,7 +230,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     const settled = await settleRecitation({
       flush: stopAndRelease,
       drain: () => queue.current.drain(),
-      read: complete => ({ ...readRecitation(samples.current, face.words, face.page), complete }),
+      read: complete => ({ ...readRecitation(samples.current, face.words, face.page, { complete }), complete }),
     });
     if (!alive.current) return;
     setReading(settled.reading);

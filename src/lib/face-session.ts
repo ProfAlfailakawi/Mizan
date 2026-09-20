@@ -100,13 +100,20 @@ export function stepsFromSamples(
  */
 export interface SettledRecitation { reading: FaceReading; attempt: FaceAttempt | null }
 
+export interface ReadRecitationOptions {
+  at?: Date;
+  /** أوصلت المقاطعُ كلُّها؟ — فما نقص لا يُبنى عليه حكمٌ يُذكَر. */
+  complete?: boolean;
+  thresholds?: FaceReadingThresholds;
+}
+
 export function readRecitation(
   samples: readonly FaceAlignmentSample[],
   words: readonly FaceWordKey[],
   page: number,
-  at: Date = new Date(),
-  thresholds?: FaceReadingThresholds,
+  options: ReadRecitationOptions = {},
 ): SettledRecitation {
+  const { at = new Date(), complete = true, thresholds } = options;
   const signals = accumulateWordSignals(stepsFromSamples(samples, words));
   const reading = thresholds ? readFace(signals, words.length, thresholds) : readFace(signals, words.length);
   /*
@@ -115,8 +122,15 @@ export function readRecitation(
    * فميكروفونٌ لا يلتقط إلا ضجيجًا يعود بردودٍ كلُّها `LOST`: لا كلمةَ عُرفت، ولا
    * علامةَ ظهرت — فتُحفظ محاولةٌ «نظيفة» وتُهدَّأ الصفحة، فلا تعود إلى الطالب وهو لم
    * يقرأها قطّ. فالعدُّ الصادقُ هو الكلماتُ التي بلغها المحرّك.
+   *
+   * ومراجعةٌ لم تصل مقاطعُها كلُّها **لا تدخل الذاكرة**، وإن عُرضت للطالب.
+   *
+   * فنقصُ المقاطع يُنقص الدليل: علاماتٌ لم تُرَ لأنّ صوتَها لم يصل، لا لأنّها لم تقع.
+   * فلو حُفظت لجمعت أسوأ الأمرين: **تُهدَّأ الصفحةُ** فلا تعود إليه قريبًا، **ويُنقَص
+   * وزنُها** فلا تُرجَّح — فيُحرَم موضعَ ضعفه مرّتين. والعرضُ شيءٌ والذاكرةُ شيء: يرى
+   * ما قِيس، ولا يُبنى على الناقص ما يُقرّر له غدًا.
    */
-  const attempt: FaceAttempt | null = signals.visitedWords > 0
+  const attempt: FaceAttempt | null = complete && signals.visitedWords > 0
     ? { page, at: at.toISOString(), marks: reading.marks.map(m => ({ kind: m.kind, intensity: m.intensity })) }
     : null;
   return { reading, attempt };

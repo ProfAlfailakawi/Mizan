@@ -201,7 +201,7 @@ test('الإنهاءُ لا يقرأ قبل آخرِ مقطعٍ وقبلَ فر�
 
 test('القراءةُ تجمع ما سُمع، وتحكم في المحاولة بما عُرف موضعُه', () => {
   const heard = [1, 2, 3].map(w => ({ surah: 1, ayah: 2, wordIndex: w, alignmentState: 'LOCKED' }));
-  const settled = readRecitation(heard, faceWords, 300, new Date('2026-09-20T12:00:00.000Z'));
+  const settled = readRecitation(heard, faceWords, 300, { at: new Date('2026-09-20T12:00:00.000Z') });
   assert.equal(settled.reading.indices.reach, 3, 'أبعدُ ما بلغ لم يُقرأ');
   assert.ok(settled.attempt, 'أُسقطت محاولةٌ سُمعت');
   assert.equal(settled.attempt!.page, 300);
@@ -304,6 +304,9 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   assert.match(screen, /await settleRecitation\(\{/, 'التقريرُ لا يمرّ بترتيب الإنهاء');
   assert.match(screen, /read: complete => \(\{ \.\.\.readRecitation\(/, 'القراءةُ ليست هي المقيسة');
+  /* ونقصُ الإفراغ يبلغ القراءةَ فلا تُحفظ مراجعةٌ ناقصة. */
+  assert.match(screen, /readRecitation\(samples\.current, face\.words, face\.page, \{ complete \}\)/,
+    'نقصُ المقاطع لا يبلغ القراءة، فتُحفظ مراجعةٌ ناقصة');
   assert.match(screen, /flush: stopAndRelease/, 'آخرُ مقطعٍ لا يُنتظر');
   /*
    * والميكروفونُ يُطلق داخلَ إيقاف التسجيل لا بعد انتظار الطابور: فعلٌ واحدٌ لا ترتيبٌ
@@ -483,6 +486,9 @@ test('السببُ المعروفُ يتقدّم على البيان العام�
   /* وبلا سببٍ معروف: يُقال النقصُ وحده. */
   const onlyPartial = reviewNote({ listening: true, faceListenable: true, incomplete: true, ar: true })!;
   assert.equal(onlyPartial.includes('ولم يصل'), true);
+  /* ويُقال له إنّها لم تُحفظ: وإلا ظنّ الوجهَ قد رُوجع وحُسب فلا يعود إليه. */
+  assert.ok(onlyPartial.includes('لم تُحفظ'), 'سُكت عن أنّ المراجعة الناقصة لا تدخل الذاكرة');
+  assert.ok(both.includes('لم تُحفظ'), 'سُكت عن ذلك حين اجتمع سببٌ ونقص');
 
   /* وبلا نقصٍ: السببُ وحده، بلا ذيلٍ يُوهم نقصًا لم يقع. */
   const onlyNote = reviewNote({ listening: true, faceListenable: true, note: expired, incomplete: false, ar: true })!;
@@ -509,4 +515,48 @@ test('وتعذُّرُ المحرّك أو الوجهِ يتقدّم على كل
   ]) {
     assert.ok((reviewNote({ ...input, ar: false }) || '').length > 10, `بيانٌ إنجليزيٌّ ناقص: ${JSON.stringify(input)}`);
   }
+});
+
+test('بيانُ طابورٍ متروكٍ لا يُسلَّم — فلا يُغلَق ميكروفونُ وجهٍ جديد', () => {
+  /*
+   * وهذا مرآةُ ثقبٍ سُدَّ من قبل: حُرست الكتابةُ بـ`live()` وتُرك البيانُ بلا حارس.
+   * وهو أخطر: البيانُ يوقف الميكروفون، فمقطعٌ من وجهٍ قديمٍ يسقط **فيُغلق ميكروفونَ
+   * الوجه الجديد** والطالبُ يقرأ فيه.
+   */
+  const announced: unknown[] = [];
+  const q = serialQueue();
+  let unblock: (() => void) | null = null;
+  q.push(
+    async () => { await new Promise<void>(r => { unblock = r; }); throw new Error('CHUNK_FAILED'); },
+    error => { announced.push(error); },
+  );
+  return q.drain(40).then(complete => {
+    assert.equal(complete, false);
+    q.abandon();
+    unblock!();
+    return new Promise(r => setTimeout(r, 20));
+  }).then(() => {
+    assert.deepEqual(announced, [], 'سُلّم بيانٌ من طابورٍ متروك — فأُغلق ميكروفونُ وجهٍ جديد');
+  });
+});
+
+test('مراجعةٌ ناقصةٌ لا تدخل الذاكرة — وإن عُرضت للطالب', () => {
+  /*
+   * فنقصُ المقاطع يُنقص الدليل: علاماتٌ لم تُرَ لأنّ صوتَها لم يصل، لا لأنّها لم تقع.
+   * فلو حُفظت لجمعت أسوأ الأمرين: تُهدَّأ الصفحةُ فلا تعود إليه قريبًا، ويُنقَص وزنُها
+   * فلا تُرجَّح — فيُحرَم موضعَ ضعفه مرّتين.
+   */
+  const heard = [1, 2, 3].map(w => ({ surah: 1, ayah: 2, wordIndex: w, alignmentState: 'LOCKED' }));
+
+  const partial = readRecitation(heard, faceWords, 300, { complete: false });
+  assert.equal(partial.attempt, null, 'حُفظت مراجعةٌ ناقصة');
+  /* ومع ذلك تُعرض له: العرضُ شيءٌ والذاكرةُ شيء. */
+  assert.equal(partial.reading.indices.reach, 3, 'حُجب عن الطالب ما قِيس فعلًا');
+  assert.ok(partial.reading.indices.totalFrames > 0);
+
+  const whole = readRecitation(heard, faceWords, 300, { complete: true });
+  assert.notEqual(whole.attempt, null, 'أُسقطت مراجعةٌ تامّة');
+
+  /* والافتراضُ «تامّ»: من لم يُصرّح فقد قاس كلَّ شيء. */
+  assert.notEqual(readRecitation(heard, faceWords, 300).attempt, null);
 });
