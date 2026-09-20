@@ -696,7 +696,8 @@ export const JudgeOS: React.FC = () => {
      <div className="mt-3 text-sm font-black text-[#214C40]">{ar?'تم اعتماد تقييمك':'Assessment locked'}</div>
      <div className="mt-1 text-[11px] text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
      {reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
-     {nextQueued&&<div className="mt-4"><Button onClick={()=>void callParticipant(nextQueued.id)}>{ar?'المتسابق التالي':'Next participant'}</Button></div>}
+     {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
+     {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
     </div>}
 
     {startError&&<div role="alert" className="mt-3 shrink-0 rounded-xl bg-[#F4E6E3] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5">{startError}</div>}
