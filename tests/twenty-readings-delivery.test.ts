@@ -27,13 +27,14 @@ import { KfgqpcDeliveryRepository } from '../server/kfgqpc-delivery';
  * صريحٌ مسمّى متى غابت أو عُبث بها — لا نصُّ روايةٍ أخرى معروضًا على أنه نصُّها.
  */
 
-test('all twenty readings have a delivery path, and the twelve pinned ones load from real bytes', () => {
+test('all twenty readings have a delivery path, and every one loads from real bytes', () => {
   assert.equal(CANONICAL_RAWI_IDS.length, 20);
   for (const rawiId of CANONICAL_RAWI_IDS) {
     assert.ok(Object.prototype.hasOwnProperty.call(DELIVERY_READING_BY_RAWI, rawiId), `${rawiId} has a delivery key`);
   }
   const status = islamwebPackageStatus();
-  assert.equal(status.length, 12);
+  // صرن عشرين: الثماني التي كانت تُجلب من الشبكة لها الآن أثرٌ مجمَّدٌ في المستودع.
+  assert.equal(status.length, 20);
   for (const row of status) {
     assert.ok(row.present, `${row.rawiId} artifact present on disk`);
     assert.ok(row.loadable, `${row.rawiId} loadable: ${row.error || ''}`);
@@ -47,8 +48,17 @@ for (const source of QURAN_FULL_TEXT_CANDIDATES) {
     assert.equal(pkg.rawiId, source.rawiId);
     assert.equal(pkg.compressedSha256, source.expectedCompressedSha256, 'bytes on disk are the approved bytes');
     assert.equal(pkg.nativeVerseCount, source.expectedVerseCount);
-    assert.equal(pkg.authority, 'ISLAMWEB_DERIVED');
-    assert.notEqual(pkg.publisherAuthority as string, 'KFGQPC');
+    /*
+     * سلسلةُ الإسناد تُقابَل بالسجلّ، ولا تُكتب حرفًا ثابتًا. والمحروسُ باقٍ: نصُّ
+     * إسلام ويب لا يُوسَم بالمجمّع أبدًا — أمّا حزمُ المرآة فالمجمّعُ ناشرُها حقًّا،
+     * ونسبتُها مسجَّلةٌ `MIRROR_REPORTED` لا إثباتًا ببصمةٍ رسميّة.
+     */
+    assert.equal(pkg.authority, source.authority);
+    assert.equal(pkg.publisherAuthority, source.publisherAuthority);
+    assert.equal(source.publisherAttribution, 'MIRROR_REPORTED');
+    if (source.authority === 'ISLAMWEB_DERIVED') {
+      assert.notEqual(pkg.publisherAuthority as string, 'KFGQPC');
+    }
 
     // ١١٤ سورة، وتسلسل آياتٍ متّصل بلا ثغرة ولا تكرار، ونصٌّ غير فارغ.
     const bySurah = new Map<number, number[]>();
@@ -257,9 +267,15 @@ test('an incomplete native passage returns nothing rather than a short one', () 
 test('delivery keys resolve to exactly one reading and the two Duris stay apart', () => {
   assert.equal(candidateRawiForDeliveryKey('duri-al-kisai'), 'al-duri-kisai');
   assert.equal(candidateRawiForDeliveryKey('al-duri-kisai'), 'al-duri-kisai');
-  // الدوري عن أبي عمرو ليس من الاثنتي عشرة، فلا يُلتقط بأي هجاء.
-  assert.equal(candidateRawiForDeliveryKey('duri-abi-amr'), undefined);
-  assert.equal(candidateRawiForDeliveryKey('al-duri-abu-amr'), undefined);
+  /*
+   * كان الدوريُّ عن أبي عمرو يُجلب من الشبكة، فكان البرهانُ على افتراقهما أنه لا
+   * يُلتقط بأيّ هجاء. وقد صار له أثرٌ مجمَّد، فيُلتقط الآن — **ويُثبَت الافتراق
+   * مباشرةً**: كلُّ هجاءٍ يقود إلى راويه هو، لا إلى الآخر. وهو أقوى من الغياب.
+   */
+  assert.equal(candidateRawiForDeliveryKey('duri-abi-amr'), 'al-duri-abu-amr');
+  assert.equal(candidateRawiForDeliveryKey('al-duri-abu-amr'), 'al-duri-abu-amr');
+  assert.notEqual(candidateRawiForDeliveryKey('duri-abi-amr'), candidateRawiForDeliveryKey('duri-al-kisai'));
+  // و«دوري» وحدها لا تكفي: لا تُخمَّن هويّةٌ من اسمٍ مشترك.
   assert.equal(candidateRawiForDeliveryKey('duri'), undefined);
   assert.equal(candidateRawiForDeliveryKey(''), undefined);
   // وخلفُ حمزة ليس خلفًا العاشر: مفتاحان مختلفان لهويتين مختلفتين.

@@ -11,9 +11,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { buildSurahTable, frozenFileName, stripAyahMarker, surahOf } from '../scripts/kfgqpc-mirror-freeze';
 import { KFGQPC_MIRROR_CANDIDATES } from '../src/lib/quran-candidate-sources';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
+import { candidateRawiForDeliveryKey } from '../server/quran-reading-delivery';
 
 const ROOT = process.cwd();
 
@@ -93,4 +95,35 @@ test('the mirror text is never the same bytes as another reading served beside i
   assert.ok(hafs.some((v, i) => warsh[i] && v.aya_text !== warsh[i].aya_text));
   assert.ok(warsh.some((v, i) => qalun[i] && v.aya_text !== qalun[i].aya_text),
     'Warsh and Qalun share a count system — they must still differ in text');
+});
+
+test('every reading the matrix calls release-ready is actually served from disk by the production path', () => {
+  /*
+   * العطبُ الذي حدث فعلًا: أُضيفت حزمُ المرآة إلى **خريطة البحث** وحدها، فصارت
+   * `candidateSourceForRawi` تجدها، بينما `CANDIDATE_KEYS` في مسار التسليم — وهو يمرّ
+   * على **القائمة** — لا يراها. فقال التقريرُ «جاهزة» ومسارُ الإنتاج يظلّ يطلبها من
+   * الشبكة. تقريرٌ أخضرُ قاس غيرَ ما يجري.
+   *
+   * فهذا الحارسُ يربط التقريرَ بالمسار العامل: ما يُقال عنه جاهزٌ يُطلب من مسار
+   * الإنتاج نفسِه ويُحمَّل من القرص — لا من سكربت التقرير.
+   */
+  // يُشغَّل المولّدُ فعلًا ثمّ يُقرأ أثرُه — لا يُقرأ أثرٌ ملتزَمٌ قد يكون بالِيًا.
+  execFileSync('npx', ['tsx', 'scripts/quran-release-matrix.ts'], {
+    cwd: ROOT, encoding: 'utf8', timeout: 180_000, maxBuffer: 1 << 26,
+  });
+  const matrix = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'artifacts', 'mizan-quran-20-release-matrix.json'), 'utf8'),
+  ) as { readings: Array<{ rawiId: string; productionReady: string; textSource: string }> };
+
+  const ready = matrix.readings.filter(r => r.productionReady === 'RELEASE_READY');
+  assert.ok(ready.length >= 15, `expected at least fifteen release-ready readings, found ${ready.length}`);
+
+  for (const row of ready) {
+    assert.equal(candidateRawiForDeliveryKey(row.rawiId), row.rawiId,
+      `${row.rawiId}: declared release-ready but the delivery path does not route it to a local artifact`);
+    const pkg = loadIslamwebReadingPackage(row.rawiId);
+    assert.ok(pkg.verses.length > 0, `${row.rawiId}: declared release-ready but no verses load from disk`);
+    assert.ok(row.textSource.startsWith(pkg.authority),
+      `${row.rawiId}: the report names ${row.textSource} but the loaded package is ${pkg.authority}`);
+  }
 });

@@ -113,8 +113,15 @@ export class MizanQuranDelivery {
         authority: source.authority,
         publisherAuthority: source.publisherAuthority,
         mode: 'PINNED_LOCAL_ARTIFACT',
-        note: 'نصٌّ مشتقٌّ من مصاحف إسلام ويب، مثبَّتٌ ببصمة وقرار لجنةٍ مربوطٍ بها. ليس من مجمع الملك فهد.',
-        packageId: `islamweb-derived-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`,
+        /*
+         * الملاحظةُ والمعرّفُ يُشتقّان من سلسلة الإسناد، ولا يُكتبان حرفًا ثابتًا.
+         * كانا مكتوبين «مشتقٌّ من مصاحف إسلام ويب… ليس من مجمع الملك فهد» دائمًا،
+         * فلمّا أُضيفت حزمُ المجمّع من مرآته صارت تُعرض بنفيٍ كاذبٍ لناشرها.
+         */
+        note: source.authority === 'KFGQPC_MIRROR_DERIVED'
+          ? 'نصٌّ من مرآةٍ عامّة مثبَّتة، بصمتُه محفوظةٌ وقرارُ اللجنة مربوطٌ بها. ليس حزمةَ المجمّع الرسميّة المضغوطة ولم تُطابَق بصمتُه الرسميّة.'
+          : 'نصٌّ مشتقٌّ من مصاحف إسلام ويب، مثبَّتٌ ببصمة وقرار لجنةٍ مربوطٍ بها. ليس من مجمع الملك فهد.',
+        packageId: `${source.authority.toLowerCase().replace(/_/g, '-')}-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`,
         sourceSha256: source.expectedCompressedSha256,
         supportsPageLoci: false,
         supportedAnchors: anchors,
