@@ -135,3 +135,35 @@ test('the non-Hafs audio packages are retired because every reading plays the on
     assert.equal([...KFGQPC_REQUIRED_DELIVERY_DATASETS].includes(id as never), false, `${id} must not be required`);
   }
 });
+
+test('every gate on the delivery path derives its set from one list — no fifth copy', async () => {
+  /*
+   * القائمةُ نفسُها وُجدت مكرّرةً في أربعة مواضع: الكتالوج، وفحصُ ما قبل النشر، وبوّابةُ
+   * الجلب، والفحصُ البعديّ. وكلُّ تضييقٍ في موضعٍ يُبطله موضعٌ نُسي — فالتخفيفُ يبقى بلا
+   * أثرٍ ما دام بابٌ قبله مقفولًا.
+   *
+   * ويُقاس هنا **بالتشغيل**: تُشتقّ بادئاتُ الفحص البعديّ من القائمة فعلًا، فتخلو من كلّ
+   * حزمةٍ مُخرَجة وتحوي كلَّ مطلوبة.
+   */
+  const { deliveryPrefixFor } = await import('../scripts/kfgqpc-ingest');
+
+  for (const id of KFGQPC_REQUIRED_DELIVERY_DATASETS) {
+    const prefix = deliveryPrefixFor(id);
+    assert.match(prefix, /^delivery\/.+\/$/, `${id}: a required dataset must resolve to a delivery prefix`);
+  }
+  for (const id of KFGQPC_RETIRED_DELIVERY_DATASETS) {
+    // المُخرَجُ ما زال له بادئةٌ معلومة — الإخراجُ من الطلب لا من السجلّ.
+    assert.match(deliveryPrefixFor(id), /^delivery\/.+\/$/);
+  }
+  assert.throws(() => deliveryPrefixFor('not-a-dataset'), /UNKNOWN_DELIVERY_DATASET/);
+
+  // ولا بادئةَ مكرّرة بين حزمتين — وإلّا خُدمت حزمةٌ مكانَ أخرى.
+  const prefixes = [...KFGQPC_REQUIRED_DELIVERY_DATASETS].map(deliveryPrefixFor);
+  assert.equal(new Set(prefixes).size, prefixes.length);
+
+  // والبادئاتُ المُخرَجة لا تظهر بين المطلوبة.
+  const retired = new Set([...KFGQPC_RETIRED_DELIVERY_DATASETS].map(deliveryPrefixFor));
+  for (const prefix of prefixes) {
+    assert.equal(retired.has(prefix), false, `${prefix} is both required and retired`);
+  }
+});

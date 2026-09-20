@@ -10,7 +10,7 @@ const OFFICIAL_DEV='https://qurancomplex.gov.sa/en/techquran/dev/';
 const OFFICIAL_AUDIO='https://qurancomplex.gov.sa/category/kfgqpc-quran-audio/recite/';
 
 type DatasetSpec={id:string;r2Prefix:string;sourceUrl:string;packageVersion?:string;reading?:string;rawi?:string;reciter?:string;officialChecksum?:KfgqpcChecksumExpectation;kind:'DATA'|'MUSHAF'|'AUDIO'|'FONT';blocked?:boolean;blockedStatus?:KfgqpcIngestStatus;note?:string};
-const DATASETS:Record<string,DatasetSpec>={
+export const DATASETS:Record<string,DatasetSpec>={
   hafs:{id:'hafs',r2Prefix:'delivery/quran-data/hafs/v13',sourceUrl:OFFICIAL_DEV,packageVersion:'13.0',reading:'حفص عن عاصم',officialChecksum:{md5:'CF6841AEA5B1D1FD70D032B43FF08278',sha1:'36EA5AB0D7EA1702F17FF43F9B50924CCCD77EBF'},kind:'DATA'},
   warsh:{id:'warsh',r2Prefix:'delivery/quran-data/warsh/v6',sourceUrl:OFFICIAL_DEV,packageVersion:'6.0',reading:'ورش عن نافع',officialChecksum:{md5:'4701E8BBF053098220CF2CF4CDA206A1',sha1:'44ECEA8FEB23817FDC01A8EE2162A6A0CF08CAE7'},kind:'DATA'},
   shubah:{id:'shubah',r2Prefix:'delivery/quran-data/shubah/v4',sourceUrl:OFFICIAL_DEV,packageVersion:'4.0',reading:'شعبة عن عاصم',officialChecksum:{md5:'5CDA29121BF0D7234E039002E1FBF600',sha1:'8D66BDF0CAB96DC7D1032792C19F77980CA6682A'},kind:'DATA'},
@@ -97,6 +97,18 @@ async function publishReadyCatalog(r2:R2PrivateClient,results:ReturnType<typeof 
  * تُخالف بصمتَها (`QUARANTINED`) فعطبٌ يُوقف النشر مهما كانت الحزمة. فالتساهلُ في
  * الوجود لا يعني التساهلَ في السلامة.
  */
+/**
+ * بادئةُ R2 لكلّ حزمة — **مشتقّةٌ من المواصفات نفسِها**.
+ *
+ * كانت تُنسخ حرفيًّا في `kfgqpc-postflight.ts`، فصارت نسخةً رابعةً من القائمة تفترق عن
+ * أصلها بلا أن ينبّه أحد. ومن يحتاج بادئةً يأخذها من هنا.
+ */
+export function deliveryPrefixFor(datasetId:string):string{
+  const spec=DATASETS[datasetId];
+  if(!spec)throw new Error(`UNKNOWN_DELIVERY_DATASET:${datasetId}`);
+  return `${spec.r2Prefix.replace(/\/+$/,'')}/`;
+}
+
 export function assertResultsReady(results:{spec:{id:string};status:KfgqpcIngestStatus}[]){
   const required=new Set<string>(KFGQPC_REQUIRED_DELIVERY_DATASETS);
   const unready=results.filter(r=>required.has(r.spec.id)&&r.status!=='VERIFIED');

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import {KFGQPC_REQUIRED_DELIVERY_DATASETS} from '../server/kfgqpc-ingest-core';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -146,7 +147,16 @@ async function main(){
   const startedAt=new Date().toISOString();const results:any[]=[];
   for(const t of selected){const r=await acquire(t);results.push(r);console.log(JSON.stringify(r))}
   /* المانعُ هو ما كان مطلوبًا ولم يُبلَغ — سواءٌ لم تُوجد حزمتُه أو لم تُفتح صفحتُه. */
-  const blocked=results.filter(r=>!r.optional&&(r.status==='REQUIRED_NOT_ACQUIRED'||r.status==='SOURCE_PAGES_UNREACHABLE'));
+  /*
+ * الهدفُ يكون مُلزِمًا إن كان في قائمة المطلوب، لا بحسب علمٍ مكتوبٍ في جدوله.
+ *
+ * كانت `audio-shubah` و`audio-qalun` و`audio-susi` مُلزِمةً هنا بينما خرجت من قائمة
+ * المطلوب، فيسقط الجلبُ بالرمز ٢ ولا تبلغ العمليّةُ البوّابةَ المخفَّفة أصلًا. أي أنّ
+ * التخفيفَ كان بلا أثرٍ ما دام البابُ الذي قبله مقفولًا.
+ */
+const requiredIds=new Set<string>(KFGQPC_REQUIRED_DELIVERY_DATASETS);
+const binding=(r:{id:string;optional:boolean})=>!r.optional&&requiredIds.has(r.id);
+const blocked=results.filter(r=>binding(r)&&(r.status==='REQUIRED_NOT_ACQUIRED'||r.status==='SOURCE_PAGES_UNREACHABLE'));
   const unreachable=results.filter(r=>r.status==='SOURCE_PAGES_UNREACHABLE');
   const report={protocol:'MIZAN-KFGQPC-HEAVY-ACQUISITION-2',mode:full?'FULL_ACQUIRE':'DISCOVERY_ONLY',startedAt,finishedAt:new Date().toISOString(),authorityRule:'HTTPS *.qurancomplex.gov.sa ONLY',results};
   fs.writeFileSync(path.join(reportDir,'official-heavy-acquisition.json'),JSON.stringify(report,null,2)+'\n');

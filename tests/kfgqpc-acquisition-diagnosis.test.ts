@@ -63,11 +63,22 @@ test('the summary line names which of the two happened', () => {
 });
 
 test('an unreachable source still fails the run — it is a blocker, not a note', () => {
-  assert.match(CODE, /const blocked=results\.filter\(r=>!r\.optional&&\(r\.status==='REQUIRED_NOT_ACQUIRED'\|\|r\.status==='SOURCE_PAGES_UNREACHABLE'\)\)/,
+  /*
+   * المقصدُ ثلاثةٌ لم يتغيّر منها شيء: أصلٌ **مطلوبٌ** لم تُفتح صفحتُه يمنع · والخروجُ
+   * غيرُ صفريّ · والاختياريُّ لا يصير مانعًا.
+   *
+   * والذي تغيّر أنّ الإلزامَ صار يُشتقّ من قائمة المطلوب بدل أن يُفترض من غياب
+   * `optional`. فحزمةٌ خرجت من المطلوب (صوتُ شعبةَ وقالونَ والسوسيّ بعد أن صار الصوتُ
+   * حفصًا للعشرين) لم تعد تمنع — وهو المقصود، لا تليين.
+   */
+  assert.match(CODE, /r\.status==='REQUIRED_NOT_ACQUIRED'\|\|r\.status==='SOURCE_PAGES_UNREACHABLE'/,
     'a required asset whose source never opened must block');
   assert.match(CODE, /process\.exitCode=2/, 'and exit non-zero');
   // ولا يصير الاختياريُّ مانعًا: حالتُه تغيّرت، وأثرُه على الخروج لم يتغيّر.
   assert.match(CODE, /!r\.optional/, 'an optional dataset must not start blocking because its wording changed');
+  // والإلزامُ مشتقٌّ من قائمةٍ واحدة، لا منسوخٌ في هذا الملفّ.
+  assert.match(CODE, /KFGQPC_REQUIRED_DELIVERY_DATASETS/,
+    'the binding set must be derived from the one required list, never redefined here');
 });
 
 test('nothing was loosened: the authority rule and the checksum path are untouched', () => {
