@@ -140,7 +140,7 @@ function deployedEnvironment(): Record<string, string> {
   const cloudbuild = read('cloudbuild.yaml');
   const env: Record<string, string> = {PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? ''};
 
-  const line = /- '--update-env-vars'\s*\n\s*- '([^']*)'/.exec(cloudbuild);
+  const line = /- '--update-env-vars'\n\s*- '([^']*)'/.exec(cloudbuild);
   assert.ok(line, 'the deployment must set runtime variables in one --update-env-vars line');
   for (const pair of line[1].split(',')) {
     const at = pair.indexOf('=');

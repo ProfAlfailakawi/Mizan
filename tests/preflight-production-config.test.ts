@@ -130,13 +130,14 @@ test('runtime settings are read where production sets them, not from the runner'
    * معًا تطالب الحلقةَ بمتغيّرٍ ليس من شأنها: السرُّ يقرؤه فرعٌ آخر بـ`--secret`
    * ولا تُقرأ قيمتُه أصلًا.
    */
-  const envVarsLine = /- '--update-env-vars'\s*\n\s*- '([^']*)'/.exec(cloudbuild);
+  const envVarsLine = /- '--update-env-vars'\n\s*- '([^']*)'/.exec(cloudbuild);
   assert.ok(envVarsLine, 'the deployment must still set runtime variables in one --update-env-vars line');
   const deployed = new Set(
     [...envVarsLine[1].matchAll(/(?:^|,)(MIZAN_[A-Z0-9_]+)=/g)].map(match => match[1]));
   assert.ok(deployed.size >= 8, `expected the deployment to set several MIZAN_* names, found ${deployed.size}`);
 
-  const loop = /for name in ((?:[^;]|\n)*?); do/.exec(workflow);
+  // `[^;]` يطابق `\n` أصلًا، فـ`(?:[^;]|\n)*?` تكرارٌ غامضٌ يتراجع أُسّيًّا — رصده CodeQL.
+  const loop = /for name in ([^;]*?); do/.exec(workflow);
   assert.ok(loop, 'the workflow must still read runtime variables in a named loop');
   const named = new Set(loop[1].split(/[\s\\]+/).filter(Boolean));
 
