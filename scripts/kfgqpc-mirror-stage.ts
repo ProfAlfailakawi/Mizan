@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
  * MIZAN — Mirror staging (Track 1: delivery).
  *
  * صار موقع مجمع الملك فهد (qurancomplex.gov.sa) محجوبًا عن مراكز البيانات وعن شبكات كثيرة،
- * فهذا السكربت يجهّز أصول التسليم من مرايا رسمية-المصدر مفتوحة (ترخيص MIT) وقابلة للوصول:
+ * فهذا السكربت يجهّز أصول التسليم من مرايا رسمية-المصدر مفتوحة وقابلة للوصول (ترخيص MIT — إفادةُ المالك؛ لا ملفَّ ترخيصٍ في المرآة، انظر quran-sources/kfgqpc-mirror-derived/README.md):
  *   - نص الروايات + الخط الأساسي: github.com/thetruetruth/quran-data-kfgqpc
  * ويكتبها في نفس مفاتيح R2 التي يخدمها سيرفر MIZAN تمامًا، مع بيان مصدر (provenance) لكل ملف.
  *

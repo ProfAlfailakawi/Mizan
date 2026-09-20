@@ -62,6 +62,7 @@ const NOT_FOR_OPERATORS: Record<string, string> = {
   MIZAN_REQUIRE_EMULATOR: 'يضعه سكربتُ `qa:firestore-rules` عن نفسه ليمنع تخطّي فحوص القواعد صامتةً حين يغيب المحاكي. بوّابةُ فحصٍ لا إعدادُ نشرة.',
   MIZAN_LEGAL_VERIFY_ATTEMPTS: 'عددُ محاولاتِ الوصول في `verify:legal-publication` — ضبطٌ لأداة الفحص، لا يقرؤه المنتج.',
   MIZAN_LEGAL_VERIFY_TIMEOUT_MS: 'مهلةُ كلّ محاولةٍ فيها — مثلُه.',
+  MIZAN_KFGQPC_MIRROR_ROOT: 'موضعُ نسخة مرآة المجمّع على قرص من يُشغّل `quran:mirror-freeze` مرّةً ليولّد الأثر المجمَّد. أداةُ تجميدٍ تُشغَّل يدويًّا، لا يقرؤها المنتج في نشرة — وما يقرؤه هو `MIZAN_KFGQPC_MIRROR_SOURCE_ROOT` المذكورة في المثال.',
 };
 
 const EXAMPLE = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');

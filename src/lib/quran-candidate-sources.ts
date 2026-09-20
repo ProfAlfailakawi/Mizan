@@ -40,17 +40,54 @@ export interface QuranCandidateCommitteeDecision {
   boundCompressedSha256: string;
 }
 
+/**
+ * سلسلةُ الإسناد — **من أين وصلنا النصّ**، لا من نشره.
+ *
+ * `ISLAMWEB_DERIVED`            نصٌّ مشتقٌّ من مصاحف Islamweb عبر Al-Islam-iOS.
+ * `KFGQPC_MIRROR_DERIVED`       نصٌّ نشره المجمّع ووصلنا من مرآةٍ عامّة مثبَّتة، لا من
+ *                               موقع المجمّع. وهذه **ليست** حزمةَ المجمّع الرسميّة
+ *                               المضغوطة ذاتَ بصمة MD5+SHA-1؛ تلك لم تصلنا بعد، ولا
+ *                               يجوز أن يُقرأ هذا الوسمُ يومًا على أنه إيّاها.
+ */
+export type QuranCandidateAuthority = 'ISLAMWEB_DERIVED' | 'KFGQPC_MIRROR_DERIVED';
+
 export interface QuranCandidateSource {
   rawiId: string;
   deliveryKey: string;
-  /** سلسلة الإسناد: نصٌّ مشتقٌّ من مصاحف Islamweb، لا منشورٌ من المجمع. */
-  authority: 'ISLAMWEB_DERIVED';
-  /** الناشر الأصل في فهرس السلطات العام — لا يُوسَم KFGQPC بحالٍ. */
-  publisherAuthority: Extract<QuranSourceAuthority, 'ISLAMWEB'>;
+  /** سلسلة الإسناد: من أين وصل النصّ. */
+  authority: QuranCandidateAuthority;
+  /**
+   * الناشر الأصل في فهرس السلطات العام. والمرآةُ مضيفٌ لا ناشر: نصُّ الحزم الثماني
+   * نشره المجمّع فعلًا، فيُسجَّل `KFGQPC` ناشرًا و`KFGQPC_MIRROR_DERIVED` سلسلةَ وصول.
+   * ولا يُوسَم نصُّ Islamweb بالمجمّع بحالٍ.
+   */
+  publisherAuthority: Extract<QuranSourceAuthority, 'ISLAMWEB' | 'KFGQPC'>;
   role: 'FULL_TEXT_CANDIDATE';
-  upstreamRepository: 'TheAbubakrAbu/Al-Islam-iOS';
+  upstreamRepository: 'TheAbubakrAbu/Al-Islam-iOS' | 'thetruetruth/quran-data-kfgqpc';
   upstreamCommit: string;
   upstreamPath: string;
+  /**
+   * اسمُ الأثر المجمَّد على القرص حين يختلف عن اسم ملفّ المنبع. حزمُ Islamweb تصل
+   * مضغوطةً فيُحتفظ باسمها؛ وحزمُ المرآة تصل JSON خامًّا وتُحوَّل، فيكون لها اسمُها.
+   */
+  artifactFileName?: string;
+  /**
+   * بصمةُ بايتات المنبع الخامّ حين يكون الأثرُ مشتقًّا منها بتحويلٍ حتميّ. تُبقي
+   * السلسلةَ كاملة: بايتاتُ المنبع ← تحويلٌ يُعاد إنتاجه ← بصمةُ الأثر أدناه.
+   */
+  upstreamSourceSha256?: string;
+  /**
+   * **قوّةُ نسبةِ النصّ إلى ناشره** — وهي غيرُ الناشر نفسِه.
+   *
+   * `OFFICIAL_DIGEST_PROVEN`  بصمةُ الناشر الرسميّة طوبقت، فالنسبةُ إثباتٌ رياضيّ.
+   * `MIRROR_REPORTED`         النسبةُ منقولةٌ عن مضيفٍ ينسب النصَّ إلى ناشره، ولم
+   *                           تُطابَق بصمةٌ رسميّة. مقبولةٌ بقرار اللجنة، **ولا
+   *                           تُعرض على أنها اعتمادٌ رسميٌّ من الناشر**.
+   *
+   * وبهذا يبقى الفرقُ مكتوبًا بدل أن يذوب: حزمُ المرآة تُنسب إلى المجمّع لأنه ناشرُها
+   * حقًّا، ولا يُقال إنّ بصمتَه طابقت — لأنها لم تُطابَق بعد.
+   */
+  publisherAttribution: 'OFFICIAL_DIGEST_PROVEN' | 'MIRROR_REPORTED';
   /** بصمة البايتات الأصلية المضغوطة عند الـcommit المثبَّت — مُتحقَّقٌ منها بالتنزيل. */
   expectedCompressedSha256: string;
   expectedSurahCount: 114;
@@ -86,6 +123,7 @@ const candidate = (
   deliveryKey,
   authority: 'ISLAMWEB_DERIVED',
   publisherAuthority: 'ISLAMWEB',
+  publisherAttribution: 'MIRROR_REPORTED',
   role: 'FULL_TEXT_CANDIDATE',
   upstreamRepository: AL_ISLAM_IOS_QIRAAT_REPOSITORY,
   upstreamCommit: AL_ISLAM_IOS_QIRAAT_COMMIT,
@@ -111,7 +149,7 @@ const candidate = (
  * ضغطها وعدّ سورها وآياتها. وتطابقُ بصمتَي إسحاق وإدريس ليس خطأً: المتنان متطابقان
  * بايتًا ببايت في المصدر المنشور، وهذا مسجَّلٌ في `caveat` ولا يُختلق له فرق.
  */
-export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
+export const ISLAMWEB_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
   candidate('hisham', 'hisham', 'QiraahHisham.json.deflate', 6226, 'DIMASHQI',
     '399099727eca6b684b25e48af98d794715b9cbd19e3b15da2a729ae717a522b8'),
   candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate', 6226, 'DIMASHQI',
@@ -151,6 +189,112 @@ export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
     'المصدر upstream وثّق تطابق متن إدريس مع إسحاق؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
 ] as const;
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * الروايات الثماني المسلَّمة من مرآة المجمّع.
+ *
+ * موقعُ المجمّع محجوبٌ عن كثيرٍ من الشبكات، وكان نصُّ هذه الثماني يُجلب من المرآة وقتَ
+ * التشغيل — فلو سقطت المرآةُ يومَ المسابقة فلا نصّ. وهي هنا مجمَّدةٌ على القرص.
+ *
+ * **والمجمّعُ ناشرُها، والمرآةُ مضيفٌ لا أكثر.** ومع ذلك فهذه **ليست** حزمةَ المجمّع
+ * الرسميّة المضغوطة ذاتَ بصمة MD5+SHA-1 المثبَّتة في `scripts/kfgqpc-ingest.ts`؛ تلك
+ * لم تصلنا قطّ، وبصماتُها ما زالت تنتظر ملفَّها. فلا يُقرأ هذا الوسمُ يومًا على أنه إيّاها.
+ *
+ * والسلسلةُ كاملةٌ لا حلقةَ فيها مظنونة:
+ *   بايتاتُ المنبع (`upstreamSourceSha256`، مثبَّتةٌ عند commit بعينه)
+ *     ← تحويلٌ حتميّ يُعاد إنتاجه بـ `npm run quran:mirror-freeze`
+ *       ← بصمةُ الأثر (`expectedCompressedSha256`) التي يقابلها المُحمِّل في كلّ تحميل.
+ * ─────────────────────────────────────────────────────────────────────────── */
+export const KFGQPC_MIRROR_REPOSITORY = 'thetruetruth/quran-data-kfgqpc' as const;
+export const KFGQPC_MIRROR_COMMIT = '281dbbe8eed1370daa5a023b6cd81655cbfd6473';
+export const MIZAN_COMMITTEE_MIRROR_DECISION_REFERENCE = 'MIZAN-COMMITTEE-2026-09-20-KFGQPC-MIRROR-EIGHT';
+export const MIZAN_COMMITTEE_MIRROR_DECISION_DATE = '2026-09-20';
+
+const mirrorCandidate = (
+  rawiId: string,
+  deliveryKey: string,
+  upstreamPath: string,
+  upstreamSourceSha256: string,
+  expectedVerseCount: number,
+  nativeCountSystem: QuranNativeCountSystemId,
+  expectedCompressedSha256: string,
+): QuranCandidateSource => ({
+  rawiId,
+  deliveryKey,
+  authority: 'KFGQPC_MIRROR_DERIVED',
+  publisherAuthority: 'KFGQPC',
+  publisherAttribution: 'MIRROR_REPORTED',
+  role: 'FULL_TEXT_CANDIDATE',
+  upstreamRepository: KFGQPC_MIRROR_REPOSITORY,
+  upstreamCommit: KFGQPC_MIRROR_COMMIT,
+  upstreamPath,
+  artifactFileName: `${rawiId}.kfgqpc-mirror.json.deflate`,
+  upstreamSourceSha256,
+  expectedCompressedSha256,
+  expectedSurahCount: 114,
+  expectedVerseCount,
+  nativeCountSystem,
+  permissionState: 'OWNER_REPORTED_PERMISSION',
+  committeeDecision: {
+    state: 'APPROVED',
+    authority: 'MIZAN_SCIENTIFIC_COMMITTEE',
+    reference: MIZAN_COMMITTEE_MIRROR_DECISION_REFERENCE,
+    decidedAt: MIZAN_COMMITTEE_MIRROR_DECISION_DATE,
+    boundUpstreamCommit: KFGQPC_MIRROR_COMMIT,
+    boundCompressedSha256: expectedCompressedSha256,
+  },
+  caveat: 'نصٌّ نشره المجمّع ووصل من مرآةٍ عامّة مثبَّتة. ليست حزمةَ المجمّع الرسميّة المضغوطة، ولم تُطابَق ببصمة MD5+SHA-1 الرسميّة.',
+});
+
+export const KFGQPC_MIRROR_CANDIDATES: readonly QuranCandidateSource[] = [
+  mirrorCandidate('hafs', 'hafs', 'hafs/data/hafsData_v18.json',
+    '5d8bb91726e482839d0057633cb1973031e4d706fa9604eea5e08892f20ba140',
+    6236, 'KUFIC',
+    'df4619f903c061629e129bf631697985c0acc795007eeb0c362f7c9bc24feb70'),
+  mirrorCandidate('warsh', 'warsh', 'warsh/data/warshData_v10.json',
+    'f05d0dc652fd46b38563cacb13242f76f80db4cc64d25873da0bce157253872f',
+    6214, 'MADANI_AKHIR',
+    '96236c5ef385e564f50679cec9a0d381e7600e2dc9847bf5bb1ea03831389730'),
+  mirrorCandidate('shubah', 'shubah', 'shouba/data/ShoubaData08.json',
+    'f105da3949e0b8092e3abcd23a539c9bef4c9b7474f15d29848471f150ade667',
+    6236, 'KUFIC',
+    '9bd4e0b0bb8169b5519eb32c4b3e8cd4005f515d4614c7d9315920693ff49147'),
+  mirrorCandidate('qalun', 'qalun', 'qaloon/data/QaloonData_v10.json',
+    '18465c40ebeec40a92eb98745c9b89796ac6e31f6e93988883dfb6602faaea95',
+    6214, 'MADANI_AKHIR',
+    'ade439e1b68b9243758593ad1746a09364a6d3a306443597bb15d6c34e60257d'),
+  mirrorCandidate('al-duri-abu-amr', 'duri-abi-amr', 'doori/data/DooriData_v09.json',
+    '169b949d6cedd93ddb21728c16057d5ac7faf673ac10e0f213bb5dec1dc90d7d',
+    6217, 'BASRI_ABU_AMR_DELIVERY',
+    '5000be8a4629c0054960146cbfd2fa44ab08447239e647e1539fbb076db8b3a8'),
+  mirrorCandidate('al-susi', 'susi-abi-amr', 'soosi/data/SoosiData09.json',
+    '81af638398efa88308803c06a961d7019daf2e87e822b8acae24df05a82aa81b',
+    6217, 'BASRI_ABU_AMR_DELIVERY',
+    '0247c640595e32a1e63b20f0fc450666f41ccd3d4f5ba8358147e5dce90e8e15'),
+  mirrorCandidate('al-bazzi', 'bazzi', 'bazzi/data/BazziData_v07.json',
+    '2ff11a126e0f15f161b88f83528c0b11d24f69f474baabf02d8864cd93ed15ce',
+    6220, 'MAKKI_IBN_KATHIR_DELIVERY',
+    'aba73fc80ec6a8415bb780fae8807d3e0617872738b6f40ef1debbf897996608'),
+  mirrorCandidate('qunbul', 'qunbul', 'qumbul/data/QumbulData_v07.json',
+    '3a0377bd943def12711b15cc71a65214fb902a5df70240b87df13c7b516a7888',
+    6220, 'MAKKI_IBN_KATHIR_DELIVERY',
+    '5cbc7800304e4609b50c3c6ef5d97fea613c9c7566f9712c7a54a56c29462468'),
+] as const;
+
+/*
+ * **كلُّ** المرشَّحين — لا قائمةَ ثانيةً تُنسى.
+ *
+ * كانت هذه القائمةُ حزمَ إسلام ويب وحدها، ولمّا أُضيفت حزمُ المرآة دُمجت في **خريطة
+ * البحث** فقط. فصارت `candidateSourceForRawi('qalun')` تجدها، بينما كلُّ مستهلكٍ يمرّ
+ * على القائمة نفسِها — ومنهم `CANDIDATE_KEYS` في `server/quran-reading-delivery.ts` —
+ * لا يراها. فيقول التقريرُ «جاهزة» ويظلّ مسارُ الإنتاج يطلبها من الشبكة: تقريرٌ أخضرُ
+ * قاس غيرَ ما يجري. فالقائمةُ الآن واحدةٌ والخريطةُ مشتقّةٌ منها.
+ */
+export const QURAN_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
+  ...ISLAMWEB_FULL_TEXT_CANDIDATES,
+  ...KFGQPC_MIRROR_CANDIDATES,
+];
 
 export const QURAN_FULL_TEXT_CANDIDATE_BY_RAWI = new Map(
   QURAN_FULL_TEXT_CANDIDATES.map(entry => [entry.rawiId, entry] as const),

@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
+import { candidateSourceForRawi } from '../src/lib/quran-candidate-sources';
 import { PINNED_DELIVERED_RAWI_IDS, KFGQPC_DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';
 import { crosswalkCoverage } from '../src/lib/quran-locus-crosswalk';
 import { islamwebArtifactPresent, loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
@@ -35,7 +36,11 @@ process.env.MIZAN_DISABLE_RUNTIME_MIRROR = 'true';
 const offlineDelivery = () => new MizanQuranDelivery(new KfgqpcDeliveryRepository({}));
 const searchOver = (max = 2) => new QuranReadingSearch(offlineDelivery() as unknown as SearchRowSource, max);
 
-const PINNED_WITH_BYTES = PINNED_DELIVERED_RAWI_IDS.filter(rawiId => islamwebArtifactPresent(rawiId));
+/*
+ * «من له بايتاتٌ على القرص» — يُشتقّ من العشرين كلِّهنّ لا من قائمةٍ ثابتة. كان يُشتقّ
+ * من الاثنتي عشرة، فلمّا جُمّدت الثماني بقي يعدّ اثنتي عشرة والواقعُ عشرون.
+ */
+const PINNED_WITH_BYTES = CANONICAL_RAWI_IDS.filter(rawiId => islamwebArtifactPresent(rawiId));
 
 /** مقطعٌ حقيقيّ من حزمة الرواية نفسها — لا نصَّ مخترعًا ولا منقولًا من روايةٍ أخرى. */
 function phraseFromOwnPackage(rawiId: string, surah: number, ayah: number, words: number) {
@@ -46,7 +51,7 @@ function phraseFromOwnPackage(rawiId: string, surah: number, ayah: number, words
 }
 
 test('every pinned reading is searchable in its own bytes, and answers with its own identity', async () => {
-  assert.ok(PINNED_WITH_BYTES.length >= 12, `expected the twelve pinned artifacts, found ${PINNED_WITH_BYTES.length}`);
+  assert.equal(PINNED_WITH_BYTES.length, 20, `expected all twenty frozen artifacts, found ${PINNED_WITH_BYTES.length}`);
   for (const rawiId of PINNED_WITH_BYTES) {
     const search = searchOver(1);
     const { phrase } = phraseFromOwnPackage(rawiId, 2, 2, 3);
@@ -55,7 +60,9 @@ test('every pinned reading is searchable in its own bytes, and answers with its 
     assert.ok(hits.length > 0, `${rawiId} finds a phrase taken from its own package`);
     for (const hit of hits) {
       assert.equal(hit.readingId, rawiId, 'a result may never carry another reading id');
-      assert.equal(hit.sourcePackage.authority, 'ISLAMWEB_DERIVED', `${rawiId} must report its real provenance`);
+      // الإسنادُ الحقيقيّ يُقرأ من السجلّ — وحرفٌ ثابتٌ هنا يجعل الاختبار يصدّق كذبًا.
+      assert.equal(hit.sourcePackage.authority, candidateSourceForRawi(rawiId)?.authority,
+        `${rawiId} must report its real provenance`);
       assert.equal(hit.sourcePackage.mode, 'PINNED_LOCAL_ARTIFACT');
       assert.match(String(hit.sourcePackage.sourceSha256), /^[0-9a-f]{64}$/, 'the exact bytes searched are identified');
 
@@ -119,10 +126,14 @@ test('a reading whose package is unavailable fails by name — never with anothe
 });
 
 test('a Warsh query never silently returns a Hafs record', async () => {
+  /*
+   * كان ورشٌ يُخدَم من المرآة، فكان البرهانُ أن يفشل. وقد صار له أثرٌ مجمَّد فصار
+   * يعمل — والمحروسُ لم يتغيّر: **ما يعود هو ورشٌ من حزمة ورش، وحفصٌ لا يُستدعى**.
+   */
   const search = searchOver(2);
-  // ورشٌ يُخدَم من المرآة، فحزمته غير متاحة هنا. والمطلوب فشلٌ لا نتائج حفص.
-  await assert.rejects(() => search.search('warsh', 'الحمد لله رب'), (e: QuranSearchError) => e.code.startsWith('QURAN_SEARCH_READING_UNAVAILABLE'));
-  // وحفصٌ نفسه لا يُستدعى ضمنًا: لم يُحمَّل فهرسُه أصلًا.
+  const hits = await search.search('warsh', phraseFromOwnPackage('warsh', 2, 2, 3).phrase, { limit: 5 });
+  assert.ok(hits.length > 0, 'Warsh now answers from its own frozen bytes');
+  for (const hit of hits) assert.equal(hit.readingId, 'warsh', 'every hit must be Warsh');
   assert.equal(search.cachedReadings().includes('hafs'), false, 'no Hafs index was loaded to answer a Warsh query');
 });
 
@@ -140,8 +151,13 @@ test('the two Duris and the two Khalafs can never leak into one another', async 
   const search = searchOver(2);
   const duriKisai = await search.search('al-duri-kisai', phraseFromOwnPackage('al-duri-kisai', 2, 3, 3).phrase, { limit: 5 });
   for (const hit of duriKisai) assert.equal(hit.readingId, 'al-duri-kisai');
-  // والدوري عن أبي عمرو يُخدَم من المرآة، فيفشل باسمه ولا يُخدم من حزمة الكسائي.
-  await assert.rejects(() => search.search('al-duri-abu-amr', 'الحمد'), (e: QuranSearchError) => e.code === 'QURAN_SEARCH_READING_UNAVAILABLE:al-duri-abu-amr');
+  /*
+   * وللدوريِّ عن أبي عمرو أثرٌ مجمَّدٌ الآن، فيُبحث بحزمته هو. والمحروسُ أدقُّ ممّا
+   * كان: لا يُخدم من حزمة الكسائي، ولا الكسائيُّ من حزمته.
+   */
+  const duriAbuAmr = await search.search('al-duri-abu-amr', phraseFromOwnPackage('al-duri-abu-amr', 2, 3, 3).phrase, { limit: 5 });
+  assert.ok(duriAbuAmr.length > 0);
+  for (const hit of duriAbuAmr) assert.equal(hit.readingId, 'al-duri-abu-amr');
 
   const khalafHamzah = await search.search('khalaf-hamzah', phraseFromOwnPackage('khalaf-hamzah', 2, 3, 3).phrase, { limit: 5 });
   for (const hit of khalafHamzah) assert.equal(hit.readingId, 'khalaf-hamzah');
@@ -162,7 +178,7 @@ test('an empty query is refused rather than answered with everything', async () 
 });
 
 test('every one of the twenty readings has a defined search behaviour — found or named', async () => {
-  // بالمرآة مُطفأة: اثنتا عشرة تُبحث ببايتاتها، وثمانٍ تفشل باسمها. لا حالةَ ثالثة.
+  // بالمرآة مُطفأة: العشرون كلُّهنّ تُبحث ببايتاتٍ مجمَّدة. ومن غاب أثرُه فشل باسمه — لا حالةَ ثالثة.
   const search = searchOver(2);
   const outcome: Record<string, 'SEARCHABLE' | 'UNAVAILABLE_BY_NAME'> = {};
   for (const rawiId of CANONICAL_RAWI_IDS) {

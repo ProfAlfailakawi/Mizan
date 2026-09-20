@@ -8,6 +8,7 @@ import {
   type CandidateApprovalBlocker,
   type QuranCandidateReviewState,
   type QuranCandidateSource,
+  type QuranCandidateAuthority,
 } from '../src/lib/quran-candidate-sources';
 
 export interface CandidateQuranVerse {
@@ -45,7 +46,7 @@ export interface CandidateQuranManifest {
   packageId: string;
   rawiId: string;
   deliveryKey: string;
-  authority: 'ISLAMWEB_DERIVED';
+  authority: QuranCandidateAuthority;
   role: 'FULL_TEXT_CANDIDATE';
   upstreamRepository: string;
   upstreamCommit: string;

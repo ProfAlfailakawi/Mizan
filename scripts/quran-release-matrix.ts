@@ -69,7 +69,12 @@ function rowFor(rawiId: string): ReadingRow {
   let runtimeTextLoadable: boolean | 'REQUIRES_NETWORK' = 'REQUIRES_NETWORK';
 
   if (candidate) {
-    textSource = `ISLAMWEB_DERIVED @ ${candidate.upstreamRepository}@${candidate.upstreamCommit.slice(0, 12)}`;
+    /*
+     * سلسلةُ الإسناد تُقرأ من السجلّ، ولا تُكتب حرفًا ثابتًا. كانت مكتوبةً
+     * `ISLAMWEB_DERIVED` دائمًا، فلمّا أُضيفت حزمُ المجمّع من مرآته وسمها التقريرُ
+     * «مشتقّةً من إسلام ويب» — وهو **إسنادٌ كاذب** في تقريرٍ موضوعُه الإسناد.
+     */
+    textSource = `${candidate.authority} @ ${candidate.upstreamRepository}@${candidate.upstreamCommit.slice(0, 12)}`;
     sourceDigest = candidate.expectedCompressedSha256;
     committeeDecision = `${candidate.committeeDecision.state} (${candidate.committeeDecision.reference})`;
     if (!islamwebArtifactPresent(rawiId)) {

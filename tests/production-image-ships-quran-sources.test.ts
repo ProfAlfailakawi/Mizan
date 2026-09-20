@@ -17,17 +17,32 @@ test('the runtime image copies the pinned Quran artifacts, not only dist', () =>
 });
 
 test('every registered pinned artifact actually exists in the tree with its approved size', () => {
-  const root = path.join(process.cwd(), 'quran-sources', 'islamweb-derived');
-  assert.ok(fs.existsSync(root), 'the pinned source root exists');
+  /*
+   * جذران لا جذرٌ واحد: سلسلتا إسنادٍ في مجلّدين منفصلين. وأيٌّ منهما لا يُشحن يعني
+   * روايةً لا نصَّ لها في الإنتاج — وهو ما لا يظهر إلّا هناك إن لم يُحرس هنا.
+   */
+  const roots = ['islamweb-derived', 'kfgqpc-mirror-derived']
+    .map(name => path.join(process.cwd(), 'quran-sources', name));
+  for (const root of roots) assert.ok(fs.existsSync(root), `${root} exists`);
+
+  const fileOf = (source: (typeof QURAN_FULL_TEXT_CANDIDATES)[number]) => {
+    const name = source.artifactFileName || (source.upstreamPath.split('/').pop() as string);
+    const root = source.authority === 'KFGQPC_MIRROR_DERIVED' ? roots[1] : roots[0];
+    return { name, file: path.join(root, name), root };
+  };
+
+  const registered = new Map(roots.map(root => [root, new Set<string>()]));
   for (const source of QURAN_FULL_TEXT_CANDIDATES) {
-    const name = source.upstreamPath.split('/').pop() as string;
-    const file = path.join(root, name);
+    const { name, file, root } = fileOf(source);
     assert.ok(fs.existsSync(file), `${source.rawiId}: ${name} is committed`);
     assert.ok(fs.statSync(file).size > 1000, `${source.rawiId}: ${name} is not a placeholder`);
+    registered.get(root)!.add(name);
   }
-  // ولا ملفّ زائد في الجذر: كل ما فيه مسجَّلٌ في السجلّ.
-  const registered = new Set(QURAN_FULL_TEXT_CANDIDATES.map(s => s.upstreamPath.split('/').pop()));
-  for (const name of fs.readdirSync(root)) {
-    assert.ok(registered.has(name), `${name} is present but not registered in the source register`);
+  // ولا ملفّ زائد في أيّ جذر: كل ما فيه مسجَّلٌ في السجلّ.
+  for (const root of roots) {
+    for (const name of fs.readdirSync(root)) {
+      if (name === 'README.md') continue; // سجلُّ المصدر، لا أثرَ نصّ.
+      assert.ok(registered.get(root)!.has(name), `${name} is present but not registered in the source register`);
+    }
   }
 });
