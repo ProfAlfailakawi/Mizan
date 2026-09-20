@@ -1448,3 +1448,83 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
  * ويبقى خاطئًا كلّما تغيّر ما حوله. والوعاء يعرف ارتفاعه بنفسه، فيُترك له.
  */
 .mizan-judge-os .mizan-mushaf-page{ max-height:100%; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   وجهُ المصحف حين لا يُتاح أصلُ الصفحة
+
+   حين لا تُحمَّل صورةُ الصفحة الرسمية يسقط السطح إلى عرض النصّ. وكان ذلك نصًّا
+   متّصلًا بلا فاصلة ولا إطار ولا اسم سورة — فيقرؤه المحكّم كفقرةٍ لا كمصحف، ويفقد
+   حدَّ الآية وهو أوّلُ ما يُحتاج في التحكيم.
+
+   فهذه الطبقةُ تعطي النصَّ هيئةَ الورقة: إطارٌ مزدوج، وعنوانُ السورة في كرتوش،
+   وفاصلةٌ بعد كل آية. ولا تدّعي أنها الصفحةُ الرسمية — الوسمُ في ذيل السطح يقول
+   «نصّ من المصدر» لا «صفحة»، ويبقى التبديلُ إلى الصفحة متاحًا متى وُجدت.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── فاصلةُ الآية ─────────────────────────────────────────────────────── */
+.mizan-ayah-mark{
+  position:relative; display:inline-grid; place-items:center;
+  width:1.44em; height:1.44em; margin-inline:.1em;
+  vertical-align:-.3em; line-height:1;
+  -webkit-user-select:none; user-select:none;
+}
+.mizan-ayah-mark svg{ position:absolute; inset:0; width:100%; height:100%; display:block }
+.mizan-ayah-mark__n{
+  position:relative; font-family:var(--font-arabic);
+  font-size:.38em; font-weight:800; line-height:1; letter-spacing:0;
+  color:#6B5A2E; font-variant-numeric:tabular-nums;
+}
+.mizan-ayah-mark[data-active="true"] .mizan-ayah-mark__n{ color:#1F4A3E }
+
+/* ── الورقة ───────────────────────────────────────────────────────────── */
+.mizan-mushaf-sheet{
+  position:relative;
+  padding:clamp(14px,2.4vw,30px);
+  border-radius:20px;
+  border:1px solid rgba(155,131,74,.34);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.5), transparent 62%),
+    #FBF7EC;
+  box-shadow:0 14px 42px rgba(42,36,20,.07);
+}
+/* الحاشيةُ الذهبية الداخلية: خطٌّ ثانٍ داخل الإطار كما في حواشي المصاحف المطبوعة. */
+.mizan-mushaf-sheet::before{
+  content:""; position:absolute; inset:7px; border-radius:14px;
+  border:1px solid rgba(155,131,74,.26); pointer-events:none;
+}
+.mizan-judge-os .mizan-mushaf-sheet{
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,.34), transparent 62%),
+    rgba(255,253,246,.5);
+  border-color:rgba(122,99,48,.26);
+  box-shadow:none;
+}
+.mizan-judge-os .mizan-mushaf-sheet::before{ border-color:rgba(122,99,48,.2) }
+
+/* ── كرتوشُ اسم السورة ────────────────────────────────────────────────── */
+.mizan-mushaf-band{
+  position:relative; display:flex; align-items:center; justify-content:center; gap:.75rem;
+  min-height:2.9rem; padding:.45rem 3.1rem; margin-bottom:clamp(14px,2vw,26px);
+  border-radius:12px;
+  border:1px solid rgba(155,131,74,.42);
+  background:linear-gradient(180deg, rgba(247,238,215,.9), rgba(241,229,200,.72));
+}
+.mizan-mushaf-band::before,
+.mizan-mushaf-band::after{
+  content:""; position:absolute; top:50%; width:1.5rem; height:1.5rem;
+  transform:translateY(-50%) rotate(45deg);
+  border:1px solid rgba(155,131,74,.42);
+  border-radius:4px;
+  background:linear-gradient(180deg, rgba(250,244,228,.95), rgba(240,228,199,.8));
+}
+.mizan-mushaf-band::before{ inset-inline-start:.85rem }
+.mizan-mushaf-band::after{ inset-inline-end:.85rem }
+.mizan-mushaf-band__name{
+  font-family:var(--font-quran);
+  font-size:clamp(15px,1.5vw,20px); font-weight:700; color:#5E4A1E; line-height:1.6;
+}
+.mizan-mushaf-band__range{
+  font-family:var(--font-arabic);
+  font-size:10px; font-weight:800; color:#8A7438; letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+}

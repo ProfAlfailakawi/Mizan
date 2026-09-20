@@ -7,6 +7,7 @@ import { useAppStore, IS_DEMO_SESSION, exitDemoSession } from './lib/store';
 import { useMizanAuth } from './lib/useMizanAuth';
 import { Header } from './components/layout/Header';
 import { DemoBar } from './components/layout/DemoBar';
+import { DEMO_BAR_SHELL_PADDING } from './components/layout/demo-shell';
 import { useIdleSignOut } from './lib/useIdleSignOut';
 import { useOpsHeartbeat } from './lib/ops-heartbeat';
 import { useBoardPublisher } from './lib/use-board-publisher';
@@ -464,14 +465,15 @@ export default function App() {
   {/*
     * حشوةُ شريط بيئة العرض تُعلَن لا تُخمَّن.
     *
-    * `pb-28` تُبعد المحتوى عن الشريط المثبَّت أسفل الشاشة في بيئة العرض. وهي صحيحةٌ
+    * الحشوة تُبعد المحتوى عن الشريط المثبَّت أسفل الشاشة في بيئة العرض. وهي صحيحةٌ
     * لصفحةٍ تُمرَّر، وخاطئةٌ لسطحٍ يقيس ارتفاعه بنفسه — كقمرة المحكّم: يحسب `100dvh`
     * ناقص الترويسة فيخرج بالضبط، ثم تضيف الحشوةُ ١١٢px تحته فتعود الصفحة تُمرَّر.
     *
     * فتُنشر القيمة في متغيّر يقرؤه من يحتاجه، بدل أن يكتب كل سطحٍ رقمًا منسوخًا يبطل
-    * يوم يتغيّر الشريط.
+    * يوم يتغيّر الشريط. ومصدرُ القيمة هو الشريط نفسه (`DEMO_BAR_SHELL_PADDING`)، فلا
+    * يبقى رقمٌ ثانٍ هنا يفترق عن ارتفاعه.
     */}
-  <main className={IS_DEMO_SESSION?'pb-28':undefined} style={{'--mizan-shell-pb':IS_DEMO_SESSION?'7rem':'0px'} as React.CSSProperties}><Page>{roleView()}</Page></main>
+  <main style={{'--mizan-shell-pb':IS_DEMO_SESSION?DEMO_BAR_SHELL_PADDING:'0px',paddingBottom:'var(--mizan-shell-pb)'} as React.CSSProperties}><Page>{roleView()}</Page></main>
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
   {/* خارج الترويسة عمدًا: شاشة البثّ لا ترويسة لها، ودون ذلك لا مخرج منها. */}
   <DemoBar/>

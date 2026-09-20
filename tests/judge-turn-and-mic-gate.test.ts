@@ -23,7 +23,9 @@ test('the judge screen shows its panel queue in order — and nothing else to st
 
   /* والبدء لصاحب الدور وحده: الصفّ الأول فعّال وما بعده معطّل بسببٍ مكتوب. */
   assert.match(judge, /committeeQueue\.slice\(0,24\)\.map\(\(p,i\)=>\{const turn=i===0;/, 'only the head of the queue is actionable');
-  assert.match(judge, /disabled=\{!turn\}/, 'every other row is disabled');
+  /* `!turn` قد يُعطف عليه شرطٌ أشدّ (قفلٌ أثناء التجهيز مثلًا)، وذلك لا يُضعف القاعدة.
+     والحارسُ يسقط كما كان لو سقط `!turn` نفسُه. */
+  assert.match(judge, /disabled=\{!turn(\}|\|\|)/, 'every other row is disabled');
   assert.match(judge, /الترتيب مُلزم/, 'and the rule is stated on the screen');
 });
 

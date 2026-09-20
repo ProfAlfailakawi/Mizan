@@ -10,6 +10,9 @@ import {
   DEMO_PLATFORM_ROLES,
 } from '../../lib/store';
 import type { Role } from '../../types';
+import { DEMO_BAR_SHELL_PADDING } from './demo-shell';
+
+export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
 
 /*
  * شريط البيئة التجريبية — ثابتٌ فوق كل شاشة، في كل دور.
@@ -21,6 +24,10 @@ import type { Role } from '../../types';
  *
  * وهو أيضًا وسمٌ لا زينة: من ينظر إلى الشاشة أثناء عرضٍ على جهة يجب أن يعرف بنظرة
  * واحدة أن ولا سجلٍّ أمامه يخصّ مسابقةً حقيقية.
+ *
+ * وهو شريطٌ يمسح قدم الصفحة كاملةً لا لوحةً عائمة في وسطها: العائمة تحجب ما تحتها في
+ * منتصف الشاشة — وهو موضع الزرّ الأساسي في أكثر لوحاتنا — وتبدو نافذةً تُغلق لا وسمَ
+ * بيئة. والممتدّ يقف على الحافة، فيحجز مكانه ولا ينازع المحتوى.
  */
 
 const ROLE_LABELS: Record<Role, [string, string]> = {
@@ -51,8 +58,12 @@ export const DemoBar: React.FC = () => {
   const label = (role: Role) => ROLE_LABELS[role]?.[ar ? 0 : 1] || role;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[220] flex justify-center px-3 pb-3 pointer-events-none" dir={ar ? 'rtl' : 'ltr'}>
-      <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-[#d8b86a] bg-[#faf3e2]/97 px-3 py-2 shadow-[0_14px_40px_rgba(25,39,33,.18)] backdrop-blur">
+    <div
+      className="fixed inset-x-0 bottom-0 z-[220] border-t border-[#d8b86a] bg-[#faf3e2]/97 shadow-[0_-10px_30px_rgba(25,39,33,.10)] backdrop-blur"
+      style={{ height: DEMO_BAR_SHELL_PADDING }}
+      dir={ar ? 'rtl' : 'ltr'}
+    >
+      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-3 sm:px-5">
         <span
           role="status"
           aria-label={ar ? 'بيئة تجريبية معزولة ببيانات مصطنعة' : 'Isolated demo environment with synthetic data'}
@@ -83,6 +94,8 @@ export const DemoBar: React.FC = () => {
             </optgroup>
           </select>
         </label>
+
+        <span className="flex-1" />
 
         <button
           type="button"
