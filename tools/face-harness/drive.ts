@@ -4,7 +4,7 @@
  * ولا يقرأ نصَّ شيفرةٍ ولا يصيّر إلى سلسلة: يفتح الصفحة، ويفتح الميكروفون، ويقرأ
  * ثوانيَ، ويضغط «أنهيتُ»، ثمّ ينظر في الصفحة وفي مسار الصوت وفي مخزن الجهاز.
  */
-import pw from '/home/user/Mizan/node_modules/playwright/index.js';
+import pw from 'playwright';
 import { createServer } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,8 +38,14 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
     ui = await createServer({ configFile: path.resolve(HERE, 'vite.config.ts') });
     await ui.listen(UI_PORT);
 
+    /*
+     * ويُترك المسارُ لبلايرايت إلّا أن يُملى بمتغيّر البيئة — وهو ما تفعله بقيّةُ
+     * فحوص المستودع. وكان هنا مسارٌ ثابتٌ إلى `/opt/pw-browsers/chromium`: يعمل على
+     * آلةٍ بعينها ولا وجودَ له على عدّاء `ubuntu-latest` بعد
+     * `npx playwright install`. أي أنّ الفحصَ كان سيسقط قبل أن يُفتح متصفّح.
+     */
     browser = await chromium.launch({
-      executablePath: '/opt/pw-browsers/chromium',
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined,
       args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
     });
     const context = await browser.newContext({ permissions: ['microphone'] });
