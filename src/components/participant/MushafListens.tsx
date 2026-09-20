@@ -71,7 +71,19 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
   const queue = useRef<SerialQueue>(serialQueue());
 
-  useEffect(() => () => { alive.current = false; }, []);
+  /*
+   * والحياةُ تُعاد عند كلّ تركيب، لا تُنفى مرّةً فتبقى منفيّة.
+   *
+   * فـ`StrictMode` تُركّب المكوّن وتفكّه ثمّ تعيد تركيبه بالمراجع نفسِها. فكتابةُ
+   * `alive.current = false` في التنظيف وحدَه تجعل الشاشةَ ميتةً بعد أوّل دورة: يصل
+   * الوجهُ من الخادم فيُطرح، فتبقى عند «يُسحب وجهٌ من نطاقك…» أبدًا ولا تعرض وجهًا.
+   * وهذا ما كان يقع فعلًا — ولم يره بناءٌ ولا تصييرٌ إلى نصّ، ورآه أوّلُ تشغيلٍ في
+   * متصفّح.
+   */
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   useEffect(() => { setAttempts(loadFaceAttempts(owner, deliveryReading || '')); }, [owner, deliveryReading]);
 
   /* القائمةُ تُطلب مرّةً لكلّ نطاقٍ ورواية — وهي مواضعُ بلا نصّ، فلا تُحمَّل الحزمةُ كلُّها. */
