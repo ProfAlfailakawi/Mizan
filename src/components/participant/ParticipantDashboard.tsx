@@ -7,7 +7,6 @@ import { surahAyahCount } from '../../lib/mushaf-map';
 import { ScopeSummary } from '../scope/QuranScopePicker';
 import { describeScope, scopeMetrics } from '../../lib/quran-scope';
 import { categoryDistribution, passageAyahCount, resolveQuestionCount } from '../../lib/scope-engine';
-import { describeZone } from '../../lib/question-zones';
 import { describeStanding, normalizeAwardPolicy, resolveAwards } from '../../lib/award-places';
 import { Badge } from '../design-system/Badge';
 import { QueueRibbon } from '../design-system/QueueRibbon';
@@ -52,17 +51,18 @@ export const ParticipantDashboard: React.FC = () => {
   */
  const scopeResolution=participant?store.participantEffectiveScope(participant.id):null;
  /*
-  * حدود المناطق التي يُوزَّع عليها سؤاله — لا أسئلته.
+  * هل يُوزَّع سؤاله على مناطق — نعم أو لا، لا حدودَ ولا عدد.
   *
-  * المتسابق يسأل «من أين سيسألونني؟»، وجوابُه الصادق هو حدود المناطق لا المواضع: المواضع
-  * لا يعرفها أحد قبل وقوفه أمام اللجنة، وعرضُها هنا لو أمكن كان كشفًا لا طمأنة.
+  * المتسابق يسأل «من أين سيسألونني؟»، وكانت الشاشة تجيبه بحدود المناطق مفصّلةً. وهي
+  * خريطةٌ لا طمأنة: ثلاثُ مناطقَ وثلاثةُ أسئلة تعني سؤالًا من كلِّ ثلث، فينكمش ما
+  * يُراجعه. فبقي المعنى — أن سؤاله لا يتجمّع في موضعٍ واحد — وذهب التفصيل إلى حيث
+  * يخصّ: لوحةُ محرّك الأسئلة عند المنظّم.
   */
- const warmupZoneHints=useMemo(()=>{
-  if(!category)return [];
+ const warmupSpreadAcrossZones=useMemo(()=>{
+  if(!category)return false;
   const plan=categoryDistribution(category,resolveQuestionCount(category,getCompetitionPolicy(competition)));
-  if(!plan||plan.mode==='free')return [];
-  return plan.zones.map(zone=>describeZone(zone,ar));
- },[category?.id,category?.distribution,competition.id,ar]);
+  return !!plan&&plan.mode!=='free'&&plan.zones.length>1;
+ },[category?.id,category?.distribution,competition.id]);
  const scopeSurahs=useMemo(()=>(scopeResolution&&!scopeResolution.blocked?scopeMetrics(scopeResolution.scope).surahs:[]),[scopeResolution?.signature]);
  const [tab,setTab]=useState<Tab>('journey');
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
@@ -197,7 +197,7 @@ export const ParticipantDashboard: React.FC = () => {
     listening={practiceEngine}/>}
    <WarmupSanctuary ar={ar}
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
-    zoneHints={warmupZoneHints}
+    spreadAcrossZones={warmupSpreadAcrossZones}
     questionCount={resolveQuestionCount(category,policy)}
     practicePassage={practicePassage}
     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
