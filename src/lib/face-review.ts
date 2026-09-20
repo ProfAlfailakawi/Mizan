@@ -11,22 +11,31 @@ import type { FaceAttempt } from './face-memory';
 /** ما يكفي للحكم على وجهٍ قبل فتحه — لا نصَّ فيه. */
 export interface FaceExtent { page: number; surahStart: number; surahEnd: number }
 
-/* الوجهُ الذي يعبر سورتين لا يُستمع إليه: المحاذاةُ تُطلب لسورةٍ ومدى آياتٍ فيها. */
-const singleSurah = (f: FaceExtent) => f.surahStart === f.surahEnd;
+/*
+ * هل يصحّ الاستماعُ إلى هذا الوجه؟
+ *
+ * ومسارُ المحاذاة يُطلب **لسورةٍ واحدةٍ** ومدى آياتٍ فيها، فالوجهُ العابرُ سورتين لا
+ * يُقاس كاملًا. وهذا سؤالٌ يُسأل عن الوجه المسحوب نفسِه، لا عن القائمة وحدها: فقد
+ * يُسحب عابرٌ من قائمةٍ كلُّها عابرة، فيلزم أن يُعرف قبل أن يُفتح ميكروفون.
+ */
+export function faceSupportsListening(face: FaceExtent | null | undefined): boolean {
+  return !!face && face.surahStart === face.surahEnd;
+}
 
 /*
  * الوجوهُ التي يصحّ الاستماعُ إليها.
  *
- * ومسارُ المحاذاة يُطلب لسورةٍ واحدةٍ ومدى آياتٍ فيها، فالوجهُ العابرُ سورتين لا يُقاس
- * كاملًا. وهي نحوُ تسعةٍ في المئة من المصحف. وحين لا يبقى غيرُها في نطاق الطالب —
- * كنطاقٍ ضيّقٍ كلُّ وجوهه عابرة — تُعرض على أنّها هي، ولا يُقال له «لا وجهَ لك».
+ * وهي نحوُ واحدٍ وتسعين في المئة من المصحف. وحين لا يبقى غيرُ العابرة في نطاق الطالب —
+ * كنطاقٍ ضيّقٍ كلُّ وجوهه عابرة — تُعرض على أنّها هي، ولا يُقال له «لا وجهَ لك». لكنّها
+ * حينئذٍ **تُراجَع صامتةً**: يُقال له إنّ الوجهَ يعبر سورتين فلا يُحلَّل، ولا يُفتح له
+ * ميكروفونٌ يرسل إلى مقطعٍ لا يقبله المحرّك فيعود بتقريرٍ فارغ.
  */
 export function listenableFaces(
   faces: readonly FaceExtent[],
   listening: unknown,
 ): readonly FaceExtent[] {
   if (!listening) return faces;
-  const single = faces.filter(singleSurah);
+  const single = faces.filter(faceSupportsListening);
   return single.length ? single : faces;
 }
 
@@ -98,4 +107,47 @@ export function rememberFaceAttempt(owner: string, reading: string, attempt: Fac
 
 export function forgetFaceAttempts(owner: string, reading: string): void {
   try { window.localStorage.removeItem(storeKey(owner, reading)); } catch { /* لا شيء يُفعل */ }
+}
+
+/* ── طابورٌ متسلسل: ترتيبُ التلاوة لا ترتيبُ الشبكة ────────────────────── */
+
+/*
+ * مقاطعُ التلاوة تُرسل واحدًا بعد واحد، بترتيب تسجيلها.
+ *
+ * وكان كلُّ مقطعٍ يُرسل مستقلًّا، فتعود الردودُ بترتيب إتمامها لا بترتيب القراءة.
+ * وذلك يصنع **رجوعًا كاذبًا**: مقطعٌ متأخّرٌ يسبق سابقَه فيبدو أنّ القارئ نكص. وهو
+ * أسوأُ ما يقع هنا: «أعدتَ» واحدةٌ من ثلاثٍ يقدر هذا المسارُ على قياسها، فكذبُها
+ * يمسّ ما بقي صادقًا.
+ *
+ * ومحرّكُ الخادم نفسُه ذو حالةٍ متّصلة، فترتيبُ وصول الصوت إليه يغيّر قراره — فلا
+ * يكفي فرزُ الردود عند العميل، بل تُرسل مرتّبةً أصلًا.
+ *
+ * والدفعُ **تزامنيّ**: يُربط الطابورُ لحظةَ وصول المقطع، لا بعد انتظار. وإلا سبق
+ * متأخّرٌ سابقَه في الربط نفسِه.
+ */
+export interface SerialQueue {
+  /** يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها. */
+  push(task: () => Promise<void>): void;
+  /** ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار. */
+  drain(): Promise<void>;
+  /** كم مهمّةً دُخلت الطابورَ — للعرض لا للحكم. */
+  readonly length: number;
+}
+
+export function serialQueue(): SerialQueue {
+  let tail: Promise<void> = Promise.resolve();
+  let entered = 0;
+  return {
+    push(task) {
+      entered += 1;
+      /* وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. */
+      tail = tail.then(task).catch(() => undefined);
+    },
+    async drain() {
+      /* ومهمّةٌ تُدفع أثناء الانتظار تُنتظر هي أيضًا — وإلا سقط آخرُ مقطع. */
+      let seen: Promise<void> | null = null;
+      while (seen !== tail) { seen = tail; await tail; }
+    },
+    get length() { return entered; },
+  };
 }
