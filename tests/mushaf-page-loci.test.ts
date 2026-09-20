@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { MizanQuranDelivery } from '../server/quran-reading-delivery';
+import { KfgqpcDeliveryRepository } from '../server/kfgqpc-delivery';
 import { KFGQPC_MIRROR_CANDIDATES, QURAN_FULL_TEXT_CANDIDATES } from '../src/lib/quran-candidate-sources';
 
 /*
@@ -14,7 +15,7 @@ import { KFGQPC_MIRROR_CANDIDATES, QURAN_FULL_TEXT_CANDIDATES } from '../src/lib
  * الخادم — ويقرأ ما خرج منه. لا نصَّ شيفرةٍ يُقرأ هنا.
  */
 
-const delivery = new MizanQuranDelivery({} as NodeJS.ProcessEnv);
+const delivery = new MizanQuranDelivery(new KfgqpcDeliveryRepository({}));
 
 const MIRROR_KEYS = KFGQPC_MIRROR_CANDIDATES.map(x => x.deliveryKey);
 const ISLAMWEB_KEYS = QURAN_FULL_TEXT_CANDIDATES.filter(x => x.authority === 'ISLAMWEB_DERIVED').map(x => x.deliveryKey);
