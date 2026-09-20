@@ -16,24 +16,41 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
+import fs, { type Dirent } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
 const ROOT = process.cwd();
 const CODE_DIRS = ['src', 'server', 'tools', 'scripts', 'tests', '.github'];
+const SOURCE = /\.(ts|tsx|mjs|cjs|js|jsx|ya?ml|json)$/;
 
-const tracked = execFileSync('git', ['ls-files', '-z', ...CODE_DIRS, 'package.json'], { cwd: ROOT, encoding: 'utf8' })
-  .split('\0')
-  .filter(Boolean)
-  .filter(f => /\.(ts|tsx|mjs|cjs|js|jsx|ya?ml|json)$/.test(f));
+/*
+ * والمسحُ من نظام الملفّات لا من `git ls-files`.
+ *
+ * وكانت أوّلُ صياغةٍ تسأل `git`، فمرّت هنا وسقطت في بناء الحاوية: `.dockerignore`
+ * يستبعد `.git` صراحةً، فلا مستودعَ هناك أصلًا — فرمى الملفُّ عند تحميله وسقط
+ * اختبارٌ **في حارسٍ كُتب ليمنع هذا الصنفَ بعينه**: شيءٌ يعمل في بيئةٍ ولا يعمل في
+ * أخرى. فصار المسحُ لا يفترض إلا القرص.
+ */
+function walk(dir: string, out: string[] = []): string[] {
+  let entries: Dirent[];
+  try { entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }) } catch { return out }
+  for (const entry of entries) {
+    const rel = path.join(dir, entry.name);
+    if (entry.isDirectory()) { if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(rel, out); continue }
+    if (entry.isFile() && SOURCE.test(entry.name)) out.push(rel);
+  }
+  return out;
+}
+
+const tracked = [...CODE_DIRS.flatMap(dir => walk(dir)), 'package.json'].filter(f => fs.existsSync(path.join(ROOT, f)));
 
 const read = (file: string) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 test('the scan actually sees the repository source', () => {
   // ولو عمي عن الملفّات لمرّ الاختبارُ فارغًا وهو يبدو حارسًا.
-  assert.ok(tracked.length > 100, `expected the tracked source files, found ${tracked.length}`);
+  assert.ok(tracked.length > 100, `expected the source files on disk, found ${tracked.length}`);
+  assert.ok(tracked.includes('package.json'), 'and the manifest beside them');
   assert.ok(tracked.includes('tools/face-harness/drive.ts'), 'the scan must see the file that caused this guard');
 });
 
