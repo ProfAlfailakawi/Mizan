@@ -146,7 +146,7 @@ export interface SerialQueue {
    * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ محاولةٌ
    * مغشوشة. والطابورُ لا يملك إيقافَ مهمّةٍ جارية، لكنّه يملك أن يقول لها: كُفّي.
    */
-  push(task: (live: () => boolean) => Promise<void>): void;
+  push(task: (live: () => boolean) => Promise<void>, onFailure?: (error: unknown) => void): void;
   /**
    * ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار — إلى حدٍّ.
    * ويُرجع `true` إن **وصل كلُّ شيءٍ وتمّ**؛ و`false` إن انقضى الحدُّ أو سقطت مهمّة.
@@ -168,14 +168,19 @@ export function serialQueue(): SerialQueue {
   const live = () => !abandoned;
 
   return {
-    push(task) {
+    push(task, onFailure) {
       if (abandoned) return;
       entered += 1;
       /*
        * وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. لكنّه
        * **يُعدّ**: مقطعٌ سقط مقطعٌ لم يصل، فالتقريرُ ناقصٌ وإن لم تنقضِ مهلة.
+       *
+       * والبيانُ للطالب يقع بعد العدّ، وسقوطُه هو لا يُسقط العدّ.
        */
-      tail = tail.then(() => (abandoned ? undefined : task(live))).catch(() => { failed += 1; });
+      tail = tail.then(() => (abandoned ? undefined : task(live))).catch(error => {
+        failed += 1;
+        try { onFailure?.(error); } catch { /* بيانٌ تعذّر لا يُلغي أنّ المقطع سقط */ }
+      });
     },
     async drain(deadlineMs = DRAIN_DEADLINE_MS) {
       let timer: ReturnType<typeof setTimeout> | undefined;

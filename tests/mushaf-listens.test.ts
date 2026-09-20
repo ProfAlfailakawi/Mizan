@@ -321,6 +321,16 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   /* والمقاطعُ تدخل الطابورَ ولا تُرسل مستقلّةً. */
   assert.match(screen, /queue\.current\.push\(/, 'المقاطعُ لا تدخل الطابور');
   assert.equal(/ondataavailable = async/.test(screen), false, 'الربطُ بالطابور ليس تزامنيًّا');
+  /*
+   * ولا `try` في مهمّة المقطع: الخطأُ يمرّ إلى الطابور فيُعدّ ساقطًا، والبيانُ للطالب
+   * يُسلَّم إلى `onFailure`. وقد وقع العكسُ مرّةً فصار عدّادُ السقوط ميتًا: المهمّةُ
+   * تبتلع خطأها فيرى الطابورُ نجاحًا، فيقول «تمّ» ومقطعٌ لم يصل.
+   */
+  const chunkTask = screen.slice(screen.indexOf('queue.current.push(async live'), screen.indexOf('rec.start(2000)'));
+  assert.equal(/\btry\s*\{/.test(chunkTask), false, 'مهمّةُ المقطع تبتلع خطأها فلا يُعدّ ساقطًا');
+  assert.match(chunkTask, /\}, error => \{/, 'لا بيانَ للطالب عند سقوط مقطع');
+  assert.match(chunkTask, /setNote\(faceNote\(code, ar\)\)/, 'سببُ التعذّر لا يبلغ الطالب');
+
   /* والمقطعُ يسأل الطابورَ قبل أن يكتب، والطابورُ القديم يُترك عند كلّ وجهٍ جديد. */
   assert.match(screen, /if \(!alive\.current \|\| !live\(\)\) return;/, 'المقطعُ يكتب بلا أن يسأل');
   /*
@@ -430,5 +440,31 @@ test('ولا سقوطَ ولا انقضاء ⇒ تامّ', () => {
   return q.drain(500).then(complete => {
     assert.equal(complete, true, 'قيل «ناقص» وكلُّ شيءٍ وصل');
     assert.equal(q.failed, 0);
+  });
+});
+
+test('بيانُ السقوط يُسلَّم إلى الطابور — فالعدُّ لا يعتمد على أدب المهمّة', () => {
+  /*
+   * ولو تُرك الالتقاطُ للمهمّة لابتلعت خطأها ومضت، فرأى الطابورُ نجاحًا حيث وقع
+   * سقوط. فصار البلعُ غيرَ ممكن: الخطأُ يمرّ إلى الطابور دائمًا، والبيانُ يُعطى هنا.
+   */
+  const seen: unknown[] = [];
+  const q = serialQueue();
+  q.push(async () => { throw new Error('CHUNK_FAILED'); }, error => { seen.push(error); });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false, 'قيل «تمّ» ومقطعٌ ساقط');
+    assert.equal(q.failed, 1);
+    assert.equal(seen.length, 1, 'لم يُبلَّغ بالسقوط');
+    assert.equal((seen[0] as Error).message, 'CHUNK_FAILED');
+  });
+});
+
+test('وبيانٌ تعذّر هو نفسُه لا يُلغي أنّ المقطع سقط', () => {
+  const q = serialQueue();
+  q.push(async () => { throw new Error('CHUNK_FAILED'); }, () => { throw new Error('NOTE_FAILED'); });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false);
+    assert.equal(q.failed, 1, 'سقوطُ البيان ابتلع عدَّ المقطع');
   });
 });

@@ -183,28 +183,32 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       rec.ondataavailable = e => {
         if (!e.data.size) return;
         const chunk = e.data;
+        /*
+         * ولا `try` هنا: الخطأُ يمرّ إلى الطابور فيُعدّ ساقطًا، والبيانُ للطالب يُسلَّم
+         * إلى `onFailure`. فلو التُقط هنا ومضت المهمّةُ رأى الطابورُ نجاحًا حيث وقع
+         * سقوط، فقال «تمّ» ومقطعٌ لم يصل.
+         */
         queue.current.push(async live => {
-          try {
-            const out = await submitPracticeAlignmentChunk({
-              blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
-              surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
-            });
-            /*
-             * ويُسأل الطابورُ قبل الكتابة: أما زال هو الجاري؟
-             *
-             * فمقطعٌ انقضت مهلتُه ثمّ عاد، والطالبُ قد انتقل إلى وجهٍ آخر، يكتب في
-             * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ
-             * محاولةٌ مغشوشة تُرجّح وجهًا بغير سبب.
-             */
-            if (!alive.current || !live()) return;
-            samples.current = [...samples.current, { surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }];
-            setHeard(n => n + 1);
-          } catch (err) {
-            const code = err instanceof Error ? err.message : '';
-            if (/NOT_CONFIGURED|BENCHMARK|BACKEND|IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) {
-              setNote(faceNote(code, ar));
-              stopAudio();
-            }
+          const out = await submitPracticeAlignmentChunk({
+            blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
+            surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
+          });
+          /*
+           * ويُسأل الطابورُ قبل الكتابة: أما زال هو الجاري؟
+           *
+           * فمقطعٌ انقضت مهلتُه ثمّ عاد، والطالبُ قد انتقل إلى وجهٍ آخر، يكتب في
+           * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ
+           * محاولةٌ مغشوشة تُرجّح وجهًا بغير سبب.
+           */
+          if (!alive.current || !live()) return;
+          samples.current = [...samples.current, { surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }];
+          setHeard(n => n + 1);
+        }, error => {
+          const code = error instanceof Error ? error.message : '';
+          /* وتعذّرٌ بنيويٌّ يوقف التتبّع كلَّه؛ وتعثُّرُ مقطعٍ واحدٍ يُعدّ ولا يوقف شيئًا. */
+          if (/NOT_CONFIGURED|BENCHMARK|BACKEND|IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) {
+            setNote(faceNote(code, ar));
+            stopAudio();
           }
         });
       };
