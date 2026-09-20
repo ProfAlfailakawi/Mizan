@@ -16,6 +16,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -41,10 +42,22 @@ test('the owner checklist names every unresolved placeholder, and no phantom one
   for (const document of LEGAL_DOCUMENTS) {
     const basename = path.basename(document);
     const actual = placeholderLines(document);
-    assert.ok(actual.length > 0, `${document} is expected to still hold owner blanks at this stage`);
-
     const cited = [...checklist.matchAll(new RegExp(`${basename.replace('.', '\\.')}:(\\d+)`, 'g'))]
       .map(match => Number(match[1]));
+
+    /*
+     * ومُلئت الأقواسُ كلُّها في 20 سبتمبر 2026. فلا تصير الدعوى بذلك بلا معنًى بل
+     * تنقلب: قائمةٌ جدولُها فارغٌ لا بدّ أن **تقول** إنه فارغ. فالصمتُ عند التمام
+     * يُقرأ كصمتٍ عن نقص، ويعود المالكُ يفتّش عن قوسٍ لا وجود له — وهو العطبُ الذي
+     * كُتب هذا الملفُّ لأجله أوّلَ مرّة، مقلوبًا.
+     */
+    if (actual.length === 0) {
+      assert.deepEqual(cited, [],
+        `${document} holds no blank any more, yet the checklist still points the owner at one`);
+      assert.match(checklist, /لم يبقَ في الوثيقتين قوسٌ واحد/,
+        'a checklist whose table has emptied must say so out loud, not fall silent');
+      continue;
+    }
 
     for (const line of actual) {
       assert.ok(cited.includes(line),
@@ -79,4 +92,51 @@ test('the checklist does not present the local preflight as a verdict on product
     'the checklist must say what preflight actually reads');
   assert.match(checklist, /بوّابات الإطلاق/,
     'and must point the owner at the deployment-aware gate for the production verdict');
+});
+
+/*
+ * والعطبُ الثالث: عددٌ مكتوبٌ في النثر لا يتحرّك حين تتحرّك الحقيقة.
+ *
+ * كانت القائمة تقول للمالك «تُملأ الخمسة» في موضعين بعد أن صار الباقي فراغين، وتقول
+ * إنّ حمرةَ بوّابة الإطلاق «بالموانع الأربعة» والبوّابةُ تطبع مانعين. ولا يكشف ذلك
+ * فحصُ الأقواس أعلاه: أرقامُ الأسطر كانت صحيحةً والعددُ في الجملة كاذبًا.
+ *
+ * فالأعدادُ التي تُقاس لا تُكتب من الذاكرة، وهذه تُقاس: يُشغَّل `preflight` نفسُه
+ * بالبيئتين اللتين تصفُهما القائمة، ويُقارَن ما يطبعه بما تدّعيه.
+ */
+function preflightBlockerCount(extraEnv: Record<string, string>): number {
+  const result = spawnSync('node', [path.join(root, 'scripts', 'go-live-preflight.mjs')], {
+    encoding: 'utf8',
+    // بيئةٌ نظيفة عمدًا: إرثُ بيئة العدّاء يجعل العددَ يختلف بين جهازٍ وجهاز.
+    env: {PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...extraEnv},
+  });
+  const printed = /النتيجة: (\d+) مانعًا/.exec(result.stdout);
+  assert.ok(printed, `preflight must print its verdict — got: ${result.stdout}\n${result.stderr}`);
+  return Number(printed[1]);
+}
+
+/** ٥ لا 5: القائمةُ عربيّةُ الأرقام، والمقارنةُ تُجرى بصيغتها لا بصيغةٍ أخرى. */
+const arabicIndic = (n: number) => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
+
+test('the shell-count the checklist warns about is the count preflight actually prints', () => {
+  const bare = preflightBlockerCount({});
+  assert.match(read('docs/OWNER-CHECKLIST.md'), new RegExp(`«${arabicIndic(bare)} موانع»`),
+    `a fresh shell reports ${bare} blockers; the checklist must warn with that number, not another`);
+});
+
+test('the gate-count the checklist reports is the count the gate itself reaches', () => {
+  /*
+   * بوّابةُ الإطلاق تقرأ ما عدا الوثائق من `cloudbuild.yaml` وSecret Manager، فلا يبقى
+   * أمامها إلا الوثيقتان. وهذه هي الحالُ التي يصفها قسمُ «كيف تتحقّق بنفسك».
+   */
+  const deployed = preflightBlockerCount({
+    VITE_REQUIRE_AUTH: 'true',
+    VITE_FIREBASE_API_KEY: 'read-from-cloudbuild',
+    VITE_FIREBASE_PROJECT_ID: 'read-from-cloudbuild',
+    MIZAN_PASS_SIGNING_SECRET: 'configured-via-secret-manager',
+    MIZAN_CERT_SIGNING_SECRET: 'configured-via-secret-manager',
+  });
+  assert.equal(deployed, 2, 'the two legal documents are expected to be all that is left for the gate');
+  assert.match(read('docs/OWNER-CHECKLIST.md'), new RegExp(`«النتيجة: ${deployed} مانعًا»`),
+    `the gate reaches ${deployed} blockers; the checklist must quote that number`);
 });
