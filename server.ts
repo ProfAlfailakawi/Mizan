@@ -53,6 +53,8 @@ import { ReferenceTemplateBackend } from './server/alignment/acoustic/reference-
 import { synthReference } from './server/alignment/benchmark/synth';
 import { DEFAULT_CONFIG as ALIGN_CONFIG } from './server/alignment/types';
 import { QuranIntelligenceService } from './server/quran-intelligence-service';
+import { AsrBenchmarkRepository, RecitationRecogniser } from './server/recitation-recogniser';
+import type { RecitationJudgingGate } from './server/recitation-asr-contract';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
 import { publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
 import { parseAllowedOrgIds, resolveEnterpriseOrganization } from './server/enterprise-scope';
@@ -540,6 +542,21 @@ async function startServer() {
   const escrowDir=process.env.MIZAN_QUESTION_ESCROW_DIR||'';const escrowMasterKey=process.env.MIZAN_QUESTION_ESCROW_MASTER_KEY||'';let questionEscrow:QuestionEscrowRepository|null=null;try{if(escrowDir&&escrowMasterKey)questionEscrow=new QuestionEscrowRepository(escrowDir,escrowMasterKey)}catch(err){console.error('Question escrow disabled:',err)}
   const quranSourceDir=process.env.MIZAN_QURAN_SOURCE_DIR||'';let serverQuranSources:ServerQuranSourceRepository|null=null;try{if(quranSourceDir)serverQuranSources=new ServerQuranSourceRepository(quranSourceDir)}catch(err){console.error('Server Quran source vault disabled:',err)}
   const quranIntelligenceDir=process.env.MIZAN_QURAN_INTELLIGENCE_DIR||(quranSourceDir?path.join(path.dirname(quranSourceDir),'quran-intelligence'):'');let quranIntelligence:QuranIntelligenceService|null=null;try{if(quranIntelligenceDir&&serverQuranSources)quranIntelligence=new QuranIntelligenceService(quranIntelligenceDir,serverQuranSources,{url:process.env.MIZAN_QURAN_ALIGNMENT_URL||'',bearerToken:process.env.MIZAN_QURAN_ALIGNMENT_BEARER_TOKEN||''})}catch(err){console.error('Quran intelligence disabled:',err)}
+
+  /*
+   * مَن يُؤذن له أن يقول للطالب «أخطأت».
+   *
+   * ومحرّكُ المحاذاة يعود بموضعٍ لا بنصّ، فلا يُعرف منه إسقاطُ كلمةٍ ولا إبدالُها.
+   * وهذا محرّكٌ آخر يردّ كلماتٍ مسموعة، وله بوّابةٌ لكلّ رواية: تقريرُ قياسٍ لها
+   * بعينها، ولا تنازلَ بينها. ومُقاسٌ لماذا: قارئُ ورشٍ يُقابَل بنصّ حفصٍ فيُخطَّأ
+   * في ٥٨٪ من حركاته الصحيحة.
+   *
+   * وبلا مجلّد بياناتٍ لا خزانةَ تقارير، فتُغلق البوّابةُ باسم سببها بدل أن يُفترض إذن.
+   */
+  const asrBenchmarks=quranIntelligenceDir
+    ?new AsrBenchmarkRepository(path.join(quranIntelligenceDir,'asr-benchmarks'))
+    :{gate:(reading:string)=>({reading,word:'CLOSED',tashkeel:'CLOSED',modelVersion:null,reasons:['QURAN_INTELLIGENCE_NOT_CONFIGURED']} as unknown as RecitationJudgingGate)};
+  const recitationRecogniser=new RecitationRecogniser({url:process.env.MIZAN_QURAN_ASR_URL||'',bearerToken:process.env.MIZAN_QURAN_ASR_BEARER_TOKEN||''},asrBenchmarks);
   const kfgqpcPageImageRoot=process.env.MIZAN_KFGQPC_PAGE_IMAGE_ROOT||'';
   const kfgqpcFontRoot=process.env.MIZAN_KFGQPC_FONT_ROOT||'';
   const kfgqpcAudioRoot=process.env.MIZAN_KFGQPC_AUDIO_ROOT||'';
@@ -1920,8 +1937,26 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    */
   const practiceFaceRawi=(req:Request):string=>{const key=soleParam(req.query.reading,'reading');const rawi=candidateRawiForDeliveryKey(key);if(!rawi)throw new PracticeFaceError('PRACTICE_FACE_READING_UNKNOWN');return rawi};
   const practiceFaceFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PRACTICE_FACE_FAILED';return res.status(code==='PRACTICE_FACE_READING_UNKNOWN'||code==='PRACTICE_FACE_PAGE_INVALID'?400:409).json({code})};
+  /* وتُسمّى العلّةُ للشاشة: غيابُ محرّكٍ ليس كخطأ طلب، وبابٌ مغلقٌ ليس عطلًا. */
+  const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')?503:code==='QURAN_ASR_JUDGING_CLOSED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
   app.post('/api/quran/practice/faces',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),express.json({limit:'64kb'}),(req,res)=>{try{const rawi=practiceFaceRawi(req);const raw=req.body?.scope;const scope=raw&&typeof raw==='object'?normalizeScope(raw as QuranScope):undefined;res.setHeader('Cache-Control','no-store');return res.json(practiceFaceCatalogue(rawi,scope))}catch(err){return practiceFaceFailure(res,err)}});
   app.get('/api/quran/practice/face',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{try{const rawi=practiceFaceRawi(req);const page=Number(soleParam(req.query.page,'page'));res.setHeader('Cache-Control','no-store');return res.json(practiceFacePage(rawi,page))}catch(err){return practiceFaceFailure(res,err)}});
+
+  /*
+   * الإذنُ يُعلن للشاشة قبل أن تُفتح تلاوة — فتقول للطالب الحقَّ بدل أن تصمت.
+   *
+   * ومغلقٌ هو الأصل: بلا محرّكٍ مضبوطٍ وبلا تقرير قياسٍ لروايته، يعود البابُ مغلقًا
+   * باسم سببه. ولا يعود خطأً: انعدامُ الإذن حالةٌ تُعرض لا عُطل.
+   */
+  app.get('/api/quran/practice/judging-gate',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{res.setHeader('Cache-Control','no-store');return res.json(recitationRecogniser.gate(soleParam(req.query.reading,'reading')))});
+
+  /*
+   * وما يُسمع يُردّ كلماتٍ — ولا حكمَ هنا: الحكمُ حيث يُعرف نصُّ الوجه.
+   *
+   * ولا يُرسل بايتٌ واحدٌ من صوت الطالب إلى محرّكٍ ما لم يكن البابُ مفتوحًا: الفحصُ
+   * كلُّه يقع قبل الشبكة في `RecitationRecogniser`.
+   */
+  app.post('/api/quran/practice/recognise',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceAlignmentRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading:soleParam(req.query.reading,'reading'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return recitationRecogniserFailure(res,err)}});
   app.get('/api/quran/alignment/shadow/session/:sessionId',requireGovernanceRoles(['judge','head_judge','auditor']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{res.setHeader('Cache-Control','no-store');return res.json(quranIntelligence.sessionEvidence(actor.uid,String(req.params.sessionId||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/session/:sessionId/human-marker',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{return res.json(quranIntelligence.markHumanEvent(actor.uid,String(req.params.sessionId||''),String(req.body?.eventType||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/reset',requireGovernanceRoles(['judge','head_judge',]),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;quranIntelligence.resetAlignment(actor.uid,String(req.body?.sessionId||''));return res.json({reset:true,mode:'SHADOW_ONLY',scoreAuthority:'HUMAN_ONLY'})});
