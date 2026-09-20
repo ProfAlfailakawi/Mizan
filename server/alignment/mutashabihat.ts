@@ -158,6 +158,24 @@ function dedupeRefs(refs: ConfusableRef[]): ConfusableRef[] {
 }
 
 /**
+ * Minimum word distance before a live competitor counts as a mutashābih rather than ordinary
+ * current/next-word ambiguity at a boundary.
+ *
+ * The decoder's runner-up is the strongest DISTINCT word, with no distance constraint: near a word
+ * boundary the neighbour is routinely a close second, which is normal tracking, not a look-alike.
+ * Every consumer of `competingWord` must apply this same floor — a rule copied into two places
+ * drifts apart, and the divergence here would surface as a false "similar passage" mark on the
+ * reciter's page and a false weakness in face memory.
+ */
+export const MIN_CONFUSABLE_DISTANCE_WORDS = 3;
+
+/** Is this competitor far enough away to be a look-alike rather than boundary ambiguity? */
+export function isDistantCompetitor(bestWord: number, competingWord: number | null): boolean {
+  if (competingWord === null) return false;
+  return Math.abs(competingWord - bestWord) >= MIN_CONFUSABLE_DISTANCE_WORDS;
+}
+
+/**
  * Live near-tie evaluator: given the decoder's best word, competing word and gap, decide whether
  * the reciter is at a live acoustic confusability (a strong, DISTANT competitor). Independent of the
  * static map — this catches look-alikes the static index missed (e.g. reordered mirror phrases).
@@ -167,11 +185,12 @@ export function liveNearTie(input: {
   competingWord: number | null;
   competingGap: number;
   gapThreshold: number;
-  minDistanceWords: number;
+  minDistanceWords?: number;
 }): ConfusableRef | null {
   if (input.competingWord === null) return null;
   const distance = Math.abs(input.competingWord - input.bestWord);
-  if (input.competingGap <= input.gapThreshold && distance >= input.minDistanceWords) {
+  const floor = input.minDistanceWords ?? MIN_CONFUSABLE_DISTANCE_WORDS;
+  if (input.competingGap <= input.gapThreshold && distance >= floor) {
     return { kind: 'live-near-tie', globalWordIndex: input.competingWord, gap: Math.round(input.competingGap * 100) / 100 };
   }
   return null;

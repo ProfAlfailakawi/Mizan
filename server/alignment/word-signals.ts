@@ -15,6 +15,8 @@
  * الخلفيةَ الصوتية، فلا تُقارن جلسةٌ بجلسة إلا بعد تسوية.
  */
 
+import { isDistantCompetitor } from './mutashabihat';
+
 export interface AlignmentStep {
   /** الكلمةُ التي بلغها القارئ في هذا الإطار (فهرسٌ عامٌّ داخل المقطع). */
   word: number;
@@ -121,15 +123,29 @@ export function accumulateWordSignals(steps: Iterable<AlignmentStep>): FaceSigna
       slot.emissionSum += step.emission;
       if (step.emission < slot.minEmission) slot.minEmission = step.emission;
     }
-    if (step.competingWord !== null && step.competingWord !== step.word && Number.isFinite(step.competingGap)) {
+    /*
+     * والمنافسُ الجارُ ليس موضعًا مشابهًا.
+     *
+     * القرارُ يُخرج أقوى كلمةٍ **مغايرة** بلا قيدِ مسافة، وعند حدود الكلمات تكون الجارةُ
+     * ثانيةً قريبةً في كلّ تلاوةٍ سليمة. فلو عُدّت التباسًا لظهرت للطالب «موضعٌ مشابه»
+     * حيث لا تشابُهَ، ولرجّحت ذاكرةُ الوجوه ضعفًا لم يقع. والقاعدةُ هي التي يعمل بها
+     * المحرّكُ الحيُّ نفسُه (`liveNearTie`) — مأخوذةٌ من موضعها لا منسوخة.
+     */
+    if (isDistantCompetitor(step.word, step.competingWord) && Number.isFinite(step.competingGap)) {
       if (step.competingGap < slot.narrowestGap) {
         slot.narrowestGap = step.competingGap;
         slot.nearestRival = step.competingWord;
       }
     }
-    if (step.tookJump && previousWord !== null && previousWord !== step.word) {
+    /*
+     * و`tookJump` إزاحةُ **إطارٍ مرجعيّ** لا فجوةُ كلمات: القرارُ يرفعها حين يبعد أفضلُ
+     * إطارٍ عن سابقه بأكثر من أربعة، وذلك يقع في الانتقال العاديّ إلى الكلمة التالية.
+     * فالتخطّي يُشترط له فجوةُ كلمةٍ حقيقيّة — كلمةٌ تُركت بينهما — وإلا كان تتابعًا
+     * سُمّي تخطّيًا. أمّا الرجوعُ فرجوعٌ ولو كلمةً واحدة: التلاوةُ لا تنكص.
+     */
+    if (step.tookJump && previousWord !== null) {
       if (step.word < previousWord) { slot.backwardJumps += 1; backwardJumps += 1; }
-      else { slot.forwardJumps += 1; forwardJumps += 1; }
+      else if (step.word > previousWord + 1) { slot.forwardJumps += 1; forwardJumps += 1; }
     }
     previousWord = step.word;
     lastKnownWord = step.word;

@@ -24,7 +24,7 @@ import { TrackingStateMachine } from './state-machine';
 import { RecoveryEngine } from './recovery';
 import { RepeatBacktrackDetector } from './repeat-detect';
 import { EventEmitter } from './events';
-import { MutashabihatMap, liveNearTie, CuratedConfusable } from './mutashabihat';
+import { MutashabihatMap, liveNearTie, CuratedConfusable, MIN_CONFUSABLE_DISTANCE_WORDS } from './mutashabihat';
 import { ConfusableRef } from './types';
 
 export interface EngineMetrics {
@@ -242,7 +242,7 @@ export class AlignmentEngine {
         competingWord: step.competingWord,
         competingGap: step.competingGap,
         gapThreshold: Math.max(0.12, this.cfg.minCompetingGap * 2),
-        minDistanceWords: 3,
+        minDistanceWords: MIN_CONFUSABLE_DISTANCE_WORDS,
       });
       if (tie) {
         this.lastLiveRiskFrame = this.frameIndex;

@@ -151,6 +151,12 @@ function marksForWord(
   if (w.backwardJumps > 0) out.push({ word: w.word, kind: 'repeat', intensity: Math.min(1, w.backwardJumps / 3) });
   if (w.forwardJumps > 0) out.push({ word: w.word, kind: 'skip', intensity: Math.min(1, w.forwardJumps / 3) });
   if (w.lostFrames > 0) out.push({ word: w.word, kind: 'lost', intensity: Math.min(1, w.lostFrames / 20) });
+  /*
+   * وما فوق هذا الحدّ استدلالٌ صوتيٌّ لا حدثٌ منفصل، فلا يُقال إلا عن كلمةٍ لُبث عندها
+   * ما يكفي لقياسها. أمّا الرجوعُ والتخطّي وانقطاعُ الأثر فأحداثٌ وقعت، تُقال ولو في
+   * إطارٍ واحد.
+   */
+  if (w.frames < t.minFrames) return out;
   if (isConfusable(w, t)) {
     out.push({
       word: w.word, kind: 'confusable', rival: w.nearestRival as number,
@@ -158,7 +164,6 @@ function marksForWord(
       intensity: Math.max(0, Math.min(1, 1 - w.narrowestGap / t.confusableGap)),
     });
   }
-  if (w.frames < t.minFrames) return out;
   if (isStrained(w, refs.emissionMedian, t)) {
     out.push({ word: w.word, kind: 'strain', intensity: intensityOf(w.meanEmission, refs.emissionMedian * t.strainRatio) });
   }

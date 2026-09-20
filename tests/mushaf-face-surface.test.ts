@@ -222,3 +222,32 @@ test('لكلّ علامةٍ لونُها ورمزُها — فلا يلتبس ن
     }
   }
 });
+
+test('وجهٌ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى: لكلٍّ حدُّها الذي يُرى', () => {
+  /*
+   * ملاحظةُ مراجعةٍ آليّة (PR #243): الوجهُ قد يعبر سورتين، وعنوانٌ واحدٌ أعلاه يجعل
+   * مطلعَ الثانية يُقرأ تحت اسم الأولى. والحدُّ يُشتقّ من مجرى الكلمات نفسِه — من
+   * تغيّر رقم السورة — لا من عنوانٍ يوصف به الوجهُ كلُّه.
+   */
+  const crossing: FaceWord[] = [
+    { index: 0, text: 'وَتَوَاصَوْا۟', surah: 103, ayah: 3, endsAyah: false },
+    { index: 1, text: 'بِٱلصَّبْرِ', surah: 103, ayah: 3, endsAyah: true },
+    { index: 2, text: 'وَيْلٌۭ', surah: 104, ayah: 1, endsAyah: false },
+    { index: 3, text: 'لِّكُلِّ', surah: 104, ayah: 1, endsAyah: false },
+  ];
+  const html = renderToStaticMarkup(React.createElement(MushafFaceSurface, {
+    ar: true, page: 601, words: crossing, surahNames: { 103: 'العَصر', 104: 'الهُمَزة' },
+  }));
+  const text = visibleText(html);
+  assert.ok(text.includes('العَصر'), 'اسمُ السورة الأولى لم يُعرض');
+  assert.ok(text.includes('الهُمَزة'), 'مطلعُ السورة الثانية بلا اسمها');
+  assert.match(html, /data-surah-break="104"/, 'لا حدَّ يُرى بين السورتين');
+  /* والحدُّ عند مطلع الثانية وحده — لا قبل كلّ كلمة. */
+  assert.equal([...html.matchAll(/data-surah-break="/g)].length, 1, 'تكرّر الحدُّ بلا موجب');
+
+  /* ووجهٌ في سورةٍ واحدة لا يُشقّ بحدٍّ لا معنى له. */
+  const single = renderToStaticMarkup(React.createElement(MushafFaceSurface, {
+    ar: true, page: 1, surahName: 'الفاتحة', words,
+  }));
+  assert.equal(/data-surah-break=/.test(single), false, 'شُقّ وجهٌ في سورةٍ واحدة');
+});

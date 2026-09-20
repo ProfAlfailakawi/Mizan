@@ -28,7 +28,9 @@ export interface FaceWord {
 export interface MushafFaceSurfaceProps {
   ar: boolean;
   page: number;
+  /** اسمُ السورة — أو أسماؤها حين يحمل الوجهُ خاتمةَ سورةٍ وفاتحةَ أخرى. */
   surahName?: string;
+  surahNames?: Readonly<Record<number, string>>;
   words: readonly FaceWord[];
   /** العلاماتُ بعد التلاوة. وقبلها تكون فارغةً فيُعرض الوجهُ نظيفًا. */
   marks?: readonly FaceMark[];
@@ -41,15 +43,18 @@ export interface MushafFaceSurfaceProps {
 }
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
-  ar, page, surahName, words, marks = [], indices, choiceNote, analysisNote, officialFont = false,
+  ar, page, surahName, surahNames, words, marks = [], indices, choiceNote, analysisNote, officialFont = false,
 }) => {
   const index = useMemo(() => marksByWord(marks), [marks]);
   const pageLabel = ar ? arabicIndicDigits(page) : String(page);
+  const nameOf = (surah: number) => surahNames?.[surah] ?? (words[0] && surah === words[0].surah ? surahName : undefined);
+  /* اسمُ الشريط الأعلى: أوّلُ سورةٍ على الوجه — والتاليةُ يُعلنها شريطُها عند موضعها. */
+  const openingName = words.length ? nameOf(words[0].surah) : surahName;
 
   return (
     <section className="mizan-mushaf-sheet mx-auto max-w-4xl" aria-label={ar ? `وجه المصحف ${pageLabel}` : `Mushaf face ${page}`}>
       <header className="mizan-mushaf-band">
-        <span className="mizan-mushaf-band__name">{surahName ? (ar ? `سُورَةُ ${surahName}` : surahName) : '—'}</span>
+        <span className="mizan-mushaf-band__name">{openingName ? (ar ? `سُورَةُ ${openingName}` : openingName) : '—'}</span>
         <span className="mizan-mushaf-band__range" dir={ar ? 'rtl' : 'ltr'}>
           {ar ? `وجه ${pageLabel}` : `Face ${page}`}
         </span>
@@ -60,12 +65,24 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
         style={officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : undefined}
         data-face-words={words.length}
       >
-        {words.map(word => {
+        {words.map((word, i) => {
+          /*
+           * وجهٌ واحدٌ قد يحمل خاتمةَ سورةٍ وفاتحةَ أخرى، فلا يُترك مطلعُ الثانية تحت
+           * عنوان الأولى بلا حدٍّ يُرى. وحدُّها يُرسم حيث يتغيّر رقمُ السورة في مجرى
+           * الكلمات — لا من عنوانٍ واحدٍ يُوصف به الوجهُ كلُّه.
+           */
+          const opensSurah = i > 0 && words[i - 1].surah !== word.surah;
           const wordMarks = index.get(word.index) || [];
           const top = primaryMark(wordMarks);
           const style = top ? FACE_MARK_STYLE[top.kind] : null;
           return (
             <React.Fragment key={word.index}>
+              {opensSurah && (
+                <span className="mizan-face-surah-break" data-surah-break={word.surah} role="separator"
+                  aria-label={ar ? `بداية سورة ${nameOf(word.surah) ?? ''}`.trim() : `Start of surah ${word.surah}`}>
+                  {nameOf(word.surah) ? (ar ? `سُورَةُ ${nameOf(word.surah)}` : (nameOf(word.surah) as string)) : (ar ? `سُورَةٌ جديدة` : 'New surah')}
+                </span>
+              )}
               <span
                 data-word={word.index}
                 data-mark={top?.kind}

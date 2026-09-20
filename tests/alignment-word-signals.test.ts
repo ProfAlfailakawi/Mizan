@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { MIN_CONFUSABLE_DISTANCE_WORDS } from '../server/alignment/mutashabihat';
 import { accumulateWordSignals, type AlignmentStep } from '../server/alignment/word-signals';
 
 /*
@@ -91,14 +92,20 @@ test('إطارُ الفقد لا يُحتسب كلفةً، ويُعدّ عند �
 });
 
 test('الفقدُ لا يصنع قفزةً كاذبة بعده', () => {
-  /* لو حُدِّث «السابق» من إطارٍ مفقود لظهرت قفزةٌ من موضعٍ ظنّيّ. */
+  /*
+   * لو حُدِّث «السابق» من إطارٍ مفقود لظهرت قفزةٌ من موضعٍ ظنّيّ.
+   *
+   * وكانت العيّنةُ هنا ٢ ← ٣، فلمّا صار التخطّي يشترط فجوةَ كلمةٍ حقيقيّة (لا مجرّد
+   * علم القفزة) لم تعد تقيس شيئًا. فجُعلت ٢ ← ٨: تخطٍّ حقيقيٌّ إلى الأمام، ولو أُخذ
+   * «السابقُ» من الإطار المفقود (٥٠) لانقلب رجوعًا. فالخاصّيّةُ تُقاس كما أُريد لها.
+   */
   const s = accumulateWordSignals([
     step({ word: 2 }),
     step({ lost: true, word: 50 }),
-    step({ word: 3, tookJump: true }),
+    step({ word: 8, tookJump: true }),
   ]);
   assert.equal(s.forwardJumps, 1);
-  assert.equal(s.words.find(w => w.word === 3)!.forwardJumps, 1);
+  assert.equal(s.words.find(w => w.word === 8)!.forwardJumps, 1);
   assert.equal(s.backwardJumps, 0, 'الفقدُ صنع قفزةً خلفيّةً كاذبة');
 });
 
@@ -124,4 +131,63 @@ test('الأوّلُ والآخرُ بالفهرس لا بترتيب الزيا�
   assert.equal(s.firstWord, 2);
   assert.equal(s.lastWord, 9);
   assert.deepEqual(s.words.map(w => w.word), [2, 5, 9]);
+});
+
+/*
+ * ملاحظتا مراجعةٍ آليّة (PR #243) — كلتاهما كانت عيبًا حقيقيًّا في هذا المراكِم.
+ */
+
+test('المنافسُ الجارُ ليس موضعًا مشابهًا — والقاعدةُ هي قاعدةُ المحرّك الحيّ', () => {
+  /*
+   * القرارُ يُخرج أقوى كلمةٍ مغايرة بلا قيدِ مسافة، فتكون الجارةُ ثانيةً قريبةً في كلّ
+   * تلاوةٍ سليمة. ولولا الحدُّ لظهر للطالب «موضعٌ مشابه» حيث لا تشابه، ولرجّحت ذاكرةُ
+   * الوجوه ضعفًا لم يقع.
+   */
+  const near = accumulateWordSignals([
+    { word: 10, emission: 1, competingWord: 11, competingGap: 0.01, tookJump: false, lost: false },
+    { word: 10, emission: 1, competingWord: 9, competingGap: 0.01, tookJump: false, lost: false },
+  ]);
+  assert.equal(near.words[0].nearestRival, null, 'عُدّت الكلمةُ الجارةُ منافسًا');
+  assert.equal(Number.isFinite(near.words[0].narrowestGap), false, 'سُجّلت فجوةٌ لمنافسٍ جار');
+
+  const far = accumulateWordSignals([
+    { word: 10, emission: 1, competingWord: 13, competingGap: 0.02, tookJump: false, lost: false },
+  ]);
+  assert.equal(far.words[0].nearestRival, 13, 'أُسقط منافسٌ بعيدٌ حقيقيّ');
+
+  /* والحدُّ مأخوذٌ من موضعه لا منسوخ: عند الحدّ بالضبط يُقبل، وتحته يُردّ. */
+  const atFloor = accumulateWordSignals([
+    { word: 10, emission: 1, competingWord: 10 + MIN_CONFUSABLE_DISTANCE_WORDS, competingGap: 0.02, tookJump: false, lost: false },
+  ]);
+  const below = accumulateWordSignals([
+    { word: 10, emission: 1, competingWord: 10 + MIN_CONFUSABLE_DISTANCE_WORDS - 1, competingGap: 0.02, tookJump: false, lost: false },
+  ]);
+  assert.equal(atFloor.words[0].nearestRival, 10 + MIN_CONFUSABLE_DISTANCE_WORDS);
+  assert.equal(below.words[0].nearestRival, null);
+});
+
+test('الانتقالُ إلى الكلمة التالية ليس تخطّيًا وإن حملت الخطوةُ علمَ القفزة', () => {
+  /*
+   * `tookJump` إزاحةُ إطارٍ مرجعيّ (أكثر من أربعة) لا فجوةُ كلمات، وهي تقع في الانتقال
+   * العاديّ. فلا يُقال للطالب «تخطّيتَ» وهو لم يترك كلمة.
+   */
+  const stepped = accumulateWordSignals([
+    { word: 4, emission: 1, competingWord: null, competingGap: 1, tookJump: false, lost: false },
+    { word: 5, emission: 1, competingWord: null, competingGap: 1, tookJump: true, lost: false },
+  ]);
+  assert.equal(stepped.forwardJumps, 0, 'عُدّ التتابعُ تخطّيًا');
+
+  const skipped = accumulateWordSignals([
+    { word: 4, emission: 1, competingWord: null, competingGap: 1, tookJump: false, lost: false },
+    { word: 9, emission: 1, competingWord: null, competingGap: 1, tookJump: true, lost: false },
+  ]);
+  assert.equal(skipped.forwardJumps, 1, 'لم يُعدّ تخطٍّ حقيقيّ');
+  assert.equal(skipped.words.find(w => w.word === 9)!.forwardJumps, 1, 'نُسب التخطّي إلى غير الكلمة التي وصل إليها');
+
+  /* والرجوعُ رجوعٌ ولو كلمةً واحدة: التلاوةُ لا تنكص. */
+  const back = accumulateWordSignals([
+    { word: 9, emission: 1, competingWord: null, competingGap: 1, tookJump: false, lost: false },
+    { word: 8, emission: 1, competingWord: null, competingGap: 1, tookJump: true, lost: false },
+  ]);
+  assert.equal(back.backwardJumps, 1, 'أُسقطت إعادةٌ قريبة');
 });
