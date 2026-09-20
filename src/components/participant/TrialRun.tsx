@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ChevronLeft, Ear, Mic, PlayCircle, RotateCcw, ShieldCheck, SkipForward, Square, Timer } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Mic, PlayCircle, RotateCcw, ShieldCheck, SkipForward, Square, Timer } from 'lucide-react';
+import { TrialSteps } from './TrialSteps';
 import { ordinalToLocus, scopeRanges, type QuranScope } from '../../lib/quran-scope';
 import { surahAyahCount } from '../../lib/mushaf-map';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
+import { IS_DEMO_SESSION } from '../../lib/store';
 
 /*
  * التجربة الكاملة — أن يعيش المتسابق يومه قبل يومه.
@@ -193,25 +195,7 @@ const TrialIntro: React.FC<{ ar: boolean; total: number; limit: number; listenin
       <Stat value={clock(limit * total)} label={ar ? 'مدة التجربة' : 'total'} />
     </div>
 
-    <ol className="space-y-2">
-      {[
-        [Mic, ar ? 'تفتح ميكروفونك مرة واحدة' : 'Open your microphone once', ar ? 'نتأكد أن صوتك يصل قبل أن تبدأ، لا في منتصف الموضع.' : 'We confirm your voice arrives before you start.'],
-        [Timer, ar ? 'يُعرض عليك موضع، وتقرأ على المؤقّت' : 'A locus appears and the clock runs', ar ? 'المطلع مخفيّ حتى تطلبه — كما لو أن المحكّم لقّنك.' : 'The opening stays hidden until you ask for it.'],
-        [Ear, listening ? (ar ? 'يتابع النظام أين وصلت' : 'The engine follows your position') : (ar ? 'التتبّع غير مهيّأ في هذه المسابقة' : 'Tracking is not configured here'), listening ? (ar ? 'صوتك يمرّ ولا يُحفظ، ولا يصل اللجنة منه شيء.' : 'Audio passes through and is discarded.') : (ar ? 'تبقى التجربة بمؤقّتها ومواضعها، ولا يُدَّعى استماعٌ لا يقع.' : 'The trial keeps its clock and loci; no listening is claimed.')],
-        [CheckCircle2, ar ? 'ثم ترى أثرك كاملًا' : 'Then you see the whole run', ar ? 'أين تعثّرت وكم استغرقت — وصفًا لا درجة.' : 'Where you stumbled and how long you took.'],
-      ].map(([Icon, title, body], i) => {
-        const Glyph = Icon as React.ComponentType<{ className?: string }>;
-        return (
-          <li key={i} className="flex items-start gap-3 rounded-2xl border border-[#e4e2da] bg-white p-3.5">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E7EEE9] text-[#214C40]"><Glyph className="h-4 w-4" /></span>
-            <div className="min-w-0">
-              <div className="text-xs font-black text-[#39423d]">{title as string}</div>
-              <p className="mt-1 text-[11px] leading-6 text-[#5b6460]">{body as string}</p>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <TrialSteps ar={ar} listening={listening} />
 
     {note && <p className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</p>}
 
@@ -567,12 +551,21 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
   );
 };
 
+/*
+ * «أعد الدخول» جوابٌ خاطئٌ في بيئة العرض.
+ *
+ * الاستماعُ الحيّ يمرّ بهويّةٍ حقيقية (`bearer()`)، وبيئةُ العرض لا حسابَ فيها أصلًا —
+ * فيرجع `IDENTITY_REQUIRED` دائمًا. وكان يُقال للزائر «انتهت جلسة دخولك، أعد الدخول»،
+ * فيُرسَل إلى بابٍ لا يفتح شيئًا: لم تنتهِ جلسةٌ، ولا يوجد دخولٌ يُعاد. فيُفصل الحالان.
+ */
 /* رموز تعذّر التتبّع بلغة المتسابق — لا رمز خام في وجهه. */
 const trialNote = (code: string, ar: boolean) => {
   if (!ar) return `Tracking is unavailable (${code}).`;
   if (/NOT_CONFIGURED/.test(code)) return 'خدمة التتبّع غير مهيّأة في هذه المسابقة بعد، فجرت التجربة بمؤقّتها ومواضعها بلا استماع.';
   if (/BENCHMARK/.test(code)) return 'خدمة التتبّع لم تُعتمد لروايتك بعد، فجرت التجربة بلا استماع.';
-  if (/IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) return 'انتهت جلسة دخولك فتوقّف التتبّع. أعد الدخول ثم جرّب من جديد.';
+  if (/IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) return IS_DEMO_SESSION
+    ? 'التتبّع الحيّ يحتاج حسابًا حقيقيًّا، وهذه بيئة عرض بلا حساب. تجري التجربة بمؤقّتها ومواضعها.'
+    : 'انتهت جلسة دخولك فتوقّف التتبّع. أعد الدخول ثم جرّب من جديد.';
   return 'تعذّر التتبّع الآن، وأكملت التجربة بمؤقّتها ومواضعها.';
 };
 

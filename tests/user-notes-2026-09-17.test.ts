@@ -43,7 +43,11 @@ test('the judge cockpit fills the screen exactly once and never scrolls as a pag
    * الشاشة. فيُنشر المقدار في متغيّر بدل أن يُنسخ رقمه في كل سطح.
    */
   const app = read('src/App.tsx');
-  assert.match(app, /'--mizan-shell-pb':IS_DEMO_SESSION\?'7rem':'0px'/, 'the shell publishes its own reserve');
+  /* والمقدارُ يُشتقّ من الشريط نفسِه (`demo-shell.ts`) لا يُكتب رقمًا هنا: رقمان في
+     موضعين يفترقان أوّلَ ما يتغيّر ارتفاع الشريط. */
+  assert.match(app, /'--mizan-shell-pb':IS_DEMO_SESSION\?DEMO_BAR_SHELL_PADDING:'0px'/, 'the shell publishes its own reserve');
+  assert.match(app, /paddingBottom:'var\(--mizan-shell-pb\)'/, 'and actually applies it');
+  assert.match(read('src/components/layout/demo-shell.ts'), /DEMO_BAR_SHELL_PADDING = `\$\{DEMO_BAR_HEIGHT_REM\}rem`/, 'derived from the bar height');
   assert.match(css, /\.mizan-judge-os\{[\s\S]{0,400}?overflow:hidden;/, 'and the page itself does not scroll');
 
   /* `dvh` لا `vh`: شريط متصفّح الجوال يتمدّد، و`vh` يقيس الحالة الكبرى فتُقصّ اللوحة. */

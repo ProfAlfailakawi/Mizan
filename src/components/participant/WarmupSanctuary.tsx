@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Ear, ListChecks, MapPin, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
 import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
+import { IS_DEMO_SESSION } from '../../lib/store';
 
 /*
  * التهيئة قبل دورك.
@@ -50,7 +51,8 @@ export interface WarmupSanctuaryProps {
   /** وصف نطاق اختباره كما اعتمدته الجهة. غيابه يعني أنه لم يُعتمد بعد، ويُقال ذلك. */
   scopeText?: string;
   /** مواضع محتملة من نطاقه، للتذكير لا للكشف — لا علاقة لها بأسئلته الفعلية. */
-  zoneHints?: string[];
+  /** هل يُوزَّع سؤاله على مناطقَ مختلفة من نطاقه — حقيقةٌ نعم/لا، بلا حدودٍ ولا عدد. */
+  spreadAcrossZones?: boolean;
   /** عدد الأسئلة المقرّر لفئته. */
   questionCount?: number;
   /** الدقائق المقرّرة للسؤال الواحد — يُبنى عليها مؤقّت البروفة. */
@@ -69,7 +71,7 @@ export interface PracticePassage {
   label: string;
 }
 
-export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, zoneHints, questionCount, minutesPerQuestion, practicePassage }) => {
+export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion, practicePassage }) => {
   const [open, setOpen] = useState(false);
   const [door, setDoor] = useState<Door>('where');
   return (
@@ -95,7 +97,7 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
           ))}
         </div>
 
-        {door === 'where' && <WhereDoor ar={ar} scopeText={scopeText} zoneHints={zoneHints} questionCount={questionCount} minutesPerQuestion={minutesPerQuestion} />}
+        {door === 'where' && <WhereDoor ar={ar} scopeText={scopeText} spreadAcrossZones={spreadAcrossZones} questionCount={questionCount} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'breath' && <BreathDoor ar={ar} active={open} />}
         {door === 'rehearsal' && <RehearsalDoor ar={ar} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'listen' && <ListenDoor ar={ar} passage={practicePassage} />}
@@ -106,7 +108,7 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
 
 /* ── أين أُختبر ─────────────────────────────────────────────────────────── */
 
-const WhereDoor: React.FC<Pick<WarmupSanctuaryProps, 'ar' | 'scopeText' | 'zoneHints' | 'questionCount' | 'minutesPerQuestion'>> = ({ ar, scopeText, zoneHints, questionCount, minutesPerQuestion }) => (
+const WhereDoor: React.FC<Pick<WarmupSanctuaryProps, 'ar' | 'scopeText' | 'spreadAcrossZones' | 'questionCount' | 'minutesPerQuestion'>> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion }) => (
   <div className="pt-4 space-y-3">
     <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
       <div className="mizan-kicker">{ar ? 'مواضع اختبارك' : 'WHERE YOU ARE TESTED'}</div>
@@ -118,14 +120,27 @@ const WhereDoor: React.FC<Pick<WarmupSanctuaryProps, 'ar' | 'scopeText' | 'zoneH
       </p>
     </div>
 
-    {!!zoneHints?.length && (
+    {/*
+      * حدودُ المناطق لا تُكتب للمتسابق.
+      *
+      * كانت تُعرض مفصّلةً: «الفاتحة ١ ← الإسراء ٥٠ · ٢٠٧٩ آية» وأخواتُها. وهي تبدو طمأنة،
+      * وهي في الحقيقة خريطة: ثلاثُ مناطقَ وثلاثةُ أسئلة تعني سؤالًا من كلِّ ثلث، فينكمش
+      * ما يُراجعه إلى ثلثٍ لكلّ سؤال. والمتسابقُ الذي يملك الخريطة ليس كمن لا يملكها،
+      * فتختلّ المسابقة بلا أن يُخالف أحدٌ قاعدة.
+      *
+      * فبقي المعنى الذي يطمئنه — أن سؤاله لا يتجمّع في موضعٍ واحد — بلا حدٍّ ولا عدد.
+      * والتفصيلُ يبقى حيث يخصّ: لوحةُ محرّك الأسئلة عند المنظّم.
+      */}
+    {spreadAcrossZones && (
       <div className="rounded-2xl border border-[#e4e2da] bg-white p-4">
-        <div className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><ListChecks className="h-4 w-4" />{ar ? 'يُوزَّع سؤالك على هذه المناطق' : 'Your questions spread across these zones'}</div>
-        <ul className="mt-2 space-y-1 text-[11px] font-bold leading-6 text-[#5b6460]">
-          {zoneHints.slice(0, 8).map(hint => <li key={hint}>• {hint}</li>)}
-        </ul>
+        <div className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><ListChecks className="h-4 w-4" />{ar ? 'أسئلتك موزَّعة على نطاقك' : 'Your questions are spread across your range'}</div>
+        <p className="mt-2 text-[11px] leading-6 text-[#5b6460]">
+          {ar
+            ? 'لا تتجمّع أسئلتك في موضعٍ واحد من نطاقك، بل تتوزّع عليه. فراجِع نطاقك كلَّه.'
+            : 'Your questions do not cluster in one part of your range; they are spread across it. Revise all of it.'}
+        </p>
         <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">
-          {ar ? 'هذه حدود المناطق لا أسئلتك. لا أحد — ولا النظام نفسه — يعرف مواضعك قبل وقوفك أمام اللجنة.' : 'These are the zone bounds, not your questions. Nobody, the system included, knows your loci before you stand before the panel.'}
+          {ar ? 'ولا تُعرض هنا حدودُ التوزيع: لا أحد — ولا النظام نفسه — يعرف مواضعك قبل وقوفك أمام اللجنة، وحدودُ المناطق وحدها تُضيّق ما تُراجعه.' : 'The distribution bounds are not shown: nobody, the system included, knows your loci beforehand — and the bounds alone would narrow what you revise.'}
         </p>
       </div>
     )}
@@ -401,6 +416,13 @@ const Cell: React.FC<{ ar: boolean; value: string; label: string; tone?: 'calm' 
   </div>
 );
 
+/*
+ * «أعد الدخول» جوابٌ خاطئٌ في بيئة العرض.
+ *
+ * الاستماعُ الحيّ يمرّ بهويّةٍ حقيقية (`bearer()`)، وبيئةُ العرض لا حسابَ فيها أصلًا —
+ * فيرجع `IDENTITY_REQUIRED` دائمًا. وكان يُقال للزائر «انتهت جلسة دخولك، أعد الدخول»،
+ * فيُرسَل إلى بابٍ لا يفتح شيئًا: لم تنتهِ جلسةٌ، ولا يوجد دخولٌ يُعاد. فيُفصل الحالان.
+ */
 /* رموز تعذّر الاستماع بلغة المتسابق — لا رمز خام في وجهه. */
 const practiceNote = (code: string, ar: boolean) => {
   if (!ar) return `Listening is unavailable (${code}).`;
@@ -409,6 +431,8 @@ const practiceNote = (code: string, ar: boolean) => {
   if (/SOURCE_READING_MISMATCH/.test(code)) return 'المقطع المختار لا يوافق روايتك. اختر مقطعًا من نطاقك.';
   if (/OUTSIDE_EXPECTED_PASSAGE/.test(code)) return 'ما قرأتَه خارج المقطع المختار. ابدأ من أوّله.';
   if (/AUDIO_CHUNK_INVALID/.test(code)) return 'لم يصل صوتٌ واضح. قرّب الميكروفون وأعد المحاولة.';
-  if (/IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) return 'انتهت جلسة دخولك. أعد الدخول ثم جرّب.';
+  if (/IDENTITY_REQUIRED|HTTP_401|HTTP_403/.test(code)) return IS_DEMO_SESSION
+    ? 'الاستماع الحيّ يحتاج حسابًا حقيقيًّا، وهذه بيئة عرض بلا حساب. بقية أبواب التهيئة تعمل هنا.'
+    : 'انتهت جلسة دخولك. أعد الدخول ثم جرّب.';
   return 'تعذّر الاستماع الآن. أعد المحاولة بعد قليل.';
 };

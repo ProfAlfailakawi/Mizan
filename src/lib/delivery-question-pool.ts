@@ -3,7 +3,8 @@ import {drawFairPassage,fetchDifficulty} from './kfgqpc-library';
 import {resolveReading} from './scientific-core';
 import {DELIVERY_READING_BY_RAWI} from './delivered-readings';
 import {isReadingQuestionSafe} from './quran-crosswalk-readiness';
-import {scopeContainsRange,scopeAyahCount,type QuranScope} from './quran-scope';
+import type {QuranScope} from './quran-scope';
+import {buildPoolItems,selectPoolPassages} from './delivery-question-pool-core';
 
 /*
  * بنك أسئلة مولَّد من المصحف بدل قائمة ثابتة.
@@ -30,14 +31,6 @@ export function deliveryReadingKey(riwaya?:string,qiraah?:string):string|null{
  const reading=resolveReading({rawi:riwaya,riwaya,qiraah});
  if(!reading)return null;
  return DELIVERY_READING_BY_RAWI[reading.rawiId]||null;
-}
-
-/** متجه الصعوبة 0..1 → تقدير 1..5 المستعمل في سياسة المسابقة. */
-function difficultyRating(score:number):number{
- return Math.max(1,Math.min(5,Math.round(score*4)+1));
-}
-function densityLabel(value:number):QuestionPoolItem['mutashabihatDensity']{
- return value>=0.5?'high':value>=0.25?'medium':value>0?'low':'none';
 }
 
 export interface DeliveryPoolOptions{
@@ -74,35 +67,17 @@ export async function buildDeliveryQuestionPool(riwaya:string,options:DeliveryPo
   drawFairPassage(reading,{seed:`${seedBase}#${i}`,min,max,...(options.maxJuz?{juz:undefined}:{})})
  ));
 
- const items:QuestionPoolItem[]=[];
- const seen=new Set<string>();
- for(const d of draws){
-  if(!d?.passage)continue;
-  const p=d.passage;
-  // النطاق المعتمد هو المرجع القاطع؛ والموروث maxJuz لا يُستعمل إلا حين لا نطاق.
-  if(options.scope&&scopeAyahCount(options.scope)>0){
-   if(!scopeContainsRange(options.scope,{surah:p.surah,ayah:p.startAyah},{surah:p.surah,ayah:p.endAyah}))continue;
-  } else if(options.maxJuz&&p.juz&&p.juz>options.maxJuz)continue;
-  const key=`${p.surah}:${p.startAyah}-${p.endAyah}`;
-  if(seen.has(key))continue;                       // لا يتكرر الموضع نفسه في البنك
-  seen.add(key);
-  const vector=await fetchDifficulty(reading,p.surah,p.startAyah,p.endAyah);
-  items.push({
-   id:`kfgqpc-${reading}-${p.surah}-${p.startAyah}-${p.endAyah}`,
-   surahNumber:p.surah,
-   surahNameArabic:p.surahNameArabic||'',
-   surahNameEnglish:p.surahNameEnglish||'',
-   startAyah:p.startAyah,
-   endAyah:p.endAyah,
-   juzNumber:p.juz||1,
-   riwaya,
-   expectedTextArabic:p.text,
-   difficultyRating:difficultyRating(vector?.score??0.5),
-   mutashabihatDensity:densityLabel(vector?.mutashabihat??0),
-   // درجة التجويد تتعلق بالأداء لا بالرسم، فلا تُشتق هنا ولا تُدّعى.
-   tajweedComplexity:'intermediate',
-   timesUsed:0,
-  });
- }
- return items;
+ /*
+  * الترشيحُ أوّلًا بلا انتظار، ثم موجةُ قياسٍ واحدة.
+  *
+  * كان `await fetchDifficulty(...)` داخل حلقة الترشيح، فأربعةَ عشرَ نداءً تمشي واحدًا بعد
+  * واحد ولا يبدأ اللاحقُ قبل أن يعود السابق. وعلى شبكةٍ حقيقية يكون ثمنُ ذلك زمنَ الذهاب
+  * والإياب مضروبًا في عددها — والمحكّم واقفٌ أمام متسابقه ينتظر شاشةً لا تتحرّك، فيضغط
+  * الزرَّ مرّتين. (قِيس على الخادم المحلّي: ١٤ نداءً بالتتابع ٥٢ms وبموجةٍ واحدة ٣٥ms؛
+  * والفارقُ يتضاعف بزمن الشبكة لا بزمن الخادم.)
+  *
+  * والترتيبُ والتكرار لا يتغيّران — وكلاهما مُقاسٌ في `delivery-question-pool-core`.
+  */
+ const picked=selectPoolPassages(draws,{scope:options.scope,maxJuz:options.maxJuz});
+ return buildPoolItems(picked,riwaya,reading,p=>fetchDifficulty(reading,p.surah,p.startAyah,p.endAyah));
 }

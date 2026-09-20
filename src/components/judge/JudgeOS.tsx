@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
 import { Ratio } from '../design-system/Ratio';
-import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, UsersRound, ShieldCheck, Square, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
@@ -296,13 +296,27 @@ export const JudgeOS: React.FC = () => {
  // فيبدو الزر معطلًا؛ الآن يُقال السبب بدل أن يبتلع الزرّ الرفض.
  const [startError,setStartError]=useState('');
  /*
+  * زرٌّ لا يُظهر أنه يعمل يُضغط مرّتين.
+  *
+  * بدءُ الجلسة يبني بنكَ المواضع من الخادم قبل أن تتبدّل الشاشة، وذلك زمنٌ يُحسّ على شبكةٍ
+  * حقيقية. وكان الزرّ يبقى كما هو طوالَه، فيظنّ المحكّم أن ضغطته ضاعت فيضغط ثانيةً —
+  * فيمشي مساران متوازيان لبدء الجلسة نفسها.
+  *
+  * فصار الزرّ يقول إنه يعمل ويُقفل حتى ينتهي: علامةٌ للمحكّم، وحارسٌ من ضغطةٍ ثانية.
+  */
+ const [startingId,setStartingId]=useState('');
+ /*
   * السبب الواحد لا احتمالان.
   *
   * كانت الرسالة تقول «لا لجنة متوافقة، أو تعذّر تجهيز أسئلته» — وحرفُ «أو» يرسل المنظّم
   * يفتّش في غرفة العمليات بينما العطل في نطاق الحفظ، أو العكس. المخزن صار يسجّل رمز
   * السبب عند كل فشل، فيُقرأ من فهرس الأعطال ويُعرض هو وحده.
   */
- const callParticipant=async(id:string)=>{setStartError('');const ok=await startSessionForParticipant(id);
+ const callParticipant=async(id:string)=>{
+  if(startingId)return;
+  setStartError('');setStartingId(id);
+  let ok=false;
+  try{ok=await startSessionForParticipant(id)}finally{setStartingId('')}
   if(ok)return;
   const code=sessionStartFailureCode?.()||'';
   const reason=code?errorMessageArabic(code):'';
@@ -510,7 +524,7 @@ export const JudgeOS: React.FC = () => {
     ?`${rosterCounts.total} متسابقًا في هذه المسابقة · ${rosterCounts.queued} في طابور لجنتك · ${rosterCounts.awaiting} معتمدًا لم يُسجَّل حضوره بعد${rosterCounts.pending?` · ${rosterCounts.pending} طلبًا تحت المراجعة`:''}.`
     :`${rosterCounts.total} participants · ${rosterCounts.queued} in your panel queue · ${rosterCounts.awaiting} approved but not checked in${rosterCounts.pending?` · ${rosterCounts.pending} applications under review`:''}.`}
   </p>
-  {nextQueued&&<Button className="mt-5" onClick={()=>void callParticipant(nextQueued.id)}>{ar?'استقبال المتسابق التالي':'Call next participant'}</Button>}
+  {nextQueued&&<Button className="mt-5" disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'استقبال المتسابق التالي':'Call next participant')}</Button>}
   {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-5">{startError}</div>}
  </div>
  {!!committeeQueue.length&&<div className="mizan-surface mt-7 p-5 text-start">
@@ -535,7 +549,7 @@ export const JudgeOS: React.FC = () => {
     <span className="font-mono text-[11px] font-black text-[#656b66]" dir="ltr">{p.code}</span>
     <span className="min-w-0 flex-1 truncate text-sm font-bold">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
     <span className="shrink-0 text-[10px] font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
-    <Button size="sm" variant={turn?'primary':'outline'} disabled={!turn} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{ar?'ابدأ جلسته':'Start'}</Button>
+    <Button size="sm" variant={turn?'primary':'outline'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
    </li>})}
   </ul>
   <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">{ar?'الترتيب مُلزم ولا يُتخطّى من هذه الشاشة. واستقبال من لم يصل ليس من هذه الشاشة: يتم من غرفة العمليات أو مكتب الاستثناء، ثم يدخل الطابور بترتيبه.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
@@ -635,17 +649,26 @@ export const JudgeOS: React.FC = () => {
     </div>}
 
     {/* ── بوابتا الحضور والموافقة ─────────────────────────────────────────── */}
+    {/*
+      * لوحُ حالةٍ ببطاقتين صار سطرًا واحدًا.
+      *
+      * كانت البوّابة تعرض بطاقتين: «المتسابق أمام اللجنة» و«موافقة المحكمين»، كلٌّ بعنوانها
+      * وحالتها. وهي تقرير حالةٍ لا طلبُ فعل: المحكّم يقرأ أربعة أسطر ليعرف أن عليه ضغطةً
+      * واحدة. والبطاقةُ المنجَزة أسوأ — تشغل نصف المساحة لتقول «تمّ».
+      *
+      * فبقي المطلوبُ الآنَ وحده: جملةٌ تصف الخطوة، وزرُّها. وعدّادُ الموافقات يظهر بعد
+      * تأكيد الحضور فقط، لأنه قبلها ليس خطوةً يملكها هذا المحكّم.
+      */}
     {!questionRevealed&&!activeSession.isLocked&&micRecording&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#f0eee7] text-[#313a35]"><LockKeyhole className="h-6 w-6"/></div>
-     <h2 className="mt-4 text-base font-black">{ar?'السؤال لم يُكشف':'Question remains sealed'}</h2>
-     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[#636864]">{ar?'لا يظهر اسم السورة أو الآيات قبل وجود المتسابق أمام اللجنة وموافقة المحكمين المكلّفين.':'No passage details appear until the participant is present and assigned judges approve the reveal.'}</p>
-     <div className="mx-auto mt-5 grid w-full max-w-sm grid-cols-2 gap-2.5">
-      <GateState icon={UserCheck} ok={participantPresent} title={ar?'المتسابق أمام اللجنة':'Participant present'} value={participantPresent?(ar?'تم التحقق':'Verified'):(ar?'مطلوب':'Required')}/>
-      <GateState icon={UsersRound} ok={required>0&&approved>=required} title={ar?'موافقة المحكمين':'Judge approvals'} value={`${approved} / ${required}`}/>
-     </div>
+     <h2 className="mt-4 text-base font-black">{ar?'الموضع مستورٌ حتى يُؤذَن':'The passage stays sealed'}</h2>
+     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[#636864]">{!participantPresent
+      ?(ar?'أكّد أن المتسابق جالسٌ أمامك، ثم تُفتح خطوة الموافقة.':'Confirm the participant is seated before you; the approval step opens next.')
+      :(ar?'بقيت موافقتك لتُفتح السورة وحدودها.':'Your approval is what opens the surah and its bounds.')}</p>
      <div className="mt-5">{!participantPresent
       ?<Button icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>
       :<Button disabled={approvedByMe} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}</div>
+     {participantPresent&&required>0&&<div className="mt-3 text-[10px] font-black tabular-nums text-[#5f6663]">{ar?`الموافقات: ${approved} من ${required}`:`Approvals: ${approved} of ${required}`}</div>}
     </div>}
 
     {/* ── الموضع ─────────────────────────────────────────────────────────── */}
@@ -673,7 +696,8 @@ export const JudgeOS: React.FC = () => {
      <div className="mt-3 text-sm font-black text-[#214C40]">{ar?'تم اعتماد تقييمك':'Assessment locked'}</div>
      <div className="mt-1 text-[11px] text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
      {reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
-     {nextQueued&&<div className="mt-4"><Button onClick={()=>void callParticipant(nextQueued.id)}>{ar?'المتسابق التالي':'Next participant'}</Button></div>}
+     {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
+     {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
     </div>}
 
     {startError&&<div role="alert" className="mt-3 shrink-0 rounded-xl bg-[#F4E6E3] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5">{startError}</div>}
@@ -768,7 +792,6 @@ export const JudgeOS: React.FC = () => {
  </div>
 }
 
-const GateState=({icon:Icon,ok,title,value}:{icon:React.ComponentType<{className?:string}>;ok:boolean;title:string;value:string})=><div className={`rounded-2xl p-4 text-start ${ok?'bg-[#E7EEE9] text-[#214C40]':'bg-[#f2f0ea] text-[#626a65]'}`}><Icon className="w-5 h-5"/><div className="text-xs font-black mt-3">{title}</div><div className="text-[10px] mt-1 opacity-75">{value}</div></div>;
 const specialtyAr=(v:string)=>({memorization:'الحفظ',tajweed:'التجويد',performance:'الأداء',waqf_ibtida:'الوقف والابتداء',all:'شامل'} as Record<string,string>)[v]||v;
 const formatTime=(s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 const HeadphonesEmpty=()=> <div className="w-14 h-14 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-6 h-6"/></div>;

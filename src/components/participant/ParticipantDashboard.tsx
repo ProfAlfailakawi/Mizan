@@ -7,7 +7,6 @@ import { surahAyahCount } from '../../lib/mushaf-map';
 import { ScopeSummary } from '../scope/QuranScopePicker';
 import { describeScope, scopeMetrics } from '../../lib/quran-scope';
 import { categoryDistribution, passageAyahCount, resolveQuestionCount } from '../../lib/scope-engine';
-import { describeZone } from '../../lib/question-zones';
 import { describeStanding, normalizeAwardPolicy, resolveAwards } from '../../lib/award-places';
 import { Badge } from '../design-system/Badge';
 import { QueueRibbon } from '../design-system/QueueRibbon';
@@ -52,17 +51,18 @@ export const ParticipantDashboard: React.FC = () => {
   */
  const scopeResolution=participant?store.participantEffectiveScope(participant.id):null;
  /*
-  * حدود المناطق التي يُوزَّع عليها سؤاله — لا أسئلته.
+  * هل يُوزَّع سؤاله على مناطق — نعم أو لا، لا حدودَ ولا عدد.
   *
-  * المتسابق يسأل «من أين سيسألونني؟»، وجوابُه الصادق هو حدود المناطق لا المواضع: المواضع
-  * لا يعرفها أحد قبل وقوفه أمام اللجنة، وعرضُها هنا لو أمكن كان كشفًا لا طمأنة.
+  * المتسابق يسأل «من أين سيسألونني؟»، وكانت الشاشة تجيبه بحدود المناطق مفصّلةً. وهي
+  * خريطةٌ لا طمأنة: ثلاثُ مناطقَ وثلاثةُ أسئلة تعني سؤالًا من كلِّ ثلث، فينكمش ما
+  * يُراجعه. فبقي المعنى — أن سؤاله لا يتجمّع في موضعٍ واحد — وذهب التفصيل إلى حيث
+  * يخصّ: لوحةُ محرّك الأسئلة عند المنظّم.
   */
- const warmupZoneHints=useMemo(()=>{
-  if(!category)return [];
+ const warmupSpreadAcrossZones=useMemo(()=>{
+  if(!category)return false;
   const plan=categoryDistribution(category,resolveQuestionCount(category,getCompetitionPolicy(competition)));
-  if(!plan||plan.mode==='free')return [];
-  return plan.zones.map(zone=>describeZone(zone,ar));
- },[category?.id,category?.distribution,competition.id,ar]);
+  return !!plan&&plan.mode!=='free'&&plan.zones.length>1;
+ },[category?.id,category?.distribution,competition.id]);
  const scopeSurahs=useMemo(()=>(scopeResolution&&!scopeResolution.blocked?scopeMetrics(scopeResolution.scope).surahs:[]),[scopeResolution?.signature]);
  const [tab,setTab]=useState<Tab>('journey');
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
@@ -97,10 +97,6 @@ export const ParticipantDashboard: React.FC = () => {
  // التدرّب يكون على رواية المتسابق نفسها؛ رواية بلا حزمة تسليم لا تفتح الاستوديو أصلًا.
  const practiceReading=deliveryReadingKeyFor({riwaya:participant.riwaya});
  const passportRows=participantPassport.filter(x=>x.participantId===participant.id&&x.competitionId===competition.id);
- /* أحكام محكّميه المستقلّين على جلسته — منها يُقاس وفاق اللجنة في بطاقة النتيجة. */
- const panelScores=store.judgeSubmissions.filter(x=>x.participantId===participant.id&&x.locked).map(x=>Number(x.totalScore)).filter(Number.isFinite);
- const panelMaxScore=(competition.ruleSet?.criteria||[]).reduce((sum,c)=>sum+(Number(c.maxScore)||0),0)||100;
-
  /*
   * الاستعداد لا يُغلق إلا لحظة وقوفه أمام اللجنة.
   *
@@ -171,8 +167,8 @@ export const ParticipantDashboard: React.FC = () => {
    {/*
      * بطاقة النتيجة: الوجه الذي يخرج من ميزان إلى الناس.
      *
-     * كانت النتيجة رقمين باهتين في صندوقين رماديين، ومعها أقوى ما تملكه المنظومة — وفاق
-     * اللجنة وختم السلسلة — لا يُقال أصلًا. وهذه اللحظة بعينها هي التي يُصوّرها المتسابق
+     * كانت النتيجة رقمين باهتين في صندوقين رماديين، ومعها أقوى ما تملكه المنظومة — ختمُ
+     * السلسلة — لا يُقال أصلًا. وهذه اللحظة بعينها هي التي يُصوّرها المتسابق
      * وأهله ويشاركونها، فتُقال فيها الحقيقة كاملةً وبشكلٍ يليق بها. ولا تُفتح قبل أن
      * تصير النتيجة معلنةً بسياسة المسابقة، فلا تسبق البطاقةُ الإعلان.
      */}
@@ -182,8 +178,6 @@ export const ParticipantDashboard: React.FC = () => {
     riwaya={participant.riwaya}
     categoryName={ar?(category?.nameArabic||category?.name):category?.name}
     finalScore={result.finalScore}
-    maxScore={panelMaxScore}
-    judgeScores={panelScores}
     sealed={result.status==='sealed'||result.status==='published'}/></div>
    <div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">{result.finalScore.toFixed(2)}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الدرجة':'Score'}</div></div><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-3xl font-black">#{result.rank||'—'}</div><div className="text-[10px] text-[#646965] mt-1">{ar?'الترتيب':'Rank'}</div></div></div>{standing&&<div className="mt-3 rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4 text-center"><div className="text-sm font-black text-[#214C40]">{describeStanding(standing,ar)}</div><p className="mt-1 text-[10px] leading-5 text-[#3c4541]">{ar?'المركز يُنال بنسبة معلنة قبل المسابقة؛ ومن لم يبلغها لا يُمنح المركز ولا يُنقل إليه.':'A place is earned against a percentage published before the competition; nobody below it receives the place.'}</p></div>}</>:<p className="text-sm text-[#646965] mt-4">{ar?'سياسة هذه المسابقة تؤجل إظهار النتائج حتى الموعد المعتمد.':'This competition delays result visibility until the approved release point.'}</p>}<div className="mt-5 flex flex-wrap gap-4 text-xs font-bold text-[#214C40]">{policy.appeals.enabled&&resultVisible&&<button onClick={()=>setShowAppeal(true)} className="hover:underline">{ar?'تقديم اعتراض وفق اللائحة':'Appeal under competition policy'}</button>}<button onClick={()=>{const receipt=store.getFairnessReceipt(participant.id);if(!receipt)return;const blob=new Blob([JSON.stringify(receipt,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`mizan-fairness-${participant.code}.json`;a.click();URL.revokeObjectURL(a.href)}} className="hover:underline">{ar?'إيصال النزاهة':'Fairness receipt'}</button></div></section>}
   </>}
@@ -203,7 +197,7 @@ export const ParticipantDashboard: React.FC = () => {
     listening={practiceEngine}/>}
    <WarmupSanctuary ar={ar}
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
-    zoneHints={warmupZoneHints}
+    spreadAcrossZones={warmupSpreadAcrossZones}
     questionCount={resolveQuestionCount(category,policy)}
     practicePassage={practicePassage}
     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
