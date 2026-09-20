@@ -66,12 +66,25 @@ export const DEFAULT_DIFF_OPTIONS: DiffOptions = {
 
 export interface RecitationDiff {
   mistakes: Mistake[];
-  /** كلماتٌ سُمعت كما هي. */
+  /**
+   * كلماتٌ سُمعت كما هي **بثقةٍ تبلغ العتبة**.
+   *
+   * ولا تُعدّ هنا مطابقةٌ دون العتبة: المحرّكُ لم يجزم أنّه سمعها، فعَدُّها «مثبَّتة»
+   * يقلب الظنَّ يقينًا. وكانت تُعدّ، فرُفعت الملاحظةُ في مراجعةٍ آليّة (#252) وهي
+   * صحيحة: كلمةٌ واحدةٌ بثقة ٠٫١ كانت تُخرج `matched: 1` و`withheld: 0`.
+   */
   matched: number;
   expectedCount: number;
   heardCount: number;
   /** ما وقع دون عتبة الثقة فلم يُقل — يُعلن عددُه ولا يُكتم. */
   withheld: number;
+  /**
+   * ومطابقاتٌ دون العتبة: سُمع ما يشبهها ولم يُجزم.
+   *
+   * وتُعدّ في خانةٍ ثالثة لا في `withheld`: ذاك عددُ **أحكامٍ حُجبت**، وهذا عددُ
+   * **مواضعَ لم يُحكم فيها أصلًا**. وخلطُهما يُخفي أيَّهما وقع.
+   */
+  uncertain: number;
 }
 
 type Op = 'match' | 'sub' | 'del' | 'ins';
@@ -123,7 +136,7 @@ export function diffRecitation(
 ): RecitationDiff {
   const opts = { ...DEFAULT_DIFF_OPTIONS, ...options };
   const mistakes: Mistake[] = [];
-  let matched = 0, withheld = 0;
+  let matched = 0, withheld = 0, uncertain = 0;
 
   const keep = (mistake: Mistake) => {
     const floor = mistake.kind === 'tashkeel' ? opts.minTashkeelConfidence : opts.minConfidence;
@@ -134,10 +147,12 @@ export function diffRecitation(
   let heardCursor = 0;
   for (const step of align(expected, heard)) {
     if (step.op === 'match') {
-      matched += 1;
       heardCursor = (step.h as number) + 1;
-      if (!opts.detectTashkeel) continue;
       const e = expected[step.e as number], h = heard[step.h as number];
+      /* والعتبةُ تُطبَّق قبل العدّ: مطابقةٌ لم يجزم بها المحرّكُ ليست تثبيتًا. */
+      if (Number.isFinite(h.confidence) && h.confidence >= opts.minConfidence) matched += 1;
+      else uncertain += 1;
+      if (!opts.detectTashkeel) continue;
       /* الكلمةُ ثبتت، فبقي سؤالُ الحركة — وهو أضعفُ حكمًا فيُحطّ. */
       if (quranVoweled(e.text) !== quranVoweled(h.text)) {
         keep({ kind: 'tashkeel', wordIndex: e.index, expected: e.text, heard: h.text, confidence: h.confidence || 0 });
@@ -166,6 +181,7 @@ export function diffRecitation(
     expectedCount: expected.length,
     heardCount: heard.length,
     withheld,
+    uncertain,
   };
 }
 
