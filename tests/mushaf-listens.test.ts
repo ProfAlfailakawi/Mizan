@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   attemptFrom, faceNote, faceSupportsListening, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
-  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue, DRAIN_DEADLINE_MS,
+  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue, DRAIN_DEADLINE_MS, reviewNote,
 } from '../src/lib/face-review';
 import { accumulateWordSignals } from '../server/alignment/word-signals';
 import { readRecitation, settleRecitation, stepsFromSamples, type FaceWordKey } from '../src/lib/face-session';
@@ -467,4 +467,46 @@ test('وبيانٌ تعذّر هو نفسُه لا يُلغي أنّ المقط�
     assert.equal(complete, false);
     assert.equal(q.failed, 1, 'سقوطُ البيان ابتلع عدَّ المقطع');
   });
+});
+
+test('السببُ المعروفُ يتقدّم على البيان العامّ — ولا يُبتلع', () => {
+  /*
+   * فسقوطُ المقاطع يجعل التقريرَ ناقصًا، وكان النقصُ يتقدّم فيُقال لمن انتهت جلستُه
+   * «الشبكةُ بطيئة، أعِد» — وهو لا يُفيده إعادةٌ، إنّما يُفيده أن يعيد الدخول. والسببُ
+   * البنيويُّ هو وحده الذي يدلّه على ما يفعل.
+   */
+  const expired = faceNote('IDENTITY_REQUIRED', true);
+  const both = reviewNote({ listening: true, faceListenable: true, note: expired, incomplete: true, ar: true })!;
+  assert.ok(both.includes(expired), 'ابتُلع السببُ المعروف');
+  assert.ok(both.includes('ولم يصل بعضُ المقاطع'), 'أُسقط بيانُ النقص');
+
+  /* وبلا سببٍ معروف: يُقال النقصُ وحده. */
+  const onlyPartial = reviewNote({ listening: true, faceListenable: true, incomplete: true, ar: true })!;
+  assert.equal(onlyPartial.includes('ولم يصل'), true);
+
+  /* وبلا نقصٍ: السببُ وحده، بلا ذيلٍ يُوهم نقصًا لم يقع. */
+  const onlyNote = reviewNote({ listening: true, faceListenable: true, note: expired, incomplete: false, ar: true })!;
+  assert.equal(onlyNote, expired);
+
+  /* وتلاوةٌ تامّةٌ بلا سبب: لا بيانَ أصلًا. */
+  assert.equal(reviewNote({ listening: true, faceListenable: true, incomplete: false, ar: true }), undefined);
+});
+
+test('وتعذُّرُ المحرّك أو الوجهِ يتقدّم على كلّ ما سواه', () => {
+  /* فلا معنى لأن يُقال «لم يصل بعضُ المقاطع» ولا مقطعَ أُرسل أصلًا. */
+  const noEngine = reviewNote({ listening: false, faceListenable: true, note: 'س', incomplete: true, ar: true })!;
+  assert.ok(noEngine.includes('غيرُ مهيّأ'), 'تعذُّرُ المحرّك لم يتقدّم');
+  assert.equal(noEngine.includes('لم يصل بعضُ المقاطع'), false, 'قيل نقصٌ ولا إرسال');
+
+  const crossing = reviewNote({ listening: true, faceListenable: false, note: 'س', incomplete: true, ar: true })!;
+  assert.ok(crossing.includes('يحمل خاتمةَ سورةٍ وفاتحةَ أخرى'), 'سببُ الوجه لم يتقدّم');
+
+  /* والإنجليزيّةُ تقول ما تقوله العربيّة — لا صمتَ في لغةٍ دون أخرى. */
+  for (const input of [
+    { listening: false, faceListenable: true, incomplete: false },
+    { listening: true, faceListenable: false, incomplete: false },
+    { listening: true, faceListenable: true, incomplete: true },
+  ]) {
+    assert.ok((reviewNote({ ...input, ar: false }) || '').length > 10, `بيانٌ إنجليزيٌّ ناقص: ${JSON.stringify(input)}`);
+  }
 });

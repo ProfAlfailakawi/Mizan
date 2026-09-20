@@ -8,7 +8,7 @@ import type { FaceMark, FaceReading } from '../../lib/face-reading';
 import { explainChoice, faceWeights, type FaceAttempt } from '../../lib/face-memory';
 import {
   attemptFrom, faceNote, faceSupportsListening, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
-  serialQueue, type SerialQueue,
+  reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
@@ -253,13 +253,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const marks: readonly FaceMark[] = stage === 'report' && reading ? reading.marks : [];
   /* أيُحلَّل هذا الوجهُ فعلًا؟ محرّكٌ مهيّأٌ **ووجهٌ** يقبل القياس. */
   const analysed = !!listening && faceSupportsListening(face);
-  const analysisNote = !listening
-    ? (ar ? 'محرّكُ الاستماع غيرُ مهيّأٍ في هذه المسابقة، فالوجهُ مفتوحٌ للمراجعة بلا تحليل — ولا يُتظاهر بسماعٍ لم يقع.' : 'The listening engine is not configured here — the face is open for review without analysis.')
-    : !faceSupportsListening(face)
-      ? (ar ? 'هذا الوجهُ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى، والتتبّعُ يُطلب لسورةٍ واحدة — فيُراجَع بلا تحليل، ولا يُفتح ميكروفونٌ يعود بتقريرٍ فارغ.' : 'This face spans two surahs and tracking is requested per surah — review it without analysis.')
-      : incomplete
-        ? (ar ? 'انقضت مهلةُ انتظار بعض المقاطع فلم تصل، وما تراه مبنيٌّ على ما وصل وحدَه — فالنقصُ من الاتّصال لا من تلاوتك. وأعِد الوجهَ إن شئت قياسًا تامًّا.' : 'Some chunks never arrived in time — what you see is built only on what did.')
-        : (note || undefined);
+  const analysisNote = reviewNote({ listening: !!listening, faceListenable: faceSupportsListening(face), note, incomplete, ar });
 
   return (
     <section className="space-y-4">
