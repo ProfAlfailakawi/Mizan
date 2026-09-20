@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { AyahMark, arabicIndicDigits } from '../judge/AyahMark';
 import { FaceMarkLegend, FACE_MARK_STYLE, markTint, marksByWord, primaryMark } from './FaceMarks';
-import type { FaceMark, FaceIndices } from '../../lib/face-reading';
+import type { FaceMark, FaceMarkKind, FaceIndices } from '../../lib/face-reading';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — والصفحةُ نفسُها هي التقرير.
@@ -35,6 +35,16 @@ export interface MushafFaceSurfaceProps {
   /** العلاماتُ بعد التلاوة. وقبلها تكون فارغةً فيُعرض الوجهُ نظيفًا. */
   marks?: readonly FaceMark[];
   indices?: FaceIndices;
+  /*
+   * وحدةُ القياس الزمنيّ كما هي في المسار الذي قاس فعلًا.
+   *
+   * المحاذاةُ المحلّيّة تعدّ إطاراتٍ صوتيّةً (عشراتُ المللي ثانية)، ومسارُ التدريب الحيّ
+   * يعدّ مقاطعَ من ثانيتين. فلو سُمّيت المقاطعُ إطاراتٍ لقُرئ «٣ من ٣٠» على أنّه جزءٌ
+   * من ثانية، وهو دقيقة. فتُسمّى الوحدةُ بما هي.
+   */
+  frameUnit?: 'frame' | 'chunk';
+  /** العلاماتُ التي يقدر هذا المسارُ على قياسها — وما سواها يُقال إنّه غيرُ متاح. */
+  measurableMarks?: readonly FaceMarkKind[];
   /** سببُ اختيار هذا الوجه — يُقال للطالب فلا يظنّ الجهازَ يلاحقه. */
   choiceNote?: string;
   /** حين لا يعمل التحليلُ العميق: يُقال السببُ ولا يُتظاهر. */
@@ -43,7 +53,8 @@ export interface MushafFaceSurfaceProps {
 }
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
-  ar, page, surahName, surahNames, words, marks = [], indices, choiceNote, analysisNote, officialFont = false,
+  ar, page, surahName, surahNames, words, marks = [], indices, frameUnit = 'frame', measurableMarks,
+  choiceNote, analysisNote, officialFont = false,
 }) => {
   const index = useMemo(() => marksByWord(marks), [marks]);
   const pageLabel = ar ? arabicIndicDigits(page) : String(page);
@@ -108,7 +119,9 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
 
       {!!marks.length && <div className="mt-6"><FaceMarkLegend marks={marks} ar={ar} /></div>}
 
-      {indices && <FaceIndicesRow indices={indices} ar={ar} />}
+      {indices && <FaceIndicesRow indices={indices} ar={ar} frameUnit={frameUnit} />}
+
+      {measurableMarks && <UnmeasurableNote measurable={measurableMarks} ar={ar} />}
 
       {choiceNote && (
         <p className="mt-4 text-center text-[10px] leading-5 text-[#6b716d]">{choiceNote}</p>
@@ -129,18 +142,19 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
  * وكلُّ خانةٍ تحمل عددَها الخامَ إلى جانب أيّ نسبةٍ تُعرض، فلا يُقرأ «٨٠٪» بلا أن
  * يُعرف من كم. والنسبةُ تُحسب هنا للعرض وحده ولا تُخزَّن ولا تُبنى عليها ذاكرة.
  */
-const FaceIndicesRow: React.FC<{ indices: FaceIndices; ar: boolean }> = ({ indices, ar }) => {
+const FaceIndicesRow: React.FC<{ indices: FaceIndices; ar: boolean; frameUnit: 'frame' | 'chunk' }> = ({ indices, ar, frameUnit }) => {
   const cells: { key: string; label: string; value: string; note?: string }[] = [
     {
-      key: 'traversed',
-      label: ar ? 'كلماتٌ بلغها المحرّك' : 'words tracked',
-      value: `${indices.traversed} / ${indices.expected}`,
+      /* أبعدُ ما بلغ، لا عددُ ما رُصد: القياسُ الخشنُ يرصد قليلًا ممّا قُرئ كلُّه. */
+      key: 'reach',
+      label: ar ? 'بلغتَ حتى الكلمة' : 'reached word',
+      value: `${indices.reach} / ${indices.expected}`,
     },
     {
       key: 'steadiness',
       label: ar ? 'انقطاعُ الأثر' : 'tracking lost',
       value: indices.totalFrames > 0 ? `${indices.lostFrames} / ${indices.totalFrames}` : '—',
-      note: ar ? 'إطارًا صوتيًّا' : 'audio frames',
+      note: frameUnit === 'chunk' ? (ar ? 'مقطعًا صوتيًّا' : 'audio chunks') : (ar ? 'إطارًا صوتيًّا' : 'audio frames'),
     },
     {
       key: 'returns',
@@ -163,5 +177,27 @@ const FaceIndicesRow: React.FC<{ indices: FaceIndices; ar: boolean }> = ({ indic
         </div>
       ))}
     </dl>
+  );
+};
+
+/*
+ * ما لا يقدر هذا المسارُ على قياسه يُقال، ولا يُترك الطالبُ يظنّ أنّ خلوَّ وجهه من
+ * علامةٍ شهادةٌ له بها.
+ *
+ * فغيابُ «موضعٍ مشابه» عن وجهٍ قِيس بمسارٍ لا يقيس التشابه ليس معناه «لم تلتبس عليك»،
+ * بل «لم يُنظر في ذلك». والفرقُ بينهما هو الفرقُ بين الصدق وضدّه.
+ */
+const UnmeasurableNote: React.FC<{ measurable: readonly FaceMarkKind[]; ar: boolean }> = ({ measurable, ar }) => {
+  const able = new Set(measurable);
+  const missing = (Object.keys(FACE_MARK_STYLE) as FaceMarkKind[]).filter(k => !able.has(k));
+  if (!missing.length) return null;
+  const names = missing.map(k => (ar ? FACE_MARK_STYLE[k].ar : FACE_MARK_STYLE[k].en)).join(ar ? '، ' : ', ');
+  return (
+    <p data-unmeasurable={missing.join(',')}
+      className="mt-4 rounded-2xl border border-[#dfe3e0] bg-[#f4f6f5] p-3 text-center text-[10px] font-bold leading-5 text-[#5f6663]">
+      {ar
+        ? `لم يُنظر في: ${names}. قياسُها يحتاج تلاوةً مرجعيّةً مُعتمدةً لروايتك، وهي غيرُ متوفّرةٍ بعد — فخلوُّ وجهك منها ليس شهادةً لك بها.`
+        : `Not examined here: ${names}. These need a certified reference recitation for your reading, which is not yet available — their absence is not a verdict in your favour.`}
+    </p>
   );
 };

@@ -33,7 +33,9 @@ import { PublicCertificateRegistry, certificateRegistryFromEnv } from './server/
 import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
-import { MizanQuranDelivery } from './server/quran-reading-delivery';
+import { MizanQuranDelivery, candidateRawiForDeliveryKey } from './server/quran-reading-delivery';
+import { practiceFaceCatalogue, practiceFacePage, PracticeFaceError } from './server/practice-face-service';
+import { normalizeScope, type QuranScope } from './src/lib/quran-scope';
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
@@ -1457,9 +1459,15 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   app.get('/api/public/kfgqpc/fairdraw/:readingId',async(req,res)=>{
     const readingId=safeSegment(String(req.params.readingId||'hafs'));
     const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>0?Math.floor(n):undefined};
-    try{const out=await generativeFairDraw(quranDelivery,{reading:readingId,seed:req.query.seed?String(req.query.seed):undefined,
-        anchor:req.query.anchor?String(req.query.anchor) as any:undefined,ayahCount:num(req.query.ayahCount),
-        juz:num(req.query.juz),surah:num(req.query.surah),minAyahCount:num(req.query.min),maxAyahCount:num(req.query.max)});
+    /*
+     * والمعاملُ المكرَّر يُرفض هنا أيضًا، لا يُترك ناجيًا بالمصادفة.
+     *
+     * فـ`Number(['1','2'])` يعطي NaN فيسقط في `num` — نجاةٌ لا حراسة. ومن كرّر المعامل
+     * لا يعرف أيَّ قيمةٍ استُعملت، فالردُّ الصريح أصدقُ من أخذ واحدةٍ صامتًا.
+     */
+    try{const out=await generativeFairDraw(quranDelivery,{reading:readingId,seed:soleParam(req.query.seed,'seed')||undefined,
+        anchor:(soleParam(req.query.anchor,'anchor')||undefined) as any,ayahCount:num(soleParam(req.query.ayahCount,'ayahCount')),
+        juz:num(soleParam(req.query.juz,'juz')),surah:num(soleParam(req.query.surah,'surah')),minAyahCount:num(soleParam(req.query.min,'min')),maxAyahCount:num(soleParam(req.query.max,'max'))});
       if(!out)return res.status(404).json({code:'FAIRDRAW_SOURCE_NOT_DELIVERED'});
       // Attach the measured cognitive load of the drawn passage so panels can see — and later
       // equalise — how heavy a draw actually is, instead of assuming randomness means fairness.
@@ -1901,6 +1909,19 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * له شيء لا يعرفه. ولا يُكتب من هذا في دفتر الأدلّة حرف.
    */
   app.post('/api/quran/practice/align',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceAlignmentRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:actor.uid,sessionId:`practice:${actor.uid}`,reading:soleParam(req.query.reading,'reading'),surah:soleParam(req.query.surah,'surah'),startAyah:soleParam(req.query.startAyah,'startAyah'),endAyah:soleParam(req.query.endAyah,'endAyah'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,practice:true});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return quranIntelligenceFailure(res,err)}});
+  /*
+   * وجوهُ المصحف للتمرين — يراجع الطالبُ بصفحته كما يراجع في مصحفه.
+   *
+   * والمسارُ يُخرج **المواضعَ لا النصّ**: قائمةٌ بأرقام الوجوه ومدياتها، فيختار الطالبُ
+   * (أو ترجيحُ ضعفه) وجهًا، ثم يُطلب نصُّه وحده. فلا تُحمَّل حزمةُ الرواية كلُّها إلى
+   * متصفّح لأنّه فتح شاشة.
+   *
+   * وهذا كلُّه من حزمة روايته هو: لا يُعرض وجهٌ ناقصٌ فيها، ولا يُملأ نقصٌ من غيرها.
+   */
+  const practiceFaceRawi=(req:Request):string=>{const key=soleParam(req.query.reading,'reading');const rawi=candidateRawiForDeliveryKey(key);if(!rawi)throw new PracticeFaceError('PRACTICE_FACE_READING_UNKNOWN');return rawi};
+  const practiceFaceFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PRACTICE_FACE_FAILED';return res.status(code==='PRACTICE_FACE_READING_UNKNOWN'||code==='PRACTICE_FACE_PAGE_INVALID'?400:409).json({code})};
+  app.post('/api/quran/practice/faces',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),express.json({limit:'64kb'}),(req,res)=>{try{const rawi=practiceFaceRawi(req);const raw=req.body?.scope;const scope=raw&&typeof raw==='object'?normalizeScope(raw as QuranScope):undefined;res.setHeader('Cache-Control','no-store');return res.json(practiceFaceCatalogue(rawi,scope))}catch(err){return practiceFaceFailure(res,err)}});
+  app.get('/api/quran/practice/face',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{try{const rawi=practiceFaceRawi(req);const page=Number(soleParam(req.query.page,'page'));res.setHeader('Cache-Control','no-store');return res.json(practiceFacePage(rawi,page))}catch(err){return practiceFaceFailure(res,err)}});
   app.get('/api/quran/alignment/shadow/session/:sessionId',requireGovernanceRoles(['judge','head_judge','auditor']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{res.setHeader('Cache-Control','no-store');return res.json(quranIntelligence.sessionEvidence(actor.uid,String(req.params.sessionId||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/session/:sessionId/human-marker',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{return res.json(quranIntelligence.markHumanEvent(actor.uid,String(req.params.sessionId||''),String(req.body?.eventType||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/reset',requireGovernanceRoles(['judge','head_judge',]),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;quranIntelligence.resetAlignment(actor.uid,String(req.body?.sessionId||''));return res.json({reset:true,mode:'SHADOW_ONLY',scoreAuthority:'HUMAN_ONLY'})});

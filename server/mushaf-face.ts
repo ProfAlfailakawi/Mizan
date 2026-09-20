@@ -225,12 +225,15 @@ export const MIN_DRAW_SHARE = 1e-3;
  * للسحب حسابًا**. والفرقُ بينهما هو الفرقُ بين النادر والممتنع.
  *
  * ويُرجع `null` حين لا وجهَ صالحًا، ولا يُختلق وجهٌ خارج النطاق ليملأ الفراغ.
+ *
+ * والسحبُ لا يحتاج من الوجه إلا رقمَ صفحته، فلا يُشترط الوجهُ كاملًا: يسحب الخادمُ من
+ * فهرسه، ويسحب المتصفّحُ من قائمةٍ خفيفةٍ لا نصَّ فيها — بالدالّة نفسِها لا بنسخةٍ منها.
  */
-export function drawFace(
-  candidates: readonly MushafFace[],
+export function drawFace<T extends { page: number }>(
+  candidates: readonly T[],
   seed: string,
   weightOf: (page: number) => number = () => 1,
-): MushafFace | null {
+): T | null {
   if (!candidates.length) return null;
   const raw = candidates.map(f => {
     const w = weightOf(f.page);

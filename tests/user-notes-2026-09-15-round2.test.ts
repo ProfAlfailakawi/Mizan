@@ -339,11 +339,21 @@ test('a repeated query parameter is refused, not quietly reinterpreted', () => {
   assert.match(server, /if\(Array\.isArray\(value\)\)throw new Error\(`QUERY_PARAM_REPEATED:\$\{name\}`\);/,
     'a repeated parameter is refused outright — taking the first silently hides which one was used');
 
-  /* والمسارَان اللذان يغذّيان محرّك التتبّع يمرّان به، لا الجديد وحده. */
-  for (const param of ['reading', 'surah', 'startAyah', 'endAyah', 'sourcePackageId']) {
-    const uses = server.split(`soleParam(req.query.${param},'${param}')`).length - 1;
-    assert.equal(uses, 2, `${param} is normalised on both the practice and the judging route`);
+  /*
+   * وكلُّ مسارٍ يقرأ هذه الوسائط يمرّ به — لا اثنان بعينهما.
+   *
+   * وكان هذا الحارسُ يعدّ الاستعمالات ويشترط اثنين، فلمّا أُضيف مسارُ وجوه المراجعة
+   * احمرّ وهو سليم: العددُ عيّنةٌ من وقتٍ مضى، والخاصّيّةُ المرادةُ أن **لا تصل قيمةٌ
+   * خامٌ إلى قارئ**. فصار الفحصُ عليها: كلُّ ذكرٍ لـ`req.query.<اسم>` داخلَ `soleParam`.
+   */
+  for (const param of ['reading', 'surah', 'startAyah', 'endAyah', 'sourcePackageId', 'page']) {
+    const all = server.split(`req.query.${param}`).length - 1;
+    const guarded = server.split(`soleParam(req.query.${param},'${param}')`).length - 1;
+    assert.equal(guarded, all, `${param}: ${all - guarded} raw read(s) bypass soleParam`);
   }
+  /* ولا يمرّ الحارسُ فارغًا: المسارات قائمةٌ فعلًا. */
+  assert.ok(server.split("soleParam(req.query.reading,'reading')").length - 1 >= 3,
+    'the alignment and face routes should all normalise the reading parameter');
   assert.doesNotMatch(server, /surah:req\.query\.surah/, 'no raw query value reaches the service any more');
   assert.match(server, /const bytes:Buffer=Buffer\.isBuffer\(req\.body\)\?req\.body:Buffer\.alloc\(0\);/,
     'and the audio body is a definite Buffer before it is measured');
