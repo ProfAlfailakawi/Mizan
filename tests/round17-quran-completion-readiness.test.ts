@@ -19,10 +19,11 @@ test('readiness separates official data completion from the live alignment engin
  const y=buildQuranReadingReadiness({reading:'hafs',spatial:'VERIFIED',waqfStatus:'VERIFIED',waqfScienceStatus:'VERIFIED',tajweedStatus:'VERIFIED',vectorStatus:'VERIFIED',verifiedWordMappings:6236,benchmarkStatus:'VERIFIED',benchmarkPassed:true,alignmentBackendConfigured:true});assert.equal(y.nextAction,'READY');assert.equal(y.productionReady,true);assert.equal(y.completionPercent,100);
 });
 
-test('science intake is wired into both Cloud Build asset flows and remains inventory-only',()=>{
- const root=path.resolve('.');for(const file of ['cloudbuild-assets.yaml','cloudbuild-assets-upload.yaml']){const text=fs.readFileSync(path.join(root,file),'utf8');assert.match(text,/kfgqpc-science-intake\.ts --root \.mizan-ingest/)}
- const script=fs.readFileSync(path.join(root,'scripts/kfgqpc-science-intake.ts'),'utf8');assert.match(script,/semanticInference:'FORBIDDEN'/);assert.match(script,/automaticPromotionToVerifiedOccurrences:false/);assert.match(script,/isOfficialKfgqpcUrl/);
-});
+/*
+ * حُذف اختبارُ «الاستيعاب العلميّ» مع إلغاء حزم الشرح الثلاث من النظام (قرارُ المالك،
+ * ٢٠ سبتمبر ٢٠٢٦). ولم يُعطَّل ولم يُفرَّغ: السكربتُ الذي كان يحرسه لم يعد موجودًا،
+ * وحارسُ الإلغاء في `tests/r2-required-datasets.test.ts` يمنع عودتَه.
+ */
 
 test('local Quran readiness CLI never needs network access or secrets',()=>{
  const text=fs.readFileSync(path.resolve('scripts/quran-intelligence-readiness.ts'),'utf8');assert.doesNotMatch(text,/fetch\(|R2_SECRET|ACCESS_KEY|Bearer/);assert.match(text,/PENDING_OFFICIAL_MASTER/);assert.match(text,/PENDING_ALIGNMENT_ENGINE/);

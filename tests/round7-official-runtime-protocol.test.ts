@@ -24,8 +24,9 @@ test('KFGQPC official packages are explicitly certified authority assets and dir
  const f=officialFixture();try{const repo=new ServerQuranSourceRepository(path.join(f.dir,'vault'));const m=repo.ingestOfficial({packageId:f.pkg.id,bundlePath:f.bundlePath,dataPath:f.dataPath,ingestedBy:'test'});assert.equal(m.scientificApproval.state,'CERTIFIED');assert.equal(m.scientificApproval.basis,'OFFICIAL_AUTHORITY_POLICY');assert.equal(repo.verses(f.pkg.id).length,114)}finally{f.restore();fs.rmSync(f.dir,{recursive:true,force:true})}
 });
 
-test('KFGQPC developer catalog includes print vector pages, smart-device text, Tafseer, Ghareeb and Tajweed assets',()=>{
- const kinds=new Set(KFGQPC_DEVELOPER_ASSETS.map(x=>x.kind));for(const k of ['PRINT_VECTOR_MUSHAF','SMART_DEVICE_UTHMANIC_TEXT','TAFSEER_DATA','GHAREEB_DATA','TAJWEED_BOOK_DATA'])assert.ok(kinds.has(k as any));
+test('KFGQPC developer catalog includes print vector pages and smart-device text',()=>{
+ const kinds=new Set(KFGQPC_DEVELOPER_ASSETS.map(x=>x.kind));// حزمُ الشرح الثلاث أُلغيت من النظام (قرارُ المالك، ٢٠ سبتمبر ٢٠٢٦)؛ وحارسُ إلغائها في tests/r2-required-datasets.test.ts.
+ for(const k of ['PRINT_VECTOR_MUSHAF','SMART_DEVICE_UTHMANIC_TEXT'])assert.ok(kinds.has(k as any));
  assert.ok(KFGQPC_DEVELOPER_ASSETS.every(x=>x.officialCertification==='CERTIFIED'));
 });
 

@@ -9,10 +9,7 @@ export const LIGHT_PACKAGES:LightPackageSpec[]=[
   {id:'shubah',md5:'5CDA29121BF0D7234E039002E1FBF600',sha1:'8D66BDF0CAB96DC7D1032792C19F77980CA6682A',maxBytes:64*1024*1024},
   {id:'qalun',md5:'964208FF04C8AADD3DDC1BE262D8CFD3',sha1:'81733666BE17742E13C9FA4C7D26D42B1ADC67C8',maxBytes:64*1024*1024},
   {id:'duri-data',md5:'A60BDD18397B3E27E4617478968A35C8',sha1:'8049482F04B4FF1053A7859F96B2B113B9771EFB',maxBytes:64*1024*1024},
-  {id:'susi-data',md5:'1BF6023E29B7622A52B6171232C17096',sha1:'E52DBC6D8B43797A8FAA0FD1EC1D8E5000265674',maxBytes:64*1024*1024},
-  {id:'tafsir',md5:'5601682965E32F4DD6992C7600FDCCC3',sha1:'5F533113C2F54F32EDED734BB49E6A5837965722',maxBytes:64*1024*1024},
-  {id:'ghareeb',md5:'7E22381EEDB152EE7ED6488F2395C6CD',sha1:'055A908C6EC7F06912C33BD00920406C665CC5F9',maxBytes:32*1024*1024},
-  {id:'tajweed',md5:'B4A265A810C0CE4A722019791910B67E',sha1:'D2496382FC5E843CCB693B94DD19407EAA174BEA',maxBytes:16*1024*1024}
+  {id:'susi-data',md5:'1BF6023E29B7622A52B6171232C17096',sha1:'E52DBC6D8B43797A8FAA0FD1EC1D8E5000265674',maxBytes:64*1024*1024}
 ];
 export {isOfficialKfgqpcUrl};
 export function extractNearbyOfficialCandidates(html:string,checksum:string,base=KFGQPC_DEV_PAGE){const needle=checksum.toLowerCase(),lower=html.toLowerCase(),at=lower.indexOf(needle);if(at<0)return [] as string[];const start=Math.max(0,at-9000),end=Math.min(html.length,at+3000),chunk=html.slice(start,end);const links:{url:string;distance:number;score:number}[]=[];const re=/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;let m:RegExpExecArray|null;while((m=re.exec(chunk))){let url:string;try{url=new URL(m[1],base).toString()}catch{continue}if(!isOfficialKfgqpcUrl(url))continue;const text=m[2].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().toLowerCase(),href=url.toLowerCase();const score=(/download|تحميل/.test(text)?4:0)+(/\.(zip|rar|7z)(?:$|\?)/.test(href)?5:0)+(/wp-content|uploads|download/.test(href)?2:0),absolute=start+m.index;links.push({url,distance:Math.abs(at-absolute),score})}return [...new Map(links.sort((a,b)=>b.score-a.score||a.distance-b.distance).map(x=>[x.url,x])).values()].slice(0,8).map(x=>x.url)}

@@ -12,6 +12,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   KFGQPC_REQUIRED_DELIVERY_DATASETS,
   KFGQPC_RETIRED_AUDIO_DATASETS,
@@ -55,9 +57,7 @@ test('the required list is exactly what production still reads from R2', () => {
    * والمحروسُ ألّا تُخرَج حزمةٌ صامتةً. فالصوتُ والصفحاتُ والتفسيرُ والغريبُ والتجويد
    * تُقرأ من R2 ولا بديلَ لها على القرص — فبقاؤها في المطلوب شرطٌ لا اختيار.
    */
-  assert.deepEqual([...KFGQPC_REQUIRED_DELIVERY_DATASETS].sort(), [
-    'audio-hafs', 'ghareeb', 'mushaf-pages', 'tafsir', 'tajweed',
-  ]);
+  assert.deepEqual([...KFGQPC_REQUIRED_DELIVERY_DATASETS].sort(), ['audio-hafs', 'mushaf-pages']);
 
   // ولا تداخُل: حزمةٌ لا تكون مطلوبةً ومُخرَجةً معًا.
   const required = new Set<string>(KFGQPC_REQUIRED_DELIVERY_DATASETS);
@@ -66,12 +66,12 @@ test('the required list is exactly what production still reads from R2', () => {
   }
 });
 
-test('a retired text dataset has no local substitute for audio, pages or tafsir', () => {
+test('a retired text dataset has no local substitute for audio or pages', () => {
   /*
    * الفرقُ الذي يبرّر الإخراج: النصُّ له أثرٌ على القرص، وهذه ليس لها. فلو عُوملت
    * معاملتَه لسقط الصوتُ يومَ المسابقة بلا حارسٍ يسبقه.
    */
-  for (const id of ['audio-hafs', 'mushaf-pages', 'tafsir']) {
+  for (const id of ['audio-hafs', 'mushaf-pages']) {
     assert.equal(candidateRawiForDeliveryKey(id), undefined,
       `${id} must not resolve to a reading artifact — it has no local substitute`);
   }
@@ -166,4 +166,43 @@ test('every gate on the delivery path derives its set from one list — no fifth
   for (const prefix of prefixes) {
     assert.equal(retired.has(prefix), false, `${prefix} is both required and retired`);
   }
+});
+
+test('the three commentary packages are gone from the tree, not merely unrequired', () => {
+  /*
+   * أُلغيت حزمُ الشرح الثلاث — التفسير الميسّر وغريب القرآن والتجويد الميسّر — من النظام
+   * كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦. وإلغاءٌ يترك مواصفاتٍ وبصماتٍ في الشجرة يعود
+   * بعد شهرٍ بلا أن ينتبه أحد، فيُقاس الحذفُ نفسُه.
+   *
+   * **ومعيارُ التجويد في التحكيم شيءٌ آخر** — `criterionScores['tajweed']` وقاعدةُ الترجيح
+   * `tajweed_priority` منطقُ مسابقةٍ لا حزمةُ بيانات، ويُثبَت هنا أنه باقٍ.
+   */
+  const ROOT = process.cwd();
+  const cancelled = /tafsir|ghareeb|tafseer|tajweed-muyassar/i;
+  const scanned: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (name.name === 'node_modules' || name.name === '.git' || name.name === 'dist') continue;
+      const full = path.join(dir, name.name);
+      if (name.isDirectory()) { walk(full); continue; }
+      if (!/\.(ts|tsx|ya?ml|json)$/.test(name.name)) continue;
+      if (full.includes(`${path.sep}tests${path.sep}`)) continue;
+      scanned.push(full);
+    }
+  };
+  walk(path.join(ROOT, 'src'));
+  walk(path.join(ROOT, 'server'));
+  walk(path.join(ROOT, 'scripts'));
+  for (const file of fs.readdirSync(ROOT)) {
+    if (/^cloudbuild.*\.ya?ml$/.test(file)) scanned.push(path.join(ROOT, file));
+  }
+  assert.ok(scanned.length > 50, `the scan must actually read the tree, found ${scanned.length} files`);
+
+  const offenders = scanned.filter(file => cancelled.test(fs.readFileSync(file, 'utf8')));
+  assert.deepEqual(offenders.map(f => path.relative(ROOT, f)), [],
+    'the cancelled commentary packages must leave no spec, digest, route or pipeline behind');
+
+  // وما لم يُلغَ باقٍ: معيارُ التجويد في التحكيم.
+  const scoring = fs.readFileSync(path.join(ROOT, 'src', 'lib', 'scoring-core.ts'), 'utf8');
+  assert.match(scoring, /tajweed_priority/, 'the tajweed judging criterion is not a data package and must survive');
 });

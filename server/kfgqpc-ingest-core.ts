@@ -55,5 +55,13 @@ export const KFGQPC_RETIRED_AUDIO_DATASETS=['audio-shubah','audio-qalun','audio-
 export const KFGQPC_RETIRED_DELIVERY_DATASETS=[...KFGQPC_RETIRED_TEXT_DATASETS,...KFGQPC_RETIRED_AUDIO_DATASETS] as const;
 
 /** ما يقرؤه المنتجُ من R2 فعلًا — ولا يُطلب تحقُّقُ ما لا يُقرأ. */
-export const KFGQPC_REQUIRED_DELIVERY_DATASETS=['tafsir','ghareeb','tajweed','mushaf-pages','audio-hafs'] as const;
+/*
+ * وحزمُ الشرح الثلاث — التفسير الميسّر وغريب القرآن والتجويد الميسّر — أُلغيت من النظام
+ * كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦. لم تُخرَج من الطلب وتُترك في الشجرة: حُذفت
+ * مواصفاتُها وبصماتُها وواجهتُها وأدواتُها.
+ *
+ * **ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ**: `criterionScores['tajweed']` وقاعدةُ
+ * الترجيح `tajweed_priority` منطقُ مسابقةٍ لا حزمةُ بيانات.
+ */
+export const KFGQPC_REQUIRED_DELIVERY_DATASETS=['mushaf-pages','audio-hafs'] as const;
 export function buildReadyDeliveryCatalog(input:{datasets:KfgqpcDeliveryCatalogDataset[];storage:KfgqpcActualStorageReport}){const byId=new Map(input.datasets.map(x=>[x.id,x]));const missing=KFGQPC_REQUIRED_DELIVERY_DATASETS.filter(id=>byId.get(id)?.status!=='VERIFIED');if(missing.length)throw new Error(`R2_DELIVERY_CATALOG_INCOMPLETE:${missing.join(',')}`);if(!input.storage.withinSafetyLimit||!input.storage.withinFreeTier)throw new Error('R2_DELIVERY_CATALOG_STORAGE_LIMIT');const warsh=byId.get('audio-warsh'),duri=byId.get('audio-duri');if(warsh&&!['OFFICIAL_AUDIO_UNAVAILABLE','VERIFIED'].includes(warsh.status))throw new Error('R2_WARSH_AUDIO_STATUS_INVALID');if(duri&&!['UNVERIFIED','VERIFIED'].includes(duri.status))throw new Error('R2_DURI_AUDIO_STATUS_INVALID');return {schemaVersion:'MIZAN-R2-CATALOG-1' as const,authority:'King Fahd Glorious Quran Printing Complex' as const,generatedAt:new Date().toISOString(),state:'READY' as const,datasets:input.datasets,storage:input.storage,unavailableAudio:warsh?.status==='OFFICIAL_AUDIO_UNAVAILABLE'?['audio-warsh']:[],unverifiedAudio:duri?.status==='UNVERIFIED'?['audio-duri']:[]}}

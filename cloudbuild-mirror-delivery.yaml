@@ -16,7 +16,7 @@ steps:
         npm install --ignore-scripts --no-audit --no-fund
         # اقتناء أصول التسليم الخفيفة داخل السحابة (المصادر مفتوحة وقابلة للوصول عكس موقع المجمع)
         npx tsx scripts/kfgqpc-mirror-stage.ts --out .mizan-delivery      # نص + خطوط 6 روايات
-        npx tsx scripts/kfgqpc-pages-tafsir.ts --out .mizan-delivery      # 604 صفحة + التفسير الميسّر
+        npx tsx scripts/kfgqpc-pages-acquire.ts --out .mizan-delivery     # 604 صفحة
         # الرفع إلى Cloudflare R2 (immutable delivery، resume، ضمن سقف الأمان)
         npx tsx scripts/kfgqpc-r2-upload.ts --root .mizan-delivery
 substitutions:

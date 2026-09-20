@@ -4,10 +4,11 @@ import {buildKfgqpcOfficialLibrary,kfgqpcLibrarySummary} from '../server/kfgqpc-
 import {KFGQPC_DEVELOPER_ASSETS} from '../server/kfgqpc-developer-assets';
 import {assessMizanGlobalIntegrityProtocol} from '../src/lib/global-integrity-protocol';
 
-test('KFGQPC official library implements points 1-14 and 16 as certified authority capabilities',()=>{
+test('KFGQPC official library implements its certified authority capabilities',()=>{
+ // سقطت النقاط ٩ و١٠ و١١ (التفسير والغريب والتجويد) مع إلغاء حزم الشرح — قرارُ المالك ٢٠ سبتمبر ٢٠٢٦.
  const items=buildKfgqpcOfficialLibrary(()=> 'NOT_INGESTED');
- assert.deepEqual(items.map(x=>x.order),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,16]);
- assert.equal(items.length,15);
+ assert.deepEqual(items.map(x=>x.order),[1,2,3,4,5,6,7,8,12,13,14,16]);
+ assert.equal(items.length,12);
  assert.ok(items.every(x=>x.authorityState==='PRIMARY_OFFICIAL_AUTHORITY'&&x.scientificState==='CERTIFIED'));
  assert.ok(items.find(x=>x.id==='official-mushaf-vector')?.visualMode==='VECTOR_PAGE');
  assert.ok(items.find(x=>x.id==='official-audio')?.uses.includes('opening ayah prompt'));
@@ -19,12 +20,13 @@ test('local Quran package readiness never changes the official authority decisio
  assert.equal(items.find(x=>x.id==='warsh-package')?.operationalState,'LOCAL_BYTES_REQUIRED');
  assert.equal(items.find(x=>x.id==='warsh-package')?.scientificState,'CERTIFIED');
  const summary=kfgqpcLibrarySummary(id=>id==='kfgqpc-hafs-uthmanic-v13'?'CERTIFIED':'NOT_INGESTED');
- assert.equal(summary.officiallyAccepted,15);assert.ok(summary.localVerified>=1);
+ // اثنتا عشرةَ قدرةً بعد إلغاء حزم الشرح الثلاث — والعددُ يتبع المكتبة لا يسبقها.
+ assert.equal(summary.officiallyAccepted,buildKfgqpcOfficialLibrary(()=>'NOT_INGESTED').length);assert.ok(summary.localVerified>=1);
 });
 
-test('developer asset catalog includes fonts, desktop publishing and publication images in addition to scientific data',()=>{
+test('developer asset catalog includes fonts, desktop publishing and publication images',()=>{
  const kinds=new Set(KFGQPC_DEVELOPER_ASSETS.map(x=>x.kind));
- for(const k of ['OFFICIAL_QURAN_FONT','DESKTOP_PUBLISHING','PUBLICATION_IMAGE_SERVICE','TAFSEER_DATA','GHAREEB_DATA','TAJWEED_BOOK_DATA'])assert.ok(kinds.has(k as any));
+ for(const k of ['OFFICIAL_QURAN_FONT','DESKTOP_PUBLISHING','PUBLICATION_IMAGE_SERVICE'])assert.ok(kinds.has(k as any));
 });
 
 test('MGIP blocks missing foundational evidence but treats lifecycle-only controls as review',async()=>{
