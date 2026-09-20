@@ -30,11 +30,17 @@ const TITLES: Record<LegalDocumentKind, string> = {
 
 /*
  * صورةُ التشغيل تنسخ `dist` وحدَها (انظر `Dockerfile`)، فلا وجودَ لـ`docs/` هناك.
- * وخطوةُ البناء تنسخ الوثيقتين إلى `dist/legal`. فيُبحث في الموضعين: موضعِ الإنتاج
- * أوّلًا ثم موضعِ المستودع، ويُذكر ما بُحث فيه عند الإخفاق كي لا يُخمَّن السبب.
+ * وخطوةُ البناء تنسخ الوثيقتين إلى `dist/legal`. فيُبحث في الموضعين، ويُذكر ما بُحث
+ * فيه عند الإخفاق كي لا يُخمَّن السبب.
+ *
+ * **والمصدرُ مقدَّمٌ على المبنيّ.** كان الترتيبُ معكوسًا، فوقعتُ في فخّه: عدّلتُ رأسَ
+ * الوثيقتين وأعدتُ القياسَ فرأيتُ القيمةَ القديمة — لأن `dist/legal` من بناءٍ سابق
+ * كان يحجب `docs/legal`. وذلك يجعل الاختبارَ يشهد لنصٍّ ليس في الشجرة.
+ *
+ * ولا يتغيّر شيءٌ في الإنتاج: لا `docs/` في الصورة أصلًا، فلا مرشّحَ إلا `dist/legal`.
  */
 export function legalDocumentDirectories(root = process.cwd()): string[] {
-  return [join(root, 'dist', 'legal'), join(root, 'legal'), join(root, 'docs', 'legal')];
+  return [join(root, 'docs', 'legal'), join(root, 'dist', 'legal'), join(root, 'legal')];
 }
 
 export class LegalPublicationError extends Error {
@@ -291,6 +297,30 @@ ${body}
 /** يقرأ ويعرض — المدخلُ الوحيد الذي يستعمله الخادم. */
 export function publishedLegalPage(kind: LegalDocumentKind, root = process.cwd()): PublishedLegalPage {
   return renderLegalPage(kind, readLegalSource(kind, root));
+}
+
+/*
+ * ترويساتُ القياس — والقيمةُ فيها **لاتينيّةٌ بالضرورة**.
+ *
+ * وضعتُ أوّلَ مرّةٍ اسمَ الناشر في الترويسة كما هو، فردّ الخادمُ 500:
+ * `ERR_INVALID_CHAR` — قيمةُ ترويسة HTTP لا تحمل إلا Latin-1، والاسمُ عربيّ. ولم
+ * تكشفه اختباراتي لأنها كانت تقرأ نصَّ الشيفرة لا تخدم الصفحة. **فدعوى في نصٍّ ليست
+ * قياسًا**، والبناءُ والتشغيلُ هما من كشفه.
+ *
+ * فيُرسَل الاسمُ مُرمَّزًا base64 لـUTF-8، والاسمُ يقول ذلك صراحةً كي لا يُقرأ نصًّا.
+ * ويُقارَن بعد فكّه حرفًا بحرف.
+ */
+export function legalPublicationHeaders(page: PublishedLegalPage): Record<string, string> {
+  return {
+    'X-Mizan-Legal-Version': page.version,
+    'X-Mizan-Legal-Effective': page.effectiveDate,
+    'X-Mizan-Legal-Publisher-B64': Buffer.from(page.publisher, 'utf8').toString('base64'),
+  };
+}
+
+/** ما يقابلها عند القارئ. يُستعمل في المتحقّق وفي الاختبار، فلا يُكتب الترميزُ مرّتين. */
+export function decodeLegalPublisher(headerValue: string): string {
+  return Buffer.from(String(headerValue ?? '').trim(), 'base64').toString('utf8');
 }
 
 /** مساراتُ النشر. مكتوبةٌ هنا مرّةً، وتُقرأ منها البوّابةُ والخادمُ والاختبار. */

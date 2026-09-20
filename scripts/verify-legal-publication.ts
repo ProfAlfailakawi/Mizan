@@ -20,6 +20,7 @@
  * موضوعُه **صدقُ عنوانٍ مضبوط**، فيتخطّى إن لم يُضبط ويقول إنه تخطّى.
  */
 import { CONSENT_BACKED_DOCUMENTS, type LegalDocumentKind } from '../src/lib/legal-documents';
+import { decodeLegalPublisher } from '../server/legal-publication';
 
 const env = process.env;
 const clean = (name: string) => String(env[name] ?? '').trim();
@@ -72,8 +73,9 @@ async function verify(kind: LegalDocumentKind): Promise<Failure | null> {
   const served = {
     version: String(response.headers.get('x-mizan-legal-version') ?? '').trim(),
     effective: String(response.headers.get('x-mizan-legal-effective') ?? '').trim(),
+    publisher: decodeLegalPublisher(response.headers.get('x-mizan-legal-publisher-b64') ?? ''),
   };
-  if (!served.version || !served.effective) {
+  if (!served.version || !served.effective || !served.publisher) {
     return {kind, code: 'LEGAL_URL_NOT_A_MIZAN_PAGE',
       detail: `${url} served no X-Mizan-Legal-* headers — it is not the published document`};
   }
@@ -81,10 +83,15 @@ async function verify(kind: LegalDocumentKind): Promise<Failure | null> {
     return {kind, code: 'LEGAL_URL_VERSION_MISMATCH',
       detail: `${url} serves ${served.version}/${served.effective}; the runtime records ${version}/${effective}`};
   }
-  const body = await response.text();
-  if (entity && !body.includes(entity)) {
+  /*
+   * **حرفًا بحرف، لا احتواءً.** كان الشرطُ `body.includes(entity)` فمرّ على اختلافٍ
+   * حقيقيّ: الوثيقةُ تُعلن «… — شركة ذات مسؤولية محدودة» والبيئةُ تحمل الاسمَ وحدَه،
+   * وهو ما يُكتب في `ConsentRecord.publisher`. فالصفحةُ تقول ناشرًا والأثرُ يقيّد
+   * غيرَه، والاحتواءُ يُصدّق ذلك لأن الأقصرَ جزءٌ من الأطول.
+   */
+  if (entity && served.publisher !== entity) {
     return {kind, code: 'LEGAL_URL_PUBLISHER_MISMATCH',
-      detail: `${url} does not name ${entity}`};
+      detail: `${url} declares «${served.publisher}»; the consent record would cite «${entity}»`};
   }
   return null;
 }

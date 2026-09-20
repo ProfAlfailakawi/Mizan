@@ -19,7 +19,7 @@ import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-
 import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
 import { policyChangeDecision, scoreCorrectionDecision, readingChangeDecision } from './server/governance-attestation';
 import { CONSENT_BACKED_DOCUMENTS, isPublished, isResolved, legalConfigFromEnv, legalDocumentState, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from './src/lib/legal-documents';
-import { LEGAL_PUBLICATION_PATHS, LegalPublicationError, publishedLegalPage, type PublishedLegalPage } from './server/legal-publication';
+import { LEGAL_PUBLICATION_PATHS, LegalPublicationError, legalPublicationHeaders, publishedLegalPage, type PublishedLegalPage } from './server/legal-publication';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -882,10 +882,20 @@ async function startServer() {
         return res.status(503).json({code:legalPageFailures.get(kind)||'LEGAL_DOCUMENT_SOURCE_MISSING',kind});
       }
       res.setHeader('Content-Type','text/html; charset=utf-8');
-      res.setHeader('Cache-Control','public, max-age=300');
-      /* النسخةُ والتاريخُ في ترويستين كي تُقاسا بلا تحليل HTML — تقرؤهما بوّابةُ الإطلاق. */
-      res.setHeader('X-Mizan-Legal-Version',page.version);
-      res.setHeader('X-Mizan-Legal-Effective',page.effectiveDate);
+      /*
+       * **لا تُخزَّن هذه الصفحةُ مدّةً.** كانت `public, max-age=300`، وذلك ينقض الغرضَ
+       * كلَّه: حين تُعدَّل وثيقةٌ وتُرفع نسختُها، تُسجّل النشرةُ الجديدة النسخةَ الجديدة
+       * فورًا بينما يُبقي متصفّحٌ أو وسيطٌ النصَّ القديم خمسَ دقائق على العنوان نفسِه.
+       * فيقرأ المتسابق نصًّا ويُقيَّد له رقمُ نصٍّ آخر — وهو بعينه العطبُ الذي بُنيت
+       * هذه الصفحةُ لإغلاقه.
+       *
+       * و`no-cache` لا يعني «لا تحفظ»: يحفظ المتصفّحُ النسخةَ ويسأل الخادمَ قبل كلّ
+       * استعمال، فيردّ 304 على ETag الذي يضعه Express. فالكلفةُ طلبٌ فارغ، والمكسبُ
+       * أن يُقرأ دائمًا ما هو منشورٌ الآن.
+       */
+      res.setHeader('Cache-Control','no-cache, must-revalidate');
+      /* والنسخةُ والتاريخُ والناشرُ في ترويسات كي تُقاس بلا تحليل HTML — يقرؤها المتحقّق. */
+      for(const [name,value] of Object.entries(legalPublicationHeaders(page))) res.setHeader(name,value);
       return res.status(200).send(page.html);
     });
   }

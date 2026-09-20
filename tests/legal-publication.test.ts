@@ -19,6 +19,9 @@ import {
   LegalPublicationError,
   assertRenderable,
   parseLegalHeader,
+  decodeLegalPublisher,
+  legalDocumentDirectories,
+  legalPublicationHeaders,
   publishedLegalPage,
   renderLegalBody,
   renderLegalPage,
@@ -164,4 +167,90 @@ test('the markdown renderer produces the structure the source declares', () => {
   assert.equal(count(/<h3>/g, body), count(/^### /gm, source), 'and every sub-heading');
   assert.equal(count(/<li>/g, body), count(/^(?:\d+\.|-) /gm, source), 'and every list item');
   assert.equal(count(/<tr>/g, body), count(/^\| /gm, source), 'and every table row');
+});
+
+/*
+ * ثلاثةُ عيوبٍ رصدها Codex على هذه الدفعة، وكلُّها صحيحة. وتُقاس هنا كي لا تعود.
+ */
+
+test('the published page is never cached for a fixed window', () => {
+  /*
+   * كانت `public, max-age=300`. وذلك ينقض الغرضَ كلَّه: حين تُعدَّل وثيقةٌ وتُرفع
+   * نسختُها، تُسجّل النشرةُ الجديدة النسخةَ الجديدة فورًا بينما يُبقي متصفّحٌ أو وسيطٌ
+   * النصَّ القديم خمسَ دقائق على العنوان نفسِه — فيقرأ المتسابق نصًّا ويُقيَّد له رقمُ
+   * نصٍّ آخر.
+   */
+  const source = fs.readFileSync(path.join(ROOT, 'server.ts'), 'utf8');
+  // من تسجيل الطريق لا من سطر الاستيراد: الشريحةُ من الاستيراد تبتلع طرقًا أخرى لها max-age بحقّ.
+  const start = source.indexOf('for(const [kind,path] of Object.entries(LEGAL_PUBLICATION_PATHS)');
+  assert.ok(start > 0, 'the legal routes must still be registered in one loop');
+  const block = source.slice(start, source.indexOf('// Public Mushaf page surface', start));
+  assert.match(block, /Cache-Control','no-cache/,
+    'a legal document must be revalidated on every read — its text can change under a stable URL');
+  assert.equal(/Cache-Control','public, max-age=\d/.test(block), false,
+    'a fixed max-age lets an old text outlive the version the runtime already records');
+});
+
+test('the publisher is served as a header, and equals the one the consent record will cite', () => {
+  /*
+   * والمقارنةُ كانت احتواءً: `body.includes(entity)`. فمرّت على اختلافٍ حقيقيّ —
+   * الوثيقةُ تُعلن «… — شركة ذات مسؤولية محدودة» والبيئةُ تحمل الاسمَ وحدَه — لأن
+   * الأقصرَ جزءٌ من الأطول. فالصفحةُ تقول ناشرًا والأثرُ يقيّد غيرَه.
+   */
+  const verifier = fs.readFileSync(path.join(ROOT, 'scripts', 'verify-legal-publication.ts'), 'utf8');
+  assert.match(verifier, /served\.publisher !== entity/,
+    'the publisher must be compared exactly, not by substring');
+  // ويُقاس غيابُ القراءة نفسِها، لا غيابُ العبارة: التعليقُ الذي يشرح العطبَ القديم يذكرها.
+  assert.equal(/await response\.text\(\)/.test(verifier), false,
+    'the verifier must judge by headers — reading the body was what let a substring pass');
+
+  const entity = /MIZAN_LEGAL_ENTITY_NAME=([^,']+)/.exec(read('cloudbuild.yaml'));
+  assert.ok(entity, 'the deployment must name the publishing entity');
+  for (const kind of CONSENT_BACKED_DOCUMENTS) {
+    assert.equal(publishedLegalPage(kind, ROOT).publisher, entity[1],
+      `${kind} declares a publisher that differs from the one the consent record would cite`);
+  }
+});
+
+test('the committed source wins over a stale build directory', () => {
+  /*
+   * وقعتُ في هذا بنفسي: عدّلتُ رأسَ الوثيقتين وأعدتُ القياسَ فرأيتُ القيمةَ القديمة،
+   * لأن `dist/legal` من بناءٍ سابق كان مقدَّمًا. واختبارٌ يقرأ نصًّا ليس في الشجرة
+   * يشهد لما لا يُنشر.
+   */
+  const directories = legalDocumentDirectories('/root');
+  assert.equal(directories[0], path.join('/root', 'docs', 'legal'),
+    'the committed source must be read before any build output');
+  assert.ok(directories.includes(path.join('/root', 'dist', 'legal')),
+    'and the build output must remain the fallback — the runtime image ships no docs/');
+});
+
+test('every measurement header is a value HTTP can actually carry', () => {
+  /*
+   * هذا هو الاختبارُ الذي كان ناقصًا.
+   *
+   * وضعتُ اسمَ الناشر العربيَّ في ترويسةٍ، ومرّت اختباراتي كلُّها — لأنها كانت تقرأ
+   * **نصَّ الشيفرة** لا تخدم الصفحة. ثم بُني الخادمُ وشُغّل فردّ **500**:
+   * `ERR_INVALID_CHAR`، فقيمةُ ترويسة HTTP لا تحمل إلا Latin-1.
+   *
+   * **فدعوى في نصٍّ ليست قياسًا.** ويُقاس هنا ما يُرسَل فعلًا.
+   */
+  for (const kind of CONSENT_BACKED_DOCUMENTS) {
+    const headers = legalPublicationHeaders(publishedLegalPage(kind, ROOT));
+    for (const [name, value] of Object.entries(headers)) {
+      assert.match(value, /^[\x20-\x7E]*$/,
+        `${kind}: ${name} carries a character Node refuses in a header — the route would answer 500`);
+      assert.doesNotThrow(() => new Headers({[name]: value}),
+        `${kind}: ${name} is not a value HTTP can carry`);
+    }
+  }
+});
+
+test('the encoded publisher decodes back to exactly what the document declares', () => {
+  for (const kind of CONSENT_BACKED_DOCUMENTS) {
+    const page = publishedLegalPage(kind, ROOT);
+    const headers = legalPublicationHeaders(page);
+    assert.equal(decodeLegalPublisher(headers['X-Mizan-Legal-Publisher-B64']), page.publisher,
+      `${kind}: the round trip must be lossless, or the exact comparison compares the wrong thing`);
+  }
 });
