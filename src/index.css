@@ -1528,3 +1528,13 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   font-size:10px; font-weight:800; color:#8A7438; letter-spacing:.02em;
   font-variant-numeric:tabular-nums;
 }
+
+/* ── كلمةٌ على وجه المصحف تحمل علامتها ─────────────────────────────────── */
+/*
+ * الصبغُ خلف الحرف لا فوقه، وخطٌّ رفيعٌ تحته — فيبقى الرسمُ العثمانيُّ مقروءًا
+ * كما هو. والنصُّ أولى من العلامة.
+ */
+.mizan-face-word{
+  display:inline; border-radius:6px; padding:.02em .1em;
+  transition:background-color .25s ease, box-shadow .25s ease;
+}
