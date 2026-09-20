@@ -18,6 +18,7 @@ import {
   QURAN_FULL_TEXT_CANDIDATES,
   candidateSourceForRawi,
   resolveCandidateReviewState,
+  type QuranCandidateAuthority,
   type QuranCandidateSource,
 } from '../src/lib/quran-candidate-sources';
 import { parseCandidateRawDeflate, type CandidateQuranVerse } from './quran-candidate-source-vault';
@@ -32,11 +33,21 @@ export function islamwebSourceRoot(env: NodeJS.ProcessEnv = process.env): string
   return env.MIZAN_ISLAMWEB_SOURCE_ROOT || path.join(process.cwd(), 'quran-sources', 'islamweb-derived');
 }
 
+/** جذر آثار مرآة المجمّع — مجلّدٌ منفصل، فلا تختلط سلسلتا إسنادٍ في موضعٍ واحد. */
+export function kfgqpcMirrorSourceRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return env.MIZAN_KFGQPC_MIRROR_SOURCE_ROOT || path.join(process.cwd(), 'quran-sources', 'kfgqpc-mirror-derived');
+}
+
+/** الجذرُ يتبع سلسلةَ الإسناد لا العكس. */
+export function sourceRootFor(authority: QuranCandidateAuthority, env: NodeJS.ProcessEnv = process.env): string {
+  return authority === 'KFGQPC_MIRROR_DERIVED' ? kfgqpcMirrorSourceRoot(env) : islamwebSourceRoot(env);
+}
+
 export interface IslamwebReadingPackage {
   rawiId: string;
   deliveryKey: string;
   packageId: string;
-  authority: 'ISLAMWEB_DERIVED';
+  authority: QuranCandidateAuthority;
   publisherAuthority: string;
   upstreamRepository: string;
   upstreamCommit: string;
@@ -52,8 +63,8 @@ const digest = (bytes: Buffer) => crypto.createHash('sha256').update(bytes).dige
 const cache = new Map<string, IslamwebReadingPackage>();
 
 function artifactFile(source: QuranCandidateSource, env: NodeJS.ProcessEnv): string {
-  const name = source.upstreamPath.split('/').pop() as string;
-  const root = path.resolve(islamwebSourceRoot(env));
+  const name = source.artifactFileName || (source.upstreamPath.split('/').pop() as string);
+  const root = path.resolve(sourceRootFor(source.authority, env));
   const file = path.resolve(root, name);
   // مسارٌ مشتقٌّ من السجلّ لا من مُدخَل مستخدم، والتثبّت هنا حارسُ عمقٍ لا أكثر.
   if (file !== path.join(root, name)) throw new IslamwebPackageError('ISLAMWEB_PACKAGE_PATH_INVALID');
@@ -99,7 +110,7 @@ export function loadIslamwebReadingPackage(rawiId: string, env: NodeJS.ProcessEn
   const pkg: IslamwebReadingPackage = {
     rawiId: source.rawiId,
     deliveryKey: source.deliveryKey,
-    packageId: `islamweb-derived-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`,
+    packageId: `${source.authority.toLowerCase().replace(/_/g, '-')}-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`,
     authority: source.authority,
     publisherAuthority: source.publisherAuthority,
     upstreamRepository: source.upstreamRepository,

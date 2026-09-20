@@ -53,7 +53,8 @@
     "qa:public-registration": "firebase emulators:exec --only firestore --project mizan-qa-surface \"bash scripts/qa-public-registration.sh\"",
     "verify:legal-publication": "tsx scripts/verify-legal-publication.ts",
     "quran:verify-local": "tsx scripts/kfgqpc-verify-local.ts",
-    "quran:stage-archives": "tsx scripts/kfgqpc-stage-archives.ts"
+    "quran:stage-archives": "tsx scripts/kfgqpc-stage-archives.ts",
+    "quran:mirror-freeze": "tsx scripts/kfgqpc-mirror-freeze.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",

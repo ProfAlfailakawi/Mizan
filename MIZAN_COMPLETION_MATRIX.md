@@ -12,16 +12,16 @@
 <!-- BEGIN GENERATED: quran:release-matrix --markdown -->
 | الرواية | مصدر النص | بصمة مُتحقَّقة | نظام العدّ | جسر المواضع | نصّ وقت التشغيل | جاهزة للسؤال | القرعة | الصوت | الحالة |
 |---|---|---|---|---|---|---|---|---|---|
-| قالون عن نافع | KFGQPC delivery mirror | ❌ | MADANI_AKHIR | ✅ 6236/6236 | ⚠️ يحتاج طبقة التسليم | ✅ | ✅ | حفص | TESTED |
-| ورش عن نافع | KFGQPC delivery mirror | ❌ | MADANI_AKHIR | ✅ 6236/6236 | ⚠️ يحتاج طبقة التسليم | ✅ | ✅ | حفص | TESTED |
-| البزي عن ابن كثير | KFGQPC delivery mirror | ❌ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ⚠️ يحتاج طبقة التسليم | ❌ | ❌ | حفص | BLOCKED |
-| قنبل عن ابن كثير | KFGQPC delivery mirror | ❌ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ⚠️ يحتاج طبقة التسليم | ❌ | ❌ | حفص | BLOCKED |
-| الدوري عن أبي عمرو | KFGQPC delivery mirror | ❌ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ⚠️ يحتاج طبقة التسليم | ❌ | ❌ | حفص | BLOCKED |
-| السوسي عن أبي عمرو | KFGQPC delivery mirror | ❌ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ⚠️ يحتاج طبقة التسليم | ❌ | ❌ | حفص | BLOCKED |
+| قالون عن نافع | ISLAMWEB_DERIVED | ✅ | MADANI_AKHIR | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| ورش عن نافع | ISLAMWEB_DERIVED | ✅ | MADANI_AKHIR | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| البزي عن ابن كثير | ISLAMWEB_DERIVED | ✅ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
+| قنبل عن ابن كثير | ISLAMWEB_DERIVED | ✅ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
+| الدوري عن أبي عمرو | ISLAMWEB_DERIVED | ✅ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
+| السوسي عن أبي عمرو | ISLAMWEB_DERIVED | ✅ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
 | هشام عن ابن عامر | ISLAMWEB_DERIVED | ✅ | DIMASHQI | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ابن ذكوان عن ابن عامر | ISLAMWEB_DERIVED | ✅ | DIMASHQI | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
-| شعبة عن عاصم | KFGQPC delivery mirror | ❌ | KUFIC | ✅ 6236/6236 | ⚠️ يحتاج طبقة التسليم | ✅ | ✅ | حفص | TESTED |
-| حفص عن عاصم | KFGQPC delivery mirror | ❌ | KUFIC | ✅ 6236/6236 | ⚠️ يحتاج طبقة التسليم | ✅ | ✅ | حفص | TESTED |
+| شعبة عن عاصم | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| حفص عن عاصم | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | خلف عن حمزة | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | خلاد عن حمزة | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | أبو الحارث عن الكسائي | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |

@@ -95,7 +95,11 @@ test('any byte or commit drift drops the reading back to pending with a named re
   assert.equal(movedPin.state, 'PENDING_SCHOLAR_REVIEW');
   assert.deepEqual(movedPin.blockers, ['UPSTREAM_COMMIT_MISMATCH']);
 
-  const unknown = resolveCandidateReviewState('hafs', { upstreamCommit: source.upstreamCommit, compressedSha256: source.expectedCompressedSha256 });
+  /*
+   * كان المثالُ هنا «حفص» لأنه لم يكن مرشّحًا. وقد صار له أثرٌ مجمَّدٌ من مرآة المجمّع،
+   * فلم يعد يصلح مثالًا لرواية مجهولة — والحارسُ يفحص المجهول، لا حفصًا بعينه.
+   */
+  const unknown = resolveCandidateReviewState('rawi-that-does-not-exist', { upstreamCommit: source.upstreamCommit, compressedSha256: source.expectedCompressedSha256 });
   assert.equal(unknown.state, 'PENDING_SCHOLAR_REVIEW');
   assert.deepEqual(unknown.blockers, ['UNKNOWN_CANDIDATE_RAWI']);
 });
@@ -124,12 +128,30 @@ test('identical upstream bodies do not collapse Ishaq and Idris into one identit
   assert.equal(resolveCandidateReviewState('idris', { upstreamCommit: idris.upstreamCommit, compressedSha256: idris.expectedCompressedSha256 }).rawiId, 'idris');
 });
 
-/* الدوريّان لا يلتقيان: أحدهما مُسلَّم عن أبي عمرو، والآخر مرشّح عن الكسائي. */
+/*
+ * الدوريّان لا يلتقيان: أحدهما عن أبي عمرو والآخر عن الكسائي، واسمُهما واحد. وخلطُهما
+ * يعني خدمةَ نصّ روايةٍ باسم أخرى — وهو أسوأُ ما يمكن أن يقع في هذا النظام.
+ *
+ * وكان الحارسُ يُثبت ذلك بأن الدوريَّ عن أبي عمرو **بلا مرشّح أصلًا**. وقد صار له أثرٌ
+ * مجمَّدٌ من مرآة المجمّع، فذلك البرهانُ سقط — لا الثابتُ نفسُه. فيُثبَت الآن مباشرةً:
+ * لكلٍّ منهما سلسلةُ إسنادٍ وأثرٌ وبصمةٌ ونظامُ عدٍّ ونصٌّ مختلف.
+ */
 test('the two Duri identities can never resolve to one candidate package', () => {
   assert.ok(KFGQPC_DELIVERED_RAWI_IDS.includes('al-duri-abu-amr'));
-  assert.equal(candidateSourceForRawi('al-duri-abu-amr'), undefined);
+  const abuAmr = candidateSourceForRawi('al-duri-abu-amr');
   const kisai = candidateSourceForRawi('al-duri-kisai');
+  assert.ok(abuAmr);
   assert.ok(kisai);
+
+  assert.equal(abuAmr.deliveryKey, 'duri-abi-amr');
   assert.equal(kisai.deliveryKey, 'duri-al-kisai');
   assert.match(kisai.upstreamPath, /QiraahDuriKisai\.json\.deflate$/);
+
+  assert.notEqual(abuAmr.authority, kisai.authority);
+  assert.notEqual(abuAmr.expectedCompressedSha256, kisai.expectedCompressedSha256);
+  assert.notEqual(abuAmr.nativeCountSystem, kisai.nativeCountSystem);
+  assert.notEqual(
+    abuAmr.artifactFileName || abuAmr.upstreamPath,
+    kisai.artifactFileName || kisai.upstreamPath,
+    'the two Duri readings must never read the same artifact off disk');
 });

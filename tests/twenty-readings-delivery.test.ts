@@ -210,9 +210,36 @@ test('a missing or tampered artifact fails closed by name — it never becomes H
     assert.throws(() => loadIslamwebReadingPackage('hisham', env),
       (e: unknown) => e instanceof IslamwebPackageError && e.code === 'ISLAMWEB_PACKAGE_DIGEST_MISMATCH');
 
-    // (ج) رواية ليست من الاثنتي عشرة.
-    assert.throws(() => loadIslamwebReadingPackage('hafs', env),
+    /*
+     * (ج) روايةٌ لا سجلَّ لها. كان المثالُ «حفصًا» لأنه لم يكن مرشّحًا؛ وقد صار له أثرٌ
+     * مجمَّدٌ من مرآة المجمّع، فلم يعد مثالًا للمجهول — والحارسُ يفحص المجهولَ لا حفصًا.
+     */
+    assert.throws(() => loadIslamwebReadingPackage('rawi-that-does-not-exist', env),
       (e: unknown) => e instanceof IslamwebPackageError && e.code === 'ISLAMWEB_PACKAGE_UNKNOWN_READING');
+
+    /*
+     * (د) والمسارُ الجديد يُحرَس كما يُحرَس القديم: أثرُ مرآةٍ مُبدَّلُ البايتات يسقط
+     * باسمه ولا يصير حفصًا. وحارسٌ لا يُجرَّب على مساره الجديد حارسٌ لا يُعرف أيعضّ.
+     */
+    const mirrorRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mizan-mirror-'));
+    try {
+      const mirrorEnv = { MIZAN_KFGQPC_MIRROR_SOURCE_ROOT: mirrorRoot } as NodeJS.ProcessEnv;
+      clearIslamwebPackageCache();
+      assert.throws(() => loadIslamwebReadingPackage('qalun', mirrorEnv),
+        (e: unknown) => e instanceof IslamwebPackageError && e.code === 'ISLAMWEB_PACKAGE_ARTIFACT_MISSING');
+
+      const mirrorSource = candidateSourceForRawi('qalun')!;
+      const mirrorName = mirrorSource.artifactFileName as string;
+      const mirrorReal = fs.readFileSync(path.join(process.cwd(), 'quran-sources', 'kfgqpc-mirror-derived', mirrorName));
+      const mirrorTampered = Buffer.from(mirrorReal);
+      mirrorTampered[mirrorTampered.length - 1] ^= 0x01;
+      fs.writeFileSync(path.join(mirrorRoot, mirrorName), mirrorTampered);
+      clearIslamwebPackageCache();
+      assert.throws(() => loadIslamwebReadingPackage('qalun', mirrorEnv),
+        (e: unknown) => e instanceof IslamwebPackageError && e.code === 'ISLAMWEB_PACKAGE_DIGEST_MISMATCH');
+    } finally {
+      fs.rmSync(mirrorRoot, { recursive: true, force: true });
+    }
   } finally {
     clearIslamwebPackageCache();
     fs.rmSync(root, { recursive: true, force: true });
