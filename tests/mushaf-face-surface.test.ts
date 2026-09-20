@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { MushafFaceSurface, type FaceWord, type MushafFaceSurfaceProps } from '../src/components/participant/MushafFaceSurface';
 import { FACE_MARK_STYLE, markTint, primaryMark } from '../src/components/participant/FaceMarks';
+import { FACE_MISTAKE_STYLE } from '../src/components/participant/FaceMistakes';
 import type { FaceMark } from '../src/lib/face-reading';
+import type { Mistake } from '../src/lib/recitation-diff';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — ويُقاس بالتصيير، لا بقراءة نصّ الشيفرة.
@@ -281,4 +283,107 @@ test('ما لم يُقس يُقال — وخلوُّ الوجه من علامة�
   assert.equal(/data-unmeasurable/.test(full), false, 'ظهر بيانُ نقصٍ بلا نقص');
   /* وبلا تصريحٍ أصلًا لا يُقال شيء: الصمتُ هنا عن المسار لا عن الطالب. */
   assert.equal(/data-unmeasurable/.test(render()), false);
+});
+
+/* ── طبقةُ الحكم: مواضعُ الخطأ على الوجه ─────────────────────────────────── */
+
+/*
+ * وهذه غيرُ العلامات، وفرقُها ليس في الشكل: العلامةُ **وصفٌ** لما جرى، وهذه **حكم**.
+ * ولا تُعرض إلا بإذنٍ مقيس، ولها من الحرص ما ليس لغيرها.
+ */
+
+const faults: Mistake[] = [
+  { kind: 'skipped', wordIndex: 2, expected: 'رَبِّ', confidence: 0.9 },
+  { kind: 'substituted', wordIndex: 4, expected: 'ٱلرَّحْمَٰنِ', heard: 'الرحيم', confidence: 0.88 },
+  { kind: 'added', wordIndex: null, heard: 'آمين', confidence: 0.6 },
+];
+
+test('بلا حكمٍ يُقال للطالب إنّ النظام لا يعرف ماذا قال', () => {
+  /*
+   * وغيابُ `mistakes` ليس «لا خطأ»: هو «لم يُحكم». فيُقال حدُّ ما يعرفه النظامُ
+   * صراحةً، لئلّا يُقرأ الصمتُ براءة.
+   */
+  const text = visibleText(render({}));
+  assert.ok(text.includes('ولا يعرف ماذا قلت'), 'لم يُقل حدُّ ما يعرفه النظام');
+  assert.equal(render({}).includes('data-mistake'), false, 'لا طبقةَ حكمٍ بلا إذن');
+});
+
+test('وبإذنٍ يتغيّر ذيلُ الوجه — فقولُ «لا يعرف ماذا قلت» حينئذٍ كذب', () => {
+  const text = visibleText(render({ mistakes: [] }));
+  assert.equal(text.includes('ولا يعرف ماذا قلت'), false, 'قيل للطالب ما ليس صحيحًا بعد أن صار يُسمع');
+  assert.ok(text.includes('سماعُ آلةٍ لا حكمُ لجنة'), 'لم يُقل إنّ هذا سماعُ آلة');
+  assert.ok(text.includes('والآلةُ تخطئ'), 'لم يُقل إنّ الآلة تخطئ');
+  assert.ok(text.includes('للبشر وحدهم'), 'لم يُقل إنّ الحكم للبشر');
+  assert.equal(render({ mistakes: [] }).includes('data-mistake-legend'), false, 'دليلُ الأخطاء يظهر بلا خطأ');
+});
+
+test('الكلمةُ المُخطَّأةُ تُعلَّم بخطٍّ تحتها ولا تُطمس', () => {
+  const html = render({ mistakes: faults });
+  assert.match(html, /data-mistake="skipped"/, 'لم تُعلَّم الكلمةُ التي لم تُسمع');
+  assert.match(html, /data-mistake="substituted"/, 'لم تُعلَّم الكلمةُ التي سُمع غيرُها');
+  /* والخطُّ تحتها لا صبغٌ فوقها: `box-shadow` لا `background`. */
+  const word = html.slice(html.indexOf('data-mistake="skipped"'));
+  const style = word.slice(word.indexOf('style="'), word.indexOf('>', word.indexOf('style="')));
+  assert.match(style, /box-shadow/, 'الحكمُ لا يُرسم خطًّا تحت الكلمة');
+  assert.ok(html.includes('رَبِّ'), 'النصُّ القرآنيُّ نفسُه غاب');
+});
+
+test('كلمةٌ سُمعت لا موضعَ لها تُعدّ ولا تُعلَّق على كلمةٍ بريئة', () => {
+  const html = render({ mistakes: faults });
+  assert.match(html, /data-added-words="1"/, 'الكلمةُ الزائدةُ لم تُعدّ');
+  const text = visibleText(html);
+  assert.ok(text.includes('لا موضعَ لها في هذا الوجه'), 'لم يُقل للطالب ما معنى الكلمة الزائدة');
+  assert.ok(text.includes('ضجيجٍ أو صدًى'), 'لم يُقل أكثرُ أسبابها');
+});
+
+test('الوصفُ والحكمُ يجتمعان على كلمةٍ واحدةٍ بلا أن يحجب أحدُهما الآخر', () => {
+  const html = render({
+    marks: [{ word: 2, kind: 'dwell', intensity: 1 }],
+    mistakes: [{ kind: 'skipped', wordIndex: 2, expected: 'رَبِّ', confidence: 0.9 }],
+  });
+  const word = html.slice(html.indexOf('data-word="2"'));
+  const tag = word.slice(0, word.indexOf('>'));
+  assert.match(tag, /data-mark="dwell"/, 'ذهبت العلامة');
+  assert.match(tag, /data-mistake="skipped"/, 'ذهب الحكم');
+  assert.match(tag, /background/, 'الوصفُ لا يُرسم صبغًا');
+  assert.match(tag, /box-shadow/, 'الحكمُ لا يُرسم خطًّا');
+});
+
+test('اسمُ الخطأ يقول ما سُمع، لا «أخطأتَ»', () => {
+  /*
+   * فالمحرّكُ يخطئ، ونسبةُ خطئه في تقريره. فيُقال «لم تُسمع» و«سُمع غيرُها» —
+   * وصفًا لفعل المحرّك لا حكمًا على حفظ الطالب.
+   */
+  for (const style of Object.values(FACE_MISTAKE_STYLE)) {
+    for (const verdict of ['أخطأت', 'أخطأتَ', 'خاطئ', 'راسب', 'ضعيف', 'درجة']) {
+      assert.equal(style.ar.includes(verdict), false, `اسمُ «${style.ar}» حكمٌ على الطالب`);
+    }
+  }
+  assert.equal(FACE_MISTAKE_STYLE.skipped.ar, 'لم تُسمع');
+  assert.equal(FACE_MISTAKE_STYLE.substituted.ar, 'سُمع غيرُها');
+});
+
+test('ألوانُ الحكم تُرى على أرضيّة المصحف ولا تلتبس بألوان الوصف', () => {
+  for (const [kind, style] of Object.entries(FACE_MISTAKE_STYLE)) {
+    const ratio = contrast(style.tint, CANVAS);
+    assert.ok(ratio >= 3, `لونُ «${kind}» (${style.tint}) عند ${ratio.toFixed(2)}:1 على أرضيّة المصحف`);
+  }
+  const mistakeTints = Object.values(FACE_MISTAKE_STYLE).map(s => s.tint.toLowerCase());
+  assert.equal(new Set(mistakeTints).size, mistakeTints.length, `ألوانُ حكمٍ متكرّرة: ${mistakeTints.join(' ')}`);
+  /* ولا يُستعار لونُ وصفٍ لحكم: طبقتان مختلفتان في المعنى لا تتشابهان في اللون. */
+  const markTints = new Set(Object.values(FACE_MARK_STYLE).map(s => s.tint.toLowerCase()));
+  for (const tint of mistakeTints) assert.equal(markTints.has(tint), false, `لونُ الحكم ${tint} هو نفسُه لونُ وصف`);
+  /* واللونُ وحده لا يحمل المعنى. */
+  for (const [kind, style] of Object.entries(FACE_MISTAKE_STYLE)) {
+    for (const field of ['ar', 'en', 'hintAr', 'hintEn', 'glyph'] as const) {
+      assert.ok(style[field].trim().length > 0, `«${kind}» بلا ${field}`);
+    }
+  }
+});
+
+test('دليلُ الأخطاء يعدّ كلَّ نوعٍ بعدده', () => {
+  const html = render({ mistakes: [...faults, { kind: 'skipped', wordIndex: 5, expected: 'ٱلرَّحِيمِ', confidence: 0.8 }] });
+  assert.match(html, /data-mistake-legend="3"/, 'أنواعُ الأخطاء لم تُعدّ في الدليل');
+  const text = visibleText(html);
+  assert.ok(text.includes('لم تُسمع'), 'اسمُ النوع غاب عن الدليل');
 });

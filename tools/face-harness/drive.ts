@@ -24,6 +24,12 @@ export interface RunOutcome {
   indices: Record<string, string>;
   marks: string[];
   analysisNote: string | null;
+  /* مواضعُ الخطأ كما رُسمت على الوجه — نوعُ كلٍّ وفهرسُ كلمته. */
+  mistakes: { word: number; kind: string }[];
+  /* وبيانُ البوّابة حين تكون مغلقة. */
+  gateNote: string | null;
+  /* وكم نغمةَ تنبيهٍ خرجت فعلًا من مسار الصوت. */
+  alertOscillators: number;
   attemptsStored: number;
   micTracksLive: number;
   reportShown: boolean;
@@ -78,6 +84,12 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
       });
       const marks = [];
       document.querySelectorAll('[data-mark]').forEach(w => marks.push(w.getAttribute('data-mark') || ''));
+      const mistakes = [];
+      document.querySelectorAll('[data-mistake]').forEach(w => mistakes.push({
+        word: Number(w.getAttribute('data-word')), kind: w.getAttribute('data-mistake') || '',
+      }));
+      const gateCell = document.querySelector('[data-judging-gate]');
+      const alerts = window.__mizanAlerts();
       const note = Array.prototype.map.call(document.querySelectorAll('p'), p => (p.textContent || '').trim())
         .find(t => t.indexOf('لم يصل') >= 0 || t.indexOf('غيرُ مهيّأ') >= 0 || t.indexOf('جلستُك') >= 0 || t.indexOf('خاتمةَ سورةٍ') >= 0) || null;
       let attempts = 0;
@@ -92,6 +104,8 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
         stage: text(document.querySelector('[data-stage]')),
         reachText: indices.reach || null,
         indices: indices, marks: marks, analysisNote: note,
+        mistakes: mistakes, gateNote: text(gateCell),
+        alertOscillators: alerts.oscillators,
         attemptsStored: attempts,
         micTracksLive: streams.reduce((sum, s) => sum + s.live, 0),
         reportShown: !!document.querySelector('[data-index="reach"]'),

@@ -329,7 +329,7 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    * يُسلَّم إلى `onFailure`. وقد وقع العكسُ مرّةً فصار عدّادُ السقوط ميتًا: المهمّةُ
    * تبتلع خطأها فيرى الطابورُ نجاحًا، فيقول «تمّ» ومقطعٌ لم يصل.
    */
-  const chunkTask = screen.slice(screen.indexOf('queue.current.push(async live'), screen.indexOf('rec.start(2000)'));
+  const chunkTask = screen.slice(screen.indexOf('queue.current.push(async live'), screen.indexOf('rec.start(CHUNK_MS)'));
   assert.equal(/\btry\s*\{/.test(chunkTask), false, 'مهمّةُ المقطع تبتلع خطأها فلا يُعدّ ساقطًا');
   assert.match(chunkTask, /\}, error => \{/, 'لا بيانَ للطالب عند سقوط مقطع');
   assert.match(chunkTask, /setNote\(faceNote\(code, ar\)\)/, 'سببُ التعذّر لا يبلغ الطالب');
@@ -344,9 +344,18 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   for (const [where, pattern] of [
     ['سحبُ وجهٍ جديد', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/],
     ['بدءُ تلاوة', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('reciting'\)/],
-    ['مغادرةُ الشاشة', /useEffect\(\(\) => \(\) => \{ queue\.current\.abandon\(\); stopAudio\(\); \}/],
   ] as const) {
     assert.match(screen, pattern, `الطابورُ القديم لا يُترك عند ${where}`);
+  }
+  /*
+   * والثالثُ عند مغادرة الشاشة. وكان يُفحص بنصّ سطرٍ واحد، فلمّا صار للتنظيف ثالثةٌ
+   * (إغلاقُ سمّاعة التنبيه) كسره الشكلُ لا المعنى. فيُقرأ جسمُ التنظيف ويُشترط فيه
+   * **ثلاثتُها**: تركُ الطابور، وإطلاقُ الميكروفون، وإغلاقُ السمّاعة.
+   */
+  const cleanup = screen.slice(screen.indexOf('useEffect(() => () => {'), screen.indexOf('}, [stopAudio]);'));
+  assert.ok(cleanup.length > 0 && cleanup.length < 400, 'لم يُعثر على تنظيف المغادرة');
+  for (const call of ['queue.current.abandon()', 'stopAudio()', 'speaker.current?.close()']) {
+    assert.ok(cleanup.includes(call), `تنظيفُ المغادرة لا يشمل ${call}`);
   }
 });
 
@@ -559,4 +568,77 @@ test('مراجعةٌ ناقصةٌ لا تدخل الذاكرة — وإن عُر
 
   /* والافتراضُ «تامّ»: من لم يُصرّح فقد قاس كلَّ شيء. */
   assert.notEqual(readRecitation(heard, faceWords, 300).attempt, null);
+});
+
+/* ── مسارُ السماع في الشاشة: ما لا يبلغه اختبارُ عقدة يُفحص نصًّا ──────────── */
+
+test('الشاشةُ لا تحكم بنفسها: لا مقابلةَ إلا عبر ما يشترط الإذن', () => {
+  /*
+   * `diffRecitation` يقابل نصّين ولا يسأل عن إذن — وهو صوابٌ في موضعه (القياسُ
+   * والاختبار). أمّا في الشاشة فلا: الطريقُ الوحيدُ إلى قولِ «أخطأت» هو
+   * `liveJudgment`/`finalJudgment`، وكلاهما يأخذ إذنًا ويعيد `null` بدونه.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  for (const bypass of ['diffRecitation(', 'judgeRecitation(', 'diffOptionsForGate(']) {
+    assert.equal(screen.includes(bypass), false, `الشاشةُ تحكم بـ${bypass} خارجَ ما يشترط الإذن`);
+  }
+  assert.match(screen, /liveJudgment\(expectedRef\.current, heardWords\.current, permission\)/, 'الحكمُ الحيُّ ليس هو المستعمل');
+  assert.match(screen, /finalJudgment\(expectedRef\.current, heardWords\.current, permission\)/, 'حكمُ الخاتمة ليس هو المستعمل');
+  /* ولا يُخترع إذنٌ في الشاشة: يُسأل عنه الخادم. */
+  assert.equal(/word:\s*'OPEN'/.test(screen), false, 'الشاشةُ تفتح البابَ لنفسها');
+  assert.match(screen, /await fetchPracticeJudgingGate\(/, 'الإذنُ لا يُسأل عنه أصلًا');
+});
+
+test('مقاطعُ السماع تدخل الطابورَ نفسَه — لا طابورًا ثانيًا', () => {
+  /*
+   * فمقطعان يتسابقان يخلطان ما سُمع، فتُقرأ كلمةٌ بعد تاليتها — ويُصنع خطأٌ حيث لا
+   * خطأ. وهي العلّةُ نفسُها التي صنعت «أعدتَ» الكاذبة في مسار المحاذاة.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  const handler = screen.slice(screen.indexOf('rec.ondataavailable'), screen.indexOf('rec.start(CHUNK_MS)'));
+  const pushes = handler.match(/queue\.current\.push\(/g) || [];
+  assert.equal(pushes.length, 2, 'يُتوقّع مسارانِ في الطابور نفسِه: محاذاةٌ وسماع');
+  assert.equal(/new Promise|Promise\.all|void submitPracticeRecognitionChunk/.test(handler), false,
+    'مقطعُ السماع يُرسل خارجَ الطابور');
+  assert.match(handler, /await submitPracticeRecognitionChunk\(/, 'السماعُ لا يُنتظر داخل مهمّته');
+});
+
+test('رقمُ المقطع يُقرأ تزامنيًّا، لا داخلَ المهمّة', () => {
+  /*
+   * فتوقيتُ الكلمة يعود مُسنَدًا إلى أوّل المقطع، ويُحتاج مُسنَدًا إلى أوّل التلاوة.
+   * ولو قُرئ العدّادُ بعد انتظارٍ لقرأ رقمَ مقطعٍ آخر — فتُطرح كلماتٌ صحيحةٌ ويُبقى صدًى.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  const handler = screen.slice(screen.indexOf('rec.ondataavailable'), screen.indexOf('rec.start(CHUNK_MS)'));
+  const readsIndex = handler.indexOf('chunkIndex.current * CHUNK_MS');
+  const firstPush = handler.indexOf('queue.current.push(');
+  assert.ok(readsIndex > 0, 'لا يُحسب مبدأُ المقطع أصلًا');
+  assert.ok(readsIndex < firstPush, 'رقمُ المقطع يُقرأ بعد دخول الطابور');
+});
+
+test('ما سُمع تحت نغمةٍ يُطرح قبل أن يُضاف — لا بعده', () => {
+  /* وإلا حُكم على صدى النغمة، فنُبِّه عليه، فصُنعت نغمةٌ أخرى — دورةٌ لا تنتهي. */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  const drop = screen.indexOf('dropWordsUnderAlert(timed, alertWindows.current,');
+  const append = screen.indexOf('heardWords.current = [...heardWords.current, ...kept]');
+  assert.ok(drop > 0 && append > 0, 'الطرحُ أو الإضافةُ غير موجودين');
+  assert.ok(drop < append, 'الإضافةُ تسبق الطرح');
+  assert.match(screen, /alertWindows\.current = \[\.\.\.alertWindows\.current, alertWindow\(now\)\]/, 'النغمةُ لا تُسجَّل نافذةً');
+  /*
+   * ويُعطى الطارحُ نصَّ الوجه، وإلا طرح كلماتٍ صحيحةً فصارت «لم تُسمع» — وهو ما وقع
+   * فعلًا وكشفه أوّلُ تشغيلٍ في متصفّح: ثلاثُ كلماتٍ صحيحةٍ عُلّمت، وكلُّها جارةُ نغمة.
+   */
+  assert.match(screen, /faceSkeletonsRef\.current\.has\(quranSkeleton\(text\)\)/, 'الطارحُ لا يعرف كلماتِ الوجه');
+});
+
+test('سقوطُ السماع لا يُسقط التتبّع', () => {
+  /*
+   * فالعلاماتُ (لبثتَ، أعدتَ، انقطع الأثر) تُقاس من مسارٍ آخر. ومحرّكُ سماعٍ يسقط
+   * يُغلق بابَ الحكم وحدَه — ولا يُطفئ ميكروفونًا ولا يُنهي مراجعة.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  const start = screen.indexOf('await submitPracticeRecognitionChunk(');
+  const handler = screen.slice(start, screen.indexOf('rec.start(CHUNK_MS)'));
+  assert.equal(handler.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
+  assert.match(handler, /setMistakes\(undefined\)/, 'بابٌ أُغلق يترك أحكامًا معروضة');
 });

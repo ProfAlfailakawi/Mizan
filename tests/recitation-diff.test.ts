@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { diffRecitation, heardNothing, DEFAULT_DIFF_OPTIONS, type ExpectedWord, type HeardWord } from '../src/lib/recitation-diff';
-import { quranSkeleton, quranVoweled, sameWord } from '../src/lib/quran-orthography';
+import { diffOptionsForGate, diffRecitation, heardNothing, judgeRecitation, DEFAULT_DIFF_OPTIONS, type ExpectedWord, type HeardWord } from '../src/lib/recitation-diff';
+import { quranSkeleton, quranVoweled, sameVowels, sameWord } from '../src/lib/quran-orthography';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 import { splitAyahWords } from '../server/practice-face-service';
 
@@ -139,4 +139,114 @@ test('والهيكلُ لا يطمس فرقًا حقيقيًّا بين رواي
   assert.equal(sameWord('ٱلۡحَمۡدُ', 'اِ۬لْحَمْدُ'), true);
   assert.equal(sameWord('فِي', 'فِے'), true);
   assert.equal(quranSkeleton('ٱلرَّحۡمَٰنِ'), 'الرحمن');
+});
+
+
+/* ── لا يُحكم إلا بإذن ────────────────────────────────────────────────────── */
+
+const OPEN = { word: 'OPEN', tashkeel: 'OPEN' } as const;
+const WORD_ONLY = { word: 'OPEN', tashkeel: 'CLOSED' } as const;
+const SHUT = { word: 'CLOSED', tashkeel: 'CLOSED' } as const;
+
+test('بابٌ مغلقٌ يعيد لا شيء — لا «لا أخطاء»', () => {
+  /*
+   * والفرقُ بينهما هو الفرقُ بين «لم يُحكم» و«حُكم فلم يُوجد خطأ». ولو أعاد تقريرًا
+   * فارغًا لقرأته الشاشةُ طمأنينةً لا سندَ لها، وقالت لطالبٍ لم يُسمع له «أحسنتَ».
+   */
+  const wrong = heardOf(['ٱلۡحَمۡدُ', 'لِلَّهِ', 'رَبِّ', 'ٱلنَّاسِ']);
+  assert.equal(judgeRecitation(expectedOf(FATIHA), wrong, SHUT), null);
+  const judged = judgeRecitation(expectedOf(FATIHA), wrong, WORD_ONLY);
+  assert.ok(judged, 'بابُ الكلمة مفتوحٌ فيجب أن يُحكم');
+  assert.equal(judged!.mistakes.length, 1);
+  assert.equal(judged!.mistakes[0].kind, 'substituted');
+});
+
+test('صمتٌ تامٌّ لا يُقرأ «أسقطتَ الوجهَ كلَّه»', () => {
+  assert.equal(judgeRecitation(expectedOf(FATIHA), heardOf(['', '   ']), OPEN), null);
+  assert.equal(judgeRecitation(expectedOf(FATIHA), [], OPEN), null);
+});
+
+test('إذنُ الحركة وحدَه هو ما يفتح حكمَ الحركة', () => {
+  /* كلمةٌ واحدةٌ يختلف شكلُها ويتّفق هيكلُها — فلا يراها إلا مَن أُذن له. */
+  const heard = [{ text: 'ٱلۡحَمۡدَ', confidence: 0.99 }, ...heardOf(FATIHA.slice(1), 0.99)];
+  assert.equal(diffOptionsForGate(WORD_ONLY).detectTashkeel, false);
+  assert.equal(diffOptionsForGate(OPEN).detectTashkeel, true);
+  assert.deepEqual(judgeRecitation(expectedOf(FATIHA), heard, WORD_ONLY)!.mistakes, []);
+  const strict = judgeRecitation(expectedOf(FATIHA), heard, OPEN)!;
+  assert.equal(strict.mistakes.length, 1);
+  assert.equal(strict.mistakes[0].kind, 'tashkeel');
+});
+
+test('العتباتُ تُنقل كما هي ولا تُخترع عند الإذن', () => {
+  const options = diffOptionsForGate(OPEN, DEFAULT_DIFF_OPTIONS);
+  assert.equal(options.minConfidence, DEFAULT_DIFF_OPTIONS.minConfidence);
+  assert.equal(options.minTashkeelConfidence, DEFAULT_DIFF_OPTIONS.minTashkeelConfidence);
+});
+
+/* ── عتبةُ الثقة تُطبَّق قبل العدّ، والرسمُ يُوحَّد قبل الحكم ─────────────── */
+
+test('مطابقةٌ لم يجزم بها المحرّكُ لا تُعدّ تثبيتًا', () => {
+  /*
+   * ملاحظةُ مراجعةٍ آليّة (#252)، وهي صحيحة: كلمةٌ بثقة ٠٫١ هيكلُها هو الهيكلُ
+   * المنتظَر كانت تُخرج `matched: 1` — فيقرأ القارئُ «ثبتت» وهو ظنٌّ ضعيف.
+   */
+  const one = diffRecitation(expectedOf(['ٱلۡحَمۡدُ']), [{ text: 'ٱلۡحَمۡدُ', confidence: 0.1 }]);
+  assert.equal(one.matched, 0, 'عُدَّت مطابقةً دون العتبة تثبيتًا');
+  assert.equal(one.uncertain, 1, 'ولم تُعدّ في خانتها');
+  assert.deepEqual(one.mistakes, [], 'ولا تُقلب المطابقةُ الضعيفةُ خطأً');
+
+  const sure = diffRecitation(expectedOf(['ٱلۡحَمۡدُ']), [{ text: 'ٱلۡحَمۡدُ', confidence: 0.95 }]);
+  assert.equal(sure.matched, 1);
+  assert.equal(sure.uncertain, 0);
+});
+
+test('خانةُ الظنّ غيرُ خانة الحجب — ولا يُخلطان', () => {
+  /*
+   * `withheld` عددُ **أحكامٍ حُجبت** (خطأٌ رآه المحرّكُ ولم يبلغ عتبتَه)، و`uncertain`
+   * عددُ **مواضعَ لم يُحكم فيها أصلًا**. وخلطُهما يُخفي أيَّهما وقع.
+   */
+  const diff = diffRecitation(
+    expectedOf(['ٱلۡحَمۡدُ', 'لِلَّهِ']),
+    [{ text: 'ٱلۡحَمۡدُ', confidence: 0.2 }, { text: 'ٱلنَّاسِ', confidence: 0.3 }],
+  );
+  assert.equal(diff.uncertain, 1, 'المطابقةُ الضعيفةُ لم تُعدّ');
+  assert.equal(diff.withheld, 1, 'الإبدالُ الضعيفُ لم يُحجب ويُعدّ');
+  assert.deepEqual(diff.mistakes, [], 'ولا يُقال حكمٌ دون عتبته');
+});
+
+test('السكونُ العثمانيُّ والسكونُ المعتاد منطوقٌ واحدٌ بصورتين', () => {
+  /*
+   * ملاحظةُ مراجعةٍ آليّة (#253)، وهي صحيحة — وأثرُها أكبرُ ممّا وُصف. قِيس على
+   * الحزمتين: **٤٠٫٣٪** من كلمات حفصٍ تحمل U+06E1 (٣١٢٥٤ من ٧٧٦٢٩) وصفرٌ في ورش؛
+   * بل حزمةُ ورشٍ تكتب السكونَ U+0652 في ٣٧٥٥٣ موضعًا وحزمةُ حفصٍ تكتبه U+06E1 في
+   * ٣٧١٤٨. فمحرّكٌ يكتب السكونَ المعتاد كان يُخطَّأ في **٤٠٪ من تلاوة حفصٍ صحيحة**.
+   */
+  const uthmani = 'ٱلۡحَمۡدُ', conventional = 'ٱلْحَمْدُ';
+  assert.equal(quranVoweled(uthmani), quranVoweled(conventional), 'الصورتان لم تستويا');
+  assert.equal(sameVowels(uthmani, conventional), true);
+  const diff = diffRecitation(expectedOf([uthmani]), [{ text: conventional, confidence: 0.99 }], { detectTashkeel: true });
+  assert.deepEqual(diff.mistakes, [], `خطأُ حركةٍ على صورتين لمنطوقٍ واحد: ${JSON.stringify(diff.mistakes)}`);
+});
+
+test('والتوحيدُ يقع قبل التطبيع الأخير — وإلا بقي ترتيبُ العلامات فارقًا', () => {
+  /*
+   * فترتيبُ العلامات المتراكبة يُرتَّب بالتطبيع، وإبدالُ رمزٍ برمزٍ قد يغيّر رتبتَه.
+   * وقِيس: ٢٣ كلمةً في حفصٍ فيها همزةٌ وسكونٌ معًا بقيت مختلفةً بعد التوحيد وحدَه.
+   * وبعد إعادة التطبيع: **صفر**.
+   */
+  const hafs = loadIslamwebReadingPackage('hafs').verses
+    .flatMap((v: { aya_text: string }) => splitAyahWords(v.aya_text));
+  const differing = hafs.filter(w => quranVoweled(w) !== quranVoweled(w.replace(/ۡ/g, 'ْ')));
+  assert.equal(differing.length, 0, `كلماتٌ لم تستوِ بعد التوحيد: ${differing.slice(0, 3).join(' · ')}`);
+  /* ولا يُسوَّى ما لم يُقس: إشاراتُ السكوت تبقى على حالها. */
+  assert.notEqual(quranVoweled('لَا۟'), quranVoweled('لَا۠'));
+});
+
+test('توحيدُ السكون لا يخلط روايةً برواية', () => {
+  /* فالتوحيدُ في الترميز وحدَه — والفروقُ المنطوقةُ بين الروايات تبقى ظاهرة. */
+  const hafs = loadIslamwebReadingPackage('hafs').verses.find((v: { sura_no: number; aya_no: number }) => v.sura_no === 1 && v.aya_no === 4);
+  const warsh = loadIslamwebReadingPackage('warsh').verses.find((v: { sura_no: number; aya_no: number }) => v.sura_no === 1 && v.aya_no === 4);
+  assert.ok(hafs && warsh, 'لم تُقرأ الآيةُ من الحزمتين');
+  assert.notEqual(quranVoweled(hafs!.aya_text), quranVoweled(warsh!.aya_text),
+    'استوت «مالك» و«ملك» بعد التوحيد — وهما فرقٌ يُسمع بين الروايتين');
 });

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { AyahMark, arabicIndicDigits } from '../judge/AyahMark';
 import { FaceMarkLegend, FACE_MARK_STYLE, markTint, marksByWord, primaryMark } from './FaceMarks';
+import { FaceMistakeLegend, FACE_MISTAKE_STYLE, addedCount, mistakesByWord, primaryMistake } from './FaceMistakes';
 import type { FaceMark, FaceMarkKind, FaceIndices } from '../../lib/face-reading';
+import type { Mistake } from '../../lib/recitation-diff';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — والصفحةُ نفسُها هي التقرير.
@@ -34,6 +36,13 @@ export interface MushafFaceSurfaceProps {
   words: readonly FaceWord[];
   /** العلاماتُ بعد التلاوة. وقبلها تكون فارغةً فيُعرض الوجهُ نظيفًا. */
   marks?: readonly FaceMark[];
+  /*
+   * مواضعُ الخطأ — وهي **حكم** لا وصف، فلا تُمرَّر إلا بإذنٍ مقيس.
+   *
+   * وغيابُها ليس «لا خطأ»: هو «لم يُحكم». ولذلك `undefined` لا `[]` حين لا إذن،
+   * ومصفوفةٌ فارغةٌ حين حُكم فلم يُوجد شيء — والذيلُ أسفل الوجه يفرّق بينهما.
+   */
+  mistakes?: readonly Mistake[];
   indices?: FaceIndices;
   /*
    * وحدةُ القياس الزمنيّ كما هي في المسار الذي قاس فعلًا.
@@ -53,10 +62,13 @@ export interface MushafFaceSurfaceProps {
 }
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
-  ar, page, surahName, surahNames, words, marks = [], indices, frameUnit = 'frame', measurableMarks,
+  ar, page, surahName, surahNames, words, marks = [], mistakes, indices, frameUnit = 'frame', measurableMarks,
   choiceNote, analysisNote, officialFont = false,
 }) => {
   const index = useMemo(() => marksByWord(marks), [marks]);
+  const faults = useMemo(() => mistakesByWord(mistakes ?? []), [mistakes]);
+  /* وحُكم؟ لا «أَوُجد خطأ؟» — والفرقُ بينهما هو الفرقُ بين «لم يُسمع» و«لم يُخطئ». */
+  const judged = mistakes !== undefined;
   const pageLabel = ar ? arabicIndicDigits(page) : String(page);
   const nameOf = (surah: number) => surahNames?.[surah] ?? (words[0] && surah === words[0].surah ? surahName : undefined);
   /* اسمُ الشريط الأعلى: أوّلُ سورةٍ على الوجه — والتاليةُ يُعلنها شريطُها عند موضعها. */
@@ -86,6 +98,12 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
           const wordMarks = index.get(word.index) || [];
           const top = primaryMark(wordMarks);
           const style = top ? FACE_MARK_STYLE[top.kind] : null;
+          /*
+           * والحكمُ طبقةٌ أخرى: خطٌّ تحت الكلمة لا صبغٌ يطمسها، فيجتمع الوصفُ والحكمُ
+           * على كلمةٍ واحدةٍ بلا أن يحجب أحدُهما الآخر — وكلاهما يُقرأ بالصوت أيضًا.
+           */
+          const fault = primaryMistake(faults.get(word.index) || []);
+          const faultStyle = fault ? FACE_MISTAKE_STYLE[fault.kind] : null;
           return (
             <React.Fragment key={word.index}>
               {opensSurah && (
@@ -97,12 +115,19 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
               <span
                 data-word={word.index}
                 data-mark={top?.kind}
-                title={style ? (ar ? style.hintAr : style.hintEn) : undefined}
+                data-mistake={fault?.kind}
+                title={[style && (ar ? style.hintAr : style.hintEn), faultStyle && (ar ? faultStyle.hintAr : faultStyle.hintEn)].filter(Boolean).join(' · ') || undefined}
                 className="mizan-face-word"
-                style={top ? { background: markTint(top), boxShadow: `0 1.5px 0 ${style!.tint}66` } : undefined}
+                style={top || faultStyle
+                  ? {
+                    background: top ? markTint(top) : undefined,
+                    boxShadow: [top && `0 1.5px 0 ${style!.tint}66`, faultStyle && `0 4px 0 -1px ${faultStyle.tint}`].filter(Boolean).join(', ') || undefined,
+                  }
+                  : undefined}
               >
                 {word.text}
                 {style && <span className="sr-only">{` — ${ar ? style.hintAr : style.hintEn}`}</span>}
+                {faultStyle && <span className="sr-only">{` — ${ar ? faultStyle.ar : faultStyle.en}: ${ar ? faultStyle.hintAr : faultStyle.hintEn}`}</span>}
               </span>
               {word.endsAyah && <AyahMark ayah={word.ayah} ar={ar} />}
               {' '}
@@ -119,6 +144,16 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
 
       {!!marks.length && <div className="mt-6"><FaceMarkLegend marks={marks} ar={ar} /></div>}
 
+      {judged && !!mistakes!.length && <div className="mt-3"><FaceMistakeLegend mistakes={mistakes!} ar={ar} /></div>}
+
+      {judged && !!addedCount(mistakes!) && (
+        <p className="mt-2 text-center text-[10px] leading-5 text-[#6b716d]" data-added-words={addedCount(mistakes!)}>
+          {ar
+            ? `وسُمعت ${addedCount(mistakes!)} كلمةً لا موضعَ لها في هذا الوجه — وأكثرُ ما يأتي هذا من ضجيجٍ أو صدًى.`
+            : `${addedCount(mistakes!)} heard words have no place on this face — most often noise or echo.`}
+        </p>
+      )}
+
       {indices && <FaceIndicesRow indices={indices} ar={ar} frameUnit={frameUnit} />}
 
       {measurableMarks && <UnmeasurableNote measurable={measurableMarks} ar={ar} />}
@@ -127,10 +162,21 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
         <p className="mt-4 text-center text-[10px] leading-5 text-[#6b716d]">{choiceNote}</p>
       )}
 
+      {/*
+        * وذيلُ الوجه يقول حدَّ ما يعرفه النظامُ الآن — وهو يتغيّر بتغيّر ما جرى فعلًا.
+        *
+        * فبلا إذنٍ للحكم لا يعرف النظامُ ماذا قال الطالب، ويُقال ذلك. وبإذنٍ صار
+        * يسمع كلماتٍ، فقولُ «لا يعرف ماذا قلت» حينئذٍ **كذب**. ويبقى الثابتُ: لا
+        * درجة، ولا حكمَ في المسابقة إلا للبشر.
+        */}
       <p className="mt-5 text-center text-[10px] leading-5 text-[#6b716d]">
-        {ar
-          ? 'وصفٌ لتلاوتك أنت، لا درجة ولا حكم على صوابها. والنظام يعرف أين بلغتَ وكم بَعُد صوتُك عن المرجع، ولا يعرف ماذا قلت.'
-          : 'A description of your own run — never a score, and never a verdict on correctness.'}
+        {judged
+          ? (ar
+            ? 'وما تحته خطٌّ سمعه محرّكٌ قِيس على روايتك بعينها — سماعُ آلةٍ لا حكمُ لجنة، والآلةُ تخطئ. فما شككتَ فيه فارجع إلى مصحفك. ولا درجة هنا، والحكمُ في المسابقة للبشر وحدهم.'
+            : 'The underlined words were heard by an engine measured on your own riwayah — a machine hearing, not a verdict, and machines err. Check your Mushaf where you doubt. No score here; human judges alone decide.')
+          : (ar
+            ? 'وصفٌ لتلاوتك أنت، لا درجة ولا حكم على صوابها. والنظام يعرف أين بلغتَ وكم بَعُد صوتُك عن المرجع، ولا يعرف ماذا قلت.'
+            : 'A description of your own run — never a score, and never a verdict on correctness.')}
       </p>
     </section>
   );

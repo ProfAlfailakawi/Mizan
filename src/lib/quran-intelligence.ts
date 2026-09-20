@@ -69,6 +69,26 @@ export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:Qura
   return body as QuranAlignmentResult&{practice:true};
 }
 
+/*
+ * الإذنُ بالحكم، وما يُسمع من كلمات.
+ *
+ * ومسارُ المحاذاة أعلاه يعود بموضعٍ لا بنصّ. وهذان مسارُ التعرّف: الأوّل يسأل
+ * «أيجوز أن يُقال لهذا الطالب أخطأت في روايته؟»، والثاني يرسل المقطعَ فيعود بما
+ * سُمع كلماتٍ. ولا حكمَ في أيّهما: الحكمُ في `judgeRecitation` حيث يُعرف نصُّ الوجه.
+ */
+export interface QuranJudgingGate{reading:QuranReadingId;word:'OPEN'|'CLOSED';tashkeel:'OPEN'|'CLOSED';modelVersion:string|null;reasons:string[]}
+export interface QuranRecognisedWord{text:string;confidence:number;startMs?:number;endMs?:number}
+export interface QuranRecognitionResult{gate:QuranJudgingGate;words:QuranRecognisedWord[];modelVersion:string}
+
+export async function fetchPracticeJudgingGate(reading:QuranReadingId){return getJson<QuranJudgingGate>(`/api/quran/practice/judging-gate?reading=${encodeURIComponent(reading)}`)}
+
+export async function submitPracticeRecognitionChunk(input:{blob:Blob;reading:QuranReadingId;sourcePackageId:string}){
+  const token=await bearer();const qs=new URLSearchParams({reading:input.reading,sourcePackageId:input.sourcePackageId});
+  const r=await fetch(`/api/quran/practice/recognise?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});
+  const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
+  return body as QuranRecognitionResult;
+}
+
 export async function resetQuranAlignment(sessionId:string){const token=await bearer();const r=await fetch('/api/quran/alignment/shadow/reset',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({sessionId}),cache:'no-store'});if(!r.ok)throw new Error('QURAN_ALIGNMENT_RESET_FAILED')}
 
 export async function fetchQuranSessionEvidence(sessionId:string){return getJson<QuranSessionEvidence>(`/api/quran/alignment/shadow/session/${encodeURIComponent(sessionId)}`)}
