@@ -54,7 +54,10 @@
     "quran:verify-local": "tsx scripts/kfgqpc-verify-local.ts",
     "quran:stage-archives": "tsx scripts/kfgqpc-stage-archives.ts",
     "quran:mirror-freeze": "tsx scripts/kfgqpc-mirror-freeze.ts",
-    "qa:face-listens": "tsx tools/face-harness/run-all.ts"
+    "qa:face-listens": "tsx tools/face-harness/run-all.ts",
+    "quran:asr-conformance": "tsx scripts/asr-conformance.ts",
+    "quran:asr-benchmark": "tsx scripts/asr-benchmark.ts",
+    "quran:asr-register": "tsx scripts/asr-register-benchmark.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",
