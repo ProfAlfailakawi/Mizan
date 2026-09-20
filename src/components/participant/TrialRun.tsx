@@ -7,6 +7,7 @@ import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
 import { IS_DEMO_SESSION } from '../../lib/store';
+import { describeStumble, emptyStumbleState, observeAlignment, type TrialPosition } from '../../lib/trial-stumbles';
 
 /*
  * التجربة الكاملة — أن يعيش المتسابق يومه قبل يومه.
@@ -39,6 +40,8 @@ interface TrialOutcome {
   seconds: number;
   /** كم مرة فقد المحرّك أثره في هذا الموضع (يقابل التردّد والوقوف). */
   lost: number;
+  /** أين وقع كلُّ انقطاعٍ عُرف موضعُه — آخرُ ما تُتبّع قبله. لا يُخترع مجهولٌ منها. */
+  stumbles: TrialPosition[];
   /** آخر آية تتبّعها المحرّك — أبعد ما وصل إليه. */
   reachedAyah?: number;
   /** متوسط وضوح الصوت في المقاطع المسموعة (0–1). */
@@ -326,14 +329,14 @@ const TrialQuestion: React.FC<{
 }> = ({ ar, locus, order, total, limit, deliveryReading, listening, onListeningLost, onDone }) => {
   const [left, setLeft] = useState(limit);
   const [last, setLast] = useState<QuranAlignmentResult | null>(null);
-  const [lost, setLost] = useState(0);
+  const [stumbleState, setStumbleState] = useState(emptyStumbleState);
+  const lost = stumbleState.lostCount;
   const [heard, setHeard] = useState(0);
   const [clarity, setClarity] = useState<number[]>([]);
   const [opening, setOpening] = useState<string | null>(null);
   const [openingAsked, setOpeningAsked] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const wasLost = useRef(false);
   const closed = useRef(false);
 
   const stopAudio = useCallback(() => {
@@ -361,9 +364,8 @@ const TrialQuestion: React.FC<{
             if (!live) return;
             setLast(out); setHeard(n => n + 1);
             if (out.backendEvidence?.acousticQuality !== undefined) setClarity(xs => [...xs, out.backendEvidence!.acousticQuality!]);
-            const nowLost = out.alignmentState === 'LOST';
-            if (nowLost && !wasLost.current) setLost(n => n + 1);
-            wasLost.current = nowLost;
+            /* العدُّ والموضعُ من مصدرٍ واحد — وإلا افترقا: عددٌ يقول ٣ ومواضعُ تقول ٢. */
+            setStumbleState(prev => observeAlignment(prev, out));
           } catch (err) {
             const code = err instanceof Error ? err.message : '';
             // تعذّرٌ بنيويّ يوقف التتبّع للتجربة كلها؛ تعثّر مقطعٍ واحد لا يوقف شيئًا.
@@ -383,12 +385,13 @@ const TrialQuestion: React.FC<{
     onDone({
       seconds: limit - left,
       lost,
+      stumbles: stumbleState.stumbles,
       reachedAyah: last?.ayah,
       clarity: clarity.length ? clarity.reduce((a, b) => a + b, 0) / clarity.length : undefined,
       heard: heard > 0,
       ended,
     });
-  }, [stopAudio, onDone, limit, left, lost, last?.ayah, clarity, heard]);
+  }, [stopAudio, onDone, limit, left, lost, stumbleState.stumbles, last?.ayah, clarity, heard]);
 
   useEffect(() => {
     const id = window.setInterval(() => setLeft(x => x - 1), 1000);
@@ -489,7 +492,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
   const hardest = useMemo(() => {
     let worst = -1, at = -1;
     outcomes.forEach((o, i) => { if (o.lost > worst) { worst = o.lost; at = i; } });
-    return worst > 0 && at >= 0 ? { locus: loci[at], lost: worst } : null;
+    return worst > 0 && at >= 0 ? { locus: loci[at], lost: worst, places: outcomes[at].stumbles.slice(0, 3) } : null;
   }, [outcomes, loci]);
 
   return (
@@ -523,7 +526,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
                   <div className="mt-1 text-[10px] font-bold text-[#656b66]">
                     {!o ? (ar ? 'لم يُقرأ' : 'not read')
                       : o.ended === 'skipped' ? (ar ? 'تخطّيته' : 'skipped')
-                      : `${clock(o.seconds)} · ${listened ? (o.heard ? (o.lost === 0 ? (ar ? 'تتبّعك بلا انقطاع' : 'tracked throughout') : ar ? `فقد أثرك ${countAr(o.lost)}` : `lost ${o.lost}×`) : (ar ? 'لم يصل صوتٌ واضح' : 'no clear audio')) : (ar ? 'بلا تتبّع' : 'no tracking')}`}
+                      : `${clock(o.seconds)} · ${listened ? (o.heard ? (o.lost === 0 ? (ar ? 'تتبّعك بلا انقطاع' : 'tracked throughout') : ar ? `فقد أثرك ${countAr(o.lost)}${o.stumbles.length ? ` — أوّلها عند ${describeStumble(o.stumbles[0], true)}` : ''}` : `lost ${o.lost}×${o.stumbles.length ? ` — first at ${describeStumble(o.stumbles[0], false)}` : ''}`) : (ar ? 'لم يصل صوتٌ واضح' : 'no clear audio')) : (ar ? 'بلا تتبّع' : 'no tracking')}`}
                   </div>
                 </div>
                 {o?.reachedAyah && <span className="shrink-0 rounded-lg bg-[#f1efe9] px-2.5 py-1 text-[10px] font-black tabular-nums text-[#4b534e]">{ar ? `بلغت الآية ${o.reachedAyah}` : `ayah ${o.reachedAyah}`}</span>}
@@ -538,7 +541,9 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
         {!listened
           ? (ar ? 'جرت تجربتك بلا تتبّع صوتي، فالزمن وحده هو ما قيس فيها. راجع مواضعك التي ضاق عليك وقتها.' : 'This run had no tracking; only time was measured.')
           : hardest
-            ? (ar ? `أكثر ما تعثّرت فيه: ${locusLabel(hardest.locus, true)} — فقد المحرّك أثرك فيه ${countAr(hardest.lost)}. أعِده وحده قبل أن تعيد التجربة كلها؛ الانقطاع قد يكون تردّدًا وقد يكون ضعف صوت، فانظر «وضوح الصوت» قبل أن تحكم على حفظك.` : `Most stumbles: ${locusLabel(hardest.locus, false)} (${hardest.lost}×). Re-read it alone before repeating the whole trial.`)
+            ? (ar
+              ? `أكثر ما تعثّرت فيه: ${locusLabel(hardest.locus, true)} — فقد المحرّك أثرك فيه ${countAr(hardest.lost)}${hardest.places.length ? `، عند ${hardest.places.map(p => describeStumble(p, true)).join('، و')}` : ''}. أعِده وحده قبل أن تعيد التجربة كلها؛ الانقطاع قد يكون تردّدًا وقد يكون ضعف صوت، فانظر «وضوح الصوت» قبل أن تحكم على حفظك.`
+              : `Most stumbles: ${locusLabel(hardest.locus, false)} (${hardest.lost}×)${hardest.places.length ? ` at ${hardest.places.map(p => describeStumble(p, false)).join('; ')}` : ''}. Re-read it alone before repeating the whole trial.`)
             : (ar ? 'تتبّعك المحرّك في كل مواضعك بلا انقطاع. هذا مؤشّر تمكّن، وليس درجة ولا وعدًا بها.' : 'You were tracked end to end across every locus. An indicator of command — not a score.')}
       </div>
 

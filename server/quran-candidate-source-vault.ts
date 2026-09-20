@@ -15,6 +15,27 @@ export interface CandidateQuranVerse {
   sura_no: number;
   aya_no: number;
   aya_text: string;
+  /*
+   * موضعُ الآية على صفحة المصحف — حين تحمله الحزمة وحدها.
+   *
+   * حزمُ مرآة المجمّع تحمله (نشره المجمّع في البايتات نفسها)، وحزمُ إسلام ويب لا تحمله.
+   * فيبقى اختياريًّا، ولا يُستعار موضعُ روايةٍ لروايةٍ أخرى بحال: غيابُه يعني ألّا تُعرض
+   * صفحةٌ لهذه الرواية، لا أن تُعرض صفحةُ غيرها.
+   */
+  page?: number;
+  line_start?: number;
+  line_end?: number;
+}
+
+/*
+ * هل تحمل هذه الحزمةُ مواضعَ صفحاتٍ؟ — سؤالٌ عن البايتات، وجوابُه منها وحدها.
+ *
+ * وُضع هنا بمدخلٍ واحدٍ هو الآياتُ نفسُها، فلا يستطيع مستدعيه أن يشتقّه من وسم السلسلة
+ * ولو أراد: الوسمُ ليس مُدخلًا أصلًا. وهذا حارسُ بناءٍ لا حارسُ اختبار — وهو أقوى،
+ * لأن وسمَ السلسلة يوافق البياناتِ اليومَ فلا يكشفه اختبارٌ على البيانات الحاضرة.
+ */
+export function packageCarriesPageLoci(verses: readonly CandidateQuranVerse[]): boolean {
+  return verses.some(v => v.page !== undefined);
 }
 
 export interface CandidateReviewEvent {
@@ -169,7 +190,21 @@ export function parseCandidateRawDeflate(bytes: Buffer, source: QuranCandidateSo
       seen.add(aya);
       if (typeof text !== 'string' || !text.length) throw new Error(`QURAN_CANDIDATE_EMPTY_TEXT:${surah}:${aya}`);
       if (text !== text.trim()) throw new Error(`QURAN_CANDIDATE_TEXT_BOUNDARY_WHITESPACE:${surah}:${aya}`);
-      return { sura_no: surah, aya_no: aya, aya_text: text } satisfies CandidateQuranVerse;
+      /*
+       * الهندسةُ تُقرأ بالحدود نفسِها التي كُتبت بها، لا بالثقة.
+       *
+       * الأثرُ مشتقٌّ بتحويلٍ حتميّ، لكنّ هذا المُحلِّلَ هو حارسُ التحميل في كلّ إقلاع:
+       * أثرٌ فيه صفحةٌ ٦٠٥ أو سطرُ نهايةٍ قبل بدايته يُرفض هنا ولا يبلغ سطحَ المصحف.
+       * والثلاثةُ معًا أو لا شيء: صفحةٌ بلا سطرٍ موضعٌ ناقصٌ لا يُرسم.
+       */
+      const geometry = [object.page, object.lineStart, object.lineEnd].filter(v => v !== undefined && v !== null);
+      if (geometry.length && geometry.length !== 3) throw new Error(`QURAN_CANDIDATE_PAGE_GEOMETRY_PARTIAL:${surah}:${aya}`);
+      if (!geometry.length) return { sura_no: surah, aya_no: aya, aya_text: text } satisfies CandidateQuranVerse;
+      const page = Number(object.page), lineStart = Number(object.lineStart), lineEnd = Number(object.lineEnd);
+      if (!Number.isInteger(page) || page < 1 || page > 604) throw new Error(`QURAN_CANDIDATE_PAGE_INVALID:${surah}:${aya}:${String(object.page)}`);
+      if (!Number.isInteger(lineStart) || lineStart < 1) throw new Error(`QURAN_CANDIDATE_LINE_START_INVALID:${surah}:${aya}:${String(object.lineStart)}`);
+      if (!Number.isInteger(lineEnd) || lineEnd < lineStart) throw new Error(`QURAN_CANDIDATE_LINE_END_INVALID:${surah}:${aya}:${String(object.lineEnd)}`);
+      return { sura_no: surah, aya_no: aya, aya_text: text, page, line_start: lineStart, line_end: lineEnd } satisfies CandidateQuranVerse;
     }).sort((a, b) => a.aya_no - b.aya_no);
     for (let i = 0; i < parsed.length; i++) {
       if (parsed[i].aya_no !== i + 1) throw new Error(`QURAN_CANDIDATE_NATIVE_AYAH_GAP:${surah}:${i + 1}:${parsed[i].aya_no}`);
