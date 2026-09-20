@@ -178,6 +178,38 @@ jobs:
           echo "revision=$ready_revision" >> "$GITHUB_OUTPUT"
           echo "url=$service_url" >> "$GITHUB_OUTPUT"
 
+      # ── صدقُ العنوان الذي يُحال إليه الموقِّع ───────────────────────────────
+      #
+      # `cloudbuild.yaml` يضبط `MIZAN_LEGAL_*_URL`، و`legal-documents.ts` يكتبه في أثر
+      # الموافقة. وبينهما فجوةٌ لا يسدّها ملفّ: أن يكون العنوانُ مكتوبًا صحيحًا وهو يشير
+      # إلى صفحةٍ لا وجود لها، أو إلى نسخةٍ غير التي تُسجَّل. وحينها يعمل كلُّ شيء —
+      # ويُكتب في الأثر أن فلانًا وافق على وثيقةٍ لا يراها أحد.
+      #
+      # فتُجلب الصفحتان **من الإنتاج بعد نشره**، ويُقارن ما تردّانه بما ضُبط. والقيمُ
+      # تُقرأ من عقد النشر نفسِه لا من أسرار المستودع: هي ليست أسرارًا، ومصدرُها الوحيد
+      # هو ما يُنشر فعلًا.
+      - name: التحقق من أن الوثيقتين منشورتان على عنوانيهما
+        shell: bash
+        run: |
+          set -uo pipefail
+          for name in MIZAN_LEGAL_ENTITY_NAME \
+                      MIZAN_LEGAL_TERMS_URL MIZAN_LEGAL_TERMS_VERSION MIZAN_LEGAL_TERMS_EFFECTIVE \
+                      MIZAN_LEGAL_PRIVACY_URL MIZAN_LEGAL_PRIVACY_VERSION MIZAN_LEGAL_PRIVACY_EFFECTIVE; do
+            if value="$(node scripts/cloudbuild-substitution.mjs --env "$name")"; then
+              printf -v "$name" '%s' "$value"; export "${name?}"
+            fi
+          done
+          npm run verify:legal-publication | tee /tmp/legal-publication.txt
+          status="${PIPESTATUS[0]}"
+          {
+            echo '## الوثيقتان القانونيّتان'
+            echo
+            echo '```'
+            cat /tmp/legal-publication.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
       - name: ملخص النشر
         shell: bash
         env:

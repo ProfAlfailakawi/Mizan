@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "npm run verify:pwa && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "npm run verify:pwa && vite build && node scripts/copy-legal-documents.mjs && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "prestart": "NODE_ENV=production npm run config:validate",
     "start": "NODE_ENV=production node dist/server.cjs",
     "preview": "vite preview",
@@ -50,7 +50,8 @@
     "r2:inventory": "tsx scripts/r2-inventory.ts",
     "test:ci": "tsx --test --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results.xml tests/*.test.ts",
     "qa:seed-public": "tsx scripts/seed-public-competition.ts",
-    "qa:public-registration": "firebase emulators:exec --only firestore --project mizan-qa-surface \"bash scripts/qa-public-registration.sh\""
+    "qa:public-registration": "firebase emulators:exec --only firestore --project mizan-qa-surface \"bash scripts/qa-public-registration.sh\"",
+    "verify:legal-publication": "tsx scripts/verify-legal-publication.ts"
   },
   "engines": {
     "node": ">=22.20.0 <23",

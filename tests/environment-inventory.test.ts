@@ -60,6 +60,8 @@ const NOT_FOR_OPERATORS: Record<string, string> = {
   MIZAN_QA_COMPETITION_ID: 'معرّفُ المسابقة المزروعة لفحص التسجيل على المحاكي — لا يقرؤه المنتج في نشرة.',
   MIZAN_QA_ORGANIZATION_ID: 'مثلُه — جهةُ تلك المسابقة المزروعة.',
   MIZAN_REQUIRE_EMULATOR: 'يضعه سكربتُ `qa:firestore-rules` عن نفسه ليمنع تخطّي فحوص القواعد صامتةً حين يغيب المحاكي. بوّابةُ فحصٍ لا إعدادُ نشرة.',
+  MIZAN_LEGAL_VERIFY_ATTEMPTS: 'عددُ محاولاتِ الوصول في `verify:legal-publication` — ضبطٌ لأداة الفحص، لا يقرؤه المنتج.',
+  MIZAN_LEGAL_VERIFY_TIMEOUT_MS: 'مهلةُ كلّ محاولةٍ فيها — مثلُه.',
 };
 
 const EXAMPLE = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');

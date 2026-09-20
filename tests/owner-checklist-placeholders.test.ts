@@ -110,6 +110,8 @@ function preflightBlockerCount(extraEnv: Record<string, string>): number {
     // بيئةٌ نظيفة عمدًا: إرثُ بيئة العدّاء يجعل العددَ يختلف بين جهازٍ وجهاز.
     env: {PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...extraEnv},
   });
+  // والصفرُ له عبارتُه: «لا موانع» لا «0 مانعًا». فقراءةُ الرقم وحدَه تُسقط أصدقَ حال.
+  if (/النتيجة: لا موانع/.test(result.stdout)) return 0;
   const printed = /النتيجة: (\d+) مانعًا/.exec(result.stdout);
   assert.ok(printed, `preflight must print its verdict — got: ${result.stdout}\n${result.stderr}`);
   return Number(printed[1]);
@@ -124,19 +126,51 @@ test('the shell-count the checklist warns about is the count preflight actually 
     `a fresh shell reports ${bare} blockers; the checklist must warn with that number, not another`);
 });
 
+/*
+ * وبيئةُ البوّابة تُشتقّ من عقد النشر، لا تُكتب بيد.
+ *
+ * كُتبت أوّلَ مرّةٍ قائمةً يدوية: خمسةُ أسماءٍ ظننتُها كلَّ ما تُمدّ به البوّابة. ثم
+ * نُشرت الوثيقتان فصار `--update-env-vars` يحمل سبعةَ `MIZAN_LEGAL_*`، فنزل عددُ
+ * الموانع إلى صفر — **والاختبارُ ظلّ يقول «اثنان» وهو أخضر**، لأنه كان يقيس بيئةً
+ * تخيّلتُها لا البيئةَ التي تصل إليها البوّابة.
+ *
+ * فيُقرأ الآن ما يضبطه النشرُ فعلًا: سطرُ `--update-env-vars` وكتلةُ `substitutions`.
+ */
+function deployedEnvironment(): Record<string, string> {
+  const cloudbuild = read('cloudbuild.yaml');
+  const env: Record<string, string> = {PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? ''};
+
+  const line = /- '--update-env-vars'\n\s*- '([^']*)'/.exec(cloudbuild);
+  assert.ok(line, 'the deployment must set runtime variables in one --update-env-vars line');
+  for (const pair of line[1].split(',')) {
+    const at = pair.indexOf('=');
+    if (at > 0) env[pair.slice(0, at)] = pair.slice(at + 1);
+  }
+
+  // و`VITE_*` تُبنى من `substitutions`، وهو ما تفعله البوّابة حرفًا بحرف.
+  for (const [, name, value] of cloudbuild.matchAll(/^\s{2}_(VITE_[A-Z0-9_]+):\s*'([^']*)'/gm)) {
+    env[name] = value;
+  }
+
+  // وسرّا التوقيع يُقرآن ربطًا اسميًّا في Secret Manager، بلا قراءة قيمة.
+  for (const name of ['MIZAN_PASS_SIGNING_SECRET', 'MIZAN_CERT_SIGNING_SECRET']) {
+    assert.match(cloudbuild, new RegExp(`${name}=${name}:latest`), `${name} must stay bound in the deployment`);
+    env[name] = 'configured-via-secret-manager';
+  }
+  return env;
+}
+
 test('the gate-count the checklist reports is the count the gate itself reaches', () => {
-  /*
-   * بوّابةُ الإطلاق تقرأ ما عدا الوثائق من `cloudbuild.yaml` وSecret Manager، فلا يبقى
-   * أمامها إلا الوثيقتان. وهذه هي الحالُ التي يصفها قسمُ «كيف تتحقّق بنفسك».
-   */
-  const deployed = preflightBlockerCount({
-    VITE_REQUIRE_AUTH: 'true',
-    VITE_FIREBASE_API_KEY: 'read-from-cloudbuild',
-    VITE_FIREBASE_PROJECT_ID: 'read-from-cloudbuild',
-    MIZAN_PASS_SIGNING_SECRET: 'configured-via-secret-manager',
-    MIZAN_CERT_SIGNING_SECRET: 'configured-via-secret-manager',
-  });
-  assert.equal(deployed, 2, 'the two legal documents are expected to be all that is left for the gate');
-  assert.match(read('docs/OWNER-CHECKLIST.md'), new RegExp(`«النتيجة: ${deployed} مانعًا»`),
+  const env = deployedEnvironment();
+  assert.ok(env.VITE_REQUIRE_AUTH === 'true', 'the derivation must really read the deployment');
+  const deployed = preflightBlockerCount(env);
+
+  const checklist = read('docs/OWNER-CHECKLIST.md');
+  if (deployed === 0) {
+    assert.match(checklist, /النتيجة: لا موانع/,
+      'the deployment now clears every blocker; the checklist must say so rather than name a stale count');
+    return;
+  }
+  assert.match(checklist, new RegExp(`«النتيجة: ${deployed} مانعًا»`),
     `the gate reaches ${deployed} blockers; the checklist must quote that number`);
 });
