@@ -23,8 +23,31 @@ test('a reader in the middle of the face is never told he skipped the rest', () 
   const live = liveJudgment(expected, heardOf(FACE.slice(0, 5)), OPEN);
   assert.deepEqual(live.settled, [], 'nothing beyond the frontier may be judged');
   assert.equal(live.frontier, 4, 'and the frontier is the last word proven read');
-  /* والحكمُ الكاملُ يرى الباقي ساقطًا — وهو ما لا يُعرض ولا يُصوَّت عليه أثناء القراءة. */
-  assert.ok(live.judgment!.mistakes.length >= 7);
+  /*
+   * ولا يراه **الحكمُ نفسُه** ساقطًا أيضًا — وهذا أقوى ممّا كان.
+   *
+   * فأوّلُ صياغةٍ كانت تُخرج الذيلَ كلَّه أخطاءً ثمّ تحجبه بالجبهة. وكان ذلك يعمل
+   * حتى قِيس في متصفّح: بكلمتين مسموعتين تتساوى كلُّ مواضع المحاذاة في الكلفة،
+   * فتُطابقان كلمتين متأخّرتين تشبهانهما، فتقفز الجبهةُ وتصير الكلماتُ المقروءةُ
+   * ساقطة — **فنُبِّه على كلمةٍ قرأها الطالبُ صحيحة**.
+   *
+   * فصار الذيلُ لا يُحاسب أثناء القراءة أصلًا: تُقابَل المسموعاتُ بأطول بدايةٍ
+   * تُفسّرها. والحجبُ بالجبهة يبقى حارسًا ثانيًا فوق ذلك.
+   */
+  assert.deepEqual(live.judgment!.mistakes, [], 'الذيلُ الذي لم يُقرأ بعدُ دخل الحكم');
+});
+
+test('a short opening is matched to the start of the face, not to look-alikes further down', () => {
+  /*
+   * وهذا هو العيبُ بعينه، مصوغًا اختبارًا: وجهٌ تتكرّر فيه كلمتان. فبكلمتين
+   * مسموعتين تتساوى المحاذاتان في الكلفة، والصوابُ أن تُختار البداية.
+   */
+  const repeated = ['ألف', 'باء', 'جيم', 'دال', 'ألف', 'باء', 'هاء', 'واو'];
+  const page: ExpectedWord[] = repeated.map((text, index) => ({ index, text }));
+  const live = liveJudgment(page, heardOf(['ألف', 'باء']), OPEN);
+  assert.equal(live.frontier, 1, `الجبهةُ قفزت إلى ${live.frontier}`);
+  assert.deepEqual(live.judgment!.mistakes, [], 'عُدّت كلماتٌ قُرئت ساقطة');
+  assert.deepEqual(live.settled, []);
 });
 
 test('a word truly skipped is judged once the reader has passed it', () => {

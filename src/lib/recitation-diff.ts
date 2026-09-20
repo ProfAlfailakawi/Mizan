@@ -46,6 +46,13 @@ export interface DiffOptions {
    * بين الروايات هو القاعدةُ لا الاستثناء — فيصير الكشفُ تخطئةً للصواب.
    */
   detectTashkeel: boolean;
+  /**
+   * أتلاوةٌ جاريةٌ أم خاتمة؟
+   *
+   * فذيلُ الوجه الذي لم يُقرأ بعدُ ليس إسقاطًا ما دام القارئُ يقرأ. ولا يصير إسقاطًا
+   * إلا حين تنتهي التلاوة — فيُحاسب عليه حينئذٍ.
+   */
+  freeTail?: boolean;
   /** ما دون هذه الثقة يُحجب ويُعدّ — لحكم الكلمة. */
   minConfidence: number;
   /**
@@ -94,8 +101,26 @@ type Op = 'match' | 'sub' | 'del' | 'ins';
  *
  * والمطابقةُ بالهيكل لا بالنصّ الخام: المحرّكُ الصوتيّ يكتب بهجائه هو، فمقابلةُ
  * الحروف كما وردت تجعل كلَّ كلمةٍ خطأً.
+ *
+ * و`freeTail` هو الفرقُ بين «يقرأ الآن» و«فرغ من القراءة».
+ *
+ * فقارئٌ في أوّل الوجه قرأ كلمتين: مقابلتُهما بالوجه كلِّه تجعل ذيلَه حذفًا، فتتساوى
+ * كلُّ المواضع في الكلفة — إذ الحذفُ سبعٌ وعشرون أينما وُضعت المطابقتان. فتختار
+ * المحاذاةُ موضعًا اعتباطيًّا، وقد تُطابقهما بكلمتين متأخّرتين تشبهانهما، **فتُعدّ
+ * الكلماتُ التي قرأها فعلًا ساقطة**.
+ *
+ * وقد وقع ذلك مقيسًا: في أوّل مقطعٍ من تلاوةٍ صحيحةٍ نُبِّه على الكلمة الأولى بصوت،
+ * والطالبُ قد قرأها. وكشفه عدُّ النغمات في متصفّحٍ حقيقيّ — ثلاثُ نغماتٍ لخطأٍ واحد.
+ *
+ * فإن كان `freeTail` صحيحًا لم يُحسب ذيلُ المنتظَر حذفًا: تُقابَل المسموعاتُ بأفضل
+ * **بدايةٍ** من الوجه، وما بعدها لم يُقرأ بعدُ فلا يُقال فيه شيء. وعند الخاتمة يُحسب
+ * الذيلُ حذفًا حقيقيًّا — إذ لم يبقَ ما يُنتظر.
  */
-function align(expected: readonly ExpectedWord[], heard: readonly HeardWord[]): { op: Op; e?: number; h?: number }[] {
+function align(
+  expected: readonly ExpectedWord[],
+  heard: readonly HeardWord[],
+  freeTail = false,
+): { op: Op; e?: number; h?: number }[] {
   const n = expected.length, m = heard.length;
   const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = 0; i <= n; i += 1) cost[i][0] = i;
@@ -107,7 +132,13 @@ function align(expected: readonly ExpectedWord[], heard: readonly HeardWord[]): 
     }
   }
   const trail: { op: Op; e?: number; h?: number }[] = [];
-  let i = n, j = m;
+  /*
+   * وبدايةُ التتبّع هي موضعُ الحسم: من آخر المنتظَر حين يُحاسب الذيل، ومن أرخص
+   * موضعٍ في العمود الأخير حين لا يُحاسب — وهو أطولُ بدايةٍ فُسِّرت بما سُمع.
+   */
+  let i = n;
+  if (freeTail) { for (let k = 0; k <= n; k += 1) if (cost[k][m] < cost[i][m]) i = k; }
+  let j = m;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
       const hit = sameWord(expected[i - 1].text, heard[j - 1].text) ? 0 : 1;
@@ -145,7 +176,7 @@ export function diffRecitation(
   };
 
   let heardCursor = 0;
-  for (const step of align(expected, heard)) {
+  for (const step of align(expected, heard, opts.freeTail === true)) {
     if (step.op === 'match') {
       heardCursor = (step.h as number) + 1;
       const e = expected[step.e as number], h = heard[step.h as number];

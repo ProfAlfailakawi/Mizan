@@ -76,6 +76,17 @@ const PLAN: Expectation[] = [
       [o.mistakes.some(m => m.word === 3 && m.kind === 'skipped'), `لم تُعلَّم الكلمةُ الساقطة: ${JSON.stringify(o.mistakes)}`],
       [!o.mistakes.some(m => m.word < 3), `عُلّمت كلماتٌ قبلها بلا موجب: ${JSON.stringify(o.mistakes)}`],
       [o.gateNote === null, `بيانُ بوّابةٍ مغلقةٍ وهي مفتوحة: ${o.gateNote}`],
+      /*
+       * والصوتُ يُقاس من مسار الصوت نفسِه لا من نصّ: نغمةُ التنبيه مذبذبان. فإن
+       * كان صفرًا فالطريقُ من «خطأٌ استقرّ» إلى «صوتٌ خرج» مقطوع.
+       */
+      [o.alertOscillators >= 2, `لم تخرج نغمةُ تنبيهٍ واحدة: ${o.alertOscillators} مذبذبًا`],
+      /*
+       * **ونغمةٌ واحدةٌ لا أكثر**: الخطأُ المُصطنَع واحد، والنغمةُ مذبذبان. وكان
+       * الناتجُ ستّةً — ثلاثَ نغماتٍ لخطأٍ واحد — وكشف ذلك أنّ المحاذاةَ كانت
+       * تُطابق أوّلَ المسموع بكلماتٍ متأخّرة، فتُعدّ الكلماتُ المقروءةُ ساقطة.
+       */
+      [o.alertOscillators <= 2, `نُبِّه أكثرَ من مرّة على خطأٍ واحد: ${o.alertOscillators} مذبذبًا`],
     ]),
   },
   {
@@ -85,6 +96,7 @@ const PLAN: Expectation[] = [
       [o.reportShown, 'لم يُعرض تقرير'],
       [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
       [o.mistakes.length === 0, `حُكم بلا إذن: ${JSON.stringify(o.mistakes)}`],
+      [o.alertOscillators === 0, `سُمع تنبيهٌ بلا إذن: ${o.alertOscillators} مذبذبًا`],
       [!!o.gateNote && o.gateNote.includes('لم يجتز'), `لم يُقل للطالب لماذا لا يُحكم: ${o.gateNote}`],
     ]),
   },
@@ -103,7 +115,7 @@ async function main() {
       console.log(`    ${JSON.stringify(outcome)}`);
     } else {
       console.log(`✓ ${head}`);
-      console.log(`    بلغ ${outcome.reachText} · مقاطع ${outcome.chunksServed} · محاولات ${outcome.attemptsStored} · ميكروفون حيّ ${outcome.micTracksLive}`);
+      console.log(`    بلغ ${outcome.reachText} · مقاطع ${outcome.chunksServed} · محاولات ${outcome.attemptsStored} · ميكروفون حيّ ${outcome.micTracksLive} · نغمات ${outcome.alertOscillators}`);
     }
   }
   if (broken) {

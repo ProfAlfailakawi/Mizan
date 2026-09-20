@@ -15,7 +15,8 @@
  */
 
 import {
-  judgeRecitation, type ExpectedWord, type HeardWord, type JudgingPermission, type Mistake, type RecitationDiff,
+  DEFAULT_DIFF_OPTIONS, diffRecitation, heardNothing, judgeRecitation,
+  type ExpectedWord, type HeardWord, type JudgingPermission, type Mistake, type RecitationDiff,
 } from './recitation-diff';
 
 /**
@@ -37,14 +38,19 @@ export interface LiveJudgment {
 }
 
 /**
- * جبهةُ القراءة: أبعدُ موضعٍ في الوجه لم يُعدّ خطأً — أي ثبت أنّه قُرئ.
+ * جبهةُ القراءة: أبعدُ موضعٍ في الوجه ثبت أنّه قُرئ.
  *
  * وتُشتقّ من الحكم نفسِه لا من عدّادٍ مستقلّ: عدّادٌ ثانٍ يصف الشيءَ نفسَه يفارقه.
+ *
+ * وأوّلُ صياغةٍ عرّفتها بـ«آخرِ موضعٍ ليس في الأخطاء»، وكانت تنقلب على صاحبها حين
+ * يُقابَل أوّلُ المسموع بالوجه كلِّه: كلمتان تُطابقان كلمتين متأخّرتين تشبهانهما،
+ * فتقفز الجبهةُ إلى آخر الوجه وتصير الكلماتُ المقروءةُ ساقطة. فصارت تُقاس بما
+ * **طوبق** فعلًا، ومعها محاذاةٌ لا تُحاسب الذيلَ ما دام القارئ يقرأ.
  */
-function frontierOf(expectedCount: number, mistakes: readonly Mistake[]): number {
+function frontierOf(mistakes: readonly Mistake[], judged: number): number {
   const unread = new Set<number>();
   for (const mistake of mistakes) if (mistake.wordIndex !== null) unread.add(mistake.wordIndex);
-  for (let index = expectedCount - 1; index >= 0; index -= 1) if (!unread.has(index)) return index;
+  for (let index = judged - 1; index >= 0; index -= 1) if (!unread.has(index)) return index;
   return -1;
 }
 
@@ -54,9 +60,20 @@ export function liveJudgment(
   gate: JudgingPermission,
   margin: number = SETTLE_MARGIN_WORDS,
 ): LiveJudgment {
-  const judgment = judgeRecitation(expected, heard, gate);
-  if (!judgment) return { judgment: null, settled: [], frontier: -1 };
-  const frontier = frontierOf(expected.length, judgment.mistakes);
+  if (gate.word !== 'OPEN' || heardNothing(heard)) return { judgment: null, settled: [], frontier: -1 };
+  /*
+   * والذيلُ لا يُحاسب هنا: القارئُ لم يبلغه بعد. فتُقابَل المسموعاتُ بأطول بدايةٍ
+   * تُفسّرها، وما وراءها ليس إسقاطًا — هو موضعٌ لم يُقرأ.
+   */
+  const judgment = diffRecitation(expected, heard, {
+    ...DEFAULT_DIFF_OPTIONS,
+    detectTashkeel: gate.tashkeel === 'OPEN',
+    freeTail: true,
+  });
+  /* وأبعدُ موضعٍ دخل الحكمَ أصلًا: ما بعده لم يُقابَل بشيء. */
+  const judgedUpTo = judgment.mistakes.reduce((max, m) => (m.wordIndex !== null && m.wordIndex > max ? m.wordIndex : max), -1);
+  const reachedByMatch = judgment.matched + judgment.uncertain + judgment.mistakes.filter(m => m.wordIndex !== null).length;
+  const frontier = frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch));
   const limit = frontier - margin;
   const settled = judgment.mistakes.filter(m => m.wordIndex !== null && m.wordIndex <= limit);
   return { judgment, settled, frontier };

@@ -28,6 +28,26 @@ navigator.mediaDevices.getUserMedia = async (constraints?: MediaStreamConstraint
     total: s.getTracks().length,
   }));
 
+/*
+ * ونغماتُ التنبيه تُعدّ من خارج الشاشة.
+ *
+ * فالشاشةُ تُنشئ `AudioContext` وتجدول عليه مذبذبين لكلّ تنبيه. ولا سبيلَ إلى قياس
+ * ذلك من نصٍّ ولا من تصيير: إمّا أن يُسمع في متصفّحٍ أو يُدَّعى. فيُلفّ المُنشئُ هنا
+ * — في المِشْحَن وحدَه، ولا تُمسّ شيفرةُ الإنتاج بحرف — ويُعدّ كم مذبذبًا شُغِّل.
+ *
+ * والمقصودُ أن يُثبَت أنّ الطريقَ من «خطأٌ استقرّ» إلى «صوتٌ خرج» موصولٌ فعلًا.
+ */
+let oscillators = 0, contexts = 0;
+const RealAudioContext = window.AudioContext;
+class CountingAudioContext extends RealAudioContext {
+  constructor() { super(); contexts += 1 }
+  createOscillator() { oscillators += 1; return super.createOscillator() }
+}
+(window as unknown as { AudioContext: typeof AudioContext }).AudioContext =
+  CountingAudioContext as unknown as typeof AudioContext;
+(window as unknown as { __mizanAlerts: () => { contexts: number; oscillators: number } }).__mizanAlerts =
+  () => ({ contexts, oscillators });
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <MushafListens
