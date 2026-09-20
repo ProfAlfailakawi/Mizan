@@ -1,0 +1,174 @@
+/*
+ * مقابلةُ ما سُمع بما كان يجب أن يُقال — وهي موضعُ الحكم.
+ *
+ * وكلُّ ما قبلها في هذا النظام كان وصفًا: «لبثتَ»، «رجعتَ». وهذه أوّلُ وحدةٍ تقول
+ * «أسقطتَ كلمة». فيلزمها من الحرص ما لا يلزم غيرَها: **أن يُقال لحافظٍ «أخطأت» وهو
+ * مصيبٌ أسوأُ من السكوت**.
+ *
+ * ولذلك ثلاثةُ قيودٍ مبنيّةٌ في التوقيع نفسِه:
+ *
+ *  ١) **الكلمةُ تُحكم بهيكلها، والحركةُ حكمٌ آخر أضعف.** قِيس بين حفصٍ وورش: الهيكلُ
+ *     يتّفق في ٩٧٫٣٪ من الكلمات، والحركةُ في ٤٢٫١٪ وحدها. فمن كشف الحركةَ بمحرّكٍ لم
+ *     يسمع إلا روايةً واحدة، خطّأ قارئَ غيرها في أكثر من نصف كلماته الصحيحة. فكشفُ
+ *     الحركة لا يُفتح إلا بإذنٍ صريح (`detectTashkeel`) لروايةٍ عُويرَ عليها المحرّك.
+ *
+ *  ٢) **ما دون عتبة الثقة لا يُقال، ويُعدّ.** فيُعلم أنّ ثمّة ما لم يُحسم، ولا يُعرض
+ *     ظنٌّ في صورة حكم.
+ *
+ *  ٣) **لا درجةَ ولا نسبة.** تُخرَج مواضعُ بأعيانها وعددٌ لِما حُجب. والحكمُ في
+ *     المسابقة للبشر كما كان.
+ */
+
+import { quranSkeleton, quranVoweled, sameWord } from './quran-orthography';
+
+/** كلمةٌ سمعها المحرّك، بثقته فيها. */
+export interface HeardWord { text: string; confidence: number; startMs?: number; endMs?: number }
+
+/** كلمةٌ في نصّ الوجه — بفهرسها الذي تعرفه الشاشة. */
+export interface ExpectedWord { index: number; text: string }
+
+export type MistakeKind = 'skipped' | 'substituted' | 'tashkeel' | 'added';
+
+export interface Mistake {
+  kind: MistakeKind;
+  /** موضعُها في نصّ الوجه؛ و`null` لِما زِيد ولا أصلَ له. */
+  wordIndex: number | null;
+  expected?: string;
+  heard?: string;
+  confidence: number;
+}
+
+export interface DiffOptions {
+  /**
+   * أيُكشف اختلافُ الحركة؟
+   *
+   * لا يُفتح إلا لروايةٍ صرّح المحرّكُ أنّه مُعايَرٌ عليها. وإلا فإنّ اختلافَ الحركة
+   * بين الروايات هو القاعدةُ لا الاستثناء — فيصير الكشفُ تخطئةً للصواب.
+   */
+  detectTashkeel: boolean;
+  /** ما دون هذه الثقة يُحجب ويُعدّ — لحكم الكلمة. */
+  minConfidence: number;
+  /**
+   * وعتبةٌ أعلى لحكم الحركة، لا حطٌّ لثقته.
+   *
+   * وأوّلُ صياغةٍ حطّت الثقةَ بمعاملٍ (٠٫٦) ثمّ قاستها بعتبة الكلمة (٠٫٧٥) — فلزم
+   * لحكمِ الحركة ثقةٌ ١٫٢٥، وهي مستحيلة. فكانت الميزةُ **ميتةً** وإن كانت شيفرتُها
+   * حاضرة. فصار الشرطُ عتبةً صريحةً أعلى: أدقُّ ما يُقاس يلزمه يقينٌ أشدّ.
+   */
+  minTashkeelConfidence: number;
+}
+
+export const DEFAULT_DIFF_OPTIONS: DiffOptions = {
+  detectTashkeel: false,
+  minConfidence: 0.75,
+  minTashkeelConfidence: 0.9,
+};
+
+export interface RecitationDiff {
+  mistakes: Mistake[];
+  /** كلماتٌ سُمعت كما هي. */
+  matched: number;
+  expectedCount: number;
+  heardCount: number;
+  /** ما وقع دون عتبة الثقة فلم يُقل — يُعلن عددُه ولا يُكتم. */
+  withheld: number;
+}
+
+type Op = 'match' | 'sub' | 'del' | 'ins';
+
+/*
+ * محاذاةُ تتابعين بأقلّ تحرير (Needleman–Wunsch).
+ *
+ * والمطابقةُ بالهيكل لا بالنصّ الخام: المحرّكُ الصوتيّ يكتب بهجائه هو، فمقابلةُ
+ * الحروف كما وردت تجعل كلَّ كلمةٍ خطأً.
+ */
+function align(expected: readonly ExpectedWord[], heard: readonly HeardWord[]): { op: Op; e?: number; h?: number }[] {
+  const n = expected.length, m = heard.length;
+  const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = 0; i <= n; i += 1) cost[i][0] = i;
+  for (let j = 0; j <= m; j += 1) cost[0][j] = j;
+  for (let i = 1; i <= n; i += 1) {
+    for (let j = 1; j <= m; j += 1) {
+      const hit = sameWord(expected[i - 1].text, heard[j - 1].text) ? 0 : 1;
+      cost[i][j] = Math.min(cost[i - 1][j - 1] + hit, cost[i - 1][j] + 1, cost[i][j - 1] + 1);
+    }
+  }
+  const trail: { op: Op; e?: number; h?: number }[] = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      const hit = sameWord(expected[i - 1].text, heard[j - 1].text) ? 0 : 1;
+      if (cost[i][j] === cost[i - 1][j - 1] + hit) {
+        trail.push({ op: hit ? 'sub' : 'match', e: i - 1, h: j - 1 });
+        i -= 1; j -= 1; continue;
+      }
+    }
+    if (i > 0 && cost[i][j] === cost[i - 1][j] + 1) { trail.push({ op: 'del', e: i - 1 }); i -= 1; continue; }
+    trail.push({ op: 'ins', h: j - 1 }); j -= 1;
+  }
+  return trail.reverse();
+}
+
+/** ثقةُ الجوار: حين لا يُسمع شيءٌ أصلًا، تُؤخذ الثقةُ ممّا حولَه. */
+function neighbourConfidence(heard: readonly HeardWord[], at: number): number {
+  const near = [heard[at - 1], heard[at]].filter(Boolean) as HeardWord[];
+  if (!near.length) return 0;
+  return near.reduce((sum, w) => sum + (Number.isFinite(w.confidence) ? w.confidence : 0), 0) / near.length;
+}
+
+export function diffRecitation(
+  expected: readonly ExpectedWord[],
+  heard: readonly HeardWord[],
+  options: Partial<DiffOptions> = {},
+): RecitationDiff {
+  const opts = { ...DEFAULT_DIFF_OPTIONS, ...options };
+  const mistakes: Mistake[] = [];
+  let matched = 0, withheld = 0;
+
+  const keep = (mistake: Mistake) => {
+    const floor = mistake.kind === 'tashkeel' ? opts.minTashkeelConfidence : opts.minConfidence;
+    if (!Number.isFinite(mistake.confidence) || mistake.confidence < floor) { withheld += 1; return; }
+    mistakes.push(mistake);
+  };
+
+  let heardCursor = 0;
+  for (const step of align(expected, heard)) {
+    if (step.op === 'match') {
+      matched += 1;
+      heardCursor = (step.h as number) + 1;
+      if (!opts.detectTashkeel) continue;
+      const e = expected[step.e as number], h = heard[step.h as number];
+      /* الكلمةُ ثبتت، فبقي سؤالُ الحركة — وهو أضعفُ حكمًا فيُحطّ. */
+      if (quranVoweled(e.text) !== quranVoweled(h.text)) {
+        keep({ kind: 'tashkeel', wordIndex: e.index, expected: e.text, heard: h.text, confidence: h.confidence || 0 });
+      }
+      continue;
+    }
+    if (step.op === 'sub') {
+      const e = expected[step.e as number], h = heard[step.h as number];
+      heardCursor = (step.h as number) + 1;
+      keep({ kind: 'substituted', wordIndex: e.index, expected: e.text, heard: h.text, confidence: h.confidence || 0 });
+      continue;
+    }
+    if (step.op === 'del') {
+      const e = expected[step.e as number];
+      keep({ kind: 'skipped', wordIndex: e.index, expected: e.text, confidence: neighbourConfidence(heard, heardCursor) });
+      continue;
+    }
+    const h = heard[step.h as number];
+    heardCursor = (step.h as number) + 1;
+    keep({ kind: 'added', wordIndex: null, heard: h.text, confidence: h.confidence || 0 });
+  }
+
+  return {
+    mistakes: mistakes.sort((a, b) => (a.wordIndex ?? Number.MAX_SAFE_INTEGER) - (b.wordIndex ?? Number.MAX_SAFE_INTEGER)),
+    matched,
+    expectedCount: expected.length,
+    heardCount: heard.length,
+    withheld,
+  };
+}
+
+/** أفارغٌ ما سُمع؟ فلا يُقال «أسقطتَ الوجهَ كلَّه»: لم يُسمع أصلًا. */
+export const heardNothing = (heard: readonly HeardWord[]) =>
+  heard.every(w => quranSkeleton(w.text).length === 0);
