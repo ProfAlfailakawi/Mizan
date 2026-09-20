@@ -25,7 +25,9 @@
  * ويُقال للطالب صراحةً أيُّ علاماتٍ متاحةٌ له.
  */
 
-import type { AlignmentStep } from '../../server/alignment/word-signals';
+import { accumulateWordSignals, type AlignmentStep } from '../../server/alignment/word-signals';
+import { readFace, type FaceReading, type FaceReadingThresholds } from './face-reading';
+import type { FaceAttempt } from './face-memory';
 
 /** ما نحتاجه من ردّ المحاذاة — لا أكثر، فلا يُستعمل ما لم يُذكر هنا. */
 export interface FaceAlignmentSample {
@@ -86,4 +88,53 @@ export function stepsFromSamples(
     previous = word;
   }
   return steps;
+}
+
+/* ── ما يقع عند «أنهيتُ» ───────────────────────────────────────────────── */
+
+/*
+ * قراءةُ ما سُمع، والحكمُ في حفظه محاولةً.
+ *
+ * وهذا كان في دالّةٍ داخل الشاشة لا يبلغها اختبار، وفيه قراران يُريان في وجه الطالب:
+ * ماذا يُعرض، وأيُّ محاولةٍ تدخل ذاكرتَه فتغيّر ما يُعطاه غدًا. فنُقلا إلى هنا.
+ */
+export interface SettledRecitation { reading: FaceReading; attempt: FaceAttempt | null }
+
+export function readRecitation(
+  samples: readonly FaceAlignmentSample[],
+  words: readonly FaceWordKey[],
+  page: number,
+  at: Date = new Date(),
+  thresholds?: FaceReadingThresholds,
+): SettledRecitation {
+  const signals = accumulateWordSignals(stepsFromSamples(samples, words));
+  const reading = thresholds ? readFace(signals, words.length, thresholds) : readFace(signals, words.length);
+  /*
+   * والمحاولةُ تُقاس بما **عُرف موضعُه**، لا بعدد الردود.
+   *
+   * فميكروفونٌ لا يلتقط إلا ضجيجًا يعود بردودٍ كلُّها `LOST`: لا كلمةَ عُرفت، ولا
+   * علامةَ ظهرت — فتُحفظ محاولةٌ «نظيفة» وتُهدَّأ الصفحة، فلا تعود إلى الطالب وهو لم
+   * يقرأها قطّ. فالعدُّ الصادقُ هو الكلماتُ التي بلغها المحرّك.
+   */
+  const attempt: FaceAttempt | null = signals.visitedWords > 0
+    ? { page, at: at.toISOString(), marks: reading.marks.map(m => ({ kind: m.kind, intensity: m.intensity })) }
+    : null;
+  return { reading, attempt };
+}
+
+/*
+ * ترتيبُ الإنهاء: آخرُ مقطعٍ، ثم كلُّ ما في الطابور، **ثم** القراءة.
+ *
+ * فـ`stop()` يُطلق آخرَ `dataavailable` بعد عودته، وقد تبقى ردودٌ في الطريق. ومن قرأ
+ * فورَ الضغط أسقط آخرَ ثانيتين من تلاوة الطالب — وهي غالبًا خاتمةُ الوجه — وأسقط معها
+ * كلَّ ردٍّ بطيء. والترتيبُ هنا في بنيةٍ لا في تعليق: لا سبيلَ إلى القراءة قبلهما.
+ */
+export async function settleRecitation<T>(steps: {
+  flush: () => Promise<void>;
+  drain: () => Promise<void>;
+  read: () => T;
+}): Promise<T> {
+  await steps.flush();
+  await steps.drain();
+  return steps.read();
 }
