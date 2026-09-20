@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   attemptFrom, faceNote, faceSupportsListening, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
-  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue,
+  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue, DRAIN_DEADLINE_MS,
 } from '../src/lib/face-review';
 import { accumulateWordSignals } from '../server/alignment/word-signals';
 import { readRecitation, settleRecitation, stepsFromSamples, type FaceWordKey } from '../src/lib/face-session';
@@ -184,11 +184,19 @@ test('الإنهاءُ لا يقرأ قبل آخرِ مقطعٍ وقبلَ فر�
   const order: string[] = [];
   const out = await settleRecitation({
     flush: async () => { await new Promise(r => setTimeout(r, 10)); order.push('flush'); },
-    drain: async () => { await new Promise(r => setTimeout(r, 10)); order.push('drain'); },
-    read: () => { order.push('read'); return 'قُرئ'; },
+    drain: async () => { await new Promise(r => setTimeout(r, 10)); order.push('drain'); return true; },
+    read: complete => { order.push('read'); return complete ? 'تامّ' : 'ناقص'; },
   });
   assert.deepEqual(order, ['flush', 'drain', 'read'], `الترتيب: ${order.join(' → ')}`);
-  assert.equal(out, 'قُرئ');
+  assert.equal(out, 'تامّ');
+
+  /* وجوابُ الإفراغ يصل القارئَ — فلا تُقرأ تلاوةٌ ناقصةٌ وكأنّها تامّة. */
+  const partial = await settleRecitation({
+    flush: async () => undefined,
+    drain: async () => false,
+    read: complete => (complete ? 'تامّ' : 'ناقص'),
+  });
+  assert.equal(partial, 'ناقص', 'نقصُ التلاوة لم يبلغ القارئ');
 });
 
 test('القراءةُ تجمع ما سُمع، وتحكم في المحاولة بما عُرف موضعُه', () => {
@@ -254,7 +262,8 @@ test('الطابورُ يحفظ ترتيبَ التلاوة ولو عادت ال
   const delays = [40, 30, 20, 10, 0];
   delays.forEach((ms, i) => q.push(() => new Promise<void>(r => setTimeout(() => { done.push(i); r(); }, ms))));
   assert.equal(q.length, 5, 'الدفعُ ليس تزامنيًّا — وقد سبق متأخّرٌ سابقَه في الربط');
-  return q.drain().then(() => {
+  return q.drain().then(complete => {
+    assert.equal(complete, true, 'قيل إنّ الطابورَ لم يفرغ وقد فرغ');
     assert.deepEqual(done, [0, 1, 2, 3, 4], `ترتيبُ الإتمام: ${done.join(',')}`);
   });
 });
@@ -294,8 +303,16 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   assert.match(screen, /await settleRecitation\(\{/, 'التقريرُ لا يمرّ بترتيب الإنهاء');
-  assert.match(screen, /read: \(\) => readRecitation\(/, 'القراءةُ ليست هي المقيسة');
-  assert.match(screen, /flush: flushRecorder/, 'آخرُ مقطعٍ لا يُنتظر');
+  assert.match(screen, /read: complete => \(\{ \.\.\.readRecitation\(/, 'القراءةُ ليست هي المقيسة');
+  assert.match(screen, /flush: stopAndRelease/, 'آخرُ مقطعٍ لا يُنتظر');
+  /*
+   * والميكروفونُ يُطلق داخلَ إيقاف التسجيل لا بعد انتظار الطابور: فعلٌ واحدٌ لا ترتيبٌ
+   * يُنسى. ولو كان بعده لبقي مفتوحًا حين يتعلّق طلبٌ لا يعود.
+   */
+  const stopper = screen.slice(screen.indexOf('const stopAndRelease'), screen.indexOf('const stopAudio'));
+  assert.match(stopper, /releaseMic\(\)/, 'إيقافُ التسجيل لا يُطلق الميكروفون');
+  assert.equal(/await queue\.current\.drain\(\);\s*\n\s*releaseMic\(\)/.test(screen), false,
+    'الميكروفونُ يُطلق بعد انتظار الطابور — فيبقى مفتوحًا إن تعلّق طلب');
   assert.match(screen, /drain: \(\) => queue\.current\.drain\(\)/, 'الطابورُ لا يُفرَّغ');
   /* ولا تُستدعى أدواتُ القراءة الخام في الشاشة: لا طريقَ ثانٍ إلى تقرير. */
   for (const bypass of ['readFace(', 'accumulateWordSignals(', 'stepsFromSamples(']) {
@@ -304,4 +321,36 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   /* والمقاطعُ تدخل الطابورَ ولا تُرسل مستقلّةً. */
   assert.match(screen, /queue\.current\.push\(/, 'المقاطعُ لا تدخل الطابور');
   assert.equal(/ondataavailable = async/.test(screen), false, 'الربطُ بالطابور ليس تزامنيًّا');
+});
+
+/*
+ * ومهلةُ الاختبار مقصودة: بلا حدٍّ في الشيفرة يتعلّق هذا الانتظارُ أبدًا، فيعلّق السيرَ
+ * كلَّه بدل أن يحمرّ. وحارسٌ يُعلّق CI أسوأُ من حارسٍ يسقط.
+ */
+test('طلبٌ لا يعود لا يحبس الشاشة — للانتظار حدٌّ يُقال بعده الحقّ', { timeout: 5_000 }, () => {
+  /*
+   * فخادمٌ توقّف عن الرد يترك المقطعَ معلّقًا، فيتعلّق الطابور، فتبقى الشاشةُ عند
+   * «يُقرأ ما سُمع…» بلا نهاية — والطالبُ لا يملك إلا إغلاقَ الصفحة. وأسوأُ من ذلك
+   * أنّ إطلاقَ الميكروفون كان بعد الانتظار، فيبقى مفتوحًا وضوءُه مضاءٌ وقد أنهى.
+   */
+  const q = serialQueue();
+  let released = false;
+  q.push(() => new Promise<void>(() => { /* لا يعود أبدًا */ }));
+  q.push(async () => { released = true; });
+  const started = Date.now();
+  return q.drain(60).then(complete => {
+    assert.equal(complete, false, 'قيل إنّ الطابورَ فرغ وفيه معلّق');
+    assert.ok(Date.now() - started < 5_000, 'الانتظارُ لم ينقطع عند حدّه');
+    assert.equal(released, false, 'مضت مهمّةٌ بعد المعلّق — فالترتيبُ ضاع');
+  });
+});
+
+test('والحدُّ الافتراضيّ معلنٌ وواسعٌ لمقطعٍ من ثانيتين', () => {
+  assert.ok(DRAIN_DEADLINE_MS >= 5_000, `الحدُّ ${DRAIN_DEADLINE_MS}ms أضيقُ من أن يسع شبكةً بطيئة`);
+  assert.ok(DRAIN_DEADLINE_MS <= 60_000, `الحدُّ ${DRAIN_DEADLINE_MS}ms أطولُ من صبر طالب`);
+});
+
+test('طابورٌ فارغٌ يفرغ فورًا ويُقال إنّه تامّ', () => {
+  const q = serialQueue();
+  return q.drain(50).then(complete => assert.equal(complete, true));
 });

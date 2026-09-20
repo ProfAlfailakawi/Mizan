@@ -128,13 +128,16 @@ export function readRecitation(
  * فـ`stop()` يُطلق آخرَ `dataavailable` بعد عودته، وقد تبقى ردودٌ في الطريق. ومن قرأ
  * فورَ الضغط أسقط آخرَ ثانيتين من تلاوة الطالب — وهي غالبًا خاتمةُ الوجه — وأسقط معها
  * كلَّ ردٍّ بطيء. والترتيبُ هنا في بنيةٍ لا في تعليق: لا سبيلَ إلى القراءة قبلهما.
+ *
+ * و`drain` يُرجع: أوصل كلُّ شيء؟ فتُمرَّر إجابتُه إلى `read` — فلا تُقرأ تلاوةٌ ناقصةٌ
+ * وكأنّها تامّة. وهو في التوقيع لا في تعليق: من قرأ فقد أُعطي الجواب.
  */
 export async function settleRecitation<T>(steps: {
   flush: () => Promise<void>;
-  drain: () => Promise<void>;
-  read: () => T;
+  drain: () => Promise<boolean>;
+  read: (complete: boolean) => T;
 }): Promise<T> {
   await steps.flush();
-  await steps.drain();
-  return steps.read();
+  const complete = await steps.drain();
+  return steps.read(complete);
 }

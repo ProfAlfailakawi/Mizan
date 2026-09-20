@@ -61,6 +61,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const [reading, setReading] = useState<FaceReading | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [heard, setHeard] = useState(0);
+  /* هل بقي مقطعٌ لم يصل حين قُرئ التقرير؟ */
+  const [incomplete, setIncomplete] = useState(false);
 
   const samples = useRef<FaceAlignmentSample[]>([]);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -99,7 +101,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const draw = useCallback(async (seed: string) => {
     if (!deliveryReading || !candidates.length) return;
-    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setSeconds(0);
+    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setSeconds(0); setIncomplete(false);
     const weightOf = faceWeights(attempts, Date.now());
     const picked = drawFace(candidates, seed, weightOf);
     if (!picked) { setStage('blocked'); setNote(ar ? 'لم يُسحب وجه.' : 'No face drawn.'); return; }
@@ -126,17 +128,23 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   }, []);
 
   /*
-   * إيقافُ التسجيل ينتظر آخرَ مقطعٍ فعلًا.
+   * إيقافُ التسجيل ينتظر آخرَ مقطعٍ فعلًا، **ثم يُطلق الميكروفون فورًا**.
    *
-   * فـ`stop()` يُطلق `dataavailable` أخيرًا **بعد** عودته، ثم `stop`. فمن قرأ المقاطعَ
-   * فورَ الضغط أسقط آخرَ ثانيتين من تلاوة الطالب — وهي غالبًا خاتمةُ الوجه.
+   * فـ`stop()` يُطلق `dataavailable` أخيرًا بعد عودته، ثم `stop`. فمن قرأ المقاطعَ فورَ
+   * الضغط أسقط آخرَ ثانيتين من تلاوة الطالب — وهي غالبًا خاتمةُ الوجه.
+   *
+   * وإطلاقُ الميكروفون في هذه الدالّة نفسِها لا بعدها: وقد كان بعد انتظار الطابور،
+   * فلو تعلّق طلبٌ لا يعود بقي **الميكروفونُ مفتوحًا** بلا نهاية وضوءُه مضاءٌ في وجه
+   * الطالب وقد أنهى. والإصلاحُ أن يصيرا فعلًا واحدًا لا ترتيبًا يُنسى: من أوقف التسجيل
+   * فقد أطلق الميكروفون.
    */
-  const flushRecorder = useCallback(() => new Promise<void>(resolve => {
+  const stopAndRelease = useCallback(() => new Promise<void>(resolve => {
     const rec = recorder.current;
-    if (!rec || rec.state !== 'recording') { resolve(); return; }
-    rec.addEventListener('stop', () => resolve(), { once: true });
-    try { rec.stop(); } catch { resolve(); }
-  }), []);
+    const done = () => { releaseMic(); resolve(); };
+    if (!rec || rec.state !== 'recording') { done(); return; }
+    rec.addEventListener('stop', done, { once: true });
+    try { rec.stop(); } catch { done(); }
+  }), [releaseMic]);
 
   const stopAudio = useCallback(() => {
     if (recorder.current?.state === 'recording') { try { recorder.current.stop(); } catch { /* مغلقٌ أصلًا */ } }
@@ -147,7 +155,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const begin = useCallback(async () => {
     if (!face) return;
-    samples.current = []; setHeard(0); setSeconds(0); setNote('');
+    samples.current = []; setHeard(0); setSeconds(0); setNote(''); setIncomplete(false);
     queue.current = serialQueue();
     setStage('reciting');
     if (!listening) return;   /* بلا محرّكٍ يبقى الوجهُ مفتوحًا للقراءة بلا استماع. */
@@ -206,16 +214,17 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (!face) return;
     setStage('analysing');
     const settled = await settleRecitation({
-      flush: flushRecorder,
+      flush: stopAndRelease,
       drain: () => queue.current.drain(),
-      read: () => readRecitation(samples.current, face.words, face.page),
+      read: complete => ({ ...readRecitation(samples.current, face.words, face.page), complete }),
     });
-    releaseMic();
     if (!alive.current) return;
     setReading(settled.reading);
+    /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
+    setIncomplete(!settled.complete);
     setStage('report');
     if (settled.attempt) setAttempts(rememberFaceAttempt(owner, deliveryReading || '', settled.attempt));
-  }, [face, owner, deliveryReading, flushRecorder, releaseMic]);
+  }, [face, owner, deliveryReading, stopAndRelease]);
 
   const words: FaceWord[] = useMemo(
     () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah })),
@@ -234,7 +243,9 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     ? (ar ? 'محرّكُ الاستماع غيرُ مهيّأٍ في هذه المسابقة، فالوجهُ مفتوحٌ للمراجعة بلا تحليل — ولا يُتظاهر بسماعٍ لم يقع.' : 'The listening engine is not configured here — the face is open for review without analysis.')
     : !faceSupportsListening(face)
       ? (ar ? 'هذا الوجهُ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى، والتتبّعُ يُطلب لسورةٍ واحدة — فيُراجَع بلا تحليل، ولا يُفتح ميكروفونٌ يعود بتقريرٍ فارغ.' : 'This face spans two surahs and tracking is requested per surah — review it without analysis.')
-      : (note || undefined);
+      : incomplete
+        ? (ar ? 'انقضت مهلةُ انتظار بعض المقاطع فلم تصل، وما تراه مبنيٌّ على ما وصل وحدَه — فالنقصُ من الاتّصال لا من تلاوتك. وأعِد الوجهَ إن شئت قياسًا تامًّا.' : 'Some chunks never arrived in time — what you see is built only on what did.')
+        : (note || undefined);
 
   return (
     <section className="space-y-4">

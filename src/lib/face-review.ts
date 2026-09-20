@@ -125,11 +125,26 @@ export function forgetFaceAttempts(owner: string, reading: string): void {
  * والدفعُ **تزامنيّ**: يُربط الطابورُ لحظةَ وصول المقطع، لا بعد انتظار. وإلا سبق
  * متأخّرٌ سابقَه في الربط نفسِه.
  */
+/*
+ * وللانتظار حدٌّ — وإلّا حبس طلبٌ لا يعود الشاشةَ إلى الأبد.
+ *
+ * فمقطعٌ يُرسل إلى خادمٍ توقّف عن الرد يبقى معلّقًا، فيبقى الطابورُ معلّقًا، فتبقى
+ * الشاشةُ عند «يُقرأ ما سُمع…» ولا تصل إلى تقرير. والطالبُ لا يعرف ما جرى ولا يملك
+ * إلا إغلاقَ الصفحة.
+ *
+ * فبعد هذا الحدّ يُقرأ ما وصل، **ويُقال إنّ بعضه لم يصل** — ولا يُعرض ناقصٌ على أنّه
+ * تامّ. وخمسَ عشرةَ ثانيةً سعةٌ لمقطعٍ من ثانيتين على أبطأ شبكةٍ معقولة.
+ */
+export const DRAIN_DEADLINE_MS = 15_000;
+
 export interface SerialQueue {
   /** يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها. */
   push(task: () => Promise<void>): void;
-  /** ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار. */
-  drain(): Promise<void>;
+  /**
+   * ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار — إلى حدٍّ.
+   * ويُرجع: أوصل كلُّ شيءٍ (`true`) أم انقضى الحدُّ وبقي معلّقٌ (`false`).
+   */
+  drain(deadlineMs?: number): Promise<boolean>;
   /** كم مهمّةً دُخلت الطابورَ — للعرض لا للحكم. */
   readonly length: number;
 }
@@ -143,10 +158,24 @@ export function serialQueue(): SerialQueue {
       /* وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. */
       tail = tail.then(task).catch(() => undefined);
     },
-    async drain() {
-      /* ومهمّةٌ تُدفع أثناء الانتظار تُنتظر هي أيضًا — وإلا سقط آخرُ مقطع. */
-      let seen: Promise<void> | null = null;
-      while (seen !== tail) { seen = tail; await tail; }
+    async drain(deadlineMs = DRAIN_DEADLINE_MS) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let expired = false;
+      const deadline = new Promise<'expired'>(resolve => {
+        timer = setTimeout(() => { expired = true; resolve('expired'); }, Math.max(0, deadlineMs));
+      });
+      try {
+        /* ومهمّةٌ تُدفع أثناء الانتظار تُنتظر هي أيضًا — وإلا سقط آخرُ مقطع. */
+        let seen: Promise<void> | null = null;
+        while (seen !== tail) {
+          seen = tail;
+          const outcome = await Promise.race([tail.then(() => 'settled' as const), deadline]);
+          if (outcome === 'expired') return false;
+        }
+        return !expired;
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
     },
     get length() { return entered; },
   };
