@@ -205,6 +205,11 @@ export const ISLAMWEB_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
  *   بايتاتُ المنبع (`upstreamSourceSha256`، مثبَّتةٌ عند commit بعينه)
  *     ← تحويلٌ حتميّ يُعاد إنتاجه بـ `npm run quran:mirror-freeze`
  *       ← بصمةُ الأثر (`expectedCompressedSha256`) التي يقابلها المُحمِّل في كلّ تحميل.
+ *
+ * وبصماتُ الأثر تحرّكت مرّةً واحدة (٢٠ سبتمبر ٢٠٢٦) حين صار التحويلُ يحفظ موضعَ الآية
+ * على صفحة المصحف بعد أن كان يُسقطه. والمنبعُ لم يتغيّر — `upstreamSourceSha256` كما هو،
+ * وارتباطُ قرار اللجنة بـ`boundUpstreamCommit` كما هو. وقُورن ٤٩٬٧٧٤ نصًّا قبل التحويل
+ * وبعده: **صفرٌ اختلف، وصفرٌ اختفى، وصفرٌ ظهر**.
  * ─────────────────────────────────────────────────────────────────────────── */
 export const KFGQPC_MIRROR_REPOSITORY = 'thetruetruth/quran-data-kfgqpc' as const;
 export const KFGQPC_MIRROR_COMMIT = '281dbbe8eed1370daa5a023b6cd81655cbfd6473';
@@ -251,35 +256,35 @@ export const KFGQPC_MIRROR_CANDIDATES: readonly QuranCandidateSource[] = [
   mirrorCandidate('hafs', 'hafs', 'hafs/data/hafsData_v18.json',
     '5d8bb91726e482839d0057633cb1973031e4d706fa9604eea5e08892f20ba140',
     6236, 'KUFIC',
-    'df4619f903c061629e129bf631697985c0acc795007eeb0c362f7c9bc24feb70'),
+    'fddd1e690812aaedf63f0de86d9772da9b2c49f5d4649a9bcd0129e57990f2a5'),
   mirrorCandidate('warsh', 'warsh', 'warsh/data/warshData_v10.json',
     'f05d0dc652fd46b38563cacb13242f76f80db4cc64d25873da0bce157253872f',
     6214, 'MADANI_AKHIR',
-    '96236c5ef385e564f50679cec9a0d381e7600e2dc9847bf5bb1ea03831389730'),
+    '52b5d5b78a9f787182348dad53764c1f4d63b7e2885f2f1fd3151fbe59b7e2c0'),
   mirrorCandidate('shubah', 'shubah', 'shouba/data/ShoubaData08.json',
     'f105da3949e0b8092e3abcd23a539c9bef4c9b7474f15d29848471f150ade667',
     6236, 'KUFIC',
-    '9bd4e0b0bb8169b5519eb32c4b3e8cd4005f515d4614c7d9315920693ff49147'),
+    'ad3023c6d66e5480f0f6c336b0af40bc24a8a9b99ab37b11f55aa59bab6d0637'),
   mirrorCandidate('qalun', 'qalun', 'qaloon/data/QaloonData_v10.json',
     '18465c40ebeec40a92eb98745c9b89796ac6e31f6e93988883dfb6602faaea95',
     6214, 'MADANI_AKHIR',
-    'ade439e1b68b9243758593ad1746a09364a6d3a306443597bb15d6c34e60257d'),
+    '6e35e4cdab6f27ef49216825e871197bd1a46cb65e69376e5a8c93692111712b'),
   mirrorCandidate('al-duri-abu-amr', 'duri-abi-amr', 'doori/data/DooriData_v09.json',
     '169b949d6cedd93ddb21728c16057d5ac7faf673ac10e0f213bb5dec1dc90d7d',
     6217, 'BASRI_ABU_AMR_DELIVERY',
-    '5000be8a4629c0054960146cbfd2fa44ab08447239e647e1539fbb076db8b3a8'),
+    'f65ed00fcac4a49e2fcd072f952587f69f12b25ce9fc2914dcb058a732fc57f1'),
   mirrorCandidate('al-susi', 'susi-abi-amr', 'soosi/data/SoosiData09.json',
     '81af638398efa88308803c06a961d7019daf2e87e822b8acae24df05a82aa81b',
     6217, 'BASRI_ABU_AMR_DELIVERY',
-    '0247c640595e32a1e63b20f0fc450666f41ccd3d4f5ba8358147e5dce90e8e15'),
+    '5c46e77bbc050bc69688ab156dd71a8b689fb5a1af7e971e12703f3c7f894f82'),
   mirrorCandidate('al-bazzi', 'bazzi', 'bazzi/data/BazziData_v07.json',
     '2ff11a126e0f15f161b88f83528c0b11d24f69f474baabf02d8864cd93ed15ce',
     6220, 'MAKKI_IBN_KATHIR_DELIVERY',
-    'aba73fc80ec6a8415bb780fae8807d3e0617872738b6f40ef1debbf897996608'),
+    '5f510078c5df7437b9d383e9cf234be8d1bbe4423b6f1499ca3f556a7a8bc810'),
   mirrorCandidate('qunbul', 'qunbul', 'qumbul/data/QumbulData_v07.json',
     '3a0377bd943def12711b15cc71a65214fb902a5df70240b87df13c7b516a7888',
     6220, 'MAKKI_IBN_KATHIR_DELIVERY',
-    '5cbc7800304e4609b50c3c6ef5d97fea613c9c7566f9712c7a54a56c29462468'),
+    '6e7bfee6fa282b8df4ef369fb05519ae690ee7ad1a1c90fc27df25ed5ab9d4db'),
 ] as const;
 
 /*

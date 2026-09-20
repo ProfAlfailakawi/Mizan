@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { buildSurahTable, frozenFileName, stripAyahMarker, surahOf } from '../scripts/kfgqpc-mirror-freeze';
-import { KFGQPC_MIRROR_CANDIDATES } from '../src/lib/quran-candidate-sources';
+import { buildSurahTable, frozenFileName, isPageSpan, pageGeometryOf, stripAyahMarker, surahOf } from '../scripts/kfgqpc-mirror-freeze';
+import { KFGQPC_MIRROR_CANDIDATES, QURAN_FULL_TEXT_CANDIDATES } from '../src/lib/quran-candidate-sources';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 import { candidateRawiForDeliveryKey } from '../server/quran-reading-delivery';
 
@@ -125,5 +125,89 @@ test('every reading the matrix calls release-ready is actually served from disk 
     assert.ok(pkg.verses.length > 0, `${row.rawiId}: declared release-ready but no verses load from disk`);
     assert.ok(row.textSource.startsWith(pkg.authority),
       `${row.rawiId}: the report names ${row.textSource} but the loaded package is ${pkg.authority}`);
+  }
+});
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * موضعُ الآية على صفحة المصحف (٢٠ سبتمبر ٢٠٢٦)
+ *
+ * كان التحويلُ يُسقط `page`/`line_start`/`line_end` ويُبقي النصَّ وحده، فيعود `loci`
+ * فارغًا في كلّ مقطع وتسقط صفحةُ المصحف المدني من السطح. وقد صار يحفظها — والخطرُ
+ * الجديد هو أن تُخترع حيث لا تُعرف، فيقع المحكّم على سطرٍ ليس سطرَ الموضع.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+test('page geometry is kept when whole, refused when partial, and never half-invented', () => {
+  const row = { page: 435, line_start: 1, line_end: 2 };
+  assert.deepEqual(pageGeometryOf(row, 35, 4), { page: 435, lineStart: 1, lineEnd: 2 });
+  /* ستُّ حزمٍ تكتبها نصًّا وحزمتان عددًا — فتُقرأ بالقيمة لا بالنوع. */
+  assert.deepEqual(pageGeometryOf({ page: '435', line_start: '1', line_end: '2' }, 35, 4), { page: 435, lineStart: 1, lineEnd: 2 });
+  /* حزمةٌ بلا هندسةٍ أصلًا: غيابٌ لا خطأ. */
+  assert.equal(pageGeometryOf({}, 35, 4), null);
+  /* أمّا النقصُ فخطأ: صفحةٌ بلا سطرٍ موضعٌ لا يُرسم. */
+  assert.throws(() => pageGeometryOf({ page: 435 }, 35, 4), /MIRROR_PAGE_GEOMETRY_PARTIAL/);
+  assert.throws(() => pageGeometryOf({ page: 435, line_start: 1 }, 35, 4), /MIRROR_PAGE_GEOMETRY_PARTIAL/);
+  /* وحدودُ المصحف تُحرس: لا صفحةَ ٦٠٥، ولا سطرَ صفر، ولا نهايةٌ قبل بداية. */
+  assert.throws(() => pageGeometryOf({ page: 605, line_start: 1, line_end: 2 }, 35, 4), /MIRROR_PAGE_INVALID/);
+  assert.throws(() => pageGeometryOf({ page: 0, line_start: 1, line_end: 2 }, 35, 4), /MIRROR_PAGE_INVALID/);
+  assert.throws(() => pageGeometryOf({ page: 435, line_start: 0, line_end: 2 }, 35, 4), /MIRROR_LINE_START_INVALID/);
+  assert.throws(() => pageGeometryOf({ page: 435, line_start: 5, line_end: 4 }, 35, 4), /MIRROR_LINE_END_INVALID/);
+  /* ونصٌّ ليس مدًى ولا عددًا يُرفض ولا يُصحَّح بالتخمين. */
+  assert.throws(() => pageGeometryOf({ page: 'ص٤٣٥', line_start: 1, line_end: 2 }, 35, 4), /MIRROR_PAGE_INVALID/);
+});
+
+test('an ayah that crosses two pages claims neither', () => {
+  /*
+   * تكتبها الحزمةُ `"85-86"` مع `line_start: 14` و`line_end: 1` — فتأتي النهايةُ قبل
+   * البداية، وهو تمامُ الصدق في بنيتها. وموضعُها لَوحان لا لوح، والشكلُ لا يسعهما،
+   * فلا يُزعم واحدٌ منهما.
+   */
+  assert.equal(isPageSpan('85-86'), true);
+  assert.equal(isPageSpan(' 317 - 318 '), true);
+  assert.equal(pageGeometryOf({ page: '85-86', line_start: 14, line_end: 1 }, 4, 44), null);
+  /* ومدًى ليس متجاورًا ليس عبورًا — فيبقى خطأً يُرفض. */
+  assert.equal(isPageSpan('85-90'), false);
+  assert.equal(isPageSpan('86-85'), false);
+  assert.equal(isPageSpan('600-700'), false);
+  assert.equal(isPageSpan(435), false);
+  assert.throws(() => pageGeometryOf({ page: '85-90', line_start: 14, line_end: 1 }, 4, 44), /MIRROR_PAGE_INVALID/);
+});
+
+test('the frozen artifacts on disk actually carry the Mushaf geometry', () => {
+  /*
+   * دعوى في نصِّ الشيفرة ليست قياسًا: تُفتح البايتات الملتزَمة نفسُها ويُعدّ ما فيها.
+   */
+  let located = 0, crossing = 0, verses = 0;
+  const pages = new Set<number>();
+  for (const source of KFGQPC_MIRROR_CANDIDATES) {
+    const pkg = loadIslamwebReadingPackage(source.rawiId);
+    for (const v of pkg.verses) {
+      verses += 1;
+      if (v.page === undefined) { crossing += 1; continue; }
+      located += 1;
+      pages.add(v.page);
+      assert.ok(v.page >= 1 && v.page <= 604, `${source.rawiId} ${v.sura_no}:${v.aya_no} صفحةٌ خارج المصحف`);
+      assert.ok(v.line_start !== undefined && v.line_end !== undefined, 'موضعٌ ناقص نفذ إلى الأثر');
+      assert.ok(v.line_end >= v.line_start, `${source.rawiId} ${v.sura_no}:${v.aya_no} نهايةٌ قبل بداية`);
+    }
+  }
+  assert.equal(verses, 49774, `عدد الآي ${verses}`);
+  assert.equal(located, 49748, `الآياتُ ذاتُ الموضع ${located}`);
+  assert.equal(crossing, 26, `الآياتُ العابرةُ صفحتين ${crossing}`);
+  assert.equal(pages.size, 604, `صفحاتُ المصحف المغطّاة ${pages.size}`);
+});
+
+test('the twelve Islamweb readings carry no page, and no page is borrowed for them', () => {
+  /*
+   * غيابُ الصفحة عندهم حقيقةٌ لا عطب: حزمُهم لا تحملها. والخطرُ أن تُعار صفحةُ رواية
+   * لأخرى — وهو رجوعٌ بين الروايات، وهو ممنوع. فيُقاس أن الغياب باقٍ غيابًا.
+   */
+  const islamweb = QURAN_FULL_TEXT_CANDIDATES.filter(x => x.authority === 'ISLAMWEB_DERIVED');
+  assert.ok(islamweb.length === 12, `حزم إسلام ويب ${islamweb.length}`);
+  for (const source of islamweb) {
+    const pkg = loadIslamwebReadingPackage(source.rawiId);
+    const withPage = pkg.verses.filter(v => v.page !== undefined).length;
+    assert.equal(withPage, 0, `${source.rawiId} حمل ${withPage} موضعًا لم تنشره حزمتُه`);
   }
 });

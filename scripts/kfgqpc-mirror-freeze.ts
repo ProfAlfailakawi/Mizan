@@ -64,16 +64,80 @@ export function stripAyahMarker(text: string, ayah: number): string {
   return stripped;
 }
 
+/*
+ * هندسةُ الصفحة تُحفظ، ولا تُخترع.
+ *
+ * كان هذا البناءُ يُبقي `{id,text}` ويُسقط كلَّ حقلٍ سواهما — ومنها `page` و`line_start`
+ * و`line_end`. وهي مواضعُ المصحف التي نشرها المجمّع نفسُه في هذه البايتات بعينها، فلمّا
+ * سقطت لم يبقَ للسطحِ ما يعرض به صفحةَ المصحف المدني ولا ما يضع عليه عدستَه: يعود
+ * `loci` فارغًا في كلّ مقطع، فيسقط العرضُ إلى نصٍّ متّصل.
+ *
+ * فصارت تُحفظ كما وردت، بشرطين: أن تكون الثلاثةُ معًا أو لا شيء — فصفحةٌ بلا سطرٍ
+ * موضعٌ ناقصٌ لا يُرسم — وأن تجتاز حدودَها (صفحةٌ ١..٦٠٤، وسطرٌ ≥١، ونهايةٌ ≥ بداية).
+ * وحقلٌ مشبوهٌ يُرفض ولا يُصحَّح بالتخمين.
+ *
+ * و`page` يصل رقمًا في حزمتين ونصًّا في ستّ — فيُقرأ بـ`Number` ويُتحقَّق أنه صحيح،
+ * لا يُفترض نوعُه. (قِيس: حفص وشعبة رقمٌ، والستُّ الباقية نصّ.)
+ *
+ * والنصُّ لم يُمسّ بحرف: `stripAyahMarker` كما هو، وعدُّ الآي كما هو. وأُثبت ذلك
+ * بمقارنة ٤٩٬٧٧٤ نصًّا قبل التغيير وبعده.
+ */
+
+export interface FrozenAyah { id: number; text: string; page?: number; lineStart?: number; lineEnd?: number }
+
+/*
+ * آيةٌ تعبر صفحتين لا تُنسب إلى إحداهما.
+ *
+ * ستٌّ من الحزم الثمانِ تكتب صفحةَ الآية العابرة مدًى: `"85-86"`، ومعها `line_start: 14`
+ * (سطرُ ٨٥ الرابعَ عشر) و`line_end: 1` (سطرُ ٨٦ الأول) — فيأتي الانتهاءُ قبل الابتداء،
+ * وهو تمامُ الصدق في بنيتها لا خطأٌ فيها.
+ *
+ * وموضعُها الصحيح لَوحان لا لوحٌ واحد. وشكلُ `{page,lineStart,lineEnd}` لا يسع لوحين،
+ * فأمامنا ثلاث: أن نكتب `85..14–14` فنزعم أنها تنتهي حيث لا تنتهي؛ أو أن نكتب سطرَ
+ * نهايةٍ للصفحة ٨٥ لا نعرفه (فعددُ أسطر كلِّ صفحةٍ ليس عندنا مقيسًا)؛ أو ألّا نزعم شيئًا.
+ *
+ * فلا نزعم. تُحفظ بلا هندسة، فلا تُرسم لها عدسةٌ ولا صفحة — ويبقى ما عداها كاملًا.
+ * وهي ٤ أو ٥ آياتٍ من ٦٢١٤ فأكثر في كلّ حزمة، وتُعدّ وتُذكر ولا تمرّ صامتة.
+ *
+ * وما سوى هذا الشكل بعينه يبقى خطأً يُرفض: صفحةٌ خارج ١..٦٠٤، أو نصٌّ ليس مدًى،
+ * أو نهايةٌ قبل بدايةٍ على صفحةٍ واحدة.
+ */
+const PAGE_SPAN = /^\s*(\d{1,3})\s*-\s*(\d{1,3})\s*$/;
+
+/** هل كتبت الحزمةُ صفحةَ هذه الآية مدًى عابرًا بين صفحتين متجاورتين؟ */
+export function isPageSpan(raw: unknown): boolean {
+  if (typeof raw !== 'string') return false;
+  const match = PAGE_SPAN.exec(raw);
+  if (!match) return false;
+  const from = Number(match[1]), to = Number(match[2]);
+  return from >= 1 && to <= 604 && to === from + 1;
+}
+
+/** موضعُ الآية على صفحة المصحف، أو `null` حين لا تحمله الحزمة أو حين تعبر صفحتين. */
+export function pageGeometryOf(row: Record<string, unknown>, surah: number, ayah: number):
+  { page: number; lineStart: number; lineEnd: number } | null {
+  const present = [row.page, row.line_start, row.line_end].filter(v => v !== undefined && v !== null && v !== '');
+  if (present.length === 0) return null;
+  if (present.length !== 3) throw new Error(`MIRROR_PAGE_GEOMETRY_PARTIAL:${surah}:${ayah}`);
+  if (isPageSpan(row.page)) return null;
+  const page = Number(row.page), lineStart = Number(row.line_start), lineEnd = Number(row.line_end);
+  if (!Number.isInteger(page) || page < 1 || page > 604) throw new Error(`MIRROR_PAGE_INVALID:${surah}:${ayah}:${String(row.page)}`);
+  if (!Number.isInteger(lineStart) || lineStart < 1) throw new Error(`MIRROR_LINE_START_INVALID:${surah}:${ayah}:${String(row.line_start)}`);
+  if (!Number.isInteger(lineEnd) || lineEnd < lineStart) throw new Error(`MIRROR_LINE_END_INVALID:${surah}:${ayah}:${String(row.line_end)}`);
+  return { page, lineStart, lineEnd };
+}
+
 /** يبني الجدولَ الذي يتوقّعه `parseCandidateRawDeflate`: مفاتيحُ سورٍ ١..١١٤. */
 export function buildSurahTable(rows: readonly Record<string, unknown>[], expectedPerSurah: readonly number[]) {
-  const table: Record<string, Array<{ id: number; text: string }>> = {};
+  const table: Record<string, FrozenAyah[]> = {};
   for (const row of rows) {
     const surah = surahOf(row);
     const ayah = Number(row.aya_no);
     if (!Number.isInteger(ayah) || ayah < 1) throw new Error(`MIRROR_ROW_AYAH_INVALID:${surah}:${String(row.aya_no)}`);
     const text = row.aya_text;
     if (typeof text !== 'string' || !text.length) throw new Error(`MIRROR_ROW_TEXT_INVALID:${surah}:${ayah}`);
-    (table[String(surah)] ||= []).push({ id: ayah, text: stripAyahMarker(text, ayah) });
+    const geometry = pageGeometryOf(row, surah, ayah);
+    (table[String(surah)] ||= []).push({ id: ayah, text: stripAyahMarker(text, ayah), ...(geometry || {}) });
   }
   for (let surah = 1; surah <= 114; surah++) {
     const list = table[String(surah)];
@@ -127,13 +191,16 @@ function main() {
 
       const table = buildSurahTable(rows, perSurah);
       const verses = Object.values(table).reduce((sum, list) => sum + list.length, 0);
+      /* الآياتُ العابرةُ صفحتين تُعدّ وتُذكر — فالنقصُ المعلن ليس كالنقص الصامت. */
+      const located = Object.values(table).reduce((sum, list) => sum + list.filter(x => x.page !== undefined).length, 0);
+      const crossing = verses - located;
       if (verses !== file.totalAyahs) throw new Error(`MIRROR_TOTAL_AYAHS:${verses}:${file.totalAyahs}`);
 
       const artifact = deflateRawSync(Buffer.from(JSON.stringify(table), 'utf8'), { level: 9 });
       writeFileSync(join(outDir, frozenFileName(file.rawiId)), artifact);
       const artifactSha256 = sha256(artifact);
       pins.push({ rawiId: file.rawiId, verses, artifactSha256 });
-      console.log(`  ✓ ${label} ${String(verses).padStart(4)} آية · ${(artifact.length / 1024).toFixed(0).padStart(4)}KB · ${artifactSha256.slice(0, 16)}…`);
+      console.log(`  ✓ ${label} ${String(verses).padStart(4)} آية · ${String(located).padStart(4)} بموضع${crossing ? ` · ${crossing} عابرةً صفحتين بلا موضع` : ''} · ${(artifact.length / 1024).toFixed(0).padStart(4)}KB · ${artifactSha256.slice(0, 16)}…`);
     } catch (error) {
       failed += 1;
       console.log(`  ✗ ${label} ${error instanceof Error ? error.message : error}`);

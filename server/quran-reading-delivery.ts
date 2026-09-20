@@ -209,6 +209,16 @@ export class MizanQuranDelivery {
         sora_name_ar: surahNameArabic(v.sura_no),
         sora_name_en: surahNameEnglish(v.sura_no),
         ...(jozz !== undefined ? { jozz } : {}),
+        /*
+         * موضعُ المصحف يمرّ من الحزمة إلى المقطع — ولا يُستعار.
+         *
+         * `passage` تحته يبني `loci` من هذه الحقول، فإن غابت عاد فارغًا وسقط العرض إلى
+         * نصٍّ متّصل. وحزمُ المرآة تحملها، وحزمُ إسلام ويب لا تحملها — فيبقى الفارقُ
+         * ظاهرًا صادقًا: من لا صفحةَ في حزمتها لا تُعرض لها صفحة، ولا تُعار صفحةُ سواها.
+         */
+        ...(v.page !== undefined ? { page: v.page } : {}),
+        ...(v.line_start !== undefined ? { line_start: v.line_start } : {}),
+        ...(v.line_end !== undefined ? { line_end: v.line_end } : {}),
       };
     });
     this.rowCache.set(rawiId, rows);
