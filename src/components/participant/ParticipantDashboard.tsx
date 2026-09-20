@@ -17,6 +17,7 @@ import { TearOffQueueTicket } from '../design-system/TearOffQueueTicket';
 import { PracticeStudio } from './PracticeStudio';
 import { WarmupSanctuary } from './WarmupSanctuary';
 import { TrialRun } from './TrialRun';
+import { MushafListens } from './MushafListens';
 import { RecitationResultCard } from './RecitationResultCard';
 import { deliveryReadingKeyFor, surahNameArabic } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
@@ -195,6 +196,16 @@ export const ParticipantDashboard: React.FC = () => {
     passageAyahCount={passageAyahCount(category)}
     deliveryReading={practiceReading}
     listening={practiceEngine}/>}
+   {/*
+     ومراجعةُ الطالب بصفحته: وجهٌ كاملٌ من نطاقه يقرؤه فيُلوَّن بتلاوته، ثم يميل التالي
+     إلى حيث تعثّر. وهي مراجعةٌ لا اختبار: لا درجةَ فيها، ولا يُسجَّل صوته، وتاريخُها
+     في جهازه وحده.
+    */}
+   {scopeResolution&&!scopeResolution.blocked&&<MushafListens ar={ar}
+    scope={scopeResolution.scope}
+    deliveryReading={practiceReading}
+    listening={practiceEngine}
+    owner={participant.id}/>}
    <WarmupSanctuary ar={ar}
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
     spreadAcrossZones={warmupSpreadAcrossZones}

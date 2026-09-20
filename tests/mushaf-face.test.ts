@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  buildFaceIndex, canonicalBridgeFor, deterministicUnit, drawFace, faceInScope, faceIsWhole, facesForScope, nativeSurahEnds,
+  buildFaceIndex, canonicalBridgeFor, deterministicUnit, drawFace, faceInScope, faceIsWhole, facesForScope,
+  MIN_DRAW_SHARE, nativeSurahEnds,
 } from '../server/mushaf-face';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 import { ayahCountOf } from '../src/lib/quran-canon';
@@ -207,4 +208,50 @@ test('موضعٌ لا يُحلّ قانونيًّا لا يُعدّ داخل ا�
   assert.equal(faceInScope(face, fullQuranScope()), true);
   assert.equal(faceInScope(face, fullQuranScope(), () => undefined), false,
     'موضعٌ مجهولُ المقابل عُدَّ داخل النطاق');
+});
+
+/*
+ * أرضيّةُ الوزن — دعوى صارت خاصّيّة (ملاحظةُ مراجعةٍ آليّة، PR #243).
+ *
+ * كانت الأرضيّةُ `Number.EPSILON`: موجبةٌ على الورق، وممتنعةٌ في القسمة. ومولّدُنا
+ * يُخرج ٢^٣٢ قيمةً لا غير، فنصيبٌ مقدارُه ٢^-٥٢ لا تقع فيه قيمةٌ واحدة. فقِيس ذلك
+ * فإذا وجهٌ وزنُه صفرٌ لم يُسحب مرّةً في ٢٠٠٠٠٠ بذرة — وكان الاختبارُ السابق يقنع
+ * بأنّ الوزنَ موجبٌ ولا يسأل: أيقع فيه المولّد؟
+ */
+const bareFace = (page: number) => ({
+  page, hasUnplacedNeighbour: false,
+  surahStart: 1, ayahStart: 1, surahEnd: 1, ayahEnd: 1,
+  ayat: [], lineStart: 1, lineEnd: 1,
+});
+
+test('وجهٌ ساقطُ الوزن يبقى مسحوبًا فعلًا — لا موجبًا على الورق وحده', () => {
+  const two = [bareFace(1), bareFace(2)];
+  let drawn = 0;
+  for (let i = 0; i < 20000; i += 1) {
+    if (drawFace(two, `s${i}`, page => (page === 1 ? 1 : 0))!.page === 2) drawn += 1;
+  }
+  assert.ok(drawn > 0, 'الوجهُ الساقطُ لم يُسحب ولا مرّةً في ٢٠٠٠٠ بذرة — فهو مُقصًى لا نادر');
+  /* ونادرٌ بحقٍّ أيضًا: لا يُنصَف من لا وزنَ له. */
+  assert.ok(drawn < 20000 * MIN_DRAW_SHARE * 12, `سُحب ${drawn} مرّةً — أكثرُ من نصيبه`);
+});
+
+test('والوجهُ الساقطُ مسحوبٌ ولو كان بين وجوه المصحف كلِّها', () => {
+  /*
+   * والعدُّ الحقيقيُّ ٦٠٤ وجهًا، فنصيبُ الساقط نحوُ واحدٍ من ٦٠٠ ألف. فلا يُبحث عنه
+   * في كلّ تشغيل: بذرةٌ وُجدت بالقياس مرّةً (بعد ٨٢٨٨١٠ محاولة) تُثبت أنّه ممكن،
+   * والممتنعُ لا تُوجد له بذرةٌ أبدًا.
+   */
+  const all = Array.from({ length: 604 }, (_, i) => bareFace(i + 1));
+  const weightOf = (page: number) => (page === 7 ? 0 : 1);
+  assert.equal(drawFace(all, 'seed828810', weightOf)!.page, 7, 'البذرةُ المقيسة لم تعد تسحب الوجهَ الساقط');
+  /* ونصيبُه أكبرُ من خطوة المولّد (٢^-٣٢)، وإلا كان ممتنعًا حسابًا. */
+  const share = MIN_DRAW_SHARE / (603 + MIN_DRAW_SHARE);
+  assert.ok(share > 2 ** -32, `نصيبُ الوجه الساقط ${share} دون خطوة المولّد`);
+});
+
+test('أوزانٌ كلُّها ساقطة: السحبُ متساوٍ ولا يُرجَّح أوّلُها', () => {
+  const two = [bareFace(1), bareFace(2)];
+  let second = 0;
+  for (let i = 0; i < 20000; i += 1) if (drawFace(two, `z${i}`, () => 0)!.page === 2) second += 1;
+  assert.ok(second > 20000 * 0.4 && second < 20000 * 0.6, `الثاني سُحب ${second} من ٢٠٠٠٠`);
 });

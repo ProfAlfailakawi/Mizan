@@ -187,3 +187,36 @@ test('المرجعُ وسيطٌ لا متوسّط — وكلمتان شاذّت�
   const strained = reading.marks.filter(m => m.kind === 'strain').map(m => m.word).sort((a, b) => a - b);
   assert.deepEqual(strained, [10, 11, 12], 'كلمةٌ شاقّةٌ اختفت خلف شاذّتين');
 });
+
+test('علامةُ الالتباس استدلالٌ صوتيّ فلا تُقال عن لحظةٍ واحدة', () => {
+  /*
+   * ملاحظةُ مراجعةٍ آليّة (PR #243): كانت تُعرض قبل حدّ `minFrames` بينما لا تُعدّ في
+   * المؤشّرات إلا من الكلمات المقيسة — فتظهر علامةٌ لا يقابلها عدد. والحدُّ موضوعٌ
+   * لردّ ما دونه ضجيجًا، فيلزمه هو أيضًا.
+   */
+  const rival = (word: number, frames: number): AlignmentStep[] =>
+    Array.from({ length: frames }, () => ({
+      word, emission: 1, competingWord: word + 5, competingGap: 0.01, tookJump: false, lost: false,
+    }));
+
+  const brief = readFace(accumulateWordSignals(rival(3, 1)), 10);
+  assert.equal(brief.marks.some(m => m.kind === 'confusable'), false, 'التباسٌ من إطارٍ واحد');
+  assert.equal(brief.indices.confusableWords, 0);
+
+  const measured = readFace(accumulateWordSignals(rival(3, DEFAULT_FACE_THRESHOLDS.minFrames)), 10);
+  assert.equal(measured.marks.some(m => m.kind === 'confusable'), true, 'أُسقط التباسٌ مقيس');
+  assert.equal(measured.indices.confusableWords, 1);
+
+  /* والعلامةُ المعروضة والمؤشّرُ المعدود لا يفترقان أبدًا. */
+  for (const reading of [brief, measured]) {
+    const marked = new Set(reading.marks.filter(m => m.kind === 'confusable').map(m => m.word));
+    assert.equal(marked.size, reading.indices.confusableWords, 'العلامةُ تخالف عددَها');
+  }
+
+  /* أمّا الرجوعُ والتخطّي وانقطاعُ الأثر فأحداثٌ وقعت: تُقال ولو في إطارٍ واحد. */
+  const oneFrameEvents = readFace(accumulateWordSignals([
+    { word: 4, emission: 1, competingWord: null, competingGap: 1, tookJump: false, lost: false },
+    { word: 9, emission: 1, competingWord: null, competingGap: 1, tookJump: true, lost: false },
+  ]), 10);
+  assert.equal(oneFrameEvents.marks.some(m => m.kind === 'skip'), true, 'أُسقط حدثٌ وقع بحجّة قِصَرِه');
+});

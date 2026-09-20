@@ -30,6 +30,14 @@ export interface FaceMark {
 }
 
 export interface FaceIndices {
+  /*
+   * أبعدُ كلمةٍ بلغها القارئ، عددًا من الكلمات — لا عددَ الكلمات المرصودة.
+   *
+   * والفرقُ بينهما يظهر حين يكون القياسُ خشنًا: مسارُ التدريب الحيّ يرسل موضعًا كلَّ
+   * ثانيتين، فيرصد ثلاثين كلمةً في وجهٍ من مئةٍ وخمسين قرأه الطالبُ كلَّه. فلو عُرض
+   * المرصودُ لقيل له «بلغتَ ٣٠ من ١٥١» وهو قد أتمّها — وذلك كذبٌ في العرض.
+   */
+  reach: number;
   /** كم كلمةً من الوجه زارها المحرّك فعلًا، من كم. */
   traversed: number;
   expected: number;
@@ -104,7 +112,16 @@ export function readFace(
 ): FaceReading {
   const measurable = signals.words.filter(w => w.frames >= thresholds.minFrames);
   const emissionMedian = median(measurable.map(w => w.meanEmission));
-  const dwellMedian = median(measurable.map(w => w.frames));
+  /*
+   * ومرجعُ اللبث يُؤخذ من **كلّ** كلمةٍ زارها، لا من المقيسة وحدها.
+   *
+   * فحدُّ `minFrames` موضوعٌ لردّ الاستدلال الصوتيّ عن لحظةٍ عابرة — والمدّةُ ليست
+   * استدلالًا صوتيًّا بل عدًّا. ولو حُسب المرجعُ من المقيسة وحدها لانقلب على نفسه حين
+   * يكون القياسُ خشنًا: تُستبعد كلُّ كلمةٍ مرّ بها سريعًا، فلا يبقى في المرجع إلا
+   * الكلماتُ التي لبث عندها — فيصير اللبثُ هو المعيار، ولا يظهر لبثٌ أبدًا. وقد وقع
+   * ذلك بالفعل: ثمانيةُ مقاطعَ على كلمةٍ واحدة ومقطعٌ على كلّ ما عداها، فلم تظهر علامة.
+   */
+  const dwellMedian = median(signals.words.filter(w => w.frames > 0).map(w => w.frames));
 
   const marks: FaceMark[] = [];
   let strainedWords = 0, confusableWords = 0;
@@ -121,6 +138,7 @@ export function readFace(
     marks: marks.sort((a, b) => (a.word - b.word) || a.kind.localeCompare(b.kind)),
     emissionMedian,
     indices: {
+      reach: signals.lastWord === null ? 0 : signals.lastWord + 1,
       traversed: signals.visitedWords,
       expected: Math.max(0, Math.trunc(expectedWords)),
       lostFrames: signals.lostFrames,
@@ -151,6 +169,12 @@ function marksForWord(
   if (w.backwardJumps > 0) out.push({ word: w.word, kind: 'repeat', intensity: Math.min(1, w.backwardJumps / 3) });
   if (w.forwardJumps > 0) out.push({ word: w.word, kind: 'skip', intensity: Math.min(1, w.forwardJumps / 3) });
   if (w.lostFrames > 0) out.push({ word: w.word, kind: 'lost', intensity: Math.min(1, w.lostFrames / 20) });
+  /*
+   * وما فوق هذا الحدّ استدلالٌ صوتيٌّ لا حدثٌ منفصل، فلا يُقال إلا عن كلمةٍ لُبث عندها
+   * ما يكفي لقياسها. أمّا الرجوعُ والتخطّي وانقطاعُ الأثر فأحداثٌ وقعت، تُقال ولو في
+   * إطارٍ واحد.
+   */
+  if (w.frames < t.minFrames) return out;
   if (isConfusable(w, t)) {
     out.push({
       word: w.word, kind: 'confusable', rival: w.nearestRival as number,
@@ -158,7 +182,6 @@ function marksForWord(
       intensity: Math.max(0, Math.min(1, 1 - w.narrowestGap / t.confusableGap)),
     });
   }
-  if (w.frames < t.minFrames) return out;
   if (isStrained(w, refs.emissionMedian, t)) {
     out.push({ word: w.word, kind: 'strain', intensity: intensityOf(w.meanEmission, refs.emissionMedian * t.strainRatio) });
   }

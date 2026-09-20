@@ -1538,3 +1538,15 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   display:inline; border-radius:6px; padding:.02em .1em;
   transition:background-color .25s ease, box-shadow .25s ease;
 }
+
+/* ── حدُّ سورةٍ داخل وجهٍ واحد ──────────────────────────────────────────── */
+/*
+ * وجهٌ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى: يُرسم بينهما شريطٌ يُرى، فلا يُقرأ مطلعُ
+ * الثانية تحت عنوان الأولى.
+ */
+.mizan-face-surah-break{
+  display:block; margin:1.1em auto .7em; max-width:20rem; padding:.28em 1.2em;
+  border:1px solid #d9cdb0; border-radius:999px; background:#fdf8ec;
+  font-family:var(--font-arabic); font-size:.46em; font-weight:800; line-height:2;
+  letter-spacing:.01em; color:#6b4f18; text-align:center;
+}

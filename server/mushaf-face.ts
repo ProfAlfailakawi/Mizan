@@ -205,28 +205,48 @@ export function deterministicUnit(seed: string, step = 0): number {
   return x / 0x100000000;
 }
 
+/*
+ * أدنى نصيبٍ يُترك لوزنٍ ساقط — نسبةً إلى أثقل وزنٍ في السحب.
+ *
+ * وكانت الأرضيّةُ `Number.EPSILON`: موجبةٌ على الورق، مستحيلةٌ في القسمة. فمولّدُنا
+ * يُخرج ٢^٣٢ قيمةً لا غير، فنصيبٌ مقدارُه ٢^-٥٢ لا تقع فيه قيمةٌ واحدة. وقِيس ذلك
+ * فإذا وجهٌ وزنُه صفرٌ لم يُسحب مرّةً واحدةً في ٢٠٠٠٠٠ بذرة — أي أنّ ضمانَ «لا وجهَ
+ * يُقصى» كان دعوى في تعليقٍ لا خاصّيّةً في الشيفرة.
+ *
+ * والألفُ نسبةٌ مقصودة: نادرٌ بحقّ، ومسحوبٌ بحقّ.
+ */
+export const MIN_DRAW_SHARE = 1e-3;
+
 /**
  * سحبُ وجهٍ واحد. الأوزانُ اختيارية: بلا أوزانٍ يكون السحبُ متساويًا، ومعها يميل إلى
- * ما يحتاجه الطالب — **ولا يُقصي شيئًا**: أدنى وزنٍ يبقى موجبًا، فلا يختفي وجهٌ أبدًا.
+ * ما يحتاجه الطالب — **ولا يُقصي شيئًا**: أدنى وزنٍ يبقى نصيبًا يقع فيه المولّد.
+ *
+ * وليس هذا وعدًا بأن يظهر كلُّ وجهٍ في كلّ جلسة، بل بألّا يكون وجهٌ **غيرَ قابلٍ
+ * للسحب حسابًا**. والفرقُ بينهما هو الفرقُ بين النادر والممتنع.
  *
  * ويُرجع `null` حين لا وجهَ صالحًا، ولا يُختلق وجهٌ خارج النطاق ليملأ الفراغ.
+ *
+ * والسحبُ لا يحتاج من الوجه إلا رقمَ صفحته، فلا يُشترط الوجهُ كاملًا: يسحب الخادمُ من
+ * فهرسه، ويسحب المتصفّحُ من قائمةٍ خفيفةٍ لا نصَّ فيها — بالدالّة نفسِها لا بنسخةٍ منها.
  */
-export function drawFace(
-  candidates: readonly MushafFace[],
+export function drawFace<T extends { page: number }>(
+  candidates: readonly T[],
   seed: string,
   weightOf: (page: number) => number = () => 1,
-): MushafFace | null {
+): T | null {
   if (!candidates.length) return null;
-  const weights = candidates.map(f => {
+  const raw = candidates.map(f => {
     const w = weightOf(f.page);
-    return Number.isFinite(w) && w > 0 ? w : Number.EPSILON;
+    return Number.isFinite(w) && w > 0 ? w : 0;
   });
+  const heaviest = raw.reduce((a, b) => (b > a ? b : a), 0);
+  /* لا وزنَ موجبًا البتّة: فالسحبُ متساوٍ — ولا يُرجَّح أحدُها بحجّة أنّه الأوّل. */
+  const weights = heaviest > 0 ? raw.map(w => (w > 0 ? w : heaviest * MIN_DRAW_SHARE)) : raw.map(() => 1);
   const total = weights.reduce((a, b) => a + b, 0);
-  if (!(total > 0)) return candidates[0];
   let cut = deterministicUnit(seed) * total;
   for (let i = 0; i < candidates.length; i += 1) {
     cut -= weights[i];
-    if (cut <= 0) return candidates[i];
+    if (cut < 0) return candidates[i];
   }
   return candidates[candidates.length - 1];
 }
