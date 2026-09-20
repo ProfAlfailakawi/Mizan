@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { MizanQuranDelivery } from '../server/quran-reading-delivery';
 import { KfgqpcDeliveryRepository } from '../server/kfgqpc-delivery';
+import { packageCarriesPageLoci } from '../server/quran-candidate-source-vault';
 import { KFGQPC_MIRROR_CANDIDATES, QURAN_FULL_TEXT_CANDIDATES } from '../src/lib/quran-candidate-sources';
 
 /*
@@ -64,4 +65,50 @@ test('مقطعٌ فيه آيةٌ عابرةٌ صفحتين يبقى له موض�
   assert.ok(passage.loci.length > 0, 'ضاع موضعُ المقطع كلِّه بسبب آيةٍ واحدة');
   const crossing = passage.ayat.find(a => a.ayah === 44);
   assert.equal(crossing?.page, undefined, 'الآيةُ العابرة ادّعت صفحةً واحدة');
+});
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * بيانُ الإسناد لا ينفي ما يرسله الردُّ نفسُه
+ *
+ * كان `supportsPageLoci: false` ثابتًا لكلّ حزمةٍ مثبَّتة — وكان صادقًا يوم لم تحمل
+ * حزمةٌ موضعًا. ولمّا عادت المواضعُ صار البيانُ يكذب على الرد: `loci` مملوءةٌ والعقدُ
+ * يقول «لا مواضع»، فمن يحترم العقدَ يُخفي صفحةَ المصحف وفي يده هندستُها.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+test('العقدُ يوافق ما يُسلَّم: مواضعُ في الرد ⇔ مواضعُ في البيان', async () => {
+  for (const key of [...MIRROR_KEYS, ...ISLAMWEB_KEYS]) {
+    const provenance = delivery.provenanceFor(key);
+    const passage = await delivery.passage(key, 35, 4, 10);
+    assert.ok(passage, `${key}: لم يُسلَّم المقطع`);
+    assert.equal(
+      provenance.supportsPageLoci,
+      passage.loci.length > 0,
+      `${key}: البيان يقول ${provenance.supportsPageLoci} والرد يرسل ${passage.loci.length} موضعًا`,
+    );
+    assert.equal(
+      provenance.supportedAnchors.includes('PAGE_START'),
+      passage.loci.length > 0,
+      `${key}: مرساةُ الصفحة لا توافق ما يُسلَّم`,
+    );
+  }
+});
+
+test('القدرةُ تُقاس من الحزمة لا من وسم سلسلتها', () => {
+  const capable = [...MIRROR_KEYS, ...ISLAMWEB_KEYS].filter(k => delivery.provenanceFor(k).supportsPageLoci);
+  assert.deepEqual(capable.sort(), [...MIRROR_KEYS].sort());
+  assert.equal(capable.length, 8);
+
+  /*
+   * وهذا الاختبارُ وحده لا يكفي: وسمُ السلسلة يوافق البياناتِ اليوم، فاشتقاقٌ منه
+   * يمرّ خضرًا. فالحارسُ الحقيقيّ بناءٌ لا اختبار — `packageCarriesPageLoci` مدخلُه
+   * الآياتُ وحدها، والوسمُ ليس مُدخلًا فيه أصلًا. ويُقاس هنا أنه يقرأ ما يُعطى:
+   */
+  assert.equal(packageCarriesPageLoci([{ sura_no: 1, aya_no: 1, aya_text: 'ن' }]), false);
+  assert.equal(packageCarriesPageLoci([
+    { sura_no: 1, aya_no: 1, aya_text: 'ن' },
+    { sura_no: 1, aya_no: 2, aya_text: 'ن', page: 1, line_start: 2, line_end: 2 },
+  ]), true);
+  assert.equal(packageCarriesPageLoci([]), false);
 });

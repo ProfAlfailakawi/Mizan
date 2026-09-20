@@ -27,6 +27,17 @@ export interface CandidateQuranVerse {
   line_end?: number;
 }
 
+/*
+ * هل تحمل هذه الحزمةُ مواضعَ صفحاتٍ؟ — سؤالٌ عن البايتات، وجوابُه منها وحدها.
+ *
+ * وُضع هنا بمدخلٍ واحدٍ هو الآياتُ نفسُها، فلا يستطيع مستدعيه أن يشتقّه من وسم السلسلة
+ * ولو أراد: الوسمُ ليس مُدخلًا أصلًا. وهذا حارسُ بناءٍ لا حارسُ اختبار — وهو أقوى،
+ * لأن وسمَ السلسلة يوافق البياناتِ اليومَ فلا يكشفه اختبارٌ على البيانات الحاضرة.
+ */
+export function packageCarriesPageLoci(verses: readonly CandidateQuranVerse[]): boolean {
+  return verses.some(v => v.page !== undefined);
+}
+
 export interface CandidateReviewEvent {
   state: QuranCandidateReviewState;
   reviewerId: string;

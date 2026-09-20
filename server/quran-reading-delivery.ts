@@ -21,6 +21,7 @@ import { MIZAN_IDENTITY_CROSSWALK, crosswalkCoverage, surahCountAssurance } from
 import { ayahCountOf, juzOfLocus, surahNameArabic, surahNameEnglish } from '../src/lib/quran-canon';
 import { KfgqpcDeliveryRepository, type KfgqpcDeliveryPassage } from './kfgqpc-delivery';
 import { islamwebPackageStatus, loadIslamwebReadingPackage } from './islamweb-reading-packages';
+import { packageCarriesPageLoci } from './quran-candidate-source-vault';
 import { verifyServedPackageNumbering } from '../src/lib/quran-delivery-count-guard';
 import { KFGQPC_DELIVERY_READING_BY_RAWI } from '../src/lib/delivered-readings';
 
@@ -93,6 +94,23 @@ export class MizanQuranDelivery {
 
   constructor(private readonly kfgqpc: KfgqpcDeliveryRepository, private readonly env: NodeJS.ProcessEnv = process.env) {}
 
+  /*
+   * هل تحمل حزمةُ هذه الرواية مواضعَ صفحاتٍ فعلًا؟ — يُقاس من بايتاتها، لا من وسم سلسلتها.
+   *
+   * وسمُ السلسلة (`KFGQPC_MIRROR_DERIVED`) قائمةٌ ثانية تفترق عن البيانات أوّلَ ما تتغيّر:
+   * حزمةٌ تُضاف بلا مواضع، أو مصدرٌ يبدأ بنشرها، فيكذب الوسمُ على الحزمة. فتُقرأ القدرةُ
+   * من الحزمة نفسِها وتُحفظ — وحزمةٌ لا تُحمّل تُقرأ «لا مواضع»، فالفشلُ مغلق.
+   */
+  private readonly pageCapability = new Map<string, boolean>();
+  private carriesPageLoci(rawiId: string): boolean {
+    const cached = this.pageCapability.get(rawiId);
+    if (cached !== undefined) return cached;
+    let capable = false;
+    try { capable = packageCarriesPageLoci(loadIslamwebReadingPackage(rawiId, this.env).verses); } catch { capable = false; }
+    this.pageCapability.set(rawiId, capable);
+    return capable;
+  }
+
   /** بيان الإسناد لرواية — يُقرأ قبل الرد حتى تُختم الترويسة بالحقيقة لا بثابت. */
   provenanceFor(readingId: string): ReadingDeliveryProvenance {
     const rawiId = candidateRawiForDeliveryKey(readingId);
@@ -107,6 +125,15 @@ export class MizanQuranDelivery {
       const anchors: ReadingDeliveryAnchor[] = coverage.questionSafe
         ? ['AYAH_START', 'SURAH_START', 'JUZ_START']
         : ['AYAH_START', 'SURAH_START'];
+      /*
+       * ومرساةُ الصفحة تتبع ما يُسلَّم فعلًا.
+       *
+       * كان `supportsPageLoci: false` ثابتًا لكلّ حزمةٍ مثبَّتة، وكان صادقًا يوم لم تحمل
+       * حزمةٌ موضعًا. ولمّا عادت المواضعُ صار البيانُ ينفي ما يُرسله الردُّ نفسُه في
+       * `loci` — ومن يحترم العقدَ يُخفي صفحةَ المصحف وفي يده هندستُها. فيُشتقّ.
+       */
+      const pageCapable = this.carriesPageLoci(rawiId);
+      if (pageCapable) anchors.push('PAGE_START');
       return {
         readingId,
         rawiId,
@@ -123,7 +150,7 @@ export class MizanQuranDelivery {
           : 'نصٌّ مشتقٌّ من مصاحف إسلام ويب، مثبَّتٌ ببصمة وقرار لجنةٍ مربوطٍ بها. ليس من مجمع الملك فهد.',
         packageId: `${source.authority.toLowerCase().replace(/_/g, '-')}-${source.deliveryKey}-${source.upstreamCommit.slice(0, 12)}`,
         sourceSha256: source.expectedCompressedSha256,
-        supportsPageLoci: false,
+        supportsPageLoci: pageCapable,
         supportedAnchors: anchors,
         ...(source.caveat ? { caveat: source.caveat } : {}),
       };
