@@ -12,7 +12,20 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed';
+
+/*
+ * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
+ *
+ * فـ`judging` تفتح البوّابةَ وتُسقط كلمةً واحدةً من التلاوة المُعادة: الكلمةُ الرابعة.
+ * فإن لم تظهر تحتها علامةٌ في الصفحة فالربطُ لا يعمل، وإن ظهرت تحت غيرها فالتوقيتُ
+ * أو الترتيبُ مكسور.
+ *
+ * و`judging-closed` تُبقيها مغلقةً كما هي في الإنتاج اليوم — فيُقاس أنّ الشاشةَ
+ * **لا تحكم** وتقول للطالب لماذا.
+ */
+const SKIPPED_WORD_INDEX = 3;
+const HARNESS_MODEL = 'harness-model-1';
 
 const RAWI = 'hafs';
 const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -34,7 +47,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
     return found;
   };
 
-  let served = 0;
+  let served = 0, heard = 0;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://127.0.0.1:${port}`);
 
@@ -44,6 +57,34 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
     }
     if (url.pathname === '/api/quran/practice/face') {
       return json(res, pageOf(Number(url.searchParams.get('page'))));
+    }
+    if (url.pathname === '/api/quran/practice/judging-gate') {
+      const open = scenario === 'judging';
+      return json(res, {
+        reading: RAWI,
+        word: open ? 'OPEN' : 'CLOSED',
+        tashkeel: 'CLOSED',
+        modelVersion: open ? HARNESS_MODEL : null,
+        reasons: open ? [] : ['ASR_BENCHMARK_NOT_AVAILABLE'],
+      });
+    }
+    if (url.pathname === '/api/quran/practice/recognise') {
+      if (scenario !== 'judging') return json(res, { code: 'QURAN_ASR_JUDGING_CLOSED' }, 409);
+      const index = heard;
+      heard += 1;
+      const face = pageOf(single.page);
+      /*
+       * ويُعاد نصُّ الوجه نفسُه كلمتين في كلّ مقطع — من حزمة الرواية لا من اختراع —
+       * إلا الكلمةَ الرابعة، فتُسقط عمدًا. فالمقصودُ قياسُ الربط لا قياسُ محرّك.
+       */
+      const words = [];
+      for (const offset of [0, 1]) {
+        const at = index * 2 + offset;
+        if (at >= face.words.length || at === SKIPPED_WORD_INDEX) continue;
+        words.push({ text: face.words[at].text, confidence: 0.95, startMs: offset * 800, endMs: offset * 800 + 700 });
+      }
+      await sleep(30);
+      return json(res, { reading: RAWI, modelVersion: HARNESS_MODEL, words });
     }
     if (url.pathname === '/api/quran/practice/align') {
       const index = served;

@@ -76,21 +76,33 @@ test('nothing sounds when nothing was judged', () => {
   assert.ok(planAlertForJudgment(judged, EMPTY_ALERT_MEMORY, 1_000).sound, 'and a real judgment does sound');
 });
 
-test('what the microphone heard under the tone is thrown away before judging', () => {
+test('the tone\u2019s own echo is thrown away — and a real word under it is not', () => {
   /*
    * وهذا هو القيدُ الذي يجعل التنبيهَ ممكنًا أصلًا على ميكروفونٍ خام. ولولاه لعاد
-   * صدى النغمة «كلمةً زائدة»، فيُنبَّه عليها، فتُصنع نغمةٌ أخرى — دورةٌ لا تنتهي.
+   * صدى النغمة «كلمةً زائدة». لكنّ أوّلَ صياغةٍ طرحت كلَّ ما في النافذة، فطرحت كلماتٍ
+   * صحيحةً فصارت «لم تُسمع» — وكشف ذلك أوّلُ تشغيلٍ في متصفّح.
    */
   const windows = [alertWindow(2_000)];
+  const face = new Set(['رب', 'العالمين', 'الرحمن']);
   const words = [
     { text: 'رب', confidence: 0.9, startMs: 1_000, endMs: 1_400 },
     { text: 'شششش', confidence: 0.3, startMs: 1_950, endMs: 2_100 },
+    { text: 'الرحمن', confidence: 0.94, startMs: 2_000, endMs: 2_150 },
     { text: 'العالمين', confidence: 0.95, startMs: 3_000, endMs: 3_500 },
   ];
-  const { kept, dropped, untimed } = dropWordsUnderAlert(words, windows);
-  assert.deepEqual(kept.map(w => w.text), ['رب', 'العالمين']);
-  assert.deepEqual(dropped.map(w => w.text), ['شششش']);
+  const { kept, dropped, untimed } = dropWordsUnderAlert(words, windows, text => face.has(text));
+  assert.deepEqual(dropped.map(w => w.text), ['شششش'], 'ما طُرح ليس أثرَ النغمة وحده');
+  assert.deepEqual(kept.map(w => w.text), ['رب', 'الرحمن', 'العالمين'], 'كلمةٌ من الوجه طُرحت لأنّها جارةُ نغمة');
   assert.equal(untimed, 0);
+});
+
+test('with no knowledge of the face, nothing at all is thrown away', () => {
+  /*
+   * فالافتراضُ الصامتُ هو الأسلم: مَن لم يُعطَ نصَّ الوجه لا يقدر أن يميّز أثرَ نغمةٍ
+   * من كلمةٍ قُرئت، فلا يطرح شيئًا — ويبقى الخطرُ «كلمةً زائدة» لا «كلمةً ساقطة».
+   */
+  const words = [{ text: 'شششش', confidence: 0.2, startMs: 1_990, endMs: 2_050 }];
+  assert.deepEqual(dropWordsUnderAlert(words, [alertWindow(2_000)]).dropped.map(w => w.text), ['شششش']);
 });
 
 test('the window is wider than the tone, on both sides', () => {
@@ -105,6 +117,7 @@ test('a word with no timing is kept, and the loss of the guard is counted', () =
   const { kept, dropped, untimed } = dropWordsUnderAlert(
     [{ text: 'رب', confidence: 0.9 }, { text: 'العالمين', confidence: 0.9, startMs: 1_900, endMs: 2_000 }],
     [alertWindow(2_000)],
+    () => false,
   );
   assert.deepEqual(kept.map(w => w.text), ['رب']);
   assert.deepEqual(dropped.map(w => w.text), ['العالمين']);

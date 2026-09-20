@@ -66,6 +66,30 @@ export function faceNote(code: string, ar: boolean): string {
   return ar ? 'تعذّر فتحُ الوجه الآن.' : 'The face could not be opened right now.';
 }
 
+/**
+ * ولماذا لا يُقال لهذا الطالب «أخطأت».
+ *
+ * فبوّابةُ الحكم مغلقةٌ افتراضًا، وإغلاقُها ليس عيبًا يُخفى: يُقال له بأيّ سببٍ
+ * أُغلقت، فيعرف أنّ الصمتَ عن خطئه ليس شهادةً بصوابه.
+ *
+ * ولا يُقال شيءٌ حين تكون مفتوحة: البابُ المفتوحُ يُرى بأثره على الوجه.
+ */
+export function judgingNote(gate: { word: 'OPEN' | 'CLOSED'; reasons: readonly string[] } | null, ar: boolean): string | undefined {
+  if (!gate || gate.word === 'OPEN') return undefined;
+  const why = gate.reasons.join(' ');
+  if (/NOT_CONFIGURED/.test(why))
+    return ar ? 'وكشفُ الخطأ غيرُ مهيّأٍ في هذه المسابقة بعد، فلا يُقال لك «أخطأت» ولا «أصبت».'
+      : 'Mistake detection is not set up in this competition yet — nothing here says you erred, or that you did not.';
+  if (/OTHER_RIWAYAH|DATASET_OTHER/.test(why))
+    return ar ? 'ومحرّكُ السماع لم يُقس على روايتك أنت، ولا يُقاس قارئُ روايةٍ بمسطرة أخرى. فلا حكمَ هنا.'
+      : 'The listening engine was not measured on your riwayah — one riwayah is never judged by another’s ruler.';
+  if (/BENCHMARK_NOT_AVAILABLE|SAMPLE_COUNT|ERROR_RATE|LATENCY|MISSING_SLICE|DUAL_APPROVED|BENCHMARK_INVALID/.test(why))
+    return ar ? 'ومحرّكُ السماع لم يجتز قياسَه لروايتك بعد، فلا يُحكم بما لم يُقس.'
+      : 'The listening engine has not passed its measurement for your riwayah, so it does not judge.';
+  return ar ? 'وكشفُ الخطأ مغلقٌ الآن، فالوجهُ يُقرأ ويُوصف ولا يُحكم عليه.'
+    : 'Mistake detection is closed right now — the face is described, not judged.';
+}
+
 /* ── ذاكرةُ المحاولات، في الجهاز وحده ──────────────────────────────────── */
 
 

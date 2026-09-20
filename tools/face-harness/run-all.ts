@@ -1,5 +1,5 @@
 /*
- * أربعُ تلاواتٍ في متصفّحٍ حقيقيّ — وهو القياسُ الذي لم يكن.
+ * تلاواتٌ في متصفّحٍ حقيقيّ — وهو القياسُ الذي لم يكن.
  *
  * فالعيوبُ الثمانيةُ التي وُجدت في هذه الشاشة كانت كلُّها **زمنيّة**: تعليقٌ، وترتيبُ
  * وصول، وتركيبٌ يتكرّر، وطلبٌ يعود بعد أوانه. ولم يرَ منها بناءٌ ولا تصييرٌ إلى نصّ
@@ -63,6 +63,31 @@ const PLAN: Expectation[] = [
       [!!o.analysisNote?.includes('لم يصل'), `لم يُقل إنّ مقطعًا لم يصل: ${o.analysisNote}`],
     ]),
   },
+  {
+    scenario: 'judging', reciteMs: 9000, settleMs: 25_000,
+    why: 'بوّابةٌ مفتوحة وكلمةٌ أُسقطت عمدًا — أتُعلَّم في موضعها؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      /*
+       * والكلمةُ الرابعة (الفهرس ٣) هي التي أسقطها المِشْحَن. فإن لم تُعلَّم فالربطُ
+       * لا يعمل، وإن عُلّمت غيرُها فالترتيبُ أو التوقيتُ مكسور.
+       */
+      [o.mistakes.some(m => m.word === 3 && m.kind === 'skipped'), `لم تُعلَّم الكلمةُ الساقطة: ${JSON.stringify(o.mistakes)}`],
+      [!o.mistakes.some(m => m.word < 3), `عُلّمت كلماتٌ قبلها بلا موجب: ${JSON.stringify(o.mistakes)}`],
+      [o.gateNote === null, `بيانُ بوّابةٍ مغلقةٍ وهي مفتوحة: ${o.gateNote}`],
+    ]),
+  },
+  {
+    scenario: 'judging-closed', reciteMs: 7000, settleMs: 25_000,
+    why: 'بوّابةٌ مغلقة — أتصمت الشاشةُ عن الحكم وتقول لماذا؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      [o.mistakes.length === 0, `حُكم بلا إذن: ${JSON.stringify(o.mistakes)}`],
+      [!!o.gateNote && o.gateNote.includes('لم يجتز'), `لم يُقل للطالب لماذا لا يُحكم: ${o.gateNote}`],
+    ]),
+  },
 ];
 
 async function main() {
@@ -86,7 +111,7 @@ async function main() {
     process.exitCode = 1;
     return;
   }
-  console.log(`\nأربعُ تلاواتٍ جرت في متصفّحٍ حقيقيّ بميكروفونٍ حقيقيّ — وكلُّها كما يجب.`);
+  console.log(`\n${PLAN.length} تلاواتٍ جرت في متصفّحٍ حقيقيّ بميكروفونٍ حقيقيّ — وكلُّها كما يجب.`);
 }
 
 void main();

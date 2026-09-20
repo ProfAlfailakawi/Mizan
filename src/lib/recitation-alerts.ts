@@ -106,21 +106,35 @@ export function alertWindow(at: number, toneMs = ALERT_TONE_MS, margin = ALERT_E
 export interface TimedWord { text: string; confidence: number; startMs?: number; endMs?: number }
 
 /**
- * يُطرح ما سُمع تحت نغمةٍ قبل أن يُحكم.
+ * يُطرح **أثرُ النغمة** مما سُمع قبل أن يُحكم — لا ما سُمع تحتها.
  *
- * وكلمةٌ بلا توقيتٍ **تُبقى**: لا يُطرح ما لا يُعرف موضعُه من الزمن، فذلك طرحٌ
- * بالظنّ. والعقدُ يسمح بغياب التوقيت، فمحرّكٌ لا يرسله يُفقد هذا الحارسَ لا أكثر —
- * ويُعرف ذلك بالعدد الذي يُرجَع.
+ * وأوّلُ صياغةٍ طرحت كلَّ كلمةٍ تقع في نافذة نغمة، فصنعت ما جاءت تمنعه: الكلمةُ
+ * المطروحةُ تصير «لم تُسمع»، فيُنبَّه عليها، فتُفتح نافذةٌ أخرى، فتُطرح كلمةٌ أخرى —
+ * دورةٌ تُخطّئ قارئًا مصيبًا. **وكشفها أوّلُ تشغيلٍ في متصفّح**: ثلاثُ كلماتٍ قرأها
+ * الطالبُ صحيحةً عُلّمت «لم تُسمع»، وكلُّها جارةُ نغمة.
+ *
+ * والصوابُ أنّ النغمةَ لا تصنع كلمةً من كلمات الوجه: أقصى ما تصنعه لفظٌ غريبٌ عنه.
+ * فيُطرح ما اجتمع فيه أمران: أن يقع في النافذة، **وألّا يكون من كلمات هذا الوجه**.
+ *
+ * وثمنُ ذلك معلومٌ ومقبول: إبدالٌ وقع تحت النغمة بعينها يمرّ بلا أن يُقال. وسكوتٌ
+ * عن خطأٍ أهونُ من أن يُقال لحافظٍ «لم تُسمع» وقد قرأها.
+ *
+ * وكلمةٌ بلا توقيتٍ تُبقى: لا يُطرح ما لا يُعرف موضعُه من الزمن. ويُعدّ ذلك ليُعرف
+ * أنّ الحارسَ لم ينطبق عليها.
  */
-export function dropWordsUnderAlert<T extends TimedWord>(words: readonly T[], windows: readonly SoundWindow[]) {
+export function dropWordsUnderAlert<T extends TimedWord>(
+  words: readonly T[],
+  windows: readonly SoundWindow[],
+  belongsToFace: (text: string) => boolean = () => false,
+) {
   if (!windows.length) return { kept: [...words], dropped: [] as T[], untimed: 0 };
   const kept: T[] = [], dropped: T[] = [];
   let untimed = 0;
   for (const word of words) {
     const start = word.startMs, end = word.endMs ?? word.startMs;
     if (start === undefined || end === undefined) { untimed += 1; kept.push(word); continue }
-    const hit = windows.some(w => start <= w.endMs && end >= w.startMs);
-    (hit ? dropped : kept).push(word);
+    const underTone = windows.some(w => start <= w.endMs && end >= w.startMs);
+    (underTone && !belongsToFace(word.text) ? dropped : kept).push(word);
   }
   return { kept, dropped, untimed };
 }
