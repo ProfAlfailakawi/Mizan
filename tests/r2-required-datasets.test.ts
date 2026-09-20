@@ -18,6 +18,7 @@ import {
 } from '../server/kfgqpc-ingest-core';
 import { candidateRawiForDeliveryKey } from '../server/quran-reading-delivery';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
+import { assertResultsReady } from '../scripts/kfgqpc-ingest';
 
 /** معرّفُ حزمة الاستيعاب ← الراوي القانونيّ الذي تخدمه. مطابقةٌ صريحة، لا اشتقاقٌ بالاسم. */
 const RETIRED_DATASET_RAWI: Record<string, string> = {
@@ -71,4 +72,36 @@ test('a retired text dataset has no local substitute for audio, pages or tafsir'
     assert.equal(candidateRawiForDeliveryKey(id), undefined,
       `${id} must not resolve to a reading artifact — it has no local substitute`);
   }
+});
+
+test('the ingest preflight follows the same required list — a retired dataset never blocks publishing', () => {
+  /*
+   * العطبُ الذي وقع: قُصرت قائمةُ المطلوب في الكتالوج، وبقي `assertResultsReady` يشترط
+   * التحقّقَ من **كلّ** حزمة. فتضييقٌ في موضعٍ يُبطله شرطٌ قديمٌ في موضعٍ آخر، ولا
+   * يُنشر كتالوجٌ جاهزٌ أبدًا.
+   *
+   * ويُقاس هنا بالتشغيل لا بقراءة النصّ: تُستدعى الدالّةُ بحالاتٍ حقيقيّة.
+   */
+  const row = (id: string, status: string) => ({ spec: { id }, status: status as never });
+  const allRequiredVerified = [...KFGQPC_REQUIRED_DELIVERY_DATASETS].map(id => row(id, 'VERIFIED'));
+
+  // حزمةٌ مُخرَجةٌ غائبةٌ أو غيرُ مُتحقَّقة لا تمنع النشر.
+  assert.doesNotThrow(() => assertResultsReady([...allRequiredVerified, row('hafs', 'UNVERIFIED')]));
+  assert.doesNotThrow(() => assertResultsReady(allRequiredVerified));
+
+  // وحزمةٌ مطلوبةٌ غيرُ مُتحقَّقة تمنعه، وتُسمّى.
+  assert.throws(() => assertResultsReady([...allRequiredVerified.slice(1), row(KFGQPC_REQUIRED_DELIVERY_DATASETS[0], 'UNVERIFIED')]),
+    new RegExp(`VERIFY_NOT_READY:${KFGQPC_REQUIRED_DELIVERY_DATASETS[0]}`));
+
+  /*
+   * وحزمةٌ مُخرَجةٌ ليست مهمَلة: غيابُها مقبولٌ لأنّا لا نقرؤها، أمّا بايتاتٌ تخالف
+   * بصمتَها فعطبٌ يوقف النشر مهما كانت الحزمة.
+   */
+  assert.throws(() => assertResultsReady([...allRequiredVerified, row('hafs', 'QUARANTINED')]),
+    /RETIRED_DATASET_QUARANTINED:hafs/);
+
+  // والصوتان الاختياريّان يبقيان معاملةً صريحة.
+  assert.throws(() => assertResultsReady([...allRequiredVerified, row('audio-warsh', 'QUARANTINED')]),
+    /OPTIONAL_AUDIO_STATE_INVALID|RETIRED_DATASET_QUARANTINED/);
+  assert.doesNotThrow(() => assertResultsReady([...allRequiredVerified, row('audio-duri', 'UNVERIFIED')]));
 });

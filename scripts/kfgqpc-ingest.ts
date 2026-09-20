@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {R2PrivateClient,r2ConfigFromEnv} from '../server/r2-private';
-import {assertOfficialKfgqpcUrl,assertUploadFitsBudget,buildPackageManifest,buildReadyDeliveryCatalog,hashDirectory,listFilesRecursive,storageReport,validateMushafDeliveryPages,verifyFileChecksums,type KfgqpcChecksumExpectation,type KfgqpcIngestStatus,type KfgqpcDeliveryCatalogDataset} from '../server/kfgqpc-ingest-core';
+import {KFGQPC_REQUIRED_DELIVERY_DATASETS,assertOfficialKfgqpcUrl,assertUploadFitsBudget,buildPackageManifest,buildReadyDeliveryCatalog,hashDirectory,listFilesRecursive,storageReport,validateMushafDeliveryPages,verifyFileChecksums,type KfgqpcChecksumExpectation,type KfgqpcIngestStatus,type KfgqpcDeliveryCatalogDataset} from '../server/kfgqpc-ingest-core';
 
 const OFFICIAL_DEV='https://qurancomplex.gov.sa/en/techquran/dev/';
 const OFFICIAL_AUDIO='https://qurancomplex.gov.sa/category/kfgqpc-quran-audio/recite/';
@@ -86,9 +86,23 @@ async function publishReadyCatalog(r2:R2PrivateClient,results:ReturnType<typeof 
   return {catalog,versionKey,status:dryRun?'DRY_RUN':'PUBLISHED'};
 }
 
-function assertResultsReady(results:ReturnType<typeof verifyDataset>[]){
-  const unready=results.filter(r=>!['audio-warsh','audio-duri'].includes(r.spec.id)&&r.status!=='VERIFIED');
+/*
+ * فحصُ ما قبل النشر يتبع قائمةَ المطلوب نفسَها، ولا يُعيد تعريفها.
+ *
+ * كان يشترط التحقّقَ من **كلّ** حزمةٍ إلّا الصوتين الاختياريّين. فلمّا قُصرت قائمةُ
+ * المطلوب على ما يقرؤه الإنتاج بقي هذا الفحصُ يطلب الستَّ المُخرَجة، فلا يُنشر كتالوجٌ
+ * جاهزٌ أبدًا — تضييقٌ في موضعٍ وشرطٌ قديمٌ في موضعٍ آخر يُبطله.
+ *
+ * **وحزمةٌ مُخرَجةٌ ليست حزمةً مهمَلة:** غيابُها مقبولٌ لأنّا لا نقرؤها، أمّا بايتاتٌ
+ * تُخالف بصمتَها (`QUARANTINED`) فعطبٌ يُوقف النشر مهما كانت الحزمة. فالتساهلُ في
+ * الوجود لا يعني التساهلَ في السلامة.
+ */
+export function assertResultsReady(results:{spec:{id:string};status:KfgqpcIngestStatus}[]){
+  const required=new Set<string>(KFGQPC_REQUIRED_DELIVERY_DATASETS);
+  const unready=results.filter(r=>required.has(r.spec.id)&&r.status!=='VERIFIED');
   if(unready.length)throw new Error(`VERIFY_NOT_READY:${unready.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
+  const corrupt=results.filter(r=>!required.has(r.spec.id)&&r.status==='QUARANTINED');
+  if(corrupt.length)throw new Error(`RETIRED_DATASET_QUARANTINED:${corrupt.map(r=>r.spec.id).join(',')}`);
   const invalidOptional=results.filter(r=>(r.spec.id==='audio-warsh'&&!['VERIFIED','OFFICIAL_AUDIO_UNAVAILABLE'].includes(r.status))||(r.spec.id==='audio-duri'&&!['VERIFIED','UNVERIFIED'].includes(r.status)));
   if(invalidOptional.length)throw new Error(`OPTIONAL_AUDIO_STATE_INVALID:${invalidOptional.map(r=>`${r.spec.id}:${r.status}`).join(',')}`);
 }
