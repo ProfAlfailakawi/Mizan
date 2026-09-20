@@ -187,7 +187,6 @@ The **software architecture and a large portion of the executable integrity logi
 | Official Mushaf page surface in JudgeOS | ✅ / deployment asset | Uses mounted official page bytes only; otherwise exact official text + page/line anchors. Never fabricates a page. |
 | Smart-device Uthmanic text surface | ✅ | Structured, exact source context retained. |
 | Six official developer reading packages | ✅ | Reading-isolated, official package identities retained. |
-| Tafseer / Ghareeb / Tajweed reference layers | ✅ | Reference provenance implemented; no automatic scoring/certification inheritance. |
 | Official Quran font runtime | ✅ / deployment asset | Self-hosted endpoint; activates only when actual approved font bytes are mounted. |
 | Desktop publishing provenance | ✅ | SHA-256 manifest binds source/version/purpose/page. |
 | Publication-image provenance | ✅ | Visual evidence cannot replace structured Quran source. |
@@ -235,3 +234,7 @@ The **software architecture and a large portion of the executable integrity logi
 | TypeScript | ✅ | `tsc --noEmit` passed |
 | Source/secret audits | ✅ | Both passed after the round |
 | Production Vite build | ○ | Not claimed: project dependencies are not installed in this execution environment (`vite: not found`) |
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

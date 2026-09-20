@@ -4,7 +4,6 @@
 MIZAN accepts Quran assets only from HTTPS URLs whose hostname is exactly `qurancomplex.gov.sa` or a real subdomain ending in `.qurancomplex.gov.sa`. This includes official services such as `download.qurancomplex.gov.sa`, `fonts.qurancomplex.gov.sa`, `qc-dev.qurancomplex.gov.sa`, and `dm.qurancomplex.gov.sa`. Lookalike domains are rejected.
 
 ## Covered datasets
-The pipeline covers the agreed KFGQPC developer packages: Hafs v13, Warsh v6, Shu'bah v4, Qalun v5, Al-Duri from Abu Amr v3, Al-Susi from Abu Amr v3, Tafsir Muyassar, Ghareeb Muyassar, and Tajweed Muyassar. Published MD5 and SHA-1 values remain mandatory for these packages.
 
 It also covers official Quran fonts for Hafs, Warsh, Shu'bah, Qalun, Al-Duri, and Al-Susi; the official 604-page Madinah Mushaf delivery set; and ayah audio targets for Hafs/Maher Al-Muaiqly, Shu'bah/Ali Al-Hudhaifi, Qalun/Ali Al-Hudhaifi, Al-Susi/Uthman Al-Siddiqi, with Al-Duri/Abdullah Al-Juhani and Warsh/Ibrahim Al-Dawsari handled fail-closed until a current direct official package passes structural validation.
 
@@ -32,3 +31,7 @@ If KFGQPC changes its page HTML so automatic discovery cannot identify a direct 
 
 ## Fail-closed exceptions
 Warsh audio remains unavailable when the current official catalog exposes no verified direct ayah package. Al-Duri audio remains unverified under the existing MIZAN policy until the official listing anomaly is resolved by a direct package that passes archive-content validation. The pipeline does not weaken those states merely because historical evidence or a page title exists.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

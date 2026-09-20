@@ -23,9 +23,6 @@ kfgqpc/
     duri-abi-amr/v3/
     susi/v3/
   knowledge/
-    tafsir-muyassar/
-    ghareeb-muyassar/
-    tajweed-muyassar/
   mushaf-masters/
   audio/
 ```
@@ -53,9 +50,6 @@ Known developer/text/knowledge packages total approximately **82.342 MB**:
 - Qalun: 8.35 MB
 - Al-Duri 'an Abi Amr: 8.38 MB
 - Al-Susi: 8.44 MB
-- Tafsir Muyassar: 7.51 MB
-- Ghareeb Muyassar: 934 KB
-- Tajweed Muyassar: 178 KB
 
 ## Verified public audio sizes (ayah-split packages currently listed by KFGQPC)
 Approximately **10.94 GB** for the currently listed set used in the estimate. This includes several Hafs reciters plus Qalun, Shu'bah, Al-Duri 'an Abi Amr and Al-Susi. The current public audio index should be rechecked before bulk ingestion because the catalog can change.
@@ -68,3 +62,13 @@ The KFGQPC developer page confirms a digital vector copy of Mushaf al-Madinah fo
 - Current official audio set + text data: about 11.1 GB.
 - With Mushaf masters / optimized page delivery assets: provision **20 GB initially** for MIZAN-required assets, then grow from measured ingestion.
 - Do not ingest the complete KFGQPC publication-photo/book/translation universe unless MIZAN actually needs it.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من
+> النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها
+> وخطوطُ بنائها. وما بقي منها في R2 لا يقرؤه المنتج.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

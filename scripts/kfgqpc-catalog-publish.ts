@@ -52,7 +52,6 @@ function summarize(objects: { key: string; size: number }[]) {
     mirrors: [
       'github.com/thetruetruth/quran-data-kfgqpc',
       'files.quran.app (madani pages)',
-      'github.com/spa5k/tafsir_api (ar-tafsir-muyassar)',
       'everyayah.com (Maher Al-Muaiqly, Hafs)',
       'github.com/zonetecde/mushaf-layout (word/line layout)'
     ],

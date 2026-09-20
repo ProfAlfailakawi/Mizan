@@ -10,7 +10,6 @@ This phase completes everything that can be completed safely while the King Fahd
 - Vector master ingestion/validation with unresolved layers held fail-closed.
 - Streaming alignment transport, stabilization, loss/reacquisition state machine, benchmark gate and human-only score authority.
 - A readiness API that exposes what is complete versus waiting on official assets for every supported reading.
-- A science-intake inventory that automatically profiles and hashes official Tajweed/Tafsir/Ghareeb payloads as soon as acquisition succeeds, without promoting prose or filenames into Quran science.
 - JudgeOS Quran Intelligence visual layer redesigned to show live confidence, readiness chain, waqf state, Tajweed education state and vector/live-tracking readiness without claiming unavailable capabilities.
 
 ## Waiting only for KFGQPC bytes / external engine evidence
@@ -22,7 +21,6 @@ This phase completes everything that can be completed safely while the King Fahd
 
 ## Activation sequence when KFGQPC returns
 1. Run the existing official acquisition build.
-2. `kfgqpc-science-intake.ts` inventories/hashes official science payloads automatically.
 3. Verify + ingest official Quran datasets and derive printed waqf.
 4. Map official Waqf/Ibtida and Tajweed evidence; register only after provenance gates pass.
 5. Derive vector metadata from the official master; unresolved layers stay unresolved.
@@ -30,3 +28,7 @@ This phase completes everything that can be completed safely while the King Fahd
 7. Run R2 postflight and full JudgeOS end-to-end verification.
 
 No unofficial fallback, OCR, Quran TTS, cross-riwayah substitution, guessed word coordinates or autonomous AI scoring is introduced by this phase.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

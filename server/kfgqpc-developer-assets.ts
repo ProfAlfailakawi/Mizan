@@ -7,9 +7,6 @@ export type KfgqpcDeveloperAssetKind =
   | 'PRINT_VECTOR_MUSHAF'
   | 'SMART_DEVICE_UTHMANIC_TEXT'
   | 'QURAN_UNICODE_PACKAGE'
-  | 'TAFSEER_DATA'
-  | 'GHAREEB_DATA'
-  | 'TAJWEED_BOOK_DATA'
   | 'WAQF_REFERENCE'
   | 'OFFICIAL_QURAN_FONT'
   | 'DESKTOP_PUBLISHING'
@@ -70,39 +67,6 @@ export const KFGQPC_DEVELOPER_ASSETS:readonly KfgqpcDeveloperAsset[]=[
   },
   ...([] as KfgqpcDeveloperAsset[]),
   {
-    id:'kfgqpc-tafseer-muyassar',
-    kind:'TAFSEER_DATA',
-    titleArabic:'التفسير الميسر للقرآن الكريم',
-    titleEnglish:'Tafseer Muyassar',
-    authority:'King Fahd Glorious Quran Printing Complex',
-    authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',
-    officialCertification:'CERTIFIED',
-    officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',
-    narrations:['Hafs'],
-    formats:['Excel','CSV','HTML5','SQL','XML','JSON','TXT'],
-    fileSizeLabel:'7.51MB',
-    md5:'5601682965E32F4DD6992C7600FDCCC3',
-    sha1:'5F533113C2F54F32EDED734BB49E6A5837965722',
-    notes:['Contains Hafs Quran data plus aya_tafseer aligned to each ayah.']
-  },
-  {
-    id:'kfgqpc-muyassar-ghareeb',
-    kind:'GHAREEB_DATA',
-    titleArabic:'الميسر في غريب القرآن الكريم',
-    titleEnglish:'Muyassar of Ghareeb Al-Quran',
-    authority:'King Fahd Glorious Quran Printing Complex',
-    authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',
-    officialCertification:'CERTIFIED',
-    officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',
-    narrations:['Hafs'],
-    formats:['Excel','CSV','HTML5','SQL','XML','JSON'],
-    fileSizeLabel:'934KB',
-    md5:'7E22381EEDB152EE7ED6488F2395C6CD',
-    sha1:'055A908C6EC7F06912C33BD00920406C665CC5F9',
-    notes:['Word-level Quranic terms with explanatory text.']
-  },
-
-  {
     id:'kfgqpc-computer-fonts',kind:'OFFICIAL_QURAN_FONT',titleArabic:'الخطوط الحاسوبية الرسمية',titleEnglish:'Official Quran computer fonts',authority:'King Fahd Glorious Quran Printing Complex',authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',officialCertification:'CERTIFIED',officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',formats:['Computer font packages'],notes:['Use only within the exact source/riwayah scope published by KFGQPC. MIZAN must not visually substitute one reading font for another.']
   },
   {
@@ -123,19 +87,4 @@ export const KFGQPC_DEVELOPER_ASSETS:readonly KfgqpcDeveloperAsset[]=[
     formats:['Official reference/publication material'],
     notes:['Official scientific reference discovery only. MIZAN does not claim a structured word-indexed waqf dataset until such data are imported with exact provenance.']
   },
-  {
-    id:'kfgqpc-tajweed-muyassar',
-    kind:'TAJWEED_BOOK_DATA',
-    titleArabic:'التجويد الميسر',
-    titleEnglish:'Al-Tajweed al-Muyassar',
-    authority:'King Fahd Glorious Quran Printing Complex',
-    authorityArabic:'مجمع الملك فهد لطباعة المصحف الشريف',
-    officialCertification:'CERTIFIED',
-    officialReference:'https://qurancomplex.gov.sa/en/techquran/dev/',
-    formats:['Digital book package'],
-    fileSizeLabel:'178KB',
-    md5:'B4A265A810C0CE4A722019791910B67E',
-    sha1:'D2496382FC5E843CCB693B94DD19407EAA174BEA',
-    notes:['Official concise Tajweed reference. It is a scientific reference asset, not an automatically executable AI rule engine.']
-  }
 ] as const;

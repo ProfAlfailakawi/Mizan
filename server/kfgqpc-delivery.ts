@@ -29,7 +29,7 @@ export function kfgqpcFreeTierBudget(env:NodeJS.ProcessEnv=process.env):KfgqpcSt
     {key:'audio-shubah-hudhaifi',labelArabic:'شعبة · علي الحذيفي',bytes:722*MB,note:'official ayah audio package; planning figure until measured ingestion'},
     {key:'audio-qalun-hudhaifi',labelArabic:'قالون · علي الحذيفي',bytes:760.66*MB,note:'official ayah audio package; planning figure until measured ingestion'},
     {key:'audio-susi-siddiqi',labelArabic:'السوسي · عثمان الصديقي',bytes:3.25*GB,note:'official ayah audio package; planning figure until measured ingestion'},
-    {key:'quran-developer-data',labelArabic:'حزم النص والعلوم القرآنية',bytes:83*MB,note:'developer packages + tafsir/ghareeb/tajweed engineering allowance'},
+    {key:'quran-developer-data',labelArabic:'حزم النص والعلوم القرآنية',bytes:83*MB,note:'developer packages/tajweed engineering allowance'},
     {key:'mushaf-delivery-hafs',labelArabic:'صفحات مصحف المدينة · نسخة ويب محسنة',bytes:180*MB,note:'604-page delivery allowance; not a claim about official master size'}
   ];
   const freeTierBytes=KFGQPC_R2_FREE_TIER_BYTES,safetyLimitBytes=configuredR2SafetyLimit(env),plannedBytes=Math.round(items.reduce((n,x)=>n+x.bytes,0));
