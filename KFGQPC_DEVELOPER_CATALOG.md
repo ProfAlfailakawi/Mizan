@@ -21,8 +21,6 @@ Developer formats listed by KFGQPC include Excel, CSV, HTML5, SQL, XML, JSON, TX
 
 - Digital copy of Mus'haf al-Madinah for printing works: high-quality vector source. KFGQPC's technical guide states high-quality digital copies for Hafs and Warsh; the developer page explicitly describes compressed Hafs Adobe Illustrator assets.
 - Hafs Uthmanic text for smart devices: verse-level display, not a full-page Mushaf replica. 21.6MB; MD5 53D82B553E5FE919CA1A732E35BF4EB0; SHA-1 1DBEAE3847880B1C21A956DCFDC0A2D9D490E729.
-- Tafseer Muyassar aligned with Hafs ayahs. 7.51MB; MD5 5601682965E32F4DD6992C7600FDCCC3; SHA-1 5F533113C2F54F32EDED734BB49E6A5837965722.
-- Muyassar of Ghareeb Al-Quran: word-level Quranic terms and explanation. 934KB; MD5 7E22381EEDB152EE7ED6488F2395C6CD; SHA-1 055A908C6EC7F06912C33BD00920406C665CC5F9.
 - Al-Tajweed al-Muyassar digital package. 178KB; MD5 B4A265A810C0CE4A722019791910B67E; SHA-1 D2496382FC5E843CCB693B94DD19407EAA174BEA.
 
 ## Important distinction: page images vs Quran text data
@@ -43,12 +41,13 @@ MIZAN now exposes the requested official capabilities through a single KFGQPC Of
 | 6 | Qalun developer package | Separate official source. |
 | 7 | Al-Duri 'an Abi Amr | Separate official source and explicitly isolated from Al-Duri 'an Al-Kisa'i. |
 | 8 | Al-Susi 'an Abi Amr | Separate official source. |
-| 9 | Tafseer Muyassar | Official explanatory/learning reference; not an automatic scoring source. |
-| 10 | Ghareeb al-Quran | Word-level contextual reference and Digital Twin enrichment. |
-| 11 | Tajweed Muyassar | Official rule-reference provenance; does not automatically certify an AI detector. |
 | 12 | Official Quran fonts | Optional server-mounted font surface, exact-source scoped. |
 | 13 | Desktop publishing | Provenance-bound publishing/emergency-booklet manifest workflow. |
 | 14 | Publication images | Official visual-reference surface; structured Quran source remains authoritative for FairDraw. |
 | 16 | Official audio Mushafs | Exact-reading/reciter audio catalog for opening prompt, calibration and scientific alignment. |
 
 Scientific acceptance and operational asset readiness are intentionally separate. A KFGQPC capability can be officially accepted while a specific deployment still reports `LOCAL_BYTES_REQUIRED` because the relevant vector/font/image/audio binary has not yet been mounted on that server.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

@@ -12,9 +12,6 @@ Verified against the current official King Fahd Glorious Quran Printing Complex 
 | Qalun Uthmanic | 5.0 | 8.35 MB | 964208FF04C8AADD3DDC1BE262D8CFD3 | 81733666BE17742E13C9FA4C7D26D42B1ADC67C8 |
 | Al-Duri 'an Abi Amr Uthmanic | 3.0 | 8.38 MB | A60BDD18397B3E27E4617478968A35C8 | 8049482F04B4FF1053A7859F96B2B113B9771EFB |
 | Al-Susi 'an Abi Amr Uthmanic | 3.0 | 8.44 MB | 1BF6023E29B7622A52B6171232C17096 | E52DBC6D8B43797A8FAA0FD1EC1D8E5000265674 |
-| Tafseer Muyassar | — | 7.51 MB | 5601682965E32F4DD6992C7600FDCCC3 | 5F533113C2F54F32EDED734BB49E6A5837965722 |
-| Muyassar Ghareeb | — | 934 KB | 7E22381EEDB152EE7ED6488F2395C6CD | 055A908C6EC7F06912C33BD00920406C665CC5F9 |
-| Tajweed Muyassar | — | 178 KB | B4A265A810C0CE4A722019791910B67E | D2496382FC5E843CCB693B94DD19407EAA174BEA |
 
 Primary developer authority: https://qurancomplex.gov.sa/en/techquran/dev/
 
@@ -40,3 +37,7 @@ No substitution across readings is allowed.
 - Warsh remains `OFFICIAL_AUDIO_UNAVAILABLE` unless a current official downloadable Ayah package is actually exposed and separately verified.
 - Al-Duri remains `UNVERIFIED` until a direct official Ayah package is identified, its real archive/content structure is validated, and the size anomaly is explicitly resolved.
 - No Hafs or other narration is ever substituted for Warsh or Al-Duri.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها وخطوطُ بنائها. وما ورد عنها في نسخٍ سابقةٍ من هذا المستند لم يعد قائمًا.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

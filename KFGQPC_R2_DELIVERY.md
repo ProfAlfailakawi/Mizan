@@ -25,9 +25,6 @@ delivery/
     qalun/v5/
     duri-abi-amr/v3/
     susi-abi-amr/v3/
-    tafsir-muyassar/v1/
-    ghareeb-muyassar/v1/
-    tajweed-muyassar/v1/
   fonts/
     hafs/v13/primary.ttf
     warsh/v6/primary.ttf
@@ -106,3 +103,9 @@ npx tsx scripts/kfgqpc-ingest.ts --upload --resume --report --root .mizan-ingest
 ```
 
 The command is fail-closed: if even one required dataset is missing, unverified, quarantined, malformed, or would exceed the safety ceiling, MIZAN does not publish the READY catalog. Individual Quran/media objects remain immutable; `delivery/_mizan/catalog.json` is the only mutable readiness pointer and is accompanied by a timestamped immutable catalog snapshot.
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من
+> النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها
+> وخطوطُ بنائها. وما بقي منها في R2 لا يقرؤه المنتج.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.

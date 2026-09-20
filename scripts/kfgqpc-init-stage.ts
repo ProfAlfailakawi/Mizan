@@ -8,7 +8,7 @@ const dev='https://qurancomplex.gov.sa/en/techquran/dev/';
 const audio='https://qurancomplex.gov.sa/category/kfgqpc-quran-audio/recite/';
 const fonts='https://fonts.qurancomplex.gov.sa/';
 const specs=[
- ['hafs',dev,'Hafs Uthmanic 13.0'],['warsh',dev,'Warsh Uthmanic 6.0'],['shubah',dev,"Shu'bah Uthmanic 4.0"],['qalun',dev,'Qalun Uthmanic 5.0'],['duri-data',dev,"Al-Duri an Abi Amr Uthmanic 3.0"],['susi-data',dev,"Al-Susi an Abi Amr Uthmanic 3.0"],['tajweed',dev,'Tajweed Muyassar'],
+ ['hafs',dev,'Hafs Uthmanic 13.0'],['warsh',dev,'Warsh Uthmanic 6.0'],['shubah',dev,"Shu'bah Uthmanic 4.0"],['qalun',dev,'Qalun Uthmanic 5.0'],['duri-data',dev,"Al-Duri an Abi Amr Uthmanic 3.0"],['susi-data',dev,"Al-Susi an Abi Amr Uthmanic 3.0"],
  ['mushaf-pages','https://dm.qurancomplex.gov.sa/','Official Madinah Mushaf 604 delivery pages'],
  ['font-hafs',fonts,'Official KFGQPC Quran font - Hafs'],['font-warsh',fonts,'Official KFGQPC Quran font - Warsh'],['font-shubah',fonts,"Official KFGQPC Quran font - Shu'bah"],['font-qalun',fonts,'Official KFGQPC Quran font - Qalun'],['font-duri',fonts,'Official KFGQPC Quran font - Al-Duri'],['font-susi',fonts,'Official KFGQPC Quran font - Al-Susi'],
  ['audio-hafs',audio,'Hafs - Maher Al-Muaiqly'],['audio-shubah',audio,"Shu'bah - Ali Al-Hudhaifi"],['audio-qalun',audio,'Qalun - Ali Al-Hudhaifi'],['audio-susi',audio,'Al-Susi - Uthman Al-Siddiqi'],

@@ -13,8 +13,6 @@
 | نص 6 روايات | `delivery/quran-data/<reading>/vN/data.json` | thetruetruth/quran-data-kfgqpc |
 | خطوط 6 روايات | `delivery/fonts/<reading>/vN/primary.woff2\|ttf` | thetruetruth |
 | 604 صفحة مصحف | `delivery/mushaf-pages/madinah/v1/NNN.png` | files.quran.app (madani) |
-| التفسير الميسّر | `delivery/quran-data/tafsir-muyassar/v1/data.json` | spa5k/tafsir_api |
-| التجويد (حفص، فهرسة حرفية) | `delivery/quran-data/tajweed-muyassar/v1/data.json` | cpfair/quran-tajweed |
 | صوت حفص/المعيقلي (6236 آية) | `delivery/audio/hafs/maher-al-muaiqly/v1/SSS/AAA.mp3` | everyayah |
 | تخطيط الكلمة (604) | `delivery/quran-data/mushaf-layout/v1/page-NNN.json` | zonetecde/mushaf-layout |
 
@@ -24,7 +22,6 @@
 SA=projects/mizan-f2ce3/serviceAccounts/993698501419-compute@developer.gserviceaccount.com
 gcloud builds submit --config cloudbuild-mirror-delivery.yaml --service-account=$SA --async .   # خطوط+نص+صفحات+تفسير
 gcloud builds submit --config cloudbuild-audio.yaml           --service-account=$SA --async .   # صوت حفص + تخطيط الكلمة
-gcloud builds submit --config cloudbuild-tajweed.yaml         --service-account=$SA --async .   # تجويد + كتالوج
 gcloud builds submit --config cloudbuild-catalog.yaml         --service-account=$SA --async .   # إعادة نشر الكتالوج فقط
 ```
 
@@ -37,3 +34,9 @@ gcloud builds submit --config cloudbuild-catalog.yaml         --service-account=
 - **خزنة المصدر/FairDraw/الوقف**: النص مرفوع للتسليم، لكن الإدخال العلمي المُصدّق checksum-gated على قفل المجمع القديم؛ يحتاج مواءمة سياسة المصدر مع بصمات المرآة (تغيير حسّاس — لم يُنفَّذ).
 - **محاذاة صوتية حية + benchmarks**: أساسها مفتوح جاهز (`tarteel-ai/whisper-base-ar-quran`, `cpfair/quran-align`)، لكن يحتاج نشر backend وتقييم.
 - **الاعتماد الرسمي الموقّع + الماستر الفكتوري**: رسمي فقط (يحتاج تواصل/إذن المجمع).
+
+> **حزمُ الشرح الثلاث (التفسير الميسّر · غريب القرآن · التجويد الميسّر) أُلغيت من
+> النظام كلِّه بقرار المالك في ٢٠ سبتمبر ٢٠٢٦** — حُذفت مواصفاتُها وبصماتُها وأدواتُها
+> وخطوطُ بنائها. وما بقي منها في R2 لا يقرؤه المنتج.
+>
+> ومعيارُ التجويد في التحكيم شيءٌ آخر ولم يُمسّ.
