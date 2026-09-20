@@ -179,6 +179,14 @@ export function serialQueue(): SerialQueue {
        */
       tail = tail.then(() => (abandoned ? undefined : task(live))).catch(error => {
         failed += 1;
+        /*
+         * وبيانُ طابورٍ متروكٍ لا يُسلَّم.
+         *
+         * فقد حُرست الكتابةُ بـ`live()` وتُرك البيانُ بلا حارس — وهو أخطر: البيانُ
+         * يوقف الميكروفون، فمقطعٌ من وجهٍ قديمٍ يسقط **فيُغلق ميكروفونَ الوجه الجديد**
+         * والطالبُ يقرأ. فلا يُسلَّم بيانٌ من طابورٍ انتهى أمرُه، كما لا تُكتب فيه كلمة.
+         */
+        if (abandoned) return;
         try { onFailure?.(error); } catch { /* بيانٌ تعذّر لا يُلغي أنّ المقطع سقط */ }
       });
     },
@@ -244,9 +252,15 @@ export function reviewNote(input: ReviewNoteInput): string | undefined {
       ? 'هذا الوجهُ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى، والتتبّعُ يُطلب لسورةٍ واحدة — فيُراجَع بلا تحليل، ولا يُفتح ميكروفونٌ يعود بتقريرٍ فارغ.'
       : 'This face spans two surahs and tracking is requested per surah — review it without analysis.';
   }
+  /*
+   * ويُقال له أيضًا إنّها لم تُحفظ.
+   *
+   * فالمراجعةُ الناقصةُ لا تدخل ذاكرتَه — ولو سُكت عن ذلك لظنّ أنّ الوجهَ قد رُوجع
+   * وحُسب، فلا يعود إليه. والصمتُ هنا كذبٌ في الأثر.
+   */
   const partial = ar
-    ? 'ولم يصل بعضُ المقاطع، فما تراه مبنيٌّ على ما وصل وحدَه — والنقصُ ليس من تلاوتك.'
-    : 'Some chunks never arrived, so what you see is built only on what did — the gap is not in your recitation.';
+    ? 'ولم يصل بعضُ المقاطع، فما تراه مبنيٌّ على ما وصل وحدَه — والنقصُ ليس من تلاوتك. ولم تُحفظ هذه المراجعةُ في ذاكرتك، فأعِد الوجهَ متى شئت.'
+    : 'Some chunks never arrived, so what you see is built only on what did — the gap is not in your recitation. This review was not recorded; recite the face again whenever you wish.';
   /* السببُ المعروفُ أوّلًا: هو الذي يدلّ الطالبَ على ما يفعل. */
   if (note) return incomplete ? `${note} ${partial}` : note;
   return incomplete ? partial : undefined;
