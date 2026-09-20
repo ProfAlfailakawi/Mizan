@@ -22,7 +22,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, createReadStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { hasZipMagic } from '../server/kfgqpc-acquisition-policy';
 
@@ -36,22 +36,54 @@ export function specsFromIngest(source: string): ArchiveSpec[] {
   return specs;
 }
 
-export function digestBytes(bytes: Buffer) {
+export interface Digest { md5: string; sha1: string }
+
+export function digestBytes(bytes: Buffer): Digest {
   return {
     md5: createHash('md5').update(bytes).digest('hex').toUpperCase(),
     sha1: createHash('sha1').update(bytes).digest('hex').toUpperCase(),
   };
 }
 
+/*
+ * البصمةُ تُحسب بالتدفّق لا بتحميل الملفّ. فالمجلّدُ الذي يُمرَّر — `~/Downloads` كما
+ * في المثال أعلاه — قد يحوي ملفًّا بعدّة جيجابايت، وقراءتُه كاملًا إلى الذاكرة تقتل
+ * العمليّة **قبل** أن تبلغ الأرشيفَ الصحيح. فالحزمةُ الصالحة تضيع بسبب جارٍ لا شأن له.
+ */
+export function digestFileStream(path: string): Promise<Digest> {
+  return new Promise((ok, fail) => {
+    const md5 = createHash('md5'), sha1 = createHash('sha1');
+    createReadStream(path)
+      .on('data', chunk => { md5.update(chunk); sha1.update(chunk); })
+      .on('error', fail)
+      .on('end', () => ok({
+        md5: md5.digest('hex').toUpperCase(),
+        sha1: sha1.digest('hex').toUpperCase(),
+      }));
+  });
+}
+
+/** أوّلُ `n` بايتًا وحدها — لفحص التوقيع بلا تحميل الملفّ. */
+export function leadingBytes(path: string, n: number): Buffer {
+  const fd = openSync(path, 'r');
+  try {
+    const buf = Buffer.alloc(n);
+    return buf.subarray(0, readSync(fd, buf, 0, n, 0));
+  } finally { closeSync(fd); }
+}
+
 /** التعيينُ بالبصمتين معًا. واحدةٌ دون الأخرى ليست تعيينًا — وتُسمّى ولا تُبتلع. */
-export function identify(bytes: Buffer, specs: readonly ArchiveSpec[]) {
-  const digest = digestBytes(bytes);
+export function identifyDigest(digest: Digest, specs: readonly ArchiveSpec[]) {
   for (const spec of specs) {
     const md5 = digest.md5 === spec.md5, sha1 = digest.sha1 === spec.sha1;
     if (md5 && sha1) return {digest, spec};
     if (md5 !== sha1) return {digest, partial: spec.id};
   }
   return {digest};
+}
+
+export function identify(bytes: Buffer, specs: readonly ArchiveSpec[]) {
+  return identifyDigest(digestBytes(bytes), specs);
 }
 
 /* فكٌّ آمن: نفسُ حارس `kfgqpc-acquire.ts` — لا مسارَ مطلقٌ ولا `..` في أيّ مُدخَل. */
@@ -70,7 +102,7 @@ function safeExtract(archive: string, payload: string) {
   if (out.status !== 0) throw new Error(`ZIP_EXTRACT_FAILED:${out.stderr || out.stdout}`);
 }
 
-function main() {
+async function main() {
   const targets = process.argv.slice(2);
   if (!targets.length) {
     console.error('الاستعمال: npx tsx scripts/kfgqpc-stage-archives.ts <ملفّ أو مجلّد> …');
@@ -98,36 +130,52 @@ function main() {
   let refused = 0;
 
   for (const file of files) {
-    const bytes = readFileSync(file);
-    const {digest, spec, partial} = identify(bytes, specs);
+    const {digest, spec, partial} = identifyDigest(await digestFileStream(file), specs);
     const name = basename(file).padEnd(28);
 
     if (partial) { console.log(`  ⚠ ${name} طابقت بصمةٌ واحدة من «${partial}» لا كلتاهما`); refused += 1; continue; }
     if (!spec) { console.log(`  ✗ ${name} لا يطابق أيَّ حزمةٍ رسميّة\n      MD5 ${digest.md5}`); refused += 1; continue; }
-    if (!hasZipMagic(bytes)) { console.log(`  ⚠ ${name} بصمتُه تطابق «${spec.id}» لكنه ليس أرشيف ZIP`); refused += 1; continue; }
-
-    const dir = join(root, spec.id);
-    mkdirSync(dir, {recursive: true});
-    const archive = join(dir, 'source.zip');
-    copyFileSync(file, archive);
-    try { safeExtract(archive, join(dir, 'payload')); }
-    catch (error) { console.log(`  ✗ ${name} تطابق «${spec.id}» لكن الفكَّ فشل: ${error instanceof Error ? error.message : error}`); refused += 1; continue; }
+    if (!hasZipMagic(leadingBytes(file, 4))) { console.log(`  ⚠ ${name} بصمتُه تطابق «${spec.id}» لكنه ليس أرشيف ZIP`); refused += 1; continue; }
 
     /*
-     * `sourceUrl` هويّةُ الناشر لا مسارُ النقل — والناشرُ هو المجمّع، أثبتته البصمة.
+     * الإدخالُ يتمّ في مجلّدٍ مؤقّتٍ ثمّ يُبدَّل دفعةً واحدة، ولا يُكتب في موضعه شيءٌ
+     * ناقص. وهذا ليس تجميلًا: `kfgqpc-ingest.ts` يتحقّق من بصمة `source.zip` ويعدّ
+     * الحمولةَ موجودةً بمجرّد وجود المجلّد (سطر ٤٧)، ولا يتحقّق من اكتمالها لحزم
+     * DATA. فلو فشل الفكُّ في منتصفه — امتلأ القرصُ مثلًا — بقي أرشيفٌ صحيحُ البصمة
+     * إلى جانب حمولةٍ منقوصة، فيُقرأ الإدخالُ `VERIFIED` ويُرفع إلى R2 ناقصًا.
+     *
+     * والمجلّدُ السابقُ الصالح يبقى كما هو حتّى ينجح بديلُه، فلا يُفسد الفشلُ ما كان
+     * سليمًا قبله.
+     *
+     * و`sourceUrl` هويّةُ الناشر لا مسارُ النقل — والناشرُ هو المجمّع، أثبتته البصمة.
      * وطريقُ الوصول يُسجَّل منفصلًا كي لا يُقرأ الأثرُ يومًا على أنه تنزيلٌ مباشر.
      */
+    const dir = join(root, spec.id);
+    const pending = join(root, `.pending-${spec.id}`);
     const previous = existsSync(join(dir, 'source.json')) ? JSON.parse(readFileSync(join(dir, 'source.json'), 'utf8')) : {};
-    writeFileSync(join(dir, 'source.json'), JSON.stringify({
-      ...previous,
-      sourceUrl: 'https://qurancomplex.gov.sa/en/techquran/dev/',
-      sourceArchive: 'source.zip',
-      downloadedAt: new Date().toISOString(),
-      officialChecksumVerified: true,
-      acquisitionMode: 'LOCAL_ARCHIVE_STAGED',
-      acquisitionNote: 'بايتاتٌ قُدِّمت محلّيًّا وطابقت بصمةَ المجمّع الرسميّة (MD5+SHA-1). لم يُتّصل بموقع المجمّع.',
-      stagedFromBasename: basename(file),
-    }, null, 2) + '\n');
+    try {
+      rmSync(pending, {recursive: true, force: true});
+      mkdirSync(pending, {recursive: true});
+      copyFileSync(file, join(pending, 'source.zip'));
+      safeExtract(join(pending, 'source.zip'), join(pending, 'payload'));
+      writeFileSync(join(pending, 'source.json'), JSON.stringify({
+        ...previous,
+        sourceUrl: 'https://qurancomplex.gov.sa/en/techquran/dev/',
+        sourceArchive: 'source.zip',
+        downloadedAt: new Date().toISOString(),
+        officialChecksumVerified: true,
+        acquisitionMode: 'LOCAL_ARCHIVE_STAGED',
+        acquisitionNote: 'بايتاتٌ قُدِّمت محلّيًّا وطابقت بصمةَ المجمّع الرسميّة (MD5+SHA-1). لم يُتّصل بموقع المجمّع.',
+        stagedFromBasename: basename(file),
+      }, null, 2) + '\n');
+      rmSync(dir, {recursive: true, force: true});
+      renameSync(pending, dir);
+    } catch (error) {
+      rmSync(pending, {recursive: true, force: true});
+      console.log(`  ✗ ${name} تطابق «${spec.id}» لكن الإدخال فشل: ${error instanceof Error ? error.message : error}`);
+      refused += 1;
+      continue;
+    }
 
     console.log(`  ✓ ${name} ← «${spec.id}» · أُدخل إلى .mizan-ingest/${spec.id}/`);
     staged.push(spec.id);
@@ -146,4 +194,6 @@ function main() {
   }
 }
 
-if (process.argv[1] && process.argv[1].endsWith('kfgqpc-stage-archives.ts')) main();
+if (process.argv[1] && process.argv[1].endsWith('kfgqpc-stage-archives.ts')) {
+  main().catch(error => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
+}
