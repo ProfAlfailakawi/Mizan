@@ -115,7 +115,13 @@ jobs:
           # النشرة. وتحذيرٌ كاذب يُفقد التقريرَ كلَّه ثقتَه، فيُتخطّى ما فيه من صدق.
           #
           # وما ليس في عقد النشر يبقى غائبًا بحقّ؛ أسرار التوقيع تُقرأ كربطٍ اسميّ فقط بلا قراءة قيمها.
-          for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do
+          # والوثيقتان كذلك: `MIZAN_LEGAL_*` في سطر `--update-env-vars` منذ نُشرتا على
+          # `/legal/terms` و`/legal/privacy` من ميزان نفسِه. وكانت البوّابة تنتظرها
+          # أسرارًا لا وجودَ لها، فتقرأ «غير منشورة» وهي منشورةٌ في عقد النشر.
+          for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR \
+                      MIZAN_LEGAL_ENTITY_NAME \
+                      MIZAN_LEGAL_TERMS_URL MIZAN_LEGAL_TERMS_VERSION MIZAN_LEGAL_TERMS_EFFECTIVE \
+                      MIZAN_LEGAL_PRIVACY_URL MIZAN_LEGAL_PRIVACY_VERSION MIZAN_LEGAL_PRIVACY_EFFECTIVE; do
             if [[ -z "${!name:-}" ]]; then
               if value="$(node scripts/cloudbuild-substitution.mjs --env "$name")"; then
                 printf -v "$name" '%s' "$value"; export "${name?}"
@@ -152,6 +158,33 @@ jobs:
           fi
           echo "الإعداد حاضر — تشغيل preflight" >> "$GITHUB_STEP_SUMMARY"
           npm run preflight
+
+      # ── صدقُ عنوان الوثيقتين ────────────────────────────────────────────────
+      # `preflight` أعلاه يحكم على **وجود** الإعداد. وهذه تحكم على **صدقه**: تجلب
+      # العنوانين فعلًا وتقارن النسخةَ والتاريخَ والناشرَ بما يُسجَّل في أثر الموافقة.
+      # فعنوانٌ مكتوبٌ يشير إلى 404 يجتاز الأوّلَ ويسقط هنا — وهو الصنفُ الذي يمرّ
+      # صامتًا حتى يُسأل عن أثرٍ بعد سنة.
+      - name: التحقق من أن الوثيقتين منشورتان على عنوانيهما
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          for name in MIZAN_LEGAL_ENTITY_NAME \
+                      MIZAN_LEGAL_TERMS_URL MIZAN_LEGAL_TERMS_VERSION MIZAN_LEGAL_TERMS_EFFECTIVE \
+                      MIZAN_LEGAL_PRIVACY_URL MIZAN_LEGAL_PRIVACY_VERSION MIZAN_LEGAL_PRIVACY_EFFECTIVE; do
+            if value="$(node scripts/cloudbuild-substitution.mjs --env "$name")"; then
+              printf -v "$name" '%s' "$value"; export "${name?}"
+            fi
+          done
+          npm run verify:legal-publication | tee /tmp/legal-publication.txt
+          status="${PIPESTATUS[0]}"
+          {
+            echo '### الوثيقتان القانونيّتان'
+            echo '```'
+            cat /tmp/legal-publication.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       # ── حزمةُ R2: جردٌ تشخيصيّ قبل الحكم ─────────────────────────────────────
       # يُقرأ ولا يُكتب. سببُه أن فشلَ التحقّق أدناه لا يميّز بين: رفعٍ لم يجرِ بعد،

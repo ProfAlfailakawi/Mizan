@@ -19,6 +19,7 @@ import { FileSealRegistryStore, ResultSealRegistry } from './server/result-seal-
 import { FilePublicationStore, publicationDecision, type PublicationRecord } from './server/result-publication';
 import { policyChangeDecision, scoreCorrectionDecision, readingChangeDecision } from './server/governance-attestation';
 import { CONSENT_BACKED_DOCUMENTS, isPublished, isResolved, legalConfigFromEnv, legalDocumentState, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from './src/lib/legal-documents';
+import { LEGAL_PUBLICATION_PATHS, LegalPublicationError, publishedLegalPage, type PublishedLegalPage } from './server/legal-publication';
 import { ServerQuranSourceRepository } from './server/quran-source-repository';
 import { KFGQPC_OFFICIAL_PACKAGES } from './server/kfgqpc-official-sources';
 import { KFGQPC_OFFICIAL_AUDIO } from './server/kfgqpc-official-audio';
@@ -848,6 +849,46 @@ async function startServer() {
     res.setHeader('Cache-Control','public, max-age=300');
     return res.status(isPublished(state)?200:503).json(state);
   });
+
+  /*
+   * وصفحتا الوثيقتين نفسُهما — لا وصفُهما.
+   *
+   * الطريقُ أعلاه يقول **أين** الوثيقة وبأيّ نسخة؛ وهذا يخدم **نصَّها**. وكان العنوانُ
+   * يُنتظر من خارج النظام، فتصير الحقيقةُ نسختين: نصٌّ في المستودع ونصٌّ على رابطٍ لا
+   * يراه المستودع. فيوقّع المتسابق على أحدهما ويُسجَّل له رقمُ الآخر.
+   *
+   * فصار ميزانُ نفسُه ناشرَهما: تُقرأ الصفحةُ من الملفّ الملتزَم، ويُقرأ منه رقمُ النسخة
+   * وتاريخُ السريان. ولا تسجيلَ دخولٍ — من يُطلب توقيعُه على شروطٍ يقرأها أوّلًا.
+   *
+   * وتُحسب مرّةً عند الإقلاع: عطبٌ في وثيقةٍ يُعرف من سجلّ الإقلاع لا من زيارة متسابق.
+   * **ولا تُسقط الخدمة**: الطريقُ وحده يردّ 503 برمزه، فالمسابقةُ الجارية لا تتوقّف
+   * لأجل صفحة — والتسجيلُ الذي يحتاجها يفشل مغلقًا من تلقائه.
+   */
+  const legalPages=new Map<LegalDocumentKind,PublishedLegalPage>();
+  const legalPageFailures=new Map<LegalDocumentKind,string>();
+  for(const kind of CONSENT_BACKED_DOCUMENTS){
+    try{legalPages.set(kind,publishedLegalPage(kind))}
+    catch(err){
+      const code=err instanceof LegalPublicationError?err.code:'LEGAL_DOCUMENT_RENDER_FAILED';
+      legalPageFailures.set(kind,code);
+      console.error(`[legal] ${kind}: ${code} — ${err instanceof Error?err.message:String(err)}`);
+    }
+  }
+  for(const [kind,path] of Object.entries(LEGAL_PUBLICATION_PATHS) as [LegalDocumentKind,string][]){
+    app.get(path,(_req,res)=>{
+      const page=legalPages.get(kind);
+      if(!page){
+        res.setHeader('Cache-Control','no-store');
+        return res.status(503).json({code:legalPageFailures.get(kind)||'LEGAL_DOCUMENT_SOURCE_MISSING',kind});
+      }
+      res.setHeader('Content-Type','text/html; charset=utf-8');
+      res.setHeader('Cache-Control','public, max-age=300');
+      /* النسخةُ والتاريخُ في ترويستين كي تُقاسا بلا تحليل HTML — تقرؤهما بوّابةُ الإطلاق. */
+      res.setHeader('X-Mizan-Legal-Version',page.version);
+      res.setHeader('X-Mizan-Legal-Effective',page.effectiveDate);
+      return res.status(200).send(page.html);
+    });
+  }
 
   // Public Mushaf page surface. Consistent with the existing public font and public ayah-audio
   // routes: the printed Madinah page is publicly published Quran content, not competition data.

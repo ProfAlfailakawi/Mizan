@@ -112,8 +112,69 @@ test('runtime settings are read where production sets them, not from the runner'
   const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'release-gates.yml'), 'utf8');
   assert.match(workflow, /cloudbuild-substitution\.mjs --env "\$name"/,
     'runtime variables must be sourced from the deployment, not the runner');
-  assert.match(workflow, /for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do/,
-    'and the ones the deployment actually sets must be named');
+
+  /*
+   * وكان هذا الشرطُ سطرًا حرفيًّا: `for name in MIZAN_SAAS_DATA_DIR MIZAN_CERTIFICATE_REGISTRY_DIR; do`.
+   * فلمّا نُشرت الوثيقتان وصار `--update-env-vars` يحمل سبعةَ `MIZAN_LEGAL_*`، انكسر
+   * الحارسُ على **توسيعٍ صحيح** — وهو أسوأ أصناف الحُرّاس: يُقرأ كإخفاق وهو ليس به،
+   * فيُعتاد تجاوزُه. فصار يُشتقّ بدل أن يُكتب:
+   *
+   *   كلُّ متغيّرٍ يضبطه عقدُ النشر **ويقرؤه `preflight`** لا بدّ أن يُسمَّى في الحلقة.
+   *
+   * فإن أُضيف غدًا متغيّرٌ ثامن ونُسي هنا، رجع التحذيرُ الكاذب وسقط هذا الاختبار —
+   * وهو غرضُه. وإن وُسّعت القائمةُ بحقّ، مرّ بلا تعديل.
+   */
+  /*
+   * ويُقرأ سطرُ `--update-env-vars` وحدَه. فسطرُ `--update-secrets` يجاوره بصيغةٍ
+   * تشبهه — `MIZAN_CERT_SIGNING_SECRET=MIZAN_CERT_SIGNING_SECRET:latest` — وقراءتُهما
+   * معًا تطالب الحلقةَ بمتغيّرٍ ليس من شأنها: السرُّ يقرؤه فرعٌ آخر بـ`--secret`
+   * ولا تُقرأ قيمتُه أصلًا.
+   */
+  const envVarsLine = /- '--update-env-vars'\s*\n\s*- '([^']*)'/.exec(cloudbuild);
+  assert.ok(envVarsLine, 'the deployment must still set runtime variables in one --update-env-vars line');
+  const deployed = new Set(
+    [...envVarsLine[1].matchAll(/(?:^|,)(MIZAN_[A-Z0-9_]+)=/g)].map(match => match[1]));
+  assert.ok(deployed.size >= 8, `expected the deployment to set several MIZAN_* names, found ${deployed.size}`);
+
+  const loop = /for name in ((?:[^;]|\n)*?); do/.exec(workflow);
+  assert.ok(loop, 'the workflow must still read runtime variables in a named loop');
+  const named = new Set(loop[1].split(/[\s\\]+/).filter(Boolean));
+
+  /*
+   * و«هل يقرؤه `preflight`؟» يُقاس ولا يُطابَق نصًّا.
+   *
+   * كُتب هذا الشرطُ أوّلَ مرّةٍ `preflight.includes(name)` — فمرّ على كلّ `MIZAN_LEGAL_*`
+   * مرورًا صامتًا، لأن الفحصَ يبني أسماءها من قالب: `MIZAN_LEGAL_${kind}_URL`. فلم يكن
+   * الحارسُ يحرس شيئًا، وسقوطُ اسمٍ من الحلقة لم يُسقطه. **وحارسٌ لا يعضّ أسوأ من لا
+   * حارس**: يُعطي طمأنينةً بلا سند.
+   *
+   * فيُشغَّل `preflight` مرّتين لكلّ اسم: بالقيمة وبلا القيمة. فإن اختلف ما يطبعه، فهو
+   * يقرؤه — مهما كُتب اسمُه في شيفرته.
+   */
+  const baseline: Record<string, string> = {
+    PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '',
+    VITE_REQUIRE_AUTH: 'true', VITE_FIREBASE_API_KEY: 'x', VITE_FIREBASE_PROJECT_ID: 'y',
+  };
+  for (const name of deployed) baseline[name] = envVarsLine[1].match(new RegExp(`(?:^|,)${name}=([^,]*)`))?.[1] ?? 'set';
+
+  const runPreflight = (env: Record<string, string>) =>
+    spawnSync(process.execPath, ['scripts/go-live-preflight.mjs'], {cwd: process.cwd(), env, encoding: 'utf8'}).stdout;
+
+  const withAll = runPreflight(baseline);
+  const observed = [...deployed].filter(name => {
+    const without = {...baseline}; delete without[name];
+    return runPreflight(without) !== withAll;
+  });
+
+  assert.ok(observed.includes('MIZAN_SAAS_DATA_DIR'),
+    'the measurement itself must work — preflight is known to observe MIZAN_SAAS_DATA_DIR');
+
+  for (const name of observed.sort()) {
+    assert.ok(named.has(name),
+      `preflight's output changes with ${name}, and --update-env-vars sets it, yet the gate never ` +
+      `sources it — so the gate reports it missing while production sets it. That false warning is ` +
+      `what this test exists to prevent.`);
+  }
 });
 
 test('the reader returns what production really deploys', () => {
