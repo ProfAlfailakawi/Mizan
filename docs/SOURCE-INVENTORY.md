@@ -39,7 +39,7 @@
 | **الروايات** | ٨: حفص · ورش · شعبة · قالون · الدوري عن أبي عمرو · السوسي · البزّي · قنبل |
 | **الإثبات** | `sha256` لبايتات المنبع، ثمّ `sha256` للأثر المشتقّ — والسلسلةُ تُعاد بأمرٍ واحد |
 | **على القرص** | `quran-sources/kfgqpc-mirror-derived/` — ٢٫٣ ميجابايت |
-| **حالة الإذن** | `OWNER_REPORTED_PERMISSION` · **الترخيص `UNVERIFIED`** |
+| **حالة الإذن** | `OWNER_REPORTED_PERMISSION` · الترخيص MIT **بإفادة المالك** (لا ملفَّ ترخيصٍ في المرآة — القياسُ في `quran-sources/kfgqpc-mirror-derived/README.md`) |
 
 > **المجمّعُ ناشرٌ، والمرآةُ مضيفٌ.** ويُسجَّل الأمران منفصلين: `publisherAuthority: KFGQPC`
 > و`authority: KFGQPC_MIRROR_DERIVED`. وهذه **ليست** حزمةَ المجمّع الرسميّة المضغوطة.
