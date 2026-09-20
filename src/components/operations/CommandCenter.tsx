@@ -14,6 +14,7 @@ import { DayRetrospective } from './DayRetrospective';
 import { HallScreenPublisher } from './HallScreenPublisher';
 import { ContinuityRecovery } from './ContinuityRecovery';
 import { ExceptionBoard } from './ExceptionBoard';
+import { LiveRecitationMonitor } from './LiveRecitationMonitor';
 import { fetchCustodyCorridor } from '../../lib/integrity-server-client';
 import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
@@ -36,7 +37,7 @@ export const CommandCenter: React.FC = () => {
  const reviewCases=useMemo(()=>allReviewCases.filter(r=>r.competitionId===competition.id),[allReviewCases,competition.id]);
  const notifications=useMemo(()=>allNotifications.filter(n=>n.competitionId===competition.id),[allNotifications,competition.id]);
  const devices=useMemo(()=>allDevices.filter(d=>d.competitionId===competition.id),[allDevices,competition.id]);
- const [expanded,setExpanded]=useState(false); const [opsTab,setOpsTab]=useState<'pulse'|'panels'|'insight'>('pulse');
+ const [expanded,setExpanded]=useState(false); const [opsTab,setOpsTab]=useState<'pulse'|'live'|'panels'|'insight'>('pulse');
  const opsTabAnchor=useTabAnchor(opsTab); const [insight,setInsight]=useState<'why-delay'|'who-missing'|'system'|'certs'>('why-delay');
  const [corridor,setCorridor]=useState<QuestionCustodyCorridorSnapshot|null>(null);
  useEffect(()=>{let live=true;const id=s.activeSession.secureRuntimeSessionId;if(!id){setCorridor(null);return}const load=()=>void fetchCustodyCorridor(id).then(x=>live&&setCorridor(x)).catch(()=>live&&setCorridor(null));load();const timer=window.setInterval(load,5000);return()=>{live=false;window.clearInterval(timer)}},[s.activeSession.secureRuntimeSessionId]);
@@ -72,12 +73,13 @@ export const CommandCenter: React.FC = () => {
   {expanded&&<>
    {/* ست كتل كاملة العرض كانت سردًا واحدًا؛ ثلاث نوافذ تشغيلية أوضح من طابور تمرير. */}
    <div role="tablist" ref={opsTabAnchor} aria-label={ar?'أقسام مركز العمليات':'Command center sections'} className="mizan-tabs">
-    {([['pulse',ar?'النبض والمقاييس':'Pulse & metrics'],['panels',ar?'اللجان والصحة':'Panels & health'],['insight',ar?'الرؤى والطابور':'Insights & queue']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={opsTab===id} onClick={()=>setOpsTab(id)} className={`mizan-tab ${opsTab===id?'is-active':''}`}>{label}</button>)}
+    {([['pulse',ar?'النبض والمقاييس':'Pulse & metrics'],['live',ar?'التلاوة الجارية':'Live recitation'],['panels',ar?'اللجان والصحة':'Panels & health'],['insight',ar?'الرؤى والطابور':'Insights & queue']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={opsTab===id} onClick={()=>setOpsTab(id)} className={`mizan-tab ${opsTab===id?'is-active':''}`}>{label}</button>)}
    </div>
    {opsTab==='pulse'&&<>
    <section className="mizan-surface p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><div className="mizan-kicker">{ar?'نبض الموقع':'VENUE PULSE'}</div><h2 className="font-extrabold mt-1">{ar?'نبض المكان':'Venue flow'}</h2></div><Badge variant="neutral">{ar?'مجمّع فقط':'Aggregated only'}</Badge></div><div className="grid grid-cols-5 gap-1.5 mt-4"><Pulse n={participants.filter(p=>p.status==='checked_in').length} t={ar?'بوابة':'Gate'}/><Pulse n={waiting} t={ar?'انتظار':'Wait'}/><Pulse n={testing} t={ar?'لجان':'Panels'}/><Pulse n={reviewCases.filter(r=>r.status==='pending').length} t={ar?'مراجعة':'Review'}/><Pulse n={done} t={ar?'خروج':'Exit'}/></div></section>
    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3"><Metric icon={UsersRound} value={participants.length} label={ar?'في النظام':'Participants'}/><Metric icon={Clock3} value={waiting} label={ar?'ينتظرون':'Waiting'}/><Metric icon={Mic2} value={testing} label={ar?'الآن':'Testing'}/><Metric icon={BadgeCheck} value={done} label={ar?'مكتمل':'Completed'}/></div>
    </>}
+   {opsTab==='live'&&<LiveRecitationMonitor ar={ar} committees={committees} participants={participants}/>}
    {opsTab==='panels'&&<>
    <div className="grid xl:grid-cols-[1.25fr_.75fr] gap-4">
     <section className="mizan-surface p-5 sm:p-6"><div className="flex items-center justify-between mb-5"><div><div className="mizan-kicker">{ar?'اللجان':'COMMITTEES'}</div><h2 className="font-extrabold mt-1">{ar?'الحمل الآن':'Live load'}</h2></div><span className="text-xs text-[#646965]">~{sim.averageWaitMinutes}m</span></div><div className="space-y-2">{committees.map(c=>{const q=participants.filter(p=>p.assignedCommitteeId===c.id&&p.status==='in_queue').length;return <div key={c.id} className="grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-2xl border border-[#e1dfd8] p-3.5"><div className="w-10 h-10 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center font-black text-xs">{c.code}</div><div className="min-w-0"><div className="text-sm font-bold truncate">{bilingualName(c,ar)}</div><div className="mt-2 h-1.5 rounded-full bg-[#eceae4] overflow-hidden"><div className="h-full bg-[#2F6555] rounded-full" style={{width:`${Math.min(100,(q/8)*100)}%`}}/></div></div><div className="text-end"><div className="text-lg font-black">{q}</div><div className="text-[10px] text-[#666b67]">{ar?'ينتظر':'queue'}</div></div></div>})}</div></section>
