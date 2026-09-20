@@ -82,11 +82,34 @@ test('the runbook says which order, and why the order matters', () => {
     'no literal secret-shaped value may appear in a committed file');
 });
 
-test('both legal drafts exist, and neither pretends to be final', () => {
+/*
+ * كان هذا الاختبارُ يشترط العكس: أن تحمل الوثيقتان تحذيرَ «مسوّدة» وأن يبقى فيهما
+ * قوسٌ — حارسًا يمنع أن تُنشر وثيقةٌ ناقصة أو غيرُ مُراجَعة. وقد أدّى عملَه: بقي
+ * التحذيرُ قائمًا حتى أكّد المالكُ في 20 سبتمبر 2026 أن المحامي اعتمد الوثيقتين
+ * كاملتين، فرُفع بكلمته.
+ *
+ * **والحارسُ لم يُحذف بل قُلب.** فالخطرُ بعد النشر ضدُّ الخطر قبله: لا أن تُنشر
+ * ناقصةً، بل أن يعود إليها نقصٌ — قوسٌ لم يُملأ في تعديلٍ لاحق، أو تحذيرُ مسوّدةٍ
+ * أُعيد سهوًا، أو تاريخُ سريانٍ سقط. فيُشترط هنا تمامُها لا مسوّديّتُها.
+ */
+test('both legal documents read as published: complete, dated, and free of drafting scaffolding', () => {
   for (const file of ['docs/legal/TERMS-AR.md', 'docs/legal/PRIVACY-AR.md']) {
     const text = read(file);
-    assert.match(text, /مسوّدة — لا تُنشر قبل مراجعة محامٍ/, `${file} must not read as a published document`);
-    assert.ok(text.includes('⟦'), `${file} must keep the owner's blanks visible rather than inventing them`);
+    assert.equal(text.includes('⟦'), false,
+      `${file} is published — an unfilled blank in it is a promise to a reader that no one kept`);
+    assert.equal(/مسوّدة — لا تُنشر قبل مراجعة محامٍ/.test(text), false,
+      `${file} must not carry a draft warning it has outgrown`);
+    assert.match(text, /^\*\*نسخة الوثيقة:\*\* \d+\.\d+$/m,
+      `${file} must name its version — consent is recorded against it`);
+    assert.match(text, /^\*\*تاريخ السريان:\*\* \d{4}-\d{2}-\d{2}$/m,
+      `${file} must carry an ISO effective date, not a word`);
+    /*
+     * وسجلُّ القرارات باسم المالك كان أداةَ تحرير: يقول للمالك ما بُتّ وما لم يُبتّ.
+     * وعرضُه على المتسابق يُريه وثيقةً تتحدّث عن نفسها — وبعضُه يقول صراحةً إن أمرًا
+     * «يبقى للمحامي»، فيقرأ وثيقةً تُعلن أنها لم تكتمل. ومحلُّه docs/legal/README.md.
+     */
+    assert.equal(/قرارُ المالك/.test(text), false,
+      `${file} speaks to the participant; editorial decision notes belong in the internal record`);
   }
   const privacy = read('docs/legal/PRIVACY-AR.md');
   const config = read('src/lib/competition-config.ts');
@@ -129,4 +152,49 @@ test('the publishing guide names all seven variables preflight blocks on', () =>
     assert.ok(guide.includes(name), `${name} is required for publication and must be documented`);
   }
   assert.match(guide, /النقصُ الجزئيّ ليس نشرًا/, 'partial configuration must be called out');
+});
+
+/*
+ * الموقِّعُ يوقّع على نصٍّ، والسجلُّ يقيّد نسخةً ورقمَ تاريخ. فإن اختلف ما في رأس
+ * الوثيقة عمّا يُضبط في `MIZAN_LEGAL_*`، صار السجلُّ يشهد على غير ما رآه الموقِّع —
+ * وهو العطبُ نفسُه الذي تمنعه قاعدةُ «النسخة تُشدّ إلى نصّها»، لكن من الجهة الأخرى.
+ *
+ * ولا يُقرأ هنا متغيّرُ بيئةٍ: الرابطان وحدهما ما لا يعرفه المستودع. أمّا النسخةُ
+ * والتاريخُ فمكتوبان في `docs/legal/README.md` أمرًا للمالك، فيُقارنان بالوثيقتين.
+ */
+test('the version and date the owner is told to set are the ones the documents carry', () => {
+  const guide = read('docs/legal/README.md');
+  const stamp = (file: string) => {
+    const text = read(file);
+    const version = /^\*\*نسخة الوثيقة:\*\* (\d+\.\d+)$/m.exec(text);
+    const effective = /^\*\*تاريخ السريان:\*\* (\d{4}-\d{2}-\d{2})$/m.exec(text);
+    assert.ok(version && effective, `${file} must carry both a version and an effective date`);
+    return {version: version[1], effective: effective[1]};
+  };
+
+  for (const [file, prefix] of [
+    ['docs/legal/TERMS-AR.md', 'MIZAN_LEGAL_TERMS'],
+    ['docs/legal/PRIVACY-AR.md', 'MIZAN_LEGAL_PRIVACY'],
+  ] as const) {
+    const {version, effective} = stamp(file);
+    assert.ok(guide.includes(`${prefix}_VERSION="${version}"`),
+      `the guide must tell the owner to register version ${version} — the one ${file} actually carries`);
+    assert.ok(guide.includes(`${prefix}_EFFECTIVE="${effective}"`),
+      `the guide must tell the owner to register ${effective} — the date ${file} actually carries`);
+  }
+});
+
+/*
+ * وما حُذف من الوثيقتين عند النشر ليس متلَفًا: السطرُ الذي لا مصدرَ له لا يُصحَّح إن
+ * تبيّن خطؤه. فموضعُ Firestore خاصّةً مكتوبٌ بتأكيد المالك لا بقراءةٍ من المستودع،
+ * وهو أوّلُ ما يحتاج تصحيحًا إن تبيّن خلافُه.
+ */
+test('what the published documents no longer show is kept where it can still be corrected', () => {
+  const guide = read('docs/legal/README.md');
+  assert.match(guide, /سجلّ المصادر/, 'the provenance record must exist, not merely be promised');
+  assert.match(guide, /تأكيدُ المالك\*\* في 20 سبتمبر 2026 — لا يُقرأ من المستودع/,
+    'the Firestore row must keep saying how it was known, so a wrong region is correctable');
+  for (const claim of ['شهادة مستخرج السجلّ التجاريّ', 'لا مسؤولَ معيَّنًا', 'info@skygateeducation.com']) {
+    assert.ok(guide.includes(claim), `the record must keep: ${claim}`);
+  }
 });

@@ -42,10 +42,22 @@ test('the owner checklist names every unresolved placeholder, and no phantom one
   for (const document of LEGAL_DOCUMENTS) {
     const basename = path.basename(document);
     const actual = placeholderLines(document);
-    assert.ok(actual.length > 0, `${document} is expected to still hold owner blanks at this stage`);
-
     const cited = [...checklist.matchAll(new RegExp(`${basename.replace('.', '\\.')}:(\\d+)`, 'g'))]
       .map(match => Number(match[1]));
+
+    /*
+     * ومُلئت الأقواسُ كلُّها في 20 سبتمبر 2026. فلا تصير الدعوى بذلك بلا معنًى بل
+     * تنقلب: قائمةٌ جدولُها فارغٌ لا بدّ أن **تقول** إنه فارغ. فالصمتُ عند التمام
+     * يُقرأ كصمتٍ عن نقص، ويعود المالكُ يفتّش عن قوسٍ لا وجود له — وهو العطبُ الذي
+     * كُتب هذا الملفُّ لأجله أوّلَ مرّة، مقلوبًا.
+     */
+    if (actual.length === 0) {
+      assert.deepEqual(cited, [],
+        `${document} holds no blank any more, yet the checklist still points the owner at one`);
+      assert.match(checklist, /لم يبقَ في الوثيقتين قوسٌ واحد/,
+        'a checklist whose table has emptied must say so out loud, not fall silent');
+      continue;
+    }
 
     for (const line of actual) {
       assert.ok(cited.includes(line),
