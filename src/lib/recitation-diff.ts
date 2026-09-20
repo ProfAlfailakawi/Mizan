@@ -172,3 +172,48 @@ export function diffRecitation(
 /** أفارغٌ ما سُمع؟ فلا يُقال «أسقطتَ الوجهَ كلَّه»: لم يُسمع أصلًا. */
 export const heardNothing = (heard: readonly HeardWord[]) =>
   heard.every(w => quranSkeleton(w.text).length === 0);
+
+/**
+ * إذنُ الحكم كما يصل الشاشةَ من الخادم.
+ *
+ * والبوّابةُ نفسُها تُحسب في `server/recitation-asr-contract.ts` من تقرير قياسٍ
+ * لكلّ رواية. أمّا هذا فشكلُها المنقول: الشاشةُ لا تحسب إذنًا لنفسها، تتلقّاه.
+ */
+export interface JudgingPermission { word: 'OPEN' | 'CLOSED'; tashkeel: 'OPEN' | 'CLOSED' }
+
+/**
+ * خياراتُ المقابلة تُشتقّ من الإذن ولا تُكتب بيد.
+ *
+ * حارسُ بناءٍ لا حارسُ اختبار: ما دام `detectTashkeel` يُولَد من الإذن وحدَه، فلا
+ * موضعَ في الشيفرة يفتح حكمَ الحركة بلا قياسٍ يسنده.
+ */
+export function diffOptionsForGate(
+  gate: JudgingPermission,
+  thresholds: Pick<DiffOptions, 'minConfidence' | 'minTashkeelConfidence'> = DEFAULT_DIFF_OPTIONS,
+): DiffOptions {
+  return {
+    detectTashkeel: gate.tashkeel === 'OPEN',
+    minConfidence: thresholds.minConfidence,
+    minTashkeelConfidence: thresholds.minTashkeelConfidence,
+  };
+}
+
+/**
+ * ولا يُحكم إلا بإذن.
+ *
+ * `diffRecitation` يقابل نصَّين ولا يسأل عن إذن — وهو صوابٌ في موضعه: مقابلةُ نصّين
+ * عمليّةٌ محايدة تُستعمل في القياس وفي الاختبار. أمّا أن يُقال لطالبٍ «أخطأت»، فبابُه
+ * هذا وحدَه: بابٌ **يعيد `null`** حين لا إذن، فلا يُخرج حكمًا فارغًا يُقرأ «لا أخطاء».
+ *
+ * والفرقُ بين `null` و«لا أخطاء» هو الفرقُ بين «لم يُحكم» و«حُكم فلم يُوجد خطأ».
+ */
+export function judgeRecitation(
+  expected: readonly ExpectedWord[],
+  heard: readonly HeardWord[],
+  gate: JudgingPermission,
+  thresholds: Pick<DiffOptions, 'minConfidence' | 'minTashkeelConfidence'> = DEFAULT_DIFF_OPTIONS,
+): RecitationDiff | null {
+  if (gate.word !== 'OPEN') return null;
+  if (heardNothing(heard)) return null;
+  return diffRecitation(expected, heard, diffOptionsForGate(gate, thresholds));
+}

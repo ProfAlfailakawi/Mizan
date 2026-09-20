@@ -28,7 +28,7 @@
  * من انقطاع جلسةِ طالبٍ في منتصف وجهه.
  */
 
-import type { DiffOptions } from '../src/lib/recitation-diff';
+import type { JudgingPermission } from '../src/lib/recitation-diff';
 import { quranReadingDefinition } from './quran-intelligence-policy';
 import type { QuranReadingId } from './quran-intelligence-types';
 
@@ -159,7 +159,7 @@ export function evaluateAsrBenchmark(report: AsrBenchmarkReport): AsrBenchmarkVe
   };
 }
 
-export interface RecitationJudgingGate {
+export interface RecitationJudgingGate extends JudgingPermission {
   reading: QuranReadingId;
   /** حكمُ الكلمة: أسقطتَ، أبدلتَ، زدتَ. */
   word: 'OPEN' | 'CLOSED';
@@ -200,19 +200,13 @@ export function recitationJudgingGate(reading: QuranReadingId, report: AsrBenchm
   };
 }
 
-/**
- * خياراتُ المقابلة تُشتقّ من البوّابة ولا تُكتب بيد.
+/*
+ * وخياراتُ المقابلة تُشتقّ من البوّابة — وموضعُ تلك الدالّة في `src/lib` لا هنا.
  *
- * وهذا حارسُ بناءٍ لا حارسُ اختبار: ما دام `detectTashkeel` يُولَد من البوّابة وحدَها،
- * فلا موضعَ في الشيفرة يستطيع فتحَه بلا إذنٍ مقيس. ومَن كتبه بيده كتب حكمًا لا سندَ له.
+ * فالشاشةُ تحتاجها وهذا الملفُّ يستورد `crypto` عبر سياسة الروايات، فلا يُحزَم في
+ * متصفّح. والقاعدةُ المتّبَعة: **تُشتقّ ولا تُنسخ** — فتُصدَّر من موضعها الواحد.
  */
-export function diffOptionsForGate(gate: RecitationJudgingGate, thresholds: Pick<DiffOptions, 'minConfidence' | 'minTashkeelConfidence'>): DiffOptions {
-  return {
-    detectTashkeel: gate.tashkeel === 'OPEN',
-    minConfidence: thresholds.minConfidence,
-    minTashkeelConfidence: thresholds.minTashkeelConfidence,
-  };
-}
+export { diffOptionsForGate, judgeRecitation } from '../src/lib/recitation-diff';
 
 /** كلمةٌ سمعها المحرّك بعد التحقّق منها. */
 export interface RecognisedWord { text: string; confidence: number; startMs?: number; endMs?: number }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { diffRecitation, heardNothing, DEFAULT_DIFF_OPTIONS, type ExpectedWord, type HeardWord } from '../src/lib/recitation-diff';
+import { diffOptionsForGate, diffRecitation, heardNothing, judgeRecitation, DEFAULT_DIFF_OPTIONS, type ExpectedWord, type HeardWord } from '../src/lib/recitation-diff';
 import { quranSkeleton, quranVoweled, sameWord } from '../src/lib/quran-orthography';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 import { splitAyahWords } from '../server/practice-face-service';
@@ -139,4 +139,46 @@ test('والهيكلُ لا يطمس فرقًا حقيقيًّا بين رواي
   assert.equal(sameWord('ٱلۡحَمۡدُ', 'اِ۬لْحَمْدُ'), true);
   assert.equal(sameWord('فِي', 'فِے'), true);
   assert.equal(quranSkeleton('ٱلرَّحۡمَٰنِ'), 'الرحمن');
+});
+
+
+/* ── لا يُحكم إلا بإذن ────────────────────────────────────────────────────── */
+
+const OPEN = { word: 'OPEN', tashkeel: 'OPEN' } as const;
+const WORD_ONLY = { word: 'OPEN', tashkeel: 'CLOSED' } as const;
+const SHUT = { word: 'CLOSED', tashkeel: 'CLOSED' } as const;
+
+test('بابٌ مغلقٌ يعيد لا شيء — لا «لا أخطاء»', () => {
+  /*
+   * والفرقُ بينهما هو الفرقُ بين «لم يُحكم» و«حُكم فلم يُوجد خطأ». ولو أعاد تقريرًا
+   * فارغًا لقرأته الشاشةُ طمأنينةً لا سندَ لها، وقالت لطالبٍ لم يُسمع له «أحسنتَ».
+   */
+  const wrong = heardOf(['ٱلۡحَمۡدُ', 'لِلَّهِ', 'رَبِّ', 'ٱلنَّاسِ']);
+  assert.equal(judgeRecitation(expectedOf(FATIHA), wrong, SHUT), null);
+  const judged = judgeRecitation(expectedOf(FATIHA), wrong, WORD_ONLY);
+  assert.ok(judged, 'بابُ الكلمة مفتوحٌ فيجب أن يُحكم');
+  assert.equal(judged!.mistakes.length, 1);
+  assert.equal(judged!.mistakes[0].kind, 'substituted');
+});
+
+test('صمتٌ تامٌّ لا يُقرأ «أسقطتَ الوجهَ كلَّه»', () => {
+  assert.equal(judgeRecitation(expectedOf(FATIHA), heardOf(['', '   ']), OPEN), null);
+  assert.equal(judgeRecitation(expectedOf(FATIHA), [], OPEN), null);
+});
+
+test('إذنُ الحركة وحدَه هو ما يفتح حكمَ الحركة', () => {
+  /* كلمةٌ واحدةٌ يختلف شكلُها ويتّفق هيكلُها — فلا يراها إلا مَن أُذن له. */
+  const heard = [{ text: 'ٱلۡحَمۡدَ', confidence: 0.99 }, ...heardOf(FATIHA.slice(1), 0.99)];
+  assert.equal(diffOptionsForGate(WORD_ONLY).detectTashkeel, false);
+  assert.equal(diffOptionsForGate(OPEN).detectTashkeel, true);
+  assert.deepEqual(judgeRecitation(expectedOf(FATIHA), heard, WORD_ONLY)!.mistakes, []);
+  const strict = judgeRecitation(expectedOf(FATIHA), heard, OPEN)!;
+  assert.equal(strict.mistakes.length, 1);
+  assert.equal(strict.mistakes[0].kind, 'tashkeel');
+});
+
+test('العتباتُ تُنقل كما هي ولا تُخترع عند الإذن', () => {
+  const options = diffOptionsForGate(OPEN, DEFAULT_DIFF_OPTIONS);
+  assert.equal(options.minConfidence, DEFAULT_DIFF_OPTIONS.minConfidence);
+  assert.equal(options.minTashkeelConfidence, DEFAULT_DIFF_OPTIONS.minTashkeelConfidence);
 });
