@@ -142,8 +142,8 @@ grep -n "⟦" docs/legal/TERMS-AR.md docs/legal/PRIVACY-AR.md
 
 | الرابط | مصدرُه |
 |---|---|
-| `https://mizan-f2ce3.web.app/legal/terms` | `docs/legal/TERMS-AR.md` |
-| `https://mizan-f2ce3.web.app/legal/privacy` | `docs/legal/PRIVACY-AR.md` |
+| `https://mizan.dr-alfailakawi.com/legal/terms` | `docs/legal/TERMS-AR.md` |
+| `https://mizan.dr-alfailakawi.com/legal/privacy` | `docs/legal/PRIVACY-AR.md` |
 
 يُفتحان **بلا تسجيل دخول**، ويُقرأ نصُّهما من الملفّ الملتزَم نفسِه — لا من نسخةٍ
 ثانية. وذلك مقصود: لو استُضيفت الوثيقةُ في مكانٍ آخر لصارت الحقيقةُ نسختين، فيوقّع

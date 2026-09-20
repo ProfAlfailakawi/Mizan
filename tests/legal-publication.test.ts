@@ -254,3 +254,26 @@ test('the encoded publisher decodes back to exactly what the document declares',
       `${kind}: the round trip must be lossless, or the exact comparison compares the wrong thing`);
   }
 });
+
+test('both documents are published under one origin, and it is an absolute https one', () => {
+  /*
+   * ورصد Codex أن النطاق السابق كان مشتقًّا من `firebase.json` — ولا شيءَ في هذا
+   * المستودع ينشر Firebase Hosting، فلم يكن لأحدٍ أن يجزم أنه يُحوِّل إلى الخدمة.
+   * فأفاد المالكُ في 20 سبتمبر 2026 بالنطاق الذي يفتح به ميزان، وقال إنه **قد
+   * يُغيّره لاحقًا**.
+   *
+   * فيُشترط هنا ما يجعل التغييرَ آمنًا: أصلٌ واحدٌ للوثيقتين. فلو غُيّر أحدُهما
+   * ونُسي الآخر، صارت وثيقتان على نطاقين — وأثرُ موافقةٍ يشير إلى نطاقٍ ميّت.
+   */
+  const deployment = read('cloudbuild.yaml');
+  const origins = new Set<string>();
+  for (const prefix of ['MIZAN_LEGAL_TERMS', 'MIZAN_LEGAL_PRIVACY']) {
+    const found = new RegExp(`${prefix}_URL=([^,']+)`).exec(deployment);
+    assert.ok(found, `${prefix}_URL must be set`);
+    const url = new URL(found[1]);
+    assert.equal(url.protocol, 'https:', `${prefix}_URL must be https — consent cites it`);
+    origins.add(url.origin);
+  }
+  assert.equal(origins.size, 1,
+    `the two documents must live under one origin; found ${[...origins].join(' and ')}`);
+});

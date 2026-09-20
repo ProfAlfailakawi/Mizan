@@ -76,11 +76,11 @@ audioRetentionDays: 90      documentRetentionDays: 365
 ```bash
 MIZAN_LEGAL_ENTITY_NAME="شركة سكاي جيت للإستشارات التربوية"
 
-MIZAN_LEGAL_TERMS_URL="https://mizan-f2ce3.web.app/legal/terms"
+MIZAN_LEGAL_TERMS_URL="https://mizan.dr-alfailakawi.com/legal/terms"
 MIZAN_LEGAL_TERMS_VERSION="1.0"
 MIZAN_LEGAL_TERMS_EFFECTIVE="2026-09-20"
 
-MIZAN_LEGAL_PRIVACY_URL="https://mizan-f2ce3.web.app/legal/privacy"
+MIZAN_LEGAL_PRIVACY_URL="https://mizan.dr-alfailakawi.com/legal/privacy"
 MIZAN_LEGAL_PRIVACY_VERSION="1.0"
 MIZAN_LEGAL_PRIVACY_EFFECTIVE="2026-09-20"
 ```
