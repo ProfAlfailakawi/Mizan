@@ -14,8 +14,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   KFGQPC_REQUIRED_DELIVERY_DATASETS,
+  KFGQPC_RETIRED_AUDIO_DATASETS,
   KFGQPC_RETIRED_DELIVERY_DATASETS,
+  KFGQPC_RETIRED_TEXT_DATASETS,
 } from '../server/kfgqpc-ingest-core';
+import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
+import { audioProfileForReading } from '../src/lib/global-hafs-audio';
 import { candidateRawiForDeliveryKey } from '../server/quran-reading-delivery';
 import { loadIslamwebReadingPackage } from '../server/islamweb-reading-packages';
 import { assertResultsReady } from '../scripts/kfgqpc-ingest';
@@ -31,8 +35,8 @@ const RETIRED_DATASET_RAWI: Record<string, string> = {
 };
 
 test('every retired dataset is retired because its text now loads from disk — measured, not assumed', () => {
-  assert.equal(KFGQPC_RETIRED_DELIVERY_DATASETS.length, 6);
-  for (const id of KFGQPC_RETIRED_DELIVERY_DATASETS) {
+  assert.equal(KFGQPC_RETIRED_TEXT_DATASETS.length, 6);
+  for (const id of KFGQPC_RETIRED_TEXT_DATASETS) {
     const rawiId = RETIRED_DATASET_RAWI[id];
     assert.ok(rawiId, `${id}: a retired dataset must name the reading it used to serve`);
 
@@ -52,8 +56,7 @@ test('the required list is exactly what production still reads from R2', () => {
    * تُقرأ من R2 ولا بديلَ لها على القرص — فبقاؤها في المطلوب شرطٌ لا اختيار.
    */
   assert.deepEqual([...KFGQPC_REQUIRED_DELIVERY_DATASETS].sort(), [
-    'audio-hafs', 'audio-qalun', 'audio-shubah', 'audio-susi',
-    'ghareeb', 'mushaf-pages', 'tafsir', 'tajweed',
+    'audio-hafs', 'ghareeb', 'mushaf-pages', 'tafsir', 'tajweed',
   ]);
 
   // ولا تداخُل: حزمةٌ لا تكون مطلوبةً ومُخرَجةً معًا.
@@ -104,4 +107,31 @@ test('the ingest preflight follows the same required list — a retired dataset 
   assert.throws(() => assertResultsReady([...allRequiredVerified, row('audio-warsh', 'QUARANTINED')]),
     /OPTIONAL_AUDIO_STATE_INVALID|RETIRED_DATASET_QUARANTINED/);
   assert.doesNotThrow(() => assertResultsReady([...allRequiredVerified, row('audio-duri', 'UNVERIFIED')]));
+});
+
+test('the non-Hafs audio packages are retired because every reading plays the one Hafs profile', () => {
+  /*
+   * الصوتُ حفصٌ عالميًّا للعشرين — قرارُ منتَجٍ مقصود. فطلبُ تحقُّقٍ من صوت شعبةَ
+   * وقالونَ والسوسيِّ طلبُ تحقُّقٍ ممّا لا يُقرأ، كطلبِ تحقُّقٍ من نصٍّ صار على القرص.
+   *
+   * ويُقاس السببُ نفسُه: العشرون كلُّها تعيد ملفَّ حفصٍ الواحد. فلو صار يومًا لكلّ
+   * روايةٍ صوتُها سقط هذا الاختبارُ ووجب ردُّ هذه الحزم إلى المطلوب.
+   */
+  assert.equal(KFGQPC_RETIRED_AUDIO_DATASETS.length, 3);
+  assert.equal(CANONICAL_RAWI_IDS.length, 20);
+
+  const profiles = new Set<string>();
+  for (const rawiId of CANONICAL_RAWI_IDS) {
+    const profile = audioProfileForReading(rawiId);
+    assert.ok(profile, `${rawiId}: every reading must resolve an audio profile`);
+    profiles.add(`${profile.reading}/${profile.reciterId}`);
+  }
+  assert.equal(profiles.size, 1, `all twenty readings must share one audio profile, found ${[...profiles].join(', ')}`);
+  assert.equal([...profiles][0].split('/')[0], 'hafs');
+
+  // وحزمةُ صوت حفصٍ تبقى مطلوبةً — هي الوحيدةُ التي تُقرأ.
+  assert.ok([...KFGQPC_REQUIRED_DELIVERY_DATASETS].includes('audio-hafs'));
+  for (const id of KFGQPC_RETIRED_AUDIO_DATASETS) {
+    assert.equal([...KFGQPC_REQUIRED_DELIVERY_DATASETS].includes(id as never), false, `${id} must not be required`);
+  }
 });
