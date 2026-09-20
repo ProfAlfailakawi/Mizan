@@ -114,10 +114,12 @@ test('the required list is read from the product, never restated here', () => {
 });
 
 test('a dataset the catalog has not verified does not count as verified', () => {
-  const verdicts = requiredDatasetVerdicts(catalogOf([dataset('hafs', { status: 'QUARANTINED' })]) as never);
-  const hafs = verdicts.find(v => v.id === 'hafs')!;
-  assert.equal(hafs.ok, false);
-  assert.equal(hafs.code, 'DATASET_NOT_VERIFIED:QUARANTINED');
+  // المثالُ يُشتقّ من قائمة المطلوب، فلا يبلى حين تتغيّر — وقد بلي حين خرج «حفص» منها.
+  const [required] = KFGQPC_REQUIRED_DELIVERY_DATASETS;
+  const verdicts = requiredDatasetVerdicts(catalogOf([dataset(required, { status: 'QUARANTINED' })]) as never);
+  const found = verdicts.find(v => v.id === required)!;
+  assert.equal(found.ok, false);
+  assert.equal(found.code, 'DATASET_NOT_VERIFIED:QUARANTINED');
 });
 
 test('a catalog of another schema is refused, not tolerated as old', () => {

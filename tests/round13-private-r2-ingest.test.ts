@@ -80,7 +80,11 @@ test('READY catalog is fail-closed and treats Warsh/Duri audio statuses explicit
   const storage={totalBytes:100,audioBytes:10,mushafPagesBytes:10,quranDataBytes:70,fontsBytes:10,otherBytes:0,remainingFromFreeTierBytes:1000,remainingFromSafetyLimitBytes:900,percentageUsed:.01,safetyPercentageUsed:.02,objectCount:20,withinFreeTier:true,withinSafetyLimit:true};
   const datasets=[...base,{id:'audio-warsh',status:'OFFICIAL_AUDIO_UNAVAILABLE' as const,r2Prefix:'delivery/audio/warsh'},{id:'audio-duri',status:'UNVERIFIED' as const,r2Prefix:'delivery/audio/duri'}];
   const catalog=buildReadyDeliveryCatalog({datasets,storage});assert.equal(catalog.state,'READY');assert.deepEqual(catalog.unavailableAudio,['audio-warsh']);assert.deepEqual(catalog.unverifiedAudio,['audio-duri']);
-  assert.throws(()=>buildReadyDeliveryCatalog({datasets:datasets.filter(x=>x.id!=='hafs'),storage}),/R2_DELIVERY_CATALOG_INCOMPLETE:hafs/);
+  // المثالُ يُشتقّ من القائمة نفسِها، فلا يبلى حين تتغيّر. كان مكتوبًا «حفص» فبلي حين
+  // خرجت حزمُ النصّ من المطلوب بعد تجميدها على القرص.
+  const [firstRequired]=KFGQPC_REQUIRED_DELIVERY_DATASETS;
+  assert.throws(()=>buildReadyDeliveryCatalog({datasets:datasets.filter(x=>x.id!==firstRequired),storage}),
+    new RegExp(`R2_DELIVERY_CATALOG_INCOMPLETE:${firstRequired}`));
 });
 
 /*
