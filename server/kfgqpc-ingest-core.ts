@@ -27,5 +27,20 @@ export function buildPackageManifest(input:Omit<KfgqpcPackageManifest,'schemaVer
 
 export interface KfgqpcDeliveryCatalogDataset{id:string;status:KfgqpcIngestStatus;r2Prefix:string;fileCount?:number;totalBytes?:number;sha256?:string;reading?:string;rawi?:string;reciter?:string;note?:string}
 export interface KfgqpcDeliveryCatalog{schemaVersion:'MIZAN-R2-CATALOG-1';authority:'King Fahd Glorious Quran Printing Complex';generatedAt:string;state:'READY';datasets:KfgqpcDeliveryCatalogDataset[];storage:KfgqpcActualStorageReport;unavailableAudio:string[];unverifiedAudio:string[]}
-export const KFGQPC_REQUIRED_DELIVERY_DATASETS=['hafs','warsh','shubah','qalun','duri-data','susi-data','tafsir','ghareeb','tajweed','mushaf-pages','audio-hafs','audio-shubah','audio-qalun','audio-susi'] as const;
+/*
+ * حزمُ النصّ الستُّ التي خرجت من قائمة المطلوب — **لأنها لم تعد تبعيّةً للإنتاج**، لا
+ * تساهلًا. فنصُّ العشرين صار يُقرأ من أثرٍ مجمَّدٍ في `quran-sources/` قبل أن يبلغ R2
+ * أصلًا (`candidateRawiForDeliveryKey` يعيّن قبل فرع التسليم).
+ *
+ * والخروجُ **مُثبَتٌ بحارس** لا مُدَّعًى: `tests/r2-required-datasets.test.ts` يقيس أن
+ * كلَّ روايةٍ هنا تُعيَّن إلى أثرٍ محلّيٍّ وتُحمَّل من القرص. فلو عاد النصُّ يومًا
+ * يُخدَم من R2 سقط الاختبارُ ووجب ردُّ الحزمة إلى المطلوب.
+ *
+ * وبوّابةُ الاكتمال لم تُمسّ: أنّ روايةً بلا نصٍّ شأنُ `quran:release-matrix`، لا شأنُ
+ * بوّابةِ نزاهةِ تسليم.
+ */
+export const KFGQPC_RETIRED_DELIVERY_DATASETS=['hafs','warsh','shubah','qalun','duri-data','susi-data'] as const;
+
+/** ما يقرؤه المنتجُ من R2 فعلًا — ولا يُطلب تحقُّقُ ما لا يُقرأ. */
+export const KFGQPC_REQUIRED_DELIVERY_DATASETS=['tafsir','ghareeb','tajweed','mushaf-pages','audio-hafs','audio-shubah','audio-qalun','audio-susi'] as const;
 export function buildReadyDeliveryCatalog(input:{datasets:KfgqpcDeliveryCatalogDataset[];storage:KfgqpcActualStorageReport}){const byId=new Map(input.datasets.map(x=>[x.id,x]));const missing=KFGQPC_REQUIRED_DELIVERY_DATASETS.filter(id=>byId.get(id)?.status!=='VERIFIED');if(missing.length)throw new Error(`R2_DELIVERY_CATALOG_INCOMPLETE:${missing.join(',')}`);if(!input.storage.withinSafetyLimit||!input.storage.withinFreeTier)throw new Error('R2_DELIVERY_CATALOG_STORAGE_LIMIT');const warsh=byId.get('audio-warsh'),duri=byId.get('audio-duri');if(warsh&&!['OFFICIAL_AUDIO_UNAVAILABLE','VERIFIED'].includes(warsh.status))throw new Error('R2_WARSH_AUDIO_STATUS_INVALID');if(duri&&!['UNVERIFIED','VERIFIED'].includes(duri.status))throw new Error('R2_DURI_AUDIO_STATUS_INVALID');return {schemaVersion:'MIZAN-R2-CATALOG-1' as const,authority:'King Fahd Glorious Quran Printing Complex' as const,generatedAt:new Date().toISOString(),state:'READY' as const,datasets:input.datasets,storage:input.storage,unavailableAudio:warsh?.status==='OFFICIAL_AUDIO_UNAVAILABLE'?['audio-warsh']:[],unverifiedAudio:duri?.status==='UNVERIFIED'?['audio-duri']:[]}}
