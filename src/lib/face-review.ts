@@ -125,29 +125,129 @@ export function forgetFaceAttempts(owner: string, reading: string): void {
  * والدفعُ **تزامنيّ**: يُربط الطابورُ لحظةَ وصول المقطع، لا بعد انتظار. وإلا سبق
  * متأخّرٌ سابقَه في الربط نفسِه.
  */
+/*
+ * وللانتظار حدٌّ — وإلّا حبس طلبٌ لا يعود الشاشةَ إلى الأبد.
+ *
+ * فمقطعٌ يُرسل إلى خادمٍ توقّف عن الرد يبقى معلّقًا، فيبقى الطابورُ معلّقًا، فتبقى
+ * الشاشةُ عند «يُقرأ ما سُمع…» ولا تصل إلى تقرير. والطالبُ لا يعرف ما جرى ولا يملك
+ * إلا إغلاقَ الصفحة.
+ *
+ * فبعد هذا الحدّ يُقرأ ما وصل، **ويُقال إنّ بعضه لم يصل** — ولا يُعرض ناقصٌ على أنّه
+ * تامّ. وخمسَ عشرةَ ثانيةً سعةٌ لمقطعٍ من ثانيتين على أبطأ شبكةٍ معقولة.
+ */
+export const DRAIN_DEADLINE_MS = 15_000;
+
 export interface SerialQueue {
-  /** يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها. */
-  push(task: () => Promise<void>): void;
-  /** ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار. */
-  drain(): Promise<void>;
+  /**
+   * يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها.
+   *
+   * وتُعطى المهمّةُ `live()`: أما زال هذا الطابورُ هو الجاري؟ **فلتسأل قبل أن تكتب
+   * شيئًا**. فمقطعٌ انقضت مهلتُه ثمّ عاد، والطالبُ قد انتقل إلى وجهٍ آخر، يكتب في
+   * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ محاولةٌ
+   * مغشوشة. والطابورُ لا يملك إيقافَ مهمّةٍ جارية، لكنّه يملك أن يقول لها: كُفّي.
+   */
+  push(task: (live: () => boolean) => Promise<void>, onFailure?: (error: unknown) => void): void;
+  /**
+   * ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار — إلى حدٍّ.
+   * ويُرجع `true` إن **وصل كلُّ شيءٍ وتمّ**؛ و`false` إن انقضى الحدُّ أو سقطت مهمّة.
+   */
+  drain(deadlineMs?: number): Promise<boolean>;
+  /** يُنهي هذا الطابور: ما لم يبدأ لا يبدأ، وما بدأ يُقال له `live() === false`. */
+  abandon(): void;
   /** كم مهمّةً دُخلت الطابورَ — للعرض لا للحكم. */
   readonly length: number;
+  /** كم مهمّةً سقطت — وكلُّ ساقطةٍ مقطعٌ لم يصل. */
+  readonly failed: number;
 }
 
 export function serialQueue(): SerialQueue {
   let tail: Promise<void> = Promise.resolve();
   let entered = 0;
+  let failed = 0;
+  let abandoned = false;
+  const live = () => !abandoned;
+
   return {
-    push(task) {
+    push(task, onFailure) {
+      if (abandoned) return;
       entered += 1;
-      /* وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. */
-      tail = tail.then(task).catch(() => undefined);
+      /*
+       * وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. لكنّه
+       * **يُعدّ**: مقطعٌ سقط مقطعٌ لم يصل، فالتقريرُ ناقصٌ وإن لم تنقضِ مهلة.
+       *
+       * والبيانُ للطالب يقع بعد العدّ، وسقوطُه هو لا يُسقط العدّ.
+       */
+      tail = tail.then(() => (abandoned ? undefined : task(live))).catch(error => {
+        failed += 1;
+        try { onFailure?.(error); } catch { /* بيانٌ تعذّر لا يُلغي أنّ المقطع سقط */ }
+      });
     },
-    async drain() {
-      /* ومهمّةٌ تُدفع أثناء الانتظار تُنتظر هي أيضًا — وإلا سقط آخرُ مقطع. */
-      let seen: Promise<void> | null = null;
-      while (seen !== tail) { seen = tail; await tail; }
+    async drain(deadlineMs = DRAIN_DEADLINE_MS) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let expired = false;
+      const deadline = new Promise<'expired'>(resolve => {
+        timer = setTimeout(() => { expired = true; resolve('expired'); }, Math.max(0, deadlineMs));
+      });
+      try {
+        /* ومهمّةٌ تُدفع أثناء الانتظار تُنتظر هي أيضًا — وإلا سقط آخرُ مقطع. */
+        let seen: Promise<void> | null = null;
+        while (seen !== tail) {
+          seen = tail;
+          const outcome = await Promise.race([tail.then(() => 'settled' as const), deadline]);
+          if (outcome === 'expired') return false;
+        }
+        return !expired && failed === 0;
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+      }
     },
+    abandon() { abandoned = true; },
     get length() { return entered; },
+    get failed() { return failed; },
   };
+}
+
+/* ── ما يُقال للطالب تحت وجهه ──────────────────────────────────────────── */
+
+/*
+ * بيانُ حال المراجعة — وأمرُه أدقُّ ممّا يبدو.
+ *
+ * فقد كان ترتيبًا بسيطًا: «إن كان ناقصًا فقل انقضت المهلة، وإلا فقل ما وقع». فبلع
+ * **سببًا بنيويًّا** يعرفه النظامُ ويحتاج فعلًا من الطالب: انتهاءُ جلسته، أو خدمةُ
+ * استماعٍ غيرُ مهيّأة. إذ سقوطُ المقاطع يجعل التقريرَ ناقصًا، والنقصُ كان يتقدّم
+ * فيُقال له «الشبكةُ بطيئة، أعِد» وجلستُه منتهيةٌ فلا يُفيده الإعادة.
+ *
+ * فالسببُ المعروفُ يتقدّم دائمًا، والنقصُ يُذكر معه لا بدله: يعرف ما يفعل، ويعرف أنّ
+ * ما يراه ناقص.
+ */
+export interface ReviewNoteInput {
+  /** أمهيّأٌ محرّكُ الاستماع في هذه المسابقة؟ */
+  listening: boolean;
+  /** أيقبل الوجهُ المسحوبُ القياسَ (في سورةٍ واحدة)؟ */
+  faceListenable: boolean;
+  /** بيانٌ بنيويٌّ وقع (جلسةٌ منتهية، خدمةٌ غيرُ مهيّأة…) — من `faceNote`. */
+  note?: string;
+  /** أنقص التقريرُ: مقطعٌ لم يصل أو سقط؟ */
+  incomplete: boolean;
+  ar: boolean;
+}
+
+export function reviewNote(input: ReviewNoteInput): string | undefined {
+  const { listening, faceListenable, note, incomplete, ar } = input;
+  if (!listening) {
+    return ar
+      ? 'محرّكُ الاستماع غيرُ مهيّأٍ في هذه المسابقة، فالوجهُ مفتوحٌ للمراجعة بلا تحليل — ولا يُتظاهر بسماعٍ لم يقع.'
+      : 'The listening engine is not configured here — the face is open for review without analysis.';
+  }
+  if (!faceListenable) {
+    return ar
+      ? 'هذا الوجهُ يحمل خاتمةَ سورةٍ وفاتحةَ أخرى، والتتبّعُ يُطلب لسورةٍ واحدة — فيُراجَع بلا تحليل، ولا يُفتح ميكروفونٌ يعود بتقريرٍ فارغ.'
+      : 'This face spans two surahs and tracking is requested per surah — review it without analysis.';
+  }
+  const partial = ar
+    ? 'ولم يصل بعضُ المقاطع، فما تراه مبنيٌّ على ما وصل وحدَه — والنقصُ ليس من تلاوتك.'
+    : 'Some chunks never arrived, so what you see is built only on what did — the gap is not in your recitation.';
+  /* السببُ المعروفُ أوّلًا: هو الذي يدلّ الطالبَ على ما يفعل. */
+  if (note) return incomplete ? `${note} ${partial}` : note;
+  return incomplete ? partial : undefined;
 }

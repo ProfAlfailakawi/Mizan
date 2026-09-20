@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 import {
   attemptFrom, faceNote, faceSupportsListening, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
-  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue,
+  forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue, DRAIN_DEADLINE_MS, reviewNote,
 } from '../src/lib/face-review';
 import { accumulateWordSignals } from '../server/alignment/word-signals';
 import { readRecitation, settleRecitation, stepsFromSamples, type FaceWordKey } from '../src/lib/face-session';
@@ -184,11 +184,19 @@ test('الإنهاءُ لا يقرأ قبل آخرِ مقطعٍ وقبلَ فر�
   const order: string[] = [];
   const out = await settleRecitation({
     flush: async () => { await new Promise(r => setTimeout(r, 10)); order.push('flush'); },
-    drain: async () => { await new Promise(r => setTimeout(r, 10)); order.push('drain'); },
-    read: () => { order.push('read'); return 'قُرئ'; },
+    drain: async () => { await new Promise(r => setTimeout(r, 10)); order.push('drain'); return true; },
+    read: complete => { order.push('read'); return complete ? 'تامّ' : 'ناقص'; },
   });
   assert.deepEqual(order, ['flush', 'drain', 'read'], `الترتيب: ${order.join(' → ')}`);
-  assert.equal(out, 'قُرئ');
+  assert.equal(out, 'تامّ');
+
+  /* وجوابُ الإفراغ يصل القارئَ — فلا تُقرأ تلاوةٌ ناقصةٌ وكأنّها تامّة. */
+  const partial = await settleRecitation({
+    flush: async () => undefined,
+    drain: async () => false,
+    read: complete => (complete ? 'تامّ' : 'ناقص'),
+  });
+  assert.equal(partial, 'ناقص', 'نقصُ التلاوة لم يبلغ القارئ');
 });
 
 test('القراءةُ تجمع ما سُمع، وتحكم في المحاولة بما عُرف موضعُه', () => {
@@ -254,7 +262,8 @@ test('الطابورُ يحفظ ترتيبَ التلاوة ولو عادت ال
   const delays = [40, 30, 20, 10, 0];
   delays.forEach((ms, i) => q.push(() => new Promise<void>(r => setTimeout(() => { done.push(i); r(); }, ms))));
   assert.equal(q.length, 5, 'الدفعُ ليس تزامنيًّا — وقد سبق متأخّرٌ سابقَه في الربط');
-  return q.drain().then(() => {
+  return q.drain().then(complete => {
+    assert.equal(complete, true, 'قيل إنّ الطابورَ لم يفرغ وقد فرغ');
     assert.deepEqual(done, [0, 1, 2, 3, 4], `ترتيبُ الإتمام: ${done.join(',')}`);
   });
 });
@@ -294,8 +303,16 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   assert.match(screen, /await settleRecitation\(\{/, 'التقريرُ لا يمرّ بترتيب الإنهاء');
-  assert.match(screen, /read: \(\) => readRecitation\(/, 'القراءةُ ليست هي المقيسة');
-  assert.match(screen, /flush: flushRecorder/, 'آخرُ مقطعٍ لا يُنتظر');
+  assert.match(screen, /read: complete => \(\{ \.\.\.readRecitation\(/, 'القراءةُ ليست هي المقيسة');
+  assert.match(screen, /flush: stopAndRelease/, 'آخرُ مقطعٍ لا يُنتظر');
+  /*
+   * والميكروفونُ يُطلق داخلَ إيقاف التسجيل لا بعد انتظار الطابور: فعلٌ واحدٌ لا ترتيبٌ
+   * يُنسى. ولو كان بعده لبقي مفتوحًا حين يتعلّق طلبٌ لا يعود.
+   */
+  const stopper = screen.slice(screen.indexOf('const stopAndRelease'), screen.indexOf('const stopAudio'));
+  assert.match(stopper, /releaseMic\(\)/, 'إيقافُ التسجيل لا يُطلق الميكروفون');
+  assert.equal(/await queue\.current\.drain\(\);\s*\n\s*releaseMic\(\)/.test(screen), false,
+    'الميكروفونُ يُطلق بعد انتظار الطابور — فيبقى مفتوحًا إن تعلّق طلب');
   assert.match(screen, /drain: \(\) => queue\.current\.drain\(\)/, 'الطابورُ لا يُفرَّغ');
   /* ولا تُستدعى أدواتُ القراءة الخام في الشاشة: لا طريقَ ثانٍ إلى تقرير. */
   for (const bypass of ['readFace(', 'accumulateWordSignals(', 'stepsFromSamples(']) {
@@ -304,4 +321,192 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   /* والمقاطعُ تدخل الطابورَ ولا تُرسل مستقلّةً. */
   assert.match(screen, /queue\.current\.push\(/, 'المقاطعُ لا تدخل الطابور');
   assert.equal(/ondataavailable = async/.test(screen), false, 'الربطُ بالطابور ليس تزامنيًّا');
+  /*
+   * ولا `try` في مهمّة المقطع: الخطأُ يمرّ إلى الطابور فيُعدّ ساقطًا، والبيانُ للطالب
+   * يُسلَّم إلى `onFailure`. وقد وقع العكسُ مرّةً فصار عدّادُ السقوط ميتًا: المهمّةُ
+   * تبتلع خطأها فيرى الطابورُ نجاحًا، فيقول «تمّ» ومقطعٌ لم يصل.
+   */
+  const chunkTask = screen.slice(screen.indexOf('queue.current.push(async live'), screen.indexOf('rec.start(2000)'));
+  assert.equal(/\btry\s*\{/.test(chunkTask), false, 'مهمّةُ المقطع تبتلع خطأها فلا يُعدّ ساقطًا');
+  assert.match(chunkTask, /\}, error => \{/, 'لا بيانَ للطالب عند سقوط مقطع');
+  assert.match(chunkTask, /setNote\(faceNote\(code, ar\)\)/, 'سببُ التعذّر لا يبلغ الطالب');
+
+  /* والمقطعُ يسأل الطابورَ قبل أن يكتب، والطابورُ القديم يُترك عند كلّ وجهٍ جديد. */
+  assert.match(screen, /if \(!alive\.current \|\| !live\(\)\) return;/, 'المقطعُ يكتب بلا أن يسأل');
+  /*
+   * والترك يقع في ثلاثة مواضعَ بعينها، لا «مرّتين في مكانٍ ما»: عند سحب وجهٍ جديد،
+   * وعند بدء تلاوةٍ جديدة، وعند مغادرة الشاشة. وعدُّ المواضع وحده يمرّ إن نُقل الترك
+   * من موضعه إلى غيره — فيُفحص كلُّ موضعٍ بجاره.
+   */
+  for (const [where, pattern] of [
+    ['سحبُ وجهٍ جديد', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/],
+    ['بدءُ تلاوة', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('reciting'\)/],
+    ['مغادرةُ الشاشة', /useEffect\(\(\) => \(\) => \{ queue\.current\.abandon\(\); stopAudio\(\); \}/],
+  ] as const) {
+    assert.match(screen, pattern, `الطابورُ القديم لا يُترك عند ${where}`);
+  }
+});
+
+/*
+ * ومهلةُ الاختبار مقصودة: بلا حدٍّ في الشيفرة يتعلّق هذا الانتظارُ أبدًا، فيعلّق السيرَ
+ * كلَّه بدل أن يحمرّ. وحارسٌ يُعلّق CI أسوأُ من حارسٍ يسقط.
+ */
+test('طلبٌ لا يعود لا يحبس الشاشة — للانتظار حدٌّ يُقال بعده الحقّ', { timeout: 5_000 }, () => {
+  /*
+   * فخادمٌ توقّف عن الرد يترك المقطعَ معلّقًا، فيتعلّق الطابور، فتبقى الشاشةُ عند
+   * «يُقرأ ما سُمع…» بلا نهاية — والطالبُ لا يملك إلا إغلاقَ الصفحة. وأسوأُ من ذلك
+   * أنّ إطلاقَ الميكروفون كان بعد الانتظار، فيبقى مفتوحًا وضوءُه مضاءٌ وقد أنهى.
+   */
+  const q = serialQueue();
+  let released = false;
+  q.push(() => new Promise<void>(() => { /* لا يعود أبدًا */ }));
+  q.push(async () => { released = true; });
+  const started = Date.now();
+  return q.drain(60).then(complete => {
+    assert.equal(complete, false, 'قيل إنّ الطابورَ فرغ وفيه معلّق');
+    assert.ok(Date.now() - started < 5_000, 'الانتظارُ لم ينقطع عند حدّه');
+    assert.equal(released, false, 'مضت مهمّةٌ بعد المعلّق — فالترتيبُ ضاع');
+  });
+});
+
+test('والحدُّ الافتراضيّ معلنٌ وواسعٌ لمقطعٍ من ثانيتين', () => {
+  assert.ok(DRAIN_DEADLINE_MS >= 5_000, `الحدُّ ${DRAIN_DEADLINE_MS}ms أضيقُ من أن يسع شبكةً بطيئة`);
+  assert.ok(DRAIN_DEADLINE_MS <= 60_000, `الحدُّ ${DRAIN_DEADLINE_MS}ms أطولُ من صبر طالب`);
+});
+
+test('طابورٌ فارغٌ يفرغ فورًا ويُقال إنّه تامّ', () => {
+  const q = serialQueue();
+  return q.drain(50).then(complete => assert.equal(complete, true));
+});
+
+test('مقطعٌ عاد بعد انقضاء مهلته لا يكتب في وجهٍ آخر', () => {
+  /*
+   * وهذا أخطرُ ما في المهلة: الطابورُ المتروك يبقى جاريًا، فإذا عاد طلبُه المتأخّر
+   * والطالبُ قد انتقل إلى وجهٍ آخر كتب في مواضع الجديد مواضعَ القديم — فيختلط تقريرٌ
+   * بتقرير، وتُحفظ محاولةٌ مغشوشة تُرجّح وجهًا بغير سبب.
+   *
+   * والطابورُ لا يملك إيقافَ مهمّةٍ جارية، لكنّه يملك أن يقول لها: كُفّي.
+   */
+  const written: string[] = [];
+  const q = serialQueue();
+  let unblock: (() => void) | null = null;
+  q.push(async live => {
+    await new Promise<void>(r => { unblock = r; });
+    if (!live()) return;
+    written.push('متأخّر');
+  });
+
+  return q.drain(40).then(complete => {
+    assert.equal(complete, false, 'قيل إنّ الطابورَ فرغ وفيه معلّق');
+    /* الطالبُ ينتقل إلى وجهٍ آخر: يُترك الطابورُ القديم. */
+    q.abandon();
+    unblock!();
+    return new Promise(r => setTimeout(r, 20));
+  }).then(() => {
+    assert.deepEqual(written, [], 'كتب مقطعٌ متأخّرٌ في وجهٍ ليس وجهَه');
+  });
+});
+
+test('طابورٌ متروكٌ لا يبدأ فيه ما لم يبدأ', () => {
+  const ran: number[] = [];
+  const q = serialQueue();
+  q.push(async () => { ran.push(1); q.abandon(); });
+  q.push(async () => { ran.push(2); });
+  q.abandon();
+  q.push(async () => { ran.push(3); });
+  assert.equal(q.length, 2, 'قُبلت مهمّةٌ بعد الترك');
+  return q.drain(200).then(() => assert.deepEqual(ran, [], 'بدأ الطابورُ المتروك'));
+});
+
+test('مقطعٌ سقط يجعل التقريرَ ناقصًا ولو لم تنقضِ مهلة', () => {
+  /*
+   * فسقوطُ الطلب — انقطاعُ شبكةٍ أو ردُّ خطأٍ — مقطعٌ لم يصل. وكان الطابورُ يبتلع
+   * السقوطَ ويقول «تمّ»، فيُعرض تقريرٌ ناقصٌ على أنّه تامّ ويُكتم التنبيه.
+   */
+  const q = serialQueue();
+  q.push(async () => { /* وصل */ });
+  q.push(async () => { throw new Error('CHUNK_FAILED'); });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false, 'قيل «تمّ» ومقطعٌ ساقط');
+    assert.equal(q.failed, 1, `عُدّ ${q.failed} ساقطًا`);
+  });
+});
+
+test('ولا سقوطَ ولا انقضاء ⇒ تامّ', () => {
+  const q = serialQueue();
+  q.push(async () => { /* وصل */ });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, true, 'قيل «ناقص» وكلُّ شيءٍ وصل');
+    assert.equal(q.failed, 0);
+  });
+});
+
+test('بيانُ السقوط يُسلَّم إلى الطابور — فالعدُّ لا يعتمد على أدب المهمّة', () => {
+  /*
+   * ولو تُرك الالتقاطُ للمهمّة لابتلعت خطأها ومضت، فرأى الطابورُ نجاحًا حيث وقع
+   * سقوط. فصار البلعُ غيرَ ممكن: الخطأُ يمرّ إلى الطابور دائمًا، والبيانُ يُعطى هنا.
+   */
+  const seen: unknown[] = [];
+  const q = serialQueue();
+  q.push(async () => { throw new Error('CHUNK_FAILED'); }, error => { seen.push(error); });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false, 'قيل «تمّ» ومقطعٌ ساقط');
+    assert.equal(q.failed, 1);
+    assert.equal(seen.length, 1, 'لم يُبلَّغ بالسقوط');
+    assert.equal((seen[0] as Error).message, 'CHUNK_FAILED');
+  });
+});
+
+test('وبيانٌ تعذّر هو نفسُه لا يُلغي أنّ المقطع سقط', () => {
+  const q = serialQueue();
+  q.push(async () => { throw new Error('CHUNK_FAILED'); }, () => { throw new Error('NOTE_FAILED'); });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false);
+    assert.equal(q.failed, 1, 'سقوطُ البيان ابتلع عدَّ المقطع');
+  });
+});
+
+test('السببُ المعروفُ يتقدّم على البيان العامّ — ولا يُبتلع', () => {
+  /*
+   * فسقوطُ المقاطع يجعل التقريرَ ناقصًا، وكان النقصُ يتقدّم فيُقال لمن انتهت جلستُه
+   * «الشبكةُ بطيئة، أعِد» — وهو لا يُفيده إعادةٌ، إنّما يُفيده أن يعيد الدخول. والسببُ
+   * البنيويُّ هو وحده الذي يدلّه على ما يفعل.
+   */
+  const expired = faceNote('IDENTITY_REQUIRED', true);
+  const both = reviewNote({ listening: true, faceListenable: true, note: expired, incomplete: true, ar: true })!;
+  assert.ok(both.includes(expired), 'ابتُلع السببُ المعروف');
+  assert.ok(both.includes('ولم يصل بعضُ المقاطع'), 'أُسقط بيانُ النقص');
+
+  /* وبلا سببٍ معروف: يُقال النقصُ وحده. */
+  const onlyPartial = reviewNote({ listening: true, faceListenable: true, incomplete: true, ar: true })!;
+  assert.equal(onlyPartial.includes('ولم يصل'), true);
+
+  /* وبلا نقصٍ: السببُ وحده، بلا ذيلٍ يُوهم نقصًا لم يقع. */
+  const onlyNote = reviewNote({ listening: true, faceListenable: true, note: expired, incomplete: false, ar: true })!;
+  assert.equal(onlyNote, expired);
+
+  /* وتلاوةٌ تامّةٌ بلا سبب: لا بيانَ أصلًا. */
+  assert.equal(reviewNote({ listening: true, faceListenable: true, incomplete: false, ar: true }), undefined);
+});
+
+test('وتعذُّرُ المحرّك أو الوجهِ يتقدّم على كلّ ما سواه', () => {
+  /* فلا معنى لأن يُقال «لم يصل بعضُ المقاطع» ولا مقطعَ أُرسل أصلًا. */
+  const noEngine = reviewNote({ listening: false, faceListenable: true, note: 'س', incomplete: true, ar: true })!;
+  assert.ok(noEngine.includes('غيرُ مهيّأ'), 'تعذُّرُ المحرّك لم يتقدّم');
+  assert.equal(noEngine.includes('لم يصل بعضُ المقاطع'), false, 'قيل نقصٌ ولا إرسال');
+
+  const crossing = reviewNote({ listening: true, faceListenable: false, note: 'س', incomplete: true, ar: true })!;
+  assert.ok(crossing.includes('يحمل خاتمةَ سورةٍ وفاتحةَ أخرى'), 'سببُ الوجه لم يتقدّم');
+
+  /* والإنجليزيّةُ تقول ما تقوله العربيّة — لا صمتَ في لغةٍ دون أخرى. */
+  for (const input of [
+    { listening: false, faceListenable: true, incomplete: false },
+    { listening: true, faceListenable: false, incomplete: false },
+    { listening: true, faceListenable: true, incomplete: true },
+  ]) {
+    assert.ok((reviewNote({ ...input, ar: false }) || '').length > 10, `بيانٌ إنجليزيٌّ ناقص: ${JSON.stringify(input)}`);
+  }
 });
