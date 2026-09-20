@@ -321,6 +321,20 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   /* والمقاطعُ تدخل الطابورَ ولا تُرسل مستقلّةً. */
   assert.match(screen, /queue\.current\.push\(/, 'المقاطعُ لا تدخل الطابور');
   assert.equal(/ondataavailable = async/.test(screen), false, 'الربطُ بالطابور ليس تزامنيًّا');
+  /* والمقطعُ يسأل الطابورَ قبل أن يكتب، والطابورُ القديم يُترك عند كلّ وجهٍ جديد. */
+  assert.match(screen, /if \(!alive\.current \|\| !live\(\)\) return;/, 'المقطعُ يكتب بلا أن يسأل');
+  /*
+   * والترك يقع في ثلاثة مواضعَ بعينها، لا «مرّتين في مكانٍ ما»: عند سحب وجهٍ جديد،
+   * وعند بدء تلاوةٍ جديدة، وعند مغادرة الشاشة. وعدُّ المواضع وحده يمرّ إن نُقل الترك
+   * من موضعه إلى غيره — فيُفحص كلُّ موضعٍ بجاره.
+   */
+  for (const [where, pattern] of [
+    ['سحبُ وجهٍ جديد', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/],
+    ['بدءُ تلاوة', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('reciting'\)/],
+    ['مغادرةُ الشاشة', /useEffect\(\(\) => \(\) => \{ queue\.current\.abandon\(\); stopAudio\(\); \}/],
+  ] as const) {
+    assert.match(screen, pattern, `الطابورُ القديم لا يُترك عند ${where}`);
+  }
 });
 
 /*
@@ -353,4 +367,68 @@ test('والحدُّ الافتراضيّ معلنٌ وواسعٌ لمقطعٍ �
 test('طابورٌ فارغٌ يفرغ فورًا ويُقال إنّه تامّ', () => {
   const q = serialQueue();
   return q.drain(50).then(complete => assert.equal(complete, true));
+});
+
+test('مقطعٌ عاد بعد انقضاء مهلته لا يكتب في وجهٍ آخر', () => {
+  /*
+   * وهذا أخطرُ ما في المهلة: الطابورُ المتروك يبقى جاريًا، فإذا عاد طلبُه المتأخّر
+   * والطالبُ قد انتقل إلى وجهٍ آخر كتب في مواضع الجديد مواضعَ القديم — فيختلط تقريرٌ
+   * بتقرير، وتُحفظ محاولةٌ مغشوشة تُرجّح وجهًا بغير سبب.
+   *
+   * والطابورُ لا يملك إيقافَ مهمّةٍ جارية، لكنّه يملك أن يقول لها: كُفّي.
+   */
+  const written: string[] = [];
+  const q = serialQueue();
+  let unblock: (() => void) | null = null;
+  q.push(async live => {
+    await new Promise<void>(r => { unblock = r; });
+    if (!live()) return;
+    written.push('متأخّر');
+  });
+
+  return q.drain(40).then(complete => {
+    assert.equal(complete, false, 'قيل إنّ الطابورَ فرغ وفيه معلّق');
+    /* الطالبُ ينتقل إلى وجهٍ آخر: يُترك الطابورُ القديم. */
+    q.abandon();
+    unblock!();
+    return new Promise(r => setTimeout(r, 20));
+  }).then(() => {
+    assert.deepEqual(written, [], 'كتب مقطعٌ متأخّرٌ في وجهٍ ليس وجهَه');
+  });
+});
+
+test('طابورٌ متروكٌ لا يبدأ فيه ما لم يبدأ', () => {
+  const ran: number[] = [];
+  const q = serialQueue();
+  q.push(async () => { ran.push(1); q.abandon(); });
+  q.push(async () => { ran.push(2); });
+  q.abandon();
+  q.push(async () => { ran.push(3); });
+  assert.equal(q.length, 2, 'قُبلت مهمّةٌ بعد الترك');
+  return q.drain(200).then(() => assert.deepEqual(ran, [], 'بدأ الطابورُ المتروك'));
+});
+
+test('مقطعٌ سقط يجعل التقريرَ ناقصًا ولو لم تنقضِ مهلة', () => {
+  /*
+   * فسقوطُ الطلب — انقطاعُ شبكةٍ أو ردُّ خطأٍ — مقطعٌ لم يصل. وكان الطابورُ يبتلع
+   * السقوطَ ويقول «تمّ»، فيُعرض تقريرٌ ناقصٌ على أنّه تامّ ويُكتم التنبيه.
+   */
+  const q = serialQueue();
+  q.push(async () => { /* وصل */ });
+  q.push(async () => { throw new Error('CHUNK_FAILED'); });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, false, 'قيل «تمّ» ومقطعٌ ساقط');
+    assert.equal(q.failed, 1, `عُدّ ${q.failed} ساقطًا`);
+  });
+});
+
+test('ولا سقوطَ ولا انقضاء ⇒ تامّ', () => {
+  const q = serialQueue();
+  q.push(async () => { /* وصل */ });
+  q.push(async () => { /* وصل */ });
+  return q.drain(500).then(complete => {
+    assert.equal(complete, true, 'قيل «ناقص» وكلُّ شيءٍ وصل');
+    assert.equal(q.failed, 0);
+  });
 });

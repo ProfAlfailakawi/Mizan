@@ -138,25 +138,44 @@ export function forgetFaceAttempts(owner: string, reading: string): void {
 export const DRAIN_DEADLINE_MS = 15_000;
 
 export interface SerialQueue {
-  /** يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها. */
-  push(task: () => Promise<void>): void;
+  /**
+   * يُلحق مهمّةً بالطابور فورًا — ولا تبدأ حتى تنتهي ما قبلها.
+   *
+   * وتُعطى المهمّةُ `live()`: أما زال هذا الطابورُ هو الجاري؟ **فلتسأل قبل أن تكتب
+   * شيئًا**. فمقطعٌ انقضت مهلتُه ثمّ عاد، والطالبُ قد انتقل إلى وجهٍ آخر، يكتب في
+   * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ محاولةٌ
+   * مغشوشة. والطابورُ لا يملك إيقافَ مهمّةٍ جارية، لكنّه يملك أن يقول لها: كُفّي.
+   */
+  push(task: (live: () => boolean) => Promise<void>): void;
   /**
    * ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار — إلى حدٍّ.
-   * ويُرجع: أوصل كلُّ شيءٍ (`true`) أم انقضى الحدُّ وبقي معلّقٌ (`false`).
+   * ويُرجع `true` إن **وصل كلُّ شيءٍ وتمّ**؛ و`false` إن انقضى الحدُّ أو سقطت مهمّة.
    */
   drain(deadlineMs?: number): Promise<boolean>;
+  /** يُنهي هذا الطابور: ما لم يبدأ لا يبدأ، وما بدأ يُقال له `live() === false`. */
+  abandon(): void;
   /** كم مهمّةً دُخلت الطابورَ — للعرض لا للحكم. */
   readonly length: number;
+  /** كم مهمّةً سقطت — وكلُّ ساقطةٍ مقطعٌ لم يصل. */
+  readonly failed: number;
 }
 
 export function serialQueue(): SerialQueue {
   let tail: Promise<void> = Promise.resolve();
   let entered = 0;
+  let failed = 0;
+  let abandoned = false;
+  const live = () => !abandoned;
+
   return {
     push(task) {
+      if (abandoned) return;
       entered += 1;
-      /* وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. */
-      tail = tail.then(task).catch(() => undefined);
+      /*
+       * وخطأُ مهمّةٍ لا يقطع الطابور: المقطعُ الواحد يسقط، والتلاوةُ تمضي. لكنّه
+       * **يُعدّ**: مقطعٌ سقط مقطعٌ لم يصل، فالتقريرُ ناقصٌ وإن لم تنقضِ مهلة.
+       */
+      tail = tail.then(() => (abandoned ? undefined : task(live))).catch(() => { failed += 1; });
     },
     async drain(deadlineMs = DRAIN_DEADLINE_MS) {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -172,11 +191,13 @@ export function serialQueue(): SerialQueue {
           const outcome = await Promise.race([tail.then(() => 'settled' as const), deadline]);
           if (outcome === 'expired') return false;
         }
-        return !expired;
+        return !expired && failed === 0;
       } finally {
         if (timer !== undefined) clearTimeout(timer);
       }
     },
+    abandon() { abandoned = true; },
     get length() { return entered; },
+    get failed() { return failed; },
   };
 }

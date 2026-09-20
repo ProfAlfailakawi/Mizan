@@ -101,6 +101,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const draw = useCallback(async (seed: string) => {
     if (!deliveryReading || !candidates.length) return;
+    /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
+    queue.current.abandon(); queue.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setSeconds(0); setIncomplete(false);
     const weightOf = faceWeights(attempts, Date.now());
     const picked = drawFace(candidates, seed, weightOf);
@@ -151,12 +153,13 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     releaseMic();
   }, [releaseMic]);
 
-  useEffect(() => stopAudio, [stopAudio]);
+  /* وعند مغادرة الشاشة: يُطلق الميكروفونُ ويُترك ما بقي من الطابور. */
+  useEffect(() => () => { queue.current.abandon(); stopAudio(); }, [stopAudio]);
 
   const begin = useCallback(async () => {
     if (!face) return;
     samples.current = []; setHeard(0); setSeconds(0); setNote(''); setIncomplete(false);
-    queue.current = serialQueue();
+    queue.current.abandon(); queue.current = serialQueue();
     setStage('reciting');
     if (!listening) return;   /* بلا محرّكٍ يبقى الوجهُ مفتوحًا للقراءة بلا استماع. */
     /*
@@ -180,13 +183,20 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       rec.ondataavailable = e => {
         if (!e.data.size) return;
         const chunk = e.data;
-        queue.current.push(async () => {
+        queue.current.push(async live => {
           try {
             const out = await submitPracticeAlignmentChunk({
               blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
               surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
             });
-            if (!alive.current) return;
+            /*
+             * ويُسأل الطابورُ قبل الكتابة: أما زال هو الجاري؟
+             *
+             * فمقطعٌ انقضت مهلتُه ثمّ عاد، والطالبُ قد انتقل إلى وجهٍ آخر، يكتب في
+             * مواضع الوجه الجديد مواضعَ الوجه القديم — فيختلط تقريرٌ بتقرير، وتُحفظ
+             * محاولةٌ مغشوشة تُرجّح وجهًا بغير سبب.
+             */
+            if (!alive.current || !live()) return;
             samples.current = [...samples.current, { surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }];
             setHeard(n => n + 1);
           } catch (err) {
