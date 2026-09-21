@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {FileCheck2,FileSearch,MapPin,Pause,Type,Play} from 'lucide-react';
-import {fetchDeliveryPassage,fetchMushafLayout,fetchOfficialMushafPage,findLayoutWord,loadKfgqpcOfficialQuranFont,type DeliveryPassage,type MushafPageLayout} from '../../lib/kfgqpc-library';
+import {fetchDeliveryPassage,fetchMushafLayout,fetchOfficialMushafPage,findLayoutWord,loadKfgqpcOfficialQuranFont,officialMushafPackageForReading,type DeliveryPassage,type MushafPageLayout} from '../../lib/kfgqpc-library';
 import type {QuranAlignmentResult,QuranPageLocus} from '../../lib/quran-intelligence';
 import {Badge} from '../design-system/Badge';
 import {DivergenceRadar} from './DivergenceRadar';
@@ -42,9 +42,6 @@ const DELIVERY_READING_BY_NAME:Record<string,string>={
  qunbul:'qunbul',qumbul:'qunbul','قنبل':'qunbul',
 };
 const readingNameKey=(v?:string)=>v?v.toLowerCase().replace(/['`’\-\s_]/g,'').replace(/[ًٌٍَُِّْ]/g,''):'';
-/* Delivery package id per reading — used only to address the delivery surface (pages/fonts). */
-const PACKAGE_BY_READING:Record<string,string>={hafs:'kfgqpc-hafs-uthmanic-v13',warsh:'kfgqpc-warsh-uthmanic-v6',shubah:'kfgqpc-shubah-uthmanic-v4',qalun:'kfgqpc-qaloun-uthmanic-v5','duri-abi-amr':'kfgqpc-douri-abu-amr-uthmanic-v3','susi-abi-amr':'kfgqpc-sousi-abu-amr-uthmanic-v3'};
-
 /* Surah name → number, so a question that carries only a name can still address the delivery
    package. Returns undefined rather than guessing when the name is unknown. */
 const SURAH_EN=['Al-Fatihah','Al-Baqarah','Ali Imran','An-Nisa','Al-Maidah','Al-Anam','Al-Araf','Al-Anfal','At-Tawbah','Yunus','Hud','Yusuf','Ar-Rad','Ibrahim','Al-Hijr','An-Nahl','Al-Isra','Al-Kahf','Maryam','Ta-Ha','Al-Anbiya','Al-Hajj','Al-Muminun','An-Nur','Al-Furqan','Ash-Shuara','An-Naml','Al-Qasas','Al-Ankabut','Ar-Rum','Luqman','As-Sajdah','Al-Ahzab','Saba','Fatir','Ya-Sin','As-Saffat','Sad','Az-Zumar','Ghafir','Fussilat','Ash-Shura','Az-Zukhruf','Ad-Dukhan','Al-Jathiyah','Al-Ahqaf','Muhammad','Al-Fath','Al-Hujurat','Qaf','Adh-Dhariyat','At-Tur','An-Najm','Al-Qamar','Ar-Rahman','Al-Waqiah','Al-Hadid','Al-Mujadila','Al-Hashr','Al-Mumtahanah','As-Saff','Al-Jumuah','Al-Munafiqun','At-Taghabun','At-Talaq','At-Tahrim','Al-Mulk','Al-Qalam','Al-Haqqah','Al-Maarij','Nuh','Al-Jinn','Al-Muzzammil','Al-Muddaththir','Al-Qiyamah','Al-Insan','Al-Mursalat','An-Naba','An-Naziat','Abasa','At-Takwir','Al-Infitar','Al-Mutaffifin','Al-Inshiqaq','Al-Buruj','At-Tariq','Al-Ala','Al-Ghashiyah','Al-Fajr','Al-Balad','Ash-Shams','Al-Layl','Ad-Duha','Ash-Sharh','At-Tin','Al-Alaq','Al-Qadr','Al-Bayyinah','Az-Zalzalah','Al-Adiyat','Al-Qariah','At-Takathur','Al-Asr','Al-Humazah','Al-Fil','Quraysh','Al-Maun','Al-Kawthar','Al-Kafirun','An-Nasr','Al-Masad','Al-Ikhlas','Al-Falaq','An-Nas'];
@@ -91,7 +88,7 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
   if(delivery?.loci?.length)return delivery.loci.map(x=>({page:x.page,lineStart:x.lineStart,lineEnd:x.lineEnd,lineCount:15}));
   return [];
  },[q.pageLoci,q.pageNumber,q.lineStart,q.lineEnd,delivery]);
- const packageId=q.quranSourcePackageId||(delivery?PACKAGE_BY_READING[readingKey]:undefined);
+ const packageId=q.quranSourcePackageId||(delivery?officialMushafPackageForReading(readingKey):undefined);
  const isKfgqpcPackage=!!packageId?.startsWith('kfgqpc-');
  /*
   * سلطةُ المصدر تُقرأ من الحزمة التي جاء منها النصّ فعلًا.

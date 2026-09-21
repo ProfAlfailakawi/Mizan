@@ -4,6 +4,7 @@ import { FaceMarkLegend, FACE_MARK_STYLE, markTint, marksByWord, primaryMark } f
 import { FaceMistakeLegend, FACE_MISTAKE_STYLE, addedCount, mistakesByWord, primaryMistake } from './FaceMistakes';
 import type { FaceMark, FaceMarkKind, FaceIndices } from '../../lib/face-reading';
 import type { Mistake } from '../../lib/recitation-diff';
+import { fetchOfficialMushafPage, officialMushafPackageForReading } from '../../lib/kfgqpc-library';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — والصفحةُ نفسُها هي التقرير.
@@ -59,11 +60,13 @@ export interface MushafFaceSurfaceProps {
   /** حين لا يعمل التحليلُ العميق: يُقال السببُ ولا يُتظاهر. */
   analysisNote?: string;
   officialFont?: boolean;
+  /** مفتاح حزمة الرواية: عند وجوده يُعرض نفس تصوير الصفحة الذي يراه المحكّم. */
+  deliveryReading?: string;
 }
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   ar, page, surahName, surahNames, words, marks = [], mistakes, indices, frameUnit = 'frame', measurableMarks,
-  choiceNote, analysisNote, officialFont = false,
+  choiceNote, analysisNote, officialFont = false, deliveryReading,
 }) => {
   const index = useMemo(() => marksByWord(marks), [marks]);
   const faults = useMemo(() => mistakesByWord(mistakes ?? []), [mistakes]);
@@ -73,6 +76,13 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   const nameOf = (surah: number) => surahNames?.[surah] ?? (words[0] && surah === words[0].surah ? surahName : undefined);
   /* اسمُ الشريط الأعلى: أوّلُ سورةٍ على الوجه — والتاليةُ يُعلنها شريطُها عند موضعها. */
   const openingName = words.length ? nameOf(words[0].surah) : surahName;
+  const packageId = officialMushafPackageForReading(deliveryReading);
+  const [officialPage,setOfficialPage]=useState<string|null>(null);
+  useEffect(()=>{let live=true;let url:string|null=null;setOfficialPage(null);
+    if(!packageId)return;
+    void fetchOfficialMushafPage(packageId,page).then(found=>{url=found;if(live)setOfficialPage(found);else if(found)URL.revokeObjectURL(found)});
+    return()=>{live=false;if(url)URL.revokeObjectURL(url)};
+  },[packageId,page]);
 
   return (
     <section className="mizan-mushaf-sheet mx-auto max-w-4xl" aria-label={ar ? `وجه المصحف ${pageLabel}` : `Mushaf face ${page}`}>
@@ -83,9 +93,13 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
         </span>
       </header>
 
+      {officialPage && <div className="relative mx-auto mb-5 flex max-h-[70vh] max-w-full items-center justify-center overflow-hidden rounded-[2px] bg-[#efede6] p-2 sm:p-3" data-official-mushaf-page={page}>
+        <img src={officialPage} alt={ar?`صفحة المصحف ${pageLabel}`:`Mushaf page ${page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[68vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
+        {marks.length>0&&<div aria-hidden className="pointer-events-none absolute inset-y-2 end-2 w-1.5 overflow-hidden rounded-full bg-black/[0.04]">{marks.slice(0,24).map((mark,i)=><span key={`${mark.word}-${mark.kind}-${i}`} className="absolute inset-x-0 rounded-full" style={{top:`${Math.max(0,Math.min(96,(mark.word/Math.max(1,words.length))*100))}%`,height:'4%',background:FACE_MARK_STYLE[mark.kind].tint}}/>)}</div>}
+      </div>}
       <div
-        className="font-quran text-center text-[1.55rem] leading-[2.6] text-[#202622] sm:text-[2.1rem]"
-        style={officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : undefined}
+        className={`${officialPage?'sr-only':'font-quran text-center text-[1.55rem] leading-[2.6] text-[#202622] sm:text-[2.1rem]'}`}
+        style={!officialPage&&officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : undefined}
         data-face-words={words.length}
       >
         {words.map((word, i) => {

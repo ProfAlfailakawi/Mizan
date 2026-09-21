@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Mic, RotateCcw, Square } from 'lucide-react';
+import { Mic, RotateCcw, Square } from 'lucide-react';
 
 import { MushafFaceSurface, type FaceWord } from './MushafFaceSurface';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
@@ -421,20 +421,14 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     <section className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="mizan-kicker">{ar ? 'راجع بصفحتك' : 'REVIEW BY THE PAGE'}</div>
-          <h2 className="mt-1 text-lg font-black">{ar ? 'المصحفُ يسمعك' : 'The Mushaf listens'}</h2>
+          <div className="mizan-kicker">{ar ? 'اختبار ذكي' : 'SMART PRACTICE'}</div>
+          <h2 className="mt-1 text-lg font-black">{ar ? 'اقرأ… والمصحف يتابعك' : 'Recite… the Mushaf follows'}</h2>
           <p className="mt-1 max-w-xl text-[10px] leading-5 text-[#5f6663]">
             {ar
-              ? 'وجهٌ كاملٌ من نطاقك، تقرؤه على ميكروفونك، فيُلوَّن الوجهُ بتلاوتك: أين لبثتَ وأين رجعت. ثم يميل الوجهُ التالي إلى حيث تعثّرت.'
-              : 'A whole face from your range: recite it, and the page itself shows where you lingered and where you went back.'}
+              ? 'صفحة المصحف الحقيقية من روايتك، كما يراها المحكّم. اقرأها بصوتك؛ وبعد الانتهاء يعيد لك ميزان مواضع المراجعة بلا درجة ولا ازدحام.'
+              : 'The real printed page for your reading, exactly as the judge sees it. Recite aloud; when you finish, MIZAN returns only the places worth reviewing — no score and no clutter.'}
           </p>
         </div>
-        {catalogue && stage !== 'blocked' && (
-          <div className="rounded-2xl bg-[#f4f2ec] px-3.5 py-2 text-center" data-faces-in-scope={catalogue.faces.length}>
-            <div className="text-sm font-black tabular-nums text-[#39423d]" dir="ltr">{catalogue.faces.length} / {catalogue.wholeFaces}</div>
-            <div className="text-[9px] text-[#5f6663]">{ar ? 'وجهًا في نطاقك' : 'faces in your range'}</div>
-          </div>
-        )}
       </header>
 
       {stage === 'blocked' && (
@@ -475,17 +469,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
                 <RotateCcw className="h-4 w-4" aria-hidden="true" />{ar ? 'وجهٌ آخر' : 'Another face'}
               </button>
             )}
-            {stage === 'reciting' && analysed && (
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#5f6663]" data-heard={heard}>
-                <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                {ar ? `مقاطعُ سُمعت: ${heard}` : `chunks heard: ${heard}`}
-              </span>
-            )}
           </div>
 
           <MushafFaceSurface
             ar={ar}
             page={face.page}
+            deliveryReading={deliveryReading}
             surahName={surahNames[face.surahStart]}
             surahNames={surahNames}
             words={words}

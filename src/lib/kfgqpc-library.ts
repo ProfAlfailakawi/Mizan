@@ -7,6 +7,14 @@ async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY
 export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
 export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
 const VENUE_CACHE='mizan-quran-venue-v1';
+
+/* One delivery key → one printed Mushaf package. Both judge and participant surfaces use this
+ * resolver so the participant can never render a different page family from the judge. */
+const OFFICIAL_MUSHAF_PACKAGE_BY_READING:Record<string,string>={
+ hafs:'kfgqpc-hafs-uthmanic-v13',warsh:'kfgqpc-warsh-uthmanic-v6',shubah:'kfgqpc-shubah-uthmanic-v4',
+ qalun:'kfgqpc-qaloun-uthmanic-v5','duri-abi-amr':'kfgqpc-douri-abu-amr-uthmanic-v3','susi-abi-amr':'kfgqpc-sousi-abu-amr-uthmanic-v3',
+};
+export function officialMushafPackageForReading(reading?:string){return reading?OFFICIAL_MUSHAF_PACKAGE_BY_READING[reading]:undefined}
 /*
  * Official Mushaf page image.
  *
