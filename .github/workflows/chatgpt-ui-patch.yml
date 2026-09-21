@@ -39,8 +39,12 @@ jobs:
                   "mx-auto grid items-start gap-4 ${loadedLoci.length>1?'lg:grid-cols-2':'grid-cols-1'}"
               ),
               (
-                  'flex items-center justify-between gap-3 text-[9px] text-[#676c68]","><span className="font-mono truncate">{q.quranSourcePackageHash?`SHA-256 ${q.quranSourcePackageHash.slice(0,18)}…`:surfaceAuthorityLabel}</span><span className="flex items-center gap-3">',
-                  'flex items-center justify-end gap-3 text-[9px] text-[#676c68]","><span className="flex items-center gap-3">'
+                  'mizan-mushaf-bar px-4 sm:px-5 py-3 border-t border-[#e5e1d7] flex items-center justify-between gap-3 text-[9px] text-[#676c68]',
+                  'mizan-mushaf-bar px-4 sm:px-5 py-3 border-t border-[#e5e1d7] flex items-center justify-end gap-3 text-[9px] text-[#676c68]'
+              ),
+              (
+                  '<span className="font-mono truncate">{q.quranSourcePackageHash?`SHA-256 ${q.quranSourcePackageHash.slice(0,18)}…`:surfaceAuthorityLabel}</span>',
+                  ''
               ),
               (
                   "hasOfficialPage&&!textView?(ar?'صفحة المصدر + عدسة منفصلة':'SOURCE PAGE + SEPARATE LENS'):officialFont?(ar?'نص وخط من المصدر':'SOURCE TEXT + FONT'):(ar?'نص من المصدر':'SOURCE TEXT')",
@@ -58,7 +62,7 @@ jobs:
 
           for old, new in replacements:
               if old not in s:
-                  raise SystemExit(f'Expected UI anchor not found: {old[:100]}')
+                  raise SystemExit(f'Expected UI anchor not found: {old[:120]}')
               s = s.replace(old, new, 1)
 
           p.write_text(s, encoding='utf-8')
