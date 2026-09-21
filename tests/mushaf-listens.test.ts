@@ -341,12 +341,23 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    * وعند بدء تلاوةٍ جديدة، وعند مغادرة الشاشة. وعدُّ المواضع وحده يمرّ إن نُقل الترك
    * من موضعه إلى غيره — فيُفحص كلُّ موضعٍ بجاره.
    */
-  for (const [where, pattern] of [
-    ['سحبُ وجهٍ جديد', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/],
-    ['بدءُ تلاوة', /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('reciting'\)/],
-  ] as const) {
-    assert.match(screen, pattern, `الطابورُ القديم لا يُترك عند ${where}`);
-  }
+  assert.match(
+    screen,
+    /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/,
+    'الطابورُ القديم لا يُترك عند سحبُ وجهٍ جديد',
+  );
+  /*
+   * عند بدء التلاوة قد يسبق `setStage('reciting')` طلبُ إذن الميكروفون أو فرعُ
+   * المراجعة اليدوية. الحارس الصحيح هو أن يُستبدل الطابور **قبل** أيّ واحدٍ من
+   * المسارين، لا أن يكون السطران متجاورين شكليًّا.
+   */
+  const beginBlock = screen.slice(screen.indexOf('const begin = useCallback'), screen.indexOf('rec.ondataavailable'));
+  const beginQueueReset = beginBlock.indexOf('queue.current.abandon(); queue.current = serialQueue();');
+  const beginManualReciting = beginBlock.indexOf("setStage('reciting')");
+  const beginMicRequest = beginBlock.indexOf('navigator.mediaDevices.getUserMedia');
+  assert.ok(beginQueueReset >= 0, 'الطابورُ القديم لا يُترك عند بدءُ تلاوة');
+  assert.ok(beginManualReciting > beginQueueReset, 'المراجعة اليدوية تبدأ قبل استبدال الطابور');
+  assert.ok(beginMicRequest > beginQueueReset, 'طلب الميكروفون يبدأ قبل استبدال الطابور');
   /*
    * والثالثُ عند مغادرة الشاشة. وكان يُفحص بنصّ سطرٍ واحد، فلمّا صار للتنظيف ثالثةٌ
    * (إغلاقُ سمّاعة التنبيه) كسره الشكلُ لا المعنى. فيُقرأ جسمُ التنظيف ويُشترط فيه
