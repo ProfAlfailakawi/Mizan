@@ -1,0 +1,88 @@
+/* Participant + Mushaf finishing pass — intentionally small and presentation-only. */
+
+/*
+ * الصفحة المطبوعة يجب أن تُرى كاملة، لا أن يقتطع أسفلها وعاءٌ أقصر منها.
+ * يحكم ارتفاعُ الشاشة الصورة نفسها، مع ترك حيزٍ لشريط التطبيق وأدوات المصحف.
+ */
+.mizan-mushaf-surface figure {
+  max-height: calc(100dvh - 9.5rem) !important;
+}
+.mizan-mushaf-surface figure > div.relative {
+  max-height: calc(100dvh - 11rem) !important;
+}
+.mizan-mushaf-surface .mizan-mushaf-page {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: calc(100dvh - 11rem) !important;
+  object-fit: contain !important;
+}
+
+/* سطح المتسابق يستعمل الصفحة الرسمية نفسها؛ لا يقصها الغلاف عند صغر الشاشة. */
+[data-official-mushaf-page] {
+  overflow: visible !important;
+  max-height: none !important;
+}
+[data-official-mushaf-page] .mizan-mushaf-page {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: min(78dvh, calc(100dvh - 11rem)) !important;
+  object-fit: contain !important;
+}
+
+/*
+ * لا نعرض عدسةً صوتيةً على صورة الصفحة المطبوعة إذا كان موضعها آتيًا من هندسةٍ
+ * لا تتطابق يقينًا مع بكسلات الصورة. إبقاءُ تمييزٍ خاطئ أسوأ من عدم التمييز؛
+ * التتبّع النصيّ يبقى متاحًا في عرض النص، وتتبع الاختبار الحي الأخضر لا يتأثر.
+ */
+.mizan-mushaf-surface figure [class*="C8922F"],
+.mizan-mushaf-surface figure [class*="8A5A2B"] {
+  display: none !important;
+}
+
+/*
+ * تهيئة نفس هادئة قبل بدء اختبار المتسابق، بلا بطاقة جديدة ولا ازدحام.
+ * تظهر فقط في حالة الجاهزية لأن زر data-listens يختفي فور بدء التلاوة.
+ */
+section:has(button[data-listens]) > header::after {
+  content: 'شهيق ٤ ثوانٍ · زفير ٦ ثوانٍ';
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: .65rem;
+  padding: .35rem .75rem;
+  border: 1px solid #d9dfdb;
+  border-radius: 999px;
+  background: radial-gradient(circle at 1rem 50%, #d9e8e1 0 5px, transparent 6px), #fbfcfa;
+  padding-inline-start: 1.75rem;
+  color: #456157;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.5;
+  animation: mizan-breathing-cue 10s ease-in-out infinite;
+}
+html[dir="ltr"] section:has(button[data-listens]) > header::after {
+  content: 'Inhale 4s · Exhale 6s';
+}
+@keyframes mizan-breathing-cue {
+  0%, 100% { transform: scale(.985); opacity: .82; }
+  40% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(.985); opacity: .82; }
+}
+@media (prefers-reduced-motion: reduce) {
+  section:has(button[data-listens]) > header::after { animation: none; }
+}
+
+@media (max-width: 639px) {
+  .mizan-mushaf-surface figure,
+  .mizan-mushaf-surface figure > div.relative {
+    max-height: none !important;
+  }
+  .mizan-mushaf-surface .mizan-mushaf-page,
+  [data-official-mushaf-page] .mizan-mushaf-page {
+    max-height: none !important;
+    width: 100% !important;
+  }
+}

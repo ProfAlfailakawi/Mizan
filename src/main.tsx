@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './mushaf-participant-polish.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
