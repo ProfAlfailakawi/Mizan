@@ -181,14 +181,15 @@ test('a pass that cannot reach the cloud still opens, and says exactly what is w
 /* ── ٦ — تقييم إلكتروني للتدريب ────────────────────────────────────────── */
 
 test('a waiting participant can be listened to, without any of it touching the record', () => {
-  const warmup = read('src/components/participant/WarmupSanctuary.tsx');
-  assert.match(warmup, /submitPracticeAlignmentChunk/);
-  assert.match(warmup, /لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك/);
+  const listens = read('src/components/participant/MushafListens.tsx');
+  assert.match(listens, /submitPracticeAlignmentChunk/);
+  assert.match(listens, /لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك/);
 
-  /* المقطع المعروض هو نفسه المُقيَّم عليه. */
+  /* الاستعداد صار بابًا واحدًا: المصحف يسمعك، بدل ثلاث واجهات تؤدي المهمة نفسها. */
   const dashboard = read('src/components/participant/ParticipantDashboard.tsx');
-  assert.match(dashboard, /practicePassage=\{practicePassage\}/);
+  assert.match(dashboard, /<MushafListens/);
   assert.match(dashboard, /const practiceEngine=practiceReadingFor\(practiceReading\)/);
+  assert.doesNotMatch(dashboard, /<WarmupSanctuary|<PracticeStudio|<TrialRun/);
 
   /* والمسار على الخادم مستقلّ عن مسار المحكّم، ولا يكتب في دفتر الأدلّة. */
   const server = read('server.ts');

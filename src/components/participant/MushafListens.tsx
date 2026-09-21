@@ -428,6 +428,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               ? 'صفحة المصحف الحقيقية من روايتك، كما يراها المحكّم. اقرأها بصوتك؛ وبعد الانتهاء يعيد لك ميزان مواضع المراجعة بلا درجة ولا ازدحام.'
               : 'The real printed page for your reading, exactly as the judge sees it. Recite aloud; when you finish, MIZAN returns only the places worth reviewing — no score and no clutter.'}
           </p>
+          <p className="mt-1 text-[9px] font-bold text-[#6b716d]">{ar?'لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك.':'Your voice is not recorded, nothing is sent to the judging panel, and this never affects your score.'}</p>
         </div>
       </header>
 

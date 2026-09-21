@@ -17,6 +17,7 @@ const deliveryReadingKeyFor = (input: { qiraah?: string; rawi?: string; riwaya?:
 };
 
 const SURFACE = fs.readFileSync(path.join(process.cwd(), 'src', 'components', 'judge', 'OfficialMushafSurface.tsx'), 'utf8');
+const LIBRARY = fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'kfgqpc-library.ts'), 'utf8');
 
 /*
  * سطحُ المصحف هو ما يراه المحكّم. وأخطرُ عطلٍ فيه ليس شاشةً فارغة بل شاشةً تبدو صحيحة
@@ -46,8 +47,10 @@ test('an unresolvable or ambiguous reading gets no surface at all, never a defau
 
 test('a printed Mushaf page is only ever fetched for a package that actually has one', () => {
   // خريطة الصفحات المطبوعة مقصورةٌ على حزم المجمع؛ لا رواية خارجها تأخذ صفحةً ليست لها.
-  const map = SURFACE.match(/const PACKAGE_BY_READING:Record<string,string>=\{([^}]*)\}/);
-  assert.ok(map, 'the printed-page package map is present');
+  const map = LIBRARY.match(/const OFFICIAL_MUSHAF_PACKAGE_BY_READING:Record<string,string>=\{([^}]*)\}/);
+  assert.ok(map, 'the shared printed-page package map is present');
+  assert.match(SURFACE, /officialMushafPackageForReading\(readingKey\)/,
+    'the judge surface must resolve printed pages through the shared package map');
   for (const entry of map![1].split(',')) {
     if (!entry.includes(':')) continue;
     assert.match(entry, /'kfgqpc-/, `printed pages may only map to a KFGQPC package: ${entry}`);
