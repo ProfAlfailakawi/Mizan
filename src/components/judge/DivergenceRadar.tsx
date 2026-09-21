@@ -41,9 +41,9 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
 
  if(!points.length&&!difficulty)return null;
 
- return <div className="mt-3 rounded-[26px] border border-[#e2ded4] bg-[#fdfcf8] overflow-hidden">
+ return <div className="mt-3 rounded-[26px] border border-[#e2ded4] bg-[#fdfcf8] overflow-visible shadow-[0_8px_24px_rgba(31,50,42,.035)]">
   <button type="button" onClick={()=>setOpen(o=>!o)} aria-expanded={open}
-   className="w-full min-h-11 px-4 sm:px-5 py-3 flex items-center justify-between gap-3 text-start">
+   className="w-full min-h-[68px] px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 text-start">
    <span className="flex items-center gap-2.5 min-w-0">
     <span className="w-8 h-8 rounded-xl bg-[#EEF3F0] text-[#2F6555] grid place-items-center shrink-0"><GitBranch className="w-4 h-4"/></span>
     <span className="min-w-0">
@@ -52,6 +52,10 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
       {points.length?(ar?`${points.length} موضع التباس في هذا المقطع`:`${points.length} fork${points.length>1?'s':''} in this passage`):(ar?'لا مفترقات في هذا المقطع':'No forks in this passage')}
       {load?` · ${load.label}`:''}
      </span>
+     {load&&<span className="mt-2 flex items-center gap-2" aria-label={ar?`مؤشر مفترقات المتشابهات ${Math.round(load.score*100)}٪`:`Divergence indicator ${Math.round(load.score*100)}%`}>
+      <span className="h-1.5 w-28 sm:w-36 max-w-[32vw] rounded-full bg-[#e6e2d8] overflow-hidden"><span className="block h-full rounded-full bg-[#2F6555] transition-[width] duration-300" style={{width:`${Math.max(6,Math.round(load.score*100))}%`}}/></span>
+      <span className="text-[9px] font-black tabular-nums text-[#2F6555]" dir="ltr">{Math.round(load.score*100)}%</span>
+     </span>}
     </span>
    </span>
    <ChevronDown className={`w-4 h-4 text-[#6b716d] shrink-0 transition-transform duration-200 ${open?'rotate-180':''}`}/>
