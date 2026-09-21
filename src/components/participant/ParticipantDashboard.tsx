@@ -37,6 +37,7 @@ const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Ap
  * قبل أول شهادة. تبويبٌ فارغ زحمة مثل القسم الفارغ تمامًا.
  */
 type Tab='journey'|'prepare'|'record';
+type PrepareMode='smart'|'calm';
 
 export const ParticipantDashboard: React.FC = () => {
  const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant}=store; const ar=language==='ar';
@@ -66,6 +67,7 @@ export const ParticipantDashboard: React.FC = () => {
  },[category?.id,category?.distribution,competition.id]);
  const scopeSurahs=useMemo(()=>(scopeResolution&&!scopeResolution.blocked?scopeMetrics(scopeResolution.scope).surahs:[]),[scopeResolution?.signature]);
  const [tab,setTab]=useState<Tab>('journey');
+ const [prepareMode,setPrepareMode]=useState<PrepareMode>('smart');
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
  const [showRegistration,setShowRegistration]=useState(false); const [showAppeal,setShowAppeal]=useState(false); const [appealText,setAppealText]=useState(''); const [showCert,setShowCert]=useState(false);
  const policy=getCompetitionPolicy(competition);
@@ -184,55 +186,66 @@ export const ParticipantDashboard: React.FC = () => {
   </>}
 
   {activeTab==='prepare'&&<>
-   {/* التهيئة قبل الدخول فقط: بمجرد أن يصير المتسابق داخل اللجنة يختفي التبويب كله. */}
-   {/*
-     التجربة الكاملة أولًا: هي الجواب عن «كيف تجري اللحظة؟»، والتهيئة والاستوديو بعدها
-     لمن أراد أن يهدّئ نفَسه أو يسمع المقطع. ولا تُعرض بلا نطاق معتمد: مواضعها تُسحب منه.
-    */}
-   {scopeResolution&&!scopeResolution.blocked&&<TrialRun ar={ar}
-    scope={scopeResolution.scope}
-    questionCount={resolveQuestionCount(category,policy)}
-    minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}
-    passageAyahCount={passageAyahCount(category)}
-    deliveryReading={practiceReading}
-    listening={practiceEngine}/>}
-   {/*
-     ومراجعةُ الطالب بصفحته: وجهٌ كاملٌ من نطاقه يقرؤه فيُلوَّن بتلاوته، ثم يميل التالي
-     إلى حيث تعثّر. وهي مراجعةٌ لا اختبار: لا درجةَ فيها، ولا يُسجَّل صوته، وتاريخُها
-     في جهازه وحده.
-    */}
-   {scopeResolution&&!scopeResolution.blocked&&<MushafListens ar={ar}
-    scope={scopeResolution.scope}
-    deliveryReading={practiceReading}
-    listening={practiceEngine}
-    owner={participant.id}/>}
-   <WarmupSanctuary ar={ar}
-    scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
-    spreadAcrossZones={warmupSpreadAcrossZones}
-    questionCount={resolveQuestionCount(category,policy)}
-    practicePassage={practicePassage}
-    minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
-   {/* بلا نطاق معتمد لا يُفتح الاستوديو: التدرّب على ما لن يُسأل فيه أسوأ من ألا يتدرّب. */}
-   {practiceReading&&scopeSurahs.length?<section className="space-y-3">
-    <div className="flex flex-wrap items-end justify-between gap-3">
-     <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
-      <h2 className="text-lg font-black mt-1">{ar?'تدرّب على المصحف نفسه':'Practise on the same Mushaf'}</h2>
-      <p className="text-[10px] text-[#656b66] mt-1">{scopeResolution&&!scopeResolution.blocked?(ar?`داخل نطاقك المعتمد: ${describeScope(scopeResolution.scope,true)}`:`Within your approved range: ${describeScope(scopeResolution.scope,false)}`):(ar?'نطاقك المعتمد لم يُحدَّد بعد.':'Your approved range is not set yet.')}</p></div>
-     <div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-3"><div className="mizan-field-label mb-2">{ar?'مقطع التدريب':'Practice passage'}</div><div className="grid grid-cols-3 gap-2">
-      <label className="block text-[9px] font-black text-[#59615c]">{ar?'السورة':'Surah'}
-       <select value={surah} onChange={e=>{setPSurah(Number(e.target.value));setPStart(1)}} className="mizan-input mt-1 text-sm block">
-        {scopeSurahs.map(s=><option key={s} value={s}>{ar?`${s} · ${surahNameArabic(s)||s}`:String(s)}</option>)}
-       </select></label>
-      <label className="block text-[9px] font-black text-[#59615c]">{ar?'من آية':'From ayah'}
-       <input type="number" min={1} max={maxAyah} value={startAyah} onChange={e=>setPStart(Math.max(1,Math.min(maxAyah,Number(e.target.value)||1)))} className="mizan-input mt-1 text-sm block"/></label>
-      <label className="block text-[9px] font-black text-[#59615c]">{ar?'عدد الآيات':'Ayat'}
-       <input type="number" min={1} max={Math.min(20,maxAyah-startAyah+1)} value={count} onChange={e=>setPCount(Math.max(1,Math.min(20,Number(e.target.value)||1)))} className="mizan-input mt-1 text-sm block"/></label>
-      </div></div>
+   <section className="mizan-surface p-3 sm:p-4">
+    <div className="grid grid-cols-2 gap-2" role="tablist" aria-label={ar?'طريقة الاستعداد':'Preparation mode'}>
+     <button type="button" role="tab" aria-selected={prepareMode==='smart'} onClick={()=>setPrepareMode('smart')}
+      className={`rounded-2xl px-4 py-3 text-start transition ${prepareMode==='smart'?'bg-[#214C40] text-white shadow-sm':'bg-[#f3f1eb] text-[#39423d] hover:bg-[#ece9e1]'}`}>
+      <span className="block text-xs font-black">{ar?'مراجعة ذكية':'Smart review'}</span>
+      <span className={`mt-1 block text-[9px] leading-4 ${prepareMode==='smart'?'text-white/75':'text-[#69706c]'}`}>{ar?'المصحف يسمع تلاوتك ويعلّم مواضع التعثر عند توفر المحرك المعتمد.':'The Mushaf listens and marks trouble spots when the certified engine is available.'}</span>
+     </button>
+     <button type="button" role="tab" aria-selected={prepareMode==='calm'} onClick={()=>setPrepareMode('calm')}
+      className={`rounded-2xl px-4 py-3 text-start transition ${prepareMode==='calm'?'bg-[#214C40] text-white shadow-sm':'bg-[#f3f1eb] text-[#39423d] hover:bg-[#ece9e1]'}`}>
+      <span className="block text-xs font-black">{ar?'تهيئة هادئة':'Calm preparation'}</span>
+      <span className={`mt-1 block text-[9px] leading-4 ${prepareMode==='calm'?'text-white/75':'text-[#69706c]'}`}>{ar?'جرّب اللحظة، اضبط النفس، ثم اختر مقطعًا للتدرّب دون ازدحام الشاشة.':'Rehearse the moment, settle your breathing, then choose a passage without crowding the screen.'}</span>
+     </button>
     </div>
-    <PracticeStudio reading={practiceReading} surah={surah} startAyah={startAyah} endAyah={startAyah+count-1} ar={ar}/>
-   </section>:<p className="mizan-surface p-6 text-center text-xs text-[#656b66]">{!practiceReading
-     ?(ar?'لا تتوفّر حزمة تسليم معتمدة لروايتك بعد، فلا يُفتح الاستوديو على نصّ غير معتمد.':'No certified delivery package for your reading yet — the studio will not open on unofficial text.')
-     :(ar?'نطاق حفظك لم يُعتمد بعد، فلا يُفتح الاستوديو على مقطع قد لا يُسأل فيه. راجع إدارة المسابقة.':'Your range is not approved yet, so the studio will not open on a passage you may never be asked. Contact the organisers.')}</p>}
+   </section>
+
+   {prepareMode==='smart'&&<>
+    {scopeResolution&&!scopeResolution.blocked?<MushafListens ar={ar}
+     scope={scopeResolution.scope}
+     deliveryReading={practiceReading}
+     listening={practiceEngine}
+     owner={participant.id}/>:<p className="mizan-surface p-6 text-center text-xs text-[#656b66]">{ar?'يلزم اعتماد نطاق الفئة قبل فتح المراجعة الذكية.':'The category range must be approved before smart review opens.'}</p>}
+   </>}
+
+   {prepareMode==='calm'&&<>
+    {/* التجربة الكاملة تشرح لحظة الاختبار من دون أن تزاحم المراجعة الذكية. */}
+    {scopeResolution&&!scopeResolution.blocked&&<TrialRun ar={ar}
+     scope={scopeResolution.scope}
+     questionCount={resolveQuestionCount(category,policy)}
+     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}
+     passageAyahCount={passageAyahCount(category)}
+     deliveryReading={practiceReading}
+     listening={practiceEngine}/>}
+    <WarmupSanctuary ar={ar}
+     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
+     spreadAcrossZones={warmupSpreadAcrossZones}
+     questionCount={resolveQuestionCount(category,policy)}
+     practicePassage={practicePassage}
+     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
+    {/* بلا نطاق معتمد لا يُفتح الاستوديو: التدرّب على ما لن يُسأل فيه أسوأ من ألا يتدرّب. */}
+    {practiceReading&&scopeSurahs.length?<section className="space-y-3">
+     <div className="flex flex-wrap items-end justify-between gap-3">
+      <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
+       <h2 className="text-lg font-black mt-1">{ar?'تدرّب على المصحف نفسه':'Practise on the same Mushaf'}</h2>
+       <p className="text-[10px] text-[#656b66] mt-1">{scopeResolution&&!scopeResolution.blocked?(ar?`داخل نطاقك المعتمد: ${describeScope(scopeResolution.scope,true)}`:`Within your approved range: ${describeScope(scopeResolution.scope,false)}`):(ar?'نطاقك المعتمد لم يُحدَّد بعد.':'Your approved range is not set yet.')}</p></div>
+      <div className="rounded-2xl border border-[#e2e0d8] bg-[#fbfaf7] p-3"><div className="mizan-field-label mb-2">{ar?'مقطع التدريب':'Practice passage'}</div><div className="grid grid-cols-3 gap-2">
+       <label className="block text-[9px] font-black text-[#59615c]">{ar?'السورة':'Surah'}
+        <select value={surah} onChange={e=>{setPSurah(Number(e.target.value));setPStart(1)}} className="mizan-input mt-1 text-sm block">
+         {scopeSurahs.map(s=><option key={s} value={s}>{ar?`${s} · ${surahNameArabic(s)||s}`:String(s)}</option>)}
+        </select></label>
+       <label className="block text-[9px] font-black text-[#59615c]">{ar?'من آية':'From ayah'}
+        <input type="number" min={1} max={maxAyah} value={startAyah} onChange={e=>setPStart(Math.max(1,Math.min(maxAyah,Number(e.target.value)||1)))} className="mizan-input mt-1 text-sm block"/></label>
+       <label className="block text-[9px] font-black text-[#59615c]">{ar?'عدد الآيات':'Ayat'}
+        <input type="number" min={1} max={Math.min(20,maxAyah-startAyah+1)} value={count} onChange={e=>setPCount(Math.max(1,Math.min(20,Number(e.target.value)||1)))} className="mizan-input mt-1 text-sm block"/></label>
+       </div></div>
+     </div>
+     <PracticeStudio reading={practiceReading} surah={surah} startAyah={startAyah} endAyah={startAyah+count-1} ar={ar}/>
+    </section>:<p className="mizan-surface p-6 text-center text-xs text-[#656b66]">{!practiceReading
+      ?(ar?'لا تتوفّر حزمة تسليم معتمدة لروايتك بعد، فلا يُفتح الاستوديو على نصّ غير معتمد.':'No certified delivery package for your reading yet — the studio will not open on unofficial text.')
+      :(ar?'نطاق حفظك لم يُعتمد بعد، فلا يُفتح الاستوديو على مقطع قد لا يُسأل فيه. راجع إدارة المسابقة.':'Your range is not approved yet, so the studio will not open on a passage you may never be asked. Contact the organisers.')}</p>}
+   </>}
   </>}
 
   {activeTab==='record'&&<>
