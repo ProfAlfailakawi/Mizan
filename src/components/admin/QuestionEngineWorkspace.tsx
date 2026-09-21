@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
+  AlertTriangle, BookCopy, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, Wand2,
-  Layers3, Activity, Library,
+  Layers3, Activity,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { QuranIntelligenceHealthConsole } from './QuranIntelligenceHealthConsole';
@@ -72,7 +72,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
     ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
-    ['library', Library, ar ? 'المكتبة الرسمية' : 'Official library'],
+    ['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'],
   ];
 
   return (
