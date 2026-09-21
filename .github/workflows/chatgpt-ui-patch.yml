@@ -1,0 +1,74 @@
+name: Apply Mizan UI patch
+
+on:
+  push:
+    branches:
+      - chatgpt/ui-recitation-polish-20260921
+
+permissions:
+  contents: write
+
+jobs:
+  patch-current-main-ui:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/ui-recitation-polish-20260921
+          fetch-depth: 0
+      - name: Patch current OfficialMushafSurface without replacing current logic
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/judge/OfficialMushafSurface.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  '<Badge variant="emerald">{ar?`المصدر: ${surfaceAuthorityLabel}`:`SOURCE: ${surfaceAuthorityLabel}`}</Badge>',
+                  ''
+              ),
+              (
+                  'mizan-mushaf-body relative bg-[#efede6] p-3 sm:p-5',
+                  'mizan-mushaf-body relative bg-[#efede6] p-2 sm:p-3 overflow-hidden'
+              ),
+              (
+                  "mx-auto grid gap-4 ${loadedLoci.length>1?'lg:grid-cols-2':'grid-cols-1'}",
+                  "mx-auto grid items-start gap-4 ${loadedLoci.length>1?'lg:grid-cols-2':'grid-cols-1'}"
+              ),
+              (
+                  'flex items-center justify-between gap-3 text-[9px] text-[#676c68]","><span className="font-mono truncate">{q.quranSourcePackageHash?`SHA-256 ${q.quranSourcePackageHash.slice(0,18)}…`:surfaceAuthorityLabel}</span><span className="flex items-center gap-3">',
+                  'flex items-center justify-end gap-3 text-[9px] text-[#676c68]","><span className="flex items-center gap-3">'
+              ),
+              (
+                  "hasOfficialPage&&!textView?(ar?'صفحة المصدر + عدسة منفصلة':'SOURCE PAGE + SEPARATE LENS'):officialFont?(ar?'نص وخط من المصدر':'SOURCE TEXT + FONT'):(ar?'نص من المصدر':'SOURCE TEXT')",
+                  "hasOfficialPage&&!textView?(ar?'صفحة كاملة':'FULL-PAGE FIT'):(ar?'عرض النص':'TEXT VIEW')"
+              ),
+              (
+                  '<figure className="relative mx-auto w-fit"><div className="relative inline-block"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto rounded-[2px] shadow-[0_12px_28px_rgba(0,0,0,.08)]"/>',
+                  '<figure className="relative mx-auto flex max-h-[70vh] max-w-full items-start justify-center"><div className="relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block h-auto w-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>'
+              ),
+              (
+                  '{ar?`صفحة المصدر ${page} غير مستوردة`:`Source page ${page} is not imported`}',
+                  '{ar?`صفحة المصحف ${page} غير مستوردة`:`Mushaf page ${page} is not imported`}'
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'Expected UI anchor not found: {old[:100]}')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Remove one-shot workflow and commit only the resulting UI patch
+        shell: bash
+        run: |
+          rm .github/workflows/chatgpt-ui-patch.yml
+          git config user.name "Mizan UI Patch"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/judge/OfficialMushafSurface.tsx .github/workflows/chatgpt-ui-patch.yml
+          git commit -m "ضبط صفحة المصحف كاملة وإزالة تكرار المصدر"
+          git push origin HEAD:chatgpt/ui-recitation-polish-20260921
