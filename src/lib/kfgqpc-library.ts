@@ -1,9 +1,16 @@
-import {auth} from './firebase';
+/*
+ * Keep Firebase out of the module graph for pure Mushaf rendering/tests.
+ * Governance calls obtain auth lazily only when a signed-in API is actually used.
+ */
+async function currentAuth(){
+  const { auth } = await import('./firebase');
+  return auth;
+}
 export type KfgqpcLibraryGroup='MUSHAF'|'QURAN_DATA'|'SCIENCE'|'PUBLISHING'|'AUDIO';
 export interface KfgqpcLibraryCapability{ id:string;order:number;group:KfgqpcLibraryGroup;titleArabic:string;titleEnglish:string;summaryArabic:string;summaryEnglish:string;authority:string;authorityArabic:string;authorityState:'PRIMARY_OFFICIAL_AUTHORITY';scientificState:'CERTIFIED';operationalState:'OFFICIALLY_ACCEPTED'|'LOCAL_BYTES_REQUIRED'|'LOCAL_VERIFIED'|'SERVICE_READY';officialReference:string;sourceIds:string[];uses:string[];guardrail:string;visualMode?:'VECTOR_PAGE'|'UTHMANIC_TEXT'|'PUBLICATION_IMAGE'|'AUDIO'; }
 export interface KfgqpcLibraryResponse{summary:{authority:string;protocol:string;officiallyAccepted:number;localVerified:number;serviceReady:number;requiresLocalBytes:number;groups:string[]};items:KfgqpcLibraryCapability[]}
 export interface KfgqpcDeliveryStatus{protocol:string;deliverySource:'LOCAL'|'R2'|'NONE';r2Configured:boolean;localPageRootConfigured:boolean;localAudioRootConfigured:boolean;localFontRootConfigured:boolean;budget:{freeTierBytes:number;plannedBytes:number;remainingBytes:number;utilization:number;items:{key:string;labelArabic:string;bytes:number;note:string}[];assumptions:string[]}}
-async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
+async function bearer(){const auth=await currentAuth();const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
 export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
 export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
 const VENUE_CACHE='mizan-quran-venue-v1';
