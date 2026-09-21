@@ -2,10 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, Wand2,
-  Layers3, BookCopy, Activity,
+  Layers3, Activity,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
-import { OfficialQuranLibrary } from './OfficialQuranLibrary';
 import { QuranIntelligenceHealthConsole } from './QuranIntelligenceHealthConsole';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { bilingualName } from '../../lib/ui-language';
@@ -52,7 +51,7 @@ import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-c
  * وموضعُهما هنا لا في مكانٍ آخر: من يسأل «على أيّ مصحفٍ تُبنى الأسئلة؟» و«أيُّ رواياتٍ
  * جاهزة؟» يسألهما وهو في ورشة المحرّك.
  */
-type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness' | 'library' | 'intelligence';
+type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness' | 'intelligence';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -71,7 +70,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
-    ['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'],
     ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
   ];
 
@@ -112,7 +110,6 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'simulation' && <SimulationTab store={store} ar={ar} />}
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
-            {tab === 'library' && <OfficialQuranLibrary />}
             {tab === 'intelligence' && <QuranIntelligenceHealthConsole ar={ar} />}
           </div>
         </>

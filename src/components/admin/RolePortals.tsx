@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { participantMatchesIdentityQuery } from '../../lib/local-snapshot-privacy';
 import { EmptyState } from '../design-system/EmptyState';
-import { Activity, AlertTriangle, Award, BadgeCheck, Building2, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileSearch, Fingerprint, Globe2, Gavel, Headphones, KeyRound, Layers3, Plane, Plus, QrCode, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Stethoscope, UsersRound, WalletCards, XCircle, LifeBuoy, Trash2 } from 'lucide-react';
+import { Activity, AlertTriangle, Award, BadgeCheck, BookCopy, Building2, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileSearch, Fingerprint, Globe2, Gavel, Headphones, KeyRound, Layers3, Plane, Plus, QrCode, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Stethoscope, UsersRound, WalletCards, XCircle, LifeBuoy, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { can } from '../../lib/permissions';
 import { auth } from '../../lib/firebase';
@@ -21,6 +21,7 @@ import { GuardianLiveLink } from '../guardian/GuardianLiveLink';
 import { Metric } from '../design-system/Metric';
 import { DetailRow } from '../design-system/DetailRow';
 import { useConfirm } from '../design-system/ConfirmDialog';
+import { OfficialQuranLibrary } from './OfficialQuranLibrary';
 
 const isAr=(l:string)=>l==='ar';
 
@@ -82,13 +83,13 @@ export const SuperAdminConsole: React.FC = () => {
  };
  const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
  const requestRescue=(action:string,tenantId:string)=>{if(docIsAuto(action))void runRescue(action,tenantId);else setConfirmAction({action,tenantId:tenantId||'__platform__'})};
- const [consoleTab,setConsoleTab]=useState<'health'|'commerce'|'governance'>('health');
+ const [consoleTab,setConsoleTab]=useState<'health'|'commerce'|'governance'|'library'>('health');
  const consoleTabAnchor=useTabAnchor(consoleTab);
  const [govTab,setGovTab]=useState<'identity'|'surface'|'modules'>('identity');
  return <PortalFrame kicker={ar?'غرفة القيادة':'MIZAN CONTROL TOWER'} title={ar?'غرفة قيادة ميزان':'MIZAN Control Tower'} subtitle={ar?'صحة المنصة، الإنقاذ، الدعم، والتشخيص من الخادم. كل ما يمس النتائج أو النزاهة يبقى محميًا بلا تجاوز صامت.':'Server-side health, rescue, support and diagnostics. Results and integrity surfaces stay protected without silent override.'}>
-   {/* إحدى عشرة بطاقة كاملة العرض كانت تتراص في عمود واحد بلا مخرج؛ التبويب هنا يفصل ثلاث مهام لا تُمارَس معًا: مراقبة الصحة، وإدارة الاشتراكات، والحوكمة. */}
+   {/* إحدى عشرة بطاقة كاملة العرض كانت تتراص في عمود واحد بلا مخرج؛ التبويب هنا يفصل ثلاث مهام لا تُمارَس معًا: مراقبة الصحة، وإدارة الاشتراكات، والحوكمة، مع إبقاء المكتبة الرسمية حصرًا للسوبر أدمن. */}
    <div role="tablist" ref={consoleTabAnchor} aria-label={ar?'أقسام غرفة القيادة':'Control tower sections'} className="mizan-tabs">
-    {([['health',ar?'الصحة والتنبيهات':'Health & alerts'],['commerce',ar?'التجارة والاشتراكات':'Commerce & plans'],['governance',ar?'الحوكمة والأمان':'Governance & security']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={consoleTab===id} onClick={()=>setConsoleTab(id)} className={`mizan-tab ${consoleTab===id?'is-active':''}`}>{label}</button>)}
+    {([['health',ar?'الصحة والتنبيهات':'Health & alerts'],['commerce',ar?'التجارة والاشتراكات':'Commerce & plans'],['governance',ar?'الحوكمة والأمان':'Governance & security'],['library',ar?'المكتبة الرسمية':'Official library']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={consoleTab===id} onClick={()=>setConsoleTab(id)} className={`mizan-tab ${consoleTab===id?'is-active':''}`}>{id==='library'&&<BookCopy className="w-4 h-4 inline-block ms-1 me-1"/>}{label}</button>)}
    </div>
    {consoleTab==='health'&&<>
    <div className="mizan-surface p-5 sm:p-6"><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5"><div><div className="mizan-kicker">{ar?'حالة المنصة':'PLATFORM HEALTH'}</div><div className="flex items-end gap-3 mt-2"><h2 className="text-4xl font-black">{health?.scoreAvailable?`${health.healthScore}%`:(ar?'غير متاح':'Unknown')}</h2><Badge variant={health?.state==='HEALTHY'?'emerald':health?.state==='OUTAGE'?'rose':'amber'}>{health?.state||'UNKNOWN'}</Badge></div><p className="text-xs text-[#636864] mt-2">{attention.length?`${attention.length} ${ar?'أشياء تحتاج تدخلك الآن':'items need your attention now'}`:(ar?'كل شيء هادئ. لا تحتاج إلى تدخل الآن.':'Everything is quiet. No owner action needed right now.')}</p></div></div>{towerError&&<div className="mt-4 rounded-2xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#88473f]">{towerError}</div>}</div>
@@ -136,6 +137,7 @@ export const SuperAdminConsole: React.FC = () => {
    <div className="mizan-surface p-5 sm:p-6"><div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#2F6555]"/><h2 className="font-extrabold">{ar?'حوكمة السوبر أدمن':'Super Admin governance'}</h2></div><div className="mt-4 grid sm:grid-cols-3 gap-3 text-xs"><Guard text={ar?'لا تعديل سري للنتائج':'No silent result edits'}/><Guard text={ar?'كل دخول حساس مدقق':'Sensitive access audited'}/><Guard text={ar?'اعتماد المصدر موثق':'Source approval is auditable'}/></div><div className="mt-4 text-[10px] text-[#656b66]">{ar?`المسابقة الحالية: ${competition.nameArabic} · ${participants.length} مشارك`:`Current competition: ${competition.name} · ${participants.length} participants`}</div></div>
     </>}
    </>}
+   {consoleTab==='library'&&<OfficialQuranLibrary/>}
  </PortalFrame>
 }
 
