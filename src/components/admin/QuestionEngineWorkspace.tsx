@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookMarked, CheckCircle2, ChevronLeft, CircleAlert, Flame, Layers, ListChecks,
   LockKeyhole, PlayCircle, Plus, Settings2, ShieldCheck, Sparkles, Target, Trash2, Wand2,
-  Layers3, Activity,
+  Layers3, Activity, Library,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { QuranIntelligenceHealthConsole } from './QuranIntelligenceHealthConsole';
+import { OfficialQuranLibrary } from './OfficialQuranLibrary';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { bilingualName } from '../../lib/ui-language';
 import type { Category, ScopeSimulationRecord } from '../../types';
@@ -51,7 +52,7 @@ import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-c
  * وموضعُهما هنا لا في مكانٍ آخر: من يسأل «على أيّ مصحفٍ تُبنى الأسئلة؟» و«أيُّ رواياتٍ
  * جاهزة؟» يسألهما وهو في ورشة المحرّك.
  */
-type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness' | 'intelligence';
+type Tab = 'scope' | 'distribution' | 'policy' | 'demand' | 'simulation' | 'models' | 'readiness' | 'intelligence' | 'library';
 type Store = ReturnType<typeof useAppStore>;
 
 export const QuestionEngineWorkspace: React.FC = () => {
@@ -71,6 +72,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
     ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
+    ['library', Library, ar ? 'المكتبة الرسمية' : 'Official library'],
   ];
 
   return (
@@ -111,6 +113,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
             {tab === 'intelligence' && <QuranIntelligenceHealthConsole ar={ar} />}
+            {tab === 'library' && <OfficialQuranLibrary />}
           </div>
         </>
       )}
