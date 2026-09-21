@@ -332,7 +332,7 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
   const chunkTask = screen.slice(screen.indexOf('queue.current.push(async live'), screen.indexOf('rec.start(CHUNK_MS)'));
   assert.equal(/\btry\s*\{/.test(chunkTask), false, 'مهمّةُ المقطع تبتلع خطأها فلا يُعدّ ساقطًا');
   assert.match(chunkTask, /\}, error => \{/, 'لا بيانَ للطالب عند سقوط مقطع');
-  assert.match(chunkTask, /setNote\(faceNote\(code, ar\)\)/, 'سببُ التعذّر لا يبلغ الطالب');
+  assert.match(chunkTask, /setNote\(listeningFailureNote\(code, ar\)\)/, 'سببُ التعذّر لا يبلغ الطالب');
 
   /* والمقطعُ يسأل الطابورَ قبل أن يكتب، والطابورُ القديم يُترك عند كلّ وجهٍ جديد. */
   assert.match(screen, /if \(!alive\.current \|\| !live\(\)\) return;/, 'المقطعُ يكتب بلا أن يسأل');

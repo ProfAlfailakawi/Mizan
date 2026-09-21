@@ -59,6 +59,12 @@ const INTENTIONALLY_PUBLIC: Record<string, string> = {
   '/api/public/competitions/:competitionId': 'صفحةُ تسجيلٍ عامّة لمسابقةٍ نُشرت.',
   '/api/public/competitions/:competitionId/register': 'تسجيلُ متسابقٍ جديد — لا هوية قبله بطبيعته؛ محروسٌ بحدّ معدّل وبتحقّقٍ من محتواه.',
   '/api/public/journeys/resolve': 'رحلةُ متسابقٍ برمزٍ سرّي يُقدَّم في الطلب — الرمزُ نفسه هو الاعتماد.',
+  '/api/public/journeys/practice/context': 'تهيئةُ تدريبٍ خاص ببطاقة الرحلة — مفتاح الرحلة في الترويسة هو الاعتماد، ويُتحقق منه خادميًّا قبل إعادة نطاق المتسابق.',
+  '/api/public/journeys/practice/faces': 'وجوهُ تدريب المتسابق — لا تُعاد إلا بعد التحقق من بطاقة الرحلة، والنطاق والرواية مشتقان من الخادم.',
+  '/api/public/journeys/practice/face': 'وجهُ مصحفٍ للتدريب — بطاقة الرحلة هي الاعتماد والخادم يرفض أي صفحة خارج نطاق صاحبها.',
+  '/api/public/journeys/practice/judging-gate': 'حالةُ بوابة الاستماع لصاحب بطاقة الرحلة — البطاقة هي الاعتماد ولا يختار المتصفح هوية المتسابق.',
+  '/api/public/journeys/practice/align': 'محاذاةُ مقطع تدريبٍ خاص — بطاقة الرحلة اعتمادٌ إلزامي، ويعيد الخادم التحقق من الرواية والنطاق لكل مقطع.',
+  '/api/public/journeys/practice/recognise': 'تعرّفُ مقطع تدريبٍ خاص — بطاقة الرحلة اعتمادٌ إلزامي، والرواية والحزمة تتحققان خادميًّا.',
   '/api/public/brand-assets/organizations/:organizationId/logo': 'شعارُ الجهة كما يظهر على صفحتها العامّة.',
   '/api/public/brand-assets/organizations/:organizationId/competitions/:competitionId/logo': 'شعارُ المسابقة على صفحتها العامّة.',
 

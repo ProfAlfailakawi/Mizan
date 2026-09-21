@@ -57,7 +57,27 @@ test('public journey practice has a separate authenticated, rate-limited corrido
   const journeyLimiter = server.slice(server.indexOf('const journeyPracticeRateLimit'), server.indexOf('const publicRegistrationRateLimit'));
   assert.match(ipLimiter, /skip:\(\)=>rateLimiterIsGlobal/);
   assert.match(journeyLimiter, /skip:\(\)=>rateLimiterIsGlobal/);
-  assert.match(server, /String\(raw\?\?''\)\.trim\(\)/);
+  assert.match(server, /const value=\(Array\.isArray\(raw\)\?raw\[0\]:String\(raw\?\?''\)\)\.trim\(\)/);
+  for (const limiter of [
+    'sensitiveIdentityRateLimit',
+    'alignmentAudioIpRateLimit',
+    'questionRuntimeRateLimit',
+    'auditRateLimit',
+    'practiceAlignmentIpRateLimit',
+    'journeyPracticeRateLimit',
+    'publicRegistrationRateLimit',
+    'journeyResolveRateLimit',
+    'competitionPublishRateLimit',
+    'paymentWebhookRateLimit',
+    'enterpriseAuditRateLimit',
+    'ownerRateLimit',
+  ]) {
+    const start = server.indexOf(`const ${limiter}`);
+    assert.ok(start >= 0, `${limiter} must exist`);
+    const block = server.slice(start, start + 900);
+    assert.match(block, /skip:\(\)=>rateLimiterIsGlobal/, `${limiter} must bypass its local store in global mode`);
+  }
+  assert.doesNotMatch(server, /RequestHandler=rateLimiterIsGlobal\s*\?/, 'global mode must use express-rate-limit skip, not conditional middleware wrapping');
 });
 
 test('the browser cannot choose another competitor scope, reading, face, or passage', () => {

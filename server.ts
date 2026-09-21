@@ -421,9 +421,11 @@ async function startServer() {
   try{if(publicationDir)resultPublications=new FilePublicationStore(publicationDir,fs,path)}catch(err){console.error('Result publication store disabled:',err)}
   /* مسارات الهوية الحسّاسة (الاستيلاء على الجلسة مثلًا) تُخنق كالحدّ الضيق للمالك:
      محاولة تخمين أو إغراق يجب أن تُوقف قبل حدّ /api الفسيح. تُترك للطبقة الخارجية متى أُسندت. */
-  const sensitiveIdentityRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const sensitiveIdentityRateLimit:RequestHandler=rateLimit({
+    windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),
+    standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'},
+    skip:()=>rateLimiterIsGlobal,
+  });
   /*
    * تدريب المتسابق: حدّان، أحدهما قبل التحقق من الهوية.
    *
@@ -451,6 +453,7 @@ async function startServer() {
     limit:Number(process.env.MIZAN_ALIGNMENT_AUDIO_IP_RATE_LIMIT_MAX||1200),
     standardHeaders:'draft-7',legacyHeaders:false,
     message:{code:'RATE_LIMITED'},
+    skip:()=>rateLimiterIsGlobal,
   });
   /*
    * حدُّ معدّلٍ على مسارات يوم المسابقة وسجلّ التدقيق.
@@ -518,20 +521,12 @@ async function startServer() {
     },
     message:{code:'RATE_LIMITED'},
   });
-  const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'}});
-  const journeyResolveRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_RATE_LIMIT_MAX||240),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'}});
-  const competitionPublishRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_COMPETITION_PUBLISH_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  const publicRegistrationRateLimit:RequestHandler=rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  const journeyResolveRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_RATE_LIMIT_MAX||240),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  const competitionPublishRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_COMPETITION_PUBLISH_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   /* إشعار بوابة الدفع عام بلا هوية مستخدم، وثقته من توقيعه وحده. يُخنق بحدّ خاص يتّسع
      لدفعات التسوية المشروعة ويمنع إغراق نقطة عامة بمحاولات توقيع فاشلة. */
-  const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const paymentWebhookRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_PAYMENT_WEBHOOK_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   /* التحقق من الشهادة عام بلا هوية: يُخنق لمنع تعداد أرقام الشهادات بالتخمين. */
   /* هذا الحدّ غير مشروط بغياب الحدّ العام: نقطة عامة تقرأ من القرص برقم يأتي من الطلب،
      فيبقى لها سقف خاص بها حتى مع وجود حدّ عام أوسع. */
@@ -1187,9 +1182,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   /* حدّ أضيق من الحدّ العام لمسارات المالك: هي تعدّل نطاقات الجهات وتوقفها، فمحاولة
      تخمين هوية أو إغراق بالتعديلات يجب أن تُخنق قبل أن تصل حدّ /api الفسيح.
      ويُترك للطبقة الخارجية متى أُسند التحديد إليها، كما يفعل الحدّ العام. */
-  const ownerRateLimit:RequestHandler=rateLimiterIsGlobal
-    ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const ownerRateLimit:RequestHandler=rateLimit({windowMs:rateWindowMs,limit:Number(process.env.MIZAN_OWNER_RATE_LIMIT_MAX||30),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   const ownerOnly=requireFirebaseRoles(['super_admin']);
   const withOperatorOrganizations=(identity:ServerIdentity):ServerIdentity=>{
     if(!saasPlatform||!identity.operatorId||!['operator_owner','operator_admin'].includes(identity.role))return identity;
