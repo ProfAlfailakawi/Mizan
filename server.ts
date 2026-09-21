@@ -39,6 +39,7 @@ import { normalizeScope, scopeAyahCount, scopeContainsRange, type QuranScope } f
 import { resolveEffectiveScope } from './src/lib/scope-engine';
 import type { ParticipantScopeRecord } from './src/lib/participant-scope';
 import { quranReadingDefinition } from './server/quran-intelligence-policy';
+import { resolveCanonicalRawiId } from './src/lib/canonical-readings';
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
@@ -2039,7 +2040,19 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     }
 
     if(!scope||scopeAyahCount(scope)===0)throw new Error('PRACTICE_SCOPE_NOT_READY');
-    const definition=quranReadingDefinition(riwaya);
+    /*
+     * `participant.riwaya` stores the human-facing canonical label (for example
+     * «حفص عن عاصم»), while the listening policy deliberately accepts compact
+     * engine ids such as `hafs`.  Passing the display label directly made a valid
+     * Hafs/Warsh/... journey look unsupported.  Resolve through the canonical
+     * twenty-reading registry first; never guess or fall back to another reading.
+     */
+    const rawiId=resolveCanonicalRawiId({riwaya});
+    const intelligenceReadingByRawi:Record<string,string>={
+      hafs:'hafs',warsh:'warsh',shubah:'shubah',qalun:'qaloun',
+      'al-duri-abu-amr':'douri-abu-amr','al-susi':'sousi-abu-amr',
+    };
+    const definition=quranReadingDefinition(rawiId?intelligenceReadingByRawi[rawiId]||'':riwaya);
     if(!definition)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
     const deliveryReading=practiceDeliveryByReading[definition.id];
     if(!deliveryReading)throw new Error('PRACTICE_READING_NOT_SUPPORTED');

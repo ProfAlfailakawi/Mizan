@@ -78,6 +78,9 @@ test('public journey practice has a separate authenticated, rate-limited corrido
     assert.match(block, /skip:\(\)=>rateLimiterIsGlobal/, `${limiter} must bypass its local store in global mode`);
   }
   assert.doesNotMatch(server, /RequestHandler=rateLimiterIsGlobal\s*\?/, 'global mode must use express-rate-limit skip, not conditional middleware wrapping');
+  assert.match(server, /resolveCanonicalRawiId\(\{riwaya\}\)/, 'journey practice must resolve the stored display reading through the canonical registry');
+  assert.match(server, /'al-duri-abu-amr':'douri-abu-amr'/, 'canonical Abu Amr al-Duri must map to its listening engine id without guessing');
+  assert.match(server, /'al-susi':'sousi-abu-amr'/, 'canonical al-Susi must map to its listening engine id without guessing');
 });
 
 test('the browser cannot choose another competitor scope, reading, face, or passage', () => {
