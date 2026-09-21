@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AyahMark, arabicIndicDigits } from '../judge/AyahMark';
 import { FaceMarkLegend, FACE_MARK_STYLE, markTint, marksByWord, primaryMark } from './FaceMarks';
 import { FaceMistakeLegend, FACE_MISTAKE_STYLE, addedCount, mistakesByWord, primaryMistake } from './FaceMistakes';
