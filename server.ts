@@ -489,6 +489,9 @@ async function startServer() {
     windowMs:120_000,
     limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_IP_RATE_LIMIT_MAX||600),
     standardHeaders:'draft-7',legacyHeaders:false,
+    // A shared/edge limiter is authoritative in global mode; keep the middleware shape
+    // stable and let express-rate-limit bypass its local store via the built-in hook.
+    skip:()=>rateLimiterIsGlobal,
     message:{code:'RATE_LIMITED'},
   });
   const practiceAlignmentRateLimit:RequestHandler=rateLimit({
