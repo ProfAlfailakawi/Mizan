@@ -1,42 +1,85 @@
-name: PR255 fit-page hotfix
+name: توليد مقاطع عبارة إنهاء الموضع
+
+# العبارة غير قرآنية («حسبك، جزاك الله خيرًا» وأخواتها) يقولها المحكم للمتسابق.
+# القرآن لا يُولَّد صوتيًا بحال؛ تلاوته من المصدر المعتمد وحده.
+#
+# يُشغَّل يدويًا فقط: المقاطع تُولَّد مرة واحدة ثم تبقى ملفات ثابتة في المستودع،
+# فلا نداء لأي خدمة أثناء المسابقة ولا حاجة لاتصال.
+#
+# المفتاح يبقى سرًّا داخل GitHub ولا يغادره: لا يُطبع ولا يُمرَّر إلا لخطوة التوليد.
 
 on:
-  push:
-    branches:
-      - chatgpt/ui-recitation-polish-20260921
+  workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
+
+concurrency:
+  group: mizan-cue-audio
+  cancel-in-progress: false
 
 jobs:
-  patch:
-    if: github.actor != 'github-actions[bot]'
+  generate:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
         with:
-          ref: chatgpt/ui-recitation-polish-20260921
-          fetch-depth: 0
-      - name: Apply minimal Mushaf fixes
+          node-version-file: package.json
+
+      # اسم السرّ قد يكون GEMINI_API_KEY أو MIZAN_GEMINI_API_KEY؛ نقبل الاثنين
+      # حتى لا يفشل التشغيل لاختلاف تسمية.
+      - name: توليد المقاطع
+        env:
+          MIZAN_GEMINI_API_KEY: ${{ secrets.MIZAN_GEMINI_API_KEY || secrets.GEMINI_API_KEY }}
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('src/components/judge/OfficialMushafSurface.tsx')
-          s = p.read_text()
-          old_figure = 'className="relative mx-auto flex max-h-[70vh] max-w-full items-start justify-center"'
-          new_figure = 'className="relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center"'
-          old_img = 'className="mizan-mushaf-page block h-auto w-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"'
-          new_img = 'className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"'
-          if s.count(old_figure) != 1:
-              raise SystemExit(f'figure contract mismatch: {s.count(old_figure)}')
-          if s.count(old_img) != 1:
-              raise SystemExit(f'image contract mismatch: {s.count(old_img)}')
-          s = s.replace(old_figure, new_figure).replace(old_img, new_img)
-          p.write_text(s)
-          PY
-          git show origin/main:.github/workflows/cue-audio.yml > .github/workflows/cue-audio.yml
-          git config user.name "github-actions[bot]"
+          if [ -z "$MIZAN_GEMINI_API_KEY" ]; then
+            echo "::error::لم يُضبط سرّ المفتاح. أضِف GEMINI_API_KEY أو MIZAN_GEMINI_API_KEY في أسرار المستودع."
+            exit 1
+          fi
+          node scripts/generate-cue-audio.mjs
+
+      - name: فتح طلب دمج بالمقاطع المولَّدة
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(git status --porcelain public/audio/cues)" ]; then
+            echo "لا جديد: المقاطع مطابقة لما في المستودع."
+            exit 0
+          fi
+          BRANCH="chore/cue-audio-$(date +%Y%m%d%H%M%S)"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/judge/OfficialMushafSurface.tsx .github/workflows/cue-audio.yml
-          git commit -m "fix(mushaf): preserve fit-page regression contract"
-          git push origin HEAD:chatgpt/ui-recitation-polish-20260921
+          git checkout -b "$BRANCH"
+          git add public/audio/cues
+          cat > /tmp/cue-commit.txt <<'MSG'
+          توليد مقاطع عبارة إنهاء الموضع
+
+          مقاطع صوتية لعبارات غير قرآنية يقولها المحكم عند نهاية الموضع، مولَّدة مرة
+          واحدة لتُشغَّل ملفات ثابتة بلا نداء لأي خدمة أثناء المسابقة.
+          MSG
+          sed -i 's/^          //' /tmp/cue-commit.txt
+          git commit -F /tmp/cue-commit.txt
+          git push -u origin "$BRANCH"
+          cat > /tmp/cue-body.txt <<'MSG'
+          مقاطع صوتية مولَّدة لعبارات إنهاء الموضع (غير قرآنية).
+
+          تُشغَّل ملفات ثابتة من public/audio/cues، فلا نداء لأي خدمة أثناء المسابقة
+          ولا حاجة لاتصال. ترتيب المقاطع يطابق ترتيب العبارات في
+          TRANSITION_PHRASES_AR، فيوافق الصوتُ النصَّ المعروض.
+
+          القرآن لا يُولَّد صوتيًا بحال؛ تلاوته من المصدر المعتمد وحده.
+          MSG
+          sed -i 's/^          //' /tmp/cue-body.txt
+          # بعض المؤسسات تمنع GitHub Actions من فتح طلبات الدمج. الفرع مدفوع على أي حال،
+          # فلا نُفشل التشغيل: نطبع رابط فتح الطلب يدويًا ونمضي.
+          if ! gh pr create --base main --head "$BRANCH" \
+            --title "توليد مقاطع عبارة إنهاء الموضع" \
+            --body-file /tmp/cue-body.txt; then
+            echo "::notice::تعذّر فتح طلب الدمج تلقائيًا. الفرع $BRANCH مدفوع؛ افتح الطلب من:"
+            echo "::notice::${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/${BRANCH}"
+          fi

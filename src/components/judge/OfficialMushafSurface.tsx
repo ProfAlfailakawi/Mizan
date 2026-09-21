@@ -221,7 +221,7 @@ const useLineBands=(url:string,expectedLines?:number)=>{
 const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;
  /* أشرطة الأسطر تُقاس من حبر الصفحة نفسها؛ متى تعذّر القياس بقيت العدسة على التقدير. */
  const bands=useLineBands(url,audioSpot?.lineCount||focus.lineCount||15);
- return <figure className="relative mx-auto flex max-h-[70vh] max-w-full items-start justify-center"><div className="relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block h-auto w-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
+ return <figure className="relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center"><div className="relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
   {audioSpot?.bbox
    ? <RecitingWordLens bbox={audioSpot.bbox}/>
    : audioSpot?.line
