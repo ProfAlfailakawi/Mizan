@@ -501,16 +501,19 @@ async function startServer() {
   /* بطاقة الرحلة الخاصة تفتح التدريب بلا حساب. يظل لها حدّ مستقل لكل بطاقة حتى لا
      يستطيع رابطٌ واحد استهلاك محرّك الاستماع على بقية المتسابقين. ولا يدخل الرمز نفسه
      في مفاتيح السجل؛ تُستخدم بصمته فقط. */
-  const journeyPracticeRateLimit:RequestHandler=rateLimit({
-    windowMs:120_000,
-    limit:Number(process.env.MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX||180),
-    standardHeaders:'draft-7',legacyHeaders:false,
-    keyGenerator:(req)=>{
-      const raw=req.headers['x-mizan-journey-key'];const value=Array.isArray(raw)?raw[0]:String(raw||'');
-      return value?`journey:${crypto.createHash('sha256').update(value).digest('hex')}`:ipKeyGenerator(req.ip||'');
-    },
-    message:{code:'RATE_LIMITED'},
-  });
+  const journeyPracticeRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({
+      windowMs:120_000,
+      limit:Number(process.env.MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX||180),
+      standardHeaders:'draft-7',legacyHeaders:false,
+      keyGenerator:(req)=>{
+        const raw=req.headers['x-mizan-journey-key'];
+        const value=(Array.isArray(raw)?raw[0]:String(raw||'')).trim();
+        return value?`journey:${crypto.createHash('sha256').update(value).digest('hex')}`:ipKeyGenerator(req.ip||'');
+      },
+      message:{code:'RATE_LIMITED'},
+    });
   const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
     : rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'}});

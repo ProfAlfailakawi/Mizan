@@ -52,6 +52,7 @@ test('public journey practice has a separate authenticated, rate-limited corrido
   }
   assert.match(server, /publicRegistration\.resolve\(competitionId,'participant',key\)/);
   assert.match(server, /crypto\.createHash\('sha256'\)\.update\(value\)/);
+  assert.match(server, /journeyPracticeRateLimit:RequestHandler=rateLimiterIsGlobal/);
 });
 
 test('the browser cannot choose another competitor scope, reading, face, or passage', () => {

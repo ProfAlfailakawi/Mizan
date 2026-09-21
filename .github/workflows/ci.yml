@@ -67,7 +67,7 @@ jobs:
 
       - name: احفظ نتائج الاختبارات عند الفشل
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: test-results.xml
@@ -142,7 +142,7 @@ jobs:
       # يبقى سجل Docker متاحاً عند الفشل حتى يكون سبب الانكسار مرئياً ولا نعالج بالتخمين.
       - name: حفظ سجل Docker عند الفشل
         if: ${{ failure() && hashFiles('docker-build.log') != '' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: cloud-run-docker-build-${{ github.sha }}
           path: docker-build.log
