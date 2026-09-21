@@ -1065,7 +1065,7 @@ async function startServer() {
     const actorCompetitionId = String((actor as any).competitionId || '');
     if ((actor as any).role === 'comp_admin' && actorCompetitionId && actorCompetitionId !== competitionId) return res.status(403).json({ error: 'competition_scope_mismatch' });
 
-    const participantPath = `settings/active/organizations/${organizationId}/competitions/${competitionId}/participants/${participantId}`;
+    const participantPath = `organizations/${organizationId}/competitions/${competitionId}/participants/${participantId}`;
     const participant = await firestoreRepository.get(participantPath);
     if (!participant) return res.status(404).json({ error: 'participant_not_found' });
 
@@ -1094,7 +1094,7 @@ async function startServer() {
     await firestoreRepository.commitAtomically({
       upserts: [
         { path: participantPath, data: updatedParticipant },
-        { path: `public_journeys/${journeyAccessTokenHash}`, data: { ...(journeyPublic as any), organizationId, competitionId, participantId, audience: 'journey', active: true } },
+        { path: `public_journeys/${journeyAccessTokenHash}`, data: { ...(journeyPublic as any), organizationId, competitionId, participantId, audience: 'participant', active: true } },
         { path: `public_journeys/${guardianAccessTokenHash}`, data: { ...(guardianPublic as any), organizationId, competitionId, participantId, audience: 'guardian', active: true } },
       ],
       deletes: [oldJourneyHash, oldGuardianHash].filter(Boolean).filter((h) => h !== journeyAccessTokenHash && h !== guardianAccessTokenHash).map((h) => `public_journeys/${h}`),

@@ -18,8 +18,11 @@ test('opening registration publishes the public record explicitly and awaits it'
   assert.match(store, /const publicRef=doc\(db,'public_competitions',publishedCompetition\.id\)/);
   assert.match(store, /await setDoc\(publicRef,/);
   assert.match(store, /const published=await publishPublicCompetitionRecord\(\)/);
-  // النشر لم يعد أثرًا جانبيًا مؤجَّلًا يسبق التحقق.
-  assert.ok(store.indexOf('const published=await publishPublicCompetitionRecord()') < store.indexOf('markCompetitionConfigChanged();\n    globalState.auditLogs'));
+  // النشر لم يعد أثرًا جانبيًا مؤجَّلًا يسبق التحقق، ولا تُنشأ بعد نجاحه مراجعة أحدث
+  // تجعل الإسقاط الذي تحققنا منه يبدو قديمًا فورًا.
+  const success = store.slice(store.indexOf('/* النشر حفظ إعداد المسابقة'), store.indexOf('notify(); return {ok:true'));
+  assert.doesNotMatch(success, /markCompetitionConfigChanged\(\)/);
+  assert.match(success, /globalState\.competitionConfigUpdatedAt=globalState\.competition\.updatedAt/);
 });
 
 test('a failed publish never leaves the competition open on the admin device alone', () => {

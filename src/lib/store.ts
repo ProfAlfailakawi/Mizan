@@ -945,10 +945,14 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
   if(!records.length)return 'NO_TOKENS';
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
-    await setDoc(doc(db,'public_competitions',globalState.competition.id),{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt:new Date().toISOString()},{merge:true});
     const committee=globalState.committees.find(c=>c.id===participant.assignedCommitteeId&&c.competitionId===participant.competitionId);
     const result=globalState.results.find(r=>r.participantId===participant.id&&r.competitionId===participant.competitionId&&r.status==='published');
     const certificate=globalState.certificates.find(c=>c.participantId===participant.id&&c.competitionId===participant.competitionId&&c.revocationState!=='REVOKED');
+    const category=globalState.competition.categories.find(c=>c.id===participant.categoryId);
+    const policy=getCompetitionPolicy(globalState.competition);
+    const scopeResolution=resolveEffectiveScope({participant,category,scopes:globalState.participantScopes,tenant:{organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id}});
+    const questionCount=resolveQuestionCount(category,policy);
+    const distribution=categoryDistribution(category,questionCount);
     const base={
       organizationId:participant.organizationId,competitionId:participant.competitionId,participantId:participant.id,
       competitionName:storedCompetitionName(true),competitionNameArabic:storedCompetitionName(false),
@@ -958,6 +962,13 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
       committee:committee?{code:committee.code,name:committee.name,nameArabic:committee.nameArabic,hall:committee.venueHall||null}:null,
       result:result?{score:result.finalScore,rank:result.rank,status:result.status}:null,
       certificate:certificate?{number:certificate.certificateNumber,verificationUrl:certificate.verificationUrl}:null,
+      preparation:{
+        scopeTextArabic:scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,true):null,
+        scopeTextEnglish:scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,false):null,
+        spreadAcrossZones:distribution.mode!=='free'&&distribution.zones.length>1,
+        questionCount,
+        minutesPerQuestion:Math.max(1,Math.round((category?.targetDurationMinutes||questionCount*5)/Math.max(1,questionCount))),
+      },
       /* الإنهاء الطبيعي لا يلغي بطاقة الرحلة ولا الشهادة. الإبطال لا يحدث إلا بقرار صريح
          (حذف/سحب وصول/إغلاق نهائي)، كي تبقى النتيجة والشهادة متاحتين بعد الحفل. */
       revoked,
@@ -2634,7 +2645,14 @@ export function useAppStore() {
  * لا يستطيع وليُّ الأمر ولا الكشك التحقّق منه. فلا يدخل الحزمة إلا ما نُشر فعلًا، وما لم
  * يُنشر يُعدّ متعذّرًا ويُقال عدده.
  */
-const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:string[]=[];for(const participant of globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected')){const out=await ensureParticipantJourneyAccess(participant.id);if(out&&!journeyAccessFailure)ready.push(out);else failed.push(participant.id)}return {participants:ready,failed};};
+const prepareJourneyAccessBatch=async()=>{
+  const candidates=globalState.participants.filter(p=>p.competitionId===globalState.competition.id&&p.status!=='rejected');
+  const publicCompetition=await publishPublicCompetitionRecord();
+  if(!publicCompetition.ok)return {participants:[] as Participant[],failed:candidates.map(p=>p.id),publicationFailure:publicCompetition.reason};
+  const ready:Participant[]=[],failed:string[]=[];
+  for(const participant of candidates){const out=await ensureParticipantJourneyAccess(participant.id);if(out&&!journeyAccessFailure)ready.push(out);else failed.push(participant.id)}
+  return {participants:ready,failed,publicationFailure:''};
+};
 
   const syncAuthorizedJudgeProfiles=(accounts:IdentityAccountRecord[],grants:RoleGrantRecord[])=>{const cid=globalState.competition.id,oid=globalState.competition.organizationId;const active=grants.filter(g=>g.organizationId===oid&&g.status==='ACTIVE'&&['judge','head_judge'].includes(g.role)&&(!g.competitionId||g.competitionId===cid));const managedIds=new Set(active.map(g=>g.id));const next=globalState.judges.filter(j=>!j.identityGrantId||managedIds.has(j.identityGrantId));for(const grant of active){const account=accounts.find(a=>a.id===grant.accountId&&a.organizationId===oid&&a.status==='ACTIVE');if(!account)continue;const managedUid=String((account as IdentityAccountRecord&{uid?:string}).uid||account.firebaseUid||account.id);const idx=next.findIndex(j=>j.identityGrantId===grant.id||j.userId===managedUid);const old=idx>=0?next[idx]:undefined;const specialties=old?.specialties?.length?old.specialties:old?.specialty?[old.specialty]:['all'];const profile:JudgeProfile={id:old?.id||`judge-${grant.id}`,userId:managedUid,name:account.displayName,nameArabic:account.displayName,title:grant.role==='head_judge'?'رئيس لجنة':'محكم',country:old?.country||'',specialty:specialties[0]||'all',specialties,certifiedRiwayat:old?.certifiedRiwayat||[...new Set(globalState.competition.categories.map(c=>c.riwaya).filter(Boolean))],assignedCommitteeId:old?.assignedCommitteeId,conflictsDeclared:old?.conflictsDeclared||[],calibrationScore:old?.calibrationScore||0,isReady:true,identityGrantId:grant.id,competitionId:grant.competitionId||cid};if(idx>=0)next[idx]=profile;else next.push(profile)}if(JSON.stringify(next)!==JSON.stringify(globalState.judges)){globalState.judges=next;notify()}return next;};
 
@@ -3333,7 +3351,9 @@ const prepareJourneyAccessBatch=async()=>{const ready:Participant[]=[],failed:st
       notify();
       return {ok:false,issues:[published.reason],warnings:laterStageWarnings,scientificBlockers,contradictions};
     }
-    markCompetitionConfigChanged();
+    /* النشر حفظ إعداد المسابقة وإسقاطها العام بالمراجعة نفسها بالفعل. إنشاء مراجعة
+       أحدث هنا كان يجعل الفحص التالي يعلن أن النسخة العامة غير مطابقة فور نجاح النشر. */
+    globalState.competitionConfigUpdatedAt=globalState.competition.updatedAt||globalState.competitionConfigUpdatedAt;
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:productionMode?'فتح التسجيل بعد اجتياز بوابات الجاهزية العلمية والتشغيلية.':'فتح التسجيل في بيئة تطوير؛ الاعتماد العلمي الكامل مطلوب قبل الإنتاج.',humanSummaryEnglish:productionMode?'Opened registration after scientific and operational gates passed.':'Opened registration in development; full scientific source certification remains required for production.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify(); return {ok:true,issues:[],warnings:laterStageWarnings,scientificBlockers,contradictions};
   };
