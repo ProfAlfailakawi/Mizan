@@ -35,7 +35,10 @@ import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { MizanQuranDelivery, candidateRawiForDeliveryKey } from './server/quran-reading-delivery';
 import { practiceFaceCatalogue, practiceFacePage, PracticeFaceError } from './server/practice-face-service';
-import { normalizeScope, type QuranScope } from './src/lib/quran-scope';
+import { normalizeScope, scopeAyahCount, scopeContainsRange, type QuranScope } from './src/lib/quran-scope';
+import { resolveEffectiveScope } from './src/lib/scope-engine';
+import type { ParticipantScopeRecord } from './src/lib/participant-scope';
+import { quranReadingDefinition } from './server/quran-intelligence-policy';
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
@@ -493,6 +496,19 @@ async function startServer() {
     limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX||60),
     standardHeaders:'draft-7',legacyHeaders:false,
     keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
+    message:{code:'RATE_LIMITED'},
+  });
+  /* بطاقة الرحلة الخاصة تفتح التدريب بلا حساب. يظل لها حدّ مستقل لكل بطاقة حتى لا
+     يستطيع رابطٌ واحد استهلاك محرّك الاستماع على بقية المتسابقين. ولا يدخل الرمز نفسه
+     في مفاتيح السجل؛ تُستخدم بصمته فقط. */
+  const journeyPracticeRateLimit:RequestHandler=rateLimit({
+    windowMs:120_000,
+    limit:Number(process.env.MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX||180),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    keyGenerator:(req)=>{
+      const raw=req.headers['x-mizan-journey-key'];const value=Array.isArray(raw)?raw[0]:String(raw||'');
+      return value?`journey:${crypto.createHash('sha256').update(value).digest('hex')}`:ipKeyGenerator(req.ip||'');
+    },
     message:{code:'RATE_LIMITED'},
   });
   const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
@@ -1947,6 +1963,119 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   const practiceFaceFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PRACTICE_FACE_FAILED';return res.status(code==='PRACTICE_FACE_READING_UNKNOWN'||code==='PRACTICE_FACE_PAGE_INVALID'?400:409).json({code})};
   /* وتُسمّى العلّةُ للشاشة: غيابُ محرّكٍ ليس كخطأ طلب، وبابٌ مغلقٌ ليس عطلًا. */
   const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')?503:code==='QURAN_ASR_JUDGING_CLOSED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
+
+  /*
+   * «يسمعك» من بطاقة الرحلة.
+   *
+   * بطاقة الرحلة اعتمادٌ خاص طويل، لكنها ليست جلسة Firebase. لذلك لا يجوز أن نفتح
+   * مسارات الطالب الأصلية بلا هوية، ولا أن نجبر صاحب البطاقة على إنشاء حساب كي يعمل زرّ
+   * ظهر له أصلًا. الباب العام أدناه مستقل: يتحقق من البطاقة، ويستخرج نطاق صاحبها وروايته
+   * من الخادم، ثم يعيد التحقق من كل وجه/مقطع. لا يثق بنطاق أو رواية يرسلها المتصفح.
+   */
+  type JourneyPracticeAccess={
+    competitionId:string;organizationId:string;participantId:string;
+    scope:QuranScope;deliveryReading:string;
+    listening:{reading:string;sourcePackageId:string};
+  };
+  const JOURNEY_PRACTICE_CACHE_MS=5_000;
+  const journeyPracticeCache=new Map<string,{expires:number;value:JourneyPracticeAccess}>();
+  const practiceDeliveryByReading:Record<string,string>={
+    hafs:'hafs',warsh:'warsh',shubah:'shubah',qaloun:'qalun',
+    'douri-abu-amr':'duri-abi-amr','sousi-abu-amr':'susi-abi-amr',
+  };
+  const journeyPracticeFailure=(res:Response,err:unknown)=>{
+    const code=err instanceof Error?err.message:'JOURNEY_PRACTICE_FAILED';
+    const status=/JOURNEY_(TOKEN_INVALID|NOT_FOUND|REVOKED)/.test(code)?401
+      :/PRACTICE_(STATUS_BLOCKED|SCOPE|READING|FACE_OUT_OF_SCOPE|REQUEST_MISMATCH)/.test(code)?409
+      :/FIRESTORE|NOT_CONFIGURED|UNAVAILABLE/.test(code)?503:400;
+    return res.status(status).json({code});
+  };
+  const journeyPracticeAccess=async(req:Request):Promise<JourneyPracticeAccess>=>{
+    if(!publicRegistration)throw new Error('PUBLIC_REGISTRATION_NOT_CONFIGURED');
+    const competitionId=soleParam(req.headers['x-mizan-competition-id'],'x-mizan-competition-id').trim();
+    const key=soleParam(req.headers['x-mizan-journey-key'],'x-mizan-journey-key').trim();
+    if(!competitionId||!key)throw new Error('JOURNEY_TOKEN_INVALID');
+    const cacheKey=crypto.createHash('sha256').update(`${competitionId}:${key}`).digest('hex');
+    const cached=journeyPracticeCache.get(cacheKey);
+    if(cached&&cached.expires>Date.now())return cached.value;
+
+    const journey=await publicRegistration.resolve(competitionId,'participant',key) as any;
+    if(!['approved','checked_in','in_queue'].includes(String(journey?.status||'')))throw new Error('PRACTICE_STATUS_BLOCKED');
+    const organizationId=String(journey?.organizationId||'').trim();
+    const participantId=String(journey?.participantId||'').trim();
+    if(!organizationId||!participantId)throw new Error('JOURNEY_TOKEN_INVALID');
+
+    const prepared=journey?.preparation&&typeof journey.preparation==='object'?journey.preparation as any:{};
+    let scope:QuranScope|undefined;
+    if(prepared.scope&&typeof prepared.scope==='object'){
+      const candidate=normalizeScope(prepared.scope as QuranScope);
+      if(scopeAyahCount(candidate)>0)scope=candidate;
+    }
+    let riwaya=String(prepared.riwaya||'').trim();
+
+    /* السجل القديم لم يكن يحمل النطاق البنيوي ولا الرواية. نصلحه عند القراءة بدل أن
+       نجبر صاحب بطاقة قديمة على انتظار إعادة نشرها. */
+    if(!scope||!riwaya){
+      if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
+      const participant=await firestoreRepository.get(`organizations/${organizationId}/competitions/${competitionId}/participants/${participantId}`) as any;
+      if(!participant)throw new Error('JOURNEY_NOT_FOUND');
+      riwaya=riwaya||String(participant.riwaya||'').trim();
+      if(!scope){
+        const compRow=await firestoreRepository.get(`public_competitions/${competitionId}`);
+        const competition=asCompetition(compRow?.competition);
+        if(!competition||competition.organizationId!==organizationId)throw new Error('COMPETITION_NOT_FOUND');
+        const category=competition.categories.find(c=>c.id===participant.categoryId);
+        let scopes:ParticipantScopeRecord[]=[];
+        if(category?.scopeMode==='participant_selected'&&category.selectionRule?.enabled){
+          const base=`organizations/${organizationId}/competitions/${competitionId}/participant_scopes`;
+          const paths=await firestoreRepository.listDocumentPaths(base);
+          const rows=await Promise.all(paths.map(x=>firestoreRepository!.get(x).catch(()=>null)));
+          scopes=rows.filter((x):x is Record<string,unknown>=>!!x&&String((x as any).participantId||'')===participantId) as unknown as ParticipantScopeRecord[];
+        }
+        const resolved=resolveEffectiveScope({participant:{id:participantId},category,scopes,tenant:{organizationId,competitionId}});
+        if(resolved.blocked||scopeAyahCount(resolved.scope)===0)throw new Error('PRACTICE_SCOPE_NOT_READY');
+        scope=normalizeScope(resolved.scope);
+      }
+    }
+
+    if(!scope||scopeAyahCount(scope)===0)throw new Error('PRACTICE_SCOPE_NOT_READY');
+    const definition=quranReadingDefinition(riwaya);
+    if(!definition)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
+    const deliveryReading=practiceDeliveryByReading[definition.id];
+    if(!deliveryReading)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
+    const value:JourneyPracticeAccess={competitionId,organizationId,participantId,scope,deliveryReading,listening:{reading:definition.id,sourcePackageId:definition.packageId}};
+    journeyPracticeCache.set(cacheKey,{expires:Date.now()+JOURNEY_PRACTICE_CACHE_MS,value});
+    return value;
+  };
+
+  app.post('/api/public/journeys/practice/context',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
+    try{const access=await journeyPracticeAccess(req);res.setHeader('Cache-Control','private, no-store');return res.json({scope:access.scope,deliveryReading:access.deliveryReading,listening:access.listening,owner:access.participantId})}
+    catch(err){return journeyPracticeFailure(res,err)}
+  });
+  app.post('/api/public/journeys/practice/faces',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.json({limit:'8kb'}),async(req,res)=>{
+    try{const access=await journeyPracticeAccess(req);const requested=soleParam(req.query.reading,'reading');if(requested!==access.deliveryReading)throw new Error('PRACTICE_REQUEST_MISMATCH');const rawi=candidateRawiForDeliveryKey(access.deliveryReading);if(!rawi)throw new Error('PRACTICE_READING_NOT_SUPPORTED');res.setHeader('Cache-Control','private, no-store');return res.json(practiceFaceCatalogue(rawi,access.scope))}
+    catch(err){return journeyPracticeFailure(res,err)}
+  });
+  app.get('/api/public/journeys/practice/face',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
+    try{const access=await journeyPracticeAccess(req);const requested=soleParam(req.query.reading,'reading');if(requested!==access.deliveryReading)throw new Error('PRACTICE_REQUEST_MISMATCH');const rawi=candidateRawiForDeliveryKey(access.deliveryReading);if(!rawi)throw new Error('PRACTICE_READING_NOT_SUPPORTED');const page=Number(soleParam(req.query.page,'page'));const catalogue=practiceFaceCatalogue(rawi,access.scope);if(!catalogue.faces.some(x=>x.page===page))throw new Error('PRACTICE_FACE_OUT_OF_SCOPE');res.setHeader('Cache-Control','private, no-store');return res.json(practiceFacePage(rawi,page))}
+    catch(err){return journeyPracticeFailure(res,err)}
+  });
+  app.get('/api/public/journeys/practice/judging-gate',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading');if(reading!==access.listening.reading)throw new Error('PRACTICE_REQUEST_MISMATCH');res.setHeader('Cache-Control','private, no-store');return res.json(recitationRecogniser.gate(reading))}
+    catch(err){return journeyPracticeFailure(res,err)}
+  });
+  app.post('/api/public/journeys/practice/align',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
+    if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));if(!scopeContainsRange(access.scope,{surah,ayah:startAyah},{surah,ayah:endAyah}))throw new Error('PRACTICE_SCOPE_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:`journey:${access.participantId}`,sessionId:`journey-practice:${crypto.createHash('sha256').update(access.participantId).digest('hex').slice(0,24)}`,reading,surah,startAyah,endAyah,sourcePackageId,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,practice:true});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
+    catch(err){return journeyPracticeFailure(res,err)}
+  });
+  app.post('/api/public/journeys/practice/recognise',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading,sourcePackageId,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
+    catch(err){
+      const code=err instanceof Error?err.message:'';
+      return code.startsWith('QURAN_ASR_')?recitationRecogniserFailure(res,err):journeyPracticeFailure(res,err);
+    }
+  });
   app.post('/api/quran/practice/faces',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),express.json({limit:'64kb'}),(req,res)=>{try{const rawi=practiceFaceRawi(req);const raw=req.body?.scope;const scope=raw&&typeof raw==='object'?normalizeScope(raw as QuranScope):undefined;res.setHeader('Cache-Control','no-store');return res.json(practiceFaceCatalogue(rawi,scope))}catch(err){return practiceFaceFailure(res,err)}});
   app.get('/api/quran/practice/face',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{try{const rawi=practiceFaceRawi(req);const page=Number(soleParam(req.query.page,'page'));res.setHeader('Cache-Control','no-store');return res.json(practiceFacePage(rawi,page))}catch(err){return practiceFaceFailure(res,err)}});
 

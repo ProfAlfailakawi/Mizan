@@ -1,4 +1,5 @@
 import {auth} from './firebase';
+import type {QuranScope} from './quran-scope';
 
 export type QuranReadingId='hafs'|'warsh'|'shubah'|'qaloun'|'douri-abu-amr'|'sousi-abu-amr';
 export type AlignmentState='LOCKED'|'PROBABLE'|'UNCERTAIN'|'LOST'|'REACQUIRING'|'REACQUIRED';
@@ -48,6 +49,35 @@ const DELIVERY_TO_INTELLIGENCE:Record<string,{reading:QuranReadingId;sourcePacka
   'susi-abi-amr':{reading:'sousi-abu-amr',sourcePackageId:'kfgqpc-sousi-abu-amr-uthmanic-v3'},
 };
 export function practiceReadingFor(deliveryKey?:string){return deliveryKey?DELIVERY_TO_INTELLIGENCE[deliveryKey]:undefined}
+
+/**
+ * بطاقةُ رحلة المتسابق العامّة تستطيع فتح التدريب الذكي بلا حساب Firebase.
+ * الرمزُ الطويل هو الاعتماد نفسه، ويُرسل في ترويسة خاصة لا في عنوان URL حتى لا يظهر
+ * في السجلّ أو history. ولا يُستعمل هذا الباب إلا لمسارات التدريب الخاصة بالمتسابق.
+ */
+export interface JourneyPracticeAuth{competitionId:string;key:string}
+export interface JourneyPracticeContext{
+  scope:QuranScope;
+  deliveryReading:string;
+  listening:{reading:QuranReadingId;sourcePackageId:string};
+  owner:string;
+}
+const journeyPracticeHeaders=(access:JourneyPracticeAuth,extra?:Record<string,string>)=>({
+  'x-mizan-competition-id':access.competitionId,
+  'x-mizan-journey-key':access.key,
+  ...(extra||{}),
+});
+async function publicPracticeJson<T>(url:string,access:JourneyPracticeAuth,init?:RequestInit):Promise<T>{
+  const headers=new Headers(init?.headers);
+  headers.set('x-mizan-competition-id',access.competitionId);
+  headers.set('x-mizan-journey-key',access.key);
+  if(!headers.has('accept'))headers.set('accept','application/json');
+  const r=await fetch(url,{...init,headers,cache:'no-store'});
+  const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as T;
+}
+export async function fetchJourneyPracticeContext(access:JourneyPracticeAuth){
+  return publicPracticeJson<JourneyPracticeContext>('/api/public/journeys/practice/context',access,{method:'POST'});
+}
 async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
 async function getJson<T>(url:string):Promise<T>{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`,accept:'application/json'},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as T}
 export async function fetchQuranIntelligenceCapabilities(){return getJson<{streamingAlignment:{mode:'SHADOW_ONLY';backendConfigured:boolean;scoreAuthority:'HUMAN_ONLY';canAffectScore:false}} & Record<string,unknown>>('/api/quran/intelligence/capabilities')}
@@ -62,9 +92,12 @@ export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:strin
  * يعود بلا `sessionEvidence` لأن التمرين لا يُقيَّد في سجلّ، ويحمل `practice:true` حتى لا
  * تُخلط نتيجته بنتيجة جلسةٍ حقيقية في أي شاشة.
  */
-export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}){
-  const token=await bearer();const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
-  const r=await fetch(`/api/quran/practice/align?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});
+export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string},access?:JourneyPracticeAuth){
+  const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
+  const url=access?`/api/public/journeys/practice/align?${qs.toString()}`:`/api/quran/practice/align?${qs.toString()}`;
+  const headers:Record<string,string>={'content-type':input.blob.type||'application/octet-stream'};
+  if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
+  const r=await fetch(url,{method:'POST',headers,body:input.blob,cache:'no-store'});
   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
   return body as QuranAlignmentResult&{practice:true};
 }
@@ -80,11 +113,17 @@ export interface QuranJudgingGate{reading:QuranReadingId;word:'OPEN'|'CLOSED';ta
 export interface QuranRecognisedWord{text:string;confidence:number;startMs?:number;endMs?:number}
 export interface QuranRecognitionResult{gate:QuranJudgingGate;words:QuranRecognisedWord[];modelVersion:string}
 
-export async function fetchPracticeJudgingGate(reading:QuranReadingId){return getJson<QuranJudgingGate>(`/api/quran/practice/judging-gate?reading=${encodeURIComponent(reading)}`)}
+export async function fetchPracticeJudgingGate(reading:QuranReadingId,access?:JourneyPracticeAuth){
+  const url=access?`/api/public/journeys/practice/judging-gate?reading=${encodeURIComponent(reading)}`:`/api/quran/practice/judging-gate?reading=${encodeURIComponent(reading)}`;
+  return access?publicPracticeJson<QuranJudgingGate>(url,access):getJson<QuranJudgingGate>(url);
+}
 
-export async function submitPracticeRecognitionChunk(input:{blob:Blob;reading:QuranReadingId;sourcePackageId:string}){
-  const token=await bearer();const qs=new URLSearchParams({reading:input.reading,sourcePackageId:input.sourcePackageId});
-  const r=await fetch(`/api/quran/practice/recognise?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});
+export async function submitPracticeRecognitionChunk(input:{blob:Blob;reading:QuranReadingId;sourcePackageId:string},access?:JourneyPracticeAuth){
+  const qs=new URLSearchParams({reading:input.reading,sourcePackageId:input.sourcePackageId});
+  const url=access?`/api/public/journeys/practice/recognise?${qs.toString()}`:`/api/quran/practice/recognise?${qs.toString()}`;
+  const headers:Record<string,string>={'content-type':input.blob.type||'application/octet-stream'};
+  if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
+  const r=await fetch(url,{method:'POST',headers,body:input.blob,cache:'no-store'});
   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
   return body as QuranRecognitionResult;
 }

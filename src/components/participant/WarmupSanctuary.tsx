@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Ear, ListChecks, MapPin, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
-import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
+import { fetchJourneyPracticeContext, submitPracticeAlignmentChunk, type JourneyPracticeAuth, type JourneyPracticeContext, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
+import { MushafListens } from './MushafListens';
 import { IS_DEMO_SESSION } from '../../lib/store';
 
 /*
@@ -59,6 +60,8 @@ export interface WarmupSanctuaryProps {
   minutesPerQuestion?: number;
   /** المقطع الذي اختاره المتسابق للتدريب، بروايته وحزمتها — يُبنى عليه التقييم الإلكتروني. */
   practicePassage?: PracticePassage;
+  /** بطاقة رحلة عامة تفتح «يسمعك» بكامل تجربة المصحف الذكي بلا حساب منفصل. */
+  journeyPracticeAuth?: JourneyPracticeAuth;
 }
 
 /** المقطع المعروض في استوديو التدريب: هو نفسه ما يُقيَّم عليه إلكترونيًّا. */
@@ -71,7 +74,7 @@ export interface PracticePassage {
   label: string;
 }
 
-export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion, practicePassage }) => {
+export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion, practicePassage, journeyPracticeAuth }) => {
   const [open, setOpen] = useState(false);
   const [door, setDoor] = useState<Door>('where');
   return (
@@ -100,7 +103,7 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
         {door === 'where' && <WhereDoor ar={ar} scopeText={scopeText} spreadAcrossZones={spreadAcrossZones} questionCount={questionCount} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'breath' && <BreathDoor ar={ar} active={open} />}
         {door === 'rehearsal' && <RehearsalDoor ar={ar} minutesPerQuestion={minutesPerQuestion} />}
-        {door === 'listen' && <ListenDoor ar={ar} passage={practicePassage} />}
+        {door === 'listen' && (journeyPracticeAuth ? <JourneyListenDoor ar={ar} access={journeyPracticeAuth} /> : <ListenDoor ar={ar} passage={practicePassage} />)}
       </div>
     </details>
   );
@@ -292,6 +295,44 @@ const RehearsalDoor: React.FC<{ ar: boolean; minutesPerQuestion?: number }> = ({
 };
 
 export default WarmupSanctuary;
+
+/* ── يسمعك في بطاقة الرحلة العامة ─────────────────────────────────────── */
+
+/**
+ * بطاقةُ الرحلة لا تملك جلسة Firebase، لذلك كانت تبويبة «يسمعك» تبدو موجودةً ثم لا
+ * تستطيع الوصول إلى أيٍّ من أبواب التدريب المحمية. هنا نفتح **نفس** «المصحف يسمعك»
+ * الذي يراه المتسابق داخل حسابه، لكن باعتماد بطاقة الرحلة الخاصة به. الخادم هو الذي
+ * يعيد النطاق والرواية ويعيد التحقق منهما مع كل طلب؛ المتصفح لا يقرر واحدًا منهما.
+ */
+const JourneyListenDoor: React.FC<{ ar:boolean; access:JourneyPracticeAuth }> = ({ ar, access }) => {
+  const [context,setContext]=useState<JourneyPracticeContext|null>(null);
+  const [state,setState]=useState<'loading'|'ready'|'blocked'>('loading');
+  const [note,setNote]=useState('');
+  const [retry,setRetry]=useState(0);
+
+  useEffect(()=>{
+    let live=true;setState('loading');setNote('');setContext(null);
+    void fetchJourneyPracticeContext(access).then(out=>{if(!live)return;setContext(out);setState('ready')}).catch(err=>{
+      if(!live)return;const code=err instanceof Error?err.message:'';setState('blocked');setNote(journeyPracticeNote(code,ar));
+    });
+    return()=>{live=false};
+  },[access.competitionId,access.key,ar,retry]);
+
+  if(state==='loading')return <div className="pt-4"><div className="rounded-2xl border border-[#e4e2da] bg-white p-6 text-center"><div className="mx-auto h-8 w-8 rounded-full border-2 border-[#d9dfdb] border-t-[#214C40] motion-safe:animate-spin"/><div className="mt-3 text-xs font-black text-[#214C40]">{ar?'يُهيَّأ المصحف لروايتك…':'Preparing your Mushaf…'}</div><p className="mt-1 text-[10px] leading-5 text-[#6b716d]">{ar?'يُثبت ميزان نطاقك وروايتك أولًا، ثم يفتح الميكروفون لك وحدك.':'MIZAN verifies your range and reading before the microphone can open.'}</p></div></div>;
+  if(state==='blocked'||!context)return <div className="pt-4"><div className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-4 text-center"><div role="status" className="text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</div><button type="button" onClick={()=>setRetry(x=>x+1)} className="mt-3 min-h-10 rounded-xl border border-[#d7c39d] bg-white/70 px-4 text-[10px] font-black text-[#6b4f18] transition hover:bg-white">{ar?'إعادة المحاولة':'Try again'}</button></div></div>;
+
+  return <div className="pt-4"><MushafListens ar={ar} scope={context.scope} deliveryReading={context.deliveryReading} listening={context.listening} owner={context.owner} journeyAuth={access}/></div>;
+};
+
+const journeyPracticeNote=(code:string,ar:boolean)=>{
+  if(!ar)return 'Smart listening is unavailable right now. Please try again.';
+  if(/PRACTICE_STATUS_BLOCKED/.test(code))return 'يتوقف التدريب الذكي أثناء دخولك اللجنة، ويعود بعد انتهاء الجلسة.';
+  if(/PRACTICE_SCOPE/.test(code))return 'لم يثبت نطاق تدريبك المعتمد بعد. حدّث بطاقة الرحلة أو راجع الجهة.';
+  if(/PRACTICE_READING/.test(code))return 'روايتك غير مربوطة بعد بحزمة المصحف الذكي، لذلك لن يخمّن ميزان روايةً بديلة.';
+  if(/JOURNEY_(TOKEN_INVALID|NOT_FOUND|REVOKED)/.test(code))return 'بطاقة الرحلة لم تعد صالحة. افتح الرابط الخاص الأحدث الذي أرسلته الجهة.';
+  if(/FIRESTORE|SERVER|HTTP_5/.test(code))return 'تعذّر الوصول إلى خدمة الاستماع الآن. جرّب بعد لحظات؛ بقية التهيئة تعمل.';
+  return 'تعذّر فتح «يسمعك» الآن. أعد المحاولة بعد لحظات.';
+};
 
 /* ── يسمعك: تقييم إلكتروني للتدريب وحده ───────────────────────────────── */
 

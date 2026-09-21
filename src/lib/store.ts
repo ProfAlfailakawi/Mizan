@@ -965,6 +965,9 @@ async function publishPublicJourneyRecord(participant:Participant,revoked=false)
       preparation:{
         scopeTextArabic:scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,true):null,
         scopeTextEnglish:scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,false):null,
+        /* بطاقة الرحلة تحتاج المرجع البنيوي نفسه كي يفتح «يسمعك» بلا تخمينٍ من النص المعروض. */
+        scope:scopeResolution&&!scopeResolution.blocked?scopeResolution.scope:null,
+        riwaya:participant.riwaya,
         spreadAcrossZones:distribution.mode!=='free'&&distribution.zones.length>1,
         questionCount,
         minutesPerQuestion:Math.max(1,Math.round((category?.targetDurationMinutes||questionCount*5)/Math.max(1,questionCount))),
