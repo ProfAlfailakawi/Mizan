@@ -130,8 +130,11 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
    */
   useEffect(() => {
     if (!token || !journey) return;
-    const refresh = () => void load(token, { silent: true });
-    const timer = window.setInterval(refresh, 15_000);
+    const refresh = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void load(token, { silent: true });
+    };
+    const timer = window.setInterval(refresh, 30_000);
     const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
@@ -209,6 +212,7 @@ export const looksLikeJourneyToken = (value: string) => /^mz_(journey|guardian)_
 
 const journeyError = (code: string, ar: boolean) => {
   const labels: Record<string, [string, string]> = {
+    RATE_LIMITED: ['تكررت المحاولات سريعًا. انتظر قليلًا ثم حاول.', 'Too many attempts. Please wait and retry.'],
     PARTICIPANT_CODE_NOT_A_JOURNEY_CODE: ['هذا رقم المتسابق، وليس رمز الرحلة. رمز الرحلة رابطٌ خاص أو رمز QR ترسله الجهة لوليّ الأمر بعد اعتماد الطلب — اطلبه منها.', 'That is the participant number, not a journey code. Ask the organizer for the private link or QR they issue to guardians.'],
     JOURNEY_TOKEN_INVALID: ['الرمز غير صحيح. استخدم الرابط كاملًا كما أرسلته الجهة.', 'The code is invalid. Use the full link sent by the organizer.'],
     JOURNEY_NOT_FOUND: ['الرحلة غير موجودة أو لم يكتمل إنشاؤها. اطلب رابطًا جديدًا من الجهة.', 'The journey was not found or was not created. Ask the organizer for a new link.'],

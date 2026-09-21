@@ -133,7 +133,7 @@ async function startServer() {
   // goes through a single hook: set MIZAN_RATE_LIMIT_BACKEND=external and front MIZAN with the
   // platform limiter, or replace `hitRateWindow` with a shared-store implementation.
   const rateWindowMs=Number(process.env.RATE_LIMIT_WINDOW_MS||60_000);
-  const rateMax=Number(process.env.RATE_LIMIT_MAX||180);
+  const rateMax=Number(process.env.RATE_LIMIT_MAX||600);
   const rateLimiterIsGlobal=process.env.MIZAN_RATE_LIMIT_BACKEND==='external';
   const buckets=new Map<string,{count:number;resetAt:number}>();
   const hitRateWindow=(key:string,now:number)=>{const current=buckets.get(key);if(!current||current.resetAt<now){const fresh={count:1,resetAt:now+rateWindowMs};buckets.set(key,fresh);return fresh}current.count++;return current};
@@ -141,6 +141,8 @@ async function startServer() {
   let lastRateSweep=Date.now();
   app.use('/api',(req,res,next)=>{
     if(rateLimiterIsGlobal)return next();
+    // Static asset delivery, fonts, layouts, and public caches must not consume transactional API quotas
+    if(req.path.startsWith('/public/kfgqpc/')||req.path.startsWith('/public/brand-assets/')||req.path==='/health'||req.path==='/capabilities')return next();
     const key=String(req.ip||'unknown');const now=Date.now();
     if(now-lastRateSweep>rateWindowMs){for(const [k,v] of buckets)if(v.resetAt<now)buckets.delete(k);lastRateSweep=now}
     const window=hitRateWindow(key,now);
@@ -495,7 +497,13 @@ async function startServer() {
   });
   const publicRegistrationRateLimit:RequestHandler=rateLimiterIsGlobal
     ? (_req,_res,next)=>next()
-    : rateLimit({windowMs:15*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||12),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+    : rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'}});
+  const journeyResolveRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_RATE_LIMIT_MAX||240),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'}});
+  const competitionPublishRateLimit:RequestHandler=rateLimiterIsGlobal
+    ? (_req,_res,next)=>next()
+    : rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_COMPETITION_PUBLISH_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   /* إشعار بوابة الدفع عام بلا هوية مستخدم، وثقته من توقيعه وحده. يُخنق بحدّ خاص يتّسع
      لدفعات التسوية المشروعة ويمنع إغراق نقطة عامة بمحاولات توقيع فاشلة. */
   const paymentWebhookRateLimit:RequestHandler=rateLimiterIsGlobal
@@ -1012,7 +1020,7 @@ async function startServer() {
     res.setHeader('Cache-Control','public, max-age=60');
     return res.json(publicCompetitionPayload(comp));
   });
-  app.post('/api/public/competitions/:competitionId/publish',publicRegistrationRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),async(req,res)=>{
+  app.post('/api/public/competitions/:competitionId/publish',competitionPublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     const comp=req.body?.competition;
     if(!comp||typeof comp!=='object'||String(comp.id||'').trim().slice(0,120)!==competitionId){
@@ -1131,7 +1139,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}
     try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
   });
-  app.post('/api/public/journeys/resolve',publicRegistrationRateLimit,async(req,res)=>{
+  app.post('/api/public/journeys/resolve',journeyResolveRateLimit,async(req,res)=>{
     if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
     const audience=req.body?.audience==='guardian'?'guardian':'participant';
     try{const journey=await publicRegistration.resolve(String(req.body?.competitionId||''),audience,String(req.body?.key||''));res.setHeader('Cache-Control','private, no-store');return res.json({journey})}catch(err){return publicApiError(res,err)}
