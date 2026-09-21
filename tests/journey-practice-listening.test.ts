@@ -130,3 +130,9 @@ test('the original Firebase participant practice doors remain protected', () => 
     assert.match(line, /requireFirebaseRoles\(\['participant'\]\)/, `${route} must remain Firebase-protected`);
   }
 });
+
+test('journey never opens a microphone when live alignment is known to be unavailable', () => {
+  assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>/);
+  assert.match(server, /stage\.id==='alignment'&&stage\.state==='READY'/);
+  assert.match(server, /const listening=journeyListeningReady\(access\.listening\.reading\)\?access\.listening:null/);
+});

@@ -2061,8 +2061,32 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     return value;
   };
 
+  /*
+   * لا نعلن للواجهة أن «يسمعك» متاح لمجرد أن الرواية معروفة.
+   *
+   * كان سياق الرحلة يعيد `listening` دائمًا، حتى إذا كانت خدمة المحاذاة نفسها غير
+   * موصولة أو معيار الرواية غير معتمد. فتُظهر الشاشة زر «ابدأ التلاوة»، يفتح الميكروفون،
+   * ثم يسقط أول مقطع بعد ثانيتين ويعود الزر كأن الطالب هو من أوقفه.
+   *
+   * الجاهزية هنا من المصدر نفسه الذي يحكم الخدمة: مرحلة alignment للرواية يجب أن تكون
+   * READY. إن لم تكن، يبقى وجه المصحف مفتوحًا للمراجعة ولا نفتح ميكروفونًا نعرف مسبقًا
+   * أن الخادم سيرفضه. ولا يوجد أي fallback إلى رواية أخرى.
+   */
+  const journeyListeningReady=(reading:string):boolean=>{
+    if(!quranIntelligence)return false;
+    try{
+      const row=quranIntelligence.readiness().find(x=>x.reading===reading);
+      return row?.stages.some(stage=>stage.id==='alignment'&&stage.state==='READY')===true;
+    }catch{return false}
+  };
+
   app.post('/api/public/journeys/practice/context',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
-    try{const access=await journeyPracticeAccess(req);res.setHeader('Cache-Control','private, no-store');return res.json({scope:access.scope,deliveryReading:access.deliveryReading,listening:access.listening,owner:access.participantId})}
+    try{
+      const access=await journeyPracticeAccess(req);
+      const listening=journeyListeningReady(access.listening.reading)?access.listening:null;
+      res.setHeader('Cache-Control','private, no-store');
+      return res.json({scope:access.scope,deliveryReading:access.deliveryReading,listening,owner:access.participantId});
+    }
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/faces',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.json({limit:'8kb'}),async(req,res)=>{
