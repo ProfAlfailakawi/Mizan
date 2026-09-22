@@ -37,7 +37,6 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
-      - '--progress=plain'
       - '-t'
       - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
       - 'services/quran-practice-listener'
