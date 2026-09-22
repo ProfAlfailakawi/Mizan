@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {FileCheck2,FileSearch,MapPin,Pause,Type,Play} from 'lucide-react';
+import {ChevronDown,FileCheck2,FileSearch,GitBranch,MapPin,Pause,Type,Play} from 'lucide-react';
 import {fetchDeliveryPassage,fetchMushafLayout,fetchOfficialMushafPage,findLayoutWord,loadKfgqpcOfficialQuranFont,officialMushafPackageForReading,type DeliveryPassage,type MushafPageLayout} from '../../lib/kfgqpc-library';
 import type {QuranAlignmentResult,QuranPageLocus} from '../../lib/quran-intelligence';
 import {Badge} from '../design-system/Badge';
@@ -102,6 +102,8 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
  const displayText=delivery?.text||q.expectedTextArabic;
  const [tajweedOn,setTajweedOn]=useState(false);
  const [textView,setTextView]=useState(false);
+ const [audioOpen,setAudioOpen]=useState(false);
+ const [divergenceOpen,setDivergenceOpen]=useState(false);
  const [active,setActive]=useState<{ayah:number;word:number}|null>(null);
  const activeAyah=active?.ayah??null;
  const activeDeliveryAyah=useMemo(()=>delivery?.ayat.find(a=>a.ayah===activeAyah)||null,[delivery,activeAyah]);
@@ -129,11 +131,23 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
     activeAyah={activeAyah} activeWords={activeWords} activeWordIndex={active?.word??-1}
     tajweedOn={tajweedOn} onToggleTajweed={()=>setTajweedOn(v=>!v)} tajweedScopeNote={delivery?.tajweedScopeNote}
     sourceLabel={surfaceAuthorityLabel} loaded={checked}/>}
-  {delivery&&<PassageAudio reading={readingKey} ayat={delivery.ayat} ar={ar} onActive={setActive}/>}
-  {delivery&&<DivergenceRadar reading={readingKey} surah={delivery.surah} startAyah={delivery.startAyah} endAyah={delivery.endAyah} ar={ar}/>}
-  <div className="mizan-mushaf-bar px-4 sm:px-5 py-3 border-t border-[#e5e1d7] flex items-center justify-end gap-3 text-[9px] text-[#676c68]"><span className="flex items-center gap-3">{delivery&&hasOfficialPage&&<button type="button" onClick={()=>setTextView(v=>!v)} aria-pressed={textView} className="min-h-11 px-2.5 -my-3 inline-flex items-center gap-1.5 text-[9px] font-black text-[#59615c] hover:text-[#214C40]"><Type className="w-3.5 h-3.5"/>{textView?(ar?'عرض الصفحة':'Page view'):(ar?'عرض النص':'Text view')}</button>}<span>{hasOfficialPage&&!textView?(ar?'صفحة كاملة':'FULL-PAGE FIT'):(ar?'عرض النص':'TEXT VIEW')}</span></span></div>
+  {delivery&&audioOpen&&<div className="mizan-mushaf-drawer"><PassageAudio reading={readingKey} ayat={delivery.ayat} ar={ar} onActive={setActive}/></div>}
+  {delivery&&divergenceOpen&&<div className="mizan-mushaf-drawer"><DivergenceRadar reading={readingKey} surah={delivery.surah} startAyah={delivery.startAyah} endAyah={delivery.endAyah} ar={ar}/></div>}
+  <div className="mizan-mushaf-tools mizan-mushaf-bar px-4 sm:px-5 py-2 border-t border-[#e5e1d7] flex items-center justify-between gap-2 text-[9px] text-[#676c68]">
+   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+    {delivery&&<MushafToolButton pressed={audioOpen} onClick={()=>setAudioOpen(v=>!v)} icon={<Play className="w-3.5 h-3.5"/>} label={ar?'استمع':'Listen'}/>}
+    {delivery&&<MushafToolButton pressed={divergenceOpen} onClick={()=>setDivergenceOpen(v=>!v)} icon={<GitBranch className="w-3.5 h-3.5"/>} label={ar?'المتشابهات':'Forks'}/>}
+    {delivery&&hasOfficialPage&&<MushafToolButton pressed={textView} onClick={()=>setTextView(v=>!v)} icon={<Type className="w-3.5 h-3.5"/>} label={textView?(ar?'عرض الصفحة':'Page'):(ar?'عرض النص':'Text')}/>}
+   </div>
+   <span className="shrink-0 font-black">{hasOfficialPage&&!textView?(ar?'صفحة كاملة':'FULL-PAGE FIT'):(ar?'عرض النص':'TEXT VIEW')}</span>
+  </div>
  </div>
 }
+
+const MushafToolButton:React.FC<{pressed:boolean;onClick:()=>void;icon:React.ReactNode;label:string}>=({pressed,onClick,icon,label})=>
+ <button type="button" onClick={onClick} aria-pressed={pressed} className={`mizan-mushaf-tool inline-flex min-h-9 items-center gap-1.5 rounded-xl border px-2.5 text-[9px] font-black transition ${pressed?'border-[#bca46b] bg-[#efe4c6] text-[#214C40]':'border-[#d9d4c6] bg-white/35 text-[#59615c] hover:text-[#214C40]'}`}>
+  {icon}<span>{label}</span><ChevronDown className={`w-3 h-3 transition ${pressed?'rotate-180':''}`}/>
+ </button>;
 
 /*
  * Reference recitation is deliberately decoupled from the displayed riwayah. Product policy uses
@@ -218,7 +232,7 @@ const useLineBands=(url:string,expectedLines?:number)=>{
 const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;
  /* أشرطة الأسطر تُقاس من حبر الصفحة نفسها؛ متى تعذّر القياس بقيت العدسة على التقدير. */
  const bands=useLineBands(url,audioSpot?.lineCount||focus.lineCount||15);
- return <figure className="relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center"><div className="relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
+ return <figure className="mizan-official-page relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center"><div className="mizan-official-page__frame relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
   {audioSpot?.bbox
    ? <RecitingWordLens bbox={audioSpot.bbox}/>
    : audioSpot?.line

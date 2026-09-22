@@ -998,6 +998,65 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
   background:transparent; display:grid; align-content:center;
 }
+.mizan-judge-os .mizan-mushaf-tools{
+  flex:0 0 auto;
+  min-height:44px;
+  padding-block:.35rem;
+  background:rgba(233,226,207,.84);
+  backdrop-filter:blur(12px);
+}
+.mizan-judge-os .mizan-mushaf-tool{
+  min-height:32px;
+  border-radius:10px;
+  background:rgba(255,253,246,.48);
+}
+.mizan-judge-os .mizan-mushaf-drawer{
+  position:absolute;
+  z-index:18;
+  inset-inline:clamp(.75rem,2vw,1.5rem);
+  bottom:calc(48px + env(safe-area-inset-bottom));
+  max-height:min(38dvh, 260px);
+  overflow:auto;
+  border-radius:18px;
+  box-shadow:0 18px 45px rgba(27,31,24,.16);
+}
+.mizan-judge-os .mizan-mushaf-drawer > .mizan-mushaf-bar,
+.mizan-judge-os .mizan-mushaf-drawer > div{
+  background:rgba(255,253,246,.94);
+  border:1px solid rgba(129,112,69,.2);
+}
+.mizan-judge-os .mizan-official-page,
+.mizan-judge-os .mizan-official-page__frame{
+  flex:1 1 auto;
+  min-height:0;
+  max-height:100%;
+  height:100%;
+}
+.mizan-judge-os .mizan-official-page figcaption{ display:none }
+.mizan-judge-os .mizan-official-page__frame{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.mizan-judge-os .mizan-official-page .mizan-mushaf-page{
+  max-height:100%;
+  height:100%;
+  width:auto;
+}
+.mizan-judge-os .mizan-mushaf-sheet{
+  max-height:100%;
+  overflow:auto;
+  border-radius:14px;
+  padding:clamp(10px,1.4vw,18px);
+}
+.mizan-judge-os .mizan-mushaf-band{
+  min-height:2.25rem;
+  margin-bottom:clamp(8px,1vw,14px);
+}
+.mizan-judge-os .mizan-mushaf-sheet .font-quran{
+  font-size:clamp(1.25rem,2.15vw,2rem);
+  line-height:2.15;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives — Badge, Stat, Modal, Command palette, Role menu

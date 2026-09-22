@@ -133,10 +133,20 @@ test('the original Firebase participant practice doors remain protected', () => 
 
 test('journey listening is backed by the dedicated production practice listener, not the unprovisioned judging aligner', () => {
   assert.match(server, /MIZAN_QURAN_PRACTICE_LISTENER_URL/);
-  assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>reading==='hafs'/);
+  assert.match(server, /const dedicatedPracticeListenerReady=\(reading:string\):boolean=>reading==='hafs'/);
+  assert.match(server, /const asrPracticeListenerReady=\(reading:string\):boolean=>\{/);
+  assert.match(server, /recitationRecogniser\.configured\(\)&&gate\.word==='OPEN'/);
+  assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>dedicatedPracticeListenerReady\(reading\)\|\|asrPracticeListenerReady\(reading\)/);
   assert.match(server, /runPracticeListener/);
   assert.match(server, /quranDelivery\.passage\(input\.access\.deliveryReading/);
   assert.match(server, /x-mizan-expected-passage/);
   assert.match(server, /scoreAuthority:'HUMAN_ONLY'/);
   assert.match(server, /const listening=journeyListeningReady\(access\.listening\.reading\)\?access\.listening:null/);
+});
+
+test('journey practice can track from the certified ASR engine when the dedicated listener is absent', () => {
+  assert.match(server, /if\(!dedicatedPracticeListenerReady\(input\.access\.listening\.reading\)\)\{/);
+  assert.match(server, /recitationRecogniser\.recognise\(\{/);
+  assert.match(server, /sameWord\(expected\[i\]\.text,heard\.text\)/);
+  assert.match(server, /alignmentState:candidate&&confidence>=0\.55\?'LOCKED':'LOST'/);
 });

@@ -37,6 +37,7 @@ import { MizanQuranDelivery, candidateRawiForDeliveryKey } from './server/quran-
 import { practiceFaceCatalogue, practiceFacePage, PracticeFaceError } from './server/practice-face-service';
 import { normalizeScope, scopeAyahCount, scopeContainsRange, type QuranScope } from './src/lib/quran-scope';
 import { resolveEffectiveScope } from './src/lib/scope-engine';
+import { quranSkeleton, sameWord } from './src/lib/quran-orthography';
 import type { ParticipantScopeRecord } from './src/lib/participant-scope';
 import { quranReadingDefinition } from './server/quran-intelligence-policy';
 import { resolveCanonicalRawiId } from './src/lib/canonical-readings';
@@ -2081,7 +2082,12 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * ويعمل على حفص فقط إلى أن يُقاس نموذجٌ مستقل لكل رواية أخرى — بلا fallback بينها.
    */
   const practiceListenerUrl=String(process.env.MIZAN_QURAN_PRACTICE_LISTENER_URL||'').trim();
-  const journeyListeningReady=(reading:string):boolean=>reading==='hafs'&&/^https:\/\//i.test(practiceListenerUrl);
+  const dedicatedPracticeListenerReady=(reading:string):boolean=>reading==='hafs'&&/^https:\/\//i.test(practiceListenerUrl);
+  const asrPracticeListenerReady=(reading:string):boolean=>{
+    const gate=recitationRecogniser.gate(reading);
+    return recitationRecogniser.configured()&&gate.word==='OPEN';
+  };
+  const journeyListeningReady=(reading:string):boolean=>dedicatedPracticeListenerReady(reading)||asrPracticeListenerReady(reading);
 
   const practiceListenerToken=async():Promise<string>=>{
     if(!practiceListenerUrl)return '';
@@ -2099,6 +2105,38 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     if(!journeyListeningReady(input.access.listening.reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
     const passage=await quranDelivery.passage(input.access.deliveryReading,input.surah,input.startAyah,input.endAyah);
     if(!passage||!passage.ayat.length)throw new Error('PRACTICE_SCOPE_NOT_READY');
+    if(!dedicatedPracticeListenerReady(input.access.listening.reading)){
+      const recognised=await recitationRecogniser.recognise({
+        reading:input.access.listening.reading,
+        sourcePackageId:input.access.listening.sourcePackageId,
+        contentType:input.contentType,
+        bytes:input.bytes,
+      });
+      const expected=passage.ayat.flatMap(ayah=>String(ayah.text||'').split(/\s+/).filter(Boolean).map((text,index)=>({surah:ayah.surah,ayah:ayah.ayah,wordIndex:index+1,text})));
+      let cursor=0;
+      let candidate:typeof expected[number]|undefined;
+      let confidence=0;
+      for(const heard of recognised.words){
+        const heardShape=quranSkeleton(heard.text);
+        if(!heardShape)continue;
+        for(let i=cursor;i<expected.length;i+=1){
+          if(sameWord(expected[i].text,heard.text)){
+            candidate=expected[i];
+            cursor=i+1;
+            confidence=Math.max(confidence,heard.confidence);
+            break;
+          }
+        }
+      }
+      return {
+        timestamp:new Date().toISOString(),reading:input.access.listening.reading,
+        surah:candidate?.surah,ayah:candidate?.ayah,wordIndex:candidate?.wordIndex,
+        alignmentState:candidate&&confidence>=0.55?'LOCKED':'LOST',recoveryState:candidate?'STABLE':'SEARCHING',
+        smoothedConfidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):0,
+        pointerMoved:!!candidate,practice:true,scoreAuthority:'HUMAN_ONLY',scoreDelta:0,shadowMode:true,
+        backendEvidence:{modelVersion:recognised.modelVersion,acousticQuality:confidence||undefined}
+      };
+    }
     const token=await practiceListenerToken();
     const expected=Buffer.from(JSON.stringify(passage.ayat.map(x=>({surah:x.surah,ayah:x.ayah,text:x.text}))),'utf8').toString('base64url');
     const response=await fetch(practiceListenerUrl,{method:'POST',headers:{
