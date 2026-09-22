@@ -131,8 +131,12 @@ test('the original Firebase participant practice doors remain protected', () => 
   }
 });
 
-test('journey never opens a microphone when live alignment is known to be unavailable', () => {
-  assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>/);
-  assert.match(server, /stage\.id==='alignment'&&stage\.state==='READY'/);
+test('journey listening is backed by the dedicated production practice listener, not the unprovisioned judging aligner', () => {
+  assert.match(server, /MIZAN_QURAN_PRACTICE_LISTENER_URL/);
+  assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>reading==='hafs'/);
+  assert.match(server, /runPracticeListener/);
+  assert.match(server, /quranDelivery\.passage\(input\.access\.deliveryReading/);
+  assert.match(server, /x-mizan-expected-passage/);
+  assert.match(server, /scoreAuthority:'HUMAN_ONLY'/);
   assert.match(server, /const listening=journeyListeningReady\(access\.listening\.reading\)\?access\.listening:null/);
 });

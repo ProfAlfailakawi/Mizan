@@ -660,7 +660,7 @@ async function startServer() {
     /* «غير معلوم» يُنقل كما هو (null) ولا يُسوّى بـ«لا يستطيع»: عطلٌ عارض ليس سوءَ تهيئة،
        واتهام نشرٍ سليم به يُرسل صاحبه إلى إصلاح ما ليس معطوبًا. */
     const claimsState=await claimsWritability().catch(()=>'UNKNOWN' as const);
-    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
+    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,quranPracticeListenerConfigured:journeyListeningReady('hafs'),secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
   app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Organization/competition logos use the already-configured private R2 bucket. Only the bytes are public; writes remain Firebase-authorized and tenant-scoped.
@@ -1988,7 +1988,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     const code=err instanceof Error?err.message:'JOURNEY_PRACTICE_FAILED';
     const status=/JOURNEY_(TOKEN_INVALID|NOT_FOUND|REVOKED)/.test(code)?401
       :/PRACTICE_(STATUS_BLOCKED|SCOPE|READING|FACE_OUT_OF_SCOPE|REQUEST_MISMATCH)/.test(code)?409
-      :/FIRESTORE|NOT_CONFIGURED|UNAVAILABLE/.test(code)?503:400;
+      :/FIRESTORE|NOT_CONFIGURED|UNAVAILABLE/.test(code)?503:/QURAN_PRACTICE_LISTENER_HTTP_/.test(code)?502:400;
     return res.status(status).json({code});
   };
   const journeyPracticeAccess=async(req:Request):Promise<JourneyPracticeAccess>=>{
@@ -2072,12 +2072,54 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * READY. إن لم تكن، يبقى وجه المصحف مفتوحًا للمراجعة ولا نفتح ميكروفونًا نعرف مسبقًا
    * أن الخادم سيرفضه. ولا يوجد أي fallback إلى رواية أخرى.
    */
-  const journeyListeningReady=(reading:string):boolean=>{
-    if(!quranIntelligence)return false;
+  /*
+   * «يسمعك» في التدريب العام لا يعتمد على محرّك التحكيم/الظلّ الخاص باللجنة.
+   * ذلك المحرّك كان يتطلب خزنة intelligence + benchmark + backend، وهي بنية لم تكن
+   * منشورة أصلًا في Cloud Run؛ لذلك كان الزرّ موجودًا بينما لا يوجد مستمع إنتاجي خلفه.
+   *
+   * التدريب الآن له مستمع قرآني مستقل، خاص بالتدريب فقط. لا يكتب دليلًا ولا درجة،
+   * ويعمل على حفص فقط إلى أن يُقاس نموذجٌ مستقل لكل رواية أخرى — بلا fallback بينها.
+   */
+  const practiceListenerUrl=String(process.env.MIZAN_QURAN_PRACTICE_LISTENER_URL||'').trim();
+  const journeyListeningReady=(reading:string):boolean=>reading==='hafs'&&/^https:\/\//i.test(practiceListenerUrl);
+
+  const practiceListenerToken=async():Promise<string>=>{
+    if(!practiceListenerUrl)return '';
+    const explicit=String(process.env.MIZAN_QURAN_PRACTICE_LISTENER_TOKEN||'').trim();
+    if(explicit)return explicit;
+    /* Cloud Run -> Cloud Run: اطلب identity token من metadata للخدمة الخاصة نفسها. */
     try{
-      const row=quranIntelligence.readiness().find(x=>x.reading===reading);
-      return row?.stages.some(stage=>stage.id==='alignment'&&stage.state==='READY')===true;
-    }catch{return false}
+      const audience=new URL(practiceListenerUrl).origin;
+      const r=await fetch(`http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`,{headers:{'Metadata-Flavor':'Google'}});
+      return r.ok?(await r.text()).trim():'';
+    }catch{return ''}
+  };
+
+  const runPracticeListener=async(input:{access:JourneyPracticeAccess;surah:number;startAyah:number;endAyah:number;contentType:string;bytes:Buffer})=>{
+    if(!journeyListeningReady(input.access.listening.reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
+    const passage=await quranDelivery.passage(input.access.deliveryReading,input.surah,input.startAyah,input.endAyah);
+    if(!passage||!passage.ayat.length)throw new Error('PRACTICE_SCOPE_NOT_READY');
+    const token=await practiceListenerToken();
+    const expected=Buffer.from(JSON.stringify(passage.ayat.map(x=>({surah:x.surah,ayah:x.ayah,text:x.text}))),'utf8').toString('base64url');
+    const response=await fetch(practiceListenerUrl,{method:'POST',headers:{
+      'content-type':input.contentType||'application/octet-stream',
+      'x-mizan-reading':input.access.listening.reading,
+      'x-mizan-expected-passage':expected,
+      ...(token?{authorization:`Bearer ${token}`}:{})
+    },body:new Uint8Array(input.bytes)});
+    if(!response.ok)throw new Error(`QURAN_PRACTICE_LISTENER_HTTP_${response.status}`);
+    const raw=await response.json() as any;
+    const candidate=raw?.candidate&&typeof raw.candidate==='object'?raw.candidate:null;
+    const confidence=Number(raw?.confidence||0);
+    return {
+      timestamp:new Date().toISOString(),reading:input.access.listening.reading,
+      surah:candidate?Number(candidate.surah):undefined,ayah:candidate?Number(candidate.ayah):undefined,
+      wordIndex:candidate?Number(candidate.wordIndex):undefined,
+      alignmentState:candidate&&confidence>=0.55?'LOCKED':'LOST',recoveryState:'STABLE',
+      smoothedConfidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):0,
+      pointerMoved:!!candidate,practice:true,scoreAuthority:'HUMAN_ONLY',scoreDelta:0,shadowMode:true,
+      backendEvidence:{modelVersion:String(raw?.modelVersion||'tarteel-whisper-base-ar-quran'),acousticQuality:raw?.acousticQuality}
+    };
   };
 
   app.post('/api/public/journeys/practice/context',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
@@ -2102,8 +2144,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/align',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
-    if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});
-    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));if(!scopeContainsRange(access.scope,{surah,ayah:startAyah},{surah,ayah:endAyah}))throw new Error('PRACTICE_SCOPE_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:`journey:${access.participantId}`,sessionId:`journey-practice:${crypto.createHash('sha256').update(access.participantId).digest('hex').slice(0,24)}`,reading,surah,startAyah,endAyah,sourcePackageId,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,practice:true});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));if(!scopeContainsRange(access.scope,{surah,ayah:startAyah},{surah,ayah:endAyah}))throw new Error('PRACTICE_SCOPE_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);if(!bytes.length)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');const out=await runPracticeListener({access,surah,startAyah,endAyah,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/recognise',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{

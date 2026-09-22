@@ -32,6 +32,41 @@ steps:
       - 'push'
       - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
 
+
+  # «يسمعك» الحقيقي: نموذج قرآني مستقل للتدريب، لا محرّك ظلّ غير منشور.
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
+      - 'services/quran-practice-listener'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        gcloud run deploy mizan-quran-listener \
+          --image "me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA" \
+          --region me-central1 --platform managed --no-allow-unauthenticated \
+          --cpu 2 --memory 2Gi --min-instances 0 --max-instances 3 --concurrency 4 --quiet
+        listener_url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')"
+        test -n "$listener_url"
+        runtime_sa="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null || true)"
+        if [ -z "$runtime_sa" ]; then
+          project_number="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+          runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+        fi
+        gcloud run services add-iam-policy-binding mizan-quran-listener --region me-central1 \
+          --member "serviceAccount:${runtime_sa}" --role roles/run.invoker --quiet >/dev/null
+        printf '%s' "$listener_url/listen" > /workspace/mizan-quran-listener-url
+
   # قواعد Firestore تُنشر مع كل دفعة، لا بيدٍ حين يتذكّر أحد.
   #
   # القواعد هي الحماية الحقيقية للبيانات — لا إخفاء المفاتيح — وكانت تُنشر يدويًا من جهاز
@@ -126,6 +161,19 @@ steps:
       - '--update-secrets'
       - 'R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest,MIZAN_PASS_SIGNING_SECRET=MIZAN_PASS_SIGNING_SECRET:latest,MIZAN_CERT_SIGNING_SECRET=MIZAN_CERT_SIGNING_SECRET:latest'
       - '--quiet'
+
+  # اربط النسخة المنشورة بالمستمع الخاص بعد معرفة عنوان Cloud Run الفعلي.
+  # update-env-vars يحافظ على بقية إعدادات الخدمة ولا ينشئ سرًّا في المستودع.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        listener_url="$(cat /workspace/mizan-quran-listener-url)"
+        gcloud run services update mizan --region me-central1 \
+          --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=${listener_url}" --quiet
+
 
 substitutions:
   # إعدادات Firebase العلنية. النشر الحي يتطلب المصادقة.
