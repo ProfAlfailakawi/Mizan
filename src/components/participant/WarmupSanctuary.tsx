@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Ear, ListChecks, MapPin, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
+import { Check, Ear, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
 import { fetchJourneyPracticeContext, submitPracticeAlignmentChunk, type JourneyPracticeAuth, type JourneyPracticeContext, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
 import { MushafListens } from './MushafListens';
 import { IS_DEMO_SESSION } from '../../lib/store';
@@ -11,12 +11,11 @@ import { IS_DEMO_SESSION } from '../../lib/store';
  * تهدّئ النفَس ولا تجيب عن السؤال الذي يشغل المنتظر فعلًا — «أين سيسألونني، وكيف تجري
  * اللحظة، وماذا يُحسب عليّ؟».
  *
- * فصار ثلاثة أبوابٍ تُفتح بالترتيب الذي يعيشه المتسابق:
- *   ١) أين أُختبر — مواضع اختباره كما اعتمدتها الجهة، لا وعدًا عامًّا.
- *   ٢) نفَسي — تنفّس حجابي متوازن: شهيق أربع، حبس أربع، زفير ست.
- *   ٣) بروفة — يقرأ على مؤقّتٍ ويرصد زلّاته بنفسه بالأزرار نفسها التي يراها المحكّم،
- *      فيرى أثرها لحظةً بلحظة. وما يرصده هنا تمرينٌ خاصّ به: لا يُسجَّل، ولا يُرسل،
- *      ولا يصل اللجنة منه شيء، ولا يمسّ درجته بحرف.
+ * فبقيت التهيئة في ثلاثة أبوابٍ عملية بلا كشفٍ زائدٍ عن الاختبار:
+ *   ١) نفَسي — تنفّس حجابي متوازن: شهيق أربع، حبس أربع، زفير ست.
+ *   ٢) بروفة — يقرأ على مؤقّتٍ ويرصد زلّاته بنفسه بالأزرار نفسها التي يراها المحكّم.
+ *   ٣) يسمعك — المصحف الذكي من نطاقه وروايته، حين تكون خدمة الاستماع جاهزة فعلًا.
+ * وما يفعله هنا تمرينٌ خاصّ به: لا يُسجَّل، ولا يُرسل إلى اللجنة، ولا يمسّ درجته بحرف.
  *
  * ولماذا مطويّ افتراضيًّا: من ينتظر دوره قلقًا لا يُعان بشاشةٍ مزدحمة. سطرٌ واحد هادئ
  * يُفتح بالنقر عند الحاجة، ويختفي القسم كلّه لحظة دخوله اللجنة.
@@ -33,7 +32,7 @@ const PHASE_TEXT = {
   en: { in: 'Inhale…', hold: 'Hold…', out: 'Exhale…' },
 } as const;
 
-type Door = 'where' | 'breath' | 'rehearsal' | 'listen';
+type Door = 'breath' | 'rehearsal' | 'listen';
 
 /** زلّات البروفة بأسمائها كما يسمّيها المحكّم، حتى لا يفاجئه المصطلح في القاعة. */
 const SLIPS = [
@@ -74,9 +73,9 @@ export interface PracticePassage {
   label: string;
 }
 
-export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion, practicePassage, journeyPracticeAuth }) => {
+export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, minutesPerQuestion, practicePassage, journeyPracticeAuth }) => {
   const [open, setOpen] = useState(false);
-  const [door, setDoor] = useState<Door>('where');
+  const [door, setDoor] = useState<Door>('breath');
   return (
     <details
       className="mizan-collapse rounded-2xl border border-[#e5e3dc] bg-[#fbfaf6]"
@@ -89,7 +88,6 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
       <div className="px-4 pb-5">
         <div className="mizan-tabs" role="tablist" aria-label={ar ? 'أبواب التهيئة' : 'Preparation'}>
           {([
-            ['where', MapPin, ar ? 'أين أُختبر' : 'Where'],
             ['breath', Wind, ar ? 'نفَسي' : 'Breathe'],
             ['rehearsal', Timer, ar ? 'بروفة' : 'Rehearse'],
             ['listen', Ear, ar ? 'يسمعك' : 'Listen'],
@@ -100,7 +98,6 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
           ))}
         </div>
 
-        {door === 'where' && <WhereDoor ar={ar} scopeText={scopeText} spreadAcrossZones={spreadAcrossZones} questionCount={questionCount} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'breath' && <BreathDoor ar={ar} active={open} />}
         {door === 'rehearsal' && <RehearsalDoor ar={ar} minutesPerQuestion={minutesPerQuestion} />}
         {door === 'listen' && (journeyPracticeAuth ? <JourneyListenDoor ar={ar} access={journeyPracticeAuth} /> : <ListenDoor ar={ar} passage={practicePassage} />)}
@@ -108,59 +105,6 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, scopeText,
     </details>
   );
 };
-
-/* ── أين أُختبر ─────────────────────────────────────────────────────────── */
-
-const WhereDoor: React.FC<Pick<WarmupSanctuaryProps, 'ar' | 'scopeText' | 'spreadAcrossZones' | 'questionCount' | 'minutesPerQuestion'>> = ({ ar, scopeText, spreadAcrossZones, questionCount, minutesPerQuestion }) => (
-  <div className="pt-4 space-y-3">
-    <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
-      <div className="mizan-kicker">{ar ? 'مواضع اختبارك' : 'WHERE YOU ARE TESTED'}</div>
-      <h3 className="mt-1 text-sm font-black text-[#214C40]">{scopeText || (ar ? 'لم تُعتمد مواضع اختبارك بعد' : 'Your range is not approved yet')}</h3>
-      <p className="mt-1.5 text-[11px] leading-6 text-[#3c4541]">
-        {scopeText
-          ? (ar ? 'لن يُطرح عليك سؤال خارج هذه الحدود. طمأنينتك هنا ليست ظنًّا: هذا هو المرجع الذي يسحب منه النظام.' : 'No question comes from outside these bounds. This is the same range the engine draws from.')
-          : (ar ? 'راجع إدارة المسابقة؛ نطاق الأسئلة يُحدَّد من فئتك.' : 'Contact the organisers; your question range comes from your category.')}
-      </p>
-    </div>
-
-    {/*
-      * حدودُ المناطق لا تُكتب للمتسابق.
-      *
-      * كانت تُعرض مفصّلةً: «الفاتحة ١ ← الإسراء ٥٠ · ٢٠٧٩ آية» وأخواتُها. وهي تبدو طمأنة،
-      * وهي في الحقيقة خريطة: ثلاثُ مناطقَ وثلاثةُ أسئلة تعني سؤالًا من كلِّ ثلث، فينكمش
-      * ما يُراجعه إلى ثلثٍ لكلّ سؤال. والمتسابقُ الذي يملك الخريطة ليس كمن لا يملكها،
-      * فتختلّ المسابقة بلا أن يُخالف أحدٌ قاعدة.
-      *
-      * فبقي المعنى الذي يطمئنه — أن سؤاله لا يتجمّع في موضعٍ واحد — بلا حدٍّ ولا عدد.
-      * والتفصيلُ يبقى حيث يخصّ: لوحةُ محرّك الأسئلة عند المنظّم.
-      */}
-    {spreadAcrossZones && (
-      <div className="rounded-2xl border border-[#e4e2da] bg-white p-4">
-        <div className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><ListChecks className="h-4 w-4" />{ar ? 'أسئلتك موزَّعة على نطاقك' : 'Your questions are spread across your range'}</div>
-        <p className="mt-2 text-[11px] leading-6 text-[#5b6460]">
-          {ar
-            ? 'لا تتجمّع أسئلتك في موضعٍ واحد من نطاقك، بل تتوزّع عليه. فراجِع نطاقك كلَّه.'
-            : 'Your questions do not cluster in one part of your range; they are spread across it. Revise all of it.'}
-        </p>
-        <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">
-          {ar ? 'ولا تُعرض هنا حدودُ التوزيع: لا أحد — ولا النظام نفسه — يعرف مواضعك قبل وقوفك أمام اللجنة، وحدودُ المناطق وحدها تُضيّق ما تُراجعه.' : 'The distribution bounds are not shown: nobody, the system included, knows your loci beforehand — and the bounds alone would narrow what you revise.'}
-        </p>
-      </div>
-    )}
-
-    <div className="grid grid-cols-2 gap-2">
-      <Fact ar={ar} value={questionCount ? String(questionCount) : '—'} label={ar ? 'عدد أسئلتك' : 'your questions'} />
-      <Fact ar={ar} value={minutesPerQuestion ? `${minutesPerQuestion}` : '—'} label={ar ? 'دقيقة للسؤال' : 'minutes per question'} />
-    </div>
-  </div>
-);
-
-const Fact: React.FC<{ ar: boolean; value: string; label: string }> = ({ value, label }) => (
-  <div className="rounded-xl bg-[#f1efe9] p-3 text-center">
-    <div className="text-lg font-black tabular-nums">{value}</div>
-    <div className="mt-0.5 text-[10px] text-[#646965]">{label}</div>
-  </div>
-);
 
 /* ── نفَسي ──────────────────────────────────────────────────────────────── */
 

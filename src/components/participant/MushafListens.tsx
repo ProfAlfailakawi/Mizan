@@ -278,8 +278,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     setMistakes(undefined);
     queue.current.abandon(); queue.current = serialQueue();
 
-    /* بلا محرّكٍ يبقى الوجهُ مراجعةً يدويةً محترمة، ولا ندّعي أنّ الميكروفون يسمع. */
-    if (!listening || !faceSupportsListening(face)) { startedAt.current = Date.now(); setStage('reciting'); return; }
+    /*
+     * لا ندخل حالة «يتلو» إلا إذا كان الاستماع الحقيقي جاهزًا لهذا الوجه.
+     * سابقًا كانت المراجعة اليدوية تشغّل المؤقّت وزر «أنهيتُ» رغم أن لا تحليل يجري؛
+     * فيبدو للمتسابق أن «يسمعك» يعمل وهو لا يسمع. الوجه يبقى مفتوحًا للمراجعة فقط.
+     */
+    if (!listening || !faceSupportsListening(face)) { setStage('ready'); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setStage('ready');
       setNote(ar
@@ -481,11 +485,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       {face && stage !== 'blocked' && stage !== 'loading' && (
         <>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            {stage === 'ready' && (
-              <button onClick={() => void begin()} data-listens={analysed ? 'yes' : 'no'}
+            {stage === 'ready' && analysed && (
+              <button onClick={() => void begin()} data-listens="yes"
                 className="inline-flex items-center gap-2 rounded-2xl bg-[#214C40] px-5 py-2.5 text-xs font-black text-white">
-                {analysed && <Mic className="h-4 w-4" aria-hidden="true" />}
-                {analysed ? (ar ? 'ابدأ التلاوة' : 'Begin reciting') : (ar ? 'راجِع الوجه' : 'Review the face')}
+                <Mic className="h-4 w-4" aria-hidden="true" />
+                {ar ? 'ابدأ التلاوة' : 'Begin reciting'}
               </button>
             )}
             {stage === 'asking' && (
