@@ -147,6 +147,17 @@ jobs:
             --substitutions="COMMIT_SHA=$VERIFIED_SHA" \
             --quiet
 
+      - name: عرض سجل فشل Cloud Build
+        if: failure()
+        shell: bash
+        run: |
+          build_id="$(gcloud builds list --project="$GCP_PROJECT_ID" --limit=1 --format='value(id)' || true)"
+          if [ -n "$build_id" ]; then
+            echo "::group::Cloud Build Logs for $build_id"
+            gcloud builds log "$build_id" --project="$GCP_PROJECT_ID" || true
+            echo "::endgroup::"
+          fi
+
       - name: التحقق من أن Cloud Run يخدم الـcommit نفسه
         id: verify
         shell: bash

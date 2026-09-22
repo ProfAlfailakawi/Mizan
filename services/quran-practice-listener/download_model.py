@@ -1,21 +1,19 @@
 import os
 import sys
-import shutil
 import time
 import json
 import urllib.request
-from huggingface_hub import snapshot_download, hf_hub_download
 
-TARGET_DIR = '/converted'
+TARGET_DIR = os.getenv('TARGET_DIR', '/converted')
 os.makedirs(TARGET_DIR, exist_ok=True)
-print('Starting model acquisition for quran-practice-listener...', flush=True)
+print(f'Starting model acquisition for quran-practice-listener into {TARGET_DIR}...', flush=True)
 
 MODEL_REPO = 'OdyAsh/faster-whisper-base-ar-quran'
 MODEL_REV = 'af9e0305a0ee90a8199ad405df0250b665d01c66'
 TOKENIZER_REPO = 'openai/whisper-base'
 TOKENIZER_REV = 'e37978b90ca9030d5170a5c07aadb050351a65bb'
 
-DIRECT_URLS = {
+ARTIFACT_URLS = {
     'model.bin': f'https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_REV}/model.bin',
     'config.json': f'https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_REV}/config.json',
     'vocabulary.json': f'https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_REV}/vocabulary.json',
@@ -23,27 +21,54 @@ DIRECT_URLS = {
     'tokenizer.json': f'https://huggingface.co/{TOKENIZER_REPO}/resolve/{TOKENIZER_REV}/tokenizer.json',
 }
 
-def direct_download(filename: str, url: str, max_retries: int = 5) -> None:
+MIN_SIZES = {
+    'model.bin': 140_000_000,
+    'config.json': 500,
+    'vocabulary.json': 500_000,
+    'preprocessor_config.json': 100,
+    'tokenizer.json': 1_000_000,
+}
+
+def download_file(filename: str, url: str, max_retries: int = 5) -> None:
     dest_path = os.path.join(TARGET_DIR, filename)
     tmp_path = dest_path + '.tmp'
+    min_size = MIN_SIZES.get(filename, 1)
+
     for attempt in range(1, max_retries + 1):
         try:
-            print(f'Direct downloading {filename} via HTTPS (attempt {attempt}/{max_retries})...', flush=True)
+            print(f'Downloading {filename} (attempt {attempt}/{max_retries}) from {url}...', flush=True)
             req = urllib.request.Request(
                 url,
-                headers={'User-Agent': 'Mozilla/5.0 (compatible; MizanQuranListener/1.0)'}
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                }
             )
-            with urllib.request.urlopen(req, timeout=180) as resp, open(tmp_path, 'wb') as f:
+            with urllib.request.urlopen(req, timeout=180) as resp, open(tmp_path, 'wb') as out_f:
+                downloaded = 0
+                chunk_size = 1024 * 1024  # 1 MB
                 while True:
-                    chunk = resp.read(1024 * 1024)
+                    chunk = resp.read(chunk_size)
                     if not chunk:
                         break
-                    f.write(chunk)
+                    out_f.write(chunk)
+                    downloaded += len(chunk)
+                    if downloaded % (10 * 1024 * 1024) == 0:
+                        print(f'  {filename}: {downloaded // (1024 * 1024)} MB received...', flush=True)
+
+            file_size = os.path.getsize(tmp_path)
+            if file_size < min_size:
+                raise ValueError(f'File {filename} is too small: {file_size} bytes (expected >= {min_size})')
+
+            if filename.endswith('.json'):
+                with open(tmp_path, 'r', encoding='utf-8') as jf:
+                    json.load(jf)
+
             os.replace(tmp_path, dest_path)
-            print(f'Direct download completed: {filename} ({os.path.getsize(dest_path)} bytes)', flush=True)
+            print(f'Successfully downloaded and validated {filename} ({file_size} bytes)', flush=True)
             return
         except Exception as exc:
-            print(f'Error during direct download of {filename} (attempt {attempt}/{max_retries}): {exc}', file=sys.stderr, flush=True)
+            print(f'Error downloading {filename} (attempt {attempt}/{max_retries}): {exc}', file=sys.stderr, flush=True)
             if os.path.exists(tmp_path):
                 try:
                     os.remove(tmp_path)
@@ -51,77 +76,25 @@ def direct_download(filename: str, url: str, max_retries: int = 5) -> None:
                     pass
             if attempt == max_retries:
                 raise
-            time.sleep(attempt * 3)
+            sleep_time = attempt * 3
+            print(f'Waiting {sleep_time}s before retry...', flush=True)
+            time.sleep(sleep_time)
 
-# 1. Primary download: HuggingFace Hub snapshot
-max_retries = 3
-hub_success = False
-for attempt in range(1, max_retries + 1):
-    try:
-        print(f'Downloading model snapshot via huggingface_hub (attempt {attempt}/{max_retries})...', flush=True)
-        snapshot_download(
-            MODEL_REPO,
-            revision=MODEL_REV,
-            local_dir=TARGET_DIR,
-            ignore_patterns=['README.md', '.gitattributes'],
-            max_workers=2,
-            etag_timeout=120,
-        )
-        print('Model snapshot download complete.', flush=True)
-        hub_success = True
-        break
-    except Exception as exc:
-        print(f'HuggingFace snapshot warning (attempt {attempt}/{max_retries}): {exc}', file=sys.stderr, flush=True)
-        time.sleep(attempt * 3)
+for name, url in ARTIFACT_URLS.items():
+    target = os.path.join(TARGET_DIR, name)
+    min_size = MIN_SIZES.get(name, 1)
+    if os.path.isfile(target) and os.path.getsize(target) >= min_size:
+        print(f'Artifact {name} already exists and valid ({os.path.getsize(target)} bytes), skipping.', flush=True)
+        continue
+    download_file(name, url)
 
-# 2. Tokenizer download via HuggingFace Hub
-tok_success = False
-for attempt in range(1, max_retries + 1):
-    try:
-        print(f'Downloading tokenizer.json via huggingface_hub (attempt {attempt}/{max_retries})...', flush=True)
-        hf_hub_download(
-            repo_id=TOKENIZER_REPO,
-            filename='tokenizer.json',
-            revision=TOKENIZER_REV,
-            local_dir=TARGET_DIR,
-            etag_timeout=120,
-        )
-        print('Tokenizer download complete.', flush=True)
-        tok_success = True
-        break
-    except Exception as exc:
-        print(f'HuggingFace tokenizer warning (attempt {attempt}/{max_retries}): {exc}', file=sys.stderr, flush=True)
-        time.sleep(attempt * 3)
+# Final strict check
+for name, min_size in MIN_SIZES.items():
+    path = os.path.join(TARGET_DIR, name)
+    if not os.path.isfile(path):
+        raise RuntimeError(f'FATAL: Missing artifact after download: {path}')
+    actual_size = os.path.getsize(path)
+    if actual_size < min_size:
+        raise RuntimeError(f'FATAL: Artifact {path} size {actual_size} is less than minimum {min_size}')
 
-# 3. Direct fallback for any missing or incomplete artifacts
-for filename, url in DIRECT_URLS.items():
-    file_path = os.path.join(TARGET_DIR, filename)
-    needs_download = False
-    if not os.path.isfile(file_path):
-        needs_download = True
-    elif filename == 'model.bin' and os.path.getsize(file_path) < 100_000_000:
-        needs_download = True
-    elif filename.endswith('.json'):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                json.load(f)
-        except Exception:
-            needs_download = True
-
-    if needs_download:
-        print(f'Artifact {filename} missing or incomplete, activating direct HTTPS fallback...', flush=True)
-        direct_download(filename, url)
-
-# 4. Clean cache directory without touching converted artifacts
-cache_dir = os.path.join(TARGET_DIR, '.cache')
-if os.path.exists(cache_dir):
-    shutil.rmtree(cache_dir, ignore_errors=True)
-
-# 5. Final strict validation
-required_artifacts = ['model.bin', 'config.json', 'vocabulary.json', 'tokenizer.json']
-for artifact in required_artifacts:
-    target_path = os.path.join(TARGET_DIR, artifact)
-    if not os.path.isfile(target_path) or os.path.getsize(target_path) == 0:
-        raise RuntimeError(f'Required model artifact missing or empty: {target_path}')
-
-print('All Quran practice model artifacts validated successfully.', flush=True)
+print('All 5 Quran practice model artifacts downloaded and validated successfully.', flush=True)
