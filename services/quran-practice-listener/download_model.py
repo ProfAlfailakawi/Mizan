@@ -40,4 +40,5 @@ for attempt in range(1, max_retries + 1):
         print(f'Retry {attempt}/{max_retries} downloading tokenizer: {exc}')
         time.sleep(3)
 
-print('Model and tokenizer downloaded successfully.')
+print('Model and tokenizer downloaded successfully.', flush=True)
+shutil.rmtree('/converted/.cache', ignore_errors=True)

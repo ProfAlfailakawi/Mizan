@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1
 # Practice-only Quran listener.
 # Consume a pinned, pre-converted CTranslate2 artifact instead of converting the
 # training checkpoint during every Cloud Build release.
 FROM python:3.11-slim AS model
+ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir 'huggingface-hub==0.35.1'
 WORKDIR /build
 COPY download_model.py .

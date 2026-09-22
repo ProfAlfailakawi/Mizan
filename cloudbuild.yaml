@@ -35,8 +35,6 @@ steps:
 
   # «يسمعك» الحقيقي: نموذج قرآني مستقل للتدريب، لا محرّك ظلّ غير منشور.
   - name: 'gcr.io/cloud-builders/docker'
-    env:
-      - 'DOCKER_BUILDKIT=1'
     args:
       - 'build'
       - '-t'
