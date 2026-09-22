@@ -251,11 +251,11 @@ test('the public page carries a roll of honour built only from sealed results', 
 test('the pre-turn section is no longer a lone breathing circle', () => {
   const warmup = read('src/components/participant/WarmupSanctuary.tsx');
   assert.match(warmup, /التهيئة قبل دورك/, 'it is renamed in the participant’s own words');
-  assert.match(warmup, /مواضع اختبارك/, 'it shows where they will be tested');
+  assert.doesNotMatch(warmup, /مواضع اختبارك|أين أُختبر/, 'the removed test-location door must not return');
   assert.match(warmup, /شهيق…/, 'the breathing exercise stays');
   assert.match(warmup, /const RehearsalDoor/, 'and a timed rehearsal marks slips the way a judge would');
-  assert.match(warmup, /لا يُسجَّل ولا يُرسل ولا يمسّ درجتك/,
-    'and says plainly that the drill never reaches the panel');
+  assert.match(warmup, /لا يُسجَّل، ولا يُرسل إلى اللجنة، ولا يمسّ درجته بحرف/,
+    'and says plainly that the preparation never reaches the panel');
 });
 
 /* ── ١٤ — قطر الأجزاء إلى جانب قطر الآيات ──────────────────────────────── */
