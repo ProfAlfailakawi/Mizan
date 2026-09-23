@@ -50,7 +50,7 @@ const geometryCache = new Map<string, Geometry | null>();
 /** يقيس هندسةَ الصفحة مرّةً لكلّ صورة، ولا يعيدها حتى تتغيّر. */
 export type OverlayState = 'pending' | 'ready' | 'none';
 
-function usePageGeometry(url: string, page: number, words: readonly LiveWord[], enabled: boolean, image: HTMLImageElement | null): { geometry: Geometry | null; state: OverlayState } {
+export function usePageGeometry(url: string, page: number, words: readonly LiveWord[], enabled: boolean, image: HTMLImageElement | null): { geometry: Geometry | null; state: OverlayState } {
   /* `undefined`: لم يصل بعد؛ `null`: وصل ولا تخطيطَ لهذه الصفحة. */
   const [layout, setLayout] = useState<MushafPageLayout | null | undefined>(undefined);
   const [geometry, setGeometry] = useState<Geometry | null | undefined>(undefined);
@@ -68,7 +68,8 @@ function usePageGeometry(url: string, page: number, words: readonly LiveWord[], 
     if (geometryCache.has(key)) { setGeometry(geometryCache.get(key) ?? null); return; }
     const lineOf = new Map<number, number>();
     const grouped = groupTokensByLine(words, w => {
-      const hit = w.ayahWordIndex ? findLayoutWord(layout, w.surah, w.ayah, w.ayahWordIndex) : null;
+      /* موضعُ الكلمة في الوجه يُعدّ من واحد، وفي ملفّ التخطيط من صفر (`server/mushaf-layout`). */
+      const hit = w.ayahWordIndex ? findLayoutWord(layout, w.surah, w.ayah, w.ayahWordIndex - 1) : null;
       if (hit?.line) lineOf.set(w.index, hit.line);
       return hit?.line;
     });

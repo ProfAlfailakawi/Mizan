@@ -77,8 +77,33 @@ test('the live page is wired: measured on the image, word-level where confident,
   assert.match(surface, /const showImage = !!officialPage && \(!needsVoice \|\| \(overlayPossible && overlay !== 'none'\)\);/);
   // وما دام القياسُ جاريًا لا يُعلن تعذّرُه.
   assert.match(page, /const state: OverlayState = !enabled \|\| geometry === null \? 'none' : geometry \? 'ready' : 'pending';/);
-  // الأثرُ لا يرجع، ومن شاهدين.
-  assert.match(listens, /setReached\(r => Math\.max\(r, index \+ 1\)\)/);
+  // الأثرُ لا يرجع، والقلمُ ينساب إلى هدفه كلمةً كلمة، ويقفز في الرجوع وحده.
+  assert.match(listens, /setReached\(r => Math\.max\(r, penTarget \+ 1\)\)/);
+  assert.match(listens, /if \(pen === null \|\| penTarget < pen \|\| penTarget - pen > 24\)/);
+  assert.match(listens, /setPen\(p => \(p === null \? penTarget : p \+ 1\)\)/);
   assert.match(listens, /if \(judged\.frontier > 0\) advance\(judged\.frontier - 1\);/);
   assert.match(listens, /noticeSlips\(settledHere\)/);
+});
+
+test('layout words are zero-based on the server and one-based everywhere else — converted at the seam', async () => {
+  const { layoutTokenWords } = await import('../src/lib/mushaf-word-boxes');
+  const words = layoutTokenWords({ words: [
+    { surah: 71, ayah: 11, wordIndex: 1, line: 2 }, { surah: 71, ayah: 11, wordIndex: 0, line: 2 },
+    { surah: 71, ayah: 12, wordIndex: 0, line: 2 },
+  ] }, (s, a, k) => `${s}:${a}:${k}`);
+  assert.deepEqual(words.map(w => [w.ayah, w.ayahWordIndex, w.endsAyah, w.text]), [
+    [11, 1, false, '71:11:1'], [11, 2, true, '71:11:2'], [12, 1, true, '71:12:1'],
+  ]);
+  const page = fs.readFileSync('src/components/participant/LiveMushafPage.tsx', 'utf8');
+  assert.match(page, /findLayoutWord\(layout, w\.surah, w\.ayah, w\.ayahWordIndex - 1\)/);
+  const judge = fs.readFileSync('src/components/judge/OfficialMushafSurface.tsx', 'utf8');
+  assert.match(judge, /findLayoutWord\(layout,a\.surah,a\.ayah,tracking\.wordIndex-1\)/);
+});
+
+test('the judge page places the pen on the word, and keeps the line lens where it cannot', () => {
+  const judge = fs.readFileSync('src/components/judge/OfficialMushafSurface.tsx', 'utf8');
+  assert.match(judge, /const penFor=usePageWordPen\(url,locus\.page,layout,!!wordLevel,imageEl\);/);
+  assert.match(judge, /\{audioPen\|\|trackPen\s*\? <span aria-hidden className=\{`mizan-live-pen/);
+  assert.match(judge, /layout=\{layouts\[locus\.page\]\} wordLevel=\{readingKey==='hafs'\}/);
+  assert.match(judge, /pageLineSlots\(ink,expectedLines,bandsFromInkProfile\(ink,\{expectedLines\}\)\)/);
 });

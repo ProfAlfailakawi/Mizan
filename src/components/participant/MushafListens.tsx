@@ -131,11 +131,30 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    */
   const [slips, setSlips] = useState<SimilarSlip[]>([]);
   const forksRef = useRef<Map<number, DivergencePoint>>(new Map());
+  /*
+   * والقلمُ ينساب ولا يقفز.
+   *
+   * الموضعُ يصل كلَّ ثانيتين، وقد تقدّم القارئُ فيهما كلماتٍ. فلو قفز القلمُ إليه لبدا
+   * الأثرُ متقطّعًا متأخّرًا. فيُعطى الهدف، ويمشي القلمُ إليه كلمةً كلمة بسرعةٍ تقطع
+   * المسافة قبل أن يصل الموضعُ التالي — فيُرى يتبع القارئ. والرجوعُ (إعادةُ آية) قفزٌ
+   * مباشر: لا يُمشى بالقلم إلى الوراء كلمةً كلمة.
+   */
+  const [penTarget, setPenTarget] = useState<number | null>(null);
   const advance = useCallback((index: number | null) => {
     if (index === null || index < 0) return;
-    setPen(index);
-    setReached(r => Math.max(r, index + 1));
+    setPenTarget(index);
   }, []);
+  useEffect(() => {
+    if (penTarget === null) { setPen(null); return; }
+    if (pen === null || penTarget < pen || penTarget - pen > 24) { setPen(penTarget); setReached(r => Math.max(r, penTarget + 1)); return; }
+    if (penTarget === pen) return;
+    const step = Math.max(90, Math.min(260, 1500 / (penTarget - pen)));
+    const t = window.setTimeout(() => {
+      setPen(p => (p === null ? penTarget : p + 1));
+      setReached(r => Math.max(r, (pen ?? penTarget) + 2));
+    }, step);
+    return () => window.clearTimeout(t);
+  }, [pen, penTarget]);
   /* هل بقي مقطعٌ لم يصل حين قُرئ التقرير؟ */
   const [incomplete, setIncomplete] = useState(false);
   /* إذنُ الحكم لهذه الرواية — يُسأل عنه الخادم، ولا تحسبه الشاشةُ لنفسها. */
@@ -339,7 +358,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
-    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
+    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     attemptJudging.current = null;
     setMistakes(undefined); setJudgingLost(false);
@@ -400,7 +419,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const begin = useCallback(async () => {
     if (!face) return;
-    samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
+    samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     setMistakes(undefined); setJudgingLost(false);
     /* والإذنُ يُلتقط الآن ويثبت: مجهولٌ عند الضغط يعني مراجعةً لا تُحكم. */

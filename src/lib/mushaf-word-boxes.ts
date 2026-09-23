@@ -196,16 +196,20 @@ export function groupTokensByLine(
 ): { lines: LineTokens[]; order: Map<number, (number | null)[]> } | null {
   const order = new Map<number, (number | null)[]>();
   const weights = new Map<number, number[]>();
+  /* سطرٌ غاب نصُّ إحدى كلماته لا يُوزن — فوزنٌ مخترعٌ يُسقط ثقةً صادقة. */
+  const unweighed = new Set<number>();
   for (const w of words) {
     const line = lineOf(w);
     if (!line) return null;
     const list = order.get(line) ?? [];
     const weigh = weights.get(line) ?? [];
-    list.push(w.index); weigh.push(printedWeight(w.text ?? 'xxxx'));
+    list.push(w.index);
+    if (w.text === undefined) unweighed.add(line); else weigh.push(printedWeight(w.text));
     if (w.endsAyah) { list.push(null); weigh.push(printedWeight(null)); }
     order.set(line, list); weights.set(line, weigh);
   }
-  const lines = [...order.entries()].sort((a, b) => a[0] - b[0]).map(([line, list]) => ({ line, tokens: list.length, weights: weights.get(line) }));
+  const lines = [...order.entries()].sort((a, b) => a[0] - b[0])
+    .map(([line, list]) => ({ line, tokens: list.length, weights: unweighed.has(line) ? undefined : weights.get(line) }));
   return { lines, order };
 }
 
@@ -276,4 +280,29 @@ export function pageLineSlots(
 export function slotCore(band: { top: number; height: number }, keep = 0.62): { top: number; height: number } {
   const trim = (band.height * (1 - keep)) / 2;
   return { top: band.top + trim, height: band.height * keep };
+}
+
+/**
+ * كلماتُ الصفحة كلُّها من ملفّ التخطيط (وفهرسُه من صفر) — لمن لا يملك «وجهًا» (سطحُ المحكّم يعرض صفحةً
+ * يقع السؤالُ في بعضها). ترتيبُ القراءة: السطر، ثم السورة والآية وموضعُ الكلمة.
+ *
+ * وفاصلةُ الآية تُعدّ بعد آخر كلمةٍ منها في الصفحة: فصفحاتُ مصحف المدينة تُختم بتمام
+ * آية. و`textOf` يعطي نصَّ الكلمة إن عُرف، فتوزن به القسمة.
+ */
+export function layoutTokenWords(
+  layout: { words: readonly { surah: number; ayah: number; wordIndex: number; line?: number }[] },
+  textOf?: (surah: number, ayah: number, wordIndex: number) => string | undefined,
+): (FaceTokenWord & { line: number })[] {
+  const sorted = layout.words.filter(w => !!w.line)
+    .map(w => ({ ...w, line: w.line as number }))
+    .sort((a, b) => a.line - b.line || a.surah - b.surah || a.ayah - b.ayah || a.wordIndex - b.wordIndex);
+  return sorted.map((w, i) => {
+    const next = sorted[i + 1];
+    return {
+      /* التخطيطُ يعدّ من صفر؛ والوجهُ والمحرّكُ من واحد — فيُعاد هنا إلى واحد. */
+      index: i, surah: w.surah, ayah: w.ayah, ayahWordIndex: w.wordIndex + 1, line: w.line,
+      endsAyah: !next || next.surah !== w.surah || next.ayah !== w.ayah,
+      text: textOf?.(w.surah, w.ayah, w.wordIndex + 1),
+    };
+  });
 }
