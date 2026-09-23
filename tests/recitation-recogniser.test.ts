@@ -171,3 +171,18 @@ test('a gate that changes while the engine is answering refuses the answer', asy
     answers({ reading: 'hafs', modelVersion: 'fixture-model-1', words: [] }).fetchImpl);
   assert.equal((await steady.recognise(chunk)).gate.modelVersion, 'fixture-model-1');
 });
+
+test('an engine upgraded mid-request is named a changed gate, not an unmeasured model', async () => {
+  /*
+   * فالمحرّكُ رُقّي والطلبُ في الطريق، فأجاب بنموذجه الجديد. وفحصُ الجواب على النموذج
+   * القديم كان يسبق إعادةَ قراءة الباب، فيردّه «غيرَ مقيس» — فتُغلق الشاشةُ البابَ كلَّه
+   * بدل أن تسأل عن البوّابة الجديدة.
+   */
+  const store = openVault();
+  const fetchImpl = async () => {
+    store.register(report({ modelVersion: 'fixture-model-2' }));
+    return { ok: true, status: 200, json: async () => ({ reading: 'hafs', modelVersion: 'fixture-model-2', words: [] }) };
+  };
+  const recogniser = new RecitationRecogniser({ url: 'https://asr.example/listen' }, store, fetchImpl);
+  await assert.rejects(recogniser.recognise(chunk), /QURAN_ASR_GATE_CHANGED/);
+});

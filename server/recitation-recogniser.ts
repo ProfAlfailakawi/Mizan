@@ -119,17 +119,21 @@ export class RecitationRecogniser {
     const response = await this.fetchImpl(url, { method: 'POST', headers, body: new Uint8Array(input.bytes) });
     if (!response.ok) throw new Error(`QURAN_ASR_BACKEND_HTTP_${response.status}`);
     const raw = await response.json();
-    const chunk = readRecognitionResponse(raw, { reading: definition.id, modelVersion: gate.modelVersion });
     /*
      * ويُقرأ البابُ ثانيةً بعد الجواب، لا قبله وحده.
      *
      * فالطلبُ إلى المحرّك يطول، وتقريرُ القياس قد يُستبدل في أثنائه. والبوّابةُ التي
      * التُقطت قبل الانتظار تعود مع الجواب كما هي، فتراها الشاشةُ مطابقةً لما بدأت به
      * — وآخرُ مقطعٍ لا يليه مقطعٌ يكشف التبدّل. فجوابٌ تبدّل بابُه وهو في الطريق يُردّ.
+     *
+     * **ويُقرأ قبل فحص الجواب لا بعده**: فمحرّكٌ رُقّي أثناء الطلب يجيب بنموذجه الجديد،
+     * وفحصُ الجواب على النموذج القديم يردّه «غيرَ مقيس» — فيُغلق البابُ في الشاشة كلُّه
+     * بدل أن تُسأل البوّابةُ الجديدة.
      */
     const after = this.benchmarks.gate(definition.id);
     if (after.word !== gate.word || after.tashkeel !== gate.tashkeel || after.modelVersion !== gate.modelVersion)
       throw new Error('QURAN_ASR_GATE_CHANGED');
+    const chunk = readRecognitionResponse(raw, { reading: definition.id, modelVersion: gate.modelVersion });
     return { gate, words: chunk.words, modelVersion: chunk.modelVersion };
   }
 }
