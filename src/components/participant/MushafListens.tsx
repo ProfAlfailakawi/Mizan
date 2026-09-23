@@ -18,6 +18,7 @@ import {
 import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff';
 import { quranSkeleton } from '../../lib/quran-orthography';
 import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
+import { CHUNK_MS, recognitionWindow } from '../../lib/recognition-window';
 import { readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -55,7 +56,6 @@ type Stage = 'loading' | 'ready' | 'asking' | 'reciting' | 'analysing' | 'report
  * التلاوة، ووحدةُ العدّ التي تُعرض. وكان مكتوبًا في موضعه وحده، فلمّا احتاجه التوقيتُ
  * كاد يُكتب ثانيةً — ورقمان يصفان شيئًا واحدًا يفترقان.
  */
-const CHUNK_MS = 2000;
 
 export interface MushafListensProps {
   ar: boolean;
@@ -382,13 +382,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * المقطعُ وحده (ثانيتان) يقطع الكلمةَ عند حدّه فيسمعها المحرّكُ خطأً، فيُقال للطالب
          * «أخطأت» وهو مصيب. فيُسمع في سياقه، ولا يُثبَّت إلا ما استقرّ قبل حافّة النافذة.
          */
-        const first = Math.max(1, index - 2);
-        const windowParts = index === 0 ? [chunk] : [all[0], ...all.slice(first, index + 1)];
-        const windowStartMs = index === 0 ? 0 : first * CHUNK_MS;
-        const windowEndMs = (index + 1) * CHUNK_MS;
-        const windowBlob = new Blob(windowParts, { type: chunk.type || all[0].type });
-        const windowHeadBytes = index === 0 ? 0 : all[0].size;
         const finalChunk = rec.state === 'inactive';
+        const win = recognitionWindow(index, finalChunk);
+        const windowParts = win.headed ? [all[0], ...all.slice(win.first, index + 1)] : all.slice(0, index + 1);
+        const windowStartMs = win.startMs;
+        const windowBlob = new Blob(windowParts, { type: chunk.type || all[0].type });
+        const windowHeadBytes = win.headed ? all[0].size : 0;
         const listenable = chunk === head ? chunk : new Blob([head, chunk], { type: chunk.type || head.type });
         /*
          * ورقمُ المقطع يُؤخذ هنا **تزامنيًّا**، لا داخل المهمّة.
@@ -459,12 +458,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              * والنوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد
              * آخر مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير).
              */
-            const hold = finalChunk ? 0 : 1200;
             const timed: HeardWord[] = [];
             for (const w of out.words) {
               if (w.startMs === undefined || w.endMs === undefined) continue;
               const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
-              if (startMs < committedUntil.current - 80 || endMs > windowEndMs - hold) continue;
+              if (startMs < committedUntil.current - 80 || endMs > win.commitUntilMs) continue;
               timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
               committedUntil.current = Math.max(committedUntil.current, endMs);
             }
