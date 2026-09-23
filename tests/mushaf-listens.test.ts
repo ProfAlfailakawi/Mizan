@@ -730,7 +730,11 @@ test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجع
   const conditional = failure.indexOf('if (/NOT_CONFIGURED');
   assert.ok(kill > 0, 'سقوطُ مقطعٍ لا يُبطل الحكم');
   assert.ok(conditional < 0 || kill < conditional, 'الإبطالُ مشروطٌ بأسماء علّةٍ بعينها');
-  assert.match(failure, /setJudgingLost\(code === 'QURAN_JUDGING_GATE_CHANGED' \? 'changed' : true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
+  assert.match(failure, /const changed = \/GATE_CHANGED\/\.test\(code\);\s*\n\s*setJudgingLost\(changed \? 'changed' : true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
+  /* وتبدّلٌ كشفه الخادمُ تُسأل بعده البوّابةُ الجديدة — ولا تبقى القديمةُ تُلتقط للمحاولة التالية. */
+  const serverChanged = failure.slice(failure.indexOf("if (code === 'QURAN_ASR_GATE_CHANGED')"));
+  assert.ok(failure.includes("if (code === 'QURAN_ASR_GATE_CHANGED')"), 'تبدّلُ الخادم لا يُعالج');
+  assert.match(serverChanged.slice(0, 300), /judgingRef\.current = null;[\s\S]*fetchPracticeJudgingGate\(/, 'البوّابةُ القديمةُ تبقى بعد تبدّلٍ كشفه الخادم');
   /* وجوابٌ ببوّابةٍ تبدّلت يُرمى قبل أن يُكتب منه شيء — فيبلغ هذا الإبطال. */
   const task = screen.slice(start, screen.indexOf('}, error => {', start));
   const check = task.indexOf('if (!answerKeepsPermission(permission, out))');

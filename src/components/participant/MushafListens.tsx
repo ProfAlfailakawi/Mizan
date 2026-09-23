@@ -499,7 +499,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             const code = error instanceof Error ? error.message : '';
             attemptJudging.current = null;
             setMistakes(undefined);
-            setJudgingLost(code === 'QURAN_JUDGING_GATE_CHANGED' ? 'changed' : true);
+            /* والتبدّلُ يُكشف في الشاشة (بوّابةُ الجواب) أو في الخادم (البابُ بعد الجواب). */
+            const changed = /GATE_CHANGED/.test(code);
+            setJudgingLost(changed ? 'changed' : true);
+            if (code === 'QURAN_ASR_GATE_CHANGED') {
+              /* والخادمُ لم يردّ البوّابةَ الجديدة، فتُسأل عنها للمحاولة التالية. */
+              judgingRef.current = null;
+              void fetchPracticeJudgingGate(listening.reading, journeyAuth)
+                .then(fresh => { if (alive.current) setGate(fresh); })
+                .catch(() => { if (alive.current) setGate(null); });
+            }
             if (/NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH|MODEL_NOT_BENCHMARKED/.test(code)) {
               judgingRef.current = null;
               setGate(previous => (previous ? { ...previous, word: 'CLOSED', tashkeel: 'CLOSED', reasons: [code] } : previous));

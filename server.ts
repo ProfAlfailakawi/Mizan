@@ -1990,7 +1990,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   const practiceFaceRawi=(req:Request):string=>{const key=soleParam(req.query.reading,'reading');const rawi=candidateRawiForDeliveryKey(key);if(!rawi)throw new PracticeFaceError('PRACTICE_FACE_READING_UNKNOWN');return rawi};
   const practiceFaceFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PRACTICE_FACE_FAILED';return res.status(code==='PRACTICE_FACE_READING_UNKNOWN'||code==='PRACTICE_FACE_PAGE_INVALID'?400:409).json({code})};
   /* وتُسمّى العلّةُ للشاشة: غيابُ محرّكٍ ليس كخطأ طلب، وبابٌ مغلقٌ ليس عطلًا. */
-  const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')||code.includes('WARMING')?503:code==='QURAN_ASR_JUDGING_CLOSED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
+  const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')||code.includes('WARMING')?503:code==='QURAN_ASR_JUDGING_CLOSED'||code==='QURAN_ASR_GATE_CHANGED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
 
   /*
    * «يسمعك» من بطاقة الرحلة.

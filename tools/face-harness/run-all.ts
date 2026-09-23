@@ -134,6 +134,19 @@ const PLAN: Expectation[] = [
       [o.attemptsStored === 1, `المراجعةُ لم تُحفظ: ${o.attemptsStored}`],
     ]),
   },
+  {
+    scenario: 'judging-changed-late', reciteMs: 11000, settleMs: 25_000,
+    why: 'الخادمُ يكشف أنّ القياسَ تبدّل والطلبُ في الطريق — أيُحكم بجوابٍ قديم؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      [o.mistakes.length === 0, `حُكم بعد تبدّلٍ كشفه الخادم: ${JSON.stringify(o.mistakes)}`],
+      [o.alertOscillators === 0, `نُبِّه بعد تبدّلٍ كشفه الخادم: ${o.alertOscillators} مذبذبًا`],
+      [!!o.gateNote && o.gateNote.includes('تغيّر محرّكُ السماع'), `لم يُقل للطالب إنّ المحرّكَ تغيّر: ${o.gateNote}`],
+      [o.chunksServed >= 3, `انقطع التتبّعُ أيضًا: ${o.chunksServed} مقاطع`],
+      [o.attemptsStored === 1, `المراجعةُ لم تُحفظ: ${o.attemptsStored}`],
+    ]),
+  },
 ];
 
 async function main() {
