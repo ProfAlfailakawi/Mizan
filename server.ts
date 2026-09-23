@@ -34,6 +34,7 @@ import { ColdVaultRepository } from './server/cold-vault';
 import { KfgqpcDeliveryRepository } from './server/kfgqpc-delivery';
 import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-generative';
 import { MizanQuranDelivery, candidateRawiForDeliveryKey } from './server/quran-reading-delivery';
+import { DELIVERY_READING_BY_RAWI } from './src/lib/delivered-readings';
 import { practiceFaceCatalogue, practiceFacePage, PracticeFaceError } from './server/practice-face-service';
 import { normalizeScope, scopeAyahCount, scopeContainsRange, type QuranScope } from './src/lib/quran-scope';
 import { resolveEffectiveScope } from './src/lib/scope-engine';
@@ -2079,10 +2080,18 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       'al-duri-abu-amr':'douri-abu-amr','al-susi':'sousi-abu-amr',
     };
     const definition=quranReadingDefinition(rawiId?intelligenceReadingByRawi[rawiId]||'':riwaya);
-    if(!definition)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
-    const deliveryReading=practiceDeliveryByReading[definition.id];
-    if(!deliveryReading)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
-    const value:JourneyPracticeAccess={competitionId,organizationId,participantId,scope,deliveryReading,listening:{reading:definition.id,sourcePackageId:definition.packageId}};
+    /*
+     * العشرون كلُّها، لا الستّ.
+     *
+     * كانت الرواياتُ خارج طبقة الاستماع الستّ تُردّ بـ PRACTICE_READING_NOT_SUPPORTED،
+     * فلا يرى طالبُ هشامٍ أو خلفٍ أو رويسٍ وجهًا ولا يُسمع — مع أنّ لكلٍّ منها حزمةَ
+     * تسليمٍ ونصًّا ووجوهًا في ميزان. فتُعرف الروايةُ من جدول التسليم الموحّد، ويُسمع
+     * صاحبُها على نصّ حزمته هو. ولا انتقالَ إلى رواية أخرى بحال.
+     */
+    const deliveryKey=definition?practiceDeliveryByReading[definition.id]:(rawiId?DELIVERY_READING_BY_RAWI[rawiId]:undefined);
+    if(!deliveryKey)throw new Error('PRACTICE_READING_NOT_SUPPORTED');
+    const deliveryReading=deliveryKey;
+    const value:JourneyPracticeAccess={competitionId,organizationId,participantId,scope,deliveryReading,listening:definition?{reading:definition.id,sourcePackageId:definition.packageId}:{reading:deliveryKey,sourcePackageId:`mizan-delivery:${deliveryKey}`}};
     journeyPracticeCache.set(cacheKey,{expires:Date.now()+JOURNEY_PRACTICE_CACHE_MS,value});
     return value;
   };

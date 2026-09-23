@@ -96,8 +96,9 @@ test('reading identity is explicit and has no cross-riwayah fallback', () => {
   assert.match(server, /qaloun:'qalun'/);
   assert.match(server, /'douri-abu-amr':'duri-abi-amr'/);
   assert.match(server, /'sousi-abu-amr':'susi-abi-amr'/);
-  assert.match(server, /if\(!definition\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
-  assert.match(server, /if\(!deliveryReading\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
+  /* العشرون كلٌّ بحزمته (طلب المالك 23 سبتمبر 2026)، وما لا حزمةَ له يُرفض — لا انتقال. */
+  assert.match(server, /const deliveryKey=definition\?practiceDeliveryByReading\[definition\.id\]:\(rawiId\?DELIVERY_READING_BY_RAWI\[rawiId\]:undefined\);/);
+  assert.match(server, /if\(!deliveryKey\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
 });
 
 test('participant-selected scope is never mistaken for the category parent scope', () => {
