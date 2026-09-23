@@ -61,3 +61,11 @@ test('انقطاعُ السماع يُقال للطالب، ولا يُسكت ع
   assert.ok(judgingNote(null, true, true)!.includes('انقطع سماع'));
   assert.ok(judgingNote(gate('CLOSED', ['WORD_ERROR_RATE']), true, true)!.includes('انقطع سماع'));
 });
+
+test('وتبدّلُ القياس أثناء التلاوة يُقال بسببه — لا يُسمّى انقطاعًا', () => {
+  const changed = judgingNote(gate('OPEN'), true, 'changed');
+  assert.ok(changed && changed.includes('تغيّر محرّكُ السماع'), `لم يُقل التبدّل: ${changed}`);
+  assert.ok(changed!.includes('فلم يُحكم'), 'لم يُقل إنّه لم يُحكم');
+  assert.equal(changed!.includes('انقطع'), false, 'سُمّي التبدّلُ انقطاعًا');
+  assert.ok(/changed/.test(judgingNote(gate('OPEN'), false, 'changed') || ''), 'الإنجليزيّةُ لا تقول التبدّل');
+});
