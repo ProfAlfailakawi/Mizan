@@ -270,7 +270,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     let live = true;
     const bySurah = new Map<number, { lo: number; hi: number }>();
     for (const w of face.words) { const r = bySurah.get(w.surah); bySurah.set(w.surah, r ? { lo: Math.min(r.lo, w.ayah), hi: Math.max(r.hi, w.ayah) } : { lo: w.ayah, hi: w.ayah }); }
-    const at = new Map(face.words.map(w => [`${w.surah}:${w.ayah}:${w.ayahWordIndex}`, w.index] as const));
+    /* محرّكُ المتشابهات يعدّ الكلمة في آيتها من صفر (`server/quran-mutashabihat`)، والوجهُ من واحد. */
+    const at = new Map(face.words.map(w => [`${w.surah}:${w.ayah}:${w.ayahWordIndex - 1}`, w.index] as const));
     void Promise.all([...bySurah].map(([surah, r]) => fetchDivergencePoints(deliveryReading, surah, r.lo, r.hi).catch(() => [] as DivergencePoint[]))).then(rows => {
       if (!live) return;
       const map = new Map<number, DivergencePoint>();

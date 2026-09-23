@@ -98,6 +98,11 @@ test('layout words are zero-based on the server and one-based everywhere else �
   assert.match(page, /findLayoutWord\(layout, w\.surah, w\.ayah, w\.ayahWordIndex - 1\)/);
   const judge = fs.readFileSync('src/components/judge/OfficialMushafSurface.tsx', 'utf8');
   assert.match(judge, /findLayoutWord\(layout,a\.surah,a\.ayah,tracking\.wordIndex-1\)/);
+  // ومحرّكُ المتشابهات من صفر كذلك.
+  const engine = fs.readFileSync('server/quran-mutashabihat.ts', 'utf8');
+  assert.match(engine, /let wi = 0;[\s\S]{0,260}wordIndex: wi,/);
+  const listens = fs.readFileSync('src/components/participant/MushafListens.tsx', 'utf8');
+  assert.match(listens, /`\$\{w\.surah\}:\$\{w\.ayah\}:\$\{w\.ayahWordIndex - 1\}`, w\.index/);
 });
 
 test('the judge page places the pen on the word, and keeps the line lens where it cannot', () => {
