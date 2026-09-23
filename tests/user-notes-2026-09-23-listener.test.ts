@@ -28,7 +28,11 @@ test('chunks after the first are sent with the container header so they can be d
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(judge, /if\(!headBlobRef\.current\)headBlobRef\.current=e\.data;/);
   assert.match(practice, /new Blob\(\[head, chunk\]/);
-  assert.match(practice, /const windowParts = index === 0 \? \[chunk\] : \[all\[0\], \.\.\.all\.slice\(first, index \+ 1\)\]/);
+  /*
+   * والترويسةُ تسبق كلَّ نافذةٍ لا تبلغ المقطعَ الأوّل؛ وما بلغته يُرسل صوتُه محتوًى لا
+   * ترويسةً — وإلا طُرح صوتُ أوّل التلاوة ولم يُثبَّت (تغطيتُه في recognition-window.test).
+   */
+  assert.match(practice, /const windowParts = win\.headed \? \[all\[0\], \.\.\.all\.slice\(win\.first, index \+ 1\)\] : all\.slice\(0, index \+ 1\)/);
   assert.match(practice, /startMs < committedUntil\.current - 80/, 'overlapping windows commit each word once');
 });
 
