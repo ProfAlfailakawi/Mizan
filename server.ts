@@ -1964,7 +1964,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   const practiceFaceRawi=(req:Request):string=>{const key=soleParam(req.query.reading,'reading');const rawi=candidateRawiForDeliveryKey(key);if(!rawi)throw new PracticeFaceError('PRACTICE_FACE_READING_UNKNOWN');return rawi};
   const practiceFaceFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PRACTICE_FACE_FAILED';return res.status(code==='PRACTICE_FACE_READING_UNKNOWN'||code==='PRACTICE_FACE_PAGE_INVALID'?400:409).json({code})};
   /* وتُسمّى العلّةُ للشاشة: غيابُ محرّكٍ ليس كخطأ طلب، وبابٌ مغلقٌ ليس عطلًا. */
-  const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')?503:code==='QURAN_ASR_JUDGING_CLOSED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
+  const recitationRecogniserFailure=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'QURAN_ASR_FAILED';const status=code.includes('NOT_CONFIGURED')||code.includes('WARMING')?503:code==='QURAN_ASR_JUDGING_CLOSED'?409:code.includes('BACKEND_HTTP')?502:400;return res.status(status).json({code})};
 
   /*
    * «يسمعك» من بطاقة الرحلة.
@@ -2131,6 +2131,40 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     void practiceListenerToken().then(token=>fetch(new URL('/health',practiceListenerUrl).toString(),{headers:token?{authorization:`Bearer ${token}`}:{},signal:AbortSignal.timeout(15_000)})).catch(()=>{});
   };
 
+  /*
+   * كشفُ أخطاء التدريب لحظيًّا من المستمع نفسه.
+   *
+   * كان «السماعُ» (ما قيل كلمةً كلمة) معلّقًا بخدمة ASR خارجية وتقرير معايرة، ولم يُنشر
+   * أيٌّ منهما — فبقي بابُ الأخطاء مغلقًا في كل مسابقة، والطالبُ لا يسمع تنبيهًا ولا يرى
+   * خطأً. المستمعُ المنشور يعرف ما قيل، فيُفتح به الكشفُ **في التدريب وحده** (لا درجة ولا
+   * تحكيم)، وبحرفه لا بتشكيله. والتقديرُ يبقى حذرًا: ما لم يثق به المحرّكُ لا يُقال خطأً.
+   */
+  const PRACTICE_LISTENER_MODEL='mizan-practice-listener';
+  const practiceJudgingGate=(reading:string)=>{
+    if(!recitationRecogniser.configured()&&dedicatedPracticeListenerReady(reading))
+      return {reading,word:'OPEN',tashkeel:'CLOSED',modelVersion:PRACTICE_LISTENER_MODEL,reasons:['PRACTICE_LISTENER']};
+    return recitationRecogniser.gate(reading);
+  };
+  const recogniseWithDedicatedListener=async(input:{reading:string;contentType:string;bytes:Buffer;headBytes:number})=>{
+    if(!input.bytes.length||input.bytes.length>4_000_000)throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
+    const token=await practiceListenerToken();
+    const response=await fetch(new URL('/recognise',practiceListenerUrl).toString(),{method:'POST',headers:{
+      'content-type':input.contentType||'application/octet-stream','x-mizan-reading':input.reading,
+      'x-mizan-head-bytes':String(Number.isInteger(input.headBytes)&&input.headBytes>0?input.headBytes:0),
+      ...(token?{authorization:`Bearer ${token}`}:{})
+    },body:new Uint8Array(input.bytes),signal:AbortSignal.timeout(20_000)});
+    if(response.status===503)throw new Error('QURAN_PRACTICE_LISTENER_WARMING');
+    if(!response.ok)throw new Error(`QURAN_PRACTICE_LISTENER_HTTP_${response.status}`);
+    const raw=await response.json() as any;
+    const words=(Array.isArray(raw?.words)?raw.words:[]).slice(0,200).flatMap((w:any)=>{
+      const text=typeof w?.text==='string'?w.text.trim().slice(0,64):'';const confidence=Number(w?.confidence);
+      const startMs=Number(w?.startMs),endMs=Number(w?.endMs);
+      if(!text||!Number.isFinite(confidence)||confidence<0||confidence>1)return [];
+      return [{text,confidence,...(Number.isFinite(startMs)&&startMs>=0?{startMs}:{}),...(Number.isFinite(endMs)&&endMs>=0?{endMs}:{})}];
+    });
+    return {gate:practiceJudgingGate(input.reading),words,modelVersion:PRACTICE_LISTENER_MODEL};
+  };
+
   const runPracticeListener=async(input:{access:JourneyPracticeAccess;surah:number;startAyah:number;endAyah:number;contentType:string;bytes:Buffer})=>{
     if(!journeyListeningReady(input.access.listening.reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
     const passage=await quranDelivery.passage(input.access.deliveryReading,input.surah,input.startAyah,input.endAyah);
@@ -2186,7 +2220,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * قط)، فلم يظهر زرّه ولا مؤشّرُه في أيّ مسابقة. والمستمعُ المنشورُ للتدريب يعرف الموضعَ
    * كذلك، فيُستعمل هنا لإظهار «أين القارئ» فقط: لا دليل، ولا درجة، ولا حكم — المحكّمُ يحكم.
    */
-  app.get('/api/quran/judge/follow/status',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{
+  app.get('/api/quran/judge/follow/status',alignmentAudioIpRateLimit,requireGovernanceRoles(['judge','head_judge']),(req,res)=>{
     let reading='';try{reading=soleParam(req.query.reading,'reading')||''}catch{return res.status(400).json({code:'QUERY_PARAM_REPEATED'})}
     const ready=dedicatedPracticeListenerReady(reading);
     if(ready)wakeDedicatedListener();
@@ -2242,7 +2276,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.get('/api/public/journeys/practice/judging-gate',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
-    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading');if(reading!==access.listening.reading)throw new Error('PRACTICE_REQUEST_MISMATCH');res.setHeader('Cache-Control','private, no-store');return res.json(recitationRecogniser.gate(reading))}
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading');if(reading!==access.listening.reading)throw new Error('PRACTICE_REQUEST_MISMATCH');res.setHeader('Cache-Control','private, no-store');return res.json(practiceJudgingGate(reading))}
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/align',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
@@ -2250,7 +2284,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/recognise',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
-    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading,sourcePackageId,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);if(!recitationRecogniser.configured()&&dedicatedPracticeListenerReady(reading)){const headBytes=Number(soleParam(req.headers['x-mizan-head-bytes'],'x-mizan-head-bytes')||0);res.setHeader('Cache-Control','private, no-store');return res.json(await recogniseWithDedicatedListener({reading,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,headBytes}))}const out=await recitationRecogniser.recognise({reading,sourcePackageId,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
     catch(err){
       const code=err instanceof Error?err.message:'';
       return code.startsWith('QURAN_ASR_')?recitationRecogniserFailure(res,err):journeyPracticeFailure(res,err);
@@ -2265,7 +2299,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * ومغلقٌ هو الأصل: بلا محرّكٍ مضبوطٍ وبلا تقرير قياسٍ لروايته، يعود البابُ مغلقًا
    * باسم سببه. ولا يعود خطأً: انعدامُ الإذن حالةٌ تُعرض لا عُطل.
    */
-  app.get('/api/quran/practice/judging-gate',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{res.setHeader('Cache-Control','no-store');return res.json(recitationRecogniser.gate(soleParam(req.query.reading,'reading')))});
+  app.get('/api/quran/practice/judging-gate',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),(req,res)=>{res.setHeader('Cache-Control','no-store');return res.json(practiceJudgingGate(soleParam(req.query.reading,'reading')))});
 
   /*
    * وما يُسمع يُردّ كلماتٍ — ولا حكمَ هنا: الحكمُ حيث يُعرف نصُّ الوجه.
@@ -2273,7 +2307,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * ولا يُرسل بايتٌ واحدٌ من صوت الطالب إلى محرّكٍ ما لم يكن البابُ مفتوحًا: الفحصُ
    * كلُّه يقع قبل الشبكة في `RecitationRecogniser`.
    */
-  app.post('/api/quran/practice/recognise',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceAlignmentRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading:soleParam(req.query.reading,'reading'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return recitationRecogniserFailure(res,err)}});
+  app.post('/api/quran/practice/recognise',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceAlignmentRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const reading=soleParam(req.query.reading,'reading');if(!recitationRecogniser.configured()&&dedicatedPracticeListenerReady(reading)){res.setHeader('Cache-Control','no-store');return res.json(await recogniseWithDedicatedListener({reading,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,headBytes:Number(soleParam(req.headers['x-mizan-head-bytes'],'x-mizan-head-bytes')||0)}))}const out=await recitationRecogniser.recognise({reading,sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return recitationRecogniserFailure(res,err)}});
   app.get('/api/quran/alignment/shadow/session/:sessionId',requireGovernanceRoles(['judge','head_judge','auditor']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{res.setHeader('Cache-Control','no-store');return res.json(quranIntelligence.sessionEvidence(actor.uid,String(req.params.sessionId||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/session/:sessionId/human-marker',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{return res.json(quranIntelligence.markHumanEvent(actor.uid,String(req.params.sessionId||''),String(req.body?.eventType||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/reset',requireGovernanceRoles(['judge','head_judge',]),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;quranIntelligence.resetAlignment(actor.uid,String(req.body?.sessionId||''));return res.json({reset:true,mode:'SHADOW_ONLY',scoreAuthority:'HUMAN_ONLY'})});

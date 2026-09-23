@@ -118,10 +118,12 @@ export async function fetchPracticeJudgingGate(reading:QuranReadingId,access?:Jo
   return access?publicPracticeJson<QuranJudgingGate>(url,access):getJson<QuranJudgingGate>(url);
 }
 
-export async function submitPracticeRecognitionChunk(input:{blob:Blob;reading:QuranReadingId;sourcePackageId:string},access?:JourneyPracticeAuth){
+export async function submitPracticeRecognitionChunk(input:{blob:Blob;reading:QuranReadingId;sourcePackageId:string;headBytes?:number},access?:JourneyPracticeAuth){
   const qs=new URLSearchParams({reading:input.reading,sourcePackageId:input.sourcePackageId});
   const url=access?`/api/public/journeys/practice/recognise?${qs.toString()}`:`/api/quran/practice/recognise?${qs.toString()}`;
   const headers:Record<string,string>={'content-type':input.blob.type||'application/octet-stream'};
+  if(input.headBytes)headers['x-mizan-head-bytes']=String(input.headBytes);
+  if(input.headBytes)headers['x-mizan-head-bytes']=String(input.headBytes);
   if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
   const r=await fetch(url,{method:'POST',headers,body:input.blob,cache:'no-store'});
   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));

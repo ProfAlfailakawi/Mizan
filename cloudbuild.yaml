@@ -200,7 +200,8 @@ substitutions:
 
 images:
   - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
-  - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
+  # صورةُ المستمع لا تُدرج هنا: `images` يُلزم بوجود كل صورةٍ مذكورة، فتعثّرُ بنائها
+  # كان سيُسقط النشرَ كلّه من جديد. تُدفع في خطوتها الخاصة (allowFailure) وحدها.
 
 timeout: '1800s'
 

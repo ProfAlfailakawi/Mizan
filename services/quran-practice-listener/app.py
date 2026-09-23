@@ -19,6 +19,15 @@ MODEL_CHAIN=[m for m in [
 state={'model':None,'id':None,'error':None,'started':time.time()}
 
 def load_model():
+    # تعثّرٌ عابرٌ في التنزيل لا يُعطّل الخدمةَ إلى الأبد: تُعاد المحاولة بمهلٍ متزايدة.
+    delay=10
+    while state['model'] is None:
+        try_models()
+        if state['model'] is not None:return
+        print(f'all models failed; retrying in {delay}s',flush=True)
+        time.sleep(delay);delay=min(delay*2,300)
+
+def try_models():
     from faster_whisper import WhisperModel
     errors=[]
     for model_id in dict.fromkeys(MODEL_CHAIN):
@@ -85,8 +94,11 @@ def best_match(transcript:str, ayat:list[dict], after:int=-1):
 
 @app.get('/health')
 def health():
-    status='ok' if state['model'] else ('failed' if state['error'] else 'loading')
-    return {'status':status,'model':state['id'],'error':state['error'],'mode':'PRACTICE_AND_FOLLOW_ONLY'}
+    from fastapi.responses import JSONResponse
+    status='ok' if state['model'] else ('retrying' if state['error'] else 'loading')
+    body={'status':status,'model':state['id'],'error':state['error'],'mode':'PRACTICE_AND_FOLLOW_ONLY'}
+    # لا «سليم» قبل أن يجهز النموذج: الصحّةُ تقول الحقيقة لمن يسأل.
+    return JSONResponse(body,status_code=200 if state['model'] else 503)
 
 @app.post('/listen')
 async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected_passage:str=Header(''),x_mizan_after:str=Header('')):
@@ -115,4 +127,50 @@ async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected
     finally:
         if path:
             try:os.remove(path)
+            except OSError:pass
+
+
+@app.post('/recognise')
+async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_bytes:str=Header('0')):
+    """
+    ما قيل، كلمةً كلمة، بتوقيتٍ من أوّل ما بعد الترويسة.
+
+    المقطعُ يصل مسبوقًا بترويسة الملف (أوّلُ مقطعٍ في التلاوة) حتى يُفكّ. فتُقاس مدّةُ
+    الترويسة وتُطرح كلماتُها، ويعود التوقيتُ منسوبًا إلى ما بعدها — والعميلُ يُسنده إلى
+    أوّل التلاوة ويُثبّت ما استقرّ منه.
+    """
+    if x_mizan_reading!='hafs':raise HTTPException(409,'READING_NOT_SUPPORTED')
+    model=state['model']
+    if model is None:raise HTTPException(503,'MODEL_LOADING')
+    audio=await request.body()
+    if not audio or len(audio)>4_000_000:raise HTTPException(400,'AUDIO_CHUNK_INVALID')
+    try:head_len=max(0,min(len(audio),int(x_mizan_head_bytes)))
+    except ValueError:head_len=0
+    content_type=request.headers.get('content-type','audio/webm')
+    suffix='.ogg' if 'ogg' in content_type else ('.mp4' if 'mp4' in content_type else '.webm')
+    paths=[]
+    def temp(data:bytes)->str:
+        with tempfile.NamedTemporaryFile(suffix=suffix,delete=False) as f:
+            f.write(data);paths.append(f.name);return f.name
+    try:
+        from faster_whisper.audio import decode_audio
+        head_s=0.0
+        if head_len and head_len<len(audio):
+            try:head_s=len(decode_audio(temp(audio[:head_len])))/16000.0
+            except Exception:head_s=0.0
+        try:
+            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=False,word_timestamps=True)
+            words=[]
+            for seg in segments:
+                for w in (seg.words or []):
+                    text=w.word.strip()
+                    if not text or w.end<=head_s+0.05:continue
+                    words.append({'text':text,'confidence':max(0.0,min(1.0,float(w.probability))),
+                                  'startMs':max(0,int((w.start-head_s)*1000)),'endMs':max(0,int((w.end-head_s)*1000))})
+        except Exception:
+            raise HTTPException(422,'AUDIO_UNDECODABLE')
+        return {'reading':'hafs','modelVersion':str(state['id']),'words':words[:200],'headMs':int(head_s*1000)}
+    finally:
+        for p in paths:
+            try:os.remove(p)
             except OSError:pass
