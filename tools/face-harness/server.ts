@@ -12,7 +12,7 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped';
 
 /*
  * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
@@ -59,7 +59,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       return json(res, pageOf(Number(url.searchParams.get('page'))));
     }
     if (url.pathname === '/api/quran/practice/judging-gate') {
-      const open = scenario === 'judging';
+      const open = scenario === 'judging' || scenario === 'judging-dropped';
       return json(res, {
         reading: RAWI,
         word: open ? 'OPEN' : 'CLOSED',
@@ -69,9 +69,15 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       });
     }
     if (url.pathname === '/api/quran/practice/recognise') {
-      if (scenario !== 'judging') return json(res, { code: 'QURAN_ASR_JUDGING_CLOSED' }, 409);
+      if (scenario !== 'judging' && scenario !== 'judging-dropped') return json(res, { code: 'QURAN_ASR_JUDGING_CLOSED' }, 409);
       const index = heard;
       heard += 1;
+      /*
+       * و`judging-dropped` تُسقط مقطعَ سماعٍ واحدًا بعطبٍ عابر — وهو أكثرُ ما يقع:
+       * شبكةٌ تتعثّر، أو ٥٠٢، أو تجاوزُ حدّ. فيصير في ما سُمع **ثقب**، والمقابلةُ
+       * تقرأ الثقبَ إسقاطًا فتُخطّئ قارئًا مصيبًا. والمنتظَرُ ألّا يُحكم أصلًا.
+       */
+      if (scenario === 'judging-dropped' && index === 2) return json(res, { code: 'HARNESS_ASR_DROPPED' }, 502);
       const face = pageOf(single.page);
       /*
        * ويُعاد نصُّ الوجه نفسُه كلمتين في كلّ مقطع — من حزمة الرواية لا من اختراع —

@@ -100,6 +100,23 @@ const PLAN: Expectation[] = [
       [!!o.gateNote && o.gateNote.includes('لم يجتز'), `لم يُقل للطالب لماذا لا يُحكم: ${o.gateNote}`],
     ]),
   },
+  {
+    scenario: 'judging-dropped', reciteMs: 11000, settleMs: 25_000,
+    why: 'مقطعُ سماعٍ يسقط بعطبٍ عابر — أيُحكم على تلاوةٍ فيها ثقب؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      /*
+       * فثقبٌ في ما سُمع تقرؤه المقابلةُ إسقاطًا، فتُعلَّم كلماتٌ قرأها الطالبُ
+       * صحيحةً ويُنبَّه عليها بصوت. والصوابُ ألّا يُحكم أصلًا، وأن يُقال لماذا.
+       */
+      [o.mistakes.length === 0, `حُكم على تلاوةٍ فيها ثقب: ${JSON.stringify(o.mistakes)}`],
+      [o.alertOscillators === 0, `نُبِّه على ثقبٍ في السماع: ${o.alertOscillators} مذبذبًا`],
+      [!!o.gateNote && o.gateNote.includes('انقطع سماع'), `لم يُقل للطالب إنّ السماعَ انقطع: ${o.gateNote}`],
+      /* ووصفُ التلاوة يبقى يعمل: سقوطُ السماع لا يُسقط التتبّع. */
+      [o.chunksServed >= 3, `انقطع التتبّعُ أيضًا: ${o.chunksServed} مقاطع`],
+    ]),
+  },
 ];
 
 async function main() {

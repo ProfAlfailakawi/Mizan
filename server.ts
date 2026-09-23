@@ -499,9 +499,34 @@ async function startServer() {
     skip:()=>rateLimiterIsGlobal,
     message:{code:'RATE_LIMITED'},
   });
+  /*
+   * حدُّ المقاطع لكلّ متسابق — ويُقاس بالإيقاع لا يُقدَّر.
+   *
+   * فالمسجّلُ يُخرج مقطعًا كلَّ **ثانيتين**، والنافذةُ مئةٌ وعشرون ثانية. فحدُّ ٦٠
+   * كان يساوي الإيقاعَ بالضبط: صفرُ فسحةٍ لإعادةِ محاولةٍ أو لطلبِ وجهٍ يمرّ في
+   * أثناء التلاوة. ووجهُ المصحف زهاءَ ١٢٨ كلمة، وقارئٌ متأنٍّ يقرؤه في أكثر من
+   * دقيقتين — أي أكثر من ٦٠ مقطعًا. فكان الحدُّ يقطع على المتأنّي تلاوتَه.
+   *
+   * فصار ٩٠: فسحةُ النصف فوق الإيقاع، وتكفي تلاوةً في ثلاث دقائق.
+   */
   const practiceAlignmentRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
-    limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX||60),
+    limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX||90),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
+    message:{code:'RATE_LIMITED'},
+  });
+  /*
+   * ولمسار السماع حدُّه هو، لا يُقاسَم مسارَ المحاذاة.
+   *
+   * فالمقطعُ الواحدُ يذهب إلى المسارين معًا حين تُفتح بوّابةُ الحكم. وحدٌّ مشترك
+   * يُستهلك في نصف الزمن، ثمّ يردّ الخادمُ 429 **للمسارين** — فينقطع وصفُ التلاوة
+   * أيضًا، وهو يعمل اليوم ولا شأن له بكشف الخطأ. فيُفصل الحدّان: سقوطُ أحدهما لا
+   * يُسقط الآخر.
+   */
+  const practiceRecognitionRateLimit:RequestHandler=rateLimit({
+    windowMs:120_000,
+    limit:Number(process.env.MIZAN_PRACTICE_RECOGNITION_RATE_LIMIT_MAX||90),
     standardHeaders:'draft-7',legacyHeaders:false,
     keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
     message:{code:'RATE_LIMITED'},
@@ -2209,7 +2234,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * ولا يُرسل بايتٌ واحدٌ من صوت الطالب إلى محرّكٍ ما لم يكن البابُ مفتوحًا: الفحصُ
    * كلُّه يقع قبل الشبكة في `RecitationRecogniser`.
    */
-  app.post('/api/quran/practice/recognise',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceAlignmentRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading:soleParam(req.query.reading,'reading'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return recitationRecogniserFailure(res,err)}});
+  app.post('/api/quran/practice/recognise',practiceAlignmentIpRateLimit,requireFirebaseRoles(['participant']),practiceRecognitionRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await recitationRecogniser.recognise({reading:soleParam(req.query.reading,'reading'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return recitationRecogniserFailure(res,err)}});
   app.get('/api/quran/alignment/shadow/session/:sessionId',requireGovernanceRoles(['judge','head_judge','auditor']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{res.setHeader('Cache-Control','no-store');return res.json(quranIntelligence.sessionEvidence(actor.uid,String(req.params.sessionId||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/session/:sessionId/human-marker',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{return res.json(quranIntelligence.markHumanEvent(actor.uid,String(req.params.sessionId||''),String(req.body?.eventType||'')))}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/quran/alignment/shadow/reset',requireGovernanceRoles(['judge','head_judge',]),(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;quranIntelligence.resetAlignment(actor.uid,String(req.body?.sessionId||''));return res.json({reset:true,mode:'SHADOW_ONLY',scoreAuthority:'HUMAN_ONLY'})});

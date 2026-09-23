@@ -74,7 +74,21 @@ export function faceNote(code: string, ar: boolean): string {
  *
  * ولا يُقال شيءٌ حين تكون مفتوحة: البابُ المفتوحُ يُرى بأثره على الوجه.
  */
-export function judgingNote(gate: { word: 'OPEN' | 'CLOSED'; reasons: readonly string[] } | null, ar: boolean): string | undefined {
+export function judgingNote(
+  gate: { word: 'OPEN' | 'CLOSED'; reasons: readonly string[] } | null,
+  ar: boolean,
+  lost = false,
+): string | undefined {
+  /*
+   * وانقطاعُ السماع في أثناء المراجعة يُقال، ولا يُسكت عنه.
+   *
+   * فمقطعٌ لم يصل يترك ثقبًا في ما سُمع، والمقابلةُ تقرأ الثقبَ إسقاطًا فتُخطّئ
+   * قارئًا مصيبًا. فيُطرح الحكمُ كلُّه لهذه المراجعة — **وسكوتٌ عن خطأٍ أهونُ من
+   * تخطئةِ مصيب** — ويُقال للطالب لماذا سكت عنه.
+   */
+  if (lost)
+    return ar ? 'وانقطع سماعُ بعض تلاوتك، فلم يُحكم على هذه المراجعة — ولا يُقال لك «أخطأت» على ما لم يُسمع كلُّه.'
+      : 'Part of your recitation never reached the engine, so this review was not judged — nothing here says you erred.';
   if (!gate || gate.word === 'OPEN') return undefined;
   const why = gate.reasons.join(' ');
   if (/NOT_CONFIGURED/.test(why))

@@ -60,10 +60,27 @@ test('a door that swallows audio is limited per actor too, and bounded in size',
   const audio = routes.filter(r => /express\.raw\(/.test(r.head));
   assert.ok(audio.length >= 2, `expected the audio routes, found ${audio.length}`);
   for (const route of audio) {
-    assert.match(route.head, /practiceAlignmentRateLimit/, `${route.url}: needs a per-actor limit`);
+    /*
+     * وحدُّ الفاعل يُطلب بوصفه لا باسم واحدٍ بعينه: مساران يبتلعان صوتًا، وحدٌّ
+     * مشتركٌ بينهما يُستهلك في نصف الزمن فيقطع كليهما. فيكفي أن يحمل كلٌّ حدًّا
+     * للفاعل — ويُشترط بعدُ ألّا يكون الحدُّ واحدًا للمسارين.
+     */
+    assert.match(route.head, /practice[A-Za-z]*RateLimit/, `${route.url}: needs a per-actor limit`);
     assert.match(route.head, /limit:'[0-9]+[km]b'/i, `${route.url}: raw body must be bounded`);
     assert.match(route.head, /type:\['audio\/\*','application\/octet-stream'\]/, `${route.url}: only audio is read raw`);
   }
+  /*
+   * ولا يتقاسم مساران يبتلعان صوتًا حدًّا واحدًا للفاعل.
+   *
+   * فالمقطعُ يذهب إليهما معًا حين تُفتح بوّابةُ الحكم، فيُستهلك الحدُّ في نصف الزمن،
+   * ثمّ يردّ الخادمُ 429 للمسارين — فينقطع **وصفُ التلاوة** أيضًا، وهو يعمل اليوم
+   * ولا شأن له بكشف الخطأ.
+   */
+  const perActor = audio.map(route => [...route.head.matchAll(/practice[A-Za-z]*RateLimit/g)]
+    .map(m => m[0]).filter(name => name !== 'practiceAlignmentIpRateLimit'));
+  audio.forEach((route, index) => assert.ok(perActor[index].length, `${route.url}: بلا حدٍّ للفاعل`));
+  const names = perActor.map(list => list.join('+'));
+  assert.equal(new Set(names).size, names.length, `مساران يبتلعان صوتًا يتقاسمان الحدّ نفسَه: ${names.join(' · ')}`);
 });
 
 test('a repeated query parameter never becomes an array on a practice door', () => {
