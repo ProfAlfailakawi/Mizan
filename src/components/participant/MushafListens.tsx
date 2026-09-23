@@ -119,6 +119,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * والفرقُ بينهما هو الفرقُ بين صمتٍ لا يعرف وصمتٍ يعرف — ولا يُعرضان سواءً.
    */
   const [mistakes, setMistakes] = useState<readonly Mistake[] | undefined>(undefined);
+  /* وانقطع سماعُ مقطعٍ في هذه المراجعة؟ فلا حكمَ عليها، ويُقال. */
+  const [judgingLost, setJudgingLost] = useState(false);
 
   const samples = useRef<FaceAlignmentSample[]>([]);
   /* ما سُمع من كلماتٍ، بتوقيتٍ من أوّل التلاوة لا من أوّل المقطع. */
@@ -127,6 +129,17 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   /* ونوافذُ خرج فيها صوتٌ من السمّاعة — يُطرح ما سُمع تحتها قبل أن يُحكم. */
   const alertWindows = useRef<SoundWindow[]>([]);
   const speaker = useRef<AlertSpeaker | null>(null);
+  /*
+   * وإذنُ الحكم يُلتقط **عند بدء التلاوة** ويثبت إلى آخرها.
+   *
+   * فسؤالُ البوّابة طلبٌ لا يعود فورًا. ولو قُرئ الإذنُ عند كلّ مقطعٍ لبدأ الطالبُ
+   * قبل أن يعود الجواب، فتُهمل أوّلُ مقاطعه، ثمّ يُفتح البابُ في أثناء التلاوة
+   * فتُقابَل بقيّةُ ما سُمع بالوجه كلِّه — **فيُعدّ أوّلُ الوجه الذي قرأه ساقطًا**.
+   *
+   * فإن لم يكن الإذنُ معروفًا عند الضغط، لم تُحكم هذه المراجعةُ أصلًا — وتُحكم
+   * التي بعدها. ومن هنا أيضًا يُطرح الحكمُ إن سقط مقطعُ سماعٍ في الطريق.
+   */
+  const attemptJudging = useRef<QuranJudgingGate | null>(null);
   const chunkIndex = useRef(0);
   const startedAt = useRef(0);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -136,6 +149,18 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const alive = useRef(true);
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
   const queue = useRef<SerialQueue>(serialQueue());
+  /*
+   * وللسماع طابورُه هو، لا يُقاسَم طابورَ المحاذاة.
+   *
+   * فكلاهما يلزمه الترتيب، ولكنّ الطابورَ يعدّ **أيَّ** مهمّةٍ سقطت ناقصةً — ومن
+   * ذلك العدّ يُعرف أنّ التلاوة لم تكتمل، فلا تُحفظ المراجعةُ ويُقال للطالب إنّ
+   * مقطعًا لم يصل. فلمّا دخل السماعُ الطابورَ نفسَه صار سقوطُ مقطعِ سماعٍ **يُسقط
+   * وصفَ التلاوة وحفظَها** — وهو يعمل ولا شأن له بكشف الخطأ. وقِيس ذلك في متصفّح:
+   * «محاولات ٠» في تلاوةٍ تتبُّعُها تامّ.
+   *
+   * فطابوران: الترتيبُ محفوظٌ في كلٍّ، وسقوطُ أحدهما لا يُحاسَب به الآخر.
+   */
+  const recognition = useRef<SerialQueue>(serialQueue());
 
   /*
    * والحياةُ تُعاد عند كلّ تركيب، لا تُنفى مرّةً فتبقى منفيّة.
@@ -243,9 +268,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (!deliveryReading || !candidates.length) return;
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
+    recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
-    setMistakes(undefined);
+    attemptJudging.current = null;
+    setMistakes(undefined); setJudgingLost(false);
     const weightOf = faceWeights(attempts, Date.now());
     const picked = drawFace(candidates, seed, weightOf);
     if (!picked) { setStage('blocked'); setNote(ar ? 'لم يُسحب وجه.' : 'No face drawn.'); return; }
@@ -297,7 +324,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   /* وعند مغادرة الشاشة: يُطلق الميكروفونُ ويُترك ما بقي من الطابور. */
   useEffect(() => () => {
-    queue.current.abandon(); stopAudio();
+    queue.current.abandon(); recognition.current.abandon(); stopAudio();
     speaker.current?.close(); speaker.current = null;
   }, [stopAudio]);
 
@@ -305,8 +332,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (!face) return;
     samples.current = []; setHeard(0); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
-    setMistakes(undefined);
+    setMistakes(undefined); setJudgingLost(false);
+    /* والإذنُ يُلتقط الآن ويثبت: مجهولٌ عند الضغط يعني مراجعةً لا تُحكم. */
+    attemptJudging.current = judgingRef.current;
     queue.current.abandon(); queue.current = serialQueue();
+    recognition.current.abandon(); recognition.current = serialQueue();
 
     /*
      * لا ندخل حالة «يتلو» إلا إذا كان الاستماع الحقيقي جاهزًا لهذا الوجه.
@@ -406,9 +436,9 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * ومقطعان يتسابقان يخلطان ما سُمع فيصنعان خطأً حيث لا خطأ — وهي العلّةُ التي
          * صنعت «أعدتَ» الكاذبة في مسار المحاذاة، ولا تُعاد هنا.
          */
-        if (judgingRef.current) {
-          queue.current.push(async live => {
-            const permission = judgingRef.current;
+        if (attemptJudging.current) {
+          recognition.current.push(async live => {
+            const permission = attemptJudging.current;
             if (!permission) return;
             const out = await submitPracticeRecognitionChunk({
               blob: windowBlob, headBytes: windowHeadBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
@@ -447,14 +477,23 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             }
           }, error => {
             /*
-             * وسقوطُ السماع لا يُسقط التتبّع: تبقى العلاماتُ تُقاس، ويبقى الوجهُ يُقرأ.
-             * ويُقال للطالب حين يكون السببُ بنيويًّا — لا عند تعثّر مقطعٍ واحد.
+             * **وأيُّ مقطعٍ سماعٍ يسقط يُبطل حكمَ هذه المراجعة كلِّها** — لا العلّةُ
+             * البنيويّةُ وحدها.
+             *
+             * فمقطعٌ لم يصل يترك ثقبًا في ما سُمع، والمقابلةُ تقرأ الثقبَ إسقاطًا:
+             * كلماتٌ قرأها الطالبُ صحيحةً تُعلَّم «لم تُسمع» ويُنبَّه عليها بصوت.
+             * وكان الشرطُ مقصورًا على أسماءٍ بعينها، فيبقى البابُ مفتوحًا بعد عطبِ
+             * شبكةٍ أو 502 أو تجاوزِ حدّ — وهي أكثرُ ما يقع.
+             *
+             * وسقوطُ السماع لا يُسقط التتبّع: تبقى العلاماتُ تُقاس ويبقى الوجهُ يُقرأ.
              */
+            attemptJudging.current = null;
+            setMistakes(undefined);
+            setJudgingLost(true);
             const code = error instanceof Error ? error.message : '';
             if (/NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH|MODEL_NOT_BENCHMARKED/.test(code)) {
               judgingRef.current = null;
               setGate(previous => (previous ? { ...previous, word: 'CLOSED', tashkeel: 'CLOSED', reasons: [code] } : previous));
-              setMistakes(undefined);
             }
           });
         }
@@ -483,6 +522,18 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       read: complete => ({ ...readRecitation(samples.current, face.words, face.page, { complete }), complete }),
     });
     if (!alive.current) return;
+    /*
+     * ويُنتظر السماعُ على حدة — وتأخّرُه ليس نقصًا في التلاوة.
+     *
+     * وإن لم يفرغ طابورُه في مهلته فقد بقي آخرُ ما سُمع في الطريق. وحكمُ الخاتمة
+     * يُحاسب الذيلَ حذفًا، فتلاوةٌ ناقصةُ السماع تُقرأ «أسقطَ آخرَ الوجه» — وهو لم
+     * يُسقط. فيُطرح الحكمُ ويُقال للطالب لماذا.
+     */
+    if (attemptJudging.current && !(await recognition.current.drain())) {
+      attemptJudging.current = null;
+      setJudgingLost(true);
+    }
+    if (!alive.current) return;
     setReading(settled.reading);
     /*
      * وحكمُ الخاتمة يختلف عن حكم الأثناء: لا جبهةَ بعده.
@@ -490,7 +541,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      * فما كان مؤجَّلًا بمسافة الأمان يُقال الآن، وآخرُ الوجه الذي لم يُقرأ يصير خطأً
      * حقيقيًّا — إذ لم يبقَ ما يُنتظر.
      */
-    const permission = judgingRef.current;
+    const permission = attemptJudging.current;
     const verdict = permission ? finalJudgment(expectedRef.current, heardWords.current, permission) : null;
     setMistakes(verdict ? judgeable(verdict.mistakes) : undefined);
     /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
@@ -519,7 +570,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * ولا يُقال إلا حين يكون المحرّكُ مهيّأً والوجهُ يقبل القياس: وإلا فالسببُ الأوّلُ
    * مقولٌ في `analysisNote`، وتكرارُ سببين على وجهٍ واحدٍ يُربك.
    */
-  const gateNote = analysed && stage !== 'ready' ? judgingNote(gate, ar) : undefined;
+  const gateNote = analysed && stage !== 'ready' ? judgingNote(gate, ar, judgingLost) : undefined;
 
   return (
     <section className="space-y-4">

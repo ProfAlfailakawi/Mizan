@@ -341,22 +341,31 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    * وعند بدء تلاوةٍ جديدة، وعند مغادرة الشاشة. وعدُّ المواضع وحده يمرّ إن نُقل الترك
    * من موضعه إلى غيره — فيُفحص كلُّ موضعٍ بجاره.
    */
-  assert.match(
-    screen,
-    /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/,
-    'الطابورُ القديم لا يُترك عند سحبُ وجهٍ جديد',
-  );
   /*
-   * عند بدء التلاوة قد يسبق `setStage('reciting')` طلبُ إذن الميكروفون أو فرعُ
-   * المراجعة اليدوية. الحارس الصحيح هو أن يُستبدل الطابور **قبل** أيّ واحدٍ من
-   * المسارين، لا أن يكون السطران متجاورين شكليًّا.
+   * ويُترك **قبل** تغيّر الحال، ولو صار بينهما سطرُ طابورٍ ثانٍ: المقصودُ أنّ ما بقي
+   * من الوجه السابق لا يكتب في الوجه الجديد، لا شكلُ السطرين.
+   */
+  for (const [where, owner, stage] of [
+    ['سحبُ وجهٍ جديد', 'const draw = useCallback', 'loading'],
+    ['بدءُ تلاوة', 'const begin = useCallback', 'reciting'],
+  ] as const) {
+    /* ويُبحث داخل الدالّة المعنيّة: `setStage('loading')` يقع في غيرها أيضًا. */
+    const scope = screen.indexOf(owner);
+    assert.ok(scope > 0, `لا موضعَ لـ${owner}`);
+    const at = screen.indexOf(`setStage('${stage}')`, scope);
+    assert.ok(at > scope, `لا موضعَ لـ${where}`);
+    const before = screen.slice(scope, at);
+    assert.match(before, /queue\.current\.abandon\(\); queue\.current = serialQueue\(\);/, `الطابورُ القديم لا يُترك عند ${where}`);
+    assert.match(before, /recognition\.current\.abandon\(\); recognition\.current = serialQueue\(\);/, `طابورُ السماع لا يُترك عند ${where}`);
+  }
+  /*
+   * وطلبُ الميكروفون نفسُه يأتي بعد استبدال الطابورين: فالإذنُ قد يطول، وما بقي من
+   * الوجه السابق لا يجوز أن يكتب فيه.
    */
   const beginBlock = screen.slice(screen.indexOf('const begin = useCallback'), screen.indexOf('rec.ondataavailable'));
   const beginQueueReset = beginBlock.indexOf('queue.current.abandon(); queue.current = serialQueue();');
-  const beginManualReciting = beginBlock.indexOf("setStage('reciting')");
   const beginMicRequest = beginBlock.indexOf('navigator.mediaDevices.getUserMedia');
   assert.ok(beginQueueReset >= 0, 'الطابورُ القديم لا يُترك عند بدءُ تلاوة');
-  assert.ok(beginManualReciting > beginQueueReset, 'المراجعة اليدوية تبدأ قبل استبدال الطابور');
   assert.ok(beginMicRequest > beginQueueReset, 'طلب الميكروفون يبدأ قبل استبدال الطابور');
   /*
    * والثالثُ عند مغادرة الشاشة. وكان يُفحص بنصّ سطرٍ واحد، فلمّا صار للتنظيف ثالثةٌ
@@ -365,7 +374,7 @@ test('الشاشةُ تبني تقريرَها من البنيتين وحدَه�
    */
   const cleanup = screen.slice(screen.indexOf('useEffect(() => () => {'), screen.indexOf('}, [stopAudio]);'));
   assert.ok(cleanup.length > 0 && cleanup.length < 400, 'لم يُعثر على تنظيف المغادرة');
-  for (const call of ['queue.current.abandon()', 'stopAudio()', 'speaker.current?.close()']) {
+  for (const call of ['queue.current.abandon()', 'recognition.current.abandon()', 'stopAudio()', 'speaker.current?.close()']) {
     assert.ok(cleanup.includes(call), `تنظيفُ المغادرة لا يشمل ${call}`);
   }
 });
@@ -600,18 +609,42 @@ test('الشاشةُ لا تحكم بنفسها: لا مقابلةَ إلا عب
   assert.match(screen, /await fetchPracticeJudgingGate\(/, 'الإذنُ لا يُسأل عنه أصلًا');
 });
 
-test('مقاطعُ السماع تدخل الطابورَ نفسَه — لا طابورًا ثانيًا', () => {
+test('لكلّ مسارٍ طابورُه المرتَّب — وسقوطُ أحدهما لا يُحاسَب به الآخر', () => {
   /*
-   * فمقطعان يتسابقان يخلطان ما سُمع، فتُقرأ كلمةٌ بعد تاليتها — ويُصنع خطأٌ حيث لا
-   * خطأ. وهي العلّةُ نفسُها التي صنعت «أعدتَ» الكاذبة في مسار المحاذاة.
+   * فالترتيبُ لازمٌ في المسارين: مقطعان يتسابقان يخلطان ما سُمع فيُصنع خطأٌ حيث لا
+   * خطأ — وهي علّةُ «أعدتَ» الكاذبة بعينها.
+   *
+   * **ولا يُقاسَم الطابورُ بينهما**: الطابورُ يعدّ أيَّ مهمّةٍ سقطت ناقصةً، ومن ذلك
+   * العدّ يُعرف أنّ التلاوة لم تكتمل فلا تُحفظ المراجعة. فلمّا دخل السماعُ الطابورَ
+   * نفسَه صار سقوطُ مقطعِ سماعٍ يُسقط **وصفَ التلاوة وحفظَها** — وقِيس ذلك في
+   * متصفّح: «محاولات ٠» في تلاوةٍ تتبُّعُها تامّ.
    */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   const handler = screen.slice(screen.indexOf('rec.ondataavailable'), screen.indexOf('rec.start(CHUNK_MS)'));
-  const pushes = handler.match(/queue\.current\.push\(/g) || [];
-  assert.equal(pushes.length, 2, 'يُتوقّع مسارانِ في الطابور نفسِه: محاذاةٌ وسماع');
+  assert.equal((handler.match(/queue\.current\.push\(/g) || []).length, 1, 'مسارُ المحاذاة لا يدخل طابورَه وحدَه');
+  assert.equal((handler.match(/recognition\.current\.push\(/g) || []).length, 1, 'مسارُ السماع لا يدخل طابورَه');
   assert.equal(/new Promise|Promise\.all|void submitPracticeRecognitionChunk/.test(handler), false,
     'مقطعُ السماع يُرسل خارجَ الطابور');
   assert.match(handler, /await submitPracticeRecognitionChunk\(/, 'السماعُ لا يُنتظر داخل مهمّته');
+
+  /* واكتمالُ التلاوة يُقرأ من طابور المحاذاة وحدَه. */
+  assert.match(screen, /drain: \(\) => queue\.current\.drain\(\)/, 'اكتمالُ التلاوة يُقرأ من غير طابورها');
+  /* وطابورُ السماع يُنتظر على حدة، وتأخّرُه يُطرح به الحكمُ لا التلاوة. */
+  assert.match(screen, /!\(await recognition\.current\.drain\(\)\)/, 'طابورُ السماع لا يُنتظر عند الخاتمة');
+  const lateDrain = screen.slice(screen.indexOf('!(await recognition.current.drain())'));
+  assert.match(lateDrain.slice(0, 200), /attemptJudging\.current = null;[\s\S]*setJudgingLost\(true\);/,
+    'تأخّرُ السماع لا يُطرح به الحكم');
+  /* والطابوران يُتركان معًا في المواضع الثلاثة. */
+  assert.match(screen, /recognition\.current\.abandon\(\); recognition\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/,
+    'طابورُ السماع لا يُترك عند سحبُ وجهٍ جديد');
+  /*
+   * وعند البدء يُترك قبل طلب الميكروفون: فالحالُ «يتلو» لا تُضبط إلا بعد الإذن، وما
+   * يعني هو ألّا يكتب مقطعٌ من المحاولة السابقة في هذه — لا تجاورُ السطرين.
+   */
+  const begin = screen.slice(screen.indexOf('const begin = useCallback'), screen.indexOf('rec.ondataavailable'));
+  const reset = begin.indexOf('recognition.current.abandon(); recognition.current = serialQueue();');
+  assert.ok(reset >= 0, 'طابورُ السماع لا يُترك عند بدءُ تلاوة');
+  assert.ok(begin.indexOf('navigator.mediaDevices.getUserMedia') > reset, 'الميكروفونُ يُفتح قبل ترك طابور السماع');
 });
 
 test('رقمُ المقطع يُقرأ تزامنيًّا، لا داخلَ المهمّة', () => {
@@ -652,4 +685,45 @@ test('سقوطُ السماع لا يُسقط التتبّع', () => {
   const handler = screen.slice(start, screen.indexOf('rec.start(CHUNK_MS)'));
   assert.equal(handler.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
   assert.match(handler, /setMistakes\(undefined\)/, 'بابٌ أُغلق يترك أحكامًا معروضة');
+});
+
+test('إذنُ الحكم يُلتقط عند بدء التلاوة ويثبت إلى آخرها', () => {
+  /*
+   * فسؤالُ البوّابة طلبٌ لا يعود فورًا. ولو قُرئ الإذنُ عند كلّ مقطعٍ لبدأ الطالبُ
+   * قبل أن يعود الجواب، فتُهمل أوّلُ مقاطعه، ثمّ يُفتح البابُ في أثناء التلاوة
+   * فتُقابَل بقيّةُ ما سُمع بالوجه كلِّه — فيُعدّ أوّلُ الوجه الذي قرأه ساقطًا.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  assert.match(screen, /attemptJudging\.current = judgingRef\.current;/, 'الإذنُ لا يُلتقط عند البدء');
+  const handler = screen.slice(screen.indexOf('rec.ondataavailable'), screen.indexOf('rec.start(CHUNK_MS)'));
+  /*
+   * ولا **يُقرأ** الإذنُ المتحرّكُ داخل معالج المقطع. وكتابتُه مسموحة: سقوطٌ بنيويٌّ
+   * يُغلق بابَ الشاشة كلَّه فلا تُعاد المحاولةُ على محرّكٍ ميت. والمنكَرُ القراءةُ
+   * وحدها — أن يُحكم بإذنٍ تبدّل بعد أن بدأت التلاوة.
+   */
+  const reads = [...handler.matchAll(/judgingRef\.current(?!\s*=)/g)];
+  assert.deepEqual(reads.map(m => m[0]), [], 'مقطعُ السماع يقرأ إذنًا متحرّكًا لا لقطةَ المحاولة');
+  assert.match(handler, /if \(attemptJudging\.current\) \{/, 'مقطعُ السماع لا يُشترط بلقطة الإذن');
+  /* وحكمُ الخاتمة باللقطة نفسِها، لا بإذنٍ تبدّل بعد أن بدأ. */
+  const finish = screen.slice(screen.indexOf('const finish = useCallback'), screen.indexOf('const words: FaceWord[]'));
+  assert.match(finish, /const permission = attemptJudging\.current;/, 'حكمُ الخاتمة يقرأ إذنًا متحرّكًا');
+  /* ويُطرح الإذنُ عند سحب وجهٍ جديد، فلا تُحكم مراجعةٌ بإذن سابقتها. */
+  assert.match(screen, /attemptJudging\.current = null;\s*\n\s*setMistakes\(undefined\); setJudgingLost\(false\);/, 'الإذنُ لا يُطرح عند السحب');
+});
+
+test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجعة كلِّها', () => {
+  /*
+   * فمقطعٌ لم يصل يترك ثقبًا في ما سُمع، والمقابلةُ تقرأ الثقبَ إسقاطًا: كلماتٌ
+   * قرأها الطالبُ صحيحةً تُعلَّم «لم تُسمع» ويُنبَّه عليها بصوت. وكان الشرطُ مقصورًا
+   * على أسماءٍ بعينها، فيبقى البابُ مفتوحًا بعد عطبِ شبكةٍ أو 502 أو تجاوزِ حدّ.
+   */
+  const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
+  const start = screen.indexOf('await submitPracticeRecognitionChunk(');
+  const failure = screen.slice(screen.indexOf('}, error => {', start), screen.indexOf('rec.start(CHUNK_MS)'));
+  const kill = failure.indexOf('attemptJudging.current = null;');
+  const conditional = failure.indexOf('if (/NOT_CONFIGURED');
+  assert.ok(kill > 0, 'سقوطُ مقطعٍ لا يُبطل الحكم');
+  assert.ok(conditional < 0 || kill < conditional, 'الإبطالُ مشروطٌ بأسماء علّةٍ بعينها');
+  assert.match(failure, /setJudgingLost\(true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
+  assert.equal(failure.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
 });
