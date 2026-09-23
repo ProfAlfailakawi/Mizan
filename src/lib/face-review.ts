@@ -77,7 +77,7 @@ export function faceNote(code: string, ar: boolean): string {
 export function judgingNote(
   gate: { word: 'OPEN' | 'CLOSED'; reasons: readonly string[] } | null,
   ar: boolean,
-  lost = false,
+  lost: boolean | 'changed' = false,
 ): string | undefined {
   /*
    * وانقطاعُ السماع في أثناء المراجعة يُقال، ولا يُسكت عنه.
@@ -86,6 +86,10 @@ export function judgingNote(
    * قارئًا مصيبًا. فيُطرح الحكمُ كلُّه لهذه المراجعة — **وسكوتٌ عن خطأٍ أهونُ من
    * تخطئةِ مصيب** — ويُقال للطالب لماذا سكت عنه.
    */
+  /* وتبدّلُ القياس في أثناء التلاوة يُقال بسببه، لا بسبب انقطاعٍ لم يقع. */
+  if (lost === 'changed')
+    return ar ? 'وتغيّر محرّكُ السماع أو قياسُه في أثناء تلاوتك، فلم يُحكم على هذه المراجعة — ولا تُجمع مراجعةٌ واحدةٌ من محرّكين.'
+      : 'The listening engine or its measurement changed during your recitation, so this review was not judged — one review is never built from two engines.';
   if (lost)
     return ar ? 'وانقطع سماعُ بعض تلاوتك، فلم يُحكم على هذه المراجعة — ولا يُقال لك «أخطأت» على ما لم يُسمع كلُّه.'
       : 'Part of your recitation never reached the engine, so this review was not judged — nothing here says you erred.';

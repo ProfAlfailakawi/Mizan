@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { SETTLE_MARGIN_WORDS, finalJudgment, liveJudgment } from '../src/lib/live-judging';
+import { SETTLE_MARGIN_WORDS, answerKeepsPermission, finalJudgment, liveJudgment } from '../src/lib/live-judging';
 import type { ExpectedWord, HeardWord } from '../src/lib/recitation-diff';
 
 const OPEN = { word: 'OPEN', tashkeel: 'CLOSED' } as const;
@@ -106,4 +106,23 @@ test('the frontier is derived from the judgment, never counted separately', () =
   assert.equal(substituted.frontier, 9);
   assert.deepEqual(substituted.settled.map(m => m.kind), ['substituted']);
   assert.deepEqual(substituted.settled.map(m => m.wordIndex), [4]);
+});
+
+test('لا يُحكم بجوابٍ جاء ببوّابةٍ غيرِ التي بدأت بها المحاولة', () => {
+  /*
+   * فالخادمُ يعيد قراءةَ تقرير القياس مع كلّ مقطع. فإن استُبدل في أثناء التلاوة جمعت
+   * المحاولةُ الواحدةُ كلماتٍ من محرّكين، أو حُوسبت بإذنِ حركةٍ لم يعد قائمًا.
+   */
+  const permission = { reading: 'hafs', word: 'OPEN', tashkeel: 'CLOSED', modelVersion: 'm@1', reasons: [] };
+  const answer = (gate: Partial<typeof permission>, modelVersion = 'm@1') => ({ gate: { ...permission, ...gate }, modelVersion });
+  assert.equal(answerKeepsPermission(permission, answer({})), true, 'الجوابُ ذاتُه رُفض');
+  assert.equal(answerKeepsPermission(permission, answer({ modelVersion: 'm@2' }, 'm@2')), false, 'نموذجٌ آخر قُبل');
+  assert.equal(answerKeepsPermission(permission, answer({}, 'm@2')), false, 'نموذجُ الجواب يخالف بوّابته وقُبل');
+  assert.equal(answerKeepsPermission(permission, answer({ tashkeel: 'OPEN' })), false, 'بابُ الحركة فُتح في الأثناء وقُبل');
+  assert.equal(answerKeepsPermission(permission, answer({ word: 'CLOSED' })), false, 'بابُ الكلمة أُغلق في الأثناء وقُبل');
+  assert.equal(answerKeepsPermission(permission, answer({ reading: 'warsh' })), false, 'روايةٌ أخرى قُبلت');
+  assert.equal(answerKeepsPermission({ ...permission, modelVersion: null }, answer({ modelVersion: null })), false,
+    'إذنٌ بلا نموذجٍ مقيس قُبل');
+  /* وجوابٌ بلا بوّابةٍ خالف العقد: يُرفض ولا يُسقط الشاشةَ بخطأ قراءة. */
+  assert.equal(answerKeepsPermission(permission, { modelVersion: 'm@1' } as never), false, 'جوابٌ بلا بوّابةٍ قُبل');
 });

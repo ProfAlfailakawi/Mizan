@@ -117,6 +117,23 @@ const PLAN: Expectation[] = [
       [o.chunksServed >= 3, `انقطع التتبّعُ أيضًا: ${o.chunksServed} مقاطع`],
     ]),
   },
+  {
+    scenario: 'judging-changed', reciteMs: 11000, settleMs: 25_000,
+    why: 'محرّكُ السماع يتبدّل في أثناء التلاوة — أتُجمع مراجعةٌ من محرّكين؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      /*
+       * فالإذنُ التُقط لنموذجٍ بعينه عند البدء. وجوابٌ من نموذجٍ آخر لا يُحكم به،
+       * فتُطرح المحاولةُ ويُقال للطالب إنّ القياسَ تغيّر — لا إنّ السماعَ انقطع.
+       */
+      [o.mistakes.length === 0, `حُكم بمحرّكين معًا: ${JSON.stringify(o.mistakes)}`],
+      [o.alertOscillators === 0, `نُبِّه بعد تبدّل المحرّك: ${o.alertOscillators} مذبذبًا`],
+      [!!o.gateNote && o.gateNote.includes('تغيّر محرّكُ السماع'), `لم يُقل للطالب إنّ المحرّكَ تغيّر: ${o.gateNote}`],
+      [o.chunksServed >= 3, `انقطع التتبّعُ أيضًا: ${o.chunksServed} مقاطع`],
+      [o.attemptsStored === 1, `المراجعةُ لم تُحفظ: ${o.attemptsStored}`],
+    ]),
+  },
 ];
 
 async function main() {

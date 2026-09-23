@@ -12,7 +12,7 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed';
 
 /*
  * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
@@ -26,6 +26,8 @@ export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging'
  */
 const SKIPPED_WORD_INDEX = 3;
 const HARNESS_MODEL = 'harness-model-1';
+/* السيناريوهاتُ التي يُفتح فيها بابُ الحكم. */
+const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed']);
 
 const RAWI = 'hafs';
 const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -59,7 +61,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       return json(res, pageOf(Number(url.searchParams.get('page'))));
     }
     if (url.pathname === '/api/quran/practice/judging-gate') {
-      const open = scenario === 'judging' || scenario === 'judging-dropped';
+      const open = OPEN_SCENARIOS.has(scenario);
       return json(res, {
         reading: RAWI,
         word: open ? 'OPEN' : 'CLOSED',
@@ -69,7 +71,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       });
     }
     if (url.pathname === '/api/quran/practice/recognise') {
-      if (scenario !== 'judging' && scenario !== 'judging-dropped') return json(res, { code: 'QURAN_ASR_JUDGING_CLOSED' }, 409);
+      if (!OPEN_SCENARIOS.has(scenario)) return json(res, { code: 'QURAN_ASR_JUDGING_CLOSED' }, 409);
       const index = heard;
       heard += 1;
       /*
@@ -90,7 +92,17 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
         words.push({ text: face.words[at].text, confidence: 0.95, startMs: offset * 800, endMs: offset * 800 + 700 });
       }
       await sleep(30);
-      return json(res, { reading: RAWI, modelVersion: HARNESS_MODEL, words });
+      /*
+       * والجوابُ بشكل الخادم الحقيقيّ: `{gate, words, modelVersion}` — فالخادمُ يعيد
+       * قراءةَ بوّابته مع كلّ مقطع ويردّها. وكان المِشحَنُ يُسقط `gate`، فكان الردُّ
+       * المزيّفُ أفقرَ من الحقيقيّ، ولم يظهر ذلك حتى صارت الشاشةُ تقرؤها.
+       *
+       * و`judging-changed` يُبدّل النموذجَ من المقطع الثالث — تقريرُ قياسٍ استُبدل
+       * والطالبُ يقرأ. والمنتظَرُ ألّا تُجمع مراجعةٌ واحدةٌ من محرّكين.
+       */
+      const model = scenario === 'judging-changed' && index >= 2 ? `${HARNESS_MODEL}-next` : HARNESS_MODEL;
+      const gate = { reading: RAWI, word: 'OPEN', tashkeel: 'CLOSED', modelVersion: model, reasons: [] };
+      return json(res, { gate, modelVersion: model, words });
     }
     if (url.pathname === '/api/quran/practice/align') {
       const index = served;
