@@ -303,9 +303,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       startedAt.current = Date.now();
       setStage('reciting');
       /* الطابورُ يُربط **تزامنيًّا** عند وصول المقطع، فلا يسبق متأخّرٌ سابقَه. */
+      let head: Blob | null = null;
       rec.ondataavailable = e => {
         if (!e.data.size) return;
         const chunk = e.data;
+        /*
+         * ترويسةُ الملف في المقطع الأوّل وحده؛ وما بعده عنقودٌ لا يُفكّ منفردًا — فكان المستمعُ
+         * يتلقّى صوتًا لا يُقرأ ويعود بلا موضع. فيُسبق كلُّ مقطعٍ بالأوّل لمسار التتبّع.
+         */
+        if (!head) head = chunk;
+        const listenable = chunk === head ? chunk : new Blob([head, chunk], { type: chunk.type || head.type });
         /*
          * ورقمُ المقطع يُؤخذ هنا **تزامنيًّا**، لا داخل المهمّة.
          *
@@ -322,7 +329,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          */
         queue.current.push(async live => {
           const out = await submitPracticeAlignmentChunk({
-            blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
+            blob: listenable, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
           }, journeyAuth);
           /*

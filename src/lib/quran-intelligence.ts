@@ -134,3 +134,14 @@ export async function fetchQuranSessionEvidence(sessionId:string){return getJson
 export async function postQuranHumanMarker(sessionId:string,eventType:string){const token=await bearer();const r=await fetch(`/api/quran/alignment/shadow/session/${encodeURIComponent(sessionId)}/human-marker`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({eventType}),cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranSessionEvidence}
 export async function fetchQuranReadingGuard(reading:QuranReadingId,sourcePackageId:string){return getJson<QuranReadingGuard>(`/api/quran/intelligence/reading-guard/${encodeURIComponent(reading)}/${encodeURIComponent(sourcePackageId)}`)}
 export async function fetchQuranIntelligenceHealth(){return getJson<QuranIntelligenceHealth>('/api/quran/intelligence/health')}
+
+/*
+ * تتبّعُ القارئ على سطح المحكّم — من المستمع القرآنيّ المنشور، لا من محرّك الظلّ.
+ * يُظهر «أين القارئ» فقط؛ لا يكتب دليلًا ولا يمسّ الدرجة.
+ */
+export async function fetchJudgeFollowStatus(reading:string){return getJson<{ready:boolean;reading:string}>(`/api/quran/judge/follow/status?reading=${encodeURIComponent(reading)}`)}
+export async function submitJudgeFollowChunk(input:{blob:Blob;reading:string;surah:number;startAyah:number;endAyah:number;after?:number}){
+  const token=await bearer();const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah)});
+  if(Number.isInteger(input.after))qs.set('after',String(input.after));
+  const r=await fetch(`/api/quran/judge/follow?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult&{globalIndex?:number};
+}

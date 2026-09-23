@@ -2101,6 +2101,36 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     }catch{return ''}
   };
 
+  /*
+   * نداءٌ واحدٌ للمستمع يشترك فيه تدريبُ الطالب وتتبّعُ المحكّم — فلا يتفرّع البروتوكول.
+   * `after` آخرُ موضعٍ معروف (فهرسُ الكلمة في المقطع)، يرجّح به المستمعُ التقدّمَ على الارتداد.
+   */
+  const callDedicatedListener=async(input:{reading:string;ayat:{surah:number;ayah:number;text:string}[];contentType:string;bytes:Buffer;after?:number})=>{
+    const token=await practiceListenerToken();
+    const expected=Buffer.from(JSON.stringify(input.ayat.map(x=>({surah:x.surah,ayah:x.ayah,text:x.text}))),'utf8').toString('base64url');
+    const response=await fetch(practiceListenerUrl,{method:'POST',headers:{
+      'content-type':input.contentType||'application/octet-stream',
+      'x-mizan-reading':input.reading,
+      'x-mizan-expected-passage':expected,
+      ...(Number.isInteger(input.after)?{'x-mizan-after':String(input.after)}:{}),
+      ...(token?{authorization:`Bearer ${token}`}:{})
+    },body:new Uint8Array(input.bytes),signal:AbortSignal.timeout(20_000)});
+    if(response.status===503)throw new Error('QURAN_PRACTICE_LISTENER_WARMING');
+    if(!response.ok)throw new Error(`QURAN_PRACTICE_LISTENER_HTTP_${response.status}`);
+    const raw=await response.json() as any;
+    const candidate=raw?.candidate&&typeof raw.candidate==='object'?raw.candidate:null;
+    const confidence=Number(raw?.confidence||0);
+    return {candidate,confidence,raw};
+  };
+  /* إيقاظُ المستمع: Cloud Run ينام بلا طلبات، والنموذجُ يُحمَّل عند الإقلاع. يُنادى عند فتح
+     الوجه أو الموضع فيجهز قبل أن يبدأ القارئ. */
+  let listenerWokeAt=0;
+  const wakeDedicatedListener=()=>{
+    if(!/^https:\/\//i.test(practiceListenerUrl)||Date.now()-listenerWokeAt<60_000)return;
+    listenerWokeAt=Date.now();
+    void practiceListenerToken().then(token=>fetch(new URL('/health',practiceListenerUrl).toString(),{headers:token?{authorization:`Bearer ${token}`}:{},signal:AbortSignal.timeout(15_000)})).catch(()=>{});
+  };
+
   const runPracticeListener=async(input:{access:JourneyPracticeAccess;surah:number;startAyah:number;endAyah:number;contentType:string;bytes:Buffer})=>{
     if(!journeyListeningReady(input.access.listening.reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
     const passage=await quranDelivery.passage(input.access.deliveryReading,input.surah,input.startAyah,input.endAyah);
@@ -2137,18 +2167,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
         backendEvidence:{modelVersion:recognised.modelVersion,acousticQuality:confidence||undefined}
       };
     }
-    const token=await practiceListenerToken();
-    const expected=Buffer.from(JSON.stringify(passage.ayat.map(x=>({surah:x.surah,ayah:x.ayah,text:x.text}))),'utf8').toString('base64url');
-    const response=await fetch(practiceListenerUrl,{method:'POST',headers:{
-      'content-type':input.contentType||'application/octet-stream',
-      'x-mizan-reading':input.access.listening.reading,
-      'x-mizan-expected-passage':expected,
-      ...(token?{authorization:`Bearer ${token}`}:{})
-    },body:new Uint8Array(input.bytes)});
-    if(!response.ok)throw new Error(`QURAN_PRACTICE_LISTENER_HTTP_${response.status}`);
-    const raw=await response.json() as any;
-    const candidate=raw?.candidate&&typeof raw.candidate==='object'?raw.candidate:null;
-    const confidence=Number(raw?.confidence||0);
+    const {candidate,confidence,raw}=await callDedicatedListener({reading:input.access.listening.reading,ayat:passage.ayat,contentType:input.contentType,bytes:input.bytes});
     return {
       timestamp:new Date().toISOString(),reading:input.access.listening.reading,
       surah:candidate?Number(candidate.surah):undefined,ayah:candidate?Number(candidate.ayah):undefined,
@@ -2160,10 +2179,55 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     };
   };
 
+  /*
+   * تتبّعُ القارئ على سطح المحكّم — من المستمع نفسه.
+   *
+   * كان التتبّعُ الحيّ عند المحكّم معلّقًا بمحرّك الظلّ وحده (خزنةٌ ومعايرةٌ وخلفيّةٌ لم تُنشر
+   * قط)، فلم يظهر زرّه ولا مؤشّرُه في أيّ مسابقة. والمستمعُ المنشورُ للتدريب يعرف الموضعَ
+   * كذلك، فيُستعمل هنا لإظهار «أين القارئ» فقط: لا دليل، ولا درجة، ولا حكم — المحكّمُ يحكم.
+   */
+  app.get('/api/quran/judge/follow/status',requireGovernanceRoles(['judge','head_judge']),(req,res)=>{
+    let reading='';try{reading=soleParam(req.query.reading,'reading')||''}catch{return res.status(400).json({code:'QUERY_PARAM_REPEATED'})}
+    const ready=dedicatedPracticeListenerReady(reading);
+    if(ready)wakeDedicatedListener();
+    res.setHeader('Cache-Control','no-store');
+    return res.json({ready,reading,scoreAuthority:'HUMAN_ONLY'});
+  });
+  app.post('/api/quran/judge/follow',alignmentAudioIpRateLimit,requireGovernanceRoles(['judge','head_judge']),alignmentAudioRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'4mb'}),async(req,res)=>{
+    try{
+      const reading=soleParam(req.query.reading,'reading');
+      if(!dedicatedPracticeListenerReady(reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
+      const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));
+      const afterRaw=soleParam(req.query.after,'after');const after=afterRaw===undefined||afterRaw===''?undefined:Number(afterRaw);
+      if(![surah,startAyah,endAyah].every(Number.isInteger)||endAyah<startAyah||endAyah-startAyah>60)throw new Error('QURAN_ALIGNMENT_RANGE_INVALID');
+      const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);
+      if(!bytes.length)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
+      const passage=await quranDelivery.passage(reading,surah,startAyah,endAyah);
+      if(!passage||!passage.ayat.length)throw new Error('PRACTICE_SCOPE_NOT_READY');
+      const {candidate,confidence,raw}=await callDedicatedListener({reading,ayat:passage.ayat,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,after:Number.isInteger(after)?after:undefined});
+      const at=candidate?passage.ayat.find((a:any)=>a.ayah===Number(candidate.ayah)):undefined;
+      res.setHeader('Cache-Control','no-store');
+      return res.json({
+        timestamp:new Date().toISOString(),reading,
+        surah:candidate?Number(candidate.surah):undefined,ayah:candidate?Number(candidate.ayah):undefined,
+        wordIndex:candidate?Number(candidate.wordIndex):undefined,globalIndex:candidate?Number(candidate.globalIndex):undefined,
+        confidence,smoothedConfidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):0,
+        alignmentState:candidate?'LOCKED':'REACQUIRING',recoveryState:candidate?'STABLE':'SEARCHING',
+        pointerMoved:!!candidate,scoreAuthority:'HUMAN_ONLY',scoreDelta:0,shadowMode:true,
+        visualLocation:at?{page:at.page,lineStart:at.lineStart,lineEnd:at.lineEnd,assurance:'AYAH_FROM_DELIVERY'}:null,
+        backendEvidence:{modelVersion:String(raw?.modelVersion||'')}
+      });
+    }catch(err){
+      const code=err instanceof Error?err.message:'QURAN_FOLLOW_FAILED';
+      return res.status(/NOT_CONFIGURED/.test(code)?503:/WARMING/.test(code)?503:/LISTENER_HTTP_/.test(code)?502:400).json({code});
+    }
+  });
+
   app.post('/api/public/journeys/practice/context',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,async(req,res)=>{
     try{
       const access=await journeyPracticeAccess(req);
       const listening=journeyListeningReady(access.listening.reading)?access.listening:null;
+      if(listening&&dedicatedPracticeListenerReady(listening.reading))wakeDedicatedListener();
       res.setHeader('Cache-Control','private, no-store');
       return res.json({scope:access.scope,deliveryReading:access.deliveryReading,listening,owner:access.participantId});
     }

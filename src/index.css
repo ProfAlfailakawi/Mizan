@@ -995,9 +995,18 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 }
 .mizan-judge-os .mizan-mushaf-bar{ background:transparent; border-color:rgba(60,61,48,.16) }
 .mizan-judge-os .mizan-mushaf-body{
-  flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
-  background:transparent; display:grid; align-content:center;
+  flex:1 1 auto; min-height:0; overflow:hidden;
+  background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
+/* الصفحةُ مقيسةٌ بالبكسل من الوعاء (OfficialMushafSurface) فلا تُمدّ بنسب هنا. */
+.mizan-judge-os .mizan-mushaf-pages{ min-height:0; }
+.mizan-judge-os .mizan-official-page[data-fit],
+.mizan-judge-os .mizan-official-page[data-fit] .mizan-official-page__frame{ flex:0 0 auto; height:auto; max-height:none; max-width:none }
+.mizan-judge-os .mizan-official-page[data-fit] .mizan-official-page__frame{ display:block }
+.mizan-judge-os .mizan-official-page[data-fit] .mizan-mushaf-page{ max-height:none; box-shadow:0 12px 30px rgba(42,36,20,.10) }
+/* شارةُ موضع القارئ تطفو على الورقة ولا تأخذ من ارتفاعها سطرًا. */
+.mizan-judge-os .mizan-mushaf-trackchip{ position:absolute; top:.5rem; inset-inline-start:.75rem; margin:0; z-index:5 }
+.mizan-judge-os .mizan-mushaf-trackchip > div{ font-size:12px; padding:.45rem .8rem; border-radius:999px; box-shadow:0 6px 18px rgba(27,31,24,.10) }
 .mizan-judge-os .mizan-mushaf-tools{
   flex:0 0 auto;
   min-height:44px;
@@ -1010,15 +1019,21 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   border-radius:10px;
   background:rgba(255,253,246,.48);
 }
+/*
+ * الدُّرجُ يُرسى تحت الصفحة ولا يطفو فوقها.
+ *
+ * كان مطلقَ الموضع فوق أسفل الورقة، فيحجب آخرَ الأسطر — وهي بالضبط التي يتلوها القارئ حين
+ * يُطلب منه الختم. الآن يأخذ مكانَه في العمود، والصفحةُ تُعاد مقايستُها فتصغر قليلًا وتبقى كاملة.
+ */
 .mizan-judge-os .mizan-mushaf-drawer{
-  position:absolute;
-  z-index:18;
-  inset-inline:clamp(.75rem,2vw,1.5rem);
-  bottom:calc(48px + env(safe-area-inset-bottom));
-  max-height:min(38dvh, 260px);
+  position:relative;
+  flex:0 0 auto;
+  z-index:3;
+  margin:.4rem clamp(.5rem,1.5vw,1rem) 0;
+  max-height:min(30dvh, 220px);
   overflow:auto;
-  border-radius:18px;
-  box-shadow:0 18px 45px rgba(27,31,24,.16);
+  border-radius:16px;
+  box-shadow:0 8px 22px rgba(27,31,24,.08);
 }
 .mizan-judge-os .mizan-mushaf-drawer > .mizan-mushaf-bar,
 .mizan-judge-os .mizan-mushaf-drawer > div{
@@ -1609,3 +1624,6 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   font-family:var(--font-arabic); font-size:.46em; font-weight:800; line-height:2;
   letter-spacing:.01em; color:#6b4f18; text-align:center;
 }
+
+/* أدواتُ المصحف عند المحكّم: كلمةٌ واضحة وزرٌّ يُصاب من أوّل لمسة. */
+.mizan-judge-os .mizan-mushaf-tool{ font-size:12px; min-height:38px; padding-inline:.8rem }
