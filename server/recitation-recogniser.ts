@@ -120,6 +120,16 @@ export class RecitationRecogniser {
     if (!response.ok) throw new Error(`QURAN_ASR_BACKEND_HTTP_${response.status}`);
     const raw = await response.json();
     const chunk = readRecognitionResponse(raw, { reading: definition.id, modelVersion: gate.modelVersion });
+    /*
+     * ويُقرأ البابُ ثانيةً بعد الجواب، لا قبله وحده.
+     *
+     * فالطلبُ إلى المحرّك يطول، وتقريرُ القياس قد يُستبدل في أثنائه. والبوّابةُ التي
+     * التُقطت قبل الانتظار تعود مع الجواب كما هي، فتراها الشاشةُ مطابقةً لما بدأت به
+     * — وآخرُ مقطعٍ لا يليه مقطعٌ يكشف التبدّل. فجوابٌ تبدّل بابُه وهو في الطريق يُردّ.
+     */
+    const after = this.benchmarks.gate(definition.id);
+    if (after.word !== gate.word || after.tashkeel !== gate.tashkeel || after.modelVersion !== gate.modelVersion)
+      throw new Error('QURAN_ASR_GATE_CHANGED');
     return { gate, words: chunk.words, modelVersion: chunk.modelVersion };
   }
 }

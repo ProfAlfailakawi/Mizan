@@ -153,3 +153,21 @@ test('a corrupted file on disk closes the door instead of throwing at the studen
   assert.equal(store.load('hafs'), null);
   assert.equal(store.gate('hafs').word, 'CLOSED');
 });
+
+test('a gate that changes while the engine is answering refuses the answer', async () => {
+  /*
+   * فالبوّابةُ تُلتقط قبل الانتظار، والطلبُ يطول. فإن استُبدل تقريرُ القياس في أثنائه
+   * عاد الجوابُ بالبوّابة القديمة، ورأتها الشاشةُ مطابقةً — وآخرُ مقطعٍ لا يليه ما يكشفه.
+   */
+  const store = openVault();
+  const fetchImpl = async () => {
+    store.register(report({ modelVersion: 'fixture-model-2' }));
+    return { ok: true, status: 200, json: async () => ({ reading: 'hafs', modelVersion: 'fixture-model-1', words: [{ text: 'الحمد', confidence: 0.9 }] }) };
+  };
+  const recogniser = new RecitationRecogniser({ url: 'https://asr.example/listen' }, store, fetchImpl);
+  await assert.rejects(recogniser.recognise(chunk), /QURAN_ASR_GATE_CHANGED/);
+  /* وبابٌ لم يتبدّل لا يُردّ جوابُه. */
+  const steady = new RecitationRecogniser({ url: 'https://asr.example/listen' }, openVault(),
+    answers({ reading: 'hafs', modelVersion: 'fixture-model-1', words: [] }).fetchImpl);
+  assert.equal((await steady.recognise(chunk)).gate.modelVersion, 'fixture-model-1');
+});

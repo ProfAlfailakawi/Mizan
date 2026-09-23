@@ -12,7 +12,7 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed' | 'judging-changed-late';
 
 /*
  * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
@@ -27,7 +27,7 @@ export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging'
 const SKIPPED_WORD_INDEX = 3;
 const HARNESS_MODEL = 'harness-model-1';
 /* السيناريوهاتُ التي يُفتح فيها بابُ الحكم. */
-const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed']);
+const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed', 'judging-changed-late']);
 
 const RAWI = 'hafs';
 const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -80,6 +80,11 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
        * تقرأ الثقبَ إسقاطًا فتُخطّئ قارئًا مصيبًا. والمنتظَرُ ألّا يُحكم أصلًا.
        */
       if (scenario === 'judging-dropped' && index === 2) return json(res, { code: 'HARNESS_ASR_DROPPED' }, 502);
+      /*
+       * و`judging-changed-late` يحكي ما يكشفه الخادمُ وحده: تقريرُ القياس استُبدل والطلبُ
+       * في الطريق، فيردّ الخادمُ 409 بعد أن يعيد قراءةَ الباب — لا بوّابةً مختلفةً في الجواب.
+       */
+      if (scenario === 'judging-changed-late' && index === 2) return json(res, { code: 'QURAN_ASR_GATE_CHANGED' }, 409);
       const face = pageOf(single.page);
       /*
        * ويُعاد نصُّ الوجه نفسُه كلمتين في كلّ مقطع — من حزمة الرواية لا من اختراع —
