@@ -16,7 +16,7 @@ import { fetchDeliveryPassage, fetchOfficialAyahAudio } from '../../lib/kfgqpc-l
 import { Badge } from '../design-system/Badge';
 import { QuranIntelligenceDock } from './QuranIntelligenceDock';
 import { RecitationReplay, type ReplayMark } from './RecitationReplay';
-import { fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetchQuranReadingGuard, fetchQuranSessionEvidence, postQuranHumanMarker, quranReadingIdForPackage, resetQuranAlignment, submitQuranAlignmentChunk, type QuranAlignmentResult, type QuranPassageIntelligence, type QuranReadingGuard, type QuranReadingId, type QuranSessionEvidence } from '../../lib/quran-intelligence';
+import { fetchJudgeFollowStatus, fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetchQuranReadingGuard, fetchQuranSessionEvidence, postQuranHumanMarker, quranReadingIdForPackage, resetQuranAlignment, submitJudgeFollowChunk, submitQuranAlignmentChunk, type QuranAlignmentResult, type QuranPassageIntelligence, type QuranReadingGuard, type QuranReadingId, type QuranSessionEvidence } from '../../lib/quran-intelligence';
 
 // Arabic counts do not pluralise the way English does: 1 takes the singular, 2 takes the
 // dual, 3-10 take the plural, and 11+ return to the singular. "4 مرة" is simply wrong.
@@ -324,6 +324,14 @@ export const JudgeOS: React.FC = () => {
    ?`تعذّر بدء الجلسة لهذا المتسابق: ${reason||'راجع غرفة العمليات أو وزّعه على لجنة أخرى.'}`
    :`Could not start this participant.${code?` (${code})`:''}`)};
  const recorderRef=useRef<MediaRecorder|null>(null); const streamRef=useRef<MediaStream|null>(null); const chunksRef=useRef<Blob[]>([]); const audioStartedAt=useRef<string>(''); const promptAudioRef=useRef<HTMLAudioElement|null>(null); const transitionAudioRef=useRef<HTMLAudioElement|null>(null); const openingPlayedKeyRef=useRef('');
+ /*
+  * تتبّعُ القارئ من المستمع المنشور، حين لا يكون محرّكُ الظلّ مهيّأً.
+  *
+  * ومقاطعُ MediaRecorder بعد الأولى بلا ترويسة ملف، فلا يفكّها المستمعُ وحدها — وهذا ما
+  * جعل التتبّعَ صامتًا ولو وصلت المقاطع. فتُحفظ الأولى (الترويسة) ويُسبق بها كلُّ مقطع،
+  * ومعه المقطعُ الذي قبله ليسمع المستمعُ جملةً لا شظيّة.
+  */
+ const followContextRef=useRef<{reading:string;surah:number;startAyah:number;endAyah:number}|null>(null); const [followReady,setFollowReady]=useState(false); const headBlobRef=useRef<Blob|null>(null); const prevBlobRef=useRef<Blob|null>(null); const followBusyRef=useRef(false); const followAfterRef=useRef<number|undefined>(undefined); const followMissRef=useRef(0);
  const alignmentContextRef=useRef<{sessionId:string;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}|null>(null); const alignmentBusyRef=useRef(false);
  useEffect(()=>{setDirectScores(Object.fromEntries(visibleCriteria.map(c=>[c.id,c.maxScore])))},[activeSession.sessionId,ruleSet.id,judge?.id]);
  useEffect(()=>{ if(recorderRef.current?.state==='recording')recorderRef.current.stop(); streamRef.current?.getTracks().forEach(t=>t.stop()); recorderRef.current=null;streamRef.current=null;chunksRef.current=[];promptAudioRef.current?.pause();promptAudioRef.current=null;transitionAudioRef.current?.pause();transitionAudioRef.current=null;setOpeningAudioState('idle');setShadowMicActive(false);setAudioState(policy.judging.requireAudioRecording?'not_ready':'ready'); },[activeSession.sessionId,policy.judging.requireAudioRecording]);
@@ -339,6 +347,24 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{alignmentContextRef.current=null;setAlignmentResult(null);if(!questionRevealed||!q)return;const x=q as any,readingId=quranReadingIdForPackage(x.quranSourcePackageId);if(!readingId||!x.quranSourcePackageId||!Number.isInteger(Number(x.surahNumber))||!Number.isInteger(Number(x.startAyah))||!Number.isInteger(Number(x.endAyah)))return;let live=true;const base={sessionId:activeSession.sessionId,reading:readingId,surah:Number(x.surahNumber),startAyah:Number(x.startAyah),endAyah:Number(x.endAyah),sourcePackageId:String(x.quranSourcePackageId)};void Promise.all([fetchQuranPassageIntelligence(readingId,base.surah,base.startAyah,base.endAyah),fetchQuranIntelligenceCapabilities(),fetchQuranReadingGuard(readingId,base.sourcePackageId)]).then(([data,c,guard])=>{if(!live)return;setQuranIntelligence(data);setReadingGuard(guard);const configured=guard.status==='CLEAR'&&c.streamingAlignment?.backendConfigured===true&&data.alignmentBenchmark?.status==='VERIFIED'&&data.alignmentBenchmark?.passed===true;setAlignmentConfigured(configured);alignmentContextRef.current=configured?base:null}).catch(()=>{if(live){setQuranIntelligence(null);setAlignmentConfigured(false);alignmentContextRef.current=null}});return()=>{live=false;alignmentContextRef.current=null}},[questionRevealed,activeSession.sessionId,(q as any)?.quranSourcePackageId,(q as any)?.surahNumber,(q as any)?.startAyah,(q as any)?.endAyah]);
  useEffect(()=>()=>{void resetQuranAlignment(activeSession.sessionId).catch(()=>{})},[activeSession.sessionId]);
  const refreshSessionEvidence=()=>void fetchQuranSessionEvidence(activeSession.sessionId).then(setSessionEvidence).catch(()=>{});
+ useEffect(()=>{followContextRef.current=null;followAfterRef.current=undefined;followMissRef.current=0;setFollowReady(false);
+  const x=q as any;if(!questionRevealed||!x)return;
+  const reading=deliveryReadingKeyFor({qiraah:x.qiraah,rawi:x.rawi,riwaya:x.riwaya});
+  const surah=Number(x.surahNumber)||surahNumberFromName(x.surahNameEnglish,x.surahNameArabic);
+  if(!reading||!surah||!Number(x.startAyah)||!Number(x.endAyah))return;let live=true;
+  void fetchJudgeFollowStatus(reading).then(st=>{if(!live||!st.ready)return;followContextRef.current={reading,surah,startAyah:Number(x.startAyah),endAyah:Number(x.endAyah)};setFollowReady(true);if(recorderRef.current?.state==='recording')setShadowMicActive(true)}).catch(()=>{});
+  return()=>{live=false;followContextRef.current=null}},[questionRevealed,activeSession.sessionId,activeSession.currentQuestionIndex,(q as any)?.surahNumber,(q as any)?.startAyah,(q as any)?.endAyah]);
+ const sendFollowChunk=(blob:Blob)=>{
+  const context=followContextRef.current;const head=headBlobRef.current;const prev=prevBlobRef.current;prevBlobRef.current=blob;
+  if(!context||alignmentContextRef.current||followBusyRef.current||!blob.size||!head)return;
+  followBusyRef.current=true;
+  const parts=blob===head?[head]:prev&&prev!==head?[head,prev,blob]:[head,blob];
+  void submitJudgeFollowChunk({blob:new Blob(parts,{type:blob.type||head.type}),...context,after:followAfterRef.current}).then(x=>{
+   if(followContextRef.current!==context)return;
+   if(x.ayah){followMissRef.current=0;if(Number.isInteger(x.globalIndex))followAfterRef.current=x.globalIndex;setAlignmentResult(x)}
+   /* مقطعٌ واحدٌ بلا تطابق (نَفَسٌ أو وقف) لا يُطفئ المؤشّر؛ ثلاثةٌ متتالية تقول «يُعاد التحديد». */
+   else if(++followMissRef.current>=3)setAlignmentResult(r=>r?{...r,alignmentState:'REACQUIRING'}:r);
+  }).catch(()=>{}).finally(()=>{followBusyRef.current=false})};
  const sendAlignmentChunk=(blob:Blob)=>{const context=alignmentContextRef.current;if(!context||alignmentBusyRef.current||!blob.size)return;alignmentBusyRef.current=true;void submitQuranAlignmentChunk({blob,...context}).then(x=>{setAlignmentResult(x);
   /* الإزاحة من لحظة بدء المسجّل، تُقرأ من الـref لا من حالة مُلتقَطة: هذا المُعالِج يُسنَد مرة
      واحدة عند تجهيز الصوت، فأي قيمة مُغلَقة عليه تبقى قيمة تلك اللحظة إلى آخر الجلسة. */
@@ -369,7 +395,7 @@ export const JudgeOS: React.FC = () => {
  const restartAudio=async()=>{const recorder=recorderRef.current;if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch{/* مسجّل أُغلق مسبقًا */}
   streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();
   setMicHeard(false);setMicMeterUnavailable(false);setAudioState('idle');await prepareAudio()};
- const prepareAudio=async()=>{ /* السياق يُنشأ ويُستأنف هنا — قبل أي `await` — فهذه اللحظة وحدها هي إيماءة المستخدم. */ primeAudioContext(); if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;startMeter(stream);const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();recorder.ondataavailable=e=>{if(e.data.size){if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
+ const prepareAudio=async()=>{ /* السياق يُنشأ ويُستأنف هنا — قبل أي `await` — فهذه اللحظة وحدها هي إيماءة المستخدم. */ primeAudioContext(); if(recorderRef.current?.state==='recording'){setShadowMicActive(!!alignmentContextRef.current||!!followContextRef.current);setAudioState('ready');return;} if(!policy.judging.requireAudioRecording&&!alignmentConfigured&&!followContextRef.current){setAudioState('ready');return;} if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){setAudioState('failed');return;} setAudioState('requesting'); try{const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});streamRef.current=stream;startMeter(stream);const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(m=>MediaRecorder.isTypeSupported(m));const recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorderRef.current=recorder;chunksRef.current=[];audioStartedAt.current=new Date().toISOString();headBlobRef.current=null;prevBlobRef.current=null;recorder.ondataavailable=e=>{if(e.data.size){if(!headBlobRef.current)headBlobRef.current=e.data;if(policy.judging.requireAudioRecording)chunksRef.current.push(e.data);sendAlignmentChunk(e.data);sendFollowChunk(e.data)}};recorder.start(1500);setShadowMicActive(!!alignmentContextRef.current||!!followContextRef.current);setAudioState('ready');}catch{setShadowMicActive(false);setAudioState('failed')}};
  const finalizeAudio=async()=>{const recorder=recorderRef.current;if(!recorder||recorder.state!=='recording')return;if(!policy.judging.requireAudioRecording){recorder.stop();streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);return;}await new Promise<void>(resolve=>{recorder.onstop=async()=>{const blob=new Blob(chunksRef.current,{type:recorder.mimeType||'audio/webm'});const url=URL.createObjectURL(blob);await registerAudioRecording({sessionId:activeSession.sessionId,participantId:participant?.id||'',status:'completed',mimeType:blob.type,startedAt:audioStartedAt.current||new Date().toISOString(),stoppedAt:new Date().toISOString(),sizeBytes:blob.size,localObjectUrl:url,quality:blob.size>2048?'good':'degraded',checksumSource:`${activeSession.sessionId}|${blob.size}|${audioStartedAt.current}`});streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null;stopMeter();setShadowMicActive(false);resolve()};recorder.stop()})};
  const submitAndLock=async()=>{if(!micRecording)return;await finalizeAudio();lockAndSubmitAssessment(directScores)};
  const isLastQuestion=activeSession.currentQuestionIndex >= Math.max(1,totalQuestions)-1;
@@ -676,8 +702,8 @@ export const JudgeOS: React.FC = () => {
      <div className="min-h-0 flex-1 flex flex-col"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/></div>
      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 shrink-0">
       {openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio()} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}
-      {alignmentConfigured&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
-      {alignmentConfigured&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}
+      {(alignmentConfigured||followReady)&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
+      {(alignmentConfigured||followReady)&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}
       {secureMode&&secureRuntime?.diversityMetrics&&<span className="text-[10px] font-bold text-[#656b66]">{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`)}</span>}
      </div>
     </>}

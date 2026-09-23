@@ -96,8 +96,9 @@ test('reading identity is explicit and has no cross-riwayah fallback', () => {
   assert.match(server, /qaloun:'qalun'/);
   assert.match(server, /'douri-abu-amr':'duri-abi-amr'/);
   assert.match(server, /'sousi-abu-amr':'susi-abi-amr'/);
-  assert.match(server, /if\(!definition\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
-  assert.match(server, /if\(!deliveryReading\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
+  /* العشرون كلٌّ بحزمته (طلب المالك 23 سبتمبر 2026)، وما لا حزمةَ له يُرفض — لا انتقال. */
+  assert.match(server, /const deliveryKey=definition\?practiceDeliveryByReading\[definition\.id\]:\(rawiId\?DELIVERY_READING_BY_RAWI\[rawiId\]:undefined\);/);
+  assert.match(server, /if\(!deliveryKey\)throw new Error\('PRACTICE_READING_NOT_SUPPORTED'\)/);
 });
 
 test('participant-selected scope is never mistaken for the category parent scope', () => {
@@ -133,7 +134,8 @@ test('the original Firebase participant practice doors remain protected', () => 
 
 test('journey listening is backed by the dedicated production practice listener, not the unprovisioned judging aligner', () => {
   assert.match(server, /MIZAN_QURAN_PRACTICE_LISTENER_URL/);
-  assert.match(server, /const dedicatedPracticeListenerReady=\(reading:string\):boolean=>reading==='hafs'/);
+  /* طلب المالك 23 سبتمبر 2026: كلُّ الروايات، كلٌّ بنصّ حزمتها — لا حفص وحده. */
+  assert.match(server, /const dedicatedPracticeListenerReady=\(reading:string\):boolean=>\/\^\[a-z\]\[a-z-\]\{1,39\}\$\/\.test\(reading\)/);
   assert.match(server, /const asrPracticeListenerReady=\(reading:string\):boolean=>\{/);
   assert.match(server, /recitationRecogniser\.configured\(\)&&gate\.word==='OPEN'/);
   assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>dedicatedPracticeListenerReady\(reading\)\|\|asrPracticeListenerReady\(reading\)/);

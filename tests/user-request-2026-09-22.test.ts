@@ -15,9 +15,9 @@ test('judge Mushaf keeps optional aids collapsed so the full face owns the cockp
   assert.match(surface, /<MushafToolButton pressed=\{divergenceOpen\}/);
   assert.match(surface, /<MushafToolButton pressed=\{textView\}/);
 
-  assert.match(css, /\.mizan-judge-os \.mizan-official-page,[\s\S]*?max-height:100%;[\s\S]*?height:100%;/);
-  assert.match(css, /\.mizan-judge-os \.mizan-official-page \.mizan-mushaf-page\{[\s\S]*?height:100%;[\s\S]*?width:auto;/);
-  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-drawer\{[\s\S]*?position:absolute;[\s\S]*?bottom:calc\(48px \+ env\(safe-area-inset-bottom\)\)/);
+  /* الدُّرجُ يُرسى تحت الصفحة ولا يحجب أسطرها الأخيرة (ملاحظة المالك 23 سبتمبر 2026). */
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-drawer\{[\s\S]*?position:relative;[\s\S]*?flex:0 0 auto;/);
+  assert.doesNotMatch(css, /\.mizan-judge-os \.mizan-mushaf-drawer\{[^}]*position:absolute/);
 });
 
 test('public registration simplifies consents into 2-3 clean items without issuer/document subtitle', () => {
