@@ -133,7 +133,8 @@ test('the original Firebase participant practice doors remain protected', () => 
 
 test('journey listening is backed by the dedicated production practice listener, not the unprovisioned judging aligner', () => {
   assert.match(server, /MIZAN_QURAN_PRACTICE_LISTENER_URL/);
-  assert.match(server, /const dedicatedPracticeListenerReady=\(reading:string\):boolean=>reading==='hafs'/);
+  /* طلب المالك 23 سبتمبر 2026: كلُّ الروايات، كلٌّ بنصّ حزمتها — لا حفص وحده. */
+  assert.match(server, /const dedicatedPracticeListenerReady=\(reading:string\):boolean=>\/\^\[a-z\]\[a-z-\]\{1,39\}\$\/\.test\(reading\)/);
   assert.match(server, /const asrPracticeListenerReady=\(reading:string\):boolean=>\{/);
   assert.match(server, /recitationRecogniser\.configured\(\)&&gate\.word==='OPEN'/);
   assert.match(server, /const journeyListeningReady=\(reading:string\):boolean=>dedicatedPracticeListenerReady\(reading\)\|\|asrPracticeListenerReady\(reading\)/);

@@ -2082,7 +2082,14 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * ويعمل على حفص فقط إلى أن يُقاس نموذجٌ مستقل لكل رواية أخرى — بلا fallback بينها.
    */
   const practiceListenerUrl=String(process.env.MIZAN_QURAN_PRACTICE_LISTENER_URL||'').trim();
-  const dedicatedPracticeListenerReady=(reading:string):boolean=>reading==='hafs'&&/^https:\/\//i.test(practiceListenerUrl);
+  /*
+   * كلُّ الروايات، كلٌّ بنصّها.
+   *
+   * كان المستمعُ مقصورًا على حفص. والنموذجُ يسمع الأصوات، والمقابلةُ تقع على نصّ رواية
+   * المتسابق نفسها (من حزمة تسليمها) — فلا يُقاس قارئُ ورشٍ بنصّ حفص. وما تنفرد به
+   * الروايةُ عن حفص لفظًا لا يُحكم عليه في كشف الأخطاء (انظر MushafListens).
+   */
+  const dedicatedPracticeListenerReady=(reading:string):boolean=>/^[a-z][a-z-]{1,39}$/.test(reading)&&/^https:\/\//i.test(practiceListenerUrl);
   const asrPracticeListenerReady=(reading:string):boolean=>{
     const gate=recitationRecogniser.gate(reading);
     return recitationRecogniser.configured()&&gate.word==='OPEN';
@@ -2146,7 +2153,8 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     return recitationRecogniser.gate(reading);
   };
   const recogniseWithDedicatedListener=async(input:{reading:string;contentType:string;bytes:Buffer;headBytes:number})=>{
-    if(!input.bytes.length||input.bytes.length>4_000_000)throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
+    /* الحمولةُ Buffer حصرًا: النصُّ والمصفوفةُ يملكان `length` كذلك فيُخدع به فحصُ الحجم. */
+    if(!Buffer.isBuffer(input.bytes)||!input.bytes.length||input.bytes.length>4_000_000)throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
     const token=await practiceListenerToken();
     const response=await fetch(new URL('/recognise',practiceListenerUrl).toString(),{method:'POST',headers:{
       'content-type':input.contentType||'application/octet-stream','x-mizan-reading':input.reading,

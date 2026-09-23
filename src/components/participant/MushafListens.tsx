@@ -17,6 +17,7 @@ import {
 } from '../../lib/recitation-alerts';
 import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff';
 import { quranSkeleton } from '../../lib/quran-orthography';
+import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -205,6 +206,33 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    */
   const faceSkeletons = useMemo(() => new Set(expected.map(w => quranSkeleton(w.text))), [expected]);
   const faceSkeletonsRef = useRef<Set<string>>(new Set());
+  /*
+   * ما تنفرد به روايةُ المتسابق عن حفص لا يُحكم عليه.
+   *
+   * المحرّكُ يسمع كلَّ الروايات، لكنّ نموذجَه تدرّب على حفص أكثر، فقد يسمع لفظَ ورشٍ
+   * الصحيحَ خطأً. فتُعرف كلماتُ الوجه التي لا نظيرَ لها في نصّ حفص حولها، ولا يُقال
+   * فيها «أخطأت» — والزيادةُ لا تُنسب في غير حفص، لأنّ لفظ الرواية قد يُسمع زيادة.
+   * ميزانٌ يسكت حيث لا يعرف، ولا يُخطّئ قارئًا مصيبًا.
+   */
+  const riwayaOnlyRef = useRef<{ words: Set<number>; strictAdded: boolean }>({ words: new Set(), strictAdded: true });
+  useEffect(() => {
+    riwayaOnlyRef.current = { words: new Set(), strictAdded: true };
+    if (!face || !deliveryReading || deliveryReading === 'hafs') return;
+    riwayaOnlyRef.current = { words: new Set(face.words.map(w => w.index)), strictAdded: false };
+    let live = true;
+    const bySurah = new Map<number, { lo: number; hi: number }>();
+    for (const w of face.words) { const r = bySurah.get(w.surah); bySurah.set(w.surah, r ? { lo: Math.min(r.lo, w.ayah), hi: Math.max(r.hi, w.ayah) } : { lo: w.ayah, hi: w.ayah }); }
+    void Promise.all([...bySurah].map(async ([surah, r]) => [surah, await fetchDeliveryPassage('hafs', surah, Math.max(1, r.lo - 3), r.hi + 3).catch(() => null)] as const)).then(rows => {
+      if (!live) return;
+      const hafs = new Map<number, Set<string>>();
+      for (const [surah, passage] of rows) if (passage) hafs.set(surah, new Set(passage.ayat.flatMap(a => a.text.split(/\s+/).map(quranSkeleton).filter(Boolean))));
+      const only = new Set<number>();
+      for (const w of face.words) { const set = hafs.get(w.surah); if (!set || !set.has(quranSkeleton(w.text))) only.add(w.index); }
+      riwayaOnlyRef.current = { words: only, strictAdded: false };
+    });
+    return () => { live = false; };
+  }, [face, deliveryReading]);
+  const judgeable = useCallback((list: readonly Mistake[]) => list.filter(m => m.wordIndex === null ? riwayaOnlyRef.current.strictAdded : !riwayaOnlyRef.current.words.has(m.wordIndex)), []);
   useEffect(() => { faceSkeletonsRef.current = faceSkeletons; }, [faceSkeletons]);
   /* والحكمُ لا يُفتح إلا ببابٍ مفتوحٍ لهذه الرواية بعينها. */
   const judging = gate?.word === 'OPEN' ? gate : null;
@@ -406,10 +434,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             heardWords.current = [...heardWords.current, ...kept];
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
-            setMistakes(judged.judgment ? judged.settled : undefined);
+            const settledHere = judgeable(judged.settled);
+            setMistakes(judged.judgment ? settledHere : undefined);
 
             const now = Date.now() - startedAt.current;
-            const plan = planAlert(judged.settled, alertMemory.current, now);
+            const plan = planAlert(settledHere, alertMemory.current, now);
             alertMemory.current = plan.memory;
             if (plan.sound) {
               if (!speaker.current) speaker.current = createAlertSpeaker();
@@ -463,7 +492,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      */
     const permission = judgingRef.current;
     const verdict = permission ? finalJudgment(expectedRef.current, heardWords.current, permission) : null;
-    setMistakes(verdict ? verdict.mistakes : undefined);
+    setMistakes(verdict ? judgeable(verdict.mistakes) : undefined);
     /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
     setIncomplete(!settled.complete);
     setStage('report');

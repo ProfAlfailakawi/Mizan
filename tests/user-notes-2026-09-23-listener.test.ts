@@ -38,3 +38,14 @@ test('live mistake detection opens for practice through the deployed listener on
   assert.match(server, /app\.get\('\/api\/quran\/judge\/follow\/status',alignmentAudioIpRateLimit,requireGovernanceRoles/);
   assert.match(server, /scoreAuthority:'HUMAN_ONLY'/);
 });
+
+test('every delivered riwayah is listened to against its own text, never judged on its own wording', () => {
+  const server = read('server.ts');
+  const app = read('services/quran-practice-listener/app.py');
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.doesNotMatch(server, /dedicatedPracticeListenerReady=\(reading:string\):boolean=>reading==='hafs'/);
+  assert.doesNotMatch(app, /x_mizan_reading!='hafs'/);
+  assert.match(practice, /fetchDeliveryPassage\('hafs', surah/);
+  assert.match(practice, /planAlert\(settledHere,/, 'the alert tone never fires on a riwayah-specific word');
+  assert.match(practice, /setMistakes\(verdict \? judgeable\(verdict\.mistakes\)/);
+});

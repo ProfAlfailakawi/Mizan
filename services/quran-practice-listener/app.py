@@ -45,6 +45,7 @@ def try_models():
 threading.Thread(target=load_model,daemon=True).start()
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
 
+READING_ID=re.compile(r'[a-z][a-z-]{1,39}')
 DIAC=re.compile(r'[ً-ٰٟۖ-ۭ]')
 NON_AR=re.compile(r'[^ء-غف-ي\s]')
 def norm(s:str)->str:
@@ -102,8 +103,8 @@ def health():
 
 @app.post('/listen')
 async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected_passage:str=Header(''),x_mizan_after:str=Header('')):
-    # النموذج مقاس لحفص فقط. لا fallback إلى رواية أخرى.
-    if x_mizan_reading!='hafs':raise HTTPException(409,'READING_NOT_SUPPORTED')
+    # النموذجُ يسمع الأصوات؛ والنصُّ المقابَل به نصُّ رواية المتسابق نفسها (يُرسل مع الطلب).
+    if not READING_ID.fullmatch(x_mizan_reading or ''):raise HTTPException(409,'READING_NOT_SUPPORTED')
     model=state['model']
     if model is None:raise HTTPException(503,'MODEL_LOADING' if not state['error'] else 'MODEL_FAILED')
     audio=await request.body()
@@ -139,7 +140,7 @@ async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_
     الترويسة وتُطرح كلماتُها، ويعود التوقيتُ منسوبًا إلى ما بعدها — والعميلُ يُسنده إلى
     أوّل التلاوة ويُثبّت ما استقرّ منه.
     """
-    if x_mizan_reading!='hafs':raise HTTPException(409,'READING_NOT_SUPPORTED')
+    if not READING_ID.fullmatch(x_mizan_reading or ''):raise HTTPException(409,'READING_NOT_SUPPORTED')
     model=state['model']
     if model is None:raise HTTPException(503,'MODEL_LOADING')
     audio=await request.body()
@@ -169,7 +170,7 @@ async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_
                                   'startMs':max(0,int((w.start-head_s)*1000)),'endMs':max(0,int((w.end-head_s)*1000))})
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
-        return {'reading':'hafs','modelVersion':str(state['id']),'words':words[:200],'headMs':int(head_s*1000)}
+        return {'reading':x_mizan_reading,'modelVersion':str(state['id']),'words':words[:200],'headMs':int(head_s*1000)}
     finally:
         for p in paths:
             try:os.remove(p)
