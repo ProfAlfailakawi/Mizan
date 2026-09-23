@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Mic, RotateCcw, Square } from 'lucide-react';
+import { Eye, EyeOff, Lightbulb, Mic, RotateCcw, Square } from 'lucide-react';
 
 import { MushafFaceSurface, type FaceWord } from './MushafFaceSurface';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
@@ -17,8 +17,9 @@ import {
 } from '../../lib/recitation-alerts';
 import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff';
 import { quranSkeleton } from '../../lib/quran-orthography';
-import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
-import { readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
+import { fetchDeliveryPassage, fetchDivergencePoints, type DivergencePoint } from '../../lib/kfgqpc-library';
+import { SimilarSlipCard, type SimilarSlip } from './SimilarSlipCard';
+import { faceWordLookup, readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
   type PracticeFaceCatalogue, type PracticeFacePage,
@@ -110,6 +111,31 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const [reading, setReading] = useState<FaceReading | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [heard, setHeard] = useState(0);
+  /*
+   * القلمُ والأثرُ والحجاب — ما يُرسم على الوجه أثناء التلاوة.
+   *
+   * `reached` أبعدُ ما بلغه القارئ من أوّل الوجه، من شاهدين: موضعُ المحاذاة (أين هو)،
+   * وجبهةُ السماع (ما قاله فعلًا). ولا يرجع الأثرُ إلى الوراء: من أعاد آيةً لم يُمحَ ما تلاه.
+   */
+  const [reached, setReached] = useState(0);
+  const [pen, setPen] = useState<number | null>(null);
+  const [veiled, setVeiled] = useState(false);
+  const [hint, setHint] = useState<number | null>(null);
+  const [hints, setHints] = useState(0);
+  /*
+   * «دخلتَ على نظيرتها»: حين يقول الطالبُ عند مفترقٍ كلمةَ الآية المتشابهة لا كلمةَ آيته.
+   *
+   * المفترقاتُ معدودةٌ مسبقًا من حزمة الرواية نفسها (عبارةٌ مشتركة ثم كلمةٌ تختلف). فإن
+   * سُمع في موضع كلمةٍ عند مفترقٍ كلمةُ أحد فروعه بعينها، فليس خطأً عابرًا: هو انتقالٌ إلى
+   * آيةٍ أخرى — ويُسمّى له موضعُها ليراجع الفرقَ بين الآيتين، لا الكلمةَ وحدها.
+   */
+  const [slips, setSlips] = useState<SimilarSlip[]>([]);
+  const forksRef = useRef<Map<number, DivergencePoint>>(new Map());
+  const advance = useCallback((index: number | null) => {
+    if (index === null || index < 0) return;
+    setPen(index);
+    setReached(r => Math.max(r, index + 1));
+  }, []);
   /* هل بقي مقطعٌ لم يصل حين قُرئ التقرير؟ */
   const [incomplete, setIncomplete] = useState(false);
   /* إذنُ الحكم لهذه الرواية — يُسأل عنه الخادم، ولا تحسبه الشاشةُ لنفسها. */
@@ -219,6 +245,50 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     return () => { live = false; };
   }, [listenReading, journeyAuth?.competitionId, journeyAuth?.key]);
 
+  useEffect(() => {
+    forksRef.current = new Map();
+    if (!face || !deliveryReading) return;
+    let live = true;
+    const bySurah = new Map<number, { lo: number; hi: number }>();
+    for (const w of face.words) { const r = bySurah.get(w.surah); bySurah.set(w.surah, r ? { lo: Math.min(r.lo, w.ayah), hi: Math.max(r.hi, w.ayah) } : { lo: w.ayah, hi: w.ayah }); }
+    const at = new Map(face.words.map(w => [`${w.surah}:${w.ayah}:${w.ayahWordIndex}`, w.index] as const));
+    void Promise.all([...bySurah].map(([surah, r]) => fetchDivergencePoints(deliveryReading, surah, r.lo, r.hi).catch(() => [] as DivergencePoint[]))).then(rows => {
+      if (!live) return;
+      const map = new Map<number, DivergencePoint>();
+      for (const p of rows.flat()) { const i = at.get(`${p.surah}:${p.ayah}:${p.wordIndex}`); if (i !== undefined) map.set(i, p); }
+      forksRef.current = map;
+    });
+    return () => { live = false; };
+  }, [face, deliveryReading]);
+  const noticeSlips = useCallback((list: readonly Mistake[]) => {
+    const found: SimilarSlip[] = [];
+    for (const m of list) {
+      if (m.kind !== 'substituted' || m.wordIndex === null || !m.heard) continue;
+      const point = forksRef.current.get(m.wordIndex);
+      const heard = quranSkeleton(m.heard);
+      const branch = point?.branches.find(b => quranSkeleton(b.nextWord) === heard);
+      if (point && branch) found.push({ wordIndex: m.wordIndex, shared: point.sharedPhrase, expected: point.expectedWord, heard: branch.nextWord, surah: branch.at.surah, ayah: branch.at.ayah, surahName: branch.surahNameArabic });
+    }
+    if (found.length) setSlips(prev => {
+      const seen = new Set(prev.map(x => x.wordIndex));
+      const fresh = found.filter(x => !seen.has(x.wordIndex));
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+  }, []);
+
+  const lookupRef = useRef<(s: FaceAlignmentSample) => number | null>(() => null);
+  useEffect(() => { lookupRef.current = face ? faceWordLookup(face.words) : () => null; }, [face]);
+  /* التلميح: الكلمةُ التالية تنكشف ثانيتين ونصفًا، وتُعدّ — فالحفظُ بتلميحٍ غيرُه بلا تلميح. */
+  const giveHint = useCallback(() => {
+    setHint(reached);
+    setHints(n => n + 1);
+  }, [reached]);
+  useEffect(() => {
+    if (hint === null) return;
+    const t = window.setTimeout(() => setHint(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [hint]);
+
   /* نصُّ الوجه كما يقابَل به ما سُمع — فهرسُ الكلمة هو نفسُه الذي تعرفه الشاشة. */
   const expected = useMemo<ExpectedWord[]>(() => (face?.words ?? []).map(w => ({ index: w.index, text: w.text })), [face]);
   const expectedRef = useRef<ExpectedWord[]>([]);
@@ -269,7 +339,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
-    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setSeconds(0); setIncomplete(false);
+    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     attemptJudging.current = null;
     setMistakes(undefined); setJudgingLost(false);
@@ -330,7 +400,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const begin = useCallback(async () => {
     if (!face) return;
-    samples.current = []; setHeard(0); setSeconds(0); setNote(''); setIncomplete(false);
+    samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     setMistakes(undefined); setJudgingLost(false);
     /* والإذنُ يُلتقط الآن ويثبت: مجهولٌ عند الضغط يعني مراجعةً لا تُحكم. */
@@ -418,6 +488,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
            */
           if (!alive.current || !live()) return;
           samples.current = [...samples.current, { surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }];
+          advance(lookupRef.current({ surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }));
           setHeard(n => n + 1);
         }, error => {
           const code = error instanceof Error ? error.message : '';
@@ -473,8 +544,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             heardWords.current = [...heardWords.current, ...kept];
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
+            /* وجبهةُ السماع أدقُّ شاهدٍ على الموضع: ما قاله فعلًا لا ما يُظنّ أنّه بلغه. */
+            if (judged.frontier > 0) advance(judged.frontier - 1);
             const settledHere = judgeable(judged.settled);
             setMistakes(judged.judgment ? settledHere : undefined);
+            noticeSlips(settledHere);
 
             const now = Date.now() - startedAt.current;
             const plan = planAlert(settledHere, alertMemory.current, now);
@@ -558,6 +632,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     const permission = attemptJudging.current;
     const verdict = permission ? finalJudgment(expectedRef.current, heardWords.current, permission) : null;
     setMistakes(verdict ? judgeable(verdict.mistakes) : undefined);
+    if (verdict) noticeSlips(judgeable(verdict.mistakes));
     /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
     setIncomplete(!settled.complete);
     setStage('report');
@@ -565,7 +640,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   }, [face, owner, deliveryReading, stopAndRelease]);
 
   const words: FaceWord[] = useMemo(
-    () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah })),
+    () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah, ayahWordIndex: w.ayahWordIndex })),
     [face],
   );
   const surahNames = useMemo(() => {
@@ -638,6 +713,24 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
                 <span className="tabular-nums opacity-80" dir="ltr">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>
               </button>
             )}
+            {/*
+              * «اختبر حفظك»: تُحجب الكلماتُ بظلالها، وتنكشف كلُّ كلمةٍ حين تُتلى.
+              * زرٌّ واحدٌ يُفهم من اسمه — والتلميحُ بجانبه حين يُحتاج، ويُعدّ.
+              */}
+            {analysed && (stage === 'ready' || stage === 'reciting') && (
+              <button onClick={() => setVeiled(v => !v)} aria-pressed={veiled} data-veil={veiled ? 'on' : 'off'}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black transition ${veiled ? 'border-[#b89a55] bg-[#f6eed8] text-[#6b4f18]' : 'border-[#cfd6d2] bg-white text-[#214C40]'}`}>
+                {veiled ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
+                {veiled ? (ar ? 'أظهِر الصفحة' : 'Show the page') : (ar ? 'اختبر حفظك' : 'Test your memory')}
+              </button>
+            )}
+            {veiled && stage === 'reciting' && (
+              <button onClick={giveHint} data-hint-count={hints}
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#e2d3ae] bg-[#fffaf0] px-4 py-2.5 text-xs font-black text-[#7a5a1c]">
+                <Lightbulb className="h-4 w-4" aria-hidden="true" />{ar ? 'تلميح' : 'Hint'}
+                {hints > 0 && <span className="tabular-nums opacity-70">{ar ? `(${hints})` : `(${hints})`}</span>}
+              </button>
+            )}
             {stage === 'report' && (
               <button onClick={() => void draw(`${owner}:${Date.now()}`)}
                 className="inline-flex items-center gap-2 rounded-2xl border border-[#cfd6d2] bg-white px-5 py-2.5 text-xs font-black text-[#214C40]">
@@ -645,6 +738,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               </button>
             )}
           </div>
+
+          {slips.length > 0 && (stage === 'reciting' || stage === 'report') && (
+            <div className="space-y-2" data-similar-slips={slips.length}>
+              {(stage === 'reciting' ? slips.slice(-1) : slips).map(slip => <SimilarSlipCard key={slip.wordIndex} slip={slip} ar={ar} />)}
+            </div>
+          )}
 
           <MushafFaceSurface
             ar={ar}
@@ -660,10 +759,19 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             measurableMarks={stage === 'report' && analysed ? SAMPLED_PATH_MARKS : undefined}
             choiceNote={stage === 'report' ? undefined : choice}
             analysisNote={analysisNote}
+            live={stage === 'reciting' || stage === 'analysing' || (stage === 'ready' && veiled)
+              ? { cursor: stage === 'reciting' ? pen : null, reached, veiled: veiled && stage !== 'analysing', hint }
+              : undefined}
           />
 
           {gateNote && (
             <p className="text-center text-[10px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
+          )}
+
+          {stage === 'report' && hints > 0 && (
+            <p className="text-center text-[11px] font-bold leading-5 text-[#7a5a1c]" data-hints-used={hints}>
+              {ar ? `استعنتَ بـ${hints} ${hints === 1 ? 'تلميح' : 'تلميحات'} في هذا الوجه.` : `You used ${hints} hint${hints === 1 ? '' : 's'} on this face.`}
+            </p>
           )}
 
           {stage === 'report' && (
