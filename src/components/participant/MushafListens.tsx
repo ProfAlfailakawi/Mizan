@@ -296,6 +296,34 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     });
   }, []);
 
+  /*
+   * المستمعُ يستيقظ قبل أن يُطلب منه السماع.
+   *
+   * خدمةُ الاستماع تنام حين لا يُسمع أحد، وأوّلُ إقلاعٍ قد يأخذ دقيقة. فلو بدأ الطالبُ
+   * التلاوةَ وهي تستيقظ سقطت أوائلُ المقاطع، وقيل له «التقريرُ ناقص» عن تلاوةٍ تامّة.
+   * فيُسأل عن حالها (والسؤالُ نفسُه يوقظها)، ويبقى زرُّ البدء يقول «يستعدّ» حتى تجهز —
+   * بحدٍّ أقصى دقيقتين، ثم يُفتح على كل حال فلا يُحبس الطالبُ خلف خدمةٍ متعثّرة.
+   */
+  const [listenerState, setListenerState] = useState<string>('UNKNOWN');
+  useEffect(() => {
+    if (!listening || stage !== 'ready') return;
+    let live = true; let tries = 0; let timer = 0;
+    const poll = async () => {
+      try {
+        const r = await fetch('/api/health?listener=1', { cache: 'no-store', headers: { accept: 'application/json' } });
+        const body = await r.json().catch(() => ({}));
+        const state = String(body?.quranPracticeListener?.state || 'UNKNOWN');
+        if (!live) return;
+        tries += 1;
+        if (['LOADING', 'RETRYING', 'CHECKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
+        else setListenerState(tries >= 24 ? 'TIMEOUT' : state);
+      } catch { if (live) setListenerState('UNKNOWN'); }
+    };
+    void poll();
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [listening, stage]);
+  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING'].includes(listenerState);
+
   const lookupRef = useRef<(s: FaceAlignmentSample) => number | null>(() => null);
   useEffect(() => { lookupRef.current = face ? faceWordLookup(face.words) : () => null; }, [face]);
   /* التلميح: الكلمةُ التالية تنكشف ثانيتين ونصفًا، وتُعدّ — فالحفظُ بتلميحٍ غيرُه بلا تلميح. */
@@ -719,10 +747,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         <>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {stage === 'ready' && analysed && (
-              <button onClick={() => void begin()} data-listens="yes"
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#214C40] px-5 py-2.5 text-xs font-black text-white">
-                <Mic className="h-4 w-4" aria-hidden="true" />
-                {ar ? 'ابدأ التلاوة' : 'Begin reciting'}
+              <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming} data-listener={listenerState}
+                className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[#214C40]'}`}>
+                <Mic className={`h-4 w-4 ${listenerWarming ? 'motion-safe:animate-pulse' : ''}`} aria-hidden="true" />
+                {listenerWarming ? (ar ? 'المستمع يستعدّ…' : 'Listener waking…') : (ar ? 'ابدأ التلاوة' : 'Begin reciting')}
               </button>
             )}
             {stage === 'asking' && (
