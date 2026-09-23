@@ -58,7 +58,9 @@ test('the judge cockpit fills the screen exactly once and never scrolls as a pag
    * تقتسم ما بقي بعد الرأس والذيل، فمهما زاد عددها أو قصرت الشاشة بقي زرّ الإنهاء ظاهرًا.
    * وقد كانت تحتاج على آيباد أفقي 646px ولديها 560px، فيختفي الإنهاء تحت الطيّ.
    */
-  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-body\{[\s\S]{0,200}?overflow:auto/, 'the Mushaf scrolls inside its own box');
+  /* ملاحظة المالك 23 سبتمبر 2026: لا تمرير فوق وتحت أصلًا — الصفحةُ تُقاس على الوعاء فتدخل كاملة. */
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-body\{[\s\S]{0,200}?overflow:hidden/, 'the Mushaf is fitted to its box, never scrolled');
+  assert.match(read('src/components/judge/OfficialMushafSurface.tsx'), /new ResizeObserver\(measure\)/, 'the page is sized from the measured box');
   assert.match(css, /\.mizan-judge-deck\{[\s\S]{0,300}?grid-template-rows:auto minmax\(0,1fr\) auto/, 'the deck gives its middle row all the slack');
   assert.match(css, /\.mizan-judge-pad\{[\s\S]{0,260}?grid-auto-rows:minmax\(0,1fr\)/, 'and the keys divide it evenly instead of overflowing');
 });

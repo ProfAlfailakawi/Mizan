@@ -34,7 +34,10 @@ steps:
 
 
   # «يسمعك» الحقيقي: نموذج قرآني مستقل للتدريب، لا محرّك ظلّ غير منشور.
+  # allowFailure: المستمعُ خدمةٌ مساعدة. تعثُّرُه لا يجوز أن يُسقط نشرَ ميزان كلّه — وقد
+  # أسقطه فعلًا في كل دفعةٍ منذ أُضيف، فلم يصل الإنتاجَ لا هو ولا شيءٌ بعده.
   - name: 'gcr.io/cloud-builders/docker'
+    allowFailure: true
     args:
       - 'build'
       - '-t'
@@ -42,11 +45,13 @@ steps:
       - 'services/quran-practice-listener'
 
   - name: 'gcr.io/cloud-builders/docker'
+    allowFailure: true
     args:
       - 'push'
       - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    allowFailure: true
     entrypoint: bash
     args:
       - '-c'
@@ -55,7 +60,8 @@ steps:
         gcloud run deploy mizan-quran-listener \
           --image "me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA" \
           --region me-central1 --platform managed --no-allow-unauthenticated \
-          --cpu 2 --memory 2Gi --min-instances 0 --max-instances 3 --concurrency 4 --quiet
+          --cpu 2 --memory 2Gi --min-instances 0 --max-instances 3 --concurrency 4 \
+          --timeout 60 --cpu-boost --quiet
         listener_url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')"
         test -n "$listener_url"
         runtime_sa="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null || true)"
@@ -170,6 +176,8 @@ steps:
       - '-c'
       - |
         set -eu
+        # لا مستمعَ منشورًا في هذه الدفعة؟ يبقى العنوانُ السابق كما هو، ولا يسقط النشر.
+        if [ ! -s /workspace/mizan-quran-listener-url ]; then echo 'listener not deployed in this build; keeping previous binding'; exit 0; fi
         listener_url="$(cat /workspace/mizan-quran-listener-url)"
         gcloud run services update mizan --region me-central1 \
           --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=${listener_url}" --quiet
@@ -192,7 +200,8 @@ substitutions:
 
 images:
   - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan:$COMMIT_SHA'
-  - 'me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA'
+  # صورةُ المستمع لا تُدرج هنا: `images` يُلزم بوجود كل صورةٍ مذكورة، فتعثّرُ بنائها
+  # كان سيُسقط النشرَ كلّه من جديد. تُدفع في خطوتها الخاصة (allowFailure) وحدها.
 
 timeout: '1800s'
 

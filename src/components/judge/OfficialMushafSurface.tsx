@@ -119,13 +119,36 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
   if(!hit)return null;
   return {page:activeDeliveryAyah.page,bbox:hit.bbox||null,line:hit.line||null,lineCount:layout?.lineCount||null};
  },[layouts,activeDeliveryAyah,active]);
+ /*
+  * موضعُ القارئ الحيّ بدقّة السطر: الكلمةُ التي عاد بها المستمعُ تُسقَط على سطرها من
+  * تخطيط الصفحة، فتمشي العدسةُ مع القارئ سطرًا سطرًا بدل أن تغطّي الآيةَ كلّها.
+  */
+ const trackSpot=useMemo(()=>{
+  if(!tracking?.ayah||!delivery)return null;
+  const a=delivery.ayat.find(x=>x.ayah===tracking.ayah&&(!tracking.surah||x.surah===tracking.surah));if(!a)return null;
+  const layout=layouts[a.page]||null;
+  const hit=tracking.wordIndex?findLayoutWord(layout,a.surah,a.ayah,tracking.wordIndex):null;
+  return {page:a.page,line:hit?.line||null,bbox:hit?.bbox||null,lineStart:a.lineStart,lineEnd:a.lineEnd,lineCount:layout?.lineCount||15};
+ },[tracking?.ayah,tracking?.surah,tracking?.wordIndex,delivery,layouts]);
+ /*
+  * الصفحةُ على قدر الشاشة — تُحسب ولا تُترك لسلسلة نسب مئوية.
+  *
+  * كانت الصورةُ تُحدّ بـ«100%» من وعاءٍ لا ارتفاعَ محسومًا له، فتأخذ حجمها الطبيعي وتفيض،
+  * ويضطرّ المحكّم إلى التمرير فوق وتحت، ويغطّي شريطُ الاستماع أسفلها. الآن يُقاس الوعاءُ
+  * نفسُه، وتُعطى الصفحةُ أكبرَ مقاسٍ يدخل فيه كاملًا — لا تمرير ولا قصّ.
+  */
+ const bodyRef=useRef<HTMLDivElement|null>(null);
+ const [fitBox,setFitBox]=useState<{w:number;h:number}|null>(null);
+ useEffect(()=>{const el=bodyRef.current;if(!el||typeof ResizeObserver==='undefined'||!el.closest('.mizan-judge-os')){setFitBox(null);return}
+  const measure=()=>setFitBox(b=>{const w=Math.floor(el.clientWidth),h=Math.floor(el.clientHeight);return b&&b.w===w&&b.h===h?b:{w,h}});
+  measure();const ro=new ResizeObserver(measure);ro.observe(el);return()=>ro.disconnect()});
  const [pages,setPages]=useState<Record<number,string>>({});const [checked,setChecked]=useState(false);const [officialFont,setOfficialFont]=useState(false);
  useEffect(()=>{let live=true;const urls:string[]=[];setPages({});setChecked(false);if(!packageId||!loci.length){setChecked(true);return}void Promise.all(loci.map(async locus=>{const url=await fetchOfficialMushafPage(packageId,locus.page);if(url)urls.push(url);return [locus.page,url] as const})).then(results=>{if(!live){urls.forEach(URL.revokeObjectURL);return}setPages(Object.fromEntries(results.filter((x):x is readonly [number,string]=>!!x[1])));setChecked(true)});return()=>{live=false;urls.forEach(URL.revokeObjectURL)}},[packageId,loci.map(x=>`${x.page}:${x.lineStart}:${x.lineEnd}`).join('|')]);
  useEffect(()=>{let live=true;if(!isKfgqpcPackage){setOfficialFont(false);return()=>{live=false}}void loadKfgqpcOfficialQuranFont(packageId||'primary').then(ok=>{if(live)setOfficialFont(ok)});return()=>{live=false}},[packageId,isKfgqpcPackage]);
  const loadedLoci=loci.filter(x=>!!pages[x.page]);const hasOfficialPage=loadedLoci.length>0;const trackingLost=tracking?.alignmentState==='LOST'||tracking?.alignmentState==='REACQUIRING';
  return <div className="mizan-mushaf-surface relative overflow-hidden rounded-[30px] border border-[#dad7cd] bg-[#fdfbf5] shadow-[0_18px_55px_rgba(25,39,33,.055)]">
   <div className="mizan-mushaf-bar flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]"><div className="flex items-center gap-2 min-w-0"><span className="w-8 h-8 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><FileCheck2 className="w-4 h-4"/></span><div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'سطح المصحف':'MUSHAF SURFACE'}</div><div className="text-[9px] text-[#656a66] truncate">{readingText||'—'}</div></div></div><div className="flex items-center gap-2">{loci.length>1?<Badge variant="neutral">{ar?`${loci.length} صفحات`:`${loci.length} pages`}</Badge>:loci[0]&&<span className="text-[10px] font-black tabular-nums text-[#59615c]">{ar?'ص':'p.'} {loci[0].page}</span>}</div></div>
-  {hasOfficialPage&&!textView?<div className="mizan-mushaf-body relative bg-[#efede6] p-2 sm:p-3 overflow-hidden"><div className={`mx-auto grid items-start gap-4 ${loadedLoci.length>1?'lg:grid-cols-2':'grid-cols-1'}`}>{loci.map(locus=>pages[locus.page]?<OfficialPage key={locus.page} url={pages[locus.page]} locus={locus} ar={ar} tracking={tracking} audioFocus={activeDeliveryAyah&&activeDeliveryAyah.page===locus.page?activeDeliveryAyah:null} audioSpot={audioSpot?.page===locus.page?audioSpot:null}/>:<MissingPage key={locus.page} page={locus.page} ar={ar}/>)}</div>{tracking&&<div className="mt-3 flex items-center justify-end gap-3"><div className={`rounded-xl px-3 py-2 text-[9px] font-black flex items-center gap-2 ${trackingLost?'bg-[#F2EADC] text-[#725630]':'bg-[#E7EEE9] text-[#214C40]'}`}><MapPin className="w-3.5 h-3.5"/>{trackingLost?(ar?'جارٍ إعادة تحديد الموضع — المؤشر ثابت':'Reacquiring — pointer held'):(ar?`تتبّع حي · آية ${tracking.ayah||'—'}`:`Live tracking · ayah ${tracking.ayah||'—'}`)}</div></div>}</div>:<MushafSheet ar={ar} surahName={q.surahNameArabic||q.surahNameEnglish} startAyah={q.startAyah} endAyah={q.endAyah}
+  {hasOfficialPage&&!textView?<div ref={bodyRef} className="mizan-mushaf-body relative bg-[#efede6] p-2 sm:p-3 overflow-hidden"><div className={`mizan-mushaf-pages mx-auto grid items-start gap-4 ${loadedLoci.length>1?(fitBox?'grid-cols-2':'lg:grid-cols-2'):'grid-cols-1'}`}>{loci.map(locus=>pages[locus.page]?<OfficialPage key={locus.page} url={pages[locus.page]} locus={locus} ar={ar} tracking={tracking} trackSpot={trackSpot?.page===locus.page?trackSpot:null} fit={fitBox?{w:(fitBox.w-(loadedLoci.length>1?16:0))/Math.max(1,loadedLoci.length>1?2:1),h:fitBox.h}:null} audioFocus={activeDeliveryAyah&&activeDeliveryAyah.page===locus.page?activeDeliveryAyah:null} audioSpot={audioSpot?.page===locus.page?audioSpot:null}/>:<MissingPage key={locus.page} page={locus.page} ar={ar}/>)}</div>{tracking&&<div className="mizan-mushaf-trackchip mt-3 flex items-center justify-end gap-3"><div className={`rounded-xl px-3 py-2 text-[9px] font-black flex items-center gap-2 ${trackingLost?'bg-[#F2EADC] text-[#725630]':'bg-[#E7EEE9] text-[#214C40]'}`}><MapPin className="w-3.5 h-3.5"/>{trackingLost?(ar?'جارٍ إعادة تحديد الموضع — المؤشر ثابت':'Reacquiring — pointer held'):(ar?`القارئ عند الآية ${tracking.ayah||'—'}`:`Reciter at ayah ${tracking.ayah||'—'}`)}</div></div>}</div>:<MushafSheet ar={ar} surahName={q.surahNameArabic||q.surahNameEnglish} startAyah={q.startAyah} endAyah={q.endAyah}
     loci={loci.map(x=>({page:x.page,lineStart:x.lineStart,lineEnd:x.lineEnd}))}
     ayat={delivery?delivery.ayat:undefined} fallbackText={displayText} officialFont={officialFont}
     activeAyah={activeAyah} activeWords={activeWords} activeWordIndex={active?.word??-1}
@@ -229,11 +252,16 @@ const useLineBands=(url:string,expectedLines?:number)=>{
  return bands;
 };
 
-const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,audioFocus,audioSpot})=>{const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;
+type TrackSpot={page:number;line:number|null;bbox:{x:number;y:number;width:number;height:number}|null;lineStart:number;lineEnd:number;lineCount:number};
+const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking?:QuranAlignmentResult|null;trackSpot?:TrackSpot|null;fit?:{w:number;h:number}|null;audioFocus?:{page:number;lineStart:number;lineEnd:number}|null;audioSpot?:{bbox:{x:number;y:number;width:number;height:number}|null;line:number|null;lineCount:number|null}|null}>=({url,locus,ar,tracking,trackSpot,fit,audioFocus,audioSpot})=>{const [aspect,setAspect]=useState(0.64);
+ const box=fit&&fit.w>0&&fit.h>0?(()=>{const h=Math.min(fit.h,fit.w/aspect);return {width:Math.floor(h*aspect),height:Math.floor(h)}})():null;
+ const trackLost=tracking?.alignmentState==='LOST'||tracking?.alignmentState==='REACQUIRING';const live=tracking?.visualLocation?.page===locus.page?tracking.visualLocation:null;const liveLocus=live?.loci?.find(x=>x.page===locus.page);const focus=liveLocus||locus;const word=tracking?.wordVector?.page===locus.page&&tracking.wordVector.resolution==='VERIFIED_WORD_MAPPING'?tracking.wordVector.normalizedBBox:undefined;
  /* أشرطة الأسطر تُقاس من حبر الصفحة نفسها؛ متى تعذّر القياس بقيت العدسة على التقدير. */
  const bands=useLineBands(url,audioSpot?.lineCount||focus.lineCount||15);
- return <figure className="mizan-official-page relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center"><div className="mizan-official-page__frame relative inline-block max-h-[70vh] max-w-full"><img src={url} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]"/>
-  {audioSpot?.bbox
+ return <figure className="mizan-official-page relative mx-auto flex flex-col max-h-[70vh] max-w-full items-center justify-center" data-fit={box?'true':undefined}><div className="mizan-official-page__frame relative inline-block max-h-[70vh] max-w-full" style={box||undefined}><img src={url} onLoad={e=>{const i=e.currentTarget;if(i.naturalWidth&&i.naturalHeight)setAspect(i.naturalWidth/i.naturalHeight)}} alt={ar?`صفحة المصحف ${locus.page}`:`Mushaf page ${locus.page}`} className="mizan-mushaf-page block w-auto h-auto max-h-[70vh] max-w-full object-contain rounded-[2px] shadow-[0_10px_24px_rgba(0,0,0,.07)]" style={box?{width:'100%',height:'100%',maxHeight:'none'}:undefined}/>
+  {!audioSpot&&!audioFocus&&trackSpot
+   ? (trackSpot.bbox?<WordVectorLens bbox={trackSpot.bbox}/>:<FocusLens lineStart={trackSpot.line||trackSpot.lineStart} lineEnd={trackSpot.line||trackSpot.lineEnd} lineCount={trackSpot.lineCount} ar={ar} tone={trackLost?'held':'track'} bands={bands}/>)
+   : audioSpot?.bbox
    ? <RecitingWordLens bbox={audioSpot.bbox}/>
    : audioSpot?.line
      ? <FocusLens lineStart={audioSpot.line} lineEnd={audioSpot.line} lineCount={audioSpot.lineCount||15} ar={ar} tone="audio" bands={bands}/>
@@ -244,13 +272,14 @@ const OfficialPage:React.FC<{url:string;locus:QuranPageLocus;ar:boolean;tracking
           : word?<WordVectorLens bbox={word}/>:null)}</div><figcaption className="mt-2 text-center text-[9px] font-black text-[#606661]">{ar?'الصفحة':'Page'} {locus.page}{!focus.lineCount?<span className="ms-2 font-normal text-[#696f6b]">{ar?'هندسة الأسطر غير متاحة — بلا تخمين':'line geometry unavailable — no guess'}</span>:null}</figcaption></figure>}
 const MissingPage:React.FC<{page:number;ar:boolean}>=({page,ar})=><div className="min-h-44 rounded-2xl border border-dashed border-[#d1cec5] bg-[#f8f6f0] grid place-items-center text-center p-6"><div><FileSearch className="w-5 h-5 mx-auto text-[#646965]"/><div className="text-xs font-black mt-2">{ar?`صفحة المصحف ${page} غير مستوردة`:`Mushaf page ${page} is not imported`}</div><div className="text-[9px] text-[#686d6a] mt-1">{ar?'لا يُستخدم بديل من رواية أخرى.':'No cross-riwayah visual fallback.'}</div></div></div>;
 
-const FocusLens:React.FC<{lineStart:number;lineEnd:number;lineCount:number;ar:boolean;tone?:'track'|'audio';bands?:LineBand[]|null}>=({lineStart,lineEnd,lineCount,ar,tone='track',bands})=>{const total=Math.max(1,lineCount),start=Math.max(1,Math.min(total,lineStart)),end=Math.max(start,Math.min(total,lineEnd));
+const FocusLens:React.FC<{lineStart:number;lineEnd:number;lineCount:number;ar:boolean;tone?:'track'|'audio'|'held';bands?:LineBand[]|null}>=({lineStart,lineEnd,lineCount,ar,tone='track',bands})=>{const total=Math.max(1,lineCount),start=Math.max(1,Math.min(total,lineStart)),end=Math.max(start,Math.min(total,lineEnd));
  const measured=bands&&bands.length?bandSpan(bands,start,end):null;
  const textTop=8.5,textHeight=83;
  const top=measured?measured.top*100:textTop+((start-1)/total)*textHeight,height=measured?Math.max(1.6,measured.height*100):Math.max(2.4,((end-start+1)/total)*textHeight);
- const c=tone==='audio'?{band:'border-[#8A5A2B]/30 bg-[#8A5A2B]/[0.05]',bar:'bg-[#8A5A2B]',glow:'rgba(138,90,43,.10)'}:{band:'border-[#2F6555]/25 bg-[#2F6555]/[0.035]',bar:'bg-[#2F6555]',glow:'rgba(47,101,85,.08)'};
- return <div aria-label={tone==='audio'?(ar?'عدسة الآية الجاري تلاوتها':'Reciting-ayah lens'):(ar?'عدسة موضع الاختبار':'Passage focus lens')} className="pointer-events-none absolute inset-0"><div className={`absolute start-[7%] end-[7%] rounded-md border-y ${c.band} transition-all duration-300`} style={{top:`${top}%`,height:`${height}%`}}/><div className={`absolute end-[3.5%] w-[3px] rounded-full ${c.bar} transition-all duration-300`} style={{top:`${top}%`,height:`${height}%`,boxShadow:`0 0 0 4px ${c.glow}`}}/></div>}
+ /* العدسةُ تُرى من مقعد المحكّم: لونٌ دافئٌ واضحٌ يعلو السطر ولا يحجب حرفًا. */
+ const c=tone==='audio'?{band:'border-[#B07A2A]/55 bg-[#E2B45C]/[0.22]',bar:'bg-[#9A6420]',glow:'rgba(176,122,42,.22)'}:tone==='held'?{band:'border-[#8b8676]/40 bg-[#8b8676]/[0.10]',bar:'bg-[#8b8676]',glow:'rgba(139,134,118,.14)'}:{band:'border-[#2F6555]/50 bg-[#5FA387]/[0.20]',bar:'bg-[#2F6555]',glow:'rgba(47,101,85,.20)'};
+ return <div aria-label={tone==='audio'?(ar?'عدسة الآية الجاري تلاوتها':'Reciting-ayah lens'):(ar?'عدسة موضع الاختبار':'Passage focus lens')} className="pointer-events-none absolute inset-0"><div className={`absolute start-[4%] end-[4%] rounded-lg border ${c.band} transition-all duration-300 ease-out mix-blend-multiply`} style={{top:`${top}%`,height:`${height}%`}}/><div className={`absolute end-[1.5%] w-[5px] rounded-full ${c.bar} transition-all duration-300`} style={{top:`${top}%`,height:`${height}%`,boxShadow:`0 0 0 4px ${c.glow}`}}/></div>}
 const RecitingWordLens:React.FC<{bbox:{x:number;y:number;width:number;height:number}}>=({bbox})=>
- <div aria-hidden className="pointer-events-none absolute rounded-[3px] bg-[#C8922F]/[0.16] shadow-[0_0_0_1.5px_rgba(138,90,43,.42)] transition-all duration-150 ease-out"
+ <div aria-hidden className="pointer-events-none absolute rounded-[4px] bg-[#E2B45C]/[0.30] shadow-[0_0_0_2px_rgba(154,100,32,.55)] mix-blend-multiply transition-all duration-150 ease-out"
   style={{left:`${bbox.x*100}%`,top:`${bbox.y*100}%`,width:`${bbox.width*100}%`,height:`${bbox.height*100}%`}}/>;
-const WordVectorLens:React.FC<{bbox:{x:number;y:number;width:number;height:number}}>=({bbox})=><div aria-hidden className="pointer-events-none absolute rounded-sm border-2 border-[#2F6555]/55 bg-[#2F6555]/[0.025] transition-all duration-200" style={{left:`${bbox.x*100}%`,top:`${bbox.y*100}%`,width:`${bbox.width*100}%`,height:`${bbox.height*100}%`}}/>;
+const WordVectorLens:React.FC<{bbox:{x:number;y:number;width:number;height:number}}>=({bbox})=><div aria-hidden className="pointer-events-none absolute rounded-[4px] border-2 border-[#2F6555]/70 bg-[#5FA387]/[0.22] mix-blend-multiply transition-all duration-200" style={{left:`${bbox.x*100}%`,top:`${bbox.y*100}%`,width:`${bbox.width*100}%`,height:`${bbox.height*100}%`}}/>;

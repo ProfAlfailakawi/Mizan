@@ -17,6 +17,7 @@ import {
 } from '../../lib/recitation-alerts';
 import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff';
 import { quranSkeleton } from '../../lib/quran-orthography';
+import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -142,6 +143,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const chunkIndex = useRef(0);
   const startedAt = useRef(0);
   const recorder = useRef<MediaRecorder | null>(null);
+  /** آخرُ لحظةٍ ثُبّت ما سُمع قبلها — النوافذُ متداخلة، والكلمةُ تُحسب مرّةً واحدة. */
+  const committedUntil = useRef(0);
   const stream = useRef<MediaStream | null>(null);
   const alive = useRef(true);
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
@@ -228,6 +231,33 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    */
   const faceSkeletons = useMemo(() => new Set(expected.map(w => quranSkeleton(w.text))), [expected]);
   const faceSkeletonsRef = useRef<Set<string>>(new Set());
+  /*
+   * ما تنفرد به روايةُ المتسابق عن حفص لا يُحكم عليه.
+   *
+   * المحرّكُ يسمع كلَّ الروايات، لكنّ نموذجَه تدرّب على حفص أكثر، فقد يسمع لفظَ ورشٍ
+   * الصحيحَ خطأً. فتُعرف كلماتُ الوجه التي لا نظيرَ لها في نصّ حفص حولها، ولا يُقال
+   * فيها «أخطأت» — والزيادةُ لا تُنسب في غير حفص، لأنّ لفظ الرواية قد يُسمع زيادة.
+   * ميزانٌ يسكت حيث لا يعرف، ولا يُخطّئ قارئًا مصيبًا.
+   */
+  const riwayaOnlyRef = useRef<{ words: Set<number>; strictAdded: boolean }>({ words: new Set(), strictAdded: true });
+  useEffect(() => {
+    riwayaOnlyRef.current = { words: new Set(), strictAdded: true };
+    if (!face || !deliveryReading || deliveryReading === 'hafs') return;
+    riwayaOnlyRef.current = { words: new Set(face.words.map(w => w.index)), strictAdded: false };
+    let live = true;
+    const bySurah = new Map<number, { lo: number; hi: number }>();
+    for (const w of face.words) { const r = bySurah.get(w.surah); bySurah.set(w.surah, r ? { lo: Math.min(r.lo, w.ayah), hi: Math.max(r.hi, w.ayah) } : { lo: w.ayah, hi: w.ayah }); }
+    void Promise.all([...bySurah].map(async ([surah, r]) => [surah, await fetchDeliveryPassage('hafs', surah, Math.max(1, r.lo - 3), r.hi + 3).catch(() => null)] as const)).then(rows => {
+      if (!live) return;
+      const hafs = new Map<number, Set<string>>();
+      for (const [surah, passage] of rows) if (passage) hafs.set(surah, new Set(passage.ayat.flatMap(a => a.text.split(/\s+/).map(quranSkeleton).filter(Boolean))));
+      const only = new Set<number>();
+      for (const w of face.words) { const set = hafs.get(w.surah); if (!set || !set.has(quranSkeleton(w.text))) only.add(w.index); }
+      riwayaOnlyRef.current = { words: only, strictAdded: false };
+    });
+    return () => { live = false; };
+  }, [face, deliveryReading]);
+  const judgeable = useCallback((list: readonly Mistake[]) => list.filter(m => m.wordIndex === null ? riwayaOnlyRef.current.strictAdded : !riwayaOnlyRef.current.words.has(m.wordIndex)), []);
   useEffect(() => { faceSkeletonsRef.current = faceSkeletons; }, [faceSkeletons]);
   /* والحكمُ لا يُفتح إلا ببابٍ مفتوحٍ لهذه الرواية بعينها. */
   const judging = gate?.word === 'OPEN' ? gate : null;
@@ -333,9 +363,33 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       startedAt.current = Date.now();
       setStage('reciting');
       /* الطابورُ يُربط **تزامنيًّا** عند وصول المقطع، فلا يسبق متأخّرٌ سابقَه. */
+      let head: Blob | null = null;
+      const all: Blob[] = [];
+      committedUntil.current = 0;
       rec.ondataavailable = e => {
         if (!e.data.size) return;
         const chunk = e.data;
+        /*
+         * ترويسةُ الملف في المقطع الأوّل وحده؛ وما بعده عنقودٌ لا يُفكّ منفردًا — فكان المستمعُ
+         * يتلقّى صوتًا لا يُقرأ ويعود بلا موضع. فيُسبق كلُّ مقطعٍ بالأوّل لمسار التتبّع.
+         */
+        if (!head) head = chunk;
+        const index = chunkIndex.current;
+        all.push(chunk);
+        /*
+         * نافذةُ السماع: الترويسةُ ثمّ آخرُ ثلاثة مقاطع (نحو ست ثوانٍ).
+         *
+         * المقطعُ وحده (ثانيتان) يقطع الكلمةَ عند حدّه فيسمعها المحرّكُ خطأً، فيُقال للطالب
+         * «أخطأت» وهو مصيب. فيُسمع في سياقه، ولا يُثبَّت إلا ما استقرّ قبل حافّة النافذة.
+         */
+        const first = Math.max(1, index - 2);
+        const windowParts = index === 0 ? [chunk] : [all[0], ...all.slice(first, index + 1)];
+        const windowStartMs = index === 0 ? 0 : first * CHUNK_MS;
+        const windowEndMs = (index + 1) * CHUNK_MS;
+        const windowBlob = new Blob(windowParts, { type: chunk.type || all[0].type });
+        const windowHeadBytes = index === 0 ? 0 : all[0].size;
+        const finalChunk = rec.state === 'inactive';
+        const listenable = chunk === head ? chunk : new Blob([head, chunk], { type: chunk.type || head.type });
         /*
          * ورقمُ المقطع يُؤخذ هنا **تزامنيًّا**، لا داخل المهمّة.
          *
@@ -352,7 +406,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          */
         queue.current.push(async live => {
           const out = await submitPracticeAlignmentChunk({
-            blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
+            blob: listenable, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
           }, journeyAuth);
           /*
@@ -387,7 +441,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             const permission = attemptJudging.current;
             if (!permission) return;
             const out = await submitPracticeRecognitionChunk({
-              blob: chunk, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
+              blob: windowBlob, headBytes: windowHeadBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);
             if (!alive.current || !live()) return;
             /*
@@ -399,21 +453,31 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               setGate(out.gate);
               throw new Error('QURAN_JUDGING_GATE_CHANGED');
             }
-            /* توقيتُ الكلمة يصير من أوّل التلاوة، فتُقاس به نوافذُ النغمات. */
-            const timed: HeardWord[] = out.words.map(w => ({
-              text: w.text, confidence: w.confidence,
-              startMs: w.startMs === undefined ? undefined : chunkStartMs + w.startMs,
-              endMs: w.endMs === undefined ? undefined : chunkStartMs + w.endMs,
-            }));
+            /*
+             * توقيتُ الكلمة يصير من أوّل التلاوة، فتُقاس به نوافذُ النغمات.
+             *
+             * والنوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد
+             * آخر مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير).
+             */
+            const hold = finalChunk ? 0 : 1200;
+            const timed: HeardWord[] = [];
+            for (const w of out.words) {
+              if (w.startMs === undefined || w.endMs === undefined) continue;
+              const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
+              if (startMs < committedUntil.current - 80 || endMs > windowEndMs - hold) continue;
+              timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
+              committedUntil.current = Math.max(committedUntil.current, endMs);
+            }
             /* وما سُمع تحت نغمةٍ يُطرح: الميكروفونُ خام، فيلتقط صدى التنبيه كلمةً. */
             const { kept } = dropWordsUnderAlert(timed, alertWindows.current, text => faceSkeletonsRef.current.has(quranSkeleton(text)));
             heardWords.current = [...heardWords.current, ...kept];
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
-            setMistakes(judged.judgment ? judged.settled : undefined);
+            const settledHere = judgeable(judged.settled);
+            setMistakes(judged.judgment ? settledHere : undefined);
 
             const now = Date.now() - startedAt.current;
-            const plan = planAlert(judged.settled, alertMemory.current, now);
+            const plan = planAlert(settledHere, alertMemory.current, now);
             alertMemory.current = plan.memory;
             if (plan.sound) {
               if (!speaker.current) speaker.current = createAlertSpeaker();
@@ -493,7 +557,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      */
     const permission = attemptJudging.current;
     const verdict = permission ? finalJudgment(expectedRef.current, heardWords.current, permission) : null;
-    setMistakes(verdict ? verdict.mistakes : undefined);
+    setMistakes(verdict ? judgeable(verdict.mistakes) : undefined);
     /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
     setIncomplete(!settled.complete);
     setStage('report');
