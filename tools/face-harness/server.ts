@@ -8,6 +8,7 @@
  * ومسارُ المحاذاة يردّ موضعًا **متقدّمًا بانتظام**: كلمةٌ بعد كلمة. فإن ظهر في التقرير
  * «أعدتَ» فذلك رجوعٌ لم يقع — صنعته فوضى الوصول، لا القارئ.
  */
+import { CHUNK_MS, recognitionWindow } from '../../src/lib/recognition-window';
 import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
@@ -90,11 +91,20 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
        * ويُعاد نصُّ الوجه نفسُه كلمتين في كلّ مقطع — من حزمة الرواية لا من اختراع —
        * إلا الكلمةَ الرابعة، فتُسقط عمدًا. فالمقصودُ قياسُ الربط لا قياسُ محرّك.
        */
+      /*
+       * والمحرّكُ يسمع **النافذةَ** كلَّها لا المقطعَ وحده: كلماتِ كلّ مقطعٍ فيها، وأزمنتُها
+       * من أوّل محتواها (بعد الترويسة المطروحة). والقاعدةُ تُقرأ من الشاشة نفسِها
+       * (`recognitionWindow`)، فلا يخترع المِشحَنُ نوافذَه — وإلا قاس ما لا يقع.
+       */
+      const win = recognitionWindow(index, false);
       const words = [];
-      for (const offset of [0, 1]) {
-        const at = index * 2 + offset;
-        if (at >= face.words.length || at === SKIPPED_WORD_INDEX) continue;
-        words.push({ text: face.words[at].text, confidence: 0.95, startMs: offset * 800, endMs: offset * 800 + 700 });
+      for (let c = win.first; c <= index; c += 1) {
+        for (const offset of [0, 1]) {
+          const at = c * 2 + offset;
+          if (at >= face.words.length || at === SKIPPED_WORD_INDEX) continue;
+          const startMs = (c - win.first) * CHUNK_MS + offset * 800;
+          words.push({ text: face.words[at].text, confidence: 0.95, startMs, endMs: startMs + 700 });
+        }
       }
       await sleep(30);
       /*

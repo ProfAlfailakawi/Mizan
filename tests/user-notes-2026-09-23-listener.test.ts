@@ -28,7 +28,11 @@ test('chunks after the first are sent with the container header so they can be d
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(judge, /if\(!headBlobRef\.current\)headBlobRef\.current=e\.data;/);
   assert.match(practice, /new Blob\(\[head, chunk\]/);
-  assert.match(practice, /const windowParts = index === 0 \? \[chunk\] : \[all\[0\], \.\.\.all\.slice\(first, index \+ 1\)\]/);
+  /*
+   * والترويسةُ تسبق كلَّ نافذةٍ لا تبلغ المقطعَ الأوّل؛ وما بلغته يُرسل صوتُه محتوًى لا
+   * ترويسةً — وإلا طُرح صوتُ أوّل التلاوة ولم يُثبَّت (تغطيتُه في recognition-window.test).
+   */
+  assert.match(practice, /const windowParts = win\.headed \? \[all\[0\], \.\.\.all\.slice\(win\.first, index \+ 1\)\] : all\.slice\(0, index \+ 1\)/);
   assert.match(practice, /startMs < committedUntil\.current - 80/, 'overlapping windows commit each word once');
 });
 
@@ -48,4 +52,21 @@ test('every delivered riwayah is listened to against its own text, never judged 
   assert.match(practice, /fetchDeliveryPassage\('hafs', surah/);
   assert.match(practice, /planAlert\(settledHere,/, 'the alert tone never fires on a riwayah-specific word');
   assert.match(practice, /setMistakes\(verdict \? judgeable\(verdict\.mistakes\)/);
+});
+
+test('the listener image prefetches its model when it can, and never fails the build when it cannot', () => {
+  const docker = read('services/quran-practice-listener/Dockerfile');
+  assert.match(docker, /RUN timeout 600 python prefetch\.py \|\| echo/);
+  const prefetch = read('services/quran-practice-listener/prefetch.py');
+  assert.match(prefetch, /sys\.exit\(0\)/);
+  assert.doesNotMatch(prefetch, /raise\b/);
+});
+
+test('the student waits for a waking listener instead of losing the first chunks — at most two minutes', () => {
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /fetch\('\/api\/health\?listener=1'/);
+  assert.match(practice, /disabled=\{listenerWarming\}/);
+  assert.match(practice, /tries < 24/);
+  const server = read('server.ts');
+  assert.match(server, /quranPracticeListener:_req\.query\?\.listener==='1'\?await practiceListenerHealth\(\):practiceListenerHealthCached\(\)/);
 });

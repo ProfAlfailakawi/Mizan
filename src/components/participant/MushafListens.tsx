@@ -19,6 +19,7 @@ import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff
 import { quranSkeleton } from '../../lib/quran-orthography';
 import { fetchDeliveryPassage, fetchDivergencePoints, type DivergencePoint } from '../../lib/kfgqpc-library';
 import { SimilarSlipCard, type SimilarSlip } from './SimilarSlipCard';
+import { CHUNK_MS, recognitionWindow } from '../../lib/recognition-window';
 import { faceWordLookup, readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -56,7 +57,6 @@ type Stage = 'loading' | 'ready' | 'asking' | 'reciting' | 'analysing' | 'report
  * التلاوة، ووحدةُ العدّ التي تُعرض. وكان مكتوبًا في موضعه وحده، فلمّا احتاجه التوقيتُ
  * كاد يُكتب ثانيةً — ورقمان يصفان شيئًا واحدًا يفترقان.
  */
-const CHUNK_MS = 2000;
 
 export interface MushafListensProps {
   ar: boolean;
@@ -131,11 +131,30 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    */
   const [slips, setSlips] = useState<SimilarSlip[]>([]);
   const forksRef = useRef<Map<number, DivergencePoint>>(new Map());
+  /*
+   * والقلمُ ينساب ولا يقفز.
+   *
+   * الموضعُ يصل كلَّ ثانيتين، وقد تقدّم القارئُ فيهما كلماتٍ. فلو قفز القلمُ إليه لبدا
+   * الأثرُ متقطّعًا متأخّرًا. فيُعطى الهدف، ويمشي القلمُ إليه كلمةً كلمة بسرعةٍ تقطع
+   * المسافة قبل أن يصل الموضعُ التالي — فيُرى يتبع القارئ. والرجوعُ (إعادةُ آية) قفزٌ
+   * مباشر: لا يُمشى بالقلم إلى الوراء كلمةً كلمة.
+   */
+  const [penTarget, setPenTarget] = useState<number | null>(null);
   const advance = useCallback((index: number | null) => {
     if (index === null || index < 0) return;
-    setPen(index);
-    setReached(r => Math.max(r, index + 1));
+    setPenTarget(index);
   }, []);
+  useEffect(() => {
+    if (penTarget === null) { setPen(null); return; }
+    if (pen === null || penTarget < pen || penTarget - pen > 24) { setPen(penTarget); setReached(r => Math.max(r, penTarget + 1)); return; }
+    if (penTarget === pen) return;
+    const step = Math.max(90, Math.min(260, 1500 / (penTarget - pen)));
+    const t = window.setTimeout(() => {
+      setPen(p => (p === null ? penTarget : p + 1));
+      setReached(r => Math.max(r, (pen ?? penTarget) + 2));
+    }, step);
+    return () => window.clearTimeout(t);
+  }, [pen, penTarget]);
   /* هل بقي مقطعٌ لم يصل حين قُرئ التقرير؟ */
   const [incomplete, setIncomplete] = useState(false);
   /* إذنُ الحكم لهذه الرواية — يُسأل عنه الخادم، ولا تحسبه الشاشةُ لنفسها. */
@@ -251,7 +270,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     let live = true;
     const bySurah = new Map<number, { lo: number; hi: number }>();
     for (const w of face.words) { const r = bySurah.get(w.surah); bySurah.set(w.surah, r ? { lo: Math.min(r.lo, w.ayah), hi: Math.max(r.hi, w.ayah) } : { lo: w.ayah, hi: w.ayah }); }
-    const at = new Map(face.words.map(w => [`${w.surah}:${w.ayah}:${w.ayahWordIndex}`, w.index] as const));
+    /* محرّكُ المتشابهات يعدّ الكلمة في آيتها من صفر (`server/quran-mutashabihat`)، والوجهُ من واحد. */
+    const at = new Map(face.words.map(w => [`${w.surah}:${w.ayah}:${w.ayahWordIndex - 1}`, w.index] as const));
     void Promise.all([...bySurah].map(([surah, r]) => fetchDivergencePoints(deliveryReading, surah, r.lo, r.hi).catch(() => [] as DivergencePoint[]))).then(rows => {
       if (!live) return;
       const map = new Map<number, DivergencePoint>();
@@ -275,6 +295,34 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       return fresh.length ? [...prev, ...fresh] : prev;
     });
   }, []);
+
+  /*
+   * المستمعُ يستيقظ قبل أن يُطلب منه السماع.
+   *
+   * خدمةُ الاستماع تنام حين لا يُسمع أحد، وأوّلُ إقلاعٍ قد يأخذ دقيقة. فلو بدأ الطالبُ
+   * التلاوةَ وهي تستيقظ سقطت أوائلُ المقاطع، وقيل له «التقريرُ ناقص» عن تلاوةٍ تامّة.
+   * فيُسأل عن حالها (والسؤالُ نفسُه يوقظها)، ويبقى زرُّ البدء يقول «يستعدّ» حتى تجهز —
+   * بحدٍّ أقصى دقيقتين، ثم يُفتح على كل حال فلا يُحبس الطالبُ خلف خدمةٍ متعثّرة.
+   */
+  const [listenerState, setListenerState] = useState<string>('UNKNOWN');
+  useEffect(() => {
+    if (!listening || stage !== 'ready') return;
+    let live = true; let tries = 0; let timer = 0;
+    const poll = async () => {
+      try {
+        const r = await fetch('/api/health?listener=1', { cache: 'no-store', headers: { accept: 'application/json' } });
+        const body = await r.json().catch(() => ({}));
+        const state = String(body?.quranPracticeListener?.state || 'UNKNOWN');
+        if (!live) return;
+        tries += 1;
+        if (['LOADING', 'RETRYING', 'CHECKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
+        else setListenerState(tries >= 24 ? 'TIMEOUT' : state);
+      } catch { if (live) setListenerState('UNKNOWN'); }
+    };
+    void poll();
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [listening, stage]);
+  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING'].includes(listenerState);
 
   const lookupRef = useRef<(s: FaceAlignmentSample) => number | null>(() => null);
   useEffect(() => { lookupRef.current = face ? faceWordLookup(face.words) : () => null; }, [face]);
@@ -339,7 +387,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
-    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
+    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     attemptJudging.current = null;
     setMistakes(undefined); setJudgingLost(false);
@@ -400,7 +448,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const begin = useCallback(async () => {
     if (!face) return;
-    samples.current = []; setHeard(0); setReached(0); setPen(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
+    samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
     setMistakes(undefined); setJudgingLost(false);
     /* والإذنُ يُلتقط الآن ويثبت: مجهولٌ عند الضغط يعني مراجعةً لا تُحكم. */
@@ -452,13 +500,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * المقطعُ وحده (ثانيتان) يقطع الكلمةَ عند حدّه فيسمعها المحرّكُ خطأً، فيُقال للطالب
          * «أخطأت» وهو مصيب. فيُسمع في سياقه، ولا يُثبَّت إلا ما استقرّ قبل حافّة النافذة.
          */
-        const first = Math.max(1, index - 2);
-        const windowParts = index === 0 ? [chunk] : [all[0], ...all.slice(first, index + 1)];
-        const windowStartMs = index === 0 ? 0 : first * CHUNK_MS;
-        const windowEndMs = (index + 1) * CHUNK_MS;
-        const windowBlob = new Blob(windowParts, { type: chunk.type || all[0].type });
-        const windowHeadBytes = index === 0 ? 0 : all[0].size;
         const finalChunk = rec.state === 'inactive';
+        const win = recognitionWindow(index, finalChunk);
+        const windowParts = win.headed ? [all[0], ...all.slice(win.first, index + 1)] : all.slice(0, index + 1);
+        const windowStartMs = win.startMs;
+        const windowBlob = new Blob(windowParts, { type: chunk.type || all[0].type });
+        const windowHeadBytes = win.headed ? all[0].size : 0;
         const listenable = chunk === head ? chunk : new Blob([head, chunk], { type: chunk.type || head.type });
         /*
          * ورقمُ المقطع يُؤخذ هنا **تزامنيًّا**، لا داخل المهمّة.
@@ -530,12 +577,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              * والنوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد
              * آخر مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير).
              */
-            const hold = finalChunk ? 0 : 1200;
             const timed: HeardWord[] = [];
             for (const w of out.words) {
               if (w.startMs === undefined || w.endMs === undefined) continue;
               const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
-              if (startMs < committedUntil.current - 80 || endMs > windowEndMs - hold) continue;
+              if (startMs < committedUntil.current - 80 || endMs > win.commitUntilMs) continue;
               timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
               committedUntil.current = Math.max(committedUntil.current, endMs);
             }
@@ -699,10 +745,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         <>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {stage === 'ready' && analysed && (
-              <button onClick={() => void begin()} data-listens="yes"
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#214C40] px-5 py-2.5 text-xs font-black text-white">
-                <Mic className="h-4 w-4" aria-hidden="true" />
-                {ar ? 'ابدأ التلاوة' : 'Begin reciting'}
+              <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming} data-listener={listenerState}
+                className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[#214C40]'}`}>
+                <Mic className={`h-4 w-4 ${listenerWarming ? 'motion-safe:animate-pulse' : ''}`} aria-hidden="true" />
+                {listenerWarming ? (ar ? 'المستمع يستعدّ…' : 'Listener waking…') : (ar ? 'ابدأ التلاوة' : 'Begin reciting')}
               </button>
             )}
             {stage === 'asking' && (

@@ -209,6 +209,34 @@ jobs:
           echo "revision=$ready_revision" >> "$GITHUB_OUTPUT"
           echo "url=$service_url" >> "$GITHUB_OUTPUT"
 
+      # ── حالُ مستمع التدريب — يُقرأ ولا يُسقط النشر ─────────────────────────
+      #
+      # خطواتُ المستمع في `cloudbuild.yaml` مسموحٌ لها بالتعثّر كي لا تُسقط ميزان. فيُسأل
+      # ميزانُ المنشورُ نفسُه عن مستمعه (`/api/health?listener=1`) ويُكتب الجوابُ في ملخّص
+      # النشر: مربوطٌ أم لا، وجاهزٌ أم يُحمِّل نموذجه — فلا يُعلن «يسمعك» على العمياء.
+      - name: حالُ مستمع التدريب (للعلم، لا يُسقط النشر)
+        if: always() && steps.verify.outputs.url != ''
+        shell: bash
+        env:
+          SERVICE_URL: ${{ steps.verify.outputs.url }}
+        run: |
+          set -uo pipefail
+          state=UNKNOWN
+          for attempt in $(seq 1 8); do
+            body="$(curl -sS --max-time 20 "${SERVICE_URL%/}/api/health?listener=1" || true)"
+            state="$(jq -r '.quranPracticeListener.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
+            model="$(jq -r '.quranPracticeListener.model // "-"' <<<"$body" 2>/dev/null || echo -)"
+            echo "listener attempt $attempt/8: state=$state model=$model"
+            [[ "$state" == READY || "$state" == NOT_CONFIGURED ]] && break
+            sleep 15
+          done
+          {
+            echo '## مستمع التدريب'
+            echo
+            echo "- الحال: \`$state\`"
+            echo "- النموذج: \`${model:--}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # ── صدقُ العنوان الذي يُحال إليه الموقِّع ───────────────────────────────
       #
       # `cloudbuild.yaml` يضبط `MIZAN_LEGAL_*_URL`، و`legal-documents.ts` يكتبه في أثر

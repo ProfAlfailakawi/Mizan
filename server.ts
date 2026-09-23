@@ -687,7 +687,7 @@ async function startServer() {
     /* «غير معلوم» يُنقل كما هو (null) ولا يُسوّى بـ«لا يستطيع»: عطلٌ عارض ليس سوءَ تهيئة،
        واتهام نشرٍ سليم به يُرسل صاحبه إلى إصلاح ما ليس معطوبًا. */
     const claimsState=await claimsWritability().catch(()=>'UNKNOWN' as const);
-    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,quranPracticeListenerConfigured:journeyListeningReady('hafs'),secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
+    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,quranPracticeListenerConfigured:journeyListeningReady('hafs'),quranPracticeListener:_req.query?.listener==='1'?await practiceListenerHealth():practiceListenerHealthCached(),secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
   app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Organization/competition logos use the already-configured private R2 bucket. Only the bytes are public; writes remain Firebase-authorized and tenant-scoped.
@@ -2163,6 +2163,35 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     const confidence=Number(raw?.confidence||0);
     return {candidate,confidence,raw};
   };
+  /*
+   * حالُ المستمع كما هو، لا كما يُفترض.
+   *
+   * «مربوط» (العنوانُ مضبوط) لا يعني «جاهز» (النموذجُ حُمِّل). والفرقُ بينهما هو الفرقُ بين
+   * طالبٍ يُسمع وطالبٍ يُقال له «يُحمَّل». فتُسأل صحّةُ المستمع نفسِه ويُنقل جوابُها إلى
+   * `/api/health` — فيقرؤه سجلُّ النشر بعد كل دفعة، ولا يُعمل على العمياء. يُخزَّن نصفَ
+   * دقيقة، ولا يُنقل من المستمع إلا حالُه واسمُ نموذجه (لا رسائلُ خطئه).
+   */
+  let listenerHealthCache:{at:number;value:{state:string;model:string|null}}|null=null;
+  const practiceListenerHealth=async():Promise<{state:string;model:string|null}>=>{
+    if(!/^https:\/\//i.test(practiceListenerUrl))return {state:'NOT_CONFIGURED',model:null};
+    if(listenerHealthCache&&Date.now()-listenerHealthCache.at<30_000)return listenerHealthCache.value;
+    let value:{state:string;model:string|null}={state:'UNREACHABLE',model:null};
+    try{
+      const token=await practiceListenerToken();
+      const r=await fetch(new URL('/health',practiceListenerUrl).toString(),{headers:token?{authorization:`Bearer ${token}`}:{},signal:AbortSignal.timeout(4_000)});
+      const body=await r.json().catch(()=>({})) as any;
+      const state=String(body?.status||'').toUpperCase();
+      value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null};
+    }catch{/* يبقى UNREACHABLE */}
+    listenerHealthCache={at:Date.now(),value};
+    return value;
+  };
+  /* للشاشات التي تسأل كثيرًا: آخرُ ما عُرف فورًا، والتحديثُ في الخلفية — لا تنتظر المستمع. */
+  const practiceListenerHealthCached=():{state:string;model:string|null}=>{
+    if(!listenerHealthCache||Date.now()-listenerHealthCache.at>=30_000)void practiceListenerHealth().catch(()=>{});
+    return listenerHealthCache?.value??{state:/^https:\/\//i.test(practiceListenerUrl)?'CHECKING':'NOT_CONFIGURED',model:null};
+  };
+
   /* إيقاظُ المستمع: Cloud Run ينام بلا طلبات، والنموذجُ يُحمَّل عند الإقلاع. يُنادى عند فتح
      الوجه أو الموضع فيجهز قبل أن يبدأ القارئ. */
   let listenerWokeAt=0;
