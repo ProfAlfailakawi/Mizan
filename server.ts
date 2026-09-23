@@ -2188,7 +2188,9 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   };
   const recogniseWithDedicatedListener=async(input:{reading:string;contentType:string;bytes:Buffer;headBytes:number})=>{
     /* الحمولةُ Buffer حصرًا: النصُّ والمصفوفةُ يملكان `length` كذلك فيُخدع به فحصُ الحجم. */
-    if(!Buffer.isBuffer(input.bytes)||!input.bytes.length||input.bytes.length>4_000_000)throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
+    if(!(input.bytes instanceof Uint8Array))throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
+    const size=input.bytes.byteLength;
+    if(!size||size>4_000_000)throw new Error('QURAN_ASR_AUDIO_CHUNK_INVALID');
     const token=await practiceListenerToken();
     const response=await fetch(new URL('/recognise',practiceListenerUrl).toString(),{method:'POST',headers:{
       'content-type':input.contentType||'application/octet-stream','x-mizan-reading':input.reading,
