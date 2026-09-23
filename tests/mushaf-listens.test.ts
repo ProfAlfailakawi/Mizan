@@ -632,7 +632,13 @@ test('لكلّ مسارٍ طابورُه المرتَّب — وسقوطُ أح�
   /* وطابورُ السماع يُنتظر على حدة، وتأخّرُه يُطرح به الحكمُ لا التلاوة. */
   assert.match(screen, /!\(await recognition\.current\.drain\(\)\)/, 'طابورُ السماع لا يُنتظر عند الخاتمة');
   const lateDrain = screen.slice(screen.indexOf('!(await recognition.current.drain())'));
-  assert.match(lateDrain.slice(0, 200), /attemptJudging\.current = null;[\s\S]*setJudgingLost\(true\);/,
+  /*
+   * ويُترك طابورُ السماع نفسُه، لا الإذنُ وحده: المهمّةُ الجاريةُ التقطت إذنَها قبل
+   * أن تنتظر، فجوابُها المتأخّرُ كان يكتب أخطاءً وينغّم بعد أن قيل «لم يُحكم».
+   */
+  assert.match(lateDrain.slice(0, 600), /recognition\.current\.abandon\(\);[\s\S]*attemptJudging\.current = null;/,
+    'طابورُ السماع لا يُترك بعد فوات مهلته');
+  assert.match(lateDrain.slice(0, 600), /attemptJudging\.current = null;[\s\S]*setJudgingLost\(true\);/,
     'تأخّرُ السماع لا يُطرح به الحكم');
   /* والطابوران يُتركان معًا في المواضع الثلاثة. */
   assert.match(screen, /recognition\.current\.abandon\(\); recognition\.current = serialQueue\(\);\s*\n\s*setStage\('loading'\)/,
@@ -724,6 +730,12 @@ test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجع
   const conditional = failure.indexOf('if (/NOT_CONFIGURED');
   assert.ok(kill > 0, 'سقوطُ مقطعٍ لا يُبطل الحكم');
   assert.ok(conditional < 0 || kill < conditional, 'الإبطالُ مشروطٌ بأسماء علّةٍ بعينها');
-  assert.match(failure, /setJudgingLost\(true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
+  assert.match(failure, /setJudgingLost\(code === 'QURAN_JUDGING_GATE_CHANGED' \? 'changed' : true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
+  /* وجوابٌ ببوّابةٍ تبدّلت يُرمى قبل أن يُكتب منه شيء — فيبلغ هذا الإبطال. */
+  const task = screen.slice(start, screen.indexOf('}, error => {', start));
+  const check = task.indexOf('if (!answerKeepsPermission(permission, out))');
+  assert.ok(check > 0, 'جوابٌ ببوّابةٍ تبدّلت يُقبل');
+  assert.ok(check < task.indexOf('heardWords.current = ['), 'يُكتب ما سُمع قبل فحص البوّابة');
+  assert.match(task.slice(check, check + 400), /throw new Error\('QURAN_JUDGING_GATE_CHANGED'\)/, 'التبدّلُ لا يُبطل المحاولة');
   assert.equal(failure.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
 });

@@ -10,7 +10,7 @@ import {
   attemptFrom, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
-import { finalJudgment, liveJudgment } from '../../lib/live-judging';
+import { answerKeepsPermission, finalJudgment, liveJudgment } from '../../lib/live-judging';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -120,7 +120,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    */
   const [mistakes, setMistakes] = useState<readonly Mistake[] | undefined>(undefined);
   /* وانقطع سماعُ مقطعٍ في هذه المراجعة؟ فلا حكمَ عليها، ويُقال. */
-  const [judgingLost, setJudgingLost] = useState(false);
+  const [judgingLost, setJudgingLost] = useState<boolean | 'changed'>(false);
 
   const samples = useRef<FaceAlignmentSample[]>([]);
   /* ما سُمع من كلماتٍ، بتوقيتٍ من أوّل التلاوة لا من أوّل المقطع. */
@@ -445,6 +445,15 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             }, journeyAuth);
             if (!alive.current || !live()) return;
             /*
+             * وجوابٌ جاء ببوّابةٍ غيرِ التي بدأت بها المحاولة لا يُحكم به: تغيّر القياسُ
+             * في أثناء التلاوة. فتُطرح المحاولةُ كلُّها، وتُحفظ البوّابةُ الجديدة للتالية.
+             */
+            if (!answerKeepsPermission(permission, out)) {
+              judgingRef.current = out.gate.word === 'OPEN' ? out.gate : null;
+              setGate(out.gate);
+              throw new Error('QURAN_JUDGING_GATE_CHANGED');
+            }
+            /*
              * توقيتُ الكلمة يصير من أوّل التلاوة، فتُقاس به نوافذُ النغمات.
              *
              * والنوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد
@@ -487,10 +496,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              *
              * وسقوطُ السماع لا يُسقط التتبّع: تبقى العلاماتُ تُقاس ويبقى الوجهُ يُقرأ.
              */
+            const code = error instanceof Error ? error.message : '';
             attemptJudging.current = null;
             setMistakes(undefined);
-            setJudgingLost(true);
-            const code = error instanceof Error ? error.message : '';
+            setJudgingLost(code === 'QURAN_JUDGING_GATE_CHANGED' ? 'changed' : true);
             if (/NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH|MODEL_NOT_BENCHMARKED/.test(code)) {
               judgingRef.current = null;
               setGate(previous => (previous ? { ...previous, word: 'CLOSED', tashkeel: 'CLOSED', reasons: [code] } : previous));
@@ -530,6 +539,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      * يُسقط. فيُطرح الحكمُ ويُقال للطالب لماذا.
      */
     if (attemptJudging.current && !(await recognition.current.drain())) {
+      /*
+       * ويُترك الطابورُ لا الإذنُ وحده: فالمهمّةُ الجاريةُ التقطت إذنَها قبل أن تنتظر،
+       * فإن عاد جوابُها بعد المهلة كتب أخطاءً ونغّم بعد أن قيل للطالب «لم يُحكم».
+       */
+      recognition.current.abandon();
       attemptJudging.current = null;
       setJudgingLost(true);
     }

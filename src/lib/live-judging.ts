@@ -92,3 +92,27 @@ export function finalJudgment(
 ): RecitationDiff | null {
   return judgeRecitation(expected, heard, gate);
 }
+
+/**
+ * أيُحكم بجوابٍ على إذنٍ التُقط قبله؟
+ *
+ * فالإذنُ يُلتقط عند بدء المحاولة ويثبت لها، والخادمُ يعيد قراءةَ بوّابته مع كلّ
+ * مقطع ويردّها مع الجواب. فإن تبدّل تقريرُ القياس في أثناء التلاوة — نموذجٌ آخر، أو
+ * بابُ الحركة فُتح أو أُغلق — صارت المحاولةُ الواحدةُ تجمع كلماتٍ من محرّكين، أو
+ * تُحاسَب بإذنٍ لم يعد قائمًا. **فالجوابُ لا يُقبل إلا والبوّابةُ التي معه هي بعينها
+ * التي بدأت بها المحاولة**: الروايةُ والبابان والنموذج — ونموذجُ الجواب نفسُه أيضًا.
+ */
+export function answerKeepsPermission(
+  permission: { reading: string; word: string; tashkeel: string; modelVersion: string | null },
+  answer: { gate: { reading: string; word: string; tashkeel: string; modelVersion: string | null }; modelVersion: string },
+): boolean {
+  /* وجوابٌ بلا بوّابةٍ خالفَ العقد — لا يُقبل، ولا يُسقط الشاشةَ بخطأ قراءة. */
+  const gate = answer?.gate;
+  if (!gate) return false;
+  return permission.modelVersion !== null
+    && gate.reading === permission.reading
+    && gate.word === permission.word
+    && gate.tashkeel === permission.tashkeel
+    && gate.modelVersion === permission.modelVersion
+    && answer.modelVersion === permission.modelVersion;
+}
