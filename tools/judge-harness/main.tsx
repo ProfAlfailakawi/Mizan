@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../../src/index.css';
+import './harness.css';
 import { OfficialMushafSurface } from '../../src/components/judge/OfficialMushafSurface';
 
 /*

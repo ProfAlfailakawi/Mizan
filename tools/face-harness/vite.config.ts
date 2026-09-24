@@ -1,11 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 /* بناءُ المِشْحَن وحدَه: الهويّةُ تُستبدل، وما سواها الشيفرةُ الحقيقيّةُ كما هي. */
 export default defineConfig({
   root: __dirname,
-  plugins: [react()],
+  /* وأنماطُ الشاشة الحقيقيّة (Tailwind وindex.css) — فتُصوَّر كما يراها الطالب. */
+  plugins: [react(), tailwindcss()],
+  publicDir: path.resolve(__dirname, '../../public'),
   resolve: {
     alias: [
       { find: path.resolve(__dirname, '../../src/lib/firebase.ts'), replacement: path.resolve(__dirname, 'firebase-stub.ts') },

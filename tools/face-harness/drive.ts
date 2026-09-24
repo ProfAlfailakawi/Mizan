@@ -33,6 +33,11 @@ export interface RunOutcome {
   attemptsStored: number;
   micTracksLive: number;
   reportShown: boolean;
+  /* «المعلّم»: حالُ تقريره، وسطورُه، والكلماتُ المخطوطةُ في الصفحة، وما وصل خادمَه. */
+  teacher: { phase: string | null; rows: string[]; notedWords: number[] };
+  teacherCalls: import('./server').TeacherCall[];
+  /* كم مقطعًا من تلاوة الطالب شُغِّل عند «تلاوتك». */
+  snippetSources: number;
 }
 
 export async function runScenario(scenario: Scenario, reciteMs: number, settleMs: number): Promise<RunOutcome> {
@@ -68,7 +73,27 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
 
     /* التقريرُ يُنتظر بالمهلة التي يحتاجها السيناريو — وتعليقُ مقطعٍ يبلغ حدَّ الإفراغ. */
     await page.waitForSelector('[data-index="reach"]', { timeout: settleMs }).catch(() => undefined);
+    /* والمعلّمُ بعد التقرير: يُنتظر حتى يفرغ حيث يُتوقّع. */
+    let snippetSources = 0;
+    if (scenario === 'teacher') {
+      await page.waitForSelector('[data-tashkeel="done"],[data-tashkeel="failed"]', { timeout: 20_000 }).catch(() => undefined);
+      /* «تلاوتك هنا»: يُضغط أوّلُها، ويُعدّ ما شُغِّل فعلًا من مسار الصوت (مصدرُ مخزنٍ مفكوك). */
+      const listen = page.locator('[data-listen-word]').first();
+      if (await listen.count()) {
+        const before = await page.evaluate('window.__mizanAlerts().buffers') as number;
+        await listen.click();
+        await page.waitForTimeout(1500);
+        snippetSources = (await page.evaluate('window.__mizanAlerts().buffers') as number) - before;
+      }
+    }
     await page.waitForTimeout(500);
+    if (process.env.HARNESS_SHOTS) {
+      await page.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}.png`), fullPage: true });
+      const report = page.locator('[data-tashkeel]').first();
+      if (await report.count()) await report.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}-report.png`) });
+      const surface = page.locator('[data-official-mushaf-page], [data-face-words]').first();
+      if (await surface.count()) await surface.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}-face.png`) });
+    }
 
     /*
      * ويُقرأ ما في الصفحة بنصٍّ يُرسل إلى المتصفّح كما هو.
@@ -109,11 +134,16 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
         attemptsStored: attempts,
         micTracksLive: streams.reduce((sum, s) => sum + s.live, 0),
         reportShown: !!document.querySelector('[data-index="reach"]'),
+        teacher: {
+          phase: (document.querySelector('[data-tashkeel]') || { getAttribute: () => null }).getAttribute('data-tashkeel'),
+          rows: Array.prototype.map.call(document.querySelectorAll('.mizan-tashkeel__row'), r => r.getAttribute('data-kind') + ':' + text(r.querySelector('.mizan-tashkeel__msg'))),
+          notedWords: Array.prototype.map.call(document.querySelectorAll('[data-live-note],[data-note]'), w => Number(w.getAttribute('data-note-word') || w.getAttribute('data-word') || -1)),
+        },
       };
-    })()`) as Omit<RunOutcome, 'scenario' | 'chunksServed'>;
+    })()`) as Omit<RunOutcome, 'scenario' | 'chunksServed' | 'teacherCalls' | 'snippetSources'>;
 
     if (errors.length) throw new Error(`أخطاءُ صفحة: ${errors.join(' | ')}`);
-    return { scenario, chunksServed: api.chunks(), ...outcome };
+    return { scenario, chunksServed: api.chunks(), teacherCalls: api.teacherCalls(), snippetSources, ...outcome };
   } finally {
     await browser?.close();
     await ui?.close();
