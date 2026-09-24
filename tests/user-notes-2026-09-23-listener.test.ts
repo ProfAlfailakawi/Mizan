@@ -100,6 +100,9 @@ test('the student waits for a waking listener instead of losing the first chunks
   assert.match(practice, /disabled=\{listenerWarming \|\| listenerDown\}/, 'never unlocked onto a listener that is not ready');
   assert.match(practice, /else if \(warming\) \{ setListenerState\('TIMEOUT'\); timer = window\.setTimeout\(poll, 30_000\); \}/);
   assert.match(practice, /data-listener-down/);
+  assert.match(practice, /useState<string>\('CHECKING'\)/, 'closed until the first answer');
+  assert.match(practice, /if \(state === 'UNREACHABLE' \|\| \/\^HTTP_\/\.test\(state\)\) timer = window\.setTimeout\(poll, 30_000\);/);
+  assert.match(practice, /catch \{ if \(live\) \{ setListenerState\('UNREACHABLE'\); timer = window\.setTimeout\(poll, 30_000\); \} \}/);
   assert.match(practice, /tries < 24/);
   const server = read('server.ts');
   assert.match(server, /quranPracticeListener:_req\.query\?\.listener==='1'\?await practiceListenerHealth\(\):practiceListenerHealthCached\(\)/);

@@ -323,7 +323,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * فيُسأل عن حالها (والسؤالُ نفسُه يوقظها)، ويبقى زرُّ البدء يقول «يستعدّ» حتى تجهز —
    * بحدٍّ أقصى دقيقتين، ثم يُفتح على كل حال فلا يُحبس الطالبُ خلف خدمةٍ متعثّرة.
    */
-  const [listenerState, setListenerState] = useState<string>('UNKNOWN');
+  /* «يُفحص» حتى يعود أوّلُ جواب — فلا يُفتح الزرُّ لحظةً قبل أن تُعرف الجاهزية. */
+  const [listenerState, setListenerState] = useState<string>('CHECKING');
   useEffect(() => {
     if (!listening || stage !== 'ready') return;
     let live = true; let tries = 0; let timer = 0;
@@ -341,8 +342,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * شيء. فيُقال له بصدق إنّ المستمع غيرُ متاحٍ الآن، ويُسأل عنه كلَّ نصف دقيقة حتى يعود.
          */
         else if (warming) { setListenerState('TIMEOUT'); timer = window.setTimeout(poll, 30_000); }
-        else setListenerState(state);
-      } catch { if (live) setListenerState('UNKNOWN'); }
+        else {
+          setListenerState(state);
+          /* ومستمعٌ لا يُوصل إليه يُسأل عنه كذلك كلَّ نصف دقيقة — فلا يُقفل الزرُّ إلى الأبد. */
+          if (state === 'UNREACHABLE' || /^HTTP_/.test(state)) timer = window.setTimeout(poll, 30_000);
+        }
+      } catch { if (live) { setListenerState('UNREACHABLE'); timer = window.setTimeout(poll, 30_000); } }
     };
     void poll();
     return () => { live = false; window.clearTimeout(timer); };
