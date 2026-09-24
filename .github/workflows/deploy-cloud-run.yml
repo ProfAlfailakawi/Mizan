@@ -228,6 +228,7 @@ jobs:
             model="$(jq -r '.quranPracticeListener.model // "-"' <<<"$body" 2>/dev/null || echo -)"
             muaalem="$(jq -r '.quranMuaalem.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
             muaalem_model="$(jq -r '.quranMuaalem.model // "-"' <<<"$body" 2>/dev/null || echo -)"
+            muaalem_mode="$(jq -r '(.quranMuaalem.mode // "-") + " · " + (.quranMuaalem.modeReason // "-")' <<<"$body" 2>/dev/null || echo -)"
             echo "listener attempt $attempt/8: state=$state model=$model · muaalem=$muaalem ($muaalem_model)"
             [[ "$state" == READY || "$state" == NOT_CONFIGURED ]] && break
             sleep 15
@@ -242,6 +243,7 @@ jobs:
             echo
             echo "- الحال: \`${muaalem:-UNKNOWN}\`"
             echo "- النموذج: \`${muaalem_model:--}\`"
+            echo "- الوضع للطلاب: \`${muaalem_mode:--}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ── صدقُ العنوان الذي يُحال إليه الموقِّع ───────────────────────────────

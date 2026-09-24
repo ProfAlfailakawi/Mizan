@@ -1,0 +1,122 @@
+name: قياس «المعلّم» على كبار القرّاء
+
+# يقيس «المعلّم القرآني» بالمسار الذي يسمع به الطلاب (services/quran-muaalem/benchmark):
+#   ـ الإنذارُ الكاذب على تلاوات كبار قرّاء حفص (آيةً آية من everyayah.com)،
+#   ـ والكشفُ على أزواج المتشابهات المختلفة بكلمةٍ واحدة (تلاوةُ آيةٍ بمرجع أختها).
+#
+# ويجري عند الطلب، وكلّما تغيّر منطقُ الحكم أو النموذجُ أو أداةُ القياس في main — فلا يبقى
+# تقريرٌ قديمٌ يشهد لقواعدَ تغيّرت. والتقريرُ يُطبع في السجلّ كاملًا ويُرفع ملفًّا؛ وبه وحده
+# يُفتح المعلّم للطلاب (MIZAN_QURAN_MUAALEM_MODE=open) حين يُحفظ في
+# services/quran-muaalem/benchmark/reports/hafs.json ويجتاز شروطه.
+#
+# الصوتُ يُنزَّل إلى مجلّدٍ مؤقّتٍ في العدّاء ولا يُرفع ولا يُحفظ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ayat:
+        description: 'آياتٌ لكلّ قارئ'
+        required: false
+        default: '60'
+      pairs:
+        description: 'أزواجُ المتشابهات (الموجودُ كلُّه نحو ١٧٤)'
+        required: false
+        default: '174'
+      pair_reciters:
+        description: 'كم قارئًا تُقاس بهم أزواجُ المتشابهات'
+        required: false
+        default: '4'
+      only:
+        description: 'قرّاءٌ بعينهم بمعرّفاتهم مفصولةً بفواصل (فارغ = الجميع)'
+        required: false
+        default: ''
+      seed:
+        description: 'بذرةُ العيّنة'
+        required: false
+        default: 'mizan'
+  push:
+    branches: [main]
+    paths:
+      - 'services/quran-muaalem/analysis.py'
+      - 'services/quran-muaalem/app.py'
+      - 'services/quran-muaalem/requirements.txt'
+      - 'services/quran-muaalem/benchmark/**'
+      - '.github/workflows/muaalem-benchmark.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muaalem-benchmark
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    defaults:
+      run:
+        working-directory: services/quran-muaalem
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      MIZAN_MUAALEM_BATCH: '4'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: المكتبات (torch للمعالج)
+        run: |
+          python -m pip install --quiet --upgrade pip
+          pip install --quiet torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet -r requirements.txt
+
+      - name: ذاكرةُ النموذج
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: muaalem-model-${{ hashFiles('services/quran-muaalem/app.py') }}
+
+      - name: اختباراتُ الخدمة وأداة القياس
+        run: MIZAN_MUAALEM_MODEL=/nonexistent python -m unittest discover -s tests
+
+      # المدخلاتُ تمرّ متغيّراتِ بيئة لا نصًّا في الأمر: فلا يصير مدخلٌ شيفرةً تُنفَّذ.
+      - name: القياس
+        env:
+          AYAT: ${{ github.event.inputs.ayat || '60' }}
+          PAIRS: ${{ github.event.inputs.pairs || '174' }}
+          PAIR_RECITERS: ${{ github.event.inputs.pair_reciters || '4' }}
+          ONLY: ${{ github.event.inputs.only || '' }}
+          SEED: ${{ github.event.inputs.seed || 'mizan' }}
+        run: |
+          python benchmark/bench.py \
+            --ayat "$AYAT" --pairs "$PAIRS" --pair-reciters "$PAIR_RECITERS" \
+            --only "$ONLY" --seed "$SEED" \
+            --out "$RUNNER_TEMP/hafs.json" --markdown "$RUNNER_TEMP/summary.md"
+
+      - name: التقرير
+        if: always()
+        run: |
+          test -f "$RUNNER_TEMP/summary.md" && cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY" || true
+          if [ -f "$RUNNER_TEMP/hafs.json" ]; then
+            echo '::group::MIZAN-MUAALEM-REPORT (يُحفظ في services/quran-muaalem/benchmark/reports/hafs.json)'
+            echo 'MIZAN-MUAALEM-REPORT-BEGIN'
+            python -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1],encoding='utf-8')),ensure_ascii=False))" "$RUNNER_TEMP/hafs.json"
+            echo 'MIZAN-MUAALEM-REPORT-END'
+            echo '::endgroup::'
+          fi
+
+      - name: رفعُ التقرير
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: muaalem-benchmark-hafs
+          path: |
+            ${{ runner.temp }}/hafs.json
+            ${{ runner.temp }}/summary.md
+          if-no-files-found: warn

@@ -36,6 +36,8 @@ import { balancedFairDraw, generativeFairDraw } from './server/kfgqpc-fairdraw-g
 import { MizanQuranDelivery, candidateRawiForDeliveryKey } from './server/quran-reading-delivery';
 import { DELIVERY_READING_BY_RAWI } from './src/lib/delivered-readings';
 import { practiceAyahWords, practiceFaceCatalogue, practiceFacePage, PracticeFaceError } from './server/practice-face-service';
+import { muaalemGate } from './server/muaalem-gate';
+import muaalemBenchmarkReport from './services/quran-muaalem/benchmark/reports/hafs.json';
 import { normalizeScope, scopeAyahCount, scopeContainsRange, type QuranScope } from './src/lib/quran-scope';
 import { resolveEffectiveScope } from './src/lib/scope-engine';
 import { quranSkeleton, sameWord } from './src/lib/quran-orthography';
@@ -2258,22 +2260,26 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       return r.ok?(await r.text()).trim():'';
     }catch{return ''}
   };
-  let muaalemHealthCache:{at:number;value:{state:string;model:string|null}}|null=null;
-  const muaalemHealth=async():Promise<{state:string;model:string|null}>=>{
+  type MuaalemHealth={state:string;model:string|null;analysis?:string|null;mode?:string;modeReason?:string};
+  let muaalemHealthCache:{at:number;value:MuaalemHealth}|null=null;
+  /* المفتاحُ يُقرأ مع كلّ سؤال: قرارُ المالك (البيئة) وتقريرُ القياس والمحرّكُ العامل معًا. */
+  const muaalemMode=(live:MuaalemHealth|null|undefined)=>muaalemGate({requested:process.env.MIZAN_QURAN_MUAALEM_MODE,report:muaalemBenchmarkReport,live});
+  const muaalemHealth=async():Promise<MuaalemHealth>=>{
     if(!muaalemReady())return {state:'NOT_CONFIGURED',model:null};
     if(muaalemHealthCache&&Date.now()-muaalemHealthCache.at<30_000)return muaalemHealthCache.value;
-    let value:{state:string;model:string|null}={state:'UNREACHABLE',model:null};
+    let value:MuaalemHealth={state:'UNREACHABLE',model:null};
     try{
       const token=await cloudRunIdentityToken(muaalemUrl);
       const r=await fetch(new URL('/health',muaalemUrl).toString(),{headers:token?{authorization:`Bearer ${token}`}:{},signal:AbortSignal.timeout(4_000)});
       const body=await r.json().catch(()=>({})) as any;
       const state=String(body?.status||'').toUpperCase();
-      value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null};
+      value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null,analysis:typeof body?.analysis==='string'?body.analysis.slice(0,40):null};
     }catch{/* يبقى UNREACHABLE */}
+    const gate=muaalemMode(value);value={...value,mode:gate.mode,modeReason:gate.reason};
     muaalemHealthCache={at:Date.now(),value};
     return value;
   };
-  const muaalemHealthCached=():{state:string;model:string|null}=>{
+  const muaalemHealthCached=():MuaalemHealth=>{
     if(!muaalemHealthCache||Date.now()-muaalemHealthCache.at>=30_000)void muaalemHealth().catch(()=>{});
     return muaalemHealthCache?.value??{state:muaalemReady()?'CHECKING':'NOT_CONFIGURED',model:null};
   };
@@ -2305,6 +2311,8 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   };
   const runMuaalem=async(request:{reading:string;audio:string;segments:any[]})=>{
     if(!muaalemReady())throw new Error('QURAN_MUAALEM_NOT_CONFIGURED');
+    const gate=muaalemMode(await muaalemHealth().catch(()=>null));
+    if(gate.mode==='off')throw new Error('QURAN_MUAALEM_OFF');
     const token=await cloudRunIdentityToken(muaalemUrl);
     const response=await fetch(new URL('/analyse',muaalemUrl).toString(),{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify(request),signal:AbortSignal.timeout(280_000)});
     if(response.status===503)throw new Error('QURAN_MUAALEM_WARMING');
@@ -2324,11 +2332,12 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
           ruleAr:typeof f?.ruleAr==='string'?f.ruleAr.slice(0,60):undefined,expectedLen:num(f?.expectedLen),predictedLen:num(f?.predictedLen)}];
       }),
     }));
-    return {reading:'hafs',modelVersion:String(raw?.modelVersion||'').slice(0,120),scoreAuthority:'HUMAN_ONLY',segments};
+    return {reading:'hafs',modelVersion:String(raw?.modelVersion||'').slice(0,120),analysisVersion:String(raw?.analysisVersion||'').slice(0,40),
+      mode:gate.mode,modeReason:gate.reason,...(gate.benchmark?{benchmark:gate.benchmark}:{}),scoreAuthority:'HUMAN_ONLY',segments};
   };
   const muaalemFailure=(res:Response,err:unknown)=>{
     const code=err instanceof Error?err.message:'TASHKEEL_FAILED';
-    const status=/NOT_CONFIGURED|WARMING/.test(code)?503:/MUAALEM_HTTP_/.test(code)?502:/SCOPE_MISMATCH|READING|TEXT_MISMATCH/.test(code)?409:/JOURNEY_|IDENTITY/.test(code)?401:400;
+    const status=/NOT_CONFIGURED|WARMING|MUAALEM_OFF/.test(code)?503:/MUAALEM_HTTP_/.test(code)?502:/SCOPE_MISMATCH|READING|TEXT_MISMATCH/.test(code)?409:/JOURNEY_|IDENTITY/.test(code)?401:400;
     return res.status(status).json({code});
   };
 

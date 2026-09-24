@@ -133,5 +133,56 @@ class Parsing(unittest.TestCase):
                 parse_segment(bad, 0)
 
 
+
+class SlipsOfTheSimilar(unittest.TestCase):
+    """زلّاتُ المتشابه بالزيادة — تُقال على كلمتها، والنَّفَسُ لا يُقال.
+
+    يُقرأ نصُّ آيةٍ ويُقابَل بمرجع أختها التي لا تختلف عنها إلا بحرفٍ زائد (من المصحف نفسه)،
+    فالرسمُ الصوتيّ المسموع هنا صحيحٌ تمامًا — والمقيسُ الحكمُ وحده.
+    """
+
+    def verdict(self, heard: tuple[int, int], reference: tuple[int, int]):
+        from quran_transcript import Aya, MoshafAttributes, explain_error, quran_phonetizer
+        from analysis import Segment, build_reference, judge
+
+        moshaf = MoshafAttributes(rewaya="hafs", madd_monfasel_len=4, madd_mottasel_len=4, madd_mottasel_waqf=4, madd_aared_len=4)
+        ref_words = Aya(*reference).get().uthmani_words
+        heard_words = Aya(*heard).get().uthmani_words
+        seg = Segment("x", reference[0], reference[1], 0, 5000, ref_words, list(range(len(ref_words))), 0, len(ref_words) - 1)
+        ref = build_reference(seg, ref_words)
+        ph = quran_phonetizer(ref.uthmani, moshaf, remove_spaces=True)
+        got = quran_phonetizer(" ".join(heard_words), moshaf, remove_spaces=True).phonemes
+        errors = explain_error(uthmani_text=ref.uthmani, ref_ph_text=ph.phonemes, predicted_ph_text=got, mappings=ph.mappings)
+        return [f for f in (judge(e, len(ph.phonemes), seg, ref.uthmani, ref.lib_to_face) for e in errors) if f]
+
+    def test_a_suffix_added_to_a_word_is_said_on_that_word(self):
+        # «وَتَرَكۡنَا عَلَيۡهِمَا» (٣٧:١١٩) مكان «وَتَرَكۡنَا عَلَيۡهِ» (٣٧:١٢٩)
+        found = self.verdict((37, 119), (37, 129))
+        self.assertEqual([f.word_index for f in found], [1])
+        self.assertIn("الميم", found[0].message_ar)
+
+    def test_a_prefix_waw_is_said_on_the_word_it_joins(self):
+        # «وَإِنَّ ٱللَّهَ» (١٩:٣٦) مكان «إِنَّ ٱللَّهَ» (٣:٥١)
+        found = self.verdict((19, 36), (3, 51))
+        self.assertEqual([f.word_index for f in found], [0])
+
+    def test_waw_before_hamzat_wasl_at_the_ayah_start_is_a_slip_not_wasl(self):
+        # «وَٱلۡحَمۡدُ لِلَّهِ» (٣٧:١٨٢) مكان «ٱلۡحَمۡدُ لِلَّهِ» (١:٢)
+        found = self.verdict((37, 182), (1, 2))
+        self.assertEqual([f.word_index for f in found], [0])
+
+    def test_breath_and_bare_vowels_are_not_letters(self):
+        from analysis import proclitic, real_insert
+
+        for noise in ("ه", "ء", "َ", "اا", "هُ"):
+            self.assertFalse(real_insert(noise), noise)
+        for letter in ("وَ", "فَ", "مَ", "م", "ذَ"):
+            self.assertTrue(real_insert(letter), letter)
+        self.assertTrue(proclitic("وَ"))
+        self.assertTrue(proclitic("فَ"))
+        self.assertFalse(proclitic("مَ"))
+        self.assertFalse(proclitic("مَا"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -245,6 +245,36 @@ steps:
         if [ -z "$vars" ]; then echo 'no engine deployed in this build; keeping previous bindings'; exit 0; fi
         gcloud run services update mizan --region me-central1 --update-env-vars "$vars" --quiet
 
+  # تنظيفُ الصور القديمة: كلُّ نشرٍ يرفع صورةً كاملةً لميزان وللمستمع (وللمعلّم حين يتغيّر)،
+  # ولم يكن ما يحذف القديم — فيكبر التخزينُ مع كل دفعةٍ ولا ينقص (٠٫١٠$ لكل غيغابايت شهريًّا).
+  # فيُبقى أحدثُ عشر نسخٍ لكلّ خدمة (يُرجع إلى أيٍّ منها: المراجعةُ تحتاج صورتَها)، ويُحذف ما
+  # جاوز ثلاثين يومًا، وما بلا وسمٍ بعد يوم. والقاعدةُ تُكتب في المستودع نفسه فتعمل بين الدفعات،
+  # وتُعاد كتابتُها كلَّ دفعةٍ فلا تنحرف. وتعثُّرُها (صلاحيةٌ ناقصة) لا يُسقط النشر، ويُقال سببُه.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: image-cleanup
+    waitFor: ['-']
+    allowFailure: true
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        cat > /workspace/image-cleanup-policy.json <<'JSON'
+        [
+          {"name": "keep-latest-10", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 10}},
+          {"name": "delete-untagged-after-1d", "action": {"type": "Delete"}, "condition": {"tagState": "untagged", "olderThan": "1d"}},
+          {"name": "delete-after-30d", "action": {"type": "Delete"}, "condition": {"tagState": "any", "olderThan": "30d"}}
+        ]
+        JSON
+        if ! gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+            --project "$PROJECT_ID" --location me-central1 \
+            --policy /workspace/image-cleanup-policy.json --no-dry-run --quiet; then
+          echo 'image cleanup policy not applied — the build service account needs roles/artifactregistry.repoAdmin on cloud-run-source-deploy'
+          exit 1
+        fi
+        gcloud artifacts repositories describe cloud-run-source-deploy --project "$PROJECT_ID" --location me-central1 \
+          --format='value(sizeBytes)' | awk '{printf "cloud-run-source-deploy size now: %.2f GiB\n", $1/1073741824}'
+
 substitutions:
   # إعدادات Firebase العلنية. النشر الحي يتطلب المصادقة.
   # مفتاح ويب Firebase معرّف علني كبقية معرّفات Firebase أعلاه (تحميه قيود النطاق لا الإخفاء).

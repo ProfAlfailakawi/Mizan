@@ -16,6 +16,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
+#: نسخةُ قواعد الحكم. تُرفع كلّما تغيّر ما يُقال أو ما يُسكت عنه — فتقريرُ القياس يحملها،
+#: وبوّابةُ الفتح في ميزان لا تقبل تقريرًا قاس قواعدَ غيرَ التي تعمل.
+ANALYSIS_VERSION = "2026-09-24.2"
+
 # ── الحروف ─────────────────────────────────────────────────────────────────
 
 #: حرفٌ عربيّ (ومنه همزةُ الوصل ٱ). ما لا حرفَ فيه (۞، علاماتُ الوقف) ليس كلمةً تُتلى.
@@ -229,8 +233,37 @@ def _tashkeel_message(expected: str, heard: str) -> tuple[str, str]:
     return (f"شكلُ {letter} على غير ما في المصحف.", "The letter's vowelling differs from the Mushaf.")
 
 
+#: الزيادةُ تُقال حين يكون المسموعُ حرفًا حقيقيًّا. فالنَّفَسُ ونقرةُ الميكروفون تُسمعان همزةً أو
+#: هاءً أو حركةً مجرّدة، ولا تُسمعان واوًا ولا فاءً ولا ميمًا. وزيادةُ حرفٍ حقيقيّ هي زلّةُ
+#: المتشابه الأشهر: «وَإِنَّ» مكان «إِنَّ»، و«فَوَيۡلٞ» مكان «وَيۡلٞ»، و«عَلَيۡهِمَا» مكان «عَلَيۡهِ».
+INSERT_NOISE = {"ء", "ه", "ڇ"}
+
+
+def _inserted_letters(heard: str) -> list[str]:
+    return [ch for ch in heard if ch in LETTER_NAMES and ch not in INSERT_NOISE and ch not in MADD_LETTERS]
+
+
+def real_insert(heard: str) -> bool:
+    """أزيادةٌ مسموعةٌ حرفًا لا نَفَسًا؟ حرفٌ صامتٌ حقيقيّ، في مقطعٍ قصير (حرفٌ أو كلمةٌ قصيرة)."""
+    return bool(_inserted_letters(heard)) and len(heard) <= 10
+
+
+#: حروفُ السوابق: تلتصق بالكلمة التي بعدها («وَ»، «فَ»، «بِ»، «لِ»، «كَ»، «سَ»).
+PROCLITICS = {"و", "ف", "ب", "ل", "ك", "س"}
+
+
+def proclitic(heard: str) -> bool:
+    """أهي سابقةٌ (حرفٌ واحدٌ من السوابق بحركته)؟ فتُنسب إلى الكلمة التي بعدها لا التي قبلها."""
+    letters = _inserted_letters(heard)
+    return len(letters) == 1 and letters[0] in PROCLITICS and len(heard) <= 3
+
+
 def _letter_message(expected: str, heard: str, speech: str) -> tuple[str, str]:
     exp_l = LETTER_NAMES.get(_base(expected), "حرف")
+    if speech == "insert":
+        letters = _inserted_letters(heard)
+        got = LETTER_NAMES.get(letters[0], "حرف") if letters else "حرف"
+        return (f"سُمع حرفٌ زائد: {got}.", "An extra letter was heard.")
     if speech == "delete" or not heard:
         return (f"لم تُسمع {exp_l}.", "A letter was not heard.")
     got_l = LETTER_NAMES.get(_base(heard), "حرفٌ آخر")
@@ -241,7 +274,8 @@ def judge(error, reference_len: int, segment: Segment, uthmani: str, lib_to_face
     """يحوّل خطأً من `explain_error` إلى ملاحظةٍ للطالب — أو يسكت عنه إن لم يُؤمَن الحكم.
 
     يُسكت عن:
-      ـ الزيادة (insert) من غير نصّ: أكثرُها نَفَسٌ أو ضجيج، لا حرفٌ زاده القارئ.
+      ـ الزيادة (insert) التي لا حرفَ حقيقيًّا فيها: نَفَسٌ أو نقرةٌ أو حركةٌ مجرّدة. أمّا حرفٌ
+        صامتٌ زائد («وَ» قبل «إِنَّ») فزلّةُ متشابهٍ تُقال (`real_insert`).
       ـ آخرِ مجموعةٍ في المقطع: المرجعُ يبنيها على الوقف، ومن وصل الآيةَ بما بعدها قرأها
         على الوصل — فالحكمُ فيها بين الوجهين ظلم.
       ـ أوّلِ مجموعةٍ حين لا يبدأ المقطعُ بأوّل الآية أو يبدأ بهمزة وصل: البدءُ من وسط الكلام
@@ -250,17 +284,29 @@ def judge(error, reference_len: int, segment: Segment, uthmani: str, lib_to_face
     """
     ph_start, ph_end = error.ph_pos
     speech = error.speech_error_type
-    if speech == "insert" and error.error_type == "normal":
+    noisy_insert = speech == "insert" and not real_insert(error.preditected_ph or "")
+    if speech == "insert" and error.error_type == "normal" and noisy_insert:
         return None
     if ph_end >= reference_len:
         return None
-    if ph_start == 0 and (not segment.opens_ayah or uthmani.startswith("ٱ") or speech == "insert"):
-        return None
+    heard_ph = error.preditected_ph or ""
+    if ph_start == 0:
+        if not segment.opens_ayah or noisy_insert:
+            return None
+        # همزةُ الوصل أوّلَ المقطع تسقط وصلًا فلا يُحكم على سقوطها؛ أمّا «وَ» أو «فَ» زيدت قبلها
+        # («وَٱلۡحَمۡدُ» مكان «ٱلۡحَمۡدُ») فزلّةٌ لا يصنعها الوصل، فتُقال.
+        if uthmani.startswith("ٱ") and not (speech in ("insert", "replace") and proclitic(heard_ph) and _inserted_letters(heard_ph)[0] in {"و", "ف"}):
+            return None
 
     lib_word = uthmani[: error.uthmani_pos[0]].count(" ")
+    # الزيادةُ عند حدّ كلمتين تُحسب على التي بعدها؛ وهي لِما قبلها إلا أن تكون سابقة:
+    # «مَا» في «عَلَيۡهِمَا» لاحقةٌ بـ«عَلَيۡهِ»، و«وَ» في «وَٱلۡحَمۡدُ» سابقةٌ لـ«ٱلۡحَمۡدُ».
+    at = error.uthmani_pos[0]
+    if speech == "insert" and lib_word > 0 and 0 < at <= len(uthmani) and uthmani[at - 1] == " " and not proclitic(heard_ph):
+        lib_word -= 1
     lib_word = max(0, min(lib_word, len(lib_to_face) - 1))
     word_index = lib_to_face[lib_word]
-    expected, heard = error.expected_ph or "", error.preditected_ph or ""
+    expected, heard = error.expected_ph or "", heard_ph
 
     if error.error_type == "tajweed":
         rules = list(error.ref_tajweed_rules or [])

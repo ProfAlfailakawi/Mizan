@@ -68,8 +68,12 @@ def load_prefetched()->bool:
 @asynccontextmanager
 async def lifespan(_app):
     # وإن لم يكن في الصورة نموذجٌ (تعثّر التنزيلُ المسبق) نُزِّل في الخلفية كما كان، والصحّةُ تقول «أُحمّل».
+    # وإن غاب عن الصورة نُزِّل في طور الإقلاع أيضًا (بالمعالج كاملًا) في مهلةٍ محدودة؛ فإن جاوزها
+    # أكمل الخيطُ نفسُه في الخلفية — ولا يُعاد التنزيلُ من أوّله.
     if not await asyncio.to_thread(load_prefetched):
-        threading.Thread(target=load_model,daemon=True).start()
+        loader=threading.Thread(target=load_model,daemon=True)
+        loader.start()
+        await asyncio.to_thread(loader.join,float(os.getenv('MIZAN_STARTUP_LOAD_SECONDS','180')))
     yield
 
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)

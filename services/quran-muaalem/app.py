@@ -30,7 +30,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from analysis import (
-    ReferenceError, SegmentVerdict, build_reference, judge, parse_segment, settle,
+    ANALYSIS_VERSION, ReferenceError, SegmentVerdict, build_reference, judge, parse_segment, settle,
 )
 
 MODEL_ID = os.getenv("MIZAN_MUAALEM_MODEL", "obadx/muaalem-model-v3_2").strip()
@@ -146,6 +146,7 @@ def health():
         "model": state["version"] or MODEL_ID,
         "mode": "PRACTICE_ONLY",
         "reading": "hafs",
+        "analysis": ANALYSIS_VERSION,
     }
     return JSONResponse(body, status_code=200 if ready else 503)
 
@@ -237,4 +238,4 @@ async def analyse(request: Request):
         results = analyse_segments(wave, segments, model)
     except ReferenceError as exc:
         raise HTTPException(400, str(exc)) from exc
-    return {"reading": "hafs", "modelVersion": state["version"], "segments": results}
+    return {"reading": "hafs", "modelVersion": state["version"], "analysisVersion": ANALYSIS_VERSION, "segments": results}

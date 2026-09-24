@@ -12,6 +12,8 @@ export interface SnippetPlayer {
   play(startMs: number, endMs: number): Promise<boolean>;
   stop(): void;
   close(): void;
+  /** مدّةُ التسجيل بالمللي ثانية (يُفكّ إن لم يُفكّ) — أو صفرٌ إن تعذّر. */
+  duration(): Promise<number>;
 }
 
 /** هامشُ ما قبل الكلمة وما بعدها: يُسمع مدخلُها ومخرجُها، لا نصفُ حرف. */
@@ -66,6 +68,7 @@ export function createSnippetPlayer(parts: readonly Blob[]): SnippetPlayer {
       return true;
     },
     stop,
+    async duration() { const audio = await decode(); return audio ? audio.duration * 1000 : 0; },
     close() { stop(); void (ctx as AudioContext | null)?.close?.(); ctx = null; buffer = null; },
   };
 }

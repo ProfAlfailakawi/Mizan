@@ -35,6 +35,12 @@ const PLAN: Expectation[] = [
       [o.teacher.rows.length === 2 && o.teacher.rows[0].startsWith('tashkeel:') && o.teacher.rows[1].startsWith('tajweed:'), `سطورُ التقرير: ${JSON.stringify(o.teacher.rows)}`],
       [o.teacher.notedWords.length >= 2, `لم تُخطّ الكلماتُ في الصفحة: ${JSON.stringify(o.teacher.notedWords)}`],
       [o.snippetSources === 1, `«تلاوتك» لم تُشغَّل من التسجيل: ${o.snippetSources}`],
+      [o.teacher.mode === 'trial', `وسمُ «تجريبي» غائب: ${o.teacher.mode}`],
+      [o.teacher.referenceButtons === o.teacher.rows.length, `«القارئ» ليس عند كلّ ملاحظة: ${o.teacher.referenceButtons}`],
+      [o.retakeOffered >= 1, 'لم تُعرض «أعِد هذه الآية» لآيةٍ لم تتّضح'],
+      [o.teacherCalls.some(c => c.segments.some(s => s.id.includes('~r'))), 'الإعادةُ لم تصل المعلّم'],
+      [o.teacher.unclearLeft === o.retakeOffered - 1, `الآيةُ المعادة بقيت في «لم يتّضح»: ${o.teacher.unclearLeft}/${o.retakeOffered}`],
+      [o.teacher.rows.length === 2, `الإعادةُ مسحت ملاحظاتٍ أو زادتها: ${o.teacher.rows.length}`],
     ]),
   },
   {
