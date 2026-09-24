@@ -226,3 +226,11 @@ test('the rough position never counts the file header as where the reader is', (
   assert.match(listener, /def after_header\(temp,audio:bytes,head_len:int\):/);
   assert.equal((listener.match(/pcm=after_header\(temp,audio,head_len\)/g) || []).length, 2, "both routes transcribe only what follows the header");
 });
+
+test('a busy listener never builds an unbounded backlog: stale chunks give way to newer ones', () => {
+  // قيس: ٣٠ ثانيةً وسيطًا حين زاد الحسابُ على طول المقطع وتراكم الطابور (MIZAN-LISTENER-FOLLOW-1).
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /if \(!finalChunk && latestAlignment\.current > index\) \{ setHeard\(n => n \+ 1\); return; \}/);
+  // والكلماتُ لا تُترك إلا بلا ثقب: نافذةُ الأحدث تبدأ قبل آخر ما ثبت. والمقطعُ الأخيرُ لا يُترك.
+  assert.match(practice, /if \(!finalChunk && newest > index && recognitionWindow\(index \+ 1, false\)\.startMs <= committedUntil\.current\) return;/);
+});
