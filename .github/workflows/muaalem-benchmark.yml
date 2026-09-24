@@ -46,9 +46,10 @@ on:
 permissions:
   contents: read
 
+# لا يُلغى قياسٌ جارٍ بدفعةٍ جديدة: أُلغي أوّلُ قياسٍ كامل بعد ٣ ساعات و٥٤ دقيقة بدمجٍ لا شأن له به.
 concurrency:
   group: muaalem-benchmark
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   bench:
