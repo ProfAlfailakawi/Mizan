@@ -119,3 +119,13 @@ test('the baked model loads during startup, with the CPU Cloud Run gives a start
   const build = read('cloudbuild.yaml');
   assert.match(build, /--cpu-boost/);
 });
+
+test('the deploy log itself says why the listener is not ready — build step statuses, running image, prefetch lines — and never fails the release', () => {
+  const deploy = read('.github/workflows/deploy-cloud-run.yml');
+  const step = deploy.slice(deploy.indexOf('- name: تشخيص المستمع والمعلّم'), deploy.indexOf('- name: حالُ مستمع التدريب والمعلّم'));
+  assert.match(step, /gcloud builds describe "\$build_id"/);
+  assert.match(step, /for svc in mizan-quran-listener mizan-quran-muaalem/);
+  assert.match(step, /MIZAN_LISTENER_MODEL/);
+  assert.match(step, /exit 0\n/);
+  assert.match(deploy, /listener attempt \$attempt\/8: state=\$state model=\$model source=\$listener_source build=\$listener_build/);
+});
