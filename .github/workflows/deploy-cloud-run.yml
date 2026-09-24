@@ -214,6 +214,47 @@ jobs:
       # خطواتُ المستمع في `cloudbuild.yaml` مسموحٌ لها بالتعثّر كي لا تُسقط ميزان. فيُسأل
       # ميزانُ المنشورُ نفسُه عن مستمعه (`/api/health?listener=1`) ويُكتب الجوابُ في ملخّص
       # النشر: مربوطٌ أم لا، وجاهزٌ أم يُحمِّل نموذجه — فلا يُعلن «يسمعك» على العمياء.
+      # ── تشخيصُ الخدمتين المساعدتين في السجلّ نفسِه ──────────────────────────────
+      #
+      # خطواتُ المستمع والمعلّم في Cloud Build كلُّها `allowFailure`، وسجلُّ البناء لا يصل هنا
+      # (`logging: CLOUD_LOGGING_ONLY`)، فالبناءُ «SUCCESS» ولو سقط بناءُ المستمع أو نشرُه —
+      # وبقي المستمعُ «LOADING» في ثلاثة نشراتٍ متتالية ولا أحدَ يرى لماذا. فتُطبع هنا: حالُ كلّ
+      # خطوة، والصورةُ والنسخةُ العاملتان فعلًا، وسطورُ التنزيل المسبق للنموذج، وآخرُ ما قاله
+      # المستمعُ عند إقلاعه. للعلم وحده: لا يُسقط النشر، وما لا تأذن به الصلاحياتُ يُقال ويُتخطّى.
+      - name: تشخيص المستمع والمعلّم (للعلم، لا يُسقط النشر)
+        if: always() && steps.verify.outputs.url != ''
+        shell: bash
+        env:
+          VERIFIED_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -uo pipefail
+          build_id="$(gcloud builds list --project="$GCP_PROJECT_ID" --filter="substitutions.COMMIT_SHA=$VERIFIED_SHA" --limit=1 --format='value(id)' 2>/dev/null || true)"
+          echo "::group::Cloud Build steps ($build_id)"
+          if [ -n "$build_id" ]; then
+            gcloud builds describe "$build_id" --project="$GCP_PROJECT_ID" \
+              --format='table[box](steps.id,steps.name.basename(),steps.status,steps.timing.startTime,steps.timing.endTime)' 2>&1 \
+              || echo "(no permission to describe the build)"
+          fi
+          echo "::endgroup::"
+          for svc in mizan-quran-listener mizan-quran-muaalem; do
+            echo "::group::$svc — running revision and image"
+            gcloud run services describe "$svc" --region "$GCP_REGION" --project "$GCP_PROJECT_ID" \
+              --format='yaml(status.latestReadyRevisionName,status.latestCreatedRevisionName,spec.template.spec.containers[0].image,status.conditions)' 2>&1 \
+              || echo "(no permission to describe $svc)"
+            echo "::endgroup::"
+          done
+          if [ -n "$build_id" ]; then
+            echo "::group::listener model prefetch (Cloud Build log)"
+            gcloud logging read "resource.type=\"build\" AND resource.labels.build_id=\"$build_id\" AND (textPayload:\"MIZAN_LISTENER_MODEL\" OR textPayload:\"prefetch\" OR textPayload:\"mizan-quran-listener\")" \
+              --project "$GCP_PROJECT_ID" --limit 60 --order asc --format='value(textPayload)' 2>&1 || echo "(no permission to read build logs)"
+            echo "::endgroup::"
+          fi
+          echo "::group::listener startup (last 40 lines)"
+          gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="mizan-quran-listener"' \
+            --project "$GCP_PROJECT_ID" --freshness 30m --limit 40 --format='value(timestamp,textPayload)' 2>&1 || echo "(no permission to read service logs)"
+          echo "::endgroup::"
+          exit 0
+
       - name: حالُ مستمع التدريب والمعلّم (للعلم، لا يُسقط النشر)
         if: always() && steps.verify.outputs.url != ''
         shell: bash
@@ -231,7 +272,7 @@ jobs:
             muaalem="$(jq -r '.quranMuaalem.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
             muaalem_model="$(jq -r '.quranMuaalem.model // "-"' <<<"$body" 2>/dev/null || echo -)"
             muaalem_mode="$(jq -r '(.quranMuaalem.mode // "-") + " · " + (.quranMuaalem.modeReason // "-")' <<<"$body" 2>/dev/null || echo -)"
-            echo "listener attempt $attempt/8: state=$state model=$model · muaalem=$muaalem ($muaalem_model)"
+            echo "listener attempt $attempt/8: state=$state model=$model source=$listener_source build=$listener_build · muaalem=$muaalem ($muaalem_model)"
             [[ "$state" == READY || "$state" == NOT_CONFIGURED ]] && break
             sleep 15
           done

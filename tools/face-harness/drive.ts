@@ -34,7 +34,7 @@ export interface RunOutcome {
   micTracksLive: number;
   reportShown: boolean;
   /* «المعلّم»: حالُ تقريره، وسطورُه، والكلماتُ المخطوطةُ في الصفحة، وما وصل خادمَه. */
-  teacher: { phase: string | null; rows: string[]; notedWords: number[]; mode: string | null; unclearLeft: number; referenceButtons: number };
+  teacher: { phase: string | null; rows: string[]; notedWords: number[]; mode: string | null; unclearLeft: number; referenceButtons: number; journeyFaceState: string | null };
   /** «أعِد هذه الآية»: كم آيةً «لم تتّضح» قبل الإعادة. */
   retakeOffered: number;
   teacherCalls: import('./server').TeacherCall[];
@@ -99,7 +99,11 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
       }
     }
     await page.waitForTimeout(500);
+    /* «رحلةُ حفظك» تُفتح بعد التقرير لتُرى في الصورة ويُقرأ حالُ صفحة هذا الوجه على الخريطة. */
+    await page.evaluate(`(() => { const d = document.querySelector('[data-hifz-journey]'); if (d) d.open = true; })()`);
     if (process.env.HARNESS_SHOTS) {
+      const journey = page.locator('[data-hifz-journey]').first();
+      if (await journey.count()) await journey.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}-journey.png`) });
       await page.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}.png`), fullPage: true });
       const report = page.locator('[data-tashkeel]').first();
       if (await report.count()) await report.screenshot({ path: path.join(process.env.HARNESS_SHOTS, `${scenario}-report.png`) });
@@ -153,6 +157,10 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
           mode: (document.querySelector('[data-tashkeel-mode]') || { getAttribute: () => null }).getAttribute('data-tashkeel-mode'),
           unclearLeft: document.querySelectorAll('[data-retake]').length,
           referenceButtons: document.querySelectorAll('[data-reference-word]').length,
+          journeyFaceState: (() => {
+            const cell = document.querySelector('[data-hifz-journey] [data-current]');
+            return cell ? cell.getAttribute('data-state') : (document.querySelector('[data-hifz-journey]') ? 'no-cell' : null);
+          })(),
         },
       };
     })()`) as Omit<RunOutcome, 'scenario' | 'chunksServed' | 'teacherCalls' | 'snippetSources' | 'retakeOffered'>;

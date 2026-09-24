@@ -6,7 +6,7 @@
  */
 
 import type { FaceMark } from './face-reading';
-import type { FaceAttempt } from './face-memory';
+import type { AttemptWord, AttemptWordKind, FaceAttempt } from './face-memory';
 
 /** ما يكفي للحكم على وجهٍ قبل فتحه — لا نصَّ فيه. */
 export interface FaceExtent { page: number; surahStart: number; surahEnd: number }
@@ -126,9 +126,41 @@ function sane(row: unknown): row is FaceAttempt {
   if (!Number.isInteger(r.page) || (r.page as number) < 1 || (r.page as number) > 604) return false;
   if (typeof r.at !== 'string' || Number.isNaN(Date.parse(r.at))) return false;
   if (!Array.isArray(r.marks)) return false;
+  if (r.words !== undefined && !(Array.isArray(r.words) && r.words.every(saneWord))) return false;
   return r.marks.every(m => m && typeof m === 'object'
     && typeof (m as { kind?: unknown }).kind === 'string'
     && Number.isFinite((m as { intensity?: unknown }).intensity));
+}
+
+const WORD_KINDS = new Set(['skipped', 'substituted', 'added', 'vowel', 'tajweed', 'letter', 'repeat', 'confusable']);
+function saneWord(w: unknown): boolean {
+  if (!w || typeof w !== 'object') return false;
+  const x = w as Record<string, unknown>;
+  return Number.isInteger(x.i) && (x.i as number) >= 0 && Number.isInteger(x.s) && (x.s as number) >= 1 && (x.s as number) <= 114
+    && Number.isInteger(x.a) && (x.a as number) >= 1 && typeof x.t === 'string' && (x.t as string).length <= 64
+    && typeof x.k === 'string' && WORD_KINDS.has(x.k as string);
+}
+
+/**
+ * يُكمل محاولةً محفوظةً بكلماتٍ عُرفت بعدها (حكمُ الكلمات، ثم «المعلّم» وإعاداتُه).
+ *
+ * تُعرف المحاولةُ بوقتها وصفحتها. و`replace` أنواعٌ تُستبدل كلماتُها كلُّها (ملاحظاتُ المعلّم
+ * تتغيّر بإعادة آية)، وما عداها يبقى. ومحاولةٌ لم تُحفظ (تلاوةٌ ناقصة) لا تُخلق هنا.
+ */
+export function amendFaceAttempt(
+  owner: string, reading: string, at: string, page: number,
+  words: readonly AttemptWord[], replace: readonly AttemptWordKind[] = [],
+): FaceAttempt[] {
+  const all = loadFaceAttempts(owner, reading);
+  const k = all.findIndex(x => x.at === at && x.page === page);
+  if (k < 0) return all;
+  const drop = new Set<string>(replace);
+  const kept = (all[k].words ?? []).filter(w => !drop.has(w.k));
+  const seen = new Set(kept.map(w => `${w.i}:${w.k}`));
+  const merged = [...kept, ...words.filter(w => saneWord(w) && !seen.has(`${w.i}:${w.k}`))].slice(0, 400);
+  all[k] = { ...all[k], words: merged };
+  try { window.localStorage.setItem(storeKey(owner, reading), JSON.stringify(all)); } catch { /* لا مكان */ }
+  return all;
 }
 
 export function loadFaceAttempts(owner: string, reading: string): FaceAttempt[] {
