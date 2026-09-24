@@ -233,3 +233,23 @@ class PauseTest(unittest.TestCase):
         errors, kept = self.run_case(4, 111, edit=lambda p: p.replace("نَفسِهِۦۦ", "نَفسِهُۥۥ", 1))
         self.assertTrue(kept)
         self.assertEqual(len(kept), len(errors))
+
+
+class ConfidenceTest(unittest.TestCase):
+    def test_confidence_lands_on_the_heard_group_of_the_error(self):
+        from analysis import heard_confidence
+        words = Aya(4, 111).get().uthmani_words
+        full = " ".join(words)
+        ref = quran_phonetizer(full, MOSHAF, remove_spaces=True)
+        heard = ref.phonemes.replace("يَكسِبُهُ", "يَكسِبَهُ", 1)
+        probs = [0.99] * len(heard)
+        at = heard.index("يَكسِبَهُ") + len("يَكسِ")
+        probs[at] = 0.31  # الباءُ المبدَّلةُ حركتُها — ضعيفةُ الثقة
+        sure = heard_confidence(ref.phonemes, heard, probs)
+        errors = explain_error(uthmani_text=full, ref_ph_text=ref.phonemes, predicted_ph_text=heard, mappings=ref.mappings)
+        self.assertEqual(len(errors), 1)
+        self.assertAlmostEqual(sure[errors[0].ph_pos[0]], 0.31)
+
+    def test_mismatched_probabilities_give_nothing(self):
+        from analysis import heard_confidence
+        self.assertEqual(heard_confidence("بَ", "بَ", [0.5]), {})

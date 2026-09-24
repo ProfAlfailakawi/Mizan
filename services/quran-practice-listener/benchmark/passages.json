@@ -1,0 +1,9 @@
+{
+  "about": "مقاطعُ قياس المتابعة الحيّة: الرحمن (لازمةٌ مكرّرة «فبأيّ آلاء ربّكما تكذّبان» — تختبر القفز)، والملك (سردٌ متّصل)، وأوّلُ البقرة (مقطّعاتٌ «الم» وآياتٌ طويلة)، والفاتحة. وقرّاءٌ بسرعاتٍ مختلفة، منهم الحدرُ السريع.",
+  "passages": [
+    { "id": "rahman", "surah": 55, "from": 1, "to": 25, "reciters": ["alafasy", "husary", "sudais", "muaiqly"] },
+    { "id": "mulk", "surah": 67, "from": 1, "to": 10, "reciters": ["alafasy", "minshawi", "shuraim"] },
+    { "id": "baqarah", "surah": 2, "from": 1, "to": 7, "reciters": ["ghamdi", "husary"] },
+    { "id": "fatiha", "surah": 1, "from": 1, "to": 7, "reciters": ["muaiqly", "minshawi"] }
+  ]
+}

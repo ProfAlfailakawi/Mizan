@@ -1,0 +1,85 @@
+name: قياس «يسمعك» — المتابعة الحيّة
+
+# يقيس المتابعةَ الحيّة كما تجري في الصفحة (services/quran-practice-listener/benchmark):
+# تلاواتُ كبار القرّاء تُقطَّع بإيقاع الصفحة وتمرّ بمساري الموضع والكلمات، ويُقاس لكلّ كلمة
+# تأخّرُ انكشافها، وهل انكشفت قبل أن تُقال، وقفزاتُ الموضع عند المكرّرات.
+#
+# يجري عند الطلب، وكلّما تغيّر المستمع أو إيقاعُ الصفحة أو أداةُ القياس في main.
+# الصوتُ يُنزَّل إلى مجلّدٍ مؤقّتٍ في العدّاء ولا يُرفع ولا يُحفظ.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'قرّاءٌ بعينهم بمعرّفاتهم مفصولةً بفواصل (فارغ = الجميع)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'services/quran-practice-listener/app.py'
+      - 'services/quran-practice-listener/benchmark/**'
+      - 'src/lib/recognition-window.ts'
+      - '.github/workflows/listener-benchmark.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: listener-benchmark
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: services/quran-practice-listener
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: المكتبات
+        run: |
+          python -m pip install --quiet --upgrade pip
+          pip install --quiet -r requirements.txt numpy quran-transcript==0.6.1
+
+      - name: اختبارُ أداة القياس
+        run: python -m unittest discover -s tests
+
+      - name: القياس
+        timeout-minutes: 100
+        env:
+          ONLY: ${{ github.event.inputs.only || '' }}
+        run: |
+          python benchmark/bench.py --only "$ONLY" \
+            --out "$RUNNER_TEMP/follow.json" --markdown "$RUNNER_TEMP/summary.md"
+
+      - name: التقرير
+        if: always()
+        run: |
+          test -f "$RUNNER_TEMP/summary.md" && cat "$RUNNER_TEMP/summary.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          if [ -f "$RUNNER_TEMP/follow.json" ]; then
+            echo 'MIZAN-LISTENER-REPORT-BEGIN'
+            python -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1],encoding='utf-8')),ensure_ascii=False))" "$RUNNER_TEMP/follow.json"
+            echo 'MIZAN-LISTENER-REPORT-END'
+          fi
+
+      - name: رفعُ التقرير
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: listener-benchmark
+          path: |
+            ${{ runner.temp }}/follow.json
+            ${{ runner.temp }}/summary.md
+          if-no-files-found: warn

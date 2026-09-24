@@ -30,7 +30,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from analysis import (
-    ANALYSIS_VERSION, ReferenceError, SegmentVerdict, build_reference, drop_pausal, judge, parse_segment, settle,
+    ANALYSIS_VERSION, ReferenceError, SegmentVerdict, build_reference, drop_pausal, heard_confidence, judge, parse_segment, settle,
 )
 
 MODEL_ID = os.getenv("MIZAN_MUAALEM_MODEL", "obadx/muaalem-model-v3_2").strip()
@@ -224,7 +224,11 @@ def analyse_segments(wave: np.ndarray, raw_segments: list, model) -> list[dict]:
                 errors = drop_pausal(errors, ref.uthmani.split(" "), out.phonemes.text,
                                      lambda text: quran_phonetizer(text, moshaf, remove_spaces=True),
                                      lambda u, r, p, mp: explain_error(uthmani_text=u, ref_ph_text=r, predicted_ph_text=p, mappings=mp))
+                sure = heard_confidence(ph.phonemes, out.phonemes.text, getattr(out.phonemes, "probs", None))
                 findings = [judge(e, len(ph.phonemes), seg, ref.uthmani, ref.lib_to_face) for e in errors]
+                for e, f in zip(errors, findings):
+                    if f is not None and e.speech_error_type != "delete":
+                        f.confidence = sure.get(e.ph_pos[0])
                 verdict = settle(seg, findings, _mean_confidence(out.phonemes), len(ref.lib_to_face))
             except Exception:
                 verdict = SegmentVerdict(seg.id, "skipped", reason="EXPLAIN_FAILED")

@@ -268,7 +268,12 @@ class Tally:
     skipped: int = 0
     by_kind: dict = field(default_factory=dict)
     by_rule: dict = field(default_factory=dict)
+    #: أطوالُ المدود المسموعة لكلّ قاعدة ({القاعدة: {الطول: العدد}}) — يُعرف بها القارئُ الذي يقصر
+    #: المنفصلَ من طريق الطيّبة بالأرقام، لا بالظنّ.
+    madd_lengths: dict = field(default_factory=dict)
     examples: list = field(default_factory=list)
+    #: لكلّ آيةٍ صحيحةٍ حُكم عليها: ملاحظاتُها بثقتها — يُبنى منها جدولُ حدّ الثقة (`confidence_sweep`).
+    raw: list = field(default_factory=list)
 
 
 def score_correct(items: list[Item], verdicts: list[dict], tally: Tally, per_reciter: dict, examples: int = 40) -> None:
@@ -284,13 +289,19 @@ def score_correct(items: list[Item], verdicts: list[dict], tally: Tally, per_rec
             continue
         words = sum(1 for w in item.words if is_word(w))
         flagged = {f["wordIndex"] for f in v.get("findings", [])}
+        tally.raw.append([(f["wordIndex"], f["kind"], f.get("confidence")) for f in v.get("findings", [])])
         for t in (tally, r):
             t.words += words
             t.flagged += len(flagged)
         for f in v.get("findings", []):
             tally.by_kind[f["kind"]] = tally.by_kind.get(f["kind"], 0) + 1
             rule = f.get("ruleAr") or f["kind"]
-            tally.by_rule[rule] = tally.by_rule.get(rule, 0) + 1
+            for t in (tally, r):
+                t.by_rule[rule] = t.by_rule.get(rule, 0) + 1
+                if f.get("predictedLen") is not None:
+                    lengths = t.madd_lengths.setdefault(rule, {})
+                    key = str(f["predictedLen"])
+                    lengths[key] = lengths.get(key, 0) + 1
             if len(tally.examples) < examples:
                 tally.examples.append({"reciter": item.reciter, "ayah": f"{item.surah}:{item.ayah}",
                                        "word": item.words[f["wordIndex"]] if 0 <= f["wordIndex"] < len(item.words) else "",
@@ -306,6 +317,8 @@ class Recall:
     collateral: int = 0
     by_type: dict = field(default_factory=dict)
     examples: list = field(default_factory=list)
+    #: لكلّ زوجٍ حُكم عليه: موضعُ الزلّة، وملاحظاتُ الآية بثقتها.
+    raw: list = field(default_factory=list)
 
 
 def score_pairs(items: list[Item], verdicts: list[dict], rec: Recall, examples: int = 30) -> None:
@@ -321,6 +334,7 @@ def score_pairs(items: list[Item], verdicts: list[dict], rec: Recall, examples: 
             rec.unclear += 1; t["unclear"] += 1
             continue
         flagged = {f["wordIndex"] for f in v.get("findings", [])}
+        rec.raw.append((item.expected, [(f["wordIndex"], f["kind"], f.get("confidence")) for f in v.get("findings", [])]))
         hit = item.expected in flagged
         if hit:
             rec.detected += 1; t["detected"] += 1
@@ -330,6 +344,30 @@ def score_pairs(items: list[Item], verdicts: list[dict], rec: Recall, examples: 
                                  "reference": f"{item.surah}:{item.ayah}", "word": item.note,
                                  "type": item.kind, "detected": hit,
                                  "messages": [f.get("messageAr", "") for f in v.get("findings", []) if f["wordIndex"] == item.expected]})
+
+
+CONFIDENCE_STEPS = (0.0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95)
+
+
+def confidence_sweep(correct: "Tally", recall: "Recall", words: int, pairs: int) -> dict:
+    """
+    ماذا لو سُكت عن كلّ ملاحظةٍ ثقتُها دون حدٍّ ما؟ — لكلّ نوعٍ (letter/tashkeel/tajweed) ولها جميعًا.
+
+    يُحسب من الملاحظات نفسِها التي خرجت في هذا القياس، فيُختار الحدُّ بالأرقام: كم ينزل الإنذارُ
+    الكاذب، وكم يُفقد من الكشف. والملاحظةُ بلا ثقةٍ (حذفٌ، أو تعذّر حسابها) تبقى كما هي.
+    """
+    out: dict = {}
+    for kind in ("letter", "tashkeel", "tajweed", "all"):
+        rows = []
+        for step in CONFIDENCE_STEPS:
+            def kept(f):
+                _, k, c = f
+                return not ((kind == "all" or k == kind) and c is not None and c < step)
+            false = sum(len({f[0] for f in item if kept(f)}) for item in correct.raw)
+            hits = sum(1 for expected, fs in recall.raw if expected in {f[0] for f in fs if kept(f)})
+            rows.append({"min": step, "falseAlarm": rate(false, words)["rate"], "recall": rate(hits, pairs)["rate"]})
+        out[kind] = rows
+    return out
 
 
 def rate(k: int, n: int) -> dict:
@@ -354,6 +392,8 @@ def build_report(*, model: str, seed: str, reciters: list[dict], correct: Tally,
         "protocol": PROTOCOL, "reading": "hafs", "model": model, "analysisVersion": ANALYSIS_VERSION, "seed": seed,
         "measuredAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "durationSeconds": round(time.time() - started),
         "thresholds": GATES, "gates": gates, "passes": all(gates.values()),
+        # للاختيار لا للاجتياز: الشروطُ أعلاه تُقاس بالمعلّم كما هو، لا بحدٍّ مفترض.
+        "confidenceSweep": confidence_sweep(correct, recall, correct.words, recall.items),
         "correct": {"items": correct.items, "words": correct.words, "flaggedWords": correct.flagged,
                     "falseAlarm": fa, "unclear": unclear, "skipped": correct.skipped,
                     "byKind": correct.by_kind, "byRule": dict(sorted(correct.by_rule.items(), key=lambda x: -x[1])),
@@ -367,6 +407,8 @@ def build_report(*, model: str, seed: str, reciters: list[dict], correct: Tally,
                       "words": per_reciter.get(r["id"], Tally()).words,
                       "flaggedWords": per_reciter.get(r["id"], Tally()).flagged,
                       "unclear": per_reciter.get(r["id"], Tally()).unclear,
+                      "byRule": dict(sorted(per_reciter.get(r["id"], Tally()).by_rule.items(), key=lambda x: -x[1])),
+                      "maddLengths": per_reciter.get(r["id"], Tally()).madd_lengths,
                       "missingFiles": missing.get(r["id"], 0)} for r in reciters],
         "caveats": [
             "النموذجُ دُرِّب على تلاواتِ قرّاءٍ متقنين من الشبكة، فقد يكون سمع بعضَ هؤلاء في تدريبه: رقمُ الإنذار الكاذب هنا قد يكون أحسنَ مما يلقاه الطلاب.",
@@ -392,9 +434,21 @@ def markdown(report: dict) -> str:
     ]
     for k, v in s["byType"].items():
         lines.append(f"  - {TYPE_AR.get(k, k)}: {pct(v['recall'])}")
-    lines += ["", "| القارئ | آيات | كلمات | ملاحظات كاذبة | لم يتّضح | ملفاتٌ غائبة |", "|---|---|---|---|---|---|"]
+    lines += ["", "| القارئ | آيات | كلمات | ملاحظات كاذبة | لم يتّضح | ملفاتٌ غائبة | أكثرُ القواعد | أطوالُ المنفصل المسموعة |",
+              "|---|---|---|---|---|---|---|---|"]
     for r in report["reciters"]:
-        lines.append(f"| {r['nameAr']} | {r['items']} | {r['words']} | {r['flaggedWords']} | {r['unclear']} | {r['missingFiles']} |")
+        top = " · ".join(f"{k} {v}" for k, v in list(r.get("byRule", {}).items())[:3])
+        munfasil = r.get("maddLengths", {}).get("المد المنفصل", {})
+        lengths = " · ".join(f"{k}ح×{v}" for k, v in sorted(munfasil.items(), key=lambda x: int(x[0])))
+        lines.append(f"| {r['nameAr']} | {r['items']} | {r['words']} | {r['flaggedWords']} | {r['unclear']} | {r['missingFiles']} | {top} | {lengths} |")
+    sweep = report.get("confidenceSweep", {})
+    if sweep:
+        lines += ["", "**لو سُكت عمّا ثقتُه دون الحدّ** (للاختيار — الشروطُ أعلاه بالمعلّم كما هو):", "",
+                  "| النوع | " + " | ".join(f"≥{r['min']}" for r in sweep["all"]) + " |",
+                  "|---|" + "---|" * len(sweep["all"])]
+        for kind, rows in sweep.items():
+            cell = lambda r: "—" if r["falseAlarm"] is None else f"{100 * r['falseAlarm']:.2f}% / {100 * (r['recall'] or 0):.1f}%"  # noqa: E731
+            lines.append(f"| {kind} (إنذار/كشف) | " + " | ".join(cell(r) for r in rows) + " |")
     if c["byRule"]:
         lines += ["", "**الملاحظاتُ على التلاوات الصحيحة بحسب القاعدة:** " + " · ".join(f"{k}: {v}" for k, v in list(c["byRule"].items())[:10])]
     lines += ["", "**حدود:**"] + [f"- {x}" for x in report["caveats"]]
