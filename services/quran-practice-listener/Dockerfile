@@ -15,6 +15,10 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout 120 -r requirements.txt
+# المكتبةُ تُستورد في البناء نفسه: صورةٌ لا تستورد نموذجَها لا تُبنى ولا تُنشر.
+# (رُصد: huggingface_hub 1.x لم يعد يجلب `requests`، وfaster-whisper 1.2.0 يستورده ولا يعلنه —
+#  فسقط التنزيلُ المسبق والإقلاعُ معًا بصمت، وبقي المستمعُ «يُحمّل» في كلّ نشر.)
+RUN python -c "from faster_whisper import WhisperModel; import requests"
 # محاولةُ تنزيلٍ مسبق لا تُسقط البناء: إن نجحت أقلع المستمعُ سريعًا بعد كل نوم.
 COPY prefetch.py .
 RUN timeout 900 python prefetch.py || echo "model prefetch skipped; runtime download will be used"

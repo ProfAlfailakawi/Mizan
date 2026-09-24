@@ -94,8 +94,14 @@ async def lifespan(_app):
 def startup_load():
     started=time.time()
     print('listener startup: loading model…',flush=True)
-    if not load_prefetched():
-        load_model()
+    try:
+        if not load_prefetched():
+            load_model()
+    except Exception as exc:
+        # لا يموت الخيطُ صامتًا: الخطأ يُحفظ فتقوله `/health` و`/ready` (كان استيرادٌ ناقص يُبقيه «يُحمّل» أبدًا).
+        state['error']=f'{type(exc).__name__}: {exc}'[-600:]; state['failed']=True
+        print(f'listener startup failed: {state["error"]}',flush=True)
+        return
     print(f'listener startup: model {state["id"]} ready from {state["source"]} in {time.time()-started:.1f}s',flush=True)
 
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
@@ -157,7 +163,8 @@ def ready():
 @app.get('/health')
 def health():
     from fastapi.responses import JSONResponse
-    status='ok' if state['model'] else ('retrying' if state['error'] else 'loading')
+    # `failed`: خيطُ التحميل انتهى بلا نموذج ولن يعيد — فيُقال «معطّل» لا «يُعيد المحاولة».
+    status='ok' if state['model'] else ('failed' if state.get('failed') else 'retrying' if state['error'] else 'loading')
     # `source`: من الصورة (إقلاعٌ في ثوانٍ) أو من الشبكة (الصورةُ بلا نموذج — يُرى في ملخّص النشر).
     # `build`: الـcommit الذي بُنيت منه النسخةُ العاملة — فلا يُظنّ الإصلاحُ منشورًا وهو لم يُنشر.
     body={'status':status,'model':state['id'],'error':state['error'],'source':state['source'],

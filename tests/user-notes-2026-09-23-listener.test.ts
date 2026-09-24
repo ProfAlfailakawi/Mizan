@@ -135,3 +135,14 @@ test('the deploy log itself says why the listener is not ready — build step st
   assert.match(step, /exit 0\n/);
   assert.match(deploy, /listener attempt \$attempt\/8: state=\$state model=\$model source=\$listener_source build=\$listener_build/);
 });
+
+test('the listener image declares requests and proves the model library imports at build time', () => {
+  /* رُصد في نشر 8b771c9 بسجلّه: «No module named 'requests'» — في التنزيل المسبق وعند الإقلاع. */
+  assert.match(read('services/quran-practice-listener/requirements.txt'), /^requests==/m);
+  assert.match(read('services/quran-practice-listener/Dockerfile'), /RUN python -c "from faster_whisper import WhisperModel; import requests"/);
+  const app = read('services/quran-practice-listener/app.py');
+  assert.match(app, /except Exception as exc:\n\s+# لا يموت الخيطُ صامتًا/);
+  /* ومحمِّلٌ انتهى بلا نموذج يُقال «failed» (فيراه الخادمُ HTTP_503 ويُغلق الزرَّ فورًا)، لا «retrying». */
+  assert.match(app, /state\['failed'\]=True/);
+  assert.match(app, /'failed' if state\.get\('failed'\) else 'retrying'/);
+});
