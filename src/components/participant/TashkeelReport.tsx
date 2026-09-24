@@ -1,0 +1,161 @@
+import React from 'react';
+import { BookOpenCheck, Loader2, RotateCcw, Volume2 } from 'lucide-react';
+import type { TashkeelFinding, TashkeelKind } from '../../lib/quran-intelligence';
+import { arabicIndicDigits } from '../judge/AyahMark';
+
+/*
+ * تقريرُ المعلّم — الحركاتُ والمدودُ بعد التلاوة.
+ *
+ * يُقال للطالب ما سمعه المعلّمُ بعربيّةٍ مفهومة، على الكلمة نفسها: «الجيم: حركتُها فتحة،
+ * وسُمعت ضمّة»، «المدّ المنفصل: مقدارُه ٤ حركات، وسُمع نحو ٢». ولا رسمَ صوتيَّ يُعرض،
+ * ولا درجة، ولا «أخطأت»: «سُمع» — فالآلةُ قد تخطئ السمع، وتُقال حدودُها تحت التقرير.
+ *
+ * وكلُّ حالٍ تُقال كما هي: يُحلَّل، يستعدّ، انتهى بلا ملاحظة، لم يتّضح بعضُه، غيرُ متاحٍ
+ * لروايتك — فالصمتُ عن الحال يُقرأ براءةً وليس كذلك.
+ */
+
+export type TashkeelPhase = 'idle' | 'analysing' | 'warming' | 'done' | 'unavailable' | 'failed';
+
+export interface TashkeelState {
+  phase: TashkeelPhase;
+  /** مقاطعُ أُرسلت وعادت / مجموعُها. */
+  done: number;
+  total: number;
+  findings: TashkeelFinding[];
+  /** آياتٌ راجعها المعلّم فعلًا، وآياتٌ لم يتّضح صوتُها. */
+  reviewed: number;
+  unclear: number;
+  note?: string;
+}
+
+export const EMPTY_TASHKEEL: TashkeelState = { phase: 'idle', done: 0, total: 0, findings: [], reviewed: 0, unclear: 0 };
+
+/* ألوانُ الأنواع — كلٌّ بلونه ورمزه، ولا يُعتمد على اللون وحده. */
+export const TASHKEEL_STYLE: Record<TashkeelKind, { ar: string; en: string; tint: string; glyph: string }> = {
+  tashkeel: { ar: 'حركة', en: 'Vowel', tint: '#4A5A86', glyph: 'ـَ' },
+  tajweed: { ar: 'تجويد', en: 'Tajweed', tint: '#7A4EA3', glyph: '〰' },
+  letter: { ar: 'حرف', en: 'Letter', tint: '#A3341F', glyph: 'ح' },
+};
+
+/** سببُ التعذّر بكلامٍ يفهمه الطالب — ولا يُعرض رمزُ خطأ. */
+export function tashkeelFailureNote(code: string, ar: boolean): string {
+  if (/TEXT_MISMATCH/.test(code)) return ar ? 'نصُّ هذا الوجه لا يطابق مصحفَ حفص المعتمد في الخادم، فلم يُراجَع.' : 'This face does not match the certified Hafs text on the server, so it was not reviewed.';
+  if (/SCOPE_MISMATCH/.test(code)) return ar ? 'هذا الوجهُ خارج نطاقك المعتمد، فلم يُراجَع.' : 'This face is outside your approved range.';
+  if (/AUDIO_INVALID|BODY_TOO_LARGE|HTTP_413/.test(code)) return ar ? 'التلاوةُ أطولُ من أن تُراجَع مرّةً واحدة — اقرأ وجهًا أقصر أو جزءًا منه.' : 'The recitation is too long to review at once.';
+  if (/HTTP_429|RATE/.test(code)) return ar ? 'كثُرت المراجعاتُ في وقتٍ قصير — أعِد بعد دقيقة.' : 'Too many reviews in a short time — retry in a minute.';
+  if (/WARMING/.test(code)) return ar ? 'لم يستيقظ المعلّمُ في المهلة — أعِد بعد قليل.' : 'The Teacher did not wake in time — retry shortly.';
+  return ar ? 'تعذّر الوصولُ إلى المعلّم الآن — ما وصل من ملاحظاتٍ باقٍ، ولك أن تعيد.' : 'The Teacher could not be reached — notes already received remain; you may retry.';
+}
+
+export const TASHKEEL_HAFS_ONLY_NOTE = (ar: boolean) => ar
+  ? 'المعلّمُ يراجع الحركاتِ والمدودَ لرواية حفص وحدها الآن؛ فنموذجُه مبنيٌّ على رسمها الصوتيّ، ولا يُقاس قارئُ روايةٍ بمسطرة أخرى. وتلاوتُك تُراجَع بالكلمات كما ترى.'
+  : 'The Teacher reviews vowels and madd for Hafs only for now; your reading is reviewed word by word as shown.';
+
+interface Props {
+  ar: boolean;
+  state: TashkeelState;
+  /** نصُّ الكلمة بفهرسها في الوجه، ورقمُ آيتها. */
+  wordOf: (index: number) => { text: string; ayah: number } | undefined;
+  onRetry?: () => void;
+  /** «استمع لتلاوتك هنا»: الكلمةُ بصوت الطالب من تسجيله في ذاكرة الصفحة — حيث يُعرف زمنُها. */
+  canListen?: (index: number) => boolean;
+  onListen?: (index: number) => void;
+}
+
+export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, canListen, onListen }) => {
+  if (state.phase === 'idle') return null;
+  const n = (v: number) => (ar ? arabicIndicDigits(v) : String(v));
+
+  if (state.phase === 'unavailable') {
+    return state.note ? (
+      <p className="mizan-tashkeel-note" data-tashkeel="unavailable">{state.note}</p>
+    ) : null;
+  }
+
+  const byAyah = new Map<number, { finding: TashkeelFinding; word?: { text: string; ayah: number } }[]>();
+  for (const finding of state.findings) {
+    const word = wordOf(finding.wordIndex);
+    const ayah = word?.ayah ?? 0;
+    byAyah.set(ayah, [...(byAyah.get(ayah) ?? []), { finding, word }]);
+  }
+  const counts = (kind: TashkeelKind) => state.findings.filter(f => f.kind === kind).length;
+
+  return (
+    <section className="mizan-tashkeel" data-tashkeel={state.phase} aria-live="polite">
+      <header className="mizan-tashkeel__head">
+        <span className="mizan-tashkeel__icon" aria-hidden="true">
+          {state.phase === 'analysing' || state.phase === 'warming' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="mizan-tashkeel__title">{ar ? 'المعلّم: الحركاتُ والمدود' : 'The Teacher: vowels and madd'}</h3>
+          <p className="mizan-tashkeel__sub">
+            {state.phase === 'warming' && (ar ? 'المعلّمُ يستعدّ — أوّلُ مراجعةٍ بعد سكونٍ تأخذ دقيقةً أو نحوها.' : 'The Teacher is waking — the first review after idle takes about a minute.')}
+            {state.phase === 'analysing' && (ar ? `يراجع آيةً آية… ${n(state.done)} من ${n(state.total)}` : `Reviewing ayah by ayah… ${state.done} of ${state.total}`)}
+            {state.phase === 'failed' && (state.note || (ar ? 'تعذّرت المراجعةُ الآن.' : 'The review could not run now.'))}
+            {state.phase === 'done' && (state.findings.length
+              ? (ar ? `راجع ${n(state.reviewed)} ${state.reviewed === 1 ? 'آية' : 'آيات'}، وله ${n(state.findings.length)} ${state.findings.length === 1 ? 'ملاحظة' : 'ملاحظات'}.` : `Reviewed ${state.reviewed} ayat — ${state.findings.length} notes.`)
+              : (ar ? `راجع ${n(state.reviewed)} ${state.reviewed === 1 ? 'آية' : 'آيات'} ولم يجد ملاحظةً في الحركات ولا المدود على ما سمعه.` : `Reviewed ${state.reviewed} ayat — no vowel or madd notes on what it heard.`))}
+          </p>
+        </div>
+        {state.phase === 'failed' && onRetry && (
+          <button type="button" onClick={onRetry} className="mizan-tashkeel__retry">
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'أعِد' : 'Retry'}
+          </button>
+        )}
+      </header>
+
+      {state.phase === 'analysing' && state.total > 0 && (
+        <div className="mizan-tashkeel__bar" role="progressbar" aria-valuemin={0} aria-valuemax={state.total} aria-valuenow={state.done}>
+          <span style={{ width: `${Math.round((state.done / state.total) * 100)}%` }} />
+        </div>
+      )}
+
+      {state.findings.length > 0 && (
+        <>
+          <div className="mizan-tashkeel__legend">
+            {(['tashkeel', 'tajweed', 'letter'] as TashkeelKind[]).filter(k => counts(k)).map(k => (
+              <span key={k} className="mizan-tashkeel__chip" style={{ ['--k' as string]: TASHKEEL_STYLE[k].tint }}>
+                {ar ? TASHKEEL_STYLE[k].ar : TASHKEEL_STYLE[k].en} · {n(counts(k))}
+              </span>
+            ))}
+          </div>
+          <ol className="mizan-tashkeel__list">
+            {[...byAyah.entries()].sort((a, b) => a[0] - b[0]).map(([ayah, rows]) => (
+              <li key={ayah} className="mizan-tashkeel__ayah">
+                <div className="mizan-tashkeel__ayah-no">{ar ? `الآية ${n(ayah)}` : `Ayah ${ayah}`}</div>
+                <ul>
+                  {rows.map(({ finding, word }, i) => (
+                    <li key={`${finding.wordIndex}-${i}`} className="mizan-tashkeel__row" data-kind={finding.kind} style={{ ['--k' as string]: TASHKEEL_STYLE[finding.kind].tint }}>
+                      <span className="mizan-tashkeel__word font-quran">{word?.text ?? '—'}</span>
+                      <span className="mizan-tashkeel__kind">{ar ? TASHKEEL_STYLE[finding.kind].ar : TASHKEEL_STYLE[finding.kind].en}</span>
+                      <span className="mizan-tashkeel__msg">{ar ? finding.messageAr : finding.messageEn}</span>
+                      {onListen && canListen?.(finding.wordIndex) && (
+                        <button type="button" className="mizan-tashkeel__listen" data-listen-word={finding.wordIndex}
+                          onClick={() => onListen(finding.wordIndex)} aria-label={ar ? `استمع لتلاوتك: ${word?.text ?? ''}` : `Hear your recitation: ${word?.text ?? ''}`}>
+                          <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'تلاوتك' : 'You'}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+
+      {(state.phase === 'done' || state.phase === 'failed') && state.unclear > 0 && (
+        <p className="mizan-tashkeel__foot">
+          {ar ? `و${n(state.unclear)} ${state.unclear === 1 ? 'آيةٌ لم يتّضح' : 'آياتٍ لم يتّضح'} صوتُها للمعلّم فلم يُحكم عليها — لا يُقال فيها صوابٌ ولا خطأ.` : `${state.unclear} ayat were not clear enough to review — nothing is said about them.`}
+        </p>
+      )}
+      {state.phase === 'done' && (
+        <p className="mizan-tashkeel__foot">
+          {ar
+            ? 'سماعُ آلةٍ لروايةِ حفص، لا حكمُ شيخ: المدودُ تُعدّ تقريبًا («نحو»)، وما يجيزه حفصٌ من أوجه المدّ لا يُعدّ خطأ. فما شككتَ فيه فاعرضه على معلّمك. ولا درجة هنا، ولا يُحفظ صوتُك.'
+            : 'A machine hearing for Hafs, not a teacher’s verdict: madd lengths are approximate and every length Hafs permits is accepted. Check doubts with your teacher. No score, and your voice is not stored.'}
+        </p>
+      )}
+    </section>
+  );
+};

@@ -11,7 +11,9 @@ test('the optional listener can never fail the Mizan release', () => {
   const listenerSteps = build.split('\n  - name:').filter(step => /mizan-quran-listener/.test(step) && !/services update mizan /.test(step));
   assert.ok(listenerSteps.length >= 3);
   for (const step of listenerSteps) assert.match(step, /allowFailure: true/);
-  assert.match(build, /if \[ ! -s \/workspace\/mizan-quran-listener-url \]; then .*exit 0; fi/);
+  // لا مستمعَ منشورًا في الدفعة؟ يبقى الربطُ السابق، ولا يسقط النشر.
+  assert.match(build, /if \[ -s \/workspace\/mizan-quran-listener-url \]; then vars=/);
+  assert.match(build, /if \[ -z "\$vars" \]; then echo 'no engine deployed in this build; keeping previous bindings'; exit 0; fi/);
 });
 
 test('the listener loads its model at runtime, retries, and reports health honestly', () => {

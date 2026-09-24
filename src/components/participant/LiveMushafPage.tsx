@@ -8,6 +8,8 @@ import {
 import { FACE_MISTAKE_STYLE, primaryMistake } from './FaceMistakes';
 import { FACE_MARK_STYLE, markTint, marksByWord, primaryMark } from './FaceMarks';
 import type { FaceMark } from '../../lib/face-reading';
+import type { TashkeelFinding } from '../../lib/quran-intelligence';
+import { TASHKEEL_STYLE } from './TashkeelReport';
 import type { Mistake } from '../../lib/recitation-diff';
 
 /*
@@ -102,13 +104,15 @@ export interface LiveMushafPageProps {
   mistakes?: readonly Mistake[];
   /** علاماتُ الوصف بعد التلاوة (لبثٌ، رجوعٌ…) — تُصبغ على كلماتها. */
   marks?: readonly FaceMark[];
+  /** ملاحظاتُ المعلّم (حركة، تجويد، حرف) — خطٌّ منقّطٌ تحت الكلمة بلون نوعها. */
+  notes?: readonly TashkeelFinding[];
   /** هل تُرسم الطبقة؟ (التخطيطُ متاحٌ لمصحف المدينة وحده.) */
   overlay: boolean;
   /** يُخبر الأبَ بحال الطبقة — فإن تعذّرت عرض النصَّ الحيّ بدل صورةٍ صامتة. */
   onReady?: (state: OverlayState) => void;
 }
 
-export const LiveMushafPage: React.FC<LiveMushafPageProps> = ({ ar, page, url, words, live, mistakes, marks, overlay, onReady }) => {
+export const LiveMushafPage: React.FC<LiveMushafPageProps> = ({ ar, page, url, words, live, mistakes, marks, notes, overlay, onReady }) => {
   const markIndex = useMemo(() => marksByWord(marks ?? []), [marks]);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -198,6 +202,12 @@ export const LiveMushafPage: React.FC<LiveMushafPageProps> = ({ ar, page, url, w
             const b = top ? place(w.index) : null;
             return top && b ? <span key={`k${w.index}`} className="mizan-live-mark" data-live-mark={top.kind}
               style={{ ...boxStyle(b), background: markTint(top), boxShadow: `inset 0 -1.5px 0 ${FACE_MARK_STYLE[top.kind].tint}66` }} /> : null;
+          })}
+          {/* ملاحظاتُ المعلّم: نوعٌ واحدٌ لكلّ كلمة، أوّلُها أولاها. */}
+          {[...new Map<number, TashkeelFinding>((notes ?? []).map(n => [n.wordIndex, n] as const).reverse()).values()].map(n => {
+            const b = place(n.wordIndex);
+            return b ? <span key={`n${n.wordIndex}`} className="mizan-live-note" data-live-note={n.kind} data-note-word={n.wordIndex}
+              style={{ ...boxStyle(b), ['--k' as string]: TASHKEEL_STYLE[n.kind].tint }} /> : null;
           })}
           {/* موضعُ المراجعة: خطٌّ تحت الكلمة، ينبض مرّةً حين يقع. */}
           {words.map(w => {

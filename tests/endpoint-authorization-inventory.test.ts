@@ -65,6 +65,7 @@ const INTENTIONALLY_PUBLIC: Record<string, string> = {
   '/api/public/journeys/practice/judging-gate': 'حالةُ بوابة الاستماع لصاحب بطاقة الرحلة — البطاقة هي الاعتماد ولا يختار المتصفح هوية المتسابق.',
   '/api/public/journeys/practice/align': 'محاذاةُ مقطع تدريبٍ خاص — بطاقة الرحلة اعتمادٌ إلزامي، ويعيد الخادم التحقق من الرواية والنطاق لكل مقطع.',
   '/api/public/journeys/practice/recognise': 'تعرّفُ مقطع تدريبٍ خاص — بطاقة الرحلة اعتمادٌ إلزامي، والرواية والحزمة تتحققان خادميًّا.',
+  '/api/public/journeys/practice/tashkeel': 'مراجعةُ المعلّم (الحركات والمدود) لوجه تدريبٍ بعد تلاوته — بطاقة الرحلة اعتمادٌ إلزامي، والرواية (حفص وحدها) والنطاق ونصُّ كل آيةٍ تتحقق خادميًّا، ولا يُحفظ الصوت.',
   '/api/public/brand-assets/organizations/:organizationId/logo': 'شعارُ الجهة كما يظهر على صفحتها العامّة.',
   '/api/public/brand-assets/organizations/:organizationId/competitions/:competitionId/logo': 'شعارُ المسابقة على صفحتها العامّة.',
 

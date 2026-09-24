@@ -1,0 +1,10 @@
+# torch (CPU) يُثبَّت قبل هذا الملفّ من فهرس PyTorch — انظر Dockerfile.
+# النُّسخ هنا هي التي اختُبرت بها الخدمةُ محلّيًّا: tests/ كلُّها (24) على torch 2.8.0 وهذه.
+quran-muaalem==0.2.2
+quran-transcript==0.6.1
+transformers==4.57.6
+huggingface-hub==0.36.2
+numpy==2.4.6
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+httpx==0.28.1

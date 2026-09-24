@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LiveMushafPage, type LiveState, type OverlayState } from './LiveMushafPage';
+import type { TashkeelFinding } from '../../lib/quran-intelligence';
 import { AyahMark, arabicIndicDigits } from '../judge/AyahMark';
 import { FaceMarkLegend, FACE_MARK_STYLE, markTint, marksByWord, primaryMark } from './FaceMarks';
 import { FaceMistakeLegend, FACE_MISTAKE_STYLE, addedCount, mistakesByWord, primaryMistake } from './FaceMistakes';
@@ -67,12 +68,16 @@ export interface MushafFaceSurfaceProps {
   deliveryReading?: string;
   /** التلاوةُ الجارية: موضعُ القلم، وما تُلي، والحجاب. */
   live?: LiveState;
+  /** ملاحظاتُ المعلّم بعد التلاوة (الحركاتُ والمدود). */
+  notes?: readonly TashkeelFinding[];
 }
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   ar, page, surahName, surahNames, words, marks = [], mistakes, indices, frameUnit = 'frame', measurableMarks,
-  choiceNote, analysisNote, officialFont = false, deliveryReading, live,
+  choiceNote, analysisNote, officialFont = false, deliveryReading, live, notes,
 }) => {
+  /* ملاحظةُ المعلّم الأولى على كلّ كلمة: نوعُها يُلوِّن، ونصُّها يُقرأ عند الإشارة ولقارئ الشاشة. */
+  const noteOf = useMemo(() => new Map<number, TashkeelFinding>((notes ?? []).map(n => [n.wordIndex, n] as const).reverse()), [notes]);
   const index = useMemo(() => marksByWord(marks), [marks]);
   const faults = useMemo(() => mistakesByWord(mistakes ?? []), [mistakes]);
   /* وحُكم؟ لا «أَوُجد خطأ؟» — والفرقُ بينهما هو الفرقُ بين «لم يُسمع» و«لم يُخطئ». */
@@ -100,7 +105,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   const [overlay, setOverlay] = useState<OverlayState>('pending');
   const onOverlay = useCallback((state: OverlayState) => setOverlay(state), []);
   useEffect(() => { setOverlay('pending'); }, [officialPage]);
-  const needsVoice = !!live || judged || marks.length > 0;
+  const needsVoice = !!live || judged || marks.length > 0 || !!notes?.length;
   /* ما دامت الطبقةُ تُقاس تبقى الصورة (فالقياسُ يحتاجها)؛ فإن تعذّرت نزل العرضُ إلى النصّ الحيّ. */
   const showImage = !!officialPage && (!needsVoice || (overlayPossible && overlay !== 'none'));
   const reached = live?.reached ?? 0;
@@ -116,7 +121,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
       </header>
 
       {officialPage && showImage && <div className="relative mx-auto mb-5 flex max-h-[70vh] max-w-full items-center justify-center overflow-hidden rounded-[2px] bg-[#efede6] p-2 sm:p-3" data-official-mushaf-page={page}>
-        <LiveMushafPage ar={ar} page={page} url={officialPage} words={words} live={live} mistakes={mistakes} marks={marks}
+        <LiveMushafPage ar={ar} page={page} url={officialPage} words={words} live={live} mistakes={mistakes} marks={marks} notes={notes}
           overlay={overlayPossible} onReady={onOverlay} />
         {marks.length>0&&<div aria-hidden className="pointer-events-none absolute inset-y-2 end-2 w-1.5 overflow-hidden rounded-full bg-black/[0.04]">{marks.slice(0,24).map((mark,i)=><span key={`${mark.word}-${mark.kind}-${i}`} className="absolute inset-x-0 rounded-full" style={{top:`${Math.max(0,Math.min(96,(mark.word/Math.max(1,words.length))*100))}%`,height:'4%',background:FACE_MARK_STYLE[mark.kind].tint}}/>)}</div>}
       </div>}
@@ -153,9 +158,10 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
                 data-word={word.index}
                 data-live={live ? (word.index === pen ? 'pen' : word.index < reached && !fault ? 'done' : undefined) : undefined}
                 data-veiled={live?.veiled && word.index >= reached && word.index !== live.hint ? 'true' : undefined}
+                data-note={noteOf.get(word.index)?.kind}
                 data-mark={top?.kind}
                 data-mistake={fault?.kind}
-                title={[style && (ar ? style.hintAr : style.hintEn), faultStyle && (ar ? faultStyle.hintAr : faultStyle.hintEn)].filter(Boolean).join(' · ') || undefined}
+                title={[style && (ar ? style.hintAr : style.hintEn), faultStyle && (ar ? faultStyle.hintAr : faultStyle.hintEn), noteOf.get(word.index) && (ar ? noteOf.get(word.index)!.messageAr : noteOf.get(word.index)!.messageEn)].filter(Boolean).join(' · ') || undefined}
                 className="mizan-face-word"
                 style={top || faultStyle
                   ? {
@@ -167,6 +173,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
                 {word.text}
                 {style && <span className="sr-only">{` — ${ar ? style.hintAr : style.hintEn}`}</span>}
                 {faultStyle && <span className="sr-only">{` — ${ar ? faultStyle.ar : faultStyle.en}: ${ar ? faultStyle.hintAr : faultStyle.hintEn}`}</span>}
+                {noteOf.get(word.index) && <span className="sr-only">{` — ${ar ? 'المعلّم' : 'Teacher'}: ${ar ? noteOf.get(word.index)!.messageAr : noteOf.get(word.index)!.messageEn}`}</span>}
               </span>
               {word.endsAyah && <AyahMark ayah={word.ayah} ar={ar} />}
               {' '}

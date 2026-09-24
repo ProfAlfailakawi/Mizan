@@ -26,9 +26,13 @@ import {
   type PracticeFaceCatalogue, type PracticeFacePage,
 } from '../../lib/practice-faces';
 import {
-  fetchPracticeJudgingGate, submitPracticeAlignmentChunk, submitPracticeRecognitionChunk,
+  fetchPracticeJudgingGate, submitPracticeAlignmentChunk, submitPracticeRecognitionChunk, submitTashkeelAnalysis,
   type JourneyPracticeAuth, type QuranJudgingGate, type QuranReadingId,
 } from '../../lib/quran-intelligence';
+import { alignHeardToFace, buildAyahSegments } from '../../lib/recitation-segments';
+import { createSnippetPlayer, type SnippetPlayer } from '../../lib/recitation-snippet';
+import { blobToBase64, runTashkeel } from '../../lib/tashkeel-run';
+import { EMPTY_TASHKEEL, TASHKEEL_HAFS_ONLY_NOTE, TashkeelReport, tashkeelFailureNote, type TashkeelState } from './TashkeelReport';
 import type { QuranScope } from '../../lib/quran-scope';
 
 /*
@@ -170,6 +174,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const samples = useRef<FaceAlignmentSample[]>([]);
   /* ما سُمع من كلماتٍ، بتوقيتٍ من أوّل التلاوة لا من أوّل المقطع. */
   const heardWords = useRef<HeardWord[]>([]);
+  /*
+   * تسجيلُ الوجه لمراجعة «المعلّم» بعد التلاوة: في الذاكرة وحدها، ويُترك عند وجهٍ آخر أو بدءٍ
+   * جديد أو مغادرة الشاشة. لا يُكتب في مخزنٍ ولا يُرفع إلا إلى المراجعة نفسها.
+   */
+  const recording = useRef<Blob[]>([]);
+  const tashkeelRun = useRef(0);
+  /* زمنُ كلّ كلمةٍ سُمعت في التسجيل، ومشغّلُ «تلاوتك هنا» — من الذاكرة وحدها. */
+  const wordTimes = useRef<Map<number, { startMs: number; endMs: number }>>(new Map());
+  const snippet = useRef<SnippetPlayer | null>(null);
+  const [tashkeel, setTashkeel] = useState<TashkeelState>(EMPTY_TASHKEEL);
   const alertMemory = useRef<AlertMemory>(EMPTY_ALERT_MEMORY);
   /* ونوافذُ خرج فيها صوتٌ من السمّاعة — يُطرح ما سُمع تحتها قبل أن يُحكم. */
   const alertWindows = useRef<SoundWindow[]>([]);
@@ -389,6 +403,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
+    recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
+    snippet.current?.close(); snippet.current = null; wordTimes.current = new Map();
     attemptJudging.current = null;
     setMistakes(undefined); setJudgingLost(false);
     const weightOf = faceWeights(attempts, Date.now());
@@ -442,6 +458,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   /* وعند مغادرة الشاشة: يُطلق الميكروفونُ ويُترك ما بقي من الطابور. */
   useEffect(() => () => {
+    recording.current = []; tashkeelRun.current += 1;
+    snippet.current?.close(); snippet.current = null;
     queue.current.abandon(); recognition.current.abandon(); stopAudio();
     speaker.current?.close(); speaker.current = null;
   }, [stopAudio]);
@@ -450,6 +468,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (!face) return;
     samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0;
+    recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
+    snippet.current?.close(); snippet.current = null; wordTimes.current = new Map();
     setMistakes(undefined); setJudgingLost(false);
     /* والإذنُ يُلتقط الآن ويثبت: مجهولٌ عند الضغط يعني مراجعةً لا تُحكم. */
     attemptJudging.current = judgingRef.current;
@@ -483,6 +503,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       /* الطابورُ يُربط **تزامنيًّا** عند وصول المقطع، فلا يسبق متأخّرٌ سابقَه. */
       let head: Blob | null = null;
       const all: Blob[] = [];
+      recording.current = all;
       committedUntil.current = 0;
       rec.ondataavailable = e => {
         if (!e.data.size) return;
@@ -651,6 +672,61 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     return () => window.clearInterval(timer);
   }, [stage]);
 
+  /*
+   * «المعلّم»: بعد التلاوة تُراجَع الحركاتُ والمدود آيةً آية.
+   *
+   * يُبنى من السماع الحيّ أين تبدأ كلُّ آيةٍ وأين تنتهي من التسجيل (`buildAyahSegments`)،
+   * ويُرسل التسجيلُ ومقاطعُه دفعاتٍ إلى المعلّم؛ وتعود ملاحظاتُه على كلماتٍ بعينها فتُخطّ
+   * تحتها في الصفحة ويُكتب تقريرُها. ولحفص وحده، ولا يعمل بلا سماعٍ كلمةً كلمة (لا أزمنة).
+   */
+  const reviewTashkeel = useCallback(async () => {
+    const run = ++tashkeelRun.current;
+    const isCurrent = () => alive.current && tashkeelRun.current === run;
+    if (!face) return;
+    if (deliveryReading !== 'hafs') { setTashkeel({ ...EMPTY_TASHKEEL, phase: 'unavailable', note: TASHKEEL_HAFS_ONLY_NOTE(ar) }); return; }
+    const parts = recording.current;
+    const heard = heardWords.current;
+    /* بلا سماعٍ كلمةً كلمة لا تُعرف أزمنةُ الآيات — وبوّابةُ السماع تقول سببَها فوق. */
+    if (!parts.length || !heard.length) { setTashkeel(EMPTY_TASHKEEL); return; }
+    const faceWords = face.words.map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah }));
+    wordTimes.current = alignHeardToFace(faceWords, heard);
+    const segments = buildAyahSegments(faceWords, heard);
+    if (!segments.length) {
+      setTashkeel({ ...EMPTY_TASHKEEL, phase: 'unavailable', note: ar ? 'لم يُسمع من الوجه ما يكفي لمراجعة الحركات آيةً آية — اقرأه كاملًا بصوتٍ واضح ثم أعد.' : 'Too little of the face was heard to review vowels ayah by ayah.' });
+      return;
+    }
+    setTashkeel({ ...EMPTY_TASHKEEL, phase: 'analysing', total: segments.length });
+    const audio = await blobToBase64(new Blob(parts, { type: parts[0].type || 'audio/webm' }));
+    if (!isCurrent()) return;
+    if (audio.length > 8_000_000) {
+      setTashkeel({ ...EMPTY_TASHKEEL, phase: 'failed', total: segments.length, note: tashkeelFailureNote('TASHKEEL_AUDIO_INVALID', ar) });
+      return;
+    }
+    /* أوّلُ مراجعةٍ بعد سكونٍ تنتظر إقلاعَ المعلّم: يُقال «يستعدّ» إن طال الجوابُ الأوّل. */
+    const slow = window.setTimeout(() => {
+      if (isCurrent()) setTashkeel(s => (s.phase === 'analysing' && s.done === 0 ? { ...s, phase: 'warming' } : s));
+    }, 12_000);
+    const out = await runTashkeel({
+      segments,
+      submit: batch => submitTashkeelAnalysis({ audio, segments: batch, scope }, journeyAuth),
+      onProgress: p => { if (isCurrent()) setTashkeel(s => ({ ...s, ...p, phase: p.phase === 'analysing' && p.done === 0 && s.phase === 'warming' ? 'warming' : p.phase })); },
+      isCurrent,
+    }).finally(() => window.clearTimeout(slow));
+    if (!isCurrent() || out.phase === 'cancelled') return;
+    if (out.phase === 'off') { setTashkeel(EMPTY_TASHKEEL); return; }
+    if (out.phase === 'unsupported') { setTashkeel({ ...EMPTY_TASHKEEL, phase: 'unavailable', note: TASHKEEL_HAFS_ONLY_NOTE(ar) }); return; }
+    if (out.phase === 'failed') { setTashkeel({ phase: 'failed', done: out.done, total: out.total, findings: out.findings, reviewed: out.reviewed, unclear: out.unclear, note: tashkeelFailureNote(out.code, ar) }); return; }
+    setTashkeel({ phase: 'done', done: out.done, total: out.total, findings: out.findings, reviewed: out.reviewed, unclear: out.unclear });
+  }, [face, deliveryReading, scope, ar, journeyAuth?.competitionId, journeyAuth?.key]);
+
+  /* «تلاوتك هنا»: الكلمةُ بصوت الطالب، من التسجيل الذي في الذاكرة — ولا يخرج من الجهاز. */
+  const listenAt = useCallback((index: number) => {
+    const t = wordTimes.current.get(index);
+    if (!t || !recording.current.length) return;
+    if (!snippet.current) snippet.current = createSnippetPlayer(recording.current);
+    void snippet.current.play(t.startMs, t.endMs);
+  }, []);
+
   const finish = useCallback(async () => {
     if (!face) return;
     setStage('analysing');
@@ -692,7 +768,9 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     setIncomplete(!settled.complete);
     setStage('report');
     if (settled.attempt) setAttempts(rememberFaceAttempt(owner, deliveryReading || '', settled.attempt));
-  }, [face, owner, deliveryReading, stopAndRelease]);
+    /* والمعلّمُ بعد التقرير لا قبله: لا ينتظر الطالبُ الحركاتِ ليرى الكلمات. */
+    void reviewTashkeel();
+  }, [face, owner, deliveryReading, stopAndRelease, reviewTashkeel]);
 
   const words: FaceWord[] = useMemo(
     () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah, ayahWordIndex: w.ayahWordIndex })),
@@ -814,6 +892,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             measurableMarks={stage === 'report' && analysed ? SAMPLED_PATH_MARKS : undefined}
             choiceNote={stage === 'report' ? undefined : choice}
             analysisNote={analysisNote}
+            notes={stage === 'report' ? tashkeel.findings : undefined}
             live={stage === 'reciting' || stage === 'analysing' || (stage === 'ready' && veiled)
               ? { cursor: stage === 'reciting' ? pen : null, reached, veiled: veiled && stage !== 'analysing', hint }
               : undefined}
@@ -821,6 +900,17 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
           {gateNote && (
             <p className="text-center text-[10px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
+          )}
+
+          {stage === 'report' && (
+            <TashkeelReport
+              ar={ar}
+              state={tashkeel}
+              wordOf={index => { const w = face.words[index]; return w ? { text: w.text, ayah: w.ayah } : undefined; }}
+              onRetry={() => void reviewTashkeel()}
+              canListen={index => wordTimes.current.has(index)}
+              onListen={listenAt}
+            />
           )}
 
           {stage === 'report' && hints > 0 && (

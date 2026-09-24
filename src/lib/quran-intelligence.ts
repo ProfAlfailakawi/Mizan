@@ -147,3 +147,20 @@ export async function submitJudgeFollowChunk(input:{blob:Blob;reading:string;sur
   if(Number.isInteger(input.after))qs.set('after',String(input.after));
   const r=await fetch(`/api/quran/judge/follow?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult&{globalIndex?:number};
 }
+
+/*
+ * «المعلّم القرآني»: كشفُ التشكيل والتجويد بعد التلاوة (حفص، للتدريب وحده).
+ * يُرسل تسجيلَ الوجه ومقاطعَه آيةً آية، ويعود بملاحظاتٍ على كلماتٍ بعينها. ولا يُحفظ الصوت.
+ */
+export type TashkeelKind='tashkeel'|'tajweed'|'letter';
+export interface TashkeelFinding{wordIndex:number;kind:TashkeelKind;speech:'replace'|'delete'|'insert';messageAr:string;messageEn:string;ruleAr?:string;expectedLen?:number;predictedLen?:number}
+export interface TashkeelSegmentResult{id:string;status:'ok'|'unclear'|'skipped';reason?:string;confidence?:number;findings:TashkeelFinding[]}
+export interface TashkeelAnalysis{reading:'hafs';modelVersion:string;scoreAuthority:'HUMAN_ONLY';segments:TashkeelSegmentResult[]}
+export async function submitTashkeelAnalysis(input:{audio:string;segments:readonly unknown[];scope?:unknown},access?:JourneyPracticeAuth):Promise<TashkeelAnalysis>{
+  const body=JSON.stringify({audio:input.audio,segments:input.segments,...(access?{}:{scope:input.scope})});
+  const url=access?'/api/public/journeys/practice/tashkeel':'/api/quran/practice/tashkeel?reading=hafs';
+  const headers:Record<string,string>={'content-type':'application/json',accept:'application/json'};
+  if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
+  const r=await fetch(url,{method:'POST',headers,body,cache:'no-store'});
+  const out=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(out.code||`HTTP_${r.status}`));return out as TashkeelAnalysis;
+}
