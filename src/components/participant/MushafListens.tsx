@@ -950,14 +950,20 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      * يُحاسب الذيلَ حذفًا، فتلاوةٌ ناقصةُ السماع تُقرأ «أسقطَ آخرَ الوجه» — وهو لم
      * يُسقط. فيُطرح الحكمُ ويُقال للطالب لماذا.
      */
-    if (attemptJudging.current && !(await recognition.current.drain())) {
+    /*
+     * ويُنتظر طابورُ السماع **حكمًا كان أو تتبّعًا**: فالتقريرُ و«المعلّم» يقرآن ما سُمع،
+     * وذيلٌ لم يصل يسقط منهما. وما لم يفرغ في مهلته يُترك، فلا يحرّك القلمَ بعد التقرير.
+     */
+    if ((attemptJudging.current || wordFollow.current) && !(await recognition.current.drain())) {
       /*
        * ويُترك الطابورُ لا الإذنُ وحده: فالمهمّةُ الجاريةُ التقطت إذنَها قبل أن تنتظر،
        * فإن عاد جوابُها بعد المهلة كتب أخطاءً ونغّم بعد أن قيل للطالب «لم يُحكم».
        */
       recognition.current.abandon();
-      attemptJudging.current = null;
-      setJudgingLost(true);
+      if (attemptJudging.current) {
+        attemptJudging.current = null;
+        setJudgingLost(true);
+      }
     }
     if (!alive.current) return;
     setReading(settled.reading);

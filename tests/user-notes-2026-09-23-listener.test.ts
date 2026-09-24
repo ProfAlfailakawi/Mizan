@@ -190,3 +190,13 @@ test('word-by-word following survives a closed gate and a dropped chunk, and the
   assert.ok(limit('MIZAN_PRACTICE_RECOGNITION_RATE_LIMIT_MAX') >= perWindow * 1.5);
   assert.ok(limit('MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX') >= perWindow * 2 * 1.5, 'journey card sends every chunk to both routes');
 });
+
+test('a closed ASR gate still lets words through the practice listener, and the report waits for them', () => {
+  const server = read('server.ts');
+  assert.match(server, /const recogniseViaPracticeListener=\(reading:string\)=>dedicatedPracticeListenerReady\(reading\)\s*\n\s*&&\(!recitationRecogniser\.configured\(\)\|\|recitationRecogniser\.gate\(reading\)\.word!=='OPEN'\);/);
+  assert.equal((server.match(/if\(recogniseViaPracticeListener\(reading\)\)\{/g) || []).length, 2, 'both recognition routes');
+  // والبوّابةُ المعادةُ من هناك بوّابةُ المحرّك (مغلقة) — فلا يُحكم بما سُمع.
+  assert.match(server, /return \{gate:practiceJudgingGate\(input\.reading\),words,modelVersion:PRACTICE_LISTENER_MODEL\};/);
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /if \(\(attemptJudging\.current \|\| wordFollow\.current\) && !\(await recognition\.current\.drain\(\)\)\) \{/);
+});
