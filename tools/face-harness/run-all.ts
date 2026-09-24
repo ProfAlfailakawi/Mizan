@@ -22,6 +22,22 @@ const failures = (o: RunOutcome, rules: [boolean, string][]) => rules.filter(([o
 
 const PLAN: Expectation[] = [
   {
+    scenario: 'teacher', reciteMs: 9000, settleMs: 25_000,
+    why: '«المعلّم» بعد التلاوة: أيصله التسجيلُ ومقاطعُ آياته، وتعود ملاحظاتُه إلى كلماتها في الصفحة؟',
+    check: o => failures(o, [
+      [o.reportShown, 'لم يُعرض تقرير'],
+      [o.micTracksLive === 0, `الميكروفونُ بقي مفتوحًا (${o.micTracksLive})`],
+      [o.teacherCalls.length >= 1, 'لم يُطلب المعلّمُ أصلًا'],
+      [o.teacherCalls.every(c => c.audioBytes > 1000), `وصل المعلّمَ تسجيلٌ فارغ: ${o.teacherCalls.map(c => c.audioBytes)}`],
+      [o.teacherCalls.every(c => c.segments.length >= 1 && c.segments.length <= 6), `دفعاتٌ بغير حجمها: ${o.teacherCalls.map(c => c.segments.length)}`],
+      [o.teacherCalls.flatMap(c => c.segments).every(s => Number.isInteger(s.startMs) && s.endMs > s.startMs), 'مقاطعُ بأزمنةٍ غير صحيحة'],
+      [o.teacher.phase === 'done', `لم يفرغ التقرير: ${o.teacher.phase}`],
+      [o.teacher.rows.length === 2 && o.teacher.rows[0].startsWith('tashkeel:') && o.teacher.rows[1].startsWith('tajweed:'), `سطورُ التقرير: ${JSON.stringify(o.teacher.rows)}`],
+      [o.teacher.notedWords.length >= 2, `لم تُخطّ الكلماتُ في الصفحة: ${JSON.stringify(o.teacher.notedWords)}`],
+      [o.snippetSources === 1, `«تلاوتك» لم تُشغَّل من التسجيل: ${o.snippetSources}`],
+    ]),
+  },
+  {
     scenario: 'happy', reciteMs: 7000, settleMs: 25_000,
     why: 'تلاوةٌ تامّةٌ على شبكةٍ سليمة',
     check: o => failures(o, [
@@ -151,7 +167,10 @@ const PLAN: Expectation[] = [
 
 async function main() {
   let broken = 0;
-  for (const plan of PLAN) {
+  /* HARNESS_ONLY=teacher,judging يقصر التشغيلَ على سيناريوهاتٍ بعينها. */
+  const only = (process.env.HARNESS_ONLY || '').split(',').filter(Boolean);
+  const plans = only.length ? PLAN.filter(p => only.includes(p.scenario)) : PLAN;
+  for (const plan of plans) {
     const outcome = await runScenario(plan.scenario, plan.reciteMs, plan.settleMs);
     const problems = plan.check(outcome);
     const head = `${plan.scenario.padEnd(10)} · ${plan.why}`;
@@ -166,11 +185,11 @@ async function main() {
     }
   }
   if (broken) {
-    console.error(`\nسقط ${broken} من ${PLAN.length} تلاوات.`);
+    console.error(`\nسقط ${broken} من ${plans.length} تلاوات.`);
     process.exitCode = 1;
     return;
   }
-  console.log(`\n${PLAN.length} تلاواتٍ جرت في متصفّحٍ حقيقيّ بميكروفونٍ حقيقيّ — وكلُّها كما يجب.`);
+  console.log(`\n${plans.length} تلاواتٍ جرت في متصفّحٍ حقيقيّ بميكروفونٍ حقيقيّ — وكلُّها كما يجب.`);
 }
 
 void main();

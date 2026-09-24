@@ -112,6 +112,7 @@ steps:
         fi
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: mizan-deploy
     entrypoint: gcloud
     args:
       - 'run'
@@ -168,20 +169,81 @@ steps:
       - 'R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest,MIZAN_PASS_SIGNING_SECRET=MIZAN_PASS_SIGNING_SECRET:latest,MIZAN_CERT_SIGNING_SECRET=MIZAN_CERT_SIGNING_SECRET:latest'
       - '--quiet'
 
-  # اربط النسخة المنشورة بالمستمع الخاص بعد معرفة عنوان Cloud Run الفعلي.
-  # update-env-vars يحافظ على بقية إعدادات الخدمة ولا ينشئ سرًّا في المستودع.
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  # ── «المعلّم القرآني»: كشفُ التشكيل والتجويد (services/quran-muaalem) ─────────
+  #
+  # يُبنى بالتوازي مع ميزان (waitFor: '-') فلا يطيل النشر، ولا يُعاد بناؤه إلا إذا تغيّر
+  # مصدرُه: الوسمُ بصمةُ ملفّات الخدمة، فإن وُجدت الصورةُ بوسمها في السجلّ أُعيد استعمالها.
+  # وكلُّ خطواته allowFailure: خدمةٌ مساعدة لا تُسقط ميزان. والصورةُ تجري اختباراتها (٢٤)
+  # داخلها قبل أن تُنزّل النموذج، فصورةٌ لا تجتازها لا تُبنى.
+  - name: 'gcr.io/cloud-builders/docker'
+    id: muaalem-image
+    waitFor: ['-']
+    allowFailure: true
+    timeout: '1800s'
     entrypoint: bash
     args:
       - '-c'
       - |
         set -eu
-        # لا مستمعَ منشورًا في هذه الدفعة؟ يبقى العنوانُ السابق كما هو، ولا يسقط النشر.
-        if [ ! -s /workspace/mizan-quran-listener-url ]; then echo 'listener not deployed in this build; keeping previous binding'; exit 0; fi
-        listener_url="$(cat /workspace/mizan-quran-listener-url)"
-        gcloud run services update mizan --region me-central1 \
-          --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=${listener_url}" --quiet
+        src_hash="$(find services/quran-muaalem -type f ! -path '*/__pycache__/*' | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)"
+        image="me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-muaalem:src-${src_hash}"
+        if docker manifest inspect "$image" >/dev/null 2>&1; then
+          echo "muaalem image unchanged; reusing $image"
+        else
+          docker build -t "$image" services/quran-muaalem
+          docker push "$image"
+        fi
+        printf '%s' "$image" > /workspace/mizan-quran-muaalem-image
 
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: muaalem-deploy
+    waitFor: ['muaalem-image']
+    allowFailure: true
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        if [ ! -s /workspace/mizan-quran-muaalem-image ]; then echo 'muaalem image not built; keeping previous deployment'; exit 0; fi
+        image="$(cat /workspace/mizan-quran-muaalem-image)"
+        current="$(gcloud run services describe mizan-quran-muaalem --region me-central1 --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || true)"
+        if [ "$current" != "$image" ]; then
+          # ٤ معالجات و8Gi: النموذجُ نحو ٦٦٠ مليون معامل بدقّة float32. طلبٌ واحدٌ في المرّة
+          # (concurrency 1)، ولا نسخةَ دائمة (min 0): لا كلفةَ إلا حين يُطلب التحليل.
+          gcloud run deploy mizan-quran-muaalem --image "$image" \
+            --region me-central1 --platform managed --no-allow-unauthenticated \
+            --cpu 4 --memory 8Gi --min-instances 0 --max-instances 2 --concurrency 1 \
+            --timeout 300 --cpu-boost --quiet
+        else
+          echo "muaalem already serving $image"
+        fi
+        url="$(gcloud run services describe mizan-quran-muaalem --region me-central1 --format='value(status.url)')"
+        test -n "$url"
+        runtime_sa="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null || true)"
+        if [ -z "$runtime_sa" ]; then
+          project_number="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+          runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+        fi
+        gcloud run services add-iam-policy-binding mizan-quran-muaalem --region me-central1 \
+          --member "serviceAccount:${runtime_sa}" --role roles/run.invoker --quiet >/dev/null
+        printf '%s' "$url" > /workspace/mizan-quran-muaalem-url
+
+  # اربط النسخة المنشورة بالمستمع الخاص بعد معرفة عنوان Cloud Run الفعلي.
+  # update-env-vars يحافظ على بقية إعدادات الخدمة ولا ينشئ سرًّا في المستودع.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: bind-engines
+    waitFor: ['mizan-deploy', 'muaalem-deploy']
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -eu
+        # ما لم يُنشر في هذه الدفعة يبقى ربطُه السابق كما هو، ولا يسقط النشر.
+        vars=''
+        if [ -s /workspace/mizan-quran-listener-url ]; then vars="MIZAN_QURAN_PRACTICE_LISTENER_URL=$(cat /workspace/mizan-quran-listener-url)"; fi
+        if [ -s /workspace/mizan-quran-muaalem-url ]; then vars="${vars:+$vars,}MIZAN_QURAN_MUAALEM_URL=$(cat /workspace/mizan-quran-muaalem-url)"; fi
+        if [ -z "$vars" ]; then echo 'no engine deployed in this build; keeping previous bindings'; exit 0; fi
+        gcloud run services update mizan --region me-central1 --update-env-vars "$vars" --quiet
 
 substitutions:
   # إعدادات Firebase العلنية. النشر الحي يتطلب المصادقة.
@@ -203,7 +265,9 @@ images:
   # صورةُ المستمع لا تُدرج هنا: `images` يُلزم بوجود كل صورةٍ مذكورة، فتعثّرُ بنائها
   # كان سيُسقط النشرَ كلّه من جديد. تُدفع في خطوتها الخاصة (allowFailure) وحدها.
 
-timeout: '1800s'
+# ٤٠ دقيقة: بناءُ المعلّم (torch ونموذجُه) يجري بالتوازي، ولا يُعاد إلا إذا تغيّر مصدرُه.
+# ومسارُ النشر في GitHub ينتظر ٤٥ دقيقة، فيبقى هذا دونه.
+timeout: '2400s'
 
 options:
   machineType: 'E2_HIGHCPU_8'

@@ -6,6 +6,7 @@ import {Badge} from '../design-system/Badge';
 import {DivergenceRadar} from './DivergenceRadar';
 import {MushafSheet} from './MushafSheet';
 import {measuredWordTimings,splitAyahWords,wordAtTime,type MeasuredSegment} from '../../lib/word-timing';
+import {planStopMs,prepareOpeningCut,refineStopMs,watchStop,type OpeningCutPlan} from '../../lib/opening-cue-player';
 import {resolveReading} from '../../lib/scientific-core';
 import {DELIVERY_READING_BY_RAWI as DELIVERY_READING_BY_RAWI_MAP} from '../../lib/delivered-readings';
 import {qiraahLabel,rawiLabel,tariqLabel} from '../../lib/arabic-labels';
@@ -109,7 +110,20 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
  const [active,setActive]=useState<{ayah:number;word:number}|null>(null);
  const activeAyah=active?.ayah??null;
  const activeDeliveryAyah=useMemo(()=>delivery?.ayat.find(a=>a.ayah===activeAyah)||null,[delivery,activeAyah]);
- const activeWords=useMemo(()=>activeDeliveryAyah?splitAyahWords(activeDeliveryAyah.text):[],[activeDeliveryAyah]);
+ /*
+  * عرضُ النصّ يتبع ما تتبعه الصفحة: التلاوةَ المرجعيّة حين تُسمع، وإلا فالقارئَ الحيّ.
+  * كان لا يتبع إلا الصوتَ المرجعيّ، فإذا انتقل المحكّمُ إلى النصّ فقد موضعَ القارئ كلَّه.
+  * وكلمةُ القارئ تُعدّ على نصّ روايته نفسِه (المستمعُ يُعطى نصَّ الرواية)، فتُظلَّل في كلّ
+  * رواية؛ وكلمةُ الصوت المرجعيّ لا تُسقط إلا على نصّ حفص (`PassageAudio`).
+  */
+ const trackingLostNow=tracking?.alignmentState==='LOST'||tracking?.alignmentState==='REACQUIRING';
+ const sheetFocus=useMemo(()=>{
+  if(active)return {ayah:active.ayah,word:active.word,tone:'audio' as const};
+  if(!tracking?.ayah||!delivery||(tracking.surah&&tracking.surah!==delivery.surah))return null;
+  return {ayah:tracking.ayah,word:tracking.wordIndex?tracking.wordIndex-1:-1,tone:trackingLostNow?'held' as const:'track' as const};
+ },[active,tracking?.ayah,tracking?.surah,tracking?.wordIndex,trackingLostNow,delivery]);
+ const sheetAyah=useMemo(()=>sheetFocus?delivery?.ayat.find(a=>a.ayah===sheetFocus.ayah)||null:null,[delivery,sheetFocus?.ayah]);
+ const activeWords=useMemo(()=>sheetAyah?splitAyahWords(sheetAyah.text):[],[sheetAyah]);
  const [layouts,setLayouts]=useState<Record<number,MushafPageLayout|null>>({});
  useEffect(()=>{let live=true;const pages=loci.map(x=>x.page);if(!pages.length)return;
   void Promise.all(pages.map(async p=>[p,await fetchMushafLayout(p)] as const)).then(rows=>{if(live)setLayouts(Object.fromEntries(rows))});
@@ -146,17 +160,24 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
   const measure=()=>setFitBox(b=>{const w=Math.floor(el.clientWidth),h=Math.floor(el.clientHeight);return b&&b.w===w&&b.h===h?b:{w,h}});
   measure();const ro=new ResizeObserver(measure);ro.observe(el);return()=>ro.disconnect()});
  const [pages,setPages]=useState<Record<number,string>>({});const [checked,setChecked]=useState(false);const [officialFont,setOfficialFont]=useState(false);
+ /* عرضُ النصّ في القمرة يأخذ قدرَ الوجه نفسه: نسبةَ صورة الصفحة إن وُجدت، وإلا نسبةَ مصحف المدينة. */
+ const surfaceRef=useRef<HTMLDivElement|null>(null);const [inCockpit,setInCockpit]=useState(false);
+ useEffect(()=>{setInCockpit(!!surfaceRef.current?.closest('.mizan-judge-os'))},[]);
+ const [pageAspect,setPageAspect]=useState(0.64);
+ const firstPageUrl=Object.values(pages)[0];
+ useEffect(()=>{if(!firstPageUrl||typeof Image==='undefined')return;let live=true;const img=new Image();img.onload=()=>{if(live&&img.naturalWidth&&img.naturalHeight)setPageAspect(img.naturalWidth/img.naturalHeight)};img.src=firstPageUrl;return()=>{live=false}},[firstPageUrl]);
  useEffect(()=>{let live=true;const urls:string[]=[];setPages({});setChecked(false);if(!packageId||!loci.length){setChecked(true);return}void Promise.all(loci.map(async locus=>{const url=await fetchOfficialMushafPage(packageId,locus.page);if(url)urls.push(url);return [locus.page,url] as const})).then(results=>{if(!live){urls.forEach(URL.revokeObjectURL);return}setPages(Object.fromEntries(results.filter((x):x is readonly [number,string]=>!!x[1])));setChecked(true)});return()=>{live=false;urls.forEach(URL.revokeObjectURL)}},[packageId,loci.map(x=>`${x.page}:${x.lineStart}:${x.lineEnd}`).join('|')]);
  useEffect(()=>{let live=true;if(!isKfgqpcPackage){setOfficialFont(false);return()=>{live=false}}void loadKfgqpcOfficialQuranFont(packageId||'primary').then(ok=>{if(live)setOfficialFont(ok)});return()=>{live=false}},[packageId,isKfgqpcPackage]);
  const loadedLoci=loci.filter(x=>!!pages[x.page]);const hasOfficialPage=loadedLoci.length>0;const trackingLost=tracking?.alignmentState==='LOST'||tracking?.alignmentState==='REACQUIRING';
- return <div className="mizan-mushaf-surface relative overflow-hidden rounded-[30px] border border-[#dad7cd] bg-[#fdfbf5] shadow-[0_18px_55px_rgba(25,39,33,.055)]">
+ return <div ref={surfaceRef} className="mizan-mushaf-surface relative overflow-hidden rounded-[30px] border border-[#dad7cd] bg-[#fdfbf5] shadow-[0_18px_55px_rgba(25,39,33,.055)]">
   <div className="mizan-mushaf-bar flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]"><div className="flex items-center gap-2 min-w-0"><span className="w-8 h-8 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><FileCheck2 className="w-4 h-4"/></span><div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'سطح المصحف':'MUSHAF SURFACE'}</div><div className="text-[9px] text-[#656a66] truncate">{readingText||'—'}</div></div></div><div className="flex items-center gap-2">{loci.length>1?<Badge variant="neutral">{ar?`${loci.length} صفحات`:`${loci.length} pages`}</Badge>:loci[0]&&<span className="text-[10px] font-black tabular-nums text-[#59615c]">{ar?'ص':'p.'} {loci[0].page}</span>}</div></div>
   {hasOfficialPage&&!textView?<div ref={bodyRef} className="mizan-mushaf-body relative bg-[#efede6] p-2 sm:p-3 overflow-hidden"><div className={`mizan-mushaf-pages mx-auto grid items-start gap-4 ${loadedLoci.length>1?(fitBox?'grid-cols-2':'lg:grid-cols-2'):'grid-cols-1'}`}>{loci.map(locus=>pages[locus.page]?<OfficialPage key={locus.page} url={pages[locus.page]} locus={locus} ar={ar} tracking={tracking} trackSpot={trackSpot?.page===locus.page?trackSpot:null} fit={fitBox?{w:(fitBox.w-(loadedLoci.length>1?16:0))/Math.max(1,loadedLoci.length>1?2:1),h:fitBox.h}:null} audioFocus={activeDeliveryAyah&&activeDeliveryAyah.page===locus.page?activeDeliveryAyah:null} audioSpot={audioSpot?.page===locus.page?audioSpot:null} layout={layouts[locus.page]} wordLevel={readingKey==='hafs'}/>:<MissingPage key={locus.page} page={locus.page} ar={ar}/>)}</div>{tracking&&<div className="mizan-mushaf-trackchip mt-3 flex items-center justify-end gap-3"><div className={`rounded-xl px-3 py-2 text-[9px] font-black flex items-center gap-2 ${trackingLost?'bg-[#F2EADC] text-[#725630]':'bg-[#E7EEE9] text-[#214C40]'}`}><MapPin className="w-3.5 h-3.5"/>{trackingLost?(ar?'جارٍ إعادة تحديد الموضع — المؤشر ثابت':'Reacquiring — pointer held'):(ar?`القارئ عند الآية ${tracking.ayah||'—'}`:`Reciter at ayah ${tracking.ayah||'—'}`)}</div></div>}</div>:<MushafSheet ar={ar} surahName={q.surahNameArabic||q.surahNameEnglish} startAyah={q.startAyah} endAyah={q.endAyah}
     loci={loci.map(x=>({page:x.page,lineStart:x.lineStart,lineEnd:x.lineEnd}))}
     ayat={delivery?delivery.ayat:undefined} fallbackText={displayText} officialFont={officialFont}
-    activeAyah={activeAyah} activeWords={activeWords} activeWordIndex={active?.word??-1}
+    activeAyah={sheetFocus?.ayah??null} activeWords={activeWords} activeWordIndex={sheetFocus?.word??-1} tone={sheetFocus?.tone}
     tajweedOn={tajweedOn} onToggleTajweed={()=>setTajweedOn(v=>!v)} tajweedScopeNote={delivery?.tajweedScopeNote}
-    sourceLabel={surfaceAuthorityLabel} loaded={checked}/>}
+    sourceLabel={surfaceAuthorityLabel} loaded={checked}
+    frame={inCockpit?{pageAspect,pages:Math.max(1,loadedLoci.length||loci.length)}:null}/>}
   {delivery&&audioOpen&&<div className="mizan-mushaf-drawer"><PassageAudio reading={readingKey} ayat={delivery.ayat} ar={ar} onActive={setActive}/></div>}
   {delivery&&divergenceOpen&&<div className="mizan-mushaf-drawer"><DivergenceRadar reading={readingKey} surah={delivery.surah} startAyah={delivery.startAyah} endAyah={delivery.endAyah} ar={ar}/></div>}
   <div className="mizan-mushaf-tools mizan-mushaf-bar px-4 sm:px-5 py-2 border-t border-[#e5e1d7] flex items-center justify-between gap-2 text-[9px] text-[#676c68]">
@@ -197,6 +218,25 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  useEffect(()=>{const el=elRef.current;if(!el||!playing)return;let raf=0;
   const tick=()=>{setPosMs(el.currentTime*1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick);
   return()=>cancelAnimationFrame(raf)},[playing,index]);
+ /*
+  * سطرٌ واحدٌ على الأكثر (طلبُ اللجنة): الآيةُ الطويلة يقف صوتُها عند آخر سطرها الأوّل، أو عند
+  * سكتةٍ قبله، ويُخفض قبل الوقوف. والتسجيلُ تسجيلُ حفص، فيُقاس القطعُ على نصّ حفص وصفحته
+  * — أيًّا كانت الروايةُ المعروضة.
+  */
+ const [cutPlan,setCutPlan]=useState<OpeningCutPlan|null>(null);
+ const first=ayat[0];
+ useEffect(()=>{setCutPlan(null);if(!first)return;let live=true;
+  void prepareOpeningCut(audioId,first.surah,first.ayah).then(p=>{if(live)setCutPlan(p)});
+  return()=>{live=false}},[audioId,first&&`${first.surah}:${first.ayah}`]);
+ const estimateStop=useMemo(()=>planStopMs(cutPlan,durMs),[cutPlan,durMs]);
+ const [stopMs,setStopMs]=useState<number|undefined>(undefined);
+ useEffect(()=>{setStopMs(estimateStop);if(estimateStop===undefined||!src)return;let live=true;
+  void refineStopMs(src,estimateStop).then(ms=>{if(live)setStopMs(ms)});
+  return()=>{live=false}},[estimateStop,src]);
+ const stopRef=useRef<number|undefined>(undefined);stopRef.current=stopMs;
+ useEffect(()=>{const el=elRef.current;if(!el||!playing)return;
+  return watchStop(el,()=>stopRef.current,()=>{setPosMs(0);setPlaying(false);setIndex(0);el.currentTime=0})},[playing,index]);
+ const oneLine=!!cutPlan&&!cutPlan.cut.whole;
  const [segments,setSegments]=useState<MeasuredSegment[]|undefined>(undefined);
  const current=ayat[index];
  useEffect(()=>{
@@ -214,14 +254,16 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  useEffect(()=>()=>onActive?.(null),[onActive]);
  if(!ayat.length||available===false)return null;
  const onEnded=()=>{setPosMs(0);setPlaying(false);setIndex(0)};
- const progress=durMs>0?Math.min(1,posMs/durMs):0;
+ const span=stopMs??durMs;const progress=span>0?Math.min(1,posMs/span):0;
  return <div className="mizan-mushaf-bar px-4 sm:px-5 py-3 border-t border-[#e5e1d7] bg-[#f7f4ec]">
   <div className="flex items-center justify-between gap-3">
    <div className="flex items-center gap-3 min-w-0">
     <button type="button" onClick={()=>setPlaying(p=>!p)} aria-label={ar?REFERENCE_AUDIO_BUTTON_AR:REFERENCE_AUDIO_BUTTON_EN}
      className="w-11 h-11 rounded-xl bg-[#214C40] text-white grid place-items-center shrink-0">{playing?<Pause className="w-4 h-4"/>:<Play className="w-4 h-4"/>}</button>
     <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?REFERENCE_AUDIO_BUTTON_AR:REFERENCE_AUDIO_BUTTON_EN}</div>
-     <div className="text-[9px] text-[#656a66] truncate">{ar?`آية ${ayat[0]?.ayah} · تتوقف بعدها`:`Ayah ${ayat[0]?.ayah} · stops after it`}</div></div>
+     <div className="text-[9px] text-[#656a66] truncate" data-opening-cut={oneLine?'one-line':'whole'}>{oneLine
+      ?(ar?`أوّلُ الآية ${ayat[0]?.ayah} · سطرٌ واحد ثم تتوقف`:`Start of ayah ${ayat[0]?.ayah} · one line, then stops`)
+      :(ar?`آية ${ayat[0]?.ayah} · تتوقف بعدها`:`Ayah ${ayat[0]?.ayah} · stops after it`)}</div></div>
    </div>
    {playing&&allowWordTiming&&timing.words.length>0&&<span className={`shrink-0 rounded-lg px-2 py-1 text-[8px] font-black ${measured?'bg-[#E7EEE9] text-[#214C40]':'bg-[#efe7d8] text-[#6f5733]'}`}>
     {measured?(ar?'تتبّع الكلمة مقيس':'Word tracking measured'):(ar?'تتبّع الكلمة تقديري':'Word tracking estimated')}</span>}

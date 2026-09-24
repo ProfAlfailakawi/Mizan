@@ -13,7 +13,7 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed' | 'judging-changed-late';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed' | 'judging-changed-late' | 'teacher';
 
 /*
  * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
@@ -28,7 +28,7 @@ export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging'
 const SKIPPED_WORD_INDEX = 3;
 const HARNESS_MODEL = 'harness-model-1';
 /* السيناريوهاتُ التي يُفتح فيها بابُ الحكم. */
-const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed', 'judging-changed-late']);
+const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed', 'judging-changed-late', 'teacher']);
 
 const RAWI = 'hafs';
 const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -37,7 +37,8 @@ const json = (res: http.ServerResponse, body: unknown, status = 200) => {
 };
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-export interface HarnessServer { port: number; close(): Promise<void>; chunks(): number }
+export interface TeacherCall { segments: { id: string; startMs: number; endMs: number; from: number; to: number; wordIndices: number[] }[]; audioBytes: number }
+export interface HarnessServer { port: number; close(): Promise<void>; chunks(): number; teacherCalls(): TeacherCall[] }
 
 export async function startHarnessServer(port: number, scenario: Scenario = 'happy'): Promise<HarnessServer> {
   const catalogue = practiceFaceCatalogue(RAWI, normalizeScope(fullQuranScope()));
@@ -51,6 +52,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
   };
 
   let served = 0, heard = 0;
+  const teacherCalls: TeacherCall[] = [];
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://127.0.0.1:${port}`);
 
@@ -119,6 +121,33 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       const gate = { reading: RAWI, word: 'OPEN', tashkeel: 'CLOSED', modelVersion: model, reasons: [] };
       return json(res, { gate, modelVersion: model, words });
     }
+    /*
+     * و«المعلّم» يُصطنع كذلك: يعود على أوّل مقطعٍ بملاحظة حركةٍ على أوّل كلمةٍ منه، وعلى
+     * الثاني بملاحظة مدٍّ على ثانية كلماته. فإن لم تُخطّ الكلمتان في الصفحة ولم يُكتب
+     * التقريرُ فالطريقُ من الجواب إلى الطالب مقطوع. وفي غير سيناريو المعلّم يُردّ كما يردّ
+     * نشرٌ لم يُهيّأ فيه المعلّم — فيُقاس أنّ الشاشة تصمت عنه.
+     */
+    if (url.pathname === '/api/quran/practice/tashkeel') {
+      if (scenario !== 'teacher') return json(res, { code: 'QURAN_MUAALEM_NOT_CONFIGURED' }, 503);
+      const chunks: Buffer[] = [];
+      for await (const c of req) chunks.push(c as Buffer);
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const segments = Array.isArray(body.segments) ? body.segments : [];
+      teacherCalls.push({ segments: segments.map((x: any) => ({ id: x.id, startMs: x.startMs, endMs: x.endMs, from: x.from, to: x.to, wordIndices: x.wordIndices })), audioBytes: Buffer.from(String(body.audio || ''), 'base64').length });
+      await sleep(teacherCalls.length === 1 ? 1200 : 200);
+      const first = teacherCalls.length === 1;
+      return json(res, {
+        reading: 'hafs', modelVersion: 'harness-muaalem', scoreAuthority: 'HUMAN_ONLY',
+        segments: segments.map((x: any, k: number) => ({
+          id: x.id, status: 'ok', confidence: 0.9,
+          findings: first && k === 0
+            ? [{ wordIndex: x.wordIndices[x.from], kind: 'tashkeel', speech: 'replace', messageAr: 'حركتُها فتحة، وسُمعت ضمّة.', messageEn: 'Its vowel is fatha; damma was heard.' }]
+            : first && k === 1
+              ? [{ wordIndex: x.wordIndices[Math.min(x.to, x.from + 1)], kind: 'tajweed', speech: 'replace', ruleAr: 'المدّ الطبيعي', expectedLen: 2, predictedLen: 1, messageAr: 'المدّ الطبيعي: مقدارُه حركتان، وسُمع نحو ١.', messageEn: 'Natural madd: 2 counts expected, about 1 heard.' }]
+              : [],
+        })),
+      });
+    }
     if (url.pathname === '/api/quran/practice/align') {
       const index = served;
       served += 1;
@@ -146,6 +175,7 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
   return {
     port,
     chunks: () => served,
+    teacherCalls: () => teacherCalls,
     close: () => new Promise<void>(r => { server.closeAllConnections?.(); server.close(() => r()); }),
   };
 }

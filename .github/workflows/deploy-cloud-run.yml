@@ -214,7 +214,7 @@ jobs:
       # خطواتُ المستمع في `cloudbuild.yaml` مسموحٌ لها بالتعثّر كي لا تُسقط ميزان. فيُسأل
       # ميزانُ المنشورُ نفسُه عن مستمعه (`/api/health?listener=1`) ويُكتب الجوابُ في ملخّص
       # النشر: مربوطٌ أم لا، وجاهزٌ أم يُحمِّل نموذجه — فلا يُعلن «يسمعك» على العمياء.
-      - name: حالُ مستمع التدريب (للعلم، لا يُسقط النشر)
+      - name: حالُ مستمع التدريب والمعلّم (للعلم، لا يُسقط النشر)
         if: always() && steps.verify.outputs.url != ''
         shell: bash
         env:
@@ -226,7 +226,9 @@ jobs:
             body="$(curl -sS --max-time 20 "${SERVICE_URL%/}/api/health?listener=1" || true)"
             state="$(jq -r '.quranPracticeListener.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
             model="$(jq -r '.quranPracticeListener.model // "-"' <<<"$body" 2>/dev/null || echo -)"
-            echo "listener attempt $attempt/8: state=$state model=$model"
+            muaalem="$(jq -r '.quranMuaalem.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
+            muaalem_model="$(jq -r '.quranMuaalem.model // "-"' <<<"$body" 2>/dev/null || echo -)"
+            echo "listener attempt $attempt/8: state=$state model=$model · muaalem=$muaalem ($muaalem_model)"
             [[ "$state" == READY || "$state" == NOT_CONFIGURED ]] && break
             sleep 15
           done
@@ -235,6 +237,11 @@ jobs:
             echo
             echo "- الحال: \`$state\`"
             echo "- النموذج: \`${model:--}\`"
+            echo
+            echo '## المعلّم القرآني (التشكيل والتجويد)'
+            echo
+            echo "- الحال: \`${muaalem:-UNKNOWN}\`"
+            echo "- النموذج: \`${muaalem_model:--}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ── صدقُ العنوان الذي يُحال إليه الموقِّع ───────────────────────────────

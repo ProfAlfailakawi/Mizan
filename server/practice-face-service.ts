@@ -83,7 +83,7 @@ function versesOf(rawiId: string, env: NodeJS.ProcessEnv): readonly CandidateQur
 const catalogueCache = new Map<string, PracticeFaceCatalogue>();
 const faceCache = new Map<string, Map<number, MushafFace>>();
 
-export function clearPracticeFaceCache() { catalogueCache.clear(); faceCache.clear(); }
+export function clearPracticeFaceCache() { catalogueCache.clear(); faceCache.clear(); ayahIndex.clear(); }
 
 function facesOf(rawiId: string, env: NodeJS.ProcessEnv): Map<number, MushafFace> {
   const cached = faceCache.get(rawiId);
@@ -137,6 +137,23 @@ export function practiceFaceCatalogue(
   };
   catalogueCache.set(cacheKey, out);
   return out;
+}
+
+/*
+ * كلماتُ آيةٍ واحدة كما تُعطى في الوجه — من الحزمة نفسِها، بالتقطيع نفسِه.
+ *
+ * يُقابَل بها ما يرسله المتصفّح من كلمات الآية (المعلّمُ يعيد ملاحظاته على مواضعها): فلا
+ * يُقبل نصٌّ لم يخرج من الحزمة، ولا تُسند ملاحظةٌ إلى كلمةٍ غير كلمتها.
+ */
+const ayahIndex = new Map<string, Map<string, string[]>>();
+export function practiceAyahWords(rawiId: string, surah: number, ayah: number, env: NodeJS.ProcessEnv = process.env): string[] | null {
+  let index = ayahIndex.get(rawiId);
+  if (!index) {
+    index = new Map();
+    for (const v of versesOf(rawiId, env)) index.set(`${v.sura_no}:${v.aya_no}`, splitAyahWords(v.aya_text));
+    ayahIndex.set(rawiId, index);
+  }
+  return index.get(`${surah}:${ayah}`) ?? null;
 }
 
 export function practiceFacePage(rawiId: string, page: number, env: NodeJS.ProcessEnv = process.env): PracticeFacePage {

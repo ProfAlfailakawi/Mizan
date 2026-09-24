@@ -51,6 +51,8 @@ const MADD = /[اويىآٓ]/;
 const SHADDA = 'ّ';
 /** رمز نهاية الآية ورقمها لا يُتلى. */
 const AYAH_MARK = /[۝࣢٠-٩۰-۹]/;
+/** حرفٌ عربيّ منطوق — وبه تُعرف الكلمة من الرمز. */
+const ARABIC_LETTER = /[\u0621-\u064A\u0671-\u06D3\u06FA-\u06FC]/;
 
 /**
  * تقطيع نص الآية إلى كلمات مع إزاحاتها، حتى يستطيع العرض تلوين حرفٍ بعينه.
@@ -65,8 +67,10 @@ export function splitAyahWords(text: string): WordSpan[] {
     const start = i;
     while (i < text.length && !/\s/.test(text[i])) i++;
     const raw = text.slice(start, i);
-    // كلمة كلّها رموز ترقيم آية (كرقم الآية) ليست كلمة تُتلى.
-    if ([...raw].every((ch) => AYAH_MARK.test(ch) || DIACRITIC.test(ch))) continue;
+    // ما لا حرفَ فيه ليس كلمةً تُتلى: رقمُ الآية، وعلامةُ الحزب «۞» التي تسبق ١٩٩ آيةً في نصّ
+    // حفص رمزًا مستقلًّا — وكانت تُعدّ كلمةً فينزاح التظليلُ كلمةً عن الصوت وعن تخطيط الصفحة،
+    // في الآيات نفسها التي تبدأ عندها الأسئلةُ غالبًا (أرباعُ الأحزاب).
+    if (!ARABIC_LETTER.test(raw) || [...raw].every((ch) => AYAH_MARK.test(ch) || DIACRITIC.test(ch))) continue;
     out.push({ index: out.length, start, end: i, text: raw });
   }
   return out;

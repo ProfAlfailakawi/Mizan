@@ -1073,6 +1073,47 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   line-height:2.15;
 }
 
+/*
+ * عرضُ النصّ على قدر الوجه.
+ *
+ * كانت الورقةُ بخطٍّ ثابتٍ وارتفاعٍ أقصى وتمرير: يطول المقطعُ فتنزل سطورُه تحت الحاشية،
+ * وتقطعها الحاشيةُ الذهبية، ويبحث المحكّمُ عن آخره بالتمرير. الآن تأخذ الورقةُ قدرَ الصفحة
+ * نفسها (بنسبتها وعدد صفحاتها)، والخطُّ يُقاس ليدخل المقطعُ كلُّه — والحاشيةُ تحيط بالنصّ
+ * ولا تمرّ فيه.
+ */
+.mizan-mushaf-sheet.mizan-mushaf-sheet--framed,
+.mizan-judge-os .mizan-mushaf-sheet.mizan-mushaf-sheet--framed{
+  display:flex; flex-direction:column;
+  max-width:none; max-height:none; overflow:hidden;
+  padding:clamp(12px,1.8vh,20px) clamp(12px,1.6vw,22px);
+}
+.mizan-mushaf-sheet--framed .mizan-mushaf-band{ flex:0 0 auto; min-height:2rem; margin-bottom:.35rem }
+.mizan-mushaf-sheet__page{
+  position:relative; flex:1 1 auto; min-height:0; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.mizan-judge-os .mizan-mushaf-sheet .mizan-mushaf-sheet__text,
+.mizan-mushaf-sheet__text{
+  width:100%;
+  line-height:2.05;
+  text-align:justify; text-align-last:center;
+  word-spacing:.04em;
+}
+.mizan-mushaf-sheet__tools{
+  flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap:.35rem .9rem; padding-top:.3rem;
+}
+.mizan-mushaf-sheet__tools button{ min-height:32px }
+.mizan-mushaf-sheet__foot{
+  flex:0 0 auto; display:flex; justify-content:center; padding-top:.2rem;
+  font-size:10px; color:#666b68;
+}
+.mizan-judge-os .mizan-mushaf-sheet .mizan-mushaf-sheet__text[data-fill="short"],
+.mizan-mushaf-sheet__text[data-fill="short"]{ text-align:center; text-align-last:center }
+.mizan-sheet-tail{ white-space:nowrap }
+/* تظليلُ الآية لونٌ يمتدّ مع سطورها ولا يزيح حرفًا. */
+.mizan-sheet-ayah{ border-radius:.3em; -webkit-box-decoration-break:clone; box-decoration-break:clone }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives — Badge, Stat, Modal, Command palette, Role menu
    These six carried 81 hand-written hex values between them, and Modal and Stat
@@ -1704,3 +1745,62 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-slip-card__branch.is-other{ background:rgba(163,52,31,.08); color:#8a2f1f }
 @keyframes mizan-slip-in{ from{ opacity:0; transform:translateY(-8px) scale(.98) } to{ opacity:1; transform:none } }
 @media (prefers-reduced-motion:reduce){ .mizan-slip-card{ animation:none } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   تقريرُ المعلّم — الحركاتُ والمدود
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mizan-tashkeel{
+  margin-inline:auto; max-width:48rem; border-radius:22px; padding:1rem 1.1rem 1.1rem;
+  background:linear-gradient(180deg,#fbfaf6,#f5f2e9); border:1px solid #e3ddcc;
+  box-shadow:0 12px 32px rgba(40,44,30,.06);
+  animation:mizan-slip-in .5s cubic-bezier(.2,.9,.25,1.15) both;
+}
+.mizan-tashkeel__head{ display:flex; align-items:center; gap:.7rem }
+.mizan-tashkeel__icon{ display:grid; place-items:center; width:2.1rem; height:2.1rem; border-radius:.8rem; background:#e4e8f1; color:#3e4c78; flex:0 0 auto }
+.mizan-tashkeel__title{ font-size:14px; font-weight:900; color:#26304d }
+.mizan-tashkeel__sub{ font-size:11.5px; font-weight:700; color:#5b6272; margin-top:.15rem; line-height:1.7 }
+.mizan-tashkeel__retry{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.8rem; border:1px solid #cfd3de; background:#fff; padding:.4rem .7rem; font-size:11px; font-weight:900; color:#3e4c78 }
+.mizan-tashkeel__bar{ margin-top:.8rem; height:4px; border-radius:99px; background:#e6e2d6; overflow:hidden }
+.mizan-tashkeel__bar > span{ display:block; height:100%; background:linear-gradient(90deg,#4A5A86,#7A4EA3); transition:width .4s ease }
+.mizan-tashkeel__legend{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.85rem }
+.mizan-tashkeel__chip{ font-size:10.5px; font-weight:900; padding:.2rem .6rem; border-radius:99px; color:var(--k); background:color-mix(in srgb, var(--k) 10%, transparent); border:1px solid color-mix(in srgb, var(--k) 28%, transparent) }
+.mizan-tashkeel__list{ margin-top:.8rem; display:grid; gap:.7rem }
+.mizan-tashkeel__ayah-no{ font-size:10.5px; font-weight:900; color:#666b68; margin-bottom:.35rem }
+.mizan-tashkeel__ayah ul{ display:grid; gap:.35rem }
+.mizan-tashkeel__row{
+  display:grid; grid-template-columns:auto auto 1fr auto; align-items:center; gap:.65rem;
+  padding:.45rem .7rem; border-radius:14px; background:#fff; border:1px solid #ebe6d8;
+  box-shadow:inset 3px 0 0 var(--k);
+}
+[dir="rtl"] .mizan-tashkeel__row{ box-shadow:inset -3px 0 0 var(--k) }
+.mizan-tashkeel__word{ font-size:1.45rem; color:#1f2420; letter-spacing:0 !important; line-height:1.6 }
+.mizan-tashkeel__kind{ font-size:10px; font-weight:900; color:var(--k); padding:.12rem .45rem; border-radius:99px; background:color-mix(in srgb, var(--k) 10%, transparent) }
+.mizan-tashkeel__msg{ font-size:12px; font-weight:700; color:#3a3f3b; line-height:1.7 }
+.mizan-tashkeel__foot{ margin-top:.8rem; font-size:10.5px; line-height:1.8; color:#6b716d; text-align:center }
+.mizan-tashkeel-note{ margin-inline:auto; max-width:44rem; text-align:center; font-size:11px; line-height:1.8; color:#6b716d }
+.mizan-tashkeel__listen{
+  display:inline-flex; align-items:center; gap:.3rem; min-height:32px; padding:0 .65rem;
+  border-radius:999px; border:1px solid color-mix(in srgb, var(--k) 35%, transparent);
+  background:color-mix(in srgb, var(--k) 8%, white); color:var(--k);
+  font-size:10.5px; font-weight:900; white-space:nowrap;
+}
+.mizan-tashkeel__listen:hover{ background:color-mix(in srgb, var(--k) 14%, white) }
+.mizan-tashkeel__listen:focus-visible{ outline:2px solid var(--k); outline-offset:2px }
+@media (max-width:520px){ .mizan-tashkeel__row{ grid-template-columns:auto 1fr auto } .mizan-tashkeel__msg{ grid-column:1 / -1 } }
+
+/* ملاحظاتُ المعلّم على الصفحة: خطٌّ منقّطٌ تحت الكلمة بلون نوعها. */
+/* تُرى من أوّل نظرة: ظلٌّ خفيفٌ بلون النوع على الكلمة، وخطٌّ منقّطٌ تحتها — غيرُ خطّ الخطأ المتّصل. */
+.mizan-live-note{
+  border-radius:4px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--k) 12%, transparent), color-mix(in srgb, var(--k) 12%, transparent)),
+    repeating-linear-gradient(90deg, var(--k) 0 5px, transparent 5px 8px) bottom / 100% 2.5px no-repeat;
+  animation:mizan-live-settle .6s ease-out both;
+}
+.mizan-face-word[data-note]{
+  text-decoration:underline dotted; text-decoration-thickness:2.5px; text-underline-offset:.5em;
+  border-radius:.3em; -webkit-box-decoration-break:clone; box-decoration-break:clone;
+}
+.mizan-face-word[data-note="tashkeel"]{ text-decoration-color:#4A5A86; background-color:rgba(74,90,134,.11) }
+.mizan-face-word[data-note="tajweed"]{ text-decoration-color:#7A4EA3; background-color:rgba(122,78,163,.11) }
+.mizan-face-word[data-note="letter"]{ text-decoration-color:#A3341F; background-color:rgba(163,52,31,.10) }

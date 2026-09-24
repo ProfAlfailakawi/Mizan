@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import './harness.css';
 import { MushafListens } from '../../src/components/participant/MushafListens';
 import { fullQuranScope } from '../../src/lib/quran-scope';
 
@@ -37,16 +38,17 @@ navigator.mediaDevices.getUserMedia = async (constraints?: MediaStreamConstraint
  *
  * والمقصودُ أن يُثبَت أنّ الطريقَ من «خطأٌ استقرّ» إلى «صوتٌ خرج» موصولٌ فعلًا.
  */
-let oscillators = 0, contexts = 0;
+let oscillators = 0, contexts = 0, buffers = 0;
 const RealAudioContext = window.AudioContext;
 class CountingAudioContext extends RealAudioContext {
   constructor() { super(); contexts += 1 }
   createOscillator() { oscillators += 1; return super.createOscillator() }
+  createBufferSource() { buffers += 1; return super.createBufferSource() }
 }
 (window as unknown as { AudioContext: typeof AudioContext }).AudioContext =
   CountingAudioContext as unknown as typeof AudioContext;
-(window as unknown as { __mizanAlerts: () => { contexts: number; oscillators: number } }).__mizanAlerts =
-  () => ({ contexts, oscillators });
+(window as unknown as { __mizanAlerts: () => { contexts: number; oscillators: number; buffers: number } }).__mizanAlerts =
+  () => ({ contexts, oscillators, buffers });
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
