@@ -2349,7 +2349,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     return res.status(status).json({code});
   };
 
-  const runPracticeListener=async(input:{access:JourneyPracticeAccess;surah:number;startAyah:number;endAyah:number;contentType:string;bytes:Buffer})=>{
+  const runPracticeListener=async(input:{access:JourneyPracticeAccess;surah:number;startAyah:number;endAyah:number;contentType:string;bytes:Buffer;after?:number})=>{
     if(!journeyListeningReady(input.access.listening.reading))throw new Error('QURAN_PRACTICE_LISTENER_NOT_CONFIGURED');
     const passage=await quranDelivery.passage(input.access.deliveryReading,input.surah,input.startAyah,input.endAyah);
     if(!passage||!passage.ayat.length)throw new Error('PRACTICE_SCOPE_NOT_READY');
@@ -2385,11 +2385,11 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
         backendEvidence:{modelVersion:recognised.modelVersion,acousticQuality:confidence||undefined}
       };
     }
-    const {candidate,confidence,raw}=await callDedicatedListener({reading:input.access.listening.reading,ayat:passage.ayat,contentType:input.contentType,bytes:input.bytes});
+    const {candidate,confidence,raw}=await callDedicatedListener({reading:input.access.listening.reading,ayat:passage.ayat,contentType:input.contentType,bytes:input.bytes,after:input.after});
     return {
       timestamp:new Date().toISOString(),reading:input.access.listening.reading,
       surah:candidate?Number(candidate.surah):undefined,ayah:candidate?Number(candidate.ayah):undefined,
-      wordIndex:candidate?Number(candidate.wordIndex):undefined,
+      wordIndex:candidate?Number(candidate.wordIndex):undefined,globalIndex:candidate&&Number.isInteger(Number(candidate.globalIndex))?Number(candidate.globalIndex):undefined,
       alignmentState:candidate&&confidence>=0.55?'LOCKED':'LOST',recoveryState:'STABLE',
       smoothedConfidence:Number.isFinite(confidence)?Math.max(0,Math.min(1,confidence)):0,
       pointerMoved:!!candidate,practice:true,scoreAuthority:'HUMAN_ONLY',scoreDelta:0,shadowMode:true,
@@ -2470,7 +2470,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/align',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{
-    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));if(!scopeContainsRange(access.scope,{surah,ayah:startAyah},{surah,ayah:endAyah}))throw new Error('PRACTICE_SCOPE_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);if(!bytes.length)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');const out=await runPracticeListener({access,surah,startAyah,endAyah,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
+    try{const access=await journeyPracticeAccess(req);const reading=soleParam(req.query.reading,'reading'),sourcePackageId=soleParam(req.query.sourcePackageId,'sourcePackageId');if(reading!==access.listening.reading||sourcePackageId!==access.listening.sourcePackageId)throw new Error('PRACTICE_REQUEST_MISMATCH');const surah=Number(soleParam(req.query.surah,'surah')),startAyah=Number(soleParam(req.query.startAyah,'startAyah')),endAyah=Number(soleParam(req.query.endAyah,'endAyah'));if(!scopeContainsRange(access.scope,{surah,ayah:startAyah},{surah,ayah:endAyah}))throw new Error('PRACTICE_SCOPE_MISMATCH');const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);if(!bytes.length)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');const afterRaw=soleParam(req.query.after,'after');const after=afterRaw===undefined||afterRaw===''?undefined:Number(afterRaw);const out=await runPracticeListener({access,surah,startAyah,endAyah,contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,after:Number.isInteger(after)&&(after as number)>=0&&(after as number)<5000?after:undefined});res.setHeader('Cache-Control','private, no-store');return res.json(out)}
     catch(err){return journeyPracticeFailure(res,err)}
   });
   app.post('/api/public/journeys/practice/recognise',practiceAlignmentIpRateLimit,journeyPracticeRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{

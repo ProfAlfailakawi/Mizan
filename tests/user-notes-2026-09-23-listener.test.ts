@@ -153,4 +153,18 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   assert.doesNotMatch(practice, /\+ 2\)\);/, 'no reveal of the next, unsaid word');
   assert.match(practice, /setReached\(r => Math\.max\(r, penTarget \+ 1\)\);\n\s+if \(veiled \|\| pen === null/, 'reached follows the heard position only; in the veil the pen jumps, no timed walk');
   assert.match(practice, /Math\.min\(penTarget, p \+ 1\)/, 'the smooth walk never passes the heard word');
+  assert.match(practice, /if \(out\.alignmentState !== 'LOST'\) \{/, 'an untrusted LOST candidate reveals nothing');
+  // تحت الحجاب: الموضعُ التقريبيّ لا يكشف إلا حين لا تُسمع الكلمات، ولا يسبق آخرَ ما سُمع بأكثر من VEIL_STEP.
+  assert.match(practice, /export const VEIL_STEP = 4;/);
+  assert.match(practice, /if \(!veiledRef\.current\) advance\(target\);/);
+  assert.match(practice, /!attemptJudging\.current && out\.alignmentState === 'LOCKED'/);
+  assert.match(practice, /reachedRef\.current - 1 \+ VEIL_STEP/);
+  // تكرارُ الموضع نفسِه لا يكشف مزيدًا (لا تسلّق).
+  assert.match(practice, /target > lastRough\.current\) \{\n\s+\/\/[^\n]*\n\s+lastRough\.current = target;/);
+  // الموضعُ يرسو على آخر ما ثبت، فلا تسحبه عبارةٌ مكرّرةٌ بعيدة.
+  assert.match(practice, /after: lastGlobal\.current >= 0/);
+  const listener = read('services/quran-practice-listener/app.py');
+  assert.match(listener, /LOCAL_BEHIND, LOCAL_AHEAD = 8, 12/);
+  assert.match(listener, /FAR_MIN_RATIO = 0\.5, 0\.65|LOCAL_MIN_RATIO, FAR_MIN_RATIO = 0\.5, 0\.65/);
+  assert.equal((listener.match(/vad_filter=True/g) || []).length, 2, 'silence is not transcribed into phantom words');
 });
