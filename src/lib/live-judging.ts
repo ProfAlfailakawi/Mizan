@@ -80,6 +80,20 @@ export function liveJudgment(
 }
 
 /**
+ * «أين بلغ؟» بالكلمات المسموعة وحدها — بلا حكم.
+ *
+ * يُستعمل حين يكون الحكمُ مغلقًا (روايةٌ لم تُقَس، أو سقط إذنُ المحاولة): الموضعُ يتبع
+ * ما قيل فعلًا كلمةً كلمة، ولا يُعرض خطأٌ ولا يُنبَّه بصوت. والتشكيلُ لا يُقابَل هنا.
+ */
+export function followFrontier(expected: readonly ExpectedWord[], heard: readonly HeardWord[]): number {
+  if (heardNothing(heard)) return -1;
+  const judgment = diffRecitation(expected, heard, { ...DEFAULT_DIFF_OPTIONS, detectTashkeel: false, freeTail: true });
+  const judgedUpTo = judgment.mistakes.reduce((max, m) => (m.wordIndex !== null && m.wordIndex > max ? m.wordIndex : max), -1);
+  const reachedByMatch = judgment.matched + judgment.uncertain + judgment.mistakes.filter(m => m.wordIndex !== null).length;
+  return frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch));
+}
+
+/**
  * وحكمُ الخاتمة يختلف عن حكم الأثناء في شيءٍ واحد: لا جبهةَ بعده.
  *
  * فما كان مؤجَّلًا بمسافة الأمان يُقال الآن — إذ لم يبقَ ما يُنتظر. وما بعد الجبهة

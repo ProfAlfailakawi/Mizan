@@ -511,10 +511,13 @@ async function startServer() {
    * دقيقتين — أي أكثر من ٦٠ مقطعًا. فكان الحدُّ يقطع على المتأنّي تلاوتَه.
    *
    * فصار ٩٠: فسحةُ النصف فوق الإيقاع، وتكفي تلاوةً في ثلاث دقائق.
+   *
+   * ثمّ قصُر المقطعُ إلى **ثانيةٍ ونصف** (أسرعُ استجابةً للقلم)، فصار الإيقاعُ ٨٠ مقطعًا
+   * في النافذة — و٩٠ فسحتُه ثُمنٌ لا نصف. فصار ١٢٠: الفسحةُ نفسُها بالإيقاع الجديد.
    */
   const practiceAlignmentRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
-    limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX||90),
+    limit:Number(process.env.MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX||120),
     standardHeaders:'draft-7',legacyHeaders:false,
     keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
     message:{code:'RATE_LIMITED'},
@@ -529,17 +532,19 @@ async function startServer() {
    */
   const practiceRecognitionRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
-    limit:Number(process.env.MIZAN_PRACTICE_RECOGNITION_RATE_LIMIT_MAX||90),
+    limit:Number(process.env.MIZAN_PRACTICE_RECOGNITION_RATE_LIMIT_MAX||120),
     standardHeaders:'draft-7',legacyHeaders:false,
     keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),
     message:{code:'RATE_LIMITED'},
   });
   /* بطاقة الرحلة الخاصة تفتح التدريب بلا حساب. يظل لها حدّ مستقل لكل بطاقة حتى لا
      يستطيع رابطٌ واحد استهلاك محرّك الاستماع على بقية المتسابقين. ولا يدخل الرمز نفسه
-     في مفاتيح السجل؛ تُستخدم بصمته فقط. */
+     في مفاتيح السجل؛ تُستخدم بصمته فقط.
+     والبطاقةُ الواحدة تُرسل المقطعَ الآن إلى المسارين دائمًا (الموضع والكلمات)، كلَّ
+     ثانيةٍ ونصف: ١٦٠ طلبًا في النافذة — فالحدُّ ٢٤٠ يُبقي فسحةَ النصف. */
   const journeyPracticeRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
-    limit:Number(process.env.MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX||180),
+    limit:Number(process.env.MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX||240),
     standardHeaders:'draft-7',legacyHeaders:false,
     // When a shared/edge limiter is configured, it is the single global authority. Keeping
     // this middleware installed but skipped avoids a second per-instance quota in Cloud Run.

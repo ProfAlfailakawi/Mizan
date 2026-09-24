@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { SETTLE_MARGIN_WORDS, answerKeepsPermission, finalJudgment, liveJudgment } from '../src/lib/live-judging';
+import { SETTLE_MARGIN_WORDS, answerKeepsPermission, finalJudgment, followFrontier, liveJudgment } from '../src/lib/live-judging';
 import type { ExpectedWord, HeardWord } from '../src/lib/recitation-diff';
 
 const OPEN = { word: 'OPEN', tashkeel: 'CLOSED' } as const;
@@ -125,4 +125,14 @@ test('لا يُحكم بجوابٍ جاء ببوّابةٍ غيرِ التي ب�
     'إذنٌ بلا نموذجٍ مقيس قُبل');
   /* وجوابٌ بلا بوّابةٍ خالف العقد: يُرفض ولا يُسقط الشاشةَ بخطأ قراءة. */
   assert.equal(answerKeepsPermission(permission, { modelVersion: 'm@1' } as never), false, 'جوابٌ بلا بوّابةٍ قُبل');
+});
+
+test('التتبّعُ بلا حكم يتبع الكلمات المسموعة — والحكمُ مغلق', () => {
+  /* الحكمُ المغلق لا يعطي موضعًا؛ والتتبّعُ يعطيه من الكلمات وحدها: رقمُ آخر كلمةٍ قيلت (فتنكشف هي أيضًا). */
+  assert.equal(liveJudgment(expected, heardOf(FACE.slice(0, 5)), SHUT).frontier, -1);
+  assert.equal(followFrontier(expected, heardOf(FACE.slice(0, 5))), 4);
+  /* لا كلمةَ مسموعة: لا موضع — فلا يُكشف شيءٌ بالوقت. */
+  assert.equal(followFrontier(expected, []), -1);
+  /* وكلمةٌ سقطت في الوسط لا توقف التتبّع: الموضعُ يمضي إلى ما قيل بعدها. */
+  assert.equal(followFrontier(expected, heardOf([...FACE.slice(0, 3), ...FACE.slice(4, 7)])), 6);
 });
