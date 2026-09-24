@@ -81,7 +81,7 @@ test('the live page is wired: measured on the image, word-level where confident,
   assert.match(listens, /setReached\(r => Math\.max\(r, penTarget \+ 1\)\)/);
   assert.match(listens, /if \(veiled \|\| pen === null \|\| penTarget < pen \|\| penTarget - pen > 24\)/);
   assert.match(listens, /setPen\(p => \(p === null \? penTarget : Math\.min\(penTarget, p \+ 1\)\)\)/);
-  assert.match(listens, /if \(judged\.frontier > 0\) advance\(judged\.frontier - 1\);/);
+  assert.match(listens, /if \(judged\.frontier >= 0\) advance\(judged\.frontier\);/);
   assert.match(listens, /noticeSlips\(settledHere\)/);
 });
 

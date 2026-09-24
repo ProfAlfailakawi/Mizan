@@ -11,7 +11,7 @@ import {
   amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
-import { answerKeepsPermission, finalJudgment, liveJudgment } from '../../lib/live-judging';
+import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment } from '../../lib/live-judging';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -66,6 +66,8 @@ type Stage = 'loading' | 'ready' | 'asking' | 'reciting' | 'analysing' | 'report
 
 /* أقصى ما يكشفه الموضعُ التقريبيُّ في مقطعٍ واحد (ثانيتان) تحت الإخفاء — نحو سرعة التلاوة. */
 export const VEIL_STEP = 4;
+/** كم مقطعًا متتاليًا يسقط قبل أن يُترك التتبّعُ بالكلمات. */
+export const FOLLOW_FAILURE_LIMIT = 3;
 
 export interface MushafListensProps {
   ar: boolean;
@@ -221,11 +223,33 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * التي بعدها. ومن هنا أيضًا يُطرح الحكمُ إن سقط مقطعُ سماعٍ في الطريق.
    */
   const attemptJudging = useRef<QuranJudgingGate | null>(null);
+  /*
+   * التتبّعُ بالكلمات منفصلٌ عن الحكم: يعمل والحكمُ مغلق، ويبقى إن سقط إذنُ المحاولة.
+   * ولا يتوقّف لمقطعٍ واحدٍ يسقط — بل بعد FOLLOW_FAILURE_LIMIT متتالية، أو إن قال
+   * الخادمُ إنّ السماعَ غيرُ متاحٍ أصلًا. وحينها يعود إلى الموضع التقريبيّ.
+   */
+  const wordFollow = useRef(true);
+  const followFailures = useRef(0);
   const chunkIndex = useRef(0);
   const startedAt = useRef(0);
   const recorder = useRef<MediaRecorder | null>(null);
   /** آخرُ لحظةٍ ثُبّت ما سُمع قبلها — النوافذُ متداخلة، والكلمةُ تُحسب مرّةً واحدة. */
   const committedUntil = useRef(0);
+  /*
+   * النوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد آخر
+   * مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير). وتوقيتُها من أوّل التلاوة.
+   */
+  const committedWords = (words: readonly { text: string; confidence: number; startMs?: number; endMs?: number }[], windowStartMs: number, commitUntilMs: number): HeardWord[] => {
+    const timed: HeardWord[] = [];
+    for (const w of words) {
+      if (w.startMs === undefined || w.endMs === undefined) continue;
+      const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
+      if (startMs < committedUntil.current - 80 || endMs > commitUntilMs) continue;
+      timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
+      committedUntil.current = Math.max(committedUntil.current, endMs);
+    }
+    return timed;
+  };
   const stream = useRef<MediaStream | null>(null);
   const alive = useRef(true);
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
@@ -444,7 +468,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -514,7 +538,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const begin = useCallback(async () => {
     if (!face) return;
     samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -616,7 +640,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
              */
             if (!veiledRef.current) advance(target);
-            else if (!attemptJudging.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
+            else if (!attemptJudging.current && !wordFollow.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
               // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
               lastRough.current = target;
               advance(Math.min(target, reachedRef.current - 1 + VEIL_STEP));
@@ -640,14 +664,22 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * ومقطعان يتسابقان يخلطان ما سُمع فيصنعان خطأً حيث لا خطأ — وهي العلّةُ التي
          * صنعت «أعدتَ» الكاذبة في مسار المحاذاة، ولا تُعاد هنا.
          */
-        if (attemptJudging.current) {
+        if (attemptJudging.current || wordFollow.current) {
           recognition.current.push(async live => {
             const permission = attemptJudging.current;
-            if (!permission) return;
+            if (!permission && !wordFollow.current) return;
             const out = await submitPracticeRecognitionChunk({
               blob: windowBlob, headBytes: windowHeadBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);
             if (!alive.current || !live()) return;
+            followFailures.current = 0;
+            if (!permission) {
+              /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
+              heardWords.current = [...heardWords.current, ...committedWords(out.words, windowStartMs, win.commitUntilMs)];
+              const frontier = followFrontier(expectedRef.current, heardWords.current);
+              if (frontier >= 0) advance(frontier);
+              return;
+            }
             /*
              * وجوابٌ جاء ببوّابةٍ غيرِ التي بدأت بها المحاولة لا يُحكم به: تغيّر القياسُ
              * في أثناء التلاوة. فتُطرح المحاولةُ كلُّها، وتُحفظ البوّابةُ الجديدة للتالية.
@@ -663,21 +695,14 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              * والنوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد
              * آخر مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير).
              */
-            const timed: HeardWord[] = [];
-            for (const w of out.words) {
-              if (w.startMs === undefined || w.endMs === undefined) continue;
-              const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
-              if (startMs < committedUntil.current - 80 || endMs > win.commitUntilMs) continue;
-              timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
-              committedUntil.current = Math.max(committedUntil.current, endMs);
-            }
+            const timed = committedWords(out.words, windowStartMs, win.commitUntilMs);
             /* وما سُمع تحت نغمةٍ يُطرح: الميكروفونُ خام، فيلتقط صدى التنبيه كلمةً. */
             const { kept } = dropWordsUnderAlert(timed, alertWindows.current, text => faceSkeletonsRef.current.has(quranSkeleton(text)));
             heardWords.current = [...heardWords.current, ...kept];
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
             /* وجبهةُ السماع أدقُّ شاهدٍ على الموضع: ما قاله فعلًا لا ما يُظنّ أنّه بلغه. */
-            if (judged.frontier > 0) advance(judged.frontier - 1);
+            if (judged.frontier >= 0) advance(judged.frontier);
             const settledHere = judgeable(judged.settled);
             setMistakes(judged.judgment ? settledHere : undefined);
             noticeSlips(settledHere);
@@ -691,6 +716,13 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               alertWindows.current = [...alertWindows.current, alertWindow(now)];
             }
           }, error => {
+            const code0 = error instanceof Error ? error.message : '';
+            if (!attemptJudging.current) {
+              /* سقوطٌ في التتبّع وحده: يُحتمل مقطعٌ أو اثنان، ثمّ يعود الموضعُ التقريبيّ. */
+              followFailures.current += 1;
+              if (followFailures.current >= FOLLOW_FAILURE_LIMIT || /NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH/.test(code0)) wordFollow.current = false;
+              return;
+            }
             /*
              * **وأيُّ مقطعٍ سماعٍ يسقط يُبطل حكمَ هذه المراجعة كلِّها** — لا العلّةُ
              * البنيويّةُ وحدها.
@@ -918,14 +950,20 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      * يُحاسب الذيلَ حذفًا، فتلاوةٌ ناقصةُ السماع تُقرأ «أسقطَ آخرَ الوجه» — وهو لم
      * يُسقط. فيُطرح الحكمُ ويُقال للطالب لماذا.
      */
-    if (attemptJudging.current && !(await recognition.current.drain())) {
+    /*
+     * ويُنتظر طابورُ السماع **حكمًا كان أو تتبّعًا**: فالتقريرُ و«المعلّم» يقرآن ما سُمع،
+     * وذيلٌ لم يصل يسقط منهما. وما لم يفرغ في مهلته يُترك، فلا يحرّك القلمَ بعد التقرير.
+     */
+    if ((attemptJudging.current || wordFollow.current) && !(await recognition.current.drain())) {
       /*
        * ويُترك الطابورُ لا الإذنُ وحده: فالمهمّةُ الجاريةُ التقطت إذنَها قبل أن تنتظر،
        * فإن عاد جوابُها بعد المهلة كتب أخطاءً ونغّم بعد أن قيل للطالب «لم يُحكم».
        */
       recognition.current.abandon();
-      attemptJudging.current = null;
-      setJudgingLost(true);
+      if (attemptJudging.current) {
+        attemptJudging.current = null;
+        setJudgingLost(true);
+      }
     }
     if (!alive.current) return;
     setReading(settled.reading);

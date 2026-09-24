@@ -157,7 +157,7 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   // تحت الحجاب: الموضعُ التقريبيّ لا يكشف إلا حين لا تُسمع الكلمات، ولا يسبق آخرَ ما سُمع بأكثر من VEIL_STEP.
   assert.match(practice, /export const VEIL_STEP = 4;/);
   assert.match(practice, /if \(!veiledRef\.current\) advance\(target\);/);
-  assert.match(practice, /!attemptJudging\.current && out\.alignmentState === 'LOCKED'/);
+  assert.match(practice, /!attemptJudging\.current && !wordFollow\.current && out\.alignmentState === 'LOCKED'/);
   assert.match(practice, /reachedRef\.current - 1 \+ VEIL_STEP/);
   // تكرارُ الموضع نفسِه لا يكشف مزيدًا (لا تسلّق).
   assert.match(practice, /target > lastRough\.current\) \{\n\s+\/\/[^\n]*\n\s+lastRough\.current = target;/);
@@ -167,4 +167,36 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   assert.match(listener, /LOCAL_BEHIND, LOCAL_AHEAD = 8, 12/);
   assert.match(listener, /FAR_MIN_RATIO = 0\.5, 0\.65|LOCAL_MIN_RATIO, FAR_MIN_RATIO = 0\.5, 0\.65/);
   assert.equal((listener.match(/vad_filter=True/g) || []).length, 2, 'silence is not transcribed into phantom words');
+});
+
+test('word-by-word following survives a closed gate and a dropped chunk, and the limits carry the faster rhythm', async () => {
+  const practice = read('src/components/participant/MushafListens.tsx');
+  // التتبّعُ بالكلمات لا يُشترط بإذن الحكم، ولا يسقط بمقطعٍ واحد.
+  assert.match(practice, /if \(attemptJudging\.current \|\| wordFollow\.current\) \{/);
+  assert.match(practice, /export const FOLLOW_FAILURE_LIMIT = 3;/);
+  assert.match(practice, /followFailures\.current >= FOLLOW_FAILURE_LIMIT/);
+  // وسقوطُ إذن الحكم في أثناء التلاوة يترك التتبّعَ قائمًا: المقاطعُ التالية تمرّ بفرع التتبّع.
+  assert.doesNotMatch(practice, /wordFollow\.current = false;[^\n]*\n[^\n]*setMistakes\(undefined\)/);
+  // والكلمةُ الأخيرةُ المسموعةُ تنكشف هي نفسُها — لا تتأخّر كلمة.
+  assert.match(practice, /if \(judged\.frontier >= 0\) advance\(judged\.frontier\);/);
+  assert.match(practice, /if \(frontier >= 0\) advance\(frontier\);/);
+
+  // والحدودُ تتّسع لإيقاع المقطع: فسحةُ النصف فوق ما يُرسله قارئٌ في النافذة.
+  const { CHUNK_MS } = await import('../src/lib/recognition-window');
+  const server = read('server.ts');
+  const perWindow = 120_000 / CHUNK_MS;
+  const limit = (name: string) => Number(new RegExp(`${name}\\|\\|(\\d+)`).exec(server)?.[1]);
+  assert.ok(limit('MIZAN_PRACTICE_ALIGNMENT_RATE_LIMIT_MAX') >= perWindow * 1.5);
+  assert.ok(limit('MIZAN_PRACTICE_RECOGNITION_RATE_LIMIT_MAX') >= perWindow * 1.5);
+  assert.ok(limit('MIZAN_JOURNEY_PRACTICE_RATE_LIMIT_MAX') >= perWindow * 2 * 1.5, 'journey card sends every chunk to both routes');
+});
+
+test('a closed ASR gate still lets words through the practice listener, and the report waits for them', () => {
+  const server = read('server.ts');
+  assert.match(server, /const recogniseViaPracticeListener=\(reading:string\)=>dedicatedPracticeListenerReady\(reading\)\s*\n\s*&&\(!recitationRecogniser\.configured\(\)\|\|recitationRecogniser\.gate\(reading\)\.word!=='OPEN'\);/);
+  assert.equal((server.match(/if\(recogniseViaPracticeListener\(reading\)\)\{/g) || []).length, 2, 'both recognition routes');
+  // والبوّابةُ المعادةُ من هناك بوّابةُ المحرّك (مغلقة) — فلا يُحكم بما سُمع.
+  assert.match(server, /return \{gate:practiceJudgingGate\(input\.reading\),words,modelVersion:PRACTICE_LISTENER_MODEL\};/);
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /if \(\(attemptJudging\.current \|\| wordFollow\.current\) && !\(await recognition\.current\.drain\(\)\)\) \{/);
 });

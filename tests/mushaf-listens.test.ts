@@ -709,7 +709,11 @@ test('إذنُ الحكم يُلتقط عند بدء التلاوة ويثبت �
    */
   const reads = [...handler.matchAll(/judgingRef\.current(?!\s*=)/g)];
   assert.deepEqual(reads.map(m => m[0]), [], 'مقطعُ السماع يقرأ إذنًا متحرّكًا لا لقطةَ المحاولة');
-  assert.match(handler, /if \(attemptJudging\.current\) \{/, 'مقطعُ السماع لا يُشترط بلقطة الإذن');
+  assert.match(handler, /if \(attemptJudging\.current \|\| wordFollow\.current\) \{/, 'مقطعُ السماع لا يُشترط بلقطة الإذن');
+  /* والتتبّعُ بلا إذنٍ لا يحكم: لا خطأَ يُعرض ولا نغمة — يعود قبل الحكم. */
+  const follow = handler.slice(handler.indexOf('if (!permission) {'), handler.indexOf('if (!answerKeepsPermission'));
+  assert.match(follow, /followFrontier\(expectedRef\.current, heardWords\.current\)[\s\S]*return;\s*\n\s*\}/);
+  assert.doesNotMatch(follow, /setMistakes|planAlert|noticeSlips/, 'التتبّعُ بلا إذنٍ يُظهر أخطاء');
   /* وحكمُ الخاتمة باللقطة نفسِها، لا بإذنٍ تبدّل بعد أن بدأ. */
   const finish = screen.slice(screen.indexOf('const finish = useCallback'), screen.indexOf('const words: FaceWord[]'));
   assert.match(finish, /const permission = attemptJudging\.current;/, 'حكمُ الخاتمة يقرأ إذنًا متحرّكًا');
@@ -739,7 +743,9 @@ test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجع
   const task = screen.slice(start, screen.indexOf('}, error => {', start));
   const check = task.indexOf('if (!answerKeepsPermission(permission, out))');
   assert.ok(check > 0, 'جوابٌ ببوّابةٍ تبدّلت يُقبل');
-  assert.ok(check < task.indexOf('heardWords.current = ['), 'يُكتب ما سُمع قبل فحص البوّابة');
+  /* (وفرعُ التتبّع بلا إذن يكتب قبله ويعود — فالمحكومُ ما بعده.) */
+  const judged = task.indexOf('return;', task.indexOf('if (!permission) {'));
+  assert.ok(check < task.indexOf('heardWords.current = [', judged), 'يُكتب ما سُمع قبل فحص البوّابة');
   assert.match(task.slice(check, check + 400), /throw new Error\('QURAN_JUDGING_GATE_CHANGED'\)/, 'التبدّلُ لا يُبطل المحاولة');
   assert.equal(failure.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
 });
