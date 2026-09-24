@@ -333,14 +333,22 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         const state = String(body?.quranPracticeListener?.state || 'UNKNOWN');
         if (!live) return;
         tries += 1;
-        if (['LOADING', 'RETRYING', 'CHECKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
+        if (['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
         else setListenerState(tries >= 24 ? 'TIMEOUT' : state);
       } catch { if (live) setListenerState('UNKNOWN'); }
     };
     void poll();
     return () => { live = false; window.clearTimeout(timer); };
   }, [listening, stage]);
-  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING'].includes(listenerState);
+  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(listenerState);
+  /* ثوانٍ تُعدّ أمام الطالب — فلا يظنّ زرًّا رماديًّا صامتًا ميكروفونًا معطّلًا. */
+  const [warmSeconds, setWarmSeconds] = useState(0);
+  useEffect(() => {
+    if (!listenerWarming) { setWarmSeconds(0); return; }
+    const since = Date.now();
+    const t = window.setInterval(() => setWarmSeconds(Math.floor((Date.now() - since) / 1000)), 1000);
+    return () => window.clearInterval(t);
+  }, [listenerWarming]);
 
   const lookupRef = useRef<(s: FaceAlignmentSample) => number | null>(() => null);
   useEffect(() => { lookupRef.current = face ? faceWordLookup(face.words) : () => null; }, [face]);
@@ -759,23 +767,30 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * بالسماع نفسه، ويراجعها المعلّم، وتُدمج في التقرير مكانَ ما كان لها — والتسجيلُ في الذاكرة وحدها.
    */
   const retakeRec = useRef<{ rec: MediaRecorder; stream: MediaStream; timers: number[] } | null>(null);
+  const retakePending = useRef(false);
   const stopRetake = useCallback(() => {
     const r = retakeRec.current;
     if (r && r.rec.state !== 'inactive') { try { r.rec.stop(); } catch { /* مغلق */ } }
   }, []);
   const startRetake = useCallback(async (u: UnclearAyah) => {
-    if (!face || retakeRec.current) return;
+    /* الموضعُ يُحجز قبل سؤال الإذن: ضغطةٌ ثانيةٌ والإذنُ معلّقٌ لا تفتح ميكروفونًا ثانيًا. */
+    if (!face || retakeRec.current || retakePending.current) return;
     const ayahWords = face.words.filter(w => w.surah === u.surah && w.ayah === u.ayah).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah }));
     if (!ayahWords.length) return;
     const run = tashkeelRun.current;
     const isCurrent = () => alive.current && tashkeelRun.current === run;
     let media: MediaStream;
+    retakePending.current = true;
     try {
       media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (error) {
-      setRetake({ surah: u.surah, ayah: u.ayah, phase: 'failed', seconds: 0, note: microphoneFailureNote(error, ar) });
+      retakePending.current = false;
+      if (isCurrent()) setRetake({ surah: u.surah, ayah: u.ayah, phase: 'failed', seconds: 0, note: microphoneFailureNote(error, ar) });
       return;
     }
+    retakePending.current = false;
+    /* وإن تغيّر الوجهُ أو غادر الطالبُ والإذنُ معلّق: يُعاد الميكروفون ولا يبدأ تسجيل. */
+    if (!isCurrent()) { media.getTracks().forEach(t => t.stop()); return; }
     const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m));
     const rec = new MediaRecorder(media, mime ? { mimeType: mime } : undefined);
     const chunks: Blob[] = [];
@@ -936,8 +951,17 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming} data-listener={listenerState}
                 className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[#214C40]'}`}>
                 <Mic className={`h-4 w-4 ${listenerWarming ? 'motion-safe:animate-pulse' : ''}`} aria-hidden="true" />
-                {listenerWarming ? (ar ? 'المستمع يستعدّ…' : 'Listener waking…') : (ar ? 'ابدأ التلاوة' : 'Begin reciting')}
+                {listenerWarming
+                  ? (ar ? `المستمع يستيقظ… ${warmSeconds.toLocaleString('ar-EG')} ث` : `Listener waking… ${warmSeconds}s`)
+                  : (ar ? 'ابدأ التلاوة' : 'Begin reciting')}
               </button>
+            )}
+            {stage === 'ready' && analysed && listenerWarming && (
+              <p className="basis-full text-center text-[11px] leading-6 text-[#5f6663]" data-listener-waking role="status" aria-live="polite">
+                {ar
+                  ? 'الميكروفونُ سليم — المستمعُ ينام حين لا يُسمع أحد، وأوّلُ تلاوةٍ بعد سكونٍ تنتظر إقلاعَه (عادةً أقلّ من دقيقة). يُفتح الزرُّ وحده حين يجهز.'
+                  : 'Your microphone is fine — the listener sleeps when idle and takes up to a minute to wake. The button unlocks by itself.'}
+              </p>
             )}
             {stage === 'asking' && (
               <span className="inline-flex items-center gap-2 rounded-2xl bg-[#E7EEE9] px-5 py-2.5 text-xs font-black text-[#214C40]" data-stage="asking" role="status" aria-live="polite">

@@ -48,6 +48,10 @@ test('ب) every unclear ayah says why and offers «أعِد هذه الآية»;
   const retake = page.slice(page.indexOf('const startRetake'), page.indexOf('rec.start();'));
   assert.doesNotMatch(retake, /localStorage|indexedDB|sessionStorage|upload/i, 'the retake is never stored');
   assert.match(retake, /media\.getTracks\(\)\.forEach\(t => t\.stop\(\)\)/, 'the microphone is released');
+  /* ضغطتان والإذنُ معلّق لا تفتحان ميكروفونين؛ ومغادرةٌ والإذنُ معلّق لا تترك تسجيلًا يعمل. */
+  assert.match(retake, /if \(!face \|\| retakeRec\.current \|\| retakePending\.current\) return;/);
+  assert.match(retake, /retakePending\.current = true;\n\s*try \{\n\s*media = await navigator\.mediaDevices\.getUserMedia/);
+  assert.match(retake, /if \(!isCurrent\(\)\) \{ media\.getTracks\(\)\.forEach\(t => t\.stop\(\)\); return; \}/);
 });
 
 test('ج) the teacher switch: off hides it, trial labels it, open needs a passing benchmark of the very engine that runs', async () => {
@@ -73,6 +77,8 @@ test('ج) the teacher switch: off hides it, trial labels it, open needs a passin
     [{ ...passing, gates: { ...passing.gates, substitutionRecall: false } }, live, 'BENCHMARK_NOT_PASSED'],
     [passing, null, 'LIVE_ENGINE_UNKNOWN'],
     [passing, { ...live, model: 'obadx/muaalem-model-v4@abc' }, 'BENCHMARK_MODEL_MISMATCH'],
+    [passing, { ...live, model: 'obadx/muaalem-model-v3_2@ffffffffffff' }, 'BENCHMARK_MODEL_MISMATCH'],
+    [{ ...passing, model: 'obadx/muaalem-model-v3_2' }, live, 'BENCHMARK_MODEL_MISMATCH'],
     [passing, { ...live, analysis: '2026-10-01.1' }, 'BENCHMARK_RULES_MISMATCH'],
     [{ ...passing, correct: { words: 6000 } }, live, 'BENCHMARK_MALFORMED'],
   ];

@@ -26,7 +26,8 @@ export interface MuaalemGate {
   benchmark?: MuaalemBenchmarkSummary;
 }
 
-const modelId = (v: unknown) => String(v ?? '').split('@')[0].trim();
+/* المعرّفُ كاملًا مع لقطته (`repo@snapshot`): تقريرٌ للقطةٍ لا يأذن للّقطة التي بعدها. */
+const modelId = (v: unknown) => String(v ?? '').trim();
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : NaN);
 
 export function muaalemGate(input: {

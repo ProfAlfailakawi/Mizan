@@ -112,6 +112,23 @@ class Counting(unittest.TestCase):
         self.assertIn("لا يجتاز", bench.markdown(report))
         json.dumps(report, ensure_ascii=False)
 
+    def test_skipped_cases_stay_in_the_denominators(self):
+        """محرّكٌ يتخطّى الصعب لا يجتاز: ما تُخطّي فائتٌ في الالتقاط، وغيرُ مراجَعٍ في «لم يتّضح»."""
+        items = [bench.Item("r", 1, 1, ["بِسۡمِ"], np.zeros(1, np.float32), expected=0, kind="letters", heard=(1, 2)) for _ in range(4)]
+        hit = {"status": "ok", "findings": [{"wordIndex": 0, "kind": "letter"}]}
+        skip = {"status": "skipped", "reason": "EXPLAIN_FAILED", "findings": []}
+        recall = bench.Recall()
+        bench.score_pairs(items, [hit, skip, skip, skip], recall)
+        self.assertEqual((recall.items, recall.detected, recall.skipped), (4, 1, 3))
+        tally = bench.Tally()
+        bench.score_correct(items, [{"status": "ok", "findings": []}, skip, skip, skip], tally, {})
+        report = bench.build_report(model="m", seed="s", reciters=[{"id": "r", "nameAr": "ر"}], correct=tally,
+                                    per_reciter={}, recall=recall, missing={}, started=0)
+        self.assertEqual(report["substitutions"]["recall"]["rate"], 0.25)
+        self.assertEqual(report["correct"]["unclear"]["rate"], 0.75)
+        self.assertFalse(report["gates"]["substitutionRecall"])
+        self.assertFalse(report["gates"]["unclearRate"])
+
     def test_the_reciter_manifest_is_well_formed(self):
         manifest = json.load(open(os.path.join(ROOT, "benchmark", "reciters.json"), encoding="utf-8"))
         self.assertTrue(manifest["base"].startswith("https://"))

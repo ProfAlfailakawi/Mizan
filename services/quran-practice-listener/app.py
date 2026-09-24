@@ -17,7 +17,8 @@ MODEL_CHAIN=[m for m in [
     'Systran/faster-whisper-small',
     'Systran/faster-whisper-base',
 ] if m]
-state={'model':None,'id':None,'error':None,'started':time.time()}
+state={'model':None,'id':None,'error':None,'source':None,'started':time.time()}
+BAKED=os.getenv('MIZAN_BAKED_MODEL_DIR','/models/baked')
 
 def load_model():
     # تعثّرٌ عابرٌ في التنزيل لا يُعطّل الخدمةَ إلى الأبد: تُعاد المحاولة بمهلٍ متزايدة.
@@ -35,7 +36,7 @@ def try_models():
         try:
             print(f'loading {model_id}…',flush=True)
             state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=int(os.getenv('MIZAN_CPU_THREADS','2')))
-            state['id']=model_id; state['error']=None
+            state['id']=model_id; state['error']=None; state['source']='download'
             print(f'model ready: {model_id}',flush=True)
             return
         except Exception as exc:
@@ -55,11 +56,21 @@ def load_prefetched()->bool:
     يجهز — فأوّلُ طلبٍ ينتظر ثوانيَ الإقلاع بدل دقائق «يستعدّ». ولا كلفةَ فوق ما كان.
     """
     from faster_whisper import WhisperModel
+    threads=int(os.getenv('MIZAN_CPU_THREADS','2'))
+    # المجلّدُ المخبوز (prefetch.py): نُزِّل وحُمِّل في البناء نفسه، فلا مخبأَ ولا شبكة.
+    try:
+        with open(os.path.join(BAKED,'MODEL_ID'),encoding='utf-8') as f:model_id=f.read().strip()
+        state['model']=WhisperModel(BAKED,device='cpu',compute_type='int8',cpu_threads=threads)
+        state['id']=model_id; state['error']=None; state['source']='image'
+        print(f'model ready from image: {model_id}',flush=True)
+        return True
+    except Exception as exc:
+        print(f'no baked model: {exc}',flush=True)
     for model_id in dict.fromkeys(MODEL_CHAIN):
         try:
-            state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=int(os.getenv('MIZAN_CPU_THREADS','2')),local_files_only=True)
-            state['id']=model_id; state['error']=None
-            print(f'model ready from image: {model_id}',flush=True)
+            state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=threads,local_files_only=True)
+            state['id']=model_id; state['error']=None; state['source']='image'
+            print(f'model ready from image cache: {model_id}',flush=True)
             return True
         except Exception as exc:
             print(f'not in image: {model_id}: {exc}',flush=True)
@@ -130,7 +141,10 @@ def best_match(transcript:str, ayat:list[dict], after:int=-1):
 def health():
     from fastapi.responses import JSONResponse
     status='ok' if state['model'] else ('retrying' if state['error'] else 'loading')
-    body={'status':status,'model':state['id'],'error':state['error'],'mode':'PRACTICE_AND_FOLLOW_ONLY'}
+    # `source`: من الصورة (إقلاعٌ في ثوانٍ) أو من الشبكة (الصورةُ بلا نموذج — يُرى في ملخّص النشر).
+    # `build`: الـcommit الذي بُنيت منه النسخةُ العاملة — فلا يُظنّ الإصلاحُ منشورًا وهو لم يُنشر.
+    body={'status':status,'model':state['id'],'error':state['error'],'source':state['source'],
+          'build':os.getenv('MIZAN_BUILD_SHA') or None,'mode':'PRACTICE_AND_FOLLOW_ONLY'}
     # لا «سليم» قبل أن يجهز النموذج: الصحّةُ تقول الحقيقة لمن يسأل.
     return JSONResponse(body,status_code=200 if state['model'] else 503)
 

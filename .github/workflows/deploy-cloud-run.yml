@@ -226,6 +226,8 @@ jobs:
             body="$(curl -sS --max-time 20 "${SERVICE_URL%/}/api/health?listener=1" || true)"
             state="$(jq -r '.quranPracticeListener.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
             model="$(jq -r '.quranPracticeListener.model // "-"' <<<"$body" 2>/dev/null || echo -)"
+            listener_source="$(jq -r '.quranPracticeListener.source // "-"' <<<"$body" 2>/dev/null || echo -)"
+            listener_build="$(jq -r '.quranPracticeListener.build // "-"' <<<"$body" 2>/dev/null || echo -)"
             muaalem="$(jq -r '.quranMuaalem.state // "UNKNOWN"' <<<"$body" 2>/dev/null || echo UNKNOWN)"
             muaalem_model="$(jq -r '.quranMuaalem.model // "-"' <<<"$body" 2>/dev/null || echo -)"
             muaalem_mode="$(jq -r '(.quranMuaalem.mode // "-") + " · " + (.quranMuaalem.modeReason // "-")' <<<"$body" 2>/dev/null || echo -)"
@@ -238,6 +240,8 @@ jobs:
             echo
             echo "- الحال: \`$state\`"
             echo "- النموذج: \`${model:--}\`"
+            echo "- مصدر النموذج: \`${listener_source:--}\` (image = مخبوزٌ في الصورة؛ download = الصورة بلا نموذج)"
+            echo "- النسخة العاملة: \`${listener_build:--}\` (المتوقّع \`${GITHUB_SHA:0:12}\`)"
             echo
             echo '## المعلّم القرآني (التشكيل والتجويد)'
             echo

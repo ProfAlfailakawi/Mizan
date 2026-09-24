@@ -302,6 +302,7 @@ class Recall:
     items: int = 0
     detected: int = 0
     unclear: int = 0
+    skipped: int = 0
     collateral: int = 0
     by_type: dict = field(default_factory=dict)
     examples: list = field(default_factory=list)
@@ -309,10 +310,13 @@ class Recall:
 
 def score_pairs(items: list[Item], verdicts: list[dict], rec: Recall, examples: int = 30) -> None:
     for item, v in zip(items, verdicts):
-        t = rec.by_type.setdefault(item.kind, {"items": 0, "detected": 0, "unclear": 0})
-        if v["status"] == "skipped":
-            continue
+        t = rec.by_type.setdefault(item.kind, {"items": 0, "detected": 0, "unclear": 0, "skipped": 0})
+        # كلُّ زلّةٍ في المقام: ما تخطّاه المحرّكُ (بلا مرجع، أو تعذّر الشرح، أو بلا حكم) فاتَه،
+        # ولا يُحذف من العدّ — وإلا اجتاز محرّكٌ الشرطَ بمئة زلّةٍ سهلة وتخطّى الصعبةَ كلَّها.
         rec.items += 1; t["items"] += 1
+        if v["status"] != "ok" and v["status"] != "unclear":
+            rec.skipped += 1; t["skipped"] += 1
+            continue
         if v["status"] == "unclear":
             rec.unclear += 1; t["unclear"] += 1
             continue
@@ -336,7 +340,8 @@ def rate(k: int, n: int) -> dict:
 def build_report(*, model: str, seed: str, reciters: list[dict], correct: Tally, per_reciter: dict, recall: Recall,
                  missing: dict, started: float) -> dict:
     fa = rate(correct.flagged, correct.words)
-    unclear = rate(correct.unclear, correct.items - correct.skipped)
+    # «لم يُراجَع» = ما لم يتّضح وما تُخطّي معًا، من كلّ الآيات — فالتخطّي لا يُجمِّل النسبة.
+    unclear = rate(correct.unclear + correct.skipped, correct.items)
     substitution_recall = rate(recall.detected, recall.items)
     gates = {
         "falseAlarmRate": fa["rate"] is not None and fa["rate"] <= GATES["falseAlarmRateMax"],
@@ -354,7 +359,7 @@ def build_report(*, model: str, seed: str, reciters: list[dict], correct: Tally,
                     "byKind": correct.by_kind, "byRule": dict(sorted(correct.by_rule.items(), key=lambda x: -x[1])),
                     "examples": correct.examples},
         "substitutions": {"items": recall.items, "detected": recall.detected, "recall": rate(recall.detected, recall.items),
-                          "unclear": recall.unclear, "collateralFlags": recall.collateral,
+                          "unclear": recall.unclear, "skipped": recall.skipped, "collateralFlags": recall.collateral,
                           "byType": {k: {**v, "recall": rate(v["detected"], v["items"])} for k, v in recall.by_type.items()},
                           "examples": recall.examples},
         "reciters": [{"id": r["id"], "nameAr": r["nameAr"], "style": r.get("style"),
