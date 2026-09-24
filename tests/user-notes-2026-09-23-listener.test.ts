@@ -157,7 +157,7 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   assert.match(practice, /if \(out\.alignmentState !== 'LOST'\) \{/, 'an untrusted LOST candidate reveals nothing');
   // تحت الحجاب: الموضعُ التقريبيّ لا يكشف إلا حين لا تُسمع الكلمات، ولا يسبق آخرَ ما سُمع بأكثر من VEIL_STEP.
   assert.match(practice, /export const VEIL_STEP = 4;/);
-  assert.match(practice, /if \(!veiledRef\.current\) advance\(target\);/);
+  assert.match(practice, /if \(!veiledRef\.current\) advance\(roughReach\(target, trustedFrontier\.current, wordFollow\.current\)\);/, 'outside the veil the rough position leads the heard words by a small edge only');
   assert.match(practice, /!attemptJudging\.current && !wordFollow\.current && out\.alignmentState === 'LOCKED'/);
   assert.match(practice, /reachedRef\.current - 1 \+ VEIL_STEP/);
   // تكرارُ الموضع نفسِه لا يكشف مزيدًا (لا تسلّق).

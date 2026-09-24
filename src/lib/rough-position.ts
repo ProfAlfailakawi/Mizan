@@ -20,6 +20,21 @@ export interface RoughGate {
 
 export const OPEN_ROUGH_GATE: RoughGate = { pending: null };
 
+/*
+ * وما دام السماعُ كلمةً كلمة جاريًا، لا يسبقه الموضعُ التقريبيُّ إلا بكلمتين.
+ *
+ * قِيس بعد نافذة اللحاق: والصوتُ في الآية 16 (لازمةٌ خارج الوجه) عاد `LOCKED` على 21:1 — لازمةِ
+ * الوجه — وكانت على ثماني كلماتٍ من أوّله، فقُبلت بلا تأكيد وتعلّمت ثماني كلماتٍ «مقروءة» قبل أن
+ * تُقال بعشرين ثانية. واللوازمُ على هذا الوجه بين كلّ آيتين، فلا يكفي بُعدُ القفزة حارسًا.
+ * والسماعُ لا يتأخّر الآن إلا ثوانيَ، فهو يقود القلم، والتقريبيُّ لا يزيد عليه إلا حافّةً صغيرة.
+ */
+export const ROUGH_LEAD_WORDS = 2;
+
+/** أبعدُ ما يبلغه القلمُ بالموضع التقريبيّ: بلا سماعٍ جارٍ هو الموضعُ كما هو. */
+export function roughReach(target: number, heardFrontier: number, following: boolean): number {
+  return following ? Math.min(target, heardFrontier + ROUGH_LEAD_WORDS) : target;
+}
+
 /** `anchor` أبعدُ موضعٍ قُبل (`-1` في أوّل التلاوة)، و`now` بالملّي ثانية. */
 export function admitRough(target: number, anchor: number, gate: RoughGate, now: number): { accept: boolean; gate: RoughGate } {
   if (target <= anchor + ROUGH_JUMP_WORDS) return { accept: true, gate: OPEN_ROUGH_GATE };

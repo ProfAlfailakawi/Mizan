@@ -12,7 +12,7 @@ import {
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment, provisionalReach } from '../../lib/live-judging';
-import { OPEN_ROUGH_GATE, admitRough, type RoughGate } from '../../lib/rough-position';
+import { OPEN_ROUGH_GATE, admitRough, roughReach, type RoughGate } from '../../lib/rough-position';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -666,7 +666,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
                * ـ وإلا فلا يكشف إلا موضعًا مُثبَتًا (LOCKED)، ولا يتقدّم في مقطعٍ واحدٍ أكثرَ من
                *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
                */
-              if (!veiledRef.current) advance(target);
+              if (!veiledRef.current) advance(roughReach(target, trustedFrontier.current, wordFollow.current));
               else if (!attemptJudging.current && !wordFollow.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
                 // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
                 lastRough.current = target;
