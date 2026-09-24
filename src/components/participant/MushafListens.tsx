@@ -229,6 +229,15 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * الخادمُ إنّ السماعَ غيرُ متاحٍ أصلًا. وحينها يعود إلى الموضع التقريبيّ.
    */
   const wordFollow = useRef(true);
+  /*
+   * آخرُ مقطعٍ دُفع إلى كلٍّ من المسارين — فمهمّةٌ تبدأ وقد جاء بعدها أحدثُ منها تُترك له.
+   *
+   * كان كلُّ مقطعٍ يُسمع ولو تأخّر: فإذا زاد الحسابُ على طول المقطع (خادمٌ مشغول، شبكةٌ
+   * بطيئة) تراكم الطابورُ وكبر التأخّرُ بلا حدّ — قيس ٣٠ ثانيةً وسيطًا (MIZAN-LISTENER-FOLLOW-1).
+   * والنوافذُ متداخلة، فالأحدثُ يحمل ما فات ما دام يبدأ قبل آخر ما ثبت.
+   */
+  const latestRecognition = useRef(-1);
+  const latestAlignment = useRef(-1);
   const followFailures = useRef(0);
   const chunkIndex = useRef(0);
   const startedAt = useRef(0);
@@ -472,7 +481,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -542,7 +551,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const begin = useCallback(async () => {
     if (!face) return;
     samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -618,7 +627,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * إلى `onFailure`. فلو التُقط هنا ومضت المهمّةُ رأى الطابورُ نجاحًا حيث وقع
          * سقوط، فقال «تمّ» ومقطعٌ لم يصل.
          */
+        latestAlignment.current = index;
         queue.current.push(async live => {
+          /* الموضعُ التقريبيُّ يحتاج أحدثَ مقطعٍ وحده: ما سبقه أحدثُ منه لا يُرسل. */
+          if (!finalChunk && latestAlignment.current > index) { setHeard(n => n + 1); return; }
           const out = await submitPracticeAlignmentChunk({
             blob: listenable, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
@@ -670,9 +682,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
          * صنعت «أعدتَ» الكاذبة في مسار المحاذاة، ولا تُعاد هنا.
          */
         if (attemptJudging.current || wordFollow.current) {
+          latestRecognition.current = index;
           recognition.current.push(async live => {
             const permission = attemptJudging.current;
             if (!permission && !wordFollow.current) return;
+            /*
+             * وإن جاء بعدها أحدثُ تُترك له — بشرط ألا يترك ثقبًا: نافذةُ الأحدث تبدأ قبل آخر ما ثبت،
+             * فكلُّ ما قيل بعده في نافذته. (والمقطعُ الأخيرُ لا يُترك أبدًا.)
+             */
+            const newest = latestRecognition.current;
+            if (!finalChunk && newest > index && recognitionWindow(newest, false).startMs <= committedUntil.current) return;
             const out = await submitPracticeRecognitionChunk({
               blob: windowBlob, headBytes: windowHeadBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);

@@ -95,3 +95,32 @@ class Bench(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Backlog(unittest.TestCase):
+    def test_a_slow_server_skips_stale_windows_and_the_lag_stays_bounded(self):
+        """حسابٌ أبطأ من الصوت: كان الطابورُ يتراكم بلا حدّ؛ والآن يُترك القديمُ لأحدثَ منه."""
+        words = [w for a in AYAT for w in bench.norm(a['text']).split()] * 4
+        ayat = AYAT * 4
+        dur = 1.6
+        ends = bench.word_times(ayat, [dur] * len(ayat))
+        total = dur * len(ayat)
+        audio = np.zeros(int(bench.SR * total), dtype=np.float32)
+        rh = bench.rhythm()
+        chunk_s = rh['chunkMs'] / 1000
+
+        clock = {'t': 0.0}
+        real = bench.time.perf_counter
+        bench.time.perf_counter = lambda: clock['t']
+        try:
+            class Slow:
+                def transcribe(self, audio_in, word_timestamps=False, **_):
+                    clock['t'] += 1.5  # كلُّ نداءٍ ثانيةٌ ونصف — والمساران معًا ثلاثُ ثوانٍ لكلّ مقطع
+                    return [], None
+            out = bench.simulate(Slow(), ayat, audio, ends, rh)
+        finally:
+            bench.time.perf_counter = real
+        self.assertGreater(out['skippedWindows'], 0, 'stale windows are skipped')
+        # بلا ترك كان آخرُ مقطعٍ يُخدم بعد (عدد المقاطع × ٣ ثوانٍ)؛ والآن يتبع الوصولَ.
+        n = out['chunks']
+        self.assertLess(len(out['recogCost']) + len(out['listenCost']), 2 * n)

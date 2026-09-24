@@ -119,6 +119,7 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
     server_free = 0.0
     listen_cost, recog_cost = [], []
     reached = 0  # أوّلُ كلمةٍ لم تنكشف
+    skipped = 0
 
     def reveal(upto: int, at: float):
         nonlocal reached, ahead_events
@@ -145,15 +146,23 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         piece = audio[i * chunk:(i + 1) * chunk]
 
         # ـ مسارُ الموضع
+        final = i == n - 1
+        newest_by = lambda t: min(n - 1, int(t * SR // chunk) - 1)  # آخرُ مقطعٍ وصل عند اللحظة t  # noqa: E731
+        # كما في الصفحة: مهمّةٌ تبدأ وقد وصل أحدثُ منها تُترك له (الموضعُ يحتاج أحدثَ مقطعٍ وحده).
+        start = max(server_free, arrive)
+        skip_listen = not final and newest_by(start) > i
         # كما في /listen (`after_header`): الترويسةُ تُقصّ من الصوت، ولا يُكتب إلا المقطعُ نفسُه.
         t0 = time.perf_counter()
-        segs, _ = model.transcribe(piece, language='ar', beam_size=1, best_of=1, condition_on_previous_text=False,
-                                   vad_filter=True, vad_parameters={'min_silence_duration_ms': 300}, without_timestamps=True)
-        transcript = ' '.join(s.text for s in segs).strip()
-        candidate, conf = best_match(transcript, ayat, last_global)
-        cost = time.perf_counter() - t0
-        listen_cost.append(cost)
-        server_free = max(server_free, arrive) + cost
+        if skip_listen:
+            candidate, conf, cost = None, 0.0, 0.0
+        else:
+            segs, _ = model.transcribe(piece, language='ar', beam_size=1, best_of=1, condition_on_previous_text=False,
+                                       vad_filter=True, vad_parameters={'min_silence_duration_ms': 300}, without_timestamps=True)
+            transcript = ' '.join(s.text for s in segs).strip()
+            candidate, conf = best_match(transcript, ayat, last_global)
+            cost = time.perf_counter() - t0
+            listen_cost.append(cost)
+        server_free = start + cost
         if candidate is not None and conf >= 0.55:
             g = candidate['globalIndex']
             truth = truth_index(arrive)
@@ -168,8 +177,13 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         # والنافذةُ كذلك بلا ترويسة (`after_header` في /recognise)، فالتوقيتُ منها مباشرة.
         audio_in = audio[first * chunk:(i + 1) * chunk]
         head_s = 0.0
-        final = i == n - 1
         commit_until = (i + 1) * chunk / SR - (0 if final else rh['edgeHoldMs'] / 1000)
+        # وكذلك الكلمات: تُترك لأحدثَ منها ما دامت نافذتُه تبدأ قبل آخر ما ثبت (لا ثقب).
+        newest = newest_by(server_free)
+        newest_first = max(0, newest - (rh['windowChunks'] - 1))
+        if not final and newest > i and newest_first * chunk / SR <= committed_until:
+            skipped += 1
+            continue
         t0 = time.perf_counter()
         segs, _ = model.transcribe(audio_in, language='ar', beam_size=1, best_of=1, condition_on_previous_text=False,
                                    vad_filter=True, vad_parameters={'min_silence_duration_ms': 300}, word_timestamps=True)
@@ -207,7 +221,7 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
     return {
         'words': total_words, 'revealed': sum(1 for r in revealed_at if r is not None),
         'lags': lags, 'aheadEvents': ahead_events, 'roughJumps': jumps, 'roughAhead': rough_ahead,
-        'chunks': n, 'listenCost': listen_cost, 'recogCost': recog_cost,
+        'chunks': n, 'skippedWindows': skipped, 'listenCost': listen_cost, 'recogCost': recog_cost,
     }
 
 
