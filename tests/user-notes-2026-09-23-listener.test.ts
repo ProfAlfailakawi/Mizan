@@ -140,5 +140,9 @@ test('the listener image declares requests and proves the model library imports 
   /* رُصد في نشر 8b771c9 بسجلّه: «No module named 'requests'» — في التنزيل المسبق وعند الإقلاع. */
   assert.match(read('services/quran-practice-listener/requirements.txt'), /^requests==/m);
   assert.match(read('services/quran-practice-listener/Dockerfile'), /RUN python -c "from faster_whisper import WhisperModel; import requests"/);
-  assert.match(read('services/quran-practice-listener/app.py'), /except Exception as exc:\n\s+# لا يموت الخيطُ صامتًا/);
+  const app = read('services/quran-practice-listener/app.py');
+  assert.match(app, /except Exception as exc:\n\s+# لا يموت الخيطُ صامتًا/);
+  /* ومحمِّلٌ انتهى بلا نموذج يُقال «failed» (فيراه الخادمُ HTTP_503 ويُغلق الزرَّ فورًا)، لا «retrying». */
+  assert.match(app, /state\['failed'\]=True/);
+  assert.match(app, /'failed' if state\.get\('failed'\) else 'retrying'/);
 });
