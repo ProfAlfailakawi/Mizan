@@ -1,0 +1,7 @@
+{
+  "protocol": "MIZAN-MUAALEM-BENCH-1",
+  "reading": "hafs",
+  "status": "NOT_MEASURED",
+  "passes": false,
+  "note": "لم يُقَس المعلّمُ بعد. يُستبدل هذا الملفّ بتقرير «قياس المعلّم على كبار القرّاء» (.github/workflows/muaalem-benchmark.yml) كما يطبعه السجلّ، ولا يُفتح المعلّم للطلاب (MIZAN_QURAN_MUAALEM_MODE=open) إلا بتقريرٍ يجتاز شروطه على النموذج والقواعد العاملة."
+}

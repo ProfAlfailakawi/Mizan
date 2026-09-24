@@ -1,0 +1,24 @@
+{
+  "about": "كبارُ قرّاء حفص (مرتّل) عيّنةً للقياس: أداءٌ متقن، وأصواتٌ وسرعاتٌ وجوداتُ تسجيلٍ مختلفة. الملفّاتُ آيةً آية من everyayah.com — تُنزَّل وقتَ القياس ولا تُحفظ في المستودع. ما غاب ملفُّه يُعدّ في «missingFiles» ولا يُخمَّن.",
+  "base": "https://everyayah.com/data",
+  "reciters": [
+    { "id": "husary", "nameAr": "محمود خليل الحصري", "folder": "Husary_128kbps", "style": "murattal", "why": "مرجعُ تعليم التجويد، أضبطُ الأداء وأوضحُه" },
+    { "id": "minshawi", "nameAr": "محمد صديق المنشاوي", "folder": "Minshawy_Murattal_128kbps", "style": "murattal", "why": "إتقانٌ وتؤدة، وتسجيلٌ قديمٌ يختبر جودةَ الصوت" },
+    { "id": "abdulbasit", "nameAr": "عبد الباسط عبد الصمد", "folder": "Abdul_Basit_Murattal_192kbps", "style": "murattal", "why": "مدٌّ وغنّةٌ واسعان — يختبر نطاقَ المدود المجازة" },
+    { "id": "ayyub", "nameAr": "محمد أيوب", "folder": "Muhammad_Ayyoub_128kbps", "style": "murattal", "why": "قارئُ المسجد النبويّ، أداءٌ منضبط" },
+    { "id": "basfar", "nameAr": "عبد الله بصفر", "folder": "Abdullah_Basfar_192kbps", "style": "murattal", "why": "ترتيلٌ تعليميٌّ واضح" },
+    { "id": "akhdar", "nameAr": "إبراهيم الأخضر", "folder": "Ibrahim_Akhdar_32kbps", "style": "murattal", "why": "شيخُ القرّاء بالمدينة؛ وتسجيلٌ بجودةٍ منخفضة (32kbps) يختبر الصوتَ الرديء" },
+    { "id": "suwaid", "nameAr": "أيمن رشدي سويد", "folder": "Ayman_Sowaid_64kbps", "style": "murattal", "why": "مقرئٌ ومعلّمُ تجويدٍ — أداءُ المعلّم نفسه" },
+    { "id": "hudhaifi", "nameAr": "علي الحذيفي", "folder": "Hudhaify_128kbps", "style": "murattal", "why": "قارئُ مصحف المجمع" },
+    { "id": "jibreel", "nameAr": "محمد جبريل", "folder": "Muhammad_Jibreel_128kbps", "style": "murattal", "why": "أداءٌ مصريٌّ متقن" },
+    { "id": "banna", "nameAr": "محمود علي البنا", "folder": "mahmoud_ali_al_banna_32kbps", "style": "murattal", "why": "مدرسةٌ قديمةٌ وتسجيلٌ منخفضُ الجودة" },
+    { "id": "muaiqly", "nameAr": "ماهر المعيقلي", "folder": "MaherAlMuaiqly128kbps", "style": "murattal", "why": "صوتُ المرجع في ميزان («استمع» و«أوّل آية»)" },
+    { "id": "alafasy", "nameAr": "مشاري العفاسي", "folder": "Alafasy_128kbps", "style": "murattal", "why": "أوسعُ القرّاء انتشارًا بين الطلاب" },
+    { "id": "ghamdi", "nameAr": "سعد الغامدي", "folder": "Ghamadi_40kbps", "style": "murattal", "why": "صوتٌ مختلفُ الطبقة، وتسجيلٌ منخفضُ الجودة" },
+    { "id": "shatri", "nameAr": "أبو بكر الشاطري", "folder": "Abu_Bakr_Ash-Shaatree_128kbps", "style": "murattal", "why": "أداءٌ متأنٍّ" },
+    { "id": "dosari", "nameAr": "ياسر الدوسري", "folder": "Yasser_Ad-Dussary_128kbps", "style": "murattal", "why": "صوتٌ شابٌّ حادّ" },
+    { "id": "qatami", "nameAr": "ناصر القطامي", "folder": "Nasser_Alqatami_128kbps", "style": "murattal", "why": "صوتٌ عميق" },
+    { "id": "sudais", "nameAr": "عبد الرحمن السديس", "folder": "Abdurrahmaan_As-Sudais_192kbps", "style": "hadr", "why": "حدرٌ سريع — يختبر السرعة", "pairs": false },
+    { "id": "shuraim", "nameAr": "سعود الشريم", "folder": "Saood_ash-Shuraym_128kbps", "style": "hadr", "why": "حدرٌ سريع", "pairs": false }
+  ]
+}

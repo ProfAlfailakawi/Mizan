@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir --timeout 180 -r requirements.txt
 
 COPY analysis.py app.py prefetch.py ./
 COPY tests ./tests
+# أداةُ القياس ترافق الخدمةَ لأنّ اختباراتها تجري هنا؛ ولا يشغّلها الإنتاج.
+COPY benchmark ./benchmark
 # الاختباراتُ داخل الصورة، على النُّسخ نفسها: منطقُ الحكم، والخدمةُ بنموذجٍ مزيّف، والمسارُ
 # الحقيقيّ بنموذجٍ صغيرٍ عشوائيّ. فصورةٌ لا تجتازها لا تُبنى — ولا تصل الإنتاج.
 RUN MIZAN_MUAALEM_MODEL=/nonexistent python -m unittest discover -s tests
