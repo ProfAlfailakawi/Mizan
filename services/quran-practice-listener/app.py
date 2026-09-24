@@ -94,8 +94,14 @@ async def lifespan(_app):
 def startup_load():
     started=time.time()
     print('listener startup: loading model…',flush=True)
-    if not load_prefetched():
-        load_model()
+    try:
+        if not load_prefetched():
+            load_model()
+    except Exception as exc:
+        # لا يموت الخيطُ صامتًا: الخطأ يُحفظ فتقوله `/health` و`/ready` (كان استيرادٌ ناقص يُبقيه «يُحمّل» أبدًا).
+        state['error']=f'{type(exc).__name__}: {exc}'[-600:]
+        print(f'listener startup failed: {state["error"]}',flush=True)
+        return
     print(f'listener startup: model {state["id"]} ready from {state["source"]} in {time.time()-started:.1f}s',flush=True)
 
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
