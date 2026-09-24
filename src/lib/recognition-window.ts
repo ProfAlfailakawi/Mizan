@@ -43,3 +43,43 @@ export function recognitionWindow(index: number, final: boolean): RecognitionWin
   const endMs = (index + 1) * CHUNK_MS;
   return { first, headed, startMs, endMs, commitUntilMs: endMs - (final ? 0 : EDGE_HOLD_MS) };
 }
+
+/*
+ * نافذةُ اللحاق — حين يتأخّر السماعُ عن التلاوة.
+ *
+ * قِيس في متصفّحٍ حقيقيّ بعد #279: التأخّرُ يبدأ ١٦ ثانيةً ويبلغ ٧٤ ثانيةً بعد أربع دقائق. فكلُّ
+ * طلبٍ يحمل ستَّ ثوانٍ فقط، وأربعُ ثوانٍ ونصفٌ منها سُمعت من قبل: كلُّ ثانيةٍ من التلاوة تُسمع
+ * أربعَ مرّات. فإن أبطأ طلبٌ واحد، تراكم الباقي خلفه.
+ *
+ * و`faster-whisper` يمرّر كلَّ صوتٍ بنافذته الثابتة (ثلاثون ثانية) مهما قصر، فنافذةٌ من
+ * أربعٍ وعشرين ثانيةً تكلّف قريبًا من كلفة نافذة الستّ — لا يزيد إلا فكُّ كلماتها.
+ *
+ * فإذا جاء دورُ مقطعٍ وخلفه أحدثُ منه، **يبقى أوّلُ نافذته كما هو** (فلا ثقبَ بعد آخر ما ثبت)
+ * **ويمتدّ آخرُها إلى أحدث مقطعٍ وصل**، حتى `MAX_WINDOW_CHUNKS`. فيُلحق بالتلاوة في طلبٍ واحد.
+ * وما دام السماعُ يلحق بها فالنافذةُ هي نافذةُ `recognitionWindow` بعينها.
+ */
+export const MAX_WINDOW_CHUNKS = 16;
+/** كم تبدأ النافذةُ قبل آخر ما ثبت، إن رجعت إليه: قبل بداية الكلمة المعلّقة بهامش. */
+export const PENDING_LEAD_MS = 300;
+
+export interface CatchUpWindow extends RecognitionWindow {
+  /** آخرُ مقطعٍ يُرسل صوتُه. */
+  last: number;
+}
+
+/*
+ * وأوّلُ النافذة يرجع إلى آخر ما ثبت إن كان أبعدَ من أوّلها المعتاد.
+ *
+ * فكلمةٌ ممدودةٌ أربعَ ثوانٍ («تكذّبان» عند العفاسي) لا تُثبَّت إلا في نافذةٍ تبدأ قبلها
+ * وتنتهي بعدها بمهلة الحافّة، ونافذةُ الستّ ثوانٍ لا تسعها إلا إن وافقت حدودُها المقاطعَ.
+ * فكانت تبقى معلّقةً لا تُثبَّت، وتُعدّ «ساقطةً» وقد قيلت. فإن كان آخرُ ما ثبت قبل أوّل
+ * النافذة، بدأت النافذةُ منه — فالمعلّقةُ فيها كاملة.
+ */
+export function catchUpWindow(index: number, newest: number, final: boolean, committedUntilMs = Number.POSITIVE_INFINITY): CatchUpWindow {
+  const base = recognitionWindow(index, final);
+  const last = final ? index : Math.max(index, newest);
+  const pending = Number.isFinite(committedUntilMs) ? Math.floor(Math.max(0, committedUntilMs - PENDING_LEAD_MS) / CHUNK_MS) : base.first;
+  const first = Math.max(0, Math.min(base.first, pending), last - MAX_WINDOW_CHUNKS + 1);
+  const endMs = (last + 1) * CHUNK_MS;
+  return { first, headed: first > 0, startMs: first * CHUNK_MS, endMs, commitUntilMs: endMs - (final ? 0 : EDGE_HOLD_MS), last };
+}

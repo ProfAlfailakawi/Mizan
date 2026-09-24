@@ -34,7 +34,8 @@ test('chunks after the first are sent with the container header so they can be d
    * والترويسةُ تسبق كلَّ نافذةٍ لا تبلغ المقطعَ الأوّل؛ وما بلغته يُرسل صوتُه محتوًى لا
    * ترويسةً — وإلا طُرح صوتُ أوّل التلاوة ولم يُثبَّت (تغطيتُه في recognition-window.test).
    */
-  assert.match(practice, /const windowParts = win\.headed \? \[all\[0\], \.\.\.all\.slice\(win\.first, index \+ 1\)\] : all\.slice\(0, index \+ 1\)/);
+  assert.match(practice, /const parts = reach\.headed \? \[all\[0\], \.\.\.all\.slice\(reach\.first, reach\.last \+ 1\)\] : all\.slice\(0, reach\.last \+ 1\)/);
+  assert.match(practice, /headBytes: reach\.headed \? all\[0\]\.size : 0/, 'the header size travels with a headed window only');
   assert.match(practice, /startMs < committedUntil\.current - 80/, 'overlapping windows commit each word once');
 });
 
@@ -203,7 +204,7 @@ test('a closed ASR gate still lets words through the practice listener, and the 
 
 test('the edge hold no longer delays the pen for a word heard exactly as the next one', () => {
   const practice = read('src/components/participant/MushafListens.tsx');
-  assert.equal((practice.match(/advance\(provisionalReach\(expectedRef\.current, (judged\.)?frontier, edgeWords\(out\.words, windowStartMs, win\.commitUntilMs\)\)\)/g) || []).length, 2);
+  assert.equal((practice.match(/advance\(provisionalReach\(expectedRef\.current, (judged\.)?frontier, edgeWords\(out\.words, reach\.startMs, reach\.commitUntilMs\)\)\)/g) || []).length, 2);
   // والحكمُ بما ثبت وحده: ما عند الحافّة لا يدخل heardWords.
   assert.doesNotMatch(practice, /heardWords\.current = \[[^\]]*edgeWords/);
 });
