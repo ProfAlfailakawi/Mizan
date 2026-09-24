@@ -227,7 +227,9 @@ def analyse_segments(wave: np.ndarray, raw_segments: list, model) -> list[dict]:
                 sure = heard_confidence(ph.phonemes, out.phonemes.text, getattr(out.phonemes, "probs", None))
                 findings = [judge(e, len(ph.phonemes), seg, ref.uthmani, ref.lib_to_face) for e in errors]
                 for e, f in zip(errors, findings):
-                    if f is not None and e.speech_error_type != "delete":
+                    if f is not None and e.speech_error_type == "insert":
+                        f.confidence = sure.get(("insert", e.ph_pos[0]))
+                    elif f is not None and e.speech_error_type != "delete":
                         f.confidence = sure.get(e.ph_pos[0])
                 verdict = settle(seg, findings, _mean_confidence(out.phonemes), len(ref.lib_to_face))
             except Exception:

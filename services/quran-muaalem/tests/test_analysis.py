@@ -253,3 +253,19 @@ class ConfidenceTest(unittest.TestCase):
     def test_mismatched_probabilities_give_nothing(self):
         from analysis import heard_confidence
         self.assertEqual(heard_confidence("بَ", "بَ", [0.5]), {})
+
+
+class InsertConfidenceTest(unittest.TestCase):
+    def test_an_inserted_letter_carries_its_own_confidence(self):
+        from analysis import heard_confidence
+        words = Aya(19, 36).get().uthmani_words
+        full = " ".join(words)
+        ref = quran_phonetizer(full, MOSHAF, remove_spaces=True)
+        heard = "وَ" + ref.phonemes  # «وَوَإِنَّ»: واوٌ زائدة (الآيةُ تبدأ بـ«وَإِنَّ»)
+        probs = [0.99] * len(heard)
+        probs[2] = 0.22  # المحاذي يضع الزائدةَ ثانيةً — ثقتُها هي المقصودة
+        sure = heard_confidence(ref.phonemes, heard, probs)
+        errors = [e for e in explain_error(uthmani_text=full, ref_ph_text=ref.phonemes, predicted_ph_text=heard, mappings=ref.mappings)
+                  if e.speech_error_type == "insert"]
+        self.assertTrue(errors)
+        self.assertAlmostEqual(sure[("insert", errors[0].ph_pos[0])], 0.22)
