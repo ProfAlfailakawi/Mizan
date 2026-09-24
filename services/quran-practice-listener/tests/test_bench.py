@@ -74,10 +74,13 @@ class Bench(unittest.TestCase):
         state = {'i': 0, 'listen': True}
 
         def transcribe(audio_in, word_timestamps=False, **kw):
+            # النداءان بالترتيب لكلّ مقطع: الموضعُ (الترويسة + المقطع) ثم الكلمات (النافذة).
             i = state['i']
-            if not word_timestamps:  # مسارُ الموضع: الترويسة + المقطع
+            if state['listen']:
+                state['listen'] = False
                 model.window = (i * chunk_s, chunk_s if i else 0.0)
-                return original(audio_in, word_timestamps=False, **kw)
+                return original(audio_in, word_timestamps=word_timestamps, **kw)
+            state['listen'] = True
             first = max(0, i - (rh['windowChunks'] - 1))
             model.window = (first * chunk_s, chunk_s if first else 0.0)
             state['i'] += 1

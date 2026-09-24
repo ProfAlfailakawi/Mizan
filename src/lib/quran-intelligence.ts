@@ -92,12 +92,14 @@ export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:strin
  * يعود بلا `sessionEvidence` لأن التمرين لا يُقيَّد في سجلّ، ويحمل `practice:true` حتى لا
  * تُخلط نتيجته بنتيجة جلسةٍ حقيقية في أي شاشة.
  */
-export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string;after?:number},access?:JourneyPracticeAuth){
+export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string;after?:number;headBytes?:number},access?:JourneyPracticeAuth){
   const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
   /* آخرُ موضعٍ مُثبَت يرسو عليه المستمع، فلا يقفز إلى آيةٍ متشابهةٍ بعيدة. */
   if(Number.isInteger(input.after)&&(input.after as number)>=0)qs.set('after',String(input.after));
   const url=access?`/api/public/journeys/practice/align?${qs.toString()}`:`/api/quran/practice/align?${qs.toString()}`;
   const headers:Record<string,string>={'content-type':input.blob.type||'application/octet-stream'};
+  /* الترويسةُ (أوّلُ مقطعٍ في التلاوة) تُرسل ليُفكّ الصوت؛ وحجمُها يُعلَن فلا تُعدّ كلماتُها موضعَ القارئ الآن. */
+  if(input.headBytes)headers['x-mizan-head-bytes']=String(input.headBytes);
   if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
   const r=await fetch(url,{method:'POST',headers,body:input.blob,cache:'no-store'});
   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
@@ -144,10 +146,10 @@ export async function fetchQuranIntelligenceHealth(){return getJson<QuranIntelli
  * يُظهر «أين القارئ» فقط؛ لا يكتب دليلًا ولا يمسّ الدرجة.
  */
 export async function fetchJudgeFollowStatus(reading:string){return getJson<{ready:boolean;reading:string}>(`/api/quran/judge/follow/status?reading=${encodeURIComponent(reading)}`)}
-export async function submitJudgeFollowChunk(input:{blob:Blob;reading:string;surah:number;startAyah:number;endAyah:number;after?:number}){
+export async function submitJudgeFollowChunk(input:{blob:Blob;reading:string;surah:number;startAyah:number;endAyah:number;after?:number;headBytes?:number}){
   const token=await bearer();const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah)});
   if(Number.isInteger(input.after))qs.set('after',String(input.after));
-  const r=await fetch(`/api/quran/judge/follow?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult&{globalIndex?:number};
+  const r=await fetch(`/api/quran/judge/follow?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream',...(input.headBytes?{'x-mizan-head-bytes':String(input.headBytes)}:{})},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult&{globalIndex?:number};
 }
 
 /*

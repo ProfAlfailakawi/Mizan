@@ -193,7 +193,7 @@ def health():
     return JSONResponse(body,status_code=200 if state['model'] else 503)
 
 @app.post('/listen')
-async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected_passage:str=Header(''),x_mizan_after:str=Header('')):
+async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected_passage:str=Header(''),x_mizan_after:str=Header(''),x_mizan_head_bytes:str=Header('0')):
     # النموذجُ يسمع الأصوات؛ والنصُّ المقابَل به نصُّ رواية المتسابق نفسها (يُرسل مع الطلب).
     if not READING_ID.fullmatch(x_mizan_reading or ''):raise HTTPException(409,'READING_NOT_SUPPORTED')
     model=state['model']
@@ -203,22 +203,36 @@ async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected
     expected=decode_expected(x_mizan_expected_passage)
     try:after=int(x_mizan_after)
     except ValueError:after=-1
+    try:head_len=max(0,min(len(audio),int(x_mizan_head_bytes)))
+    except ValueError:head_len=0
     content_type=request.headers.get('content-type','audio/webm')
     suffix='.ogg' if 'ogg' in content_type else ('.mp4' if 'mp4' in content_type else '.webm')
-    path=''
-    try:
+    paths=[]
+    def temp(data:bytes)->str:
         with tempfile.NamedTemporaryFile(suffix=suffix,delete=False) as f:
-            f.write(audio); path=f.name
+            f.write(data);paths.append(f.name);return f.name
+    try:
+        # الترويسةُ أوّلُ التلاوة تُرسل ليُفكّ الصوت — وكلماتُها ليست موضعَ القارئ الآن. فكان ذيلُ
+        # ما سُمع يحملها حين يقصر المقطعُ أو يصمت، فيُطابَق أوّلَ المقطع ويقفز الموضعُ إليه
+        # (قيس: ٨١ قفزةً في MIZAN-LISTENER-FOLLOW-1، أكثرُها في الفاتحة وأوّل البقرة).
+        head_s=0.0
+        if head_len and head_len<len(audio):
+            from faster_whisper.audio import decode_audio
+            try:head_s=len(decode_audio(temp(audio[:head_len])))/16000.0
+            except Exception:head_s=0.0
         try:
-            segments,_=model.transcribe(path,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},without_timestamps=True)
-            transcript=' '.join(seg.text for seg in segments).strip()
+            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=head_s>0)
+            if head_s>0:
+                transcript=' '.join(w.word.strip() for seg in segments for w in (seg.words or []) if w.end>head_s+0.05).strip()
+            else:
+                transcript=' '.join(seg.text for seg in segments).strip()
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
         candidate,confidence=best_match(transcript,expected,after)
         return {'candidate':candidate,'confidence':confidence,'modelVersion':str(state['id']),'transcriptDiscarded':True,'acousticQuality':None}
     finally:
-        if path:
-            try:os.remove(path)
+        for p in paths:
+            try:os.remove(p)
             except OSError:pass
 
 

@@ -623,6 +623,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             blob: listenable, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
             after: lastGlobal.current >= 0 ? lastGlobal.current : undefined,
+            headBytes: chunk === head ? 0 : head.size,
           }, journeyAuth);
           /*
            * ويُسأل الطابورُ قبل الكتابة: أما زال هو الجاري؟
