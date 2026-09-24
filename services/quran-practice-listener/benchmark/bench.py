@@ -177,11 +177,15 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         recog_cost.append(cost)
         recog_free = max(recog_free, arrive) + cost
         start_s = first * chunk / SR
+        tail = []
         for w in words:
             if w.end <= head_s + 0.05:
                 continue
             ws, we = start_s + (w.start - head_s), start_s + (w.end - head_s)
-            if ws < committed_until - 0.08 or we > commit_until:
+            if ws < committed_until - 0.08:
+                continue
+            if we > commit_until:
+                tail.append(norm(w.word))  # عند الحافّة: لا يُثبَّت، ويُكشف إن طابق التاليةَ تمامًا
                 continue
             text = norm(w.word)
             if text:
@@ -189,6 +193,12 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
             committed_until = max(committed_until, we)
         f = follow_frontier(expected, heard)
         if f >= 0:
+            # provisionalReach (src/lib/live-judging.ts): ما عند الحافّة مطابقًا التاليةَ تمامًا.
+            for text in tail:
+                if f + 1 < total_words and text and text == expected[f + 1]:
+                    f += 1
+                else:
+                    break
             reveal(f, recog_free)
 
     lags = [revealed_at[k] - ends[k] for k in range(total_words) if revealed_at[k] is not None]
