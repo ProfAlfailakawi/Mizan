@@ -58,10 +58,32 @@ test('every delivered riwayah is listened to against its own text, never judged 
 
 test('the listener image prefetches its model when it can, and never fails the build when it cannot', () => {
   const docker = read('services/quran-practice-listener/Dockerfile');
-  assert.match(docker, /RUN timeout 600 python prefetch\.py \|\| echo/);
+  assert.match(docker, /RUN timeout 900 python prefetch\.py \|\| echo/);
   const prefetch = read('services/quran-practice-listener/prefetch.py');
   assert.match(prefetch, /sys\.exit\(0\)/);
   assert.doesNotMatch(prefetch, /raise\b/);
+  /* يُنزَّل إلى مجلّدٍ صريح ويُحمَّل في البناء نفسه، ولا يُكتب اسمُه إلا بعد أن يُحمَّل. */
+  assert.match(prefetch, /download_model\(model_id, output_dir=BAKED\)\n\s*WhisperModel\(BAKED[^\n]*\)\n\s*with open\(os\.path\.join\(BAKED, 'MODEL_ID'\)/);
+  const app = read('services/quran-practice-listener/app.py');
+  assert.match(app, /state\['model'\]=WhisperModel\(BAKED,/);
+});
+
+test('the listener says where its model came from and which build runs — so an undeployed fix is never taken for deployed', () => {
+  const app = read('services/quran-practice-listener/app.py');
+  assert.match(app, /'source':state\['source'\]/);
+  assert.match(app, /'build':os\.getenv\('MIZAN_BUILD_SHA'\) or None/);
+  assert.match(read('cloudbuild.yaml'), /--update-env-vars "MIZAN_BUILD_SHA=\$COMMIT_SHA"/);
+  assert.match(read('server.ts'), /source:\['image','download'\]\.includes\(body\?\.source\)\?body\.source:null/);
+  const deploy = read('.github/workflows/deploy-cloud-run.yml');
+  assert.match(deploy, /quranPracticeListener\.source/);
+  assert.match(deploy, /quranPracticeListener\.build/);
+});
+
+test('a waking listener shows seconds and says the microphone is fine — never a silent grey button', () => {
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /المستمع يستيقظ… \$\{warmSeconds\.toLocaleString\('ar-EG'\)\} ث/);
+  assert.match(practice, /data-listener-waking/);
+  assert.match(practice, /الميكروفونُ سليم/);
 });
 
 test('the student waits for a waking listener instead of losing the first chunks — at most two minutes', () => {

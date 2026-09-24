@@ -17,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --timeout 120 -r requirements.txt
 # محاولةُ تنزيلٍ مسبق لا تُسقط البناء: إن نجحت أقلع المستمعُ سريعًا بعد كل نوم.
 COPY prefetch.py .
-RUN timeout 600 python prefetch.py || echo "model prefetch skipped; runtime download will be used"
+RUN timeout 900 python prefetch.py || echo "model prefetch skipped; runtime download will be used"
 COPY app.py .
 
 CMD ["sh","-c","uvicorn app:app --host 0.0.0.0 --port ${PORT}"]

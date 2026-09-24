@@ -2174,22 +2174,23 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
    * دقيقة، ولا يُنقل من المستمع إلا حالُه واسمُ نموذجه (لا رسائلُ خطئه).
    */
   let listenerHealthCache:{at:number;value:{state:string;model:string|null}}|null=null;
-  const practiceListenerHealth=async():Promise<{state:string;model:string|null}>=>{
+  type ListenerHealth={state:string;model:string|null;source?:string|null;build?:string|null};
+  const practiceListenerHealth=async():Promise<ListenerHealth>=>{
     if(!/^https:\/\//i.test(practiceListenerUrl))return {state:'NOT_CONFIGURED',model:null};
     if(listenerHealthCache&&Date.now()-listenerHealthCache.at<30_000)return listenerHealthCache.value;
-    let value:{state:string;model:string|null}={state:'UNREACHABLE',model:null};
+    let value:ListenerHealth={state:'UNREACHABLE',model:null};
     try{
       const token=await practiceListenerToken();
       const r=await fetch(new URL('/health',practiceListenerUrl).toString(),{headers:token?{authorization:`Bearer ${token}`}:{},signal:AbortSignal.timeout(4_000)});
       const body=await r.json().catch(()=>({})) as any;
       const state=String(body?.status||'').toUpperCase();
-      value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null};
+      value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null,source:['image','download'].includes(body?.source)?body.source:null,build:typeof body?.build==='string'&&/^[0-9a-f]{7,40}$/.test(body.build)?body.build.slice(0,12):null};
     }catch{/* يبقى UNREACHABLE */}
     listenerHealthCache={at:Date.now(),value};
     return value;
   };
   /* للشاشات التي تسأل كثيرًا: آخرُ ما عُرف فورًا، والتحديثُ في الخلفية — لا تنتظر المستمع. */
-  const practiceListenerHealthCached=():{state:string;model:string|null}=>{
+  const practiceListenerHealthCached=():ListenerHealth=>{
     if(!listenerHealthCache||Date.now()-listenerHealthCache.at>=30_000)void practiceListenerHealth().catch(()=>{});
     return listenerHealthCache?.value??{state:/^https:\/\//i.test(practiceListenerUrl)?'CHECKING':'NOT_CONFIGURED',model:null};
   };
