@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, EyeOff, Lightbulb, Mic, RotateCcw, Square } from 'lucide-react';
 
 import { MushafFaceSurface, type FaceWord } from './MushafFaceSurface';
+import { warmQuranFont } from '../../lib/quran-font';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { drawFace } from '../../../server/mushaf-face';
 import type { FaceMark, FaceReading } from '../../lib/face-reading';
@@ -299,6 +300,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     return () => { alive.current = false; };
   }, []);
   useEffect(() => { setAttempts(loadFaceAttempts(owner, deliveryReading || '')); }, [owner, deliveryReading]);
+  /* خطُّ المصحف يُطلب عند فتح «يسمعك» — فإذا سُحب الوجهُ كان جاهزًا فظهر به من أوّل لحظة. */
+  useEffect(() => { void warmQuranFont(); }, []);
 
   /* القائمةُ تُطلب مرّةً لكلّ نطاقٍ ورواية — وهي مواضعُ بلا نصّ، فلا تُحمَّل الحزمةُ كلُّها. */
   useEffect(() => {

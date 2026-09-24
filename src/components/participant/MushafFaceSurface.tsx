@@ -7,6 +7,7 @@ import { FaceMistakeLegend, FACE_MISTAKE_STYLE, addedCount, mistakesByWord, prim
 import type { FaceMark, FaceMarkKind, FaceIndices } from '../../lib/face-reading';
 import type { Mistake } from '../../lib/recitation-diff';
 import { fetchOfficialMushafPage, officialMushafPackageForReading } from '../../lib/kfgqpc-library';
+import { useQuranFontReady } from '../../lib/quran-font';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — والصفحةُ نفسُها هي التقرير.
@@ -64,8 +65,16 @@ export interface MushafFaceSurfaceProps {
   /** حين لا يعمل التحليلُ العميق: يُقال السببُ ولا يُتظاهر. */
   analysisNote?: string;
   officialFont?: boolean;
-  /** مفتاح حزمة الرواية: عند وجوده يُعرض نفس تصوير الصفحة الذي يراه المحكّم. */
+  /** مفتاح حزمة الرواية. */
   deliveryReading?: string;
+  /*
+   * تصويرُ الصفحة المطبوعة بدل النصّ — وهو مطفأٌ ما لم يُطلب.
+   *
+   * كان يُعرض أوّلًا ما دامت طبقةُ القلم تُقاس عليه، فإن تعذّرت (وهو الغالب) نزل العرضُ إلى
+   * النصّ. فكان الطالبُ يرى صورةَ المصحف المدنيّ لحظةً ثمّ تتبدّل إلى الخطّ — وقرارُ صاحب
+   * المنصّة (٢٤ سبتمبر ٢٠٢٦) أنّ الخطَّ أجملُ وأنفعُ للطالب، فيُعرض من أوّل لحظة.
+   */
+  pageImage?: boolean;
   /** التلاوةُ الجارية: موضعُ القلم، وما تُلي، والحجاب. */
   live?: LiveState;
   /** ملاحظاتُ المعلّم بعد التلاوة (الحركاتُ والمدود). */
@@ -74,7 +83,7 @@ export interface MushafFaceSurfaceProps {
 
 export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   ar, page, surahName, surahNames, words, marks = [], mistakes, indices, frameUnit = 'frame', measurableMarks,
-  choiceNote, analysisNote, officialFont = false, deliveryReading, live, notes,
+  choiceNote, analysisNote, officialFont = false, deliveryReading, pageImage = false, live, notes,
 }) => {
   /* ملاحظةُ المعلّم الأولى على كلّ كلمة: نوعُها يُلوِّن، ونصُّها يُقرأ عند الإشارة ولقارئ الشاشة. */
   const noteOf = useMemo(() => new Map<number, TashkeelFinding>((notes ?? []).map(n => [n.wordIndex, n] as const).reverse()), [notes]);
@@ -86,7 +95,9 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
   const nameOf = (surah: number) => surahNames?.[surah] ?? (words[0] && surah === words[0].surah ? surahName : undefined);
   /* اسمُ الشريط الأعلى: أوّلُ سورةٍ على الوجه — والتاليةُ يُعلنها شريطُها عند موضعها. */
   const openingName = words.length ? nameOf(words[0].surah) : surahName;
-  const packageId = officialMushafPackageForReading(deliveryReading);
+  const packageId = pageImage ? officialMushafPackageForReading(deliveryReading) : undefined;
+  /* والكلماتُ لا تُكشف بخطٍّ احتياطيٍّ ثمّ تتبدّل: تنتظر خطَّ المصحف (بمهلةٍ قصيرة). */
+  const fontReady = useQuranFontReady();
   const [officialPage,setOfficialPage]=useState<string|null>(null);
   useEffect(()=>{let live=true;let url:string|null=null;setOfficialPage(null);
     if(!packageId)return;
@@ -127,7 +138,12 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
       </div>}
       <div
         className={`${officialPage && showImage?'sr-only':'font-quran text-center text-[1.55rem] leading-[2.6] text-[#202622] sm:text-[2.1rem]'}`}
-        style={!(officialPage && showImage)&&officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : undefined}
+        style={{
+          ...(!(officialPage && showImage) && officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : {}),
+          ...(!(officialPage && showImage) && !fontReady ? { visibility: 'hidden' as const } : {}),
+        }}
+        aria-busy={!fontReady || undefined}
+        data-quran-font={fontReady ? 'ready' : 'loading'}
         data-face-words={words.length}
       >
         {words.map((word, i) => {
