@@ -41,6 +41,7 @@ export function muaalemGate(input: {
 
   const r = (input.report ?? {}) as any;
   if (r.protocol !== 'MIZAN-MUAALEM-BENCH-1' || r.reading !== 'hafs' || r.status === 'NOT_MEASURED') return { mode: 'trial', reason: 'NOT_MEASURED' };
+  if (r.status === 'PARTIAL') return { mode: 'trial', reason: 'BENCHMARK_PARTIAL' };
   const gates = r.gates && typeof r.gates === 'object' ? Object.values(r.gates) : [];
   if (r.passes !== true || !gates.length || gates.some(g => g !== true)) return { mode: 'trial', reason: 'BENCHMARK_NOT_PASSED' };
   if (!input.live?.model || !input.live?.analysis) return { mode: 'trial', reason: 'LIVE_ENGINE_UNKNOWN' };

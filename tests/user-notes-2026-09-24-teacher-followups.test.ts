@@ -74,6 +74,7 @@ test('ج) the teacher switch: off hides it, trial labels it, open needs a passin
   assert.deepEqual(muaalemGate({ requested: 'open', report: committed, live }), { mode: 'trial', reason: 'NOT_MEASURED' }, 'no measurement, no opening');
   const cases: [unknown, typeof live | null, string][] = [
     [{ ...passing, passes: false }, live, 'BENCHMARK_NOT_PASSED'],
+    [{ ...passing, status: 'PARTIAL' }, live, 'BENCHMARK_PARTIAL'],
     [{ ...passing, gates: { ...passing.gates, substitutionRecall: false } }, live, 'BENCHMARK_NOT_PASSED'],
     [passing, null, 'LIVE_ENGINE_UNKNOWN'],
     [passing, { ...live, model: 'obadx/muaalem-model-v4@abc' }, 'BENCHMARK_MODEL_MISMATCH'],

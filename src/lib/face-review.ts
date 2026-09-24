@@ -127,6 +127,11 @@ function sane(row: unknown): row is FaceAttempt {
   if (typeof r.at !== 'string' || Number.isNaN(Date.parse(r.at))) return false;
   if (!Array.isArray(r.marks)) return false;
   if (r.words !== undefined && !(Array.isArray(r.words) && r.words.every(saneWord))) return false;
+  if (r.reach !== undefined && !(Number.isInteger(r.reach) && (r.reach as number) >= 0)) return false;
+  if (r.judged !== undefined) {
+    const j = r.judged as Record<string, unknown> | null;
+    if (!j || typeof j !== 'object' || Object.values(j).some(v => typeof v !== 'boolean')) return false;
+  }
   return r.marks.every(m => m && typeof m === 'object'
     && typeof (m as { kind?: unknown }).kind === 'string'
     && Number.isFinite((m as { intensity?: unknown }).intensity));
@@ -149,7 +154,7 @@ function saneWord(w: unknown): boolean {
  */
 export function amendFaceAttempt(
   owner: string, reading: string, at: string, page: number,
-  words: readonly AttemptWord[], replace: readonly AttemptWordKind[] = [],
+  words: readonly AttemptWord[], replace: readonly AttemptWordKind[] = [], judgedTeacher = false,
 ): FaceAttempt[] {
   const all = loadFaceAttempts(owner, reading);
   const k = all.findIndex(x => x.at === at && x.page === page);
@@ -158,7 +163,7 @@ export function amendFaceAttempt(
   const kept = (all[k].words ?? []).filter(w => !drop.has(w.k));
   const seen = new Set(kept.map(w => `${w.i}:${w.k}`));
   const merged = [...kept, ...words.filter(w => saneWord(w) && !seen.has(`${w.i}:${w.k}`))].slice(0, 400);
-  all[k] = { ...all[k], words: merged };
+  all[k] = { ...all[k], words: merged, ...(judgedTeacher ? { judged: { ...all[k].judged, teacher: true } } : {}) };
   try { window.localStorage.setItem(storeKey(owner, reading), JSON.stringify(all)); } catch { /* لا مكان */ }
   return all;
 }
@@ -173,14 +178,63 @@ export function loadFaceAttempts(owner: string, reading: string): FaceAttempt[] 
   } catch { return []; }
 }
 
+/*
+ * سجلُّ الرحلة الدائم — غيرُ ذاكرة السحب القصيرة.
+ *
+ * ذاكرةُ السحب تبقي آخرَ مئتي محاولةٍ فحسب (ما وراءها لا يزن شيئًا). أمّا الخريطةُ والسلسلة
+ * فتاريخ: الصفحةُ التي تُليت قبل ثلاثمئة تلاوةٍ لا تعود «لم تُتلَ»، ويومٌ قُرئ فيه لا يُمحى.
+ * فتُحفظ هنا مُجمَلاتٌ صغيرة: لكلّ صفحةٍ [عددُ تلاواتها، آخرُها]، وأيّامُ التلاوة (بحدّ).
+ */
+export interface JourneyLedger { pages: Record<string, [number, number]>; days: string[] }
+export const MAX_LEDGER_DAYS = 800;
+const LEDGER_PREFIX = 'mizan.hifz-journey.v1';
+const ledgerKey = (owner: string, reading: string) => `${LEDGER_PREFIX}:${owner}:${reading}`;
+
+function localDay(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function addToLedger(ledger: JourneyLedger, attempt: FaceAttempt): void {
+  const at = Date.parse(attempt.at);
+  if (!Number.isFinite(at)) return;
+  const [count, last] = ledger.pages[attempt.page] ?? [0, 0];
+  ledger.pages[attempt.page] = [count + 1, Math.max(last, at)];
+  const day = localDay(at);
+  if (!ledger.days.includes(day)) ledger.days = [day, ...ledger.days].slice(0, MAX_LEDGER_DAYS);
+}
+
+export function loadJourneyLedger(owner: string, reading: string): JourneyLedger {
+  try {
+    const raw = window.localStorage.getItem(ledgerKey(owner, reading));
+    if (raw) {
+      const x = JSON.parse(raw);
+      const pages: Record<string, [number, number]> = {};
+      for (const [k, v] of Object.entries(x?.pages ?? {})) {
+        const page = Number(k);
+        if (Number.isInteger(page) && page >= 1 && page <= 604 && Array.isArray(v) && Number.isInteger(v[0]) && v[0] > 0 && Number.isFinite(v[1])) pages[k] = [v[0], v[1]];
+      }
+      const days = Array.isArray(x?.days) ? x.days.filter((d: unknown) => typeof d === 'string' && /^\d{4}-\d{1,2}-\d{1,2}$/.test(d)).slice(0, MAX_LEDGER_DAYS) : [];
+      return { pages, days };
+    }
+  } catch { /* يُبنى من الذاكرة القصيرة */ }
+  /* أوّلُ مرّة: يُبذر السجلُّ من المحاولات المحفوظة، فلا تبدأ الرحلةُ من الصفر عند من تلا قبلها. */
+  const ledger: JourneyLedger = { pages: {}, days: [] };
+  for (const a of [...loadFaceAttempts(owner, reading)].reverse()) addToLedger(ledger, a);
+  return ledger;
+}
+
 export function rememberFaceAttempt(owner: string, reading: string, attempt: FaceAttempt): FaceAttempt[] {
+  const ledger = loadJourneyLedger(owner, reading);
+  addToLedger(ledger, attempt);
   const kept = [attempt, ...loadFaceAttempts(owner, reading)].slice(0, MAX_REMEMBERED_ATTEMPTS);
   try { window.localStorage.setItem(storeKey(owner, reading), JSON.stringify(kept)); } catch { /* لا مكان: تبقى الجلسةُ وحدها */ }
+  try { window.localStorage.setItem(ledgerKey(owner, reading), JSON.stringify(ledger)); } catch { /* لا مكان */ }
   return kept;
 }
 
 export function forgetFaceAttempts(owner: string, reading: string): void {
-  try { window.localStorage.removeItem(storeKey(owner, reading)); } catch { /* لا شيء يُفعل */ }
+  try { window.localStorage.removeItem(storeKey(owner, reading)); window.localStorage.removeItem(ledgerKey(owner, reading)); } catch { /* لا شيء يُفعل */ }
 }
 
 /* ── طابورٌ متسلسل: ترتيبُ التلاوة لا ترتيبُ الشبكة ────────────────────── */

@@ -57,11 +57,16 @@ steps:
       - '-c'
       - |
         set -eu
+        # مجسُّ الإقلاع على `/ready`: النسخةُ لا تُعدّ مُقلعةً حتى يُحمَّل نموذجُها (حتى عشر دقائق،
+        # بالمعالج كاملًا)، فلا تُرسل إليها حركةٌ قبله ولا يُخنق تحميلُه. وكان مجسُّ TCP الافتراضيّ
+        # يُسقط كلَّ نسخةٍ جديدة، فبقيت الحركةُ على نسخةٍ قديمةٍ لا يكتمل تحميلُها أبدًا.
         gcloud run deploy mizan-quran-listener \
           --image "me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener:$COMMIT_SHA" \
           --region me-central1 --platform managed --no-allow-unauthenticated \
           --cpu 2 --memory 2Gi --min-instances 0 --max-instances 3 --concurrency 4 \
-          --timeout 60 --cpu-boost --update-env-vars "MIZAN_BUILD_SHA=$COMMIT_SHA" --quiet
+          --timeout 60 --cpu-boost --update-env-vars "MIZAN_BUILD_SHA=$COMMIT_SHA" \
+          --startup-probe=httpGet.path=/ready,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=10,timeoutSeconds=5,failureThreshold=60 \
+          --quiet
         listener_url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')"
         test -n "$listener_url"
         runtime_sa="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null || true)"

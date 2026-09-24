@@ -86,7 +86,9 @@ jobs:
         run: MIZAN_MUAALEM_MODEL=/nonexistent python -m unittest discover -s tests
 
       # المدخلاتُ تمرّ متغيّراتِ بيئة لا نصًّا في الأمر: فلا يصير مدخلٌ شيفرةً تُنفَّذ.
+      # للقياس مهلتُه دون مهلة العمل: فإن طال بقي وقتٌ لطباعة التقرير الجزئيّ ورفعه.
       - name: القياس
+        timeout-minutes: 300
         env:
           AYAT: ${{ github.event.inputs.ayat || '60' }}
           PAIRS: ${{ github.event.inputs.pairs || '174' }}

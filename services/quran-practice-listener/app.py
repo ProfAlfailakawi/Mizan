@@ -81,11 +81,22 @@ async def lifespan(_app):
     # وإن لم يكن في الصورة نموذجٌ (تعثّر التنزيلُ المسبق) نُزِّل في الخلفية كما كان، والصحّةُ تقول «أُحمّل».
     # وإن غاب عن الصورة نُزِّل في طور الإقلاع أيضًا (بالمعالج كاملًا) في مهلةٍ محدودة؛ فإن جاوزها
     # أكمل الخيطُ نفسُه في الخلفية — ولا يُعاد التنزيلُ من أوّله.
-    if not await asyncio.to_thread(load_prefetched):
-        loader=threading.Thread(target=load_model,daemon=True)
-        loader.start()
-        await asyncio.to_thread(loader.join,float(os.getenv('MIZAN_STARTUP_LOAD_SECONDS','180')))
+    #
+    # المنفذُ يُفتح فورًا، والنموذجُ يُحمَّل في خيطٍ يبدأ الآن. وCloud Run يسأل `/ready` (مجسُّ
+    # الإقلاع في cloudbuild.yaml) ولا يعدّ النسخةَ «مُقلعة» حتى يجيب بـ200 — وطوالَ ذلك تُعطى
+    # الحاويةُ معالجَها كاملًا (مع `--cpu-boost`). فلا يُخنق التحميلُ، ولا تُرسل حركةٌ قبل النموذج.
+    #
+    # وكان التحميلُ قبل فتح المنفذ: فتجاوز مهلةَ مجسّ TCP الافتراضيّ (٢٤٠ ثانية)، فسقطت كلُّ نسخةٍ
+    # جديدة بـ`HealthCheckContainerError` وبقيت الحركةُ على نسخةٍ قديمةٍ «تُحمّل» إلى الأبد.
+    threading.Thread(target=startup_load,daemon=True).start()
     yield
+
+def startup_load():
+    started=time.time()
+    print('listener startup: loading model…',flush=True)
+    if not load_prefetched():
+        load_model()
+    print(f'listener startup: model {state["id"]} ready from {state["source"]} in {time.time()-started:.1f}s',flush=True)
 
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 
@@ -136,6 +147,12 @@ def best_match(transcript:str, ayat:list[dict], after:int=-1):
     end=min(len(words)-1,start+size-1)
     _,surah,ayah,word_index=words[end]
     return {'surah':surah,'ayah':ayah,'wordIndex':word_index,'globalIndex':end},ratio
+
+@app.get('/ready')
+def ready():
+    # مجسُّ الإقلاع: ٢٠٠ حين يجهز النموذج وحده. وحتى ذلك لا تُعدّ النسخةُ مُقلعة، فلا حركةَ إليها.
+    from fastapi.responses import JSONResponse
+    return JSONResponse({'ready':bool(state['model']),'error':state['error']},status_code=200 if state['model'] else 503)
 
 @app.get('/health')
 def health():

@@ -103,20 +103,21 @@ test('the student waits for a waking listener instead of losing the first chunks
   assert.match(server, /quranPracticeListener:_req\.query\?\.listener==='1'\?await practiceListenerHealth\(\):practiceListenerHealthCached\(\)/);
 });
 
-test('the baked model loads during startup, with the CPU Cloud Run gives a starting container', () => {
+test('the listener opens its port at once and Cloud Run waits on /ready — full CPU while loading, no traffic before the model', () => {
   /*
-   * بلا `--no-cpu-throttling` لا يُعطى خيطٌ خلفيٌّ معالجًا بين الطلبات، فكان المستمعُ «يستعدّ»
-   * دقائقَ بعد كلّ نشرٍ ونوم. فالنموذجُ المخبوز يُحمَّل في طور الإقلاع (lifespan) من القرص وحده،
-   * ولا يُفتح المنفذ قبله؛ والتنزيلُ الخلفيّ بقي للصورة التي لا نموذجَ فيها.
+   * رُصد في نشر 08e22fe: كلُّ نسخةٍ جديدةٍ سقطت بـ`HealthCheckContainerError` (التحميلُ قبل فتح
+   * المنفذ تجاوز مجسَّ TCP الافتراضيّ)، فبقيت الحركةُ على نسخةٍ قديمةٍ «تُحمّل» إلى الأبد.
+   * فالمنفذُ يُفتح فورًا، والتحميلُ في خيطٍ يبدأ عند الإقلاع، ومجسُّ HTTP على `/ready` يُبقي
+   * النسخةَ «تُقلع» (بالمعالج كاملًا) حتى يجهز النموذج — عشر دقائق على الأكثر.
    */
   const app = read('services/quran-practice-listener/app.py');
-  assert.match(app, /local_files_only=True/);
   assert.match(app, /app=FastAPI\(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan\)/);
-  assert.match(app, /if not await asyncio\.to_thread\(load_prefetched\):\n\s+loader=threading\.Thread\(target=load_model,daemon=True\)/);
-  /* وإن غاب عن الصورة نُزِّل في طور الإقلاع نفسه (مهلةٌ دون مهلة فحص الإقلاع ٢٤٠ ثانية). */
-  assert.match(app, /await asyncio\.to_thread\(loader\.join,float\(os\.getenv\('MIZAN_STARTUP_LOAD_SECONDS','180'\)\)\)/);
-  assert.doesNotMatch(app, /^threading\.Thread\(target=load_model,daemon=True\)\.start\(\)$/m, 'no load thread started at import time');
+  assert.match(app, /threading\.Thread\(target=startup_load,daemon=True\)\.start\(\)\n\s+yield/);
+  assert.doesNotMatch(app, /loader\.join/, 'nothing blocks the port from opening');
+  assert.match(app, /@app\.get\('\/ready'\)[\s\S]{0,400}status_code=200 if state\['model'\] else 503/);
+  assert.match(app, /local_files_only=True/);
   const build = read('cloudbuild.yaml');
+  assert.match(build, /--startup-probe=httpGet\.path=\/ready,httpGet\.port=8080,initialDelaySeconds=0,periodSeconds=10,timeoutSeconds=5,failureThreshold=60/);
   assert.match(build, /--cpu-boost/);
 });
 

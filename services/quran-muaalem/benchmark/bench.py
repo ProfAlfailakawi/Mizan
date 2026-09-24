@@ -441,16 +441,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             return None
         return wave if len(wave) * 1000 / SAMPLE_RATE <= MAX_SEGMENT_MS else None
 
-    for r in reciters:
-        items = [Item(r["id"], s, a, words, w) for s, a, words in ayat if (w := audio(r, s, a)) is not None]
-        if not items:
-            print(f"  {r['id']}: no audio reachable — skipped", flush=True)
-            continue
-        verdicts = analyse(items, model, service.analyse_segments)
-        score_correct(items, verdicts, correct, per_reciter)
-        t = per_reciter[r["id"]]
-        print(f"  {r['id']}: {t.items} ayat · {t.words} words · {t.flagged} flagged · {t.unclear} unclear", flush=True)
+    def write(final: bool) -> str:
+        """يُكتب التقريرُ بعد كلّ قارئ: فإن انقضت مهلةُ العدّاء بقي ما قيس — موسومًا «جزئيًّا» لا يفتح بابًا."""
+        report = build_report(model=str(service.state["version"] or service.MODEL_ID), seed=args.seed, reciters=reciters,
+                              correct=correct, per_reciter=per_reciter, recall=recall, missing=missing, started=started)
+        if not final:
+            report["status"] = "PARTIAL"
+            report["passes"] = False
+        with open(args.out, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, ensure_ascii=False, indent=2)
+        md = markdown(report)
+        if args.markdown:
+            with open(args.markdown, "w", encoding="utf-8") as fh:
+                fh.write(md + "\n")
+        return md
 
+    # الالتقاطُ أوّلًا — هو السؤالُ الأصعب — ثم الإنذارُ الكاذب قارئًا قارئًا.
     for r in [x for x in reciters if x.get("pairs", True)][: args.pair_reciters]:
         items = []
         for p in pairs:
@@ -461,15 +467,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         if items:
             score_pairs(items, analyse(items, model, service.analyse_segments), recall)
             print(f"  pairs {r['id']}: {len(items)} items · detected so far {recall.detected}/{recall.items}", flush=True)
+            write(final=False)
 
-    report = build_report(model=str(service.state["version"] or service.MODEL_ID), seed=args.seed, reciters=reciters,
-                          correct=correct, per_reciter=per_reciter, recall=recall, missing=missing, started=started)
-    with open(args.out, "w", encoding="utf-8") as fh:
-        json.dump(report, fh, ensure_ascii=False, indent=2)
-    md = markdown(report)
-    if args.markdown:
-        with open(args.markdown, "w", encoding="utf-8") as fh:
-            fh.write(md + "\n")
+    for r in reciters:
+        items = [Item(r["id"], s, a, words, w) for s, a, words in ayat if (w := audio(r, s, a)) is not None]
+        if not items:
+            print(f"  {r['id']}: no audio reachable — skipped", flush=True)
+            continue
+        verdicts = analyse(items, model, service.analyse_segments)
+        score_correct(items, verdicts, correct, per_reciter)
+        t = per_reciter[r["id"]]
+        print(f"  {r['id']}: {t.items} ayat · {t.words} words · {t.flagged} flagged · {t.unclear} unclear · {time.time() - started:.0f}s", flush=True)
+        write(final=False)
+
+    md = write(final=True)
     print(md, flush=True)
     return 0
 
