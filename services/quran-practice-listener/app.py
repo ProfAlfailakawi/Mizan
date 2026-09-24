@@ -188,7 +188,8 @@ def after_header(temp,audio:bytes,head_len:int):
     if head_len and head_len<len(audio):
         try:head=len(decode_audio(temp(audio[:head_len])))
         except Exception:head=0
-        if 0<head<len(pcm):pcm=pcm[head:]
+        # وإن لم يبقَ بعد الترويسة شيء (مقطعٌ أخيرٌ قصير) فالمسموعُ فارغ — لا تُسمع الترويسةُ مكانه.
+        if 0<head<=len(pcm):pcm=pcm[head:]
     return pcm
 
 @app.get('/ready')
@@ -234,7 +235,7 @@ async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected
         # (قيس: ٨١ قفزةً في MIZAN-LISTENER-FOLLOW-1، أكثرُها في الفاتحة وأوّل البقرة).
         try:
             pcm=after_header(temp,audio,head_len)
-            segments,_=model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},without_timestamps=True)
+            segments=[] if len(pcm)==0 else model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},without_timestamps=True)[0]
             transcript=' '.join(seg.text for seg in segments).strip()
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
@@ -272,7 +273,7 @@ async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_
         try:
             # ما بعد الترويسة وحده يُكتب (`after_header`)، فتوقيتُ الكلمات منه مباشرة.
             pcm=after_header(temp,audio,head_len)
-            segments,_=model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=True)
+            segments=[] if len(pcm)==0 else model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=True)[0]
             words=[]
             for seg in segments:
                 for w in (seg.words or []):
