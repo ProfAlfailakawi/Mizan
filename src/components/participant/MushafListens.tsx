@@ -5,9 +5,10 @@ import { MushafFaceSurface, type FaceWord } from './MushafFaceSurface';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { drawFace } from '../../../server/mushaf-face';
 import type { FaceMark, FaceReading } from '../../lib/face-reading';
-import { explainChoice, faceWeights, type FaceAttempt } from '../../lib/face-memory';
+import { explainChoice, faceWeights, type AttemptWord, type AttemptWordKind, type FaceAttempt } from '../../lib/face-memory';
+import { HifzJourney } from './HifzJourney';
 import {
-  attemptFrom, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
+  amendFaceAttempt, attemptFrom, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { answerKeepsPermission, finalJudgment, liveJudgment } from '../../lib/live-judging';
@@ -408,7 +409,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const judgingRef = useRef<QuranJudgingGate | null>(null);
   useEffect(() => { judgingRef.current = judging; }, [judging]);
 
-  const draw = useCallback(async (seed: string) => {
+  const draw = useCallback(async (seed: string, forcedPage?: number) => {
     if (!deliveryReading || !candidates.length) return;
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
@@ -421,13 +422,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     attemptJudging.current = null;
     setMistakes(undefined); setJudgingLost(false);
     const weightOf = faceWeights(attempts, Date.now());
-    const picked = drawFace(candidates, seed, weightOf);
+    /* صفحةٌ اختارها الطالبُ من خريطة حفظه — من نطاقه وحده؛ وإلا فالسحبُ الموزون. */
+    const picked = (forcedPage !== undefined ? candidates.find(c => c.page === forcedPage) : undefined) ?? drawFace(candidates, seed, weightOf);
     if (!picked) { setStage('blocked'); setNote(ar ? 'لم يُسحب وجه.' : 'No face drawn.'); return; }
     try {
       const page = await fetchPracticeFace(deliveryReading, picked.page, journeyAuth);
       if (!alive.current) return;
       setFace(page);
-      setChoice(explainChoice(page.page, attempts, Date.now(), ar));
+      setChoice(forcedPage === page.page
+        ? (ar ? 'اخترتَه أنت من رحلة حفظك.' : 'You chose it from your hifz journey.')
+        : explainChoice(page.page, attempts, Date.now(), ar));
       setStage('ready');
     } catch (err) {
       setStage('blocked');
@@ -889,13 +893,55 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     const verdict = permission ? finalJudgment(expectedRef.current, heardWords.current, permission) : null;
     setMistakes(verdict ? judgeable(verdict.mistakes) : undefined);
     if (verdict) noticeSlips(judgeable(verdict.mistakes));
+    if (settled.attempt) {
+      /*
+       * والمحاولةُ تحفظ **كلماتِ** التعثّر لا أنواعَه وحدها: ما أعاده أو التبس عليه من علامات
+       * المتابعة، وما سقط أو أُبدل من حكم الكلمات. فتعرف «رحلةُ حفظك» أيَّ كلمةٍ تتكرّر.
+       */
+      const at = (i: number, k: AttemptWordKind): AttemptWord | null => {
+        const w = face.words[i];
+        return w ? { i, s: w.surah, a: w.ayah, t: w.text.slice(0, 64), k } : null;
+      };
+      /*
+       * وما بعد أبعد موضعٍ بلغه لا يُسجَّل «سقط»: من توقّف عند الآية الثالثة لم ينسَ ما بعدها،
+       * بل لم يقرأه. فالسجلُّ للتعثّر لا للتوقّف (كما في «لم يُسمع» عند المعلّم).
+       */
+      const judged = (verdict ? judgeable(verdict.mistakes) : []).filter(m => m.wordIndex !== null);
+      const farthest = Math.max(settled.reading.indices.reach,
+        ...judged.filter(m => m.kind !== 'skipped').map(m => (m.wordIndex as number) + 1));
+      const words = [
+        ...settled.reading.marks.filter(m => m.kind === 'repeat' || m.kind === 'confusable').map(m => at(m.word, m.kind as AttemptWordKind)),
+        ...judged.filter(m => (m.wordIndex as number) < farthest)
+          .map(m => at(m.wordIndex as number, m.kind === 'tashkeel' ? 'vowel' : m.kind)),
+      ].filter((w): w is AttemptWord => !!w);
+      const attempt = { ...settled.attempt, words };
+      attemptKey.current = { at: attempt.at, page: attempt.page };
+      setAttempts(rememberFaceAttempt(owner, deliveryReading || '', attempt));
+    } else attemptKey.current = null;
     /* وتلاوةٌ لم يصل بعضُها تُقال ناقصةً، ولا تُعرض وكأنّها تامّة. */
     setIncomplete(!settled.complete);
     setStage('report');
-    if (settled.attempt) setAttempts(rememberFaceAttempt(owner, deliveryReading || '', settled.attempt));
     /* والمعلّمُ بعد التقرير لا قبله: لا ينتظر الطالبُ الحركاتِ ليرى الكلمات. */
     void reviewTashkeel();
   }, [face, owner, deliveryReading, stopAndRelease, reviewTashkeel]);
+
+  /*
+   * ملاحظاتُ «المعلّم» تلحق بمحاولتها حين تكتمل — وتُستبدل كلُّها بعد كلّ إعادة آية، فلا يبقى
+   * في الذاكرة ما صحّحته الإعادة.
+   */
+  const attemptKey = useRef<{ at: string; page: number } | null>(null);
+  useEffect(() => {
+    const key = attemptKey.current;
+    if (!key || !face || face.page !== key.page || tashkeel.phase !== 'done') return;
+    const kind = (k: string): AttemptWordKind => (k === 'tajweed' ? 'tajweed' : k === 'letter' ? 'letter' : 'vowel');
+    const teacher = tashkeel.findings.map(f => {
+      const w = face.words[f.wordIndex];
+      return w ? { i: f.wordIndex, s: w.surah, a: w.ayah, t: w.text.slice(0, 64), k: kind(f.kind) } : null;
+    }).filter((w): w is AttemptWord => !!w);
+    setAttempts(amendFaceAttempt(owner, deliveryReading || '', key.at, key.page, teacher, ['vowel', 'tajweed', 'letter']));
+  }, [tashkeel.phase, tashkeel.findings, face, owner, deliveryReading]);
+
+  const practisable = useMemo(() => new Set(candidates.map(c => c.page)), [candidates]);
 
   const words: FaceWord[] = useMemo(
     () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah, ayahWordIndex: w.ayahWordIndex })),
@@ -933,6 +979,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           <p className="mt-1 text-[9px] font-bold text-[#6b716d]">{ar?'لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك.':'Your voice is not recorded, nothing is sent to the judging panel, and this never affects your score.'}</p>
         </div>
       </header>
+
+      {(stage === 'ready' || stage === 'report' || stage === 'blocked') && (
+        <HifzJourney ar={ar} attempts={attempts} practisable={practisable} current={face?.page}
+          onPractise={page => void draw(`${owner}:${Date.now()}`, page)} />
+      )}
 
       {stage === 'blocked' && (
         <p className="mizan-surface p-6 text-center text-xs leading-6 text-[#5f6663]">{note}</p>

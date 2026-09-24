@@ -41,6 +41,7 @@ const PLAN: Expectation[] = [
       [o.teacherCalls.some(c => c.segments.some(s => s.id.includes('~r'))), 'الإعادةُ لم تصل المعلّم'],
       [o.teacher.unclearLeft === o.retakeOffered - 1, `الآيةُ المعادة بقيت في «لم يتّضح»: ${o.teacher.unclearLeft}/${o.retakeOffered}`],
       [o.teacher.rows.length === 2, `الإعادةُ مسحت ملاحظاتٍ أو زادتها: ${o.teacher.rows.length}`],
+      [o.teacher.journeyFaceState === 'review', `«رحلةُ حفظك» لا تعرض هذا الوجه بحاله (ملاحظتا المعلّم = مراجعة): ${o.teacher.journeyFaceState}`],
     ]),
   },
   {

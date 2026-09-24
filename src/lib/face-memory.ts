@@ -39,12 +39,44 @@ export const MARK_WEIGHT: Record<FaceMarkKind, number> = {
   strain: 0.35,
 };
 
+/**
+ * كلمةٌ تعثّر فيها الطالب — موضعُها ونوعُ التعثّر، لا صوتٌ ولا درجة.
+ *
+ * `skipped`/`substituted`/`added` من مراجعة الكلمات (حين يكون الحكمُ مفتوحًا)، و`vowel`/
+ * `tajweed`/`letter` من «المعلّم»، و`repeat`/`confusable` من علامات المتابعة نفسها.
+ */
+export type AttemptWordKind = 'skipped' | 'substituted' | 'added' | 'vowel' | 'tajweed' | 'letter' | 'repeat' | 'confusable';
+
+export interface AttemptWord {
+  /** موضعُ الكلمة في الوجه (ثابتٌ للرواية نفسها). */
+  i: number;
+  s: number;
+  a: number;
+  /** نصُّ الكلمة كما في الوجه — للعرض وحده. */
+  t: string;
+  k: AttemptWordKind;
+}
+
 export interface FaceAttempt {
   page: number;
   /** متى تُليت — ISO. */
   at: string;
   marks: readonly Pick<FaceMark, 'kind' | 'intensity'>[];
+  /** الكلماتُ التي تعثّر فيها — اختياريّ: محاولاتٌ قديمةٌ حُفظت قبله تبقى صالحة. */
+  words?: readonly AttemptWord[];
 }
+
+/*
+ * ثقلُ الكلمة المتعثَّر فيها في وزن الوجه.
+ *
+ * كلمةٌ سقطت أو أُبدلت أدلُّ دليلٍ على ضعف الحفظ؛ والحرفُ والحركةُ أخفّ؛ والتجويدُ أخفُّها
+ * أثرًا في «أيَّ وجهٍ يُعاد» لأنه أداءٌ لا حفظ. و`repeat`/`confusable` محسوبان في العلامات.
+ */
+export const WORD_WEIGHT: Record<AttemptWordKind, number> = {
+  skipped: 1.0, substituted: 1.0, added: 0.5, letter: 0.6, vowel: 0.4, tajweed: 0.2, repeat: 0, confusable: 0,
+};
+/* سقفُ ما تضيفه كلماتُ محاولةٍ واحدة — لئلّا تبتلع تلاوةٌ مضطربةٌ السحبَ كلَّه. */
+const WORD_BURDEN_CAP = 4;
 
 export interface FaceMemoryOptions {
   /** بعد كم يومًا يهبط أثرُ التعثّر إلى نصفه. */
@@ -73,7 +105,9 @@ export function attemptBurden(attempt: FaceAttempt): number {
     const intensity = Number.isFinite(mark.intensity) ? Math.max(0, Math.min(1, mark.intensity)) : 0;
     burden += weight * intensity;
   }
-  return burden;
+  let words = 0;
+  for (const w of attempt.words ?? []) words += WORD_WEIGHT[w.k] ?? 0;
+  return burden + Math.min(WORD_BURDEN_CAP, words);
 }
 
 /**
