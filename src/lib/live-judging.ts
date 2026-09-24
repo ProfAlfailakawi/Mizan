@@ -14,6 +14,7 @@
  * ولا شيءَ من هذا يُخرج حكمًا بلا إذن: المدخلُ إذنٌ، وبلا إذنٍ يعود `null`.
  */
 
+import { quranSkeleton } from './quran-orthography';
 import {
   DEFAULT_DIFF_OPTIONS, diffRecitation, heardNothing, judgeRecitation,
   type ExpectedWord, type HeardWord, type JudgingPermission, type Mistake, type RecitationDiff,
@@ -91,6 +92,25 @@ export function followFrontier(expected: readonly ExpectedWord[], heard: readonl
   const judgedUpTo = judgment.mistakes.reduce((max, m) => (m.wordIndex !== null && m.wordIndex > max ? m.wordIndex : max), -1);
   const reachedByMatch = judgment.matched + judgment.uncertain + judgment.mistakes.filter(m => m.wordIndex !== null).length;
   return frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch));
+}
+
+/**
+ * كم يُكشف فوق الجبهة ممّا سُمع عند حافّة النافذة ولم يُثبَّت بعد؟
+ *
+ * الكلمةُ عند الحافّة تُمسك عن التثبيت مهلةً (قد تكون مقطوعة، فتُسمع كاملةً في النافذة التالية)
+ * — وهي مهلةٌ يدفعها القلمُ تأخّرًا. فما سُمع هناك **مطابقًا بهيكله الكلمةَ التالية تمامًا**
+ * قد قيل يقينًا، فيُكشف الآن. ويمضي كلمةً كلمة من بعد الجبهة، ويقف عند أوّل ما لا يطابق:
+ * فلا يقفز، ولا يُكشف ما لم يُسمع. ولا يدخل الحكمَ شيءٌ منه — الحكمُ بما ثبت وحده.
+ */
+export function provisionalReach(expected: readonly ExpectedWord[], frontier: number, tail: readonly string[]): number {
+  let at = frontier;
+  for (const text of tail) {
+    const next = expected[at + 1];
+    const heard = quranSkeleton(text);
+    if (!next || !heard || heard !== quranSkeleton(next.text)) break;
+    at += 1;
+  }
+  return at;
 }
 
 /**

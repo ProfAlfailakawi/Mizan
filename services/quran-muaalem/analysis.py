@@ -409,7 +409,7 @@ def drop_pausal(errors: list, words: list[str], predicted: str, phonetize, expla
     return [e for e in errors if _word_of(uthmani, e) not in excused]
 
 
-def heard_confidence(ref_ph: str, predicted: str, probs) -> dict[int, float]:
+def heard_confidence(ref_ph: str, predicted: str, probs) -> dict:
     """ثقةُ النموذج بما سُمع مكانَ كلّ مجموعةٍ في المرجع: {بدايةُ المجموعة في المرجع: أدنى ثقة}.
 
     يُعاد بناءُ المحاذاة **بدوالّ المكتبة نفسِها** التي يحاذي بها `explain_error` (مجموعاتُ
@@ -431,13 +431,21 @@ def heard_confidence(ref_ph: str, predicted: str, probs) -> dict[int, float]:
     at = 0
     for g in pred_groups:
         pred_starts.append(at); at += len(g)
-    out: dict[int, float] = {}
+    out: dict = {}
+    total = sum(len(g) for g in ref_groups)
     for a in align_phonemes_groups(ref_groups, pred_groups):
-        if a.op_type == "insert" or a.ref_idx >= len(ref_groups) or a.pred_idx >= len(pred_groups):
+        if a.pred_idx >= len(pred_groups):
             continue
         start = pred_starts[a.pred_idx]
         chunk = values[start:start + len(pred_groups[a.pred_idx])]
-        if chunk:
+        if not chunk:
+            continue
+        if a.op_type == "insert":
+            # الزيادةُ موضعُها في المرجع بدايةُ ما تسبقه (كما يضعها `explain_error`)، وتُفرد بمفتاحها
+            # فلا تختلط بثقة المجموعة التي في الموضع نفسه. وزيادتان في موضعٍ واحد: أضعفُهما.
+            key = ("insert", ref_starts[a.ref_idx] if a.ref_idx < len(ref_starts) else total)
+            out[key] = min(out.get(key, 1.0), float(min(chunk)))
+        elif a.ref_idx < len(ref_groups):
             out[ref_starts[a.ref_idx]] = float(min(chunk))
     return out
 

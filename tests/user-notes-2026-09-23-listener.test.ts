@@ -178,8 +178,8 @@ test('word-by-word following survives a closed gate and a dropped chunk, and the
   // وسقوطُ إذن الحكم في أثناء التلاوة يترك التتبّعَ قائمًا: المقاطعُ التالية تمرّ بفرع التتبّع.
   assert.doesNotMatch(practice, /wordFollow\.current = false;[^\n]*\n[^\n]*setMistakes\(undefined\)/);
   // والكلمةُ الأخيرةُ المسموعةُ تنكشف هي نفسُها — لا تتأخّر كلمة.
-  assert.match(practice, /if \(judged\.frontier >= 0\) advance\(judged\.frontier\);/);
-  assert.match(practice, /if \(frontier >= 0\) advance\(frontier\);/);
+  assert.match(practice, /if \(judged\.frontier >= 0\) advance\(provisionalReach\(expectedRef\.current, judged\.frontier, /);
+  assert.match(practice, /if \(frontier >= 0\) advance\(provisionalReach\(expectedRef\.current, frontier, /);
 
   // والحدودُ تتّسع لإيقاع المقطع: فسحةُ النصف فوق ما يُرسله قارئٌ في النافذة.
   const { CHUNK_MS } = await import('../src/lib/recognition-window');
@@ -199,4 +199,11 @@ test('a closed ASR gate still lets words through the practice listener, and the 
   assert.match(server, /return \{gate:practiceJudgingGate\(input\.reading\),words,modelVersion:PRACTICE_LISTENER_MODEL\};/);
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(practice, /if \(\(attemptJudging\.current \|\| wordFollow\.current\) && !\(await recognition\.current\.drain\(\)\)\) \{/);
+});
+
+test('the edge hold no longer delays the pen for a word heard exactly as the next one', () => {
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.equal((practice.match(/advance\(provisionalReach\(expectedRef\.current, (judged\.)?frontier, edgeWords\(out\.words, windowStartMs, win\.commitUntilMs\)\)\)/g) || []).length, 2);
+  // والحكمُ بما ثبت وحده: ما عند الحافّة لا يدخل heardWords.
+  assert.doesNotMatch(practice, /heardWords\.current = \[[^\]]*edgeWords/);
 });

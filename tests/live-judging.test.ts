@@ -136,3 +136,14 @@ test('التتبّعُ بلا حكم يتبع الكلمات المسموعة �
   /* وكلمةٌ سقطت في الوسط لا توقف التتبّع: الموضعُ يمضي إلى ما قيل بعدها. */
   assert.equal(followFrontier(expected, heardOf([...FACE.slice(0, 3), ...FACE.slice(4, 7)])), 6);
 });
+
+test('ما سُمع عند الحافّة يُكشف إن طابق الكلمةَ التالية تمامًا — ويقف عند أوّل ما لا يطابق', async () => {
+  const { provisionalReach } = await import('../src/lib/live-judging');
+  assert.equal(provisionalReach(expected, 4, [FACE[5], FACE[6]]), 6);
+  // كلمةٌ لا تطابق التاليةَ توقفه، ولو طابقت ما بعدها: لا قفز.
+  assert.equal(provisionalReach(expected, 4, [FACE[7], FACE[5]]), 4);
+  assert.equal(provisionalReach(expected, 4, [FACE[5], 'غير', FACE[7]]), 5);
+  // لا شيء عند الحافّة: الجبهةُ كما هي. وآخرُ الوجه لا يُتجاوز.
+  assert.equal(provisionalReach(expected, 4, []), 4);
+  assert.equal(provisionalReach(expected, expected.length - 1, [FACE[0]]), expected.length - 1);
+});

@@ -114,7 +114,9 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
     revealed_at = [None] * total_words  # لحظةُ الانكشاف
     ahead_events, jumps, rough_ahead = 0, 0, 0
     last_global, committed_until, heard = -1, 0.0, []
-    listen_free = recog_free = 0.0
+    # المساران يتقاسمان النموذجَ والمعالجَ نفسَهما في الإنتاج (نسخةٌ بمعالجين): فساعةُ خادمٍ واحدة،
+    # وكلُّ طلبٍ ينتظر ما قبله — لا ساعتان مستقلّتان تُظهران التأخّرَ أقلَّ ممّا هو.
+    server_free = 0.0
     listen_cost, recog_cost = [], []
     reached = 0  # أوّلُ كلمةٍ لم تنكشف
 
@@ -151,7 +153,7 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         candidate, conf = best_match(transcript, ayat, last_global)
         cost = time.perf_counter() - t0
         listen_cost.append(cost)
-        listen_free = max(listen_free, arrive) + cost
+        server_free = max(server_free, arrive) + cost
         if candidate is not None and conf >= 0.55:
             g = candidate['globalIndex']
             truth = truth_index(arrive)
@@ -175,13 +177,18 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         words = [w for s in segs for w in (s.words or [])]
         cost = time.perf_counter() - t0
         recog_cost.append(cost)
-        recog_free = max(recog_free, arrive) + cost
+        server_free = server_free + cost  # يصل مع مقطع الموضع نفسه، فيُخدم بعده
+        recog_free = server_free
         start_s = first * chunk / SR
+        tail = []
         for w in words:
             if w.end <= head_s + 0.05:
                 continue
             ws, we = start_s + (w.start - head_s), start_s + (w.end - head_s)
-            if ws < committed_until - 0.08 or we > commit_until:
+            if ws < committed_until - 0.08:
+                continue
+            if we > commit_until:
+                tail.append(norm(w.word))  # عند الحافّة: لا يُثبَّت، ويُكشف إن طابق التاليةَ تمامًا
                 continue
             text = norm(w.word)
             if text:
@@ -189,6 +196,12 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
             committed_until = max(committed_until, we)
         f = follow_frontier(expected, heard)
         if f >= 0:
+            # provisionalReach (src/lib/live-judging.ts): ما عند الحافّة مطابقًا التاليةَ تمامًا.
+            for text in tail:
+                if f + 1 < total_words and text and text == expected[f + 1]:
+                    f += 1
+                else:
+                    break
             reveal(f, recog_free)
 
     lags = [revealed_at[k] - ends[k] for k in range(total_words) if revealed_at[k] is not None]

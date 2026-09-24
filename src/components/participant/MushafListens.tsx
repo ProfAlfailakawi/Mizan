@@ -11,7 +11,7 @@ import {
   amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
-import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment } from '../../lib/live-judging';
+import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment, provisionalReach } from '../../lib/live-judging';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -250,6 +250,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     }
     return timed;
   };
+  /* وما بعد حافّة التثبيت من المقطع نفسِه — يُكشف منه ما طابق الكلمةَ التالية تمامًا (`provisionalReach`)، ولا يُحكم به. */
+  const edgeWords = (words: readonly { text: string; startMs?: number; endMs?: number }[], windowStartMs: number, commitUntilMs: number): string[] =>
+    words.filter(w => w.endMs !== undefined && w.startMs !== undefined && windowStartMs + w.startMs >= committedUntil.current - 80 && windowStartMs + w.endMs > commitUntilMs)
+      .map(w => w.text);
   const stream = useRef<MediaStream | null>(null);
   const alive = useRef(true);
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
@@ -677,7 +681,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
               heardWords.current = [...heardWords.current, ...committedWords(out.words, windowStartMs, win.commitUntilMs)];
               const frontier = followFrontier(expectedRef.current, heardWords.current);
-              if (frontier >= 0) advance(frontier);
+              if (frontier >= 0) advance(provisionalReach(expectedRef.current, frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
               return;
             }
             /*
@@ -702,7 +706,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
             /* وجبهةُ السماع أدقُّ شاهدٍ على الموضع: ما قاله فعلًا لا ما يُظنّ أنّه بلغه. */
-            if (judged.frontier >= 0) advance(judged.frontier);
+            if (judged.frontier >= 0) advance(provisionalReach(expectedRef.current, judged.frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
             const settledHere = judgeable(judged.settled);
             setMistakes(judged.judgment ? settledHere : undefined);
             noticeSlips(settledHere);
