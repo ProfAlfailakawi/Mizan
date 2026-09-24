@@ -767,23 +767,30 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * بالسماع نفسه، ويراجعها المعلّم، وتُدمج في التقرير مكانَ ما كان لها — والتسجيلُ في الذاكرة وحدها.
    */
   const retakeRec = useRef<{ rec: MediaRecorder; stream: MediaStream; timers: number[] } | null>(null);
+  const retakePending = useRef(false);
   const stopRetake = useCallback(() => {
     const r = retakeRec.current;
     if (r && r.rec.state !== 'inactive') { try { r.rec.stop(); } catch { /* مغلق */ } }
   }, []);
   const startRetake = useCallback(async (u: UnclearAyah) => {
-    if (!face || retakeRec.current) return;
+    /* الموضعُ يُحجز قبل سؤال الإذن: ضغطةٌ ثانيةٌ والإذنُ معلّقٌ لا تفتح ميكروفونًا ثانيًا. */
+    if (!face || retakeRec.current || retakePending.current) return;
     const ayahWords = face.words.filter(w => w.surah === u.surah && w.ayah === u.ayah).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah }));
     if (!ayahWords.length) return;
     const run = tashkeelRun.current;
     const isCurrent = () => alive.current && tashkeelRun.current === run;
     let media: MediaStream;
+    retakePending.current = true;
     try {
       media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (error) {
-      setRetake({ surah: u.surah, ayah: u.ayah, phase: 'failed', seconds: 0, note: microphoneFailureNote(error, ar) });
+      retakePending.current = false;
+      if (isCurrent()) setRetake({ surah: u.surah, ayah: u.ayah, phase: 'failed', seconds: 0, note: microphoneFailureNote(error, ar) });
       return;
     }
+    retakePending.current = false;
+    /* وإن تغيّر الوجهُ أو غادر الطالبُ والإذنُ معلّق: يُعاد الميكروفون ولا يبدأ تسجيل. */
+    if (!isCurrent()) { media.getTracks().forEach(t => t.stop()); return; }
     const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m));
     const rec = new MediaRecorder(media, mime ? { mimeType: mime } : undefined);
     const chunks: Blob[] = [];
