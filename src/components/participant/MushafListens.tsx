@@ -691,7 +691,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              * فكلُّ ما قيل بعده في نافذته. (والمقطعُ الأخيرُ لا يُترك أبدًا.)
              */
             const newest = latestRecognition.current;
-            if (!finalChunk && newest > index && recognitionWindow(newest, false).startMs <= committedUntil.current) return;
+            // وتُقاس بالتي تليها لا بأحدثِها: فالتاليةُ إن غطّت تُترك لها هذه، وهي تُقاس بما يليها — حتى أحدثِ نافذةٍ تغطّي.
+            if (!finalChunk && newest > index && recognitionWindow(index + 1, false).startMs <= committedUntil.current) return;
             const out = await submitPracticeRecognitionChunk({
               blob: windowBlob, headBytes: windowHeadBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);

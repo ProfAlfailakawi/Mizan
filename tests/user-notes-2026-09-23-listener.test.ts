@@ -232,5 +232,5 @@ test('a busy listener never builds an unbounded backlog: stale chunks give way t
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(practice, /if \(!finalChunk && latestAlignment\.current > index\) \{ setHeard\(n => n \+ 1\); return; \}/);
   // والكلماتُ لا تُترك إلا بلا ثقب: نافذةُ الأحدث تبدأ قبل آخر ما ثبت. والمقطعُ الأخيرُ لا يُترك.
-  assert.match(practice, /if \(!finalChunk && newest > index && recognitionWindow\(newest, false\)\.startMs <= committedUntil\.current\) return;/);
+  assert.match(practice, /if \(!finalChunk && newest > index && recognitionWindow\(index \+ 1, false\)\.startMs <= committedUntil\.current\) return;/);
 });

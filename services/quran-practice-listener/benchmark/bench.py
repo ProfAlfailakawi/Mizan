@@ -180,8 +180,9 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         commit_until = (i + 1) * chunk / SR - (0 if final else rh['edgeHoldMs'] / 1000)
         # وكذلك الكلمات: تُترك لأحدثَ منها ما دامت نافذتُه تبدأ قبل آخر ما ثبت (لا ثقب).
         newest = newest_by(server_free)
-        newest_first = max(0, newest - (rh['windowChunks'] - 1))
-        if not final and newest > i and newest_first * chunk / SR <= committed_until:
+        # وتُقاس بالتي تليها (i+1) لا بأحدثِها — كما في الصفحة: تتسلسل حتى أحدثِ نافذةٍ تغطّي.
+        next_first = max(0, i + 1 - (rh['windowChunks'] - 1))
+        if not final and newest > i and next_first * chunk / SR <= committed_until:
             skipped += 1
             continue
         t0 = time.perf_counter()
