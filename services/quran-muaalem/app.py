@@ -195,11 +195,28 @@ def analyse_segments(wave: np.ndarray, raw_segments: list, model) -> list[dict]:
             continue
         prepared.append((seg, ref, ph, wave[a:b]))
 
+    def infer(batch):
+        with infer_lock:
+            return model([x[3] for x in batch], [x[2] for x in batch], sampling_rate=SAMPLE_RATE)
+
     for k in range(0, len(prepared), BATCH):
         batch = prepared[k : k + BATCH]
-        with infer_lock:
-            outs = model([x[3] for x in batch], [x[2] for x in batch], sampling_rate=SAMPLE_RATE)
+        # فكُّ المكتبة قد يسقط على مقطعٍ بعينه (رُصد في القياس: IndexError في
+        # multilevel_greedy_decode حين لا يطابق قناعُ الفونيمات المرجعَ). فلا تُسقط آيةٌ واحدةٌ
+        # دفعتَها ولا مراجعةَ الطالب كلَّها: تُعاد الدفعةُ مقطعًا مقطعًا، ويُتخطّى الساقطُ وحده.
+        try:
+            outs = infer(batch)
+        except Exception:
+            outs = []
+            for x in batch:
+                try:
+                    outs.append(infer([x])[0])
+                except Exception:
+                    outs.append(None)
         for (seg, ref, ph, _), out in zip(batch, outs):
+            if out is None:
+                verdicts[seg.id] = SegmentVerdict(seg.id, "skipped", reason="DECODE_FAILED").to_json()
+                continue
             try:
                 errors = explain_error(uthmani_text=ref.uthmani, ref_ph_text=ph.phonemes,
                                        predicted_ph_text=out.phonemes.text, mappings=ph.mappings)

@@ -116,6 +116,23 @@ class Service(unittest.TestCase):
         self.assertEqual(self.client.post("/analyse", content=json.dumps(body)).status_code, 503)
         self.assertEqual(self.client.get("/health").status_code, 503)
 
+    def test_a_decoder_crash_on_one_segment_skips_only_that_segment(self):
+        """رُصد في القياس: فكُّ المكتبة يسقط على مقطعٍ بعينه — فلا تسقط معه الدفعةُ ولا المراجعة."""
+        class Breaks(FakeModel):
+            def __call__(self, waves, refs, sampling_rate):
+                self.calls.append([len(w) for w in waves])
+                if any(len(w) == int(1.8 * 16000) - int(0.2 * 16000) for w in waves):
+                    raise IndexError("The shape of the mask [18] does not match the indexed tensor [37]")
+                return [Out(r.phonemes, self.conf) for r in refs]
+
+        model = Breaks()
+        r = self.post(model, [segment(id="a", endMs=3800), segment(id="b", endMs=1800)])
+        self.assertEqual(r.status_code, 200, r.text)
+        segs = {x["id"]: x for x in r.json()["segments"]}
+        self.assertEqual(segs["a"]["status"], "ok")
+        self.assertEqual((segs["b"]["status"], segs["b"]["reason"]), ("skipped", "DECODE_FAILED"))
+        self.assertEqual(len(model.calls), 3, "the batch, then each segment alone")
+
     def test_reference_is_built_from_the_segment_words_only(self):
         seen = []
 
