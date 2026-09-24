@@ -128,6 +128,10 @@ function sane(row: unknown): row is FaceAttempt {
   if (!Array.isArray(r.marks)) return false;
   if (r.words !== undefined && !(Array.isArray(r.words) && r.words.every(saneWord))) return false;
   if (r.reach !== undefined && !(Number.isInteger(r.reach) && (r.reach as number) >= 0)) return false;
+  if (r.judged !== undefined) {
+    const j = r.judged as Record<string, unknown> | null;
+    if (!j || typeof j !== 'object' || Object.values(j).some(v => typeof v !== 'boolean')) return false;
+  }
   return r.marks.every(m => m && typeof m === 'object'
     && typeof (m as { kind?: unknown }).kind === 'string'
     && Number.isFinite((m as { intensity?: unknown }).intensity));
@@ -150,7 +154,7 @@ function saneWord(w: unknown): boolean {
  */
 export function amendFaceAttempt(
   owner: string, reading: string, at: string, page: number,
-  words: readonly AttemptWord[], replace: readonly AttemptWordKind[] = [],
+  words: readonly AttemptWord[], replace: readonly AttemptWordKind[] = [], judgedTeacher = false,
 ): FaceAttempt[] {
   const all = loadFaceAttempts(owner, reading);
   const k = all.findIndex(x => x.at === at && x.page === page);
@@ -159,7 +163,7 @@ export function amendFaceAttempt(
   const kept = (all[k].words ?? []).filter(w => !drop.has(w.k));
   const seen = new Set(kept.map(w => `${w.i}:${w.k}`));
   const merged = [...kept, ...words.filter(w => saneWord(w) && !seen.has(`${w.i}:${w.k}`))].slice(0, 400);
-  all[k] = { ...all[k], words: merged };
+  all[k] = { ...all[k], words: merged, ...(judgedTeacher ? { judged: { ...all[k].judged, teacher: true } } : {}) };
   try { window.localStorage.setItem(storeKey(owner, reading), JSON.stringify(all)); } catch { /* لا مكان */ }
   return all;
 }

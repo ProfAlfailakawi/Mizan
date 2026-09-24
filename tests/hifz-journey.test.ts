@@ -86,10 +86,11 @@ test('the teacher’s notes join their attempt later, and a retake replaces them
   stubStorage();
   const first: FaceAttempt = { page: 42, at: at(0), marks: [], words: [word(3)] };
   rememberFaceAttempt('p', 'hafs', first);
-  amendFaceAttempt('p', 'hafs', first.at, 42, [word(5, 'vowel'), word(6, 'tajweed')], ['vowel', 'tajweed', 'letter']);
+  amendFaceAttempt('p', 'hafs', first.at, 42, [word(5, 'vowel'), word(6, 'tajweed')], ['vowel', 'tajweed', 'letter'], true);
   assert.deepEqual(loadFaceAttempts('p', 'hafs')[0].words?.map(w => `${w.i}${w.k}`), ['3skipped', '5vowel', '6tajweed']);
   amendFaceAttempt('p', 'hafs', first.at, 42, [word(6, 'tajweed')], ['vowel', 'tajweed', 'letter']);
   assert.deepEqual(loadFaceAttempts('p', 'hafs')[0].words?.map(w => `${w.i}${w.k}`), ['3skipped', '6tajweed'], 'the retake cleared the vowel note');
+  assert.deepEqual(loadFaceAttempts('p', 'hafs')[0].judged, { teacher: true }, 'the teacher’s review is recorded as evidence');
   amendFaceAttempt('p', 'hafs', at(9), 42, [word(1)]);
   assert.equal(loadFaceAttempts('p', 'hafs').length, 1, 'an attempt that was never saved is not created here');
   /* ومحاولةٌ بكلماتٍ مشوّهةٍ تُطرح كلُّها، ولا تُصلَّح بالتخمين. */
@@ -105,7 +106,8 @@ test('the journey sits on the practice page, opens your own pages, and says it s
   assert.match(page, /<HifzJourney ar=\{ar\} attempts=\{attempts\} ledger=\{ledger\} practisable=\{practisable\}/);
   assert.match(page, /candidates\.find\(c => c\.page === forcedPage\)/, 'only a page in the student’s range opens');
   assert.match(page, /judged\.filter\(m => \(m\.wordIndex as number\) < farthest\)/, 'stopping early is not recorded as forgetting');
-  assert.match(page, /amendFaceAttempt\(owner, deliveryReading \|\| '', key\.at, key\.page, teacher, \['vowel', 'tajweed', 'letter'\]\)/);
+  assert.match(page, /amendFaceAttempt\(owner, deliveryReading \|\| '', key\.at, key\.page, teacher, \['vowel', 'tajweed', 'letter'\], true\)/);
+  assert.match(page, /judged: \{ words: !!verdict \}/);
   const view = fs.readFileSync('src/components/participant/HifzJourney.tsx', 'utf8');
   assert.match(view, /disabled=\{!open\}/);
   assert.match(view, /في هذا الجهاز وحده/);
@@ -117,11 +119,19 @@ test('a hard word drops off once recited cleanly twice past it — a recitation 
     { page: 42, at: at(5), marks: [], words: [word(7)], reach: 30 },
     { page: 42, at: at(4), marks: [], words: [word(7)], reach: 30 },
   ];
-  const clean = (d: number, reach: number): FaceAttempt => ({ page: 42, at: at(d), marks: [], words: [], reach });
+  const clean = (d: number, reach: number, judged = true): FaceAttempt => ({ page: 42, at: at(d), marks: [], words: [], reach, judged: { words: judged } });
   assert.equal(hardWords(stumbles, NOW).length, 1);
   assert.equal(hardWords([...stumbles, clean(2, 30)], NOW).length, 1, 'one clean pass is not yet mastery');
   assert.equal(hardWords([...stumbles, clean(2, 30), clean(1, 5), clean(0, 6)], NOW).length, 1, 'stopping before the word proves nothing');
+  assert.equal(hardWords([...stumbles, clean(2, 30, false), clean(1, 30, false)], NOW).length, 1, 'recitations where word judging was closed prove nothing');
   assert.equal(hardWords([...stumbles, clean(2, 30), clean(1, 30)], NOW).length, 0, 'mastered');
+  const vowel: FaceAttempt[] = [
+    { page: 42, at: at(5), marks: [], words: [word(7, 'vowel')], reach: 30, judged: { words: true, teacher: true } },
+    { page: 42, at: at(4), marks: [], words: [word(7, 'vowel')], reach: 30, judged: { words: true, teacher: true } },
+  ];
+  assert.equal(hardWords([...vowel, clean(2, 30), clean(1, 30)], NOW).length, 1, 'a vowel note needs the teacher to have reviewed the later passes');
+  const teacherPass = (d: number): FaceAttempt => ({ page: 42, at: at(d), marks: [], words: [], reach: 30, judged: { words: true, teacher: true } });
+  assert.equal(hardWords([...vowel, teacherPass(2), teacherPass(1)], NOW).length, 0);
   const old: FaceAttempt[] = [{ page: 9, at: at(40), marks: [], words: [word(1)] }, { page: 9, at: at(41), marks: [], words: [word(1)] }];
   assert.equal(hardWords(old, NOW).length, 0, 'a month-old stumble is not chased');
 });

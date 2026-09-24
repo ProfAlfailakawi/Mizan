@@ -914,7 +914,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         ...judged.filter(m => (m.wordIndex as number) < farthest)
           .map(m => at(m.wordIndex as number, m.kind === 'tashkeel' ? 'vowel' : m.kind)),
       ].filter((w): w is AttemptWord => !!w);
-      const attempt = { ...settled.attempt, words, reach: farthest };
+      const attempt = { ...settled.attempt, words, reach: farthest, judged: { words: !!verdict } };
       attemptKey.current = { at: attempt.at, page: attempt.page };
       setAttempts(rememberFaceAttempt(owner, deliveryReading || '', attempt));
     } else attemptKey.current = null;
@@ -938,7 +938,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       const w = face.words[f.wordIndex];
       return w ? { i: f.wordIndex, s: w.surah, a: w.ayah, t: w.text.slice(0, 64), k: kind(f.kind) } : null;
     }).filter((w): w is AttemptWord => !!w);
-    setAttempts(amendFaceAttempt(owner, deliveryReading || '', key.at, key.page, teacher, ['vowel', 'tajweed', 'letter']));
+    setAttempts(amendFaceAttempt(owner, deliveryReading || '', key.at, key.page, teacher, ['vowel', 'tajweed', 'letter'], true));
   }, [tashkeel.phase, tashkeel.findings, face, owner, deliveryReading]);
 
   const practisable = useMemo(() => new Set(candidates.map(c => c.page)), [candidates]);

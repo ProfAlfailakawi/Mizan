@@ -110,10 +110,16 @@ export function hardWords(attempts: readonly FaceAttempt[], now: number, limit =
    * والإتقانُ يُمحي: كلمةٌ قُرئت نظيفةً في تلاوتين بعد آخر تعثّرٍ فيها — تلاوتين بلغتا موضعَها —
    * تنزل من القائمة. وما قَدُم حتى تضاءل أثرُه (نحو شهر) ينزل كذلك.
    */
+  /* ولا يُعدّ المرورُ نظيفًا إلا بحكمٍ جرى على نوع تعثّرها: تلاوةٌ أُغلق فيها حكمُ الكلمات لا تشهد لها. */
+  const evidence = (a: FaceAttempt, k: AttemptWordKind) =>
+    k === 'repeat' || k === 'confusable' ? true
+      : k === 'vowel' || k === 'tajweed' || k === 'letter' ? a.judged?.teacher === true
+        : a.judged?.words === true;
   const cleanAfter = (h: HardWord) => attempts.filter(a => {
     const at = valid(a, now);
     return at !== null && a.page === h.page && at > h.lastAt && a.reach !== undefined && h.index < a.reach
-      && !(a.words ?? []).some(w => w.i === h.index && WORD_WEIGHT[w.k] !== 0);
+      && h.kinds.every(k => evidence(a, k))
+      && !(a.words ?? []).some(w => w.i === h.index);
   }).length;
   return [...byWord.values()]
     .filter(h => h.times >= 2 && h.score >= MASTERED_SCORE && cleanAfter(h) < MASTERED_CLEAN)
