@@ -681,7 +681,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
               heardWords.current = [...heardWords.current, ...committedWords(out.words, windowStartMs, win.commitUntilMs)];
               const frontier = followFrontier(expectedRef.current, heardWords.current);
-              if (frontier >= 0) advance(provisionalReach(expectedRef.current, frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
+              /* ومن الجبهة الفارغة (-1) كذلك: أوّلُ كلمةٍ عند الحافّة تنكشف ولا تنتظر النافذةَ التالية. */
+              advance(provisionalReach(expectedRef.current, frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
               return;
             }
             /*
@@ -706,7 +707,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
             /* وجبهةُ السماع أدقُّ شاهدٍ على الموضع: ما قاله فعلًا لا ما يُظنّ أنّه بلغه. */
-            if (judged.frontier >= 0) advance(provisionalReach(expectedRef.current, judged.frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
+            advance(provisionalReach(expectedRef.current, judged.frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
             const settledHere = judgeable(judged.settled);
             setMistakes(judged.judgment ? settledHere : undefined);
             noticeSlips(settledHere);

@@ -147,3 +147,9 @@ test('ما سُمع عند الحافّة يُكشف إن طابق الكلمة�
   assert.equal(provisionalReach(expected, 4, []), 4);
   assert.equal(provisionalReach(expected, expected.length - 1, [FACE[0]]), expected.length - 1);
 });
+
+test('الكلمةُ الأولى عند الحافّة تنكشف من الجبهة الفارغة', async () => {
+  const { provisionalReach } = await import('../src/lib/live-judging');
+  assert.equal(provisionalReach(expected, -1, [FACE[0]]), 0);
+  assert.equal(provisionalReach(expected, -1, ['غير']), -1);
+});

@@ -178,8 +178,8 @@ test('word-by-word following survives a closed gate and a dropped chunk, and the
   // وسقوطُ إذن الحكم في أثناء التلاوة يترك التتبّعَ قائمًا: المقاطعُ التالية تمرّ بفرع التتبّع.
   assert.doesNotMatch(practice, /wordFollow\.current = false;[^\n]*\n[^\n]*setMistakes\(undefined\)/);
   // والكلمةُ الأخيرةُ المسموعةُ تنكشف هي نفسُها — لا تتأخّر كلمة.
-  assert.match(practice, /if \(judged\.frontier >= 0\) advance\(provisionalReach\(expectedRef\.current, judged\.frontier, /);
-  assert.match(practice, /if \(frontier >= 0\) advance\(provisionalReach\(expectedRef\.current, frontier, /);
+  assert.match(practice, /advance\(provisionalReach\(expectedRef\.current, judged\.frontier, /);
+  assert.match(practice, /advance\(provisionalReach\(expectedRef\.current, frontier, /);
 
   // والحدودُ تتّسع لإيقاع المقطع: فسحةُ النصف فوق ما يُرسله قارئٌ في النافذة.
   const { CHUNK_MS } = await import('../src/lib/recognition-window');

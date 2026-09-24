@@ -195,13 +195,13 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
                 heard.extend(text.split())
             committed_until = max(committed_until, we)
         f = follow_frontier(expected, heard)
+        # provisionalReach (src/lib/live-judging.ts): ما عند الحافّة مطابقًا التاليةَ تمامًا — ومن الجبهة الفارغة كذلك.
+        for text in tail:
+            if f + 1 < total_words and text and text == expected[f + 1]:
+                f += 1
+            else:
+                break
         if f >= 0:
-            # provisionalReach (src/lib/live-judging.ts): ما عند الحافّة مطابقًا التاليةَ تمامًا.
-            for text in tail:
-                if f + 1 < total_words and text and text == expected[f + 1]:
-                    f += 1
-                else:
-                    break
             reveal(f, recog_free)
 
     lags = [revealed_at[k] - ends[k] for k in range(total_words) if revealed_at[k] is not None]
