@@ -60,8 +60,10 @@ test('كلُّ آيةٍ تُختم بفاصلةٍ تحمل رقمها', () => {
 
 test('الفاصلة طبقةُ عرضٍ فوق النصّ، لا حرفٌ يُضاف إليه', () => {
   const html = sheet();
+  /* آخرُ كلمةٍ تُضمّ إلى فاصلتها في وحدةٍ لا تنكسر، فيُقرأ النصُّ بلا وسوم — حرفًا بحرف. */
+  const plain = html.replace(/<[^>]+>/g, '');
   for (const a of AYAT) {
-    assert.ok(html.includes(a.text), `نصّ الآية ${a.ayah} تغيّر عمّا سُلِّم`);
+    assert.ok(plain.includes(a.text), `نصّ الآية ${a.ayah} تغيّر عمّا سُلِّم`);
   }
   /* لا رقمَ عربيًّا هنديًّا داخل نصّ الآية نفسه — الأرقام كلُّها في الفواصل وحدها. */
   const insideText = AYAT.some(a => /[٠-٩]/.test(a.text));
@@ -100,4 +102,15 @@ test('شريطُ بيئة العرض وحشوتُه رقمٌ واحد', () => {
   assert.equal(/pb-28/.test(app), false, 'عاد رقمُ الحشوة المنسوخ إلى القشرة');
   assert.equal(/'7rem'/.test(app), false, 'عاد ارتفاعُ الشريط منسوخًا في القشرة');
   assert.match(DEMO_BAR_SHELL_PADDING, /^\d+(\.\d+)?rem$/);
+});
+
+test('الفاصلةُ لا تنفصل عن آخر كلمةٍ من آيتها', () => {
+  const html = sheet();
+  assert.equal((html.match(/class="mizan-sheet-tail"/g) || []).length, AYAT.length, 'لكلّ آيةٍ وحدةٌ تضمّ آخرَ كلمةٍ وفاصلتها');
+  const plain = html.replace(/<[^>]+>/g, '');
+  for (const a of AYAT) {
+    const last = a.text.split(' ').pop()!;
+    /* مسافةٌ لا تنكسر (U+00A0) بين الكلمة ورقم الآية — لا مسافةٌ عاديّة يجوز الكسرُ عندها. */
+    assert.ok(plain.includes(`${last}\u00A0${arabicIndicDigits(a.ayah)}`), `الكلمة «${last}» لا تلتصق بفاصلتها`);
+  }
 });

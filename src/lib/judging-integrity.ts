@@ -205,11 +205,43 @@ export function buildParticipantFairnessEvidence(input:{
    المنظّم يختار عبارة واحدة أو عدة عبارات أو المجموعة كلها، ويُحفظ الاختيار كفهارس. */
 export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا','أحسنت، بارك الله فيك','كفى، وفقك الله','شكرًا لك، نتوقف هنا','أحسنت القراءة، جزاك الله خيرًا'];
 export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.','Well done, may God bless you.','That is enough. Thank you.','Thank you, we stop here.','Well recited. Thank you.'];
+/*
+ * ترتيبُ عبارات الإنهاء لمتسابقٍ واحد.
+ *
+ * كان الترتيبُ برقم السؤال وحده، فيسمع كلُّ متسابقٍ السلسلةَ نفسها: الأوّلُ يُقال له «حسبك»
+ * في موضعه الأوّل، والثاني كذلك، والعاشر كذلك — تكرارٌ تسمعه القاعةُ واللجنة. فصار لكلّ
+ * متسابقٍ ترتيبُه المشتقّ من هويّته، بثلاثة شروط:
+ *   ١) لا تُعاد عبارةٌ على المتسابق الواحد حتى تُقال له المختاراتُ كلُّها؛
+ *   ٢) ولا تُقال عبارةٌ مرّتين متتاليتين — ولا بين آخر متسابقٍ وأوّل من بعده (`before`)؛
+ *   ٣) والترتيبُ حتميّ: يُعاد حسابُه بعد إعادة تحميل الصفحة فيخرج هو هو، ولا يحتاج ذاكرةً
+ *      لما قيل للمتسابق نفسه.
+ */
+const cueHash=(text:string)=>{let h=0x811c9dc5;for(let i=0;i<text.length;i+=1){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193)}return h>>>0};
+export function contestantCueSequence(selected:readonly number[],contestantKey:string,count:number,before?:number){
+  const pool=[...new Set(selected)];
+  const out:number[]=[];
+  let cycle=new Set<number>();
+  for(let k=0;k<Math.max(0,count);k+=1){
+    if(pool.length===1){out.push(pool[0]);continue}
+    if(cycle.size>=pool.length)cycle=new Set();
+    const previous=k?out[k-1]:before;
+    let options=pool.filter(i=>!cycle.has(i));
+    if(options.length>1)options=options.filter(i=>i!==previous);
+    const pick=options[cueHash(`${contestantKey}:${k}`)%options.length];
+    cycle.add(pick);out.push(pick);
+  }
+  return out;
+}
+
 export function passageTransitionPlan(input:{
   isLastQuestion:boolean;
   ar:boolean;
   cue?:{enabled?:boolean;phraseArabic?:string;phraseEnglish?:string;selectedPhraseIndexes?:number[];autoAdvanceDelayMs?:number;audioUrl?:string};
   variantSeed?:number;
+  /** هويّةُ المتسابق: يُشتقّ منها ترتيبُه. وبغيابها يبقى التناوبُ برقم السؤال وحده. */
+  contestantKey?:string;
+  /** آخرُ عبارةٍ قيلت قبل أن يبدأ هذا المتسابق — لا تكون أوّلَ ما يُقال له. */
+  previousIndex?:number;
 }){
   const cue=input.cue;
   const arr=input.ar?TRANSITION_PHRASES_AR:TRANSITION_PHRASES_EN;
@@ -217,8 +249,11 @@ export function passageTransitionPlan(input:{
   const legacyIndex=legacyPhrase?arr.indexOf(legacyPhrase):-1;
   const requested=(cue?.selectedPhraseIndexes||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<arr.length);
   const selected=[...new Set(requested.length?requested:[legacyIndex>=0?legacyIndex:0])];
+  const seed=Math.max(0,Math.floor(input.variantSeed??0));
   const slot=((input.variantSeed??0)%selected.length+selected.length)%selected.length;
-  const idx=selected[slot]??0;
+  const idx=input.contestantKey
+    ?contestantCueSequence(selected,input.contestantKey,seed+1,input.previousIndex)[seed]
+    :selected[slot]??0;
   return {
     enabled:cue?.enabled!==false,
     variantIndex:idx,

@@ -83,7 +83,8 @@ export const TajweedAyahWords:React.FC<{text:string;spans?:TajweedSpan[];enabled
  },[spans,words,enabled]);
  return <>{pieces.map(p=>p.word<0
   ? <span key={p.key}>{p.text}</span>
-  : <span key={p.key} className={p.word===activeWord?'rounded-md bg-[#dCe9e1] shadow-[0_0_0_1px_#bcd6c9] transition-colors duration-150':'transition-colors duration-150'}>
+  : <span key={p.key} data-word={p.word} data-active-word={p.word===activeWord?'true':undefined} className={p.word===activeWord?'rounded-md transition-colors duration-150':'transition-colors duration-150'}
+     style={p.word===activeWord?{background:'var(--mizan-word, #dCe9e1)',boxShadow:'0 0 0 1px var(--mizan-word, #bcd6c9)'}:undefined}>
      <TajweedAyah text={p.text} spans={localSpans.get(p.word)} enabled={enabled}/>
     </span>)}</>;
 };

@@ -1073,6 +1073,47 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   line-height:2.15;
 }
 
+/*
+ * عرضُ النصّ على قدر الوجه.
+ *
+ * كانت الورقةُ بخطٍّ ثابتٍ وارتفاعٍ أقصى وتمرير: يطول المقطعُ فتنزل سطورُه تحت الحاشية،
+ * وتقطعها الحاشيةُ الذهبية، ويبحث المحكّمُ عن آخره بالتمرير. الآن تأخذ الورقةُ قدرَ الصفحة
+ * نفسها (بنسبتها وعدد صفحاتها)، والخطُّ يُقاس ليدخل المقطعُ كلُّه — والحاشيةُ تحيط بالنصّ
+ * ولا تمرّ فيه.
+ */
+.mizan-mushaf-sheet.mizan-mushaf-sheet--framed,
+.mizan-judge-os .mizan-mushaf-sheet.mizan-mushaf-sheet--framed{
+  display:flex; flex-direction:column;
+  max-width:none; max-height:none; overflow:hidden;
+  padding:clamp(12px,1.8vh,20px) clamp(12px,1.6vw,22px);
+}
+.mizan-mushaf-sheet--framed .mizan-mushaf-band{ flex:0 0 auto; min-height:2rem; margin-bottom:.35rem }
+.mizan-mushaf-sheet__page{
+  position:relative; flex:1 1 auto; min-height:0; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.mizan-judge-os .mizan-mushaf-sheet .mizan-mushaf-sheet__text,
+.mizan-mushaf-sheet__text{
+  width:100%;
+  line-height:2.05;
+  text-align:justify; text-align-last:center;
+  word-spacing:.04em;
+}
+.mizan-mushaf-sheet__tools{
+  flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap:.35rem .9rem; padding-top:.3rem;
+}
+.mizan-mushaf-sheet__tools button{ min-height:32px }
+.mizan-mushaf-sheet__foot{
+  flex:0 0 auto; display:flex; justify-content:center; padding-top:.2rem;
+  font-size:10px; color:#666b68;
+}
+.mizan-judge-os .mizan-mushaf-sheet .mizan-mushaf-sheet__text[data-fill="short"],
+.mizan-mushaf-sheet__text[data-fill="short"]{ text-align:center; text-align-last:center }
+.mizan-sheet-tail{ white-space:nowrap }
+/* تظليلُ الآية لونٌ يمتدّ مع سطورها ولا يزيح حرفًا. */
+.mizan-sheet-ayah{ border-radius:.3em; -webkit-box-decoration-break:clone; box-decoration-break:clone }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared primitives — Badge, Stat, Modal, Command palette, Role menu
    These six carried 81 hand-written hex values between them, and Modal and Stat
