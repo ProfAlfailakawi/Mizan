@@ -1,4 +1,5 @@
-import json, base64, os, re, tempfile, threading, time
+import asyncio, json, base64, os, re, tempfile, threading, time
+from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
 from fastapi import FastAPI, Header, HTTPException, Request
 
@@ -42,8 +43,36 @@ def try_models():
             print(f'model failed: {model_id}: {exc}',flush=True)
     state['error']=' | '.join(errors)[-600:]
 
-threading.Thread(target=load_model,daemon=True).start()
-app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
+def load_prefetched()->bool:
+    """
+    النموذجُ المخبوزُ في الصورة يُحمَّل قبل أن تُفتح الخدمةُ للطلبات — من القرص، بلا شبكة.
+
+    كان التحميلُ كلُّه في خيطٍ خلفيّ يبدأ مع الإقلاع، والخدمةُ تفتح منفذَها فورًا. وCloud Run
+    (بلا `--no-cpu-throttling`) لا يعطي الحاويةَ معالجًا إلا ما دام طلبٌ يُخدَم أو هي تُقلع —
+    فيُخنق الخيطُ بعد ثانيتين من الإقلاع ولا يتقدّم إلا في لحظات طلبات الصحّة: فيبقى المستمعُ
+    «يستعدّ» دقائق بعد كل نشرٍ وكل نوم (رُصد في نشر a879e6e: LOADING ثماني مرّات في دقيقتين).
+    الآن يُحمَّل في طور الإقلاع نفسه، بالمعالج كاملًا ومعه `--cpu-boost`، ولا يُفتح المنفذ حتى
+    يجهز — فأوّلُ طلبٍ ينتظر ثوانيَ الإقلاع بدل دقائق «يستعدّ». ولا كلفةَ فوق ما كان.
+    """
+    from faster_whisper import WhisperModel
+    for model_id in dict.fromkeys(MODEL_CHAIN):
+        try:
+            state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=int(os.getenv('MIZAN_CPU_THREADS','2')),local_files_only=True)
+            state['id']=model_id; state['error']=None
+            print(f'model ready from image: {model_id}',flush=True)
+            return True
+        except Exception as exc:
+            print(f'not in image: {model_id}: {exc}',flush=True)
+    return False
+
+@asynccontextmanager
+async def lifespan(_app):
+    # وإن لم يكن في الصورة نموذجٌ (تعثّر التنزيلُ المسبق) نُزِّل في الخلفية كما كان، والصحّةُ تقول «أُحمّل».
+    if not await asyncio.to_thread(load_prefetched):
+        threading.Thread(target=load_model,daemon=True).start()
+    yield
+
+app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 
 READING_ID=re.compile(r'[a-z][a-z-]{1,39}')
 DIAC=re.compile(r'[ً-ٰٟۖ-ۭ]')

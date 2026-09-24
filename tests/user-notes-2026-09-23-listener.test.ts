@@ -70,3 +70,18 @@ test('the student waits for a waking listener instead of losing the first chunks
   const server = read('server.ts');
   assert.match(server, /quranPracticeListener:_req\.query\?\.listener==='1'\?await practiceListenerHealth\(\):practiceListenerHealthCached\(\)/);
 });
+
+test('the baked model loads during startup, with the CPU Cloud Run gives a starting container', () => {
+  /*
+   * بلا `--no-cpu-throttling` لا يُعطى خيطٌ خلفيٌّ معالجًا بين الطلبات، فكان المستمعُ «يستعدّ»
+   * دقائقَ بعد كلّ نشرٍ ونوم. فالنموذجُ المخبوز يُحمَّل في طور الإقلاع (lifespan) من القرص وحده،
+   * ولا يُفتح المنفذ قبله؛ والتنزيلُ الخلفيّ بقي للصورة التي لا نموذجَ فيها.
+   */
+  const app = read('services/quran-practice-listener/app.py');
+  assert.match(app, /local_files_only=True/);
+  assert.match(app, /app=FastAPI\(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan\)/);
+  assert.match(app, /if not await asyncio\.to_thread\(load_prefetched\):\n\s+threading\.Thread\(target=load_model,daemon=True\)\.start\(\)/);
+  assert.doesNotMatch(app, /^threading\.Thread\(target=load_model,daemon=True\)\.start\(\)$/m, 'no load thread started at import time');
+  const build = read('cloudbuild.yaml');
+  assert.match(build, /--cpu-boost/);
+});
