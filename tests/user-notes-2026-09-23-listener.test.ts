@@ -82,7 +82,9 @@ test('the baked model loads during startup, with the CPU Cloud Run gives a start
   const app = read('services/quran-practice-listener/app.py');
   assert.match(app, /local_files_only=True/);
   assert.match(app, /app=FastAPI\(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan\)/);
-  assert.match(app, /if not await asyncio\.to_thread\(load_prefetched\):\n\s+threading\.Thread\(target=load_model,daemon=True\)\.start\(\)/);
+  assert.match(app, /if not await asyncio\.to_thread\(load_prefetched\):\n\s+loader=threading\.Thread\(target=load_model,daemon=True\)/);
+  /* وإن غاب عن الصورة نُزِّل في طور الإقلاع نفسه (مهلةٌ دون مهلة فحص الإقلاع ٢٤٠ ثانية). */
+  assert.match(app, /await asyncio\.to_thread\(loader\.join,float\(os\.getenv\('MIZAN_STARTUP_LOAD_SECONDS','180'\)\)\)/);
   assert.doesNotMatch(app, /^threading\.Thread\(target=load_model,daemon=True\)\.start\(\)$/m, 'no load thread started at import time');
   const build = read('cloudbuild.yaml');
   assert.match(build, /--cpu-boost/);
