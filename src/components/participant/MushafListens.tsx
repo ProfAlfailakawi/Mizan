@@ -150,17 +150,23 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (index === null || index < 0) return;
     setPenTarget(index);
   }, []);
+  /*
+   * و«بلغ» لا يتجاوز ما سُمع أبدًا — لا بمؤقّت ولا بكلمةٍ سابقة.
+   *
+   * كان القلمُ ينساب بمؤقّتٍ بين موضعين، و«بلغ» يسبقه بكلمة (`pen + 2`) — فكان الإخفاءُ
+   * («اختبر حفظك») يكشف كلماتٍ بالوقت، بل كلمةً لم يقلها الطالبُ بعد. والحفظُ يُختبر بما
+   * يُتلى: فالكشفُ لا يتقدّم إلا إلى الموضع الذي وصل من السماع نفسه، والكلمةُ تنكشف بعد
+   * أن تُقال لا قبل. وفي الإخفاء لا انسياب: يقفز القلمُ إلى ما سُمع ويقف.
+   */
   useEffect(() => {
     if (penTarget === null) { setPen(null); return; }
-    if (pen === null || penTarget < pen || penTarget - pen > 24) { setPen(penTarget); setReached(r => Math.max(r, penTarget + 1)); return; }
+    setReached(r => Math.max(r, penTarget + 1));
+    if (veiled || pen === null || penTarget < pen || penTarget - pen > 24) { setPen(penTarget); return; }
     if (penTarget === pen) return;
     const step = Math.max(90, Math.min(260, 1500 / (penTarget - pen)));
-    const t = window.setTimeout(() => {
-      setPen(p => (p === null ? penTarget : p + 1));
-      setReached(r => Math.max(r, (pen ?? penTarget) + 2));
-    }, step);
+    const t = window.setTimeout(() => setPen(p => (p === null ? penTarget : Math.min(penTarget, p + 1))), step);
     return () => window.clearTimeout(t);
-  }, [pen, penTarget]);
+  }, [pen, penTarget, veiled]);
   /* هل بقي مقطعٌ لم يصل حين قُرئ التقرير؟ */
   const [incomplete, setIncomplete] = useState(false);
   /* إذنُ الحكم لهذه الرواية — يُسأل عنه الخادم، ولا تحسبه الشاشةُ لنفسها. */
