@@ -365,7 +365,7 @@ export const JudgeOS: React.FC = () => {
   if(!context||alignmentContextRef.current||followBusyRef.current||!blob.size||!head)return;
   followBusyRef.current=true;
   const parts=blob===head?[head]:prev&&prev!==head?[head,prev,blob]:[head,blob];
-  void submitJudgeFollowChunk({blob:new Blob(parts,{type:blob.type||head.type}),...context,after:followAfterRef.current}).then(x=>{
+  void submitJudgeFollowChunk({blob:new Blob(parts,{type:blob.type||head.type}),...context,after:followAfterRef.current,headBytes:blob===head?0:head.size}).then(x=>{
    if(followContextRef.current!==context)return;
    if(x.ayah){followMissRef.current=0;if(Number.isInteger(x.globalIndex))followAfterRef.current=x.globalIndex;setAlignmentResult(x)}
    /* مقطعٌ واحدٌ بلا تطابق (نَفَسٌ أو وقف) لا يُطفئ المؤشّر؛ ثلاثةٌ متتالية تقول «يُعاد التحديد». */

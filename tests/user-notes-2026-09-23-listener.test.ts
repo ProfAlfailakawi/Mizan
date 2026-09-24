@@ -207,3 +207,18 @@ test('the edge hold no longer delays the pen for a word heard exactly as the nex
   // والحكمُ بما ثبت وحده: ما عند الحافّة لا يدخل heardWords.
   assert.doesNotMatch(practice, /heardWords\.current = \[[^\]]*edgeWords/);
 });
+
+test('the rough position never counts the file header as where the reader is', () => {
+  // قيس: ٨١ قفزةً للموضع التقريبيّ (MIZAN-LISTENER-FOLLOW-1)، أكثرُها ترويسةٌ تُطابَق أوّلَ المقطع.
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /headBytes: chunk === head \? 0 : head\.size,/);
+  const client = read('src/lib/quran-intelligence.ts');
+  assert.match(client, /if\(input\.headBytes\)headers\['x-mizan-head-bytes'\]=String\(input\.headBytes\);/);
+  const judge = read('src/components/judge/JudgeOS.tsx');
+  assert.match(judge, /headBytes:blob===head\?0:head\.size/);
+  const server = read('server.ts');
+  assert.match(server, /'x-mizan-head-bytes':String\(input\.headBytes\)/);
+  assert.ok((server.match(/headBytes:Number\(soleParam\(req\.headers\['x-mizan-head-bytes'\],'x-mizan-head-bytes'\)\|\|0\)/g) || []).length >= 2, 'journey align and judge follow');
+  const listener = read('services/quran-practice-listener/app.py');
+  assert.match(listener, /if w\.end>head_s\+0\.05/);
+});
