@@ -16,6 +16,8 @@
  * الأسطر، وإلا فمن متوسّط السطر في مصحف المدينة (نحو تسع كلمات). والتقديرُ يقال في السبب.
  */
 
+import { REFERENCE_AUDIO_ID, REFERENCE_AUDIO_READING } from './reference-audio-policy';
+
 export type OpeningCutReason = 'FITS_ONE_LINE' | 'LINE_END' | 'WAQF' | 'LINE_LENGTH' | 'ESTIMATED_LINE';
 
 export interface OpeningCutInput {
@@ -135,15 +137,9 @@ export function energyFrames(samples: Float32Array, sampleRate: number, frameMs 
 }
 
 /**
- * التسجيلُ الرسميّ لكلّ رواية — من روايتها نفسِها.
- * ما لا تسجيلَ له لا يُعطى تسجيلَ غيره: لا يُلقَّن متسابقٌ بغير روايته.
+ * تسجيلُ «أوّل آية»: تسجيلُ حفص (المعيقلي) للروايات العشرين كلّها — قرارُ المالك في
+ * `reference-audio-policy.ts`: الصوتُ مرجعٌ سمعيٌّ واحد، لا دليلٌ على نصّ الرواية المعروضة.
+ * فيُقاس القطعُ على نصّ حفص وصفحته أيًّا كانت روايةُ المتسابق، لأنّ الصوتَ صوتُ حفص.
  */
-export const OPENING_RECORDING_BY_READING: Record<string, string> = {
-  hafs: 'hafs-muaiqly',
-  warsh: 'warsh-dawsari',
-  qalun: 'qalun-hudhaifi',
-  shubah: 'shubah-hudhaifi',
-  'duri-abi-amr': 'duri-juhani',
-  'susi-abi-amr': 'susi-siddiqi',
-};
-export const openingRecordingFor = (reading: string | undefined) => (reading ? OPENING_RECORDING_BY_READING[reading] : undefined);
+export const OPENING_RECORDING = REFERENCE_AUDIO_ID;
+export const OPENING_TEXT_READING = REFERENCE_AUDIO_READING;

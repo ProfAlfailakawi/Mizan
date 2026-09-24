@@ -67,7 +67,8 @@ test('the judge screen passes the contestant and remembers the last phrase acros
 /*
  *   ـ «أوّلُ آية» سطرٌ واحد على الأكثر: من الآيات ما يطول جدًّا.
  */
-import { AVERAGE_LINE_WORDS, cutTimeMs, energyFrames, OPENING_FADE_MS, openingRecordingFor, OPENING_RECORDING_BY_READING, planOpeningCut, snapToQuiet } from '../src/lib/opening-cue';
+import { AVERAGE_LINE_WORDS, cutTimeMs, energyFrames, OPENING_FADE_MS, OPENING_RECORDING, OPENING_TEXT_READING, planOpeningCut, snapToQuiet } from '../src/lib/opening-cue';
+import { REFERENCE_AUDIO_ID } from '../src/lib/reference-audio-policy';
 import { kfgqpcAudioKeys } from '../server/kfgqpc-delivery';
 import { splitAyahWords } from '../src/lib/word-timing';
 
@@ -146,14 +147,16 @@ test('the cut snaps to the quietest moment near the estimate', () => {
   assert.equal(frames[1], 1);
 });
 
-test('the opening cue plays the contestant’s own reading, from a recording the server actually serves', () => {
-  for (const [reading, recording] of Object.entries(OPENING_RECORDING_BY_READING)) {
-    assert.ok(kfgqpcAudioKeys(recording, 2, 255).length > 0, `${reading} → ${recording} has no delivery path`);
-    /* والاسمُ وحده (hafs) ليس مسارًا — وكان هو ما يُرسَل فيعود ٤٠٤ دائمًا. */
-    assert.equal(kfgqpcAudioKeys(reading, 2, 255).length, 0);
-  }
-  assert.equal(openingRecordingFor('khalaf-hamzah'), undefined, 'no cross-riwayah fallback');
+test('the opening cue is the Hafs recording for all twenty readings — one the server actually serves', () => {
+  /* قرارُ المالك: الصوتُ حفصٌ للروايات العشرين كلّها (reference-audio-policy). */
+  assert.equal(OPENING_RECORDING, REFERENCE_AUDIO_ID);
+  assert.equal(OPENING_RECORDING, 'hafs-muaiqly');
+  assert.equal(OPENING_TEXT_READING, 'hafs', 'the cut is measured on the Hafs text the recording actually recites');
+  assert.ok(kfgqpcAudioKeys(OPENING_RECORDING, 2, 255).length > 0, 'the server serves the Hafs recording');
+  /* واسمُ الرواية وحده (hafs، warsh…) ليس مسارًا — وكان هو ما يُرسَل فيعود ٤٠٤ دائمًا. */
+  for (const reading of ['hafs', 'warsh', 'qalun', 'khalaf-hamzah']) assert.equal(kfgqpcAudioKeys(reading, 2, 255).length, 0);
   const src = fs.readFileSync('src/components/judge/JudgeOS.tsx', 'utf8');
+  assert.match(src, /const recording=OPENING_RECORDING;/, 'no per-reading recording choice');
   assert.match(src, /fetchOfficialAyahAudio\(recording,surah,q\.startAyah\)/);
   assert.doesNotMatch(src, /fetchOfficialAyahAudio\(readingKey/);
   assert.match(src, /watchStop\(player,\(\)=>stopMs,finish\)/);

@@ -7,7 +7,7 @@
  */
 import { fetchDeliveryPassage, fetchMushafLayout } from './kfgqpc-library';
 import { measuredWordTimings, splitAyahWords, type MeasuredSegment } from './word-timing';
-import { cutTimeMs, energyFrames, OPENING_FADE_MS, OPENING_RECORDING_BY_READING, planOpeningCut, snapToQuiet, type OpeningCut } from './opening-cue';
+import { cutTimeMs, energyFrames, OPENING_FADE_MS, OPENING_RECORDING, OPENING_TEXT_READING, planOpeningCut, snapToQuiet, type OpeningCut } from './opening-cue';
 
 export interface OpeningCutPlan {
   text: string;
@@ -15,10 +15,6 @@ export interface OpeningCutPlan {
   segments?: MeasuredSegment[];
 }
 
-/* نصُّ التسجيل من روايته: تسجيلُ حفصٍ يُقاس على نصّ حفص وتخطيطِ صفحته. */
-const READING_OF_RECORDING: Record<string, string> = Object.fromEntries(
-  Object.entries(OPENING_RECORDING_BY_READING).map(([reading, recording]) => [recording, reading]),
-);
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 
@@ -28,10 +24,14 @@ const cached = (key: string, make: () => Promise<OpeningCutPlan | null>) => {
   if (!p) { p = make().catch(() => null); plans.set(key, p); }
   return p;
 };
-/** خطّةُ القطع لتسجيلٍ رسميّ بعينه (ومعها توقيتُ كلماته المقيس إن وُجد). */
+/**
+ * خطّةُ القطع لتسجيل حفص المرجعيّ (ومعها توقيتُ كلماته المقيس إن وُجد). الصوتُ صوتُ حفص
+ * للروايات العشرين، فيُقاس على نصّ حفص وتخطيطِ صفحته أيًّا كانت الروايةُ المعروضة.
+ */
 export function prepareOpeningCut(recording: string, surah: number, ayah: number): Promise<OpeningCutPlan | null> {
-  const reading = READING_OF_RECORDING[recording];
-  return reading ? cached(`${recording}:${surah}:${ayah}`, () => buildPlan(reading, recording, surah, ayah)) : Promise.resolve(null);
+  return recording === OPENING_RECORDING
+    ? cached(`${recording}:${surah}:${ayah}`, () => buildPlan(OPENING_TEXT_READING, recording, surah, ayah))
+    : Promise.resolve(null);
 }
 /** خطّةُ القطع على نصّ الرواية وحده — لمرجعٍ صوتيٍّ لا توقيتَ لكلماته. */
 export function prepareOpeningCutForReading(reading: string, surah: number, ayah: number): Promise<OpeningCutPlan | null> {

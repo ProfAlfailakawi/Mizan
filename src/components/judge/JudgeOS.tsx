@@ -7,7 +7,7 @@ import { useAppStore } from '../../lib/store';
 import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
 import { openingAudioWindow, passageTransitionPlan, selectApprovedOpeningAudio } from '../../lib/judging-integrity';
-import { openingRecordingFor } from '../../lib/opening-cue';
+import { OPENING_RECORDING } from '../../lib/opening-cue';
 import { planStopMs, prepareOpeningCut, prepareOpeningCutForReading, refineStopMs, watchStop } from '../../lib/opening-cue-player';
 import { certifiedCapabilityFor, resolveReading } from '../../lib/scientific-core';
 import { approveEmergencyQuestionReplacement, approveSecureQuestion, confirmSecureParticipantPresence, getSecureRuntimeStatus, revealSecureQuestion, type SecureQuestionPlaintext, type SecureQuestionRuntimeState } from '../../lib/server-question-client';
@@ -509,14 +509,14 @@ export const JudgeOS: React.FC = () => {
   * «أوّلُ آية» سطرًا واحدًا على الأكثر (طلبُ اللجنة): الآيةُ الطويلة يقف صوتُها عند آخر سطرها
   * الأوّل — أو عند سكتةٍ قبله — ويُخفض قبل الوقوف فلا يُسمع بتر. والقاعدةُ في `opening-cue.ts`.
   *
-  * والتسجيلُ من رواية المتسابق نفسِها (`openingRecordingFor`). كان الطلبُ يُرسَل باسم الرواية
-  * («hafs») والخادمُ لا يعرف إلا معرّفَ التسجيل («hafs-muaiqly»)، فيعود ٤٠٤ دائمًا ولا يُسمع
-  * ملفُّ الآية الرسميّ من هذا الزرّ قطّ. وما لا تسجيلَ لروايته لا يُلقَّن بتسجيل غيرها.
+  * والتسجيلُ تسجيلُ حفص (المعيقلي) للروايات العشرين كلّها — قرارُ المالك (`OPENING_RECORDING`
+  * = `REFERENCE_AUDIO_ID`). كان الطلبُ يُرسَل باسم الرواية («hafs»، «warsh»…) والخادمُ لا يعرف
+  * إلا معرّفَ التسجيل («hafs-muaiqly»)، فيعود ٤٠٤ دائمًا ولا يُسمع ملفُّ الآية من هذا الزرّ قطّ.
   *
   * والتشغيلُ التلقائيّ مرّةً واحدة؛ أمّا الزرّ فيعيد متى ضُغط (كان يُمنع بعد أوّل مرّة فيبدو ميتًا).
   */
  const openingStopRef=useRef<(()=>void)|null>(null);
- const playOfficialDeliveryAyah=async(manual=false)=>{if(!q)return false;const anyq=q as any;const readingKey=deliveryReadingKeyFor({qiraah:anyq.qiraah||readingQiraah,rawi:anyq.rawi||readingRawi,riwaya:anyq.riwaya||participant?.riwaya});const surah=Number(anyq.surahNumber)||surahNumberFromName(anyq.surahNameEnglish,anyq.surahNameArabic);const recording=openingRecordingFor(readingKey);if(!recording||!surah||!q.startAyah)return false;const playKey=`${activeSession.sessionId}:${activeSession.currentQuestionIndex}:delivery:${surah}:${q.startAyah}`;if(!manual&&openingPlayedKeyRef.current===playKey)return true;setOpeningAudioState('playing');
+ const playOfficialDeliveryAyah=async(manual=false)=>{if(!q)return false;const anyq=q as any;const readingKey=deliveryReadingKeyFor({qiraah:anyq.qiraah||readingQiraah,rawi:anyq.rawi||readingRawi,riwaya:anyq.riwaya||participant?.riwaya});const surah=Number(anyq.surahNumber)||surahNumberFromName(anyq.surahNameEnglish,anyq.surahNameArabic);const recording=OPENING_RECORDING;if(!surah||!q.startAyah)return false;const playKey=`${activeSession.sessionId}:${activeSession.currentQuestionIndex}:delivery:${surah}:${q.startAyah}`;if(!manual&&openingPlayedKeyRef.current===playKey)return true;setOpeningAudioState('playing');
   const [src,plan]=await Promise.all([fetchOfficialAyahAudio(recording,surah,q.startAyah),prepareOpeningCut(recording,surah,q.startAyah)]);
   if(!src){setOpeningAudioState('unavailable');return false;}
   try{promptAudioRef.current?.pause();openingStopRef.current?.();const player=new Audio(src);promptAudioRef.current=player;let stopMs:number|undefined;
