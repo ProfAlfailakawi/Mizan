@@ -602,7 +602,7 @@ test('الشاشةُ لا تحكم بنفسها: لا مقابلةَ إلا عب
   for (const bypass of ['diffRecitation(', 'judgeRecitation(', 'diffOptionsForGate(']) {
     assert.equal(screen.includes(bypass), false, `الشاشةُ تحكم بـ${bypass} خارجَ ما يشترط الإذن`);
   }
-  assert.match(screen, /liveJudgment\(expectedRef\.current, heardWords\.current, permission\)/, 'الحكمُ الحيُّ ليس هو المستعمل');
+  assert.match(screen, /liveJudgment\(expectedRef\.current, heardWords\.current, permission(?:, undefined, trustedFrontier\.current)?\)/, 'الحكمُ الحيُّ ليس هو المستعمل');
   assert.match(screen, /finalJudgment\(expectedRef\.current, heardWords\.current, permission\)/, 'حكمُ الخاتمة ليس هو المستعمل');
   /* ولا يُخترع إذنٌ في الشاشة: يُسأل عنه الخادم. */
   assert.equal(/word:\s*'OPEN'/.test(screen), false, 'الشاشةُ تفتح البابَ لنفسها');
@@ -712,7 +712,7 @@ test('إذنُ الحكم يُلتقط عند بدء التلاوة ويثبت �
   assert.match(handler, /if \(attemptJudging\.current \|\| wordFollow\.current\) \{/, 'مقطعُ السماع لا يُشترط بلقطة الإذن');
   /* والتتبّعُ بلا إذنٍ لا يحكم: لا خطأَ يُعرض ولا نغمة — يعود قبل الحكم. */
   const follow = handler.slice(handler.indexOf('if (!permission) {'), handler.indexOf('if (!answerKeepsPermission'));
-  assert.match(follow, /followFrontier\(expectedRef\.current, heardWords\.current\)[\s\S]*return;\s*\n\s*\}/);
+  assert.match(follow, /followFrontier\(expectedRef\.current, heardWords\.current(?:, trustedFrontier\.current)?\)[\s\S]*return;\s*\n\s*\}/);
   assert.doesNotMatch(follow, /setMistakes|planAlert|noticeSlips/, 'التتبّعُ بلا إذنٍ يُظهر أخطاء');
   /* وحكمُ الخاتمة باللقطة نفسِها، لا بإذنٍ تبدّل بعد أن بدأ. */
   const finish = screen.slice(screen.indexOf('const finish = useCallback'), screen.indexOf('const words: FaceWord[]'));
