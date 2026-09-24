@@ -64,6 +64,8 @@ export interface FaceAttempt {
   marks: readonly Pick<FaceMark, 'kind' | 'intensity'>[];
   /** الكلماتُ التي تعثّر فيها — اختياريّ: محاولاتٌ قديمةٌ حُفظت قبله تبقى صالحة. */
   words?: readonly AttemptWord[];
+  /** أبعدُ ما بلغه (عددُ كلماتٍ من أوّل الوجه) — به تُعرف الكلمةُ التي قُرئت نظيفةً بعد تعثّر. */
+  reach?: number;
 }
 
 /*

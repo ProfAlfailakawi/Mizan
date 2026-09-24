@@ -3,7 +3,7 @@ import { BookMarked, Flame, Target } from 'lucide-react';
 import { arabicIndicDigits } from '../judge/AyahMark';
 import { surahNameArabic } from '../../lib/quran-canon';
 import type { FaceAttempt, AttemptWordKind } from '../../lib/face-memory';
-import { hardWords, journeySummary, JUZ_START_PAGES, pageMemory, type PageState } from '../../lib/hifz-journey';
+import { hardWords, journeySummary, JUZ_START_PAGES, neediestPage, pageMemory, type Ledger, type PageState } from '../../lib/hifz-journey';
 
 /*
  * «رحلةُ حفظك» — خريطةُ المصحف كلِّه من تلاواتك، وسلسلةُ أيّامك، وكلماتُك الصعبة.
@@ -40,23 +40,22 @@ function ago(ms: number, now: number, ar: boolean): string {
 export const HifzJourney: React.FC<{
   ar: boolean;
   attempts: readonly FaceAttempt[];
+  /** سجلُّ الرحلة الدائم (ما وراء ذاكرة السحب القصيرة). */
+  ledger?: Ledger;
   /** صفحاتُ نطاقك التي تُتلى هنا. */
   practisable: ReadonlySet<number>;
   onPractise: (page: number) => void;
   /** الوجهُ المعروضُ الآن — يُعلَّم على الخريطة. */
   current?: number;
   now?: number;
-}> = ({ ar, attempts, practisable, onPractise, current, now = Date.now() }) => {
-  const memory = useMemo(() => pageMemory(attempts, now), [attempts, now]);
-  const summary = useMemo(() => journeySummary(attempts, now), [attempts, now]);
+}> = ({ ar, attempts, ledger, practisable, onPractise, current, now = Date.now() }) => {
+  const memory = useMemo(() => pageMemory(attempts, now, ledger), [attempts, now, ledger]);
+  const summary = useMemo(() => journeySummary(attempts, now, ledger), [attempts, now, ledger]);
   const hard = useMemo(() => hardWords(attempts, now), [attempts, now]);
   const n = (x: number) => (ar ? arabicIndicDigits(x) : String(x));
-  if (!attempts.length) return null;
+  if (!attempts.length && !Object.keys(ledger?.pages ?? {}).length) return null;
 
-  /* أحوجُ صفحةٍ في نطاقك: الأثقلُ وزنًا، ثم الأقدمُ عهدًا — وهي ما يرجّحه السحبُ نفسُه. */
-  const neediest = [...memory.entries()]
-    .filter(([page, m]) => practisable.has(page) && m.state !== 'strong' && page !== current)
-    .sort((x, y) => y[1].burden - x[1].burden || x[1].lastAt - y[1].lastAt)[0]?.[0] ?? null;
+  const neediest = neediestPage(attempts, now, practisable, current, ledger);
 
   return (
     <details className="mizan-journey" data-hifz-journey>

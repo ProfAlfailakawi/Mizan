@@ -8,7 +8,7 @@ import type { FaceMark, FaceReading } from '../../lib/face-reading';
 import { explainChoice, faceWeights, type AttemptWord, type AttemptWordKind, type FaceAttempt } from '../../lib/face-memory';
 import { HifzJourney } from './HifzJourney';
 import {
-  amendFaceAttempt, attemptFrom, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
+  amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { answerKeepsPermission, finalJudgment, liveJudgment } from '../../lib/live-judging';
@@ -914,7 +914,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         ...judged.filter(m => (m.wordIndex as number) < farthest)
           .map(m => at(m.wordIndex as number, m.kind === 'tashkeel' ? 'vowel' : m.kind)),
       ].filter((w): w is AttemptWord => !!w);
-      const attempt = { ...settled.attempt, words };
+      const attempt = { ...settled.attempt, words, reach: farthest };
       attemptKey.current = { at: attempt.at, page: attempt.page };
       setAttempts(rememberFaceAttempt(owner, deliveryReading || '', attempt));
     } else attemptKey.current = null;
@@ -942,6 +942,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   }, [tashkeel.phase, tashkeel.findings, face, owner, deliveryReading]);
 
   const practisable = useMemo(() => new Set(candidates.map(c => c.page)), [candidates]);
+  /* السجلُّ الدائم يُقرأ كلما تغيّرت الذاكرة (أي بعد كلّ حفظ). */
+  const ledger = useMemo(() => loadJourneyLedger(owner, deliveryReading || ''), [owner, deliveryReading, attempts]);
 
   const words: FaceWord[] = useMemo(
     () => (face?.words ?? []).map(w => ({ index: w.index, text: w.text, surah: w.surah, ayah: w.ayah, endsAyah: w.endsAyah, ayahWordIndex: w.ayahWordIndex })),
@@ -981,7 +983,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       </header>
 
       {(stage === 'ready' || stage === 'report' || stage === 'blocked') && (
-        <HifzJourney ar={ar} attempts={attempts} practisable={practisable} current={face?.page}
+        <HifzJourney ar={ar} attempts={attempts} ledger={ledger} practisable={practisable} current={face?.page}
           onPractise={page => void draw(`${owner}:${Date.now()}`, page)} />
       )}
 
