@@ -122,12 +122,21 @@ def decode_expected(value:str):
     except Exception as exc:
         raise HTTPException(400,'EXPECTED_PASSAGE_INVALID') from exc
 
+# عتباتُ المطابقة: قربَ آخر موضعٍ مُثبَت تكفي مطابقةٌ معقولة؛ والقفزُ بعيدًا يحتاج دليلًا قويًّا.
+LOCAL_BEHIND, LOCAL_AHEAD = 8, 12
+LOCAL_MIN_RATIO, FAR_MIN_RATIO = 0.5, 0.65
+
 def best_match(transcript:str, ayat:list[dict], after:int=-1):
     """
-    يُطابَق **ذيلُ** ما سُمع لا كلُّه.
+    يُطابَق **ذيلُ** ما سُمع لا كلُّه — ويرسو على آخر موضعٍ مُثبَت.
 
     فالمقطعُ يصل مسبوقًا بترويسة الملف (أوّل ثانيتين من التلاوة) حتى يُفكّ — فأوّلُ ما يُكتب
-    قديم، وآخرُه هو موضعُ القارئ الآن. ويُفضَّل ما بعد آخر موضعٍ معروف، لأنّ القارئ يتقدّم.
+    قديم، وآخرُه هو موضعُ القارئ الآن.
+
+    ومع `after` (آخرُ موضعٍ مُثبَت) يُبحث أوّلًا في نافذةٍ حوله (ثماني كلماتٍ خلفه واثنتا عشرة
+    أمامه)، ولا يُقبل موضعٌ أبعدُ منها إلا بمطابقةٍ قويّة: فعبارةٌ تتكرّر («فبأيّ آلاء ربّكما
+    تكذّبان») أو آيةٌ متشابهةٌ بعيدة لا تسحب الموضعَ إليها بمطابقةٍ ضعيفة — ولا تكشف ما لم يُقرأ.
+    وعند التساوي يُختار الأقربُ إلى آخر موضع.
     """
     heard=norm(transcript).split()[-10:]
     if not heard:return None,0.0
@@ -138,18 +147,29 @@ def best_match(transcript:str, ayat:list[dict], after:int=-1):
     if not words:return None,0.0
     expected=[w[0] for w in words]
     lo=max(1,len(heard)-3); hi=min(len(expected),len(heard)+4)
-    best=(0.0,0,0,0.0)
-    for size in range(lo,hi+1):
-        for start in range(0,len(expected)-size+1):
-            ratio=SequenceMatcher(None,heard,expected[start:start+size],autojunk=False).ratio()
-            end=start+size-1
-            score=ratio
-            if after>=0:
-                if end<after-2: score-=0.18
-                elif end<=after+len(heard)+6: score+=0.06
-            if score>best[3]:best=(ratio,start,size,score)
-    ratio,start,size,_=best
-    if ratio<0.42:return None,ratio
+
+    def search(end_lo:int, end_hi:int):
+        best=None
+        for size in range(lo,hi+1):
+            for start in range(max(0,end_lo-size+1),min(len(expected)-size,end_hi-size+1)+1):
+                end=start+size-1
+                if end<end_lo or end>end_hi:continue
+                ratio=SequenceMatcher(None,heard,expected[start:start+size],autojunk=False).ratio()
+                distance=abs(end-after) if after>=0 else 0
+                key=(round(ratio,3),-distance)
+                if best is None or key>best[0]:best=(key,ratio,start,size)
+        return best
+
+    found=None
+    if after>=0:
+        local=search(max(0,after-LOCAL_BEHIND),min(len(expected)-1,after+LOCAL_AHEAD))
+        if local and local[1]>=LOCAL_MIN_RATIO:found=local
+    if found is None:
+        far=search(0,len(expected)-1)
+        threshold=FAR_MIN_RATIO if after>=0 else LOCAL_MIN_RATIO
+        if far and far[1]>=threshold:found=far
+    if found is None:return None,0.0
+    _,ratio,start,size=found
     end=min(len(words)-1,start+size-1)
     _,surah,ayah,word_index=words[end]
     return {'surah':surah,'ayah':ayah,'wordIndex':word_index,'globalIndex':end},ratio
@@ -190,7 +210,7 @@ async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected
         with tempfile.NamedTemporaryFile(suffix=suffix,delete=False) as f:
             f.write(audio); path=f.name
         try:
-            segments,_=model.transcribe(path,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=False,without_timestamps=True)
+            segments,_=model.transcribe(path,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},without_timestamps=True)
             transcript=' '.join(seg.text for seg in segments).strip()
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
@@ -231,7 +251,7 @@ async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_
             try:head_s=len(decode_audio(temp(audio[:head_len])))/16000.0
             except Exception:head_s=0.0
         try:
-            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=False,word_timestamps=True)
+            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=True)
             words=[]
             for seg in segments:
                 for w in (seg.words or []):

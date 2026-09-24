@@ -92,14 +92,16 @@ export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:strin
  * يعود بلا `sessionEvidence` لأن التمرين لا يُقيَّد في سجلّ، ويحمل `practice:true` حتى لا
  * تُخلط نتيجته بنتيجة جلسةٍ حقيقية في أي شاشة.
  */
-export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string},access?:JourneyPracticeAuth){
+export async function submitPracticeAlignmentChunk(input:{blob:Blob;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string;after?:number},access?:JourneyPracticeAuth){
   const qs=new URLSearchParams({reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
+  /* آخرُ موضعٍ مُثبَت يرسو عليه المستمع، فلا يقفز إلى آيةٍ متشابهةٍ بعيدة. */
+  if(Number.isInteger(input.after)&&(input.after as number)>=0)qs.set('after',String(input.after));
   const url=access?`/api/public/journeys/practice/align?${qs.toString()}`:`/api/quran/practice/align?${qs.toString()}`;
   const headers:Record<string,string>={'content-type':input.blob.type||'application/octet-stream'};
   if(access)Object.assign(headers,journeyPracticeHeaders(access));else headers.authorization=`Bearer ${await bearer()}`;
   const r=await fetch(url,{method:'POST',headers,body:input.blob,cache:'no-store'});
   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));
-  return body as QuranAlignmentResult&{practice:true};
+  return body as QuranAlignmentResult&{practice:true;globalIndex?:number};
 }
 
 /*
