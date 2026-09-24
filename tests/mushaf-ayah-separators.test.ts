@@ -37,6 +37,17 @@ const sheet = (over: Record<string, unknown> = {}) => renderToStaticMarkup(
   } as never),
 );
 
+/* نصُّ الورقة بلا وسوم — يُقرأ حرفًا حرفًا (ما بين ‹ و› وسمٌ يُتخطّى)، لا بتعويضٍ نمطيّ. */
+const textOf = (html: string) => {
+  let out = '', inTag = false;
+  for (const ch of html) {
+    if (ch === '<') inTag = true;
+    else if (ch === '>') inTag = false;
+    else if (!inTag) out += ch;
+  }
+  return out;
+};
+
 const marks = (html: string) => [...html.matchAll(/data-ayah="(\d+)"[^>]*class="mizan-ayah-mark"|class="mizan-ayah-mark"[^>]*data-ayah="(\d+)"/g)]
   .map(m => Number(m[1] ?? m[2]));
 
@@ -61,7 +72,7 @@ test('كلُّ آيةٍ تُختم بفاصلةٍ تحمل رقمها', () => {
 test('الفاصلة طبقةُ عرضٍ فوق النصّ، لا حرفٌ يُضاف إليه', () => {
   const html = sheet();
   /* آخرُ كلمةٍ تُضمّ إلى فاصلتها في وحدةٍ لا تنكسر، فيُقرأ النصُّ بلا وسوم — حرفًا بحرف. */
-  const plain = html.replace(/<[^>]+>/g, '');
+  const plain = textOf(html);
   for (const a of AYAT) {
     assert.ok(plain.includes(a.text), `نصّ الآية ${a.ayah} تغيّر عمّا سُلِّم`);
   }
@@ -107,7 +118,7 @@ test('شريطُ بيئة العرض وحشوتُه رقمٌ واحد', () => {
 test('الفاصلةُ لا تنفصل عن آخر كلمةٍ من آيتها', () => {
   const html = sheet();
   assert.equal((html.match(/class="mizan-sheet-tail"/g) || []).length, AYAT.length, 'لكلّ آيةٍ وحدةٌ تضمّ آخرَ كلمةٍ وفاصلتها');
-  const plain = html.replace(/<[^>]+>/g, '');
+  const plain = textOf(html);
   for (const a of AYAT) {
     const last = a.text.split(' ').pop()!;
     /* مسافةٌ لا تنكسر (U+00A0) بين الكلمة ورقم الآية — لا مسافةٌ عاديّة يجوز الكسرُ عندها. */
