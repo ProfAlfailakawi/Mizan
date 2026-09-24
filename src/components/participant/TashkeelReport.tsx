@@ -1,6 +1,7 @@
 import React from 'react';
-import { BookOpenCheck, Loader2, RotateCcw, Volume2 } from 'lucide-react';
-import type { TashkeelFinding, TashkeelKind } from '../../lib/quran-intelligence';
+import { BookOpenCheck, Loader2, Mic, RotateCcw, Square, Volume2 } from 'lucide-react';
+import type { TashkeelBenchmark, TashkeelFinding, TashkeelKind, TashkeelMode } from '../../lib/quran-intelligence';
+import type { UnclearAyah } from '../../lib/tashkeel-run';
 import { arabicIndicDigits } from '../judge/AyahMark';
 
 /*
@@ -25,10 +26,40 @@ export interface TashkeelState {
   /** آياتٌ راجعها المعلّم فعلًا، وآياتٌ لم يتّضح صوتُها. */
   reviewed: number;
   unclear: number;
+  /** الآياتُ التي لم يُحكم عليها، بأسبابها — ولكلٍّ «أعِدها». */
+  unclearAyat: UnclearAyah[];
+  /** «تجريبي» ما لم يُقَس؛ و«مفتوح» بتقرير قياسٍ اجتاز شروطه (وأرقامُه). */
+  mode?: TashkeelMode;
+  benchmark?: TashkeelBenchmark;
   note?: string;
 }
 
-export const EMPTY_TASHKEEL: TashkeelState = { phase: 'idle', done: 0, total: 0, findings: [], reviewed: 0, unclear: 0 };
+export const EMPTY_TASHKEEL: TashkeelState = { phase: 'idle', done: 0, total: 0, findings: [], reviewed: 0, unclear: 0, unclearAyat: [] };
+
+/** إعادةُ آيةٍ واحدة: تُسجَّل وحدها ثم يراجعها المعلّم، وتُدمج في التقرير نفسه. */
+export interface TashkeelRetake {
+  surah: number;
+  ayah: number;
+  phase: 'recording' | 'reviewing' | 'failed';
+  seconds: number;
+  note?: string;
+}
+
+/** ما يُقال للطالب في آيةٍ لم يُحكم عليها — سببُها وما يفعل. */
+export function unclearReason(reason: string, ar: boolean): string {
+  switch (reason) {
+    case 'LOW_CONFIDENCE':
+      return ar ? 'لم يتّضح صوتُها للمعلّم — اقترب من الميكروفون، في مكانٍ هادئ، واقرأها بتؤدة.' : 'Not clear enough — move closer to the mic, somewhere quiet, and recite steadily.';
+    case 'TOO_MANY_DIFFERENCES':
+      return ar ? 'سُمع فيها ما يخالفها كثيرًا — لعلّك قرأت غيرَها، أو تداخلت أصوات.' : 'Much of what was heard differs from it — perhaps another ayah, or overlapping voices.';
+    case 'AUDIO_TOO_SHORT':
+      return ar ? 'مقطعُها قصيرٌ جدًّا — اقرأها كاملةً.' : 'Too short — recite it in full.';
+    case 'NOT_HEARD':
+      return ar ? 'لم يُسمع منها ما يكفي لمراجعتها.' : 'Too little of it was heard to review.';
+    default:
+      return ar ? 'تعذّرت مراجعتُها تقنيًّا.' : 'It could not be reviewed for a technical reason.';
+  }
+}
 
 /* ألوانُ الأنواع — كلٌّ بلونه ورمزه، ولا يُعتمد على اللون وحده. */
 export const TASHKEEL_STYLE: Record<TashkeelKind, { ar: string; en: string; tint: string; glyph: string }> = {
@@ -60,9 +91,16 @@ interface Props {
   /** «استمع لتلاوتك هنا»: الكلمةُ بصوت الطالب من تسجيله في ذاكرة الصفحة — حيث يُعرف زمنُها. */
   canListen?: (index: number) => boolean;
   onListen?: (index: number) => void;
+  /** «القارئ»: الكلمةُ نفسُها من تلاوة المرجع (حفص). */
+  canHearReference?: (index: number) => boolean;
+  onHearReference?: (index: number) => void;
+  /** «أعِد هذه الآية». */
+  retake?: TashkeelRetake | null;
+  onRetake?: (ayah: UnclearAyah) => void;
+  onRetakeStop?: () => void;
 }
 
-export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, canListen, onListen }) => {
+export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, canListen, onListen, canHearReference, onHearReference, retake, onRetake, onRetakeStop }) => {
   if (state.phase === 'idle') return null;
   const n = (v: number) => (ar ? arabicIndicDigits(v) : String(v));
 
@@ -87,7 +125,11 @@ export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, ca
           {state.phase === 'analysing' || state.phase === 'warming' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" /> : <BookOpenCheck className="h-4 w-4" />}
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="mizan-tashkeel__title">{ar ? 'المعلّم: الحركاتُ والمدود' : 'The Teacher: vowels and madd'}</h3>
+          <h3 className="mizan-tashkeel__title">
+            {ar ? 'المعلّم: الحركاتُ والمدود' : 'The Teacher: vowels and madd'}
+            {state.mode === 'trial' && <span className="mizan-tashkeel__badge" data-tashkeel-mode="trial">{ar ? 'تجريبي — قيد القياس' : 'Trial — being measured'}</span>}
+            {state.mode === 'open' && <span className="mizan-tashkeel__badge" data-tashkeel-mode="open">{ar ? 'مقيس' : 'Measured'}</span>}
+          </h3>
           <p className="mizan-tashkeel__sub">
             {state.phase === 'warming' && (ar ? 'المعلّمُ يستعدّ — أوّلُ مراجعةٍ بعد سكونٍ تأخذ دقيقةً أو نحوها.' : 'The Teacher is waking — the first review after idle takes about a minute.')}
             {state.phase === 'analysing' && (ar ? `يراجع آيةً آية… ${n(state.done)} من ${n(state.total)}` : `Reviewing ayah by ayah… ${state.done} of ${state.total}`)}
@@ -129,12 +171,20 @@ export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, ca
                       <span className="mizan-tashkeel__word font-quran">{word?.text ?? '—'}</span>
                       <span className="mizan-tashkeel__kind">{ar ? TASHKEEL_STYLE[finding.kind].ar : TASHKEEL_STYLE[finding.kind].en}</span>
                       <span className="mizan-tashkeel__msg">{ar ? finding.messageAr : finding.messageEn}</span>
-                      {onListen && canListen?.(finding.wordIndex) && (
-                        <button type="button" className="mizan-tashkeel__listen" data-listen-word={finding.wordIndex}
-                          onClick={() => onListen(finding.wordIndex)} aria-label={ar ? `استمع لتلاوتك: ${word?.text ?? ''}` : `Hear your recitation: ${word?.text ?? ''}`}>
-                          <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'تلاوتك' : 'You'}
-                        </button>
-                      )}
+                      <span className="mizan-tashkeel__hear">
+                        {onListen && canListen?.(finding.wordIndex) && (
+                          <button type="button" className="mizan-tashkeel__listen" data-listen-word={finding.wordIndex}
+                            onClick={() => onListen(finding.wordIndex)} aria-label={ar ? `استمع لتلاوتك: ${word?.text ?? ''}` : `Hear your recitation: ${word?.text ?? ''}`}>
+                            <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'تلاوتك' : 'You'}
+                          </button>
+                        )}
+                        {onHearReference && canHearReference?.(finding.wordIndex) && (
+                          <button type="button" className="mizan-tashkeel__listen" data-reference-word={finding.wordIndex}
+                            onClick={() => onHearReference(finding.wordIndex)} aria-label={ar ? `استمع للقارئ: ${word?.text ?? ''}` : `Hear the reciter: ${word?.text ?? ''}`}>
+                            <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'القارئ' : 'Reciter'}
+                          </button>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -144,9 +194,41 @@ export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, ca
         </>
       )}
 
-      {(state.phase === 'done' || state.phase === 'failed') && state.unclear > 0 && (
-        <p className="mizan-tashkeel__foot">
-          {ar ? `و${n(state.unclear)} ${state.unclear === 1 ? 'آيةٌ لم يتّضح' : 'آياتٍ لم يتّضح'} صوتُها للمعلّم فلم يُحكم عليها — لا يُقال فيها صوابٌ ولا خطأ.` : `${state.unclear} ayat were not clear enough to review — nothing is said about them.`}
+      {(state.phase === 'done' || state.phase === 'failed') && state.unclearAyat.length > 0 && (
+        <div className="mizan-tashkeel__unclear" data-unclear-ayat={state.unclearAyat.length}>
+          <div className="mizan-tashkeel__ayah-no">{ar ? 'لم يحكم عليها المعلّم — لا يُقال فيها صوابٌ ولا خطأ' : 'Not reviewed — nothing is said about these'}</div>
+          <ul>
+            {state.unclearAyat.map(u => {
+              const mine = retake && retake.surah === u.surah && retake.ayah === u.ayah ? retake : null;
+              return (
+                <li key={`${u.surah}:${u.ayah}`} className="mizan-tashkeel__unclear-row" data-unclear-reason={u.reason}>
+                  <span className="mizan-tashkeel__kind">{ar ? `الآية ${n(u.ayah)}` : `Ayah ${u.ayah}`}</span>
+                  <span className="mizan-tashkeel__msg">
+                    {mine?.phase === 'recording' ? (ar ? `اقرأ الآية ${n(u.ayah)} الآن… ${n(mine.seconds)} ث` : `Recite ayah ${u.ayah} now… ${mine.seconds}s`)
+                      : mine?.phase === 'reviewing' ? (ar ? 'يراجعها المعلّم…' : 'The Teacher is reviewing it…')
+                      : mine?.phase === 'failed' ? (mine.note || unclearReason(u.reason, ar))
+                      : unclearReason(u.reason, ar)}
+                  </span>
+                  {mine?.phase === 'recording' && onRetakeStop
+                    ? <button type="button" className="mizan-tashkeel__retry" data-retake-stop onClick={onRetakeStop}><Square className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'انتهيت' : 'Done'}</button>
+                    : mine?.phase === 'reviewing' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+                    : onRetake && <button type="button" className="mizan-tashkeel__retry" data-retake={`${u.surah}:${u.ayah}`} disabled={!!retake && retake.phase !== 'failed'} onClick={() => onRetake(u)}><Mic className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'أعِد هذه الآية' : 'Recite again'}</button>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {state.mode === 'open' && state.benchmark && (
+        <p className="mizan-tashkeel__foot" data-benchmark>
+          {ar
+            ? `مقيسٌ على تلاوات ${n(state.benchmark.reciters)} من كبار القرّاء (${n(state.benchmark.words)} كلمة): ملاحظاتٌ كاذبة ${(state.benchmark.falseAlarmRate * 100).toFixed(2)}٪، ويرى ${Math.round(state.benchmark.substitutionRecall * 100)}٪ من زلّات المتشابه.`
+            : `Measured on ${state.benchmark.reciters} master reciters: ${(state.benchmark.falseAlarmRate * 100).toFixed(2)}% false notes; catches ${Math.round(state.benchmark.substitutionRecall * 100)}% of similar-ayah slips.`}
+        </p>
+      )}
+      {state.mode === 'trial' && state.phase === 'done' && (
+        <p className="mizan-tashkeel__foot" data-trial>
+          {ar ? 'المعلّمُ في طور القياس: ملاحظاتُه للتدريب، ولم تُعتمد بعدُ بتقرير دقّة.' : 'The Teacher is still being measured: its notes are for practice and not yet certified.'}
         </p>
       )}
       {state.phase === 'done' && (

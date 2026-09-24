@@ -1778,12 +1778,18 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-tashkeel__msg{ font-size:12px; font-weight:700; color:#3a3f3b; line-height:1.7 }
 .mizan-tashkeel__foot{ margin-top:.8rem; font-size:10.5px; line-height:1.8; color:#6b716d; text-align:center }
 .mizan-tashkeel-note{ margin-inline:auto; max-width:44rem; text-align:center; font-size:11px; line-height:1.8; color:#6b716d }
+.mizan-tashkeel__badge{ display:inline-block; margin-inline-start:.5rem; padding:.1rem .5rem; border-radius:99px; font-size:10px; font-weight:900; vertical-align:middle; background:#f3ead6; color:#6b4f18; border:1px solid #e2d3ae }
+.mizan-tashkeel__badge[data-tashkeel-mode="open"]{ background:#E7EEE9; color:#214C40; border-color:#bcd6c9 }
+.mizan-tashkeel__unclear{ margin-top:.9rem }
+.mizan-tashkeel__unclear ul{ display:grid; gap:.35rem }
+.mizan-tashkeel__unclear-row{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.65rem; padding:.45rem .7rem; border-radius:14px; background:#fbfaf6; border:1px dashed #e0d9c6; --k:#6b716d }
 .mizan-tashkeel__listen{
   display:inline-flex; align-items:center; gap:.3rem; min-height:32px; padding:0 .65rem;
   border-radius:999px; border:1px solid color-mix(in srgb, var(--k) 35%, transparent);
   background:color-mix(in srgb, var(--k) 8%, white); color:var(--k);
   font-size:10.5px; font-weight:900; white-space:nowrap;
 }
+.mizan-tashkeel__hear{ display:inline-flex; gap:.35rem; flex-wrap:wrap; justify-content:flex-end }
 .mizan-tashkeel__listen:hover{ background:color-mix(in srgb, var(--k) 14%, white) }
 .mizan-tashkeel__listen:focus-visible{ outline:2px solid var(--k); outline-offset:2px }
 @media (max-width:520px){ .mizan-tashkeel__row{ grid-template-columns:auto 1fr auto } .mizan-tashkeel__msg{ grid-column:1 / -1 } }

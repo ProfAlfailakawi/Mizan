@@ -162,8 +162,10 @@ test('«your recitation here» plays the word with a little of what surrounds it
   assert.equal(snippetWindow(100, 500, 60_000).from, 0, 'never before the start');
   assert.equal(snippetWindow(59_800, 59_950, 60_000).to, 60_000, 'never past the end');
   const page = fs.readFileSync('src/components/participant/MushafListens.tsx', 'utf8');
-  assert.match(page, /wordTimes\.current = alignHeardToFace\(faceWords, heard\);/);
-  assert.match(page, /createSnippetPlayer\(recording\.current\)/);
+  assert.match(page, /const times = alignHeardToFace\(faceWords, heard\);\n\s*wordTimes\.current = new Map\(\[\.\.\.times\]\.map\(\(\[i, t\]\) => \[i, \{ \.\.\.t, source: 0 \}\]\)\);/);
+  /* المصدرُ صفرٌ لتسجيل الوجه، وما بعده لإعاداتِ الآيات — كلٌّ في الذاكرة. */
+  assert.match(page, /t\.source === 0 \? recording\.current : retakeClips\.current\[t\.source - 1\]/);
+  assert.match(page, /createSnippetPlayer\(parts\)/);
   assert.match(page, /canListen=\{index => wordTimes\.current\.has\(index\)\}/);
   /* ولا يُرسل التسجيلُ إلى أيّ مكانٍ للاستماع: مصدرُ صوتٍ في المتصفّح وحده. */
   const player = fs.readFileSync('src/lib/recitation-snippet.ts', 'utf8');

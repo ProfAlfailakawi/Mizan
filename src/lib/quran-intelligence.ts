@@ -155,7 +155,10 @@ export async function submitJudgeFollowChunk(input:{blob:Blob;reading:string;sur
 export type TashkeelKind='tashkeel'|'tajweed'|'letter';
 export interface TashkeelFinding{wordIndex:number;kind:TashkeelKind;speech:'replace'|'delete'|'insert';messageAr:string;messageEn:string;ruleAr?:string;expectedLen?:number;predictedLen?:number}
 export interface TashkeelSegmentResult{id:string;status:'ok'|'unclear'|'skipped';reason?:string;confidence?:number;findings:TashkeelFinding[]}
-export interface TashkeelAnalysis{reading:'hafs';modelVersion:string;scoreAuthority:'HUMAN_ONLY';segments:TashkeelSegmentResult[]}
+/** «تجريبي» ما لم يُقَس، و«مفتوح» بتقرير قياسٍ اجتاز شروطَه (وأرقامُه معه). */
+export type TashkeelMode='trial'|'open';
+export interface TashkeelBenchmark{falseAlarmRate:number;substitutionRecall:number;unclearRate:number;reciters:number;words:number;measuredAt:string}
+export interface TashkeelAnalysis{reading:'hafs';modelVersion:string;analysisVersion?:string;mode?:TashkeelMode;modeReason?:string;benchmark?:TashkeelBenchmark;scoreAuthority:'HUMAN_ONLY';segments:TashkeelSegmentResult[]}
 export async function submitTashkeelAnalysis(input:{audio:string;segments:readonly unknown[];scope?:unknown},access?:JourneyPracticeAuth):Promise<TashkeelAnalysis>{
   const body=JSON.stringify({audio:input.audio,segments:input.segments,...(access?{}:{scope:input.scope})});
   const url=access?'/api/public/journeys/practice/tashkeel':'/api/quran/practice/tashkeel?reading=hafs';

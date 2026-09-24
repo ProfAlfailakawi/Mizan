@@ -136,9 +136,14 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       teacherCalls.push({ segments: segments.map((x: any) => ({ id: x.id, startMs: x.startMs, endMs: x.endMs, from: x.from, to: x.to, wordIndices: x.wordIndices })), audioBytes: Buffer.from(String(body.audio || ''), 'base64').length });
       await sleep(teacherCalls.length === 1 ? 1200 : 200);
       const first = teacherCalls.length === 1;
+      /*
+       * والمقطعُ الثالثُ من الدفعة الأولى «لم يتّضح» — فيُقاس أنّ الآيةَ تُذكر بسببها ولها
+       * «أعِدها». والإعادةُ (معرِّفُها ينتهي بـ`~r`) تعود صافية، فتخرج من القائمة.
+       */
+      const unclear = (x: any, k: number) => first && k === 2 && !String(x.id).includes('~r');
       return json(res, {
-        reading: 'hafs', modelVersion: 'harness-muaalem', scoreAuthority: 'HUMAN_ONLY',
-        segments: segments.map((x: any, k: number) => ({
+        reading: 'hafs', modelVersion: 'harness-muaalem', scoreAuthority: 'HUMAN_ONLY', mode: 'trial', modeReason: 'OWNER_TRIAL',
+        segments: segments.map((x: any, k: number) => unclear(x, k) ? { id: x.id, status: 'unclear', reason: 'LOW_CONFIDENCE', confidence: 0.3, findings: [] } : ({
           id: x.id, status: 'ok', confidence: 0.9,
           findings: first && k === 0
             ? [{ wordIndex: x.wordIndices[x.from], kind: 'tashkeel', speech: 'replace', messageAr: 'حركتُها فتحة، وسُمعت ضمّة.', messageEn: 'Its vowel is fatha; damma was heard.' }]

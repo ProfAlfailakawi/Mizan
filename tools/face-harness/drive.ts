@@ -34,7 +34,9 @@ export interface RunOutcome {
   micTracksLive: number;
   reportShown: boolean;
   /* «المعلّم»: حالُ تقريره، وسطورُه، والكلماتُ المخطوطةُ في الصفحة، وما وصل خادمَه. */
-  teacher: { phase: string | null; rows: string[]; notedWords: number[] };
+  teacher: { phase: string | null; rows: string[]; notedWords: number[]; mode: string | null; unclearLeft: number; referenceButtons: number };
+  /** «أعِد هذه الآية»: كم آيةً «لم تتّضح» قبل الإعادة. */
+  retakeOffered: number;
   teacherCalls: import('./server').TeacherCall[];
   /* كم مقطعًا من تلاوة الطالب شُغِّل عند «تلاوتك». */
   snippetSources: number;
@@ -75,6 +77,7 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
     await page.waitForSelector('[data-index="reach"]', { timeout: settleMs }).catch(() => undefined);
     /* والمعلّمُ بعد التقرير: يُنتظر حتى يفرغ حيث يُتوقّع. */
     let snippetSources = 0;
+    let retakeOffered = 0;
     if (scenario === 'teacher') {
       await page.waitForSelector('[data-tashkeel="done"],[data-tashkeel="failed"]', { timeout: 20_000 }).catch(() => undefined);
       /* «تلاوتك هنا»: يُضغط أوّلُها، ويُعدّ ما شُغِّل فعلًا من مسار الصوت (مصدرُ مخزنٍ مفكوك). */
@@ -84,6 +87,15 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
         await listen.click();
         await page.waitForTimeout(1500);
         snippetSources = (await page.evaluate('window.__mizanAlerts().buffers') as number) - before;
+      }
+      /* «أعِد هذه الآية»: تُقرأ الآيةُ وحدها ثانيتين، ثم «انتهيت»، فيراجعها المعلّم وتخرج من القائمة. */
+      retakeOffered = await page.locator('[data-retake]').count();
+      if (retakeOffered) {
+        await page.locator('[data-retake]').first().click();
+        await page.waitForSelector('[data-retake-stop]', { timeout: 5000 });
+        await page.waitForTimeout(2500);
+        await page.locator('[data-retake-stop]').click();
+        await page.waitForFunction(n => document.querySelectorAll('[data-retake]').length < n, retakeOffered, { timeout: 15_000 }).catch(() => undefined);
       }
     }
     await page.waitForTimeout(500);
@@ -138,12 +150,15 @@ export async function runScenario(scenario: Scenario, reciteMs: number, settleMs
           phase: (document.querySelector('[data-tashkeel]') || { getAttribute: () => null }).getAttribute('data-tashkeel'),
           rows: Array.prototype.map.call(document.querySelectorAll('.mizan-tashkeel__row'), r => r.getAttribute('data-kind') + ':' + text(r.querySelector('.mizan-tashkeel__msg'))),
           notedWords: Array.prototype.map.call(document.querySelectorAll('[data-live-note],[data-note]'), w => Number(w.getAttribute('data-note-word') || w.getAttribute('data-word') || -1)),
+          mode: (document.querySelector('[data-tashkeel-mode]') || { getAttribute: () => null }).getAttribute('data-tashkeel-mode'),
+          unclearLeft: document.querySelectorAll('[data-retake]').length,
+          referenceButtons: document.querySelectorAll('[data-reference-word]').length,
         },
       };
-    })()`) as Omit<RunOutcome, 'scenario' | 'chunksServed' | 'teacherCalls' | 'snippetSources'>;
+    })()`) as Omit<RunOutcome, 'scenario' | 'chunksServed' | 'teacherCalls' | 'snippetSources' | 'retakeOffered'>;
 
     if (errors.length) throw new Error(`أخطاءُ صفحة: ${errors.join(' | ')}`);
-    return { scenario, chunksServed: api.chunks(), teacherCalls: api.teacherCalls(), snippetSources, ...outcome };
+    return { scenario, chunksServed: api.chunks(), teacherCalls: api.teacherCalls(), snippetSources, retakeOffered, ...outcome };
   } finally {
     await browser?.close();
     await ui?.close();
