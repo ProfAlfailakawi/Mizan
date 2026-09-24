@@ -223,5 +223,6 @@ test('the rough position never counts the file header as where the reader is', (
   assert.match(read('server/quran-intelligence-service.ts'), /headers\['x-mizan-head-bytes'\]=String\(input\.headBytes\)/);
   assert.ok((server.match(/headBytes:Number\(soleParam\(req\.headers\['x-mizan-head-bytes'\],'x-mizan-head-bytes'\)\|\|0\)/g) || []).length >= 2, 'journey align and judge follow');
   const listener = read('services/quran-practice-listener/app.py');
-  assert.match(listener, /if w\.end>head_s\+0\.05/);
+  assert.match(listener, /def after_header\(temp,audio:bytes,head_len:int\):/);
+  assert.equal((listener.match(/pcm=after_header\(temp,audio,head_len\)/g) || []).length, 2, "both routes transcribe only what follows the header");
 });

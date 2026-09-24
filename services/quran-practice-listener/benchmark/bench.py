@@ -145,16 +145,11 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
         piece = audio[i * chunk:(i + 1) * chunk]
 
         # ـ مسارُ الموضع
-        listenable = piece if i == 0 else np.concatenate([head, piece])
+        # كما في /listen (`after_header`): الترويسةُ تُقصّ من الصوت، ولا يُكتب إلا المقطعُ نفسُه.
         t0 = time.perf_counter()
-        # كما في /listen: كلماتُ الترويسة تُطرح، فلا تُعدّ موضعَ القارئ.
-        head_len = 0.0 if i == 0 else len(head) / SR
-        segs, _ = model.transcribe(listenable, language='ar', beam_size=1, best_of=1, condition_on_previous_text=False,
-                                   vad_filter=True, vad_parameters={'min_silence_duration_ms': 300}, word_timestamps=head_len > 0)
-        if head_len > 0:
-            transcript = ' '.join(w.word.strip() for s in segs for w in (s.words or []) if w.end > head_len + 0.05).strip()
-        else:
-            transcript = ' '.join(s.text for s in segs).strip()
+        segs, _ = model.transcribe(piece, language='ar', beam_size=1, best_of=1, condition_on_previous_text=False,
+                                   vad_filter=True, vad_parameters={'min_silence_duration_ms': 300}, without_timestamps=True)
+        transcript = ' '.join(s.text for s in segs).strip()
         candidate, conf = best_match(transcript, ayat, last_global)
         cost = time.perf_counter() - t0
         listen_cost.append(cost)
@@ -170,10 +165,9 @@ def simulate(model, ayat: list[dict], audio: np.ndarray, ends: list[float], rh: 
 
         # ـ مسارُ الكلمات
         first = max(0, i - (rh['windowChunks'] - 1))
-        headed = first > 0
-        window = audio[first * chunk:(i + 1) * chunk]
-        audio_in = np.concatenate([head, window]) if headed else window
-        head_s = len(head) / SR if headed else 0.0
+        # والنافذةُ كذلك بلا ترويسة (`after_header` في /recognise)، فالتوقيتُ منها مباشرة.
+        audio_in = audio[first * chunk:(i + 1) * chunk]
+        head_s = 0.0
         final = i == n - 1
         commit_until = (i + 1) * chunk / SR - (0 if final else rh['edgeHoldMs'] / 1000)
         t0 = time.perf_counter()
