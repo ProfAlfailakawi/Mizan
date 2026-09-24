@@ -323,7 +323,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
    * فيُسأل عن حالها (والسؤالُ نفسُه يوقظها)، ويبقى زرُّ البدء يقول «يستعدّ» حتى تجهز —
    * بحدٍّ أقصى دقيقتين، ثم يُفتح على كل حال فلا يُحبس الطالبُ خلف خدمةٍ متعثّرة.
    */
-  const [listenerState, setListenerState] = useState<string>('UNKNOWN');
+  /* «يُفحص» حتى يعود أوّلُ جواب — فلا يُفتح الزرُّ لحظةً قبل أن تُعرف الجاهزية. */
+  const [listenerState, setListenerState] = useState<string>('CHECKING');
   useEffect(() => {
     if (!listening || stage !== 'ready') return;
     let live = true; let tries = 0; let timer = 0;
@@ -334,14 +335,25 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         const state = String(body?.quranPracticeListener?.state || 'UNKNOWN');
         if (!live) return;
         tries += 1;
-        if (['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
-        else setListenerState(tries >= 24 ? 'TIMEOUT' : state);
-      } catch { if (live) setListenerState('UNKNOWN'); }
+        const warming = ['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(state);
+        if (warming && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
+        /*
+         * وبعد دقيقتين لا يُفتح الزرُّ على مستمعٍ لم يجهز: كان الطالبُ يتلو وجهًا كاملًا ولا يُسمع منه
+         * شيء. فيُقال له بصدق إنّ المستمع غيرُ متاحٍ الآن، ويُسأل عنه كلَّ نصف دقيقة حتى يعود.
+         */
+        else if (warming) { setListenerState('TIMEOUT'); timer = window.setTimeout(poll, 30_000); }
+        else {
+          setListenerState(state);
+          /* ومستمعٌ لا يُوصل إليه يُسأل عنه كذلك كلَّ نصف دقيقة — فلا يُقفل الزرُّ إلى الأبد. */
+          if (state === 'UNREACHABLE' || /^HTTP_/.test(state)) timer = window.setTimeout(poll, 30_000);
+        }
+      } catch { if (live) { setListenerState('UNREACHABLE'); timer = window.setTimeout(poll, 30_000); } }
     };
     void poll();
     return () => { live = false; window.clearTimeout(timer); };
   }, [listening, stage]);
   const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(listenerState);
+  const listenerDown = listenerState === 'TIMEOUT' || listenerState === 'UNREACHABLE' || /^HTTP_/.test(listenerState);
   /* ثوانٍ تُعدّ أمام الطالب — فلا يظنّ زرًّا رماديًّا صامتًا ميكروفونًا معطّلًا. */
   const [warmSeconds, setWarmSeconds] = useState(0);
   useEffect(() => {
@@ -1001,13 +1013,20 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         <>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {stage === 'ready' && analysed && (
-              <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming} data-listener={listenerState}
+              <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming || listenerDown} data-listener={listenerState}
                 className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[#214C40]'}`}>
                 <Mic className={`h-4 w-4 ${listenerWarming ? 'motion-safe:animate-pulse' : ''}`} aria-hidden="true" />
                 {listenerWarming
                   ? (ar ? `المستمع يستيقظ… ${warmSeconds.toLocaleString('ar-EG')} ث` : `Listener waking… ${warmSeconds}s`)
                   : (ar ? 'ابدأ التلاوة' : 'Begin reciting')}
               </button>
+            )}
+            {stage === 'ready' && analysed && listenerDown && (
+              <p className="basis-full text-center text-[11px] font-bold leading-6 text-[#8f2d1c]" data-listener-down role="status" aria-live="polite">
+                {ar
+                  ? 'المستمعُ غيرُ متاحٍ الآن، فلن يُسمع ما تتلوه — ولا نريد أن تقرأ وجهًا كاملًا بلا مراجعة. يُعاد السؤالُ عنه تلقائيًّا كلَّ نصف دقيقة، ويُفتح الزرُّ حين يعود. ويمكنك الآن «اختبر حفظك» بلا سماع.'
+                  : 'The listener is unavailable right now, so nothing you recite would be heard. It is re-checked every 30 seconds and the button unlocks when it is back.'}
+              </p>
             )}
             {stage === 'ready' && analysed && listenerWarming && (
               <p className="basis-full text-center text-[11px] leading-6 text-[#5f6663]" data-listener-waking role="status" aria-live="polite">
