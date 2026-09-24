@@ -146,3 +146,11 @@ test('the listener image declares requests and proves the model library imports 
   assert.match(app, /state\['failed'\]=True/);
   assert.match(app, /'failed' if state\.get\('failed'\) else 'retrying'/);
 });
+
+test('«اختبر حفظك» reveals only what was heard — never by a timer, never a word ahead', () => {
+  /* شكوى المالك: «قاعد يحسب على الوقت ويفتح له… والمفروض يسمع حسب الكلمة». */
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.doesNotMatch(practice, /\+ 2\)\);/, 'no reveal of the next, unsaid word');
+  assert.match(practice, /setReached\(r => Math\.max\(r, penTarget \+ 1\)\);\n\s+if \(veiled \|\| pen === null/, 'reached follows the heard position only; in the veil the pen jumps, no timed walk');
+  assert.match(practice, /Math\.min\(penTarget, p \+ 1\)/, 'the smooth walk never passes the heard word');
+});
