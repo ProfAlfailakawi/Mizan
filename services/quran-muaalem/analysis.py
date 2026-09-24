@@ -185,6 +185,9 @@ class Finding:
     rule_ar: Optional[str] = None
     expected_len: Optional[int] = None
     predicted_len: Optional[int] = None
+    #: ثقةُ النموذج بأضعف فونيمٍ في المسموع الذي بُني عليه الحكم (0–1) — تُجمع في القياس
+    #: ليُختار حدُّها من الأرقام؛ ولا تصل الطالب (الخادمُ لا ينقلها).
+    confidence: Optional[float] = None
 
     def to_json(self) -> dict:
         out = {
@@ -197,6 +200,8 @@ class Finding:
             out["expectedLen"] = self.expected_len
         if self.predicted_len is not None:
             out["predictedLen"] = self.predicted_len
+        if self.confidence is not None:
+            out["confidence"] = round(self.confidence, 3)
         return out
 
 
@@ -402,6 +407,39 @@ def drop_pausal(errors: list, words: list[str], predicted: str, phonetize, expla
                 excused.add(word)
                 break
     return [e for e in errors if _word_of(uthmani, e) not in excused]
+
+
+def heard_confidence(ref_ph: str, predicted: str, probs) -> dict[int, float]:
+    """ثقةُ النموذج بما سُمع مكانَ كلّ مجموعةٍ في المرجع: {بدايةُ المجموعة في المرجع: أدنى ثقة}.
+
+    يُعاد بناءُ المحاذاة **بدوالّ المكتبة نفسِها** التي يحاذي بها `explain_error` (مجموعاتُ
+    الفونيمات، ومحاذاةُ أوّل حرفٍ من كلٍّ منها)، فتقع الثقةُ على المسموع الذي بُني عليه الخطأ
+    بعينه. والثقةُ لكلّ حرفٍ من المسموع إن طابق عددُها عددَ حروفه؛ وإلا لم تُحسب (قاموسٌ فارغ).
+    """
+    try:
+        values = probs.tolist() if hasattr(probs, "tolist") else list(probs or [])
+    except Exception:
+        return {}
+    if len(values) != len(predicted):
+        return {}
+    from quran_transcript.phonetics.error_explainer import align_phonemes_groups, chunck_phonemes
+
+    ref_groups, pred_groups = chunck_phonemes(ref_ph), chunck_phonemes(predicted)
+    ref_starts, pred_starts, at = [], [], 0
+    for g in ref_groups:
+        ref_starts.append(at); at += len(g)
+    at = 0
+    for g in pred_groups:
+        pred_starts.append(at); at += len(g)
+    out: dict[int, float] = {}
+    for a in align_phonemes_groups(ref_groups, pred_groups):
+        if a.op_type == "insert" or a.ref_idx >= len(ref_groups) or a.pred_idx >= len(pred_groups):
+            continue
+        start = pred_starts[a.pred_idx]
+        chunk = values[start:start + len(pred_groups[a.pred_idx])]
+        if chunk:
+            out[ref_starts[a.ref_idx]] = float(min(chunk))
+    return out
 
 
 @dataclass
