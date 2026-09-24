@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from quran_transcript import Aya, MoshafAttributes, explain_error, quran_phonetizer  # noqa: E402
 
 from analysis import (  # noqa: E402
-    Segment, build_reference, judge, map_words, parse_segment, settle, skeleton,
+    Segment, build_reference, drop_pausal, judge, map_words, parse_segment, settle, skeleton,
 )
 
 MOSHAF = MoshafAttributes(rewaya="hafs", madd_monfasel_len=4, madd_mottasel_len=4, madd_mottasel_waqf=4, madd_aared_len=4)
@@ -186,3 +186,50 @@ class SlipsOfTheSimilar(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PauseTest(unittest.TestCase):
+    """الوقفُ على أيّ كلمةٍ جائز: تسكينُ آخرها وسقوطُ الإدغام بعدها ليسا لحنًا.
+
+    وهي أكثرُ ما عُدّ على كبار القرّاء في القياس (MIZAN-MUAALEM-BENCH-1): «نَفْسِهِۦ» و«ٱللَّهُ»
+    و«حَقًّۭا وَهُوَ» — قرّاءٌ وقفوا فحُسب الوقفُ عليهم.
+    """
+
+    @staticmethod
+    def phonetize(text):
+        return quran_phonetizer(text, MOSHAF, remove_spaces=True)
+
+    @staticmethod
+    def explain(u, r, p, mp):
+        return explain_error(uthmani_text=u, ref_ph_text=r, predicted_ph_text=p, mappings=mp)
+
+    def run_case(self, surah, ayah, pause_after=None, edit=None):
+        words = Aya(surah, ayah).get().uthmani_words
+        full = " ".join(words)
+        ref = self.phonetize(full)
+        heard = ref.phonemes
+        if pause_after is not None:
+            heard = self.phonetize(" ".join(words[:pause_after])).phonemes + self.phonetize(" ".join(words[pause_after:])).phonemes
+        if edit:
+            heard = edit(heard)
+        errors = self.explain(full, ref.phonemes, heard, ref.mappings)
+        return errors, drop_pausal(errors, words, heard, self.phonetize, self.explain)
+
+    def test_pausing_after_a_word_is_not_a_mistake(self):
+        for surah, ayah, word in [(4, 111, "نفسه"), (31, 9, "حقا"), (53, 30, "العلم"), (61, 13, "قريب")]:
+            words = Aya(surah, ayah).get().uthmani_words
+            at = [skeleton(w) for w in words].index(skeleton(word))
+            errors, kept = self.run_case(surah, ayah, pause_after=at + 1)
+            self.assertTrue(errors, f"{surah}:{ayah} the continuous reference flags the pause")
+            self.assertEqual(kept, [], f"{surah}:{ayah} a pause after «{word}» is excused")
+
+    def test_a_real_mistake_survives_a_pause(self):
+        # «يَكْسِبُهُۥ» بفتح الباء — لحنٌ في وسط الكلمة، والقارئ وقف بعد «نَفْسِهِۦ».
+        _, kept = self.run_case(4, 111, pause_after=7, edit=lambda p: p.replace("يَكسِبُهُ", "يَكسِبَهُ", 1))
+        self.assertEqual([(k.expected_ph, k.preditected_ph) for k in kept], [("بُ", "بَ")])
+
+    def test_a_wrong_vowel_at_a_word_end_is_not_a_pause(self):
+        # الوقفُ يُسكّن ولا يُبدّل: «نَفْسِهُۥ» بالضمّ خطأٌ يبقى.
+        errors, kept = self.run_case(4, 111, edit=lambda p: p.replace("نَفسِهِۦۦ", "نَفسِهُۥۥ", 1))
+        self.assertTrue(kept)
+        self.assertEqual(len(kept), len(errors))

@@ -18,7 +18,7 @@ from typing import Iterable, Optional
 
 #: نسخةُ قواعد الحكم. تُرفع كلّما تغيّر ما يُقال أو ما يُسكت عنه — فتقريرُ القياس يحملها،
 #: وبوّابةُ الفتح في ميزان لا تقبل تقريرًا قاس قواعدَ غيرَ التي تعمل.
-ANALYSIS_VERSION = "2026-09-24.3"
+ANALYSIS_VERSION = "2026-09-24.4"
 
 # ── الحروف ─────────────────────────────────────────────────────────────────
 
@@ -348,6 +348,60 @@ def judge(error, reference_len: int, segment: Segment, uthmani: str, lib_to_face
 
     ar, en = _letter_message(expected, heard, speech)
     return Finding(word_index, "letter", speech, ar, en)
+
+
+def _word_of(uthmani: str, error) -> int:
+    """رقمُ الكلمة (في نصّ المكتبة) التي يقع فيها الخطأ."""
+    return uthmani[: error.uthmani_pos[0]].count(" ")
+
+
+def paused_reference(words: list[str], boundary: int, phonetize) -> tuple[str, list]:
+    """مرجعُ من وقف بعد الكلمة `boundary - 1` ثمّ ابتدأ بما بعدها — بالنصّ نفسِه والمواضع نفسِها.
+
+    فالوقفُ جائزٌ على أيّ كلمة: يُسكَّن آخرُها، ويسقط ما بعدها من إدغامٍ أو إخفاءٍ بين الكلمتين،
+    ويُنطق همزُ الوصل عند الابتداء. والمرجعُ المتّصلُ يعدّ ذلك كلَّه خطأً.
+    """
+    from dataclasses import replace
+
+    first = phonetize(" ".join(words[:boundary]))
+    second = phonetize(" ".join(words[boundary:]))
+    shift = len(first.phonemes)
+    space = replace(first.mappings[0], pos=(shift, shift), tajweed_rules=None, deleted=True)
+    moved = [replace(mp, pos=(mp.pos[0] + shift, mp.pos[1] + shift)) for mp in second.mappings]
+    return first.phonemes + second.phonemes, list(first.mappings) + [space] + moved
+
+
+def drop_pausal(errors: list, words: list[str], predicted: str, phonetize, explain) -> list:
+    """يُسقط ما يفسّره **وقفٌ** على حدّ الكلمة تفسيرًا تامًّا.
+
+    لكلّ كلمةٍ فيها خطأ: يُجرَّب الوقفُ بعدها ثمّ قبلها. فإن طابق المسموعُ الكلمةَ كلَّها على
+    ذلك الوقف (لا خطأ فيها البتّة) فما عُدّ عليها أثرُ وقفٍ لا لحن — فيُسقط كلُّه. وإن بقي فيها
+    خطأٌ على الوجهين بقيت أخطاؤها كما هي: الوقفُ لا يُعذر به خطأٌ في وسط الكلمة.
+
+    (والكلمةُ الأولى والأخيرة لا حدَّ لهما داخل المقطع، فتبقى لقواعد `judge`.)
+    """
+    if not errors:
+        return errors
+    uthmani = " ".join(words)
+    flagged = sorted({_word_of(uthmani, e) for e in errors})
+    cache: dict[int, set[int]] = {}
+
+    def troubled(boundary: int) -> set[int]:
+        if boundary not in cache:
+            try:
+                ref_ph, mappings = paused_reference(words, boundary, phonetize)
+                cache[boundary] = {_word_of(uthmani, e) for e in explain(uthmani, ref_ph, predicted, mappings)}
+            except Exception:
+                cache[boundary] = set(range(len(words)))  # لم يُبنَ المرجع: لا يُعذر شيء
+        return cache[boundary]
+
+    excused = set()
+    for word in flagged:
+        for boundary in (word + 1, word):
+            if 0 < boundary < len(words) and word not in troubled(boundary):
+                excused.add(word)
+                break
+    return [e for e in errors if _word_of(uthmani, e) not in excused]
 
 
 @dataclass
