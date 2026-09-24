@@ -61,7 +61,7 @@ export class QuranIntelligenceService{
    * يدخل دفتر الأدلّة ولا يُبنى عليه هاش جلسة. تمرينه له وحده: لا يُسجَّل، ولا تصل اللجنة
    * منه كلمة، ولا يمسّ درجته بحرف.
    */
-  async processAlignmentChunk(input:{actorId:string;sessionId:string;reading:string;surah:unknown;startAyah:unknown;endAyah:unknown;sourcePackageId:string;contentType:string;bytes:Buffer;practice?:boolean}){
+  async processAlignmentChunk(input:{actorId:string;sessionId:string;reading:string;surah:unknown;startAyah:unknown;endAyah:unknown;sourcePackageId:string;contentType:string;bytes:Buffer;practice?:boolean;headBytes?:number}){
     if(!this.alignmentBackend.url)throw new Error('QURAN_ALIGNMENT_BACKEND_NOT_CONFIGURED');
     if(!input.actorId.trim()||!input.sessionId.trim())throw new Error('QURAN_ALIGNMENT_SESSION_IDENTITY_REQUIRED');
     const id=readingId(input.reading),def=quranReadingDefinition(id)!;if(input.sourcePackageId!==def.packageId)throw new Error('QURAN_ALIGNMENT_SOURCE_READING_MISMATCH');
@@ -87,6 +87,8 @@ export class QuranIntelligenceService{
     if(!chunkSize||chunkSize>2_000_000)throw new Error('QURAN_ALIGNMENT_AUDIO_CHUNK_INVALID');
     const backend=new URL(this.alignmentBackend.url);backend.searchParams.set('reading',id);backend.searchParams.set('surah',String(surah));backend.searchParams.set('startAyah',String(startAyah));backend.searchParams.set('endAyah',String(endAyah));
     const headers:Record<string,string>={'content-type':input.contentType||'application/octet-stream','x-mizan-mode':'shadow','x-mizan-source-package':def.packageId,'x-mizan-source-hash':passage.package.packageHash};if(this.alignmentBackend.bearerToken)headers.authorization=`Bearer ${this.alignmentBackend.bearerToken}`;
+    /* الترويسةُ (أوّلُ مقطعٍ في التلاوة) تُعلَن بحجمها فلا تُعدّ كلماتُها موضعَ القارئ الآن. */
+    if(Number.isInteger(input.headBytes)&&(input.headBytes as number)>0&&(input.headBytes as number)<chunkSize)headers['x-mizan-head-bytes']=String(input.headBytes);
     const response=await fetch(backend,{method:'POST',headers,body:new Uint8Array(input.bytes)});if(!response.ok)throw new Error(`QURAN_ALIGNMENT_BACKEND_HTTP_${response.status}`);const raw=await response.json() as any;
     const backendModelVersion=String(raw.modelVersion||'');if(!backendModelVersion||backendModelVersion!==benchmarkReport.modelVersion)throw new Error('QURAN_ALIGNMENT_MODEL_NOT_BENCHMARKED');
     const alternatives=Array.isArray(raw.alternatives)?raw.alternatives.map((a:any)=>({surah:Number(a.surah),ayah:Number(a.ayah),wordIndex:Number(a.wordIndex),phonemeIndex:a.phonemeIndex===undefined?undefined:Number(a.phonemeIndex),confidence:Number(a.confidence)})).filter((a:any)=>a.surah===surah&&a.ayah>=startAyah&&a.ayah<=endAyah&&Number.isInteger(a.wordIndex)&&a.wordIndex>0&&Number.isFinite(a.confidence)&&a.confidence>=0&&a.confidence<=1).slice(0,5):[];
