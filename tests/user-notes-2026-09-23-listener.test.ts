@@ -79,6 +79,14 @@ test('the listener says where its model came from and which build runs — so an
   assert.match(deploy, /quranPracticeListener\.build/);
 });
 
+test('a health probe that times out on a booting listener is WAKING, not UNREACHABLE — the page keeps waiting', () => {
+  const server = read('server.ts');
+  assert.match(server, /name==='TimeoutError'\|\|\(error as any\)\?\.name==='AbortError'\)return \{state:'WAKING',model:null\}/, 'and it is returned before the cache is written');
+  const practice = read('src/components/participant/MushafListens.tsx');
+  assert.match(practice, /\['LOADING', 'RETRYING', 'CHECKING', 'WAKING'\]\.includes\(state\) && tries < 24/);
+  assert.match(practice, /const listenerWarming = \['LOADING', 'RETRYING', 'CHECKING', 'WAKING'\]\.includes\(listenerState\);/);
+});
+
 test('a waking listener shows seconds and says the microphone is fine — never a silent grey button', () => {
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(practice, /المستمع يستيقظ… \$\{warmSeconds\.toLocaleString\('ar-EG'\)\} ث/);

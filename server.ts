@@ -2185,7 +2185,14 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       const body=await r.json().catch(()=>({})) as any;
       const state=String(body?.status||'').toUpperCase();
       value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null,source:['image','download'].includes(body?.source)?body.source:null,build:typeof body?.build==='string'&&/^[0-9a-f]{7,40}$/.test(body.build)?body.build.slice(0,12):null};
-    }catch{/* يبقى UNREACHABLE */}
+    }catch(error){
+      /*
+       * مهلةٌ لا جواب: المستمعُ يُقلع — والإقلاعُ يحمّل النموذجَ قبل أن يفتح منفذَه، فيتجاوز
+       * أربعَ ثوانٍ. فهو «يستيقظ» لا «غيرُ موجود»، والصفحةُ تبقى تنتظره. ولا يُخبَّأ هذا الحال،
+       * فالسؤالُ التالي يرى الجاهزيةَ حين تقع.
+       */
+      if((error as any)?.name==='TimeoutError'||(error as any)?.name==='AbortError')return {state:'WAKING',model:null};
+    }
     listenerHealthCache={at:Date.now(),value};
     return value;
   };

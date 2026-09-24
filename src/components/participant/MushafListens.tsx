@@ -333,14 +333,14 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         const state = String(body?.quranPracticeListener?.state || 'UNKNOWN');
         if (!live) return;
         tries += 1;
-        if (['LOADING', 'RETRYING', 'CHECKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
+        if (['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(state) && tries < 24) { setListenerState(state); timer = window.setTimeout(poll, 5000); }
         else setListenerState(tries >= 24 ? 'TIMEOUT' : state);
       } catch { if (live) setListenerState('UNKNOWN'); }
     };
     void poll();
     return () => { live = false; window.clearTimeout(timer); };
   }, [listening, stage]);
-  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING'].includes(listenerState);
+  const listenerWarming = ['LOADING', 'RETRYING', 'CHECKING', 'WAKING'].includes(listenerState);
   /* ثوانٍ تُعدّ أمام الطالب — فلا يظنّ زرًّا رماديًّا صامتًا ميكروفونًا معطّلًا. */
   const [warmSeconds, setWarmSeconds] = useState(0);
   useEffect(() => {
