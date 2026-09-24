@@ -174,6 +174,24 @@ def best_match(transcript:str, ayat:list[dict], after:int=-1):
     _,surah,ayah,word_index=words[end]
     return {'surah':surah,'ayah':ayah,'wordIndex':word_index,'globalIndex':end},ratio
 
+def after_header(temp,audio:bytes,head_len:int):
+    """
+    الصوتُ بعد الترويسة، مفكوكًا — والترويسةُ نفسُها لا تُسمع.
+
+    المقطعُ يصل مسبوقًا بأوّل مقطعٍ في التلاوة حتى يُفكّ. فكانت الترويسةُ تُكتب مع ما بعدها
+    ثم تُطرح كلماتُها — كتابةٌ تُضاعف الحساب، وحين تُكتب بلا توقيتٍ يُطابَق ذيلُها أوّلَ المقطع
+    فيقفز الموضع (MIZAN-LISTENER-FOLLOW-1). والآن يُفكّ الملفُّ كلُّه، ويُقصّ منه طولُ
+    الترويسة، ولا يُكتب إلا ما بعدها: أرخصُ، ولا ترويسةَ في المسموع أصلًا.
+    """
+    from faster_whisper.audio import decode_audio
+    pcm=decode_audio(temp(audio))
+    if head_len and head_len<len(audio):
+        try:head=len(decode_audio(temp(audio[:head_len])))
+        except Exception:head=0
+        # وإن لم يبقَ بعد الترويسة شيء (مقطعٌ أخيرٌ قصير) فالمسموعُ فارغ — لا تُسمع الترويسةُ مكانه.
+        if 0<head<=len(pcm):pcm=pcm[head:]
+    return pcm
+
 @app.get('/ready')
 def ready():
     # مجسُّ الإقلاع: ٢٠٠ حين يجهز النموذج وحده. وحتى ذلك لا تُعدّ النسخةُ مُقلعة، فلا حركةَ إليها.
@@ -215,17 +233,10 @@ async def listen(request:Request,x_mizan_reading:str=Header(''),x_mizan_expected
         # الترويسةُ أوّلُ التلاوة تُرسل ليُفكّ الصوت — وكلماتُها ليست موضعَ القارئ الآن. فكان ذيلُ
         # ما سُمع يحملها حين يقصر المقطعُ أو يصمت، فيُطابَق أوّلَ المقطع ويقفز الموضعُ إليه
         # (قيس: ٨١ قفزةً في MIZAN-LISTENER-FOLLOW-1، أكثرُها في الفاتحة وأوّل البقرة).
-        head_s=0.0
-        if head_len and head_len<len(audio):
-            from faster_whisper.audio import decode_audio
-            try:head_s=len(decode_audio(temp(audio[:head_len])))/16000.0
-            except Exception:head_s=0.0
         try:
-            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=head_s>0)
-            if head_s>0:
-                transcript=' '.join(w.word.strip() for seg in segments for w in (seg.words or []) if w.end>head_s+0.05).strip()
-            else:
-                transcript=' '.join(seg.text for seg in segments).strip()
+            pcm=after_header(temp,audio,head_len)
+            segments=[] if len(pcm)==0 else model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},without_timestamps=True)[0]
+            transcript=' '.join(seg.text for seg in segments).strip()
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
         candidate,confidence=best_match(transcript,expected,after)
@@ -259,23 +270,20 @@ async def recognise(request:Request,x_mizan_reading:str=Header(''),x_mizan_head_
         with tempfile.NamedTemporaryFile(suffix=suffix,delete=False) as f:
             f.write(data);paths.append(f.name);return f.name
     try:
-        from faster_whisper.audio import decode_audio
-        head_s=0.0
-        if head_len and head_len<len(audio):
-            try:head_s=len(decode_audio(temp(audio[:head_len])))/16000.0
-            except Exception:head_s=0.0
         try:
-            segments,_=model.transcribe(temp(audio),language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=True)
+            # ما بعد الترويسة وحده يُكتب (`after_header`)، فتوقيتُ الكلمات منه مباشرة.
+            pcm=after_header(temp,audio,head_len)
+            segments=[] if len(pcm)==0 else model.transcribe(pcm,language='ar',beam_size=1,best_of=1,condition_on_previous_text=False,vad_filter=True,vad_parameters={'min_silence_duration_ms':300},word_timestamps=True)[0]
             words=[]
             for seg in segments:
                 for w in (seg.words or []):
                     text=w.word.strip()
-                    if not text or w.end<=head_s+0.05:continue
+                    if not text:continue
                     words.append({'text':text,'confidence':max(0.0,min(1.0,float(w.probability))),
-                                  'startMs':max(0,int((w.start-head_s)*1000)),'endMs':max(0,int((w.end-head_s)*1000))})
+                                  'startMs':max(0,int(w.start*1000)),'endMs':max(0,int(w.end*1000))})
         except Exception:
             raise HTTPException(422,'AUDIO_UNDECODABLE')
-        return {'reading':x_mizan_reading,'modelVersion':str(state['id']),'words':words[:200],'headMs':int(head_s*1000)}
+        return {'reading':x_mizan_reading,'modelVersion':str(state['id']),'words':words[:200]}
     finally:
         for p in paths:
             try:os.remove(p)
