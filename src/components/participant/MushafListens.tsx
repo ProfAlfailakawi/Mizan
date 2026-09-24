@@ -12,6 +12,7 @@ import {
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment, provisionalReach } from '../../lib/live-judging';
+import { OPEN_ROUGH_GATE, admitRough, type RoughGate } from '../../lib/rough-position';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -134,6 +135,10 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const lastGlobal = useRef(-1);
   /** آخرُ موضعٍ تقريبيٍّ كشف شيئًا تحت الحجاب — فتكرارُه لا يكشف مزيدًا. */
   const lastRough = useRef(-1);
+  /** قفزةٌ تقريبيّةٌ بعيدةٌ تنتظر جوابًا ثانيًا يؤكّدها (`rough-position.ts`). */
+  const roughGate = useRef<RoughGate>(OPEN_ROUGH_GATE);
+  /** آخرُ جبهةِ سماعٍ مقبولة — تُقاس بها القفزةُ البعيدة (`credibleFrontier`). */
+  const trustedFrontier = useRef(-1);
   useEffect(() => { reachedRef.current = reached; }, [reached]);
   const [pen, setPen] = useState<number | null>(null);
   const [veiled, setVeiled] = useState(false);
@@ -481,7 +486,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; roughGate.current = OPEN_ROUGH_GATE; trustedFrontier.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -551,7 +556,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const begin = useCallback(async () => {
     if (!face) return;
     samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; wordFollow.current = true; followFailures.current = 0;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; roughGate.current = OPEN_ROUGH_GATE; trustedFrontier.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -647,20 +652,28 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           if (!alive.current || !live()) return;
           samples.current = [...samples.current, { surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState }];
           /* موضعٌ «LOST» مرشَّحٌ لم يُوثَق به (ضجيجٌ أو مطابقةٌ ضعيفة): لا يحرّك القلمَ ولا يكشف كلمة. */
-          if (out.alignmentState === 'LOCKED' && Number.isInteger(out.globalIndex)) lastGlobal.current = out.globalIndex as number;
           if (out.alignmentState !== 'LOST') {
             const target = lookupRef.current({ surah: out.surah, ayah: out.ayah, wordIndex: out.wordIndex, alignmentState: out.alignmentState });
             /*
-             * وفي «اختبر حفظك» لا يكشف الموضعُ التقريبيُّ ما لم يُسمع:
-             * ـ إن كان السماعُ كلمةً كلمةً جاريًا فهو وحده يكشف (أدنا)، والتقريبيُّ لا يكشف شيئًا؛
-             * ـ وإلا فلا يكشف إلا موضعًا مُثبَتًا (LOCKED)، ولا يتقدّم في مقطعٍ واحدٍ أكثرَ من
-             *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
+             * والقفزةُ البعيدةُ للأمام تنتظر جوابًا ثانيًا يؤكّدها — ولا تصير مرساةً قبل ذلك.
+             * (قِيس: `LOCKED` على 33:15 والصوتُ في الآية 7 علّم ثمانين كلمةً «مقروءة».)
              */
-            if (!veiledRef.current) advance(target);
-            else if (!attemptJudging.current && !wordFollow.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
-              // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
-              lastRough.current = target;
-              advance(Math.min(target, reachedRef.current - 1 + VEIL_STEP));
+            const admitted = target === null ? null : admitRough(target, reachedRef.current - 1, roughGate.current, Date.now());
+            if (admitted) roughGate.current = admitted.gate;
+            if (admitted?.accept && out.alignmentState === 'LOCKED' && Number.isInteger(out.globalIndex)) lastGlobal.current = out.globalIndex as number;
+            if (admitted?.accept) {
+              /*
+               * وفي «اختبر حفظك» لا يكشف الموضعُ التقريبيُّ ما لم يُسمع:
+               * ـ إن كان السماعُ كلمةً كلمةً جاريًا فهو وحده يكشف (أدنا)، والتقريبيُّ لا يكشف شيئًا؛
+               * ـ وإلا فلا يكشف إلا موضعًا مُثبَتًا (LOCKED)، ولا يتقدّم في مقطعٍ واحدٍ أكثرَ من
+               *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
+               */
+              if (!veiledRef.current) advance(target);
+              else if (!attemptJudging.current && !wordFollow.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
+                // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
+                lastRough.current = target;
+                advance(Math.min(target, reachedRef.current - 1 + VEIL_STEP));
+              }
             }
           }
           setHeard(n => n + 1);
@@ -701,7 +714,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             if (!permission) {
               /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
               heardWords.current = [...heardWords.current, ...committedWords(out.words, windowStartMs, win.commitUntilMs)];
-              const frontier = followFrontier(expectedRef.current, heardWords.current);
+              const frontier = followFrontier(expectedRef.current, heardWords.current, trustedFrontier.current);
+              trustedFrontier.current = Math.max(trustedFrontier.current, frontier);
               /* ومن الجبهة الفارغة (-1) كذلك: أوّلُ كلمةٍ عند الحافّة تنكشف ولا تنتظر النافذةَ التالية. */
               advance(provisionalReach(expectedRef.current, frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
               return;
@@ -726,7 +740,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             const { kept } = dropWordsUnderAlert(timed, alertWindows.current, text => faceSkeletonsRef.current.has(quranSkeleton(text)));
             heardWords.current = [...heardWords.current, ...kept];
 
-            const judged = liveJudgment(expectedRef.current, heardWords.current, permission);
+            const judged = liveJudgment(expectedRef.current, heardWords.current, permission, undefined, trustedFrontier.current);
+            trustedFrontier.current = Math.max(trustedFrontier.current, judged.frontier);
             /* وجبهةُ السماع أدقُّ شاهدٍ على الموضع: ما قاله فعلًا لا ما يُظنّ أنّه بلغه. */
             advance(provisionalReach(expectedRef.current, judged.frontier, edgeWords(out.words, windowStartMs, win.commitUntilMs)));
             const settledHere = judgeable(judged.settled);
@@ -1197,7 +1212,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             choiceNote={stage === 'report' ? undefined : choice}
             analysisNote={analysisNote}
             notes={stage === 'report' ? tashkeel.findings : undefined}
-            live={stage === 'reciting' || stage === 'analysing' || (stage === 'ready' && veiled)
+            live={stage === 'reciting' || stage === 'analysing' || ((stage === 'ready' || stage === 'asking') && veiled)
               ? { cursor: stage === 'reciting' ? pen : null, reached, veiled: veiled && stage !== 'analysing', hint }
               : undefined}
           />

@@ -55,11 +55,54 @@ function frontierOf(mistakes: readonly Mistake[], judged: number): number {
   return -1;
 }
 
+/*
+ * والجبهةُ لا تتقدّم بكلمةٍ واحدةٍ طابقت.
+ *
+ * قِيس في متصفّحٍ حقيقيّ: سمع المحرّكُ «ألا تطغوا في الميزان» (الآية 8، خارج الوجه) فطابقت
+ * «لا» كلمةَ 20:3، فقفزت الجبهةُ إليها، وصار كلُّ ما قبلها «سُمع غيرُها» — كلماتٌ لم يبلغها
+ * القارئُ بعد تُعلَّم حمراء. وسمع لازمةَ الآية 13 فقفزت إلى لازمة 21 على الوجه.
+ *
+ * فالجبهةُ لا تُقبل إلا في آخر **سلسلةٍ متّصلةٍ** من الكلمات المطابقة. وإن كان بين آخر جبهةٍ
+ * مقبولة وأوّل السلسلة أكثرُ من `NEAR_GAP_WORDS` كلماتٍ لم تُسمع، فهي قفزةٌ لا متابعة: تحتاج
+ * سلسلةً أطول من اللازمة («فبأيّ آلاء ربّكما تكذّبان» أربعُ كلمات). والرجوعُ لا قيد عليه.
+ */
+export const FRONTIER_RUN_WORDS = 2;
+export const NEAR_GAP_WORDS = 3;
+export const FAR_JUMP_RUN_WORDS = 6;
+
+/** طولُ السلسلة المطابقة المنتهية عند `index`: كلماتٌ لم تُسمع غيرَها ولم تسقط. */
+function matchedRunEndingAt(mistakes: readonly Mistake[], index: number): number {
+  const miss = new Set<number>();
+  for (const mistake of mistakes) {
+    if (mistake.wordIndex !== null && (mistake.kind === 'substituted' || mistake.kind === 'skipped')) miss.add(mistake.wordIndex);
+  }
+  let run = 0;
+  for (let at = index; at >= 0 && !miss.has(at); at -= 1) run += 1;
+  return run;
+}
+
+/**
+ * الجبهةُ الموثوقة: أبعدُ موضعٍ ≤ `raw` تنتهي عنده سلسلةٌ كافية. و`previous` آخرُ جبهةٍ مقبولة
+ * (`-1` في أوّل التلاوة). وبلا `previous` لا تُقاس الفجوة، وتكفي السلسلةُ القصيرة.
+ */
+export function credibleFrontier(mistakes: readonly Mistake[], raw: number, previous?: number): number {
+  const floor = previous ?? -1;
+  if (raw <= floor) return raw;
+  for (let at = raw; at > floor; at -= 1) {
+    const run = matchedRunEndingAt(mistakes, at);
+    const gap = at - run + 1 - (floor + 1);
+    const far = previous !== undefined && gap > NEAR_GAP_WORDS;
+    if (run >= Math.min(far ? FAR_JUMP_RUN_WORDS : FRONTIER_RUN_WORDS, at + 1)) return at;
+  }
+  return floor;
+}
+
 export function liveJudgment(
   expected: readonly ExpectedWord[],
   heard: readonly HeardWord[],
   gate: JudgingPermission,
   margin: number = SETTLE_MARGIN_WORDS,
+  previous?: number,
 ): LiveJudgment {
   if (gate.word !== 'OPEN' || heardNothing(heard)) return { judgment: null, settled: [], frontier: -1 };
   /*
@@ -74,7 +117,7 @@ export function liveJudgment(
   /* وأبعدُ موضعٍ دخل الحكمَ أصلًا: ما بعده لم يُقابَل بشيء. */
   const judgedUpTo = judgment.mistakes.reduce((max, m) => (m.wordIndex !== null && m.wordIndex > max ? m.wordIndex : max), -1);
   const reachedByMatch = judgment.matched + judgment.uncertain + judgment.mistakes.filter(m => m.wordIndex !== null).length;
-  const frontier = frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch));
+  const frontier = credibleFrontier(judgment.mistakes, frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch)), previous);
   const limit = frontier - margin;
   const settled = judgment.mistakes.filter(m => m.wordIndex !== null && m.wordIndex <= limit);
   return { judgment, settled, frontier };
@@ -86,12 +129,12 @@ export function liveJudgment(
  * يُستعمل حين يكون الحكمُ مغلقًا (روايةٌ لم تُقَس، أو سقط إذنُ المحاولة): الموضعُ يتبع
  * ما قيل فعلًا كلمةً كلمة، ولا يُعرض خطأٌ ولا يُنبَّه بصوت. والتشكيلُ لا يُقابَل هنا.
  */
-export function followFrontier(expected: readonly ExpectedWord[], heard: readonly HeardWord[]): number {
+export function followFrontier(expected: readonly ExpectedWord[], heard: readonly HeardWord[], previous?: number): number {
   if (heardNothing(heard)) return -1;
   const judgment = diffRecitation(expected, heard, { ...DEFAULT_DIFF_OPTIONS, detectTashkeel: false, freeTail: true });
   const judgedUpTo = judgment.mistakes.reduce((max, m) => (m.wordIndex !== null && m.wordIndex > max ? m.wordIndex : max), -1);
   const reachedByMatch = judgment.matched + judgment.uncertain + judgment.mistakes.filter(m => m.wordIndex !== null).length;
-  return frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch));
+  return credibleFrontier(judgment.mistakes, frontierOf(judgment.mistakes, Math.max(judgedUpTo + 1, reachedByMatch)), previous);
 }
 
 /**
