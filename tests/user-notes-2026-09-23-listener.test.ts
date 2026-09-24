@@ -159,6 +159,8 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   assert.match(practice, /if \(!veiledRef\.current\) advance\(target\);/);
   assert.match(practice, /!attemptJudging\.current && out\.alignmentState === 'LOCKED'/);
   assert.match(practice, /reachedRef\.current - 1 \+ VEIL_STEP/);
+  // تكرارُ الموضع نفسِه لا يكشف مزيدًا (لا تسلّق).
+  assert.match(practice, /target > lastRough\.current\) \{\n\s+\/\/[^\n]*\n\s+lastRough\.current = target;/);
   // الموضعُ يرسو على آخر ما ثبت، فلا تسحبه عبارةٌ مكرّرةٌ بعيدة.
   assert.match(practice, /after: lastGlobal\.current >= 0/);
   const listener = read('services/quran-practice-listener/app.py');

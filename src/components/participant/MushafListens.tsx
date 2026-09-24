@@ -130,6 +130,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const reachedRef = useRef(0);
   /* آخرُ موضعٍ مُثبَتٍ في نصّ المستمع — يُرسل معه ليرسو عليه ولا يقفز بعيدًا. */
   const lastGlobal = useRef(-1);
+  /** آخرُ موضعٍ تقريبيٍّ كشف شيئًا تحت الحجاب — فتكرارُه لا يكشف مزيدًا. */
+  const lastRough = useRef(-1);
   useEffect(() => { reachedRef.current = reached; }, [reached]);
   const [pen, setPen] = useState<number | null>(null);
   const [veiled, setVeiled] = useState(false);
@@ -442,7 +444,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
     setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -512,7 +514,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const begin = useCallback(async () => {
     if (!face) return;
     samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
-    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1;
+    heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; lastGlobal.current = -1; lastRough.current = -1;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
     try { retakeRec.current?.rec.stop(); } catch { /* مغلق */ } setRetake(null);
@@ -614,8 +616,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
              */
             if (!veiledRef.current) advance(target);
-            else if (!attemptJudging.current && out.alignmentState === 'LOCKED' && target !== null)
+            else if (!attemptJudging.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
+              // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
+              lastRough.current = target;
               advance(Math.min(target, reachedRef.current - 1 + VEIL_STEP));
+            }
           }
           setHeard(n => n + 1);
         }, error => {
