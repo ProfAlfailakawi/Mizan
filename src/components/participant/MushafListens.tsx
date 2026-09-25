@@ -9,7 +9,7 @@ import type { FaceMark, FaceReading } from '../../lib/face-reading';
 import { explainChoice, faceWeights, type AttemptWord, type AttemptWordKind, type FaceAttempt } from '../../lib/face-memory';
 import { HifzJourney } from './HifzJourney';
 import {
-  amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
+  amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, faceSurahSegments, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt, segmentAt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
 import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment, provisionalReach } from '../../lib/live-judging';
@@ -136,6 +136,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const lastGlobal = useRef(-1);
   /** آخرُ موضعٍ تقريبيٍّ كشف شيئًا تحت الحجاب — فتكرارُه لا يكشف مزيدًا. */
   const lastRough = useRef(-1);
+  /** سورةُ القطعة التي يُطلب لها الموضعُ التقريبيّ — في الوجه العابر تتبدّل، فتُنسى المرساة. */
+  const alignSurah = useRef<number | null>(null);
   /** قفزةٌ تقريبيّةٌ بعيدةٌ تنتظر جوابًا ثانيًا يؤكّدها (`rough-position.ts`). */
   const roughGate = useRef<RoughGate>(OPEN_ROUGH_GATE);
   /** آخرُ جبهةِ سماعٍ مقبولة — تُقاس بها القفزةُ البعيدة (`credibleFrontier`). */
@@ -598,6 +600,9 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       /* الطابورُ يُربط **تزامنيًّا** عند وصول المقطع، فلا يسبق متأخّرٌ سابقَه. */
       let head: Blob | null = null;
       const all: Blob[] = [];
+      /* قطعُ السور في الوجه — واحدةٌ في أكثر الوجوه، واثنتان أو أكثر في الوجه العابر. */
+      const surahSegments = faceSurahSegments(face.words);
+      alignSurah.current = null;
       recording.current = all;
       committedUntil.current = 0; coveredUntil.current = 0;
       rec.ondataavailable = e => {
@@ -637,9 +642,16 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         queue.current.push(async live => {
           /* الموضعُ التقريبيُّ يحتاج أحدثَ مقطعٍ وحده: ما سبقه أحدثُ منه لا يُرسل. */
           if (!finalChunk && latestAlignment.current > index) { setHeard(n => n + 1); return; }
+          /*
+           * والموضعُ التقريبيُّ لسورةٍ واحدة: في الوجه العابر يُطلب لقطعة السورة التي فيها الكلمةُ
+           * التالية لما بلغه القارئ. وحين تتبدّل السورةُ تُنسى المرساة — فرقمُها في نصّ السورة الأخرى.
+           */
+          const segment = segmentAt(surahSegments, Math.min(face.words.length - 1, Math.max(0, reachedRef.current)));
+          const part = segment ?? { surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd };
+          if (alignSurah.current !== part.surah) { alignSurah.current = part.surah; lastGlobal.current = -1; }
           const out = await submitPracticeAlignmentChunk({
             blob: listenable, reading: listening.reading, sourcePackageId: listening.sourcePackageId,
-            surah: face.surahStart, startAyah: face.ayahStart, endAyah: face.ayahEnd,
+            surah: part.surah, startAyah: part.startAyah, endAyah: part.endAyah,
             after: lastGlobal.current >= 0 ? lastGlobal.current : undefined,
             headBytes: chunk === head ? 0 : head.size,
           }, journeyAuth);

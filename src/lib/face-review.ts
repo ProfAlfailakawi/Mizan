@@ -12,31 +12,45 @@ import type { AttemptWord, AttemptWordKind, FaceAttempt } from './face-memory';
 export interface FaceExtent { page: number; surahStart: number; surahEnd: number }
 
 /*
- * هل يصحّ الاستماعُ إلى هذا الوجه؟
+ * هل يصحّ الاستماعُ إلى هذا الوجه؟ — نعم، ولو عبر سورتين.
  *
- * ومسارُ المحاذاة يُطلب **لسورةٍ واحدةٍ** ومدى آياتٍ فيها، فالوجهُ العابرُ سورتين لا
- * يُقاس كاملًا. وهذا سؤالٌ يُسأل عن الوجه المسحوب نفسِه، لا عن القائمة وحدها: فقد
- * يُسحب عابرٌ من قائمةٍ كلُّها عابرة، فيلزم أن يُعرف قبل أن يُفتح ميكروفون.
+ * كان الوجهُ العابرُ لا يُسمع: مسارُ المحاذاة يُطلب لسورةٍ واحدةٍ ومدى آياتٍ فيها. فكانت ٥٤ صفحةً
+ * من ٦٠٤ (٨٫٩٪) لا يُفتح لها ميكروفون — ومنها ١٩ من صفحات جزء عمّ الثلاث والعشرين، وهو أوّلُ ما
+ * يحفظه الصغار؛ ومنها أوّلُ الرحمن. والسماعُ كلمةً كلمةً لا يعرف السور (نصُّ الوجه كلُّه يُقابَل)،
+ * والموضعُ التقريبيُّ يُطلب لقطعة السورة التي يقرأ فيها الطالبُ الآن (`faceSurahSegments`) —
+ * والخادمُ يتحقّق من القطعة في نطاقه كما يتحقّق من الوجه.
  */
 export function faceSupportsListening(face: FaceExtent | null | undefined): boolean {
-  return !!face && face.surahStart === face.surahEnd;
+  return !!face;
 }
 
-/*
- * الوجوهُ التي يصحّ الاستماعُ إليها.
- *
- * وهي نحوُ واحدٍ وتسعين في المئة من المصحف. وحين لا يبقى غيرُ العابرة في نطاق الطالب —
- * كنطاقٍ ضيّقٍ كلُّ وجوهه عابرة — تُعرض على أنّها هي، ولا يُقال له «لا وجهَ لك». لكنّها
- * حينئذٍ **تُراجَع صامتةً**: يُقال له إنّ الوجهَ يعبر سورتين فلا يُحلَّل، ولا يُفتح له
- * ميكروفونٌ يرسل إلى مقطعٍ لا يقبله المحرّك فيعود بتقريرٍ فارغ.
- */
+/** الوجوهُ التي يُستمع إليها — كلُّها. */
 export function listenableFaces(
   faces: readonly FaceExtent[],
-  listening: unknown,
+  _listening: unknown,
 ): readonly FaceExtent[] {
-  if (!listening) return faces;
-  const single = faces.filter(faceSupportsListening);
-  return single.length ? single : faces;
+  return faces;
+}
+
+/** قطعةُ سورةٍ من الوجه: مدى آياتها، وفهرسا أوّل كلمةٍ وآخرها فيه. */
+export interface FaceSurahSegment { surah: number; startAyah: number; endAyah: number; firstIndex: number; lastIndex: number }
+
+export function faceSurahSegments(words: readonly { index: number; surah: number; ayah: number }[]): FaceSurahSegment[] {
+  const out: FaceSurahSegment[] = [];
+  for (const w of words) {
+    const last = out[out.length - 1];
+    if (last && last.surah === w.surah) {
+      last.startAyah = Math.min(last.startAyah, w.ayah); last.endAyah = Math.max(last.endAyah, w.ayah); last.lastIndex = w.index;
+    } else out.push({ surah: w.surah, startAyah: w.ayah, endAyah: w.ayah, firstIndex: w.index, lastIndex: w.index });
+  }
+  return out;
+}
+
+/** القطعةُ التي فيها الكلمةُ `index`؛ وقبل أوّلها الأولى، وبعد آخرها الأخيرة. */
+export function segmentAt(segments: readonly FaceSurahSegment[], index: number): FaceSurahSegment | null {
+  if (!segments.length) return null;
+  return segments.find(s => index >= s.firstIndex && index <= s.lastIndex)
+    ?? (index < segments[0].firstIndex ? segments[0] : segments[segments.length - 1]);
 }
 
 /*
