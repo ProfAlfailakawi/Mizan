@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 
 import {
-  attemptFrom, faceNote, faceSupportsListening, listenableFaces, loadFaceAttempts, rememberFaceAttempt,
+  attemptFrom, faceNote, faceSupportsListening, faceSurahSegments, listenableFaces, loadFaceAttempts, rememberFaceAttempt, segmentAt,
   forgetFaceAttempts, MAX_REMEMBERED_ATTEMPTS, serialQueue, DRAIN_DEADLINE_MS, reviewNote,
 } from '../src/lib/face-review';
 import { accumulateWordSignals } from '../server/alignment/word-signals';
@@ -20,31 +20,35 @@ const face = (page: number, surahStart: number, surahEnd = surahStart) => ({
   page, surahStart, ayahStart: 1, surahEnd, ayahEnd: 5, ayahCount: 5,
 });
 
-test('الوجهُ العابرُ سورتين لا يُستمع إليه — والمحاذاةُ تُطلب لسورةٍ واحدة', () => {
+test('الوجهُ العابرُ سورتين يُستمع إليه — وكان ٥٤ صفحةً بلا ميكروفون، منها ١٩ من جزء عمّ', () => {
   const faces = [face(1, 2), face(2, 2, 3), face(3, 3)];
-  assert.deepEqual(listenableFaces(faces, { reading: 'hafs' }).map(f => f.page), [1, 3]);
-  /* وبلا محرّكٍ يُعرض كلُّ وجهٍ للمراجعة الصامتة: القيدُ قيدُ القياس لا قيدُ العرض. */
+  assert.deepEqual(listenableFaces(faces, { reading: 'hafs' }).map(f => f.page), [1, 2, 3]);
   assert.deepEqual(listenableFaces(faces, null).map(f => f.page), [1, 2, 3]);
-});
-
-test('نطاقٌ كلُّ وجوهه عابرةٌ لا يُترك بلا وجه — لكنّه يُراجَع صامتًا', () => {
-  /*
-   * وإلا قيل لصاحب النطاق الضيّق «لا وجهَ لك» وله وجوهٌ تُقرأ وإن لم تُقس كاملة.
-   *
-   * لكنّ العودةَ إلى العابرة لا تعني فتحَ ميكروفونٍ عليها: المحاذاةُ تُطلب لسورةٍ ومدى
-   * آياتٍ فيها، فمدًى ينتهي في سورةٍ أخرى يردّه الخادم — فيقرأ الطالبُ وجهًا كاملًا ثم
-   * يُعطى تقريرًا فارغًا لا يعرف سببه. فالسؤالُ يُسأل عن **الوجه المسحوب** لا عن القائمة.
-   */
-  const crossing = [face(1, 2, 3), face(2, 3, 4)];
-  const offered = listenableFaces(crossing, { reading: 'hafs' });
-  assert.deepEqual(offered.map(f => f.page), [1, 2], 'تُرك صاحبُ النطاق الضيّق بلا وجه');
-  for (const f of offered) {
-    assert.equal(faceSupportsListening(f), false, `وجه ${f.page} عابرٌ وفُتح له ميكروفون`);
-  }
-  /* والوجهُ في سورةٍ واحدةٍ يُستمع إليه، وما لا وجهَ له لا يُستمع إليه. */
+  assert.equal(faceSupportsListening(face(2, 2, 3)), true, 'العابرُ لا يُفتح له ميكروفون');
   assert.equal(faceSupportsListening(face(3, 5)), true);
   assert.equal(faceSupportsListening(null), false);
   assert.equal(faceSupportsListening(undefined), false);
+});
+
+test('والموضعُ التقريبيُّ يُطلب لقطعة السورة التي يقرأ فيها الطالب — ولسورةٍ واحدةٍ دائمًا', () => {
+  /* الوجه ٥٣١: خاتمةُ القمر (٥٠–٥٥) ثمّ فاتحةُ الرحمن (١–١٨). */
+  const words = [
+    ...Array.from({ length: 6 }, (_, i) => ({ index: i, surah: 54, ayah: 50 + i })),
+    ...Array.from({ length: 18 }, (_, i) => ({ index: 6 + i, surah: 55, ayah: 1 + i })),
+  ];
+  const segments = faceSurahSegments(words);
+  assert.deepEqual(segments, [
+    { surah: 54, startAyah: 50, endAyah: 55, firstIndex: 0, lastIndex: 5 },
+    { surah: 55, startAyah: 1, endAyah: 18, firstIndex: 6, lastIndex: 23 },
+  ]);
+  assert.equal(segmentAt(segments, 0)!.surah, 54);
+  assert.equal(segmentAt(segments, 5)!.surah, 54);
+  assert.equal(segmentAt(segments, 6)!.surah, 55, 'أوّلُ كلمةٍ في الرحمن');
+  assert.equal(segmentAt(segments, 99)!.surah, 55, 'بعد آخر الوجه: القطعةُ الأخيرة');
+  assert.equal(segmentAt([], 0), null);
+  const screen = fs.readFileSync('src/components/participant/MushafListens.tsx', 'utf8');
+  assert.match(screen, /surah: part\.surah, startAyah: part\.startAyah, endAyah: part\.endAyah,/, 'الطلبُ لا يحمل مدى الوجه العابر كلَّه');
+  assert.match(screen, /if \(alignSurah\.current !== part\.surah\) \{ alignSurah\.current = part\.surah; lastGlobal\.current = -1; \}/, 'المرساةُ لا تعبر إلى سورةٍ أخرى');
 });
 
 test('محاولةٌ لم يُسمع فيها شيءٌ لا تدخل الذاكرة', () => {
