@@ -30,9 +30,17 @@ export const OPEN_ROUGH_GATE: RoughGate = { pending: null };
  */
 export const ROUGH_LEAD_WORDS = 2;
 
+/*
+ * ومن الجبهة الفارغة (لم يُسمع من الوجه شيء) لا يحرّك القلمَ موضعٌ في داخل الوجه: فالقارئُ قد يكون
+ * قبله، يتلو لازمةً تشبه لازمته. قِيس في ٢٥ سبتمبر ٢٠٢٦ على الإنتاج بتلاوةٍ من أوّل السورة: لازمةُ الآية 13
+ * عادت `LOCKED` على 21:1، فتعلّمت ثماني كلماتٍ قبل أن تُقال باثنتين وخمسين ثانية. ولو قادها بكلمتين
+ * لتعلّمت «مرج البحرين» كذلك. فلا يُصدَّق منه إلا ما دلّ على أوّل كلمات الوجه.
+ */
 /** أبعدُ ما يبلغه القلمُ بالموضع التقريبيّ: بلا سماعٍ جارٍ هو الموضعُ كما هو. */
 export function roughReach(target: number, heardFrontier: number, following: boolean): number {
-  return following ? Math.min(target, heardFrontier + ROUGH_LEAD_WORDS) : target;
+  if (!following) return target;
+  if (heardFrontier < 0 && target > ROUGH_LEAD_WORDS) return heardFrontier;
+  return Math.min(target, heardFrontier + ROUGH_LEAD_WORDS);
 }
 
 /** `anchor` أبعدُ موضعٍ قُبل (`-1` في أوّل التلاوة)، و`now` بالملّي ثانية. */
