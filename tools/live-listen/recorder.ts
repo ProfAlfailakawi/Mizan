@@ -8,6 +8,9 @@
  * ـ `gum` و`onset`: لحظةُ فتح الميكروفون، وأوّلُ لحظةٍ جاء فيها صوت. والملفُّ يبدأ من أوّله حين
  *   يُفتح الجهاز، فالبدايةُ مرساةُ الزمن كلِّه (أوّلُ كلمةٍ في الملفّ عند ٣٠ ملّي ثانية).
  *
+ * ـ `recorders`: لكلّ `MediaRecorder` لحظةُ بدئه، ولكلّ مقطعٍ منه لحظةُ وصوله و`timecode` المتصفّح وحجمُه.
+ *   فالصفحةُ تحسب زمنَ الكلمة على أنّ المقطعَ ١٥٠٠ ملّي ثانيةٍ بالضبط؛ وهذا يقيس ما هو حقًّا.
+ *
  * الأزمنةُ كلُّها `performance.now()` الصفحة.
  */
 export const RECORDER = String.raw`(() => {
@@ -25,6 +28,15 @@ export const RECORDER = String.raw`(() => {
     } catch (e) { R.err = String(e); }
     return s;
   };
+  if (window.MediaRecorder) {
+    const start = MediaRecorder.prototype.start;
+    MediaRecorder.prototype.start = function (slice) {
+      const log = { startedAt: performance.now(), slice: slice === undefined ? null : slice, mime: this.mimeType || null, chunks: [] };
+      (R.recorders = R.recorders || []).push(log);
+      this.addEventListener('dataavailable', (e) => log.chunks.push([Math.round(performance.now() * 10) / 10, typeof e.timecode === 'number' ? Math.round(e.timecode * 10) / 10 : null, e.data ? e.data.size : 0]));
+      return start.call(this, slice);
+    };
+  }
   setInterval(() => {
     const t = Math.round(performance.now());
     for (const el of document.querySelectorAll('[data-word]')) {

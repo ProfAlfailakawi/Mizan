@@ -27,7 +27,11 @@ export interface LiveRun {
   meta: { label: string; mode: 'normal' | 'veil'; page: number; origin: string; build: string | null; startedAt: string; bundles: string[] };
   recitation: Omit<Recitation, 'wav'>;
   faceWords: { index: number; text: string; surah: number; ayah: number; ayahWordIndex?: number; endsAyah?: boolean }[];
-  rec: { gum: number | null; onset: number | null; trans: [number, number, string][] };
+  rec: {
+    gum: number | null; onset: number | null; trans: [number, number, string][];
+    /** مقاطعُ المسجِّل كما وصلت: `[لحظةُ الوصول، timecode المتصفّح، الحجم]`. */
+    recorders?: { startedAt: number; slice: number | null; mime: string | null; chunks: [number, number | null, number][] }[];
+  };
   clickAt: number;
   net: { kind: 'align' | 'recognise'; sentAt: number | null; at: number; status: number; body: any }[];
   report: string | null;
@@ -123,7 +127,7 @@ async function main() {
     const rec = await race(p.evaluate(() => (window as any).__liveListen).catch(() => null), 10_000);
     if (rec) fs.writeFileSync(partial, JSON.stringify({ rec, net }));
   }
-  const rec = (await race(p.evaluate(() => { const r = (window as any).__liveListen; return { gum: r.gum, onset: r.onset, trans: r.trans }; }), 20_000))
+  const rec = (await race(p.evaluate(() => { const r = (window as any).__liveListen; return { gum: r.gum, onset: r.onset, trans: r.trans, recorders: r.recorders }; }), 20_000))
     ?? JSON.parse(fs.readFileSync(partial, 'utf8')).rec;
   await p.locator('button').filter({ hasText: /أنهيت/ }).first().click().catch(() => {});
   await p.waitForTimeout(40_000);
@@ -134,7 +138,7 @@ async function main() {
   const { wav: _wav, ...timeline } = recitation;
   const run: LiveRun = {
     meta: { label, mode, page, origin, build, startedAt: new Date().toISOString(), bundles: [...bundles] },
-    recitation: timeline, faceWords: face.words, rec: { gum: rec.gum, onset: rec.onset, trans: rec.trans }, clickAt, net, report,
+    recitation: timeline, faceWords: face.words, rec: { gum: rec.gum, onset: rec.onset, trans: rec.trans, recorders: rec.recorders }, clickAt, net, report,
   };
   const file = path.join(outDir, `${label}.json`);
   fs.writeFileSync(file, JSON.stringify(run));
