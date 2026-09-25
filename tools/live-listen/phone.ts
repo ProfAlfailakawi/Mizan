@@ -64,15 +64,17 @@ async function revealCurve(file: string, measure: 'ink' | 'color', fps: number, 
   const ch = measure === 'color' ? 3 : 1;
   const top = Math.floor(H * crop[0]), bottom = Math.floor(H * crop[1]);
   const proc = spawn('ffmpeg', ['-loglevel', 'error', '-i', file, '-vf', `fps=${fps},scale=${W}:${H}`, '-pix_fmt', measure === 'color' ? 'rgb24' : 'gray', '-f', 'rawvideo', '-']);
-  const size = W * H * ch; const out: { t: number; v: number }[] = []; let pending = Buffer.alloc(0);
+  const size = W * H * ch; const out: { t: number; v: number }[] = []; let pending = Buffer.alloc(0); let dark: boolean | null = null;
   for await (const chunk of proc.stdout) {
     pending = Buffer.concat([pending, chunk as Buffer]);
     while (pending.length >= size) {
       const f = pending.subarray(0, size); pending = pending.subarray(size);
+      /* الحبرُ ما خالف الورق: داكنٌ على صفحةٍ فاتحة، وفاتحٌ على صفحةٍ داكنة (الوضعُ الليليّ في ترتيل). */
+      if (dark === null && measure === 'ink') { let sum = 0, n = 0; for (let y = top; y < bottom; y += 4) for (let x = 0; x < W; x += 4) { sum += f[(y * W + x) * ch]; n += 1; } dark = sum / n < 100; }
       let count = 0;
       for (let y = top; y < bottom; y += 1) for (let x = 0; x < W; x += 1) {
         const i = (y * W + x) * ch;
-        if (measure === 'ink') { if (f[i] < 110) count += 1; }
+        if (measure === 'ink') { if (dark ? f[i] > 150 : f[i] < 110) count += 1; }
         else { const r = f[i], g = f[i + 1], b = f[i + 2]; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx > 60 && (mx - mn) / mx > 0.35) count += 1; }
       }
       out.push({ t: out.length / fps, v: count });

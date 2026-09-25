@@ -13,6 +13,7 @@
  *
  * ورابطُ البطاقة سرٌّ يفتح رحلةَ متسابق: يُمرَّر بالوسيط أو بـ`MIZAN_LIVE_JOURNEY`، ولا يُكتب في المستودع.
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,7 +38,7 @@ export interface LiveRun {
   report: string | null;
 }
 
-const ARGS = ['journey', 'base', 'page', 'range', 'pad', 'mode', 'label', 'out', 'cache', 'shots', 'seconds'] as const;
+const ARGS = ['journey', 'base', 'page', 'range', 'pad', 'mode', 'label', 'out', 'cache', 'shots', 'seconds', 'audio'] as const;
 
 const CHROME = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
 const race = <T>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), ms))]);
@@ -61,7 +62,14 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   if (shots) fs.mkdirSync(shots, { recursive: true });
 
-  const recitation = await buildRecitation({ segments: parseRange(a.range || '55:19-41'), padSeconds: Number(a.pad || 120), cacheDir });
+  /*
+   * وتلاوةٌ غيرُ العفاسي (`--audio`): تسجيلُ طالبٍ أو قارئٍ بعينه (wav)، بلا توقيتٍ للكلمات — فالجولةُ تحفظ
+   * ما فعلته الصفحة، ومتى قيلت كلُّ كلمةٍ يُعرف من خارجها (مثلًا من أجوبة المستمع نفسه).
+   */
+  const recitation: Recitation = a.audio
+    ? (() => { const wav = path.resolve(a.audio); const ms = Math.round(Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', wav]).toString()) * 1000);
+        return { range: `audio:${path.basename(wav)}`, surah: 0, fromAyah: 0, toAyah: 0, reciter: path.basename(wav), speechMs: ms, totalMs: ms, words: [], ayahs: [], wav }; })()
+    : await buildRecitation({ segments: parseRange(a.range || '55:19-41'), padSeconds: Number(a.pad || 120), cacheDir });
   const reciteMs = Number(a.seconds || 0) * 1000 || recitation.totalMs;
   const headers = { 'x-mizan-competition-id': comp, 'x-mizan-journey-key': key, accept: 'application/json' };
   const context = await (await fetch(`${origin}/api/public/journeys/practice/context`, { method: 'POST', headers })).json() as { deliveryReading: string; owner: string };
