@@ -114,5 +114,27 @@ export function sameWord(a: string, b: string): boolean {
   return stripped.length > 0 && stripped === withoutAlef(sb);
 }
 
+/*
+ * كم تشبه الكلمةُ الكلمة؟ — من صفرٍ إلى واحد، على الهيكل: ١ − مسافةُ التحرير ÷ الأطول.
+ *
+ * لا يُحكم به على صوابٍ ولا خطأ. إنّما يفرّق بين كلمةٍ **أخطأ المحرّكُ سماعَها** وكلمةٍ **من غير
+ * هذا الموضع**: فالمحرّكُ حين يُخطئ يُقارب («آلاكما» لـ«ءالاء»، «بكما» لـ«ربكما»، «منهم» لـ«منهما»)،
+ * وكلامٌ من آيةٍ أخرى لا يشبه ما يقابله («الا» لـ«مرج»). والأولى قراءةٌ متّصلة، والثانية قفزة.
+ */
+export function wordLikeness(a: string, b: string): number {
+  const sa = quranSkeleton(a), sb = quranSkeleton(b);
+  if (!sa.length || !sb.length) return 0;
+  const row = Array.from({ length: sb.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= sa.length; i += 1) {
+    let diag = row[0]; row[0] = i;
+    for (let j = 1; j <= sb.length; j += 1) {
+      const up = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diag + (sa[i - 1] === sb[j - 1] ? 0 : 1));
+      diag = up;
+    }
+  }
+  return 1 - row[sb.length] / Math.max(sa.length, sb.length);
+}
+
 /** أهي بحركتها أيضًا؟ يُسأل بعد أن تثبت الكلمة، لا قبله. */
 export const sameVowels = (a: string, b: string) => quranVoweled(a) === quranVoweled(b);

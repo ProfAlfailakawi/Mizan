@@ -14,7 +14,7 @@
  * ولا شيءَ من هذا يُخرج حكمًا بلا إذن: المدخلُ إذنٌ، وبلا إذنٍ يعود `null`.
  */
 
-import { quranSkeleton } from './quran-orthography';
+import { quranSkeleton, wordLikeness } from './quran-orthography';
 import {
   DEFAULT_DIFF_OPTIONS, diffRecitation, heardNothing, judgeRecitation,
   type ExpectedWord, type HeardWord, type JudgingPermission, type Mistake, type RecitationDiff,
@@ -63,12 +63,31 @@ function frontierOf(mistakes: readonly Mistake[], judged: number): number {
  * القارئُ بعد تُعلَّم حمراء. وسمع لازمةَ الآية 13 فقفزت إلى لازمة 21 على الوجه.
  *
  * فالجبهةُ لا تُقبل إلا في آخر **سلسلةٍ متّصلةٍ** من الكلمات المطابقة. وإن كان بين آخر جبهةٍ
- * مقبولة وأوّل السلسلة أكثرُ من `NEAR_GAP_WORDS` كلماتٍ لم تُسمع، فهي قفزةٌ لا متابعة: تحتاج
- * سلسلةً أطول من اللازمة («فبأيّ آلاء ربّكما تكذّبان» أربعُ كلمات). والرجوعُ لا قيد عليه.
+ * مقبولة وأوّل السلسلة أكثرُ من `NEAR_GAP_WORDS` **فجوات**، فهي قفزةٌ لا متابعة: تحتاج سلسلةً
+ * أطول من اللازمة («فبأيّ آلاء ربّكما تكذّبان» أربعُ كلمات). والرجوعُ لا قيد عليه.
+ *
+ * والفجوةُ كلمةٌ لم يُسمع في موضعها شيء، أو سُمع فيه ما لا يشبهها (`wordLikeness` دون الثلث):
+ * كلامٌ من غير هذا الموضع. أمّا كلمةٌ سُمعت شبيهةً بها فقراءةٌ متّصلةٌ أخطأ المحرّكُ سماعَها.
+ *
+ * وقِيس لماذا: كانت الفجوةُ كلَّ ما لم يطابق، فعلى وجهٍ لوازمُه بين كلّ آيتين والمحرّكُ يخطئ
+ * سماعَها («آلاكما»، «بكما»، «يذبكما») تجمّعت الفجوات، ولم تأتِ ستُّ كلماتٍ صحيحةٍ متّصلة —
+ * فوقفت الجبهةُ عند الآية ٣٦ من الرحمن، وبقيت ٣١ كلمةً إلى آخر الوجه لا تُعلَّم وقد قيلت.
  */
 export const FRONTIER_RUN_WORDS = 2;
 export const NEAR_GAP_WORDS = 3;
 export const FAR_JUMP_RUN_WORDS = 6;
+export const LIKENESS_FLOOR = 1 / 3;
+
+/** الفجواتُ بين `from` و`to` (شاملًا): ما لم يُسمع، وما سُمع غيرَ شبيه. */
+function gapsBetween(mistakes: readonly Mistake[], from: number, to: number): number {
+  let gaps = 0;
+  for (const m of mistakes) {
+    if (m.wordIndex === null || m.wordIndex < from || m.wordIndex > to) continue;
+    if (m.kind === 'skipped') gaps += 1;
+    else if (m.kind === 'substituted' && wordLikeness(m.expected ?? '', m.heard ?? '') < LIKENESS_FLOOR) gaps += 1;
+  }
+  return gaps;
+}
 
 /** طولُ السلسلة المطابقة المنتهية عند `index`: كلماتٌ لم تُسمع غيرَها ولم تسقط. */
 function matchedRunEndingAt(mistakes: readonly Mistake[], index: number): number {
@@ -90,8 +109,7 @@ export function credibleFrontier(mistakes: readonly Mistake[], raw: number, prev
   if (raw <= floor) return raw;
   for (let at = raw; at > floor; at -= 1) {
     const run = matchedRunEndingAt(mistakes, at);
-    const gap = at - run + 1 - (floor + 1);
-    const far = previous !== undefined && gap > NEAR_GAP_WORDS;
+    const far = previous !== undefined && gapsBetween(mistakes, floor + 1, at - run) > NEAR_GAP_WORDS;
     if (run >= Math.min(far ? FAR_JUMP_RUN_WORDS : FRONTIER_RUN_WORDS, at + 1)) return at;
   }
   return floor;
