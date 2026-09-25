@@ -291,9 +291,11 @@ export interface SerialQueue {
   push(task: (live: () => boolean) => Promise<void>, onFailure?: (error: unknown) => void): void;
   /**
    * ينتظر ما في الطابور كلِّه، بما دُفع أثناء الانتظار — إلى حدٍّ.
-   * ويُرجع `true` إن **وصل كلُّ شيءٍ وتمّ**؛ و`false` إن انقضى الحدُّ أو سقطت مهمّة.
+   * ويُرجع `true` إن **وصل كلُّ شيءٍ وتمّ**؛ و`false` إن انقضى الحدُّ أو سقطت مهمّة. ومن يحرس
+   * السقوطَ بنفسه (`countFailures: false`) يُسأل عن الحدّ وحده: طابورُ السماع يعيد صوتَ الطلب الساقط في
+   * النافذة التالية، ويُبطل الحكمَ بالثقب لا بعدّ السقوط.
    */
-  drain(deadlineMs?: number): Promise<boolean>;
+  drain(deadlineMs?: number, countFailures?: boolean): Promise<boolean>;
   /** يُنهي هذا الطابور: ما لم يبدأ لا يبدأ، وما بدأ يُقال له `live() === false`. */
   abandon(): void;
   /** كم مهمّةً دُخلت الطابورَ — للعرض لا للحكم. */
@@ -332,7 +334,7 @@ export function serialQueue(): SerialQueue {
         try { onFailure?.(error); } catch { /* بيانٌ تعذّر لا يُلغي أنّ المقطع سقط */ }
       });
     },
-    async drain(deadlineMs = DRAIN_DEADLINE_MS) {
+    async drain(deadlineMs = DRAIN_DEADLINE_MS, countFailures = true) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       let expired = false;
       const deadline = new Promise<'expired'>(resolve => {
@@ -346,7 +348,7 @@ export function serialQueue(): SerialQueue {
           const outcome = await Promise.race([tail.then(() => 'settled' as const), deadline]);
           if (outcome === 'expired') return false;
         }
-        return !expired && failed === 0;
+        return !expired && (!countFailures || failed === 0);
       } finally {
         if (timer !== undefined) clearTimeout(timer);
       }

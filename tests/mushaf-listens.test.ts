@@ -297,6 +297,18 @@ test('سقوطُ مقطعٍ لا يقطع الطابور — التلاوةُ ت
   return q.drain().then(() => assert.deepEqual(done, [1, 3], 'مقطعٌ ساقطٌ أوقف ما بعده'));
 });
 
+test('الطابورُ يعدّ السقوطَ في انتظاره — إلا لمن يحرس السقوطَ بنفسه فيُسأل عن المهلة وحدها', async () => {
+  /* طابورُ السماع: طلبٌ سقط أعادت النافذةُ التالية صوتَه، فلا يُعدّ في الخاتمة — قِيس بسقوطٍ مقصود أنّه أبطل الحكم. */
+  const q = serialQueue();
+  q.push(async () => { throw new Error('The operation was aborted due to timeout'); });
+  q.push(async () => { /* النافذةُ التالية نجحت */ });
+  assert.equal(await q.drain(), false, 'السقوطُ لم يُعدّ');
+  assert.equal(await q.drain(undefined, false), true, 'من يحرس السقوطَ بنفسه قيل له «ناقص»');
+  const slow = serialQueue();
+  slow.push(() => new Promise<void>(r => setTimeout(r, 200)));
+  assert.equal(await slow.drain(20, false), false, 'وانقضاءُ المهلة يُقال له دائمًا');
+});
+
 test('الشاشةُ تبني تقريرَها من البنيتين وحدَهما، ولا تشقّ طريقًا ثانيًا', () => {
   /*
    * وهذا فحصُ نصٍّ لا قياسُ تشغيل، ويُقال كما هو: دالّةُ الإنهاء تعيش في ردّ فعلٍ لا
@@ -634,8 +646,8 @@ test('لكلّ مسارٍ طابورُه المرتَّب — وسقوطُ أح�
   /* واكتمالُ التلاوة يُقرأ من طابور المحاذاة وحدَه. */
   assert.match(screen, /drain: \(\) => queue\.current\.drain\(\)/, 'اكتمالُ التلاوة يُقرأ من غير طابورها');
   /* وطابورُ السماع يُنتظر على حدة، وتأخّرُه يُطرح به الحكمُ لا التلاوة. */
-  assert.match(screen, /!\(await recognition\.current\.drain\(\)\)/, 'طابورُ السماع لا يُنتظر عند الخاتمة');
-  const lateDrain = screen.slice(screen.indexOf('!(await recognition.current.drain())'));
+  assert.match(screen, /!\(await recognition\.current\.drain\(undefined, false\)\)/, 'طابورُ السماع لا يُنتظر عند الخاتمة — أو يُعدّ فيه سقوطٌ أعادت النافذةُ صوتَه');
+  const lateDrain = screen.slice(screen.indexOf('!(await recognition.current.drain(undefined, false))'));
   /*
    * ويُترك طابورُ السماع نفسُه، لا الإذنُ وحده: المهمّةُ الجاريةُ التقطت إذنَها قبل
    * أن تنتظر، فجوابُها المتأخّرُ كان يكتب أخطاءً وينغّم بعد أن قيل «لم يُحكم».
