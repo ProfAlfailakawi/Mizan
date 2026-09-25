@@ -12,7 +12,7 @@ import test from 'node:test';
 
 import { PREFACE_WORDS, keepFaceEntry } from '../src/lib/live-judging';
 import { ALERT_ECHO_MAX_MS, alertWindow, dropWordsUnderAlert } from '../src/lib/recitation-alerts';
-import { CHUNK_MS, ChunkTimeline, GRID_CLOCK, catchUpWindow, commitWords, edgeWords, recognitionWindow } from '../src/lib/recognition-window';
+import { CHUNK_MS, ChunkTimeline, GRID_CLOCK, HOLE_TOLERANCE_MS, catchUpWindow, commitWords, edgeWords, leavesHole, recognitionWindow } from '../src/lib/recognition-window';
 
 const word = (text: string, startMs: number, endMs: number) => ({ text, confidence: 0.9, startMs, endMs });
 
@@ -114,4 +114,16 @@ test('the page commits with the measured clock and the midpoint, and trims befor
   assert.match(screen, /commitWords\(words, windowStartMs, commitUntilMs, committedUntil\.current\)/);
   assert.match(screen, /catchUpWindow\(index, finalChunk \? index : newest, finalChunk, committedUntil\.current, clock\)/);
   assert.equal((screen.match(/heardWords\.current = keepFaceEntry\(/g) || []).length, 2, 'both the follow and the judging paths trim before the face');
+});
+
+test('a failed request leaves no hole when the next window starts before the last commit (the real case after the deploy)', () => {
+  /* الجولةُ على الموقع بعد النشر: سقط طلبُ النافذة ٠–٢ ولم يُثبَّت شيءٌ بعد، والنافذةُ التالية بدأت من الصفر. */
+  assert.equal(leavesHole(0, 0), false);
+  assert.equal(leavesHole(1500, 1930), false, 'the usual window starts before the last commit, with its lead');
+  assert.equal(leavesHole(1930 + HOLE_TOLERANCE_MS, 1930), false);
+  assert.equal(leavesHole(1930 + HOLE_TOLERANCE_MS + 1, 1930), true, 'a window that starts after the last commit leaves the audio between unheard');
+  /* ونافذةُ اللحاق لا تتجاوز ١٦ مقطعًا: تأخّرٌ فوقها يبدأ النافذةَ بعد آخر مُثبَّت — وذلك الثقبُ الحقيقيّ. */
+  const w = catchUpWindow(30, 30, false, 1930);
+  assert.equal(w.first, 15);
+  assert.equal(leavesHole(w.startMs, 1930), true);
 });

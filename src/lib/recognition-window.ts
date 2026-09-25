@@ -182,3 +182,20 @@ export function edgeWords(words: readonly TimedHeardWord[], windowStartMs: numbe
       && windowStartMs + (w.startMs + w.endMs) / 2 >= committedUntilMs && windowStartMs + w.endMs > commitUntilMs)
     .map(w => w.text);
 }
+
+/*
+ * هل تترك النافذةُ ثقبًا في ما سُمع؟
+ *
+ * كان سقوطُ طلبِ سماعٍ واحد يُبطل حكمَ المحاولة كلِّها: مقطعٌ لم يصل ثقبٌ يُقرأ «أسقطتَ». ومنذ نافذة
+ * اللحاق (#282) لا يتقدّم آخرُ مُثبَّتٍ بطلبٍ سقط، فالنافذةُ التالية تبدأ قبله وتعيد الصوتَ نفسه — لا ثقب.
+ * قِيس على الموقع في ٢٥ سبتمبر ٢٠٢٦ بعد النشر بدقيقتين: انقضت مهلةُ طلبٍ والمستمعُ يُقلع نسخةً ثانية،
+ * فأُبطل حكمُ المحاولة، والنافذةُ التالية بدأت من الصفر وسمعت كلَّ ما فاته.
+ *
+ * فالثقبُ الحقيقيُّ نافذةٌ تبدأ بعد آخر مُثبَّت: حين يطول التأخّرُ فوق `MAX_WINDOW_CHUNKS` — بطلبٍ سقط
+ * أو بلا سقوط. وهذا وحده يُبطل الحكم، ومعه سقوطُ المقطع الأخير (لا نافذةَ بعده).
+ */
+export const HOLE_TOLERANCE_MS = 80;
+
+export function leavesHole(windowStartMs: number, committedUntilMs: number): boolean {
+  return windowStartMs > committedUntilMs + HOLE_TOLERANCE_MS;
+}

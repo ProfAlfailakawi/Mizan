@@ -718,7 +718,7 @@ test('إذنُ الحكم يُلتقط عند بدء التلاوة ويثبت �
   assert.deepEqual(reads.map(m => m[0]), [], 'مقطعُ السماع يقرأ إذنًا متحرّكًا لا لقطةَ المحاولة');
   assert.match(handler, /if \(attemptJudging\.current \|\| wordFollow\.current\) \{/, 'مقطعُ السماع لا يُشترط بلقطة الإذن');
   /* والتتبّعُ بلا إذنٍ لا يحكم: لا خطأَ يُعرض ولا نغمة — يعود قبل الحكم. */
-  const follow = handler.slice(handler.indexOf('if (!permission) {'), handler.indexOf('if (!answerKeepsPermission'));
+  const follow = handler.slice(handler.indexOf('if (!permission || hole) {'), handler.indexOf('if (!answerKeepsPermission'));
   assert.match(follow, /followFrontier\(expectedRef\.current, heardWords\.current(?:, trustedFrontier\.current)?\)[\s\S]*return;\s*\n\s*\}/);
   assert.doesNotMatch(follow, /setMistakes|planAlert|noticeSlips/, 'التتبّعُ بلا إذنٍ يُظهر أخطاء');
   /* وحكمُ الخاتمة باللقطة نفسِها، لا بإذنٍ تبدّل بعد أن بدأ. */
@@ -728,31 +728,42 @@ test('إذنُ الحكم يُلتقط عند بدء التلاوة ويثبت �
   assert.match(screen, /attemptJudging\.current = null;\s*\n\s*setMistakes\(undefined\); setJudgingLost\(false\);/, 'الإذنُ لا يُطرح عند السحب');
 });
 
-test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجعة كلِّها', () => {
+test('طلبُ سماعٍ يسقط لا يُبطل الحكمَ إلا إن بقي صوتُه بلا سماع', () => {
   /*
-   * فمقطعٌ لم يصل يترك ثقبًا في ما سُمع، والمقابلةُ تقرأ الثقبَ إسقاطًا: كلماتٌ
-   * قرأها الطالبُ صحيحةً تُعلَّم «لم تُسمع» ويُنبَّه عليها بصوت. وكان الشرطُ مقصورًا
-   * على أسماءٍ بعينها، فيبقى البابُ مفتوحًا بعد عطبِ شبكةٍ أو 502 أو تجاوزِ حدّ.
+   * فمقطعٌ لم يُسمع يترك ثقبًا في ما سُمع، والمقابلةُ تقرأ الثقبَ إسقاطًا: كلماتٌ قرأها الطالبُ صحيحةً
+   * تُعلَّم «لم تُسمع» ويُنبَّه عليها بصوت. لكنّ طلبًا سقط لا يترك ثقبًا بنفسه منذ نافذة اللحاق (#282):
+   * آخرُ مُثبَّتٍ لم يتقدّم به، والنافذةُ التالية تبدأ قبله فتعيد صوتَه. قِيس على الموقع بعد النشر:
+   * مهلةٌ واحدةٌ أبطلت محاولةً كاملة، وقد سمعت النافذةُ التالية كلَّ ما فاتها (بدأت من الصفر).
+   * فالإبطالُ للثقب الحقيقيّ: نافذةٌ تبدأ بعد آخر مُثبَّت، أو المقطعُ الأخير، أو علّةٌ بنيويّة، أو طلبٌ
+   * سقط ولم تُعِده نافذةٌ قبل الخاتمة.
    */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   const start = screen.indexOf('await submitPracticeRecognitionChunk(');
   const failure = screen.slice(screen.indexOf('}, error => {', start), screen.indexOf('rec.start(CHUNK_MS)'));
+  /* السقوطُ العابرُ ينتظر النافذةَ التالية — إلا المقطعَ الأخير والعلّةَ البنيويّة. */
+  const transient = failure.indexOf('if (!structural && !finalChunk) {');
   const kill = failure.indexOf('attemptJudging.current = null;');
-  const conditional = failure.indexOf('if (/NOT_CONFIGURED');
-  assert.ok(kill > 0, 'سقوطُ مقطعٍ لا يُبطل الحكم');
-  assert.ok(conditional < 0 || kill < conditional, 'الإبطالُ مشروطٌ بأسماء علّةٍ بعينها');
+  assert.ok(transient > 0, 'كلُّ سقوطٍ يُبطل الحكمَ وإن أعادت النافذةُ التالية صوتَه');
+  assert.ok(kill > transient, 'السقوطُ العابرُ لا ينتظر النافذةَ التالية');
+  assert.match(failure, /const structural = \/GATE_CHANGED\|NOT_CONFIGURED\|JUDGING_CLOSED\|MISMATCH\|MODEL_NOT_BENCHMARKED\/\.test\(code\);/, 'العلّةُ البنيويّةُ تُعامَل عابرة');
+  assert.match(failure.slice(transient, kill), /if \(unheardSince\.current === null\) unheardSince\.current = committedUntil\.current;\s*\n\s*return;/, 'السقوطُ العابرُ لا يُحفظ حدُّ ما لم يُسمع');
   assert.match(failure, /const changed = \/GATE_CHANGED\/\.test\(code\);\s*\n\s*setJudgingLost\(changed \? 'changed' : true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
   /* وتبدّلٌ كشفه الخادمُ تُسأل بعده البوّابةُ الجديدة — ولا تبقى القديمةُ تُلتقط للمحاولة التالية. */
   const serverChanged = failure.slice(failure.indexOf("if (code === 'QURAN_ASR_GATE_CHANGED')"));
   assert.ok(failure.includes("if (code === 'QURAN_ASR_GATE_CHANGED')"), 'تبدّلُ الخادم لا يُعالج');
   assert.match(serverChanged.slice(0, 300), /judgingRef\.current = null;[\s\S]*fetchPracticeJudgingGate\(/, 'البوّابةُ القديمةُ تبقى بعد تبدّلٍ كشفه الخادم');
-  /* وجوابٌ ببوّابةٍ تبدّلت يُرمى قبل أن يُكتب منه شيء — فيبلغ هذا الإبطال. */
+  /* والنافذةُ التي تبدأ بعد آخر مُثبَّت ثقبٌ يُبطل الحكم — ويبقى التتبّعُ بها؛ وغيرُها يمحو الانتظار. */
   const task = screen.slice(start, screen.indexOf('}, error => {', start));
+  assert.match(task, /const hole = !!permission && leavesHole\(reach\.startMs, committedUntil\.current\);\s*\n\s*if \(hole\) \{\s*\n\s*attemptJudging\.current = null;\s*\n\s*setMistakes\(undefined\);\s*\n\s*setJudgingLost\(true\);/, 'الثقبُ لا يُبطل الحكم');
+  assert.ok(task.indexOf('unheardSince.current = null;') > task.indexOf('const hole ='), 'النافذةُ التالية لا تمحو انتظارَ ما سقط');
+  /* وجوابٌ ببوّابةٍ تبدّلت يُرمى قبل أن يُكتب منه شيء — فيبلغ هذا الإبطال. */
   const check = task.indexOf('if (!answerKeepsPermission(permission, out))');
   assert.ok(check > 0, 'جوابٌ ببوّابةٍ تبدّلت يُقبل');
-  /* (وفرعُ التتبّع بلا إذن يكتب قبله ويعود — فالمحكومُ ما بعده.) */
-  const judged = task.indexOf('return;', task.indexOf('if (!permission) {'));
+  const judged = task.indexOf('return;', task.indexOf('if (!permission || hole) {'));
   assert.ok(check < task.indexOf('heardWords.current = keepFaceEntry([', judged), 'يُكتب ما سُمع قبل فحص البوّابة');
   assert.match(task.slice(check, check + 400), /throw new Error\('QURAN_JUDGING_GATE_CHANGED'\)/, 'التبدّلُ لا يُبطل المحاولة');
   assert.equal(failure.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
+  /* وفي الخاتمة: طلبٌ سقط ولم تُعِده نافذةٌ بعده — لا حكم. */
+  const finish = screen.slice(screen.indexOf('const finish = useCallback'), screen.indexOf('const permission = attemptJudging.current;', screen.indexOf('const finish = useCallback')));
+  assert.match(finish, /if \(attemptJudging\.current && unheardSince\.current !== null\) \{\s*\n\s*attemptJudging\.current = null;[\s\S]*?setJudgingLost\(true\);/, 'سقوطٌ لم تُعِده نافذةٌ يُحكم معه');
 });
