@@ -264,7 +264,8 @@ const avail = (rec, mode) => runs.filter(r => r.recording === rec && r.mode === 
 const heroOf = spec => {
   const list = (Array.isArray(spec) ? spec : [spec]).map(byLabel).filter(Boolean);
   if (list.length < 2) return list[0] || null;
-  const med = xs => { const v = xs.filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor((v.length - 1) / 2)] : null; };
+  /* الوسيطُ الحقّ: في العدد الزوجيّ متوسّطُ الأوسطين — لا أصغرُهما، فلا يُحابي جانبًا بعدد جولاته. */
+  const med = xs => { const v = xs.filter(x => x != null).sort((a, b) => a - b); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
   return { ...list[0], summary: Object.fromEntries(Object.keys(list[0].summary).map(k => [k, med(list.map(r => r.summary[k]))])) };
 };
 const heroBefore = heroOf(DATA.hero && DATA.hero.before), heroAfter = heroOf(DATA.hero && DATA.hero.after);
