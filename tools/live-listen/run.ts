@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import pw from 'playwright';
+import { parseArgs } from './args';
 import { RECORDER } from './recorder';
 import { buildRecitation, parseRange, type Recitation } from './recitation';
 
@@ -32,22 +33,13 @@ export interface LiveRun {
   report: string | null;
 }
 
-function args(argv: string[]) {
-  const out: Record<string, string> = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    if (!argv[i].startsWith('--')) continue;
-    const key = argv[i].slice(2);
-    const next = argv[i + 1];
-    out[key] = next && !next.startsWith('--') ? (i += 1, next) : 'true';
-  }
-  return out;
-}
+const ARGS = ['journey', 'base', 'page', 'range', 'pad', 'mode', 'label', 'out', 'cache', 'shots', 'seconds'] as const;
 
 const CHROME = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined);
 const race = <T>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), ms))]);
 
 async function main() {
-  const a = args(process.argv.slice(2));
+  const a = parseArgs(process.argv.slice(2), ARGS);
   const journey = a.journey || process.env.MIZAN_LIVE_JOURNEY;
   if (!journey) throw new Error('JOURNEY_REQUIRED: pass --journey "<https://…/#journey?comp=…&key=…>" or set MIZAN_LIVE_JOURNEY');
   const url = new URL(journey);
@@ -56,6 +48,7 @@ async function main() {
   if (!comp || !key) throw new Error('JOURNEY_INVALID: the link must carry comp= and key=');
   const origin = (a.base || url.origin).replace(/\/$/, '');
   const page = Number(a.page || 532);
+  if (a.mode && a.mode !== 'normal' && a.mode !== 'veil') throw new Error(`MODE_INVALID «${a.mode}»: normal or veil`);
   const mode = (a.mode === 'veil' ? 'veil' : 'normal') as 'normal' | 'veil';
   const label = a.label || `${mode}-${page}-${Date.now()}`;
   const outDir = path.resolve(a.out || 'tools/live-listen/out');
@@ -64,7 +57,7 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   if (shots) fs.mkdirSync(shots, { recursive: true });
 
-  const recitation = await buildRecitation({ ...parseRange(a.range || '55:19-41'), padSeconds: Number(a.pad || 120), cacheDir });
+  const recitation = await buildRecitation({ segments: parseRange(a.range || '55:19-41'), padSeconds: Number(a.pad || 120), cacheDir });
   const reciteMs = Number(a.seconds || 0) * 1000 || recitation.totalMs;
   const headers = { 'x-mizan-competition-id': comp, 'x-mizan-journey-key': key, accept: 'application/json' };
   const context = await (await fetch(`${origin}/api/public/journeys/practice/context`, { method: 'POST', headers })).json() as { deliveryReading: string; owner: string };

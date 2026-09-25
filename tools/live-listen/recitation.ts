@@ -24,6 +24,8 @@ export interface TimedWord {
 }
 
 export interface Recitation {
+  /** «55:19-41»، أو قطعٌ متتالية «54:50-55,55:1-18» لوجهٍ يعبر سورتين. */
+  range: string;
   surah: number;
   fromAyah: number;
   toAyah: number;
@@ -33,13 +35,12 @@ export interface Recitation {
   speechMs: number;
   totalMs: number;
   words: TimedWord[];
-  ayahs: { ayah: number; startMs: number; durMs: number }[];
+  ayahs: { surah: number; ayah: number; startMs: number; durMs: number }[];
 }
 
 export interface RecitationSpec {
-  surah: number;
-  fromAyah: number;
-  toAyah: number;
+  /** قطعُ التلاوة بترتيبها — وأكثرُ من قطعةٍ لوجهٍ يعبر سورتين. */
+  segments: { surah: number; fromAyah: number; toAyah: number }[];
   /** مجلّد القارئ في EveryAyah. */
   everyAyahFolder?: string;
   /** رقمُ التلاوة نفسها في Quran.com (العفاسي: 7). */
@@ -97,51 +98,63 @@ export async function buildRecitation(spec: RecitationSpec): Promise<Recitation>
   const padSeconds = spec.padSeconds ?? 120;
   const dir = path.resolve(spec.cacheDir, folder);
   fs.mkdirSync(dir, { recursive: true });
+  if (!spec.segments.length) throw new Error('RANGE_EMPTY');
 
-  const files: { ayah: number; file: string; durMs: number }[] = [];
-  for (let ayah = spec.fromAyah; ayah <= spec.toAyah; ayah += 1) {
-    const name = `${pad3(spec.surah)}${pad3(ayah)}.mp3`;
-    const file = path.join(dir, name);
-    await download(`https://everyayah.com/data/${folder}/${name}`, file);
-    files.push({ ayah, file, durMs: durationMs(file) });
+  const files: { surah: number; ayah: number; file: string; durMs: number }[] = [];
+  for (const seg of spec.segments) {
+    for (let ayah = seg.fromAyah; ayah <= seg.toAyah; ayah += 1) {
+      const name = `${pad3(seg.surah)}${pad3(ayah)}.mp3`;
+      const file = path.join(dir, name);
+      await download(`https://everyayah.com/data/${folder}/${name}`, file);
+      files.push({ surah: seg.surah, ayah, file, durMs: durationMs(file) });
+    }
   }
 
-  const verses = await quranComVerses(spec.surah, recitation);
-  const byAyah = new Map(verses.map(v => [v.verse_number, v]));
-  await verifySameAudio(byAyah.get(spec.fromAyah)!, files[0].file, dir);
+  const bySurah = new Map<number, Map<number, QuranComVerse>>();
+  for (const surah of new Set(spec.segments.map(s => s.surah))) {
+    bySurah.set(surah, new Map((await quranComVerses(surah, recitation)).map(v => [v.verse_number, v])));
+  }
+  await verifySameAudio(bySurah.get(files[0].surah)!.get(files[0].ayah)!, files[0].file, dir);
 
   const words: TimedWord[] = [];
   const ayahs: Recitation['ayahs'] = [];
   let at = 0;
-  for (const { ayah, durMs } of files) {
-    ayahs.push({ ayah, startMs: at, durMs });
-    const verse = byAyah.get(ayah);
-    if (!verse?.audio) throw new Error(`QURAN_COM_NO_SEGMENTS ${spec.surah}:${ayah}`);
+  for (const { surah, ayah, durMs } of files) {
+    ayahs.push({ surah, ayah, startMs: at, durMs });
+    const verse = bySurah.get(surah)?.get(ayah);
+    if (!verse?.audio) throw new Error(`QURAN_COM_NO_SEGMENTS ${surah}:${ayah}`);
     const texts = verse.words.filter(w => w.char_type_name === 'word').map(w => w.text_uthmani);
     /* المقطع: [فهرسٌ من صفر، موضعٌ من واحد، بدايةٌ، نهايةٌ] بالملّي ثانية داخل الآية. */
     for (const seg of verse.audio.segments) {
       const pos = seg[1];
       if (!pos || !texts[pos - 1]) continue;
-      words.push({ surah: spec.surah, ayah, pos, text: texts[pos - 1], startMs: at + seg[2], endMs: at + seg[3] });
+      words.push({ surah, ayah, pos, text: texts[pos - 1], startMs: at + seg[2], endMs: at + seg[3] });
     }
     at += durMs;
   }
 
-  const list = path.join(dir, `list-${spec.surah}-${spec.fromAyah}-${spec.toAyah}.txt`);
+  const range = formatRange(spec.segments);
+  const key = range.replace(/[^0-9]+/g, '-');
+  const list = path.join(dir, `list-${key}.txt`);
   fs.writeFileSync(list, files.map(f => `file '${f.file}'`).join('\n'));
-  const wav = path.join(dir, `recitation-${spec.surah}-${spec.fromAyah}-${spec.toAyah}-pad${padSeconds}.wav`);
+  const wav = path.join(dir, `recitation-${key}-pad${padSeconds}.wav`);
   if (!fs.existsSync(wav)) {
     execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-af', `apad=pad_dur=${padSeconds}`, '-ac', '1', '-ar', '48000', wav]);
   }
+  const first = spec.segments[0], last = spec.segments[spec.segments.length - 1];
   return {
-    surah: spec.surah, fromAyah: spec.fromAyah, toAyah: spec.toAyah, reciter: folder,
+    range, surah: first.surah, fromAyah: first.fromAyah, toAyah: last.toAyah, reciter: folder,
     wav: path.resolve(wav), speechMs: at, totalMs: durationMs(wav), words, ayahs,
   };
 }
 
-/** «55:19-41» → سورة ومن آية وإلى آية. */
-export function parseRange(range: string): { surah: number; fromAyah: number; toAyah: number } {
-  const m = /^(\d+):(\d+)-(\d+)$/.exec(range.trim());
-  if (!m) throw new Error(`RANGE_INVALID ${range} (expected surah:from-to, e.g. 55:19-41)`);
-  return { surah: Number(m[1]), fromAyah: Number(m[2]), toAyah: Number(m[3]) };
+export const formatRange = (segments: RecitationSpec['segments']) => segments.map(s => `${s.surah}:${s.fromAyah}-${s.toAyah}`).join(',');
+
+/** «55:19-41» أو «54:50-55,55:1-18» → قطعُ التلاوة بترتيبها. */
+export function parseRange(range: string): RecitationSpec['segments'] {
+  return range.split(',').map(part => {
+    const m = /^(\d+):(\d+)-(\d+)$/.exec(part.trim());
+    if (!m) throw new Error(`RANGE_INVALID ${range} (expected surah:from-to[,surah:from-to], e.g. 55:19-41 or 54:50-55,55:1-18)`);
+    return { surah: Number(m[1]), fromAyah: Number(m[2]), toAyah: Number(m[3]) };
+  });
 }

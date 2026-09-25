@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { analyzeRun, median, quantile, similarity } from '../tools/live-listen/analyze';
+import { parseArgs } from '../tools/live-listen/args';
+import { formatRange, parseRange } from '../tools/live-listen/recitation';
 import type { LiveRun } from '../tools/live-listen/run';
 
 /* تلاوةٌ من ثلاث كلمات، والملفُّ يبدأ صوتُه عند ٣٠ ملّي ثانية. */
@@ -22,7 +24,7 @@ const at = (sec: number) => ONSET - 30 + sec * 1000; // زمنُ الصفحة ل
 function run(mode: 'normal' | 'veil', trans: [number, number, string][], net: LiveRun['net'] = []): LiveRun {
   return {
     meta: { label: `t-${mode}`, mode, page: 532, origin: 'https://example', build: 'abc', startedAt: '', bundles: [] },
-    recitation: { surah: 55, fromAyah: 19, toAyah: 19, reciter: 'x', speechMs: 5200, totalMs: 9000, words, ayahs: [] },
+    recitation: { range: '55:19-19', surah: 55, fromAyah: 19, toAyah: 19, reciter: 'x', speechMs: 5200, totalMs: 9000, words, ayahs: [] },
     faceWords: words.map((w, index) => ({ index, text: w.text, surah: 55, ayah: 19, ayahWordIndex: w.pos, endsAyah: index === 2 })),
     rec: { gum: ONSET - 100, onset: ONSET, trans }, clickAt: ONSET - 400, net, report: null,
   };
@@ -79,4 +81,19 @@ test('helpers', () => {
   assert.equal(similarity('يلتقيان', 'يلتقيان'), 1);
   assert.ok(similarity('تكذبان', 'تكذبا') > 0.8);
   assert.equal(similarity('', 'x'), 0);
+});
+
+test('a recording can span two surahs, the way a face does', () => {
+  assert.deepEqual(parseRange('54:50-55,55:1-18'), [{ surah: 54, fromAyah: 50, toAyah: 55 }, { surah: 55, fromAyah: 1, toAyah: 18 }]);
+  assert.equal(formatRange(parseRange(' 55:19-41 ')), '55:19-41');
+  assert.throws(() => parseRange('55:19'), /RANGE_INVALID/);
+});
+
+test('an argument the tool does not know stops the run — «--base URL» passed as one word is not ignored', () => {
+  const known = ['base', 'page', 'shots'];
+  assert.deepEqual(parseArgs(['--page', '531', '--base', 'http://127.0.0.1:5615', '--shots'], known),
+    { page: '531', base: 'http://127.0.0.1:5615', shots: 'true' });
+  assert.throws(() => parseArgs(['--base http://127.0.0.1:5614', '--page', '532'], known), /UNKNOWN_ARG.*one word/);
+  assert.throws(() => parseArgs(['--bsae', 'http://x'], known), /UNKNOWN_ARG «--bsae»/);
+  assert.throws(() => parseArgs(['532'], known), /UNKNOWN_ARG «532»/);
 });
