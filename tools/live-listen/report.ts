@@ -22,7 +22,7 @@ export function buildReport(config: ReportConfig, base: string): string {
     const { recitation: r } = result;
     return {
       label: result.label, name: entry.name, note: entry.note ?? '', side: entry.side ?? null, color: entry.color ?? 1,
-      mode: result.mode, recording: `${r.surah}:${r.fromAyah}-${r.toAyah}`, build: result.build,
+      mode: result.mode, recording: r.range, build: result.build,
       words: result.words, lag: result.lag, summary: result.summary,
     };
   });

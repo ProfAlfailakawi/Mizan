@@ -53,7 +53,7 @@ export interface RunResult {
   build: string | null;
   origin: string;
   bundles: string[];
-  recitation: { surah: number; fromAyah: number; toAyah: number; speechMs: number; totalMs: number };
+  recitation: { range: string; surah: number; fromAyah: number; toAyah: number; speechMs: number; totalMs: number };
   words: WordResult[];
   lag: LagPoint[];
   summary: RunSummary;
@@ -150,7 +150,7 @@ export function analyzeRun(run: LiveRun): RunResult {
   const r1 = (v: number | null) => (v === null ? null : round(v, 1));
   return {
     label: run.meta.label, mode: run.meta.mode, build: run.meta.build, origin: run.meta.origin, bundles: run.meta.bundles,
-    recitation: { surah: recitation.surah, fromAyah: recitation.fromAyah, toAyah: recitation.toAyah, speechMs: recitation.speechMs, totalMs: recitation.totalMs },
+    recitation: { range: recitation.range ?? `${recitation.surah}:${recitation.fromAyah}-${recitation.toAyah}`, surah: recitation.surah, fromAyah: recitation.fromAyah, toAyah: recitation.toAyah, speechMs: recitation.speechMs, totalMs: recitation.totalMs },
     words, lag,
     summary: {
       said: said.length, shown: delays.length,

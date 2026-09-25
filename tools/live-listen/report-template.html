@@ -269,15 +269,22 @@ function head() {
   const v = $('#verdict'); v.replaceChildren();
   if (!heroBefore || !heroAfter) return;
   const b = heroBefore.summary, a = heroAfter.summary;
-  v.append(el('div', { class: 'eyebrow', text: DATA.hero.label || 'تأخّر الإشارة إلى الكلمة بعد نطقها — الوسيط' }));
+  /* الرقمُ الأوّل يختاره الإعداد: كم كلمةً تابعها ميزان، أو تأخّرُ الإشارة، أو تأخّرُ السماع. */
+  const metric = DATA.hero.metric || 'delayMedian';
+  const words = metric === 'shown';
+  v.append(el('div', { class: 'eyebrow', text: DATA.hero.label || (words ? 'كلماتٌ تابعها ميزان على الوجه' : 'تأخّر الإشارة إلى الكلمة بعد نطقها — الوسيط') }));
   const h = el('div', { class: 'hero' });
-  h.append(el('span', { class: 'from num', text: fmt(b.delayMedian) + ' ث' }), el('span', { class: 'arrow', text: '←' }), el('span', { class: 'to', text: fmt(a.delayMedian) }), el('span', { class: 'unit', text: 'ثانية' }));
+  h.append(el('span', { class: 'from num', text: words ? String(b.shown) : fmt(b[metric]) + ' ث' }), el('span', { class: 'arrow', text: '←' }), el('span', { class: 'to', text: words ? String(a.shown) : fmt(a[metric]) }), el('span', { class: 'unit', text: words ? `من ${a.said} كلمةً قيلت` : 'ثانية' }));
   v.append(h, el('div', { class: 'hero-cap', text: DATA.hero.caption || `من «${heroBefore.name}» إلى «${heroAfter.name}» على التسجيل نفسه.` }));
   const tiles = $('#tiles'); tiles.replaceChildren();
   const tile = (k, from, to, d) => { const n = el('div', { class: 'v num' }); n.append(el('s', { text: from }), to); return el('div', { class: 'tile' }, el('div', { class: 'k', text: k }), n, el('div', { class: 'd', text: d })); };
   tiles.append(
-    tile('تأخّر السماع عن القارئ · الوسيط', fmt(b.lagMedian) + ' ث', fmt(a.lagMedian) + ' ث', `وفي أوّل نصف دقيقة ${fmt(a.lagFirst30)} ث`),
-    tile('أبطأُ ١٠٪ من الكلمات', fmt(b.delayP90) + ' ث', fmt(a.delayP90) + ' ث', 'تأخّر الإشارة عند المئين التسعين'),
+    words
+      ? tile('تأخّر الإشارة بعد النطق · الوسيط', fmt(b.delayMedian) + ' ث', fmt(a.delayMedian) + ' ث', `وأبطأُ ١٠٪: ${fmt(a.delayP90)} ث`)
+      : tile('تأخّر السماع عن القارئ · الوسيط', fmt(b.lagMedian) + ' ث', fmt(a.lagMedian) + ' ث', `وفي أوّل نصف دقيقة ${fmt(a.lagFirst30)} ث`),
+    words
+      ? tile('تأخّر السماع عن القارئ · الوسيط', fmt(b.lagMedian) + ' ث', fmt(a.lagMedian) + ' ث', `وأبطؤه (p90): ${fmt(a.lagP90)} ث`)
+      : tile('أبطأُ ١٠٪ من الكلمات', fmt(b.delayP90) + ' ث', fmt(a.delayP90) + ' ث', 'تأخّر الإشارة عند المئين التسعين'),
     tile('كلماتٌ ظهرت قبل نطقها', String(b.early), String(a.early), a.early ? `أبعدُها ${fmt(a.earliest)} ث قبل النطق` : 'لا كلمةَ تسبق القارئ'),
     tile('صحيحةٌ انتهت حمراء', String(b.wrongRed), String(a.wrongRed), `من ${a.said} كلمةً قيلت على الوجه`),
   );
