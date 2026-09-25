@@ -22,10 +22,23 @@ const TYPES: Record<string, string> = {
 };
 /* ما لا يُمرَّر: رؤوسُ الاتّصال، ومصدرُ الصفحة المحلّيّة (فالخادم يرى طلبًا من غير متصفّحٍ على نطاقه). */
 const HOP = new Set(['host', 'connection', 'content-length', 'accept-encoding', 'origin', 'referer']);
+/*
+ * وحقنُ سقوطٍ لقياس المتانة: `MIZAN_FAIL_RECOGNISE=3,7` يُسقط طلبَ الكلمات الثالثَ والسابع كما يسقط في
+ * الإنتاج حين تنقضي مهلةُ المستمع — بالجواب نفسه (٤٠٠ ورمزُه) — ولا يُمرَّر. فيُقاس ما تفعله الصفحةُ بطلبٍ سقط.
+ */
+const FAIL = new Set(String(process.env.MIZAN_FAIL_RECOGNISE || '').split(',').map(Number).filter(n => n > 0));
+let recognised = 0;
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://local');
   if (url.pathname.startsWith('/api/')) {
+    if (/practice\/recognise$/.test(url.pathname) && FAIL.has(++recognised)) {
+      for await (const _ of req) { /* يُقرأ الطلبُ ويُطرح */ }
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ code: 'The operation was aborted due to timeout' }));
+      console.log(`failed recognise #${recognised} on purpose`);
+      return;
+    }
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
     const headers: Record<string, string> = {};
