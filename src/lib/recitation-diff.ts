@@ -97,6 +97,22 @@ export interface RecitationDiff {
 type Op = 'match' | 'sub' | 'del' | 'ins';
 
 /*
+ * «يا» تُكتب في المصحف موصولةً بما بعدها، ويكتبها المحرّكُ منفصلة.
+ *
+ * «يَٰٓأَيُّهَا»، «يَٰقَوْمِ»، «يَٰمَعْشَرَ»: كلمةٌ واحدةٌ في الرسم، وكلمتان في الهجاء المعتاد («يا أيها»).
+ * وفي حفصٍ ٣٤٩ كلمةً من هذا في ٣٤٧ آية (٥٫٦٪)، ولا «يا» مفردةً فيه البتّة. فكانت المقابلةُ تعدّ
+ * «يا» زائدة و«معشر» غيرَ «يَٰمَعْشَرَ» — فيُخطَّأ القارئُ في كلّ نداء. قِيس في متصفّحٍ حقيقيّ على
+ * الرحمن ٣٣: سمع المحرّكُ «يَا مَعْشَرَ» صحيحةً، فعُلّمت الكلمةُ «سُمع غيرُها».
+ *
+ * فيُقابَل بكلمة الوجه الواحدة ما سُمع كلمتين أولاهما «يا» (أو «ها» كـ«هَٰٓأَنتُمْ»)، إذا طابق
+ * المجموعُ الكلمةَ. ولا يُفرض الوصلُ: هو طريقٌ في المحاذاة يُسلك حين يُطابق وحده.
+ */
+const JOINED_PREFIXES = new Set(['يا', 'ها']);
+function joinsInto(expected: ExpectedWord, first: HeardWord, second: HeardWord): boolean {
+  return JOINED_PREFIXES.has(quranSkeleton(first.text)) && sameWord(expected.text, `${first.text}${second.text}`);
+}
+
+/*
  * محاذاةُ تتابعين بأقلّ تحرير (Needleman–Wunsch).
  *
  * والمطابقةُ بالهيكل لا بالنصّ الخام: المحرّكُ الصوتيّ يكتب بهجائه هو، فمقابلةُ
@@ -120,7 +136,7 @@ function align(
   expected: readonly ExpectedWord[],
   heard: readonly HeardWord[],
   freeTail = false,
-): { op: Op; e?: number; h?: number }[] {
+): { op: Op; e?: number; h?: number; joined?: boolean }[] {
   const n = expected.length, m = heard.length;
   const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = 0; i <= n; i += 1) cost[i][0] = i;
@@ -129,9 +145,10 @@ function align(
     for (let j = 1; j <= m; j += 1) {
       const hit = sameWord(expected[i - 1].text, heard[j - 1].text) ? 0 : 1;
       cost[i][j] = Math.min(cost[i - 1][j - 1] + hit, cost[i - 1][j] + 1, cost[i][j - 1] + 1);
+      if (j >= 2 && joinsInto(expected[i - 1], heard[j - 2], heard[j - 1])) cost[i][j] = Math.min(cost[i][j], cost[i - 1][j - 2]);
     }
   }
-  const trail: { op: Op; e?: number; h?: number }[] = [];
+  const trail: { op: Op; e?: number; h?: number; joined?: boolean }[] = [];
   /*
    * وبدايةُ التتبّع هي موضعُ الحسم: من آخر المنتظَر حين يُحاسب الذيل، ومن أرخص
    * موضعٍ في العمود الأخير حين لا يُحاسب — وهو أطولُ بدايةٍ فُسِّرت بما سُمع.
@@ -140,6 +157,10 @@ function align(
   if (freeTail) { for (let k = 0; k <= n; k += 1) if (cost[k][m] < cost[i][m]) i = k; }
   let j = m;
   while (i > 0 || j > 0) {
+    if (i > 0 && j >= 2 && cost[i][j] === cost[i - 1][j - 2] && joinsInto(expected[i - 1], heard[j - 2], heard[j - 1])) {
+      trail.push({ op: 'match', e: i - 1, h: j - 1, joined: true });
+      i -= 1; j -= 2; continue;
+    }
     if (i > 0 && j > 0) {
       const hit = sameWord(expected[i - 1].text, heard[j - 1].text) ? 0 : 1;
       if (cost[i][j] === cost[i - 1][j - 1] + hit) {
@@ -183,7 +204,8 @@ export function diffRecitation(
       /* والعتبةُ تُطبَّق قبل العدّ: مطابقةٌ لم يجزم بها المحرّكُ ليست تثبيتًا. */
       if (Number.isFinite(h.confidence) && h.confidence >= opts.minConfidence) matched += 1;
       else uncertain += 1;
-      if (!opts.detectTashkeel) continue;
+      /* والموصولةُ («يا» + كلمة) رسمُها غيرُ هجائها بالضرورة، فلا يُسأل فيها عن حركة. */
+      if (!opts.detectTashkeel || step.joined) continue;
       /* الكلمةُ ثبتت، فبقي سؤالُ الحركة — وهو أضعفُ حكمًا فيُحطّ. */
       if (quranVoweled(e.text) !== quranVoweled(h.text)) {
         keep({ kind: 'tashkeel', wordIndex: e.index, expected: e.text, heard: h.text, confidence: h.confidence || 0 });
