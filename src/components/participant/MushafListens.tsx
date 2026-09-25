@@ -1045,7 +1045,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
      * ويُنتظر طابورُ السماع **حكمًا كان أو تتبّعًا**: فالتقريرُ و«المعلّم» يقرآن ما سُمع،
      * وذيلٌ لم يصل يسقط منهما. وما لم يفرغ في مهلته يُترك، فلا يحرّك القلمَ بعد التقرير.
      */
-    if ((attemptJudging.current || wordFollow.current) && !(await recognition.current.drain())) {
+    /*
+     * والسقوطُ لا يُعدّ هنا: طلبٌ سقط تعيد النافذةُ التالية صوتَه، وما لم تُعِده يحرسه `unheardSince` والثقب.
+     * قِيس بسقوطٍ مقصود: عُدّ السقوطُ هنا فأُبطل حكمُ محاولةٍ سُمع صوتُها كلُّه. فيُسأل عن المهلة وحدها.
+     */
+    if ((attemptJudging.current || wordFollow.current) && !(await recognition.current.drain(undefined, false))) {
       /*
        * ويُترك الطابورُ لا الإذنُ وحده: فالمهمّةُ الجاريةُ التقطت إذنَها قبل أن تنتظر،
        * فإن عاد جوابُها بعد المهلة كتب أخطاءً ونغّم بعد أن قيل للطالب «لم يُحكم».
