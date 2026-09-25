@@ -63,6 +63,7 @@ const NOT_FOR_OPERATORS: Record<string, string> = {
   MIZAN_LEGAL_VERIFY_ATTEMPTS: 'عددُ محاولاتِ الوصول في `verify:legal-publication` — ضبطٌ لأداة الفحص، لا يقرؤه المنتج.',
   MIZAN_LEGAL_VERIFY_TIMEOUT_MS: 'مهلةُ كلّ محاولةٍ فيها — مثلُه.',
   MIZAN_KFGQPC_MIRROR_ROOT: 'موضعُ نسخة مرآة المجمّع على قرص من يُشغّل `quran:mirror-freeze` مرّةً ليولّد الأثر المجمَّد. أداةُ تجميدٍ تُشغَّل يدويًّا، لا يقرؤها المنتج في نشرة — وما يقرؤه هو `MIZAN_KFGQPC_MIRROR_SOURCE_ROOT` المذكورة في المثال.',
+  MIZAN_LIVE_JOURNEY: 'رابطُ بطاقة رحلة متسابقٍ معتمَد تقيس به `qa:live-listen` «يسمعك» على الموقع الحيّ. أداةُ قياسٍ تُشغَّل بيد، لا يقرؤها المنتج في نشرة — والرابطُ سرٌّ يفتح رحلة متسابق، فلا يُكتب في مثالٍ ولا مستودع.',
 };
 
 const EXAMPLE = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');

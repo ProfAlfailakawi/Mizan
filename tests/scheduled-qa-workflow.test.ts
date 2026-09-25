@@ -40,6 +40,8 @@ const NOT_SCHEDULED: Record<string, string> = {
     'يعمل في كل دفعة ضمن `ci.yml` على المحاكي؛ جدولتُه مرّةً أخرى تكرارٌ بلا فائدة.',
   'qa:seed-public':
     'خطوةٌ داخل `qa:public-registration` لا فحصٌ بذاته: يزرع مسابقةً منشورةً على المحاكي قبل أن يبدأ الفحص، ويرفض العملَ بلا `FIRESTORE_EMULATOR_HOST`.',
+  'qa:live-listen':
+    'قياسٌ لا فحصٌ ينجح أو يسقط: تلاوةٌ حقيقيّةٌ في كروم بميكروفونٍ وهميّ على الموقع الحيّ وبمستمعه، تحتاج رابطَ رحلةِ متسابقٍ معتمَد (سرّ) وتشغل المستمعَ الإنتاجيّ ستَّ دقائق — تُشغَّل بيدٍ قبل دمج تعديلٍ في السماع وبعده.',
 };
 
 test('the scan sees the workflows and the scripts — an empty list proves nothing', () => {
