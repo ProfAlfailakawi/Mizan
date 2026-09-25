@@ -115,6 +115,24 @@ export function credibleFrontier(mistakes: readonly Mistake[], raw: number, prev
   return floor;
 }
 
+/*
+ * وقبل أن يثبت دخولُ الوجه لا يُحفظ من المسموع إلا آخرُه.
+ *
+ * فمن بدأ قبل الوجه (أوّلُ السورة، أو وجهٌ سابقٌ يصل به) حُسب كلُّ ما قاله مسموعًا يُقابَل بالوجه:
+ * ستّون كلمةً من خارجه، فيها لوازمُ تطابق لوازمه، تُحاذى على أوّل كلماته فتصير فجواتٍ، ولا يُقبل
+ * الدخولُ إلا بسلسلة ستّ كلماتٍ صحيحة. قِيس في ٢٥ سبتمبر ٢٠٢٦ بتلاوةٍ من أوّل الرحمن على الوجه ٥٣٢:
+ * بلغ القارئُ الوجهَ ولم تتحرّك الجبهةُ ستًّا وأربعين ثانية. وما قيل قبل الوجه لا يدلّ على موضعٍ فيه.
+ *
+ * والدخولُ يثبت بكلمتين لا بكلمة: الجبهةُ على أوّل كلمةٍ تُقبل بمطابقةٍ واحدة (لا تنتظر الثانية)،
+ * فلو كان ذلك دخولًا لتوقّف التقليمُ على مطابقةٍ عابرة. والقفزةُ من الجبهة الفارغة ما زالت تحتاج
+ * سلسلتها — فلازمةٌ خارج الوجه لا تُدخل القارئَ إليه.
+ */
+export const PREFACE_WORDS = 24;
+
+export function keepFaceEntry<T>(heard: readonly T[], frontier: number): T[] {
+  return frontier < 1 && heard.length > PREFACE_WORDS ? heard.slice(-PREFACE_WORDS) : [...heard];
+}
+
 export function liveJudgment(
   expected: readonly ExpectedWord[],
   heard: readonly HeardWord[],

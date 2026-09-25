@@ -657,24 +657,27 @@ test('لكلّ مسارٍ طابورُه المرتَّب — وسقوطُ أح�
   assert.ok(begin.indexOf('navigator.mediaDevices.getUserMedia') > reset, 'الميكروفونُ يُفتح قبل ترك طابور السماع');
 });
 
-test('رقمُ المقطع يُقرأ تزامنيًّا، لا داخلَ المهمّة', () => {
+test('رقمُ المقطع وموضعُه يُقرآن تزامنيًّا، لا داخلَ المهمّة', () => {
   /*
    * فتوقيتُ الكلمة يعود مُسنَدًا إلى أوّل المقطع، ويُحتاج مُسنَدًا إلى أوّل التلاوة.
    * ولو قُرئ العدّادُ بعد انتظارٍ لقرأ رقمَ مقطعٍ آخر — فتُطرح كلماتٌ صحيحةٌ ويُبقى صدًى.
+   * والموضعُ يُقاس من المقطع نفسه (`timecode`) لا من رقمه: المقطعُ ليس ١٥٠٠ ملّي ثانيةٍ بالضبط.
    */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   const handler = screen.slice(screen.indexOf('rec.ondataavailable'), screen.indexOf('rec.start(CHUNK_MS)'));
-  const readsIndex = handler.indexOf('chunkIndex.current * CHUNK_MS');
+  const readsIndex = handler.indexOf('chunkClock.current?.add(index, (e as BlobEvent).timecode, performance.now())');
   const firstPush = handler.indexOf('queue.current.push(');
-  assert.ok(readsIndex > 0, 'لا يُحسب مبدأُ المقطع أصلًا');
-  assert.ok(readsIndex < firstPush, 'رقمُ المقطع يُقرأ بعد دخول الطابور');
+  assert.ok(readsIndex > 0, 'لا يُسجَّل موضعُ المقطع أصلًا');
+  assert.ok(readsIndex < firstPush, 'موضعُ المقطع يُسجَّل بعد دخول الطابور');
+  assert.ok(handler.indexOf('const index = chunkIndex.current;') < firstPush, 'رقمُ المقطع يُقرأ بعد دخول الطابور');
+  assert.match(screen, /chunkClock\.current = new ChunkTimeline\(performance\.now\(\)\);\s*rec\.start\(CHUNK_MS\);/, 'الساعةُ لا تبدأ مع التسجيل');
 });
 
 test('ما سُمع تحت نغمةٍ يُطرح قبل أن يُضاف — لا بعده', () => {
   /* وإلا حُكم على صدى النغمة، فنُبِّه عليه، فصُنعت نغمةٌ أخرى — دورةٌ لا تنتهي. */
   const screen = fs.readFileSync(path.resolve(process.cwd(), 'src/components/participant/MushafListens.tsx'), 'utf8');
   const drop = screen.indexOf('dropWordsUnderAlert(timed, alertWindows.current,');
-  const append = screen.indexOf('heardWords.current = [...heardWords.current, ...kept]');
+  const append = screen.indexOf('heardWords.current = keepFaceEntry([...heardWords.current, ...kept]');
   assert.ok(drop > 0 && append > 0, 'الطرحُ أو الإضافةُ غير موجودين');
   assert.ok(drop < append, 'الإضافةُ تسبق الطرح');
   assert.match(screen, /alertWindows\.current = \[\.\.\.alertWindows\.current, alertWindow\(now\)\]/, 'النغمةُ لا تُسجَّل نافذةً');
@@ -749,7 +752,7 @@ test('أيُّ مقطعِ سماعٍ يسقط يُبطل حكمَ المراجع
   assert.ok(check > 0, 'جوابٌ ببوّابةٍ تبدّلت يُقبل');
   /* (وفرعُ التتبّع بلا إذن يكتب قبله ويعود — فالمحكومُ ما بعده.) */
   const judged = task.indexOf('return;', task.indexOf('if (!permission) {'));
-  assert.ok(check < task.indexOf('heardWords.current = [', judged), 'يُكتب ما سُمع قبل فحص البوّابة');
+  assert.ok(check < task.indexOf('heardWords.current = keepFaceEntry([', judged), 'يُكتب ما سُمع قبل فحص البوّابة');
   assert.match(task.slice(check, check + 400), /throw new Error\('QURAN_JUDGING_GATE_CHANGED'\)/, 'التبدّلُ لا يُبطل المحاولة');
   assert.equal(failure.includes('stopAudio()'), false, 'سقوطُ السماع يُطفئ الميكروفون');
 });

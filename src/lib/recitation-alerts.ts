@@ -121,7 +121,15 @@ export interface TimedWord { text: string; confidence: number; startMs?: number;
  *
  * وكلمةٌ بلا توقيتٍ تُبقى: لا يُطرح ما لا يُعرف موضعُه من الزمن. ويُعدّ ذلك ليُعرف
  * أنّ الحارسَ لم ينطبق عليها.
+ *
+ * **ولا يُطرح إلا ما يمكن أن تصنعه النغمة**: لفظٌ لا يطول عنها وعن هامشيها، يقع نصفُه على الأقلّ
+ * في نافذتها. فقد كانت النافذةُ تطرح كلَّ كلمةٍ غريبةٍ تلمسها — ومنها كلماتٌ قرأها القارئُ فأخطأ
+ * المحرّكُ سماعَها («الثقلاء» للثقلان، و«يا معشر» مفصولةً لـ«يَٰمَعۡشَرَ»): فصار الإبدالُ «إسقاطًا»،
+ * والإسقاطُ فجوةً توقف الجبهة. قِيس في ٢٥ سبتمبر ٢٠٢٦ بإعادة إحدى عشرةَ جولةً حيّةً على أجوبة
+ * المستمع نفسها (مع التثبيت بالمنتصف): «أسقطتَ» الكاذبة ٨٧ ← ٥٠، والكلماتُ المتابَعة ١١٧٦ ← ١١٩٣.
  */
+export const ALERT_ECHO_MAX_MS = ALERT_TONE_MS + 2 * ALERT_ECHO_MARGIN_MS;
+
 export function dropWordsUnderAlert<T extends TimedWord>(
   words: readonly T[],
   windows: readonly SoundWindow[],
@@ -134,7 +142,9 @@ export function dropWordsUnderAlert<T extends TimedWord>(
     const start = word.startMs, end = word.endMs ?? word.startMs;
     if (start === undefined || end === undefined) { untimed += 1; kept.push(word); continue }
     const underTone = windows.some(w => start <= w.endMs && end >= w.startMs);
-    (underTone && !belongsToFace(word.text) ? dropped : kept).push(word);
+    const inside = windows.reduce((most, w) => Math.max(most, Math.min(end, w.endMs) - Math.max(start, w.startMs)), 0);
+    const toneMade = underTone && end - start <= ALERT_ECHO_MAX_MS && inside >= (end - start) / 2;
+    (toneMade && !belongsToFace(word.text) ? dropped : kept).push(word);
   }
   return { kept, dropped, untimed };
 }
