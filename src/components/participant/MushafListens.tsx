@@ -731,14 +731,17 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);
             if (!alive.current || !live()) return;
+            /* ما عولج من الصوت قبل هذه النافذة — والطلبُ الذي سقط لا يقدّمه. */
+            const heardUntil = coveredUntil.current;
             coveredUntil.current = Math.max(coveredUntil.current, reach.commitUntilMs);
             followFailures.current = 0;
             /*
-             * والطلبُ الذي سقط قبله لا يُبطل الحكمَ ما دامت هذه النافذةُ تبدأ قبل آخر مُثبَّت: فقد أعادت
+             * والطلبُ الذي سقط قبله لا يُبطل الحكمَ ما دامت هذه النافذةُ تبدأ قبل آخر ما عولج: فقد أعادت
              * صوتَه. أمّا نافذةٌ تبدأ بعده فقد تركت ما بينهما بلا سماع — سقط قبلها طلبٌ أو لم يسقط —
-             * فيُبطَل الحكمُ ويبقى التتبّع: النافذةُ نفسُها تحرّك القلم.
+             * فيُبطَل الحكمُ ويبقى التتبّع: النافذةُ نفسُها تحرّك القلم. (والحدُّ ما عولج لا آخرُ كلمةٍ ثُبّتت:
+             * في الصمت لا تُثبَّت كلمة، والصوتُ مسموعٌ — قِيس: صمتُ دقيقتين بعد التلاوة أبطل حكمَ جولةٍ كاملة.)
              */
-            const hole = !!permission && leavesHole(reach.startMs, committedUntil.current);
+            const hole = !!permission && leavesHole(reach.startMs, heardUntil);
             if (hole) {
               attemptJudging.current = null;
               setMistakes(undefined);
@@ -818,7 +821,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              */
             const structural = /GATE_CHANGED|NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH|MODEL_NOT_BENCHMARKED/.test(code);
             if (!structural && !finalChunk) {
-              if (unheardSince.current === null) unheardSince.current = committedUntil.current;
+              if (unheardSince.current === null) unheardSince.current = coveredUntil.current;
               return;
             }
             attemptJudging.current = null;

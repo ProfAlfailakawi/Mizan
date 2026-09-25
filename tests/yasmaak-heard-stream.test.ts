@@ -116,14 +116,28 @@ test('the page commits with the measured clock and the midpoint, and trims befor
   assert.equal((screen.match(/heardWords\.current = keepFaceEntry\(/g) || []).length, 2, 'both the follow and the judging paths trim before the face');
 });
 
-test('a failed request leaves no hole when the next window starts before the last commit (the real case after the deploy)', () => {
-  /* الجولةُ على الموقع بعد النشر: سقط طلبُ النافذة ٠–٢ ولم يُثبَّت شيءٌ بعد، والنافذةُ التالية بدأت من الصفر. */
+test('a failed request leaves no hole when the next window starts before the audio already heard (the real case after the deploy)', () => {
+  /* الجولةُ على الموقع بعد النشر: سقط طلبُ النافذة ٠–٢ ولم يُعالَج شيءٌ بعد، والنافذةُ التالية بدأت من الصفر. */
   assert.equal(leavesHole(0, 0), false);
-  assert.equal(leavesHole(1500, 1930), false, 'the usual window starts before the last commit, with its lead');
-  assert.equal(leavesHole(1930 + HOLE_TOLERANCE_MS, 1930), false);
-  assert.equal(leavesHole(1930 + HOLE_TOLERANCE_MS + 1, 1930), true, 'a window that starts after the last commit leaves the audio between unheard');
-  /* ونافذةُ اللحاق لا تتجاوز ١٦ مقطعًا: تأخّرٌ فوقها يبدأ النافذةَ بعد آخر مُثبَّت — وذلك الثقبُ الحقيقيّ. */
+  assert.equal(leavesHole(1500, 3000), false, 'the usual window starts inside audio already heard');
+  assert.equal(leavesHole(3000 + HOLE_TOLERANCE_MS, 3000), false);
+  assert.equal(leavesHole(3000 + HOLE_TOLERANCE_MS + 1, 3000), true, 'a window that starts after the audio heard leaves the gap unheard');
+  /* ونافذةُ اللحاق لا تتجاوز ١٦ مقطعًا: طلباتٌ تسقط أكثرَ من ذلك تبدأ النافذةَ بعد ما عولج — الثقبُ الحقيقيّ. */
   const w = catchUpWindow(30, 30, false, 1930);
   assert.equal(w.first, 15);
-  assert.equal(leavesHole(w.startMs, 1930), true);
+  assert.equal(leavesHole(w.startMs, 1930 + 900), true);
+});
+
+test('silence is heard audio: a long pause moves the window past the last word, and that is no hole', () => {
+  /*
+   * بعد آخر كلمةٍ (١٩٣٠ ملّي ثانية) صمتٌ ثلاثون ثانية: لا تُثبَّت كلمة، ونوافذُ اللحاق تمضي. كلُّ نافذةٍ تبدأ
+   * بعد آخر كلمة — لكن قبل ما عولج من الصوت. قِيس بالحدّ الخطأ (آخرُ كلمة) أن صمتَ دقيقتين أبطل الحكم.
+   */
+  let heardUntil = 0;
+  for (let last = 2; last <= 22; last += 2) {
+    const w = catchUpWindow(last, last, false, 1930);
+    assert.equal(leavesHole(w.startMs, heardUntil), false, `window ending at chunk ${last}`);
+    heardUntil = Math.max(heardUntil, w.commitUntilMs);
+  }
+  assert.ok(catchUpWindow(22, 22, false, 1930).startMs > 1930, 'the window does move past the last word');
 });

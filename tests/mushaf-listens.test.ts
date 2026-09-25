@@ -746,7 +746,7 @@ test('طلبُ سماعٍ يسقط لا يُبطل الحكمَ إلا إن بق
   assert.ok(transient > 0, 'كلُّ سقوطٍ يُبطل الحكمَ وإن أعادت النافذةُ التالية صوتَه');
   assert.ok(kill > transient, 'السقوطُ العابرُ لا ينتظر النافذةَ التالية');
   assert.match(failure, /const structural = \/GATE_CHANGED\|NOT_CONFIGURED\|JUDGING_CLOSED\|MISMATCH\|MODEL_NOT_BENCHMARKED\/\.test\(code\);/, 'العلّةُ البنيويّةُ تُعامَل عابرة');
-  assert.match(failure.slice(transient, kill), /if \(unheardSince\.current === null\) unheardSince\.current = committedUntil\.current;\s*\n\s*return;/, 'السقوطُ العابرُ لا يُحفظ حدُّ ما لم يُسمع');
+  assert.match(failure.slice(transient, kill), /if \(unheardSince\.current === null\) unheardSince\.current = coveredUntil\.current;\s*\n\s*return;/, 'السقوطُ العابرُ لا يُحفظ حدُّ ما لم يُسمع');
   assert.match(failure, /const changed = \/GATE_CHANGED\/\.test\(code\);\s*\n\s*setJudgingLost\(changed \? 'changed' : true\)/, 'لا يُقال للطالب إنّ الحكمَ سقط');
   /* وتبدّلٌ كشفه الخادمُ تُسأل بعده البوّابةُ الجديدة — ولا تبقى القديمةُ تُلتقط للمحاولة التالية. */
   const serverChanged = failure.slice(failure.indexOf("if (code === 'QURAN_ASR_GATE_CHANGED')"));
@@ -754,7 +754,7 @@ test('طلبُ سماعٍ يسقط لا يُبطل الحكمَ إلا إن بق
   assert.match(serverChanged.slice(0, 300), /judgingRef\.current = null;[\s\S]*fetchPracticeJudgingGate\(/, 'البوّابةُ القديمةُ تبقى بعد تبدّلٍ كشفه الخادم');
   /* والنافذةُ التي تبدأ بعد آخر مُثبَّت ثقبٌ يُبطل الحكم — ويبقى التتبّعُ بها؛ وغيرُها يمحو الانتظار. */
   const task = screen.slice(start, screen.indexOf('}, error => {', start));
-  assert.match(task, /const hole = !!permission && leavesHole\(reach\.startMs, committedUntil\.current\);\s*\n\s*if \(hole\) \{\s*\n\s*attemptJudging\.current = null;\s*\n\s*setMistakes\(undefined\);\s*\n\s*setJudgingLost\(true\);/, 'الثقبُ لا يُبطل الحكم');
+  assert.match(task, /const heardUntil = coveredUntil\.current;\s*\n\s*coveredUntil\.current = Math\.max\(coveredUntil\.current, reach\.commitUntilMs\);[\s\S]*?const hole = !!permission && leavesHole\(reach\.startMs, heardUntil\);\s*\n\s*if \(hole\) \{\s*\n\s*attemptJudging\.current = null;\s*\n\s*setMistakes\(undefined\);\s*\n\s*setJudgingLost\(true\);/, 'الثقبُ لا يُبطل الحكم');
   assert.ok(task.indexOf('unheardSince.current = null;') > task.indexOf('const hole ='), 'النافذةُ التالية لا تمحو انتظارَ ما سقط');
   /* وجوابٌ ببوّابةٍ تبدّلت يُرمى قبل أن يُكتب منه شيء — فيبلغ هذا الإبطال. */
   const check = task.indexOf('if (!answerKeepsPermission(permission, out))');

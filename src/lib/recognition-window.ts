@@ -191,11 +191,13 @@ export function edgeWords(words: readonly TimedHeardWord[], windowStartMs: numbe
  * قِيس على الموقع في ٢٥ سبتمبر ٢٠٢٦ بعد النشر بدقيقتين: انقضت مهلةُ طلبٍ والمستمعُ يُقلع نسخةً ثانية،
  * فأُبطل حكمُ المحاولة، والنافذةُ التالية بدأت من الصفر وسمعت كلَّ ما فاته.
  *
- * فالثقبُ الحقيقيُّ نافذةٌ تبدأ بعد آخر مُثبَّت: حين يطول التأخّرُ فوق `MAX_WINDOW_CHUNKS` — بطلبٍ سقط
- * أو بلا سقوط. وهذا وحده يُبطل الحكم، ومعه سقوطُ المقطع الأخير (لا نافذةَ بعده).
+ * فالثقبُ الحقيقيُّ نافذةٌ تبدأ بعد آخر ما **عولج** من الصوت (حدُّ تثبيت آخر نافذةٍ نجحت): حين يطول التأخّرُ
+ * فوق `MAX_WINDOW_CHUNKS` بطلباتٍ تسقط. وهذا وحده يُبطل الحكم، ومعه سقوطُ المقطع الأخير (لا نافذةَ بعده).
+ * والحدُّ ما عولج لا آخرُ كلمةٍ ثُبّتت: في الصمت لا تُثبَّت كلمة، ونافذةُ اللحاق تتقدّم وتبدأ بعد آخر كلمة
+ * — والصوتُ بينهما مسموع. قِيس: صمتُ دقيقتين بعد التلاوة، بالحدّ الأوّل، أبطل حكمَ جولةٍ لم يسقط فيها طلب.
  */
 export const HOLE_TOLERANCE_MS = 80;
 
-export function leavesHole(windowStartMs: number, committedUntilMs: number): boolean {
-  return windowStartMs > committedUntilMs + HOLE_TOLERANCE_MS;
+export function leavesHole(windowStartMs: number, heardUntilMs: number): boolean {
+  return windowStartMs > heardUntilMs + HOLE_TOLERANCE_MS;
 }
