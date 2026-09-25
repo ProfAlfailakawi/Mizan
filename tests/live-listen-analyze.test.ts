@@ -97,3 +97,16 @@ test('an argument the tool does not know stops the run — «--base URL» passed
   assert.throws(() => parseArgs(['--bsae', 'http://x'], known), /UNKNOWN_ARG «--bsae»/);
   assert.throws(() => parseArgs(['532'], known), /UNKNOWN_ARG «532»/);
 });
+
+test('a phone screen recording is placed on the reference by its audio envelope, through noise and gain', async () => {
+  const { envelope, locate } = await import('../tools/live-listen/phone');
+  /* «كلامٌ» مصطنع: مقاطعُ صوتٍ وصمتٍ بأطوالٍ مختلفة، ثمّ نسخةٌ منه متأخّرةٌ ٣٫٢ ثانية، بنصف الارتفاع ومع ضجيج. */
+  let seed = 7; const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rate = 8000, ref = new Float32Array(rate * 30);
+  for (let t = 0, on = true; t < ref.length; on = !on) { const len = Math.floor(rate * (0.15 + rand() * 0.6)); for (let i = t; i < Math.min(ref.length, t + len); i += 1) ref[i] = on ? Math.sin(i / 7) * (0.3 + rand() * 0.3) : 0; t += len; }
+  const shift = Math.round(rate * 3.2), rec = new Float32Array(ref.length + shift + rate * 5);
+  for (let i = 0; i < rec.length; i += 1) rec[i] = (i >= shift && i - shift < ref.length ? ref[i - shift] * 0.5 : 0) + (rand() - 0.5) * 0.02;
+  const found = locate(envelope(rec), envelope(ref));
+  assert.equal(found.offset, 160, '3.2 s is 160 frames of 20 ms');
+  assert.ok(found.score > 0.5);
+});

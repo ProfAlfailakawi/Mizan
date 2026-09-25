@@ -137,6 +137,8 @@ tr.hist td{color:var(--ink-2)}
 .note h3{font-size:16px;margin-bottom:6px}
 .note ul{margin:0;padding-inline-start:18px;color:var(--ink-2);font-size:13.5px}
 .note li{margin-block:3px}
+.note p.d{font-size:13px;color:var(--ink-2);margin:4px 0 8px}
+.note .table-box{margin-block:6px}
 footer{margin-top:56px;color:var(--muted);font-size:12px;border-top:1px solid var(--rule);padding-top:16px}
 
 @media (max-width:860px){
@@ -210,6 +212,15 @@ footer{margin-top:56px;color:var(--muted);font-size:12px;border-top:1px solid va
     <div class="table-box"><table id="table"></table></div>
   </section>
 
+  <section aria-labelledby="tables-h" id="tables-sec">
+    <header>
+      <div class="eyebrow" id="tables-eyebrow"></div>
+      <h2 id="tables-h"></h2>
+      <p class="lede" id="tables-lede"></p>
+    </header>
+    <div class="stack" id="tables"></div>
+  </section>
+
   <section aria-labelledby="changes-h" id="changes-sec">
     <header>
       <div class="eyebrow">ما الذي تغيّر</div>
@@ -249,7 +260,14 @@ const recName = k => (DATA.recordings && DATA.recordings[k]) || k;
 const color = r => `var(--s${r.color || 1})`;
 const byLabel = l => runs.find(r => r.label === l);
 const avail = (rec, mode) => runs.filter(r => r.recording === rec && r.mode === mode);
-const heroBefore = byLabel(DATA.hero && DATA.hero.before), heroAfter = byLabel(DATA.hero && DATA.hero.after);
+/* الرقمُ الأوّل من جولةٍ واحدة، أو من وسيطِ عدّة جولات (`hero.before` مصفوفة) — فجولةٌ واحدةٌ قد تكون محظوظة. */
+const heroOf = spec => {
+  const list = (Array.isArray(spec) ? spec : [spec]).map(byLabel).filter(Boolean);
+  if (list.length < 2) return list[0] || null;
+  const med = xs => { const v = xs.filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor((v.length - 1) / 2)] : null; };
+  return { ...list[0], summary: Object.fromEntries(Object.keys(list[0].summary).map(k => [k, med(list.map(r => r.summary[k]))])) };
+};
+const heroBefore = heroOf(DATA.hero && DATA.hero.before), heroAfter = heroOf(DATA.hero && DATA.hero.after);
 const state = { rec: heroAfter ? heroAfter.recording : recKeys[0], mode: 'normal', t: 0, playing: false, speed: 4, panes: [null, null] };
 try { const s = JSON.parse(localStorage.getItem('yasmaak-lab') || 'null'); if (s && recKeys.includes(s.rec)) { state.rec = s.rec; state.mode = s.mode || 'normal'; } } catch (e) {}
 const save = () => { try { localStorage.setItem('yasmaak-lab', JSON.stringify({ rec: state.rec, mode: state.mode })); } catch (e) {} };
@@ -433,6 +451,23 @@ function table() {
   t.append(tb);
 }
 
+/* جداولُ الإعداد: ما لا يُقاس من جولةٍ واحدة (إعادةُ الجولات على منطق الصفحة، وساعةُ المقاطع). */
+function extraTables() {
+  const list = DATA.tables || [];
+  if (!list.length) { $('#tables-sec').hidden = true; return; }
+  $('#tables-eyebrow').textContent = DATA.tablesEyebrow || '';
+  $('#tables-h').textContent = DATA.tablesTitle || '';
+  $('#tables-lede').textContent = DATA.tablesLede || '';
+  $('#tables').replaceChildren(...list.map(tb => {
+    const t = el('table'); const hr = el('tr');
+    for (const h of tb.head) hr.append(el('th', { scope: 'col', text: h }));
+    const body = el('tbody');
+    for (const r of tb.rows) { const tr = el('tr', { class: r.hl ? 'hl' : '' }); (r.cells || r).forEach((c, i) => tr.append(el('td', { class: i ? 'n' : '', text: c == null ? '—' : String(c) }))); body.append(tr); }
+    t.append(el('thead', {}, hr), body);
+    return el('div', { class: 'note' }, el('h3', { text: tb.title }), tb.lede ? el('p', { class: 'd', text: tb.lede }) : null, el('div', { class: 'table-box' }, t), tb.note ? el('p', { class: 'd', text: tb.note }) : null);
+  }));
+}
+
 function prose() {
   $('#changes-h').textContent = DATA.changesTitle || '';
   const tl = $('#timeline'); tl.replaceChildren();
@@ -445,7 +480,7 @@ function prose() {
 }
 
 function renderAll() { segs(); if (!state.panes[0] || !byLabel(state.panes[0]) || byLabel(state.panes[0]).recording !== state.rec || byLabel(state.panes[0]).mode !== state.mode) defaults(); $('#time').max = String(maxT()); if (state.t > maxT()) state.t = 0; renderPanes(); chips(); drawChart(); }
-head(); prose(); table(); defaults();
+head(); prose(); table(); extraTables(); defaults();
 state.t = Math.round(maxT() * 0.45);
 renderAll();
 let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawChart, 150); });
