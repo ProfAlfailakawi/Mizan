@@ -12,8 +12,8 @@ import {
   amendFaceAttempt, attemptFrom, loadJourneyLedger, faceNote, faceSupportsListening, faceSurahSegments, judgingNote, listenableFaces, loadFaceAttempts, rememberFaceAttempt, segmentAt,
   reviewNote, serialQueue, type SerialQueue,
 } from '../../lib/face-review';
-import { answerKeepsPermission, finalJudgment, followFrontier, liveJudgment, provisionalReach } from '../../lib/live-judging';
-import { OPEN_ROUGH_GATE, admitRough, type RoughGate } from '../../lib/rough-position';
+import { answerKeepsPermission, finalJudgment, followFrontier, keepFaceEntry, liveJudgment, provisionalReach } from '../../lib/live-judging';
+import { OPEN_ROUGH_GATE, admitRough, roughReach, type RoughGate } from '../../lib/rough-position';
 import {
   alertWindow, createAlertSpeaker, dropWordsUnderAlert, planAlert, EMPTY_ALERT_MEMORY,
   type AlertMemory, type AlertSpeaker, type SoundWindow,
@@ -22,7 +22,7 @@ import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff
 import { quranSkeleton } from '../../lib/quran-orthography';
 import { fetchDeliveryPassage, fetchDivergencePoints, type DivergencePoint } from '../../lib/kfgqpc-library';
 import { SimilarSlipCard, type SimilarSlip } from './SimilarSlipCard';
-import { CHUNK_MS, recognitionWindow, catchUpWindow } from '../../lib/recognition-window';
+import { CHUNK_MS, ChunkTimeline, GRID_CLOCK, catchUpWindow, commitWords, edgeWords as edgeWordsOf, recognitionWindow } from '../../lib/recognition-window';
 import { faceWordLookup, readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -252,27 +252,23 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const recorder = useRef<MediaRecorder | null>(null);
   /** آخرُ لحظةٍ ثُبّت ما سُمع قبلها — النوافذُ متداخلة، والكلمةُ تُحسب مرّةً واحدة. */
   const committedUntil = useRef(0);
+  /** ساعةُ المقاطع المقيسة (`ChunkTimeline`): أين يبدأ كلُّ مقطعٍ من التسجيل حقًّا. */
+  const chunkClock = useRef<ChunkTimeline | null>(null);
   /** وآخرُ ما عولج من الصوت (حدُّ تثبيت آخر نافذةٍ أُرسلت) — به يُترك طلبٌ لا جديدَ فيه. */
   const coveredUntil = useRef(0);
   /*
-   * النوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما بدأ بعد آخر
-   * مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير). وتوقيتُها من أوّل التلاوة.
+   * النوافذُ متداخلة، فالكلمةُ تُسمع أكثر من مرّة: تُثبَّت مرّةً واحدة — ما وقع منتصفُه بعد آخر
+   * مُثبَّت، وانتهى قبل حافّة النافذة بمهلة (إلا في المقطع الأخير). وتوقيتُها من أوّل التلاوة
+   * بساعة المقاطع المقيسة. (`commitWords` يشرح لماذا المنتصفُ لا البداية.)
    */
   const committedWords = (words: readonly { text: string; confidence: number; startMs?: number; endMs?: number }[], windowStartMs: number, commitUntilMs: number): HeardWord[] => {
-    const timed: HeardWord[] = [];
-    for (const w of words) {
-      if (w.startMs === undefined || w.endMs === undefined) continue;
-      const startMs = windowStartMs + w.startMs, endMs = windowStartMs + w.endMs;
-      if (startMs < committedUntil.current - 80 || endMs > commitUntilMs) continue;
-      timed.push({ text: w.text, confidence: w.confidence, startMs, endMs });
-      committedUntil.current = Math.max(committedUntil.current, endMs);
-    }
-    return timed;
+    const { committed, committedUntilMs } = commitWords(words, windowStartMs, commitUntilMs, committedUntil.current);
+    committedUntil.current = committedUntilMs;
+    return committed.map(w => ({ text: w.text, confidence: w.confidence, startMs: w.startMs, endMs: w.endMs }));
   };
   /* وما بعد حافّة التثبيت من المقطع نفسِه — يُكشف منه ما طابق الكلمةَ التالية تمامًا (`provisionalReach`)، ولا يُحكم به. */
-  const edgeWords = (words: readonly { text: string; startMs?: number; endMs?: number }[], windowStartMs: number, commitUntilMs: number): string[] =>
-    words.filter(w => w.endMs !== undefined && w.startMs !== undefined && windowStartMs + w.startMs >= committedUntil.current - 80 && windowStartMs + w.endMs > commitUntilMs)
-      .map(w => w.text);
+  const edgeWords = (words: readonly { text: string; confidence: number; startMs?: number; endMs?: number }[], windowStartMs: number, commitUntilMs: number): string[] =>
+    edgeWordsOf(words, windowStartMs, commitUntilMs, committedUntil.current);
   const stream = useRef<MediaStream | null>(null);
   const alive = useRef(true);
   /* ترتيبُ التلاوة لا ترتيبُ الشبكة — والضمانُ في `serialQueue` لا في هذا الملفّ. */
@@ -625,13 +621,14 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         const finalChunk = rec.state === 'inactive';
         const listenable = chunk === head ? chunk : new Blob([head, chunk], { type: chunk.type || head.type });
         /*
-         * ورقمُ المقطع يُؤخذ هنا **تزامنيًّا**، لا داخل المهمّة.
+         * ورقمُ المقطع وموضعُه من التسجيل يُؤخذان هنا **تزامنيًّا**، لا داخل المهمّة.
          *
          * فتوقيتُ الكلمة يعود من المحرّك مُسنَدًا إلى أوّل المقطع، ويُحتاج مُسنَدًا إلى
          * أوّل التلاوة. ولو قُرئ العدّادُ بعد انتظارٍ لقرأ رقمَ مقطعٍ آخر — فتُطرح
-         * كلماتٌ صحيحةٌ ويُبقى صدًى.
+         * كلماتٌ صحيحةٌ ويُبقى صدًى. والموضعُ يُقاس ولا يُفترض (`ChunkTimeline`): المقطعُ ليس
+         * ١٥٠٠ ملّي ثانيةٍ بالضبط.
          */
-        const chunkStartMs = chunkIndex.current * CHUNK_MS;
+        chunkClock.current?.add(index, (e as BlobEvent).timecode, performance.now());
         chunkIndex.current += 1;
         /*
          * ولا `try` هنا: الخطأُ يمرّ إلى الطابور فيُعدّ ساقطًا، والبيانُ للطالب يُسلَّم
@@ -681,7 +678,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
                * ـ وإلا فلا يكشف إلا موضعًا مُثبَتًا (LOCKED)، ولا يتقدّم في مقطعٍ واحدٍ أكثرَ من
                *   `VEIL_STEP` كلمات — فمطابقةٌ ضعيفةٌ مع آيةٍ بعيدة لا تفتح نصفَ الصفحة.
                */
-              if (!veiledRef.current) advance(target);
+              if (!veiledRef.current) advance(roughReach(target, trustedFrontier.current, wordFollow.current));
               else if (!attemptJudging.current && !wordFollow.current && out.alignmentState === 'LOCKED' && target !== null && target > lastRough.current) {
                 // الكشفُ يتقدّم بدليلٍ جديد فقط: موضعٌ مُثبَتٌ أبعدُ من السابق، ولا يسبقه بأكثر من VEIL_STEP.
                 lastRough.current = target;
@@ -718,12 +715,13 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              */
             const newest = latestRecognition.current;
             // وتُقاس بالتي تليها لا بأحدثِها: فالتاليةُ إن غطّت تُترك لها هذه، وهي تُقاس بما يليها — حتى أحدثِ نافذةٍ تغطّي.
-            if (!finalChunk && newest > index && recognitionWindow(index + 1, false).startMs <= committedUntil.current) return;
+            const clock = chunkClock.current ?? GRID_CLOCK;
+            if (!finalChunk && newest > index && recognitionWindow(index + 1, false, clock).startMs <= committedUntil.current) return;
             /*
              * ونافذتُه تُحسب الآن لا عند وصول المقطع: إن كان خلفه أحدثُ امتدّت إليه (`catchUpWindow`)،
              * فيُلحق بالتلاوة في طلبٍ واحد. وإن لم يبقَ بعد آخر ما ثبت شيءٌ جديد، فلا طلب.
              */
-            const reach = catchUpWindow(index, finalChunk ? index : newest, finalChunk, committedUntil.current);
+            const reach = catchUpWindow(index, finalChunk ? index : newest, finalChunk, committedUntil.current, clock);
             if (!finalChunk && reach.commitUntilMs <= Math.max(committedUntil.current, coveredUntil.current)) return;
             const parts = reach.headed ? [all[0], ...all.slice(reach.first, reach.last + 1)] : all.slice(0, reach.last + 1);
             const out = await submitPracticeRecognitionChunk({
@@ -735,7 +733,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             followFailures.current = 0;
             if (!permission) {
               /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
-              heardWords.current = [...heardWords.current, ...committedWords(out.words, reach.startMs, reach.commitUntilMs)];
+              heardWords.current = keepFaceEntry([...heardWords.current, ...committedWords(out.words, reach.startMs, reach.commitUntilMs)], trustedFrontier.current);
               const frontier = followFrontier(expectedRef.current, heardWords.current, trustedFrontier.current);
               trustedFrontier.current = Math.max(trustedFrontier.current, frontier);
               /* ومن الجبهة الفارغة (-1) كذلك: أوّلُ كلمةٍ عند الحافّة تنكشف ولا تنتظر النافذةَ التالية. */
@@ -760,7 +758,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             const timed = committedWords(out.words, reach.startMs, reach.commitUntilMs);
             /* وما سُمع تحت نغمةٍ يُطرح: الميكروفونُ خام، فيلتقط صدى التنبيه كلمةً. */
             const { kept } = dropWordsUnderAlert(timed, alertWindows.current, text => faceSkeletonsRef.current.has(quranSkeleton(text)));
-            heardWords.current = [...heardWords.current, ...kept];
+            heardWords.current = keepFaceEntry([...heardWords.current, ...kept], trustedFrontier.current);
 
             const judged = liveJudgment(expectedRef.current, heardWords.current, permission, undefined, trustedFrontier.current);
             trustedFrontier.current = Math.max(trustedFrontier.current, judged.frontier);
@@ -817,6 +815,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           });
         }
       };
+      chunkClock.current = new ChunkTimeline(performance.now());
       rec.start(CHUNK_MS);
     } catch (error) {
       /* إن رُفض الإذن فلا نظهر جلسةً وهميةً ولا مؤقّتًا يتحرك من دون صوت. */

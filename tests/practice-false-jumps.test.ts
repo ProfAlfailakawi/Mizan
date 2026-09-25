@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { FAR_JUMP_RUN_WORDS, credibleFrontier, followFrontier, liveJudgment } from '../src/lib/live-judging';
-import { OPEN_ROUGH_GATE, ROUGH_CONFIRM_MS, ROUGH_JUMP_WORDS, admitRough } from '../src/lib/rough-position';
+import { OPEN_ROUGH_GATE, ROUGH_CONFIRM_MS, ROUGH_JUMP_WORDS, ROUGH_LEAD_WORDS, admitRough, roughReach } from '../src/lib/rough-position';
 import type { ExpectedWord, HeardWord, Mistake } from '../src/lib/recitation-diff';
 
 const OPEN = { word: 'OPEN', tashkeel: 'CLOSED' } as const;
@@ -89,4 +89,15 @@ test('a far LOCKED that is not accepted never becomes the anchor', () => {
 test('the veil stays on while the microphone permission is asked', () => {
   const source = readFileSync(new URL('../src/components/participant/MushafListens.tsx', import.meta.url), 'utf8');
   assert.match(source, /\(stage === 'ready' \|\| stage === 'asking'\) && veiled/);
+});
+
+test('while words are being followed, a rough LOCKED leads the heard frontier by two words at most', () => {
+  /* قِيس: الصوتُ في لازمة الآية 16 (خارج الوجه)، و`LOCKED` على لازمة 21:1 — ثماني كلماتٍ من أوّل الوجه. */
+  assert.equal(roughReach(7, -1, true), -1, 'from the empty frontier, the refrain on the page marks nothing on a rough match');
+  assert.equal(roughReach(1, -1, true), 1, 'the opening words of the face do');
+  assert.equal(roughReach(12, 10, true), 12);
+  assert.equal(roughReach(30, 10, true), 10 + ROUGH_LEAD_WORDS, 'further on, it leads the heard frontier by two words at most');
+  assert.equal(roughReach(30, 10, false), 30, 'without word following the rough position leads as before');
+  const source = readFileSync(new URL('../src/components/participant/MushafListens.tsx', import.meta.url), 'utf8');
+  assert.match(source, /if \(!veiledRef\.current\) advance\(roughReach\(target, trustedFrontier\.current, wordFollow\.current\)\);/);
 });

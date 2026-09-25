@@ -36,7 +36,7 @@ test('chunks after the first are sent with the container header so they can be d
    */
   assert.match(practice, /const parts = reach\.headed \? \[all\[0\], \.\.\.all\.slice\(reach\.first, reach\.last \+ 1\)\] : all\.slice\(0, reach\.last \+ 1\)/);
   assert.match(practice, /headBytes: reach\.headed \? all\[0\]\.size : 0/, 'the header size travels with a headed window only');
-  assert.match(practice, /startMs < committedUntil\.current - 80/, 'overlapping windows commit each word once');
+  assert.match(practice, /commitWords\(words, windowStartMs, commitUntilMs, committedUntil\.current\)/, 'overlapping windows commit each word once (commitWords, by its midpoint)');
 });
 
 test('live mistake detection opens for practice through the deployed listener only', () => {
@@ -157,7 +157,7 @@ test('«اختبر حفظك» reveals only what was heard — never by a timer, 
   assert.match(practice, /if \(out\.alignmentState !== 'LOST'\) \{/, 'an untrusted LOST candidate reveals nothing');
   // تحت الحجاب: الموضعُ التقريبيّ لا يكشف إلا حين لا تُسمع الكلمات، ولا يسبق آخرَ ما سُمع بأكثر من VEIL_STEP.
   assert.match(practice, /export const VEIL_STEP = 4;/);
-  assert.match(practice, /if \(!veiledRef\.current\) advance\(target\);/);
+  assert.match(practice, /if \(!veiledRef\.current\) advance\(roughReach\(target, trustedFrontier\.current, wordFollow\.current\)\);/, 'outside the veil the rough position leads the heard words by a small edge only');
   assert.match(practice, /!attemptJudging\.current && !wordFollow\.current && out\.alignmentState === 'LOCKED'/);
   assert.match(practice, /reachedRef\.current - 1 \+ VEIL_STEP/);
   // تكرارُ الموضع نفسِه لا يكشف مزيدًا (لا تسلّق).
@@ -233,5 +233,5 @@ test('a busy listener never builds an unbounded backlog: stale chunks give way t
   const practice = read('src/components/participant/MushafListens.tsx');
   assert.match(practice, /if \(!finalChunk && latestAlignment\.current > index\) \{ setHeard\(n => n \+ 1\); return; \}/);
   // والكلماتُ لا تُترك إلا بلا ثقب: نافذةُ الأحدث تبدأ قبل آخر ما ثبت. والمقطعُ الأخيرُ لا يُترك.
-  assert.match(practice, /if \(!finalChunk && newest > index && recognitionWindow\(index \+ 1, false\)\.startMs <= committedUntil\.current\) return;/);
+  assert.match(practice, /if \(!finalChunk && newest > index && recognitionWindow\(index \+ 1, false, clock\)\.startMs <= committedUntil\.current\) return;/);
 });
