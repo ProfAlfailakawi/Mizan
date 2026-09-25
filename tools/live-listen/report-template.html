@@ -1,0 +1,445 @@
+<title>مختبر يسمعك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Readex+Pro:wght@300;400;500;600&family=Reem+Kufi:wght@500;600&display=swap">
+<style>
+:root{
+  --paper:#f3f1e9; --sheet:#fbfaf5; --ink:#18201b; --ink-2:#4a544e; --muted:#6f7871; --rule:#dfdcd0; --rule-2:#ebe8de;
+  --green:#214c40; --green-wash:#e2ebe5; --gold:#9c7836; --gold-soft:#e9d9b1; --gold-wash:#f5eddb;
+  --crit:#b3392b; --crit-wash:#f6dfda; --veil:#dcd8cc; --veil-ink:#c9c4b6;
+  --d0:#f4ead0; --d1:#ead79f; --d2:#dcbc6d; --d3:#c79a45; --d4:#a0712a; --d5:#6f4a17; --d-ink:#fbf6ea;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --shadow:0 1px 0 rgba(24,32,27,.04),0 8px 24px -14px rgba(24,32,27,.18);
+  --ui:"Readex Pro",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;
+  --display:"Reem Kufi","Readex Pro",system-ui,sans-serif;
+  --quran:"Amiri Quran","Amiri","Noto Naskh Arabic","Geeza Pro",serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){color-scheme:dark;
+    --paper:#0f1411; --sheet:#151c18; --ink:#e7ebe5; --ink-2:#b6bfb8; --muted:#8c978f; --rule:#27312b; --rule-2:#1d2621;
+    --green:#7cc2a3; --green-wash:#1c2d26; --gold:#d6b26a; --gold-soft:#5a4a28; --gold-wash:#2c2517;
+    --crit:#f0806f; --crit-wash:#3b1f1a; --veil:#2a322d; --veil-ink:#39433d;
+    --d0:#2e2a1f; --d1:#4a3f25; --d2:#6b572a; --d3:#957434; --d4:#c39646; --d5:#ecc56b; --d-ink:#18130a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    --shadow:0 1px 0 rgba(0,0,0,.2),0 10px 28px -16px rgba(0,0,0,.6);}
+}
+:root[data-theme="dark"]{color-scheme:dark;
+  --paper:#0f1411; --sheet:#151c18; --ink:#e7ebe5; --ink-2:#b6bfb8; --muted:#8c978f; --rule:#27312b; --rule-2:#1d2621;
+  --green:#7cc2a3; --green-wash:#1c2d26; --gold:#d6b26a; --gold-soft:#5a4a28; --gold-wash:#2c2517;
+  --crit:#f0806f; --crit-wash:#3b1f1a; --veil:#2a322d; --veil-ink:#39433d;
+  --d0:#2e2a1f; --d1:#4a3f25; --d2:#6b572a; --d3:#957434; --d4:#c39646; --d5:#ecc56b; --d-ink:#18130a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --shadow:0 1px 0 rgba(0,0,0,.2),0 10px 28px -16px rgba(0,0,0,.6);}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.7;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:28px 64px}
+a{color:var(--green);text-underline-offset:3px}
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.3;text-wrap:balance;margin:0}
+.eyebrow{font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:500}
+.lede{color:var(--ink-2);max-width:68ch;margin:0}
+.num{font-variant-numeric:tabular-nums}
+section{margin-top:56px}
+section>header{display:grid;gap:6px;margin-bottom:18px}
+section>header h2{font-size:clamp(20px,2.4vw,26px)}
+
+.top{display:grid;gap:22px;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:end;border-bottom:1px solid var(--rule);padding-bottom:26px}
+.top h1{font-size:clamp(34px,5vw,54px);letter-spacing:-.01em;color:var(--green)}
+.top h1 span{font-family:var(--quran);font-weight:400;color:var(--ink);font-size:.8em}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--muted);font-size:13px}
+.meta b{color:var(--ink-2);font-weight:500}
+.verdict{display:grid;gap:10px;justify-items:start}
+.hero{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.hero .from{font-size:clamp(22px,3vw,30px);color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px;font-weight:300}
+.hero .arrow{color:var(--muted);font-size:20px}
+.hero .to{font-size:clamp(48px,7vw,76px);font-weight:600;color:var(--green);line-height:1}
+.hero .unit{font-size:16px;color:var(--ink-2)}
+.hero-cap{font-size:13px;color:var(--ink-2);max-width:48ch}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-top:22px}
+.tile{background:var(--sheet);padding:14px 16px;display:grid;gap:2px;align-content:start}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-size:24px;font-weight:600}
+.tile .v s{font-weight:300;color:var(--muted);font-size:16px;margin-inline-end:6px}
+.tile .d{font-size:12px;color:var(--ink-2)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;box-shadow:var(--shadow)}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:9px;overflow:hidden;background:var(--paper)}
+.seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--ink-2);padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--green);color:var(--sheet)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.play{font:inherit;font-weight:500;border:1px solid var(--green);background:var(--green);color:var(--sheet);border-radius:9px;padding:6px 14px;cursor:pointer;min-width:92px}
+.play[aria-pressed="true"]{background:transparent;color:var(--green)}
+.scrub{flex:1 1 260px;display:flex;align-items:center;gap:10px;min-width:0}
+.scrub input{flex:1;min-width:0;accent-color:var(--green)}
+.clock{font-size:13px;color:var(--ink-2);min-width:64px;text-align:center}
+.small{font-size:12px;color:var(--muted)}
+select{font:inherit;font-size:13px;background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:4px 8px;max-width:100%}
+.panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:16px}
+.pane{display:grid;gap:10px;align-content:start;min-width:0}
+.pane-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.pane-head .tag{font-size:12px;color:var(--muted)}
+.pane-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.pane-stats b{color:var(--ink);font-weight:600}
+.pane-stats .lagv{color:var(--green)}
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.band{display:flex;justify-content:space-between;align-items:center;background:var(--gold-wash);border:1px solid var(--gold-soft);border-radius:8px;padding:4px 14px;margin-bottom:10px}
+.band .sura{font-family:var(--quran);font-size:21px;color:var(--ink)}
+.band .pg{font-size:11px;color:var(--gold)}
+.face{font-family:var(--quran);font-size:clamp(19px,2.1vw,25px);line-height:2.35;text-align:justify;text-align-last:center;direction:rtl}
+.w{border-radius:5px;padding:0 2px;transition:background-color .25s,color .25s,box-shadow .25s;cursor:default}
+.w.unsaid{color:var(--muted)}
+.w.said,.w.shown{color:var(--ink)}
+.w.b0{background:var(--d0)}.w.b1{background:var(--d1)}.w.b2{background:var(--d2)}.w.b3{background:var(--d3)}.w.b4{background:var(--d4);color:var(--d-ink)}.w.b5{background:var(--d5);color:var(--d-ink)}
+.w.early{background:var(--crit-wash);box-shadow:inset 0 0 0 1.5px var(--crit)}
+.w.red{text-decoration:underline;text-decoration-color:var(--crit);text-decoration-thickness:2px;text-underline-offset:9px}
+.w.here{box-shadow:0 0 0 2px var(--gold)}
+.w.veiled{color:transparent;background:var(--veil)}
+.w.veiled.said{background:var(--veil-ink)}
+.ayah{font-family:var(--quran);color:var(--gold);font-size:.8em;padding-inline:3px;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12px;color:var(--ink-2);margin-top:12px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-inline-end:6px}
+.ramp{display:inline-flex;border-radius:4px;overflow:hidden;vertical-align:-2px;margin-inline:6px}
+.ramp span{width:16px;height:14px}
+.tip{position:fixed;z-index:30;pointer-events:none;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:8px 11px;font-size:12.5px;line-height:1.55;box-shadow:var(--shadow);max-width:260px}
+.tip strong{font-weight:600}
+.tip .q{font-family:var(--quran);font-size:19px;line-height:1.4}
+
+.chart-card{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:14px 14px 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.chip{font:inherit;font-size:12.5px;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);background:var(--paper);color:var(--ink-2);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chip[aria-pressed="false"]{opacity:.5}
+.chip .key{width:16px;height:2px;border-radius:2px}
+.chart-box{position:relative;overflow-x:auto}
+svg text{fill:var(--muted);font-family:var(--ui);font-size:11px}
+.axis-title{fill:var(--ink-2)}
+
+.table-box{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--sheet)}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:820px}
+th,td{padding:9px 12px;text-align:start;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+th{font-weight:500;color:var(--muted);font-size:12px;background:var(--paper)}
+td.n{font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--green-wash)}
+tr.hist td{color:var(--ink-2)}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--rule);color:var(--ink-2);margin-inline-start:6px}
+.pill.after{border-color:var(--green);color:var(--green)}
+
+.changes{display:grid;border-inline-start:2px solid var(--rule);margin-inline-start:6px;align-content:start}
+.change{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;padding-block:10px 12px;padding-inline-start:18px;position:relative}
+.change::before{content:"";position:absolute;inset-inline-start:-7px;top:18px;width:12px;height:12px;border-radius:50%;background:var(--sheet);border:2px solid var(--rule)}
+.change.mine::before{border-color:var(--green);background:var(--green)}
+.change .pr{font-weight:600;font-size:14px}
+.change .what{color:var(--ink-2);font-size:13.5px}
+.change .who{grid-column:2;font-size:12px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.stack{display:grid;gap:14px;align-content:start}
+.note{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+.note h3{font-size:16px;margin-bottom:6px}
+.note ul{margin:0;padding-inline-start:18px;color:var(--ink-2);font-size:13.5px}
+.note li{margin-block:3px}
+footer{margin-top:56px;color:var(--muted);font-size:12px;border-top:1px solid var(--rule);padding-top:16px}
+
+@media (max-width:860px){
+  .top{grid-template-columns:1fr}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panes,.cols{grid-template-columns:1fr}
+  .controls{position:static}
+}
+@media (prefers-reduced-motion:reduce){.w{transition:none}}
+</style>
+
+<div class="wrap" dir="rtl" lang="ar">
+  <header class="top">
+    <div style="display:grid;gap:10px">
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1>مختبر يسمعك <span id="sura-title"></span></h1>
+      <p class="lede" id="lede"></p>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+  </header>
+  <div class="tiles" id="tiles"></div>
+
+  <section aria-labelledby="replay-h">
+    <header>
+      <div class="eyebrow">أعِد التلاوة</div>
+      <h2 id="replay-h">كلُّ كلمةٍ في لحظتها</h2>
+      <p class="lede">حرّك الزمن أو اضغط «تشغيل»، وقارن لوحين من جولتين على التسجيل نفسه. الإطارُ الذهبيّ حيث يقرأ القارئ الآن، واللونُ الرمليّ كلمةٌ أشار إليها ميزان — وكلّما غمق طال انتظارُها. والإطارُ الأحمر كلمةٌ ظهرت قبل أن تُقال.</p>
+    </header>
+    <div class="controls" role="group" aria-label="التحكّم في الإعادة">
+      <div class="seg" id="rec-seg" role="group" aria-label="التسجيل"></div>
+      <div class="seg" id="mode-seg" role="group" aria-label="الوضع"></div>
+      <button class="play" id="play" type="button" aria-pressed="false">▶ تشغيل</button>
+      <div class="scrub">
+        <label for="time" class="small">الزمن</label>
+        <input type="range" id="time" min="0" max="300" step="0.1" value="0" aria-describedby="clock">
+        <span class="clock num" id="clock">0:00</span>
+      </div>
+      <label class="small" for="speed">السرعة
+        <select id="speed"><option value="1">×1</option><option value="4" selected>×4</option><option value="10">×10</option></select>
+      </label>
+    </div>
+    <div class="panes" id="panes"></div>
+    <div class="legend" aria-label="مفتاح الألوان">
+      <span><i style="box-shadow:0 0 0 2px var(--gold)"></i>القارئ هنا</span>
+      <span>انتظرت حتى أُشير إليها<span class="ramp"><span style="background:var(--d0)"></span><span style="background:var(--d1)"></span><span style="background:var(--d2)"></span><span style="background:var(--d3)"></span><span style="background:var(--d4)"></span><span style="background:var(--d5)"></span></span>&lt;٣ · ٦ · ١٢ · ٣٠ · ٦٠ · أكثر (ث)</span>
+      <span><i style="background:var(--crit-wash);box-shadow:inset 0 0 0 1.5px var(--crit)"></i>ظهرت قبل أن تُقال</span>
+      <span><i style="border-bottom:2px solid var(--crit);border-radius:0;height:10px"></i>انتهت معلّمةً خطأً</span>
+      <span><i style="background:var(--veil)"></i>محجوبة («اختبر حفظك»)</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="lag-h">
+    <header>
+      <div class="eyebrow">السماع والتلاوة</div>
+      <h2 id="lag-h">كم يتأخّر السماع عن القارئ؟</h2>
+      <p class="lede">لكلّ ردٍّ من المستمع: آخرُ كلمةٍ سمعها، وكم مضى على نطقها حين وصل. الخطُّ الصاعد طابورٌ يتراكم، والمستوي سماعٌ يلحق بالقارئ. والخطُّ الذهبيّ العموديّ زمنُ الإعادة أعلاه؛ واضغط الرسم لتنقل الإعادة إلى تلك اللحظة.</p>
+    </header>
+    <div class="chart-card">
+      <div class="chips" id="chips" role="group" aria-label="الجولات المعروضة"></div>
+      <div class="chart-box" id="chart" dir="ltr"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="numbers-h">
+    <header>
+      <div class="eyebrow">الأرقام كلّها</div>
+      <h2 id="numbers-h">كلُّ جولةٍ قِيست</h2>
+      <p class="lede">«تأخّر الإشارة» من نهاية نطق الكلمة إلى أن يعلّمها ميزان مقروءةً (أو يكشفها في «اختبر حفظك»). «مبكرة» ظهرت قبل بداية نطقها. «حمراء خطأً» قيلت صحيحةً وانتهت معلّمة.</p>
+    </header>
+    <div class="table-box"><table id="table"></table></div>
+  </section>
+
+  <section aria-labelledby="changes-h" id="changes-sec">
+    <header>
+      <div class="eyebrow">ما الذي تغيّر</div>
+      <h2 id="changes-h"></h2>
+    </header>
+    <div class="cols">
+      <div class="changes" id="timeline"></div>
+      <div class="stack" id="why"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="method-h">
+    <header>
+      <div class="eyebrow">الطريقة وحدودها</div>
+      <h2 id="method-h">كيف قِيس هذا</h2>
+    </header>
+    <div class="cols" id="method"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v); } for (const k of kids) if (k != null) n.append(k); return n; };
+const fmt = (s, d = 1) => s == null ? '—' : (Math.abs(s) >= 100 ? String(Math.round(s)) : Number(s).toFixed(d));
+const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const AR = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+const BIN = [3, 6, 12, 30, 60];
+const binOf = d => { let b = 0; while (b < BIN.length && d >= BIN[b]) b += 1; return b; };
+const MODES = { normal: 'عادي', veil: 'اختبر حفظك' };
+const runs = DATA.runs;
+const recKeys = [...new Set(runs.map(r => r.recording))];
+const recName = k => (DATA.recordings && DATA.recordings[k]) || k;
+const color = r => `var(--s${r.color || 1})`;
+const byLabel = l => runs.find(r => r.label === l);
+const avail = (rec, mode) => runs.filter(r => r.recording === rec && r.mode === mode);
+const heroBefore = byLabel(DATA.hero && DATA.hero.before), heroAfter = byLabel(DATA.hero && DATA.hero.after);
+const state = { rec: heroAfter ? heroAfter.recording : recKeys[0], mode: 'normal', t: 0, playing: false, speed: 4, panes: [null, null] };
+try { const s = JSON.parse(localStorage.getItem('yasmaak-lab') || 'null'); if (s && recKeys.includes(s.rec)) { state.rec = s.rec; state.mode = s.mode || 'normal'; } } catch (e) {}
+const save = () => { try { localStorage.setItem('yasmaak-lab', JSON.stringify({ rec: state.rec, mode: state.mode })); } catch (e) {} };
+function defaults() {
+  const av = avail(state.rec, state.mode);
+  const pickBy = side => av.find(r => r.side === side);
+  state.panes = [(pickBy('before') || av[0] || {}).label || null, (pickBy('after') || av[av.length - 1] || {}).label || null];
+}
+
+/* الرأس */
+function head() {
+  $('#eyebrow').textContent = DATA.eyebrow || '';
+  $('#sura-title').textContent = DATA.suraTitle || '';
+  $('#lede').textContent = DATA.lede || '';
+  const meta = $('#meta'); meta.replaceChildren();
+  for (const [k, v] of DATA.meta || []) { const s = el('span'); s.append(el('b', { text: k }), ' ' + v); meta.append(s); }
+  const v = $('#verdict'); v.replaceChildren();
+  if (!heroBefore || !heroAfter) return;
+  const b = heroBefore.summary, a = heroAfter.summary;
+  v.append(el('div', { class: 'eyebrow', text: DATA.hero.label || 'تأخّر الإشارة إلى الكلمة بعد نطقها — الوسيط' }));
+  const h = el('div', { class: 'hero' });
+  h.append(el('span', { class: 'from num', text: fmt(b.delayMedian) + ' ث' }), el('span', { class: 'arrow', text: '←' }), el('span', { class: 'to', text: fmt(a.delayMedian) }), el('span', { class: 'unit', text: 'ثانية' }));
+  v.append(h, el('div', { class: 'hero-cap', text: DATA.hero.caption || `من «${heroBefore.name}» إلى «${heroAfter.name}» على التسجيل نفسه.` }));
+  const tiles = $('#tiles'); tiles.replaceChildren();
+  const tile = (k, from, to, d) => { const n = el('div', { class: 'v num' }); n.append(el('s', { text: from }), to); return el('div', { class: 'tile' }, el('div', { class: 'k', text: k }), n, el('div', { class: 'd', text: d })); };
+  tiles.append(
+    tile('تأخّر السماع عن القارئ · الوسيط', fmt(b.lagMedian) + ' ث', fmt(a.lagMedian) + ' ث', `وفي أوّل نصف دقيقة ${fmt(a.lagFirst30)} ث`),
+    tile('أبطأُ ١٠٪ من الكلمات', fmt(b.delayP90) + ' ث', fmt(a.delayP90) + ' ث', 'تأخّر الإشارة عند المئين التسعين'),
+    tile('كلماتٌ ظهرت قبل نطقها', String(b.early), String(a.early), a.early ? `أبعدُها ${fmt(a.earliest)} ث قبل النطق` : 'لا كلمةَ تسبق القارئ'),
+    tile('صحيحةٌ انتهت حمراء', String(b.wrongRed), String(a.wrongRed), `من ${a.said} كلمةً قيلت على الوجه`),
+  );
+}
+
+function segs() {
+  const rs = $('#rec-seg'); rs.replaceChildren();
+  for (const k of recKeys) { const b = el('button', { type: 'button', 'aria-pressed': String(state.rec === k), text: recName(k) }); b.onclick = () => { state.rec = k; if (!avail(k, state.mode).length) state.mode = 'normal'; defaults(); save(); renderAll(); }; rs.append(b); }
+  const ms = $('#mode-seg'); ms.replaceChildren();
+  for (const k of Object.keys(MODES)) { const b = el('button', { type: 'button', 'aria-pressed': String(state.mode === k), text: MODES[k] }); if (!avail(state.rec, k).length) b.disabled = true; b.onclick = () => { state.mode = k; defaults(); save(); renderAll(); }; ms.append(b); }
+}
+
+/* اللوحان */
+function paneEl(i) {
+  const av = avail(state.rec, state.mode);
+  const sel = el('select', { id: `pane-${i}`, 'aria-label': `الجولة في اللوح ${i + 1}` });
+  for (const r of av) { const o = el('option', { value: r.label, text: r.name + (r.note ? ` — ${r.note}` : '') }); if (state.panes[i] === r.label) o.selected = true; sel.append(o); }
+  sel.onchange = () => { state.panes[i] = sel.value; renderPanes(); };
+  const r = byLabel(state.panes[i]);
+  const sheet = el('div', { class: 'sheet' }, el('div', { class: 'band' }, el('span', { class: 'sura', text: DATA.bandTitle || '' }), el('span', { class: 'pg num', text: DATA.pageLabel || '' })));
+  const face = el('div', { class: 'face', id: `face-${i}` });
+  (r || av[0] || { words: [] }).words.forEach((w, k) => {
+    face.append(el('span', { class: 'w', 'data-k': String(k), tabindex: '0', text: w.text }), ' ');
+    if (w.endsAyah) face.append(el('span', { class: 'ayah', 'aria-hidden': 'true', text: `﴿${AR(w.ayah)}﴾` }), ' ');
+  });
+  sheet.append(face);
+  return el('div', { class: 'pane' }, el('div', { class: 'pane-head' }, sel, el('span', { class: 'tag', text: r && r.side === 'after' ? 'بعد' : r && r.side === 'before' ? 'قبل' : '' })), el('div', { class: 'pane-stats', id: `stats-${i}` }), sheet);
+}
+function renderPanes() { $('#panes').replaceChildren(paneEl(0), paneEl(1)); paint(); }
+function lagAt(r, t) { let v = null; for (const p of r.lag) { if (p.at <= t) v = p.lag + (t - p.at); else break; } return v; }
+function paint() {
+  const t = state.t, veil = state.mode === 'veil';
+  state.panes.forEach((label, i) => {
+    const r = byLabel(label), face = $(`#face-${i}`); if (!face || !r) return;
+    let shownN = 0, saidN = 0, early = 0;
+    face.querySelectorAll('.w').forEach(n => {
+      const w = r.words[+n.dataset.k]; if (!w) return;
+      const said = w.saidStart != null && w.saidStart <= t, shown = w.shown != null && w.shown <= t;
+      const cls = ['w', said ? 'said' : 'unsaid'];
+      if (said) saidN += 1;
+      if (w.saidStart != null && w.saidStart <= t && t < w.saidEnd + 0.25) cls.push('here');
+      if (shown) { shownN += 1; cls.push('shown'); if (w.saidStart != null && w.shown < w.saidStart) { cls.push('early'); early += 1; } else if (w.saidEnd != null) cls.push('b' + binOf(Math.max(0, w.shown - w.saidEnd))); }
+      else if (veil) cls.push('veiled');
+      if (w.markedAt != null && w.markedAt <= t && w.markedAtEnd) cls.push('red');
+      n.className = cls.join(' ');
+    });
+    const st = $(`#stats-${i}`); st.replaceChildren();
+    const item = (label, val, cls) => { const s = el('span'); s.append(label + ' ', el('b', { class: 'num ' + (cls || ''), text: val })); return s; };
+    const lagNow = lagAt(r, t);
+    st.append(item('قيلت', String(saidN)), item(veil ? 'انكشفت' : 'أُشير إليها', String(shownN)), item('سبقت القارئ', String(early)), item('السماع متأخّر', lagNow == null ? '—' : fmt(lagNow) + ' ث', 'lagv'));
+  });
+  $('#clock').textContent = clock(t); $('#time').value = String(t); moveMarker();
+}
+
+/* التشغيل */
+let raf = 0, last = 0;
+const maxT = () => { let m = 0; for (const r of avail(state.rec, state.mode)) for (const w of r.words) { if (w.shown != null) m = Math.max(m, w.shown); if (w.saidEnd != null) m = Math.max(m, w.saidEnd); } return Math.ceil(Math.min(m + 5, 600)); };
+function tick(now) { if (!state.playing) return; state.t = Math.min(maxT(), state.t + (now - last) / 1000 * state.speed); last = now; paint(); if (state.t >= maxT()) return toggle(false); raf = requestAnimationFrame(tick); }
+function toggle(on) { state.playing = on; const b = $('#play'); b.setAttribute('aria-pressed', String(on)); b.textContent = on ? '❚❚ إيقاف' : '▶ تشغيل'; if (on) { if (state.t >= maxT()) state.t = 0; last = performance.now(); raf = requestAnimationFrame(tick); } else cancelAnimationFrame(raf); }
+$('#play').onclick = () => toggle(!state.playing);
+$('#time').oninput = e => { state.t = +e.target.value; paint(); };
+$('#speed').onchange = e => { state.speed = +e.target.value; };
+
+/* بطاقة الكلمة */
+const tip = $('#tip');
+function place(x, y) { const w = tip.offsetWidth, h = tip.offsetHeight; tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px'; tip.style.top = (y - h - 14 > 8 ? y - h - 14 : y + 24) + 'px'; }
+function wordTip(n) {
+  const i = +n.closest('.face').id.split('-')[1], r = byLabel(state.panes[i]); if (!r) return;
+  const w = r.words[+n.dataset.k];
+  tip.replaceChildren(el('div', { class: 'q', text: w.text }), el('div', { text: `${AR(w.ayah)}:${AR(w.pos)} · ${r.name}` }));
+  const line = (label, val) => { const d = el('div'); d.append(el('strong', { class: 'num', text: val }), ' ' + label); tip.append(d); };
+  if (w.saidStart != null) line('قيلت (ث)', `${fmt(w.saidStart)}–${fmt(w.saidEnd)}`); else tip.append(el('div', { text: 'لم تُقل في هذا التسجيل' }));
+  if (w.shown != null) line(state.mode === 'veil' ? 'انكشفت (ث)' : 'أُشير إليها (ث)', fmt(w.shown)); else tip.append(el('div', { text: 'لم يُشر إليها' }));
+  if (w.saidStart != null && w.shown != null) line(w.shown < w.saidStart ? 'قبل أن تُقال' : 'بعد نهاية نطقها', `${fmt(Math.abs(w.shown < w.saidStart ? w.saidStart - w.shown : w.shown - w.saidEnd))} ث`);
+  if (w.markedAt != null) tip.append(el('div', { text: w.markedAtEnd ? 'انتهت معلّمةً خطأً' : 'عُلّمت ثمّ رُفعت العلامة' }));
+  tip.hidden = false; const b = n.getBoundingClientRect(); place(b.left + b.width / 2, b.top);
+}
+document.addEventListener('pointerover', e => { const n = e.target.closest && e.target.closest('.face .w'); if (n) wordTip(n); });
+document.addEventListener('pointerout', e => { if (e.target.closest && e.target.closest('.face .w')) tip.hidden = true; });
+document.addEventListener('focusin', e => { const n = e.target.closest && e.target.closest('.face .w'); if (n) wordTip(n); });
+document.addEventListener('focusout', () => { tip.hidden = true; });
+
+/* الرسم */
+const hidden = new Set();
+function chips() {
+  const box = $('#chips'); box.replaceChildren();
+  for (const r of avail(state.rec, state.mode)) {
+    const c = el('button', { type: 'button', class: 'chip', 'aria-pressed': String(!hidden.has(r.label)) }, el('span', { class: 'key' }), r.name);
+    c.querySelector('.key').style.background = color(r);
+    c.onclick = () => { hidden.has(r.label) ? hidden.delete(r.label) : hidden.add(r.label); chips(); drawChart(); };
+    box.append(c);
+  }
+}
+let geo = null;
+function drawChart() {
+  const box = $('#chart'); box.replaceChildren();
+  const av = avail(state.rec, state.mode).filter(r => !hidden.has(r.label));
+  const W = Math.max(560, box.clientWidth || 900), H = 300, m = { l: 48, r: 118, t: 14, b: 38 };
+  const xMax = maxT(); let yMax = 10;
+  for (const r of av) for (const p of r.lag) if (p.at <= xMax) yMax = Math.max(yMax, p.lag);
+  const step = yMax > 200 ? 60 : yMax > 90 ? 30 : yMax > 40 ? 10 : 5; yMax = Math.ceil(yMax / step) * step;
+  const X = t => m.l + (t / xMax) * (W - m.l - m.r), Y = v => H - m.b - (Math.max(0, v) / yMax) * (H - m.t - m.b);
+  const NS = 'http://www.w3.org/2000/svg', s = (tag, a = {}) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(a)) n.setAttribute(k, v); return n; };
+  const text = (x, y, str, anchor, cls) => { const n = s('text', { x, y, 'text-anchor': anchor }); if (cls) n.setAttribute('class', cls); n.textContent = str; return n; };
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': 'تأخّر السماع عن القارئ بمرور التلاوة' });
+  for (let v = 0; v <= yMax; v += step) { svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--rule-2)', 'stroke-width': 1 }), text(m.l - 8, Y(v) + 4, String(v), 'end')); }
+  const xs = xMax > 300 ? 60 : 30;
+  for (let t = 0; t <= xMax; t += xs) svg.append(text(X(t), H - m.b + 16, clock(t), 'middle'));
+  svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(0), y2: Y(0), stroke: 'var(--rule)', 'stroke-width': 1 }));
+  svg.append(text(m.l - 36, m.t + 2, 'ث', 'start', 'axis-title'), text(W - m.r, H - 6, 'زمن التلاوة (دقيقة:ثانية)', 'end', 'axis-title'));
+  const ends = [];
+  for (const r of av) { const pts = r.lag.filter(p => p.at <= xMax); if (!pts.length) continue;
+    svg.append(s('path', { d: pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.at).toFixed(1)},${Y(Math.min(p.lag, yMax)).toFixed(1)}`).join(''), fill: 'none', stroke: color(r), 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    const lp = pts[pts.length - 1]; svg.append(s('circle', { cx: X(lp.at), cy: Y(lp.lag), r: 4, fill: color(r), stroke: 'var(--sheet)', 'stroke-width': 2 }));
+    ends.push({ r, x: X(lp.at), y: Y(lp.lag) }); }
+  ends.sort((a, b) => a.y - b.y); let prevY = -99;
+  for (const e of ends) { const y = Math.max(e.y, prevY + 14); prevY = y; const n = text(W - m.r + 8, y + 4, e.r.name, 'start'); n.setAttribute('style', 'fill:var(--ink-2)'); svg.append(n); if (Math.abs(y - e.y) > 2) svg.append(s('line', { x1: e.x + 4, x2: W - m.r + 5, y1: e.y, y2: y, stroke: 'var(--rule)', 'stroke-width': 1 })); }
+  svg.append(s('line', { id: 'tmark', x1: X(state.t), x2: X(state.t), y1: m.t, y2: H - m.b, stroke: 'var(--gold)', 'stroke-width': 1.5 }));
+  const cross = s('line', { x1: 0, x2: 0, y1: m.t, y2: H - m.b, stroke: 'var(--muted)', 'stroke-width': 1, opacity: 0 }); svg.append(cross);
+  const hit = s('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' }); svg.append(hit);
+  const tAt = e => { const b = svg.getBoundingClientRect(); return Math.max(0, Math.min(xMax, (((e.clientX - b.left) * (W / b.width)) - m.l) / (W - m.l - m.r) * xMax)); };
+  hit.addEventListener('pointermove', e => { const t = tAt(e); cross.setAttribute('x1', X(t)); cross.setAttribute('x2', X(t)); cross.setAttribute('opacity', 1);
+    tip.replaceChildren(el('div', { class: 'num', text: `عند ${clock(t)} من التلاوة` }));
+    for (const r of av) { let best = null; for (const p of r.lag) if (Math.abs(p.at - t) < 6 && (!best || Math.abs(p.at - t) < Math.abs(best.at - t))) best = p;
+      const row = el('div'), key = el('span'); key.style.cssText = `display:inline-block;width:14px;height:2px;background:${color(r)};vertical-align:middle;margin-inline-end:6px`;
+      row.append(key, el('strong', { class: 'num', text: best ? `${fmt(best.lag)} ث` : '—' }), ` ${r.name}` + (best ? ` · سمع ${AR(best.ayah)}:${AR(best.pos)}` : '')); tip.append(row); }
+    tip.hidden = false; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + 'px'; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 12) + 'px'; });
+  hit.addEventListener('pointerleave', () => { cross.setAttribute('opacity', 0); tip.hidden = true; });
+  hit.addEventListener('click', e => { state.t = tAt(e); paint(); });
+  box.append(svg); geo = { X };
+}
+function moveMarker() { const mk = document.getElementById('tmark'); if (mk && geo) { mk.setAttribute('x1', geo.X(state.t)); mk.setAttribute('x2', geo.X(state.t)); } }
+
+/* الجدول */
+function table() {
+  const t = $('#table'); t.replaceChildren();
+  const cols = [['الجولة'], ['التسجيل'], ['الوضع'], ['تأخّر الإشارة · الوسيط', 1], ['p90', 1], ['مبكرة', 1], ['حمراء خطأً', 1], ['تأخّر السماع · الوسيط', 1], ['p90', 1], ['طلب الكلمات · ث', 1], ['سقوط الحجاب · ث', 1]];
+  const hr = el('tr'); for (const [h] of cols) hr.append(el('th', { scope: 'col', text: h })); t.append(el('thead', {}, hr));
+  const tb = el('tbody');
+  const row = (cells, cls) => { const tr = el('tr', { class: cls || '' }); cells.forEach((c, i) => { const td = el('td', { class: cols[i][1] ? 'n' : '' }); if (c instanceof Node) td.append(c); else td.textContent = c == null ? '—' : String(c); tr.append(td); }); tb.append(tr); };
+  for (const r of runs) {
+    const s = r.summary, name = el('span', { text: r.name }); if (r.side) name.append(el('span', { class: 'pill' + (r.side === 'after' ? ' after' : ''), text: r.side === 'after' ? 'بعد' : 'قبل' }));
+    row([name, recName(r.recording), MODES[r.mode], fmt(s.delayMedian), fmt(s.delayP90), s.early, s.wrongRed, fmt(s.lagMedian), fmt(s.lagP90), fmt(s.recogniseMedian), s.veilDrop == null ? '—' : fmt(s.veilDrop, 2)], r.side === 'after' ? 'hl' : '');
+  }
+  for (const h of DATA.history || []) row([h.name, h.recording, MODES[h.mode] || h.mode, fmt(h.delayMedian), fmt(h.delayP90), h.early, h.wrongRed, fmt(h.lagMedian), fmt(h.lagP90), fmt(h.recogniseMedian), h.veilDrop == null ? '—' : fmt(h.veilDrop, 2)], 'hist');
+  t.append(tb);
+}
+
+function prose() {
+  $('#changes-h').textContent = DATA.changesTitle || '';
+  const tl = $('#timeline'); tl.replaceChildren();
+  for (const c of DATA.changes || []) tl.append(el('div', { class: 'change' + (c.mine ? ' mine' : '') }, c.url ? el('a', { href: c.url, class: 'pr', target: '_blank', rel: 'noopener', text: c.pr }) : el('span', { class: 'pr', text: c.pr }), el('div', { class: 'what', text: c.what }), el('div', { class: 'who', text: c.who || '' })));
+  const note = n => { const ul = el('ul'); for (const li of n.items) ul.append(el('li', { text: li })); return el('div', { class: 'note' }, el('h3', { text: n.title }), ul); };
+  $('#why').replaceChildren(...(DATA.why || []).map(note));
+  $('#method').replaceChildren(...(DATA.method || []).map(note));
+  $('#footer').textContent = DATA.footer || '';
+  if (!(DATA.changes || []).length) $('#changes-sec').hidden = true;
+}
+
+function renderAll() { segs(); if (!state.panes[0] || !byLabel(state.panes[0]) || byLabel(state.panes[0]).recording !== state.rec || byLabel(state.panes[0]).mode !== state.mode) defaults(); $('#time').max = String(maxT()); if (state.t > maxT()) state.t = 0; renderPanes(); chips(); drawChart(); }
+head(); prose(); table(); defaults();
+state.t = Math.round(maxT() * 0.45);
+renderAll();
+let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(drawChart, 150); });
+</script>

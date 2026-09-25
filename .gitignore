@@ -22,3 +22,7 @@ tmp/
 # تقارير مُولَّدة — تُحسب عند الطلب ولا تُلتزَم
 artifacts/
 test-results.xml
+
+# live-listen: recordings and run outputs stay local
+tools/live-listen/.cache/
+tools/live-listen/out/
