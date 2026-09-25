@@ -199,7 +199,7 @@ test('a closed ASR gate still lets words through the practice listener, and the 
   // والبوّابةُ المعادةُ من هناك بوّابةُ المحرّك (مغلقة) — فلا يُحكم بما سُمع.
   assert.match(server, /return \{gate:practiceJudgingGate\(input\.reading\),words,modelVersion:PRACTICE_LISTENER_MODEL\};/);
   const practice = read('src/components/participant/MushafListens.tsx');
-  assert.match(practice, /if \(\(attemptJudging\.current \|\| wordFollow\.current\) && !\(await recognition\.current\.drain\(\)\)\) \{/);
+  assert.match(practice, /if \(\(attemptJudging\.current \|\| wordFollow\.current\) && !\(await recognition\.current\.drain\(undefined, false\)\)\) \{/);
 });
 
 test('the edge hold no longer delays the pen for a word heard exactly as the next one', () => {
