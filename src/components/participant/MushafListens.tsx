@@ -22,7 +22,7 @@ import type { ExpectedWord, HeardWord, Mistake } from '../../lib/recitation-diff
 import { quranSkeleton } from '../../lib/quran-orthography';
 import { fetchDeliveryPassage, fetchDivergencePoints, type DivergencePoint } from '../../lib/kfgqpc-library';
 import { SimilarSlipCard, type SimilarSlip } from './SimilarSlipCard';
-import { CHUNK_MS, ChunkTimeline, GRID_CLOCK, catchUpWindow, commitWords, edgeWords as edgeWordsOf, recognitionWindow } from '../../lib/recognition-window';
+import { CHUNK_MS, ChunkTimeline, GRID_CLOCK, catchUpWindow, commitWords, edgeWords as edgeWordsOf, leavesHole, recognitionWindow } from '../../lib/recognition-window';
 import { faceWordLookup, readRecitation, SAMPLED_PATH_MARKS, settleRecitation, type FaceAlignmentSample } from '../../lib/face-session';
 import {
   fetchPracticeFace, fetchPracticeFaceCatalogue,
@@ -254,6 +254,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const committedUntil = useRef(0);
   /** ساعةُ المقاطع المقيسة (`ChunkTimeline`): أين يبدأ كلُّ مقطعٍ من التسجيل حقًّا. */
   const chunkClock = useRef<ChunkTimeline | null>(null);
+  /** سقط طلبُ سماعٍ وما بعد هذا الحدّ لم يُسمع بعد — والنافذةُ التالية تعيده أو يُبطَل الحكم (`leavesHole`). */
+  const unheardSince = useRef<number | null>(null);
   /** وآخرُ ما عولج من الصوت (حدُّ تثبيت آخر نافذةٍ أُرسلت) — به يُترك طلبٌ لا جديدَ فيه. */
   const coveredUntil = useRef(0);
   /*
@@ -600,7 +602,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
       const surahSegments = faceSurahSegments(face.words);
       alignSurah.current = null;
       recording.current = all;
-      committedUntil.current = 0; coveredUntil.current = 0;
+      committedUntil.current = 0; coveredUntil.current = 0; unheardSince.current = null;
       rec.ondataavailable = e => {
         if (!e.data.size) return;
         const chunk = e.data;
@@ -729,9 +731,24 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               reading: listening.reading, sourcePackageId: listening.sourcePackageId,
             }, journeyAuth);
             if (!alive.current || !live()) return;
+            /* ما عولج من الصوت قبل هذه النافذة — والطلبُ الذي سقط لا يقدّمه. */
+            const heardUntil = coveredUntil.current;
             coveredUntil.current = Math.max(coveredUntil.current, reach.commitUntilMs);
             followFailures.current = 0;
-            if (!permission) {
+            /*
+             * والطلبُ الذي سقط قبله لا يُبطل الحكمَ ما دامت هذه النافذةُ تبدأ قبل آخر ما عولج: فقد أعادت
+             * صوتَه. أمّا نافذةٌ تبدأ بعده فقد تركت ما بينهما بلا سماع — سقط قبلها طلبٌ أو لم يسقط —
+             * فيُبطَل الحكمُ ويبقى التتبّع: النافذةُ نفسُها تحرّك القلم. (والحدُّ ما عولج لا آخرُ كلمةٍ ثُبّتت:
+             * في الصمت لا تُثبَّت كلمة، والصوتُ مسموعٌ — قِيس: صمتُ دقيقتين بعد التلاوة أبطل حكمَ جولةٍ كاملة.)
+             */
+            const hole = !!permission && leavesHole(reach.startMs, heardUntil);
+            if (hole) {
+              attemptJudging.current = null;
+              setMistakes(undefined);
+              setJudgingLost(true);
+            }
+            unheardSince.current = null;
+            if (!permission || hole) {
               /* تتبّعٌ بلا حكم: الموضعُ من الكلمات المسموعة، ولا خطأَ يُعرض ولا نغمة. */
               heardWords.current = keepFaceEntry([...heardWords.current, ...committedWords(out.words, reach.startMs, reach.commitUntilMs)], trustedFrontier.current);
               const frontier = followFrontier(expectedRef.current, heardWords.current, trustedFrontier.current);
@@ -796,7 +813,19 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
              * وسقوطُ السماع لا يُسقط التتبّع: تبقى العلاماتُ تُقاس ويبقى الوجهُ يُقرأ.
              */
             const code = error instanceof Error ? error.message : '';
+            /*
+             * إلا طلبًا سقط عابرًا (مهلة، شبكة، مستمعٌ يُقلع): آخرُ مُثبَّتٍ لم يتقدّم به، فالنافذةُ التالية
+             * تعيد صوتَه — ويُبطَل الحكمُ إن تركت ثقبًا (`leavesHole`)، أو كان هذا المقطعَ الأخير فلا نافذةَ
+             * بعده، أو كانت العلّةُ بنيويّةً في البوّابة والإعداد. قِيس: مهلةٌ واحدةٌ بعد النشر أبطلت محاولةً
+             * كاملةً وقد سُمع صوتُها كلُّه في النافذة التالية.
+             */
+            const structural = /GATE_CHANGED|NOT_CONFIGURED|JUDGING_CLOSED|MISMATCH|MODEL_NOT_BENCHMARKED/.test(code);
+            if (!structural && !finalChunk) {
+              if (unheardSince.current === null) unheardSince.current = coveredUntil.current;
+              return;
+            }
             attemptJudging.current = null;
+            unheardSince.current = null;
             setMistakes(undefined);
             /* والتبدّلُ يُكشف في الشاشة (بوّابةُ الجواب) أو في الخادم (البابُ بعد الجواب). */
             const changed = /GATE_CHANGED/.test(code);
@@ -1026,6 +1055,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         attemptJudging.current = null;
         setJudgingLost(true);
       }
+    }
+    /* وطلبٌ سقط ولم تُعِده نافذةٌ بعده: بقي ما بعده بلا سماع، فلا حكم. */
+    if (attemptJudging.current && unheardSince.current !== null) {
+      attemptJudging.current = null;
+      unheardSince.current = null;
+      setJudgingLost(true);
     }
     if (!alive.current) return;
     setReading(settled.reading);
