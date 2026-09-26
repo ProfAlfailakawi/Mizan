@@ -71,7 +71,7 @@ test('a retired text dataset has no local substitute for audio or pages', () => 
    * الفرقُ الذي يبرّر الإخراج: النصُّ له أثرٌ على القرص، وهذه ليس لها. فلو عُوملت
    * معاملتَه لسقط الصوتُ يومَ المسابقة بلا حارسٍ يسبقه.
    */
-  for (const id of ['audio-hafs', 'mushaf-pages']) {
+  for (const id of ['mushaf-pages']) {
     assert.equal(candidateRawiForDeliveryKey(id), undefined,
       `${id} must not resolve to a reading artifact — it has no local substitute`);
   }
@@ -117,7 +117,7 @@ test('the non-Hafs audio packages are retired because every reading plays the on
    * ويُقاس السببُ نفسُه: العشرون كلُّها تعيد ملفَّ حفصٍ الواحد. فلو صار يومًا لكلّ
    * روايةٍ صوتُها سقط هذا الاختبارُ ووجب ردُّ هذه الحزم إلى المطلوب.
    */
-  assert.equal(KFGQPC_RETIRED_AUDIO_DATASETS.length, 4);
+  assert.equal(KFGQPC_RETIRED_AUDIO_DATASETS.length, 3);
   assert.equal(CANONICAL_RAWI_IDS.length, 20);
 
   const profiles = new Set<string>();

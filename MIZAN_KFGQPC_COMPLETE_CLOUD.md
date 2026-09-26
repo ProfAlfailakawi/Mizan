@@ -5,7 +5,7 @@ MIZAN accepts Quran assets only from HTTPS URLs whose hostname is exactly `quran
 
 ## Covered datasets
 
-It also covers official Quran fonts for Hafs, Warsh, Shu'bah, Qalun, Al-Duri, and Al-Susi; the official 604-page Madinah Mushaf delivery set; and ayah audio targets for Hafs/Maher Al-Muaiqly, Shu'bah/Ali Al-Hudhaifi, Qalun/Ali Al-Hudhaifi, Al-Susi/Uthman Al-Siddiqi, with Al-Duri/Abdullah Al-Juhani and Warsh/Ibrahim Al-Dawsari handled fail-closed until a current direct official package passes structural validation.
+It also covers official Quran fonts for Hafs, Warsh, Shu'bah, Qalun, Al-Duri, and Al-Susi; the official 604-page Madinah Mushaf delivery set; and ayah audio targets for Shu'bah/Ali Al-Hudhaifi, Qalun/Ali Al-Hudhaifi, Al-Susi/Uthman Al-Siddiqi, with Al-Duri/Abdullah Al-Juhani and Warsh/Ibrahim Al-Dawsari handled fail-closed until a current direct official package passes structural validation.
 
 ## No app bloat
 Heavy files are never added to GitHub, AI Studio source, Vite assets, or the Cloud Run image. Cloud Build uses an ephemeral staging directory and sends verified delivery files to the private Cloudflare R2 bucket. The browser receives assets through MIZAN server routes; the private R2 origin and credentials remain server-side.

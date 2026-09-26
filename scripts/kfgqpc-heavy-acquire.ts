@@ -33,7 +33,6 @@ const targets:Target[]=[
   {id:'font-qalun',kind:'FONT',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.fonts],tokens:[/قالون|qal(?:u|o)n/i,/عثماني|uthmanic|quran/i],maxBytes:256*MB,overrideEnv:'KFGQPC_FONT_QALUN_URL'},
   {id:'font-duri',kind:'FONT',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.fonts],tokens:[/الدوري|douri|duri/i,/أبي عمرو|abu amr|uthmanic|quran/i],maxBytes:256*MB,overrideEnv:'KFGQPC_FONT_DURI_URL'},
   {id:'font-susi',kind:'FONT',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.fonts],tokens:[/السوسي|sousi|susi/i,/أبي عمرو|abu amr|uthmanic|quran/i],maxBytes:256*MB,overrideEnv:'KFGQPC_FONT_SUSI_URL'},
-  {id:'audio-hafs',kind:'AUDIO',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.audioCatalog],tokens:[/حفص|hafs/i,/ماهر|muaiqly|المعيقلي/i],maxBytes:2*GB,overrideEnv:'KFGQPC_AUDIO_HAFS_URL'},
   {id:'audio-shubah',kind:'AUDIO',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.audioCatalog],tokens:[/شعبة|shu.?bah/i,/الحذيفي|hudhai/i],maxBytes:2*GB,overrideEnv:'KFGQPC_AUDIO_SHUBAH_URL'},
   {id:'audio-qalun',kind:'AUDIO',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.audioCatalog],tokens:[/قالون|qal(?:u|o)n/i,/الحذيفي|hudhai/i],maxBytes:2*GB,overrideEnv:'KFGQPC_AUDIO_QALUN_URL'},
   {id:'audio-susi',kind:'AUDIO',sourcePages:[KFGQPC_OFFICIAL_ENTRYPOINTS.audioCatalog],tokens:[/السوسي|sousi|susi/i,/عثمان|siddiq/i],maxBytes:5*GB,overrideEnv:'KFGQPC_AUDIO_SUSI_URL'},

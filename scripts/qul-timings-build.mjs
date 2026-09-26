@@ -11,9 +11,9 @@
  *
  * الاستعمال:
  *   node scripts/qul-timings-build.mjs \
- *     --timings maher_al_muaiqly.timings.json \
+ *     --timings <qul-dataset>.timings.json \
  *     --layout <مجلد تخطيط المصحف> \
- *     --recording hafs-muaiqly [--out <مجلد>]
+ *     --recording husary-murattal [--out <مجلد>]
  */
 
 import fs from 'node:fs';

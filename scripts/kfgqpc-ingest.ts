@@ -18,7 +18,6 @@ export const DATASETS:Record<string,DatasetSpec>={
   'duri-data':{id:'duri-data',r2Prefix:'delivery/quran-data/duri-abi-amr/v3',sourceUrl:OFFICIAL_DEV,packageVersion:'3.0',reading:'الدوري عن أبي عمرو',officialChecksum:{md5:'A60BDD18397B3E27E4617478968A35C8',sha1:'8049482F04B4FF1053A7859F96B2B113B9771EFB'},kind:'DATA'},
   'susi-data':{id:'susi-data',r2Prefix:'delivery/quran-data/susi-abi-amr/v3',sourceUrl:OFFICIAL_DEV,packageVersion:'3.0',reading:'السوسي عن أبي عمرو',officialChecksum:{md5:'1BF6023E29B7622A52B6171232C17096',sha1:'E52DBC6D8B43797A8FAA0FD1EC1D8E5000265674'},kind:'DATA'},
   'mushaf-pages':{id:'mushaf-pages',r2Prefix:'delivery/mushaf-pages/madinah/v1',sourceUrl:OFFICIAL_DEV,reading:'حفص عن عاصم',kind:'MUSHAF'},
-  'audio-hafs':{id:'audio-hafs',r2Prefix:'delivery/audio/hafs/maher-al-muaiqly/v1',sourceUrl:OFFICIAL_AUDIO,reading:'حفص عن عاصم',rawi:'حفص',reciter:'الشيخ ماهر المعيقلي',kind:'AUDIO'},
   'audio-shubah':{id:'audio-shubah',r2Prefix:'delivery/audio/shubah/ali-al-hudhaifi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'شعبة عن عاصم',rawi:'شعبة',reciter:'الشيخ علي الحذيفي',kind:'AUDIO'},
   'audio-qalun':{id:'audio-qalun',r2Prefix:'delivery/audio/qalun/ali-al-hudhaifi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'قالون عن نافع',rawi:'قالون',reciter:'الشيخ علي الحذيفي',kind:'AUDIO'},
   'audio-susi':{id:'audio-susi',r2Prefix:'delivery/audio/susi/uthman-al-siddiqi/v1',sourceUrl:OFFICIAL_AUDIO,reading:'السوسي عن أبي عمرو',rawi:'السوسي',reciter:'د. عثمان الصديقي',kind:'AUDIO'},

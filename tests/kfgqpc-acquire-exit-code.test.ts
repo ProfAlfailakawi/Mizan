@@ -25,7 +25,7 @@ const allVerified = () => ({
   results: [
     ...LIGHT_PACKAGES.map(spec => ({id: spec.id, status: 'ACQUIRED_VERIFIED'})),
     {id: 'mushaf-pages', status: 'DEFERRED'},
-    {id: 'audio-hafs', status: 'DEFERRED_HEAVY'},
+    {id: 'audio-shubah', status: 'DEFERRED_HEAVY'},
   ],
 });
 
