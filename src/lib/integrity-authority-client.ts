@@ -1,4 +1,5 @@
 import {auth} from './firebase';
+import {demoAuthorityCall} from './demo-authority';
 
 /*
  * عميل سلطة النزاهة.
@@ -22,6 +23,9 @@ export type AuthorityResult<T> = { ok: true; value: T } | { ok: false; failure: 
 export const succeeded = <T,>(r: AuthorityResult<T>): r is {ok: true; value: T} => 'value' in r;
 
 async function call<T>(path: string, init?: {method?: string; body?: unknown}): Promise<AuthorityResult<T>> {
+  /* البيئة التجريبية وحدها (يفعّلها المخزن صراحةً): انظر `demo-authority.ts`. */
+  const demo = demoAuthorityCall(path, init);
+  if (demo) return demo as AuthorityResult<T>;
   const user = auth.currentUser;
   if (!user) return {ok: false, failure: 'NOT_SIGNED_IN'};
   let response: Response;

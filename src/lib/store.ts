@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
 import { normalizeAwardPolicy, resolveAwards, type AwardPlace } from './award-places';
 import { tieDecision, type TieDecision, type TieGroup } from './tie-resolution';
+import { enableDemoAuthority } from './demo-authority';
 import { sealResultOnServer, publishResultsOnServer, attestPolicyChangeOnServer, attestScoreCorrectionOnServer, attestReadingChangeOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
@@ -235,7 +236,12 @@ export const DEMO_AVAILABLE = demoIsAvailable();
 
 function demoFlagIsSet(): boolean {
   try {
-    return typeof window !== 'undefined' && window.sessionStorage.getItem(DEMO_FLAG_KEY) === 'true';
+    if (typeof window === 'undefined') return false;
+    /* رابط شاشةٍ نُسخ من بيئة العرض (`#board?…&demo=1`) يُفتح في تبويبٍ جديد لا يرث
+       رايتها، فكانت الشاشة تقول «لم تُنشر بعد». فيرفع الرابطُ الرايةَ لتبويبه — وهذا
+       لا يلمس حالة حقيقية: للعرض مفتاح تخزينه المستقل. */
+    if (/^#board\?/.test(window.location.hash) && /[?&]demo=1(?:&|$)/.test(window.location.hash)) window.sessionStorage.setItem(DEMO_FLAG_KEY, 'true');
+    return window.sessionStorage.getItem(DEMO_FLAG_KEY) === 'true';
   } catch {
     /* نافذةٌ خاصة أو تخزينٌ محجوب يرمي هنا. الفشل المغلق هو الجواب الآمن: لا علم، لا ديمو. */
     return false;
@@ -498,6 +504,8 @@ function applyStoredDemoRole(): void {
 }
 
 if (IS_DEMO_SESSION) {
+  /* سلطة النزاهة في العرض تُجاب محليًا باسم الدور المعروض — انظر `demo-authority.ts`. */
+  enableDemoAuthority(() => ({ id: globalState.currentUser.id, role: globalState.currentUser.role, name: globalState.currentUser.nameArabic || globalState.currentUser.name }));
   let alreadyHydrated = false;
   try {
     alreadyHydrated = Boolean(window.sessionStorage.getItem(DEMO_STATE_KEY));
@@ -4010,7 +4018,10 @@ const prepareJourneyAccessBatch=async()=>{
     rows.push({key:'ai_never_scores',titleArabic:'الذكاء الاصطناعي لا يحكم',titleEnglish:'AI never scores',status:policy.judging.aiCanAffectScore===false?'pass':'violation',evidence:[`aiCanAffectScore=${String(policy.judging.aiCanAffectScore)}`]});
     const sealed=globalState.results.filter(r=>r.competitionId===globalState.competition.id&&['sealed','published'].includes(r.status));
     let sealOk=true;
-    for(const r of sealed){const at=r.sealMetadata?.sealedAt;const expected=r.sealMetadata?.cryptographicChecksum;if(!at||!expected){sealOk=false;break;}const set=globalState.results.filter(x=>x.competitionId===globalState.competition.id&&['sealed','published'].includes(x.status));const payload=JSON.stringify(set.map(x=>({id:x.id,participantId:x.participantId,score:x.finalScore,rank:x.rank,categoryId:x.categoryId})).sort((a,b)=>a.id.localeCompare(b.id)))+globalState.competition.ruleSet.version+at;const h=`SHA256:${await sha256(payload)}`;if(h!==expected){sealOk=false;break;}}
+    for(const r of sealed){const at=r.sealMetadata?.sealedAt;const expected=r.sealMetadata?.cryptographicChecksum;if(!at||!expected){sealOk=false;break;}
+      /* ختمٌ ألّفه الخادم يحمل بصمته هو (`SHA256:<serverSealSha256>`) لا بصمة المجموعة المحلية، وثباتُه
+         يُتحقّق منه عند الخادم. فمقارنته بصيغة المجموعة كانت تُسقطه دائمًا وتمنع كل ختمٍ بعده. */
+      if(r.sealMetadata?.serverSealSha256&&expected===`SHA256:${r.sealMetadata.serverSealSha256}`&&r.sealMetadata.serverComposedScore===r.finalScore)continue;const set=globalState.results.filter(x=>x.competitionId===globalState.competition.id&&['sealed','published'].includes(x.status));const payload=JSON.stringify(set.map(x=>({id:x.id,participantId:x.participantId,score:x.finalScore,rank:x.rank,categoryId:x.categoryId})).sort((a,b)=>a.id.localeCompare(b.id)))+globalState.competition.ruleSet.version+at;const h=`SHA256:${await sha256(payload)}`;if(h!==expected){sealOk=false;break;}}
     rows.push({key:'sealed_results_immutable',titleArabic:'النتيجة المختومة ثابتة',titleEnglish:'Sealed results immutable',status:sealOk?'pass':'violation',evidence:[sealed.length?`${sealed.length} sealed/published result(s) checked`:'No sealed results yet']});
     const independent=policy.judging.independentUntilLock!==false;
     rows.push({key:'judge_independence',titleArabic:'استقلال المحكم',titleEnglish:'Judge independence',status:independent?'pass':'violation',evidence:[`independentUntilLock=${String(policy.judging.independentUntilLock)}`]});
