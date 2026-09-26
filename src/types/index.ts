@@ -1047,7 +1047,7 @@ export interface QuestionPolicy {
   diversity: { acrossJuz: boolean; acrossSurah: boolean; mutashabihatBalance: boolean };
   promptMode: 'judge' | 'certified_audio' | 'visual' | 'configurable';
   secureReveal?: { requireParticipantPresence:boolean; judgeApprovalMode:'all_assigned'|'minimum'; minimumApprovals?:number };
-  openingPrompt?: { mode:'approved_reference_audio'|'judge'; autoplay:boolean; usageScope:string; preferredReciter?:string };
+  openingPrompt?: { mode:'approved_reference_audio'|'judge'; autoplay:boolean; usageScope:string };
   transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; selectedPhraseIndexes?:number[]; /** legacy read-only field; no longer exposed or played */ audioUrl?:string };
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {KfgqpcDeliveryRepository,KFGQPC_R2_DEFAULT_SAFETY_LIMIT_BYTES,KFGQPC_R2_FREE_TIER_BYTES,kfgqpcActualStorageReport,kfgqpcAudioKeys,kfgqpcFreeTierBudget,kfgqpcMushafPageKeys} from '../server/kfgqpc-delivery';
+import {KfgqpcDeliveryRepository,KFGQPC_R2_DEFAULT_SAFETY_LIMIT_BYTES,KFGQPC_R2_FREE_TIER_BYTES,kfgqpcActualStorageReport,kfgqpcFreeTierBudget,kfgqpcMushafPageKeys} from '../server/kfgqpc-delivery';
 import {assertUploadFitsBudget,validateMushafDeliveryPages,verifyFileChecksums} from '../server/kfgqpc-ingest-core';
 import {R2PrivateClient,r2ConfigFromEnv} from '../server/r2-private';
 
@@ -15,17 +15,6 @@ test('private R2 key builder uses versioned delivery paths and validates pages 1
   assert.deepEqual(kfgqpcMushafPageKeys('kfgqpc-hafs-uthmanic-v13',0),[]);
   assert.deepEqual(kfgqpcMushafPageKeys('kfgqpc-hafs-uthmanic-v13',605),[]);
   assert.deepEqual(kfgqpcMushafPageKeys('kfgqpc-warsh-uthmanic-v6',1),[],'Hafs Madinah delivery page must not be reused for Warsh');
-});
-
-test('audio mapping is exact and has no cross-riwayah fallback',()=>{
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-hafs-muaiqly',2,255)[0],'delivery/audio/hafs/maher-al-muaiqly/v1/002/255.mp3');
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-shubah-hudhaifi',1,1)[0],'delivery/audio/shubah/ali-al-hudhaifi/v1/001/001.mp3');
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-qalun-hudhaifi',1,1)[0],'delivery/audio/qalun/ali-al-hudhaifi/v1/001/001.mp3');
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-susi-siddiqi',1,1)[0],'delivery/audio/susi/uthman-al-siddiqi/v1/001/001.mp3');
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-warsh-dawsari',1,1)[0],'delivery/audio/warsh/ibrahim-al-dawsari/v1/001/001.mp3');
-  assert.equal(kfgqpcAudioKeys('kfgqpc-audio-duri-juhani',1,1)[0],'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1/001/001.mp3');
-  assert.deepEqual(kfgqpcAudioKeys('warsh',1,1),[],'generic Warsh alias is deliberately unsupported');
-  assert.deepEqual(kfgqpcAudioKeys('hafs',1,1),[],'generic Hafs alias is deliberately unsupported');
 });
 
 test('planned storage stays under the configured safety ceiling, not merely under 10 GiB',()=>{

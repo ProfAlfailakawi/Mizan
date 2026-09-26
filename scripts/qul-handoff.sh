@@ -21,7 +21,7 @@ SERVICE="${SERVICE:-mizan}"
 REGION="${REGION:-me-central1}"
 BUCKET="${BUCKET:-${PROJECT}-mizan-handoff}"
 WORK="${WORK:-$HOME/mizan-handoff}"
-RECORDING="${RECORDING:-hafs-muaiqly}"
+RECORDING="${RECORDING:-husary-murattal}"
 
 if [ -z "${PROJECT}" ] || [ "${PROJECT}" = "(unset)" ]; then
   echo "No project selected. Run: gcloud config set project <PROJECT_ID>" >&2
@@ -106,7 +106,7 @@ for (let surah = 1; surah <= 114; surah += 2) {
   let recorded = false;
   for (const ayah of [3, 2, 1]) {
     try {
-      const r = await fetch(`${url}/api/public/kfgqpc/audio/${recording}/${surah}/${ayah}`, { cache: 'no-store' });
+      const r = await fetch(`${url}/api/public/quran-audio/${String(surah).padStart(3, '0')}${String(ayah).padStart(3, '0')}.mp3`, { cache: 'no-store' });
       if (!r.ok) continue;
       const buf = Buffer.from(await r.arrayBuffer());
       const ms = mod.mp3DurationMs(buf);

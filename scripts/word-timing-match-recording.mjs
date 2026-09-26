@@ -13,7 +13,7 @@
  *   node scripts/word-timing-match-recording.mjs \
  *     --timings .mizan-data/word-timings/Husary_64kbps.json \
  *     --base https://mizan-xxxx.run.app \
- *     --recording hafs-muaiqly [--sample 40]
+ *     --recording husary-murattal [--sample 40]
  *
  * المخرج حكمٌ صريح: MATCH أو MISMATCH، ولا شيء بينهما يُترك للتأويل.
  */
@@ -75,7 +75,7 @@ async function main() {
 
   for (const key of keys) {
     const [surah, ayah] = key.split(':');
-    const url = `${base}/api/public/kfgqpc/audio/${encodeURIComponent(recording)}/${surah}/${ayah}`;
+    const url = `${base}/api/public/quran-audio/${String(surah).padStart(3, '0')}${String(ayah).padStart(3, '0')}.mp3`;
     let buf;
     try {
       const r = await fetch(url, { cache: 'no-store' });

@@ -7,9 +7,9 @@ import { useAppStore } from '../../lib/store';
 import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
-import { openingAudioWindow, passageTransitionPlan, selectApprovedOpeningAudio } from '../../lib/judging-integrity';
+import { passageTransitionPlan } from '../../lib/judging-integrity';
 import { OPENING_RECORDING } from '../../lib/opening-cue';
-import { planStopMs, prepareOpeningCut, prepareOpeningCutForReading, refineStopMs, watchStop } from '../../lib/opening-cue-player';
+import { planStopMs, prepareOpeningCut, refineStopMs, watchStop } from '../../lib/opening-cue-player';
 import { certifiedCapabilityFor, resolveReading } from '../../lib/scientific-core';
 import { approveEmergencyQuestionReplacement, approveSecureQuestion, confirmSecureParticipantPresence, getSecureRuntimeStatus, revealSecureQuestion, type SecureQuestionPlaintext, type SecureQuestionRuntimeState } from '../../lib/server-question-client';
 import { Button } from '../design-system/Button';
@@ -486,7 +486,6 @@ export const JudgeOS: React.FC = () => {
  const calibrationBlocked=policy.judging.calibrationRequired && !!judge && !judge.isReady;
  const reviewAvailable=activeSession.isLocked&&policy.aiPolicy.revealOnlyAfterJudgeLock&&policy.aiPolicy.mode!=='AI_DISABLED'&&policy.aiPolicy.mode!=='AI_RESEARCH_SHADOW_MODE'&&store.reviewCases.some(r=>r.sessionId===activeSession.sessionId&&r.status==='pending'&&r.reason==='ai_high_confidence_alert');
  const reading=participant?resolveReading({riwaya:participant.riwaya}):undefined; const readingQiraah=secureRuntime?.qiraah||activeSession.questionSelection?.qiraah||reading?.qiraah; const readingRawi=secureRuntime?.rawi||activeSession.questionSelection?.rawi||reading?.rawi; const readingTariq=secureRuntime?.tariq||activeSession.questionSelection?.tariq;
- const openingReference=q&&readingQiraah&&readingRawi?selectApprovedOpeningAudio({references:store.quranReferenceAudio,qiraah:readingQiraah,rawi:readingRawi,tariq:readingTariq,preferredReciter:policy.questions.openingPrompt?.preferredReciter,surah:q.surahNumber,ayah:q.startAyah}):undefined;
  const certifiedPosition=readingQiraah&&readingRawi?certifiedCapabilityFor(store.aiCapabilityValidations,{capability:'quran_position',qiraah:readingQiraah,rawi:readingRawi,tariq:readingTariq}):undefined;
  const sessionRecording=store.audioRecordings.find(x=>x.sessionId===activeSession.sessionId&&x.status==='completed'&&!!x.localObjectUrl);
  const replayEvidence=(offsetMs:number)=>{if(!sessionRecording?.localObjectUrl)return;const player=new Audio(sessionRecording.localObjectUrl);player.currentTime=Math.max(0,offsetMs/1000);void player.play().catch(()=>{})};
@@ -506,42 +505,30 @@ export const JudgeOS: React.FC = () => {
   return()=>{live=false}},[questionRevealed,(q as any)?.surahNumber,(q as any)?.startAyah,(q as any)?.endAyah,(q as any)?.rawi,(q as any)?.riwaya]);
  const assignedJudgeId=judge?.userId||store.currentUser.id; const approvedByMe=secureMode?myRevealApproved:!!gate?.approvals.some(a=>a.judgeId===assignedJudgeId); const required=secureMode?(secureQuestionState?.required||activeSession.committee?.judgeIds.length||0):(gate?.requiredJudgeIds.length||activeSession.committee?.judgeIds.length||0); const approved=secureMode?(secureQuestionState?.approved||0):(gate?.approvals.length||0); const participantPresent=secureMode?!!secureRuntime?.escrow.presenceVerified:!!gate?.participantPresence.verified;
 
- // بلا مرجع صوتي في المتجر: نشغّل «أول آية» من مصدر التسليم الرسمي (Cloudflare R2) مباشرة —
+ // «أول آية» بصوت الحصري المرتل من المصدر المركزي (`quran-audio.ts`) —
  // ملف صوتي لآية واحدة، فيبدأ ويقف عند نهايتها وحده. صوت رسمي معتمد، لا تحويل نص إلى كلام.
  /*
   * «أوّلُ آية» سطرًا واحدًا على الأكثر (طلبُ اللجنة): الآيةُ الطويلة يقف صوتُها عند آخر سطرها
   * الأوّل — أو عند سكتةٍ قبله — ويُخفض قبل الوقوف فلا يُسمع بتر. والقاعدةُ في `opening-cue.ts`.
   *
-  * والتسجيلُ تسجيلُ حفص (المعيقلي) للروايات العشرين كلّها — قرارُ المالك (`OPENING_RECORDING`
-  * = `REFERENCE_AUDIO_ID`). كان الطلبُ يُرسَل باسم الرواية («hafs»، «warsh»…) والخادمُ لا يعرف
-  * إلا معرّفَ التسجيل («hafs-muaiqly»)، فيعود ٤٠٤ دائمًا ولا يُسمع ملفُّ الآية من هذا الزرّ قطّ.
+  * والتسجيلُ تسجيلُ حفص (الحصري المرتل) للروايات العشرين كلّها — قرارُ المالك (`OPENING_RECORDING`
+  * = `REFERENCE_AUDIO_ID`)، ورابطُ الملف يُبنى من السورة والآية وحدهما (`getQuranAudioUrl`).
   *
   * والتشغيلُ التلقائيّ مرّةً واحدة؛ أمّا الزرّ فيعيد متى ضُغط (كان يُمنع بعد أوّل مرّة فيبدو ميتًا).
   */
  const openingStopRef=useRef<(()=>void)|null>(null);
  const playOfficialDeliveryAyah=async(manual=false)=>{if(!q)return false;const anyq=q as any;const readingKey=deliveryReadingKeyFor({qiraah:anyq.qiraah||readingQiraah,rawi:anyq.rawi||readingRawi,riwaya:anyq.riwaya||participant?.riwaya});const surah=Number(anyq.surahNumber)||surahNumberFromName(anyq.surahNameEnglish,anyq.surahNameArabic);const recording=OPENING_RECORDING;if(!surah||!q.startAyah)return false;const playKey=`${activeSession.sessionId}:${activeSession.currentQuestionIndex}:delivery:${surah}:${q.startAyah}`;if(!manual&&openingPlayedKeyRef.current===playKey)return true;setOpeningAudioState('playing');
-  const [src,plan]=await Promise.all([fetchOfficialAyahAudio(recording,surah,q.startAyah),prepareOpeningCut(recording,surah,q.startAyah)]);
+  const [src,plan]=await Promise.all([fetchOfficialAyahAudio(surah,q.startAyah),prepareOpeningCut(recording,surah,q.startAyah)]);
   if(!src){setOpeningAudioState('unavailable');return false;}
   try{promptAudioRef.current?.pause();openingStopRef.current?.();const player=new Audio(src);promptAudioRef.current=player;let stopMs:number|undefined;
    const finish=()=>{openingStopRef.current?.();openingStopRef.current=null;setOpeningAudioState('idle');URL.revokeObjectURL(src)};
    player.onloadedmetadata=()=>{const estimate=planStopMs(plan,(player.duration||0)*1000);stopMs=estimate;if(estimate!==undefined)void refineStopMs(src,estimate).then(ms=>{if(player.currentTime*1000<ms-40)stopMs=ms})};
    openingStopRef.current=watchStop(player,()=>stopMs,finish);
    player.onended=finish;player.onerror=()=>{openingStopRef.current?.();setOpeningAudioState('failed')};
-   await player.play();openingPlayedKeyRef.current=playKey;return true}catch{setOpeningAudioState('failed');return false}};
+   await player.play();openingPlayedKeyRef.current=playKey;store.markOpeningAudioPlayed(recording);return true}catch{setOpeningAudioState('failed');return false}};
  const playOpeningAudio=async(manual=false)=>{if(!questionRevealed||!q){setOpeningAudioState('unavailable');return false;}
-   // الأولوية دائمًا لملف الآية الواحدة من مصدر التسليم الرسمي. لا نلجأ إلى مقطع الخزنة إلا
-   // إذا تعذّر ملف الآية، ونضع له السقفَ نفسَه: سطرٌ واحد.
-   if(await playOfficialDeliveryAyah(manual))return true;
-   if(!openingReference?.audioUrl){setOpeningAudioState('unavailable');return false;}const playKey=`${activeSession.sessionId}:${activeSession.currentQuestionIndex}:${openingReference.id}`;if(!manual&&openingPlayedKeyRef.current===playKey)return true;const window=openingAudioWindow(openingReference,q.startAyah);if(!window){setOpeningAudioState('unavailable');return false;}
-   const anyq=q as any;const readingKey=deliveryReadingKeyFor({qiraah:anyq.qiraah||readingQiraah,rawi:anyq.rawi||readingRawi,riwaya:anyq.riwaya||participant?.riwaya});const surah=Number(anyq.surahNumber)||surahNumberFromName(anyq.surahNameEnglish,anyq.surahNameArabic);
-   const plan=readingKey&&surah?await prepareOpeningCutForReading(readingKey,surah,q.startAyah):null;
-   try{promptAudioRef.current?.pause();openingStopRef.current?.();const player=new Audio(openingReference.audioUrl);promptAudioRef.current=player;player.currentTime=window.startMs/1000;setOpeningAudioState('playing');
-   /* لا يُشغّل إلا أول آية من السؤال — وسطرًا منها على الأكثر — ثم يسكت. وحين لا يتوفر توقيت
-      نهاية الآية نضع سقفًا آمنًا قصيرًا حتى لا يُكمِل تلاوة الوجه كله بلا توقّف. */
-   let limitMs=window.endMs!==undefined?window.endMs:window.startMs+7000;
-   player.onloadedmetadata=()=>{const span=(window.endMs??(player.duration||0)*1000)-window.startMs;const planned=planStopMs(plan,span);if(planned!==undefined)limitMs=Math.min(limitMs,window.startMs+planned)};
-   const finish=()=>{openingStopRef.current?.();openingStopRef.current=null;setOpeningAudioState('idle')};
-   openingStopRef.current=watchStop(player,()=>limitMs,finish);player.onended=finish;await player.play();openingPlayedKeyRef.current=playKey;store.markOpeningAudioPlayed(openingReference.id);return true}catch{setOpeningAudioState('failed');return false}};
+   // صوت الحصري المرتل هو المصدر الوحيد — لا بديل احتياطيّ بقارئٍ آخر.
+   return playOfficialDeliveryAyah(manual)};
  const confirmPresence=async()=>{if(!secureMode){setSecureError('');const out=await store.verifyParticipantPresenceForQuestion('manual_visual_confirmation');if(!out.ok)setSecureError(revealRefusalText(out.reason,ar));return out}if(!activeSession.secureRuntimeSessionId)return {ok:false,reason:'SECURE_RUNTIME_MISSING'} as const;try{const runtime=await confirmSecureParticipantPresence(activeSession.secureRuntimeSessionId);setSecureRuntime(runtime);setSecureError('');return {ok:true} as const}catch(e){setSecureError(e instanceof Error?e.message:'PRESENCE_FAILED');return {ok:false,reason:'PRESENCE_FAILED'} as const}};
  /*
   * رفضُ الفتح يُقال، لا يُبتلع.
@@ -573,7 +560,7 @@ export const JudgeOS: React.FC = () => {
  const storedCue=()=>playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue);
  storedCue()};
 
- useEffect(()=>{if(questionRevealed&&q&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),80)},[questionRevealed,(q as any)?.questionId,(q as any)?.id,openingReference?.id,activeSession.currentQuestionIndex]);
+ useEffect(()=>{if(questionRevealed&&q&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),80)},[questionRevealed,(q as any)?.questionId,(q as any)?.id,activeSession.currentQuestionIndex]);
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 

@@ -12,7 +12,7 @@ test('all twenty rawis use the same Hafs reference audio identity', () => {
   for (const reading of TEN_QIRAAT_GRAPH) {
     const policy = referenceAudioPolicy(reading.rawiId);
     assert.equal(policy.audioId, REFERENCE_AUDIO_ID);
-    assert.equal(policy.audioId, 'hafs-muaiqly');
+    assert.equal(policy.audioId, 'husary-murattal');
     assert.equal(policy.evidenceForDisplayedReading, false);
     assert.equal(policy.canAffectScore, false);
   }

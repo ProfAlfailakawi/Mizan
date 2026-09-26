@@ -57,7 +57,7 @@ test('the required list is exactly what production still reads from R2', () => {
    * والمحروسُ ألّا تُخرَج حزمةٌ صامتةً. فالصوتُ والصفحاتُ والتفسيرُ والغريبُ والتجويد
    * تُقرأ من R2 ولا بديلَ لها على القرص — فبقاؤها في المطلوب شرطٌ لا اختيار.
    */
-  assert.deepEqual([...KFGQPC_REQUIRED_DELIVERY_DATASETS].sort(), ['audio-hafs', 'mushaf-pages']);
+  assert.deepEqual([...KFGQPC_REQUIRED_DELIVERY_DATASETS].sort(), ['mushaf-pages']);
 
   // ولا تداخُل: حزمةٌ لا تكون مطلوبةً ومُخرَجةً معًا.
   const required = new Set<string>(KFGQPC_REQUIRED_DELIVERY_DATASETS);
@@ -117,7 +117,7 @@ test('the non-Hafs audio packages are retired because every reading plays the on
    * ويُقاس السببُ نفسُه: العشرون كلُّها تعيد ملفَّ حفصٍ الواحد. فلو صار يومًا لكلّ
    * روايةٍ صوتُها سقط هذا الاختبارُ ووجب ردُّ هذه الحزم إلى المطلوب.
    */
-  assert.equal(KFGQPC_RETIRED_AUDIO_DATASETS.length, 3);
+  assert.equal(KFGQPC_RETIRED_AUDIO_DATASETS.length, 4);
   assert.equal(CANONICAL_RAWI_IDS.length, 20);
 
   const profiles = new Set<string>();
@@ -129,8 +129,8 @@ test('the non-Hafs audio packages are retired because every reading plays the on
   assert.equal(profiles.size, 1, `all twenty readings must share one audio profile, found ${[...profiles].join(', ')}`);
   assert.equal([...profiles][0].split('/')[0], 'hafs');
 
-  // وحزمةُ صوت حفصٍ تبقى مطلوبةً — هي الوحيدةُ التي تُقرأ.
-  assert.ok([...KFGQPC_REQUIRED_DELIVERY_DATASETS].includes('audio-hafs'));
+  // ولا حزمةَ صوتٍ مطلوبةٌ من R2: تلاوة الحصري المرتل تُخدم عبر /api/public/quran-audio.
+  assert.equal([...KFGQPC_REQUIRED_DELIVERY_DATASETS].some(id => id.startsWith('audio-')), false);
   for (const id of KFGQPC_RETIRED_AUDIO_DATASETS) {
     assert.equal([...KFGQPC_REQUIRED_DELIVERY_DATASETS].includes(id as never), false, `${id} must not be required`);
   }

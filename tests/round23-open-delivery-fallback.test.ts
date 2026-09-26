@@ -36,15 +36,14 @@ test('open delivery serves the Hafs Mushaf page when neither local nor R2 resolv
   });
 });
 
-test('open delivery serves Hafs (Muaiqly) ayah audio and stays reading-isolated',async()=>{
+test('ayah audio is Husary Murattal (Husary_128kbps) only, with no substitute reciter',async()=>{
   const repo=freshRepo();
-  await withStubbedFetch({'https://everyayah.com/data/Maher_AlMuaiqly_64kbps/001001.mp3':()=>new Response(Buffer.from('MP3'),{status:200,headers:{'content-type':'audio/mpeg'}})},async()=>{
-    const hafs=await repo.ayahAudio('hafs-muaiqly',1,1);
-    assert.ok(hafs,'hafs audio resolved');
-    assert.equal(hafs!.type,'audio/mpeg');
-    // A narration with no open recitation mapping resolves to nothing — never a substitute reciter.
-    const warsh=await repo.ayahAudio('warsh-dawsari',1,1);
-    assert.equal(warsh,null);
+  await withStubbedFetch({'https://everyayah.com/data/Husary_128kbps/002255.mp3':()=>new Response(Buffer.from('MP3'),{status:200,headers:{'content-type':'audio/mpeg'}})},async()=>{
+    const a=await repo.husaryAyahAudio(2,255);
+    assert.ok(a,'husary audio resolved');
+    assert.equal(a!.type,'audio/mpeg');
+    // An upstream failure yields nothing — never another reciter.
+    assert.equal(await repo.husaryAyahAudio(1,1),null);
   });
 });
 
@@ -70,6 +69,5 @@ test('open delivery can be disabled, leaving primary sources as the only path',a
   const repo=freshRepo();const prev=process.env.MIZAN_DISABLE_RUNTIME_MIRROR;process.env.MIZAN_DISABLE_RUNTIME_MIRROR='true';
   try{await withStubbedFetch({'https://files.quran.app/':()=>new Response(Buffer.from('X'),{status:200})},async()=>{
     assert.equal(await repo.page('kfgqpc-hafs-uthmanic-v13',2),null);
-    assert.equal(await repo.ayahAudio('hafs-muaiqly',1,1),null);
   })}finally{if(prev===undefined)delete process.env.MIZAN_DISABLE_RUNTIME_MIRROR;else process.env.MIZAN_DISABLE_RUNTIME_MIRROR=prev}
 });

@@ -66,7 +66,7 @@ export const BASE_POLICY: CompetitionPolicy = {
     diversity: { acrossJuz: true, acrossSurah: true, mutashabihatBalance: true },
     promptMode: 'configurable',
     secureReveal: { requireParticipantPresence:true, judgeApprovalMode:'all_assigned' },
-    openingPrompt: { mode:'approved_reference_audio', autoplay:true, usageScope:'opening_prompt', preferredReciter:'' },
+    openingPrompt: { mode:'approved_reference_audio', autoplay:true, usageScope:'opening_prompt' },
     transitionCue: { enabled:true, phraseArabic:'', phraseEnglish:'', selectedPhraseIndexes:[0], autoAdvanceDelayMs:900 }
   },
   operations: {

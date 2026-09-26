@@ -33,11 +33,6 @@ export function prepareOpeningCut(recording: string, surah: number, ayah: number
     ? cached(`${recording}:${surah}:${ayah}`, () => buildPlan(OPENING_TEXT_READING, recording, surah, ayah))
     : Promise.resolve(null);
 }
-/** خطّةُ القطع على نصّ الرواية وحده — لمرجعٍ صوتيٍّ لا توقيتَ لكلماته. */
-export function prepareOpeningCutForReading(reading: string, surah: number, ayah: number): Promise<OpeningCutPlan | null> {
-  return reading ? cached(`reading:${reading}:${surah}:${ayah}`, () => buildPlan(reading, undefined, surah, ayah)) : Promise.resolve(null);
-}
-
 async function buildPlan(reading: string, recording: string | undefined, surah: number, ayah: number): Promise<OpeningCutPlan | null> {
   const passage = await fetchDeliveryPassage(reading, surah, ayah, ayah);
   const a = passage?.ayat.find(x => x.surah === surah && x.ayah === ayah);

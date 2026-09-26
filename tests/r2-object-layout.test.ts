@@ -34,7 +34,7 @@ test('certified package and source keys are immutable versioned paths', () => {
 test('tenant assets and exports are scoped under the tenant id', () => {
   assert.equal(tenantBrandingKey('tenant-a', 'v1', 'logo.png'), 'tenants/tenant-a/branding/v1/logo.png');
   assert.equal(tenantExportKey('tenant-a', 'comp-1', 'results.pdf'), 'exports/tenant-a/comp-1/results.pdf');
-  assert.equal(globalHafsAudioKey('hafs-muaiqly', 'v1', '001001.mp3'), 'audio/hafs/hafs-muaiqly/v1/001001.mp3');
+  assert.equal(globalHafsAudioKey('husary-murattal', 'v1', '001001.mp3'), 'audio/hafs/husary-murattal/v1/001001.mp3');
   // a malicious tenant id cannot escape its prefix
   assert.throws(() => tenantBrandingKey('../tenant-b', 'v1', 'logo.png'), (e: unknown) => e instanceof R2KeyError);
 });

@@ -31,6 +31,7 @@ test('delivery repository rejects unsafe asset coordinates',async()=>{
   const repo=new KfgqpcDeliveryRepository({});
   assert.equal(await repo.page('../escape',1),null);
   assert.equal(await repo.page('safe',0),null);
-  assert.equal(await repo.ayahAudio('../bad',1,1),null);
-  assert.equal(await repo.ayahAudio('hafs',115,1),null);
+  assert.equal(await repo.husaryAyahAudio(115,1),null);
+  assert.equal(await repo.husaryAyahAudio(1,8),null,'Al-Fatihah has seven ayat');
+  assert.equal(await repo.husaryAyahAudio(0,1),null);
 });

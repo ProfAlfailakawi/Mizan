@@ -69,7 +69,7 @@ test('the judge screen passes the contestant and remembers the last phrase acros
  */
 import { AVERAGE_LINE_WORDS, cutTimeMs, energyFrames, OPENING_FADE_MS, OPENING_RECORDING, OPENING_TEXT_READING, planOpeningCut, snapToQuiet } from '../src/lib/opening-cue';
 import { REFERENCE_AUDIO_ID } from '../src/lib/reference-audio-policy';
-import { kfgqpcAudioKeys } from '../server/kfgqpc-delivery';
+import { getQuranAudioUrl } from '../src/lib/quran-audio';
 import { splitAyahWords } from '../src/lib/word-timing';
 
 const W = (n: number) => Array.from({ length: n }, (_, i) => `كلمة${i}`);
@@ -150,14 +150,13 @@ test('the cut snaps to the quietest moment near the estimate', () => {
 test('the opening cue is the Hafs recording for all twenty readings — one the server actually serves', () => {
   /* قرارُ المالك: الصوتُ حفصٌ للروايات العشرين كلّها (reference-audio-policy). */
   assert.equal(OPENING_RECORDING, REFERENCE_AUDIO_ID);
-  assert.equal(OPENING_RECORDING, 'hafs-muaiqly');
+  assert.equal(OPENING_RECORDING, 'husary-murattal');
   assert.equal(OPENING_TEXT_READING, 'hafs', 'the cut is measured on the Hafs text the recording actually recites');
-  assert.ok(kfgqpcAudioKeys(OPENING_RECORDING, 2, 255).length > 0, 'the server serves the Hafs recording');
-  /* واسمُ الرواية وحده (hafs، warsh…) ليس مسارًا — وكان هو ما يُرسَل فيعود ٤٠٤ دائمًا. */
-  for (const reading of ['hafs', 'warsh', 'qalun', 'khalaf-hamzah']) assert.equal(kfgqpcAudioKeys(reading, 2, 255).length, 0);
+  /* الرابط من السورة والآية وحدهما — لا اسمُ رواية ولا قارئ. */
+  assert.equal(getQuranAudioUrl(2, 255), '/api/public/quran-audio/002255.mp3');
   const src = fs.readFileSync('src/components/judge/JudgeOS.tsx', 'utf8');
   assert.match(src, /const recording=OPENING_RECORDING;/, 'no per-reading recording choice');
-  assert.match(src, /fetchOfficialAyahAudio\(recording,surah,q\.startAyah\)/);
+  assert.match(src, /fetchOfficialAyahAudio\(surah,q\.startAyah\)/);
   assert.doesNotMatch(src, /fetchOfficialAyahAudio\(readingKey/);
   assert.match(src, /watchStop\(player,\(\)=>stopMs,finish\)/);
   assert.match(src, /onClick=\{\(\)=>void playOpeningAudio\(true\)\}/, 'the judge can replay the cue');

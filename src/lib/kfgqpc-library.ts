@@ -1,3 +1,4 @@
+import { getQuranAudioUrl, isValidAyahRef } from './quran-audio';
 /*
  * Keep Firebase out of the module graph for pure Mushaf rendering/tests.
  * Governance calls obtain auth lazily only when a signed-in API is actually used.
@@ -9,11 +10,13 @@ async function currentAuth(){
 export type KfgqpcLibraryGroup='MUSHAF'|'QURAN_DATA'|'SCIENCE'|'PUBLISHING'|'AUDIO';
 export interface KfgqpcLibraryCapability{ id:string;order:number;group:KfgqpcLibraryGroup;titleArabic:string;titleEnglish:string;summaryArabic:string;summaryEnglish:string;authority:string;authorityArabic:string;authorityState:'PRIMARY_OFFICIAL_AUTHORITY';scientificState:'CERTIFIED';operationalState:'OFFICIALLY_ACCEPTED'|'LOCAL_BYTES_REQUIRED'|'LOCAL_VERIFIED'|'SERVICE_READY';officialReference:string;sourceIds:string[];uses:string[];guardrail:string;visualMode?:'VECTOR_PAGE'|'UTHMANIC_TEXT'|'PUBLICATION_IMAGE'|'AUDIO'; }
 export interface KfgqpcLibraryResponse{summary:{authority:string;protocol:string;officiallyAccepted:number;localVerified:number;serviceReady:number;requiresLocalBytes:number;groups:string[]};items:KfgqpcLibraryCapability[]}
-export interface KfgqpcDeliveryStatus{protocol:string;deliverySource:'LOCAL'|'R2'|'NONE';r2Configured:boolean;localPageRootConfigured:boolean;localAudioRootConfigured:boolean;localFontRootConfigured:boolean;budget:{freeTierBytes:number;plannedBytes:number;remainingBytes:number;utilization:number;items:{key:string;labelArabic:string;bytes:number;note:string}[];assumptions:string[]}}
+export interface KfgqpcDeliveryStatus{protocol:string;deliverySource:'LOCAL'|'R2'|'NONE';r2Configured:boolean;localPageRootConfigured:boolean;localFontRootConfigured:boolean;budget:{freeTierBytes:number;plannedBytes:number;remainingBytes:number;utilization:number;items:{key:string;labelArabic:string;bytes:number;note:string}[];assumptions:string[]}}
 async function bearer(){const auth=await currentAuth();const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');return u.getIdToken()}
 export async function fetchKfgqpcOfficialLibrary():Promise<KfgqpcLibraryResponse>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/library',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_LIBRARY_UNAVAILABLE');return r.json()}
 export async function fetchKfgqpcDeliveryStatus():Promise<KfgqpcDeliveryStatus>{const token=await bearer();const r=await fetch('/api/science/quran/kfgqpc/delivery-status',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});if(!r.ok)throw new Error('KFGQPC_DELIVERY_STATUS_UNAVAILABLE');return r.json()}
 const VENUE_CACHE='mizan-quran-venue-v1';
+/* تلاوة القارئ السابق كانت تُخزَّن هنا تحت مسارٍ أُزيل؛ تُحذف مرّةً عند التحميل فلا يبقى منها شيء. */
+if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(async c=>{for(const k of await c.keys())if(new URL(k.url).pathname.startsWith('/api/public/kfgqpc/audio/'))await c.delete(k)}).catch(()=>{});
 
 /* One delivery key → one printed Mushaf package. Both judge and participant surfaces use this
  * resolver so the participant can never render a different page family from the judge. */
@@ -36,13 +39,12 @@ export async function fetchOfficialMushafPage(packageId:string,page:number):Prom
  try{const r=await fetch(publicUrl,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 /*
- * صوت أول آية الرسمي من مصدر التسليم (Cloudflare R2) — ملف صوتي لآية واحدة.
- * يُستعمل كبداية معتمدة للسؤال حين لا يوجد مرجع صوتي مُدخَل في المتجر. عام (بلا مصادقة)،
- * ويُخزَّن في ذاكرة القاعة ليعمل دون إنترنت لاحقًا. يرجّع رابط blob أو null إن لم يُرفع الأصل.
+ * ملف آية واحدة بصوت الحصري المرتل (المصدر المركزي `quran-audio.ts`). عام (بلا مصادقة)،
+ * ويُخزَّن في ذاكرة القاعة ليعمل دون إنترنت لاحقًا. يرجّع رابط blob أو null إن تعذّر الملف.
  */
-export async function fetchOfficialAyahAudio(readingId:string,surah:number,ayah:number):Promise<string|null>{
- if(!readingId||!Number.isInteger(surah)||!Number.isInteger(ayah)||surah<1||ayah<1)return null;
- const url=`/api/public/kfgqpc/audio/${encodeURIComponent(readingId)}/${surah}/${ayah}`;
+export async function fetchOfficialAyahAudio(surah:number,ayah:number):Promise<string|null>{
+ if(!isValidAyahRef(surah,ayah))return null;
+ const url=getQuranAudioUrl(surah,ayah);
  try{const r=await fetch(url,{cache:'default'});if(r.ok){if(typeof caches!=='undefined')void caches.open(VENUE_CACHE).then(c=>c.put(url,r.clone())).catch(()=>{});const b=await r.blob();return URL.createObjectURL(b)}}catch{}
  try{if(typeof caches==='undefined')return null;const cached=await caches.open(VENUE_CACHE).then(c=>c.match(url));if(!cached)return null;return URL.createObjectURL(await cached.blob())}catch{return null}}
 export async function venueResilienceStatus(){if(typeof caches==='undefined')return {supported:false,cachedPages:0};try{const c=await caches.open(VENUE_CACHE),keys=await c.keys();return {supported:true,cachedPages:keys.filter(k=>new URL(k.url).pathname.includes('/api/science/quran/kfgqpc/page/')).length}}catch{return {supported:false,cachedPages:0}}}
