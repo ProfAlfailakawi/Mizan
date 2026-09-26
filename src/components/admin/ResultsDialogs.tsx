@@ -25,7 +25,7 @@ export const dualSealActive = (store: Store) =>
 const Step: React.FC<{ done: boolean; title: string; detail: string }> = ({ done, title, detail }) => (
   <li className="flex items-start gap-3 rounded-2xl border border-[#e4e2db] bg-white px-4 py-3">
     {done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#2F6555]" /> : <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#a39f94]" />}
-    <span className="min-w-0"><span className="block text-xs font-black">{title}</span><span className="mt-0.5 block text-[10px] leading-5 text-[#646965]">{detail}</span></span>
+    <span className="min-w-0"><span className="block text-xs font-black">{title}</span><span className="mt-0.5 block text-xs leading-5 text-[#646965]">{detail}</span></span>
   </li>
 );
 
@@ -60,10 +60,10 @@ export const SealDialog: React.FC<{ open: boolean; store: Store; ar: boolean; on
       <SealMark size={64} />
       <div className="min-w-0 flex-1">
         <div className="text-2xl font-black tabular-nums">{sealed}<span className="text-sm text-[#646965]"> / {results.length}</span></div>
-        <div className="text-[11px] text-[#646965]">{ar ? 'نتيجة مختومة الآن' : 'results currently sealed'}</div>
+        <div className="text-[13px] text-[#646965]">{ar ? 'نتيجة مختومة الآن' : 'results currently sealed'}</div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><span className="block h-full rounded-full bg-gradient-to-l from-[#214C40] to-[#a8834a] transition-all" style={{ width: `${results.length ? Math.round((sealed / results.length) * 100) : 0}%` }} /></div>
       </div>
-      {dual && <div className="text-center"><div className="text-3xl font-black tabular-nums text-[#214C40]">{approvers.length}/2</div><div className="text-[10px] text-[#646965]">{ar ? 'اعتماد' : 'approvals'}</div></div>}
+      {dual && <div className="text-center"><div className="text-3xl font-black tabular-nums text-[#214C40]">{approvers.length}/2</div><div className="text-xs text-[#646965]">{ar ? 'اعتماد' : 'approvals'}</div></div>}
     </div>
     <ol className="mt-4 space-y-2">
       {dual ? <>
@@ -78,7 +78,7 @@ export const SealDialog: React.FC<{ open: boolean; store: Store; ar: boolean; on
       {IS_DEMO_SESSION && role !== 'head_judge' && <Button variant="outline" onClick={() => setDemoRole('head_judge')} icon={<UserRound className="h-4 w-4" />}>{ar ? 'اعتمد بصفة رئيس اللجنة' : 'Approve as head judge'}</Button>}
       <Button variant="ghost" onClick={onClose}>{ar ? 'إغلاق' : 'Close'}</Button>
     </div>
-    {IS_DEMO_SESSION && <p className="mt-3 text-[10px] leading-5 text-[#696f6b]">{ar ? 'في بيئة العرض: إن ختمتَ بنفسك فالنشر يحتاج شخصًا آخر (مدير الجهة). وإن ختم رئيسُ اللجنة من صندوقه، نشرتَ أنت من هنا.' : 'Demo: if you seal yourself, another person (organization admin) must publish. If the head judge seals, you can publish from here.'}</p>}
+    {IS_DEMO_SESSION && <p className="mt-3 text-xs leading-5 text-[#696f6b]">{ar ? 'في بيئة العرض: إن ختمتَ بنفسك فالنشر يحتاج شخصًا آخر (مدير الجهة). وإن ختم رئيسُ اللجنة من صندوقه، نشرتَ أنت من هنا.' : 'Demo: if you seal yourself, another person (organization admin) must publish. If the head judge seals, you can publish from here.'}</p>}
   </Modal>;
 };
 
@@ -113,9 +113,9 @@ export const PublishDialog: React.FC<{ open: boolean; store: Store; ar: boolean;
       </div>
       : <>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length}</div><div className="text-[10px] text-[#646965]">{ar ? 'نتيجة' : 'results'}</div></div>
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length - unsealed.length}</div><div className="text-[10px] text-[#646965]">{ar ? 'مختومة' : 'sealed'}</div></div>
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{byCategory.length}</div><div className="text-[10px] text-[#646965]">{ar ? 'فئة' : 'categories'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length}</div><div className="text-xs text-[#646965]">{ar ? 'نتيجة' : 'results'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length - unsealed.length}</div><div className="text-xs text-[#646965]">{ar ? 'مختومة' : 'sealed'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{byCategory.length}</div><div className="text-xs text-[#646965]">{ar ? 'فئة' : 'categories'}</div></div>
         </div>
         <ul className="mt-3 divide-y divide-[#ece9e1] rounded-2xl border border-[#e4e2db] bg-white px-4">
           {byCategory.map(({ c, n }) => <li key={c.id} className="flex items-center justify-between py-2 text-xs"><span className="font-bold">{ar ? c.nameArabic : c.name}</span><span className="tabular-nums text-[#646965]">{n}</span></li>)}

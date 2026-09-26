@@ -296,12 +296,12 @@ export const CertificateModal: React.FC<{ cert: Certificate | null; ar: boolean;
   const verify = /^https?:/.test(cert.verificationUrl) ? cert.verificationUrl : `${window.location.origin}${cert.verificationUrl || ''}`;
   return <Modal isOpen onClose={onClose} title={ar ? (preview ? 'معاينة الشهادة' : 'الشهادة') : (preview ? 'Certificate preview' : 'Certificate')} subtitle={`${ar ? (cert.participantNameArabic || cert.participantName) : cert.participantName} · ${cert.certificateNumber}`} maxWidth="3xl">
     <div className="[&_svg]:max-w-full [&_svg]:h-auto rounded-2xl overflow-hidden border border-[#e3ddcf] shadow-[0_18px_40px_-24px_rgba(23,34,30,.45)]"><CertificateArtwork cert={cert} ar={ar} preview={preview} showScore={showScore} title={title} /></div>
-    {note && <p className="mt-3 rounded-xl bg-[#F5EDE2] px-3 py-2 text-[11px] font-bold leading-5 text-[#7a5a2f]">{note}</p>}
+    {note && <p className="mt-3 rounded-xl bg-[#F5EDE2] px-3 py-2 text-[13px] font-bold leading-5 text-[#7a5a2f]">{note}</p>}
     <div className="mt-4 flex flex-wrap gap-2">
       <Button onClick={() => printDocument(html())} icon={<Printer className="w-4 h-4" />}>{ar ? 'طباعة / PDF' : 'Print / PDF'}</Button>
       <Button variant="outline" onClick={() => downloadFile(`certificate-${cert.certificateNumber}.html`, html(), 'text/html;charset=utf-8')} icon={<Download className="w-4 h-4" />}>{ar ? 'تنزيل الشهادة' : 'Download'}</Button>
       {!preview && <Button variant="outline" onClick={() => window.open(verify, '_blank', 'noopener')} icon={<Link2 className="w-4 h-4" />}>{ar ? 'صفحة التحقق' : 'Verification page'}</Button>}
-      <span className="ms-auto inline-flex items-center gap-1.5 text-[10px] font-bold text-[#6a706c]"><Award className="w-3.5 h-3.5" />{ar ? 'تُطبع على A4 أفقيًّا' : 'Prints on landscape A4'}</span>
+      <span className="ms-auto inline-flex items-center gap-1.5 text-xs font-bold text-[#6a706c]"><Award className="w-3.5 h-3.5" />{ar ? 'تُطبع على A4 أفقيًّا' : 'Prints on landscape A4'}</span>
     </div>
   </Modal>;
 };

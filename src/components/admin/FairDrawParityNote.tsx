@@ -47,7 +47,7 @@ export const FairDrawParityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   if (!review) {
     return (
-      <div className="flex items-center gap-2 px-1 text-[10px] font-bold text-[#656b66]">
+      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[#656b66]">
         <span className="mizan-status-orb" aria-hidden="true"/>
         {ar
           ? `تكافؤ الحِمل الذهني بين ${report.participantCount} أطقم مسحوبة ضمن الهامش — أوسع فارق ${gap}٪.`
@@ -59,12 +59,12 @@ export const FairDrawParityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
   const widest = Math.max(1, ...report.participants.map(p => p.totalEnergy));
   return (
     <details className="mizan-collapse rounded-2xl border border-[#e2c9a8] bg-[#fbf6ec]">
-      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[11px] font-black text-[#7a5a2f]">
+      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-black text-[#7a5a2f]">
         <span className="flex items-center gap-2"><Gauge className="h-3.5 w-3.5"/>{ar ? 'أطقم القرعة متفاوتة في الحِمل الذهني' : 'Drawn sets differ in cognitive load'}</span>
-        <span className="text-[10px] font-bold">{ar ? `فارق ${gap}٪` : `${gap}% gap`}</span>
+        <span className="text-xs font-bold">{ar ? `فارق ${gap}٪` : `${gap}% gap`}</span>
       </summary>
       <div className="px-4 pb-4">
-        <p className="text-[10px] leading-5 text-[#6e5936]">
+        <p className="text-xs leading-5 text-[#6e5936]">
           {ar
             ? `الحِمل = صعوبة المقطع + كثافة المتشابهات + تعقيد التجويد. الهامش المعتمد ${TOLERANCE * 100}٪. هذا قياس لا إجراء: إعادة القرعة قرار صريح يُسجَّل، ولا تُعاد بذرة في الخفاء.`
             : `Load = passage difficulty + mutashabihat density + tajweed complexity. Tolerance is ${TOLERANCE * 100}%. This measures only: a re-draw stays an explicit, recorded decision — no seed is quietly replaced.`}
@@ -72,11 +72,11 @@ export const FairDrawParityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
         <div className="mt-3 space-y-1.5">
           {report.participants.map(p => (
             <div key={p.participantId} className="flex items-center gap-3">
-              <span className="w-28 shrink-0 truncate font-mono text-[9px] text-[#6e5936]" dir="ltr">{p.participantId}</span>
+              <span className="w-28 shrink-0 truncate font-mono text-[11px] text-[#6e5936]" dir="ltr">{p.participantId}</span>
               <span className="h-2 flex-1 overflow-hidden rounded-full bg-[#eee6d7]">
                 <span className="block h-full rounded-full bg-[#b98b4e]" style={{ width: `${Math.round((p.totalEnergy / widest) * 100)}%` }}/>
               </span>
-              <span className="w-10 shrink-0 text-end text-[9px] font-black text-[#7a5a2f]">{p.totalEnergy}</span>
+              <span className="w-10 shrink-0 text-end text-[11px] font-black text-[#7a5a2f]">{p.totalEnergy}</span>
             </div>
           ))}
         </div>

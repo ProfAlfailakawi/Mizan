@@ -86,7 +86,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
       <div className="mt-5 rounded-2xl border border-[#dfe7e1] bg-[#f2f6f3] py-9 text-center">
         <BadgeCheck className="mx-auto h-7 w-7 text-[#2F6555]" aria-hidden />
         <div className="mt-2.5 text-sm font-black text-[#214C40]">{ar ? 'لا شيء مفتوح' : 'Nothing open'}</div>
-        <p className="mx-auto mt-1.5 max-w-xs text-[10px] leading-5 text-[#5f6b64]">
+        <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-[#5f6b64]">
           {ar ? 'لا أعطال ولا حالات مراجعة تنتظر قرارك. ما لا يظهر هنا يسير وحده.' : 'No faults or review cases are waiting on you. Anything not listed here is running on its own.'}
         </p>
       </div>
@@ -100,7 +100,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
       <div className="flex items-end gap-3">
         <div className="text-[44px] font-black leading-none tabular-nums text-[#20241f]" dir="ltr">{items.length}</div>
-        <div className="pb-1 text-[11px] font-bold leading-5 text-[#666d68]">
+        <div className="pb-1 text-[13px] font-bold leading-5 text-[#666d68]">
           {ar ? 'بندًا مفتوحًا' : 'open items'}
           {critical > 0 && <div className="mt-0.5 inline-flex items-center gap-1 text-[#8a453c]">
             <Flame className="h-3 w-3" aria-hidden />{ar ? `${critical} منها حرج` : `${critical} critical`}
@@ -108,7 +108,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-        {mix.map(({ kind, n }) => <span key={kind} className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#5a625c]">
+        {mix.map(({ kind, n }) => <span key={kind} className="inline-flex items-center gap-1.5 text-xs font-black text-[#5a625c]">
           <span className="h-2 w-2 rounded-full" style={{ background: KIND[kind].bar }} aria-hidden />
           {ar ? KIND[kind].ar : KIND[kind].en} <span className="tabular-nums" dir="ltr">{n}</span>
         </span>)}
@@ -134,7 +134,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-black text-[#222623]">{item.title}</span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-bold text-[#6b716c]">
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#6b716c]">
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone.dot }} aria-hidden />
                 {ar ? kind.ar : kind.en}
@@ -142,14 +142,14 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
               {age && <span className="tabular-nums">· {age}</span>}
             </span>
           </span>
-          {(item.count || 1) > 1 && <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black tabular-nums ${tone.chip}`} dir="ltr"
+          {(item.count || 1) > 1 && <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black tabular-nums ${tone.chip}`} dir="ltr"
             title={ar ? `تكرّر ${item.count} مرات` : `${item.count} occurrences`}>×{item.count}</span>}
         </li>;
       })}
     </ol>
 
     {/* ما لم يتّسع له المكان يُقال عددًا، لا يُبتلع بصمت. */}
-    {sorted.length > max && <div className="mt-2.5 text-center text-[10px] font-bold text-[#6b716c]">
+    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#6b716c]">
       {ar ? `و${sorted.length - max} بندًا آخر` : `and ${sorted.length - max} more`}
     </div>}
   </section>;
@@ -158,9 +158,8 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
 const Head: React.FC<{ ar: boolean; title?: string; hint?: string }> = ({ ar, title, hint }) => (
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0">
-      <div className="mizan-kicker">{ar ? 'ما يحتاج تدخّلك' : 'NEEDS YOU'}</div>
-      <h2 className="mt-1 font-extrabold">{title || (ar ? 'ما لم يُغلق بعد' : 'Still open')}</h2>
-      {hint && <p className="mt-1.5 text-[10px] leading-5 text-[#696f6b]">{hint}</p>}
+      <h2 className="text-lg font-extrabold">{title || (ar ? 'ما لم يُغلق بعد' : 'Still open')}</h2>
+      {hint && <p className="mt-1.5 text-xs leading-5 text-[#696f6b]">{hint}</p>}
     </div>
     <CircleAlert className="h-5 w-5 shrink-0 text-[#89673a]" aria-hidden />
   </div>

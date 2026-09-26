@@ -24,13 +24,13 @@ export const Header: React.FC = () => {
       <MizanLogo language={language} compact/>
       <div className="min-w-0 hidden sm:block">
         <div className="flex items-center gap-2">
-          {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[11px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
+          {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[13px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
           <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
-          <span className="text-[10px] text-[#636864] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
+          <span className="text-xs text-[#636864] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
           {brandInfo.placements.showHeaderContact && (brandInfo.phoneNumber || brandInfo.supportEmail) && (
             <a
               href={brandInfo.phoneNumber ? `tel:${brandInfo.phoneNumber}` : `mailto:${brandInfo.supportEmail}`}
-              className="hidden xl:inline-flex items-center gap-1 text-[10px] text-[#2F6555] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
+              className="hidden xl:inline-flex items-center gap-1 text-xs text-[#2F6555] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
               title={language==='ar'?'رقم التواصل والدعم المعتمد':'Official support contact'}
             >
               <Headphones className="w-3 h-3"/>
