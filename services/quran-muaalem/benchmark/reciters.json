@@ -12,7 +12,6 @@
     { "id": "hudhaifi", "nameAr": "علي الحذيفي", "folder": "Hudhaify_128kbps", "style": "murattal", "why": "قارئُ مصحف المجمع" },
     { "id": "jibreel", "nameAr": "محمد جبريل", "folder": "Muhammad_Jibreel_128kbps", "style": "murattal", "why": "أداءٌ مصريٌّ متقن" },
     { "id": "banna", "nameAr": "محمود علي البنا", "folder": "mahmoud_ali_al_banna_32kbps", "style": "murattal", "why": "مدرسةٌ قديمةٌ وتسجيلٌ منخفضُ الجودة" },
-    { "id": "muaiqly", "nameAr": "ماهر المعيقلي", "folder": "MaherAlMuaiqly128kbps", "style": "murattal", "why": "صوتُ المرجع في ميزان («استمع» و«أوّل آية»)" },
     { "id": "alafasy", "nameAr": "مشاري العفاسي", "folder": "Alafasy_128kbps", "style": "murattal", "why": "أوسعُ القرّاء انتشارًا بين الطلاب" },
     { "id": "ghamdi", "nameAr": "سعد الغامدي", "folder": "Ghamadi_40kbps", "style": "murattal", "why": "صوتٌ مختلفُ الطبقة، وتسجيلٌ منخفضُ الجودة" },
     { "id": "shatri", "nameAr": "أبو بكر الشاطري", "folder": "Abu_Bakr_Ash-Shaatree_128kbps", "style": "murattal", "why": "أداءٌ متأنٍّ" },

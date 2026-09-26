@@ -55,7 +55,7 @@ async function main(){
   const startedAt=new Date().toISOString();let html='';try{html=await text(KFGQPC_DEV_PAGE)}catch(e){const report={protocol:'MIZAN-KFGQPC-ACQUIRE-1',startedAt,finishedAt:new Date().toISOString(),source:KFGQPC_DEV_PAGE,status:'SOURCE_PAGE_UNREACHABLE',reason:e instanceof Error?e.message:'UNKNOWN',results:[]};fs.writeFileSync(path.join(reportDir,'official-acquisition.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));finish(report);return}
   const results=[];for(const spec of LIGHT_PACKAGES){const r=await acquireOne(spec,html);results.push(r);console.log(JSON.stringify(r))}
   results.push({id:'mushaf-pages',status:'DEFERRED',reason:'NO_CURRENT_OFFICIAL_604_PAGE_DELIVERY_ARCHIVE_IS_AUTO_SELECTED; MIZAN_WILL_NOT_RECONSTRUCT_OR_CROP_QURAN_PAGES'});
-  for(const id of ['audio-hafs','audio-shubah','audio-qalun','audio-susi','audio-duri','audio-warsh'])results.push({id,status:'DEFERRED_HEAVY',reason:'HEAVY_AUDIO_DOWNLOAD_IS_NOT_RUN_IN_AUDIT_BUILD_AND_NOT_UPLOADED_TO_R2'});
+  for(const id of ['audio-shubah','audio-qalun','audio-susi','audio-duri','audio-warsh'])results.push({id,status:'DEFERRED_HEAVY',reason:'HEAVY_AUDIO_DOWNLOAD_IS_NOT_RUN_IN_AUDIT_BUILD_AND_NOT_UPLOADED_TO_R2'});
   const report={protocol:'MIZAN-KFGQPC-ACQUIRE-1',startedAt,finishedAt:new Date().toISOString(),source:KFGQPC_DEV_PAGE,status:'COMPLETE',results};
   fs.writeFileSync(path.join(reportDir,'official-acquisition.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({mode:'ACQUISITION_AUDIT',report:path.join(reportDir,'official-acquisition.json')}));
   finish(report);

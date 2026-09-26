@@ -17,7 +17,6 @@ Primary developer authority: https://qurancomplex.gov.sa/en/techquran/dev/
 
 ## Selected delivery audio
 
-- Hafs 'an Asim — Sheikh Maher Al-Muaiqly — official ayah package listing 724.25 MB.
 - Shu'bah 'an Asim — Sheikh Ali Al-Hudhaifi — official ayah package listing 722 MB.
 - Qalun 'an Nafi — Sheikh Ali Al-Hudhaifi — official ayah package listing 760.66 MB.
 - Al-Susi 'an Abi Amr — Dr. Uthman Al-Siddiqi — official ayah package listing 3.25 GB.

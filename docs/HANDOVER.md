@@ -127,7 +127,7 @@ npm run quran:release-matrix
 تفحص البوّابةُ ما يقرؤه المنتجُ من R2. وبعد تجميد النصّ وإلغاء حزم الشرح لم يبقَ إلّا:
 
 ```
-KFGQPC_REQUIRED_DELIVERY_DATASETS = ['mushaf-pages', 'audio-hafs']
+KFGQPC_REQUIRED_DELIVERY_DATASETS = ['mushaf-pages']
 ```
 
 والحمرةُ سببُها واحد: **المنشورُ في R2 جردٌ لا كتالوجُ تحقّق.**

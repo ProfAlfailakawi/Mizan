@@ -27,7 +27,7 @@ test('audit Cloud Build cannot upload to R2; upload build is explicit and Secret
 
 test('heavy asset source overrides are namespaced and never secrets',()=>{
   const script=fs.readFileSync(path.resolve(process.cwd(),'scripts/kfgqpc-heavy-acquire.ts'),'utf8');
-  for(const key of ['KFGQPC_MUSHAF_PAGES_URL','KFGQPC_FONT_HAFS_URL','KFGQPC_AUDIO_HAFS_URL','KFGQPC_AUDIO_SUSI_URL','KFGQPC_AUDIO_DURI_URL','KFGQPC_AUDIO_WARSH_URL'])assert.match(script,new RegExp(key));
+  for(const key of ['KFGQPC_MUSHAF_PAGES_URL','KFGQPC_FONT_HAFS_URL','KFGQPC_AUDIO_SUSI_URL','KFGQPC_AUDIO_DURI_URL','KFGQPC_AUDIO_WARSH_URL'])assert.match(script,new RegExp(key));
   assert.equal(script.includes('VITE_'),false);assert.match(script,/assertOfficialKfgqpcUrl/);assert.match(script,/AUDIO_CANONICAL_COVERAGE_FAILED/);assert.match(script,/MUSHAF_604_VALIDATION_FAILED/);
 });
 
