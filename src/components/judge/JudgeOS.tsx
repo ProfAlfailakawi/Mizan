@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
 import { Ratio } from '../design-system/Ratio';
-import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock, FileText } from 'lucide-react';
+import { CompletionSeal } from '../participant/CompletionSeal';
+import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
@@ -566,12 +567,10 @@ export const JudgeOS: React.FC = () => {
  if(!participant) return <div className="max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
   <h1 className="text-3xl sm:text-4xl font-black mt-5">{nextQueued?(ar?'المتسابق التالي جاهز':'Next participant is ready'):rosterCounts.awaiting?(ar?'لا أحد في الطابور بعد':'Nobody in the queue yet'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
   {/* أرقام الكشف كانت سطرًا صغيرًا واحدًا بنقاط فاصلة؛ صارت بطاقات: رقم كبير وكلمة. */}
-  <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl mx-auto" aria-label={ar?'حالة الكشوف':'Roster status'}>
+  <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 max-w-md mx-auto" aria-label={ar?'حالة الكشوف':'Roster status'}>
    <JudgeStat icon={Users} value={rosterCounts.queued} label={ar?'في طابورك':'In your queue'} strong/>
    <JudgeStat icon={Clock} value={rosterCounts.awaiting} label={ar?'لم يحضروا':'Not arrived'}/>
-   <JudgeStat icon={FileText} value={rosterCounts.pending} label={ar?'قيد المراجعة':'Under review'}/>
   </div>
-  {!!rosterCounts.pending&&<p className="sr-only">{ar?`${rosterCounts.pending} طلبًا تحت المراجعة.`:`${rosterCounts.pending} applications under review.`}</p>}
   <p className="sr-only">{ar?`${rosterCounts.total} متسابقًا في هذه المسابقة.`:`${rosterCounts.total} participants in this competition.`}</p>
   {nextQueued&&<Button size="xl" className="mt-7 min-h-16 min-w-64" icon={<UserCheck className="w-6 h-6"/>} disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'ابدأ مع المتسابق التالي':'Start with the next participant')}</Button>}
   {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-sm font-bold leading-6">{startError}</div>}
@@ -727,9 +726,12 @@ export const JudgeOS: React.FC = () => {
     </div>}
 
     {activeSession.isLocked&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
-     <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#E7EEE9] text-[#214C40]"><Check className="h-5 w-5"/></span>
-     <div className="mt-3 text-sm font-black text-[#214C40]">{ar?'تم اعتماد تقييمك':'Assessment locked'}</div>
-     <div className="mt-1 text-[11px] text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
+     <div role="status" aria-live="polite">
+      <CompletionSeal size="md"/>
+      <div className="mt-4 text-3xl font-black text-[#17352D]">{ar?'انتهت الجلسة':'Session complete'}</div>
+      <div className="mt-2 text-base font-black text-[#214C40]">{ar?'تم اعتماد تقييمك وقفله':'Your assessment is locked'}</div>
+      <div className="mt-1 text-sm text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
+     </div>
      {reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
      {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
      {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
