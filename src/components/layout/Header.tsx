@@ -2,7 +2,7 @@ import React,{useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION, exitDemoSession } from '../../lib/store';
-import { durableSignOut } from '../../lib/cloud-session-durability';
+import { signOutAndReload } from '../../lib/cloud-session-durability';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
 import { EmergencyControl } from '../design-system/EmergencyControl';
@@ -17,7 +17,7 @@ export const Header: React.FC = () => {
  const brandInfo = useBrandInfo();
  const superAdmin=currentUser.role==='super_admin';
  // في البيئة التجريبية لا توجد جلسة هوية تُنهى؛ الخروج يمحو الصندوق التجريبي وحده.
- const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} void durableSignOut().catch(()=>{}).finally(()=>window.location.reload())};
+ const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} signOutAndReload() };
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">

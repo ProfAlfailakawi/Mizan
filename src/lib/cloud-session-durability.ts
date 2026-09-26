@@ -82,14 +82,33 @@ export async function persistDurableCompetitionSnapshot(
     && verified.competition?.organizationId === organizationId;
 }
 
-/** Sign out only after the latest editable competition state has reached Firestore. */
+/*
+ * زرّ الخروج «لا يعمل أحيانًا» لأن الخروج كان ينتظر وعدين لا سقف لهما: الدفع الأخير إلى
+ * Firestore (و`getDoc` بلا شبكة ينتظر الخادم إلى ما لا نهاية) ثم `signOut`. فإذا تعلّق
+ * أحدهما لم تأتِ `finally` ولا إعادة التحميل، وبقي المستخدم داخل الجلسة بلا أثر. والنقر
+ * المكرّر كان يطلق سلاسل متوازية. الآن لكل خطوة سقف زمني، والخروج يحدث دائمًا.
+ */
+const FLUSH_BUDGET_MS = 4000;
+const SIGN_OUT_BUDGET_MS = 3000;
+const withinBudget = <T,>(work: Promise<T>, ms: number): Promise<T | undefined> =>
+  Promise.race([work, new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), ms))]);
+
+/** Sign out only after the latest editable competition state has reached Firestore (bounded). */
 export async function durableSignOut(): Promise<void> {
   try {
-    await persistDurableCompetitionSnapshot();
+    await withinBudget(persistDurableCompetitionSnapshot(), FLUSH_BUDGET_MS);
   } catch (error) {
     // Sign-out must remain available even during a cloud outage. The existing redacted local
     // snapshot stays intact, and the next authenticated bootstrap will reconcile it if needed.
     console.error('MIZAN final cloud flush before sign-out failed', error);
   }
-  await signOut(auth);
+  await withinBudget(signOut(auth), SIGN_OUT_BUDGET_MS);
+}
+
+let signingOut = false;
+/** المخرج الوحيد لكل أزرار الخروج: مرة واحدة، بسقف زمني، ثم إعادة تحميل مهما حدث. */
+export function signOutAndReload(): void {
+  if (signingOut) return;
+  signingOut = true;
+  void durableSignOut().catch(error => console.error('MIZAN sign-out failed', error)).finally(() => window.location.reload());
 }

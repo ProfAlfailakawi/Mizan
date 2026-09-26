@@ -36,6 +36,8 @@ export interface User {
   /** Direct managed-identity scope for operator staff. This is not an Organization. */
   operatorId?: string;
   competitionId?: string;
+  /** نطاق وفد مدير الوفد؛ إن غاب فالوفد هو الحساب نفسه. */
+  delegationId?: string;
   avatarUrl?: string;
   phone?: string;
   country?: string;

@@ -11,6 +11,7 @@ import {
 } from '../../lib/store';
 import type { Role } from '../../types';
 import { DEMO_BAR_SHELL_PADDING } from './demo-shell';
+import { roleLabel } from '../../lib/ui-language';
 
 export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
 
@@ -35,32 +36,13 @@ export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
  * وقد سمّتها `aria-label` أصلًا، والقائمةُ تنكمش ولا تنكمش الأزرار.
  */
 
-const ROLE_LABELS: Record<Role, [string, string]> = {
-  comp_admin: ['مدير المسابقة', 'Competition admin'],
-  head_judge: ['رئيس اللجنة', 'Head judge'],
-  judge: ['محكّم', 'Judge'],
-  ops_manager: ['مدير التشغيل', 'Operations manager'],
-  exception_host: ['الحالات الاستثنائية', 'Exception host'],
-  delegation_manager: ['مدير الوفد', 'Delegation manager'],
-  participant: ['متسابق', 'Participant'],
-  guardian: ['ولي أمر', 'Guardian'],
-  broadcast_operator: ['مشغّل البثّ', 'Broadcast operator'],
-  auditor: ['مدقّق', 'Auditor'],
-  support_agent: ['الدعم', 'Support agent'],
-  org_admin: ['مدير الجهة', 'Organization admin'],
-  branch_admin: ['مدير الفرع', 'Branch admin'],
-  super_admin: ['مالك المنصة', 'Platform owner'],
-  operator_owner: ['مالك المشغّل', 'Operator owner'],
-  operator_admin: ['مدير المشغّل', 'Operator admin'],
-  storage_admin: ['مدير التخزين', 'Storage admin'],
-  billing_admin: ['مدير الفوترة', 'Billing admin'],
-};
-
+/* أسماء الأدوار من المصدر المشترك نفسه الذي تقرأه الواجهة الحقيقية (`roleLabel`)، لا نسخة
+   تجريبية مستقلة كانت تتقادم كلما تغيّرت التسمية في المنتج. */
 export const DemoBar: React.FC = () => {
   const { language, currentUser } = useAppStore();
   if (!IS_DEMO_SESSION) return null;
   const ar = language === 'ar';
-  const label = (role: Role) => ROLE_LABELS[role]?.[ar ? 0 : 1] || role;
+  const label = (role: Role) => roleLabel(role, ar);
 
   return (
     <div
