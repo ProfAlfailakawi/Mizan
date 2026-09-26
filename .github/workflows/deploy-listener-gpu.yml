@@ -14,7 +14,7 @@ on:
         required: true
         default: 'europe-west1'
       route:
-        description: 'إلى أين يُوجَّه ميزان بعد النشر؟ keep=لا تغيير (جرّب أولًا) · gpu=حوِّل إليه · cpu=أرجِع للقديم'
+        description: 'keep=انشر وتحقّق بلا تغيير (جرّب أولًا) · gpu=انشر ثم حوِّل ميزان إليه · cpu=أرجِع ميزان للقديم فورًا بلا بناء'
         required: true
         default: 'keep'
         type: choice
@@ -37,11 +37,14 @@ env:
   GPU_SERVICE: mizan-quran-listener-gpu
   SOURCE_STAGING_BUCKET: gs://mizan-f2ce3-github-deploy-source/source
   GCP_BUILD_SERVICE_ACCOUNT: mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com
+  REGION: ${{ inputs.region }}
+  ROUTE: ${{ inputs.route }}
+  MIN_INSTANCES: ${{ inputs.min_instances }}
 
 jobs:
   gpu:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       # كما في نشر الإنتاج: main الموثوق وحده، لا مدخلاتُ ref.
       - name: جلب main الموثوق
@@ -49,6 +52,13 @@ jobs:
         with:
           ref: refs/heads/main
           fetch-depth: 1
+
+      - name: فحص المدخلات
+        run: |
+          set -euo pipefail
+          [[ "$REGION" =~ ^[a-z]+-[a-z]+[0-9]+$ ]] || { echo "::error::region غير صالح: $REGION"; exit 1; }
+          [[ "$REGION" != me-central1 ]] || { echo "::error::me-central1 لا GPU فيه"; exit 1; }
+          [[ "$MIN_INSTANCES" =~ ^[01]$ ]] || { echo "::error::min_instances إمّا 0 أو 1 (السقف مثيلٌ واحد): $MIN_INSTANCES"; exit 1; }
 
       - name: مصادقة Google Cloud
         uses: google-github-actions/auth@v3
@@ -63,82 +73,58 @@ jobs:
           project_id: ${{ env.GCP_PROJECT_ID }}
           version: '>= 500.0.0'
 
-      # الصورةُ تُدفع إلى مستودع الصور القائم (me-central1) — وCloud Run ينشر منها في أيّ إقليم.
-      # سجلُّ البناء في Cloud Logging لا في التشغيلة (خيارُ CLOUD_LOGGING_ONLY الذي يفرضه حسابُ
-      # البناء المخصّص) — ففشلان متتاليان مضيا بلا سببٍ ظاهر. عند الفشل يُسحب السجلُّ بصلاحية
-      # logging.viewer التي يحملها حسابُ النشر، ويُطبع هنا كاملًا.
-      - name: بناء صورة GPU
+      # كلُّ ما يمسّ Cloud Run يجري داخل Cloud Build بحساب البناء — كما ينشر الإنتاج — لأن حسابَ
+      # هذا العدّاء لا يملك من Cloud Run إلا القراءة. route=cpu رجوعٌ وحده بلا بناء
+      # (cloudbuild.gpu-route.yaml)، فيعمل ولو كانت خدمةُ GPU معطوبة.
+      #
+      # سجلُّ البناء في Cloud Logging لا في التشغيلة (CLOUD_LOGGING_ONLY): يُسحب ذيلُه هنا نجحَ أو
+      # فشل — الأخيرُ لا الأوّل، فسطرُ الخطأ في النهاية. وعند الفشل يُسحب معه سجلُّ خدمة GPU نفسِها:
+      # عطبُ CUDA يقع عند الإقلاع هناك، لا في البناء.
+      - name: البناء والنشر والصحّة — داخل Cloud Build
         run: |
           set -euo pipefail
-          TAG="me-central1-docker.pkg.dev/$GCP_PROJECT_ID/cloud-run-source-deploy/$GPU_SERVICE:$GITHUB_SHA"
+          SRC=services/quran-practice-listener
+          ARGS=(--service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT"
+                --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET")
+          if [ "$ROUTE" = cpu ]; then
+            ARGS+=(--config "$SRC/cloudbuild.gpu-route.yaml")
+          else
+            TAG="me-central1-docker.pkg.dev/$GCP_PROJECT_ID/cloud-run-source-deploy/$GPU_SERVICE:$GITHUB_SHA"
+            ARGS+=(--config "$SRC/cloudbuild.gpu.yaml"
+                   --substitutions "_TAG=$TAG,_REGION=$REGION,_MIN_INSTANCES=$MIN_INSTANCES,_ROUTE=$ROUTE,COMMIT_SHA=$GITHUB_SHA")
+          fi
           OUT="$(mktemp)"
           ok=0
-          gcloud builds submit services/quran-practice-listener \
-            --config services/quran-practice-listener/cloudbuild.gpu.yaml \
-            --substitutions "_TAG=$TAG" \
-            --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
-            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" 2>&1 | tee "$OUT" || ok=$?
-          if [ "$ok" != "0" ]; then
-            BID="$(grep -oE 'builds/[0-9a-f-]{36}' "$OUT" | head -1 | cut -d/ -f2 || true)"
-            # آخرُ الأسطر لا أوّلُها: سطرُ الخطأ في نهاية السجل، وقراءةٌ تصاعديّةٌ بحدٍّ
-            # تُقصّ قبل بلوغه (جرى ذلك فعلًا — سجلُّ apt وحده يتجاوز الألف). تنازليًّا ثم تُعكس.
-            echo "::group::Cloud Build log ${BID} (آخر 400 سطر)"
-            [ -n "$BID" ] && gcloud logging read \
-              "resource.type=\"build\" AND resource.labels.build_id=\"$BID\"" \
+          gcloud builds submit "$SRC" "${ARGS[@]}" 2>&1 | tee "$OUT" || ok=$?
+          BID="$(grep -oE 'builds/[0-9a-f-]{36}' "$OUT" | head -1 | cut -d/ -f2 || true)"
+          touch "$RUNNER_TEMP/build.log"
+          if [ -n "$BID" ]; then
+            gcloud logging read "resource.type=\"build\" AND resource.labels.build_id=\"$BID\"" \
               --project "$GCP_PROJECT_ID" --order=desc --limit=400 --format='value(textPayload)' \
+              | tac > "$RUNNER_TEMP/build.log" || true
+          fi
+          echo "::group::Cloud Build log ${BID} (آخر 400 سطر)"
+          cat "$RUNNER_TEMP/build.log"
+          echo "::endgroup::"
+          if [ "$ok" != "0" ] && [ "$ROUTE" != cpu ]; then
+            echo "::group::GPU service log (آخر 80 سطر)"
+            gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$GPU_SERVICE\"" \
+              --project "$GCP_PROJECT_ID" --freshness=2h --order=desc --limit=80 --format='value(textPayload)' \
               | tac || true
             echo "::endgroup::"
-            exit "$ok"
           fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-
-      - name: نشر خدمة GPU (منفصلة — لا تمسّ الإنتاج)
-        run: |
-          set -euo pipefail
-          gcloud run deploy "$GPU_SERVICE" \
-            --image "$TAG" \
-            --region "${{ inputs.region }}" --platform managed --no-allow-unauthenticated \
-            --gpu 1 --gpu-type nvidia-l4 --no-gpu-zonal-redundancy \
-            --cpu 4 --memory 16Gi --concurrency 8 \
-            --min-instances "${{ inputs.min_instances }}" --max-instances 1 \
-            --no-cpu-throttling --cpu-boost --timeout 60 \
-            --set-env-vars "MIZAN_LISTENER_DEVICE=cuda,MIZAN_BUILD_SHA=$GITHUB_SHA"
-
-      - name: السماح لميزان بندائه، وقراءة صحّته
-        run: |
-          set -euo pipefail
-          RUNTIME_SA="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)')"
-          gcloud run services add-iam-policy-binding "$GPU_SERVICE" --region "${{ inputs.region }}" \
-            --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker >/dev/null
-          GPU_URL="$(gcloud run services describe "$GPU_SERVICE" --region "${{ inputs.region }}" --format='value(status.url)')"
-          echo "GPU_URL=$GPU_URL" >> "$GITHUB_ENV"
-          # `/health` يقول device — نشرُ GPU يشتغل على CPU خطأٌ يُرى هنا لا يُدفع ثمنُه بصمت.
-          curl -fsS -m 120 -H "Authorization: Bearer $(gcloud auth print-identity-token)" "$GPU_URL/health" \
-            | tee /tmp/health.json || echo "health check could not be read from this runner; check the service logs"
-          if grep -q '"device": *"cpu"' /tmp/health.json 2>/dev/null; then
-            echo "::error::the GPU service is running on CPU — refusing to leave it silently mis-deployed"; exit 1
-          fi
-
-      - name: توجيه ميزان (إن طُلب)
-        if: ${{ inputs.route != 'keep' }}
-        run: |
-          set -euo pipefail
-          if [ "${{ inputs.route }}" = "gpu" ]; then
-            TARGET="$GPU_URL/listen"
-          else
-            TARGET="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')/listen"
-          fi
-          gcloud run services update mizan --region me-central1 \
-            --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=$TARGET"
-          echo "Mizan now points to: $TARGET"
+          exit "$ok"
 
       - name: الملخّص
         if: always()
         run: |
           {
             echo "## مستمع GPU"
-            echo "- الخدمة: \`$GPU_SERVICE\` في \`${{ inputs.region }}\` — min-instances=${{ inputs.min_instances }}"
-            echo "- التوجيه: \`${{ inputs.route }}\`"
-            echo "- الصحّة:"; echo '```json'; cat /tmp/health.json 2>/dev/null || echo '(لم تُقرأ)'; echo '```'
+            echo "- الخدمة: \`$GPU_SERVICE\` في \`$REGION\` — min-instances=$MIN_INSTANCES"
+            echo "- المطلوب: \`$ROUTE\`"
+            echo "- الصحّة والتوجيه (من سجل البناء):"
+            echo '```'
+            grep -h 'MIZAN_GPU_' "$RUNNER_TEMP/build.log" 2>/dev/null || echo '(لا شيء — انظر سجلّ الخطوة السابقة)'
+            echo '```'
             echo "- الكلفة تجري ما دام مثيلٌ يعمل (~1.05\$/ساعة). للإيقاف: شغِّل بـroute=cpu ثم احذف الخدمة إن شئت."
           } >> "$GITHUB_STEP_SUMMARY"

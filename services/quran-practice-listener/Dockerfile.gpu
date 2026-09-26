@@ -19,7 +19,11 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY requirements.txt .
-RUN python -m pip install --no-cache-dir --timeout 120 -r requirements.txt
+# pip أوبنتو 22.04 (22.0.2) ينهار في المُحلِّل (`AssertionError` في `get_topological_weights`) حين
+# يتراجع عن huggingface-hub 2.0.0 إلى 1.x — أسقط البناءَ الرابع، وأُعيد إنتاجُه محليًّا بالنسختين
+# نفسيهما وزال بترقية pip قبل التثبيت.
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip install --no-cache-dir --timeout 120 -r requirements.txt
 # كما في الصورة العاديّة: صورةٌ لا تستورد مكتبتَها لا تُبنى ولا تُنشر.
 RUN python -c "from faster_whisper import WhisperModel; import requests"
 # التنزيلُ المسبق يجري على CPU (لا GPU في البناء) — والتحقّقُ من float16 يقع عند الإقلاع.

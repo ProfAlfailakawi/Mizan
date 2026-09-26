@@ -73,6 +73,26 @@ test('the listener image prefetches its model when it can, and never fails the b
   const gpuDocker = read('services/quran-practice-listener/Dockerfile.gpu');
   assert.match(gpuDocker, /MIZAN_LISTENER_DEVICE=cuda/);
   assert.match(gpuDocker, /RUN timeout 900 python prefetch\.py \|\| echo/);
+  // pip أوبنتو 22.04 ينهار في المُحلِّل على هذه الحزم: يُرقّى قبل التثبيت في الأمر نفسه.
+  assert.match(gpuDocker, /RUN python -m pip install --no-cache-dir --upgrade pip \\\n\s*&& python -m pip install [^\n]*-r requirements\.txt/);
+});
+
+test('the GPU listener deploys from Cloud Build (the runner can only read Cloud Run), and routes to it only on a read device=cuda', () => {
+  const gpuBuild = read('services/quran-practice-listener/cloudbuild.gpu.yaml');
+  const at = (s: string) => { const i = gpuBuild.indexOf(s); assert.ok(i >= 0, `missing: ${s}`); return i; };
+  assert.ok(at("args: ['push', '${_TAG}']") < at('gcloud run deploy mizan-quran-listener-gpu'), 'the image is pushed before it is deployed');
+  assert.match(gpuBuild, /--startup-probe=httpGet\.path=\/ready,/);
+  assert.ok(at(`grep -Eq '"device": ?"cuda"'`) < at('MIZAN_QURAN_PRACTICE_LISTENER_URL=${url}/listen'), 'no routing before a read device=cuda');
+  const route = read('services/quran-practice-listener/cloudbuild.gpu-route.yaml');
+  assert.match(route, /gcloud run services describe mizan-quran-listener --region me-central1/);
+  assert.doesNotMatch(route, /docker|run deploy/, 'rolling back never waits on a GPU build');
+  const workflow = read('.github/workflows/deploy-listener-gpu.yml');
+  assert.doesNotMatch(workflow, /gcloud run (deploy|services (update|add-iam-policy-binding))/);
+  assert.match(workflow, /--config "\$SRC\/cloudbuild\.gpu-route\.yaml"/);
+  assert.match(workflow, /--order=desc --limit=400/, 'the tail of the build log, where the error is');
+  assert.match(workflow, /resource\.labels\.service_name=\\"\$GPU_SERVICE\\"/, 'a CUDA failure at boot is printed from the service log');
+  // ونشرُ ميزان الدوريّ لا يمحو توجيهًا إلى GPU.
+  assert.match(read('cloudbuild.yaml'), /grep -q 'mizan-quran-listener-gpu-'; then\n[^\n]*\n\s*rm -f \/workspace\/mizan-quran-listener-url/);
 });
 
 test('the listener says where its model came from and which build runs — so an undeployed fix is never taken for deployed', () => {

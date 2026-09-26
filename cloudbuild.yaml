@@ -243,6 +243,12 @@ steps:
       - '-c'
       - |
         set -eu
+        # توجيهٌ يدويٌّ إلى مستمع GPU (deploy-listener-gpu.yml بـroute=gpu) لا يمحوه نشرٌ دوريّ:
+        # لولا هذا لأعاده كلُّ دمجٍ إلى CPU بصمت. والرجوعُ عنه صريحٌ بـroute=cpu وحده.
+        if gcloud run services describe mizan --region me-central1 --format='yaml(spec.template.spec.containers[0].env)' 2>/dev/null | grep -q 'mizan-quran-listener-gpu-'; then
+          echo 'listener is routed to the GPU service; keeping that binding'
+          rm -f /workspace/mizan-quran-listener-url
+        fi
         # ما لم يُنشر في هذه الدفعة يبقى ربطُه السابق كما هو، ولا يسقط النشر.
         vars=''
         if [ -s /workspace/mizan-quran-listener-url ]; then vars="MIZAN_QURAN_PRACTICE_LISTENER_URL=$(cat /workspace/mizan-quran-listener-url)"; fi
