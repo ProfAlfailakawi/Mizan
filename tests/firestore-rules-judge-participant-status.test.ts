@@ -13,7 +13,8 @@ import { doc, setDoc, updateDoc, type Firestore } from 'firebase/firestore';
  */
 
 const HOST = process.env.FIRESTORE_EMULATOR_HOST;
-const ORG = 'org-a', COMP = 'comp-a';
+// مسار خاص بهذا الملف: ملفات القواعد تعمل متزامنة على المشروع نفسه، وهذا الملف يُغلق مسابقته.
+const ORG = 'org-judge-status', COMP = 'comp-judge-status';
 const COMP_PATH = `organizations/${ORG}/competitions/${COMP}`;
 const P = `${COMP_PATH}/participants/part-1`;
 const T0 = '2026-05-01T08:00:00.000Z', T1 = '2026-05-01T09:00:00.000Z';
