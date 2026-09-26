@@ -1849,3 +1849,88 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-journey__kinds{ grid-column:2; font-size:10px; color:#6b716d }
 .mizan-journey__go{ grid-row:1 / span 2; grid-column:3; font-size:10.5px; font-weight:900; color:#214C40; border:1px solid #cfd6d2; border-radius:999px; padding:.3rem .7rem; background:#fff; white-space:nowrap }
 @media (max-width:520px){ .mizan-journey__hard li{ grid-template-columns:auto 1fr } .mizan-journey__go{ grid-column:1 / -1; grid-row:auto; justify-self:start } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
+   الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.mizan-judge-modectl{ position:relative; display:flex; align-items:center; justify-content:center; align-self:center }
+.mizan-judge-modebtn{
+  width:44px; height:44px; display:grid; place-items:center; border-radius:12px;
+  border:1px solid var(--venue-line); background:transparent; color:var(--venue-faint);
+  transition:color .2s ease, border-color .2s ease;
+}
+.mizan-judge-modebtn svg{ width:18px; height:18px }
+.mizan-judge-modebtn[data-on="true"]{ color:var(--jc-gold,#c7a968); border-color:color-mix(in srgb, var(--jc-gold,#c7a968) 45%, transparent) }
+.mizan-judge-modebtn:focus-visible,.mizan-judge-modepanel button:focus-visible,.mizan-judge-modeswitch input:focus-visible{ outline:3px solid #c7a968; outline-offset:2px }
+/* خارج القمرة (شاشة الانتظار) يأخذ الزر ألوان الصفحة الفاتحة */
+.mizan-judge-modectl.is-light .mizan-judge-modebtn{ border-color:#d9dfdb; color:#214C40; background:#fff }
+.mizan-judge-modepanel{
+  position:absolute; z-index:40; top:calc(100% + .4rem); inset-inline-end:50%; transform:translateX(50%);
+  width:min(17rem, 80vw); display:grid; gap:.6rem; padding:.75rem;
+  border-radius:16px; border:1px solid rgba(255,255,255,.14);
+  background:#16241f; color:#f4f1e8; box-shadow:0 18px 40px rgba(0,0,0,.35);
+  font-size:calc(14px * var(--mizan-text-scale)); font-weight:600;
+}
+[dir="rtl"] .mizan-judge-modepanel{ transform:translateX(-50%) }
+.mizan-judge-modectl.is-light .mizan-judge-modepanel{ inset-inline-end:0; transform:none }
+.mizan-judge-modeswitch{ display:flex; align-items:center; gap:.6rem; min-height:44px; line-height:1.45; cursor:pointer }
+.mizan-judge-modeswitch input{ width:22px; height:22px; flex:0 0 auto; accent-color:#c7a968 }
+.mizan-judge-modethemes{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem }
+.mizan-judge-modethemes button{
+  min-height:44px; padding:.35rem .4rem; border-radius:12px; line-height:1.2;
+  border:1px solid rgba(255,255,255,.16); background:transparent; color:#f4f1e8; font-weight:700;
+}
+.mizan-judge-modethemes button[aria-checked="true"]{ background:#c7a968; border-color:#c7a968; color:#16241f }
+
+/* ── وضع المحكّم: لا نصّ دون 16px، ولا هدف لمسٍ دون 44px ─────────────── */
+[data-judge-mode="on"] :is(.text-\[8px\],.text-\[9px\],.text-\[10px\],.text-\[10\.5px\],.text-\[11px\],.text-\[11\.5px\],.text-\[12px\],.text-\[13px\],.text-\[14px\],.text-\[15px\],.text-xs,.text-sm),
+[data-judge-mode="on"] :is(.js-fact,.js-rub,.mizan-judge-cost,.mizan-judge-key,.mizan-judge-note,.mizan-kicker,.mizan-badge-sm,.mizan-badge-md,.mizan-mushaf-sheet__foot,.mizan-tashkeel__badge,.mizan-judge-modepanel),
+[data-judge-mode="on"] .mizan-judge-hud span,
+[data-judge-mode="on"] .mizan-mushaf-trackchip > div,
+[data-judge-mode="on"] :is(kbd,small){ font-size:16px }
+[data-judge-mode="on"]{ font-size:max(16px, 1em) }
+[data-judge-mode="on"] :is(button,[role="button"],input:not([type="checkbox"]):not([type="radio"]),select,a[href]){ min-height:44px }
+[data-judge-mode="on"] :is(button,[role="button"]){ min-width:44px }
+[data-judge-mode="on"] .mizan-mushaf-sheet__tools button{ min-height:44px }
+[data-judge-mode="on"] .mizan-judge-strip .js-dots i{ height:4px }
+
+/* ── «إضاءة القاعة»: فاتحٌ عالي التباين لقاعةٍ مضاءة (≥ 7:1) ─────────────── */
+.mizan-judge-os[data-judge-theme="hall"]{
+  --venue:#ffffff; --venue-2:#f7f5ef; --venue-deep:#f7f5ef;
+  --venue-surface:rgba(0,0,0,.04); --venue-line:rgba(0,0,0,.30);
+  --venue-ink:#0b0d0c; --venue-muted:#1f2622; --venue-faint:#2f3833;
+  --jc-paper:#fffdf7; --jc-paper-ink:#000000; --jc-gold:#5a420b;
+}
+.mizan-judge-os[data-judge-theme="hall"] .jt-memorization{ --ja-ink:#8a2a1c; --ja-ring:rgba(138,42,28,.35) }
+.mizan-judge-os[data-judge-theme="hall"] .jt-tajweed    { --ja-ink:#0f5638; --ja-ring:rgba(15,86,56,.35) }
+.mizan-judge-os[data-judge-theme="hall"] .jt-waqf_ibtida{ --ja-ink:#1d4a66; --ja-ring:rgba(29,74,102,.35) }
+.mizan-judge-os[data-judge-theme="hall"] .jt-performance{ --ja-ink:#5a420b; --ja-ring:rgba(90,66,11,.35) }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-strip{ background:rgba(255,255,255,.97) }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-deck{ border-inline-start-color:rgba(0,0,0,.30) }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-finish{ color:var(--jc-gold); border-color:var(--jc-gold) }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-finish[data-armed="true"]{ background:var(--jc-gold); color:#ffffff }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-action{ background:#ffffff; border-color:rgba(0,0,0,.30) }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-key{ opacity:1 }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"]){ color:#2f3833 }
+
+/* ── «ليلي»: معتمٌ دافئ قليل الوهج، والورقة مطفأةٌ لا تبهر العين (≥ 4.5:1) ── */
+.mizan-judge-os[data-judge-theme="night"]{
+  --venue:#0b100e; --venue-2:#080c0b; --venue-deep:#060908;
+  --venue-surface:rgba(255,255,255,.04); --venue-line:rgba(255,255,255,.12);
+  --venue-ink:#e3dccb; --venue-muted:#b3ac98; --venue-faint:#a09a86;
+  --jc-paper:#c9bfa3; --jc-paper-ink:#1d1c16; --jc-gold:#b89c5c;
+}
+.mizan-judge-os[data-judge-theme="night"] .jt-memorization{ --ja-ink:#d08a7b }
+.mizan-judge-os[data-judge-theme="night"] .jt-tajweed    { --ja-ink:#7fb89c }
+.mizan-judge-os[data-judge-theme="night"] .jt-waqf_ibtida{ --ja-ink:#8fabbd }
+.mizan-judge-os[data-judge-theme="night"] .jt-performance{ --ja-ink:#c8a978 }
+.mizan-judge-os[data-judge-theme="night"] .mizan-judge-strip{ background:rgba(6,9,8,.95) }
+.mizan-judge-os[data-judge-theme="night"] .mizan-judge-finish{ color:#c8a978 }
+.mizan-judge-os[data-judge-theme="night"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"]){ color:#3f403a }
+.mizan-judge-os[data-judge-theme="night"] .mizan-mushaf-page{ filter:brightness(.86) sepia(.08) }
+
+/* ── العرض المبسّط لوليّ الأمر والمتسابق: نبضٌ هادئ عند النداء، ويسكن لمن طلب تقليل الحركة ── */
+.mizan-simple-queue__pulse{ animation:mzSimpleCall 2.4s ease-in-out infinite }
+@keyframes mzSimpleCall{ 0%,100%{ box-shadow:0 0 0 0 rgba(232,203,147,.55) } 50%{ box-shadow:0 0 0 14px rgba(232,203,147,0) } }
+@media (prefers-reduced-motion: reduce){ .mizan-simple-queue__pulse{ animation:none } .mizan-simple-queue *{ transition:none !important } }
