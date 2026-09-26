@@ -115,20 +115,17 @@ export const AuthPortal:React.FC=()=>{
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-12 mt-2 text-sm font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
     {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
         تُفتح بضغطةٍ صريحة فقط، ولها مفتاح تخزينها الخاص داخل هذا التبويب. */}
-    {/* أيقونة صامتة لا لافتة: المدخل اختياريٌّ ثانوي، وشاشةُ الدخول لجهةٍ حقيقية
-        لا ينبغي أن يتصدّرها زرُّ عرض. والوصف باقٍ في `title`/`aria-label` فيبلغ
-        قارئَ الشاشة ومن يمرّ بالفأرة، ولا يزاحم العين. والحجم 44px كبقية أزرار
-        اللمس في ميزان. */}
-    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5] flex justify-center">
+    {/* زرٌّ مسمّى واضح: التجربة بابُ التعريف بالمنتج، والأيقونة وحدها لم يفهمها أحد. */}
+    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
      <button
       type="button"
       onClick={()=>enterDemoSession()}
-      title={ar?'استعراض النظام ببيانات تجريبية — بيئة معزولة لا تتصل بأي مسابقة حقيقية':'Explore with demo data — an isolated environment, not connected to any real competition'}
-      aria-label={ar?'استعراض النظام ببيانات تجريبية':'Explore with demo data'}
-      className="w-11 h-11 grid place-items-center rounded-xl border border-[#d8b86a] bg-[#faf3e2] text-[#8a6a1c] transition hover:bg-[#f6ebd3]"
+            className="w-full min-h-14 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-[#d8b86a] bg-gradient-to-b from-[#fdf7e8] to-[#f6e8c6] px-5 text-base font-black text-[#6b5314] shadow-[0_6px_18px_rgba(138,106,28,.14)] transition hover:from-[#faf0d8] hover:to-[#f0dcae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8a6a1c]"
      >
-      <FlaskConical className="w-4 h-4" aria-hidden="true"/>
+      <FlaskConical className="w-5 h-5" aria-hidden="true"/>
+      <span>{ar?'جرّب النسخة التجريبية':'Try the demo'}</span>
      </button>
+     <p className="mt-2 text-center text-xs font-bold text-[#6b5f45]">{ar?'بيانات مصطنعة — لا تتصل بأي مسابقة حقيقية':'Synthetic data — not connected to any real competition'}</p>
     </div>}
    </>}
   </div>
