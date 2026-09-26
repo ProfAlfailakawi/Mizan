@@ -1,0 +1,128 @@
+name: مستمع «يسمعك» على GPU — تشغيل يدوي
+
+# زرُّ التجربة المدفوعة (docs/LISTENER-GPU.md): يُبنى مستمعُ GPU ويُنشر **خدمةً منفصلة**
+# لا تمسّ الإنتاج، ثم — إن طُلب صراحةً — يُوجَّه ميزانُ إليها. الكلفةُ تجري فقط ما دام
+# مثيلُها يعمل (نحو 1.05$/ساعة)، وتنام إلى الصفر بلا استخدام. والرجوعُ تشغيلةٌ بـroute=cpu.
+#
+# لا يعمل إلا يدويًّا (workflow_dispatch) ومن main — فلا كلفةَ تبدأ إلا بضغطة صاحب المشروع.
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'إقليمُ GPU (ليس me-central1 — لا GPU فيه)'
+        required: true
+        default: 'europe-west1'
+      route:
+        description: 'إلى أين يُوجَّه ميزان بعد النشر؟ keep=لا تغيير (جرّب أولًا) · gpu=حوِّل إليه · cpu=أرجِع للقديم'
+        required: true
+        default: 'keep'
+        type: choice
+        options: [keep, gpu, cpu]
+      min_instances:
+        description: 'مثيلٌ دائم؟ 0=ينام إلى الصفر (الأرخص) · 1=جاهز دائمًا (~764$/شهر)'
+        required: true
+        default: '0'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mizan-listener-gpu
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: mizan-f2ce3
+  GPU_SERVICE: mizan-quran-listener-gpu
+  SOURCE_STAGING_BUCKET: gs://mizan-f2ce3-github-deploy-source/source
+  GCP_BUILD_SERVICE_ACCOUNT: mizan-cloud-build@mizan-f2ce3.iam.gserviceaccount.com
+
+jobs:
+  gpu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # كما في نشر الإنتاج: main الموثوق وحده، لا مدخلاتُ ref.
+      - name: جلب main الموثوق
+        uses: actions/checkout@v5
+        with:
+          ref: refs/heads/main
+          fetch-depth: 1
+
+      - name: مصادقة Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: تجهيز gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          version: '>= 500.0.0'
+
+      # الصورةُ تُدفع إلى مستودع الصور القائم (me-central1) — وCloud Run ينشر منها في أيّ إقليم.
+      - name: بناء صورة GPU
+        run: |
+          set -euo pipefail
+          TAG="me-central1-docker.pkg.dev/$GCP_PROJECT_ID/cloud-run-source-deploy/$GPU_SERVICE:$GITHUB_SHA"
+          gcloud builds submit services/quran-practice-listener \
+            --config services/quran-practice-listener/cloudbuild.gpu.yaml \
+            --substitutions "_TAG=$TAG" \
+            --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
+            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" \
+            --suppress-logs
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: نشر خدمة GPU (منفصلة — لا تمسّ الإنتاج)
+        run: |
+          set -euo pipefail
+          gcloud run deploy "$GPU_SERVICE" \
+            --image "$TAG" \
+            --region "${{ inputs.region }}" --platform managed --no-allow-unauthenticated \
+            --gpu 1 --gpu-type nvidia-l4 --no-gpu-zonal-redundancy \
+            --cpu 4 --memory 16Gi --concurrency 8 \
+            --min-instances "${{ inputs.min_instances }}" --max-instances 1 \
+            --no-cpu-throttling --cpu-boost --timeout 60 \
+            --set-env-vars "MIZAN_LISTENER_DEVICE=cuda,MIZAN_BUILD_SHA=$GITHUB_SHA"
+
+      - name: السماح لميزان بندائه، وقراءة صحّته
+        run: |
+          set -euo pipefail
+          RUNTIME_SA="$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)')"
+          gcloud run services add-iam-policy-binding "$GPU_SERVICE" --region "${{ inputs.region }}" \
+            --member "serviceAccount:$RUNTIME_SA" --role roles/run.invoker >/dev/null
+          GPU_URL="$(gcloud run services describe "$GPU_SERVICE" --region "${{ inputs.region }}" --format='value(status.url)')"
+          echo "GPU_URL=$GPU_URL" >> "$GITHUB_ENV"
+          # `/health` يقول device — نشرُ GPU يشتغل على CPU خطأٌ يُرى هنا لا يُدفع ثمنُه بصمت.
+          curl -fsS -m 120 -H "Authorization: Bearer $(gcloud auth print-identity-token)" "$GPU_URL/health" \
+            | tee /tmp/health.json || echo "health check could not be read from this runner; check the service logs"
+          if grep -q '"device": *"cpu"' /tmp/health.json 2>/dev/null; then
+            echo "::error::the GPU service is running on CPU — refusing to leave it silently mis-deployed"; exit 1
+          fi
+
+      - name: توجيه ميزان (إن طُلب)
+        if: ${{ inputs.route != 'keep' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.route }}" = "gpu" ]; then
+            TARGET="$GPU_URL/listen"
+          else
+            TARGET="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')/listen"
+          fi
+          gcloud run services update mizan --region me-central1 \
+            --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=$TARGET"
+          echo "Mizan now points to: $TARGET"
+
+      - name: الملخّص
+        if: always()
+        run: |
+          {
+            echo "## مستمع GPU"
+            echo "- الخدمة: \`$GPU_SERVICE\` في \`${{ inputs.region }}\` — min-instances=${{ inputs.min_instances }}"
+            echo "- التوجيه: \`${{ inputs.route }}\`"
+            echo "- الصحّة:"; echo '```json'; cat /tmp/health.json 2>/dev/null || echo '(لم تُقرأ)'; echo '```'
+            echo "- الكلفة تجري ما دام مثيلٌ يعمل (~1.05\$/ساعة). للإيقاف: شغِّل بـroute=cpu ثم احذف الخدمة إن شئت."
+          } >> "$GITHUB_STEP_SUMMARY"
