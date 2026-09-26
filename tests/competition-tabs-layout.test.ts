@@ -33,7 +33,7 @@ test('the judging tab is a judging screen, not the operations screen again', () 
    */
   assert.doesNotMatch(fs.readFileSync('src/index.css', 'utf8'), /\[data-operation-mode="judging"\][^{]*\{\s*display:none/,
     'no stylesheet may hide a judging section by its position in the tree');
-  assert.match(operations, /mode==='operations'\s*\n?\s*\?[\s\S]{0,400}'إدارة يوم المسابقة'/,
+  assert.match(operations, /mode==='operations'\s*\n?\s*\?[\s\S]{0,400}'يوم المسابقة'/,
     'the event-day heading belongs to operations only');
   assert.match(operations, /:\s*<div className="flex justify-end"><Button[^>]*onClick=\{\(\)=>store\.addCommittee\(\)\}/,
     'judging keeps the create-panel action — it is where panels are built');

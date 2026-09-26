@@ -433,40 +433,25 @@ const LocusField: React.FC<{
 /** بطاقة الملخّص الحيّ: ما الذي اختاره الآن، بالأرقام لا بالانطباع. */
 export const ScopeSummary: React.FC<{ scope: QuranScope; arabic: boolean; compact?: boolean }> = ({ scope, arabic, compact }) => {
   const metrics = useMemo(() => scopeMetrics(scope), [scope]);
-  const rows: [string, React.ReactNode][] = [
-    [arabic ? 'الآيات' : 'Ayat', metrics.ayahCount.toLocaleString(arabic ? 'ar-KW-u-nu-latn' : 'en-US')],
-    [arabic ? 'السور' : 'Surahs', metrics.surahCount],
-    [arabic ? 'أجزاء كاملة' : 'Complete juz', metrics.fullJuz.length],
-    [arabic ? 'أجزاء جزئية' : 'Partial juz', metrics.partialJuz.length],
-    [arabic ? 'الصفحات (تقريبًا)' : 'Pages (approx.)', metrics.approximatePageCount],
-    [arabic ? 'المقاطع' : 'Segments', metrics.segmentCount],
+  const fmt = (n: number) => n.toLocaleString(arabic ? 'ar-KW-u-nu-latn' : 'en-US', { maximumFractionDigits: 1 });
+  const tiles: [string, string, React.ComponentType<{ className?: string }>][] = [
+    [arabic ? 'الأجزاء' : 'Juz', fmt(metrics.juzEquivalent), BookOpen],
+    [arabic ? 'الآيات' : 'Ayat', fmt(metrics.ayahCount), ListChecks],
   ];
   return (
-    <div className={`rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] ${compact ? 'p-3' : 'p-4 sm:p-5'}`} role="status" aria-live="polite">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <div className="mizan-kicker">{arabic ? 'النطاق المختار' : 'SELECTED SCOPE'}</div>
-          <p className="mt-1 text-sm font-black text-[#214C40]">{describeScope(scope, arabic)}</p>
-        </div>
-        <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black tabular-nums text-[#2F6555]">
-          {arabic ? `${metrics.juzEquivalent} جزء بالمعادلة` : `${metrics.juzEquivalent} juz-equivalent`}
-        </span>
-      </div>
-      <dl className={`mt-3 grid gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'}`}>
-        {rows.map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-xl bg-white/80 px-2.5 py-2">
-            <dt className="text-[9px] font-bold text-[#656b67]">{label}</dt>
-            <dd className="mt-0.5 text-sm font-black tabular-nums text-[#24302b]">{value}</dd>
+    <div className={`rounded-3xl border border-[#cddbd3] bg-gradient-to-br from-[#F7FAF8] to-[#E7EEE9] ${compact ? 'p-3' : 'p-4 sm:p-5'}`} role="status" aria-live="polite">
+      <p className="text-sm font-black text-[#214C40]">{describeScope(scope, arabic)}</p>
+      <dl className="mt-3 grid grid-cols-2 gap-3">
+        {tiles.map(([label, value, Icon]) => (
+          <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#214C40] text-white"><Icon className="h-6 w-6" /></span>
+            <div className="min-w-0">
+              <dd className={`${compact ? 'text-2xl' : 'text-2xl sm:text-3xl'} font-black leading-none tabular-nums text-[#214C40]`}>{value}</dd>
+              <dt className="mt-1 text-xs font-bold text-[#5b6460]">{label}</dt>
+            </div>
           </div>
         ))}
       </dl>
-      {metrics.firstLocus && metrics.lastLocus && (
-        <p className="mt-3 text-[10px] leading-5 text-[#5f6662]">
-          {arabic
-            ? `يبدأ عند ${surahNameArabic(metrics.firstLocus.surah)} ${metrics.firstLocus.ayah} وينتهي عند ${surahNameArabic(metrics.lastLocus.surah)} ${metrics.lastLocus.ayah}.`
-            : `Starts at ${surahNameEnglish(metrics.firstLocus.surah)} ${metrics.firstLocus.ayah} and ends at ${surahNameEnglish(metrics.lastLocus.surah)} ${metrics.lastLocus.ayah}.`}
-        </p>
-      )}
     </div>
   );
 };
