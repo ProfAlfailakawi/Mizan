@@ -64,7 +64,7 @@ export const ParticipantDashboard: React.FC = () => {
  if(showRegistration) return <RegistrationFlow onSuccess={()=>setShowRegistration(false)}/>;
  if(!participant) return <div className="max-w-xl mx-auto px-4 py-16 text-center"><h1 className="text-2xl font-black">{ar?'ابدأ مشاركتك':'Start your participation'}</h1><Button className="mt-5" onClick={()=>setShowRegistration(true)}>{ar?'تسجيل':'Register'}</Button></div>;
  /* الحالة الفعلية لا المكتوبة وحدها: نتيجةٌ أو شهادةٌ أو تقييمٌ مقفل يعني أن تلاوته انتهت، ولو تأخّر تحديث السجل. */
- const status=deriveJourneyStage({status:participant.status,hasResult:!!result,hasCertificate:!!cert,hasLockedScores:(judgeSubmissions||[]).some(s=>s.participantId===participant.id&&s.locked),inSession:store.activeSession?.participant?.id===participant.id&&!store.activeSession.isLocked});
+ const status=deriveJourneyStage({status:participant.status,hasResult:!!result,hasCertificate:!!cert,hasLockedScores:(judgeSubmissions||[]).filter(s=>s.participantId===participant.id&&s.locked).length>=Math.max(1,competition.ruleSet?.judgesCountPerPanel??1),inSession:store.activeSession?.participant?.id===participant.id&&!store.activeSession.isLocked});
  const step=statusStep(status);
  const committee=store.committees.find(c=>c.competitionId===competition.id&&c.id===participant.assignedCommitteeId);
  /*

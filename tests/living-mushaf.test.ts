@@ -123,3 +123,13 @@ test('the judge page places the pen on the word, and keeps the line lens where i
   assert.match(judge, /layout=\{layouts\[locus\.page\]\} wordLevel=\{readingKey==='hafs'\}/);
   assert.match(judge, /pageLineSlots\(ink,expectedLines,bandsFromInkProfile\(ink,\{expectedLines\}\)\)/);
 });
+
+test('a multi-word hint stays revealed until the reader passes the whole span', async () => {
+  const { extendHint, spanEnd } = await import('../src/lib/hint-reveal');
+  let span = extendHint(null, 4, 10);
+  span = extendHint(span, 4, 10);
+  assert.equal(spanEnd(span, 4, 10), 5);
+  assert.equal(spanEnd(span, 5, 10), 5, 'second word still revealed after reciting the first');
+  assert.equal(spanEnd(span, 6, 10), null);
+  assert.deepEqual(extendHint(span, 6, 10), { from: 6, count: 1 });
+});
