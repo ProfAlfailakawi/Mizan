@@ -17,6 +17,7 @@ import { MushafListens } from './MushafListens';
 import { RecitationResultCard } from './RecitationResultCard';
 import { deliveryReadingKeyFor } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
+import { deriveJourneyStage, displayParticipantName, formatParticipantCode } from '../../lib/journey-progress';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
 const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Approve'},{ar:'الحضور',en:'Arrive'},{ar:'الاختبار',en:'Recite'},{ar:'الشهادة',en:'Certificate'}];
@@ -35,7 +36,7 @@ const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Ap
 type Tab='journey'|'prepare'|'record';
 
 export const ParticipantDashboard: React.FC = () => {
- const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant}=store; const ar=language==='ar';
+ const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant,judgeSubmissions}=store; const ar=language==='ar';
  // يُحلّ المتسابق قبل الخطّافات: الفئة تُشتق منه، والخروج المبكر بعدها لا يجوز أن يتخطّى خطّافًا.
  const participant=participants.find(p=>p.competitionId===competition.id&&String(p.email||'').toLowerCase()===currentUser.email.toLowerCase());
  const category=competition.categories.find(c=>c.id===participant?.categoryId);
@@ -62,7 +63,9 @@ export const ParticipantDashboard: React.FC = () => {
  const cert=certificates.find(c=>c.competitionId===competition.id&&c.participantId===participant?.id);
  if(showRegistration) return <RegistrationFlow onSuccess={()=>setShowRegistration(false)}/>;
  if(!participant) return <div className="max-w-xl mx-auto px-4 py-16 text-center"><h1 className="text-2xl font-black">{ar?'ابدأ مشاركتك':'Start your participation'}</h1><Button className="mt-5" onClick={()=>setShowRegistration(true)}>{ar?'تسجيل':'Register'}</Button></div>;
- const step=statusStep(participant.status);
+ /* الحالة الفعلية لا المكتوبة وحدها: نتيجةٌ أو شهادةٌ أو تقييمٌ مقفل يعني أن تلاوته انتهت، ولو تأخّر تحديث السجل. */
+ const status=deriveJourneyStage({status:participant.status,hasResult:!!result,hasCertificate:!!cert,hasLockedScores:(judgeSubmissions||[]).filter(s=>s.participantId===participant.id&&s.locked).length>=Math.max(1,competition.ruleSet?.judgesCountPerPanel??1),inSession:store.activeSession?.participant?.id===participant.id&&!store.activeSession.isLocked});
+ const step=statusStep(status);
  const committee=store.committees.find(c=>c.competitionId===competition.id&&c.id===participant.assignedCommitteeId);
  /*
   * ما يعنيه رقمه.
@@ -95,7 +98,7 @@ export const ParticipantDashboard: React.FC = () => {
   * مواضعه ولا تجربته. والتهيئة والتجربة لا تكشفان شيئًا ولا تمسّان درجة، فلا سبب لحجبهما
   * إلا اللحظة الوحيدة التي يضرّه فيها الانشغال: وهو داخل اللجنة.
   */
- const canPrepare=participant.status!=='in_session'; const hasRecord=passportRows.length>0||!!cert;
+ const canPrepare=status!=='in_session'; const hasRecord=passportRows.length>0||!!cert;
  // تبويبٌ اختاره ثم زال سببه (دخل اللجنة مثلًا) يعود إلى «دورك» بدل أن يترك فراغًا.
  const activeTab:Tab=(tab==='prepare'&&!canPrepare)||(tab==='record'&&!hasRecord)?'journey':tab;
 
@@ -105,7 +108,7 @@ export const ParticipantDashboard: React.FC = () => {
  const practiceEngine=practiceReadingFor(practiceReading);
 
  return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
-  <section className="mizan-surface p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="mizan-code">{participant.code}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar?participant.fullNameArabic:participant.fullName}</h1><p className="text-xs text-[#646965] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(participant.status,ar)}</Badge></div><div className="mt-7 flex items-start gap-1.5" role="list" aria-label={ar?'مراحل رحلتك':'Your journey'}>{[1,2,3,4,5].map(n=>{const state=n<step?'done':n===step?'current':'upcoming';return <React.Fragment key={n}><span role="listitem" aria-current={state==='current'?'step':undefined} aria-label={`${STEP_LABELS[n-1][ar?'ar':'en']} — ${ar?(state==='done'?'مكتملة':state==='current'?'أنت هنا':'لاحقًا'):(state==='done'?'done':state==='current'?'you are here':'upcoming')}`} className="flex flex-col items-center gap-2 shrink-0"><span className="mizan-step" data-state={state}>{state==='done'?<Check className="w-4 h-4"/>:n}</span><span className="mizan-step-label" data-state={state==='current'?'current':undefined}>{ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en}</span></span>{n<5&&<span className="mizan-step-rule mt-[17px]" data-done={n<step||undefined} aria-hidden="true"/>}</React.Fragment>})}</div></section>
+  <section className="mizan-surface p-6 sm:p-8"><div className="flex items-start justify-between gap-4"><div><div className="mizan-code" dir="ltr">{formatParticipantCode(participant.code)}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="text-3xl sm:text-4xl font-black mt-2">{displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)}</h1><p className="text-xs text-[#646965] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(status,ar)}</Badge></div><div className="mt-7 flex items-start gap-1.5" role="list" aria-label={ar?'مراحل رحلتك':'Your journey'}>{[1,2,3,4,5].map(n=>{const state=n<step?'done':n===step?'current':'upcoming';return <React.Fragment key={n}><span role="listitem" aria-current={state==='current'?'step':undefined} aria-label={`${STEP_LABELS[n-1][ar?'ar':'en']} — ${ar?(state==='done'?'مكتملة':state==='current'?'أنت هنا':'لاحقًا'):(state==='done'?'done':state==='current'?'you are here':'upcoming')}`} className="flex flex-col items-center gap-2 shrink-0"><span className="mizan-step" data-state={state}>{state==='done'?<Check className="w-4 h-4"/>:n}</span><span className="mizan-step-label" data-state={state==='current'?'current':undefined}>{ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en}</span></span>{n<5&&<span className="mizan-step-rule mt-[17px]" data-done={n<step||undefined} aria-hidden="true"/>}</React.Fragment>})}</div></section>
 
   {(canPrepare||hasRecord)&&<div className="mizan-tabs" role="tablist" aria-label={ar?'أقسام صفحتك':'Your sections'}>
    <TabButton active={activeTab==='journey'} onClick={()=>setTab('journey')} icon={MapPin} label={ar?'دورك':'Your turn'}/>
@@ -116,13 +119,13 @@ export const ParticipantDashboard: React.FC = () => {
   {activeTab==='journey'&&<>
    {/* النطاق ثابت حسب الفئة؛ لا توجد شاشة اختيار ثانية للمتسابق. */}
    {scopeResolution&&<section className="mizan-surface p-5 sm:p-6"><div className="min-w-0"><div className="mizan-kicker">{ar?'نطاق الفئة':'CATEGORY RANGE'}</div><h2 className="mt-1 text-lg font-black">{scopeResolution.blocked?(ar?'لم تحدد الجهة نطاق هذه الفئة بعد':'The category range is not configured yet'):describeScope(scopeResolution.scope,ar)}</h2><p className="mt-1 text-[11px] leading-6 text-[#646965]">{scopeResolution.blocked?(ar?'راجع إدارة المسابقة؛ نطاق الأسئلة يُحدد من الفئة نفسها.':'Contact the organizer; the question range is defined by the category itself.'):(ar?'هذا هو النطاق الذي حددته الجهة لفئتك، ولن يُطرح عليك سؤال خارجه.':'This is the range set by the organizer for your category; questions stay inside it.')}</p></div>{!scopeResolution.blocked&&<div className="mt-4"><ScopeSummary scope={scopeResolution.scope} arabic={ar} compact/></div>}</section>}
-  {participant.status==='approved'&&<section className="mizan-surface p-6 sm:p-8 text-center"><div className="w-12 h-12 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><QrCode className="w-6 h-6"/></div><h2 className="text-xl font-black mt-4">{ar?'بطاقتك جاهزة':'Your pass is ready'}</h2><div className="mt-5 w-44 h-44 border-8 border-white outline outline-1 outline-[#deddd6] bg-white rounded-2xl mx-auto grid place-items-center overflow-hidden"><RealQRCode value={passPayload} size={160} label={ar?'رمز دخول ميزان':'MIZAN entry pass'}/></div><div className="mt-3 text-[10px] font-mono text-[#656a66]">{participant.code}</div><div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-[#626a65]"><span className="flex items-center gap-1.5"><CalendarClock className="w-4 h-4"/>{participant.arrivalSlot||(ar?'يُحدد بعد الجدولة':'Set after scheduling')}</span><span className="flex items-center gap-1.5"><MapPin className="w-4 h-4"/>{competition.venueName}</span></div>{policy.operations.selfCheckIn&&<Button className="mt-6" onClick={()=>checkInParticipant(participant.id,'mobile_self')}>{ar?'أنا وصلت':'I’m here'}</Button>}</section>}
+  {status==='approved'&&<section className="mizan-surface p-6 sm:p-8 text-center"><div className="w-12 h-12 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><QrCode className="w-6 h-6"/></div><h2 className="text-xl font-black mt-4">{ar?'بطاقتك جاهزة':'Your pass is ready'}</h2><div className="mt-5 w-44 h-44 border-8 border-white outline outline-1 outline-[#deddd6] bg-white rounded-2xl mx-auto grid place-items-center overflow-hidden"><RealQRCode value={passPayload} size={160} label={ar?'رمز دخول ميزان':'MIZAN entry pass'}/></div><div className="mt-3 text-lg font-black tabular-nums text-[#3f4642]" dir="ltr">{formatParticipantCode(participant.code)}</div><div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-xs text-[#626a65]"><span className="flex items-center gap-1.5"><CalendarClock className="w-4 h-4"/>{participant.arrivalSlot||(ar?'يُحدد بعد الجدولة':'Set after scheduling')}</span><span className="flex items-center gap-1.5"><MapPin className="w-4 h-4"/>{competition.venueName}</span></div>{policy.operations.selfCheckIn&&<Button className="mt-6" onClick={()=>checkInParticipant(participant.id,'mobile_self')}>{ar?'أنا وصلت':'I’m here'}</Button>}</section>}
 
   {/*
     نقلٌ جرى له وهو ينتظر. لا يُفاجَأ بلجنةٍ تبدّلت ولا برقمٍ تأخّر: يُقال له من أين وإلى
     أين، وكم انتظر، وأين كان سيقع لولا مراعاة انتظاره وأين وقع بها.
   */}
-  {participant.lastQueueTransfer&&participant.status==='in_queue'&&<section className="rounded-2xl border border-[#d8c7a7] bg-[#fffaf0] p-5">
+  {participant.lastQueueTransfer&&status==='in_queue'&&<section className="rounded-2xl border border-[#d8c7a7] bg-[#fffaf0] p-5">
    <div className="flex items-start gap-3">
     <span className="w-9 h-9 rounded-xl bg-white grid place-items-center shrink-0"><ArrowLeftRight className="w-4 h-4 text-[#7a5c2e]"/></span>
     <div className="min-w-0">
@@ -136,11 +139,11 @@ export const ParticipantDashboard: React.FC = () => {
     </div>
    </div>
   </section>}
-  {participant.status==='in_queue'&&<section className="mizan-surface p-7 text-center"><TearOffQueueTicket number={participant.originalQueueNumber||participant.queueNumber||1} committee={committee?.code} ar={ar}/><div className="mizan-kicker mt-2">{ar?'حالة الدور':'QUEUE STATUS'}</div><div className="text-4xl font-black mt-2">{queueEstimate?.ahead??0}</div><div className="text-sm font-bold mt-2">{(queueEstimate?.ahead||0)===0?(ar?'أنت التالي':'You’re next'):(ar?'متسابق أمامك':'ahead')}</div>{queueEstimate&&<QueueRibbon total={queueEstimate.basis.queueSize} youAt={queueEstimate.ahead+1} ar={ar} className="justify-center mt-4 text-[#214C40]"/>}{queueEstimate&&<div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">~{queueEstimate.estimatedWaitMinutes}</div><div className="text-[10px] text-[#646965]">{ar?'دقيقة تقديريًا':'estimated min'}</div></div><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">{new Date(queueEstimate.expectedTurnAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div><div className="text-[10px] text-[#646965]">{ar?'وقت متوقع':'estimated turn'}</div></div></div>}<div className="mt-2 text-[10px] text-[#696f6b]">{ar?'يتغير التقدير مع حركة اللجان.':'Estimate updates with live flow.'}</div><div className="mt-4 text-xs font-bold text-[#626a65]">{committee?.code||'—'} · {ar?committee?.nameArabic:committee?.name}</div></section>}
+  {status==='in_queue'&&<section className="mizan-surface p-7 text-center"><TearOffQueueTicket number={participant.originalQueueNumber||participant.queueNumber||1} committee={committee?.code} ar={ar}/><div className="mizan-kicker mt-2">{ar?'حالة الدور':'QUEUE STATUS'}</div><div className="text-4xl font-black mt-2">{queueEstimate?.ahead??0}</div><div className="text-sm font-bold mt-2">{(queueEstimate?.ahead||0)===0?(ar?'أنت التالي':'You’re next'):(ar?'متسابق أمامك':'ahead')}</div>{queueEstimate&&<QueueRibbon total={queueEstimate.basis.queueSize} youAt={queueEstimate.ahead+1} ar={ar} className="justify-center mt-4 text-[#214C40]"/>}{queueEstimate&&<div className="mt-5 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">~{queueEstimate.estimatedWaitMinutes}</div><div className="text-[10px] text-[#646965]">{ar?'دقيقة تقديريًا':'estimated min'}</div></div><div className="rounded-xl bg-[#f1efe9] p-3"><div className="text-lg font-black">{new Date(queueEstimate.expectedTurnAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div><div className="text-[10px] text-[#646965]">{ar?'وقت متوقع':'estimated turn'}</div></div></div>}<div className="mt-2 text-[10px] text-[#696f6b]">{ar?'يتغير التقدير مع حركة اللجان.':'Estimate updates with live flow.'}</div><div className="mt-4 text-xs font-bold text-[#626a65]">{committee?.code||'—'} · {ar?committee?.nameArabic:committee?.name}</div></section>}
 
-  {participant.status==='in_session'&&<section className="mizan-surface p-7 text-center bg-[#fffefb]"><span className="inline-flex w-3 h-3 rounded-full bg-[#2F6555] animate-pulse"/><h2 className="text-2xl font-black mt-4">{ar?'اختبارك جارٍ الآن':'Your recitation is in progress'}</h2><p className="text-xs text-[#646965] mt-2">{ar?'المحكم يستمع. لا تحتاج إلى أي إجراء.':'The judges are listening. No action is required from you.'}</p></section>}
+  {status==='in_session'&&<section className="mizan-surface p-7 text-center bg-[#fffefb]"><span className="inline-flex w-3 h-3 rounded-full bg-[#2F6555] animate-pulse"/><h2 className="text-2xl font-black mt-4">{ar?'اختبارك جارٍ الآن':'Your recitation is in progress'}</h2><p className="text-xs text-[#646965] mt-2">{ar?'المحكم يستمع. لا تحتاج إلى أي إجراء.':'The judges are listening. No action is required from you.'}</p></section>}
 
-  {(participant.status==='tested'||participant.status==='certified'||participant.status==='appealed')&&<section className="mizan-surface p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'بعد الاختبار':'AFTER RECITATION'}</div><h2 className="text-xl font-black mt-1">{resultVisible&&result?(ar?'نتيجتك':'Your result'):(ar?'تم حفظ تقييمك':'Assessment secured')}</h2></div><ShieldCheck className="w-6 h-6 text-[#2F6555]"/></div>{resultVisible&&result?<>
+  {(status==='tested'||status==='certified'||status==='appealed')&&<section className="mizan-surface p-6 sm:p-8"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'بعد الاختبار':'AFTER RECITATION'}</div><h2 className="text-xl font-black mt-1">{resultVisible&&result?(ar?'نتيجتك':'Your result'):(ar?'تم حفظ تقييمك':'Assessment secured')}</h2></div><ShieldCheck className="w-6 h-6 text-[#2F6555]"/></div>{resultVisible&&result?<>
    {/*
      * بطاقة النتيجة: الوجه الذي يخرج من ميزان إلى الناس.
      *
@@ -150,7 +153,7 @@ export const ParticipantDashboard: React.FC = () => {
      * تصير النتيجة معلنةً بسياسة المسابقة، فلا تسبق البطاقةُ الإعلان.
      */}
    <div className="mt-6"><RecitationResultCard ar={ar}
-    participantName={ar?participant.fullNameArabic:participant.fullName}
+    participantName={displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)}
     participantCode={participant.code}
     riwaya={participant.riwaya}
     categoryName={ar?(category?.nameArabic||category?.name):category?.name}
