@@ -62,6 +62,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
   const [tab, setTab] = useState<Tab>('scope');
   const [selectedId, setSelectedId] = useState(store.competition.categories[0]?.id || '');
   const category = store.competition.categories.find(c => c.id === selectedId) || store.competition.categories[0];
+  const isPlatformOwner = store.currentUser.role === 'super_admin';
 
   const tabs: [Tab, React.ComponentType<{ className?: string }>, string][] = [
     ['scope', BookMarked, ar ? 'النطاق' : 'Scope'],
@@ -72,22 +73,12 @@ export const QuestionEngineWorkspace: React.FC = () => {
     ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
     ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
-    ['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'],
+    /* المكتبة الرسمية لمالك المنصة وحده؛ حسابات الجهات لا تراها. */
+    ...(isPlatformOwner ? [['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'] as [Tab, React.ComponentType<{ className?: string }>, string]] : []),
   ];
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <div className="mizan-kicker">{ar ? 'محرك النطاق والأسئلة' : 'SCOPE & QUESTION ENGINE'}</div>
-          <h1 className="mt-1 text-2xl font-black sm:text-3xl">{ar ? 'الفئة تُعرّف بنطاقها لا باسمها' : 'A category is defined by its range, not its name'}</h1>
-          <p className="mt-2 max-w-2xl text-xs leading-6 text-[#666c68]">
-            {ar
-              ? 'سمِّ الفئة ما شئت — «ربع القرآن» أو «الفئة الذهبية» أو «أ». ميزان لا يستنتج شيئًا من الاسم؛ يعمل على النطاق القرآني الحقيقي وقواعده.'
-              : 'Name the category anything. Mizan infers nothing from the name; it works on the real Quranic range and its rules.'}
-          </p>
-        </div>
-      </header>
 
       {store.competition.categories.length === 0 ? (
         <div className="mizan-surface">
@@ -113,7 +104,7 @@ export const QuestionEngineWorkspace: React.FC = () => {
             {tab === 'models' && <ModelFairnessStudio store={store} ar={ar} categoryId={category?.id} />}
             {tab === 'readiness' && <ReadinessTab store={store} ar={ar} onNavigate={setTab} />}
             {tab === 'intelligence' && <QuranIntelligenceHealthConsole ar={ar} />}
-            {tab === 'library' && <OfficialQuranLibrary />}
+            {tab === 'library' && isPlatformOwner && <OfficialQuranLibrary />}
           </div>
         </>
       )}
@@ -187,6 +178,8 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = (
 
       <QuranScopePicker value={scope} onChange={setDraft} arabic={ar} idPrefix={`cat-${category.id}`} />
 
+      <PassageLength ar={ar} value={passageUnits(category)} onChange={v => store.updateCategory(category.id, { passageMode: 'page_quarters', pageQuarterUnits: Math.max(1, v), ayatPerQuestion: undefined, pagePortion: undefined })} />
+
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efeee8] pt-4">
         <p className="text-[11px] text-[#696f6b]">
           {ar ? `النسخة الحالية ${category.scopeVersion || 1}. أي تعديل يرفع النسخة ويبطل النماذج المبنية على السابقة.` : `Current version ${category.scopeVersion || 1}. Any change bumps it and invalidates models built on the old one.`}
@@ -200,6 +193,25 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = (
     </div>
   );
 };
+
+/*
+ * طول مقطع السؤال.
+ *
+ * كان في محرّر الفئة بين الاسم والعمر، وهو إعدادُ نطاقٍ لا هوية: كم يقرأ المتسابق من موضع
+ * السؤال. مكانه هنا بجوار النطاق، ويُقاس بالأوجه وأرباعها لا بالآيات.
+ */
+const passageUnits = (cat: Category) => cat.pageQuarterUnits || ({ quarter: 1, third: 1, half: 2, full: 4 } as Record<string, number>)[cat.pagePortion || ''] || 1;
+const quarterLabel = (units: number, ar: boolean) => { const n = Math.max(1, Math.round(units)); const whole = Math.floor(n / 4), rem = n % 4; const frac = ['', '¼', '½', '¾'][rem]; if (!whole) return ar ? `${frac} وجه` : `${frac} page`; return ar ? `${whole}${frac ? ` و${frac}` : ''} ${whole === 1 ? 'وجه' : 'أوجه'}` : `${whole}${frac ? ` ${frac}` : ''} page${whole === 1 ? '' : 's'}`; };
+const PassageLength: React.FC<{ ar: boolean; value: number; onChange: (v: number) => void }> = ({ ar, value, onChange }) => (
+  <div className="rounded-2xl border border-[#dcdad2] bg-white p-4">
+    <div className="text-sm font-black text-[#24302b]">{ar ? 'طول مقطع السؤال' : 'Question passage length'}</div>
+    <div className="mt-3 flex items-center justify-between gap-3">
+      <button type="button" aria-label={ar ? 'إنقاص' : 'Decrease'} onClick={() => onChange(Math.max(1, value - 1))} className="h-12 w-12 rounded-xl border border-[#dcdad2] text-2xl font-black">−</button>
+      <div className="min-w-0 flex-1 text-center"><div className="text-xl font-black tabular-nums">{quarterLabel(value, ar)}</div><div className="text-[11px] text-[#656b66]">{ar ? 'الزيادة كل مرة: ربع وجه' : 'increments by quarter page'}</div></div>
+      <button type="button" aria-label={ar ? 'زيادة' : 'Increase'} onClick={() => onChange(value + 1)} className="h-12 w-12 rounded-xl border border-[#dcdad2] text-2xl font-black">+</button>
+    </div>
+  </div>
+);
 
 const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = ({ store, ar, category }) => {
   const policy = getCompetitionPolicy(store.competition);

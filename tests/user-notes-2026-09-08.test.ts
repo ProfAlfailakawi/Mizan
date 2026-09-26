@@ -108,7 +108,7 @@ test('large-file notes were applied: labels, no presets, full domains, delete AP
  const rolePortals=fs.readFileSync('src/components/admin/RolePortals.tsx','utf8');
  const server=fs.readFileSync('server.ts','utf8');
  const store=fs.readFileSync('src/lib/store.ts','utf8');
- assert.match(overview,/w-14 text-center/);assert.doesNotMatch(overview,/COMPETITION_TEMPLATES\.map/);
+ /* رحلة المسابقة: ست محطات بأيقونات كبيرة تلتفّ ولا تُقصّ. */assert.match(overview,/grid grid-cols-3 sm:grid-cols-6/);assert.match(overview,/w-14 h-14 rounded-2xl/);assert.doesNotMatch(overview,/COMPETITION_TEMPLATES\.map/);
  assert.doesNotMatch(brand,/PRESET_LOGOS\.map/);
  assert.match(tenants,/overflow-wrap:anywhere/);assert.match(rolePortals,/overflow-wrap:anywhere/);
  assert.match(server,/app\.delete\('\/api\/identity\/accounts\/:id'/);assert.match(server,/MIZAN_REQUIRE_MFA_FOR_SENSITIVE==='true'/);

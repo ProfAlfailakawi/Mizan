@@ -33,9 +33,12 @@ test('Policy Compiler surfaces ambiguous and unmapped policy lines instead of si
  assert.ok(rec.rules.every(r=>r.evidenceIds.length>0));
 });
 
-test('Contradiction Radar detects privacy and ceremony publication conflicts',()=>{
+/* «الخصوصية والاحتفاظ» حُذفت وصارت «المساندة الآلية» مفعّلة دائمًا (قرار المالك ٢٦‑٩)، فتعارض
+   الخصوصية لم يعد ممكنًا: القيمة المحفوظة تُعاد إلى الثابت. ويبقى تعارض النشر مكشوفًا. */
+test('Contradiction Radar detects ceremony publication conflicts; privacy is a fixed default',()=>{
  const competition=structuredClone(SEED_COMPETITION);const policy=getCompetitionPolicy(competition);policy.judging.silentAiGuardian=true;policy.aiPolicy.mode='AI_CERTIFIED_CAPABILITIES_ONLY';policy.privacy.allowAiProcessing=false;policy.results.visibility='ceremony_only';policy.results.publicLeaderboard='top_only';competition.policy=policy;
  const issues=detectContradictions({competition,quranSources:[],aiValidations:[],availableQualifiedJudges:99,committeeCount:1});
- assert.ok(issues.some(i=>i.kind==='privacy'&&i.severity==='BLOCKER'));
+ assert.equal(getCompetitionPolicy(competition).privacy.allowAiProcessing,true);
+ assert.ok(!issues.some(i=>i.kind==='privacy'&&i.severity==='BLOCKER'));
  assert.ok(issues.some(i=>i.kind==='publication'&&i.severity==='BLOCKER'));
 });

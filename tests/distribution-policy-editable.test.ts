@@ -20,21 +20,14 @@ const store = read('src/lib/store.ts');
  * وحده غائب. فالحراسة على **وجود المحرّر** نفسه.
  */
 
-const SETTABLE = [
-  'distributionMode',
-  'unmatchedArrivalPolicy',
-  'delegationShareCap',
-  'maxQueueDepth',
-] as const;
-
-test('every routing policy the engine reads can be written from the policy editor', () => {
-  const missing = SETTABLE.filter(k => !editor.includes(`p.operations.${k}=`));
-  assert.deepEqual(missing, [], 'a policy the organization cannot set is a decision made on their behalf');
-});
-
-test('each control is reachable from the operations section, not stranded in the file', () => {
-  assert.match(editor, /<DistributionPolicyBlock ar=\{ar\} policy=\{policy\} patch=\{patch\}\/>/);
-  assert.match(editor, /const DistributionPolicyBlock=/);
+/*
+ * قرار المالك (٢٦‑٩): تبويب «التشغيل» في هوية المسابقة حُذف، فصارت قرارات التوزيع افتراضاتٍ
+ * ثابتة. لم يعد المطلوب «محرّرًا لكل حقل» بل ألّا يبقى محرّرٌ يتيم، وأن تبقى الافتراضات آمنة.
+ */
+test('the operations sub-tab and its routing editor are gone from competition DNA', () => {
+  assert.doesNotMatch(editor, /const DistributionPolicyBlock=/);
+  assert.doesNotMatch(editor, /const OperationsPolicySection=/);
+  assert.doesNotMatch(editor, /\['operations',QrCode/);
 });
 
 test('the engine still reads each one, so the editor is not writing into a void', () => {
@@ -42,12 +35,6 @@ test('the engine still reads each one, so the editor is not writing into a void'
   assert.match(store, /operations\.unmatchedArrivalPolicy/);
   assert.match(store, /delegationShareCap: ops\.delegationShareCap/);
   assert.match(store, /maxQueueDepth: ops\.maxQueueDepth/);
-});
-
-test('the share cap is edited as a percentage and stored as a fraction, clamped both ways', () => {
-  /* مسؤولُ مسابقةٍ يكتب ٤٠ لا ٠٫٤؛ وسقفٌ صفرٌ أو فوق المئة يُفرغ لجنةً أو يُلغي القيد بصمت. */
-  assert.match(editor, /delegationShareCap=Math\.min\(1,Math\.max\(0\.1,v\/100\)\)/);
-  assert.match(editor, /min=\{10\} max=\{100\}/);
 });
 
 test('the defaults are unchanged, so an organization that signs nothing keeps today’s behaviour', () => {
@@ -59,8 +46,3 @@ test('the defaults are unchanged, so an organization that signs nothing keeps to
   assert.equal(ops.maxQueueDepth, 0);
 });
 
-test('each control states its consequence in words, not only its field name', () => {
-  /* من يضبط هذه مسؤولُ مسابقة لا مبرمج: «سقف حصة الوفد» يُفهم، و`delegationShareCap` لا. */
-  for (const phrase of ['متى تُسنَد اللجنة', 'حين لا تؤهّله أيُّ لجنة', 'سقف حصة الوفد', 'أقصى عمق للطابور'])
-    assert.ok(editor.includes(phrase), `the editor must name the decision: ${phrase}`);
-});

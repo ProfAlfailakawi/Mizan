@@ -17,6 +17,9 @@ const DEFAULT_ACTIONS: JudgeActionDefinition[] = [
   { id: 'act-stop', eventType: 'waqf_stop', labelArabic: 'وقف', labelEnglish: 'Stop', shortArabic: 'وقف', shortEnglish: 'Stop', criterion: 'tajweed', penalty: 0.5, enabled: true, shortcut: '6', icon: 'stop' }
 ];
 
+/** عبارة إنهاء الموضع الوحيدة المعتمدة لكل الجهات — كلمة واحدة، بلا قائمة ولا تناوب. */
+export const FIXED_END_PHRASE = 'حسبك';
+
 export const BASE_POLICY: CompetitionPolicy = {
   version: '1.0.0',
   registration: {
@@ -67,7 +70,7 @@ export const BASE_POLICY: CompetitionPolicy = {
     promptMode: 'configurable',
     secureReveal: { requireParticipantPresence:true, judgeApprovalMode:'all_assigned' },
     openingPrompt: { mode:'approved_reference_audio', autoplay:true, usageScope:'opening_prompt', preferredReciter:'' },
-    transitionCue: { enabled:true, phraseArabic:'', phraseEnglish:'', selectedPhraseIndexes:[0], autoAdvanceDelayMs:900 }
+    transitionCue: { enabled:true, phraseArabic:FIXED_END_PHRASE, phraseEnglish:FIXED_END_PHRASE, autoAdvanceDelayMs:900 }
   },
   operations: {
     deploymentProfile: 'lean',
@@ -202,6 +205,39 @@ function mergePolicy<T>(base: T, override: Partial<T> | undefined): T {
 export function getCompetitionPolicy(competition: Competition): CompetitionPolicy {
   const policy=mergePolicy(BASE_POLICY, competition.policy);
   policy.questions.participantInitiatedDraw=false;
+  return applyFixedDefaults(policy);
+}
+
+/*
+ * إعداداتٌ حُذفت من الواجهة فصارت ثابتة للجميع.
+ *
+ * صاحب المنتج قرّر أن هذه لا يُسأل عنها المنظّم: تُفعَّل دائمًا وتُقرأ من هنا وحدها، فلا
+ * تبقى قيمةٌ قديمة محفوظة (أُطفئت يوم كان المفتاح ظاهرًا) تعطّلها بلا سطحٍ يعيد تشغيلها.
+ */
+export function applyFixedDefaults(policy: CompetitionPolicy): CompetitionPolicy {
+  // السحب: التكرار والتنوع والمتشابهات مفعّلة دائمًا.
+  policy.questions.avoidRepeatWithinRound=true;
+  policy.questions.diversity={ acrossJuz:true, acrossSurah:true, mutashabihatBalance:true };
+  // عبارة الإنهاء ثابتة «حسبك»؛ يبقى للجهة مفتاح التنبيه الصوتي وحده.
+  const cue=policy.questions.transitionCue||BASE_POLICY.questions.transitionCue!;
+  policy.questions.transitionCue={ enabled:cue.enabled!==false, phraseArabic:FIXED_END_PHRASE, phraseEnglish:FIXED_END_PHRASE, autoAdvanceDelayMs:Number.isFinite(cue.autoAdvanceDelayMs)?cue.autoAdvanceDelayMs:900 };
+  // التحكيم: توزيع مختلط حسب اللجنة، وتسجيل الملاحظات والأخطاء أثناء التلاوة، وكل مفاتيح النزاهة والسلوك مفعّلة.
+  policy.judging.mode='hybrid';
+  policy.judging.scoreEntryMode='event_based';
+  policy.judging.independentUntilLock=true;
+  policy.judging.requireAudioRecording=true;
+  policy.judging.calibrationRequired=true;
+  policy.judging.allowPhysicalJudgePad=true;
+  policy.judging.showRunningScoreToJudge=true;
+  policy.judging.allowJudgeUndo=true;
+  policy.judging.silentAiGuardian=true;
+  policy.judging.reserveJudgeAllowed=true;
+  // الخصوصية: صوت ٩٠ يومًا، مستندات ٣٦٥ يومًا، المساندة الآلية مفعّلة، والاسم لا يظهر على الشاشات العامة (الرقم فقط).
+  policy.privacy={ ...policy.privacy, audioRetentionDays:90, documentRetentionDays:365, allowAiProcessing:true, displayParticipantNameOnPublicScreens:false };
+  // المسار والتشغيل: كل المراحل مفعّلة، ومفاتيح الاستقبال والقاعة مفعّلة.
+  policy.workflow=policy.workflow.map(w=>({ ...w, enabled:true }));
+  for(const base of BASE_POLICY.workflow) if(!policy.workflow.some(w=>w.id===base.id)) policy.workflow.push(clone(base));
+  Object.assign(policy.operations,{ selfCheckIn:true, kioskCheckIn:true, exceptionDesk:true, smartArrivalSlots:true, autoRouting:true, publicQueueUsesCodesOnly:true, offlineContinuity:true });
   return policy;
 }
 
