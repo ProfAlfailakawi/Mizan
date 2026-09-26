@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarClock, CircleDot, LockKeyhole, MapPin, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarClock, CircleDot, Eye, LockKeyhole, MapPin, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import { WarmupSanctuary } from '../participant/WarmupSanctuary';
+import { SimpleQueueView } from './SimpleQueueView';
 
 type Audience = 'participant' | 'guardian';
 type PublicJourney = {
@@ -38,6 +39,26 @@ const tokenFromHash = () => {
   }
 };
 
+const simpleFromHash = () => {
+  try {
+    const q = window.location.hash.split('?')[1] || '';
+    return new URLSearchParams(q).get('view') === 'simple';
+  } catch {
+    return false;
+  }
+};
+
+/* تبديل العرض بلا hashchange: التطبيق يعيد تحميل المسابقة العامة عند كل تغيّر في الرابط. */
+const writeSimpleToHash = (on: boolean) => {
+  try {
+    const [route, query = ''] = window.location.hash.split('?');
+    const params = new URLSearchParams(query);
+    if (on) params.set('view', 'simple'); else params.delete('view');
+    const next = params.toString();
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}${route}${next ? `?${next}` : ''}`);
+  } catch { /* المتصفح منع تعديل الرابط: يبقى العرض كما اختير في هذه الجلسة */ }
+};
+
 const statusIndex = (status: string) => {
   const order = ['submitted', 'under_review', 'approved', 'checked_in', 'in_queue', 'in_session', 'tested', 'appealed', 'certified'];
   const found = order.indexOf(status);
@@ -60,6 +81,9 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   const [journey, setJourney] = useState<PublicJourney | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [simple, setSimple] = useState(() => simpleFromHash());
+  const [journeyUpdatedAt, setJourneyUpdatedAt] = useState(0);
+  const openSimple = useCallback((on: boolean) => { setSimple(on); writeSimpleToHash(on); window.scrollTo?.({ top: 0 }); }, []);
 
   /*
    * انتهاء المسابقة ليس إلغاءً لرحلة المتسابق. النتيجة والشهادة والحفل تقع بعد التحكيم،
@@ -86,6 +110,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
       const data = body.journey as PublicJourney;
       if (!data || data.competitionId !== competition.id || data.audience !== audience) throw new Error('JOURNEY_TOKEN_INVALID');
       setJourney(data);
+      setJourneyUpdatedAt(Date.now());
       setToken(clean);
       setError('');
       localStorage.setItem(storageKey, clean);
@@ -158,6 +183,8 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
     window.location.hash = `verify?certificate=${encodeURIComponent(journey.certificate.number)}`;
   };
 
+  if (journey && simple) return <SimpleQueueView journey={journey} journeyUpdatedAt={journeyUpdatedAt} onBack={() => openSimple(false)} />;
+
   return <div className="min-h-screen bg-[#FAF8F2] text-[#171B18]" dir={ar ? 'rtl' : 'ltr'}>
     <header className="border-b border-[#e5dfd0] bg-[#FAF8F2]/95">
       <div className="max-w-4xl mx-auto h-16 px-4 flex items-center justify-between">
@@ -191,6 +218,11 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         <section className="mizan-surface p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5"><div><div className="mizan-kicker">{audience === 'guardian' ? (ar ? 'متابعة ولي الأمر' : 'GUARDIAN VIEW') : (ar ? 'رحلتي في المسابقة' : 'MY JOURNEY')}</div><h1 className="text-2xl sm:text-3xl font-black mt-2">{ar ? journey.participantNameArabic : journey.participantName}</h1><div className="text-xs text-[#636864] mt-2">{journey.participantCode} · {ar ? journey.competitionNameArabic : journey.competitionName}</div></div><Badge variant="emerald">{stepLabel(idx, ar)}</Badge></div>
           {next && <div className="mt-6 rounded-2xl bg-[#E7EEE9] text-[#214C40] p-4"><div className="text-[10px] font-black">{ar ? 'الخطوة التالية' : 'NEXT'}</div><div className="font-black mt-1">{next}</div></div>}
+          {/* مدخلٌ صريح للعرض المبسّط: خطٌّ كبير وسؤالٌ واحد — متى دوري؟ */}
+          <button type="button" onClick={() => openSimple(true)} className="mt-4 w-full min-h-12 rounded-2xl border border-[#cfd9d3] bg-white px-4 py-3 text-start flex items-center justify-between gap-3 hover:border-[#9fb5aa] transition-colors">
+            <span className="flex items-center gap-3 min-w-0"><Eye className="w-5 h-5 shrink-0 text-[#214C40]" aria-hidden="true" /><span className="min-w-0"><span className="block text-sm font-black text-[#214C40]">{ar ? 'عرض مبسّط بخطٍّ كبير' : 'Simple large-type view'}</span><span className="block text-[11px] text-[#5b6460] mt-0.5">{ar ? 'موضعك في الطابور والوقت التقريبي، ويتحدّث تلقائيًا' : 'Your place in the queue and approximate wait, updating live'}</span></span></span>
+            <Arrow className="w-4 h-4 shrink-0 text-[#214C40]" aria-hidden="true" />
+          </button>
         </section>
         <section className="mizan-surface p-5 sm:p-6"><div className="text-sm font-black">{ar ? 'مسار الرحلة' : 'Journey timeline'}</div><div className="mt-5 overflow-x-auto pb-2"><div className="min-w-[720px] flex items-start">{Array.from({ length: 9 }, (_, i) => <React.Fragment key={i}><div ref={i === idx ? currentStepRef : undefined} className="w-20 shrink-0 text-center"><div className={`mx-auto w-9 h-9 rounded-xl grid place-items-center ${i < idx ? 'bg-[#214C40] text-white' : i === idx ? 'bg-[#E8CB93] text-[#183a31]' : 'bg-[#f0eee8] text-[#656b66]'}`}>{i < idx ? <BadgeCheck className="w-4 h-4" /> : <span className="text-xs font-black">{i + 1}</span>}</div><div className="mt-2 text-[9px] leading-4 font-bold">{stepLabel(i, ar)}</div></div>{i < 8 && <div className={`h-px flex-1 mt-[18px] ${i < idx ? 'bg-[#214C40]' : 'bg-[#ddd9d0]'}`} />}</React.Fragment>)}</div></div></section>
         <section className="grid sm:grid-cols-3 gap-3"><Info icon={CalendarClock} label={ar ? 'الموعد' : 'Time'} value={journey.arrivalSlot || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={MapPin} label={ar ? 'المكان' : 'Location'} value={journey.committee?.hall || journey.venueName || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={CircleDot} label={ar ? 'الدور' : 'Queue'} value={journey.queueNumber ? String(journey.queueNumber) : (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /></section>

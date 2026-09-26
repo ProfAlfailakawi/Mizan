@@ -4,6 +4,7 @@ import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamb
 import { Ratio } from '../design-system/Ratio';
 import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
 import { openingAudioWindow, passageTransitionPlan, selectApprovedOpeningAudio } from '../../lib/judging-integrity';
@@ -241,6 +242,8 @@ export const JudgeOS: React.FC = () => {
   * تُلمس مقبضه. وتثبيته بضغطةٍ عليه لمن أراده مفتوحًا.
   */
  const [peek,setPeek]=useState(true);
+ /* وضع المحكّم وسمته: تفضيلٌ لهذا الجهاز، يُسنَد بسماتٍ على جذر القمرة وحدها. */
+ const judgeMode=useJudgeMode();
  const peekPinRef=useRef(false);
  const peekTimerRef=useRef<number|undefined>(undefined);
  const showStrip=(ms:number)=>{window.clearTimeout(peekTimerRef.current);setPeek(true);
@@ -574,8 +577,8 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
- if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20"><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[#646965] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[#656b66] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[#696f6b] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
- if(!participant) return <div className="max-w-3xl mx-auto px-4 py-16"><div className="text-center"><HeadphonesEmpty/>
+ if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[#646965] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[#656b66] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[#696f6b] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
+ if(!participant) return <div className="relative max-w-3xl mx-auto px-4 py-16" {...judgeMode.attrs}><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light absolute top-4 end-4 z-10"/><div className="text-center"><HeadphonesEmpty/>
   <h1 className="text-2xl font-black mt-4">{nextQueued?(ar?'لا توجد جلسة الآن':'No active session'):rosterCounts.awaiting?(ar?'لا أحد في الطابور — والكشوف ليست فارغة':'The queue is empty — the roster is not'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
   <p className="mt-2 text-xs leading-6 text-[#646965]">
    {ar
@@ -634,7 +637,7 @@ export const JudgeOS: React.FC = () => {
   * وترتيب البوابات كما كان: الميكروفون حين تُلزم به السياسة، ثم الحضور والموافقة، ثم
   * الموضع. لم يُمَسّ منها شيء؛ المتغيّر هو أين تُرسم لا متى تُفتح.
   */
- return <div ref={attachOs} className="mizan-judge-os" data-peek={peek?'true':'false'}
+ return <div ref={attachOs} className="mizan-judge-os" data-peek={peek?'true':'false'} {...judgeMode.attrs}
    style={osTop!=null?({'--mizan-judge-top':`${osTop}px`} as React.CSSProperties):undefined}>
 
   {/*
@@ -770,6 +773,7 @@ export const JudgeOS: React.FC = () => {
      <b dir="ltr">{showRunningScore?`−${deductions.toFixed(2)}`:String(activeSession.events.filter(e=>!e.reversed).length)}</b>
      <span>{showRunningScore?(ar?'الخصم':'Deducted'):(ar?'الملاحظات':'Marks')}</span>
     </div>
+    <JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update}/>
     <div className="m">
      <b dir="ltr">{formatTime(elapsed)}</b>
      <span>{activeSession.isLocked?(ar?'زمن الجلسة · متوقف':'Session · stopped'):(ar?'زمن الجلسة':'Session')}</span>
