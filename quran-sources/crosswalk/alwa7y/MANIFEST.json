@@ -1,0 +1,65 @@
+{
+  "source": "alwa7y.com — مصاحف التيسير",
+  "fetchedAt": "2026-09-26",
+  "approval": {
+    "by": "ميزان",
+    "date": "2026-09-26",
+    "text": "اعتُمدت مصاحف التيسير من alwa7y.com مرجعًا لعدّ الآي وحدود الآيات للروايات: الدوري والسوسي والبزي وقنبل وروح."
+  },
+  "version": "غير مذكور في أسماء الملفات ولا في صفحة التنزيلات؛ Last-Modified مسجَّل بدلًا منه",
+  "storage": {
+    "kind": "r2",
+    "bucket": "mizan-quran-assets",
+    "prefix": "crosswalk/alwa7y/",
+    "why": "كل ملف > 50MB فلا يُحفظ في git",
+    "frozenBy": ".github/workflows/alwa7y-r2-freeze.yml (sha256 verified before upload and after re-download)"
+  },
+  "files": [
+    {
+      "rawi": "al-duri-abu-amr",
+      "url": "http://www.alwa7y.com/downloads/TayseerDoryBasry.pdf",
+      "r2Key": "crosswalk/alwa7y/TayseerDoryBasry.pdf",
+      "sha256": "389f06a6448885bfc1516fdea75ab335d31c5e6253368dbfa5ddaea5bfd10da0",
+      "byteLength": 95654697,
+      "pdfTitle": "مصحف التيسير برواية الدوري عن أبي عمرو",
+      "lastModified": "2026-07-04",
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+    },
+    {
+      "rawi": "al-susi",
+      "url": "http://www.alwa7y.com/downloads/TayseerSosy.pdf",
+      "r2Key": "crosswalk/alwa7y/TayseerSosy.pdf",
+      "sha256": "46ce3d95a65fbeea9ebdf3cfc811425284ae6924fdb823d34cb43b3e955b0997",
+      "byteLength": 95169168,
+      "pdfTitle": "مصحف التيسير برواية السوسي عن أبي عمرو",
+      "lastModified": "2026-09-20",
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+    },
+    {
+      "rawi": "ibn-kathir (al-bazzi + qunbul, combined)",
+      "url": "http://www.alwa7y.com/downloads/TayseerKathir.pdf",
+      "r2Key": "crosswalk/alwa7y/TayseerKathir.pdf",
+      "sha256": "f327a21b6839328017ece6caef68b690bef6e716e7a6f32daa453cc99280aef5",
+      "byteLength": 89921415,
+      "pdfTitle": "مصحف التيسير بقراءة ابن كثير من طريق الشاطبية",
+      "lastModified": "2023-03-25",
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+    },
+    {
+      "rawi": "yaqub (ruways + rawh, combined)",
+      "url": "http://www.alwa7y.com/downloads/TayseerYakob.pdf",
+      "r2Key": "crosswalk/alwa7y/TayseerYakob.pdf",
+      "sha256": "fa43e9db3195eeac34a121bfba9919475613acbb51bd99e84cedcc752f586f55",
+      "byteLength": 92476408,
+      "pdfTitle": "مصحف التيسير بقراءة يعقوب من طريق الدرة",
+      "lastModified": "2022-02-07",
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+    }
+  ],
+  "extraction": {
+    "scope": "per-surah ayah counts only — no ayah boundaries",
+    "method": "ayah-end markers detected by the vector outline of the marker ornament; marker digits classified from their outlines; every surah must read 1..n in order (gaps only where the mushaf omits a marker at a page end, each checked visually)",
+    "script": "scripts/alwa7y-extract/",
+    "output": "extracted-counts.json"
+  }
+}
