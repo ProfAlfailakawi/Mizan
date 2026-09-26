@@ -64,15 +64,29 @@ jobs:
           version: '>= 500.0.0'
 
       # الصورةُ تُدفع إلى مستودع الصور القائم (me-central1) — وCloud Run ينشر منها في أيّ إقليم.
+      # سجلُّ البناء في Cloud Logging لا في التشغيلة (خيارُ CLOUD_LOGGING_ONLY الذي يفرضه حسابُ
+      # البناء المخصّص) — ففشلان متتاليان مضيا بلا سببٍ ظاهر. عند الفشل يُسحب السجلُّ بصلاحية
+      # logging.viewer التي يحملها حسابُ النشر، ويُطبع هنا كاملًا.
       - name: بناء صورة GPU
         run: |
           set -euo pipefail
           TAG="me-central1-docker.pkg.dev/$GCP_PROJECT_ID/cloud-run-source-deploy/$GPU_SERVICE:$GITHUB_SHA"
+          OUT="$(mktemp)"
+          ok=0
           gcloud builds submit services/quran-practice-listener \
             --config services/quran-practice-listener/cloudbuild.gpu.yaml \
             --substitutions "_TAG=$TAG" \
             --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
-            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET"
+            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" 2>&1 | tee "$OUT" || ok=$?
+          if [ "$ok" != "0" ]; then
+            BID="$(grep -oE 'builds/[0-9a-f-]{36}' "$OUT" | head -1 | cut -d/ -f2 || true)"
+            echo "::group::Cloud Build log ${BID}"
+            [ -n "$BID" ] && gcloud logging read \
+              "resource.type=\"build\" AND resource.labels.build_id=\"$BID\"" \
+              --project "$GCP_PROJECT_ID" --order=asc --limit=1000 --format='value(textPayload)' || true
+            echo "::endgroup::"
+            exit "$ok"
+          fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: نشر خدمة GPU (منفصلة — لا تمسّ الإنتاج)
