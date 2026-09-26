@@ -40,6 +40,8 @@ export interface DeliveryPoolOptions{
  seedBase?:string;
  minAyahCount?:number;
  maxAyahCount?:number;
+ /** طول المقطع بأرباع الوجه؛ متى وُجد قاس الخادمُ الطول بأسطر المصحف (¾ ⇒ ١١٫٢٥ سطرًا تقريبًا). */
+ pageQuarterUnits?:number;
  /** جسر توافق موروث: أعلى جزء مسموح. يُستعمل فقط حين لا نطاق. */
  maxJuz?:number;
  /**
@@ -64,7 +66,7 @@ export async function buildDeliveryQuestionPool(riwaya:string,options:DeliveryPo
  const min=options.minAyahCount??4,max=options.maxAyahCount??8;
 
  const draws=await Promise.all(Array.from({length:size},(_,i)=>
-  drawFairPassage(reading,{seed:`${seedBase}#${i}`,min,max,...(options.maxJuz?{juz:undefined}:{})})
+  drawFairPassage(reading,{seed:`${seedBase}#${i}`,min,max,quarters:options.pageQuarterUnits,...(options.maxJuz?{juz:undefined}:{})})
  ));
 
  /*

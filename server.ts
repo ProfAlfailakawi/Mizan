@@ -1543,7 +1543,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
      */
     try{const out=await generativeFairDraw(quranDelivery,{reading:readingId,seed:soleParam(req.query.seed,'seed')||undefined,
         anchor:(soleParam(req.query.anchor,'anchor')||undefined) as any,ayahCount:num(soleParam(req.query.ayahCount,'ayahCount')),
-        juz:num(soleParam(req.query.juz,'juz')),surah:num(soleParam(req.query.surah,'surah')),minAyahCount:num(soleParam(req.query.min,'min')),maxAyahCount:num(soleParam(req.query.max,'max'))});
+        juz:num(soleParam(req.query.juz,'juz')),surah:num(soleParam(req.query.surah,'surah')),minAyahCount:num(soleParam(req.query.min,'min')),maxAyahCount:num(soleParam(req.query.max,'max')),pageQuarters:num(soleParam(req.query.quarters,'quarters'))});
       if(!out)return res.status(404).json({code:'FAIRDRAW_SOURCE_NOT_DELIVERED'});
       // Attach the measured cognitive load of the drawn passage so panels can see — and later
       // equalise — how heavy a draw actually is, instead of assuming randomness means fairness.

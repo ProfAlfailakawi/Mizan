@@ -59,7 +59,7 @@ test('question starts must resolve to an exact ayah boundary in the certified Qu
 });
 
 test('transition plan says Hasbuk then automatically advances only when another passage exists',()=>{
- const next=passageTransitionPlan({isLastQuestion:false,ar:true,cue:{enabled:true,phraseArabic:'حسبك، جزاك الله خيرًا',autoAdvanceDelayMs:900}});assert.equal(next.phrase,'حسبك، جزاك الله خيرًا');assert.equal(next.autoAdvance,true);assert.equal(next.delayMs,900);
+ const next=passageTransitionPlan({isLastQuestion:false,ar:true,cue:{enabled:true,autoAdvanceDelayMs:900}});assert.equal(next.phrase,'حسبك');assert.equal(next.autoAdvance,true);assert.equal(next.delayMs,900);
  const last=passageTransitionPlan({isLastQuestion:true,ar:true,cue:{enabled:true}});assert.equal(last.autoAdvance,false);assert.match(last.phrase,/حسبك/);
 });
 

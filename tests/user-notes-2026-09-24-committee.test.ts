@@ -1,67 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { contestantCueSequence, passageTransitionPlan, TRANSITION_PHRASES_AR } from '../src/lib/judging-integrity';
+import { passageTransitionPlan, TRANSITION_PHRASES_AR } from '../src/lib/judging-integrity';
 
-/*
- * ملاحظاتُ اللجنة (٢٤ سبتمبر ٢٠٢٦):
- *   ـ عباراتُ الإنهاء إذا اختيرت كلُّها: تتنوّع للمتسابق الواحد بلا تكرار، ولا تُسمع السلسلةُ
- *     نفسها من كلّ متسابق.
- */
-
-const ALL = TRANSITION_PHRASES_AR.map((_, i) => i);
-
-test('all phrases selected: one contestant never hears the same phrase twice before the set is exhausted', () => {
-  for (let c = 0; c < 300; c += 1) {
-    const seq = contestantCueSequence(ALL, `participant-${c}`, ALL.length);
-    assert.equal(new Set(seq).size, ALL.length, `participant-${c}: ${seq}`);
-  }
-});
-
-test('contestants do not all hear the same order', () => {
-  const firsts = new Set(Array.from({ length: 40 }, (_, c) => contestantCueSequence(ALL, `p-${c}`, 1)[0]));
-  assert.ok(firsts.size >= 5, `only ${firsts.size} distinct opening phrases across 40 contestants`);
-  const orders = new Set(Array.from({ length: 40 }, (_, c) => contestantCueSequence(ALL, `p-${c}`, 3).join(',')));
-  assert.ok(orders.size >= 35);
-});
-
-test('never the same phrase twice in a row — within a contestant, across cycles, or across contestants', () => {
-  for (const selected of [[2, 5], [0, 3, 6], ALL]) {
-    let last: number | undefined;
-    for (let c = 0; c < 100; c += 1) {
-      const seq = contestantCueSequence(selected, `k-${c}`, 7, last);
-      assert.notEqual(seq[0], last, `contestant k-${c} opened with the phrase that closed the previous one`);
-      for (let i = 1; i < seq.length; i += 1) assert.notEqual(seq[i], seq[i - 1], `${selected}: ${seq}`);
-      for (let i = 0; i + selected.length <= seq.length; i += selected.length) {
-        assert.equal(new Set(seq.slice(i, i + selected.length)).size, selected.length, 'each cycle uses every selected phrase once');
-      }
-      last = seq[seq.length - 1];
-    }
-  }
-});
-
-test('the order is deterministic: a reload mid-contestant replays the same plan', () => {
-  const cue = { enabled: true, selectedPhraseIndexes: ALL };
-  const run = () => [0, 1, 2, 3].map(q => passageTransitionPlan({ isLastQuestion: q === 3, ar: true, cue, variantSeed: q, contestantKey: 'participant-42', previousIndex: 4 }).variantIndex);
-  assert.deepEqual(run(), run());
-  assert.equal(new Set(run()).size, 4);
-  assert.notEqual(run()[0], 4);
-});
-
-test('a single selected phrase is simply that phrase; no key keeps the legacy rotation', () => {
-  const one = passageTransitionPlan({ isLastQuestion: false, ar: true, cue: { selectedPhraseIndexes: [3] }, variantSeed: 2, contestantKey: 'x', previousIndex: 3 });
-  assert.equal(one.phrase, TRANSITION_PHRASES_AR[3]);
-  const legacy = passageTransitionPlan({ isLastQuestion: false, ar: true, cue: { selectedPhraseIndexes: [2, 5] }, variantSeed: 1 });
-  assert.equal(legacy.variantIndex, 5);
-});
-
-test('the judge screen passes the contestant and remembers the last phrase across contestants', () => {
+/* قرار المالك (2026-09-26): عبارة الإنهاء «حسبك» وحدها للجميع، بلا تناوب. */
+test('the end phrase is always «حسبك» for every contestant and question', () => {
+  assert.deepEqual(TRANSITION_PHRASES_AR, ['حسبك']);
+  for (let q = 0; q < 5; q += 1) assert.equal(passageTransitionPlan({ isLastQuestion: q === 4, ar: true, cue: { enabled: true } }).phrase, 'حسبك');
   const src = fs.readFileSync('src/components/judge/JudgeOS.tsx', 'utf8');
-  assert.match(src, /contestantKey:participant\?\.id\|\|activeSession\.sessionId/);
-  assert.match(src, /previousIndex:cueMemory\.before/);
-  assert.match(src, /sessionStorage\.setItem\('mizan:cue-memory'/);
-  /* ولكلّ عبارةٍ مقطعُها المسجَّل بترتيبها — فيطابق الصوتُ النصَّ المختار. */
-  for (const i of ALL) assert.ok(fs.existsSync(`public/audio/cues/cue-${i}.wav`), `cue-${i}.wav`);
+  assert.doesNotMatch(src, /cue-memory|contestantKey/);
 });
 
 /*

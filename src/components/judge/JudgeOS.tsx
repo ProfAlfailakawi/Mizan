@@ -58,7 +58,7 @@ const marksAr=(n:number)=> n===1?'مرة واحدة' : n===2?'مرتين' : n<=1
 const notesAr=(n:number)=> n===0?'لا ملاحظات' : n===1?'ملاحظة واحدة' : n===2?'ملاحظتان' : n<=10?`${n} ملاحظات` : `${n} ملاحظة`;
 // Criterion names were only ever available in English, inside an Arabic-first surface.
 import type { RegistrationStatus } from '../../types';
-import { calculateCategoryPassageRange } from '../../lib/scope-engine';
+import { calculateCategoryPassageRange, categoryPageQuarterUnits, pageQuarterLabel } from '../../lib/scope-engine';
 
 const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
 /*
@@ -82,6 +82,9 @@ const criterionTone=(criterionId:string|undefined,ruleSet?:{criteria?:{id:string
 };
 
 const passageSizeLabel = (category: any, ar: boolean) => {
+  /* الفئة المقيسة بأرباع الوجه تُسمّى بكسرها («ثلاثة أرباع وجه»)، لا بنافذة آيات تقديرية. */
+  const quarters = categoryPageQuarterUnits(category);
+  if (quarters) return pageQuarterLabel(quarters, ar);
   const range = calculateCategoryPassageRange(category);
   if (range.minAyahCount && range.maxAyahCount) {
     if (range.minAyahCount === range.maxAyahCount) {
@@ -332,7 +335,6 @@ export const JudgeOS: React.FC = () => {
  /* ذاكرةُ عبارة الإنهاء على هذا الجهاز: آخرُ ما قيل، وما قيل قبل أن يبدأ المتسابقُ الحاضر —
     فلا يسمع المتسابقُ التالي في أوّل موضعه ما سمعه سابقُه في آخر موضعه. تبقى بعد إعادة
     التحميل؛ وإن غابت فالترتيبُ لكلّ متسابقٍ صحيحٌ بلا تكرار، ويسقط هذا الشرطُ وحده. */
- const cueMemoryRef=useRef<{session?:string;before?:number;last?:number}>((()=>{try{return JSON.parse(sessionStorage.getItem('mizan:cue-memory')||'{}')||{}}catch{return {}}})());
  /*
   * تتبّعُ القارئ من المستمع المنشور، حين لا يكون محرّكُ الظلّ مهيّأً.
   *
@@ -553,9 +555,7 @@ export const JudgeOS: React.FC = () => {
    if(!result.ok){setSecureError(revealRefusalText(result.reason,ar));return}
    if(result.revealed&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),30);return}if(!activeSession.secureRuntimeSessionId)return;try{setMyRevealApproved(true);const runtime=await approveSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(runtime);const state=runtime.escrow.questions.find(x=>x.index===activeSession.currentQuestionIndex);if(state?.released){const revealed=await revealSecureQuestion(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureQuestion(revealed.payload);setSecureError('')}}catch(e){setMyRevealApproved(false);setSecureError(e instanceof Error?e.message:'SECURE_APPROVAL_FAILED')}};
  const approveReplacement=async()=>{if(!secureMode||!activeSession.secureRuntimeSessionId)return;setReplacementBusy(true);try{const result=await approveEmergencyQuestionReplacement(activeSession.secureRuntimeSessionId,activeSession.currentQuestionIndex);setSecureRuntime(result);if(result.replacementReady){setSecureQuestion(null);setMyRevealApproved(false);setOpeningAudioState('idle')}setSecureError('')}catch(e){setSecureError(e instanceof Error?e.message:'QUESTION_REPLACEMENT_FAILED')}finally{setReplacementBusy(false)}};
- const speakTransition=()=>{if(!store.finishCurrentQuestionSegment())return;const cueMemory=cueMemoryRef.current;if(cueMemory.session!==activeSession.sessionId){cueMemory.before=cueMemory.last;cueMemory.session=activeSession.sessionId}
- const transition=passageTransitionPlan({isLastQuestion,ar,cue:policy.questions.transitionCue,variantSeed:activeSession.currentQuestionIndex,contestantKey:participant?.id||activeSession.sessionId,previousIndex:cueMemory.before});
- cueMemory.last=transition.variantIndex;try{sessionStorage.setItem('mizan:cue-memory',JSON.stringify(cueMemory))}catch{}const proceed=()=>{if(transition.autoAdvance)nextQuestion()};const afterCue=()=>window.setTimeout(proceed,transition.delayMs);if(!transition.enabled){afterCue();return;}let fallbackUsed=false;const speakFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if(typeof window!=='undefined'&&'speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(transition.phrase);u.lang=ar?'ar-SA':'en-US';
+ const speakTransition=()=>{if(!store.finishCurrentQuestionSegment())return;const transition=passageTransitionPlan({isLastQuestion,ar,cue:policy.questions.transitionCue});const proceed=()=>{if(transition.autoAdvance)nextQuestion()};const afterCue=()=>window.setTimeout(proceed,transition.delayMs);if(!transition.enabled){afterCue();return;}let fallbackUsed=false;const speakFallback=()=>{if(fallbackUsed)return;fallbackUsed=true;if(typeof window!=='undefined'&&'speechSynthesis'in window){window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(transition.phrase);u.lang=ar?'ar-SA':'en-US';
   /* صوت المتصفح الافتراضي يبدو آليًا؛ نختار أقرب صوت عربي طبيعي متاح (Natural/Enhanced/Premium)
      ونضبط السرعة والنبرة لنبرة ألطف. هذا fallback فقط بعد فشل صوت ميزان المطابق. */
   /* المنادي في القاعة رجل: يُقدَّم الصوت الذكوري على غيره، ثم يُفاضَل بين الذكورية على الجودة. */
@@ -567,11 +567,9 @@ export const JudgeOS: React.FC = () => {
    const best=men.find(fine)||men[0]||pool.find(fine)||pool[0];if(best)u.voice=best;}catch{}
   u.rate=.9;u.pitch=.92;u.onend=afterCue;u.onerror=afterCue;window.speechSynthesis.speak(u);}else afterCue()};
  const playCueUrl=(url:string,onFail:()=>void)=>{if(typeof Audio==='undefined'){onFail();return}try{transitionAudioRef.current?.pause();const player=new Audio(url);transitionAudioRef.current=player;player.onended=afterCue;player.onerror=onFail;void player.play().catch(onFail)}catch{onFail()}};
- /* مصادر عبارة الإيقاف مملوكة لميزان ومطابقة للنص المختار: مقطع مدمج، ثم صوت الخادم
-    لنفس العبارة غير القرآنية، ثم نطق الجهاز. لا رفع تسجيل يدوي ولا نص قرآني في TTS. */
- const serverCue=()=>playCueUrl(`/api/public/cue-audio?text=${encodeURIComponent(transition.phrase)}`,speakFallback);
- const storedCue=()=>playCueUrl(`/audio/cues/cue-${transition.variantIndex}.wav`,serverCue);
- storedCue()};
+ /* العبارة ثابتة «حسبك»: صوت الخادم لها (مخزَّن بعد أول توليد)، ثم نطق الجهاز.
+    لا مقطع مدمج لها بعد، ولا نص قرآني في TTS. */
+ playCueUrl(`/api/public/cue-audio?text=${encodeURIComponent(transition.phrase)}`,speakFallback)};
 
  useEffect(()=>{if(questionRevealed&&q&&policy.questions.openingPrompt?.autoplay!==false)window.setTimeout(()=>void playOpeningAudio(),80)},[questionRevealed,(q as any)?.questionId,(q as any)?.id,openingReference?.id,activeSession.currentQuestionIndex]);
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);

@@ -96,7 +96,7 @@ export async function fetchDeliveryPassage(reading:string,surah:number,startAyah
  if(!reading)return null;
  return deliveryJson<DeliveryPassage>(`/api/public/kfgqpc/passage/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`,{cache:'default'});}
 
-export async function drawFairPassage(reading='hafs',options:{seed?:string;anchor?:string;juz?:number;surah?:number;min?:number;max?:number;ayahCount?:number}={}):Promise<FairDrawResult|null>{
+export async function drawFairPassage(reading='hafs',options:{seed?:string;anchor?:string;juz?:number;surah?:number;min?:number;max?:number;ayahCount?:number;quarters?:number}={}):Promise<FairDrawResult|null>{
  const q=new URLSearchParams();for(const [k,v] of Object.entries(options))if(v!==undefined&&v!==null&&v!=='')q.set(k,String(v));
  try{const r=await fetch(`/api/public/kfgqpc/fairdraw/${encodeURIComponent(reading)}${q.toString()?`?${q}`:''}`,{cache:'no-store'});
   if(!r.ok)return null;return await r.json()}catch{return null}}
