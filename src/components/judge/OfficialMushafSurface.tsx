@@ -216,7 +216,7 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  useEffect(()=>{setIndex(0);setPlaying(false)},[reading,ayat.map(a=>`${a.surah}:${a.ayah}`).join('|')]);
  useEffect(()=>{if(!ayat.length){setAvailable(false);return}let live=true;
   if(!isValidAyahRef(ayat[0].surah,ayat[0].ayah)){setAvailable(false);return}
-  void fetch(getQuranAudioUrl(ayat[0].surah,ayat[0].ayah),{method:'HEAD'}).then(r=>{if(live)setAvailable(r.ok)}).catch(()=>{if(live)setAvailable(false)});
+  void fetch(getQuranAudioUrl(ayat[0].surah,ayat[0].ayah),{method:'HEAD'}).then(r=>{if(!live)return;/* غيابٌ نهائيّ يُخفي المشغّل؛ عطلٌ عابرٌ يُبقيه بزرّ «إعادة المحاولة». */if(r.status===400||r.status===404){setAvailable(false);return}setAvailable(true);if(!r.ok)setFailed(true)}).catch(()=>{if(live){setAvailable(true);setFailed(true)}});
   return()=>{live=false}},[ayat.length&&`${ayat[0].surah}:${ayat[0].ayah}`]);
  useEffect(()=>{const el=elRef.current;if(!el)return;if(playing)void el.play().catch(()=>setPlaying(false));else el.pause()},[playing,index,src]);
  useEffect(()=>{const el=elRef.current;if(!el||!playing)return;let raf=0;

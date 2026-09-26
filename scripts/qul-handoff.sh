@@ -22,6 +22,8 @@ REGION="${REGION:-me-central1}"
 BUCKET="${BUCKET:-${PROJECT}-mizan-handoff}"
 WORK="${WORK:-$HOME/mizan-handoff}"
 RECORDING="${RECORDING:-husary-murattal}"
+# قواعد توقيت QUL يجب أن تطابق تسجيل RECORDING نفسه (الحصري المرتل)؛ لا افتراضيَّ لقارئٍ آخر.
+QUL_TIMINGS="${QUL_TIMINGS:?set QUL_TIMINGS to the QUL timing dataset slug(s) recorded from ${RECORDING}}"
 
 if [ -z "${PROJECT}" ] || [ "${PROJECT}" = "(unset)" ]; then
   echo "No project selected. Run: gcloud config set project <PROJECT_ID>" >&2
@@ -35,7 +37,7 @@ echo ""
 
 # ── 1. قواعد التوقيت: البنية أولًا، فهي التي تقول أهي كلمة أم آية ────────────
 echo "── QUL timing databases"
-for r in maher_al_muaiqly yasser_dussary abdullah_juhany; do
+for r in ${QUL_TIMINGS}; do
   zip=""
   for candidate in "$HOME/Mizan/${r}.zip" "$HOME/${r}.zip" "./${r}.zip"; do
     [ -f "${candidate}" ] && zip="${candidate}" && break
