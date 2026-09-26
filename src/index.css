@@ -1936,3 +1936,6 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 /* الهاتف: شريط بيئة العرض يجري في تدفّق الصفحة أسفلها لا مثبّتًا فوقها، فلا يحجب زرًّا
    ولا يحتاج حشوةً محجوزة (انظر DemoBar.tsx). */
 @media (max-width:639.98px){.mizan-shell-main{--mizan-shell-pb:0px!important}}
+
+/* الترويسة على الجوال: العلامة وحدها، والاسم في سطره تحتها (Header.tsx). */
+@media (max-width:639px){.mizan-header-logo .mizan-wordmark{display:none}}
