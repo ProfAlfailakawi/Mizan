@@ -454,6 +454,14 @@ async function startServer() {
    * كان بلا حدّ منذ كُتب، ولم يظهر حتى لمس هذا التغيير سطره. وسقفه أوسع لأن قاعةً فيها
    * عدّة لجان تقرأ معًا، وكلُّ لجنة ترسل مقطعًا كل ثانية ونصف.
    */
+  /* تلاوة الآية (وكيل الحصري): عامّة، لكن كلّ طلبٍ قد يلمس القرص أو المصدر — حدٌّ لكلّ عنوان. */
+  const quranAudioIpRateLimit:RequestHandler=rateLimit({
+    windowMs:60_000,
+    limit:Number(process.env.MIZAN_QURAN_AUDIO_IP_RATE_LIMIT_MAX||600),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    message:{code:'RATE_LIMITED'},
+    skip:()=>rateLimiterIsGlobal,
+  });
   const alignmentAudioIpRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
     limit:Number(process.env.MIZAN_ALIGNMENT_AUDIO_IP_RATE_LIMIT_MAX||1200),
@@ -1005,7 +1013,7 @@ async function startServer() {
 
   // تلاوة الآية: الشيخ محمود خليل الحصري — المصحف المرتل (EveryAyah Husary_128kbps)، المصدر الوحيد.
   // وكيلٌ من الأصل نفسه: لا CORS على فكّ الصوت ولا خرق لـ media-src 'self'. الرابط SSSAAA.mp3.
-  app.get('/api/public/quran-audio/:file',async(req,res)=>{const m=/^(\d{3})(\d{3})\.mp3$/.exec(String(req.params.file||''));if(!m)return res.status(400).json({code:'QURAN_AUDIO_BAD_REF'});const surah=Number(m[1]),ayah=Number(m[2]);if(!isValidAyahRef(surah,ayah))return res.status(404).json({code:'QURAN_AUDIO_AYAH_NOT_FOUND'});try{const asset=await kfgqpcDelivery.husaryAyahAudio(surah,ayah);if(asset?.file){res.setHeader('Cache-Control','public, max-age=86400, immutable');res.setHeader('X-MIZAN-Quran-Reciter','husary-murattal');res.type('audio/mpeg');return res.sendFile(asset.file)}return res.status(502).json({code:'QURAN_AUDIO_UPSTREAM_UNAVAILABLE'})}catch{return res.status(502).json({code:'QURAN_AUDIO_DELIVERY_FAILED'})}});
+  app.get('/api/public/quran-audio/:file',quranAudioIpRateLimit,async(req,res)=>{const m=/^(\d{3})(\d{3})\.mp3$/.exec(String(req.params.file||''));if(!m)return res.status(400).json({code:'QURAN_AUDIO_BAD_REF'});const surah=Number(m[1]),ayah=Number(m[2]);if(!isValidAyahRef(surah,ayah))return res.status(404).json({code:'QURAN_AUDIO_AYAH_NOT_FOUND'});try{const asset=await kfgqpcDelivery.husaryAyahAudio(surah,ayah);if(asset?.file){res.setHeader('Cache-Control','public, max-age=86400, immutable');res.setHeader('X-MIZAN-Quran-Reciter','husary-murattal');res.type('audio/mpeg');return res.sendFile(asset.file)}return res.status(502).json({code:'QURAN_AUDIO_UPSTREAM_UNAVAILABLE'})}catch{return res.status(502).json({code:'QURAN_AUDIO_DELIVERY_FAILED'})}});
   /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
      فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */
   /* الجهة صاحبة هذا النطاق. نشرٌ واحد يخدم الجميع، والمضيف هو ما يميّز الجهة، فتظهر هويتها
