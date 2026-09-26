@@ -33,7 +33,10 @@ test('least privilege: a judge authors evidence, not results or certificates',()
   assert.equal(canWriteSyncedCollection('judge','judge_submissions'),true);
   assert.equal(canWriteSyncedCollection('judge','results'),false,'a single judge does not author the panel result');
   assert.equal(canWriteSyncedCollection('judge','certificates'),false);
-  assert.equal(canWriteSyncedCollection('judge','participants'),false);
+  /* قرار المالك (2026-09-26): المحكّم يقدّم حالة المتسابق وحدها — والقواعد تحصر التعديل في الحالة. */
+  assert.equal(canWriteSyncedCollection('judge','participants'),true);
+  const rules=fs.readFileSync('firestore.rules','utf8');
+  assert.match(rules,/roleIs\(\['judge'\]\)\s*&& request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['status','statusHistory','updatedAt'\]\)\s*&& request\.resource\.data\.status in \['in_session','tested'\]/);
   assert.equal(canWriteSyncedCollection('head_judge','results'),true);
   assert.equal(canWriteSyncedCollection('comp_admin','participants'),true);
 });
