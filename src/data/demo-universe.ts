@@ -34,6 +34,9 @@ import type {
 } from '../types';
 import type { AppStoreState } from '../lib/store-state';
 import { buildParticipantScopeRecord } from '../lib/participant-scope';
+import { computePanelScore } from '../lib/scoring-core';
+import { demoDigest } from '../lib/demo-authority';
+import { demoConsents, demoDevices, demoNotifications, demoOperationsRecords, demoPassports, demoTravel } from './demo-extras';
 import { ayahCountOf, fullQuranScope, ordinalToLocus, scopeFromJuzRange, scopeRanges } from '../lib/quran-scope';
 import {
   SEED_APPEALS,
@@ -278,42 +281,90 @@ function demoParticipants(committees: Committee[]): Participant[] {
   });
 }
 
-function demoResults(participants: Participant[]): ResultRecord[] {
-  const random = makeRandom(0x7265);
+/*
+ * النتيجة تُؤلَّف من إرسالات المحكّمين، لا تُخترع بجانبها.
+ *
+ * كانت الدرجة النهائية رقمًا عشوائيًّا، وإرسالات المحكّمين أرقامًا عشوائيةً أخرى — فأيّ
+ * ختمٍ يُعيد تأليف الدرجة من الإرسالات (وهو ما يفعله الخادم) يُخرج رقمًا غير المعروض،
+ * وتقول شاشة الجودة إن المحكّمَين اختلفا بعشرين درجة على متسابقٍ واحد. فالدرجة هنا هي
+ * `computePanelScore` على الإرسالات نفسها، والمركز يُحسب داخل الفئة كما يُحسب في الختم.
+ *
+ * والحالة تتبع رحلة المتسابق: من صدرت شهادته نتيجته مختومة، ومن اعترض نتيجته معتمدة
+ * تنتظر الحسم، ومن أنهى اختباره للتوّ نتيجته في إحدى مراحل ما قبل الختم.
+ */
+const CRITERIA = [
+  { id: 'crit-memorization', maxScore: 70 },
+  { id: 'crit-tajweed', maxScore: 25 },
+  { id: 'crit-performance', maxScore: 5 },
+];
+
+function resultStatusFor(participant: Participant, index: number): ResultRecord['status'] {
+  if (participant.status === 'certified') return 'sealed';
+  if (participant.status === 'appealed') return 'approved';
+  return index % 6 === 0 ? 'calculated' : index % 6 === 1 ? 'quality_checked' : index % 6 === 2 ? 'approved' : 'sealed';
+}
+
+function demoResults(participants: Participant[], submissions: JudgeSubmission[], committees: Committee[], judges: JudgeProfile[]): ResultRecord[] {
   const template = clone(SEED_RESULTS[0]);
   const completed = participants.filter(participant => HAS_RESULT.includes(participant.status));
-  return completed
-    .map((participant, index) => {
-      const category = SEED_CATEGORIES.find(item => item.id === participant.categoryId);
-      return {
-        ...clone(template),
-        id: `res-demo-${index + 1}`,
-        participantId: participant.id,
-        participantCode: participant.code,
-        participantName: participant.fullName,
-        participantNameArabic: participant.fullNameArabic,
-        country: participant.country,
-        categoryId: participant.categoryId,
-        categoryName: category?.name || '',
-        /* الاسم العربي للفئة يُكتب مع الإنجليزي: شاشة النتائج تعرض العربي متى وُجد،
-           فكان غيابه يُظهر «Consecutive Juz 20» في شاشةٍ عربية بالكامل. */
-        categoryNameArabic: category?.nameArabic || '',
-        finalScore: Number((72 + random() * 27.5).toFixed(2)),
-        // أغلب النتائج مختومة، وبعضها ما زال في مرحلةٍ سابقة: شاشة الختم تحتاج
-        // شيئًا تختمه، وشاشة الجودة تحتاج شيئًا تفحصه.
-        status: (index % 9 === 0 ? 'calculated' : index % 7 === 0 ? 'quality_checked' : index % 11 === 0 ? 'approved' : 'sealed') as ResultRecord['status'],
-        rank: 0,
-        awardTitle: undefined,
-        awardTitleArabic: undefined,
-      };
-    })
-    .sort((a, b) => b.finalScore - a.finalScore)
-    .map((result, index) => ({
-      ...result,
-      rank: index + 1,
-      awardTitle: index === 0 ? 'First Place' : index === 1 ? 'Second Place' : index === 2 ? 'Third Place' : undefined,
-      awardTitleArabic: index === 0 ? 'المركز الأول' : index === 1 ? 'المركز الثاني' : index === 2 ? 'المركز الثالث' : undefined,
-    }));
+  const bySubmission = new Map<string, JudgeSubmission[]>();
+  for (const sub of submissions) bySubmission.set(sub.participantId || '', [...(bySubmission.get(sub.participantId || '') || []), sub]);
+  const rows = completed.map((participant, index): ResultRecord => {
+    const category = SEED_CATEGORIES.find(item => item.id === participant.categoryId);
+    const subs = bySubmission.get(participant.id) || [];
+    const panel = computePanelScore({ submissions: subs, criteria: CRITERIA, mode: 'all_judges_all_criteria' });
+    const status = resultStatusFor(participant, index);
+    const committee = committees.find(c => c.id === participant.assignedCommitteeId);
+    const head = judges.find(j => j.userId === committee?.headJudgeId);
+    const sealedAt = new Date(Date.UTC(2027, 1, 11, 15, (index * 3) % 60)).toISOString();
+    const serverSealSha256 = demoDigest(`${participant.id}|${panel.finalScore}|${sealedAt}`);
+    return {
+      ...clone(template),
+      id: `res-demo-${index + 1}`,
+      participantId: participant.id,
+      participantCode: participant.code,
+      participantName: participant.fullName,
+      participantNameArabic: participant.fullNameArabic,
+      country: participant.country,
+      categoryId: participant.categoryId,
+      categoryName: category?.name || '',
+      /* الاسم العربي للفئة يُكتب مع الإنجليزي: شاشة النتائج تعرض العربي متى وُجد،
+         فكان غيابه يُظهر «Consecutive Juz 20» في شاشةٍ عربية بالكامل. */
+      categoryNameArabic: category?.nameArabic || '',
+      finalScore: panel.finalScore,
+      criterionScores: panel.criterionScores,
+      penaltyCount: subs.reduce((sum, sub) => sum + (sub.eventsCount || 0), 0),
+      status,
+      /* الختم كما يكتبه المخزن بعد ختم الخادم: بصمته، ومن ختم (رئيس اللجنة — فيبقى النشر
+         لغيره)، والدرجة التي ألّفها. */
+      sealMetadata: status === 'sealed' ? {
+        sealedBy: head?.nameArabic || 'رئيس اللجنة',
+        sealedById: committee?.headJudgeId,
+        sealedAt,
+        cryptographicChecksum: `SHA256:${serverSealSha256}`,
+        assurance: 'SERVER_DIGEST' as const,
+        serverSealSha256,
+        serverComposedScore: panel.finalScore,
+        contributingJudges: subs.length,
+      } : undefined,
+      rank: 0,
+      awardTitle: undefined,
+      awardTitleArabic: undefined,
+    };
+  });
+  /* المركز داخل الفئة: المسابقة تُعلن أوائل كل فئة، لا أوائلَ الجميع مختلطين. */
+  const places = [['First Place', 'المركز الأول'], ['Second Place', 'المركز الثاني'], ['Third Place', 'المركز الثالث']] as const;
+  const byCategory = new Map<string, ResultRecord[]>();
+  for (const row of rows) byCategory.set(row.categoryId, [...(byCategory.get(row.categoryId) || []), row]);
+  for (const list of byCategory.values()) {
+    list.sort((a, b) => b.finalScore - a.finalScore || a.participantCode.localeCompare(b.participantCode));
+    list.forEach((row, index) => {
+      row.rank = index + 1;
+      row.awardTitle = places[index]?.[0];
+      row.awardTitleArabic = places[index]?.[1];
+    });
+  }
+  return rows.sort((a, b) => a.categoryId.localeCompare(b.categoryId) || a.rank - b.rank);
 }
 
 function demoAuditLogs(participants: Participant[], committees: Committee[]): AuditEvent[] {
@@ -341,20 +392,50 @@ function demoAuditLogs(participants: Participant[], committees: Committee[]): Au
   });
 }
 
+/*
+ * إرسالات المحكّمين: لكل من أنهى اختباره إرسالٌ مقفلٌ من كل محكّمي لجنته، بمعاييره الثلاثة
+ * مجموعةً إلى درجته، وبفارقٍ صغير بين المحكّمَين كما يقع فعلًا. ولا تتساوى درجتان في فئةٍ
+ * واحدة: التعادل يوقف الختم حتى تفصل فيه الإدارة، وعرضٌ يقف عند أول ختمٍ لا يُري شيئًا.
+ */
+const round2 = (value: number) => Math.round(value * 100) / 100;
+function splitCriteria(total: number): Record<string, number> {
+  const performance = Math.min(5, round2(total * 0.05));
+  let tajweed = Math.min(25, round2(total * 0.25));
+  let memorization = round2(total - tajweed - performance);
+  if (memorization > 70) { memorization = 70; tajweed = round2(total - 70 - performance); }
+  return { 'crit-memorization': memorization, 'crit-tajweed': tajweed, 'crit-performance': performance };
+}
+
 function demoJudgeSubmissions(participants: Participant[], judges: JudgeProfile[]): JudgeSubmission[] {
   const random = makeRandom(0x6a73);
   const template = clone(SEED_JUDGE_SUBMISSIONS[0]);
   const graded = participants.filter(participant => HAS_RESULT.includes(participant.status));
   const submissions: JudgeSubmission[] = [];
+  const usedByCategory = new Map<string, Set<number>>();
   graded.forEach((participant, p) => {
-    const panel = judges.filter(judge => judge.assignedCommitteeId === participant.assignedCommitteeId);
-    panel.slice(0, 3).forEach((judge, j) => {
+    const panel = judges.filter(judge => judge.assignedCommitteeId === participant.assignedCommitteeId).slice(0, 3);
+    if (!panel.length) return;
+    const used = usedByCategory.get(participant.categoryId) || new Set<number>();
+    usedByCategory.set(participant.categoryId, used);
+    let base = round2(72 + random() * 27);
+    while (used.has(base)) base = round2(base + 0.01);
+    used.add(base);
+    /* فارقٌ متقابل حول الدرجة: متوسّط المحكّمين يعود إليها بالضبط. */
+    const spread = round2(Math.min(0.75, 100 - base, random() * 0.75));
+    const totals = panel.length === 1 ? [base] : panel.length === 2 ? [round2(base + spread), round2(base - spread)] : [round2(base + spread), base, round2(base - spread)];
+    panel.forEach((judge, j) => {
+      const criterionScores = splitCriteria(totals[j]);
       submissions.push({
         ...clone(template),
         participantId: participant.id,
-        judgeId: judge.userId,
-        totalScore: Number((72 + random() * 27).toFixed(2)),
-        submittedAt: new Date(Date.UTC(2027, 1, 11, 7 + (p % 9), (p * 5) % 60)).toISOString(),
+        judgeId: judge.userId || judge.id,
+        judgeName: judge.name,
+        sessionId: `sess-demo-${participant.id}`,
+        criterionScores,
+        totalScore: round2(Object.values(criterionScores).reduce((a, b) => a + b, 0)),
+        eventsCount: Math.floor(random() * 4),
+        submittedAt: new Date(Date.UTC(2027, 1, 11, 7 + (p % 9), (p * 5) % 60, j * 40)).toISOString(),
+        locked: true,
       });
     });
   });
@@ -466,21 +547,42 @@ function demoReviewCases(results: ResultRecord[], participants: Participant[]): 
     });
 }
 
-function demoCertificates(results: ResultRecord[]): Certificate[] {
+/*
+ * الشهادات: لكلّ من صدرت شهادته (`certified`) شهادتُه هو — برقمه ودرجته ومركزه وفئته.
+ * كانت تُستنسخ من قالبٍ واحد فتحمل أربعون شهادةً رقمًا واحدًا وفئةً واحدة.
+ */
+function demoCertificates(results: ResultRecord[], participants: Participant[]): Certificate[] {
   const template = clone(SEED_CERTIFICATE);
+  const certified = new Set(participants.filter(p => p.status === 'certified').map(p => p.id));
   return results
-    .filter(result => result.status === 'sealed')
-    .slice(0, 40)
-    .map((result, index) => ({
-      ...clone(template),
-      id: `cert-demo-${index + 1}`,
-      participantId: result.participantId,
-      participantName: result.participantName,
-      participantNameArabic: result.participantNameArabic,
-      finalScore: result.finalScore,
-      rank: result.rank,
-      issuedAt: '2027-02-11T17:30:00Z',
-    }));
+    .filter(result => result.status === 'sealed' && certified.has(result.participantId))
+    .map((result, index) => {
+      const certificateNumber = `MZN-2027-DXB27-${result.participantCode.replace(/[^A-Za-z0-9]/g, '')}`;
+      return {
+        ...clone(template),
+        id: `cert-demo-${index + 1}`,
+        certificateNumber,
+        resultId: result.id,
+        participantId: result.participantId,
+        participantName: result.participantName,
+        participantNameArabic: result.participantNameArabic,
+        categoryName: result.categoryName,
+        categoryNameArabic: result.categoryNameArabic || result.categoryName,
+        score: result.finalScore,
+        rank: result.rank,
+        awardTextArabic: result.rank <= 3
+          ? `تشهد الأمانة العامة للمسابقة بأن المتسابق أتمّ اختبارات فئته بجدارة ونال ${result.awardTitleArabic} بدرجة ${result.finalScore.toFixed(2)}.`
+          : 'تشهد الأمانة العامة للمسابقة بإتمام المشاركة وفق لائحة المسابقة المعتمدة، سائلين الله له القبول والتوفيق.',
+        issueDate: '2027-02-11',
+        issuedTimestamp: '2027-02-11T17:30:00Z',
+        verificationToken: demoDigest(certificateNumber).slice(0, 24),
+        verificationUrl: `/verify/${certificateNumber}`,
+        qrPayload: `/verify/${certificateNumber}`,
+        certificateVersion: 'MZ-CERT-1',
+        resultSealReference: result.sealMetadata?.cryptographicChecksum,
+        revocationState: 'ACTIVE' as const,
+      };
+    });
 }
 
 export interface DemoUniverse {
@@ -577,18 +679,19 @@ export function buildDemoUniverse(): DemoUniverse {
   const judges = demoJudges(committees);
   const participants = demoParticipants(committees);
   wireLiveCalls(committees, participants);
-  const results = demoResults(participants);
+  const judgeSubmissions = demoJudgeSubmissions(participants, judges);
+  const results = demoResults(participants, judgeSubmissions, committees, judges);
   return {
     committees,
     judges,
     participants,
     results,
-    judgeSubmissions: demoJudgeSubmissions(participants, judges),
+    judgeSubmissions,
     auditLogs: demoAuditLogs(participants, committees),
     appeals: demoAppeals(results, participants),
     incidents: demoIncidents(committees),
     reviewCases: demoReviewCases(results, participants),
-    certificates: demoCertificates(results),
+    certificates: demoCertificates(results, participants),
   };
 }
 
@@ -757,6 +860,9 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     currentDay: 1,
     totalDays: SEED_COMPETITION.totalDays,
   };
+  const participants = universe.participants.map(participant => ({ ...participant, organizationId: organization.id }));
+  const passports = demoPassports(competition.id, participants, universe.results, universe.certificates, universe.judges, universe.committees);
+  const operations = demoOperationsRecords(organization.id, competition.id, universe.auditLogs.length);
   return {
     ...base,
     currentUser: {
@@ -772,7 +878,7 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     competition,
     competitions: [competition],
     // المتسابق يتبع جهة العرض لا جهة البذرة المتقاعدة.
-    participants: universe.participants.map(participant => ({ ...participant, organizationId: organization.id })),
+    participants,
     committees: universe.committees,
     judges: universe.judges,
     results: universe.results,
@@ -789,6 +895,17 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     integrations: demoIntegrations(organization.id),
     /* القائمة نفسها التي تدخل المسابقة — لا نسخة ثانية قد تفترق عنها. */
     participantScopes: demoParticipantScopes(universe.participants, categories, organization.id, competition.id),
+    /* ما تقرؤه غرفة العمليات وبوابة المتسابق ووليّه ومدير الوفد والمدقّق — انظر `demo-extras`. */
+    devices: demoDevices(competition.id, universe.committees),
+    notifications: demoNotifications(competition.id, participants, universe.results),
+    consents: demoConsents(competition.id, participants),
+    travelRecords: demoTravel(competition.id, participants),
+    participantPassport: passports.participantPassport,
+    judgePassport: passports.judgePassport,
+    backups: operations.backups,
+    auditLedgerSeals: operations.auditLedgerSeals,
+    trainingRuns: operations.trainingRuns,
+    quranSourceManifests: [...operations.quranSourceManifests, ...base.quranSourceManifests],
   };
 }
 

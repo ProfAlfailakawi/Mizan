@@ -144,10 +144,17 @@ export const CorridorScreen: React.FC<{
           {panel === 'queue' && <QueuePanel ar={ar} board={board} />}
         </main>
 
-        {/* نقاطٌ تقول أين نحن من الدورة، فلا يبدو تبدّل الشاشة عطلًا. */}
+        {/* نقاطٌ تقول أين نحن من الدورة، فلا يبدو تبدّل الشاشة عطلًا — ومعها اسم كل لوحة وشريطُ
+            ما بقي من وقت اللوحة الحاضرة. */}
         {shown.length > 1 && (
-          <footer className="mt-5 flex items-center justify-center gap-2" aria-hidden="true">
-            {shown.map((p, i) => <span key={p} className="h-1.5 rounded-full transition-all duration-500" style={{ width: i === index ? 28 : 8, background: i === index ? '#c49a5d' : 'rgba(255,255,255,.22)' }} />)}
+          <footer className="mt-5 flex items-center justify-center gap-3" aria-hidden="true">
+            {shown.map((p, i) => <span key={p} className="flex items-center gap-2">
+              <span className="relative h-1.5 overflow-hidden rounded-full bg-white/20 transition-all duration-500" style={{ width: i === index ? 56 : 10 }}>
+                {i === index && <span key={`${p}-${index}`} className="absolute inset-y-0 start-0 rounded-full bg-[#c49a5d]" style={{ animation: `mizan-corridor-fill ${step}s linear forwards` }} />}
+              </span>
+              <span className={`text-[10px] font-black ${i === index ? 'text-[#e0c894]' : 'text-white/35'}`}>{ar ? CORRIDOR_PANEL_LABEL[p] : p}</span>
+            </span>)}
+            <style>{'@keyframes mizan-corridor-fill{from{width:0}to{width:100%}}'}</style>
           </footer>
         )}
       </div>
@@ -182,6 +189,10 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
   const pages = board?.recitation?.pages;
   const [locus, setLocus] = useState(() => pickLocus(pages));
   const [text, setText] = useState<string[] | null>(null);
+  /* مكتبة المصحف قد لا تُبلَغ (جهاز عرضٍ بلا خادم، أو بيئة العرض). كانت اللوحة تبقى على
+     «جارٍ تحميل الموضع…» ربع دقيقةٍ بعد ربع دقيقة؛ فبعد مهلةٍ قصيرة تُعرض بطاقة الموضع
+     نفسه — سورته وآيته وصفحته وجزؤه — بلا نصٍّ يُنسب إلى المصحف دون مصدره. */
+  const [unavailable, setUnavailable] = useState(false);
 
   /* موضعٌ جديد مع كل دورة: الجدار نفسه لا يعيد الآية نفسها كل ربع دقيقة. */
   useEffect(() => {
@@ -191,12 +202,13 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
 
   useEffect(() => {
     let live = true;
-    setText(null);
+    setText(null); setUnavailable(false);
     const end = Math.min(surahAyahCount(locus.surah) || locus.ayah, locus.ayah + 2);
+    const giveUp = setTimeout(() => { if (live) setUnavailable(true) }, 6000);
     void fetchDeliveryPassage(reading, locus.surah, locus.ayah, end)
-      .then(p => { if (live) setText(p?.ayat?.map(a => a.text) || null) })
-      .catch(() => { if (live) setText(null) });
-    return () => { live = false };
+      .then(p => { if (!live) return; const ayat = p?.ayat?.map(a => a.text) || null; setText(ayat); if (!ayat?.length) setUnavailable(true) })
+      .catch(() => { if (live) setUnavailable(true) });
+    return () => { live = false; clearTimeout(giveUp) };
   }, [locus.surah, locus.ayah, reading]);
 
   const page = locusToPage(locus.surah, locus.ayah);
@@ -211,7 +223,17 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
       <div className="mt-8 min-h-0 flex-1 overflow-hidden">
         {text?.length
           ? <p className="font-quran text-[clamp(1.6rem,3.6vw,3.2rem)] leading-[2.05] text-white/95">{text.join(' ')}</p>
-          : <p className="mt-10 text-sm mizan-venue-muted">{ar ? 'جارٍ تحميل الموضع…' : 'Loading…'}</p>}
+          : unavailable
+            ? <div className="flex h-full flex-col items-center justify-center">
+              <div className="font-quran text-[clamp(3rem,8vw,6.5rem)] leading-none text-[#e0c894]">{ar ? `سورة ${name}` : name}</div>
+              <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-5">
+                <Tile value={String(locus.ayah)} label={ar ? 'الآية' : 'ayah'} />
+                <Tile value={String(page)} label={ar ? 'الصفحة' : 'page'} />
+                <Tile value={String(pageToJuz(page))} label={ar ? 'الجزء' : 'juz'} />
+              </div>
+              <p className="mt-6 text-[11px] text-white/40">{ar ? 'يظهر نصّ الموضع حين تتصل الشاشة بمكتبة المصحف المعتمدة.' : 'The passage text appears once the screen reaches the approved Mushaf library.'}</p>
+            </div>
+            : <p className="mt-10 text-sm mizan-venue-muted">{ar ? 'جارٍ تحميل الموضع…' : 'Loading…'}</p>}
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-bold text-white/60">

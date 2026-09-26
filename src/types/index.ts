@@ -36,6 +36,8 @@ export interface User {
   /** Direct managed-identity scope for operator staff. This is not an Organization. */
   operatorId?: string;
   competitionId?: string;
+  /** نطاق وفد مدير الوفد؛ إن غاب فالوفد هو الحساب نفسه. */
+  delegationId?: string;
   avatarUrl?: string;
   phone?: string;
   country?: string;
@@ -1048,7 +1050,11 @@ export interface QuestionPolicy {
   promptMode: 'judge' | 'certified_audio' | 'visual' | 'configurable';
   secureReveal?: { requireParticipantPresence:boolean; judgeApprovalMode:'all_assigned'|'minimum'; minimumApprovals?:number };
   openingPrompt?: { mode:'approved_reference_audio'|'judge'; autoplay:boolean; usageScope:string };
-  transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; selectedPhraseIndexes?:number[]; /** legacy read-only field; no longer exposed or played */ audioUrl?:string };
+  /**
+   * عبارة إنهاء الموضع ثابتة للجميع: «حسبك» وحدها. لا قائمة اختيار ولا تناوب — الجهة تملك
+   * مفتاح التنبيه الصوتي فقط. `getCompetitionPolicy` يعيد كتابة العبارة دائمًا إلى «حسبك».
+   */
+  transitionCue?: { enabled:boolean; phraseArabic:string; phraseEnglish:string; autoAdvanceDelayMs:number; /** @deprecated legacy rotation list; ignored — the phrase is always «حسبك» */ selectedPhraseIndexes?:number[]; /** legacy read-only field; no longer exposed or played */ audioUrl?:string };
 }
 
 export interface WorkflowStagePolicy {

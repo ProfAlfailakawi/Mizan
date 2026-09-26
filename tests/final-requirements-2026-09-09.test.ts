@@ -13,7 +13,7 @@ test('competition and organization logos use authenticated R2 object storage, ne
 
 test('FairDraw is system initiated and public registration auto-approval remains policy driven',()=>{
  const overview=s('src/components/admin/CompetitionOverview.tsx');const cfg=s('src/lib/competition-config.ts');const store=s('src/lib/store.ts');const registration=s('src/components/public/RegistrationFlow.tsx');
- assert.doesNotMatch(overview,/المتسابق يبدأ سحب سؤاله|Participant initiates the question draw/);assert.match(overview,/يبدأ ميزان السحب العادل تلقائيًا/);
+ assert.doesNotMatch(overview,/المتسابق يبدأ سحب سؤاله|Participant initiates the question draw/);/* كتلة «إعدادات السحب المتقدمة» حُذفت بقرار المالك (٢٦‑٩)؛ السحب يبقى آليًّا تفرضه السياسة. */assert.doesNotMatch(overview,/إعدادات السحب المتقدمة/);
  assert.match(cfg,/policy\.questions\.participantInitiatedDraw=false/);assert.match(store,/generateFairDraw/);assert.match(store,/startSessionForParticipant/);assert.match(registration,/autoApproveEligible/);
 });
 
@@ -54,7 +54,7 @@ test('all September 9 UX fixes are wired to real state rather than cosmetic plac
  // Opening registration is an in-place publish action, not a broken hash redirect.
  assert.match(overview,/store\.publishCompetition\(\)/);assert.doesNotMatch(overview,/window\.location\.hash=['"]#manage-competition['"]/);
  // Category passage uses ayah or quarter-page steppers; internal question/time fields are not shown in the category editor.
- assert.match(types,/passageMode\?: 'ayat' \| 'page_quarters'/);assert.match(types,/pageQuarterUnits\?: number/);assert.match(overview,/PassageLengthControl/);assert.match(overview,/الزيادة كل مرة: ربع وجه/);const draft=overview.slice(overview.indexOf('const emptyDraft'),overview.indexOf('const saveCategory'));assert.doesNotMatch(draft,/question|Duration|أسئلة|زمن/i);assert.match(overview,/targetDurationMinutes:c\.ruleSet\.questionDurationMinutes/);
+ assert.match(types,/passageMode\?: 'ayat' \| 'page_quarters'/);assert.match(types,/pageQuarterUnits\?: number/);/* طول المقطع انتقل من محرّر الفئة إلى تبويب النطاق (قرار المالك ٢٦‑٩). */const engine=s('src/components/admin/QuestionEngineWorkspace.tsx');assert.doesNotMatch(overview,/PassageLengthControl/);assert.match(engine,/<PassageLength /);assert.match(engine,/الزيادة كل مرة: ربع وجه/);const draft=overview.slice(overview.indexOf('const emptyDraft'),overview.indexOf('const saveCategory'));assert.doesNotMatch(draft,/question|Duration|أسئلة|زمن/i);assert.match(overview,/targetDurationMinutes:c\.ruleSet\.questionDurationMinutes/);
  // Save is durable locally on every mutation and competition configuration carries conflict-safe freshness.
  assert.match(store,/function persistLocalSnapshot\(\): boolean/);assert.match(store,/function notify\(\)[\s\S]{0,700}persistLocalSnapshot\(\)/);assert.match(store,/competitionConfigUpdatedAt/);assert.match(store,/markCompetitionConfigChanged\(\); notify\(\)/);
  // Manager permission surface is tabbed and includes the organization's actual licensed modules.
@@ -64,7 +64,7 @@ test('all September 9 UX fixes are wired to real state rather than cosmetic plac
  // Deployment has no artificial economic/balanced/expanded choice.
  assert.doesNotMatch(deployment,/اقتصادي|متوازن|موسّع|economic|balanced|expanded/i);
  // No fake flight is shown/seeded, and CSV has a downloadable template.
- assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);assert.doesNotMatch(store,/flightNumber:\s*['"]MZ 417['"]/);assert.match(enterprise,/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
+ assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);assert.doesNotMatch(store,/flightNumber:\s*['"]MZ 417['"]/);assert.match(fs.readFileSync('src/components/admin/RolePortals.tsx','utf8'),/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
  // Recovery/export/support utilities are centralized once; regulation-to-policy import card is removed from readiness UI.
  assert.match(enterprise,/أدوات الإدارة/);assert.equal((enterprise.match(/<Governance /g)||[]).length,1);assert.doesNotMatch(readiness,/استيراد لائحة|حوّل اللائحة إلى سياسة مسابقة/);
  // The official Madinah Mushaf visual master is already accepted, not shown as missing.

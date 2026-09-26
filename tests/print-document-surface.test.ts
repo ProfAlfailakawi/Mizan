@@ -57,33 +57,32 @@ test('a row or a heading is never split across two pages', () => {
   assert.ok(block.includes('break-after: avoid'), 'a heading must not end a page alone');
 });
 
+const DOCUMENTS = read('src/components/admin/ResultsDocuments.tsx');
+
 test('every print trigger has a document to print, and hides its own button', () => {
   /*
    * زرُّ طباعةٍ بلا وثيقةٍ مُعلَنة يطبع الصفحة كلَّها — وهو العطلُ نفسُه بصيغةٍ أخرى.
-   * فكلُّ شاشةٍ فيها `window.print()` يجب أن تُعلن ما يُطبع، وأن يختفي زرُّها من الورق.
+   * صفحة التحقق تُعلن وثيقتها داخل الصفحة؛ والشهادة وكشوف النتائج تُطبع وثيقةً مستقلة في
+   * إطارٍ خفيّ (`printDocument`)، فلا يصل الورقَ شيءٌ من واجهة التطبيق أصلًا.
    */
-  for (const [name, source] of [
-    ['ParticipantDashboard', PARTICIPANT],
-    ['CertificateVerification', VERIFICATION],
-    ['CompetitionOverview', OVERVIEW],
-  ] as const) {
-    assert.ok(source.includes('window.print()'), `${name} must offer printing`);
-    assert.ok(source.includes('data-mizan-print'), `${name} must declare what gets printed`);
-    assert.ok(/no-print/.test(source), `${name} must keep its own controls off the page`);
-  }
+  assert.ok(VERIFICATION.includes('window.print()'), 'CertificateVerification must offer printing');
+  assert.ok(VERIFICATION.includes('data-mizan-print'), 'CertificateVerification must declare what gets printed');
+  assert.ok(/no-print/.test(VERIFICATION), 'CertificateVerification must keep its own controls off the page');
+  assert.ok(/export function printDocument/.test(DOCUMENTS), 'an isolated print document must exist');
+  assert.ok(/createElement\('iframe'\)/.test(DOCUMENTS), 'printed in a frame of its own, not the app page');
+  assert.ok(PARTICIPANT.includes('CertificateModal'), 'the participant prints the certificate document');
+  assert.ok(OVERVIEW.includes('ResultsSheetModal') && OVERVIEW.includes('CertificateModal'), 'the results view prints documents, not the page');
 });
 
 test('the certificate dialog prints the certificate, not the dialog chrome', () => {
-  const at = PARTICIPANT.indexOf('data-mizan-print');
-  assert.ok(at > 0);
-  // المُعلَن هو بطاقةُ الشهادة نفسها، لا الغلافُ المعتم الذي حولها.
-  const before = PARTICIPANT.slice(Math.max(0, at - 260), at);
-  assert.equal(/backdrop-blur[^>]*$/.test(before), false, 'the dimmed backdrop must not be the print root');
-  assert.ok(PARTICIPANT.includes('justify-center gap-2 no-print'), 'the close/print buttons must not print');
+  // ما يُطبع هو عملُ الشهادة وحده مُصيَّرًا إلى وثيقة، لا النافذة التي تعرضه.
+  assert.ok(/renderToStaticMarkup\(<CertificateArtwork/.test(DOCUMENTS), 'the print source is the certificate artwork alone');
+  assert.ok(/size:A4 \$\{landscape/.test(DOCUMENTS), 'the certificate has its own A4 page box');
 });
 
 test('the results sheet can be printed only when there are results', () => {
   // زرٌّ يطبع ورقةً فارغة يُخرج وثيقةً بلا مضمون ويبدو أنها نتيجة.
-  assert.ok(/disabled=\{!results\.length\} onClick=\{\(\)=>window\.print\(\)\}/.test(OVERVIEW),
+  assert.ok(/disabled=\{!results\.length\} onClick=\{\(\)=>setSheet\('official'\)\}/.test(OVERVIEW),
     'printing an empty sheet must not be offered');
+  assert.ok(/REPORTABLE_RESULT_STATUSES/.test(DOCUMENTS), 'only approved, sealed or published results reach the printed sheet');
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MonitorDot, Copy, Check } from 'lucide-react';
+import { MonitorDot, Copy, Check, Play, BookOpen, Sparkles, UsersRound } from 'lucide-react';
 import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { useBoardPublisherStatus } from '../../lib/use-board-publisher';
 import { describePublisherRole } from '../../lib/board-lease';
@@ -25,6 +25,10 @@ export const HallScreenPublisher: React.FC = () => {
   const [copied, setCopied] = useState('');
   const [corridorPanels, setCorridorPanels] = useState<string[]>(['mushaf', 'khatmah', 'queue']);
   const [corridorRotate, setCorridorRotate] = useState(25);
+  /* الحقل يُكتب فيه بحرية ويُثبَّت عند الخروج منه. كان يُقصّ مع كل ضغطة مفتاح إلى ١٠–١٢٠،
+     فمن أراد «40» كتب «4» فصارت «10» ثم «104» فصارت «120» — ولا يصل إلى رقمه أبدًا. */
+  const [rotateDraft, setRotateDraft] = useState('25');
+  const commitRotate = (raw: string) => { const n = Math.round(Number(raw)); const v = Number.isFinite(n) && n > 0 ? Math.max(10, Math.min(120, n)) : 25; setCorridorRotate(v); setRotateDraft(String(v)); };
   const togglePanel = (id: string) => setCorridorPanels(prev => {
     const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
     /* لوحةٌ واحدة على الأقل: جدارٌ بلا لوحةٍ شاشةٌ سوداء. */
@@ -46,20 +50,43 @@ export const HallScreenPublisher: React.FC = () => {
 
   const committees = s.committees.filter(c => c.competitionId === s.competition.id);
   const base = `${window.location.origin}${window.location.pathname}`;
-  const hallLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=hall`;
-  const panelLink = (code: string) => `${base}#board?comp=${encodeURIComponent(s.competition.id)}&panel=${encodeURIComponent(code)}`;
+  /* رابطٌ نُسخ من بيئة العرض يحمل رايتها: التبويب الجديد لا يرث تخزين هذا التبويب، فكانت
+     الشاشة تُفتح هناك على «لم تُنشر شاشة هذه المسابقة بعد». */
+  const demoTag = IS_DEMO_SESSION ? '&demo=1' : '';
+  const hallLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=hall${demoTag}`;
+  const panelLink = (code: string) => `${base}#board?comp=${encodeURIComponent(s.competition.id)}&panel=${encodeURIComponent(code)}${demoTag}`;
   /*
    * شاشة الممرّ: جدارٌ يتناوب، ولوحاته يختارها المشرف قبل أن ينسخ الرابط.
    *
    * ولا تُعرض عليه أسماء معاملات: يضغط ما يريد عرضه، ويخرج الرابط بها. ورابطٌ بلا اختيار
    * يعرضها كلها، فلا يقف جدارٌ فارغًا لأن أحدًا نسي معاملًا.
    */
-  const corridorLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=corridor&panels=${corridorPanels.join(',')}&rotate=${corridorRotate}`;
-
-  const copy = async (key: string, url: string) => {
-    try { await navigator.clipboard.writeText(url); setCopied(key); setTimeout(() => setCopied(''), 2000) }
-    catch { /* متصفّحٌ يمنع الحافظة: الرابط معروضٌ كاملًا فيُنسخ يدويًّا. */ }
+  const corridorLink = `${base}#board?comp=${encodeURIComponent(s.competition.id)}&view=corridor&panels=${corridorPanels.join(',')}&rotate=${corridorRotate}${demoTag}`;
+  /* ما ستعرضه كل لوحة الآن — فيرى المشرف أن الجدار سيمتلئ قبل أن يفتحه. */
+  const recited = s.recitationLedger.filter(x => x.competitionId === s.competition.id);
+  const waiting = s.participants.filter(p => p.competitionId === s.competition.id && p.status === 'in_queue').length;
+  const panelFacts: Record<string, string> = {
+    mushaf: ar ? `${new Set(recited.map(x => x.surah)).size} سورة تُليت منها اليوم` : `${new Set(recited.map(x => x.surah)).size} surahs recited today`,
+    khatmah: ar ? `${recited.length} موضعًا تُلي` : `${recited.length} passages recited`,
+    queue: ar ? `${waiting} في الانتظار · ${committees.filter(c => c.status !== 'offline').length} لجنة` : `${waiting} waiting · ${committees.filter(c => c.status !== 'offline').length} panels`,
   };
+
+  /* الحافظة الحديثة تُرفض في إطارٍ مضمَّن أو صفحةٍ غير آمنة — وهناك كان الزرّ لا يفعل شيئًا.
+     فيُجرَّب النسخ القديم بعدها، ويُعلن النجاح في الحالتين. */
+  const copy = async (key: string, url: string) => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true } catch { ok = false }
+    if (!ok) {
+      try {
+        const area = document.createElement('textarea');
+        area.value = url; area.setAttribute('readonly', ''); area.style.position = 'fixed'; area.style.opacity = '0';
+        document.body.appendChild(area); area.select(); ok = document.execCommand('copy'); area.remove();
+      } catch { ok = false }
+    }
+    setCopied(ok ? key : `${key}:failed`); setTimeout(() => setCopied(''), 2500);
+  };
+  /* يفتح الشاشة في تبويبٍ جديد؛ وإن منعه المتصفّح فُتحت في هذا التبويب. */
+  const open = (url: string) => { const w = window.open(url, '_blank'); if (!w) window.location.href = url; };
 
   const leading = status.role === 'LEADER';
 
@@ -92,11 +119,11 @@ export const HallScreenPublisher: React.FC = () => {
     <div className="mt-4 space-y-2">
       <LinkRow
         label={ar ? 'شاشة القاعة العامة — كل اللجان' : 'Public hall screen — every panel'}
-        url={hallLink} ar={ar} copied={copied === 'hall'} onCopy={() => void copy('hall', hallLink)} />
+        url={hallLink} ar={ar} copied={copied === 'hall'} failed={copied === 'hall:failed'} onCopy={() => void copy('hall', hallLink)} onOpen={() => open(hallLink)} />
       {committees.map(c => <LinkRow
         key={c.id}
         label={ar ? `شاشة اللجنة ${c.code}` : `Panel screen ${c.code}`}
-        url={panelLink(c.code)} ar={ar} copied={copied === c.id} onCopy={() => void copy(c.id, panelLink(c.code))} />)}
+        url={panelLink(c.code)} ar={ar} copied={copied === c.id} failed={copied === `${c.id}:failed`} onCopy={() => void copy(c.id, panelLink(c.code))} onOpen={() => open(panelLink(c.code))} />)}
       {!committees.length && <div className="rounded-xl bg-[#f1efe9] px-4 py-3 text-[11px] text-[#646965]">
         {ar ? 'لا لجان بعد — شاشة القاعة وحدها متاحة.' : 'No panels yet — only the hall screen is available.'}
       </div>}
@@ -115,25 +142,31 @@ export const HallScreenPublisher: React.FC = () => {
         </div>
         <label className="flex items-center gap-2 text-[10px] font-black text-[#59615c]">
           {ar ? 'كل' : 'every'}
-          <input type="number" min={10} max={120} value={corridorRotate}
-            onChange={e => setCorridorRotate(Math.max(10, Math.min(120, Number(e.target.value) || 25)))}
+          <input type="number" inputMode="numeric" min={10} max={120} step={5} value={rotateDraft}
+            onChange={e => { setRotateDraft(e.target.value); const n = Number(e.target.value); if (n >= 10 && n <= 120) setCorridorRotate(Math.round(n)); }}
+            onBlur={e => commitRotate(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') commitRotate((e.target as HTMLInputElement).value); }}
             className="mizan-input !w-20 text-xs" aria-label={ar ? 'ثواني التناوب' : 'Rotation seconds'} />
           {ar ? 'ثانية' : 'sec'}
         </label>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {([['mushaf', 'من المصحف', 'From the Mushaf'], ['khatmah', 'ختمة القاعة', 'Hall khatmah'], ['queue', 'دورك والطابور', 'Queue']] as const).map(([id, arLabel, enLabel]) => {
+        {([['mushaf', 'من المصحف', 'From the Mushaf', BookOpen], ['khatmah', 'ختمة القاعة', 'Hall khatmah', Sparkles], ['queue', 'دورك والطابور', 'Queue', UsersRound]] as const).map(([id, arLabel, enLabel, Icon]) => {
           const on = corridorPanels.includes(id);
-          return <button key={id} type="button" onClick={() => togglePanel(id)} aria-pressed={on}
-            className={`min-h-10 rounded-xl border px-3 text-[11px] font-black transition ${on ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dedbd2] bg-white text-[#636965]'}`}>
-            {ar ? arLabel : enLabel}
+          const last = on && corridorPanels.length === 1;
+          return <button key={id} type="button" onClick={() => togglePanel(id)} aria-pressed={on} aria-label={ar ? arLabel : enLabel} title={last ? (ar ? 'لوحةٌ واحدة على الأقل' : 'At least one panel') : undefined}
+            className={`min-h-12 rounded-xl border px-3 py-1.5 text-start transition ${on ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dedbd2] bg-white text-[#636965] opacity-80'}`}>
+            <span className="flex items-center gap-1.5 text-[11px] font-black">{on ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}{ar ? arLabel : enLabel}</span>
+            <span className="mt-0.5 block text-[9px] font-bold opacity-75">{panelFacts[id]}</span>
           </button>;
         })}
       </div>
       <div className="mt-3">
         <LinkRow
           label={ar ? 'رابط شاشة الممرّ' : 'Corridor screen link'}
-          url={corridorLink} ar={ar} copied={copied === 'corridor'} onCopy={() => void copy('corridor', corridorLink)} />
+          url={corridorLink} ar={ar} copied={copied === 'corridor'} failed={copied === 'corridor:failed'} onCopy={() => void copy('corridor', corridorLink)} onOpen={() => open(corridorLink)} />
+        <div className="mt-2 text-[10px] font-bold text-[#59615c]">
+          {ar ? `يعرض ${corridorPanels.length} ${corridorPanels.length === 1 ? 'لوحة ثابتة' : `لوحات تتبدّل كل ${corridorRotate} ثانية`}` : `${corridorPanels.length} panel(s), rotating every ${corridorRotate}s`}
+        </div>
       </div>
       <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">
         {ar
@@ -151,7 +184,7 @@ export const HallScreenPublisher: React.FC = () => {
   </section>;
 };
 
-const LinkRow: React.FC<{ label: string; url: string; ar: boolean; copied: boolean; onCopy: () => void }> = ({ label, url, ar, copied, onCopy }) => (
+const LinkRow: React.FC<{ label: string; url: string; ar: boolean; copied: boolean; failed?: boolean; onCopy: () => void; onOpen?: () => void }> = ({ label, url, ar, copied, failed, onCopy, onOpen }) => (
   <div className="rounded-2xl border border-[#dfddd6] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
     <span className="min-w-0">
       <span className="block text-xs font-black">{label}</span>
@@ -163,7 +196,11 @@ const LinkRow: React.FC<{ label: string; url: string; ar: boolean; copied: boole
       className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#f1efe9] hover:bg-[#e7e4dc] px-3 py-2 text-[11px] font-black text-[#171b18]"
     >
       {copied ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
-      {copied ? (ar ? 'نُسخ' : 'Copied') : (ar ? 'انسخ الرابط' : 'Copy link')}
+      {copied ? (ar ? 'نُسخ' : 'Copied') : failed ? (ar ? 'انسخه يدويًّا' : 'Copy manually') : (ar ? 'انسخ الرابط' : 'Copy link')}
     </button>
+    {onOpen && <button type="button" onClick={onOpen}
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#214C40] hover:bg-[#1a3d33] px-3 py-2 text-[11px] font-black text-white">
+      <Play className="w-3.5 h-3.5" aria-hidden />{ar ? 'افتح الشاشة' : 'Open screen'}
+    </button>}
   </div>
 );

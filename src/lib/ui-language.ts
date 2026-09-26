@@ -15,7 +15,7 @@ const AR_TOKENS:Record<string,string>={
   super_admin:'إدارة المنصة', operator_owner:'مالك المشغّل', operator_admin:'مدير المشغّل',
   org_admin:'مدير الجهة', storage_admin:'مدير التخزين', billing_admin:'مدير الفوترة', branch_admin:'مدير الفرع', comp_admin:'مدير المسابقة',
   head_judge:'رئيس التحكيم', judge:'محكم', ops_manager:'مدير التشغيل', exception_host:'مكتب الاستثناء',
-  delegation_manager:'مندوب الوفد', participant:'متسابق', broadcast_operator:'البث والحفل', auditor:'مدقق',
+  delegation_manager:'مدير الوفد', participant:'متسابق', broadcast_operator:'البث والحفل', auditor:'مدقق',
   guardian:'ولي الأمر', support_agent:'الدعم',
   fixture:'بيانات تطوير', approved:'معتمد', reviewed:'تمت المراجعة', pending:'معلّق', active:'نشط', offline:'غير متصل', online:'متصل', valid:'ساري', revoked:'ملغى', requested:'بانتظار الموافقة', ended:'منتهٍ', rejected:'مرفوض',
   forming:'قيد التشكيل', reconciling:'قيد المصالحة', closed:'مغلق', connected:'متصل', unavailable:'غير متاح', disabled:'معطّل', degraded:'متدهور', sent:'أُرسل', queued:'في قائمة الإرسال', failed:'فشل',

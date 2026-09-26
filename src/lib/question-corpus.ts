@@ -17,6 +17,8 @@ import type { DifficultyAssurance, QuestionCandidate } from './question-engine';
 export interface CorpusProjectionOptions {
   /** عدد آيات المقطع. المقطع لا يعبر حدّ السورة ولا حدّ النطاق. */
   passageAyahCount?: number;
+  /** طول المقطع لكل سورة (مثلًا ¾ وجه بكثافة آيات السورة). يتقدّم على passageAyahCount. */
+  passageAyahCountFor?: (surah: number) => number;
   /** المسافة بين بدايتين متتاليتين. واحد يعني كل آية بداية محتملة. */
   stride?: number;
   /** خريطة صعوبة مُعتمدة إن وُجدت: "surah:ayah" → ١..٥. */
@@ -47,7 +49,7 @@ function structuralDifficulty(surah: number, startAyah: number, endAyah: number)
 
 /** كل مواضع البداية الصالحة بنيويًا داخل النطاق. */
 export function projectCandidatesFromScope(scope: QuranScope, options: CorpusProjectionOptions = {}): QuestionCandidate[] {
-  const length = Math.max(1, Math.min(20, Math.round(options.passageAyahCount ?? 3)));
+  const fixedLength = Math.max(1, Math.min(20, Math.round(options.passageAyahCount ?? 3)));
   const stride = Math.max(1, Math.round(options.stride ?? 1));
   const limit = Math.max(1, Math.min(QURAN_TOTAL_AYAHS, options.limit ?? QURAN_TOTAL_AYAHS));
   /*
@@ -63,6 +65,7 @@ export function projectCandidatesFromScope(scope: QuranScope, options: CorpusPro
   for (const [from, to] of scopeRanges(scope)) {
     for (let ordinal = from; ordinal <= to; ordinal += stride) {
       const start = ordinalToLocus(ordinal);
+      const length = options.passageAyahCountFor ? Math.max(1, Math.min(40, Math.round(options.passageAyahCountFor(start.surah)))) : fixedLength;
       const endAyah = start.ayah + length - 1;
       // المقطع لا يتجاوز سورته ولا مقطع النطاق الذي وقعت فيه بدايته.
       if (endAyah > ayahCountOf(start.surah)) continue;
