@@ -1242,7 +1242,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   background:var(--emerald); color:#fff;
   box-shadow:0 0 0 4px rgba(33,76,64,.16); transform:scale(1.06);
 }
-.mizan-step-label{ font-size:calc(10px * var(--mizan-text-scale)); color:var(--muted); text-align:center; }
+.mizan-step-label{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); text-align:center; }
 .mizan-step-label[data-state="current"]{ color:var(--emerald); font-weight:800; }
 .mizan-step-rule{ height:2px; flex:1; border-radius:999px; background:#dddcd5; }
 .mizan-step-rule[data-done="true"]{ background:var(--emerald-2); }
