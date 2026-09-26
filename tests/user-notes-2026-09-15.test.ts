@@ -384,7 +384,8 @@ test('an empty judging screen says why it is empty and offers the next real step
    */
   assert.doesNotMatch(judge, /admitAndCall/, 'admitting a late arrival is not the judge’s action');
   assert.match(judge, /استقبالهم من غرفة العمليات/, 'the judge is told who admits, and where');
-  assert.match(judge, /طلبًا تحت المراجعة/, 'and is told when the roster is pending approval instead');
+  /* عدّاد «قيد المراجعة» أُزيل بطلب المالك: لا يملك المحكّم فيه إجراءً. */
+  assert.doesNotMatch(judge, /label=\{ar\?'قيد المراجعة'/, 'the non-actionable under-review tile is gone');
 
   /*
    * كل من له دور لم يُقيَّم بعد يظهر، لا حالتان فقط.
