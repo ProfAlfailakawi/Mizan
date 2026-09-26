@@ -1,0 +1,10 @@
+# بناءُ صورة GPU للمستمع — يُشغَّل يدويًّا (docs/LISTENER-GPU.md)، ولا يدخل نشرَ ميزان الدوريّ.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'Dockerfile.gpu', '-t', '${_TAG}', '.']
+images: ['${_TAG}']
+substitutions:
+  _TAG: ''
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1800s
