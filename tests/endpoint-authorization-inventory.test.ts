@@ -84,7 +84,7 @@ const INTENTIONALLY_PUBLIC: Record<string, string> = {
   // ── نصُّ القرآن وأصولُه: محتوًى عام بطبيعته، وليس بيانات مستأجر ──────────────────
   '/api/public/kfgqpc/page/:packageId/:page': 'صفحةُ مصحفٍ مطبوعة — محتوًى عام.',
   '/api/public/kfgqpc/font/:fontId': 'خطُّ المصحف — أصلٌ ثابت يُحمّله المتصفّح.',
-  '/api/public/kfgqpc/audio/:readingId/:surah/:ayah': 'تلاوةُ آية — محتوًى عام، وسياسةُ الصوت حفصٌ معلنة.',
+  '/api/public/quran-audio/:file': 'تلاوةُ آية بصوت الحصري المرتل — محتوًى قرآنيٌّ عام يُسمَع قبل الدخول، ولا يكشف شيئًا خاصًّا.',
   '/api/public/kfgqpc/word-timings/:readingId/:surah/:ayah': 'توقيتاتُ كلمات التلاوة — تابعةٌ للصوت العام.',
   '/api/public/kfgqpc/passage/:readingId/:surah/:startAyah/:endAyah': 'نصُّ مقطعٍ قرآني — محتوًى عام، وروايتُه مصرَّحٌ بها في الردّ.',
   '/api/public/kfgqpc/mushaf-layout/:page': 'تخطيطُ صفحةٍ مطبوعة — إثراءٌ بصري لا بيانات.',

@@ -95,7 +95,7 @@ readingProductionReady(rawiId, { deliveryAvailableAtRuntime, sourceCertified? })
 - **زرّ الواجهة حرفيًا:** `استمع إلى الآية` — بلا «بحفص»، وبلا تحذير. اللجنة تعرف المنهج.
 - **لغير حفص:** التشغيل على مستوى الآية/المقطع (`nonHafsSyncGranularity: 'AYAH'`). لا
   مزامنةَ كلمةٍ مضلّلة تفترض تطابق صوت حفصٍ مع نصّ روايةٍ أخرى.
-- القارئ قابلٌ للتهيئة: `MIZAN_GLOBAL_HAFS_RECITER_ID` (الافتراضي `hafs-muaiqly`).
+- القارئ ثابت وغير قابل للتبديل: الشيخ محمود خليل الحصري — المصحف المرتل (`Husary_128kbps`)، عبر `src/lib/quran-audio.ts`.
 
 > محرّك المحاذاة يبقى `SHADOW_ONLY` و `scoreAuthority: HUMAN_ONLY`. الصوت والذكاء
 > **لا يعدّلان الدرجة**؛ المحكّم البشري صاحب القرار.

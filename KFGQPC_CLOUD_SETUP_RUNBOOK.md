@@ -13,7 +13,6 @@
 | نص 6 روايات | `delivery/quran-data/<reading>/vN/data.json` | thetruetruth/quran-data-kfgqpc |
 | خطوط 6 روايات | `delivery/fonts/<reading>/vN/primary.woff2\|ttf` | thetruetruth |
 | 604 صفحة مصحف | `delivery/mushaf-pages/madinah/v1/NNN.png` | files.quran.app (madani) |
-| صوت حفص/المعيقلي (6236 آية) | `delivery/audio/hafs/maher-al-muaiqly/v1/SSS/AAA.mp3` | everyayah |
 | تخطيط الكلمة (604) | `delivery/quran-data/mushaf-layout/v1/page-NNN.json` | zonetecde/mushaf-layout |
 
 ## 2) كيفية إعادة التشغيل/التحديث
@@ -21,7 +20,7 @@
 ```bash
 SA=projects/mizan-f2ce3/serviceAccounts/993698501419-compute@developer.gserviceaccount.com
 gcloud builds submit --config cloudbuild-mirror-delivery.yaml --service-account=$SA --async .   # خطوط+نص+صفحات+تفسير
-gcloud builds submit --config cloudbuild-audio.yaml           --service-account=$SA --async .   # صوت حفص + تخطيط الكلمة
+gcloud builds submit --config cloudbuild-audio.yaml           --service-account=$SA --async .   # تخطيط الكلمة (صوت الحصري يُخدم مباشرة عبر /api/public/quran-audio)
 gcloud builds submit --config cloudbuild-catalog.yaml         --service-account=$SA --async .   # إعادة نشر الكتالوج فقط
 ```
 

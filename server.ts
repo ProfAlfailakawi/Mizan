@@ -44,6 +44,7 @@ import { quranSkeleton, sameWord } from './src/lib/quran-orthography';
 import type { ParticipantScopeRecord } from './src/lib/participant-scope';
 import { quranReadingDefinition } from './server/quran-intelligence-policy';
 import { resolveCanonicalRawiId } from './src/lib/canonical-readings';
+import { isValidAyahRef } from './src/lib/quran-audio';
 import { attestResult } from './server/result-attestation';
 import { sealResult, verifySeal, verifySealSignature } from './server/result-sealing';
 import { IntegrityAuthorityRepository } from './server/integrity-authority';
@@ -453,6 +454,14 @@ async function startServer() {
    * كان بلا حدّ منذ كُتب، ولم يظهر حتى لمس هذا التغيير سطره. وسقفه أوسع لأن قاعةً فيها
    * عدّة لجان تقرأ معًا، وكلُّ لجنة ترسل مقطعًا كل ثانية ونصف.
    */
+  /* تلاوة الآية (وكيل الحصري): عامّة، لكن كلّ طلبٍ قد يلمس القرص أو المصدر — حدٌّ لكلّ عنوان. */
+  const quranAudioIpRateLimit:RequestHandler=rateLimit({
+    windowMs:60_000,
+    limit:Number(process.env.MIZAN_QURAN_AUDIO_IP_RATE_LIMIT_MAX||600),
+    standardHeaders:'draft-7',legacyHeaders:false,
+    message:{code:'RATE_LIMITED'},
+    skip:()=>rateLimiterIsGlobal,
+  });
   const alignmentAudioIpRateLimit:RequestHandler=rateLimit({
     windowMs:120_000,
     limit:Number(process.env.MIZAN_ALIGNMENT_AUDIO_IP_RATE_LIMIT_MAX||1200),
@@ -620,8 +629,7 @@ async function startServer() {
   const recitationRecogniser=new RecitationRecogniser({url:process.env.MIZAN_QURAN_ASR_URL||'',bearerToken:process.env.MIZAN_QURAN_ASR_BEARER_TOKEN||''},asrBenchmarks);
   const kfgqpcPageImageRoot=process.env.MIZAN_KFGQPC_PAGE_IMAGE_ROOT||'';
   const kfgqpcFontRoot=process.env.MIZAN_KFGQPC_FONT_ROOT||'';
-  const kfgqpcAudioRoot=process.env.MIZAN_KFGQPC_AUDIO_ROOT||'';
-  const kfgqpcDelivery=new KfgqpcDeliveryRepository({pageRoot:kfgqpcPageImageRoot,fontRoot:kfgqpcFontRoot,audioRoot:kfgqpcAudioRoot,r2BaseUrl:process.env.MIZAN_KFGQPC_R2_DELIVERY_BASE_URL||'',r2BearerToken:process.env.MIZAN_KFGQPC_R2_BEARER_TOKEN||''});
+  const kfgqpcDelivery=new KfgqpcDeliveryRepository({pageRoot:kfgqpcPageImageRoot,fontRoot:kfgqpcFontRoot,r2BaseUrl:process.env.MIZAN_KFGQPC_R2_DELIVERY_BASE_URL||'',r2BearerToken:process.env.MIZAN_KFGQPC_R2_BEARER_TOKEN||''});
   /* نصّ العشرين يمرّ من واجهةٍ واحدة تعرف مصدر كل رواية وإسنادَها؛ الصفحات والخطوط والصوت
      تبقى على مستودع المجمع لأنها أصولُه فعلًا. */
   const quranDelivery=new MizanQuranDelivery(kfgqpcDelivery);
@@ -1003,7 +1011,9 @@ async function startServer() {
     return res.json({recordingId:readingId,surah,ayah,assurance:hit.meta.assurance,attribution:hit.meta.attribution,segments:hit.segments});
   });
 
-  app.get('/api/public/kfgqpc/audio/:readingId/:surah/:ayah',async(req,res)=>{const readingId=safeSegment(String(req.params.readingId||'')),surah=Number(req.params.surah),ayah=Number(req.params.ayah);try{const asset=await kfgqpcDelivery.ayahAudio(readingId,surah,ayah);if(await sendKfgqpcAsset(res,asset,'public, max-age=86400, immutable'))return;return res.status(404).json({code:'OFFICIAL_AUDIO_AYAH_NOT_INGESTED'})}catch{return res.status(502).json({code:'OFFICIAL_AUDIO_DELIVERY_FAILED'})}});
+  // تلاوة الآية: الشيخ محمود خليل الحصري — المصحف المرتل (EveryAyah Husary_128kbps)، المصدر الوحيد.
+  // وكيلٌ من الأصل نفسه: لا CORS على فكّ الصوت ولا خرق لـ media-src 'self'. الرابط SSSAAA.mp3.
+  app.get('/api/public/quran-audio/:file',quranAudioIpRateLimit,async(req,res)=>{const m=/^(\d{3})(\d{3})\.mp3$/.exec(String(req.params.file||''));if(!m)return res.status(400).json({code:'QURAN_AUDIO_BAD_REF'});const surah=Number(m[1]),ayah=Number(m[2]);if(!isValidAyahRef(surah,ayah))return res.status(404).json({code:'QURAN_AUDIO_AYAH_NOT_FOUND'});try{const asset=await kfgqpcDelivery.husaryAyahAudio(surah,ayah);if(asset?.file){res.setHeader('Cache-Control','public, max-age=86400, immutable');res.setHeader('X-MIZAN-Quran-Reciter','husary-murattal');res.type('audio/mpeg');return res.sendFile(asset.file)}return res.status(502).json({code:'QURAN_AUDIO_UPSTREAM_UNAVAILABLE'})}catch{return res.status(502).json({code:'QURAN_AUDIO_DELIVERY_FAILED'})}});
   /* طبقة تخطيط الكلمة: إثراء بصري لعدسة الكلمة فوق الصفحة الرسمية. غيابها لا يعطّل شيئًا،
      فتُعاد 204 بدل خطأ، وتبقى عدسة السطر عاملة عند العميل. */
   /* الجهة صاحبة هذا النطاق. نشرٌ واحد يخدم الجميع، والمضيف هو ما يميّز الجهة، فتظهر هويتها

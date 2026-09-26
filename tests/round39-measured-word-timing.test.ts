@@ -100,7 +100,7 @@ test('a recording listed in the manifest gets its measured segments',()=>{
 test('a recording with no registered timings gets nothing, which is the normal case',()=>{
   const s=store({'hafs-husary':'Husary_64kbps.json'},{'Husary_64kbps.json':SET});
   // نفس القارئ لا يكفي: تسجيل آخر توقيتُه آخر.
-  assert.equal(s.segments('hafs-muaiqly',1,2),null);
+  assert.equal(s.segments('husary-murattal',1,2),null);
   assert.equal(s.segments('hafs-husary',2,255),null,'an ayah outside the set is absent, not fabricated');
   assert.deepEqual(s.recordings(),['hafs-husary']);
 });

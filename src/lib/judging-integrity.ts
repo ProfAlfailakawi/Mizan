@@ -1,4 +1,4 @@
-import type { Committee, Participant, QuranReferenceAudioRecord, QueueTransferMode } from '../types';
+import type { Committee, Participant, QueueTransferMode } from '../types';
 import { hashCanonical } from './trust-protocol';
 
 export type QuestionRevealApproval = { judgeId:string; judgeName:string; approvedAt:string };
@@ -17,37 +17,6 @@ export function questionRevealReady(input:{
   const required=input.mode==='minimum'?Math.min(requiredIds.length,Math.max(1,input.minimumApprovals||1)):requiredIds.length;
   if(requiredIds.length===0)return {ready:false,reason:'NO_ELIGIBLE_JUDGES' as const,approved:0,required:0};
   return approved>=required?{ready:true,reason:'READY' as const,approved,required}:{ready:false,reason:'JUDGE_APPROVALS_REQUIRED' as const,approved,required};
-}
-
-const normalized=(v?:string)=>String(v||'').trim().toLowerCase().replace(/[’'`]/g,'').replace(/\s+/g,' ');
-
-export function selectApprovedOpeningAudio(input:{
-  references:QuranReferenceAudioRecord[];
-  qiraah?:string;
-  rawi?:string;
-  tariq?:string;
-  preferredReciter?:string;
-  surah:number;
-  ayah:number;
-}){
-  const q=normalized(input.qiraah),r=normalized(input.rawi),t=normalized(input.tariq),preferred=normalized(input.preferredReciter);
-  const eligible=input.references.filter(a=>{
-    if(a.approvalState!=='APPROVED_REFERENCE'||!a.audioUrl)return false;
-    if(!a.usageScope.some(x=>['opening_prompt','judge_prompt','competition_prompt'].includes(normalized(x).replace(/ /g,'_'))))return false;
-    if(normalized(a.qiraah)!==q||normalized(a.rawi)!==r)return false;
-    if(t&&normalized(a.tariq)!==t)return false;
-    if(a.surah!==input.surah||input.ayah<a.ayahStart||input.ayah>a.ayahEnd)return false;
-    if(a.ayahStart!==a.ayahEnd&&!a.ayahTimings?.some(x=>x.ayah===input.ayah))return false;
-    return true;
-  });
-  return (preferred?eligible.find(a=>normalized(a.reciter)===preferred):undefined)||eligible[0];
-}
-
-export function openingAudioWindow(reference:QuranReferenceAudioRecord,ayah:number){
-  const segment=reference.ayahTimings?.find(x=>x.ayah===ayah);
-  if(segment)return {startMs:segment.startMs,endMs:segment.endMs};
-  if(reference.ayahStart===ayah&&reference.ayahEnd===ayah)return {startMs:0,endMs:undefined};
-  return null;
 }
 
 export const queueOrderValue=(p:Participant)=>p.queueOrderKey??p.queueNumber??Number.MAX_SAFE_INTEGER;

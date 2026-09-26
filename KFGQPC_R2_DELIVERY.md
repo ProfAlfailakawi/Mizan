@@ -14,7 +14,6 @@ delivery/
         001.webp ... 604.webp
         manifest.json
   audio/
-    hafs/maher-al-muaiqly/v1/NNN/NNN.mp3
     shubah/ali-al-hudhaifi/v1/NNN/NNN.mp3
     qalun/ali-al-hudhaifi/v1/NNN/NNN.mp3
     susi/uthman-al-siddiqi/v1/NNN/NNN.mp3

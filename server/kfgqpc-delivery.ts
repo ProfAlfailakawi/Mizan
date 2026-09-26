@@ -4,6 +4,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import {R2PrivateClient,r2ConfigFromEnv,type R2ObjectInfo} from './r2-private';
 import {normalizeMushafLayout,type MushafPageLayout} from './mushaf-layout';
+import {getHusaryAudioUrl,HUSARY_EVERYAYAH_FOLDER,isValidAyahRef,quranAudioFileId} from '../src/lib/quran-audio';
 
 export type KfgqpcDeliveryKind='mushaf-page'|'audio-ayah'|'font';
 export type KfgqpcDeliverySource='LOCAL'|'R2'|'NONE';
@@ -25,7 +26,6 @@ export function configuredR2SafetyLimit(env:NodeJS.ProcessEnv=process.env){
 // Conservative planning only. Actual usage is always measured from R2 before/after ingestion.
 export function kfgqpcFreeTierBudget(env:NodeJS.ProcessEnv=process.env):KfgqpcStorageBudget{
   const items:KfgqpcStorageBudgetItem[]=[
-    {key:'audio-hafs-muaiqly',labelArabic:'حفص · ماهر المعيقلي',bytes:724.25*MB,note:'official ayah audio package; planning figure until measured ingestion'},
     {key:'audio-shubah-hudhaifi',labelArabic:'شعبة · علي الحذيفي',bytes:722*MB,note:'official ayah audio package; planning figure until measured ingestion'},
     {key:'audio-qalun-hudhaifi',labelArabic:'قالون · علي الحذيفي',bytes:760.66*MB,note:'official ayah audio package; planning figure until measured ingestion'},
     {key:'audio-susi-siddiqi',labelArabic:'السوسي · عثمان الصديقي',bytes:3.25*GB,note:'official ayah audio package; planning figure until measured ingestion'},
@@ -57,20 +57,6 @@ const pad3=(n:number)=>String(n).padStart(3,'0');
 const MUSHAF_PAGE_PREFIX:Record<string,string>={
   'kfgqpc-hafs-uthmanic-v13':'delivery/mushaf-pages/madinah/v1'
 };
-const AUDIO_PREFIX:Record<string,string>={
-  'kfgqpc-audio-hafs-muaiqly':'delivery/audio/hafs/maher-al-muaiqly/v1',
-  'hafs-muaiqly':'delivery/audio/hafs/maher-al-muaiqly/v1',
-  'kfgqpc-audio-shubah-hudhaifi':'delivery/audio/shubah/ali-al-hudhaifi/v1',
-  'shubah-hudhaifi':'delivery/audio/shubah/ali-al-hudhaifi/v1',
-  'kfgqpc-audio-qalun-hudhaifi':'delivery/audio/qalun/ali-al-hudhaifi/v1',
-  'qalun-hudhaifi':'delivery/audio/qalun/ali-al-hudhaifi/v1',
-  'kfgqpc-audio-susi-siddiqi':'delivery/audio/susi/uthman-al-siddiqi/v1',
-  'susi-siddiqi':'delivery/audio/susi/uthman-al-siddiqi/v1',
-  'kfgqpc-audio-duri-juhani':'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',
-  'duri-juhani':'delivery/audio/duri-abi-amr/abdullah-al-juhany/v1',
-  'kfgqpc-audio-warsh-dawsari':'delivery/audio/warsh/ibrahim-al-dawsari/v1',
-  'warsh-dawsari':'delivery/audio/warsh/ibrahim-al-dawsari/v1'
-};
 const FONT_PREFIX:Record<string,string>={
   'kfgqpc-hafs-uthmanic-v13':'delivery/fonts/hafs/v13/primary',
   'kfgqpc-warsh-uthmanic-v6':'delivery/fonts/warsh/v6/primary',
@@ -96,11 +82,10 @@ export function kfgqpcQuranDataKey(readingId:string){if(!safe(readingId))return 
 
 /*
  * تسليم وقت التشغيل من منافذ المحتوى المفتوح للمصحف الشريف باعتماد مجمع الملك فهد لطباعة المصحف
- * الشريف. حين لا يحسم جذرٌ محلي ولا R2 الأصلَ، يخدم ميزان الصفحة/التلاوة/النص من هذه المنافذ
- * ويخزّنها على القرص. هذا نقلٌ لنفس مصحف المدينة وتسجيل المعيقلي المعتمدَين، لا مصدرٌ آخر، ولا
+ * الشريف. حين لا يحسم جذرٌ محلي ولا R2 الأصلَ، يخدم ميزان الصفحة/النص من هذه المنافذ
+ * ويخزّنها على القرص. هذا نقلٌ لنفس مصحف المدينة المعتمد، لا مصدرٌ آخر، ولا
  * استبدال بين الروايات. يُعطَّل بـ MIZAN_DISABLE_RUNTIME_MIRROR=true.
  */
-const OPEN_AUDIO_RECITER:Record<string,string>={'hafs-muaiqly':'Maher_AlMuaiqly_64kbps','kfgqpc-audio-hafs-muaiqly':'Maher_AlMuaiqly_64kbps'};
 const OPEN_PAGE_HAFS=new Set(['kfgqpc-hafs-uthmanic-v13']);
 const OPEN_DATA_DIR:Record<string,string>={'hafs':'hafs','kfgqpc-hafs-uthmanic-v13':'hafs','warsh':'warsh','kfgqpc-warsh-uthmanic-v6':'warsh','shubah':'shouba','kfgqpc-shubah-uthmanic-v4':'shouba','qalun':'qaloon','kfgqpc-qaloun-uthmanic-v5':'qaloon','duri-abi-amr':'doori','kfgqpc-douri-abu-amr-uthmanic-v3':'doori','susi-abi-amr':'soosi','kfgqpc-sousi-abu-amr-uthmanic-v3':'soosi','bazzi':'bazzi','kfgqpc-bazzi-uthmanic-v7':'bazzi','qunbul':'qumbul','kfgqpc-qumbul-uthmanic-v7':'qumbul'};
 const OPEN_DATA_REPO='thetruetruth/quran-data-kfgqpc';
@@ -114,29 +99,24 @@ export function kfgqpcMushafPageKeys(packageId:string,page:number){
   const prefix=MUSHAF_PAGE_PREFIX[packageId];if(!prefix)return [] as string[];
   return ['avif','webp','png'].map(ext=>`${prefix}/${pad3(page)}.${ext}`);
 }
-export function kfgqpcAudioKeys(readingId:string,surah:number,ayah:number){
-  if(!safe(readingId)||!Number.isInteger(surah)||surah<1||surah>114||!Number.isInteger(ayah)||ayah<1||ayah>400)return [] as string[];
-  const prefix=AUDIO_PREFIX[readingId];if(!prefix)return [] as string[];
-  return [`${prefix}/${pad3(surah)}/${pad3(ayah)}.mp3`,`${prefix}/${pad3(surah)}/${pad3(ayah)}.m4a`];
-}
 export function kfgqpcFontKeys(packageId:string){
   if(!safe(packageId))return [] as string[];const prefix=FONT_PREFIX[packageId];if(!prefix)return [] as string[];
   return ['woff2','woff','ttf'].map(ext=>`${prefix}.${ext}`);
 }
 
 export class KfgqpcDeliveryRepository{
-  private readonly options:{pageRoot?:string;fontRoot?:string;audioRoot?:string;r2BaseUrl?:string;r2BearerToken?:string;r2Client?:R2PrivateClient;cacheRoot?:string};
+  private readonly options:{pageRoot?:string;fontRoot?:string;r2BaseUrl?:string;r2BearerToken?:string;r2Client?:R2PrivateClient;cacheRoot?:string};
   private readonly r2:R2PrivateClient|null;
   private r2Readiness:KfgqpcR2Readiness='NOT_CONFIGURED';
   private r2ReadinessReason='';
   private readonly cacheRoot:string;
 
-  constructor(options:{pageRoot?:string;fontRoot?:string;audioRoot?:string;r2BaseUrl?:string;r2BearerToken?:string;r2Client?:R2PrivateClient;cacheRoot?:string}){
+  constructor(options:{pageRoot?:string;fontRoot?:string;r2BaseUrl?:string;r2BearerToken?:string;r2Client?:R2PrivateClient;cacheRoot?:string}){
     this.options=options;const envConfig=r2ConfigFromEnv();this.r2=options.r2Client||(envConfig?new R2PrivateClient(envConfig):null);this.cacheRoot=options.cacheRoot||path.join(os.tmpdir(),'mizan-kfgqpc-r2-cache');
     if(this.r2){this.r2Readiness='CHECKING';void this.refreshR2Readiness()}
   }
 
-  status(){const budget=kfgqpcFreeTierBudget();const r2Configured=!!this.r2||!!this.options.r2BaseUrl;return {protocol:'MIZAN-KFGQPC-DELIVERY-2',deliverySource:r2Configured?'R2':(this.options.pageRoot||this.options.audioRoot||this.options.fontRoot)?'LOCAL':'NONE',r2Configured,r2Mode:this.r2?'PRIVATE_S3':this.options.r2BaseUrl?'PROTECTED_GATEWAY':'NONE',r2Readiness:this.r2?this.r2Readiness:(this.options.r2BaseUrl?'UNAVAILABLE':'NOT_CONFIGURED'),r2ReadinessReason:this.r2Readiness==='UNAVAILABLE'?this.r2ReadinessReason:undefined,privateOriginExposedToBrowser:false,localFirst:true,localPageRootConfigured:!!this.options.pageRoot,localAudioRootConfigured:!!this.options.audioRoot,localFontRootConfigured:!!this.options.fontRoot,budget}}
+  status(){const budget=kfgqpcFreeTierBudget();const r2Configured=!!this.r2||!!this.options.r2BaseUrl;return {protocol:'MIZAN-KFGQPC-DELIVERY-2',deliverySource:r2Configured?'R2':(this.options.pageRoot||this.options.fontRoot)?'LOCAL':'NONE',r2Configured,r2Mode:this.r2?'PRIVATE_S3':this.options.r2BaseUrl?'PROTECTED_GATEWAY':'NONE',r2Readiness:this.r2?this.r2Readiness:(this.options.r2BaseUrl?'UNAVAILABLE':'NOT_CONFIGURED'),r2ReadinessReason:this.r2Readiness==='UNAVAILABLE'?this.r2ReadinessReason:undefined,privateOriginExposedToBrowser:false,localFirst:true,localPageRootConfigured:!!this.options.pageRoot,localFontRootConfigured:!!this.options.fontRoot,budget}}
 
   async refreshR2Readiness(){if(!this.r2){this.r2Readiness='NOT_CONFIGURED';this.r2ReadinessReason='';return this.r2Readiness}this.r2Readiness='CHECKING';const result=await this.r2.health();this.r2Readiness=result.state;this.r2ReadinessReason=result.state==='READY'?'':result.reason;return this.r2Readiness}
   async actualStorageReport(){if(!this.r2)throw new Error('R2_PRIVATE_NOT_CONFIGURED');return kfgqpcActualStorageReport(await this.r2.listAllObjects('delivery/'))}
@@ -174,9 +154,10 @@ export class KfgqpcDeliveryRepository{
     if(openDeliveryEnabled()&&OPEN_PAGE_HAFS.has(packageId))return this.openFetch(`https://files.quran.app/hafs/madani/width_1024/page${pad3(page)}.png`,`open:page:${packageId}:${page}`,'image/png');
     return null}
 
-  async ayahAudio(readingId:string,surah:number,ayah:number){if(!safe(readingId)||!Number.isInteger(surah)||surah<1||surah>114||!Number.isInteger(ayah)||ayah<1||ayah>400)return null;const privateKeys=kfgqpcAudioKeys(readingId,surah,ayah);if(!privateKeys.length)return null;const local=this.localFile(this.options.audioRoot,[readingId,String(surah),String(ayah)],['mp3','m4a']);if(local)return {source:'LOCAL' as const,...local};const r=await this.remote(privateKeys,[`audio/${readingId}/ayah/${surah}/${ayah}.mp3`,`audio/${readingId}/ayah/${surah}/${ayah}.m4a`]);if(r)return r;
-    const reciter=OPEN_AUDIO_RECITER[readingId];if(openDeliveryEnabled()&&reciter)return this.openFetch(`https://everyayah.com/data/${reciter}/${pad3(surah)}${pad3(ayah)}.mp3`,`open:audio:${readingId}:${surah}:${ayah}`,'audio/mpeg');
-    return null}
+  /* تلاوة الآية — الحصري المرتل وحده (`src/lib/quran-audio.ts`). يُجلب من EveryAyah مرّةً ويُخدم
+     من ذاكرة القرص بعدها؛ مفتاح الذاكرة خاصٌّ بالحصري فلا يُقدَّم ملفٌّ لقارئٍ سابق. لا بديل احتياطيّ. */
+  async husaryAyahAudio(surah:number,ayah:number){if(!isValidAyahRef(surah,ayah))return null;
+    return this.openFetch(getHusaryAudioUrl(surah,ayah),`quran-audio:${HUSARY_EVERYAYAH_FOLDER}:${quranAudioFileId(surah,ayah)}.mp3`,'audio/mpeg')}
 
   /**
    * Structured Quran text for one reading, delivered from R2 and cached in-process.

@@ -6,7 +6,6 @@ import {
   globalHafsAudioProfile,
   audioProfileForReading,
   requiresAyahLevelSyncOnly,
-  DEFAULT_GLOBAL_HAFS_RECITER,
 } from '../src/lib/global-hafs-audio';
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 
@@ -34,11 +33,12 @@ test('audio identity is independent of text identity — Hafs audio never implie
   assert.ok(!requiresAyahLevelSyncOnly('hafs'));
 });
 
-test('the reciter is configurable but defaults to a confirmed Hafs reciter', () => {
-  assert.equal(globalHafsAudioProfile().reciterId, DEFAULT_GLOBAL_HAFS_RECITER.id);
-  const custom = globalHafsAudioProfile({ MIZAN_GLOBAL_HAFS_RECITER_ID: 'hafs-hudhaifi' });
-  assert.equal(custom.reciterId, 'hafs-hudhaifi');
-  assert.equal(custom.reading, 'hafs');
+test('the only reciter is Sheikh Mahmoud Khalil Al-Husary (Murattal)', () => {
+  const p = globalHafsAudioProfile();
+  assert.equal(p.reciterId, 'husary-murattal');
+  assert.equal(p.reciterNameArabic, 'الشيخ محمود خليل الحصري');
+  assert.equal(p.packageVersion, 'Husary_128kbps');
+  assert.equal(p.reading, 'hafs');
 });
 
 test('an unknown rawi yields no audio profile — fail closed', () => {

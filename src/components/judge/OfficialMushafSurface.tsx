@@ -14,6 +14,7 @@ import {bandsFromInkProfile,bandSpan,inkProfileFromImage,type LineBand} from '..
 import {layoutTokenWords,pageLineSlots,type WordBox} from '../../lib/mushaf-word-boxes';
 import {usePageGeometry,type LiveWord} from '../participant/LiveMushafPage';
 import {REFERENCE_AUDIO_BUTTON_AR,REFERENCE_AUDIO_BUTTON_EN,referenceAudioPolicy} from '../../lib/reference-audio-policy';
+import {getQuranAudioUrl,isValidAyahRef,QURAN_AUDIO_RECITATION_AR,QURAN_AUDIO_RECITER_EN} from '../../lib/quran-audio';
 
 /*
  * جدول الرواة المسلَّمين واحد لا اثنان.
@@ -209,11 +210,14 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  const [index,setIndex]=useState(0);const [playing,setPlaying]=useState(false);const [available,setAvailable]=useState<boolean|null>(null);
  const [posMs,setPosMs]=useState(0);const [durMs,setDurMs]=useState(0);
  const elRef=useRef<HTMLAudioElement|null>(null);
- const src=ayat[index]?`/api/public/kfgqpc/audio/${audioId}/${ayat[index].surah}/${ayat[index].ayah}`:'';
+ const src=ayat[index]&&isValidAyahRef(ayat[index].surah,ayat[index].ayah)?getQuranAudioUrl(ayat[index].surah,ayat[index].ayah):'';
+ const [failed,setFailed]=useState(false);
+ useEffect(()=>{setFailed(false)},[src]);
  useEffect(()=>{setIndex(0);setPlaying(false)},[reading,ayat.map(a=>`${a.surah}:${a.ayah}`).join('|')]);
  useEffect(()=>{if(!ayat.length){setAvailable(false);return}let live=true;
-  void fetch(`/api/public/kfgqpc/audio/${audioId}/${ayat[0].surah}/${ayat[0].ayah}`,{method:'HEAD'}).then(r=>{if(live)setAvailable(r.ok)}).catch(()=>{if(live)setAvailable(false)});
-  return()=>{live=false}},[audioId,ayat.length&&`${ayat[0].surah}:${ayat[0].ayah}`]);
+  if(!isValidAyahRef(ayat[0].surah,ayat[0].ayah)){setAvailable(false);return}
+  void fetch(getQuranAudioUrl(ayat[0].surah,ayat[0].ayah),{method:'HEAD'}).then(r=>{if(!live)return;/* غيابٌ نهائيّ يُخفي المشغّل؛ عطلٌ عابرٌ يُبقيه بزرّ «إعادة المحاولة». */if(r.status===400||r.status===404){setAvailable(false);return}setAvailable(true);if(!r.ok)setFailed(true)}).catch(()=>{if(live){setAvailable(true);setFailed(true)}});
+  return()=>{live=false}},[ayat.length&&`${ayat[0].surah}:${ayat[0].ayah}`]);
  useEffect(()=>{const el=elRef.current;if(!el)return;if(playing)void el.play().catch(()=>setPlaying(false));else el.pause()},[playing,index,src]);
  useEffect(()=>{const el=elRef.current;if(!el||!playing)return;let raf=0;
   const tick=()=>{setPosMs(el.currentTime*1000);raf=requestAnimationFrame(tick)};raf=requestAnimationFrame(tick);
@@ -258,7 +262,7 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
  return <div className="mizan-mushaf-bar px-4 sm:px-5 py-3 border-t border-[#e5e1d7] bg-[#f7f4ec]">
   <div className="flex items-center justify-between gap-3">
    <div className="flex items-center gap-3 min-w-0">
-    <button type="button" onClick={()=>setPlaying(p=>!p)} aria-label={ar?REFERENCE_AUDIO_BUTTON_AR:REFERENCE_AUDIO_BUTTON_EN}
+    <button type="button" onClick={()=>setPlaying(p=>!p)} aria-label={ar?REFERENCE_AUDIO_BUTTON_AR:REFERENCE_AUDIO_BUTTON_EN} title={ar?QURAN_AUDIO_RECITATION_AR:`${QURAN_AUDIO_RECITER_EN} — Murattal`}
      className="w-11 h-11 rounded-xl bg-[#214C40] text-white grid place-items-center shrink-0">{playing?<Pause className="w-4 h-4"/>:<Play className="w-4 h-4"/>}</button>
     <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?REFERENCE_AUDIO_BUTTON_AR:REFERENCE_AUDIO_BUTTON_EN}</div>
      <div className="text-[9px] text-[#656a66] truncate" data-opening-cut={oneLine?'one-line':'whole'}>{oneLine
@@ -269,7 +273,9 @@ export const PassageAudio:React.FC<{reading:string;ayat:{surah:number;ayah:numbe
     {measured?(ar?'تتبّع الكلمة مقيس':'Word tracking measured'):(ar?'تتبّع الكلمة تقديري':'Word tracking estimated')}</span>}
   </div>
   <div className="mt-2.5 h-[3px] rounded-full bg-[#e3ded1] overflow-hidden"><div className="h-full bg-[#214C40] transition-[width] duration-100" style={{width:`${progress*100}%`}}/></div>
-  <audio ref={elRef} src={src} onEnded={onEnded} preload="none"
+  {failed&&<div role="alert" className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black text-[#8a3b2e]"><span>{ar?'تعذّر تحميل تلاوة هذه الآية':'Could not load this ayah’s recitation'}</span>
+   <button type="button" onClick={()=>{const el=elRef.current;setFailed(false);if(el){el.load();setPlaying(true)}}} className="rounded-lg border border-[#d9d4c6] px-2 py-1 text-[#214C40]">{ar?'إعادة المحاولة':'Retry'}</button></div>}
+  <audio ref={elRef} src={src} onEnded={onEnded} preload="none" onError={()=>{if(src){setPlaying(false);setFailed(true)}}}
    onLoadedMetadata={e=>setDurMs((e.currentTarget.duration||0)*1000)}
    onSeeked={e=>setPosMs(e.currentTarget.currentTime*1000)}/>
  </div>}

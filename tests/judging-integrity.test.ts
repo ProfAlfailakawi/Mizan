@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildJudgeIndependenceCommitment, buildParticipantFairnessEvidence, openingAudioWindow, planQueueTransfer, questionRevealReady, queueTransferImpact, recommendBalancedQueueMove, selectApprovedOpeningAudio } from '../src/lib/judging-integrity';
-import type { Participant, QuranReferenceAudioRecord } from '../src/types';
+import { buildJudgeIndependenceCommitment, buildParticipantFairnessEvidence, planQueueTransfer, questionRevealReady, queueTransferImpact, recommendBalancedQueueMove } from '../src/lib/judging-integrity';
+import type { Participant } from '../src/types';
 
 const approval=(judgeId:string)=>({judgeId,judgeName:judgeId,approvedAt:'2026-09-02T00:00:00.000Z'});
 
@@ -18,34 +18,6 @@ test('all assigned judges must independently approve question reveal by default'
   assert.equal(partial.required,3);
   const complete=questionRevealReady({participantPresent:true,requiredJudgeIds:['j1','j2','j3'],approvals:[approval('j1'),approval('j2'),approval('j3')],mode:'all_assigned'});
   assert.equal(complete.ready,true);
-});
-
-const baseAudio:QuranReferenceAudioRecord={
-  id:'a1',organizationId:'org',reciter:'Approved Reciter',qiraah:"Qira'at Asim",rawi:"Hafs 'an Asim",surah:1,ayahStart:1,ayahEnd:1,
-  recordingSource:'Scientific reference',audioFormat:'audio/mpeg',fileHash:'a'.repeat(64),audioUrl:'https://example.org/fatiha-1.mp3',approvalState:'APPROVED_REFERENCE',usageScope:['opening_prompt']
-};
-
-test('opening Quran audio requires an approved exact-reading reference',()=>{
-  assert.equal(selectApprovedOpeningAudio({references:[baseAudio],qiraah:"Qira'at Asim",rawi:"Hafs 'an Asim",surah:1,ayah:1})?.id,'a1');
-  assert.equal(selectApprovedOpeningAudio({references:[baseAudio],qiraah:"Qira'at Nafi'",rawi:"Warsh 'an Nafi'",surah:1,ayah:1}),undefined);
-  assert.equal(selectApprovedOpeningAudio({references:[{...baseAudio,approvalState:'PENDING_REVIEW'}],qiraah:"Qira'at Asim",rawi:"Hafs 'an Asim",surah:1,ayah:1}),undefined);
-});
-
-test('preferred approved reciter is selected without weakening reading isolation',()=>{
-  const alternate={...baseAudio,id:'a2',reciter:'Second Approved Reciter',audioUrl:'https://example.org/fatiha-1-b.mp3'};
-  const selected=selectApprovedOpeningAudio({references:[baseAudio,alternate],qiraah:baseAudio.qiraah,rawi:baseAudio.rawi,preferredReciter:'Second Approved Reciter',surah:1,ayah:1});
-  assert.equal(selected?.id,'a2');
-  const wrongReading=selectApprovedOpeningAudio({references:[baseAudio,alternate],qiraah:"Qira'at Nafi'",rawi:"Warsh 'an Nafi'",preferredReciter:'Second Approved Reciter',surah:1,ayah:1});
-  assert.equal(wrongReading,undefined);
-});
-
-test('multi-ayah audio is unusable for an opening ayah unless exact timings exist',()=>{
-  const multi={...baseAudio,ayahStart:1,ayahEnd:3};
-  assert.equal(selectApprovedOpeningAudio({references:[multi],qiraah:multi.qiraah,rawi:multi.rawi,surah:1,ayah:2}),undefined);
-  const timed={...multi,ayahTimings:[{ayah:2,startMs:1250,endMs:5400}]};
-  const found=selectApprovedOpeningAudio({references:[timed],qiraah:timed.qiraah,rawi:timed.rawi,surah:1,ayah:2});
-  assert.ok(found);
-  assert.deepEqual(openingAudioWindow(found!,2),{startMs:1250,endMs:5400});
 });
 
 const p=(id:string,committee:string,original:number,order=original):Participant=>({

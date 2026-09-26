@@ -48,7 +48,7 @@ await page.route('**/api/**', async route => {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ reading: 'hafs', surah: 2, startAyah: 282, endAyah: 282, ayat, text, loci: [{ page: 48, lineStart: 1, lineEnd: 13 }], provenance: { mode: 'HARNESS', authority: 'KFGQPC', note: '' } }) });
   }
   if (url.pathname.endsWith('/mushaf-layout/48')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ page: 48, scale: 'LINE_ONLY', lineCount: 15, words: layoutWords }) });
-  if (url.pathname === '/api/public/kfgqpc/audio/hafs-muaiqly/2/282') return route.fulfill({ status: 200, contentType: 'audio/wav', body: wav });
+  if (url.pathname === '/api/public/quran-audio/002282.mp3') return route.fulfill({ status: 200, contentType: 'audio/wav', body: wav });
   return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
 });
 await page.goto('http://127.0.0.1:4174/?surah=2&start=282&end=282&name=البقرة');

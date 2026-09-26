@@ -21,7 +21,9 @@ SERVICE="${SERVICE:-mizan}"
 REGION="${REGION:-me-central1}"
 BUCKET="${BUCKET:-${PROJECT}-mizan-handoff}"
 WORK="${WORK:-$HOME/mizan-handoff}"
-RECORDING="${RECORDING:-hafs-muaiqly}"
+RECORDING="${RECORDING:-husary-murattal}"
+# قواعد توقيت QUL يجب أن تطابق تسجيل RECORDING نفسه (الحصري المرتل)؛ لا افتراضيَّ لقارئٍ آخر.
+QUL_TIMINGS="${QUL_TIMINGS:?set QUL_TIMINGS to the QUL timing dataset slug(s) recorded from ${RECORDING}}"
 
 if [ -z "${PROJECT}" ] || [ "${PROJECT}" = "(unset)" ]; then
   echo "No project selected. Run: gcloud config set project <PROJECT_ID>" >&2
@@ -35,7 +37,7 @@ echo ""
 
 # ── 1. قواعد التوقيت: البنية أولًا، فهي التي تقول أهي كلمة أم آية ────────────
 echo "── QUL timing databases"
-for r in maher_al_muaiqly yasser_dussary abdullah_juhany; do
+for r in ${QUL_TIMINGS}; do
   zip=""
   for candidate in "$HOME/Mizan/${r}.zip" "$HOME/${r}.zip" "./${r}.zip"; do
     [ -f "${candidate}" ] && zip="${candidate}" && break
@@ -106,7 +108,7 @@ for (let surah = 1; surah <= 114; surah += 2) {
   let recorded = false;
   for (const ayah of [3, 2, 1]) {
     try {
-      const r = await fetch(`${url}/api/public/kfgqpc/audio/${recording}/${surah}/${ayah}`, { cache: 'no-store' });
+      const r = await fetch(`${url}/api/public/quran-audio/${String(surah).padStart(3, '0')}${String(ayah).padStart(3, '0')}.mp3`, { cache: 'no-store' });
       if (!r.ok) continue;
       const buf = Buffer.from(await r.arrayBuffer());
       const ms = mod.mp3DurationMs(buf);
