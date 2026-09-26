@@ -1,0 +1,45 @@
+# تجميد مصاحف «التيسير» من alwa7y.com في R2.
+# كل ملفٍّ يُسحب، وتُطابَق بصمته sha256 المسجَّلة عند السحب الأول (26 سبتمبر 2026)،
+# ولا يُرفع إن خالفت. ثم يُعاد تنزيله من R2 وتُطابَق البصمة مرة ثانية.
+# لا تُطبع قيمة أيّ سرّ.
+name: alwa7y-r2-freeze
+
+on:
+  push:
+    branches: [claude/clever-turing-gy1d9j]
+    paths: [.github/workflows/alwa7y-r2-freeze.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: Fetch, verify, upload, re-verify
+        run: |
+          set -euo pipefail
+          while read -r name sha size; do
+            curl -fsSL --retry 3 -o "$name" "http://www.alwa7y.com/downloads/$name"
+            [ "$(head -c4 "$name")" = "%PDF" ] || { echo "$name: not a PDF"; exit 1; }
+            [ "$(stat -c%s "$name")" = "$size" ] || { echo "$name: size mismatch"; exit 1; }
+            echo "$sha  $name" | sha256sum -c -
+            key="crosswalk/alwa7y/$name"
+            aws s3 cp "$name" "s3://$R2_BUCKET/$key" --endpoint-url "$R2_ENDPOINT" \
+              --metadata "sha256=$sha,source=http://www.alwa7y.com/downloads/$name" --only-show-errors
+            aws s3 cp "s3://$R2_BUCKET/$key" "check-$name" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+            echo "$sha  check-$name" | sha256sum -c -
+            echo "FROZEN $key $sha $size"
+          done <<'LIST'
+          TayseerDoryBasry.pdf 389f06a6448885bfc1516fdea75ab335d31c5e6253368dbfa5ddaea5bfd10da0 95654697
+          TayseerSosy.pdf 46ce3d95a65fbeea9ebdf3cfc811425284ae6924fdb823d34cb43b3e955b0997 95169168
+          TayseerKathir.pdf f327a21b6839328017ece6caef68b690bef6e716e7a6f32daa453cc99280aef5 89921415
+          TayseerYakob.pdf fa43e9db3195eeac34a121bfba9919475613acbb51bd99e84cedcc752f586f55 92476408
+          LIST
