@@ -53,7 +53,7 @@ export const CommandCenter: React.FC = () => {
  const committeeCode=(id?:string)=>committees.find(c=>c.id===id)?.code||'';
  const alerts=[
   ...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,kind:'incident' as const,title:incidentTitle(i,ar),where:ar?INCIDENT_TYPE_ARABIC[i.type]:i.type,at:i.lastOccurredAt||i.reportedAt,severity:i.severity})),
-  ...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,kind:'review' as const,title:ar?`${r.participantCode} — ${reviewReasonLabel(r.reason,ar)}`:`${r.participantCode} — ${reviewReasonLabel(r.reason,ar)}`,where:committeeCode(r.committeeId),at:undefined,severity:r.severity})),
+  ...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,kind:'review' as const,title:(()=>{const p=participants.find(x=>x.id===r.participantId);const name=p?(ar?p.fullNameArabic||p.fullName:p.fullName||p.fullNameArabic):(ar?'متسابق':'A participant');return `${name} — ${reviewReasonLabel(r.reason,ar)}`})(),where:committeeCode(r.committeeId),at:undefined,severity:r.severity})),
   ...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,kind:'device' as const,title:d.name,where:d.zone||committeeCode(d.committeeId),at:d.lastSeenAt,severity:d.status==='offline'?'critical':'moderate'})),
  ];
  const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);

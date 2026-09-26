@@ -33,7 +33,14 @@ test('least privilege: a judge authors evidence, not results or certificates',()
   assert.equal(canWriteSyncedCollection('judge','judge_submissions'),true);
   assert.equal(canWriteSyncedCollection('judge','results'),false,'a single judge does not author the panel result');
   assert.equal(canWriteSyncedCollection('judge','certificates'),false);
-  assert.equal(canWriteSyncedCollection('judge','participants'),false);
+  /* قرار المالك (2026-09-26): المحكّم يقدّم حالة المتسابق وحدها — والقواعد تحصر التعديل في الحالة. */
+  assert.equal(canWriteSyncedCollection('judge','participants'),true);
+  const rules=fs.readFileSync('firestore.rules','utf8');
+  assert.match(rules,/roleIs\(\['judge'\]\)\s*&& request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['status','statusHistory','updatedAt'\]\)/);
+  assert.match(rules,/request\.resource\.data\.status == 'tested' && resource\.data\.status in \['checked_in','in_queue','in_session'\]/,'only a forward transition');
+  assert.match(rules,/statusHistory\.size\(\) == resource\.data\.get\('statusHistory', \[\]\)\.size\(\) \+ 1/,'history is append-only');
+  const store=fs.readFileSync('src/lib/store.ts','utf8');
+  assert.match(store,/role==='judge'\)void persistParticipantStatusOnly/,'a judge merges status fields only, never uploaderUid');
   assert.equal(canWriteSyncedCollection('head_judge','results'),true);
   assert.equal(canWriteSyncedCollection('comp_admin','participants'),true);
 });

@@ -29,7 +29,8 @@ const PANEL: Role[] = ['judge', 'head_judge'];
  * والإدارة تكتب بنية المسابقة، والمشارك يكتب تسجيله واعتراضه وحدهما.
  */
 const WRITERS: Record<SyncedCollection, Role[]> = {
-  participants: [...ADMIN, 'delegation_manager', 'exception_host'],
+  /* المحكّم يقدّم حالة المتسابق وحدها عند انتهاء الجلسة؛ القواعد تحصره في الحالة وسجلّها. */
+  participants: [...ADMIN, 'delegation_manager', 'exception_host', 'judge'],
   committees: [...ADMIN, 'ops_manager'],
   judge_submissions: ['judge'],
   judge_events: ['judge'],

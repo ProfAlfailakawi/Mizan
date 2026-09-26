@@ -46,7 +46,7 @@ test('participant scope selection and duplicate panel distribution are removed f
   assert.doesNotMatch(participant,/saveParticipantScope|Request a range change|اطلب تعديل نطاقي/);
   assert.match(participant,/نطاق الفئة/);
   assert.match(overview,/mode==='judging'&&<section className="mizan-surface p-5 sm:p-6"/);
-  assert.match(overview,/هذا هو المكان الوحيد لتوزيع اللجان/);
+  assert.match(overview,/'اللجان والمحكمون'/);
 });
 
 test('activation email is explicitly left-to-right inside the Arabic page',()=>{

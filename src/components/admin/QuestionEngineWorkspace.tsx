@@ -64,15 +64,21 @@ export const QuestionEngineWorkspace: React.FC = () => {
   const category = store.competition.categories.find(c => c.id === selectedId) || store.competition.categories[0];
   const isPlatformOwner = store.currentUser.role === 'super_admin';
 
+  const advancedTabs: [Tab, React.ComponentType<{ className?: string }>, string][] = [
+    ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
+    ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
+    ['demand', Flame, ar ? 'الآيات المزدحمة' : 'Demand'],
+  ];
+  const advancedActive = advancedTabs.some(([id]) => id === tab);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const showAdvanced = advancedOpen || advancedActive;
+
   const tabs: [Tab, React.ComponentType<{ className?: string }>, string][] = [
     ['scope', BookMarked, ar ? 'الأجزاء' : 'Scope'],
     ['distribution', Layers, ar ? 'توزيع الأسئلة' : 'Distribution'],
     ['policy', Settings2, ar ? 'سياسة الأسئلة' : 'Question policy'],
-    ['demand', Flame, ar ? 'الآيات المزدحمة' : 'Demand'],
     ['simulation', PlayCircle, ar ? 'المحاكاة' : 'Simulation'],
-    ['models', Layers3, ar ? 'النماذج والعدالة' : 'Models & fairness'],
     ['readiness', ShieldCheck, ar ? 'الجاهزية' : 'Readiness'],
-    ['intelligence', Activity, ar ? 'صحّة الذكاء' : 'Intelligence health'],
     /* المكتبة الرسمية لمالك المنصة وحده؛ حسابات الجهات لا تراها. */
     ...(isPlatformOwner ? [['library', BookCopy, ar ? 'المكتبة الرسمية' : 'Official library'] as [Tab, React.ComponentType<{ className?: string }>, string]] : []),
   ];
@@ -94,7 +100,20 @@ export const QuestionEngineWorkspace: React.FC = () => {
                 <Icon className="h-4 w-4" />{label}
               </button>
             ))}
+            <button type="button" aria-expanded={showAdvanced} onClick={() => setAdvancedOpen(v => !v)} className={`mizan-tab ${advancedActive ? 'is-active' : ''}`}>
+              <Settings2 className="h-4 w-4" />{ar ? 'متقدم' : 'Advanced'}
+              <ChevronLeft className={`h-4 w-4 transition ${showAdvanced ? '-rotate-90' : ''}`} />
+            </button>
           </div>
+          {showAdvanced && (
+            <div className="flex flex-wrap gap-2 rounded-2xl border border-dashed border-[#cddbd3] bg-[#F7FAF8] p-2">
+              {advancedTabs.map(([id, Icon, label]) => (
+                <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)} className={`mizan-tab ${tab === id ? 'is-active' : ''}`}>
+                  <Icon className="h-4 w-4" />{label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="mizan-surface p-5 sm:p-7">
             {tab === 'scope' && <ScopeTab store={store} ar={ar} category={category} />}
             {tab === 'distribution' && <DistributionTab store={store} ar={ar} category={category} />}
@@ -181,9 +200,7 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = (
       <PassageLength ar={ar} value={passageUnits(category)} onChange={v => store.updateCategory(category.id, { passageMode: 'page_quarters', pageQuarterUnits: Math.max(1, v), ayatPerQuestion: undefined, pagePortion: undefined })} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efeee8] pt-4">
-        <p className="text-xs text-[#696f6b]">
-          {ar ? `النسخة الحالية ${category.scopeVersion || 1}. أي تعديل يرفع النسخة ويبطل النماذج المبنية على السابقة.` : `Current version ${category.scopeVersion || 1}. Any change bumps it and invalidates models built on the old one.`}
-        </p>
+        <span />
         <div className="flex items-center gap-2">
           {saved && <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1.5 text-xs font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'حُفظ النطاق' : 'Range saved'}</span>}
           {dirty && <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>{ar ? 'تراجع' : 'Revert'}</Button>}
