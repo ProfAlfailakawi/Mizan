@@ -3361,7 +3361,7 @@ const prepareJourneyAccessBatch=async()=>{
       console.warn('MIZAN public competition server check failed',err);
     }
     if(!firestoreReached&&!serverDefinitive)return {state:'unknown',reason:'تعذّر الوصول إلى سجل النشر العام الآن. لم يغيّر الفحص أي بيانات؛ أعد المحاولة بعد التأكد من الاتصال.'};
-    return {state:'missing',reason:'لم نعثر على نسخة عامة مطابقة لهذه المسابقة. اضغط «انشر الآن» لنشرها والتحقق منها قبل مشاركة الرابط.'};
+    return {state:'missing',reason:'اضغط «انشر الآن» أولًا، ثم شارك الرابط.'};
   };
   const republishPublicCompetition=async():Promise<{ok:boolean;reason:string}>=>{
     return await publishPublicCompetitionRecord();

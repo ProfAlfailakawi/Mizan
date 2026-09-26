@@ -93,7 +93,7 @@ export const CloudDiagnostics: React.FC = () => {
               {result.ready ? <CheckCircle2 className="h-5 w-5" /> : <CloudRain className="h-5 w-5" />}
               {summariseCloud(result, ar)}
             </h2>
-            <p className="mt-1.5 max-w-2xl text-[11px] leading-6 text-[#5b6460]">
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-[#5b6460]">
               {ar
                 ? 'بينك وبين أول كتابة ناجحة ستّ حلقات، وكلُّها تفشل بالرسالة نفسها. هنا تُقرأ كلُّ حلقة على حدة: أين انقطع الخيط، ومن يصلحه.'
                 : 'Six links stand between you and a successful write, and all of them fail with the same message. Each one is read separately here: where the chain broke, and who fixes it.'}
@@ -110,7 +110,7 @@ export const CloudDiagnostics: React.FC = () => {
             </Button>
           </div>
         </div>
-        {repairNote && <p role="status" className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[11px] font-bold leading-6 text-[#4f5752]">{repairNote}</p>}
+        {repairNote && <p role="status" className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-bold leading-6 text-[#4f5752]">{repairNote}</p>}
       </div>
 
       <ul className="space-y-2">
@@ -122,9 +122,9 @@ export const CloudDiagnostics: React.FC = () => {
               <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#24302b]">
                 <Icon className={`h-4 w-4 ${tone.iconColor}`} />{ar ? item.titleAr : item.titleEn}
               </h3>
-              <p className="mt-1.5 text-[11px] leading-6 text-[#4f5752]">{ar ? item.detailAr : item.detailEn}</p>
+              <p className="mt-1.5 text-[13px] leading-6 text-[#4f5752]">{ar ? item.detailAr : item.detailEn}</p>
               {item.state !== 'ok' && (
-                <p className="mt-1.5 text-[10px] font-black text-[#696f6b]">
+                <p className="mt-1.5 text-xs font-black text-[#696f6b]">
                   {ar ? `يصلحها: ${item.ownerAr}` : `Fixed by: ${item.ownerEn}`}
                 </p>
               )}
@@ -133,7 +133,7 @@ export const CloudDiagnostics: React.FC = () => {
         })}
       </ul>
 
-      <p className="text-[10px] leading-5 text-[#696f6b]">
+      <p className="text-xs leading-5 text-[#696f6b]">
         {ar
           ? 'لا تُعرض هنا مفاتيح ولا أسرار — أسماء الحقول وحالتها فقط. وزرّ الإصلاح لا يمنح دورًا ولا جهة ولا مسابقة: يعيد كتابة ما قرّره سجلّ الهويات أصلًا.'
           : 'No keys or secrets appear here — only field names and their state. The repair button grants no role, organization or competition: it rewrites what the identity registry already decided.'}

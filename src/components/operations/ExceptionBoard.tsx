@@ -60,7 +60,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
             const style = KIND_STYLE[kind];
             const Icon = style.icon;
             return (
-              <span key={kind} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-black" style={{ background: style.tint, color: style.dot }}>
+              <span key={kind} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[13px] font-black" style={{ background: style.tint, color: style.dot }}>
                 <Icon className="h-3.5 w-3.5" />
                 <span className="tabular-nums">{counts[kind]}</span>
                 <span className="font-bold opacity-80">{ar ? style.ar : style.en}</span>
@@ -80,7 +80,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/80" style={{ color: style.dot }}><Icon className="h-4 w-4" /></span>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-black leading-5 text-[#2c322e]">{item.title}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-[#6b706c]">
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-[#6b706c]">
                   <span>{ar ? style.ar : style.en}</span>
                   {item.where && <><span aria-hidden="true">·</span><span>{item.where}</span></>}
                   {time && <><span aria-hidden="true">·</span><span className="tabular-nums" dir="ltr">{time}</span></>}
@@ -92,7 +92,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
         })}
       </ul>
       {items.length > 8 && (
-        <p className="border-t border-[#eeece5] px-5 py-2.5 text-[10px] font-bold text-[#696f6b]">
+        <p className="border-t border-[#eeece5] px-5 py-2.5 text-xs font-bold text-[#696f6b]">
           {ar ? `و${items.length - 8} حالة أخرى.` : `And ${items.length - 8} more.`}
         </p>
       )}

@@ -97,7 +97,7 @@ export const HallScreenPublisher: React.FC = () => {
         <div>
           <div className="mizan-kicker">{ar ? 'شاشات القاعة' : 'HALL SCREENS'}</div>
           <h2 className="font-black mt-1">{ar ? 'افتح الشاشات، واعرف من ينشرها' : 'Open the screens, and see who publishes them'}</h2>
-          <p className="text-[11px] text-[#646965] mt-2 max-w-2xl leading-5">
+          <p className="text-[13px] text-[#646965] mt-2 max-w-2xl leading-5">
             {ar
               ? 'الشاشة تفتح رابطها ولا تسجّل دخولًا ولا تقرأ سجلّ المتسابقين: تعرض إسقاطًا بالأكواد وحدها ينشره جهاز إدارة. وأجهزة الإدارة تتناوب النشر تلقائيًّا، فإغلاق أحدها لا يُطفئ القاعة.'
               : 'A screen opens its link with no sign-in and no access to the roster: it shows a codes-only projection published by an admin device. Admin devices hand the publishing over automatically, so closing one does not darken the hall.'}
@@ -108,7 +108,7 @@ export const HallScreenPublisher: React.FC = () => {
     </div>
 
     {/* المحاسبة: من يقف أمام هذا الجهاز يستحقّ أن يعرف أن عشر شاشاتٍ معلّقة به. */}
-    <div className={`mt-4 rounded-2xl px-4 py-3 text-[11px] font-bold leading-5 ${leading ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#f1efe9] text-[#4a4f4b]'}`}>
+    <div className={`mt-4 rounded-2xl px-4 py-3 text-[13px] font-bold leading-5 ${leading ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#f1efe9] text-[#4a4f4b]'}`}>
       {demoOnly
         ? (ar
           ? 'بيئة عرض: لا نشر من هذا الجهاز. تُفتح الشاشات بروابطها وتقرأ بيانات هذا الجهاز نفسه، فتعمل كما تعمل في القاعة.'
@@ -124,7 +124,7 @@ export const HallScreenPublisher: React.FC = () => {
         key={c.id}
         label={ar ? `شاشة اللجنة ${c.code}` : `Panel screen ${c.code}`}
         url={panelLink(c.code)} ar={ar} copied={copied === c.id} failed={copied === `${c.id}:failed`} onCopy={() => void copy(c.id, panelLink(c.code))} onOpen={() => open(panelLink(c.code))} />)}
-      {!committees.length && <div className="rounded-xl bg-[#f1efe9] px-4 py-3 text-[11px] text-[#646965]">
+      {!committees.length && <div className="rounded-xl bg-[#f1efe9] px-4 py-3 text-[13px] text-[#646965]">
         {ar ? 'لا لجان بعد — شاشة القاعة وحدها متاحة.' : 'No panels yet — only the hall screen is available.'}
       </div>}
     </div>
@@ -134,13 +134,13 @@ export const HallScreenPublisher: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-black">{ar ? 'شاشة الممرّ وقاعة الانتظار' : 'Corridor & waiting screen'}</div>
-          <p className="mt-1 text-[10px] leading-5 text-[#646965]">
+          <p className="mt-1 text-xs leading-5 text-[#646965]">
             {ar
               ? 'جدارٌ يتناوب بين لوحاته. لا يعرض موضع جلسةٍ جارية ولا يخرج منه إلا الكود، كبقية شاشات القاعة.'
               : 'A rotating wall. It never shows a live session’s passage, and like every hall screen it carries codes only.'}
           </p>
         </div>
-        <label className="flex items-center gap-2 text-[10px] font-black text-[#59615c]">
+        <label className="flex items-center gap-2 text-xs font-black text-[#59615c]">
           {ar ? 'كل' : 'every'}
           <input type="number" inputMode="numeric" min={10} max={120} step={5} value={rotateDraft}
             onChange={e => { setRotateDraft(e.target.value); const n = Number(e.target.value); if (n >= 10 && n <= 120) setCorridorRotate(Math.round(n)); }}
@@ -155,8 +155,8 @@ export const HallScreenPublisher: React.FC = () => {
           const last = on && corridorPanels.length === 1;
           return <button key={id} type="button" onClick={() => togglePanel(id)} aria-pressed={on} aria-label={ar ? arLabel : enLabel} title={last ? (ar ? 'لوحةٌ واحدة على الأقل' : 'At least one panel') : undefined}
             className={`min-h-12 rounded-xl border px-3 py-1.5 text-start transition ${on ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dedbd2] bg-white text-[#636965] opacity-80'}`}>
-            <span className="flex items-center gap-1.5 text-[11px] font-black">{on ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}{ar ? arLabel : enLabel}</span>
-            <span className="mt-0.5 block text-[9px] font-bold opacity-75">{panelFacts[id]}</span>
+            <span className="flex items-center gap-1.5 text-[13px] font-black">{on ? <Check className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}{ar ? arLabel : enLabel}</span>
+            <span className="mt-0.5 block text-[11px] font-bold opacity-75">{panelFacts[id]}</span>
           </button>;
         })}
       </div>
@@ -164,11 +164,11 @@ export const HallScreenPublisher: React.FC = () => {
         <LinkRow
           label={ar ? 'رابط شاشة الممرّ' : 'Corridor screen link'}
           url={corridorLink} ar={ar} copied={copied === 'corridor'} failed={copied === 'corridor:failed'} onCopy={() => void copy('corridor', corridorLink)} onOpen={() => open(corridorLink)} />
-        <div className="mt-2 text-[10px] font-bold text-[#59615c]">
+        <div className="mt-2 text-xs font-bold text-[#59615c]">
           {ar ? `يعرض ${corridorPanels.length} ${corridorPanels.length === 1 ? 'لوحة ثابتة' : `لوحات تتبدّل كل ${corridorRotate} ثانية`}` : `${corridorPanels.length} panel(s), rotating every ${corridorRotate}s`}
         </div>
       </div>
-      <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">
+      <p className="mt-2 text-xs leading-5 text-[#696f6b]">
         {ar
           ? '«من المصحف» و«ختمة القاعة» تعملان بعد أن تُنهي القاعة أول جلساتها، فمنها يُبنى ما يُعرض. وقبل ذلك يبقى «دورك» وحده.'
           : '“From the Mushaf” and “Hall khatmah” start once the hall completes its first sessions; until then the queue panel runs alone.'}
@@ -176,7 +176,7 @@ export const HallScreenPublisher: React.FC = () => {
     </div>
 
     {/* الشاشة تُقفل بالإيماءة والرمز من داخلها؛ يُقال هنا لئلّا يُبحث عنه في الممرّ. */}
-    <p className="text-[10px] text-[#646965] mt-3 leading-5">
+    <p className="text-xs text-[#646965] mt-3 leading-5">
       {ar
         ? 'افتح الرابط على الشاشة ثم اقفلها من زرّ القفل داخلها، فلا يخرج منها مارّ. والشاشة تعلن عمر ما تعرضه من نفسها إن تأخّر.'
         : 'Open the link on the screen, then lock it from the lock button inside it so no passer-by can exit. Each screen reports the age of what it shows if it falls behind.'}
@@ -188,18 +188,18 @@ const LinkRow: React.FC<{ label: string; url: string; ar: boolean; copied: boole
   <div className="rounded-2xl border border-[#dfddd6] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
     <span className="min-w-0">
       <span className="block text-xs font-black">{label}</span>
-      <span className="block mizan-proof-code text-[10px] text-[#646965] mt-0.5 truncate" dir="ltr">{url}</span>
+      <span className="block mizan-proof-code text-xs text-[#646965] mt-0.5 truncate" dir="ltr">{url}</span>
     </span>
     <button
       type="button"
       onClick={onCopy}
-      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#f1efe9] hover:bg-[#e7e4dc] px-3 py-2 text-[11px] font-black text-[#171b18]"
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#f1efe9] hover:bg-[#e7e4dc] px-3 py-2 text-[13px] font-black text-[#171b18]"
     >
       {copied ? <Check className="w-3.5 h-3.5" aria-hidden /> : <Copy className="w-3.5 h-3.5" aria-hidden />}
       {copied ? (ar ? 'نُسخ' : 'Copied') : failed ? (ar ? 'انسخه يدويًّا' : 'Copy manually') : (ar ? 'انسخ الرابط' : 'Copy link')}
     </button>
     {onOpen && <button type="button" onClick={onOpen}
-      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#214C40] hover:bg-[#1a3d33] px-3 py-2 text-[11px] font-black text-white">
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#214C40] hover:bg-[#1a3d33] px-3 py-2 text-[13px] font-black text-white">
       <Play className="w-3.5 h-3.5" aria-hidden />{ar ? 'افتح الشاشة' : 'Open screen'}
     </button>}
   </div>

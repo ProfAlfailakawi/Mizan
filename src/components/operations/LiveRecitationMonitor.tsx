@@ -43,16 +43,16 @@ export const LiveRecitationMonitor: React.FC<{
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E7EEE9] text-[#214C40]"><RadioTower className="h-4 w-4" /></span>
           <div>
             <div className="text-sm font-black">{ar ? 'التلاوة الجارية' : 'Live recitation'}</div>
-            <div className="text-[10px] font-bold text-[#656b66]">{ar ? 'غرفة العمليات وحدها — ولا يُعرض هنا رقمٌ لم يُعلن' : 'Operations only — nothing unannounced is shown'}</div>
+            <div className="text-xs font-bold text-[#656b66]">{ar ? 'غرفة العمليات وحدها — ولا يُعرض هنا رقمٌ لم يُعلن' : 'Operations only — nothing unannounced is shown'}</div>
           </div>
         </div>
-        <span className="text-[10px] font-black tabular-nums text-[#5f6663]" data-live-count={rows.length}>
+        <span className="text-xs font-black tabular-nums text-[#5f6663]" data-live-count={rows.length}>
           {ar ? `${rows.length} لجنةً تختبر الآن` : `${rows.length} panels testing`}
         </span>
       </div>
 
       {rows.length === 0
-        ? <p className="mt-4 rounded-2xl bg-[#f4f2ec] p-4 text-[11px] font-bold leading-6 text-[#5b6460]">
+        ? <p className="mt-4 rounded-2xl bg-[#f4f2ec] p-4 text-[13px] font-bold leading-6 text-[#5b6460]">
             {ar ? 'لا لجنةَ تختبر الآن. تظهر هنا كلُّ جلسةٍ جاريةٍ لحظةَ بدئها.' : 'No panel is testing. Every running session appears here as it starts.'}
           </p>
         : <ul className="mt-4 space-y-2">
@@ -71,12 +71,12 @@ const LiveRow: React.FC<{ row: LiveRecitationRow; ar: boolean }> = ({ row, ar })
     <span className="min-w-0 flex-1 truncate text-xs font-black text-[#39423d]">
       {(ar ? row.committeeNameArabic : undefined) || row.committeeName}
     </span>
-    <span dir="ltr" className="shrink-0 rounded-lg bg-[#f1efe9] px-2.5 py-1 font-mono text-[11px] font-black text-[#4b534e]">{row.participantCode}</span>
-    <span dir="ltr" className="shrink-0 text-[11px] font-black tabular-nums text-[#5f6663]" data-elapsed={row.elapsedSeconds ?? ''}>
+    <span dir="ltr" className="shrink-0 rounded-lg bg-[#f1efe9] px-2.5 py-1 font-mono text-[13px] font-black text-[#4b534e]">{row.participantCode}</span>
+    <span dir="ltr" className="shrink-0 text-[13px] font-black tabular-nums text-[#5f6663]" data-elapsed={row.elapsedSeconds ?? ''}>
       {row.elapsedSeconds === undefined ? '—' : clock(row.elapsedSeconds)}
     </span>
     <span
-      className={`inline-flex shrink-0 items-center gap-1 text-[10px] font-black ${row.audioOk ? 'text-[#2F6555]' : 'text-[#8a5a2b]'}`}
+      className={`inline-flex shrink-0 items-center gap-1 text-xs font-black ${row.audioOk ? 'text-[#2F6555]' : 'text-[#8a5a2b]'}`}
       title={row.audioOk ? (ar ? 'مدخل الصوت مثبَت' : 'Audio input verified') : (ar ? 'لم تُثبت سلامة مدخل الصوت لهذه اللجنة' : 'Audio input not verified for this panel')}
     >
       {row.audioOk ? <Mic2 className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}

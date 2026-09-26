@@ -34,7 +34,7 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
         <div className="min-w-0 flex-1">
           <div className="mizan-kicker">{ar ? 'موثوقية التحكيم' : 'JUDGING RELIABILITY'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'قياس بالإعماء، لا شهادة حسن سيرة' : 'Measured blind, not asserted'}</h2>
-          <p className="mt-2 max-w-2xl text-[11px] leading-5 text-[#636864]">
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[#636864]">
             {ar
               ? 'تلاواتٌ سبق تحكيمها أُعيدت على محكّم آخر دون أن يعلم أنها مُعادة، ثم قِيس الفرق بين الحكمين. لا يغيّر هذا أي درجة مختومة، ولا يُنسب فرقٌ إلى محكّم بعينه.'
               : 'Already-judged recitations were re-judged by another judge who was not told they were re-judged, and the two verdicts were compared. No sealed score changes, and no difference is attributed to a named judge.'}
@@ -59,7 +59,7 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
         {data.widestCriterion && (
           <div className="flex items-center gap-3 rounded-2xl bg-[#f5f3ed] px-4 py-3">
             <Activity className="h-4 w-4 shrink-0 text-[#8a6738]" />
-            <p className="text-[11px] leading-5 text-[#5b615d]">
+            <p className="text-[13px] leading-5 text-[#5b615d]">
               {ar ? 'أوسع المعايير خلافًا: ' : 'Widest divergence: '}
               <strong className="font-black text-[#2c3330]">{ar ? (CRITERION_AR[data.widestCriterion.criterionId] || data.widestCriterion.criterionId) : data.widestCriterion.criterionId}</strong>
               {ar ? ` بمتوسط ${data.widestCriterion.meanAbsoluteDifference} درجة. هذا موضع تدريب لا موضع لوم.` : ` averaging ${data.widestCriterion.meanAbsoluteDifference} points — a training subject, not a fault.`}
@@ -69,25 +69,25 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
 
         {data.outliers.length > 0 && (
           <div>
-            <div className="text-[9px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'جلسات تجاوزت السماحية' : 'BEYOND TOLERANCE'}</div>
+            <div className="text-[11px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'جلسات تجاوزت السماحية' : 'BEYOND TOLERANCE'}</div>
             <ul className="mt-2 divide-y divide-[#eceae3]">
               {data.outliers.slice(0, 6).map((o) => (
                 <li key={o.sessionId} className="flex items-center justify-between gap-4 py-2.5">
-                  <span className="font-mono text-[11px] text-[#5b615d]" dir="ltr">{o.participantId}</span>
-                  <span className="tabular-nums text-[11px] font-black text-[#8a6738]" dir="ltr">{o.difference > 0 ? '+' : ''}{o.difference}</span>
+                  <span className="font-mono text-[13px] text-[#5b615d]" dir="ltr">{o.participantId}</span>
+                  <span className="tabular-nums text-[13px] font-black text-[#8a6738]" dir="ltr">{o.difference > 0 ? '+' : ''}{o.difference}</span>
                 </li>
               ))}
             </ul>
             {data.outliers.length > 6 && (
               /* «و6/9 أخرى» تُقرأ كسرًا لا عددًا، والمقصود عدد المعروض من الجملة. تُقال كما هي. */
-              <p className="mt-2 text-[10px] text-[#6b706c]">
+              <p className="mt-2 text-xs text-[#6b706c]">
                 {ar ? 'معروضة ' : 'Showing '}<Ratio value={6} of={data.outliers.length} label={ar ? `معروضة 6 من ${data.outliers.length}` : `showing 6 of ${data.outliers.length}`} />
               </p>
             )}
           </div>
         )}
 
-        <p className="text-[10px] leading-5 text-[#6b706c]">{data.note}</p>
+        <p className="text-xs leading-5 text-[#6b706c]">{data.note}</p>
       </div>
     </section>
   );
@@ -96,6 +96,6 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
 const Cell: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="bg-[#fffefb] px-5 py-4">
     <div className="text-2xl font-black text-[#2c3330]">{value}</div>
-    <div className="mt-1 text-[10px] text-[#646965]">{label}</div>
+    <div className="mt-1 text-xs text-[#646965]">{label}</div>
   </div>
 );

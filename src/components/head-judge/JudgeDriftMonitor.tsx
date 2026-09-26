@@ -75,17 +75,17 @@ export const JudgeDriftMonitor: React.FC = () => {
           <div>
             <div className="mizan-kicker">{ar ? 'مراقبة انحراف المحكم' : 'JUDGE DRIFT'}</div>
             <h2 className="text-lg font-black mt-0.5">{ar ? 'عدّاد الإرهاق الصامت' : 'Silent fatigue monitor'}</h2>
-            <p className="text-[11px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
+            <p className="text-[13px] text-[#646965] mt-1 max-w-xl">{ar ? 'يقارن كل محكم بخط أساسه الصباحي. عند تجاوز انحرافين معياريين نحو التشدد، يقترح ميزان استراحة أو إعادة استماع.' : 'Each judge vs their own morning baseline. Past 2σ harsher, MIZAN suggests a break or re-listen.'}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
           {/* من أين قُرئ هذا الرقم: ملاحظات الجلسة القائمة، أم أحكام اليوم المقفلة. */}
-          {enoughRealEvidence && <span className="text-[9px] font-bold text-[#6b706c]">{source === 'live' ? (ar ? 'من ملاحظات الجلسة الجارية' : 'from the live session') : (ar ? `من ${events.length} حكمًا مقفلًا اليوم` : `from ${events.length} locked scores today`)}</span>}
+          {enoughRealEvidence && <span className="text-[11px] font-bold text-[#6b706c]">{source === 'live' ? (ar ? 'من ملاحظات الجلسة الجارية' : 'from the live session') : (ar ? `من ${events.length} حكمًا مقفلًا اليوم` : `from ${events.length} locked scores today`)}</span>}
         </div>
       </div>
 
-      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[11px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحكام فعلية من المحكمين — من ملاحظات الجلسة الجارية أو من أحكام اليوم المقفلة. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judging arrives — live session marks or today’s locked scores. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
+      {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[13px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحكام فعلية من المحكمين — من ملاحظات الجلسة الجارية أو من أحكام اليوم المقفلة. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judging arrives — live session marks or today’s locked scores. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
       {enoughRealEvidence && <div className="mt-5 grid md:grid-cols-2 gap-3">
         {signals.map((s) => {
           const judgeEvents = events.filter((e) => e.judgeId === s.judgeId).sort((a, b) => a.relativeSeconds - b.relativeSeconds);
@@ -96,9 +96,9 @@ export const JudgeDriftMonitor: React.FC = () => {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-black truncate">{judgeName(s.judgeId)}</div>
-                  <div className="text-[10px] text-[#666b67] mt-0.5">{ar ? 'اللجنة' : 'Committee'} {committeeFor(s.judgeId)} · {s.minutesObserved}{ar ? ' د' : 'm'}</div>
+                  <div className="text-xs text-[#666b67] mt-0.5">{ar ? 'اللجنة' : 'Committee'} {committeeFor(s.judgeId)} · {s.minutesObserved}{ar ? ' د' : 'm'}</div>
                 </div>
-                <span className={`inline-flex items-center gap-1 text-[11px] font-black ${s.direction === 'harsher' ? 'text-[#92642d]' : s.direction === 'gentler' ? 'text-[#496477]' : 'text-[#5f6862]'}`}>
+                <span className={`inline-flex items-center gap-1 text-[13px] font-black ${s.direction === 'harsher' ? 'text-[#92642d]' : s.direction === 'gentler' ? 'text-[#496477]' : 'text-[#5f6862]'}`}>
                   {s.direction === 'harsher' ? <TrendingDown className="w-3.5 h-3.5 rotate-180" /> : <Activity className="w-3.5 h-3.5" />}
                   {s.deltaSigma > 0 ? '+' : ''}{s.deltaSigma}σ
                 </span>
@@ -106,18 +106,18 @@ export const JudgeDriftMonitor: React.FC = () => {
 
               <DriftSparkline events={judgeEvents} split={detail.baselineEvents} attention={s.attention} />
 
-              <div className="mt-3 flex items-center justify-between text-[10px] text-[#636864]">
+              <div className="mt-3 flex items-center justify-between text-xs text-[#636864]">
                 <span>{ar ? 'الصباح' : 'AM'} <b className="text-[#333]">−{s.baselinePenaltyRate}</b></span>
                 <span>{ar ? 'الآن' : 'now'} <b className="text-[#333]">−{s.recentPenaltyRate}</b></span>
               </div>
 
               {s.attention && !acked && (
                 <div className="mt-3 rounded-xl bg-white border border-[#e6dcc4] p-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-[#7d5e34]"><Coffee className="w-4 h-4" />{ar ? `${committeeFor(s.judgeId)} قد تحتاج استراحة` : `${committeeFor(s.judgeId)} may need a break`}</div>
+                  <div className="flex items-center gap-2 text-[13px] font-bold text-[#7d5e34]"><Coffee className="w-4 h-4" />{ar ? `${committeeFor(s.judgeId)} قد تحتاج استراحة` : `${committeeFor(s.judgeId)} may need a break`}</div>
                   <Button size="sm" variant="outline" onClick={() => setAckd((v) => ({ ...v, [s.judgeId]: true }))}>{ar ? 'رتّبت استراحة' : 'Arranged'}</Button>
                 </div>
               )}
-              {s.attention && acked && <div className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-[#2f6555]"><ShieldCheck className="w-4 h-4" />{ar ? 'تمت المعالجة بشريًا' : 'Handled by a human'}</div>}
+              {s.attention && acked && <div className="mt-3 flex items-center gap-1.5 text-[13px] font-bold text-[#2f6555]"><ShieldCheck className="w-4 h-4" />{ar ? 'تمت المعالجة بشريًا' : 'Handled by a human'}</div>}
             </div>
           );
         })}

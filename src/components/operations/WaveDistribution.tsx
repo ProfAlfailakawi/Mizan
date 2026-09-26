@@ -58,7 +58,7 @@ export const WaveDistribution: React.FC = () => {
         <div>
           <div className="mizan-kicker">{ar ? 'توزيع الموجة' : 'WAVE DISTRIBUTION'}</div>
           <h2 className="font-black mt-1">{ar ? 'وزّع المنتظرين بلا لجنة دفعةً واحدة' : 'Route everyone waiting without a panel, in one batch'}</h2>
-          <p className="text-[11px] text-[#646965] mt-2 max-w-2xl leading-5">
+          <p className="text-[13px] text-[#646965] mt-2 max-w-2xl leading-5">
             {ar
               ? 'الدفعة ترى التركيبة كلّها فتوازن بالدقائق لا بالرؤوس، وتمنع وقوع وفدٍ كامل تحت لجنةٍ واحدة، وتحسم التعادل الحقيقي بقرعةٍ ملتزمة ببصمة. والأسبقية لا تُمسّ: يتغيّر بابه ولا يتغيّر دوره.'
               : 'A batch sees the whole intake: it balances minutes rather than heads, keeps one delegation from filling a panel, and settles genuine ties with a committed draw. Arrival priority is untouched.'}
@@ -90,7 +90,7 @@ export const WaveDistribution: React.FC = () => {
       <input type="checkbox" checked={allowException} onChange={e => setAllowException(e.target.checked)} className="mt-0.5" />
       <span>
         <span className="block text-xs font-black text-[#604724]">{ar ? 'اسمح بلجان لا تحكم فئتهم حين لا تبقى لجنة مؤهَّلة' : 'Allow panels outside their category when no qualifying panel remains'}</span>
-        <span className="block text-[10px] text-[#6b5b45] mt-1 leading-5">
+        <span className="block text-xs text-[#6b5b45] mt-1 leading-5">
           {ar
             ? 'يُستعمل حين تتعطّل لجان فئتهم كلها. يبقون يُسألون في نطاق فئتهم هم — لا في تخصّص اللجنة — وتُوسَم حالتهم للمحكّمين. وبدون هذا الإذن يبقون بلا لجنة ويُقال السبب.'
             : 'For when every panel of their category is down. They are still questioned within their own scope, and the panel is warned. Without this they stay unrouted, and the plan says why.'}
@@ -111,7 +111,7 @@ export const WaveDistribution: React.FC = () => {
       </div>
 
       {/* أثر الخطة على أثقل لجنة — وهو ما يشعر به المنتظر، لا المتوسّط. */}
-      <div className="mt-3 rounded-xl bg-[#E7EEE9] text-[#214C40] px-4 py-3 text-[11px] font-bold">
+      <div className="mt-3 rounded-xl bg-[#E7EEE9] text-[#214C40] px-4 py-3 text-[13px] font-bold">
         {ar
           ? `أطول انتظارٍ متوقّع في أثقل لجنة: ${plan.maxLoadMinutesBefore} ← ${plan.maxLoadMinutesAfter} دقيقة${plan.swapsApplied ? ` · ${plan.swapsApplied} تبديلًا داخل الموجة` : ''}`
           : `Worst expected wait on the heaviest panel: ${plan.maxLoadMinutesBefore} → ${plan.maxLoadMinutesAfter} min${plan.swapsApplied ? ` · ${plan.swapsApplied} swaps inside the wave` : ''}`}
@@ -121,7 +121,7 @@ export const WaveDistribution: React.FC = () => {
         {plan.assignments.map(row => <li key={row.participantId} className="py-2.5 flex items-start justify-between gap-3">
           <span className="min-w-0">
             <span className="text-xs font-black">{row.participantCode} → {row.committeeCode}</span>
-            <span className="block text-[10px] text-[#646965] mt-0.5 leading-4">{ar ? row.reasonArabic : row.reasonEnglish}</span>
+            <span className="block text-xs text-[#646965] mt-0.5 leading-4">{ar ? row.reasonArabic : row.reasonEnglish}</span>
           </span>
           <span className="flex items-center gap-1.5 shrink-0">
             {row.drawn && <Badge variant="neutral">{ar ? 'قرعة' : 'Draw'}</Badge>}
@@ -130,7 +130,7 @@ export const WaveDistribution: React.FC = () => {
         </li>)}
       </ul>
 
-      {plan.unassigned.length > 0 && <div className="mt-3 rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-[10px] leading-5">
+      {plan.unassigned.length > 0 && <div className="mt-3 rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs leading-5">
         {ar
           ? `${plan.unassigned.length} لا تؤهّلهم أيُّ لجنة — يحتاجون لجنةً تغطي فئتهم أو إسنادًا يدويًا. لن تمسّهم الخطة.`
           : `${plan.unassigned.length} have no qualifying panel — they need a panel covering their category, or manual routing. The plan leaves them alone.`}
@@ -151,7 +151,7 @@ export const WaveDistribution: React.FC = () => {
 const Figure = ({ n, t, tone = 'plain' }: { n: number; t: string; tone?: 'plain' | 'warn' }) => (
   <div className={`rounded-xl px-4 py-3 ${tone === 'warn' ? 'bg-[#F2EADC] text-[#725630]' : 'bg-[#f1efe9] text-[#171b18]'}`}>
     <div className="text-lg font-black tabular-nums">{n}</div>
-    <div className="text-[10px] opacity-75">{t}</div>
+    <div className="text-xs opacity-75">{t}</div>
   </div>
 );
 
