@@ -56,3 +56,10 @@ test('the official Quran library tab is for the platform owner only', () => {
   assert.match(engine, /\.\.\.\(isPlatformOwner \? \[\['library'/);
   assert.match(engine, /tab === 'library' && isPlatformOwner &&/);
 });
+
+test('dual seal approval follows the policy alone, so the 1/2 → 2/2 flow shows in demo too', () => {
+  for (const f of ['src/lib/store.ts', 'src/components/admin/ResultsDialogs.tsx']) {
+    const src = fs.readFileSync(f, 'utf8');
+    assert.doesNotMatch(src, /requireDualApprovalToSeal\s*&&\s*\([^)]*judgesCountPerPanel/, f);
+  }
+});

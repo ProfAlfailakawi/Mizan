@@ -20,7 +20,7 @@ type Store = ReturnType<typeof useAppStore>;
 
 /** هل يشترط الختمُ موافقتين الآن؟ الشرط نفسه الذي يطبّقه المخزن — لا ما تقوله السياسة وحدها. */
 export const dualSealActive = (store: Store) =>
-  getCompetitionPolicy(store.competition).results.requireDualApprovalToSeal && (store.competition.ruleSet?.judgesCountPerPanel ?? 0) >= 2;
+  getCompetitionPolicy(store.competition).results.requireDualApprovalToSeal;
 
 const Step: React.FC<{ done: boolean; title: string; detail: string }> = ({ done, title, detail }) => (
   <li className="flex items-start gap-3 rounded-2xl border border-[#e4e2db] bg-white px-4 py-3">
