@@ -57,7 +57,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
         <div className="mt-2 text-[64px] font-black leading-none tabular-nums text-white" dir="ltr">{finalScore.toFixed(2)}</div>
         <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-white/55">
           <ShieldCheck className="h-3.5 w-3.5 text-[#8fbfa9]" />
-          {sealed ? (ar ? 'مختومة بسلسلة بصمات — لا تُعدَّل بعد ختمها' : 'Sealed to the hash chain — immutable') : (ar ? 'معتمدة وبانتظار الختم' : 'Approved, pending seal')}
+          {sealed ? (ar ? 'مختومة — لا تُعدَّل' : 'Sealed to the hash chain — immutable') : (ar ? 'معتمدة وبانتظار الختم' : 'Approved, pending seal')}
         </div>
       </div>
 
@@ -72,7 +72,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
 
       <p className="mt-5 text-center text-[10px] leading-5 text-white/35">
         {ar
-          ? 'الحكم للمحكّمين البشريين وحدهم. لا يظهر في هذه البطاقة ما لم يُعلَن، ولا تحمل بيانات متسابقٍ آخر.'
+          ? 'حكمُ المحكّمين وحدهم.'
           : 'Scoring is human. Nothing unpublished appears here, and no other participant’s data is included.'}
       </p>
     </section>

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
 import { Ratio } from '../design-system/Ratio';
-import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown } from 'lucide-react';
+import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock, FileText } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
@@ -563,43 +563,32 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
  if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[#646965] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[#656b66] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[#696f6b] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
- if(!participant) return <div className="relative max-w-3xl mx-auto px-4 py-16" {...judgeMode.attrs}><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light absolute top-4 end-4 z-10"/><div className="text-center"><HeadphonesEmpty/>
-  <h1 className="text-2xl font-black mt-4">{nextQueued?(ar?'لا توجد جلسة الآن':'No active session'):rosterCounts.awaiting?(ar?'لا أحد في الطابور — والكشوف ليست فارغة':'The queue is empty — the roster is not'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
-  <p className="mt-2 text-xs leading-6 text-[#646965]">
-   {ar
-    ?`${rosterCounts.total} متسابقًا في هذه المسابقة · ${rosterCounts.queued} في طابور لجنتك · ${rosterCounts.awaiting} معتمدًا لم يُسجَّل حضوره بعد${rosterCounts.pending?` · ${rosterCounts.pending} طلبًا تحت المراجعة`:''}.`
-    :`${rosterCounts.total} participants · ${rosterCounts.queued} in your panel queue · ${rosterCounts.awaiting} approved but not checked in${rosterCounts.pending?` · ${rosterCounts.pending} applications under review`:''}.`}
-  </p>
-  {nextQueued&&<Button className="mt-5" disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'استقبال المتسابق التالي':'Call next participant')}</Button>}
-  {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-xs font-bold leading-5">{startError}</div>}
+ if(!participant) return <div className="max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
+  <h1 className="text-3xl sm:text-4xl font-black mt-5">{nextQueued?(ar?'المتسابق التالي جاهز':'Next participant is ready'):rosterCounts.awaiting?(ar?'لا أحد في الطابور بعد':'Nobody in the queue yet'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
+  {/* أرقام الكشف كانت سطرًا صغيرًا واحدًا بنقاط فاصلة؛ صارت بطاقات: رقم كبير وكلمة. */}
+  <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3 max-w-xl mx-auto" aria-label={ar?'حالة الكشوف':'Roster status'}>
+   <JudgeStat icon={Users} value={rosterCounts.queued} label={ar?'في طابورك':'In your queue'} strong/>
+   <JudgeStat icon={Clock} value={rosterCounts.awaiting} label={ar?'لم يحضروا':'Not arrived'}/>
+   <JudgeStat icon={FileText} value={rosterCounts.pending} label={ar?'قيد المراجعة':'Under review'}/>
+  </div>
+  {!!rosterCounts.pending&&<p className="sr-only">{ar?`${rosterCounts.pending} طلبًا تحت المراجعة.`:`${rosterCounts.pending} applications under review.`}</p>}
+  <p className="sr-only">{ar?`${rosterCounts.total} متسابقًا في هذه المسابقة.`:`${rosterCounts.total} participants in this competition.`}</p>
+  {nextQueued&&<Button size="xl" className="mt-7 min-h-16 min-w-64" icon={<UserCheck className="w-6 h-6"/>} disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'ابدأ مع المتسابق التالي':'Start with the next participant')}</Button>}
+  {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-sm font-bold leading-6">{startError}</div>}
  </div>
- {!!committeeQueue.length&&<div className="mizan-surface mt-7 p-5 text-start">
-  <div className="mizan-kicker">{ar?'من ينتظر دوره':'WAITING'}</div>
-  <h2 className="mt-1 text-sm font-black">{ar?'صاحب الدور أوّلًا — بالترتيب':'The next in line — in order'}</h2>
-  {/*
-    * شاشة المحكّم لا تعرض إلا طابور لجنته، بترتيبه.
-    *
-    * كانت تعرض قائمتين: الطابور، ومعه «من لم يصل بعد» وزرُّ «أدخِله وابدأ» لكل صفّ فيها.
-    * فيستطيع المحكّم أن يستقبل من لم يحضر ويبدأ به فورًا أمام عشرين منتظرًا — تخطٍّ أشدّ
-    * من التخطّي داخل الطابور، لأن صاحبه لا يظهر في الطابور أصلًا فلا يُرى أن أحدًا تُخطّي.
-    *
-    * والاستقبال ليس عمل المحكّم أصلًا: هو إجراء حضورٍ يخصّ التشغيل ومكتب الاستثناء، ويُوثَّق
-    * هناك باسم فاعله وسببه. فبقي للمحكّم ما يخصّه وحده: من أمامه الآن، ومن يليه.
-    *
-    * وصاحب الدور وحده يُبدأ به. والقاعدة نفسها مفروضة عند بدء الجلسة لا في الشاشة وحدها
-    * (`SESSION_START_OUT_OF_TURN`)، فلا يفتحها مسارٌ آخر.
-    */}
+ {!!committeeQueue.length&&<div className="mizan-surface mt-8 p-5 text-start">
+  <h2 className="text-lg font-black">{ar?'من ينتظر دوره':'Who is waiting'}</h2>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
-   {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex items-center gap-3 px-3 py-2.5 ${turn?'':'opacity-60'}`}>
-    <span className="w-6 shrink-0 text-[11px] font-black text-[#656b66] tabular-nums">{i+1}</span>
-    <span className="font-mono text-[11px] font-black text-[#656b66]" dir="ltr">{p.code}</span>
-    <span className="min-w-0 flex-1 truncate text-sm font-bold">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
-    <span className="shrink-0 text-[10px] font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
+   {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex items-center gap-3 px-3 py-3 ${turn?'bg-[#F7FAF8]':'opacity-60'}`}>
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black tabular-nums ${turn?'bg-[#214C40] text-white':'bg-[#f1efe9] text-[#656b66]'}`}>{i+1}</span>
+    {maskParticipantForJudge(p,blindness,ar).displayName!==p.code&&<span className="font-mono text-xs font-black text-[#656b66]" dir="ltr">{p.code}</span>}
+    <span className="min-w-0 flex-1 truncate text-base font-black" dir="auto">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
+    <span className="shrink-0 text-xs font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
     <Button size="sm" variant={turn?'primary':'outline'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
    </li>})}
   </ul>
-  <p className="mt-2 text-[10px] leading-5 text-[#696f6b]">{ar?'الترتيب مُلزم ولا يُتخطّى من هذه الشاشة. واستقبال من لم يصل ليس من هذه الشاشة: يتم من غرفة العمليات أو مكتب الاستثناء، ثم يدخل الطابور بترتيبه.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
-  {!!awaitingArrival.length&&<p className="mt-1.5 text-[10px] leading-5 text-[#696f6b]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
+  <p className="mt-3 text-xs leading-6 text-[#696f6b]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
+  {!!awaitingArrival.length&&<p className="mt-1 text-xs leading-6 text-[#696f6b]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
   {committeeQueue.length>24&&<p className="mt-1.5 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
  </div>}
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
@@ -841,4 +830,5 @@ export const JudgeOS: React.FC = () => {
 
 const specialtyAr=(v:string)=>({memorization:'الحفظ',tajweed:'التجويد',performance:'الأداء',waqf_ibtida:'الوقف والابتداء',all:'شامل'} as Record<string,string>)[v]||v;
 const formatTime=(s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-const HeadphonesEmpty=()=> <div className="w-14 h-14 rounded-2xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-6 h-6"/></div>;
+const HeadphonesEmpty=()=> <div className="w-20 h-20 rounded-3xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-10 h-10"/></div>;
+const JudgeStat=({icon:Icon,value,label,strong}:{icon:React.ComponentType<{className?:string}>;value:number;label:string;strong?:boolean})=><div className={`rounded-2xl p-3 sm:p-4 text-center ${strong?'bg-[#E7EEE9] text-[#214C40]':'bg-[#f1efe9] text-[#3f4642]'}`}><Icon className="mx-auto h-6 w-6"/><div className="mt-1 text-3xl font-black tabular-nums">{value}</div><div className="mt-0.5 text-xs sm:text-sm font-bold">{label}</div></div>;
