@@ -66,7 +66,13 @@ test('the listener image prefetches its model when it can, and never fails the b
   /* يُنزَّل إلى مجلّدٍ صريح ويُحمَّل في البناء نفسه، ولا يُكتب اسمُه إلا بعد أن يُحمَّل. */
   assert.match(prefetch, /download_model\(model_id, output_dir=BAKED\)\n\s*WhisperModel\(BAKED[^\n]*\)\n\s*with open\(os\.path\.join\(BAKED, 'MODEL_ID'\)/);
   const app = read('services/quran-practice-listener/app.py');
-  assert.match(app, /state\['model'\]=WhisperModel\(BAKED,/);
+  assert.match(app, /state\['model'\]=make_model\(BAKED\)/);
+  // والعتادُ يُختار عند الإقلاع: نشرُ GPU صارم (لا سقوطَ صامتًا إلى CPU بثمن GPU)، وauto يرجع إلى CPU.
+  assert.match(app, /if want=='cuda':raise/);
+  assert.match(app, /device='cpu',compute_type='int8'/);
+  const gpuDocker = read('services/quran-practice-listener/Dockerfile.gpu');
+  assert.match(gpuDocker, /MIZAN_LISTENER_DEVICE=cuda/);
+  assert.match(gpuDocker, /RUN timeout 900 python prefetch\.py \|\| echo/);
 });
 
 test('the listener says where its model came from and which build runs — so an undeployed fix is never taken for deployed', () => {

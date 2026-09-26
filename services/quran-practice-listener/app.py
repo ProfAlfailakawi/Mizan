@@ -17,8 +17,38 @@ MODEL_CHAIN=[m for m in [
     'Systran/faster-whisper-small',
     'Systran/faster-whisper-base',
 ] if m]
-state={'model':None,'id':None,'error':None,'source':None,'started':time.time()}
+state={'model':None,'id':None,'error':None,'source':None,'started':time.time(),'device':None}
 BAKED=os.getenv('MIZAN_BAKED_MODEL_DIR','/models/baked')
+
+def make_model(path_or_id:str,**kw):
+    """
+    يبني النموذجَ على أفضل عتادٍ حاضر — وأمرُ العتاد بيد النشر لا الشيفرة.
+
+    `MIZAN_LISTENER_DEVICE`:
+      ـ `auto` (الأصل): يُجرَّب المعالجُ الرسوميّ (CUDA، بدقّة `MIZAN_GPU_COMPUTE`، الأصلُ float16)
+        فإن غاب أو تعثّر عاد إلى المعالج العاديّ (int8) — فالصورةُ الواحدة تصلح للنشرين.
+      ـ `cuda`: يُشترط الرسوميُّ ولا رجوع — نشرُ GPU الذي يسقط إلى CPU بصمتٍ يدفع ثمنَ
+        الرسوميّ ويعمل ببطء العاديّ، ولا يُكتشف إلا بالقياس.
+      ـ `cpu`: العاديُّ صراحةً.
+
+    والفيصلُ المقيس: على CPU يأخذ المقطعُ (١٫٥ ث) نحو ٠٫٥–١٫٢ ث حسابًا للمسارين معًا
+    فيتزاحم، وعلى L4 أجزاءَ الثانية — وهو الطريقُ إلى تنبيهٍ في نحو ثانيتين كما يفعل ترتيل
+    (docs/LISTENER-GPU.md بالأرقام والكلفة).
+    """
+    from faster_whisper import WhisperModel
+    want=(os.getenv('MIZAN_LISTENER_DEVICE','auto').strip() or 'auto').lower()
+    if want in ('auto','cuda'):
+        try:
+            model=WhisperModel(path_or_id,device='cuda',compute_type=os.getenv('MIZAN_GPU_COMPUTE','float16').strip() or 'float16',**kw)
+            state['device']='cuda'
+            return model
+        except Exception as exc:
+            if want=='cuda':raise
+            print(f'cuda unavailable, using cpu: {exc}',flush=True)
+    model=WhisperModel(path_or_id,device='cpu',compute_type='int8',cpu_threads=int(os.getenv('MIZAN_CPU_THREADS','2')),**kw)
+    state['device']='cpu'
+    return model
+
 
 def load_model():
     # تعثّرٌ عابرٌ في التنزيل لا يُعطّل الخدمةَ إلى الأبد: تُعاد المحاولة بمهلٍ متزايدة.
@@ -30,12 +60,11 @@ def load_model():
         time.sleep(delay);delay=min(delay*2,300)
 
 def try_models():
-    from faster_whisper import WhisperModel
     errors=[]
     for model_id in dict.fromkeys(MODEL_CHAIN):
         try:
             print(f'loading {model_id}…',flush=True)
-            state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=int(os.getenv('MIZAN_CPU_THREADS','2')))
+            state['model']=make_model(model_id,download_root='/models')
             state['id']=model_id; state['error']=None; state['source']='download'
             print(f'model ready: {model_id}',flush=True)
             return
@@ -55,12 +84,10 @@ def load_prefetched()->bool:
     الآن يُحمَّل في طور الإقلاع نفسه، بالمعالج كاملًا ومعه `--cpu-boost`، ولا يُفتح المنفذ حتى
     يجهز — فأوّلُ طلبٍ ينتظر ثوانيَ الإقلاع بدل دقائق «يستعدّ». ولا كلفةَ فوق ما كان.
     """
-    from faster_whisper import WhisperModel
-    threads=int(os.getenv('MIZAN_CPU_THREADS','2'))
     # المجلّدُ المخبوز (prefetch.py): نُزِّل وحُمِّل في البناء نفسه، فلا مخبأَ ولا شبكة.
     try:
         with open(os.path.join(BAKED,'MODEL_ID'),encoding='utf-8') as f:model_id=f.read().strip()
-        state['model']=WhisperModel(BAKED,device='cpu',compute_type='int8',cpu_threads=threads)
+        state['model']=make_model(BAKED)
         state['id']=model_id; state['error']=None; state['source']='image'
         print(f'model ready from image: {model_id}',flush=True)
         return True
@@ -68,7 +95,7 @@ def load_prefetched()->bool:
         print(f'no baked model: {exc}',flush=True)
     for model_id in dict.fromkeys(MODEL_CHAIN):
         try:
-            state['model']=WhisperModel(model_id,device='cpu',compute_type='int8',download_root='/models',cpu_threads=threads,local_files_only=True)
+            state['model']=make_model(model_id,download_root='/models',local_files_only=True)
             state['id']=model_id; state['error']=None; state['source']='image'
             print(f'model ready from image cache: {model_id}',flush=True)
             return True
@@ -205,7 +232,7 @@ def health():
     status='ok' if state['model'] else ('failed' if state.get('failed') else 'retrying' if state['error'] else 'loading')
     # `source`: من الصورة (إقلاعٌ في ثوانٍ) أو من الشبكة (الصورةُ بلا نموذج — يُرى في ملخّص النشر).
     # `build`: الـcommit الذي بُنيت منه النسخةُ العاملة — فلا يُظنّ الإصلاحُ منشورًا وهو لم يُنشر.
-    body={'status':status,'model':state['id'],'error':state['error'],'source':state['source'],
+    body={'status':status,'model':state['id'],'error':state['error'],'source':state['source'],'device':state['device'],
           'build':os.getenv('MIZAN_BUILD_SHA') or None,'mode':'PRACTICE_AND_FOLLOW_ONLY'}
     # لا «سليم» قبل أن يجهز النموذج: الصحّةُ تقول الحقيقة لمن يسأل.
     return JSONResponse(body,status_code=200 if state['model'] else 503)

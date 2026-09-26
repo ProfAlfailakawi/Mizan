@@ -1,0 +1,28 @@
+# مستمع «يسمعك» على معالجٍ رسوميّ (NVIDIA L4 على Cloud Run).
+#
+# الشيفرةُ هي شيفرةُ المستمع نفسِها حرفًا بحرف: `app.py` يختار العتادَ عند الإقلاع
+# (`MIZAN_LISTENER_DEVICE`)، وهذه الصورةُ لا تزيد على العاديّة إلا مكتبات CUDA/cuDNN
+# التي يحتاجها ctranslate2 لدقّة float16. النشرُ وأثمانُه في docs/LISTENER-GPU.md.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080 \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    MIZAN_LISTENER_DEVICE=cuda
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3.11 python3-pip ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/local/bin/python
+
+WORKDIR /app
+COPY requirements.txt .
+RUN python -m pip install --no-cache-dir --timeout 120 -r requirements.txt
+# كما في الصورة العاديّة: صورةٌ لا تستورد مكتبتَها لا تُبنى ولا تُنشر.
+RUN python -c "from faster_whisper import WhisperModel; import requests"
+# التنزيلُ المسبق يجري على CPU (لا GPU في البناء) — والتحقّقُ من float16 يقع عند الإقلاع.
+COPY prefetch.py .
+RUN timeout 900 python prefetch.py || echo "model prefetch skipped; runtime download will be used"
+COPY app.py .
+
+CMD ["sh","-c","python -m uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
