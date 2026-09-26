@@ -42,46 +42,37 @@ GPU على Cloud Run يُلزم فوترةَ «مثيلٍ كامل» بأربع�
 2. **الحصّة**: `Total Nvidia L4 GPU allocation, per project per region` تُطلب مرّةً من
    وحدة الحصص إن كانت صفرًا.
 
-## التنفيذ (كلُّ شيءٍ جاهز — يبقى أمران يُنفَّذان مرّة)
+## التنفيذ (زرٌّ واحد، وكلُّه داخل Cloud Build)
 
 الشيفرةُ نفسُها تخدم النشرين: `app.py` يختار العتادَ عند الإقلاع (`MIZAN_LISTENER_DEVICE`:
 `auto`/`cuda`/`cpu` — وفي صورة GPU الأصلُ `cuda` **بلا** رجوعٍ صامتٍ إلى CPU يدفع ثمنَ
 الرسوميّ ويعمل ببطء العاديّ)، و`/health` يذكر `device` فيُرى في ملخّص النشر ما الذي يعمل فعلًا.
 
-**١) بناءُ صورة GPU** (من جذر المستودع):
+الزرّ: `.github/workflows/deploy-listener-gpu.yml` (Actions ← «مستمع «يسمعك» على GPU» ← Run
+workflow)، ويُرسل كلَّ شيءٍ إلى Cloud Build بحساب البناء — الحسابِ نفسِه الذي ينشر ميزانَ كلَّ
+يوم — لأن حسابَ عدّاء GitHub لا يملك من Cloud Run إلا القراءة:
+
+| `route` | ما يجري |
+|---|---|
+| `keep` (الأصل) | بناءٌ فدفعٌ فنشرُ `mizan-quran-listener-gpu` (خدمةٌ منفصلة) فقراءةُ `/health`؛ لا ينجح إلا إن قال `device: cuda`. ميزانُ لا يُمسّ. |
+| `gpu` | كلُّ ما سبق، ثم يُوجَّه ميزانُ إليه — بعد صحّةٍ مقروءة فقط. |
+| `cpu` | رجوعٌ فوريّ إلى المستمع العاديّ **بلا بناء** (`cloudbuild.gpu-route.yaml`) — يعمل ولو كانت خدمةُ GPU معطوبة. |
+
+والتوجيهُ إلى GPU يبقى عبر نشرات ميزان الدوريّة (خطوة `bind-engines` في `cloudbuild.yaml` لا
+تمحوه)، فلا يُرجعه دمجٌ عابرٌ إلى CPU بصمت؛ الرجوعُ صريحٌ بـ`route=cpu` وحده. وعند الفشل تطبع
+التشغيلةُ ذيلَ سجلّ Cloud Build وذيلَ سجلّ خدمة GPU نفسِها (عطبُ CUDA يُكتب عند الإقلاع هناك).
+
+ويدويًّا من Cloud Shell (حسابُ المالك) الأمرُ نفسُه:
 
 ```bash
 gcloud builds submit services/quran-practice-listener \
   --config services/quran-practice-listener/cloudbuild.gpu.yaml \
-  --substitutions _TAG=europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener-gpu:manual-1
-```
-
-**٢) النشرُ خدمةً منفصلة** (لا يمسّ الخدمةَ العاملة — والرجوعُ متغيّرُ بيئةٍ واحد):
-
-```bash
-gcloud run deploy mizan-quran-listener-gpu \
-  --image europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener-gpu:manual-1 \
-  --region europe-west1 --platform managed --no-allow-unauthenticated \
-  --gpu 1 --gpu-type nvidia-l4 --no-gpu-zonal-redundancy \
-  --cpu 4 --memory 16Gi --concurrency 8 --min-instances 0 --max-instances 1 \
-  --no-cpu-throttling --cpu-boost --timeout 60 \
-  --set-env-vars MIZAN_LISTENER_DEVICE=cuda
-
-gcloud run services add-iam-policy-binding mizan-quran-listener-gpu --region europe-west1 \
-  --member "serviceAccount:$(gcloud run services describe mizan --region me-central1 --format='value(spec.template.spec.serviceAccountName)')" \
-  --role roles/run.invoker
-```
-
-**٣) توجيهُ ميزان إليه** (وهو مفتاحُ الرجوع أيضًا):
-
-```bash
-gcloud run services update mizan --region me-central1 \
-  --update-env-vars MIZAN_QURAN_PRACTICE_LISTENER_URL="$(gcloud run services describe mizan-quran-listener-gpu --region europe-west1 --format='value(status.url)')/listen"
+  --substitutions "_TAG=me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener-gpu:manual-1,_REGION=europe-west1,_MIN_INSTANCES=0,_ROUTE=keep,COMMIT_SHA=manual-1"
 ```
 
 ثم يُقاس قبل أيّ حكم: `tools/live-listen` على الموقع الحيّ، والمقارنةُ بأرقام
-docs/TARTEEL-COMPARISON.md. فإن لم يهبط التأخّرُ كما حُسب، يُعاد المتغيّرُ إلى الخدمة القديمة
-وتُحذف خدمةُ GPU — ولا كلفةَ باقية.
+docs/TARTEEL-COMPARISON.md. فإن لم يهبط التأخّرُ كما حُسب، يُرجَع بـ`route=cpu` وتُحذف خدمةُ GPU
+(`gcloud run services delete mizan-quran-listener-gpu --region europe-west1`) — ولا كلفةَ باقية.
 
 ## ما بعد GPU (بترتيبه)
 
