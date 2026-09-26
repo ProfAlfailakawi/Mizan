@@ -29,7 +29,8 @@ test('committee setup synchronizes governed judge names and uses a clean number 
   assert.match(src,/الغرفة العمياء/);
   assert.match(src,/BLIND_LEVELS/);
   assert.match(src,/blindnessLevel/);
-  assert.match(src,/إعدادات تحكيم متقدمة/);
+  // «إعدادات تحكيم متقدمة» حُذفت بقرار المالك (٢٦‑٩): التوزيع مختلط والتسجيل بالملاحظات ثابتان في السياسة.
+  assert.doesNotMatch(src,/إعدادات تحكيم متقدمة/);
   assert.match(src,/aria-label=\{`إنقاص \$\{label\}`\}/);
   assert.match(src,/aria-label=\{`زيادة \$\{label\}`\}/);
   assert.match(css,/mizan-number-input::-webkit-outer-spin-button/);

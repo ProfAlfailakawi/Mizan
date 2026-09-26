@@ -13,7 +13,7 @@ test('competition and organization logos use authenticated R2 object storage, ne
 
 test('FairDraw is system initiated and public registration auto-approval remains policy driven',()=>{
  const overview=s('src/components/admin/CompetitionOverview.tsx');const cfg=s('src/lib/competition-config.ts');const store=s('src/lib/store.ts');const registration=s('src/components/public/RegistrationFlow.tsx');
- assert.doesNotMatch(overview,/المتسابق يبدأ سحب سؤاله|Participant initiates the question draw/);assert.match(overview,/يبدأ ميزان السحب العادل تلقائيًا/);
+ assert.doesNotMatch(overview,/المتسابق يبدأ سحب سؤاله|Participant initiates the question draw/);/* كتلة «إعدادات السحب المتقدمة» حُذفت بقرار المالك (٢٦‑٩)؛ السحب يبقى آليًّا تفرضه السياسة. */assert.doesNotMatch(overview,/إعدادات السحب المتقدمة/);
  assert.match(cfg,/policy\.questions\.participantInitiatedDraw=false/);assert.match(store,/generateFairDraw/);assert.match(store,/startSessionForParticipant/);assert.match(registration,/autoApproveEligible/);
 });
 
@@ -54,7 +54,7 @@ test('all September 9 UX fixes are wired to real state rather than cosmetic plac
  // Opening registration is an in-place publish action, not a broken hash redirect.
  assert.match(overview,/store\.publishCompetition\(\)/);assert.doesNotMatch(overview,/window\.location\.hash=['"]#manage-competition['"]/);
  // Category passage uses ayah or quarter-page steppers; internal question/time fields are not shown in the category editor.
- assert.match(types,/passageMode\?: 'ayat' \| 'page_quarters'/);assert.match(types,/pageQuarterUnits\?: number/);assert.match(overview,/PassageLengthControl/);assert.match(overview,/الزيادة كل مرة: ربع وجه/);const draft=overview.slice(overview.indexOf('const emptyDraft'),overview.indexOf('const saveCategory'));assert.doesNotMatch(draft,/question|Duration|أسئلة|زمن/i);assert.match(overview,/targetDurationMinutes:c\.ruleSet\.questionDurationMinutes/);
+ assert.match(types,/passageMode\?: 'ayat' \| 'page_quarters'/);assert.match(types,/pageQuarterUnits\?: number/);/* طول المقطع انتقل من محرّر الفئة إلى تبويب النطاق (قرار المالك ٢٦‑٩). */const engine=s('src/components/admin/QuestionEngineWorkspace.tsx');assert.doesNotMatch(overview,/PassageLengthControl/);assert.match(engine,/<PassageLength /);assert.match(engine,/الزيادة كل مرة: ربع وجه/);const draft=overview.slice(overview.indexOf('const emptyDraft'),overview.indexOf('const saveCategory'));assert.doesNotMatch(draft,/question|Duration|أسئلة|زمن/i);assert.match(overview,/targetDurationMinutes:c\.ruleSet\.questionDurationMinutes/);
  // Save is durable locally on every mutation and competition configuration carries conflict-safe freshness.
  assert.match(store,/function persistLocalSnapshot\(\): boolean/);assert.match(store,/function notify\(\)[\s\S]{0,700}persistLocalSnapshot\(\)/);assert.match(store,/competitionConfigUpdatedAt/);assert.match(store,/markCompetitionConfigChanged\(\); notify\(\)/);
  // Manager permission surface is tabbed and includes the organization's actual licensed modules.
