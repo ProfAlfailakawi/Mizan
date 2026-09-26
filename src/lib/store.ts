@@ -270,7 +270,7 @@ export function exitDemoSession(): boolean {
   // كان فشلُ التخزين يُرجع قبل إعادة التحميل فيبدو زرّ الخروج معطّلًا، وكان الدور
   // التجريبي المختار يبقى فيعود به الزائر في المرة التالية. الخروج يحدث دائمًا الآن.
   let cleared = true;
-  for (const key of [DEMO_FLAG_KEY, DEMO_STATE_KEY, 'mizan_demo_role_v1']) {
+  for (const key of [DEMO_FLAG_KEY, DEMO_STATE_KEY, 'mizan_demo_role_v1', 'mizan_demo_quorum_v1']) {
     try { window.sessionStorage.removeItem(key); } catch { cleared = false; }
   }
   window.location.reload();
@@ -281,7 +281,9 @@ export function exitDemoSession(): boolean {
 export function resetDemoSession(): boolean {
   if (!IS_DEMO_SESSION) return false;
   try {
+    /* والموافقات المعلّقة تُمحى معه: عرضٌ جديد لا يُختم بتفويضٍ من العرض السابق. */
     window.sessionStorage.removeItem(DEMO_STATE_KEY);
+    window.sessionStorage.removeItem('mizan_demo_quorum_v1');
   } catch {
     return false;
   }

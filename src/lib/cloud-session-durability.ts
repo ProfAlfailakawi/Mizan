@@ -102,7 +102,20 @@ export async function durableSignOut(): Promise<void> {
     // snapshot stays intact, and the next authenticated bootstrap will reconcile it if needed.
     console.error('MIZAN final cloud flush before sign-out failed', error);
   }
-  await withinBudget(signOut(auth), SIGN_OUT_BUDGET_MS);
+  const done = await withinBudget(signOut(auth).then(() => true), SIGN_OUT_BUDGET_MS);
+  /* خروجٌ تعلّق لا يُحسب خروجًا: يُمحى الاعتماد المحفوظ بيدنا، وإلا أعاد التحميلُ الجلسةَ نفسها. */
+  if (!done || auth.currentUser) await clearPersistedAuth();
+}
+
+/** يمحو اعتماد Firebase المحفوظ في المتصفح (التخزين المحلي وقاعدة IndexedDB) — بسقف زمني. */
+export async function clearPersistedAuth(): Promise<void> {
+  for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
+    try { if (!store) continue; for (const key of Object.keys(store)) if (key.startsWith('firebase:')) store.removeItem(key); } catch { /* تخزينٌ محجوب */ }
+  }
+  if (typeof indexedDB === 'undefined') return;
+  await withinBudget(new Promise<void>(resolve => {
+    try { const req = indexedDB.deleteDatabase('firebaseLocalStorageDb'); req.onsuccess = req.onerror = req.onblocked = () => resolve(); } catch { resolve(); }
+  }), 1500);
 }
 
 let signingOut = false;

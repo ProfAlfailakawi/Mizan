@@ -43,7 +43,7 @@ test('sign-out is an explicit durability boundary for category/config edits',()=
   assert.match(durability,/setDoc\(ref, configuration, \{ merge: true \}\)/,'competition config must be written before sign-out');
   assert.match(durability,/const verification = await getDoc\(ref\)/,'the authoritative root must be read back after writing');
   const flushAt=durability.indexOf('await withinBudget(persistDurableCompetitionSnapshot(), FLUSH_BUDGET_MS);');
-  const signOutAt=durability.indexOf('await withinBudget(signOut(auth), SIGN_OUT_BUDGET_MS);',flushAt);
+  const signOutAt=durability.indexOf('await withinBudget(signOut(auth)',flushAt);
   assert.ok(flushAt>=0&&signOutAt>flushAt,'Firebase sign-out must happen after the awaited cloud flush');
   assert.doesNotMatch(durability,/localStorage\.setItem/,'durability helper must not add a clear-text browser storage sink');
 });
@@ -89,4 +89,15 @@ test('logout always completes: bounded flush, single flight, reload, demo keys c
   const exit=store.slice(store.indexOf('export function exitDemoSession'),store.indexOf('export function resetDemoSession'));
   assert.match(exit,/mizan_demo_role_v1/,'leaving the demo forgets the chosen demo role');
   assert.doesNotMatch(exit,/return false;\s*\}\s*window\.location\.reload/,'a storage error must not skip the reload');
+});
+
+test('a stalled sign-out clears persisted Firebase auth instead of reloading into the same session', () => {
+  const src = fs.readFileSync('src/lib/cloud-session-durability.ts', 'utf8');
+  assert.match(src, /if \(!done \|\| auth\.currentUser\) await clearPersistedAuth\(\)/);
+  assert.match(src, /deleteDatabase\('firebaseLocalStorageDb'\)/);
+});
+
+test('demo reset and exit both drop pending seal approvals', () => {
+  const src = fs.readFileSync('src/lib/store.ts', 'utf8');
+  assert.equal((src.match(/mizan_demo_quorum_v1/g) || []).length >= 2, true);
 });
