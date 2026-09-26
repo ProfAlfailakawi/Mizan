@@ -87,11 +87,11 @@ jobs:
           ARGS=(--service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT"
                 --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET")
           if [ "$ROUTE" = cpu ]; then
-            ARGS+=(--config "$SRC/cloudbuild.gpu-route.yaml")
+            ARGS+=(--config "$SRC/cloudbuild.gpu-route.yaml" --substitutions "_ROUTE=cpu,_REGION=$REGION")
           else
             TAG="me-central1-docker.pkg.dev/$GCP_PROJECT_ID/cloud-run-source-deploy/$GPU_SERVICE:$GITHUB_SHA"
             ARGS+=(--config "$SRC/cloudbuild.gpu.yaml"
-                   --substitutions "_TAG=$TAG,_REGION=$REGION,_MIN_INSTANCES=$MIN_INSTANCES,_ROUTE=$ROUTE,COMMIT_SHA=$GITHUB_SHA")
+                   --substitutions "_TAG=$TAG,_REGION=$REGION,_MIN_INSTANCES=$MIN_INSTANCES,COMMIT_SHA=$GITHUB_SHA")
           fi
           OUT="$(mktemp)"
           ok=0
@@ -114,6 +114,34 @@ jobs:
             echo "::endgroup::"
           fi
           exit "$ok"
+
+      # العتادُ يُقرأ ولا يُفترض: سطرُ إقلاع هذه النسخة في سجلّ الخدمة يقول `on cuda` أو `on cpu`.
+      # (Cloud Build لا يُصدر رمزَ هويّةٍ لقراءة `/health` — ردّ 404 في التشغيلة الخامسة.)
+      # ولا توجيهَ إلى GPU إلا بعده.
+      - name: التحقّق من CUDA ثم التوجيه (إن طُلب)
+        if: ${{ inputs.route != 'cpu' }}
+        run: |
+          set -euo pipefail
+          line=''
+          for attempt in $(seq 1 12); do
+            line="$(gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$GPU_SERVICE\" AND textPayload:\"listener startup: model\"" \
+              --project "$GCP_PROJECT_ID" --freshness=1h --order=desc --limit=1 --format='value(textPayload)' || true)"
+            [ -n "$line" ] && break
+            sleep 10
+          done
+          echo "MIZAN_GPU_BOOT ${line:-(no startup line found)}" | tee -a "$RUNNER_TEMP/build.log"
+          case "$line" in
+            *" on cuda "*) ;;
+            *) echo "::error::the GPU service did not boot on CUDA; not routing to it"; exit 1 ;;
+          esac
+          if [ "$ROUTE" = gpu ]; then
+            gcloud builds submit services/quran-practice-listener \
+              --config services/quran-practice-listener/cloudbuild.gpu-route.yaml \
+              --substitutions "_ROUTE=gpu,_REGION=$REGION" \
+              --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
+              --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET"
+            echo "MIZAN_GPU_ROUTE mizan -> GPU" | tee -a "$RUNNER_TEMP/build.log"
+          fi
 
       - name: الملخّص
         if: always()

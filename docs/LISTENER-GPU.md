@@ -54,8 +54,8 @@ workflow)، ويُرسل كلَّ شيءٍ إلى Cloud Build بحساب الب�
 
 | `route` | ما يجري |
 |---|---|
-| `keep` (الأصل) | بناءٌ فدفعٌ فنشرُ `mizan-quran-listener-gpu` (خدمةٌ منفصلة) فقراءةُ `/health`؛ لا ينجح إلا إن قال `device: cuda`. ميزانُ لا يُمسّ. |
-| `gpu` | كلُّ ما سبق، ثم يُوجَّه ميزانُ إليه — بعد صحّةٍ مقروءة فقط. |
+| `keep` (الأصل) | بناءٌ فدفعٌ فنشرُ `mizan-quran-listener-gpu` (خدمةٌ منفصلة)، ثم يُقرأ سطرُ إقلاعه من سجلّه: لا ينجح إلا إن قال `on cuda`. ميزانُ لا يُمسّ. |
+| `gpu` | كلُّ ما سبق، ثم يُوجَّه ميزانُ إليه — بعد `on cuda` مقروءةً فقط. |
 | `cpu` | رجوعٌ فوريّ إلى المستمع العاديّ **بلا بناء** (`cloudbuild.gpu-route.yaml`) — يعمل ولو كانت خدمةُ GPU معطوبة. |
 
 والتوجيهُ إلى GPU يبقى عبر نشرات ميزان الدوريّة (خطوة `bind-engines` في `cloudbuild.yaml` لا
@@ -67,7 +67,7 @@ workflow)، ويُرسل كلَّ شيءٍ إلى Cloud Build بحساب الب�
 ```bash
 gcloud builds submit services/quran-practice-listener \
   --config services/quran-practice-listener/cloudbuild.gpu.yaml \
-  --substitutions "_TAG=me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener-gpu:manual-1,_REGION=europe-west1,_MIN_INSTANCES=0,_ROUTE=keep,COMMIT_SHA=manual-1"
+  --substitutions "_TAG=me-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/mizan-quran-listener-gpu:manual-1,_REGION=europe-west1,_MIN_INSTANCES=0,COMMIT_SHA=manual-1"
 ```
 
 ثم يُقاس قبل أيّ حكم: `tools/live-listen` على الموقع الحيّ، والمقارنةُ بأرقام
