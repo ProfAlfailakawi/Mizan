@@ -201,31 +201,23 @@ export function buildParticipantFairnessEvidence(input:{
  };
 }
 
-/* عبارات إنهاء الموضع المعتمدة داخل ميزان. لا تسجيل يدوي ولا نص حر:
-   المنظّم يختار عبارة واحدة أو عدة عبارات أو المجموعة كلها، ويُحفظ الاختيار كفهارس. */
-export const TRANSITION_PHRASES_AR=['حسبك، جزاك الله خيرًا','بارك الله فيك، قف هنا','أحسنت، نكتفي بهذا الموضع','جزاك الله خيرًا، توقّف هنا','أحسنت، بارك الله فيك','كفى، وفقك الله','شكرًا لك، نتوقف هنا','أحسنت القراءة، جزاك الله خيرًا'];
-export const TRANSITION_PHRASES_EN=['Thank you. Please stop here.','Well done. Stop here, please.','That is enough for this passage. Thank you.','May God reward you. Please stop.','Well done, may God bless you.','That is enough. Thank you.','Thank you, we stop here.','Well recited. Thank you.'];
+/* عبارة إنهاء الموضع ثابتة للجميع: «حسبك» وحدها، بلا تناوب ولا بدائل.
+   الخيار الوحيد للمنظّم تشغيل التنبيه الصوتي أو إيقافه. */
+export const TRANSITION_PHRASE_AR='حسبك';
+export const TRANSITION_PHRASE_EN='That is enough.';
+/** @deprecated قائمة من عنصر واحد تبقى لمن يستوردها؛ العبارة ثابتة. */
+export const TRANSITION_PHRASES_AR=[TRANSITION_PHRASE_AR];
+export const TRANSITION_PHRASES_EN=[TRANSITION_PHRASE_EN];
 export function passageTransitionPlan(input:{
   isLastQuestion:boolean;
   ar:boolean;
-  cue?:{enabled?:boolean;phraseArabic?:string;phraseEnglish?:string;selectedPhraseIndexes?:number[];autoAdvanceDelayMs?:number;audioUrl?:string};
-  variantSeed?:number;
+  cue?:{enabled?:boolean;autoAdvanceDelayMs?:number};
 }){
   const cue=input.cue;
-  const arr=input.ar?TRANSITION_PHRASES_AR:TRANSITION_PHRASES_EN;
-  const legacyPhrase=input.ar?cue?.phraseArabic:cue?.phraseEnglish;
-  const legacyIndex=legacyPhrase?arr.indexOf(legacyPhrase):-1;
-  const requested=(cue?.selectedPhraseIndexes||[]).filter(i=>Number.isInteger(i)&&i>=0&&i<arr.length);
-  const selected=[...new Set(requested.length?requested:[legacyIndex>=0?legacyIndex:0])];
-  const slot=((input.variantSeed??0)%selected.length+selected.length)%selected.length;
-  const idx=selected[slot]??0;
   return {
     enabled:cue?.enabled!==false,
-    variantIndex:idx,
-    phrase:arr[idx],
-    selectedPhraseIndexes:selected,
+    phrase:input.ar?TRANSITION_PHRASE_AR:TRANSITION_PHRASE_EN,
     delayMs:Math.max(0,Math.min(10_000,cue?.autoAdvanceDelayMs??700)),
-    audioUrl:'',
     autoAdvance:!input.isLastQuestion,
   };
 }

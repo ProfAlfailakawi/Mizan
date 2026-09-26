@@ -220,9 +220,17 @@ export function applyTemplate(competition: Competition, templateId: string): Com
   };
 }
 
+/*
+ * أزرار المحكم كما ضبطها المنظّم، بترتيبها، المفعّلة وحدها.
+ *
+ * الإعدادات تحرّر `labelArabic/labelEnglish` فقط، وكانت شاشة المحكم تعرض `shortArabic`
+ * الموروث من القالب — فيسمّي المنظّم الزر «تردد» ويبقى على الشاشة «تكرار». الاسم المعروض
+ * هنا يُشتق من اسم الإعدادات دائمًا، فلا مصدر ثانٍ للاسم.
+ */
 export function getEnabledJudgeActions(competition: Competition) {
   const criteria=competition.ruleSet.criteria||[];
-  return getCompetitionPolicy(competition).judging.actions.filter(a=>a.enabled).map(a=>{
+  return getCompetitionPolicy(competition).judging.actions.filter(a=>a.enabled).map(raw=>{
+    const a={...raw,shortArabic:raw.labelArabic||raw.shortArabic,shortEnglish:raw.labelEnglish||raw.shortEnglish,penalty:Math.max(0,Number(raw.penalty)||0)};
     if(a.criterion==='custom'||criteria.some(c=>c.id===a.criterion))return a;
     const match=criteria.find(c=>c.assignedJudgeType===a.criterion||c.id===`crit-${a.criterion}`||c.id.endsWith(`-${a.criterion}`));
     return match?{...a,criterion:match.id}:a;

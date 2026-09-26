@@ -34,6 +34,8 @@ export interface FairDrawRequest {
   surah?: number;          // تقييد اختياري بسورة
   minAyahCount?: number;
   maxAyahCount?: number;
+  /** طول المقطع بأرباع الوجه (1=¼، 3=¾، 4=وجه…). متى وُجد وحملت الحزمة أسطر الآيات قِيس الطول بالأسطر لا بعدد الآيات. */
+  pageQuarters?: number;
 }
 
 export interface FairDrawResult {
@@ -218,6 +220,38 @@ export async function balancedFairDraw(
   };
 }
 
+export const MUSHAF_LINES_PER_PAGE = 15;
+/*
+ * طول «¾ وجه» يُقاس بأسطر المصحف لا بعدد آيات تقديري.
+ *
+ * كان ربع الوجه يُترجم إلى نافذة آيات ثابتة (¾ ⇒ ٤–٧ آيات)، فيخرج في البقرة قرابة وجه كامل
+ * وفي قصار السور سطرين. هنا يُمدّ المقطع من آية البداية آيةً آية على أسطر الحزمة
+ * (page/line_start/line_end) حتى يقترب ما يغطيه من أرباع الوجه المطلوبة. وإن وقعت البداية
+ * قرب آخر السورة يُمدّ إلى الخلف، فيبقى الطول صحيحًا والبداية على حدّ آية.
+ * يعود null متى خلت الحزمة من الأسطر، فيرجع السحب إلى عدد الآيات.
+ */
+export function ayahCountForPageQuarters(rows: any[], surah: number, startAyah: number, quarters: number): number | null {
+  const lines = new Map<number, { from: number; to: number }>();
+  for (const r of rows) {
+    if (Number(r.sora) !== surah) continue;
+    const page = Number(r.page), ls = Number(r.line_start), le = Number(r.line_end);
+    if (!(page > 0 && ls > 0 && le >= ls)) return null;
+    lines.set(Number(r.aya_no), { from: (page - 1) * MUSHAF_LINES_PER_PAGE + ls, to: (page - 1) * MUSHAF_LINES_PER_PAGE + le });
+  }
+  if (!lines.has(startAyah)) return null;
+  const target = quarters * MUSHAF_LINES_PER_PAGE / 4;
+  const last = Math.max(...lines.keys());
+  const covered = (a: number, b: number) => lines.get(b)!.to - lines.get(a)!.from + 1;
+  let first = startAyah, end = startAyah;
+  while (covered(first, end) < target && (end < last || first > 1)) {
+    const next = end < last ? covered(first, end + 1) : covered(first - 1, end);
+    // يُتوقف عند الأقرب إلى الهدف: آيةٌ طويلة تتجاوزه كثيرًا لا تُضاف.
+    if (next - target > target - covered(first, end)) break;
+    if (end < last) end++; else first--;
+  }
+  return end - first + 1;
+}
+
 export async function generativeFairDraw(delivery: MizanQuranDelivery, req: FairDrawRequest): Promise<FairDrawResult | null> {
   const reading = String(req.reading || 'hafs');
   const rows = await delivery.quranData(reading);
@@ -259,7 +293,8 @@ export async function generativeFairDraw(delivery: MizanQuranDelivery, req: Fair
    * حدّ آية حقيقي، فالبداية تظل موضعًا صحيحًا. أما السورة الأقصر من الطول المطلوب فتُؤخذ كاملة.
    */
   const lastAyahInSurah = rows.reduce((m: number, r: any) => (Number(r.sora) === start.sora ? Math.max(m, Number(r.aya_no)) : m), 0);
-  const span = Math.min(ayahCount, lastAyahInSurah);
+  const byLines = req.pageQuarters && req.pageQuarters > 0 ? ayahCountForPageQuarters(rows, start.sora, start.aya_no, req.pageQuarters) : null;
+  const span = Math.min(byLines ?? ayahCount, lastAyahInSurah);
   const startAyah = Math.max(1, Math.min(start.aya_no, lastAyahInSurah - span + 1));
   const endAyah = Math.min(startAyah + span - 1, lastAyahInSurah);
 

@@ -68,9 +68,9 @@ import { QuestionAllocationEngine, type QuestionCandidate } from './question-eng
 import { buildScopeReadiness } from './scope-readiness';
 import { invalidateStaleModels, buildQuestionModel } from './model-fairness';
 import { migrateLegacyScope, planCategoryMigration } from './scope-migration';
-import { buildCandidatePool, categoryDistribution, categoryRepeatPolicy, categoryScopeOf, categorySelectionRule, planAllocation, readingContextOf, resolveEffectiveScope, resolveQuestionCount, staleModels } from './scope-engine';
+import { buildCandidatePool, categoryDistribution, categoryPageQuarterUnits, categoryRepeatPolicy, categoryScopeOf, categorySelectionRule, planAllocation, readingContextOf, resolveEffectiveScope, resolveQuestionCount, staleModels } from './scope-engine';
 import { surahNameArabic } from './quran-canon';
-import type { ScopeEngineSealRecord, ScopeSimulationRecord, QuestionModelRecord, QuestionModelBatchRecord, QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord } from '../types';
+import type { RegistrationStatus, ScopeEngineSealRecord, ScopeSimulationRecord, QuestionModelRecord, QuestionModelBatchRecord, QuestionQuarantineRecord, QuestionReservationRecord, FairnessReportRecord } from '../types';
 import { applyQuarantine, claimReserveModel, generateModelBatch, recoverFromQuarantine } from './model-batch';
 import { blockedLocusKeys, expireReservations, reserveQuestions, transitionReservations } from './question-reservation';
 import { buildExposureOracle } from './exposure-risk';
@@ -924,6 +924,7 @@ async function deleteScopedDocument(collectionName:string,id:string){
   }catch(err){reportCloudError(classifyCloudError(err),`${collectionName}/${id}`);return false;}
 }
 
+const JUDGE_JOURNEY_STATUSES:RegistrationStatus[]=['in_session','tested'];
 const JOURNEY_PUBLISHERS:Role[]=['super_admin','org_admin','comp_admin','head_judge','ops_manager','exception_host','delegation_manager'];
 const launchPlaceholderActive=()=>globalState.competition.id==='comp-pending-setup'||globalState.competition.organizationId==='org-pending-setup';
 /*
@@ -937,12 +938,19 @@ type JourneyPublishOutcome='PUBLISHED'|'OFFLINE'|'NOT_SIGNED_IN'|'ROLE_CANNOT_PU
 async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<JourneyPublishOutcome>{
   if(globalState.isOffline)return 'OFFLINE';
   if(!auth.currentUser)return 'NOT_SIGNED_IN';
-  if(!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return 'ROLE_CANNOT_PUBLISH';
+  /* المحكّم هو من يُنهي الجلسة، فيملك تقديم الحالة وحدها في البطاقة (القواعد تقصره على
+     status/updatedAt وعلى حالتي الجلسة). ولولا ذلك بقيت رحلة المتسابق عند «الانتظار». */
+  const statusOnly=globalState.currentUser.role==='judge'&&JUDGE_JOURNEY_STATUSES.includes(participant.status)&&!revoked;
+  if(!statusOnly&&!JOURNEY_PUBLISHERS.includes(globalState.currentUser.role))return 'ROLE_CANNOT_PUBLISH';
   if(launchPlaceholderActive())return 'LAUNCH_PLACEHOLDER';
   const records:[string,'participant'|'guardian'][]=[];
   if(participant.journeyAccessToken)records.push([await sha256(participant.journeyAccessToken),'participant']);else if(participant.journeyAccessTokenHash)records.push([participant.journeyAccessTokenHash,'participant']);
   if(participant.guardianAccessToken)records.push([await sha256(participant.guardianAccessToken),'guardian']);else if(participant.guardianAccessTokenHash)records.push([participant.guardianAccessTokenHash,'guardian']);
   if(!records.length)return 'NO_TOKENS';
+  if(statusOnly){
+    try{const {db,doc,setDoc}=await getFirestoreClient();for(const [key] of records)await setDoc(doc(db,'public_journeys',key),{status:participant.status,updatedAt:new Date().toISOString()},{merge:true});resolveCloudScope('public journey');return 'PUBLISHED';}
+    catch(err){reportCloudError(classifyCloudError(err),'public journey');return 'CLOUD_REJECTED';}
+  }
   try{
     const {db,doc,setDoc}=await getFirestoreClient();
     const committee=globalState.committees.find(c=>c.id===participant.assignedCommitteeId&&c.competitionId===participant.competitionId);
@@ -990,6 +998,28 @@ async function syncPublicJourneys(){
 function syncParticipantLifecycle(participant:Participant){
   void persistScopedDocument('participants',participant.id,participant as unknown as Record<string,unknown>);
   void publishPublicJourneyRecord(participant);
+}
+
+/*
+ * مصدر واحد لحالة المتسابق بعد النداء: `globalState.participants`.
+ *
+ * كان من أنهى اختباره يبقى «ينتظر» ومسار رحلته عند «الانتظار»: الحالة لا تتقدّم إلى
+ * «أنهى الاختبار» إلا باكتمال نصاب اللجنة كله — ومحكّمٌ واحد في العرض التجريبي أو لجنةٌ
+ * ناقصة لا تبلغه أبدًا — ولقطةُ `activeSession.participant` تبقى على «في الطابور»، وجهاز
+ * المحكّم لا يملك نشر بطاقة الرحلة. الآن تتقدّم الحالة لحظة انتهاء الجلسة، إلى الأمام فقط،
+ * وتُكتب في القائمة واللقطة معًا ثم تُنشر، فتقرأ القوائم والطابور والرحلة المصدر نفسه.
+ */
+const PARTICIPANT_PROGRESS:RegistrationStatus[]=['submitted','under_review','approved','checked_in','in_queue','in_session','tested','appealed','certified'];
+function advanceParticipantStatus(participantId:string|undefined,status:RegistrationStatus,actor:string,reason?:string){
+  if(!participantId)return;
+  const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);
+  if(idx<0)return;
+  const current=globalState.participants[idx];
+  if(PARTICIPANT_PROGRESS.indexOf(current.status)>=PARTICIPANT_PROGRESS.indexOf(status))return;
+  const next={...current,status,statusHistory:[...(current.statusHistory||[]),{status,timestamp:new Date().toISOString(),actor,...(reason?{reason}:{})}]};
+  globalState.participants[idx]=next;
+  if(globalState.activeSession.participant?.id===participantId)globalState.activeSession={...globalState.activeSession,participant:next};
+  syncParticipantLifecycle(next);
 }
 
 /*
@@ -1812,6 +1842,8 @@ export function useAppStore() {
     };
     globalState.judgeSubmissions = [...globalState.judgeSubmissions.filter(s => !(s.sessionId === submission.sessionId && s.judgeId === submission.judgeId)), submission];
     void persistScopedDocument('judge_submissions',`${submission.sessionId}_${submission.judgeId}`,submission as unknown as Record<string,unknown>);
+    /* انتهت الجلسة أمام المتسابق بقفل أول تقييم: «أنهى الاختبار» الآن، لا عند اكتمال النصاب. */
+    advanceParticipantStatus(submission.participantId,'tested','Session completed');
     /*
      * إثبات القرعة يُسجَّل هنا، عند قفل التقييم، لا قبله: كشف البذرة قبل انتهاء التلاوة
      * يكشف بقيّة الطقم. وبعد القفل لم يبقَ ما يُكشف، فهذا هو موضع reveal الصحيح من
@@ -1879,7 +1911,7 @@ export function useAppStore() {
       // for this participant, so a reserve/extra judge re-locking cannot double-count committee load.
       if (existing < 0) {
         const pIndex = globalState.participants.findIndex(p => p.id === participant.id && p.competitionId===globalState.competition.id);
-        if (pIndex !== -1) { const tested={ ...globalState.participants[pIndex], status:'tested' as const, statusHistory:[...globalState.participants[pIndex].statusHistory,{status:'tested' as const,timestamp:new Date().toISOString(),actor:'Panel completion'}] }; globalState.participants[pIndex]=tested; syncParticipantLifecycle(tested); }
+        if (pIndex !== -1) advanceParticipantStatus(participant.id,'tested','Panel completion');
         globalState.committees=globalState.committees.map(c=>c.id===globalState.activeSession.committee?.id?{...c,currentParticipantId:undefined,status:'ready',completedCount:c.completedCount+1}:c);
         /*
          * يُكتب أثر التلاوة هنا، لا في شاشةٍ تقرأ الجلسة الجارية.
@@ -3544,7 +3576,7 @@ const prepareJourneyAccessBatch=async()=>{
       /* مقدار الموضع من الوجه ⇒ مدى تقريبي لعدد الآيات. الوجه يظهر كاملًا على سطح المصحف،
          والتظليل يقع على هذا المقدار وحده. تقريبي لأن أطوال الآيات تتفاوت بين السور. */
       const passageSpan=categoryPassageAyahRange(category);
-      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:Math.max(14,resolveQuestionCount(category,policy)*6),seedBase:`${globalState.competition.id}:${participant.id}`,scope:effectiveScope,minAyahCount:passageSpan.minAyahCount,maxAyahCount:passageSpan.maxAyahCount});
+      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:Math.max(14,resolveQuestionCount(category,policy)*6),seedBase:`${globalState.competition.id}:${participant.id}`,scope:effectiveScope,minAyahCount:passageSpan.minAyahCount,maxAyahCount:passageSpan.maxAyahCount,pageQuarterUnits:categoryPageQuarterUnits(category)});
       /* تعذّر التسليم لا يعني السحب من خارج النطاق: تُسقَط مواضع المصحف البنيوية داخله. */
       const structural=generated.length?[]:buildCandidatePool({scope:effectiveScope,category,reading:readingContextOf({riwaya:participant.riwaya})})
         .slice(0,60)
