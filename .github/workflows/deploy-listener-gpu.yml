@@ -72,8 +72,7 @@ jobs:
             --config services/quran-practice-listener/cloudbuild.gpu.yaml \
             --substitutions "_TAG=$TAG" \
             --service-account="projects/$GCP_PROJECT_ID/serviceAccounts/$GCP_BUILD_SERVICE_ACCOUNT" \
-            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" \
-            --suppress-logs
+            --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: نشر خدمة GPU (منفصلة — لا تمسّ الإنتاج)
