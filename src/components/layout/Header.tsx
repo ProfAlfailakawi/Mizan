@@ -2,7 +2,7 @@ import React,{useState} from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { Wifi, WifiOff, Search, CircleHelp, Menu, LogOut, Headphones, LifeBuoy } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION, exitDemoSession } from '../../lib/store';
-import { durableSignOut } from '../../lib/cloud-session-durability';
+import { signOutAndReload } from '../../lib/cloud-session-durability';
 import { LanguageSwitcher } from '../design-system/LanguageSwitcher';
 import { CommandPalette } from '../design-system/CommandPalette';
 import { EmergencyControl } from '../design-system/EmergencyControl';
@@ -17,20 +17,20 @@ export const Header: React.FC = () => {
  const brandInfo = useBrandInfo();
  const superAdmin=currentUser.role==='super_admin';
  // في البيئة التجريبية لا توجد جلسة هوية تُنهى؛ الخروج يمحو الصندوق التجريبي وحده.
- const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} void durableSignOut().catch(()=>{}).finally(()=>window.location.reload())};
+ const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} signOutAndReload() };
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
       <MizanLogo language={language} compact/>
       <div className="min-w-0 hidden sm:block">
         <div className="flex items-center gap-2">
-          {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[11px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
+          {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[13px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
           <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
-          <span className="text-[10px] text-[#636864] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
+          <span className="text-xs text-[#636864] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
           {brandInfo.placements.showHeaderContact && (brandInfo.phoneNumber || brandInfo.supportEmail) && (
             <a
               href={brandInfo.phoneNumber ? `tel:${brandInfo.phoneNumber}` : `mailto:${brandInfo.supportEmail}`}
-              className="hidden xl:inline-flex items-center gap-1 text-[10px] text-[#2F6555] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
+              className="hidden xl:inline-flex items-center gap-1 text-xs text-[#2F6555] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
               title={language==='ar'?'رقم التواصل والدعم المعتمد':'Official support contact'}
             >
               <Headphones className="w-3 h-3"/>

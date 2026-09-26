@@ -11,7 +11,7 @@ import type {
 } from '../types';
 export type { QuestionPoolItem };
 import { describeScope, fullQuranScope, normalizeScope, scopeAyahCount, scopeSignature, type QuranScope } from './quran-scope';
-import { ayahOrdinal, surahNameArabic } from './quran-canon';
+import { MUSHAF_TOTAL_PAGES, QURAN_SURAH_TOTAL, ayahCountOf, ayahOrdinal, surahNameArabic, surahStartPage } from './quran-canon';
 import { DEFAULT_SELECTION_RULE, buildEffectiveScope, scopeRecordIsUsable, type ParticipantScopeRecord, type ParticipantScopeSelectionRule } from './participant-scope';
 import { autoBalancedPlan, freeDistributionPlan, resolveZoneSlots, type QuestionDistributionPlan, type ZoneSlot } from './question-zones';
 import { DEFAULT_REPEAT_POLICY, type RepeatPolicy } from './repeat-policy';
@@ -140,6 +140,19 @@ export function passageAyahCount(category: Category | undefined): number {
   return Math.max(1, Math.min(20, range.targetAyahCount || 3));
 }
 
+/*
+ * تقدير «¾ وجه» بالآيات حين لا تتوفر أسطر المصحف (مواضع بنيوية بلا حزمة تسليم):
+ * بكثافة آيات السورة في الوجه، لا بنافذة ثابتة تُعطي البقرة وجهًا والنبأ سطرين.
+ */
+export function pageQuarterAyahEstimator(category: Category | undefined): ((surah: number) => number) | undefined {
+  const units = categoryPageQuarterUnits(category);
+  if (!units) return undefined;
+  return (surah: number) => {
+    const pages = Math.max(1, (surah < QURAN_SURAH_TOTAL ? surahStartPage(surah + 1) : MUSHAF_TOTAL_PAGES + 1) - surahStartPage(surah));
+    return Math.max(1, Math.round(units / 4 * ayahCountOf(surah) / pages));
+  };
+}
+
 export interface CandidatePoolOptions {
   scope: QuranScope;
   category: Category | undefined;
@@ -160,6 +173,7 @@ export function buildCandidatePool(options: CandidatePoolOptions): QuestionCandi
   if (options.certifiedPool?.length) return candidatesInScope(options.certifiedPool, options.scope);
   return projectCandidatesFromScope(options.scope, {
     passageAyahCount: passageAyahCount(options.category),
+    passageAyahCountFor: pageQuarterAyahEstimator(options.category),
     reading: options.reading,
     difficultyByLocus: options.difficultyByLocus,
     idPrefix: options.category ? `cat-${options.category.id}` : 'loc',
@@ -227,6 +241,28 @@ export function staleModels(models: QuestionModelRecord[], scopes: ParticipantSc
   });
 }
 
+/**
+ * طول مقطع السؤال بأرباع الوجه كما ضبطه المنظّم (1=¼، 2=½، 3=¾، 4=وجه، 5=وجه وربع…).
+ * المصدر الوحيد لهذا الرقم: السحب يقيس به أسطر المصحف، والعرض يسمّيه بالكسر نفسه.
+ * يعود undefined متى كانت الفئة تقيس بالآيات.
+ */
+export function categoryPageQuarterUnits(category: Category | undefined): number | undefined {
+  if (!category) return undefined;
+  if (category.passageMode === 'ayat' && category.ayatPerQuestion && category.ayatPerQuestion > 0) return undefined;
+  if (category.pageQuarterUnits && category.pageQuarterUnits > 0) return Math.round(category.pageQuarterUnits);
+  return ({ quarter: 1, third: 1, half: 2, full: 4 } as Record<string, number>)[category.pagePortion || ''];
+}
+
+/** «¾ وجه»، «وجه وربع»… اسم طول المقطع كما يراه المنظّم والمحكّم والمتسابق. */
+export function pageQuarterLabel(units: number, ar: boolean): string {
+  const whole = Math.floor(units / 4), rest = units % 4;
+  if (!ar) { const frac = ['', '¼', '½', '¾'][rest]; return whole ? `${whole}${frac ? ` ${frac}` : ''} page${whole > 1 && !frac ? 's' : ''}` : `${frac} page`; }
+  const fracAr = ['', 'ربع', 'نصف', 'ثلاثة أرباع'][rest];
+  if (!whole) return `${fracAr} وجه`;
+  const wholeAr = whole === 1 ? 'وجه' : whole === 2 ? 'وجهان' : `${whole} أوجه`;
+  return rest ? `${wholeAr} و${fracAr}` : wholeAr;
+}
+
 /** تقدير نافذة آيات المقطع حسب إعدادات الفئة */
 export function calculateCategoryPassageRange(category: Category | undefined): { minAyahCount?: number; maxAyahCount?: number; targetAyahCount?: number } {
   if (!category) return {};
@@ -236,13 +272,7 @@ export function calculateCategoryPassageRange(category: Category | undefined): {
     return { minAyahCount: n, maxAyahCount: n, targetAyahCount: n };
   }
 
-  const legacyUnits = category.pagePortion === 'quarter' ? 1 
-                    : category.pagePortion === 'half' ? 2 
-                    : category.pagePortion === 'third' ? Math.max(1, Math.round(4 / 3)) 
-                    : category.pagePortion === 'full' ? 4 
-                    : undefined;
-
-  const units = category.pageQuarterUnits && category.pageQuarterUnits > 0 ? category.pageQuarterUnits : legacyUnits;
+  const units = categoryPageQuarterUnits(category);
 
   if (!units) {
     return category.ayatPerQuestion && category.ayatPerQuestion > 0 
@@ -282,15 +312,17 @@ export function resolveSourceQuestionPool(args: {
   const reading = resolveReading({ riwaya: participant.riwaya });
   if (!reading || !effectiveScope || scopeAyahCount(effectiveScope) === 0) return [];
   const passage = calculateCategoryPassageRange(category);
+  const perSurah = pageQuarterAyahEstimator(category);
   const approved = new Map((governanceRecords || [])
     .filter(g => g.competitionId === competitionId && g.status === 'approved' && g.sourceManifestId === source.id)
     .map(g => [g.questionId, g]));
   if (!approved.size) return [];
   const rows = new Map(content.rows.map(v => [`${v.surah}:${v.ayah}`, v.text]));
   const candidates = buildCandidatePool({ scope: effectiveScope, category, reading: readingContextOf({ riwaya: participant.riwaya }) })
-    .filter(q => approved.has(q.id) && (!passage.minAyahCount || (q.endAyah - q.startAyah + 1) >= passage.minAyahCount));
+    .filter(q => approved.has(q.id) && (perSurah || !passage.minAyahCount || (q.endAyah - q.startAyah + 1) >= passage.minAyahCount));
   return candidates.flatMap(q => {
-    const target = passage.targetAyahCount ? Math.min(q.endAyah, q.startAyah + passage.targetAyahCount - 1) : q.endAyah;
+    const want = perSurah ? perSurah(q.surahNumber) : passage.targetAyahCount;
+    const target = want ? Math.min(q.endAyah, q.startAyah + want - 1) : q.endAyah;
     const verses: string[] = [];
     for (let ayah = q.startAyah; ayah <= target; ayah++) {
       const text = rows.get(`${q.surahNumber}:${ayah}`);

@@ -73,7 +73,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   if (!flagged.length) {
     return (
-      <div className="flex items-center gap-2 px-1 text-[10px] font-bold text-[#656b66]">
+      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[#656b66]">
         <span className="mizan-status-orb" aria-hidden="true"/>
         {ar
           ? `إشارات نزاهة اللجان سليمة عبر ${measured.length} لجنة — رصد مستقل وخصم متكافئ بين الوفود.`
@@ -84,12 +84,12 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   return (
     <details className="mizan-collapse rounded-2xl border border-[#e2c9a8] bg-[#fbf6ec]">
-      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[11px] font-black text-[#7a5a2f]">
+      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-black text-[#7a5a2f]">
         <span className="flex items-center gap-2"><UsersRound className="h-3.5 w-3.5"/>{ar ? 'إشارة نزاهة تستحق المراجعة' : 'A committee signal is worth reviewing'}</span>
-        <span className="text-[10px] font-bold">{flagged.length}</span>
+        <span className="text-xs font-bold">{flagged.length}</span>
       </summary>
       <div className="px-4 pb-4">
-        <p className="text-[10px] leading-5 text-[#6e5936]">
+        <p className="text-xs leading-5 text-[#6e5936]">
           {ar
             ? 'غير رسمي · على مستوى اللجنة فقط. لا يُصنَّف أي محكّم ولا يُسمَّى: هذه مؤشرات مراجعة للأمانة العامة، لا أحكام.'
             : 'Non-official · committee granularity only. No individual judge is scored, named or ranked — these are review prompts for the secretariat, not findings.'}
@@ -97,8 +97,8 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
         <div className="mt-3 space-y-2">
           {flagged.map(c => (
             <div key={c.committeeId} className="rounded-xl border border-[#e8dcc5] bg-white/70 p-3">
-              <div className="text-[10px] font-black text-[#3a423d]">{nameOf(c.committeeId)}</div>
-              <div className="mt-2 space-y-1 text-[10px] text-[#6e5936]">
+              <div className="text-xs font-black text-[#3a423d]">{nameOf(c.committeeId)}</div>
+              <div className="mt-2 space-y-1 text-xs text-[#6e5936]">
                 {c.synchrony === 'REVIEW_SYNC' && (
                   <div>{ar
                     ? `تسليم الدرجات متقارب جدًّا (${c.submissionSpreadMs} م.ث) — تأكّد أن الرصد بقي مستقلًّا.`
@@ -109,7 +109,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
                     ? `فارق متوسط الخصم بين الوفود داخل هذه اللجنة ${c.regionalPenaltyGap} درجة.`
                     : `Mean deduction differs by ${c.regionalPenaltyGap} points across delegations in this committee.`}</div>
                 )}
-                <div className="text-[9px] text-[#8a7857]">{ar ? `عيّنة ${c.sampleCount} تسليمًا` : `${c.sampleCount} submissions sampled`}</div>
+                <div className="text-[11px] text-[#8a7857]">{ar ? `عيّنة ${c.sampleCount} تسليمًا` : `${c.sampleCount} submissions sampled`}</div>
               </div>
             </div>
           ))}

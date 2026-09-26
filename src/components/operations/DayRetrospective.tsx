@@ -30,7 +30,7 @@ export const DayRetrospective: React.FC = () => {
         <div>
           <div className="mizan-kicker">{ar ? 'مراجعة اليوم' : 'DAY RETROSPECTIVE'}</div>
           <h2 className="font-black mt-1">{ar ? 'ما قُدّر مقابل ما وقع' : 'What was planned against what happened'}</h2>
-          <p className="text-[11px] text-[#646965] mt-2 max-w-2xl leading-5">
+          <p className="text-[13px] text-[#646965] mt-2 max-w-2xl leading-5">
             {ar
               ? 'يقارن زمن الجلسة المُعدّ بما فعلته كل لجنة، وصدقَ الأرقام المعروضة على المنتظرين، وما اضطُرّت إليه القاعة من نقلٍ واستثناء. الغرض إعدادُ السنة القادمة، لا تقييمُ أحد.'
               : 'Compares configured session length with what each panel actually did, how honest the displayed waits were, and what the hall had to improvise. For next year’s setup — not for judging anyone.'}
@@ -56,9 +56,9 @@ export const DayRetrospective: React.FC = () => {
 
       {/* إيقاع كل لجنة مقابل ما قُدّر لها — الفارق هو الدرس، لا الترتيب. */}
       <div className="rounded-2xl border border-[#dfddd6] p-4">
-        <div className="text-[10px] font-black text-[#646965]">{ar ? 'زمن الجلسة: المُعدّ مقابل المقيس' : 'SESSION LENGTH: CONFIGURED VS MEASURED'}</div>
+        <div className="text-xs font-black text-[#646965]">{ar ? 'زمن الجلسة: المُعدّ مقابل المقيس' : 'SESSION LENGTH: CONFIGURED VS MEASURED'}</div>
         <ul className="mt-2.5 divide-y divide-[#e6e4dd]">
-          {report.panels.map(p => <li key={p.committeeId} className="py-2.5 flex items-center justify-between gap-3 text-[11px]">
+          {report.panels.map(p => <li key={p.committeeId} className="py-2.5 flex items-center justify-between gap-3 text-[13px]">
             <span className="font-black shrink-0">{p.code}</span>
             <span className="text-[#646965] truncate">{ar ? `أنجز ${p.completed}` : `${p.completed} completed`}</span>
             <span className="tabular-nums shrink-0">
@@ -70,14 +70,14 @@ export const DayRetrospective: React.FC = () => {
                   </span>}
             </span>
           </li>)}
-          {!report.panels.length && <li className="py-3 text-[11px] text-[#646965]">{ar ? 'لا لجان في هذه المسابقة.' : 'No panels in this competition.'}</li>}
+          {!report.panels.length && <li className="py-3 text-[13px] text-[#646965]">{ar ? 'لا لجان في هذه المسابقة.' : 'No panels in this competition.'}</li>}
         </ul>
       </div>
 
       {/* التقدير يُحاسَب: الشيء الوحيد في المنصّة الذي كان يَعِد ولا يُراجَع. */}
       <div className="rounded-2xl bg-[#f1efe9] px-4 py-3">
-        <div className="text-[10px] font-black text-[#646965]">{ar ? 'صدق الأرقام المعروضة على المنتظرين' : 'HONESTY OF THE WAITS WE SHOWED'}</div>
-        <p className="text-[11px] mt-1.5 leading-5">{describeEtaAccuracy(report.eta, ar)}</p>
+        <div className="text-xs font-black text-[#646965]">{ar ? 'صدق الأرقام المعروضة على المنتظرين' : 'HONESTY OF THE WAITS WE SHOWED'}</div>
+        <p className="text-[13px] mt-1.5 leading-5">{describeEtaAccuracy(report.eta, ar)}</p>
       </div>
 
       <div className="rounded-2xl border border-[#d8c7a7] bg-[#fffaf0] p-4">
@@ -87,8 +87,8 @@ export const DayRetrospective: React.FC = () => {
         </div>
         <ul className="mt-2.5 space-y-2.5">
           {report.lessons.map((l, i) => <li key={i}>
-            <div className="text-[11px] font-black text-[#604724]">{ar ? l.titleArabic : l.titleEnglish}</div>
-            <div className="text-[10px] text-[#6b5b45] mt-0.5 leading-5">{ar ? l.detailArabic : l.detailEnglish}</div>
+            <div className="text-[13px] font-black text-[#604724]">{ar ? l.titleArabic : l.titleEnglish}</div>
+            <div className="text-xs text-[#6b5b45] mt-0.5 leading-5">{ar ? l.detailArabic : l.detailEnglish}</div>
           </li>)}
         </ul>
       </div>
@@ -99,6 +99,6 @@ export const DayRetrospective: React.FC = () => {
 const Figure = ({ n, t, tone = 'plain' }: { n: number; t: string; tone?: 'plain' | 'warn' }) => (
   <div className={`rounded-xl px-4 py-3 ${tone === 'warn' ? 'bg-[#F2EADC] text-[#725630]' : 'bg-[#f1efe9] text-[#171b18]'}`}>
     <div className="text-lg font-black tabular-nums">{n}</div>
-    <div className="text-[10px] opacity-75">{t}</div>
+    <div className="text-xs opacity-75">{t}</div>
   </div>
 );

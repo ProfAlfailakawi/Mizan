@@ -48,7 +48,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
             <h3 className="mt-0.5 text-sm font-black">{ar ? 'ميل المسطرة — من أبعد عن لجنته' : 'Scale tendency — who stands furthest from their panel'}</h3>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-[10px] font-black">
+        <div className="flex items-center gap-3 text-xs font-black">
           <span className="inline-flex items-center gap-1.5 text-[#92642d]"><span className="h-2.5 w-2.5 rounded-full bg-[#B98A3E]" />{ar ? 'أشدّ من لجنته' : 'harsher'}</span>
           <span className="inline-flex items-center gap-1.5 text-[#3f5f74]"><span className="h-2.5 w-2.5 rounded-full bg-[#5b7f96]" />{ar ? 'أليَن من لجنته' : 'gentler'}</span>
         </div>
@@ -65,7 +65,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
             <li key={row.judgeId} className="grid grid-cols-[minmax(96px,1.1fr)_2fr_auto] items-center gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="truncate text-xs font-black text-[#39423d]">{name}</div>
-                <div className="mt-0.5 text-[9px] font-bold text-[#656b66]">
+                <div className="mt-0.5 text-[11px] font-bold text-[#656b66]">
                   {code ? `${code} · ` : ''}{row.sessions ? (ar ? `${row.sessions} جلسة` : `${row.sessions} sessions`) : (ar ? 'ميل مرصود' : 'observed')}
                 </div>
               </div>
@@ -92,7 +92,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
         })}
       </ul>
 
-      <p className="border-t border-[#eeece5] bg-[#fbfaf6] px-5 py-3 text-[10px] leading-5 text-[#6b706c]">
+      <p className="border-t border-[#eeece5] bg-[#fbfaf6] px-5 py-3 text-xs leading-5 text-[#6b706c]">
         {ar
           ? 'مقارنة مع بقية اللجنة على المتسابق نفسه، بانكماشٍ يمنع الحكم من عيّنة صغيرة. استشاري فقط: لا يُعدَّل حكم محكّم ولا تُمسّ درجة.'
           : 'Compared with the rest of the panel on the same participant, shrunk so a small sample cannot label a judge. Advisory only: no judge score is altered.'}

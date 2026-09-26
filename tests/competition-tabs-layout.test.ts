@@ -45,18 +45,13 @@ test('the judging tab is a judging screen, not the operations screen again', () 
     'the panels section is never gated to a single mode');
 });
 
-test('the judging policy toggles are grouped by what they actually change', () => {
-  /* تسعة مفاتيح متتابعة بلا فاصل ولا عنوان: لا يُعرف أيّها يمسّ نزاهة النتيجة وأيّها يغيّر
-     شكل شاشة المحكّم. */
+test('the judging policy has no integrity/conduct tab; its switches are fixed ON in the policy', () => {
+  /* قرار المالك (٢٦‑٩): تبويب «النزاهة والسلوك» حُذف وكل مفاتيحه مفعّلة دائمًا من السياسة. */
   const judging = /const JudgingSection=[\s\S]*?\n(?=const )/.exec(view)?.[0] || '';
   assert.ok(judging, 'the judging section must still exist');
-  for (const heading of ['نزاهة التحكيم', 'أدوات المحكم أثناء الجلسة', 'المساندة والاحتياط']) {
-    assert.ok(judging.includes(heading), `missing group heading: ${heading}`);
-  }
-  // ولا يضيع مفتاح في التجميع: التسعة كلها ما زالت معروضة.
-  const toggles = judging.split('<Toggle ').length - 1;
-  assert.equal(toggles, 9, 'every judging toggle must survive the regrouping');
-  // ولا يبقى شريط واحد يبتلعها كلها.
-  const strips = judging.split('mizan-surface-soft px-4').length - 1;
-  assert.equal(strips, 3, 'the nine toggles must sit in three labelled clusters');
+  assert.doesNotMatch(judging, /النزاهة والسلوك|judgingTab==='conduct'/);
+  assert.equal(judging.split('<Toggle ').length - 1, 0, 'no conduct toggles remain in the judging section');
+  const cfg = fs.readFileSync('src/lib/competition-config.ts', 'utf8');
+  for (const key of ['independentUntilLock', 'requireAudioRecording', 'calibrationRequired', 'allowPhysicalJudgePad', 'showRunningScoreToJudge', 'allowJudgeUndo', 'silentAiGuardian', 'reserveJudgeAllowed'])
+    assert.match(cfg, new RegExp(`policy\\.judging\\.${key}=true`), `${key} is forced on`);
 });

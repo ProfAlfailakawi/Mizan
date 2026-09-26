@@ -163,6 +163,16 @@ service cloud.firestore {
         && sameOrg(resource.data.organizationId)
         && compScope(resource.data.competitionId)
         && competitionOpen(resource.data.organizationId, resource.data.competitionId);
+      // The judge ends the session, so it may advance the card's status (and nothing else)
+      // to in-judging / judging-complete. Without this the journey stayed at "waiting".
+      allow update: if signedIn()
+        && present()
+        && roleIs(['judge'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+        && request.resource.data.status in ['in_session','tested']
+        && sameOrg(resource.data.organizationId)
+        && compScope(resource.data.competitionId)
+        && competitionOpen(resource.data.organizationId, resource.data.competitionId);
       allow delete: if false;
     }
 

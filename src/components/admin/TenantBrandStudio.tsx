@@ -50,7 +50,7 @@ const CopyChip: React.FC<{ value: string; label: string }> = ({ value, label }) 
     <button
       type="button"
       onClick={() => { try { void navigator.clipboard?.writeText(value); setDone(true); setTimeout(() => setDone(false), 1600); } catch { /* النسخ غير متاح في هذا المتصفح */ } }}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-[#DAD8D0] bg-white px-2 py-1 text-[10px] font-black text-[#2F6555] hover:bg-[#F3F1EB]"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#DAD8D0] bg-white px-2 py-1 text-xs font-black text-[#2F6555] hover:bg-[#F3F1EB]"
       aria-label={label}
     >
       {done ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}{done ? 'تم النسخ' : 'نسخ'}
@@ -73,11 +73,11 @@ const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }
         {steps.map((s, i) => (
           <li key={s.t} className="relative rounded-xl border border-[#E9E7E0] bg-white p-3">
             <div className="flex items-center gap-2">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#214C40] text-[11px] font-black text-white">{i + 1}</span>
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#214C40] text-[13px] font-black text-white">{i + 1}</span>
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#EBF2EE] text-[#214C40]"><s.icon className="h-4 w-4" /></span>
               <span className="text-xs font-black text-[#171b18]">{s.t}</span>
             </div>
-            <p className="mt-2 text-[10px] leading-5 text-[#656b66]">{s.d}</p>
+            <p className="mt-2 text-xs leading-5 text-[#656b66]">{s.d}</p>
           </li>
         ))}
       </ol>
@@ -89,15 +89,15 @@ const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }
           { k: ar ? 'القيمة' : 'Value', v: host, copy: true },
         ].map(row => (
           <div key={row.k} className="flex flex-wrap items-center justify-between gap-2 p-2.5">
-            <dt className="text-[10px] font-black text-[#656b66]">{row.k}</dt>
+            <dt className="text-xs font-black text-[#656b66]">{row.k}</dt>
             <dd className="flex min-w-0 items-center gap-2">
-              <span dir="ltr" className="text-[11px] font-bold break-all [overflow-wrap:anywhere]">{row.v}</span>
+              <span dir="ltr" className="text-[13px] font-bold break-all [overflow-wrap:anywhere]">{row.v}</span>
               {row.copy && <CopyChip value={row.v} label={ar ? `نسخ ${row.k}` : `Copy ${row.k}`} />}
             </dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-[10px] leading-5 text-[#77613e]">{ar ? 'قد يستغرق انتشار السجل حتى بضع ساعات عند بعض المزوّدين. لا حاجة لأي إعداد آخر منك.' : 'DNS propagation can take a few hours with some providers. Nothing else is required from you.'}</p>
+      <p className="mt-3 text-xs leading-5 text-[#77613e]">{ar ? 'قد يستغرق انتشار السجل حتى بضع ساعات عند بعض المزوّدين. لا حاجة لأي إعداد آخر منك.' : 'DNS propagation can take a few hours with some providers. Nothing else is required from you.'}</p>
     </div>
   );
 };
@@ -156,7 +156,7 @@ export const TenantDomainRequestCard: React.FC = () => {
           <input dir="ltr" lang="en" className="mizan-input flex-1 min-w-0" value={wanted} onChange={e => setWanted(e.target.value)} placeholder="quran.example.com" />
           <Button type="button" disabled={busy || !isDomain(normalizeDomain(wanted))} onClick={() => void request()} icon={<Link2 className="w-4 h-4" />}>{busy ? (ar ? 'جارٍ الإرسال…' : 'Sending…') : (ar ? 'اطلب الربط' : 'Request connection')}</Button>
         </div>
-        <span className="mt-1 block text-[10px] text-[#8d7a52]">{ar ? 'يصل طلبك مباشرة إلى فريق ميزان مع اسم جهتك، ويُثبَّت النطاق بعد التحقق.' : 'Your request reaches the MIZAN team with your organization name.'}</span>
+        <span className="mt-1 block text-xs text-[#8d7a52]">{ar ? 'يصل طلبك مباشرة إلى فريق ميزان مع اسم جهتك، ويُثبَّت النطاق بعد التحقق.' : 'Your request reaches the MIZAN team with your organization name.'}</span>
       </label>
 
       {sent && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'وصل طلبك. سنتحقق من السجل ونفعّل نطاقك.' : 'Request received. We will verify and activate your domain.'}</div>}
@@ -230,16 +230,16 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
         {ar ? 'اختر نطاقًا فرعيًا سهلًا يصل منه الجميع إلى بوابتك، أو اربط نطاقك الخاص باحترافية. يكفي إدخال العنوان هنا؛ نتكفّل بالباقي.' : 'Pick a friendly subdomain or connect your own custom domain. Enter the address here and we handle the rest.'}
       </p>
 
-      {locked && <div className="rounded-xl bg-[#F3EFE6] border border-[#E2D6BE] p-3 flex items-start gap-2 text-[11px] leading-6 font-bold text-[#725630]"><ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-[#8b6837]" />{ar ? 'تم ضبط النطاق واعتماده. لا يمكن تغييره من هنا؛ للتعديل تواصل مع مالك المنصة.' : 'The domain is set and locked. Contact the platform owner to change it.'}</div>}
+      {locked && <div className="rounded-xl bg-[#F3EFE6] border border-[#E2D6BE] p-3 flex items-start gap-2 text-[13px] leading-6 font-bold text-[#725630]"><ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-[#8b6837]" />{ar ? 'تم ضبط النطاق واعتماده. لا يمكن تغييره من هنا؛ للتعديل تواصل مع مالك المنصة.' : 'The domain is set and locked. Contact the platform owner to change it.'}</div>}
 
       {/* النطاق الفرعي */}
       <label className="block">
         <span className="mizan-field-label">{ar ? 'النطاق الفرعي' : 'Subdomain'}</span>
         <div className="flex items-stretch mt-1 rounded-xl border border-[#DAD8D0] overflow-hidden focus-within:border-[#2F6555]">
           <input dir="ltr" lang="en" disabled={locked} className="flex-1 px-3 py-2.5 text-sm outline-none bg-white disabled:bg-[#f5f4f0] disabled:text-[#5f6862]" value={subdomain} onChange={e => setSubdomain(normalizeDomain(e.target.value))} placeholder="a" />
-          {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[11px] font-bold text-[#656b66] border-s border-[#E4E2DB]">{suffix}</span>}
+          {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[13px] font-bold text-[#656b66] border-s border-[#E4E2DB]">{suffix}</span>}
         </div>
-        <span className="mt-1 block text-[10px] text-[#8d7a52]">{ar ? 'حروف لاتينية وأرقام وشرطة فقط.' : 'Lowercase letters, digits and hyphen only.'}</span>
+        <span className="mt-1 block text-xs text-[#8d7a52]">{ar ? 'حروف لاتينية وأرقام وشرطة فقط.' : 'Lowercase letters, digits and hyphen only.'}</span>
       </label>
 
       {/* النطاقات الخاصة */}
@@ -582,7 +582,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
           {/* عداد جودة الهوية */}
           <div className="rounded-2xl bg-[#F7F5EF] border border-[#E0DED7] p-3 text-center sm:min-w-[170px] shrink-0">
-            <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider">
+            <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider">
               {ar ? 'مؤشر اكتمال الهوية' : 'Brand Health Score'}
             </div>
             <div className="mt-1 flex items-center justify-center gap-2">
@@ -675,7 +675,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   <div>
                     <span className="font-bold">{probe.message || (ar ? 'أدخل رابط شعار لفحصه آليًا.' : 'Enter a logo URL to probe.')}</span>
                     {probe.status === 'valid' && (
-                      <div className="mt-1 text-[11px] opacity-90">
+                      <div className="mt-1 text-[13px] opacity-90">
                         {ar ? 'الأبعاد المقروءة: ' : 'Detected size: '}
                         <span className="font-mono font-bold" dir="ltr">{probe.width} × {probe.height} px</span>
                         {' · '}
@@ -691,8 +691,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             {/* معاينة تباين الشعار وخلفياته */}
             <div className="pt-2 border-t border-[#EAE8E1]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-[#656b66]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
-                <div className="flex gap-1 text-[10px] font-bold">
+                <span className="text-[13px] font-bold text-[#656b66]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
+                <div className="flex gap-1 text-xs font-bold">
                   {([
                     ['light', ar ? 'فاتح' : 'Light'],
                     ['dark', ar ? 'داكن' : 'Dark'],
@@ -874,7 +874,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 <Settings2 className="w-4 h-4 text-[#2F6555]" />
                 <h3 className="font-extrabold text-sm">{ar ? 'مصفوفة خيارات ومواضع العرض' : 'Display Placements Matrix'}</h3>
               </div>
-              <span className="text-[11px] text-[#656b66]">
+              <span className="text-[13px] text-[#656b66]">
                 {ar ? 'أين يظهر كل عنصر في واجهات النظام؟' : 'Control visibility per surface'}
               </span>
             </div>
@@ -947,7 +947,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             </div>
 
             {/* أزرار اختيار السطح المطلوب معاينته */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-[#F7F5EF] rounded-xl text-[11px] font-bold">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-[#F7F5EF] rounded-xl text-[13px] font-bold">
               {([
                 ['header', ar ? 'الترويسة' : 'Header'],
                 ['footer', ar ? 'التذييل' : 'Footer'],
@@ -974,7 +974,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 1. معاينة الترويسة */}
               {previewSurface === 'header' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة الترويسة العلوية للنظام' : 'Header Simulation'}
                   </div>
                   <div className="border border-[#DFDED7] bg-[#F7F5EF] rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
@@ -991,7 +991,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                           {nameArabic || nameEnglish || (ar ? 'اسم الجهة' : 'Organization Name')}
                         </div>
                         {placements.showHeaderSlogan && sloganArabic && (
-                          <div className="text-[10px] text-[#2F6555] font-medium truncate">
+                          <div className="text-xs text-[#2F6555] font-medium truncate">
                             {sloganArabic}
                           </div>
                         )}
@@ -1000,7 +1000,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
                     <div className="flex items-center gap-2">
                       {placements.showHeaderContact && (phoneNumber || supportEmail) && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[#214C40] flex items-center gap-1" dir="ltr">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[#214C40] flex items-center gap-1" dir="ltr">
                           <Headphones className="w-2.5 h-2.5" />
                           <span>{phoneNumber || supportEmail}</span>
                         </span>
@@ -1008,7 +1008,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       <div className="w-5 h-5 rounded-full bg-[#DFDED7]" />
                     </div>
                   </div>
-                  <p className="text-[10px] text-[#656b66] text-center">
+                  <p className="text-xs text-[#656b66] text-center">
                     {ar ? 'تظهر الترويسة بهذا التنسيق لجميع المحكمين والمسؤولين والزوّار.' : 'This layout appears for all staff and attendees.'}
                   </p>
                 </div>
@@ -1017,10 +1017,10 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 2. معاينة التذييل */}
               {previewSurface === 'footer' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة تذييل الصفحات العام' : 'Footer Simulation'}
                   </div>
-                  <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-3 shadow-xs text-[11px]">
+                  <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-3 shadow-xs text-[13px]">
                     <div className="flex items-center gap-2 border-b border-[#EAE8E1] pb-2">
                       {logoUrl && probe.status !== 'broken' && (
                         <img src={logoUrl} alt="Logo" className="w-6 h-6 object-contain" />
@@ -1028,7 +1028,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       <span className="font-black text-xs text-[#171b18]">{nameArabic || nameEnglish}</span>
                     </div>
 
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#4a504c] text-[10px]">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#4a504c] text-xs">
                       {placements.showFooterWebsite && websiteUrl && (
                         <div className="flex items-center gap-1 text-[#214C40]">
                           <Globe className="w-3 h-3" />
@@ -1049,7 +1049,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       )}
                     </div>
 
-                    <div className="text-[9px] text-[#656b66] pt-1">
+                    <div className="text-[11px] text-[#656b66] pt-1">
                       © {new Date().getFullYear()} {nameArabic || nameEnglish}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
                     </div>
                   </div>
@@ -1059,7 +1059,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 3. معاينة الشهادة الرسمية */}
               {previewSurface === 'certificate' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة الشهادة والوثائق المطبوعة' : 'Certificate Stamp Preview'}
                   </div>
                   <div className="border border-[#D4C5B0] bg-[#FFFDF8] rounded-xl p-4 text-center space-y-2.5 shadow-xs relative">
@@ -1071,21 +1071,21 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       )}
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold text-[#9B7542] uppercase tracking-widest">
+                      <div className="text-xs font-bold text-[#9B7542] uppercase tracking-widest">
                         {ar ? 'شهادة إتقان قرآنية معتمدة' : 'Official Certificate'}
                       </div>
                       <div className="text-xs font-black text-[#171b18] mt-0.5">
                         {nameArabic || nameEnglish || 'الجهة المانحة للشهادة'}
                       </div>
                       {sloganArabic && (
-                        <div className="text-[9px] text-[#6b726d] italic mt-0.5">
+                        <div className="text-[11px] text-[#6b726d] italic mt-0.5">
                           «{sloganArabic}»
                         </div>
                       )}
                     </div>
 
                     {placements.showOnCertificates && (
-                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[9px] text-[#656b66]">
+                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[11px] text-[#656b66]">
                         <span>{websiteUrl ? websiteUrl.replace(/^https?:\/\//i, '') : 'quran-verify.org'}</span>
                         <span className="inline-flex items-center gap-1 font-bold text-[#214C40]"><ShieldCheck className="w-3 h-3"/>{ar?'قابلة للتحقق':'Verifiable'}</span>
                       </div>
@@ -1097,7 +1097,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 4. معاينة البوابة العامة والتسجيل */}
               {previewSurface === 'public' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-[10px] font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة بوابة التسجيل والجمهور' : 'Public Registration Card'}
                   </div>
                   <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-2.5 shadow-xs">
@@ -1111,12 +1111,12 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       )}
                       <div>
                         <div className="font-black text-xs text-[#171b18]">{nameArabic || nameEnglish}</div>
-                        <div className="text-[10px] text-[#656b66]">{sloganArabic || (ar ? 'البوابة الرسمية للمتسابقين والجمهور' : 'Official Public Portal')}</div>
+                        <div className="text-xs text-[#656b66]">{sloganArabic || (ar ? 'البوابة الرسمية للمتسابقين والجمهور' : 'Official Public Portal')}</div>
                       </div>
                     </div>
 
                     {placements.showOnPublicPortal && (
-                      <div className="p-2 rounded-lg bg-[#F7F5EF] text-[10px] text-[#4a504c] space-y-1">
+                      <div className="p-2 rounded-lg bg-[#F7F5EF] text-xs text-[#4a504c] space-y-1">
                         {websiteUrl && <div className="truncate"><span className="text-[#656b66]">{ar ? 'الموقع: ' : 'Web: '}</span>{websiteUrl}</div>}
                         {phoneNumber && <div><span className="text-[#656b66]">{ar ? 'الهاتف: ' : 'Phone: '}</span><span dir="ltr">{phoneNumber}</span></div>}
                       </div>
@@ -1127,12 +1127,12 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             </div>
 
             {/* شروط وضوابط النقاء لضمان عدم رفع ملف مكسور */}
-            <div className="rounded-xl border border-[#DFDED7] bg-[#FAF9F5] p-3 space-y-1.5 text-[11px] text-[#656b66]">
+            <div className="rounded-xl border border-[#DFDED7] bg-[#FAF9F5] p-3 space-y-1.5 text-[13px] text-[#656b66]">
               <div className="flex items-center gap-1.5 font-bold text-[#214C40]">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>{ar ? 'شروط اعتماد الشعار للنظام:' : 'Brand Asset Quality Criteria:'}</span>
               </div>
-              <ul className="list-disc list-inside space-y-1 text-[10px] leading-relaxed">
+              <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
                 <li>{ar ? 'صيغة متجهة (SVG) أو صورة مفرغة (PNG) بخلفية شفافة.' : 'Vector (SVG) or transparent PNG is highly recommended.'}</li>
                 <li>{ar ? 'دقة موصى بها لا تقل عن 200×200 بكسل لضمان وضوح الطباعة.' : 'Minimum 200x200px recommended for print clarity.'}</li>
                 <li>{ar ? 'رابط آمن يبدأ بـ HTTPS لتفادي تحذيرات الأمان في المتصفحات.' : 'Secure HTTPS protocol required to prevent browser mixed-content.'}</li>

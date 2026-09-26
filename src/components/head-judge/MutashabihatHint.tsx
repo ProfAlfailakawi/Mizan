@@ -63,12 +63,12 @@ export const MutashabihatHint: React.FC<{ sessionId: string; ar: boolean }> = ({
 
   return (
     <details className="mizan-collapse mt-4 rounded-2xl border border-[#e5e3dc] bg-[#fbfaf6]">
-      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[11px] font-black text-[#59615c]">
+      <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[13px] font-black text-[#59615c]">
         <span className="flex items-center gap-2"><Radar className="h-3.5 w-3.5 text-[#2F6555]"/>{ar ? 'عند هذا الموضع نظير متشابه معتمد' : 'An approved twin locus sits here'}</span>
-        <span className="rounded-full bg-[#efede7] px-1.5 py-0.5 text-[10px] font-bold text-[#59615c]">{total}</span>
+        <span className="rounded-full bg-[#efede7] px-1.5 py-0.5 text-xs font-bold text-[#59615c]">{total}</span>
       </summary>
       <div className="px-4 pb-4">
-        <p className="text-[10px] leading-5 text-[#656b66]">
+        <p className="text-xs leading-5 text-[#656b66]">
           {ar
             ? 'من خريطة المتشابهات المعتمدة. استدلال للمراجعة فقط: لا يُغيّر درجة ولا يُعرض للمحكّم أثناء التلاوة.'
             : 'From the scientific committee’s approved similarity map. Review context only: it changes no score and is never shown to the scoring judge.'}
@@ -76,15 +76,15 @@ export const MutashabihatHint: React.FC<{ sessionId: string; ar: boolean }> = ({
         <div className="mt-3 space-y-2">
           {hits.map(radar => (
             <div key={`${radar.at.surah}:${radar.at.ayah}`} className="rounded-xl border border-[#e3e1da] bg-white/70 p-3">
-              <div className="text-[10px] font-black text-[#3a423d]">{ar ? 'موضع التردّد' : 'Hesitation locus'} · {locusLabel(radar.at, ar)}</div>
+              <div className="text-xs font-black text-[#3a423d]">{ar ? 'موضع التردّد' : 'Hesitation locus'} · {locusLabel(radar.at, ar)}</div>
               <div className="mt-2 space-y-1.5">
                 {radar.competitors.map(c => (
                   <div key={`${c.locus.surah}:${c.locus.ayah}`} className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate text-[11px] font-bold text-[#29342f]">
+                    <span className="min-w-0 truncate text-[13px] font-bold text-[#29342f]">
                       {locusLabel(c.locus, ar)}
                       {c.reference && <span className="font-quran ms-2 text-[12px] text-[#5f6661]">{c.reference}</span>}
                     </span>
-                    <span className="shrink-0 text-[9px] font-black text-[#656b66]">{Math.round(c.score * 100)}%</span>
+                    <span className="shrink-0 text-[11px] font-black text-[#656b66]">{Math.round(c.score * 100)}%</span>
                   </div>
                 ))}
               </div>

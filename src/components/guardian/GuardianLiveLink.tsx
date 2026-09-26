@@ -97,7 +97,7 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
       {/* Live headline */}
       <div className="mt-4 rounded-2xl bg-gradient-to-b from-[#20493d] to-[#17362b] text-white p-5">
         <div className="text-[11px] text-white/50 font-black">{ar ? child.fullNameArabic : child.fullName} · {child.code}</div>
-        <div className="text-xl sm:text-2xl font-black mt-1">
+        <div className="text-2xl sm:text-3xl font-black mt-1 leading-snug">
           {stage === 'in_committee' ? (ar ? `${firstName} الآن أمام ${committee?.code || 'اللجنة'}` : `${firstName} is now with ${committee?.code || 'the panel'}`)
             : stage === 'queued' ? (ar ? `الترتيب في الطابور: ${position || '—'}` : `Queue position: ${position || '—'}`)
             : stage === 'result' ? (ar ? 'صدرت النتيجة — تُكشف في الحفل' : 'Result is in — revealed at the ceremony')
@@ -114,8 +114,8 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
           return (
             <React.Fragment key={s.key}>
               <div className="flex flex-col items-center gap-1.5 text-center min-w-14 shrink-0">
-                <span className={`w-10 h-10 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-4 h-4" /></span>
-                <span className={`text-[10px] font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
+                <span className={`w-12 h-12 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-5 h-5" /></span>
+                <span className={`text-xs font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
               </div>
               {i < steps.length - 1 && <div className={`flex-1 min-w-3 h-0.5 mx-1 rounded-full ${steps[i + 1].done || steps[i + 1].active ? 'bg-[#bcd0c7]' : 'bg-[#e6e4dd]'}`} />}
             </React.Fragment>
@@ -127,26 +127,26 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
       {consent ? (
         <div className="mt-6 pt-5 border-t border-[#e5e3dc] grid sm:grid-cols-2 gap-3">
           <button onClick={() => void toggleNotify()} className={`rounded-2xl border p-4 text-start transition ${notify ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:border-[#bcc7c1]'}`}>
-            <div className="flex items-center justify-between"><Bell className={`w-4 h-4 ${notify ? 'text-[#214C40]' : 'text-[#666b67]'}`} />{notify && <Check className="w-4 h-4 text-[#214C40]" />}</div>
-            <div className="text-sm font-black mt-3">{ar ? 'نبّهني عند الدخول' : 'Alert me at the turn'}</div>
-            <div className="text-[10px] text-[#656b66] mt-1">{notifyDenied ? (ar ? 'المتصفح لا يسمح بالتنبيهات. تابع من هذه الصفحة، فهي تتحدّث تلقائيًا.' : 'The browser blocks notifications. Follow this page instead; it updates on its own.') : notify ? (ar ? 'سيصلك تنبيه عند دخول اللجنة وعند صدور النتيجة، ما دامت هذه الصفحة مفتوحة.' : 'You will be notified at panel entry and at the result, while this page stays open.') : (ar ? 'دخول اللجنة وإعلان النتيجة' : 'Panel entry & result reveal')}</div>
+            <div className="flex items-center justify-between"><Bell className={`w-6 h-6 ${notify ? 'text-[#214C40]' : 'text-[#666b67]'}`} />{notify && <Check className="w-4 h-4 text-[#214C40]" />}</div>
+            <div className="text-base font-black mt-3">{ar ? 'نبّهني عند الدخول' : 'Alert me at the turn'}</div>
+            <div className="text-xs leading-5 text-[#656b66] mt-1">{notifyDenied ? (ar ? 'المتصفح لا يسمح بالتنبيهات. تابع من هذه الصفحة، فهي تتحدّث تلقائيًا.' : 'The browser blocks notifications. Follow this page instead; it updates on its own.') : notify ? (ar ? 'سيصلك تنبيه عند دخول اللجنة وعند صدور النتيجة، ما دامت هذه الصفحة مفتوحة.' : 'You will be notified at panel entry and at the result, while this page stays open.') : (ar ? 'عند دخول اللجنة وصدور النتيجة' : 'Panel entry & result reveal')}</div>
           </button>
           {shareLink ? <button onClick={() => void copy()} className="rounded-2xl border border-[#dcdad2] bg-white p-4 text-start hover:border-[#bcc7c1] transition">
-            <div className="flex items-center justify-between"><Share2 className="w-4 h-4 text-[#666b67]" />{copied && <span className="text-[10px] font-black text-[#214C40]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
-            <div className="text-sm font-black mt-3">{ar ? 'رابط العائلة الخاص' : 'Private family link'}</div>
-            <div className="text-[10px] text-[#656b66] mt-1">{shareNote || (ar ? 'عرض فقط. الرابط مفتاح خاص بك، فشاركه مع العائلة وحدها ولا تنشره.' : 'View-only. This link is your private key — share it with family only.')}</div>
+            <div className="flex items-center justify-between"><Share2 className="w-6 h-6 text-[#666b67]" />{copied && <span className="text-[10px] font-black text-[#214C40]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
+            <div className="text-base font-black mt-3">{ar ? 'رابط العائلة الخاص' : 'Private family link'}</div>
+            <div className="text-xs leading-5 text-[#656b66] mt-1">{shareNote || (ar ? 'للعائلة فقط — لا تنشره.' : 'View-only. This link is your private key — share it with family only.')}</div>
           </button> : <div className="rounded-2xl border border-dashed border-[#dcdad2] bg-[#faf9f5] p-4 text-start">
-            <Share2 className="w-4 h-4 text-[#666b67]" />
-            <div className="text-sm font-black mt-3">{ar ? 'رابط العائلة الخاص' : 'Private family link'}</div>
-            <div className="text-[10px] text-[#656b66] mt-1">{ar ? 'أنت داخل بحسابك، فهذه الصفحة لا تُشارَك. رابط المشاركة هو رابط ولي الأمر الذي أرسلته الجهة، ويمكنك طلبه منها.' : 'You are signed in, so this page is not shareable. The shareable link is the guardian link the organisation issued — ask them for it.'}</div>
+            <Share2 className="w-6 h-6 text-[#666b67]" />
+            <div className="text-base font-black mt-3">{ar ? 'رابط العائلة الخاص' : 'Private family link'}</div>
+            <div className="text-xs leading-5 text-[#656b66] mt-1">{ar ? 'اطلبه من الجهة المنظِّمة.' : 'You are signed in, so this page is not shareable. The shareable link is the guardian link the organisation issued — ask them for it.'}</div>
           </div>}
         </div>
       ) : (
-        <div className="mt-6 pt-5 border-t border-[#e5e3dc] flex items-center gap-2 text-[11px] text-[#696f6b]"><ShieldCheck className="w-4 h-4" />{ar ? 'المتابعة الحية والتنبيهات تُفعّل بعد موافقة ولي الأمر أعلاه.' : 'Live thread and alerts activate after guardian consent above.'}</div>
+        <div className="mt-6 pt-5 border-t border-[#e5e3dc] flex items-center gap-3 text-base font-bold text-[#3f4642]"><ShieldCheck className="w-6 h-6 shrink-0 text-[#214C40]" />{ar ? 'اضغط «موافقة» أعلاه لتفعيل المتابعة.' : 'Live thread and alerts activate after guardian consent above.'}</div>
       )}
 
-      <div className="mt-4 text-[10px] text-[#696f6b] leading-6">
-        {ar ? 'يخص طفلك وحده وبعد موافقتك. لا يكشف الرابط بيانات متسابقين آخرين. البث الحي للحفل يتطلب تجهيز القاعة وموافقة صريحة، ولا يدّعي ميزان تشغيله قبل توفره فعليًا.' : "Scoped to your own child and gated by your consent. The link never exposes other participants. Live ceremony streaming needs venue setup and explicit consent; MIZAN never claims it works before it truly does."}
+      <div className="mt-4 text-xs text-[#696f6b] leading-6">
+        {ar ? 'تخص طفلك وحده، ولا تُظهر بيانات غيره.' : "Scoped to your own child and gated by your consent. The link never exposes other participants. Live ceremony streaming needs venue setup and explicit consent; MIZAN never claims it works before it truly does."}
       </div>
     </div>
   );

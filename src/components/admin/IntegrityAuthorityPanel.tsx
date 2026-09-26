@@ -73,7 +73,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
         <div className="min-w-0">
           <div className="mizan-kicker">{ar ? 'سلطة النزاهة' : 'INTEGRITY AUTHORITY'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'محفوظة على الخادم، لا في هذا الجهاز' : 'Held on the server, not on this device'}</h2>
-          <p className="mt-2 max-w-2xl text-[11px] leading-5 text-[#636864]">
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[#636864]">
             {ar
               ? 'الموافقات وبذور القرعة تُحفظ وتُفرَض على الخادم بهوية مُصدَّقة. ما يظهر هنا لا يستطيع هذا المتصفح تغييره.'
               : 'Approvals and draw seeds are held and enforced on the server under an authenticated identity. Nothing shown here can be changed from this browser.'}
@@ -84,12 +84,12 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
       {unavailable ? (
         <div className="flex items-start gap-3 bg-[#F8EFED] px-5 py-4 sm:px-6">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#9a4b42]" />
-          <p className="text-[11px] font-bold leading-5 text-[#9a4b42]">{unavailable}</p>
+          <p className="text-[13px] font-bold leading-5 text-[#9a4b42]">{unavailable}</p>
         </div>
       ) : (
         <div className="space-y-6 p-5 sm:p-6">
           <div>
-            <div className="text-[9px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'إجراءات تتطلّب نصابًا' : 'ACTIONS REQUIRING A QUORUM'}</div>
+            <div className="text-[11px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'إجراءات تتطلّب نصابًا' : 'ACTIONS REQUIRING A QUORUM'}</div>
             {!actions.length ? (
               <div className="mt-2"><EmptyState icon={Lock} title={ar ? 'لا إجراء مفتوح' : 'No open action'} body={ar ? 'يظهر هنا كل إجراء يحتاج سلطتين مستقلتين.' : 'Every action needing two independent authorities appears here.'} /></div>
             ) : (
@@ -102,7 +102,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-xs font-black">{ar ? (ACTION_AR[q.action] || q.action) : q.action}</div>
-                          <div className="mt-1 text-[10px] text-[#646965]">
+                          <div className="mt-1 text-xs text-[#646965]">
                             {ar ? 'اعتمادات مستقلة ' : 'Independent approvals '}
                             <Ratio value={q.approvals.length} of={needed} label={ar ? `${q.approvals.length} من ${needed} اعتمادات` : `${q.approvals.length} of ${needed} approvals`} />
                           </div>
@@ -116,13 +116,13 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                             <Button size="sm" loading={busy === q.id} onClick={() => void act(q.id, () => approveQuorum(q.id))}>{ar ? 'اعتماد' : 'Approve'}</Button>
                           )}
                           {mine && q.status !== 'executed' && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'اعتمدتُه' : 'You approved'}</span>
+                            <span className="inline-flex items-center gap-1 text-xs font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'اعتمدتُه' : 'You approved'}</span>
                           )}
                           <Badge variant={statusTone(q.status)}>{uiToken(q.status,ar)}</Badge>
                         </div>
                       </div>
                       {q.status === 'ready' && q.requestedBy === currentUserId && (
-                        <p className="mt-3 text-[10px] leading-5 text-[#8a6738]">{ar ? 'طلبتَ هذا الإجراء، فلا تُنفّذه بنفسك — يُنفّذه صاحب سلطة أخرى.' : 'You requested this action, so another authority must execute it.'}</p>
+                        <p className="mt-3 text-xs leading-5 text-[#8a6738]">{ar ? 'طلبتَ هذا الإجراء، فلا تُنفّذه بنفسك — يُنفّذه صاحب سلطة أخرى.' : 'You requested this action, so another authority must execute it.'}</p>
                       )}
                     </li>
                   );
@@ -133,13 +133,13 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
 
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[9px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'التزامات القرعة' : 'DRAW COMMITMENTS'}</div>
+              <div className="text-[11px] font-black tracking-[.14em] text-[#6b706c]">{ar ? 'التزامات القرعة' : 'DRAW COMMITMENTS'}</div>
               <Button size="sm" variant="ghost" loading={busy === 'commit'}
                 onClick={() => void act('commit', () => commitFairDraw({competitionId, participantId: 'pending-assignment', constraintHash: 'pending'}))}>
                 {ar ? 'التزام جديد' : 'New commitment'}
               </Button>
             </div>
-            <p className="mt-2 text-[10px] leading-5 text-[#646965]">
+            <p className="mt-2 text-xs leading-5 text-[#646965]">
               {ar
                 ? 'البذرة تُولَّد عند الخادم ولا تخرج منه. يُنشر التزامها الآن، ويُكشف عنها لاحقًا — والمدّة بين اللحظتين هي ما يُثبت أن الالتزام سبق معرفة النتيجة.'
                 : 'The seed is generated on the server and never leaves it. Its commitment is published now and revealed later — the gap between the two is what shows the commitment preceded knowing the outcome.'}
@@ -155,7 +155,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="mizan-proof-code" dir="ltr" title={c.seedCommitmentHash}>{shortHash(c.seedCommitmentHash)}</div>
-                          <div className="mt-1 text-[10px] text-[#646965]" dir="ltr">{new Date(c.committedAt).toLocaleString()}</div>
+                          <div className="mt-1 text-xs text-[#646965]" dir="ltr">{new Date(c.committedAt).toLocaleString()}</div>
                         </div>
                         <div className="flex items-center gap-2">
                           {c.status === 'COMMITTED'
@@ -171,8 +171,8 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                       {shown && (
                         <div className="mt-2 rounded-2xl bg-[#f5f3ed] px-4 py-3">
                           <div className="mizan-proof-code break-all" dir="ltr">{shown.seed}</div>
-                          <div className="mt-1 text-[9px] text-[#6b706c]">{ar ? 'البذرة كاملة — تُنسخ للتحقّق المستقل.' : 'Full seed — copy it for independent verification.'}</div>
-                          <div className="mt-1 text-[10px] font-black text-[#214C40]">
+                          <div className="mt-1 text-[11px] text-[#6b706c]">{ar ? 'البذرة كاملة — تُنسخ للتحقّق المستقل.' : 'Full seed — copy it for independent verification.'}</div>
+                          <div className="mt-1 text-xs font-black text-[#214C40]">
                             {ar ? 'فاصل الالتزام عن الكشف: ' : 'Commit-to-reveal gap: '}<span dir="ltr">{mmss(shown.separationMs)}</span>
                           </div>
                         </div>

@@ -44,8 +44,8 @@ export const JudgeCalibrationPanel:React.FC<{judges:JudgeCalibrationRow[];scenar
    <span className="flex items-center gap-2.5 min-w-0">
     <span className="w-8 h-8 rounded-xl bg-[#EEF3F0] text-[#2F6555] grid place-items-center shrink-0"><Scale className="w-4 h-4"/></span>
     <span className="min-w-0">
-     <span className="block text-[10px] font-black truncate">{ar?'اتزان المسطرة بين المحكمين':'Judge calibration'}</span>
-     <span className="block text-[9px] text-[#636864] truncate">
+     <span className="block text-xs font-black truncate">{ar?'اتزان المسطرة بين المحكمين':'Judge calibration'}</span>
+     <span className="block text-[11px] text-[#636864] truncate">
       {notable.length?(ar?`${notable.length} محكّم يبتعد عن متوسط زملائه`:`${notable.length} judge${notable.length>1?'s':''} away from the peer mean`):(ar?'المسطرة متقاربة بين الجميع':'Rulers are consistent across the panel')}
       {movers.length?(ar?` · ${movers.length} مركز يتغير في المقارنة`:` · ${movers.length} rank${movers.length>1?'s':''} differ in comparison`):''}
      </span>
@@ -57,19 +57,19 @@ export const JudgeCalibrationPanel:React.FC<{judges:JudgeCalibrationRow[];scenar
   {open&&<div className="px-4 sm:px-5 pb-4 space-y-4">
    <div className="space-y-2">
     {judges.map(j=><div key={j.judgeId} className="flex items-center gap-3">
-     <span className="text-[10px] font-black text-[#2a312c] w-28 sm:w-36 truncate shrink-0">{j.judgeName||j.judgeId}</span>
+     <span className="text-xs font-black text-[#2a312c] w-28 sm:w-36 truncate shrink-0">{j.judgeName||j.judgeId}</span>
      <BiasBar value={j.shrunkBias} tone={TONE[j.tendency]}/>
-     <span className="text-[9px] tabular-nums w-12 text-end shrink-0" style={{color:TONE[j.tendency]}}>
+     <span className="text-[11px] tabular-nums w-12 text-end shrink-0" style={{color:TONE[j.tendency]}}>
       {j.tendency==='INSUFFICIENT_DATA'?'—':`${j.shrunkBias>0?'+':''}${j.shrunkBias.toFixed(2)}`}
      </span>
-     <span className="text-[9px] text-[#636864] w-24 sm:w-32 truncate shrink-0">{ar?TENDENCY_AR[j.tendency]:TENDENCY_EN[j.tendency]}</span>
+     <span className="text-[11px] text-[#636864] w-24 sm:w-32 truncate shrink-0">{ar?TENDENCY_AR[j.tendency]:TENDENCY_EN[j.tendency]}</span>
     </div>)}
    </div>
 
    {movers.length>0&&<div className="rounded-2xl bg-[#f7f5ef] p-3.5">
-    <div className="text-[9px] font-black text-[#59615c]">{ar?'سيناريو مقارنة — لا يُعتمد':'Comparison scenario — not applied'}</div>
+    <div className="text-[11px] font-black text-[#59615c]">{ar?'سيناريو مقارنة — لا يُعتمد':'Comparison scenario — not applied'}</div>
     <div className="mt-2 space-y-1.5">
-     {movers.slice(0,6).map(r=><div key={r.participantId} className="flex items-center justify-between gap-3 text-[10px]">
+     {movers.slice(0,6).map(r=><div key={r.participantId} className="flex items-center justify-between gap-3 text-xs">
       <span className="font-black text-[#2a312c] truncate min-w-0">{r.participantId}</span>
       <span className="text-[#636864] tabular-nums shrink-0">
        {ar?'الفعلي':'actual'} {r.actualRank} → {ar?'المعياري':'normalized'} {r.normalizedRank}

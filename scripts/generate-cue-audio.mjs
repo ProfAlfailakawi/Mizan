@@ -7,16 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PHRASES = [
-  'حسبك، جزاك الله خيرًا',
-  'بارك الله فيك، قف هنا',
-  'أحسنت، نكتفي بهذا الموضع',
-  'جزاك الله خيرًا، توقّف هنا',
-  'أحسنت، بارك الله فيك',
-  'كفى، وفقك الله',
-  'شكرًا لك، نتوقف هنا',
-  'أحسنت القراءة، جزاك الله خيرًا',
-];
+const PHRASES = ['حسبك'];
 
 const KEY = process.env.MIZAN_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const MODEL = process.env.MIZAN_CUE_TTS_MODEL || 'gemini-2.5-flash-preview-tts';
@@ -41,7 +32,7 @@ fs.mkdirSync(OUT, { recursive: true });
 let made = 0;
 for (let i = 0; i < PHRASES.length; i++) {
   const text = PHRASES[i];
-  const file = path.join(OUT, `cue-${i}.wav`);
+  const file = path.join(OUT, 'hasbuk.wav');
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': KEY },
@@ -59,7 +50,7 @@ for (let i = 0; i < PHRASES.length; i++) {
   if (!part) { console.error(`لا صوت في الرد للعبارة «${text}»`); continue; }
   const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType || '')?.[1] || 24000);
   fs.writeFileSync(file, pcmToWav(Buffer.from(part.inlineData.data, 'base64'), rate));
-  console.log(`✓ cue-${i}.wav — ${text}`);
+  console.log(`✓ hasbuk.wav — ${text}`);
   made++;
 }
 console.log(`\nتم توليد ${made}/${PHRASES.length} مقطعًا في public/audio/cues`);

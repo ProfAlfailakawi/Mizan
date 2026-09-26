@@ -61,7 +61,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
       <div className="min-w-0">
         <div className="mizan-kicker">{ar ? 'قرار الإدارة' : 'ADMINISTRATIVE DECISION'}</div>
         <h2 className="mt-1 font-extrabold">{ar ? 'مراكز موقوفة على تعادل' : 'Places on hold for a tie'}</h2>
-        <p className="mt-1 text-[11px] leading-6 text-[#666c68]">
+        <p className="mt-1 text-[13px] leading-6 text-[#666c68]">
           {ar
             ? 'اللجنة قيّمت وانتهت إلى تساوٍ، وقواعد كسر التعادل المعلنة لم تفصل. الفصل بعد ذلك قرار إداري بسبب مكتوب — ولا يُعلن المركز قبله.'
             : 'The committee scored and arrived at a tie, and the published tie-break rules did not separate them. Breaking it is an administrative decision with a written reason — and the place is not announced before it.'}
@@ -69,7 +69,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
       </div>
     </div>
 
-    {!mayDecide && <div role="status" className="mt-4 rounded-xl bg-[#F2EADC] px-3.5 py-3 text-[11px] font-bold leading-6 text-[#725630]">
+    {!mayDecide && <div role="status" className="mt-4 rounded-xl bg-[#F2EADC] px-3.5 py-3 text-[13px] font-bold leading-6 text-[#725630]">
       {ar
         ? 'هذه القرارات للإدارة (مدير المسابقة أو مدير الجهة). ما تراه هنا للعلم لا للفصل.'
         : 'These decisions belong to the administration (competition or organization admin). This view is informational.'}
@@ -78,14 +78,14 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
     <ul className="mt-4 space-y-3">
       {open.map(tie => <li key={tie.group.key} className="rounded-2xl border border-[#e4e2da] bg-white p-3.5">
         <div className="text-[12px] font-black text-[#3E4A43]">{tie.categoryName} · {ar ? tie.place.titleArabic : tie.place.titleEnglish}</div>
-        <p className="mt-1 text-[11px] leading-6 text-[#7a6a4f]">{describeTie(tie.group, null, ar)}</p>
+        <p className="mt-1 text-[13px] leading-6 text-[#7a6a4f]">{describeTie(tie.group, null, ar)}</p>
         <ul className="mt-2 flex flex-wrap gap-2">
-          {tie.group.participants.map(p => <li key={p.participantId} className="rounded-lg bg-[#F3F1EB] px-2.5 py-1 text-[11px] font-bold text-[#4f5752]">{p.participantCode}</li>)}
+          {tie.group.participants.map(p => <li key={p.participantId} className="rounded-lg bg-[#F3F1EB] px-2.5 py-1 text-[13px] font-bold text-[#4f5752]">{p.participantCode}</li>)}
         </ul>
 
         {mayDecide && activeKey !== tie.group.key && <div className="mt-3 flex justify-end">
           <button type="button" onClick={() => start(tie.group.key, tie.group.participants.map(p => p.participantId))}
-            className="rounded-lg bg-[#214C40] px-3 py-2 text-[11px] font-black text-white">
+            className="rounded-lg bg-[#214C40] px-3 py-2 text-[13px] font-black text-white">
             {ar ? 'تسجيل قرار الإدارة' : 'Record the decision'}
           </button>
         </div>}
@@ -93,11 +93,11 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {mayDecide && activeKey === tie.group.key && <div className="mt-3 space-y-3 border-t border-[#ece9e1] pt-3">
           <div className="flex flex-wrap gap-2" role="group" aria-label={ar ? 'نوع القرار' : 'Decision type'}>
             <button type="button" aria-pressed={mode === 'shared'} onClick={() => setMode('shared')}
-              className={`rounded-lg px-3 py-2 text-[11px] font-black ${mode === 'shared' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
+              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'shared' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
               {ar ? 'يُشرَّك المركز بينهم' : 'Share the place'}
             </button>
             <button type="button" aria-pressed={mode === 'ordered'} onClick={() => setMode('ordered')}
-              className={`rounded-lg px-3 py-2 text-[11px] font-black ${mode === 'ordered' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
+              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'ordered' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
               {ar ? 'ترتيب معلن تكتبه الإدارة' : 'An ordering the administration writes'}
             </button>
           </div>
@@ -106,8 +106,8 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
             {order.map((id, index) => {
               const person = tie.group.participants.find(p => p.participantId === id);
               return <li key={id} className="flex items-center gap-2 rounded-lg bg-[#F8F7F3] px-2.5 py-1.5">
-                <span className="text-[11px] font-black tabular-nums text-[#7a6a4f]">{index + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-[11px] font-bold">{person?.participantCode || id}</span>
+                <span className="text-[13px] font-black tabular-nums text-[#7a6a4f]">{index + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{person?.participantCode || id}</span>
                 <button type="button" onClick={() => move(index, -1)} disabled={index === 0}
                   aria-label={ar ? `رفع ${person?.participantCode || id}` : `Move ${person?.participantCode || id} up`}
                   className="h-11 w-11 rounded-lg bg-white text-[#4f5752] disabled:opacity-40">↑</button>
@@ -116,7 +116,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
                   className="h-11 w-11 rounded-lg bg-white text-[#4f5752] disabled:opacity-40">↓</button>
               </li>;
             })}
-            <li className="text-[10px] leading-5 text-[#6b675d]">
+            <li className="text-xs leading-5 text-[#6b675d]">
               {ar
                 ? `يأخذ المركز أوّلُ ${tie.group.seatsRemaining}، ومن بعدهم ينافس على ما دونه من المراكز ولا يُحذف.`
                 : `The first ${tie.group.seatsRemaining} take the place; the rest compete for the places below rather than being dropped.`}
@@ -130,27 +130,27 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
           </label>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="me-auto text-[10px] font-bold text-[#6b675d]">
+            <span className="me-auto text-xs font-bold text-[#6b675d]">
               {ar ? `${TIE_REASON_MIN_LENGTH} حرفًا فأكثر` : `${TIE_REASON_MIN_LENGTH} characters or more`}
             </span>
-            <button type="button" onClick={() => setActiveKey('')} className="rounded-lg bg-[#F3F1EB] px-3 py-2 text-[11px] font-black text-[#4f5752]">
+            <button type="button" onClick={() => setActiveKey('')} className="rounded-lg bg-[#F3F1EB] px-3 py-2 text-[13px] font-black text-[#4f5752]">
               {ar ? 'إلغاء' : 'Cancel'}
             </button>
-            <button type="button" onClick={() => submit(tie.group.key)} className="rounded-lg bg-[#214C40] px-3 py-2 text-[11px] font-black text-white">
+            <button type="button" onClick={() => submit(tie.group.key)} className="rounded-lg bg-[#214C40] px-3 py-2 text-[13px] font-black text-white">
               {ar ? 'تسجيل القرار' : 'Record decision'}
             </button>
           </div>
 
           {/* الرفض يُقال بنصّه، ولا يبتلعه الزر. */}
-          {note && <div role="alert" className="rounded-xl bg-[#F6E7E7] px-3.5 py-3 text-[11px] font-bold leading-6 text-[#7A2E2E]">{note}</div>}
+          {note && <div role="alert" className="rounded-xl bg-[#F6E7E7] px-3.5 py-3 text-[13px] font-bold leading-6 text-[#7A2E2E]">{note}</div>}
         </div>}
       </li>)}
 
       {settled.map(tie => <li key={tie.group.key} className="rounded-2xl border border-[#e4e2da] bg-[#F8FAF8] p-3.5">
         <div className="text-[12px] font-black text-[#3E4A43]">{tie.categoryName} · {ar ? tie.place.titleArabic : tie.place.titleEnglish}</div>
-        <p className="mt-1 text-[11px] leading-6 text-[#31584c]">{describeTie(tie.group, tie.decision, ar)}</p>
+        <p className="mt-1 text-[13px] leading-6 text-[#31584c]">{describeTie(tie.group, tie.decision, ar)}</p>
         {/* القرار يبقى منسوبًا بعد الإعلان: من فصل، ومتى. */}
-        <p className="mt-1 text-[10px] font-bold text-[#6b675d]">{tie.decision?.decidedBy.userId} · {tie.decision?.decidedAt}</p>
+        <p className="mt-1 text-xs font-bold text-[#6b675d]">{tie.decision?.decidedBy.userId} · {tie.decision?.decidedAt}</p>
       </li>)}
     </ul>
   </section>;

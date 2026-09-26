@@ -11,6 +11,7 @@ import {
 } from '../../lib/store';
 import type { Role } from '../../types';
 import { DEMO_BAR_SHELL_PADDING } from './demo-shell';
+import { roleLabel } from '../../lib/ui-language';
 
 export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
 
@@ -35,32 +36,13 @@ export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
  * وقد سمّتها `aria-label` أصلًا، والقائمةُ تنكمش ولا تنكمش الأزرار.
  */
 
-const ROLE_LABELS: Record<Role, [string, string]> = {
-  comp_admin: ['مدير المسابقة', 'Competition admin'],
-  head_judge: ['رئيس اللجنة', 'Head judge'],
-  judge: ['محكّم', 'Judge'],
-  ops_manager: ['مدير التشغيل', 'Operations manager'],
-  exception_host: ['الحالات الاستثنائية', 'Exception host'],
-  delegation_manager: ['مدير الوفد', 'Delegation manager'],
-  participant: ['متسابق', 'Participant'],
-  guardian: ['ولي أمر', 'Guardian'],
-  broadcast_operator: ['مشغّل البثّ', 'Broadcast operator'],
-  auditor: ['مدقّق', 'Auditor'],
-  support_agent: ['الدعم', 'Support agent'],
-  org_admin: ['مدير الجهة', 'Organization admin'],
-  branch_admin: ['مدير الفرع', 'Branch admin'],
-  super_admin: ['مالك المنصة', 'Platform owner'],
-  operator_owner: ['مالك المشغّل', 'Operator owner'],
-  operator_admin: ['مدير المشغّل', 'Operator admin'],
-  storage_admin: ['مدير التخزين', 'Storage admin'],
-  billing_admin: ['مدير الفوترة', 'Billing admin'],
-};
-
+/* أسماء الأدوار من المصدر المشترك نفسه الذي تقرأه الواجهة الحقيقية (`roleLabel`)، لا نسخة
+   تجريبية مستقلة كانت تتقادم كلما تغيّرت التسمية في المنتج. */
 export const DemoBar: React.FC = () => {
   const { language, currentUser } = useAppStore();
   if (!IS_DEMO_SESSION) return null;
   const ar = language === 'ar';
-  const label = (role: Role) => ROLE_LABELS[role]?.[ar ? 0 : 1] || role;
+  const label = (role: Role) => roleLabel(role, ar);
 
   return (
     <div
@@ -72,19 +54,19 @@ export const DemoBar: React.FC = () => {
         <span
           role="status"
           aria-label={ar ? 'بيئة تجريبية معزولة ببيانات مصطنعة' : 'Isolated demo environment with synthetic data'}
-          className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-black tracking-wide text-[#8a6a1c]"
+          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-black tracking-wide text-[#8a6a1c]"
         >
           <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
           <span className="hidden sm:inline">{ar ? 'بيئة تجريبية' : 'DEMO'}</span>
         </span>
 
         <label className="inline-flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
-          <span className="hidden shrink-0 text-[10px] font-black text-[#8a6a1c] sm:inline">{ar ? 'الدور' : 'Role'}</span>
+          <span className="hidden shrink-0 text-xs font-black text-[#8a6a1c] sm:inline">{ar ? 'الدور' : 'Role'}</span>
           <select
             value={currentUser.role}
             onChange={event => setDemoRole(event.target.value as Role)}
             aria-label={ar ? 'اختر الدور المعروض' : 'Choose the role on screen'}
-            className="min-h-11 w-full min-w-0 rounded-xl border border-[#d8b86a] bg-white px-2.5 text-[11px] font-black text-[#6b5314] sm:w-auto"
+            className="min-h-11 w-full min-w-0 rounded-xl border border-[#d8b86a] bg-white px-2.5 text-sm font-black text-[#6b5314] sm:w-auto"
           >
             <optgroup label={ar ? 'أدوار المسابقة والجهة' : 'Competition & organization'}>
               {DEMO_TENANT_ROLES.map(role => (
