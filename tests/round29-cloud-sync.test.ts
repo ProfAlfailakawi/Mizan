@@ -38,7 +38,8 @@ test('least privilege: a judge authors evidence, not results or certificates',()
   const rules=fs.readFileSync('firestore.rules','utf8');
   assert.match(rules,/roleIs\(\['judge'\]\)\s*&& request\.resource\.data\.diff\(resource\.data\)\.affectedKeys\(\)\.hasOnly\(\['status','statusHistory','updatedAt'\]\)/);
   assert.match(rules,/request\.resource\.data\.status == 'tested' && resource\.data\.status in \['checked_in','in_queue','in_session'\]/,'only a forward transition');
-  assert.match(rules,/statusHistory\.size\(\) == resource\.data\.get\('statusHistory', \[\]\)\.size\(\) \+ 1/,'history is append-only');
+  assert.match(rules,/next\.size\(\) == prev\.size\(\) \+ 1/,'history is append-only');
+  assert.match(rules,/appendsOneStatusEntry\(resource\.data\.get\('statusHistory', \[\]\), request\.resource\.data\.statusHistory, request\.resource\.data\.status\)/,'judge update uses the append-only check');
   const store=fs.readFileSync('src/lib/store.ts','utf8');
   assert.match(store,/role==='judge'\)void persistParticipantStatusOnly/,'a judge merges status fields only, never uploaderUid');
   assert.equal(canWriteSyncedCollection('head_judge','results'),true);
