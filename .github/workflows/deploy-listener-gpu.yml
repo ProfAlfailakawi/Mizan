@@ -80,10 +80,13 @@ jobs:
             --gcs-source-staging-dir="$SOURCE_STAGING_BUCKET" 2>&1 | tee "$OUT" || ok=$?
           if [ "$ok" != "0" ]; then
             BID="$(grep -oE 'builds/[0-9a-f-]{36}' "$OUT" | head -1 | cut -d/ -f2 || true)"
-            echo "::group::Cloud Build log ${BID}"
+            # آخرُ الأسطر لا أوّلُها: سطرُ الخطأ في نهاية السجل، وقراءةٌ تصاعديّةٌ بحدٍّ
+            # تُقصّ قبل بلوغه (جرى ذلك فعلًا — سجلُّ apt وحده يتجاوز الألف). تنازليًّا ثم تُعكس.
+            echo "::group::Cloud Build log ${BID} (آخر 400 سطر)"
             [ -n "$BID" ] && gcloud logging read \
               "resource.type=\"build\" AND resource.labels.build_id=\"$BID\"" \
-              --project "$GCP_PROJECT_ID" --order=asc --limit=1000 --format='value(textPayload)' || true
+              --project "$GCP_PROJECT_ID" --order=desc --limit=400 --format='value(textPayload)' \
+              | tac || true
             echo "::endgroup::"
             exit "$ok"
           fi
