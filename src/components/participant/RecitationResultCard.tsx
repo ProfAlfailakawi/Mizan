@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { formatParticipantCode } from '../../lib/journey-progress';
 
 /*
  * بطاقة التلاوة — الوجه الذي يخرج من ميزان إلى الناس.
@@ -40,7 +41,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
           <span className="h-2 w-2 rounded-full bg-[#c49a5d]" aria-hidden="true" />
           {ar ? 'نتيجة معلنة · ميزان' : 'PUBLISHED RESULT · MIZAN'}
         </span>
-        <span dir="ltr" className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-black tabular-nums text-white/80 whitespace-nowrap">{participantCode}</span>
+        <span dir="ltr" className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-black tabular-nums text-white/80 whitespace-nowrap">{formatParticipantCode(participantCode)}</span>
       </header>
 
       <div className="mt-6">

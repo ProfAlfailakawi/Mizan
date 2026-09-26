@@ -38,6 +38,7 @@ import { blobToBase64, notHeardAyat, runTashkeel, type UnclearAyah } from '../..
 import { playReferenceWord, spokenPosition } from '../../lib/reference-word';
 import { EMPTY_TASHKEEL, TASHKEEL_HAFS_ONLY_NOTE, TashkeelReport, tashkeelFailureNote, unclearReason, type TashkeelRetake, type TashkeelState } from './TashkeelReport';
 import type { QuranScope } from '../../lib/quran-scope';
+import { hintEnd, hintsLeft } from '../../lib/hint-reveal';
 
 /*
  * «المصحفُ يسمعك» — أن يراجع الطالبُ بصفحته كما يراجع في مصحفه، والصفحةُ تردّ عليه.
@@ -147,7 +148,8 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
   const [veiled, setVeiled] = useState(false);
   const veiledRef = useRef(false);
   useEffect(() => { veiledRef.current = veiled; }, [veiled]);
-  const [hint, setHint] = useState<number | null>(null);
+  /** ضغطاتُ التلميح عند الموضع الحاليّ: تُصفَّر حين يتقدّم الطالب. */
+  const [hintStreak, setHintStreak] = useState(0);
   const [hints, setHints] = useState(0);
   /*
    * «دخلتَ على نظيرتها»: حين يقول الطالبُ عند مفترقٍ كلمةَ الآية المتشابهة لا كلمةَ آيته.
@@ -429,16 +431,14 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const lookupRef = useRef<(s: FaceAlignmentSample) => number | null>(() => null);
   useEffect(() => { lookupRef.current = face ? faceWordLookup(face.words) : () => null; }, [face]);
-  /* التلميح: الكلمةُ التالية تنكشف ثانيتين ونصفًا، وتُعدّ — فالحفظُ بتلميحٍ غيرُه بلا تلميح. */
+  /* التلميح المتدرّج: الأولى كلمة، والثانية كلمتان… ويبقى المكشوف حتى يُتلى، ويُعدّ من رصيدٍ محدود. */
   const giveHint = useCallback(() => {
-    setHint(reached);
+    if (hintsLeft(hints) <= 0) return;
+    setHintStreak(n => n + 1);
     setHints(n => n + 1);
-  }, [reached]);
-  useEffect(() => {
-    if (hint === null) return;
-    const t = window.setTimeout(() => setHint(null), 2500);
-    return () => window.clearTimeout(t);
-  }, [hint]);
+  }, [hints]);
+  useEffect(() => { setHintStreak(0); }, [reached]);
+  const hint = hintEnd(reached, hintStreak, face?.words.length ?? 0);
 
   /* نصُّ الوجه كما يقابَل به ما سُمع — فهرسُ الكلمة هو نفسُه الذي تعرفه الشاشة. */
   const expected = useMemo<ExpectedWord[]>(() => (face?.words ?? []).map(w => ({ index: w.index, text: w.text })), [face]);
@@ -490,7 +490,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     /* وما بقي من طابور الوجه السابق يُترك قبل أن يُسحب وجهٌ جديد. */
     queue.current.abandon(); queue.current = serialQueue();
     recognition.current.abandon(); recognition.current = serialQueue();
-    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
+    setStage('loading'); setReading(null); setNote(''); samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHintStreak(0); setHints(0); setSlips([]); setSeconds(0); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; roughGate.current = OPEN_ROUGH_GATE; trustedFrontier.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
@@ -560,7 +560,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
 
   const begin = useCallback(async () => {
     if (!face) return;
-    samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHint(null); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
+    samples.current = []; setHeard(0); setReached(0); setPen(null); setPenTarget(null); setHintStreak(0); setHints(0); setSlips([]); setSeconds(0); setNote(''); setIncomplete(false);
     heardWords.current = []; alertMemory.current = EMPTY_ALERT_MEMORY; alertWindows.current = []; chunkIndex.current = 0; latestRecognition.current = -1; latestAlignment.current = -1; lastGlobal.current = -1; lastRough.current = -1; roughGate.current = OPEN_ROUGH_GATE; trustedFrontier.current = -1; wordFollow.current = true; followFailures.current = 0;
     recording.current = []; tashkeelRun.current += 1; setTashkeel(EMPTY_TASHKEEL);
     snippets.current.forEach(p => p.close()); snippets.current = new Map(); wordTimes.current = new Map(); retakeClips.current = [];
@@ -1237,10 +1237,11 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               </button>
             )}
             {veiled && stage === 'reciting' && (
-              <button onClick={giveHint} data-hint-count={hints}
-                className="inline-flex items-center gap-2 rounded-2xl border border-[#e2d3ae] bg-[#fffaf0] px-4 py-2.5 text-xs font-black text-[#7a5a1c]">
-                <Lightbulb className="h-4 w-4" aria-hidden="true" />{ar ? 'تلميح' : 'Hint'}
-                {hints > 0 && <span className="tabular-nums opacity-70">{ar ? `(${hints})` : `(${hints})`}</span>}
+              <button onClick={giveHint} data-hint-count={hints} data-hints-left={hintsLeft(hints)} disabled={hintsLeft(hints) <= 0}
+                aria-label={ar ? `تلميح — بقي ${hintsLeft(hints)}` : `Hint — ${hintsLeft(hints)} left`}
+                className="inline-flex min-h-[52px] items-center gap-2 rounded-2xl border-2 border-[#e2d3ae] bg-[#fffaf0] px-5 py-3 text-base font-black text-[#7a5a1c] disabled:opacity-40">
+                <Lightbulb className="h-6 w-6" aria-hidden="true" />{ar ? 'تلميح' : 'Hint'}
+                <span className="tabular-nums opacity-80">({hintsLeft(hints)})</span>
               </button>
             )}
             {stage === 'report' && (

@@ -8,6 +8,7 @@ import type { FaceMark, FaceMarkKind, FaceIndices } from '../../lib/face-reading
 import type { Mistake } from '../../lib/recitation-diff';
 import { fetchOfficialMushafPage, officialMushafPackageForReading } from '../../lib/kfgqpc-library';
 import { useQuranFontReady } from '../../lib/quran-font';
+import { isHinted } from '../../lib/hint-reveal';
 
 /*
  * الوجهُ يُلوَّن بتلاوته — والصفحةُ نفسُها هي التقرير.
@@ -173,7 +174,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
               <span
                 data-word={word.index}
                 data-live={live ? (word.index === pen ? 'pen' : word.index < reached && !fault ? 'done' : undefined) : undefined}
-                data-veiled={live?.veiled && word.index >= reached && word.index !== live.hint ? 'true' : undefined}
+                data-veiled={live?.veiled && word.index >= reached && !isHinted(word.index, reached, live.hint) ? 'true' : undefined}
                 data-note={noteOf.get(word.index)?.kind}
                 data-mark={top?.kind}
                 data-mistake={fault?.kind}

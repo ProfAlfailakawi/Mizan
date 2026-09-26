@@ -29,13 +29,24 @@ test('the pen sits on the word being recited, and what was recited keeps a trail
   assert.doesNotMatch(html, /data-word="2"[^>]*data-live=/, 'a word not yet reached carries no trail');
 });
 
-test('the veil hides only what has not been recited — and the hint lifts one word', () => {
-  const html = render({ cursor: 1, reached: 2, veiled: true, hint: 3 });
+test('the veil hides only what has not been recited — and each hint press lifts one more word', () => {
+  const html = render({ cursor: 0, reached: 1, veiled: true, hint: 2 });
   assert.doesNotMatch(html, /data-word="0"[^>]*data-veiled/);
-  assert.match(html, /data-word="2"[^>]*data-veiled="true"/);
-  assert.doesNotMatch(html, /data-word="3"[^>]*data-veiled/, 'the hinted word is revealed');
+  assert.doesNotMatch(html, /data-word="1"[^>]*data-veiled/, 'first hinted word is revealed');
+  assert.doesNotMatch(html, /data-word="2"[^>]*data-veiled/, 'second hinted word is revealed');
+  assert.match(html, /data-word="3"[^>]*data-veiled="true"/, 'beyond the hint stays veiled');
   // الحجابُ يُخفي الرسمَ ولا يمحوه: النصُّ القرآنيّ كما هو في الصفحة.
   for (const w of words) assert.ok(html.includes(w.text));
+});
+
+test('hint reveal grows one word per press and has a budget', async () => {
+  const { hintEnd, hintsLeft, HINT_BUDGET } = await import('../src/lib/hint-reveal');
+  assert.equal(hintEnd(4, 0, 10), null);
+  assert.equal(hintEnd(4, 1, 10), 4);
+  assert.equal(hintEnd(4, 2, 10), 5);
+  assert.equal(hintEnd(8, 5, 10), 9);
+  assert.equal(hintsLeft(0), HINT_BUDGET);
+  assert.equal(hintsLeft(99), 0);
 });
 
 test('before recitation the face is untouched by the live layer', () => {

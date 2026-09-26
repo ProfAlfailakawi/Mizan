@@ -28,6 +28,8 @@ import type { Mistake } from '../../lib/recitation-diff';
  * كلِّه: لا تُعلَّم كلمةٌ ليست هي.
  */
 
+import { isHinted } from '../../lib/hint-reveal';
+
 export interface LiveWord extends FaceTokenWord { text: string }
 
 export interface LiveState {
@@ -37,7 +39,7 @@ export interface LiveState {
   reached: number;
   /** «اختبر حفظك»: الكلماتُ محجوبةٌ حتى تُتلى. */
   veiled: boolean;
-  /** كلمةٌ كُشفت تلميحًا مؤقّتًا. */
+  /** آخرُ كلمةٍ كشفها التلميح (شاملة) — من أوّل ما لم يُتلَ حتى هنا. */
   hint: number | null;
 }
 
@@ -172,7 +174,7 @@ export const LiveMushafPage: React.FC<LiveMushafPageProps> = ({ ar, page, url, w
       for (const w of hidden) {
         const b = geometry.boxes.get(w.index);
         if (!b) continue;
-        if (w.index === live.hint) windows.push({ x: b.x - 0.008, y: slot.top, width: b.width + 0.016, height: slot.height });
+        if (isHinted(w.index, reached, live.hint)) windows.push({ x: b.x - 0.008, y: slot.top, width: b.width + 0.016, height: slot.height });
         else ghosts.push(b);
       }
     }
