@@ -82,13 +82,16 @@ test('the GPU listener deploys from Cloud Build (the runner can only read Cloud 
   const at = (s: string) => { const i = gpuBuild.indexOf(s); assert.ok(i >= 0, `missing: ${s}`); return i; };
   assert.ok(at("args: ['push', '${_TAG}']") < at('gcloud run deploy mizan-quran-listener-gpu'), 'the image is pushed before it is deployed');
   assert.match(gpuBuild, /--startup-probe=httpGet\.path=\/ready,/);
-  assert.ok(at(`grep -Eq '"device": ?"cuda"'`) < at('MIZAN_QURAN_PRACTICE_LISTENER_URL=${url}/listen'), 'no routing before a read device=cuda');
+  assert.doesNotMatch(gpuBuild, /MIZAN_QURAN_PRACTICE_LISTENER_URL/, 'the build never routes: routing waits for a read on cuda');
+  assert.match(read('services/quran-practice-listener/app.py'), /ready from \{state\["source"\]\} on \{state\["device"\]\}/);
   const route = read('services/quran-practice-listener/cloudbuild.gpu-route.yaml');
-  assert.match(route, /gcloud run services describe mizan-quran-listener --region me-central1/);
+  assert.match(route, /cpu\) url="\$\(gcloud run services describe mizan-quran-listener --region me-central1/);
   assert.doesNotMatch(route, /docker|run deploy/, 'rolling back never waits on a GPU build');
   const workflow = read('.github/workflows/deploy-listener-gpu.yml');
   assert.doesNotMatch(workflow, /gcloud run (deploy|services (update|add-iam-policy-binding))/);
-  assert.match(workflow, /--config "\$SRC\/cloudbuild\.gpu-route\.yaml"/);
+  assert.match(workflow, /--config "\$SRC\/cloudbuild\.gpu-route\.yaml" --substitutions "_ROUTE=cpu/);
+  const w = (s: string) => { const i = workflow.indexOf(s); assert.ok(i >= 0, `missing: ${s}`); return i; };
+  assert.ok(w('*" on cuda "*)') < w('"_ROUTE=gpu,'), 'no routing to the GPU before its boot line says on cuda');
   assert.match(workflow, /--order=desc --limit=400/, 'the tail of the build log, where the error is');
   assert.match(workflow, /resource\.labels\.service_name=\\"\$GPU_SERVICE\\"/, 'a CUDA failure at boot is printed from the service log');
   // ونشرُ ميزان الدوريّ لا يمحو توجيهًا إلى GPU.

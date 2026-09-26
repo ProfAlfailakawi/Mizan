@@ -1,4 +1,4 @@
-# مستمعُ GPU كاملًا داخل Cloud Build — بناءٌ فدفعٌ فنشرٌ فصحّةٌ فتوجيه — يُشغَّل يدويًّا من
+# مستمعُ GPU داخل Cloud Build — بناءٌ فدفعٌ فنشرٌ فصلاحيةُ النداء — يُشغَّل يدويًّا من
 # .github/workflows/deploy-listener-gpu.yml (docs/LISTENER-GPU.md)، ولا يدخل نشرَ ميزان الدوريّ.
 #
 # النشرُ هنا لا في عدّاء GitHub: حسابُ النشر هناك لا يملك من Cloud Run إلا run.viewer
@@ -7,6 +7,9 @@
 #
 # صياغة: Cloud Build يستبدل PROJECT_ID وCOMMIT_SHA والبدائلَ المبدوءةَ بشرطةٍ سفليّة قبل الصدفة؛
 # ومتغيّراتُ الصدفة هنا بالصغيرة كما في cloudbuild.yaml، فلا تُعدّ استبدالًا.
+#
+# التحقّقُ من العتاد (`on cuda`) والتوجيهُ خارج هذا الملف: Cloud Build لا يُصدر رمزَ هويّةٍ لقراءة
+# `/health` (ردّ 404 في التشغيلة الخامسة)، فيقرأ الـworkflow سطرَ الإقلاع من سجلّ الخدمة نفسها.
 steps:
   - id: build
     name: gcr.io/cloud-builders/docker
@@ -46,29 +49,11 @@ steps:
         gcloud run services add-iam-policy-binding mizan-quran-listener-gpu --region '${_REGION}' \
           --member "serviceAccount:${runtime_sa}" --role roles/run.invoker --quiet >/dev/null
 
-        # `/health` يقول `device`: نشرُ GPU لا يُعدّ ناجحًا إلا إن قال cuda — قراءةً لا افتراضًا.
-        token="$(gcloud auth print-identity-token --audiences="$url" 2>/dev/null \
-          || curl -fsS -H 'Metadata-Flavor: Google' "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${url}" \
-          || true)"
-        if [ -z "$token" ]; then echo 'MIZAN_GPU_NO_TOKEN: could not mint an identity token to read /health'; exit 1; fi
-        health="$(curl -sS -m 180 -H "Authorization: Bearer ${token}" "${url}/health" || true)"
-        echo "MIZAN_GPU_HEALTH ${health}"
-        if ! grep -Eq '"device": ?"cuda"' <<<"$health"; then
-          echo 'MIZAN_GPU_NOT_CUDA: the GPU service did not report device=cuda; not routing to it'
-          exit 1
-        fi
-
-        if [ '${_ROUTE}' = gpu ]; then
-          gcloud run services update mizan --region me-central1 \
-            --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=${url}/listen" --quiet
-          echo "MIZAN_GPU_ROUTE mizan -> ${url}/listen"
-        fi
 
 substitutions:
   _TAG: ''
   _REGION: europe-west1
   _MIN_INSTANCES: '0'
-  _ROUTE: keep
 options:
   machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY

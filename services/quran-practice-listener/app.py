@@ -129,7 +129,7 @@ def startup_load():
         state['error']=f'{type(exc).__name__}: {exc}'[-600:]; state['failed']=True
         print(f'listener startup failed: {state["error"]}',flush=True)
         return
-    print(f'listener startup: model {state["id"]} ready from {state["source"]} in {time.time()-started:.1f}s',flush=True)
+    print(f'listener startup: model {state["id"]} ready from {state["source"]} on {state["device"]} in {time.time()-started:.1f}s',flush=True)
 
 app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 

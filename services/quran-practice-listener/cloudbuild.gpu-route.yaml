@@ -1,19 +1,27 @@
-# إرجاعُ ميزان إلى مستمع CPU وحده — بلا بناءٍ ولا نشر، فيعمل ولو كانت خدمةُ GPU معطوبة.
-# يُشغَّل من .github/workflows/deploy-listener-gpu.yml بـroute=cpu (docs/LISTENER-GPU.md).
+# توجيهُ ميزان بين مستمعَي CPU وGPU وحده — بلا بناءٍ ولا نشر. يُشغَّل من
+# .github/workflows/deploy-listener-gpu.yml: `cpu` رجوعٌ فوريّ يعمل ولو كانت خدمةُ GPU معطوبة،
+# و`gpu` بعد أن يقرأ الـworkflow من سجلّ خدمة GPU أنها أقلعت `on cuda`.
 # ويجري بحساب البناء كما يجري النشر: حسابُ عدّاء GitHub لا يملك تعديلَ خدمة ميزان.
 steps:
-  - id: route-cpu
+  - id: route
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
     args:
       - '-c'
       - |
         set -euo pipefail
-        url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')"
+        case '${_ROUTE}' in
+          gpu) url="$(gcloud run services describe mizan-quran-listener-gpu --region '${_REGION}' --format='value(status.url)')" ;;
+          cpu) url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)')" ;;
+          *) echo "unknown route: ${_ROUTE}"; exit 1 ;;
+        esac
         test -n "$url"
         gcloud run services update mizan --region me-central1 \
           --update-env-vars "MIZAN_QURAN_PRACTICE_LISTENER_URL=${url}/listen" --quiet
         echo "MIZAN_GPU_ROUTE mizan -> ${url}/listen"
+substitutions:
+  _ROUTE: cpu
+  _REGION: europe-west1
 options:
   logging: CLOUD_LOGGING_ONLY
 timeout: 900s
