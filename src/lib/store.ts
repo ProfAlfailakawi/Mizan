@@ -1006,8 +1006,21 @@ async function syncPublicJourneys(){
   for(const p of globalState.participants.filter(x=>x.competitionId===globalState.competition.id))await publishPublicJourneyRecord(p);
 }
 
+/*
+ * المحكّم لا يكتب سجلّ المتسابق كاملًا: يدمج الحالة وسجلّها وحدهما، فلا يلمس `uploaderUid`
+ * ولا غيره — والقواعد لا تقبل منه إلا هذه الحقول وانتقالًا إلى الأمام.
+ */
+async function persistParticipantStatusOnly(participant:Participant){
+  if(globalState.isOffline||!auth.currentUser||cloudSessionLost())return false;
+  try{
+    const {db,doc,setDoc}=await getFirestoreClient();
+    await setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,'participants',participant.id),{status:participant.status,statusHistory:participant.statusHistory||[],updatedAt:new Date().toISOString()},{merge:true});
+    return true;
+  }catch(err){reportCloudError(classifyCloudError(err),`participants/${participant.id}`);return false;}
+}
 function syncParticipantLifecycle(participant:Participant){
-  void persistScopedDocument('participants',participant.id,participant as unknown as Record<string,unknown>);
+  if(globalState.currentUser.role==='judge')void persistParticipantStatusOnly(participant);
+  else void persistScopedDocument('participants',participant.id,participant as unknown as Record<string,unknown>);
   void publishPublicJourneyRecord(participant);
 }
 
