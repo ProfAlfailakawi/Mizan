@@ -42,15 +42,15 @@ test('sign-out is an explicit durability boundary for category/config edits',()=
   assert.match(durability,/configWriteAllowed\(remoteUpdatedAt, localUpdatedAt\)/,'logout must not overwrite a newer cloud edit');
   assert.match(durability,/setDoc\(ref, configuration, \{ merge: true \}\)/,'competition config must be written before sign-out');
   assert.match(durability,/const verification = await getDoc\(ref\)/,'the authoritative root must be read back after writing');
-  const flushAt=durability.indexOf('await persistDurableCompetitionSnapshot();');
-  const signOutAt=durability.indexOf('await signOut(auth);',flushAt);
+  const flushAt=durability.indexOf('await withinBudget(persistDurableCompetitionSnapshot(), FLUSH_BUDGET_MS);');
+  const signOutAt=durability.indexOf('await withinBudget(signOut(auth), SIGN_OUT_BUDGET_MS);',flushAt);
   assert.ok(flushAt>=0&&signOutAt>flushAt,'Firebase sign-out must happen after the awaited cloud flush');
   assert.doesNotMatch(durability,/localStorage\.setItem/,'durability helper must not add a clear-text browser storage sink');
 });
 
 
 test('the primary signed-in logout surface flushes before ending Firebase auth',()=>{
-  assert.match(header,/durableSignOut\(\).*window\.location\.reload/,'header logout must use the durability path');
+  assert.match(header,/signOutAndReload\(\)/,'header logout must use the shared bounded durability path');
   assert.doesNotMatch(header,/signOut\(auth\)/,'header must not bypass the final cloud flush');
 });
 
@@ -74,8 +74,19 @@ test('server-created student registrations reappear through the restored competi
 
 
 test('idle sign-out preserves the same final cloud write boundary',()=>{
-  assert.match(idle,/durableSignOut\(\)/,
+  assert.match(idle,/signOutAndReload\(\)/,
     'idle timeout must use the same durability boundary');
   assert.doesNotMatch(idle,/signOut\(auth\)/,
     'idle timeout must not bypass the final cloud flush');
+});
+
+test('logout always completes: bounded flush, single flight, reload, demo keys cleared',()=>{
+  const app=read('src/App.tsx');
+  assert.match(durability,/Promise\.race\(\[work, new Promise<undefined>/,'a hung Firestore flush or signOut must not block logout forever');
+  assert.match(durability,/if \(signingOut\) return;/,'repeated clicks must not start parallel sign-out chains');
+  assert.match(durability,/\.finally\(\(\) => window\.location\.reload\(\)\)/,'sign-out always reloads');
+  assert.doesNotMatch(app,/signOut\(auth\)/,'every App logout surface uses the shared path');
+  const exit=store.slice(store.indexOf('export function exitDemoSession'),store.indexOf('export function resetDemoSession'));
+  assert.match(exit,/mizan_demo_role_v1/,'leaving the demo forgets the chosen demo role');
+  assert.doesNotMatch(exit,/return false;\s*\}\s*window\.location\.reload/,'a storage error must not skip the reload');
 });

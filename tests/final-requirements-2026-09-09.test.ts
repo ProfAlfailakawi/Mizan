@@ -64,7 +64,7 @@ test('all September 9 UX fixes are wired to real state rather than cosmetic plac
  // Deployment has no artificial economic/balanced/expanded choice.
  assert.doesNotMatch(deployment,/اقتصادي|متوازن|موسّع|economic|balanced|expanded/i);
  // No fake flight is shown/seeded, and CSV has a downloadable template.
- assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);assert.doesNotMatch(store,/flightNumber:\s*['"]MZ 417['"]/);assert.match(enterprise,/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
+ assert.equal(fs.existsSync('src/lib/seed-data.ts'),false);assert.doesNotMatch(store,/flightNumber:\s*['"]MZ 417['"]/);assert.match(fs.readFileSync('src/components/admin/RolePortals.tsx','utf8'),/لن يُنشئ ميزان أي رحلة تلقائيًا/);assert.match(enterprise,/تحميل النموذج/);assert.match(enterprise,/downloadTemplate/);
  // Recovery/export/support utilities are centralized once; regulation-to-policy import card is removed from readiness UI.
  assert.match(enterprise,/أدوات الإدارة/);assert.equal((enterprise.match(/<Governance /g)||[]).length,1);assert.doesNotMatch(readiness,/استيراد لائحة|حوّل اللائحة إلى سياسة مسابقة/);
  // The official Madinah Mushaf visual master is already accepted, not shown as missing.

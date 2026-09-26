@@ -261,14 +261,14 @@ export function enterDemoSession(): boolean {
 
 /** يخرج منها ويمحو كل ما كتبته في هذا التبويب. */
 export function exitDemoSession(): boolean {
-  try {
-    window.sessionStorage.removeItem(DEMO_FLAG_KEY);
-    window.sessionStorage.removeItem(DEMO_STATE_KEY);
-  } catch {
-    return false;
+  // كان فشلُ التخزين يُرجع قبل إعادة التحميل فيبدو زرّ الخروج معطّلًا، وكان الدور
+  // التجريبي المختار يبقى فيعود به الزائر في المرة التالية. الخروج يحدث دائمًا الآن.
+  let cleared = true;
+  for (const key of [DEMO_FLAG_KEY, DEMO_STATE_KEY, 'mizan_demo_role_v1']) {
+    try { window.sessionStorage.removeItem(key); } catch { cleared = false; }
   }
   window.location.reload();
-  return true;
+  return cleared;
 }
 
 /** يعيد بناء البيانات التجريبية من الصفر دون مغادرة البيئة. */
@@ -486,7 +486,8 @@ function demoIdentityFor(role: Role): User {
     guardian: ['ولي أمر (بيئة تجريبية)', 'Demo Guardian'],
   };
   const [nameArabic, name] = labels[role] || ['بيئة تجريبية', 'Demo User'];
-  return generic(nameArabic, name);
+  // الوفد في البذور التجريبية؛ الشيفرة نفسها تشتقّ النطاق من الحساب في الجلسة الحقيقية.
+  return role === 'delegation_manager' ? { ...generic(nameArabic, name), delegationId: 'delegation-current' } : generic(nameArabic, name);
 }
 
 /** يطبّق الدور المختار على الحالة التجريبية القائمة. لا أثر له خارجها. */
