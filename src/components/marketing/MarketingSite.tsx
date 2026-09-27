@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck, Scale, Mic, WifiOff, QrCode, BadgeCheck, Users, Building2,
   Fingerprint, FileCheck2, Radio, Accessibility, Trophy, BookOpen, Layers,
-  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity,
+  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity, ArrowLeft,
 } from 'lucide-react';
+import { DnaStepper } from '../dna/DnaKit';
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
 import { toWesternDigits } from '../../lib/input-normalize';
@@ -45,14 +46,14 @@ const Section: React.FC<{ children: React.ReactNode; className?: string; id?: st
 };
 
 const Kicker: React.FC<{ children: React.ReactNode; tone?: 'light' | 'dark' }> = ({ children, tone = 'light' }) => (
-  <div className="text-[11px] font-black tracking-[.18em]" style={{ color: tone === 'dark' ? '#a9b6ae' : '#8a9089' }}>{children}</div>
+  <div className="text-[11px] font-bold tracking-[.18em]" style={{ color: tone === 'dark' ? 'var(--venue-muted)' : 'var(--muted)' }}>{children}</div>
 );
 
 /* ── الرقم الكبير: البرهان قبل الكلام ─────────────────────────────── */
 const Stat: React.FC<{ value: string; label: string; tone?: 'dark' | 'light' }> = ({ value, label, tone = 'light' }) => (
   <div className="text-center px-2">
-    <div className="font-display text-[clamp(30px,6vw,52px)] leading-none font-black" style={{ color: tone === 'dark' ? '#f4f1e8' : '#214c40' }}>{value}</div>
-    <div className="mt-2 text-[11px] font-bold" style={{ color: tone === 'dark' ? '#a9b6ae' : '#696f6b' }}>{label}</div>
+    <div className="font-display text-[clamp(30px,6vw,52px)] leading-none font-black" style={{ color: tone === 'dark' ? 'var(--venue-ink)' : 'var(--emerald)' }}>{value}</div>
+    <div className="mt-2 text-[11px] font-bold" style={{ color: tone === 'dark' ? 'var(--venue-muted)' : 'var(--muted)' }}>{label}</div>
   </div>
 );
 
@@ -61,7 +62,7 @@ const Capability: React.FC<{ icon: React.ElementType; title: string; line: strin
   <div className="mizan-panel p-5 mizan-surface-hover">
     <div className={`mizan-pictogram ${tone} w-12 h-12 rounded-[15px]`}>
       <span className="mizan-pictogram-dot" /><span className="mizan-pictogram-plane" />
-      <Icon size={20} strokeWidth={2.1} />
+      <Icon size={20} strokeWidth={1.6} />
     </div>
     <div className="mt-4 text-[15px] font-black mizan-title">{title}</div>
     <div className="mt-1.5 text-[13px] leading-6 mizan-muted">{line}</div>
@@ -78,6 +79,9 @@ const CAPABILITIES: Array<{ icon: React.ElementType; title: string; line: string
   { icon: Radio, title: 'شاشات القاعة', tone: 'mizan-pictogram-ink', line: 'انتظار، وخريطة، وبث، وحفل ختامي — جاهزة.' },
   { icon: Accessibility, title: 'وصولٌ للجميع', tone: 'mizan-pictogram-neutral', line: 'حجم النص واللمس والتباين والحركة بيد المستخدم.' },
 ];
+
+/* قدرات الذكاء المعروضة في قسمها — والرقم في شريط الأرقام يُعدّ منها لا يُكتب باليد. */
+const AI_CAPABILITIES = ['محاذاة النص بالصوت', 'جودة الصوت', 'مراقبة الحفظ', 'تجويدٌ صوتي', 'نزاهة اللجنة', 'صعوبة الأسئلة', 'تنوّع بنك الأسئلة', 'صوت الانتقال'];
 
 /* ── الرحلة: إنفوجرافيك من خمس محطات ──────────────────────────────── */
 const JOURNEY: Array<{ icon: React.ElementType; step: string; title: string; line: string }> = [
@@ -166,7 +170,7 @@ const ContactForm: React.FC = () => {
   };
 
   const field = 'w-full rounded-xl px-3.5 py-3 text-[13px] outline-none';
-  const fieldStyle = { background: 'rgba(255,255,255,.06)', border: '1px solid var(--venue-line)', color: 'var(--venue-ink)' } as React.CSSProperties;
+  const fieldStyle = { background: 'var(--canvas)', border: '1px solid var(--line)', color: 'var(--ink)' } as React.CSSProperties;
 
   return (
     <div className="grid gap-3">
@@ -178,11 +182,11 @@ const ContactForm: React.FC = () => {
       <textarea className={field} style={{ ...fieldStyle, minHeight: 96, resize: 'vertical' }} value={note} onChange={e => setNote(e.target.value)} placeholder="موعد مسابقتك، أو سؤالك" aria-label="رسالتك" />
       <button onClick={send} disabled={!ready}
         className="mt-1 inline-flex items-center justify-center gap-2.5 rounded-2xl py-4 text-[14px] font-black transition"
-        style={{ background: ready ? 'var(--gold-light)' : 'rgba(255,255,255,.10)', color: ready ? 'var(--ink-deep)' : 'var(--venue-faint)', cursor: ready ? 'pointer' : 'not-allowed' }}>
+        style={{ background: ready ? 'var(--emerald)' : 'var(--surface-soft)', color: ready ? 'var(--surface)' : 'var(--muted)', cursor: ready ? 'pointer' : 'not-allowed' }}>
         <Mail size={17} /> أرسل الطلب
       </button>
-      <div className="text-[11px] text-center" style={{ color: 'var(--venue-faint)' }}>
-        أو راسلنا مباشرةً على <a href={`mailto:${CONTACT_TO}`} className="font-black" style={{ color: 'var(--gold-light)' }}>{CONTACT_TO}</a>
+      <div className="text-[11px] text-center" style={{ color: 'var(--muted)' }}>
+        أو راسلنا مباشرةً على <a href={`mailto:${CONTACT_TO}`} className="font-black" style={{ color: 'var(--emerald)' }}>{CONTACT_TO}</a>
       </div>
     </div>
   );
@@ -196,7 +200,7 @@ export const MarketingSite: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen font-arabic" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
+    <div className="min-h-screen font-arabic overflow-x-clip" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
 
       {/* ══ شريط علوي: العلامة وحدها. لا دخول — كل جهة تدخل من نطاقها ══ */}
       <header className="sticky top-0 z-40 backdrop-blur" style={{ background: 'rgba(247,245,239,.86)', borderBottom: '1px solid var(--line)' }}>
@@ -218,7 +222,7 @@ export const MarketingSite: React.FC = () => {
       <Section className="!pt-10 sm:!pt-16">
         <div className="grid lg:grid-cols-[1.05fr_1fr] gap-8 lg:gap-12 items-center">
           <div>
-            <Kicker>ميزان · MIZAN</Kicker>
+            <Kicker>ميزان</Kicker>
             <h1 className="font-display font-black mt-4 leading-[1.12] text-[clamp(32px,6.4vw,58px)] mizan-title">
               مسابقات القرآن،
               <br />
@@ -253,7 +257,7 @@ export const MarketingSite: React.FC = () => {
         <div className="mizan-hero grid grid-cols-2 md:grid-cols-4 gap-y-8 py-8">
           {/* الرقم مشتقٌّ من ROLE_PERMISSIONS لا مكتوبٌ باليد — يحرسه marketing-claims.test.ts. */}
           <Stat value={String(GOVERNED_ROLES.length)} label="دورًا بصلاحياتٍ مفصولة" />
-          <Stat value="8" label="قدرات ذكاءٍ محكومة" />
+          <Stat value={String(AI_CAPABILITIES.length)} label="قدرات ذكاءٍ محكومة" />
           <Stat value="100%" label="قرارٍ مختوم في سجلٍّ متسلسل" />
           <Stat value="0" label="أوامر تكتبها لإطلاق جهة" />
         </div>
@@ -270,18 +274,17 @@ export const MarketingSite: React.FC = () => {
       <Section id="kayf">
         <Kicker>الرحلة</Kicker>
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">من فكرة المسابقة إلى صورة الفائز</h2>
-        <div className="mt-8 relative">
-          {/* الخيط الواصل بين المحطات */}
-          <div className="hidden lg:block absolute top-[26px] inset-x-6 h-px" style={{ background: 'linear-gradient(to left, transparent, var(--line) 12%, var(--line) 88%, transparent)' }} />
-          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-8 dna-surface p-5 sm:p-7">
+          <DnaStepper
+            className="mizan-mk-journey"
+            size="lg"
+            ariaLabel="رحلة المسابقة"
+            steps={JOURNEY.map(s => ({ key: s.step, label: s.title, state: 'done' as const, icon: <s.icon size={20} strokeWidth={1.6} />, title: s.line }))}
+          />
+          <ol className="mt-5 grid gap-2.5 sm:gap-3 sm:grid-cols-5 text-start sm:text-center" aria-hidden="true">
             {JOURNEY.map(s => (
-              <li key={s.step} className="relative">
-                <div className="w-[52px] h-[52px] rounded-2xl grid place-items-center relative z-10" style={{ background: 'var(--emerald)', color: '#fff', boxShadow: 'var(--shadow-3)' }}>
-                  <s.icon size={22} strokeWidth={2} />
-                </div>
-                <div className="mt-4 font-display text-[12px] font-black" style={{ color: 'var(--gold)' }}>{s.step}</div>
-                <div className="mt-1 text-[15px] font-black mizan-title">{s.title}</div>
-                <div className="mt-1.5 text-[13px] leading-6 mizan-muted">{s.line}</div>
+              <li key={s.step} className="text-[12px] leading-6 mizan-muted">
+                <span className="sm:hidden font-bold" style={{ color: 'var(--ink)' }}>{s.title} · </span>{s.line}
               </li>
             ))}
           </ol>
@@ -356,23 +359,26 @@ export const MarketingSite: React.FC = () => {
         </div>
 
         {/* الخلاصة التي يفهمها المشتري: الفريق */}
-        <div className="mt-6 rounded-[24px] p-7 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid #cddbd3' }}>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: '#9a938c', textDecoration: 'line-through', textDecorationColor: 'rgba(163,77,67,.5)' }}>24</div>
-          <div className="text-[13px] font-black mizan-muted">فريق تشغيل اليوم الواحد</div>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--emerald)' }}>6</div>
+        <div className="mt-6 rounded-[24px] p-7 grid justify-items-center gap-2 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-center gap-5">
+            <div className="font-display text-[clamp(26px,4vw,44px)] leading-none font-black" style={{ color: 'var(--muted)' }}>24</div>
+            <ArrowLeft size={22} strokeWidth={1.6} aria-hidden="true" style={{ color: 'var(--muted)' }} />
+            <div className="font-display text-[clamp(26px,4vw,44px)] leading-none font-black" style={{ color: 'var(--emerald)' }}>6</div>
+          </div>
+          <div className="text-[13px] font-bold mizan-muted">فريق تشغيل اليوم الواحد</div>
         </div>
       </Section>
 
       {/* ══ ٤٫٧) الذكاء الاصطناعي: قدراتٌ محكومة، لا وعودٌ عامة ══ */}
-      <section className="mt-4" style={{ background: 'var(--venue-2)', color: 'var(--venue-ink)' }}>
+      <section className="mt-4" style={{ background: 'var(--surface-soft)', color: 'var(--ink)' }}>
         <Section className="!py-16">
           <div className="max-w-[62ch]">
-            <Kicker tone="dark">الذكاء الاصطناعي</Kicker>
-            <h2 className="font-display text-[clamp(24px,3.8vw,40px)] font-black mt-3 leading-[1.22]">
+            <Kicker>الذكاء الاصطناعي</Kicker>
+            <h2 className="font-display text-[clamp(24px,3.8vw,40px)] font-black mt-3 leading-[1.22] mizan-title">
               ذكاءٌ يُشير،
               <br />ولا يحكم.
             </h2>
-            <p className="mt-5 text-[14px] leading-8" style={{ color: 'var(--venue-muted)' }}>
+            <p className="mt-5 text-[14px] leading-8" style={{ color: 'var(--muted)' }}>
               الدرجة بيد المحكّم وحده. والقدرة لا يُسمع لها قولٌ أصلًا قبل أن تُعتمد لتلك الرواية بعينها —
               فلا اعتماد شامل، ولا حدّ قبولٍ يُخترع في الشيفرة.
             </p>
@@ -385,11 +391,11 @@ export const MarketingSite: React.FC = () => {
               { src: '/marketing/ai-radar.png', t: 'رادار المتشابهات', s: 'عند التردّد، يُظهر المواضع التي تجذب الذاكرة — من خريطةٍ معتمدةٍ سلفًا، في حالة المراجعة أمام رئيس التحكيم وحده.' },
               { src: '/marketing/ai-parity.png', t: 'تكافؤ القرعة', s: 'هل حمل المتسابقان العبء نفسه؟ يقيس مجموع الصعوبة والمتشابهات والتجويد بجانب إعدادات السحب، ويُنبّه عند الفارق.' },
             ].map(c => (
-              <figure key={c.src} className="rounded-[20px] overflow-hidden" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--venue-line)' }}>
+              <figure key={c.src} className="rounded-[22px] overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-2)' }}>
                 <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="w-full block" />
-                <figcaption className="p-5" style={{ borderTop: '1px solid var(--venue-line)' }}>
+                <figcaption className="p-5" style={{ borderTop: '1px solid var(--line)' }}>
                   <div className="text-[14px] font-black">{c.t}</div>
-                  <div className="text-[13px] leading-6 mt-1.5" style={{ color: 'var(--venue-muted)' }}>{c.s}</div>
+                  <div className="text-[13px] leading-6 mt-1.5" style={{ color: 'var(--muted)' }}>{c.s}</div>
                 </figcaption>
               </figure>
             ))}
@@ -397,8 +403,8 @@ export const MarketingSite: React.FC = () => {
 
           {/* القدرات، كلٌّ تُعتمد وحدها */}
           <div className="mt-10 flex flex-wrap gap-2.5">
-            {['محاذاة النص بالصوت', 'جودة الصوت', 'مراقبة الحفظ', 'تجويدٌ صوتي', 'نزاهة اللجنة', 'صعوبة الأسئلة', 'تنوّع بنك الأسئلة', 'صوت الانتقال'].map(c => (
-              <span key={c} className="rounded-full px-4 py-2 text-[12px] font-black" style={{ background: 'rgba(255,255,255,.05)', border: '1px solid var(--venue-line)', color: 'var(--venue-ink)' }}>{c}</span>
+            {AI_CAPABILITIES.map(c => (
+              <span key={c} className="rounded-full px-4 py-2 text-[12px] font-bold" style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)' }}>{c}</span>
             ))}
           </div>
 
@@ -409,29 +415,29 @@ export const MarketingSite: React.FC = () => {
               { icon: BadgeCheck, t: 'اعتمادٌ لكل رواية', s: 'قدرةٌ معتمدة في روايةٍ لا تنطق في غيرها.' },
               { icon: Mic, t: 'لا تلاوة مصطنعة', s: 'ميزان لا يُولّد صوت القرآن — أبدًا.' },
             ].map(g => (
-              <div key={g.t} className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--venue-line)' }}>
-                <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'rgba(185,139,78,.16)', color: 'var(--gold-light)' }}>
-                  <g.icon size={18} strokeWidth={2.1} />
+              <div key={g.t} className="rounded-[22px] p-5" style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-1)' }}>
+                <div className="w-10 h-10 rounded-xl grid place-items-center" style={{ background: 'var(--emerald-soft)', color: 'var(--emerald)' }}>
+                  <g.icon size={18} strokeWidth={1.6} />
                 </div>
                 <div className="mt-3.5 text-[14px] font-black">{g.t}</div>
-                <div className="text-[13px] leading-6 mt-1" style={{ color: 'var(--venue-muted)' }}>{g.s}</div>
+                <div className="text-[13px] leading-6 mt-1" style={{ color: 'var(--muted)' }}>{g.s}</div>
               </div>
             ))}
           </div>
         </Section>
       </section>
 
-      {/* ══ ٥) النزاهة: القسم الداكن — قلب البيع ══ */}
-      <section className="mt-4" style={{ background: 'var(--venue)', color: 'var(--venue-ink)' }}>
+      {/* ══ ٥) النزاهة: قلب البيع ══ */}
+      <section className="mt-4" style={{ color: 'var(--ink)' }}>
         <Section className="!py-16">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-10 items-center">
             <div>
-              <Kicker tone="dark">النزاهة</Kicker>
-              <h2 className="font-display text-[clamp(24px,3.6vw,38px)] font-black mt-3 leading-[1.25]">
+              <Kicker>النزاهة</Kicker>
+              <h2 className="font-display text-[clamp(24px,3.6vw,38px)] font-black mt-3 leading-[1.25] mizan-title">
                 نتيجةٌ لا يستطيع أحد
                 <br />أن يغيّرها بصمت.
               </h2>
-              <p className="mt-5 text-[14px] leading-8" style={{ color: 'var(--venue-muted)' }}>
+              <p className="mt-5 text-[14px] leading-8" style={{ color: 'var(--muted)' }}>
                 كل درجة، وكل اعتراض، وكل استثناء — يُختم ويُربط بما قبله. كسرُ حلقةٍ واحدة يُظهر نفسه فورًا.
               </p>
             </div>
@@ -443,15 +449,15 @@ export const MarketingSite: React.FC = () => {
                 { icon: Fingerprint, t: 'ختم', s: 'بصمةٌ مرتبطة بما قبلها' },
                 { icon: BadgeCheck, t: 'شهادة', s: 'يتحقّق منها أي أحد' },
               ].map((n, i, all) => (
-                <div key={n.t} className="relative flex items-center gap-4 rounded-2xl p-4" style={{ background: 'var(--venue-surface)', border: '1px solid var(--venue-line)' }}>
-                  <div className="w-11 h-11 rounded-xl grid place-items-center shrink-0" style={{ background: 'rgba(185,139,78,.16)', color: 'var(--gold-light)' }}>
-                    <n.icon size={19} strokeWidth={2} />
+                <div key={n.t} className="relative flex items-center gap-4 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-1)' }}>
+                  <div className="w-11 h-11 rounded-xl grid place-items-center shrink-0" style={{ background: 'var(--emerald-soft)', color: 'var(--emerald)' }}>
+                    <n.icon size={19} strokeWidth={1.6} />
                   </div>
                   <div className="min-w-0">
                     <div className="text-[14px] font-black">{n.t}</div>
-                    <div className="text-[12px] mt-0.5" style={{ color: 'var(--venue-muted)' }}>{n.s}</div>
+                    <div className="text-[12px] mt-0.5" style={{ color: 'var(--muted)' }}>{n.s}</div>
                   </div>
-                  {i < all.length - 1 && <div className="absolute -bottom-3 start-[34px] w-px h-3" style={{ background: 'var(--venue-line)' }} />}
+                  {i < all.length - 1 && <div className="absolute -bottom-3 start-[34px] w-px h-3" style={{ borderInlineStart: '1px dashed var(--line)' }} />}
                 </div>
               ))}
             </div>
@@ -490,22 +496,22 @@ export const MarketingSite: React.FC = () => {
 
       {/* ══ ٨) تواصل معنا ══ */}
       <Section id="tawasul" className="!pb-6">
-        <div className="rounded-[28px] p-8 sm:p-12" style={{ background: 'linear-gradient(160deg, var(--ink-deep), var(--venue) 70%)', color: 'var(--venue-ink)', boxShadow: 'var(--shadow-4)' }}>
+        <div className="rounded-[28px] p-8 sm:p-12" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-3)' }}>
           <div className="grid lg:grid-cols-[1fr_1fr] gap-10 items-center">
             <div>
-              <div className="grid place-items-start"><MizanMark className="w-12 h-12" tone="inverse" decorative /></div>
-              <h2 className="font-display text-[clamp(24px,4vw,40px)] font-black mt-6 leading-[1.25]">جاهزون لمسابقتك القادمة</h2>
-              <p className="mt-4 text-[14px] leading-8 max-w-[42ch]" style={{ color: 'var(--venue-muted)' }}>
+              <div className="grid place-items-start"><MizanMark className="w-12 h-12" decorative /></div>
+              <h2 className="font-display text-[clamp(24px,4vw,40px)] font-black mt-6 leading-[1.25] mizan-title">جاهزون لمسابقتك القادمة</h2>
+              <p className="mt-4 text-[14px] leading-8 max-w-[42ch]" style={{ color: 'var(--muted)' }}>
                 اسم جهتك وموعد مسابقتك يكفيان — ونُسلّمك نطاقك ولوحتك جاهزين.
               </p>
-              <div className="mt-7 grid gap-3 text-[13px] font-bold" style={{ color: 'var(--venue-faint)' }}>
+              <div className="mt-7 grid gap-3 text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
                 <span className="inline-flex items-center gap-2"><Gauge size={15} /> إطلاقٌ في اليوم نفسه</span>
                 <span className="inline-flex items-center gap-2"><ShieldCheck size={15} /> بياناتك ملكك، معزولةً عن غيرك</span>
                 <span className="inline-flex items-center gap-2"><Users size={15} /> بلا حدٍّ لعدد المتسابقين</span>
               </div>
             </div>
             <div>
-              <div className="text-[11px] font-black tracking-[.18em] mb-4" style={{ color: 'var(--venue-faint)' }}>تواصل معنا</div>
+              <div className="text-[11px] font-bold tracking-[.18em] mb-4" style={{ color: 'var(--muted)' }}>تواصل معنا</div>
               <ContactForm />
             </div>
           </div>

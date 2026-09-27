@@ -1,4 +1,5 @@
 import React, { useRef,  useMemo, useState  } from 'react';
+import { DnaStepper } from '../dna/DnaKit';
 import { bilingualName } from '../../lib/ui-language';
 import { Ratio } from '../design-system/Ratio';
 import { useDialogBehavior } from '../../lib/useDialogBehavior';
@@ -48,11 +49,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
       <h1 className="text-3xl sm:text-5xl font-black mt-4 tracking-tight">{ar?'مختومة':'SEALED'}</h1>
       {reveal&&<div className="text-5xl font-black tabular-nums mt-6"><Ratio value={reveal.approvals.length} of={reveal.authorizedRoles?.length||0}/></div>}
       {reveal?.minimumApprovals?<div className="text-[10px] mizan-venue-muted mt-1">{ar?`${reveal.minimumApprovals} موافقات مستقلة مطلوبة`:`${reveal.minimumApprovals} independent approvals required`}</div>:null}
-      <div className="mt-6 grid grid-cols-3 gap-2 text-start">
-        <Approval ar={ar} ok={!!reveal?.approvals.some(a=>a.actorRole==='head_judge')} label={ar?'رئيس التحكيم':'Head Judge'}/>
-        <Approval ar={ar} ok={!!reveal?.approvals.some(a=>a.actorRole==='comp_admin')} label={ar?'المسابقة':'Competition'}/>
-        <Approval ar={ar} ok={!!reveal?.approvals.some(a=>a.actorRole==='org_admin')} label={ar?'الجهة':'Organization'}/>
-      </div>
+      {(()=>{const approved=(role:string)=>!!reveal?.approvals.some(a=>a.actorRole===role);const roles=[{role:'head_judge',label:ar?'رئيس التحكيم':'Head Judge',stamp:ar?'ر ت':'HJ'},{role:'comp_admin',label:ar?'المسابقة':'Competition',stamp:ar?'م':'CA'},{role:'org_admin',label:ar?'الجهة':'Organization',stamp:ar?'ج':'OA'}];return <DnaStepper className="!mt-6 mizan-dna-venue dna-dark" size="md" ariaLabel={ar?'الموافقات':'Approvals'} stateText={ar?{done:'تمت الموافقة',pending:'بانتظار الموافقة'}:{done:'Approved',current:'current',pending:'Awaiting approval',returned:'returned',blocked:'blocked'}} steps={roles.map(r=>({key:r.role,label:r.label,state:approved(r.role)?'done':'pending',stamp:r.stamp,icon:approved(r.role)?undefined:<KeyRound className="w-4 h-4"/>,title:`${r.label} — ${approved(r.role)?(ar?'تمت الموافقة':'Approved'):(ar?'بانتظار الموافقة':'Awaiting approval')}`}))}/>})()}
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {!vault&&(canSeal?<Button loading={busy} onClick={request} icon={<LockKeyhole className="w-4 h-4"/>}>{ar?'ختم الحزمة':'Seal package'}</Button>:<div className="text-[11px] mizan-venue-muted max-w-md leading-6">{!localVaultAdapterAvailable?(ar?'ختم خزنة الحفل عبر مفتاح متصفح غير مسموح في الإنتاج. استخدم النتائج المختومة خادميًا حتى تُربط إدارة مفاتيح خارجية.':'Browser-key ceremony sealing is disabled in production. Use server-sealed results until external key management is connected.'):(ar?'ختم الحزمة من صلاحية رئيس التحكيم أو إدارة المسابقة.':'Sealing the package is for the head judge or competition administration.')}</div>)}
         {canApprove&&<Button onClick={()=>reveal&&s.approveQuorumAction(reveal.id)} icon={<BadgeCheck className="w-4 h-4"/>}>{ar?'اعتماد':'Approve'}</Button>}
@@ -72,4 +69,3 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  </div>
 }
 
-const Approval=({ok,label,ar}:{ok:boolean;label:string;ar:boolean})=><div className={`rounded-2xl border p-4 flex items-center gap-3 ${ok?'border-[#365a4d] bg-white/[.05]':'border-white/10 bg-white/[.02]'}`}><span className={`w-9 h-9 rounded-xl grid place-items-center ${ok?'bg-[#d8c39b] text-[#1d2a24]':'bg-white/[.06] mizan-venue-faint'}`}>{ok?<BadgeCheck className="w-4 h-4"/>:<KeyRound className="w-4 h-4"/>}</span><div><div className="text-xs font-black">{label}</div><div className="text-[9px] mizan-venue-faint mt-1">{ok?(ar?'تمت الموافقة':'Approved'):(ar?'بانتظار الموافقة':'Awaiting approval')}</div></div></div>;

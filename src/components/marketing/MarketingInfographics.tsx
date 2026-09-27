@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Award,
   Radio,
+  Pause,
   Clock,
   Volume2,
   CheckCircle2,
@@ -14,7 +15,9 @@ import {
   RotateCcw,
   Check,
   Binary,
+  ArrowLeft,
 } from 'lucide-react';
+import { DnaIconTile } from '../dna/DnaKit';
 
 /*
  * إنفوجرافيك تفاعلي متحرك لـ MarketingSite:
@@ -33,7 +36,7 @@ export const LiveJudgingSimulator: React.FC = () => {
     { word: 'الْحَمْدُ', tajweed: 'إظهار', state: 'perfect' },
     { word: 'لِلَّهِ', tajweed: 'ترقيق اللام', state: 'perfect' },
     { word: 'رَبِّ', tajweed: 'تشديد الراء', state: 'active' },
-    { word: 'الْعَالَمِينَ', tajweed: 'مد عارض ٤ حركات', state: 'pending' },
+    { word: 'الْعَالَمِينَ', tajweed: 'مد عارض 4 حركات', state: 'pending' },
   ];
 
   useEffect(() => {
@@ -51,38 +54,32 @@ export const LiveJudgingSimulator: React.FC = () => {
   }, [isPlaying]);
 
   return (
-    <div className="rounded-[26px] p-5 sm:p-7 border border-[#2F6555]/25 bg-gradient-to-b from-[#16241F] to-[#101A16] text-[#F4F1E8] shadow-2xl relative overflow-hidden">
-      {/* وميض خلفي تعبيري */}
-      <div className="absolute -top-24 -left-24 w-60 h-60 bg-[#2F6555]/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-[#B98B4E]/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="dna-surface p-5 sm:p-7 relative overflow-hidden" style={{ color: 'var(--ink)' }}>
 
       {/* الشريط العلوي للإنفوجرافيك */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+      <div className="flex items-center justify-between pb-4" style={{ borderBottom: '1px dashed var(--line)' }}>
         <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#34D399] opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#10B981]" />
-          </span>
-          <div className="text-xs font-black tracking-wide text-[#E8CB93] flex items-center gap-1.5">
-            <Radio size={14} className="animate-pulse text-[#34D399]" />
-            محاكاة تلاوة حية · القاعة الرئيسية
+          <DnaIconTile icon={<Radio size={16} strokeWidth={1.6} />} tone="accent" size="sm" />
+          <div>
+            <div className="text-[13px] font-black mizan-title">محاكاة تلاوة · عيّنة توضيحية</div>
+            <div className="text-[11px] font-medium mizan-muted">أرقامٌ للتوضيح، لا بثٌّ حيّ</div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="px-3 py-1 rounded-lg text-[11px] font-bold border border-white/15 bg-white/5 hover:bg-white/10 transition flex items-center gap-1.5"
+            className="dna-btn text-[11px] font-bold flex items-center gap-1.5"
             aria-label={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
           >
             {isPlaying ? (
               <>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E8CB93]" />
-                مباشر
+                <Pause size={12} strokeWidth={1.6} />
+                إيقاف
               </>
             ) : (
               <>
-                <Play size={10} className="text-[#34D399]" />
+                <Play size={12} strokeWidth={1.6} />
                 تشغيل
               </>
             )}
@@ -92,12 +89,12 @@ export const LiveJudgingSimulator: React.FC = () => {
 
       {/* لوحة الكلمات ومتابعة التجويد */}
       <div className="my-6">
-        <div className="text-[11px] font-bold text-[#A9B6AE] mb-2 flex items-center justify-between">
+        <div className="text-[11px] font-medium mizan-muted mb-2 flex items-center justify-between">
           <span>نص التلاوة اللحظي</span>
-          <span className="text-[#B98B4E]">رواية حفص عن عاصم</span>
+          <span style={{ color: 'var(--amber)' }}>رواية حفص عن عاصم</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-black/25 border border-white/10 flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-quran text-2xl sm:text-3xl" dir="rtl">
+        <div className="p-4 rounded-2xl flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-quran text-2xl sm:text-3xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }} dir="rtl">
           {tokens.map((t, idx) => {
             const isActive = idx === activeToken;
             const isDone = idx < activeToken;
@@ -106,23 +103,20 @@ export const LiveJudgingSimulator: React.FC = () => {
                 key={t.word}
                 className={`relative px-4 py-2 rounded-xl transition-all duration-500 flex flex-col items-center ${
                   isActive
-                    ? 'bg-[#2F6555] text-[#F4F1E8] scale-105 shadow-lg shadow-[#2F6555]/40 border border-[#34D399]/50'
+                    ? 'bg-[var(--emerald)] text-[var(--surface)] shadow-sm'
                     : isDone
-                    ? 'text-[#A9B6AE] opacity-90'
-                    : 'text-white/40'
+                    ? 'text-[var(--ink)]'
+                    : 'text-[var(--muted)] opacity-60'
                 }`}
               >
                 <span>{t.word}</span>
                 <span
-                  className={`text-[9px] font-arabic font-normal mt-1 px-1.5 py-0.5 rounded ${
-                    isActive ? 'bg-[#16241F] text-[#E8CB93]' : 'text-transparent'
+                  className={`text-[9px] font-arabic font-normal mt-3 px-1.5 py-0.5 rounded ${
+                    isActive ? 'bg-[var(--surface)] text-[var(--emerald)]' : 'text-transparent'
                   }`}
                 >
                   {t.tajweed}
                 </span>
-                {isActive && (
-                  <span className="absolute -top-1.5 right-1/2 translate-x-1/2 w-2 h-2 rounded-full bg-[#E8CB93] animate-ping" />
-                )}
               </div>
             );
           })}
@@ -132,19 +126,19 @@ export const LiveJudgingSimulator: React.FC = () => {
       {/* المؤشرات الرسومية المتحركة السفلية */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
         {/* مؤشر الصوت والتردد */}
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
-          <div className="flex items-center justify-between text-[11px] text-[#A9B6AE] font-bold">
-            <span className="flex items-center gap-1"><Mic size={12} className="text-[#34D399]" /> سلامة الصوت</span>
-            <span className="text-[#34D399]">99%</span>
+        <div className="p-3 rounded-2xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-between text-[11px] mizan-muted font-medium">
+            <span className="flex items-center gap-1"><Mic size={12} strokeWidth={1.6} style={{ color: 'var(--emerald)' }} /> سلامة الصوت</span>
+            <span style={{ color: 'var(--emerald)' }}>99%</span>
           </div>
           <div className="mt-2.5 flex items-end gap-1 h-6">
             {[40, 75, 100, 60, 85, 95, 50, 80].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 bg-[#2F6555] rounded-full transition-all duration-300"
+                className="flex-1 rounded-full transition-all duration-300"
                 style={{
                   height: isPlaying ? `${((h + pulse * 12) % 70) + 30}%` : `${h * 0.5}%`,
-                  backgroundColor: i === 3 ? '#E8CB93' : undefined,
+                  backgroundColor: i === 3 ? 'var(--gold)' : 'var(--emerald-2)',
                 }}
               />
             ))}
@@ -152,44 +146,45 @@ export const LiveJudgingSimulator: React.FC = () => {
         </div>
 
         {/* مؤشر المدود الحركي */}
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
-          <div className="flex items-center justify-between text-[11px] text-[#A9B6AE] font-bold">
-            <span className="flex items-center gap-1"><Clock size={12} className="text-[#E8CB93]" /> ميزان المدود</span>
-            <span className="text-[#E8CB93]">٤ حركات</span>
+        <div className="p-3 rounded-2xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-between text-[11px] mizan-muted font-medium">
+            <span className="flex items-center gap-1"><Clock size={12} strokeWidth={1.6} style={{ color: 'var(--amber)' }} /> ميزان المدود</span>
+            <span style={{ color: 'var(--amber)' }}>4 حركات</span>
           </div>
-          <div className="mt-3 relative w-full bg-white/10 h-2 rounded-full overflow-hidden">
+          <div className="mt-3 relative w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--line)' }}>
             <div
-              className="h-full bg-gradient-to-r from-[#2F6555] to-[#E8CB93] rounded-full transition-all duration-700"
-              style={{ width: isPlaying ? (activeToken === 3 ? '92%' : '75%') : '50%' }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{ background: 'var(--emerald-2)', width: isPlaying ? (activeToken === 3 ? '92%' : '75%') : '50%' }}
             />
           </div>
-          <div className="text-[10px] text-[#656b66] mt-1 text-center font-mono">2.1s · بالنبض</div>
+          <div className="text-[10px] mizan-muted mt-1 text-center tabular-nums">2.1s · بالنبض</div>
         </div>
 
         {/* مؤشر توافق المحكمين */}
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
-          <div className="flex items-center justify-between text-[11px] text-[#A9B6AE] font-bold">
-            <span className="flex items-center gap-1"><Scale size={12} className="text-[#38BDF8]" /> وفاق اللجنة</span>
-            <span className="text-[#38BDF8]">100%</span>
+        <div className="p-3 rounded-2xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-between text-[11px] mizan-muted font-medium">
+            <span className="flex items-center gap-1"><Scale size={12} strokeWidth={1.6} style={{ color: 'var(--blue)' }} /> وفاق اللجنة</span>
+            <span style={{ color: 'var(--blue)' }}>100%</span>
           </div>
           <div className="mt-2 flex justify-center gap-1.5">
-            {['لجنة ١', 'لجنة ٢', 'لجنة ٣'].map((l, i) => (
+            {['لجنة 1', 'لجنة 2', 'لجنة 3'].map((l, i) => (
               <div
                 key={l}
-                className="w-7 h-7 rounded-lg bg-[#2F6555]/40 border border-[#34D399]/30 grid place-items-center text-[10px] font-bold text-[#E8CB93]"
+                className="w-7 h-7 rounded-full grid place-items-center"
+                style={{ background: 'var(--emerald-soft)', color: 'var(--emerald)' }}
                 title={l}
               >
-                ✓
+                <Check size={13} strokeWidth={1.8} aria-label={l} />
               </div>
             ))}
           </div>
         </div>
 
         {/* النتيجة والختم الفوري */}
-        <div className="p-3 rounded-xl bg-gradient-to-br from-[#2F6555]/40 to-transparent border border-[#34D399]/30 text-center">
-          <div className="text-[10px] text-[#A9B6AE] font-bold">الدرجة المعتمدة</div>
-          <div className="text-2xl font-black font-display text-[#E8CB93] mt-0.5">{judgeScore.toFixed(1)}</div>
-          <div className="text-[9px] text-[#34D399] font-mono flex items-center justify-center gap-1 mt-0.5">
+        <div className="p-3 rounded-2xl text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
+          <div className="text-[10px] mizan-muted font-medium">درجة العيّنة</div>
+          <div className="text-2xl font-black font-display text-[var(--emerald)] mt-0.5">{judgeScore.toFixed(1)}</div>
+          <div className="text-[10px] font-medium text-[var(--emerald-2)] flex items-center justify-center gap-1 mt-0.5">
             <ShieldCheck size={11} /> مختومة بسلسلة
           </div>
         </div>
@@ -208,7 +203,7 @@ export const InteractiveEvolutionFlow: React.FC = () => {
       title: 'استقبال القاعة',
       traditional: { badge: 'كشف ورقي وطابور', detail: 'تأكيد الحضور يدوي وتأخر في انطلاق الجلسات' },
       mizan: { badge: 'مسح ضوئي ذكي', detail: 'دخول خلال 3 ثوانٍ وتوجيه فوري للقاعة المخصصة' },
-      metric: 'وفر 90% من الوقت',
+      metric: 'استقبالٌ أسرع',
     },
     {
       id: 1,
@@ -243,9 +238,9 @@ export const InteractiveEvolutionFlow: React.FC = () => {
   const curr = stations[selectedStation];
 
   return (
-    <div className="rounded-[28px] bg-white border border-[#DFDED7] p-6 sm:p-8 shadow-sm">
+    <div className="rounded-[28px] bg-white border border-[var(--line)] p-6 sm:p-8 shadow-sm">
       {/* شريط المحطات - Tabs مصممة كإنفوجرافيك تسلسلي */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-3 mb-6 border-b border-[#DFDED7]">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-3 mb-6 border-b border-[var(--line)]">
         {stations.map((s, idx) => {
           const isSelected = selectedStation === idx;
           return (
@@ -254,12 +249,12 @@ export const InteractiveEvolutionFlow: React.FC = () => {
               onClick={() => setSelectedStation(idx)}
               className={`flex-1 min-w-[120px] py-3 px-3 rounded-2xl transition-all text-center flex flex-col items-center gap-1.5 ${
                 isSelected
-                  ? 'bg-[#214C40] text-white shadow-md'
-                  : 'bg-[#F7F5EF] text-[#696F6B] hover:bg-[#E7EEE9]'
+                  ? 'bg-[var(--emerald)] text-white shadow-md'
+                  : 'bg-[var(--canvas)] text-[var(--muted)] hover:bg-[var(--emerald-soft)]'
               }`}
             >
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[#E8CB93]' : 'bg-black/5 text-[#696F6B]'}`}>
-                المرحلة ٠{idx + 1}
+              <span className={`text-[10px] tabular-nums px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[var(--gold-light)]' : 'bg-black/5 text-[var(--muted)]'}`}>
+                المرحلة 0{idx + 1}
               </span>
               <span className="text-xs font-extrabold">{s.title}</span>
             </button>
@@ -270,44 +265,45 @@ export const InteractiveEvolutionFlow: React.FC = () => {
       {/* المقارنة البصرية للمحطة المحددة */}
       <div className="grid md:grid-cols-2 gap-5 items-stretch">
         {/* الطريقة التقليدية (قبل ميزان) */}
-        <div className="rounded-2xl p-5 bg-[#F9F7F4] border border-[#E5E0D8] relative overflow-hidden flex flex-col justify-between">
+        <div className="rounded-2xl p-5 bg-[var(--surface-soft)] border border-[var(--line)] relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-[#A34D43] bg-[#F4E6E3] px-3 py-1 rounded-full flex items-center gap-1">
-              <AlertTriangle size={13} /> في المسابقات السابقة
+            <span className="text-[11px] font-bold text-[var(--danger)] bg-[var(--danger-soft)] px-3 py-1 rounded-full flex items-center gap-1">
+              <AlertTriangle size={13} strokeWidth={1.6} /> في المسابقات السابقة
             </span>
-            <span className="text-[11px] text-[#656b66] line-through">طريقة ورقية</span>
+            <span className="text-[11px] mizan-muted">طريقة ورقية</span>
           </div>
 
           <div className="my-3">
-            <h3 className="text-base font-black text-[#696F6B] line-through">{curr.traditional.badge}</h3>
-            <p className="text-xs text-[#656b66] mt-2 leading-6">{curr.traditional.detail}</p>
+            <h3 className="text-base font-black mizan-muted">{curr.traditional.badge}</h3>
+            <p className="text-xs text-[var(--muted)] mt-2 leading-6">{curr.traditional.detail}</p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#E5E0D8] text-[11px] text-[#A34D43] font-bold flex items-center gap-1.5">
-            <span>⚠️ عبء تشغيلي وتأخر متكرر</span>
+          <div className="mt-4 pt-3 border-t border-[var(--line)] text-[11px] text-[var(--danger)] font-bold flex items-center gap-1.5">
+            <AlertTriangle size={13} strokeWidth={1.6} />
+            <span>عبء تشغيلي وتأخر متكرر</span>
           </div>
         </div>
 
         {/* مع منظومة ميزان */}
-        <div className="rounded-2xl p-5 bg-[#E7EEE9] border-2 border-[#2F6555] relative overflow-hidden flex flex-col justify-between shadow-sm">
+        <div className="rounded-2xl p-5 bg-[var(--emerald-soft)] border-2 border-[var(--emerald-2)] relative overflow-hidden flex flex-col justify-between shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-[#214C40] bg-white px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
-              <CheckCircle2 size={13} className="text-[#2F6555]" /> مع منظومة ميزان
+            <span className="text-[11px] font-bold text-[var(--emerald)] bg-white px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+              <CheckCircle2 size={13} className="text-[var(--emerald-2)]" /> مع منظومة ميزان
             </span>
-            <span className="text-[11px] font-black text-[#2F6555] bg-[#34D399]/20 px-2 py-0.5 rounded">
+            <span className="text-[11px] font-black text-[var(--emerald-2)] bg-[var(--surface)] px-2 py-0.5 rounded">
               {curr.metric}
             </span>
           </div>
 
           <div className="my-3">
-            <h3 className="text-base font-black text-[#171B18] flex items-center gap-2">
-              <Sparkles size={16} className="text-[#B98B4E]" /> {curr.mizan.badge}
+            <h3 className="text-base font-black text-[var(--ink)] flex items-center gap-2">
+              <Sparkles size={16} className="text-[var(--gold)]" /> {curr.mizan.badge}
             </h3>
-            <p className="text-xs text-[#214C40] mt-2 leading-6 font-medium">{curr.mizan.detail}</p>
+            <p className="text-xs text-[var(--emerald)] mt-2 leading-6 font-medium">{curr.mizan.detail}</p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#2F6555]/20 text-[11px] text-[#214C40] font-black flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-[#2F6555]" />
+          <div className="mt-4 pt-3 border-t border-[var(--emerald-2)]/20 text-[11px] text-[var(--emerald)] font-black flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-[var(--emerald-2)]" />
             <span>نظام رقمي مؤتمت بالكامل بلا أوراق</span>
           </div>
         </div>
@@ -321,13 +317,13 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'isolation' | 'chain'>('isolation');
 
   return (
-    <div className="rounded-[28px] bg-[#11211B] text-white p-6 sm:p-8 border border-white/10 shadow-xl">
+    <div className="rounded-[28px] bg-[var(--venue-2)] text-white p-6 sm:p-8 border border-white/10 shadow-xl">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <div className="text-[11px] font-black text-[#E8CB93] tracking-widest uppercase">
+          <div className="text-[11px] font-black text-[var(--gold-light)] tracking-widest uppercase">
             البنية التحتية والنزاهة
           </div>
-          <h3 className="text-xl sm:text-2xl font-black text-[#F4F1E8] mt-1">
+          <h3 className="text-xl sm:text-2xl font-black text-[var(--venue-ink)] mt-1">
             {activeTab === 'isolation' ? 'عزل كامل لكل جهة في بيئتها' : 'سلسلة الختم الرقمي لكل قرار'}
           </h3>
         </div>
@@ -353,20 +349,20 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
         <div className="grid md:grid-cols-3 gap-4">
           {[
             {
-              domain: 'awqaf.gov.kw',
-              name: 'وزارة الأوقاف',
+              domain: 'jiha-a.example',
+              name: 'جهة (أ) — مثال',
               db: 'قاعدة بيانات مشفرة مستقلة',
               active: true,
             },
             {
-              domain: 'maknoon.org.sa',
-              name: 'جمعية مكنون',
+              domain: 'jiha-b.example',
+              name: 'جهة (ب) — مثال',
               db: 'سجلات ولجان خاصة بالجمعية',
               active: false,
             },
             {
-              domain: 'quran-dubai.ae',
-              name: 'جائزة دبي للقرآن',
+              domain: 'jiha-c.example',
+              name: 'جهة (ج) — مثال',
               db: 'هوية وبوابة مرشحين منفصلة',
               active: false,
             },
@@ -375,22 +371,22 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
               key={org.domain}
               className={`rounded-2xl p-5 border transition-all duration-300 relative ${
                 i === 0
-                  ? 'bg-gradient-to-b from-[#16241F] to-[#11211B] border-[#2F6555] ring-1 ring-[#34D399]/40'
+                  ? 'bg-gradient-to-b from-[var(--venue)] to-[var(--venue-2)] border-[var(--emerald-2)] ring-1 ring-[var(--gold-light)]/40'
                   : 'bg-white/[0.02] border-white/10 opacity-75 hover:opacity-100'
               }`}
             >
               <div className="flex items-center justify-between text-[11px] mb-3">
-                <span className="font-mono text-[#E8CB93] font-bold">{org.domain}</span>
-                <span className="inline-flex items-center gap-1 text-[10px] text-[#34D399]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#34D399]" /> آمن ومستقل
+                <span className="font-mono text-[var(--gold-light)] font-bold">{org.domain}</span>
+                <span className="inline-flex items-center gap-1 text-[10px] text-[var(--gold-light)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--gold-light)]" /> آمن ومستقل
                 </span>
               </div>
-              <div className="text-base font-black text-[#F4F1E8]">{org.name}</div>
-              <div className="text-xs text-[#A9B6AE] mt-2">{org.db}</div>
+              <div className="text-base font-black text-[var(--venue-ink)]">{org.name}</div>
+              <div className="text-xs text-[var(--venue-muted)] mt-2">{org.db}</div>
 
-              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[#656b66]">
-                <span>عزل كامل ١٠٠٪</span>
-                <span className="font-mono">Zero Cross-Access</span>
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[var(--venue-faint)]">
+                <span>عزل كامل 100%</span>
+                <span>لا وصول بين الجهات</span>
               </div>
             </div>
           ))}
@@ -399,21 +395,21 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
         /* رسم توضيحي لسلسلة النزاهة */
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { step: '١. التلاوة', icon: Mic, title: 'إثبات الصوت', desc: 'تسجيل الوقف والتردد لحظياً' },
-            { step: '٢. التقييم', icon: Scale, title: 'إدخال اللجان', desc: 'تطابق درجات مستقل' },
-            { step: '٣. التشفير', icon: Binary, title: 'الختم الرقمي', desc: 'توليد بصمة SHA مشفرة' },
-            { step: '٤. الشهادة', icon: Award, title: 'رمز التحقق', desc: 'سجل لا يقبل التعديل أبداً' },
+            { step: '1. التلاوة', icon: Mic, title: 'إثبات الصوت', desc: 'تسجيل الوقف والتردد لحظياً' },
+            { step: '2. التقييم', icon: Scale, title: 'إدخال اللجان', desc: 'تطابق درجات مستقل' },
+            { step: '3. التشفير', icon: Binary, title: 'الختم الرقمي', desc: 'توليد بصمة SHA مشفرة' },
+            { step: '4. الشهادة', icon: Award, title: 'رمز التحقق', desc: 'سجل لا يقبل التعديل أبداً' },
           ].map((s, idx) => (
             <div key={s.step} className="rounded-2xl p-4 bg-white/[0.03] border border-white/10 text-center relative flex flex-col items-center">
-              <div className="w-10 h-10 rounded-xl bg-[#2F6555]/30 text-[#E8CB93] grid place-items-center mb-2">
-                <s.icon size={18} />
+              <div className="w-10 h-10 rounded-xl bg-[var(--emerald-2)]/30 text-[var(--gold-light)] grid place-items-center mb-2">
+                <s.icon size={18} strokeWidth={1.6} />
               </div>
-              <div className="text-[10px] font-mono text-[#656b66]">{s.step}</div>
-              <div className="text-sm font-black text-[#F4F1E8] mt-1">{s.title}</div>
-              <div className="text-[11px] text-[#A9B6AE] mt-1">{s.desc}</div>
+              <div className="text-[10px] tabular-nums text-[var(--venue-faint)]">{s.step}</div>
+              <div className="text-sm font-black text-[var(--venue-ink)] mt-1">{s.title}</div>
+              <div className="text-[11px] text-[var(--venue-muted)] mt-1">{s.desc}</div>
               {idx < 3 && (
-                <div className="hidden sm:block absolute -left-2 top-1/2 -translate-y-1/2 text-white/20 text-xs">
-                  ←
+                <div className="hidden sm:block absolute -left-2 top-1/2 -translate-y-1/2 text-white/30" aria-hidden="true">
+                  <ArrowLeft size={14} strokeWidth={1.6} />
                 </div>
               )}
             </div>
