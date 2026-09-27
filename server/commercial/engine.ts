@@ -925,7 +925,9 @@ export function expireEndedAgreements(ctx: EngineCtx) {
     const wallet = findWallet(ctx.s, a.operatorId, a.currency);
     if (!wallet || a.walletExpiryPolicy === 'carry_over') continue;
     if (ctx.s.walletLedger.some(e => e.type === 'expiration' && e.agreementId === a.id)) continue;
-    const balance = ledgerBalance(ctx.s, wallet.id);
+    /* لا يُسقط إلا ما بقي من مال هذه الاتفاقية نفسها: رصيد اتفاقيةٍ مجدَّدة أو شحنٌ لاحق لا يُمسّ. */
+    const attributable = ctx.s.walletLedger.filter(e => e.walletId === wallet.id && e.agreementId === a.id).reduce((n, e) => n + e.amountMinor, 0);
+    const balance = Math.min(ledgerBalance(ctx.s, wallet.id), attributable);
     if (balance <= 0) continue;
     postWalletEntry(ctx, a.currency, { operatorId: a.operatorId, agreementId: a.id, type: 'expiration', amountMinor: -balance, reason: `Commitment period ${a.startsAt.slice(0, 10)}→${a.endsAt.slice(0, 10)} ended` });
     out.push({ agreementId: a.id, expiredMinor: balance });
@@ -1156,26 +1158,44 @@ export function transferCommercialOwner(ctx: EngineCtx, organizationId: string, 
   const to = { owner: (toOperatorId ? 'operator' : 'direct') as CommercialOwner, operatorId: toOperatorId };
   if (from.owner === to.owner && from.operatorId === to.operatorId) throw new CommercialError('OWNER_UNCHANGED');
   const treatment = input.subscriptionTreatment === 'close_current_term' ? 'close_current_term' : 'keep_current_term';
+  const effectiveAt = normalizeInstant(input.effectiveAt || iso(ctx.at));
   const event: OwnershipEvent = {
-    id: ctx.nextId('OWN'), organizationId, from, to, effectiveAt: normalizeInstant(input.effectiveAt || iso(ctx.at)), reason: clean(input.reason, 500),
-    subscriptionTreatment: treatment, actorId: ctx.actor.uid, createdAt: iso(ctx.at),
+    id: ctx.nextId('OWN'), organizationId, from, to, effectiveAt, reason: clean(input.reason, 500),
+    subscriptionTreatment: treatment, actorId: ctx.actor.uid, createdAt: iso(ctx.at), status: 'scheduled',
   };
   ctx.s.ownershipEvents.push(event);
+  /* النقل المؤرَّخ في المستقبل يُسجَّل مجدولًا، ولا يتبدّل المالك ولا الدورة قبل موعده. */
+  if (Date.parse(effectiveAt) <= ctx.at) applyOwnershipTransfer(ctx, event);
+  else ctx.audit({ tenantId: org.tenantId, organizationId, action: 'COMMERCIAL_OWNER_TRANSFER_SCHEDULED', entityType: 'organization', entityId: organizationId, reason: `${from.owner}:${from.operatorId || '-'} → ${to.owner}:${to.operatorId || '-'} at ${effectiveAt} · ${event.reason}` });
+  return event;
+}
+
+export function applyOwnershipTransfer(ctx: EngineCtx, event: OwnershipEvent) {
+  if (event.status === 'applied') return event;
+  const org = organizationOf(ctx.s, event.organizationId);
+  const toOperatorId = event.to.operatorId;
   org.operatorId = toOperatorId;
-  org.commercialOwner = to.owner;
+  org.commercialOwner = event.to.owner;
   org.updatedAt = iso(ctx.at);
   for (const sub of ctx.s.subscriptions) {
-    if (sub.subjectType !== 'organization' || sub.subjectId !== organizationId || sub.status === 'canceled') continue;
+    if (sub.subjectType !== 'organization' || sub.subjectId !== event.organizationId || sub.status === 'canceled') continue;
     sub.ownerOperatorId = toOperatorId;
     sub.provider = toOperatorId ? 'operator_wallet' : 'manual';
     sub.updatedAt = iso(ctx.at);
   }
-  if (treatment === 'close_current_term') {
-    const term = currentTerm(ctx.s, organizationId, ctx.at);
+  if (event.subscriptionTreatment === 'close_current_term') {
+    const term = currentTerm(ctx.s, event.organizationId, ctx.at);
     if (term) { term.endsAt = iso(Math.max(ctx.at, Date.parse(term.startsAt) + 1)); term.status = 'closed'; term.closedAt = iso(ctx.at); }
   }
-  ctx.audit({ tenantId: org.tenantId, organizationId, action: 'COMMERCIAL_OWNER_TRANSFERRED', entityType: 'organization', entityId: organizationId, reason: `${from.owner}:${from.operatorId || '-'} → ${to.owner}:${to.operatorId || '-'} · ${event.reason}` });
+  event.status = 'applied';
+  event.appliedAt = iso(ctx.at);
+  ctx.audit({ tenantId: org.tenantId, organizationId: org.id, action: 'COMMERCIAL_OWNER_TRANSFERRED', entityType: 'organization', entityId: org.id, reason: `${event.from.owner}:${event.from.operatorId || '-'} → ${event.to.owner}:${event.to.operatorId || '-'} · ${event.reason}` });
   return event;
+}
+
+/** Apply scheduled transfers whose effective date has arrived (billing cycle). */
+export function applyDueOwnershipTransfers(ctx: EngineCtx) {
+  return ctx.s.ownershipEvents.filter(e => e.status === 'scheduled' && Date.parse(e.effectiveAt) <= ctx.at).map(e => applyOwnershipTransfer(ctx, e));
 }
 
 /** Channel-conflict guard: MIZAN direct must not license an operator-managed organization unknowingly. */

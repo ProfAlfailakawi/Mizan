@@ -8,6 +8,7 @@
  */
 
 import crypto from 'crypto';
+import net from 'net';
 import { CommercialError, type CommercialState, type EngineCtx } from './engine';
 import { WEBHOOK_EVENT_TYPES, type WebhookDeliveryRecord, type WebhookEndpointRecord, type WebhookEventType } from './types';
 
@@ -47,6 +48,39 @@ export function assertWebhookUrl(url: string) {
     throw new CommercialError('WEBHOOK_URL_PRIVATE_NETWORK');
   }
   return u.toString();
+}
+
+/*
+ * التحقق من اسم المضيف وحده لا يكفي: اسمٌ عامّ يملكه المهاجم قد يُحلَّ إلى عنوانٍ داخلي
+ * (127.0.0.1، 169.254.169.254، 10/8…). فيُحلّ الاسم لحظة التسليم وتُرفض أي نتيجة خاصة أو
+ * محجوزة، IPv4 وIPv6 معًا، وتُمنع إعادة التوجيه كي لا يقفز الطلب إلى الداخل بعد الفحص.
+ */
+const BLOCKED = (() => {
+  const b = new net.BlockList();
+  for (const [a, p] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.88.99.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4]] as const) b.addSubnet(a, p, 'ipv4');
+  for (const [a, p] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8], ['2001:db8::', 32], ['64:ff9b::', 96], ['100::', 64]] as const) b.addSubnet(a, p, 'ipv6');
+  return b;
+})();
+
+export function isPrivateAddress(ip: string): boolean {
+  const family = net.isIP(ip);
+  if (!family) return true;
+  if (family === 6) {
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+    if (mapped) return BLOCKED.check(mapped[1], 'ipv4');
+    return BLOCKED.check(ip, 'ipv6');
+  }
+  return BLOCKED.check(ip, 'ipv4');
+}
+
+export type AddressLookup = (hostname: string) => Promise<string[]>;
+
+/** Resolve every address of the destination and refuse if any is private or reserved. */
+export async function assertPublicDestination(url: string, lookup: AddressLookup) {
+  const host = new URL(url).hostname.replace(/^\[|\]$/g, '');
+  const addresses = net.isIP(host) ? [host] : await lookup(host);
+  if (!addresses.length || addresses.some(isPrivateAddress)) throw new CommercialError('WEBHOOK_URL_PRIVATE_NETWORK');
+  return addresses;
 }
 
 export function createWebhookEndpoint(ctx: EngineCtx, organizationId: string, input: { url: string; events: string[] }, secretRef: string) {

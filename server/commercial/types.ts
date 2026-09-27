@@ -256,6 +256,9 @@ export interface OwnershipEvent {
   effectiveAt: string;
   reason: string;
   subscriptionTreatment: 'keep_current_term' | 'close_current_term';
+  /** A future-dated transfer is recorded as `scheduled` and applied by the billing cycle at `effectiveAt`. */
+  status?: 'scheduled' | 'applied';
+  appliedAt?: string;
   actorId: string;
   createdAt: string;
 }

@@ -546,12 +546,13 @@ test('§69 webhooks are HMAC-signed, retried with backoff, and logged', async ()
     h.repo.adminRenewTerm(owner, c.org.id, { reason: 'contract paid offline' });
     const seen: { body: string; sig: string }[] = [];
     let fail = true;
+    const publicDns = async () => ['93.184.216.34'];
     const send = async (_url: string, init: any) => { seen.push({ body: init.body, sig: init.headers['x-mizan-signature'] }); return { status: fail ? 500 : 200 }; };
-    assert.deepEqual(await h.repo.dispatchWebhooks(send), { attempted: 1, delivered: 0 });
-    assert.deepEqual(await h.repo.dispatchWebhooks(send), { attempted: 0, delivered: 0 }, 'not retried before its backoff');
+    assert.deepEqual(await h.repo.dispatchWebhooks(send, publicDns), { attempted: 1, delivered: 0 });
+    assert.deepEqual(await h.repo.dispatchWebhooks(send, publicDns), { attempted: 0, delivered: 0 }, 'not retried before its backoff');
     h.clock.now += backoffMs(1);
     fail = false;
-    assert.deepEqual(await h.repo.dispatchWebhooks(send), { attempted: 1, delivered: 1 });
+    assert.deepEqual(await h.repo.dispatchWebhooks(send, publicDns), { attempted: 1, delivered: 1 });
     const { body, sig } = seen[1];
     assert.equal(verifyWebhookSignature(signingSecret, sig, body, Math.floor(h.clock.now / 1000)), true);
     assert.equal(verifyWebhookSignature('wrong', sig, body, Math.floor(h.clock.now / 1000)), false);
@@ -561,5 +562,68 @@ test('§69 webhooks are HMAC-signed, retried with backoff, and logged', async ()
     assert.equal(log.deliveries[0].attempts, 2);
     assert.ok(!JSON.stringify(log).includes(signingSecret), 'the secret is never listed');
     assert.match(signWebhook('s', 1, 'b'), /^t=1,v1=[0-9a-f]{64}$/);
+  } finally { h.cleanup(); }
+});
+
+test('webhook delivery refuses a public hostname that resolves to a private or metadata address', async () => {
+  const h = harness('2026-09-27T10:00:00Z');
+  try {
+    const c = directCustomer(h, 'mizan-150', '2026-09-27T00:00:00.000Z');
+    h.repo.createWebhookEndpoint(c.admin, c.org.id, { url: 'https://rebind.attacker.example/hook', events: ['subscription.renewed'] });
+    h.repo.adminRenewTerm(owner, c.org.id, { reason: 'contract paid offline' });
+    let sent = 0;
+    const send = async () => { sent++; return { status: 200 }; };
+    for (const internal of [['169.254.169.254'], ['10.0.0.5'], ['93.184.216.34', '127.0.0.1'], ['::1'], ['::ffff:192.168.1.1'], ['fd00::1']]) {
+      await h.repo.dispatchWebhooks(send, async () => internal);
+      h.clock.now += 7 * 3_600_000;
+    }
+    assert.equal(sent, 0, 'no request ever leaves for an internal address');
+    const d = h.repo.listWebhooks(c.admin, c.org.id).deliveries[0];
+    assert.equal(d.lastError, 'WEBHOOK_URL_PRIVATE_NETWORK');
+  } finally { h.cleanup(); }
+});
+
+test('a future-dated ownership transfer changes nothing until its effective date', () => {
+  const h = harness('2026-09-27T10:00:00Z');
+  try {
+    const o = operatorSetup(h);
+    const { organization } = h.repo.operatorActivateOrganization(o.actor, { ...identity('Moving'), planId: h.plan('mizan-150').id }, 'm');
+    const admin = { uid: 'x', role: 'org_admin', organizationId: organization.id };
+    const event = h.repo.transferCommercialOwner(owner, organization.id, { toOperatorId: null, effectiveAt: '2027-01-01T00:00:00Z', reason: 'contract boundary move', subscriptionTreatment: 'close_current_term' });
+    assert.equal(event.status, 'scheduled');
+    assert.equal(h.repo.organizationBilling(admin, organization.id).commercialOwner, 'operator');
+    assert.equal(h.repo.organizationBilling(admin, organization.id).term!.endsAt, '2027-09-27T10:00:00.000Z', 'term not truncated early');
+    h.clock.now = day('2027-01-01T01:00:00Z');
+    assert.equal(h.repo.runBillingCycle().ownershipTransfers, 1);
+    assert.equal(h.repo.organizationBilling(admin, organization.id).commercialOwner, 'direct');
+  } finally { h.cleanup(); }
+});
+
+test('tenants migrated after startup receive a first term and stay active', () => {
+  const h = harness('2026-09-27T10:00:00Z');
+  try {
+    const legacyPlan = h.repo.seedInitialPlan(owner);
+    h.repo.migrateLegacyTenants(owner, [{ orgId: 'late-org', displayName: 'Late Org' }], legacyPlan.id);
+    const admin = { uid: 'late', role: 'org_admin', organizationId: 'late-org' };
+    const b = h.repo.organizationBilling(admin, 'late-org');
+    assert.equal(b.accessState, 'active');
+    h.repo.setCompetitionState(admin, { organizationId: 'late-org', competitionId: 'L', state: 'registration_open' });
+  } finally { h.cleanup(); }
+});
+
+test('agreement expiry only removes that agreement\'s unused funds', () => {
+  const h = harness('2026-09-27T10:00:00Z');
+  try {
+    const o = operatorSetup(h);
+    h.repo.operatorActivateOrganization(o.actor, { ...identity('Spend'), planId: h.plan('mizan-500').id }, 's');
+    const next = h.repo.renewAgreement(owner, o.agreement.id);
+    h.clock.now = day('2027-09-27T10:00:00Z');
+    h.repo.approveAgreement(owner, next.id);
+    h.repo.fundCommitment(owner, next.id, { reference: 'wire-2027' });
+    h.clock.now = day('2027-09-27T11:00:00Z');
+    const cycle = h.repo.runBillingCycle();
+    assert.equal(cycle.expiredAgreements[0].expiredMinor, 250_000 - 35_940, 'only the old agreement remainder expires');
+    // الرصيد الجديد سليم، ولا يُخصم منه إلا تجديد العميل التلقائي الذي جرى في الدورة نفسها.
+    assert.equal(h.repo.operatorCommercial(o.actor).summary.balanceMinor, 250_000 - 35_940, 'the new commitment is untouched except the customer renewal it paid');
   } finally { h.cleanup(); }
 });
