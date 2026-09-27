@@ -36,7 +36,7 @@ const problems = [];
 const note = (m) => { problems.push(m); console.log(`  ✗ ${m}`) };
 const ok = (m) => console.log(`  ✓ ${m}`);
 
-const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+const DEMO_ENTRY = 'جرّب النسخة التجريبية';
 /* شاشات الإدارة كما تظهر في شريط التبويبات على الهاتف. */
 const ADMIN_ROLE = 'مدير المسابقة';
 const VIEWS = ['اليوم', 'هوية المسابقة', 'النطاق والأسئلة', 'المشاركون', 'التشغيل', 'التحكيم', 'النتائج', 'المؤسسة'];
@@ -105,7 +105,7 @@ console.log(`── التمدّد الأفقي على ${WIDTH}px`);
 await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
 /* مدخل العرض أيقونةٌ صامتة بلا نصّ — فيُطلب بوسم الوصول لا بنصٍّ لا وجود له. */
-const entry = page.locator(`button:visible[aria-label="${DEMO_ENTRY}"]`).first();
+const entry = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
 /*
  * ويُنتظر ظهورُه بدل أن يُسأل `count()` بعد مهلةٍ ثابتة: صفحةٌ أبطأ قليلًا كانت تُقرأ
  * «المدخل غير موجود» وهو موجودٌ لم يُرسم بعد. وسكونُ الشبكة لم يكن شرطًا صحيحًا أصلًا.
