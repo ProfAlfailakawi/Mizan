@@ -532,6 +532,12 @@ export type RegistrationStatus =
   | 'certified';
 
 export interface Participant {
+  /** إجابات الحقول المخصّصة في نموذج التسجيل (الحقول الظاهرة فقط وقت الإرسال). */
+  customAnswers?: Record<string, string | number | boolean | string[] | undefined>;
+  /** رسوم التسجيل التي تفرضها الجهة — ليست رسوم ميزان. */
+  registrationPayment?: { status: 'not_required' | 'pending' | 'paid' | 'refunded' | 'waived'; amountMinor: number; currency: string; receiptReference?: string; updatedAt: string };
+  /** أثر تعديلات المتسابق بعد الإرسال: متى وأي الحقول — بلا القيم نفسها. */
+  editHistory?: { at: string; fields: string[]; actor: 'participant' | 'staff' }[];
   id: string;
   code: string; // e.g., A-104
   competitionId: string;
@@ -981,14 +987,38 @@ export interface IncidentRecord {
 // Every competition can define its own registration, workflow, judging, result and privacy
 // policies. Defaults are only templates; no policy below is globally hard-coded.
 
+/**
+ * شرطٌ تصريحي على إجابات نموذج التسجيل. `field` معرّف حقلٍ آخر أو المشتقّ `age`.
+ * يُقيَّم بالمحرّك نفسه في المتصفّح وعلى الخادم (`registration-form.ts`).
+ */
+export interface RegistrationFieldCondition {
+  field: string;
+  operator: 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte' | 'in' | 'not_in' | 'exists' | 'not_exists' | 'contains';
+  value?: string | number | boolean | string[];
+}
+
 export interface RegistrationFieldDefinition {
   id: string;
   labelArabic: string;
   labelEnglish: string;
-  type: 'text' | 'email' | 'phone' | 'date' | 'select' | 'file' | 'checkbox';
+  type: 'text' | 'long_text' | 'number' | 'email' | 'phone' | 'date' | 'select' | 'multi_select' | 'country' | 'file' | 'checkbox' | 'consent' | 'section';
   required: boolean;
   visible: boolean;
   options?: { value: string; labelArabic: string; labelEnglish: string }[];
+  /** حقلٌ أضافته الجهة (لا يقابل حقلًا أساسيًّا للمتسابق)؛ تُحفظ إجابته في `customAnswers`. */
+  custom?: boolean;
+  helpArabic?: string;
+  helpEnglish?: string;
+  /** يظهر الحقل (ويُتحقَّق منه) فقط إذا تحقّقت كل الشروط. */
+  visibleWhen?: RegistrationFieldCondition[];
+  /** يصير الحقل مطلوبًا إذا تحقّقت كل الشروط (إضافةً إلى `required`). */
+  requiredWhen?: RegistrationFieldCondition[];
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  /** تعبيرٌ نمطي بسيط يُتحقَّق به من النصّ (يُرفض ما يتجاوز 200 محرف). */
+  pattern?: string;
 }
 
 export interface EligibilityCondition {
@@ -1009,6 +1039,10 @@ export interface RegistrationPolicy {
   requireGuardianForMinors: boolean;
   fields: RegistrationFieldDefinition[];
   eligibility: EligibilityCondition[];
+  /** تعديل التسجيل بعد إرساله: ممنوع، أو مسموح حتى إغلاق التسجيل (قبل الحضور). الافتراضي: حتى الإغلاق. */
+  editPolicy?: 'never' | 'until_deadline';
+  /** رسوم تسجيلٍ تفرضها الجهة على متسابقيها (ليست رسوم اشتراك ميزان). غيابها = تسجيلٌ مجاني. */
+  fee?: { amountMinor: number; currency: string; refundable: boolean; noteArabic?: string; noteEnglish?: string };
 }
 
 export interface JudgeActionDefinition {

@@ -57,6 +57,7 @@ const INTENTIONALLY_PUBLIC: Record<string, string> = {
   '/api/public/competition': 'المسابقةُ المنشورة للعموم بقرار ناشرها.',
   '/api/public/competitions': 'قائمةُ المسابقات المنشورة — ما نُشر بقصدٍ لا ما في قاعدة البيانات.',
   '/api/public/competitions/:competitionId': 'صفحةُ تسجيلٍ عامّة لمسابقةٍ نُشرت.',
+  '/api/public/competitions/:competitionId/registration': 'تعديلُ المتسابق تسجيلَه قبل الإغلاق — محروسٌ برمز رحلته السرّي (لا هوية حساب)، وبحدّ معدّل، وبالتحقق الكامل نفسه.',
   '/api/public/competitions/:competitionId/register': 'تسجيلُ متسابقٍ جديد — لا هوية قبله بطبيعته؛ محروسٌ بحدّ معدّل وبتحقّقٍ من محتواه.',
 
   // ── الكتالوج والعلامة ودليل Discover: ما قُصد نشرُه للعموم، مُسقَطًا على الخادم ──────────

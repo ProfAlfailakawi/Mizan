@@ -77,6 +77,7 @@ import { paymentGatewayFromEnv } from './server/payments';
 import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type TelemetrySubject } from './server/ops-telemetry';
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
+import type { WebhookEventType } from './server/commercial/types';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
 import type { Competition } from './src/types';
@@ -308,6 +309,14 @@ async function startServer() {
     ...(saasPlatform?saasPlatform.legalChainFor(organizationId):[]),
     {level:'platform',config:legalConfigFromEnv(process.env as Record<string,string|undefined>)},
   ];
+  /*
+   * أحداث المسابقة إلى webhooks الجهة: تُشتقّ الجهة من المسابقة المنشورة على الخادم، ولا
+   * يُقبل معرّفٌ من المتصفّح. تعذّر الإرسال لا يُفشل العملية الأصلية أبدًا.
+   */
+  const emitDomainWebhook=(competitionId:string,type:WebhookEventType,data:Record<string,unknown>,organizationId?:string)=>{
+    if(!saasPlatform)return;
+    void (async()=>{try{let org=organizationId;if(!org&&firestoreRepository){const row=await firestoreRepository.get(`public_competitions/${competitionId}`);org=String((row?.competition as any)?.organizationId||'')}if(org&&saasPlatform.organizationName(org))saasPlatform.emitWebhookEvent(org,type,{competitionId,...data})}catch(err){console.warn('[webhooks] domain event not queued:',err instanceof Error?err.message:err)}})();
+  };
   const publicRegistration=new PublicRegistrationService({
     /* التسجيل عملية كتابة رسمية، لذلك لا نقبل نسخة القرص كسلطة للفئات. شاشة الطالب
        تسجّل فقط مقابل الإسقاط المنشور فعليًا في Firestore؛ إذا كانت السحابة غير متاحة
@@ -339,6 +348,8 @@ async function startServer() {
         console.warn('[public-registration] local write failed:',e);
       }
     },
+    getDocument:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');return firestoreRepository.get(docPath)},
+    upsert:async(documents)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.commitAtomically({upserts:documents})},
     getJourney:async(tokenHash)=>{
       if(firestoreRepository){
         try{
@@ -1203,7 +1214,12 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
 
   app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}
-    try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
+    try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));emitDomainWebhook(result.participant.competitionId,'registration.created',{participantId:result.participant.id,participantCode:result.participant.code,status:result.participant.status});res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
+  });
+  /* تعديل المتسابق تسجيلَه قبل الإغلاق — برابط رحلته، وبالتحقق الكامل نفسه على الخادم. */
+  app.put('/api/public/competitions/:competitionId/registration',publicRegistrationRateLimit,async(req,res)=>{
+    if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
+    try{const {key,...changes}=req.body||{};const out=await publicRegistration.editRegistration(String(req.params.competitionId||''),String(key||''),changes);if(out.changed.length)emitDomainWebhook(String(req.params.competitionId||''),'registration.updated',{participantId:out.participant.id,participantCode:out.participant.code,changedFields:out.changed});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return publicApiError(res,err)}
   });
   app.post('/api/public/journeys/resolve',journeyResolveRateLimit,async(req,res)=>{
     if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});

@@ -198,6 +198,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         {finished && <TestCompletePanel ar={ar} resultReady={!!journey.result || !!journey.certificate} onShowResult={() => { setShowResult(true); window.setTimeout(() => resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50); }} />}
         <details open={!finished} className="mizan-surface p-5 sm:p-6" data-journey-step={JOURNEY_ORDER[idx]}><summary className={`min-h-11 text-lg font-black ${finished ? 'cursor-pointer text-[#214C40]' : 'list-none pointer-events-none'}`}>{finished ? (ar ? 'عرض مراحل رحلتك' : 'Show your journey steps') : (ar ? 'مسار الرحلة' : 'Journey')}</summary><ol className="mt-4 space-y-2">{steps.map(i => <li key={i} ref={i === idx ? currentStepRef : undefined} aria-current={i === idx ? 'step' : undefined} className={`flex items-center gap-4 rounded-2xl p-3 ${i === idx ? 'bg-[#FBF3E2] ring-2 ring-[#E8CB93]' : ''}`}><span className={`w-12 h-12 shrink-0 rounded-2xl grid place-items-center ${i < idx ? 'bg-[#214C40] text-white' : i === idx ? 'bg-[#E8CB93] text-[#183a31]' : 'bg-[#f0eee8] text-[#656b66]'}`}>{i < idx ? <BadgeCheck className="w-7 h-7" aria-hidden="true" /> : <span className="text-lg font-black">{steps.indexOf(i) + 1}</span>}</span><span className={`text-lg ${i === idx ? 'font-black' : i < idx ? 'font-bold text-[#214C40]' : 'font-bold text-[#5f6661]'}`}>{stepLabel(i, ar)}</span></li>)}</ol></details>
         {!finished && <section className="grid sm:grid-cols-3 gap-3"><Info icon={CalendarClock} label={ar ? 'الموعد' : 'Time'} value={journey.arrivalSlot || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={MapPin} label={ar ? 'المكان' : 'Location'} value={journey.committee?.hall || journey.venueName || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={CircleDot} label={ar ? 'رقم دورك' : 'Queue number'} value={journey.queueNumber ? journey.queueNumber.toLocaleString(ar ? 'ar-EG' : 'en-US') : (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /></section>}
+        {audience === 'participant' && !finished && ['submitted', 'under_review', 'approved'].includes(String(journey.status)) && competition.status === 'registration_open' && <RegistrationEditPanel ar={ar} competitionId={competition.id} token={token} />}
         {canPrepare && <section className="mizan-surface p-5 sm:p-6"><div className="mb-4"><div className="mizan-kicker">{ar ? 'التحضير للاختبار' : 'TEST PREPARATION'}</div><h2 className="mt-1 text-lg font-black">{ar ? 'تهيّأ قبل دورك' : 'Settle your range, breathing, and private rehearsal'}</h2><p className="mt-1 text-sm leading-7 text-[#646965]">{ar ? 'لك وحدك — لا تمسّ درجتك.' : 'This preparation is private; nothing is sent to the panel or affects your score.'}</p></div><WarmupSanctuary ar={ar} scopeText={ar ? journey.preparation?.scopeTextArabic || undefined : journey.preparation?.scopeTextEnglish || undefined} spreadAcrossZones={journey.preparation?.spreadAcrossZones} questionCount={journey.preparation?.questionCount} minutesPerQuestion={journey.preparation?.minutesPerQuestion} journeyPracticeAuth={{competitionId:journey.competitionId,key:token}}/></section>}
         {journey.committee && !finished && <section className="mizan-surface p-5"><div className="text-sm font-black text-[#656b66]">{ar ? 'اللجنة' : 'PANEL'}</div><div className="text-xl font-black mt-1">{journey.committee.code} · {ar ? journey.committee.nameArabic : journey.committee.name}</div></section>}
         {journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><ShieldCheck className="w-7 h-7 text-[#2F6555] mx-auto" /><div className="mizan-kicker mt-3">{ar ? 'النتيجة المعتمدة' : 'PUBLISHED RESULT'}</div><div className="text-4xl font-black mt-2">{journey.result.score}</div><div className="text-xl font-black text-[#3f4642] mt-2">{ar ? 'الترتيب' : 'Rank'} #{journey.result.rank}</div>{journey.certificate && <button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[#214C40]">{ar ? 'التحقق من الشهادة' : 'Verify certificate'}</button>}</section>}
@@ -238,3 +239,38 @@ const journeyError = (code: string, ar: boolean) => {
 };
 
 const Info = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) => <div className="mizan-surface p-5 flex items-center gap-4"><Icon className="w-9 h-9 shrink-0 text-[#2F6555]" aria-hidden="true" /><div><div className="text-sm text-[#565d59]">{label}</div><div className="text-xl font-black mt-1">{value}</div></div></div>;
+
+/*
+ * تعديل التسجيل قبل الإغلاق — برمز الرحلة نفسه. الحقول الفارغة تبقى كما هي، والخادم يعيد
+ * التحقق كاملًا ويرفض بعد إغلاق التسجيل أو بعد الحضور، ويسجّل أيّ الحقول تغيّر.
+ */
+const RegistrationEditPanel: React.FC<{ ar: boolean; competitionId: string; token: string }> = ({ ar, competitionId, token }) => {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ fullNameArabic: '', fullName: '', email: '', phone: '' });
+  const [state, setState] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'error'; text?: string }>({ kind: 'idle' });
+  const labels: Record<keyof typeof form, [string, string]> = { fullNameArabic: ['الاسم بالعربية', 'Arabic name'], fullName: ['الاسم بالإنجليزية', 'English name'], email: ['البريد الإلكتروني', 'Email'], phone: ['الهاتف', 'Phone'] };
+  const save = async () => {
+    const changes = Object.fromEntries(Object.entries(form).filter(([, v]) => v.trim()));
+    if (!Object.keys(changes).length) return;
+    setState({ kind: 'busy' });
+    try {
+      const r = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/registration`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: token, ...changes }) });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(body.code || `HTTP_${r.status}`));
+      setState({ kind: 'ok', text: ar ? 'حُفظت التعديلات.' : 'Your changes were saved.' });
+      setForm({ fullNameArabic: '', fullName: '', email: '', phone: '' });
+    } catch (e) {
+      const code = e instanceof Error ? e.message : '';
+      const locked = code.startsWith('REGISTRATION_LOCKED') || code.startsWith('REGISTRATION_EDIT_NOT_ALLOWED');
+      setState({ kind: 'error', text: locked ? (ar ? 'انتهت فترة تعديل التسجيل.' : 'The registration can no longer be edited.') : journeyError(code, ar) });
+    }
+  };
+  return <section className="mizan-surface p-5">
+    <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="min-h-11 text-sm font-black text-[#214C40] underline">{ar ? 'تعديل بيانات التسجيل' : 'Edit my registration'}</button>
+    {open && <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      {(Object.keys(form) as (keyof typeof form)[]).map(k => <label key={k} className="block text-xs font-bold">{labels[k][ar ? 0 : 1]}<input className="mizan-input mt-1" dir={k === 'fullNameArabic' ? 'rtl' : 'ltr'} placeholder={ar ? 'اتركه فارغًا إن لم يتغيّر' : 'Leave empty if unchanged'} value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} /></label>)}
+      <div className="sm:col-span-2"><button type="button" disabled={state.kind === 'busy'} onClick={() => void save()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? 'حفظ التعديلات' : 'Save changes'}</button></div>
+      {state.text && <p role={state.kind === 'error' ? 'alert' : 'status'} className={`sm:col-span-2 text-xs font-bold ${state.kind === 'error' ? 'text-[#A34D43]' : 'text-[#2F6555]'}`}>{state.text}</p>}
+    </div>}
+  </section>;
+};
