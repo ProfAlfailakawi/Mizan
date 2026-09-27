@@ -83,6 +83,7 @@ import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './ser
 import type { WebhookEventType } from './server/commercial/types';
 import { CommunicationsService, InAppProvider, providersFromEnv, type Recipient } from './server/communications';
 import { runParticipantReminders, type ReminderSource } from './server/participant-reminders';
+import { RegistrationReminderStore, runRegistrationReminders } from './server/registration-reminders';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
@@ -444,6 +445,8 @@ async function startServer() {
     const remind=()=>{try{const t=saasPlatform!.communicationTargets();for(const r of t.renewals)communicate('renewal_approaching',`${r.termId}:${r.window}`,[{channel:'in_app',address:r.organizationId,locale:'ar',organizationId:r.organizationId},...(r.email?[{channel:'email' as const,address:r.email,locale:'ar' as const,organizationId:r.organizationId}]:[])],{organization:r.name,date:r.endsAt.slice(0,10),days:r.daysLeft});for(const o of t.overdue)communicate('payment_failed',o.invoiceId,[{channel:'in_app',address:o.organizationId,locale:'ar',organizationId:o.organizationId},...(o.email?[{channel:'email' as const,address:o.email,locale:'ar' as const,organizationId:o.organizationId}]:[])],{invoice:o.invoiceNumber});void communications!.dispatch()}catch(err){console.error('[communications] reminder cycle failed:',err)}};
     setTimeout(remind,15_000).unref?.();const commTimer=setInterval(remind,15*60_000);commTimer.unref?.();
   }
+  /* تذكير من لم يُكمل تسجيله — بطلبه فقط، ويحفظ البريد والمسابقة وحدهما. */
+  const registrationReminders=communicationsDir?new RegistrationReminderStore(path.join(communicationsDir,'registration-reminders.json')):null;
   if(communications&&firestoreRepository){
     /*
      * تذكير المتسابقين بمواعيدهم من الجدول المعتمد في Firestore. المسابقات من الإسقاط العام
@@ -458,6 +461,15 @@ async function startServer() {
     const channels=()=>{const st=communications!.status();return {whatsapp:st.some(c=>c.channel==='whatsapp'&&c.configured),sms:st.some(c=>c.channel==='sms'&&c.configured)}};
     const remindParticipants=()=>{void runParticipantReminders(reminderSource,r=>communicate(r.trigger,r.subjectKey,r.recipients,r.vars),Date.now(),channels()).catch(err=>console.warn('[participant-reminders] cycle failed:',err instanceof Error?err.message:err))};
     const participantTimer=setInterval(remindParticipants,Number(process.env.MIZAN_PARTICIPANT_REMINDER_INTERVAL_MS||30*60_000));participantTimer.unref?.();
+    if(registrationReminders){
+      const origin=(()=>{try{return new URL(String(process.env.APP_URL||'')).origin}catch{return ''}})();
+      const remindIncomplete=()=>{void runRegistrationReminders(registrationReminders,async id=>{const row:any=await fsRepo.get(`public_competitions/${id}`);const c=row?.competition;return c?{id:String(c.id),name:String(c.name||''),nameArabic:c.nameArabic,status:String(c.status||''),registrationEndDate:c.registrationEndDate}:null},(r,c)=>{
+        /* بلا عنوان عام مضبوط لا يُرسل رابط؛ فالتذكير بلا رابط إكمال لا فائدة منه، ويُسجَّل ذلك بدل إرسال رسالة ناقصة. */
+        if(!origin){console.warn('[registration-reminders] APP_URL is not set; reminder dropped');return}
+        communicate('incomplete_registration',r.id,[{channel:'email',address:r.email,locale:r.locale}],{competition:r.locale==='ar'?c.nameArabic||c.name:c.name||c.nameArabic,deadline:c.registrationEndDate?String(c.registrationEndDate).slice(0,10):'',link:`${origin}/#register?comp=${encodeURIComponent(c.id)}`,cancel:`${origin}/api/public/registration-reminders/cancel?token=${encodeURIComponent(r.cancelToken)}`});
+      },Date.now()).catch(err=>console.warn('[registration-reminders] cycle failed:',err instanceof Error?err.message:err))};
+      const incompleteTimer=setInterval(remindIncomplete,30*60_000);incompleteTimer.unref?.();
+    }
   }
   /*
    * السلطة لا تُفعَّل على مسار غير دائم: موافقة نصاب تختفي، أو بذرة التُزم بها ولم تُكشف تضيع،
@@ -1288,7 +1300,24 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
 
   app.post('/api/public/competitions/:competitionId/register',publicRegistrationRateLimit,async(req,res)=>{
     if(!publicRegistration){reportPublicFailure(String(req.params.competitionId||''),'PUBLIC_REGISTRATION_NOT_CONFIGURED',503);return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'})}
-    try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));emitDomainWebhook(result.participant.competitionId,'registration.created',{participantId:result.participant.id,participantCode:result.participant.code,status:result.participant.status});{const body=req.body as PublicRegistrationInput;const email=String(body?.email||'').trim();if(email)communicate('registration_confirmation',result.participant.id,[{channel:'email',address:email,locale:'ar'}],{competition:String(req.params.competitionId||''),name:result.participant.fullNameArabic||result.participant.fullName,code:result.participant.code});}res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
+    try{const result=await publicRegistration.register(String(req.params.competitionId||''),req.body as PublicRegistrationInput,requestOrigin(req));emitDomainWebhook(result.participant.competitionId,'registration.created',{participantId:result.participant.id,participantCode:result.participant.code,status:result.participant.status});{const body=req.body as PublicRegistrationInput;const email=String(body?.email||'').trim();if(email)registrationReminders?.completed(result.participant.competitionId,email);if(email)communicate('registration_confirmation',result.participant.id,[{channel:'email',address:email,locale:'ar'}],{competition:String(req.params.competitionId||''),name:result.participant.fullNameArabic||result.participant.fullName,code:result.participant.code});}res.setHeader('Cache-Control','no-store');return res.status(201).json(result)}catch(err){reportPublicFailure(String(req.params.competitionId||''),err instanceof Error?String(err.message).split(':')[0]:'PUBLIC_API_FAILED',publicApiStatus(err));return publicApiError(res,err)}
+  });
+  /* طلب التذكير بإكمال التسجيل: الرد واحد سواء أكان الطلب جديدًا أم مكرّرًا، فلا يكشف من طلب قبلًا. */
+  app.post('/api/public/competitions/:competitionId/registration/reminder',publicRegistrationRateLimit,async(req,res)=>{
+    if(!registrationReminders||!firestoreRepository)return res.status(503).json({code:'REGISTRATION_REMINDERS_NOT_CONFIGURED'});
+    try{
+      const competitionId=String(req.params.competitionId||'').replace(/[^a-zA-Z0-9_-]/g,'');
+      const row:any=await firestoreRepository.get(`public_competitions/${competitionId}`);const c=row?.competition;
+      if(!c||c.status!=='registration_open')return res.status(409).json({code:'REGISTRATION_CLOSED'});
+      const out=registrationReminders.request({competitionId,email:String(req.body?.email||''),locale:String(req.body?.locale||'ar')});
+      res.setHeader('Cache-Control','no-store');
+      return res.status(202).json({requested:true,...(out.created?{cancelToken:out.cancelToken}:{})});
+    }catch(err){const code=err instanceof Error?err.message:'';if(code==='REGISTRATION_EMAIL_INVALID')return res.status(400).json({code});return publicApiError(res,err)}
+  });
+  app.get('/api/public/registration-reminders/cancel',publicRegistrationRateLimit,(req,res)=>{
+    const ok=!!registrationReminders&&registrationReminders.cancel(String(req.query.token||''));
+    res.setHeader('Cache-Control','no-store');res.type('text/plain; charset=utf-8');
+    return res.status(200).send(ok?'تم إيقاف التذكير. — The reminder has been cancelled.':'لا يوجد تذكير نشط بهذا الرابط. — No active reminder for this link.');
   });
   /* تعديل المتسابق تسجيلَه قبل الإغلاق — برابط رحلته، وبالتحقق الكامل نفسه على الخادم. */
   app.put('/api/public/competitions/:competitionId/registration',publicRegistrationRateLimit,async(req,res)=>{
