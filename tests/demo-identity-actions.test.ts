@@ -42,3 +42,10 @@ test('demo session never reaches owner endpoints even when an owner is signed in
   assert.match(gov, /reissueRoleGrantActivation\(grant\.id\)/);
   assert.doesNotMatch(gov, /s\.reissueIdentityInvitation\(grant\.id\)/);
 });
+
+test('competition statuses on organization cards read in Arabic, never as raw codes', async () => {
+  const { uiToken } = await import('../src/lib/ui-language');
+  for (const s of ['registration_open', 'registration_closed', 'judging_complete', 'results_sealed', 'results_published'])
+    assert.doesNotMatch(uiToken(s, true), /_/);
+  assert.equal(uiToken('registration_open', true), 'التسجيل مفتوح');
+});

@@ -36,7 +36,7 @@ const demoCommercial=async(path:string)=>{
   if(!IS_DEMO_SESSION)return null;
   try{const mod=await import('../../data/demo-commercial');return mod.demoCommercialResponse(path)}catch{return null}
 };
-const api=async(path:string,init?:RequestInit)=>{const user=auth.currentUser;if(!user){if(!init){const demo=await demoCommercial(path);if(demo)return demo}throw new Error('IDENTITY_REQUIRED')}const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
+const api=async(path:string,init?:RequestInit)=>{const user=auth.currentUser;/* بيئة العرض لا تبلغ الخادم الحقيقي ولو كان في التبويب مالكٌ مسجَّل. */if(!user||IS_DEMO_SESSION){if(!init){const demo=await demoCommercial(path);if(demo)return demo}throw new Error('IDENTITY_REQUIRED')}const token=await user.getIdToken();const res=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,...(init?.body?{'content-type':'application/json'}:{}),...(init?.headers||{})},cache:'no-store'});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(body.code||`HTTP_${res.status}`));return body};
 /*
  * الرمز الخام لا يُعرض. `api()` ترمي `body.code` أو `HTTP_<رقم>`، وأي رمز خارج القاموس أعلاه —
  * STORAGE_ADMIN_REQUIRED، IDENTITY_REQUIRED، HTTP_403 — كان يُطبع على الشاشة كما هو أمام
