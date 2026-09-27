@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { CONSENT_BACKED_DOCUMENTS, consentVersionOf, isResolved, legalConfigFromEnv, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from '../src/lib/legal-documents';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
+import {isPlausibleEmail} from '../shared/email-shape';
 import {persistableCustomAnswers,validateAnswers,CORE_FIELD_IDS,type Answers} from '../src/lib/registration-form';
 import {categoryDistribution,categoryScopeOf,resolveQuestionCount} from '../src/lib/scope-engine';
 import {describeScope} from '../src/lib/quran-scope';
@@ -12,7 +13,7 @@ export interface PublicRegistrationStore{getCompetition(id:string):Promise<Compe
   getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>}
 
 const clean=(value:unknown,max=160)=>String(value??'').trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
-const emailOk=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)&&value.length<=254;
+const emailOk=(value:string)=>isPlausibleEmail(value);
 const ageOn=(dob:string,now:Date)=>{const birth=new Date(`${dob}T00:00:00Z`);if(!Number.isFinite(birth.getTime())||birth>now)return NaN;let age=now.getUTCFullYear()-birth.getUTCFullYear();const before=now.getUTCMonth()<birth.getUTCMonth()||(now.getUTCMonth()===birth.getUTCMonth()&&now.getUTCDate()<birth.getUTCDate());if(before)age--;return age};
 const compare=(actual:unknown,condition:EligibilityCondition)=>{const expected=condition.value;switch(condition.operator){case'eq':return String(actual)===String(expected);case'neq':return String(actual)!==String(expected);case'lte':return Number(actual)<=Number(expected);case'gte':return Number(actual)>=Number(expected);case'in':return Array.isArray(expected)&&expected.map(String).includes(String(actual));case'not_in':return Array.isArray(expected)&&!expected.map(String).includes(String(actual));case'exists':return condition.value?actual!==undefined&&actual!==null&&actual!=='':actual===undefined||actual===null||actual==='';default:return false}};
 const fieldValue=(field:RegistrationFieldDefinition,input:PublicRegistrationInput)=>({fullNameArabic:input.fullNameArabic,fullName:input.fullName,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,dateOfBirth:input.dateOfBirth,gender:input.gender,identity:input.nationalIdOrPassport}[field.id]??'');

@@ -11,6 +11,7 @@
  */
 
 import crypto from 'crypto';
+import { isPlausibleEmail } from '../../shared/email-shape';
 import type {
   BrandProfileRecord, BrandingMode, CustomDomainRecord, DiscoverVisibility, PublishedCompetitionListing,
 } from './types';
@@ -82,7 +83,7 @@ const safeUrl = (v: unknown) => {
 const safeEmail = (v: unknown) => {
   const e = clean(v, 180);
   if (!e) return undefined;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new CommercialError('BRAND_EMAIL_INVALID');
+  if (!isPlausibleEmail(e)) throw new CommercialError('BRAND_EMAIL_INVALID');
   return e;
 };
 

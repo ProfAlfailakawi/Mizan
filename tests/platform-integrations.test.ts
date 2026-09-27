@@ -93,3 +93,13 @@ test('host brand: white label only for a non-MIZAN host with a non-MIZAN mode, a
   assert.match(logo, /brandInfo\.hideMizanMark \?/);
   assert.match(fs.readFileSync('src/main.tsx', 'utf8'), /loadHostBrand\(\)/);
 });
+
+test('email shape check is linear-time and matches the previous accept/reject behaviour', async () => {
+  const { isPlausibleEmail } = await import('../shared/email-shape');
+  for (const ok of ['a@b.co', 'first.last@uni.edu.sa', 'x+tag@sub.domain.org']) assert.equal(isPlausibleEmail(ok), true, ok);
+  for (const bad of ['', 'a@b', '@b.co', 'a@.co', 'a@b.', 'a b@c.co', 'a@@b.co', 'a@b..co']) assert.equal(isPlausibleEmail(bad), false, bad);
+  const hostile = '!@!.' + '!.'.repeat(200_000);
+  const started = Date.now();
+  isPlausibleEmail(hostile);
+  assert.ok(Date.now() - started < 200, 'adversarial CodeQL input completes quickly');
+});

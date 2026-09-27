@@ -12,6 +12,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { isPlausibleEmail } from '../shared/email-shape';
 
 export type Channel = 'in_app' | 'email' | 'sms' | 'whatsapp';
 export type Trigger =
@@ -129,7 +130,7 @@ export class CommunicationsService {
     const created: OutboxMessage[] = [];
     for (const r of recipients) {
       if (!r.address) continue;
-      if (r.channel === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.address)) continue;
+      if (r.channel === 'email' && !isPlausibleEmail(r.address)) continue;
       const dedupeKey = crypto.createHash('sha256').update(`${trigger}|${subjectKey}|${r.channel}|${r.address}`).digest('hex').slice(0, 32);
       if (rows.some(x => x.dedupeKey === dedupeKey)) continue;
       const { subject, body } = renderTemplate(trigger, r.locale, vars);

@@ -12,6 +12,7 @@
  * وحدة نقيّة: لا شبكة ولا حالة.
  */
 import type { RegistrationFieldCondition, RegistrationFieldDefinition } from '../types';
+import { isPlausibleEmail } from '../../shared/email-shape';
 
 export type AnswerValue = string | number | boolean | string[] | undefined;
 export type Answers = Record<string, AnswerValue>;
@@ -83,7 +84,7 @@ export function validateField(field: RegistrationFieldDefinition, value: AnswerV
       if ((field.min !== undefined && n < field.min) || (field.max !== undefined && n > field.max)) return 'OUT_OF_RANGE';
       return undefined;
     }
-    case 'email': return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text) && text.length <= 254 ? undefined : 'INVALID_EMAIL';
+    case 'email': return isPlausibleEmail(text) ? undefined : 'INVALID_EMAIL';
     case 'phone': return /^\+?[0-9٠-٩۰-۹ -]{7,24}$/.test(text) ? undefined : 'INVALID_PHONE';
     case 'date': return /^\d{4}-\d{2}-\d{2}$/.test(text) && Number.isFinite(Date.parse(`${text}T00:00:00Z`)) ? undefined : 'INVALID_DATE';
     case 'select': return field.options?.length && !field.options.some(o => o.value === text) ? 'INVALID_OPTION' : undefined;
