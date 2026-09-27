@@ -111,7 +111,7 @@ export const LiveJudgingSimulator: React.FC = () => {
               >
                 <span>{t.word}</span>
                 <span
-                  className={`text-[9px] font-arabic font-normal mt-1 px-1.5 py-0.5 rounded ${
+                  className={`text-[9px] font-arabic font-normal mt-3 px-1.5 py-0.5 rounded ${
                     isActive ? 'bg-[var(--surface)] text-[var(--emerald)]' : 'text-transparent'
                   }`}
                 >
