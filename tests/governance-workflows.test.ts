@@ -150,3 +150,15 @@ test('review fix: store applies participant reassignment and persists schedule d
   assert.match(events, /identity\.competitionId!==competitionId\)return res\.status\(403\)\.json\(\{code:'COMPETITION_SCOPE_MISMATCH'\}\)/);
   assert.match(events, /DOMAIN_EVENT_SUBJECT_NOT_FOUND/);
 });
+
+test('review fix: a judge without a linked identity keeps binding conflicts (fail safe), and the UI can tell the three cases apart', async () => {
+  const { caseIsBinding, caseVerification } = await import('../src/lib/conflict-of-interest');
+  const c = declareConflict([], { ...base, id: 'n', judgeId: 'unlinked', declaredByUid: 'uid-x', declaredByRole: 'judge', participantId: 'p1', kind: 'recusal', relation: 'other', reason: 'self recusal without grant' });
+  assert.equal(caseIsBinding(c, {}), true);
+  assert.equal(judgeMayScore([c], 'unlinked', { id: 'p1' }, {}).allowed, false);
+  assert.equal(caseVerification(c, {}), 'unverifiable');
+  assert.equal(caseVerification(c, { unlinked: 'uid-x' }), 'verified');
+  assert.equal(caseVerification(c, { unlinked: 'uid-other' }), 'forged');
+  const store = fs.readFileSync('src/lib/store.ts', 'utf8');
+  for (const code of ['CONFLICT_TARGET_COMMITTEE_NOT_FOUND', 'CONFLICT_TARGET_COMMITTEE_WRONG_CATEGORY', 'CONFLICT_TARGET_COMMITTEE_CONFLICTED']) assert.ok(store.includes(code), code);
+});

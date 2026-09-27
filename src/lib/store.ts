@@ -3958,6 +3958,14 @@ const prepareJourneyAccessBatch=async()=>{
   const resolveJudgeConflict=(caseId:string,input:{decision:ConflictDecision;note:string;reassignedToCommitteeId?:string;replacementJudgeId?:string})=>{
     const current=globalState.conflictCases.find(c=>c.id===caseId);
     if(!current)return {ok:false as const,code:'CONFLICT_NOT_FOUND'};
+    /* لجنة النقل يجب أن تكون مؤهّلة فعلًا: من المسابقة نفسها، تتولّى فئة المتسابق، ولا تضارب على محكّميها. */
+    if(input.decision==='reassigned_participant'&&current.participantId){
+      const target=globalState.committees.find(k=>k.id===input.reassignedToCommitteeId&&k.competitionId===current.competitionId);
+      const participant=globalState.participants.find(p=>p.id===current.participantId);
+      if(!target)return {ok:false as const,code:'CONFLICT_TARGET_COMMITTEE_NOT_FOUND'};
+      if(participant&&!target.assignedCategories.includes(participant.categoryId))return {ok:false as const,code:'CONFLICT_TARGET_COMMITTEE_WRONG_CATEGORY'};
+      if(participant&&committeeHasHardConflict(target,participant))return {ok:false as const,code:'CONFLICT_TARGET_COMMITTEE_CONFLICTED'};
+    }
     try{
       const resolved=resolveConflict(current,{...input,actorId:auth.currentUser?.uid||globalState.currentUser.id,actorRole:globalState.currentUser.role,now:new Date().toISOString()});
       globalState.conflictCases=globalState.conflictCases.map(c=>c.id===caseId?resolved:c);
