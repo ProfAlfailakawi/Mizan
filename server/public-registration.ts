@@ -10,7 +10,9 @@ import {describeScope} from '../src/lib/quran-scope';
 export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string;customAnswers?:Record<string,unknown>};
 export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>;
   /** قراءة وثيقة مفردة وكتابة تحديثاتٍ ذرّية — لازمتان لتعديل التسجيل قبل الإغلاق. */
-  getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>}
+  getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;
+  /** Field-masked update: only the listed fields change, so concurrent staff edits (status, check-in, payment) survive. */
+  patch?(path:string,fields:Record<string,unknown>):Promise<void>}
 
 const clean=(value:unknown,max=160)=>String(value??'').trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
 const emailOk=(value:string)=>isPlausibleEmail(value);
@@ -122,7 +124,7 @@ export class PublicRegistrationService{
    * يمرّ بالجهة). ويُسجَّل أيّ الحقول تغيّر ومتى، بلا القيم.
    */
   async editRegistration(competitionId:string,rawToken:string,raw:Partial<PublicRegistrationInput>){
-    if(!this.store.getDocument||!this.store.upsert)throw new Error('REGISTRATION_EDIT_NOT_CONFIGURED');
+    if(!this.store.getDocument||!this.store.patch)throw new Error('REGISTRATION_EDIT_NOT_CONFIGURED');
     const journey=await this.resolve(competitionId,'participant',rawToken);
     const competition=await this.store.getCompetition(competitionId);if(!competition)throw new Error('COMPETITION_NOT_FOUND');
     const policy=getCompetitionPolicy(competition),now=this.now();
@@ -147,7 +149,10 @@ export class PublicRegistrationService{
     for(const k of new Set([...Object.keys(current.customAnswers||{}),...Object.keys(customAnswers)]))if(JSON.stringify(current.customAnswers?.[k])!==JSON.stringify(customAnswers[k]))changed.push(`custom:${k}` as never);
     if(!changed.length)return {participant:{id:current.id,code:current.code,status:current.status},changed:[]};
     next.editHistory=[...(current.editHistory||[]),{at:now.toISOString(),fields:changed as string[],actor:'participant' as const}].slice(-50);
-    await this.store.upsert([{path,data:next as unknown as Record<string,unknown>}]);
+    /* يُكتب ما يملك المتسابق تعديله فقط، لا الوثيقة كاملة: حالةٌ اعتمدها المشرف أو حضورٌ سُجّل أو
+       دفعٌ قُيّد بين القراءة والكتابة يبقى كما هو. */
+    const editable=['fullNameArabic','fullName','email','phone','country','nationality','nationalIdOrPassport','dateOfBirth','gender','customAnswers','editHistory'] as const;
+    await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])));
     return {participant:{id:next.id,code:next.code,status:next.status},changed};
   }
   async resolve(competitionId:string,audience:'participant'|'guardian',rawToken:string){

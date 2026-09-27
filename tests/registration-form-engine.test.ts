@@ -68,6 +68,7 @@ class Store implements PublicRegistrationStore {
   async getJourney(h: string) { return this.docs.get(`public_journeys/${h}`) || null; }
   async getDocument(p: string) { return this.docs.get(p) || null; }
   async upsert(d: { path: string; data: Record<string, unknown> }[]) { for (const x of d) this.docs.set(x.path, structuredClone(x.data)); }
+  async patch(p: string, fields: Record<string, unknown>) { const cur = this.docs.get(p); if (!cur) throw new Error('FIRESTORE_NOT_FOUND'); this.docs.set(p, { ...cur, ...structuredClone(fields) }); }
 }
 const base = (): PublicRegistrationInput => ({ fullNameArabic: 'أحمد', fullName: 'Ahmad', email: 'a@example.com', phone: '+96555555555', country: 'Kuwait', nationality: 'Kuwaiti', nationalIdOrPassport: 'P1', dateOfBirth: '2000-01-01', gender: 'male', categoryId: SEED_COMPETITION.categories[0].id, riwaya: SEED_COMPETITION.categories[0].riwaya, consents: { terms: true, privacy: true, audioRecording: true, guardian: true, aiProcessing: false } });
 const adultCategory = (c: Competition) => { c.categories[0] = { ...c.categories[0], minAge: undefined, maxAge: undefined, genderConstraint: 'all' }; return c; };
@@ -103,4 +104,27 @@ test('§65 a participant edits before the deadline; edits are revalidated, logge
   store.competition.policy!.registration.editPolicy = 'never';
   clock = now;
   await assert.rejects(() => service.editRegistration(store.competition.id, reg.journeyAccessToken, { phone: '+96577777777' }), /REGISTRATION_EDIT_NOT_ALLOWED/);
+});
+
+test('review fix: a required document field never blocks registration (documents are uploaded later)', () => {
+  const doc: RegistrationFieldDefinition = { id: 'birthCert', labelArabic: 'شهادة الميلاد', labelEnglish: 'Birth certificate', type: 'file', required: true, visible: true, custom: true };
+  assert.equal(isFieldRequired(doc, {}, now), false);
+  assert.deepEqual(validateAnswers([doc], {}, now), []);
+});
+
+test('review fix: an edit only writes participant-editable fields, preserving concurrent staff changes', async () => {
+  const store = new Store(adultCategory(competitionWith([mode, juz])));
+  const service = new PublicRegistrationService(store, () => now, LEGAL_ENV);
+  const reg = await service.register(store.competition.id, { ...base(), customAnswers: { mode: 'online', juz: 3 } }, 'https://x');
+  const path = [...store.docs.keys()].find(p => p.includes('/participants/'))!;
+  // staff approve and record a payment after the participant opened the edit
+  store.docs.set(path, { ...store.docs.get(path)!, status: 'approved', registrationPayment: { status: 'paid', amountMinor: 1500, currency: 'KWD', receiptReference: 'R-1', updatedAt: 'x' } });
+  const realGet = store.getDocument.bind(store);
+  let stale: Record<string, unknown> | null = null;
+  store.getDocument = async (p: string) => { if (!stale) { stale = { ...(await realGet(p))!, status: 'under_review', registrationPayment: { status: 'pending' } }; } return stale; };
+  await service.editRegistration(store.competition.id, reg.journeyAccessToken, { phone: '+96566666666' });
+  const after = store.docs.get(path) as any;
+  assert.equal(after.phone, '+96566666666');
+  assert.equal(after.status, 'approved', 'staff approval survives');
+  assert.equal(after.registrationPayment.status, 'paid', 'payment record survives');
 });

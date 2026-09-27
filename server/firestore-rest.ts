@@ -89,6 +89,18 @@ export class FirestoreRestRepository{
     }
   }
 
+  /**
+   * Update only the named top-level fields of an existing document (Firestore update mask).
+   * Fields not listed keep whatever another writer set meanwhile — no stale full-document overwrite.
+   */
+  async patchFields(path:string,fields:Record<string,unknown>){
+    const keys=Object.keys(fields);if(!keys.length)return;
+    const token=await this.tokenProvider();
+    const writes=[{update:{name:this.name(path),fields:encodeFields(fields)},updateMask:{fieldPaths:keys.map(k=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)?k:`\`${k.replace(/`/g,'')}\``)},currentDocument:{exists:true}}];
+    const response=await fetch(`${this.root}:commit`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({writes}),signal:AbortSignal.timeout(12000)});
+    if(!response.ok){const code=response.status===404||response.status===400?'FIRESTORE_NOT_FOUND':response.status===409?'FIRESTORE_CONFLICT':response.status===401||response.status===403?'FIRESTORE_PERMISSION_DENIED':'FIRESTORE_UNAVAILABLE';throw new Error(code)}
+  }
+
   async createAtomically(documents:{path:string;data:Record<string,unknown>}[]){
     const token=await this.tokenProvider();const writes=documents.map(document=>({update:{name:this.name(document.path),fields:encodeFields(document.data)},currentDocument:{exists:false}}));
     const response=await fetch(`${this.root}:commit`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({writes}),signal:AbortSignal.timeout(12000)});

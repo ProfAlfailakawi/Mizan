@@ -317,7 +317,8 @@ service cloud.firestore {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge'])
-              || (roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid && request.resource.data.status == 'open'));
+              || (roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid && request.resource.data.declaredByUid == request.resource.data.uploaderUid
+                && request.resource.data.declaredByRole == 'judge' && request.resource.data.status == 'open'));
           allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
           allow delete: if false;
         }

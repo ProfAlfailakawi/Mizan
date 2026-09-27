@@ -35,6 +35,8 @@ export interface SchedulerInput {
   judgeAvailability: JudgeAvailability[];
   conflicts: ConflictCase[];
   pins: ManualPin[];
+  /** judgeId → Firebase uid, used to verify judge-declared conflict cases. */
+  judgeUids?: Record<string, string | undefined>;
 }
 
 export interface ScheduledSlot { participantId: string; committeeId: string; hallId: string; date: string; start: string; end: string; pinned: boolean; reason: string }
@@ -141,7 +143,7 @@ export function buildSchedule(input: SchedulerInput): SchedulePlan {
     const len = duration(p);
     let start: number;
     try { start = toMin(pin.start); } catch { unscheduled.push({ participantId: p.id, reason: 'PIN_INVALID', detail: 'time' }); pinned.add(p.id); continue; }
-    if (!c.judgeIds.every(j => judgeMayScore(input.conflicts, j, p).allowed)) { unscheduled.push({ participantId: p.id, reason: 'PIN_INVALID', detail: 'conflict of interest' }); pinned.add(p.id); continue; }
+    if (!c.judgeIds.every(j => judgeMayScore(input.conflicts, j, p, input.judgeUids).allowed)) { unscheduled.push({ participantId: p.id, reason: 'PIN_INVALID', detail: 'conflict of interest' }); pinned.add(p.id); continue; }
     if (!fits(c, day, start, len)) { unscheduled.push({ participantId: p.id, reason: 'PIN_INVALID', detail: 'slot unavailable or overlapping' }); pinned.add(p.id); continue; }
     if (!c.assignedCategories.includes(p.categoryId)) warnings.push(`PIN_OUTSIDE_COMMITTEE_CATEGORY:${p.id}`);
     book(c, day, start, len);
@@ -153,7 +155,7 @@ export function buildSchedule(input: SchedulerInput): SchedulePlan {
   for (const p of queue) {
     const forCategory = input.committees.filter(c => c.assignedCategories.includes(p.categoryId));
     if (!forCategory.length) { unscheduled.push({ participantId: p.id, reason: 'NO_COMMITTEE_FOR_CATEGORY' }); continue; }
-    const eligible = eligibleCommittees(forCategory, input.conflicts, p);
+    const eligible = eligibleCommittees(forCategory, input.conflicts, p, input.judgeUids);
     if (!eligible.length) { unscheduled.push({ participantId: p.id, reason: 'ALL_COMMITTEES_CONFLICTED' }); continue; }
     const len = duration(p);
     let best: { c: SchedulerCommittee; day: ScheduleDay; start: number } | undefined;

@@ -59,7 +59,8 @@ export function isFieldVisible(field: RegistrationFieldDefinition, answers: Answ
 }
 
 export function isFieldRequired(field: RegistrationFieldDefinition, answers: Answers, now: Date) {
-  if (!isFieldVisible(field, answers, now) || field.type === 'section') return false;
+  /* المستندات تُرفع بعد التسجيل من رابط الرحلة، فلا تمنع الإرسال وقت التسجيل. */
+  if (!isFieldVisible(field, answers, now) || field.type === 'section' || field.type === 'file') return false;
   return field.required || (!!field.requiredWhen?.length && allHold(field.requiredWhen, answers, now));
 }
 

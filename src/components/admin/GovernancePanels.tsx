@@ -5,7 +5,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../../lib/store';
-import type { ConflictDecision, ConflictKind, ConflictRelation } from '../../lib/conflict-of-interest';
+import { caseIsBinding, type ConflictDecision, type ConflictKind, type ConflictRelation } from '../../lib/conflict-of-interest';
 import { hierarchyOf } from '../../lib/qualification';
 
 const L = (ar: boolean, a: string, e: string) => (ar ? a : e);
@@ -28,6 +28,7 @@ export const ConflictOfInterestPanel: React.FC<{ mode: 'judge' | 'review' }> = (
   const participants = s.participants.filter(p => p.competitionId === cid);
   const committees = s.committees.filter(c => c.competitionId === cid);
   const cases = s.conflictCases.filter(c => c.competitionId === cid && (mode === 'review' || c.judgeId === me?.id));
+  const uidMap = Object.fromEntries(s.judges.map(j => { const g = s.roleGrants.find(x => x.id === j.identityGrantId); const acc = g ? s.identityAccounts.find(x => x.id === g.accountId) : undefined; return [j.id, acc?.firebaseUid]; }));
   const [form, setForm] = useState({ judgeId: me?.id || '', participantId: '', institution: '', kind: 'declared_conflict' as ConflictKind, relation: 'student' as ConflictRelation, reason: '' });
   const [decision, setDecision] = useState<Record<string, { decision: ConflictDecision; note: string; committeeId: string; judgeId: string }>>({});
   const [result, setResult] = useState<{ ok: boolean; code?: string } | null>(null);
@@ -47,7 +48,7 @@ export const ConflictOfInterestPanel: React.FC<{ mode: 'judge' | 'review' }> = (
     <ul className="space-y-2">{cases.map(c => {
       const d = decision[c.id] || { decision: 'reassigned_participant' as ConflictDecision, note: '', committeeId: '', judgeId: '' };
       return <li key={c.id} className="rounded-2xl border border-[#e5e3dc] bg-white p-4 text-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2"><b>{judgeName(c.judgeId)} — {KIND[c.kind][ar ? 0 : 1]} · {RELATION[c.relation][ar ? 0 : 1]}</b><span className={`rounded-full px-2 py-0.5 font-bold ${c.status === 'open' ? 'bg-[#F5EDE2] text-[#725630]' : 'bg-[#E7EEE9] text-[#214C40]'}`}>{c.status === 'open' ? L(ar, 'مفتوح', 'Open') : L(ar, 'محسوم', 'Resolved')}</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><b>{judgeName(c.judgeId)} — {KIND[c.kind][ar ? 0 : 1]} · {RELATION[c.relation][ar ? 0 : 1]}</b><span className={`rounded-full px-2 py-0.5 font-bold ${c.status === 'open' ? 'bg-[#F5EDE2] text-[#725630]' : 'bg-[#E7EEE9] text-[#214C40]'}`}>{c.status === 'open' ? L(ar, 'مفتوح', 'Open') : L(ar, 'محسوم', 'Resolved')}</span>{c.status === 'open' && c.declaredByRole === 'judge' && !caseIsBinding(c, uidMap) && <span className="rounded-full bg-[#F4E6E3] px-2 py-0.5 font-bold text-[#87483f]">{L(ar, 'غير موثَّق: لم يُعلنه المحكّم نفسه', 'Unverified: not declared by that judge')}</span>}</div>
         <div className="mt-1 text-[#4f5752]">{c.participantId ? name(c.participantId) : c.institution} · {c.reason}</div>
         <div className="mt-1 text-[#6a706c]">{L(ar, 'التعيين الأصلي', 'Original assignment')}: {c.originalAssignment.committeeId || '—'} ({c.originalAssignment.judgeIds.length})</div>
         {c.resolution && <div className="mt-2 rounded-xl bg-[#f4f2ec] p-2">{DECISION[c.resolution.decision][ar ? 0 : 1]} — {c.resolution.note}{c.resolution.reassignedToCommitteeId ? ` → ${c.resolution.reassignedToCommitteeId}` : ''}{c.resolution.replacementJudgeId ? ` → ${judgeName(c.resolution.replacementJudgeId)}` : ''}</div>}

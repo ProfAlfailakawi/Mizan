@@ -121,5 +121,32 @@ test('the new collections are declared for sync and guarded by Firestore rules',
   const rules = fs.readFileSync('firestore.rules', 'utf8');
   for (const c of ['conflict_cases', 'schedule_plans', 'qualifications']) assert.match(rules, new RegExp(`match /${c}/\\{`));
   const coi = rules.slice(rules.indexOf('match /conflict_cases/'), rules.indexOf('match /schedule_plans/'));
-  assert.ok(coi.includes("roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid && request.resource.data.status == 'open'"), 'a judge can only declare, in their own name, an open case');
+  assert.ok(coi.includes("roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid && request.resource.data.declaredByUid == request.resource.data.uploaderUid"), 'a judge can only declare in their own name');
+  assert.ok(coi.includes("request.resource.data.status == 'open'"), 'and only an open case');
+});
+
+test('review fix: a judge cannot forge a binding conflict case against another judge', async () => {
+  const { caseIsBinding } = await import('../src/lib/conflict-of-interest');
+  const forged = declareConflict([], { ...base, id: 'f', judgeId: 'victim', declaredByUid: 'uid-attacker', declaredByRole: 'judge', participantId: 'p1', kind: 'recusal', relation: 'other', reason: 'forged declaration' });
+  const own = declareConflict([], { ...base, id: 'o', judgeId: 'victim', declaredByUid: 'uid-victim', declaredByRole: 'judge', participantId: 'p2', kind: 'recusal', relation: 'other', reason: 'my own declaration' });
+  const uids = { victim: 'uid-victim' };
+  assert.equal(caseIsBinding(forged, uids), false);
+  assert.equal(judgeMayScore([forged], 'victim', { id: 'p1' }, uids).allowed, true, 'forged case does not block');
+  assert.equal(judgeMayScore([own], 'victim', { id: 'p2' }, uids).allowed, false, 'own declaration binds');
+  const byHeadJudge = declareConflict([], { ...base, id: 'h', judgeId: 'victim', declaredByUid: 'uid-hj', declaredByRole: 'head_judge', participantId: 'p3', kind: 'declared_conflict', relation: 'relative', reason: 'reported by head judge' });
+  assert.equal(judgeMayScore([byHeadJudge], 'victim', { id: 'p3' }, uids).allowed, false, 'reviewer-declared cases bind');
+  const rules = fs.readFileSync('firestore.rules', 'utf8');
+  const coi = rules.slice(rules.indexOf('match /conflict_cases/'), rules.indexOf('match /schedule_plans/'));
+  assert.ok(coi.includes('request.resource.data.declaredByUid == request.resource.data.uploaderUid'));
+  assert.ok(coi.includes("request.resource.data.declaredByRole == 'judge'"));
+});
+
+test('review fix: store applies participant reassignment and persists schedule demotion; events endpoint checks competition scope and subject', () => {
+  const store = fs.readFileSync('src/lib/store.ts', 'utf8');
+  assert.match(store, /input\.decision==='reassigned_participant'&&current\.participantId&&input\.reassignedToCommitteeId\)\{[\s\S]*?assignedCommitteeId:target[\s\S]*?persistScopedDocument\('participants'/);
+  assert.match(store, /if\(p\.id===planId\|\|demoted\.has\(p\.id\)\)void persistScopedDocument\('schedule_plans'/);
+  const server = fs.readFileSync('server.ts', 'utf8');
+  const events = server.slice(server.indexOf("app.post('/api/saas/events'"), server.indexOf("app.post('/api/saas/events'") + 3000);
+  assert.match(events, /identity\.competitionId!==competitionId\)return res\.status\(403\)\.json\(\{code:'COMPETITION_SCOPE_MISMATCH'\}\)/);
+  assert.match(events, /DOMAIN_EVENT_SUBJECT_NOT_FOUND/);
 });

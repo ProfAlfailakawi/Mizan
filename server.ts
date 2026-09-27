@@ -352,6 +352,7 @@ async function startServer() {
     },
     getDocument:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');return firestoreRepository.get(docPath)},
     upsert:async(documents)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.commitAtomically({upserts:documents})},
+    patch:async(docPath,fields)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.patchFields(docPath,fields)},
     getJourney:async(tokenHash)=>{
       if(firestoreRepository){
         try{
@@ -1538,7 +1539,25 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   app.post('/api/saas/organization/discover',ownerRateLimit,requireFirebaseRoles(['super_admin','org_admin','comp_admin','operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req);return res.json({listing:repo.publishDiscoverListing(actor,scopedOrgId(req,actor),req.body||{})})}catch(err){return commercialError(res,err)}});
   app.post('/api/saas/organization/discover/:id/unpublish',ownerRateLimit,requireFirebaseRoles(['super_admin','org_admin','comp_admin','operator_owner','operator_admin']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({listing:repo.unpublishDiscoverListing(saasActor(req),String(req.params.id))})}catch(err){return commercialError(res,err)}});
   /* أحداث المسابقة التي تقع في المتصفّح تُبلَّغ هنا لتُرسل موقّعة؛ الجهة من الهوية لا من الطلب. */
-  app.post('/api/saas/events',ownerRateLimit,requireFirebaseRoles(['super_admin','org_admin','comp_admin','ops_manager','exception_host','head_judge','judge']),(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const actor=saasActor(req);const organizationId=actor.role==='super_admin'&&req.body?.organizationId?String(req.body.organizationId):actor.organizationId;if(!repo.organizationName(organizationId))return res.status(202).json({queued:0});const queued=repo.reportDomainEvent(actor,organizationId,req.body||{});const t=String(req.body?.type||'');if(t==='results.published'||t==='certificate.issued')communicate(t==='results.published'?'results_published':'certificate_issued',`${req.body?.competitionId}:${req.body?.subjectId}`,[{channel:'in_app',address:organizationId,locale:'ar',organizationId}],{competition:String(req.body?.competitionId||'')});return res.status(202).json({queued})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/events',ownerRateLimit,requireFirebaseRoles(['super_admin','org_admin','comp_admin','ops_manager','exception_host','head_judge','judge']),async(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{
+    const actor=saasActor(req);const identity=scopedMizanIdentity(req);const organizationId=actor.role==='super_admin'&&req.body?.organizationId?String(req.body.organizationId):actor.organizationId;
+    if(!repo.organizationName(organizationId))return res.status(202).json({queued:0});
+    const type=String(req.body?.type||''),competitionId=String(req.body?.competitionId||'').replace(/[^A-Za-z0-9_-]/g,''),subjectId=String(req.body?.subjectId||'').replace(/[^A-Za-z0-9_:.-]/g,'');
+    /* الأدوار المقيّدة بمسابقة لا تُبلغ إلا عن مسابقتها: محكّم المسابقة (أ) لا يصنع حدثًا للمسابقة (ب). */
+    if(['judge','head_judge','ops_manager','exception_host','comp_admin'].includes(actor.role)&&identity.competitionId&&identity.competitionId!==competitionId)return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
+    if(['judge','head_judge','ops_manager','exception_host'].includes(actor.role)&&!identity.competitionId)return res.status(403).json({code:'COMPETITION_SCOPE_REQUIRED'});
+    /* والموضوع يُتحقَّق من وجوده في مسابقة الجهة نفسها قبل توقيع أي حدث. */
+    if(!firestoreRepository)return res.status(503).json({code:'FIRESTORE_UNAVAILABLE'});
+    const base=`organizations/${organizationId}/competitions/${competitionId}`;
+    const subjectPath=type==='participant.checked_in'||type==='judging.completed'?`${base}/participants/${subjectId}`:type==='certificate.issued'?`${base}/certificates/${subjectId}`:subjectId===competitionId?`public_competitions/${competitionId}`:'';
+    if(!subjectPath)return res.status(400).json({code:'DOMAIN_EVENT_SUBJECT_INVALID'});
+    const subject=await firestoreRepository.get(subjectPath);
+    if(!subject)return res.status(404).json({code:'DOMAIN_EVENT_SUBJECT_NOT_FOUND'});
+    if(subjectPath.startsWith('public_competitions/')&&String((subject.competition as any)?.organizationId||'')!==organizationId)return res.status(403).json({code:'CROSS_TENANT_ACCESS_BLOCKED'});
+    const queued=repo.reportDomainEvent(actor,organizationId,{...req.body,type,competitionId,subjectId});
+    if(type==='results.published'||type==='certificate.issued')communicate(type==='results.published'?'results_published':'certificate_issued',`${competitionId}:${subjectId}`,[{channel:'in_app',address:organizationId,locale:'ar',organizationId}],{competition:competitionId});
+    return res.status(202).json({queued});
+  }catch(err){return commercialError(res,err)}});
   /* الدخول الموحّد: إعداد الجهة، واكتشاف المزوّد بالنطاق لشاشة الدخول، ومعاينة الدور المقترح. */
   let ssoConfigs:SsoConfigRepository|null=null;try{if(saasDir)ssoConfigs=new SsoConfigRepository(path.join(saasDir,'sso','configs.json'))}catch(err){console.error('SSO configuration disabled:',err)}
   app.get('/api/public/sso/discover',publicCommercialLimit,(req,res)=>{if(!ssoConfigs)return res.json({provider:null});res.setHeader('cache-control','no-store');return res.json({provider:ssoConfigs.discover(String(req.query.email||''))})});
