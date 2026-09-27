@@ -119,6 +119,39 @@ async function roleSwitch(page, roleValue) {
   await page.waitForTimeout(2200);
 }
 
+/*
+ * أقسامُ ورشة النطاق والأسئلة كما هي في `QuestionEngineWorkspace.tsx`.
+ *
+ * كان الفحصُ يسقط بأربعة تبويباتٍ «غير موجودة». والمنتجُ سليم: في `ed02c35` (تبسيطُ
+ * الإدارة لغير التقنيين) نُقلت «صحّة الذكاء» و«النماذج والعدالة» و«الآيات المزدحمة»
+ * (وكان اسمُها «الازدحام») خلف زرّ «متقدم»، أزرارًا لا تبويبات؛ و«المكتبة الرسمية»
+ * لمالك المنصة وحده منذ أُضيفت. فالفحصُ كان يطلب ما لم يعد في مكانه، لا ما انكسر.
+ * وهو يفتح «متقدم» الآن كما يفتحه المستخدم، ويحرس حجبَ المكتبة بدل أن يطلبها.
+ */
+const ENGINE_TABS = [['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['المحاكاة', 'simulation'], ['الجاهزية', 'readiness']];
+const ENGINE_ADVANCED = [['الآيات المزدحمة', 'demand'], ['النماذج والعدالة', 'models'], ['صحّة الذكاء', 'intelligence']];
+const ADVANCED = ENGINE_ADVANCED.map(([tab]) => tab);
+
+async function engineTab(page, tab) {
+  if (!ADVANCED.includes(tab)) return page.locator('[role="tab"]:visible', { hasText: tab }).first();
+  const toggle = page.locator('button[aria-expanded]:visible', { hasText: 'متقدم' }).first();
+  if (await toggle.count() && await toggle.getAttribute('aria-expanded') !== 'true') {
+    await toggle.click();
+    await page.waitForTimeout(300);
+  }
+  return page.locator('button[aria-pressed]:visible', { hasText: tab }).first();
+}
+
+/*
+ * والتنقّلُ بين أقسام المسابقة على الهاتف واللوح شبكةُ أيقوناتٍ باسمٍ قصير («الأسئلة»)
+ * منذ `ed02c35`، وعلى سطح المكتب بالاسم الكامل. فيُطلب الزرُّ بأيّهما ظهر.
+ */
+function engineNav(page) {
+  return page.locator('button:visible', { hasText: 'النطاق والأسئلة' })
+    .or(page.locator('nav[aria-label="أقسام المسابقة"] button:visible', { hasText: /^الأسئلة$/ }))
+    .first();
+}
+
 async function assertNoHorizontalScroll(page, label, where) {
   const size = await page.evaluate(() => ({ s: document.documentElement.scrollWidth, c: document.documentElement.clientWidth }));
   if (size.s > size.c + 2) note(`[${label}] ${where}: الصفحة تتمدّد أفقيًا (${size.s} > ${size.c})`);
@@ -131,7 +164,7 @@ for (const [width, height, label] of VIEWPORTS) {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     if (!await enterDemo(page, label)) { await ctx.close(); continue; }
 
-    const engine = page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first();
+    const engine = engineNav(page);
     if (!await engine.count()) { note(`[${label}] تبويب النطاق والأسئلة غير موجود`); await ctx.close(); continue; }
     await engine.click();
     await page.waitForTimeout(1200);
@@ -139,8 +172,8 @@ for (const [width, height, label] of VIEWPORTS) {
     await assertNoHorizontalScroll(page, label, 'النطاق');
     ok('شاشة النطاق');
 
-    for (const [tab, file] of [['توزيع الأسئلة', 'distribution'], ['سياسة الأسئلة', 'policy'], ['الازدحام', 'demand'], ['المحاكاة', 'simulation'], ['النماذج والعدالة', 'models'], ['الجاهزية', 'readiness'], ['المكتبة الرسمية', 'library'], ['صحّة الذكاء', 'intelligence']]) {
-      const target = page.locator('[role="tab"]:visible', { hasText: tab }).first();
+    for (const [tab, file] of [...ENGINE_TABS, ...ENGINE_ADVANCED]) {
+      const target = await engineTab(page, tab);
       if (!await target.count()) { note(`[${label}] التبويب «${tab}» غير موجود`); continue; }
       await target.click({ timeout: 8000 }).catch(e => note(`[${label}] «${tab}»: ${String(e).slice(0, 80)}`));
       await page.waitForTimeout(1400);
@@ -148,6 +181,9 @@ for (const [width, height, label] of VIEWPORTS) {
       await assertNoHorizontalScroll(page, label, tab);
       ok(tab);
     }
+    // المكتبةُ الرسمية لمالك المنصة وحده، والعرضُ التجريبيّ يدخل مديرًا للمسابقة: ظهورُها له تسرّب.
+    if (await page.locator('[role="tab"]:visible', { hasText: 'المكتبة الرسمية' }).count()) note(`[${label}] «المكتبة الرسمية» ظهرت لمدير المسابقة وهي لمالك المنصة وحده`);
+    else ok('المكتبة الرسمية محجوبة عن مدير المسابقة');
 
     // المحاكاة تُشغَّل فعلًا، ولا يُكتفى بظهور الزر.
     await page.locator('[role="tab"]:visible', { hasText: 'المحاكاة' }).first().click();
@@ -178,7 +214,7 @@ for (const [width, height, label] of VIEWPORTS) {
      * القائم: التقريرُ يصدر، ولا يدّعي أنه شهادة علمية، ويذكر الحدَّ الأدنى الرياضي.
      */
     if (label === 'desktop') {
-      await page.locator('[role="tab"]:visible', { hasText: 'النماذج والعدالة' }).first().click();
+      await (await engineTab(page, 'النماذج والعدالة')).click();
       await page.waitForTimeout(900);
 
       let body = await page.locator('body').innerText();
@@ -358,7 +394,20 @@ console.log('\n── نطاق المتسابق: قرارُ الفئة لا اخ
     else {
       await roleSwitch(page, 'participant');
       const participantBody = await page.locator('body').innerText();
-      if (!/نطاق الفئة/.test(participantBody)) note('صفحة المتسابق لا تعرض نطاق فئته');
+      /*
+       * متسابقُ العرض التجريبيّ **أنهى اختباره** (له نتيجةٌ وشهادة). ومنذ `905ebdc` تُخفى
+       * بطاقةُ النطاق بعد الاختبار عمدًا (`scopeResolution&&!finished`)، ويحلّ محلَّها ختمُ
+       * «انتهى اختبارك»: لا يلزمه شيءٌ آخر ذلك اليوم. فكان الفحصُ يطلب بطاقةً «قبل أن يدخل»
+       * من متسابقٍ خرج، ويقرأ غيابَها عطلًا.
+       *
+       * فيُحكم بحسب المرحلة الظاهرة، ولا يُسكَت أيٌّ منهما: قبل الاختبار يلزم نطاقُ الفئة،
+       * وبعده يلزم الختمُ ويُمنع أن تعود البطاقة. وما لا يبلغه العرضُ يُقال باسمه.
+       */
+      if (/انتهى اختبارك/.test(participantBody)) {
+        if (/نطاق الفئة/.test(participantBody)) note('بطاقة نطاق الفئة ظهرت لمتسابقٍ أنهى اختباره، وقد أُخفيت بعده عمدًا');
+        else ok('المتسابق المنتهي يرى ختم «انتهى اختبارك» بلا بطاقة نطاق');
+        console.log('  ⏭ متسابقُ العرض أنهى اختباره، فبطاقةُ النطاق قبل الاختبار لا تُبلَغ هنا؛ يحرسها `tests/user-notes-2026-09-14-regression.test.ts`.');
+      } else if (!/نطاق الفئة/.test(participantBody)) note('صفحة المتسابق لا تعرض نطاق فئته');
       else ok('المتسابق يرى نطاق فئته قبل أن يدخل');
       for (const returned of ['اطلب تعديل نطاقي', 'أرسل إلى اللجنة', 'سجل نطاقي']) {
         if (participantBody.includes(returned)) note(`«${returned}» عادت إلى صفحة المتسابق بعد أن أُزيلت بطلب المالك`);
@@ -367,7 +416,7 @@ console.log('\n── نطاق المتسابق: قرارُ الفئة لا اخ
       await page.screenshot({ path: path.join(OUT, 'participant-scope.png'), fullPage: true });
 
       await roleSwitch(page, 'comp_admin');
-      await page.locator('button:visible', { hasText: 'النطاق والأسئلة' }).first().click();
+      await engineNav(page).click();
       await page.waitForTimeout(1200);
       if (/اختيار المتسابق/.test(await page.locator('body').innerText())) note('تبويب «اختيار المتسابق» عاد إلى ورشة المحرّك بعد أن أُزيل بطلب المالك');
       else ok('ورشة المحرّك بلا تبويب اختيار المتسابق، كما قرّر المالك');
