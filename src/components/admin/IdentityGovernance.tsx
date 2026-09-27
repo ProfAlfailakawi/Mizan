@@ -5,7 +5,7 @@ import {
  RotateCcw,ShieldCheck,Trash2,UserPlus,XCircle,
   ChevronDown,
 } from 'lucide-react';
-import {useAppStore} from '../../lib/store';
+import {useAppStore, IS_DEMO_SESSION} from '../../lib/store';
 import {auth} from '../../lib/firebase';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
@@ -47,7 +47,7 @@ const resetStatus=(status:string,ar:boolean)=>({PENDING:ar?'طلب جديد':'Ne
 const identityHashParams=()=>{if(typeof window==='undefined'||!window.location.hash.startsWith('#identity'))return null;return new URLSearchParams(window.location.hash.split('?')[1]||'')};
 
 export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:string;operatorId?:string;operatorName?:string}>=({competitionId,organizationId,operatorId,operatorName})=>{
- const s=useAppStore();const ar=s.language==='ar';const production=true;
+ const s=useAppStore();const ar=s.language==='ar';/* البيئة التجريبية بلا حساب ولا خادم: تقرأ الفريق من صندوقها المعزول، وكل جلسةٍ حقيقية من الخادم وحده. */const production=!IS_DEMO_SESSION;
  const operatorScoped=Boolean(operatorId);
  const operatorManagingOrganization=!operatorScoped&&Boolean(organizationId)&&['operator_owner','operator_admin'].includes(s.currentUser.role);
  const competitionScoped=Boolean(competitionId)&&!operatorScoped;

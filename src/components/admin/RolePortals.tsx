@@ -3,7 +3,7 @@ import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { participantMatchesIdentityQuery } from '../../lib/local-snapshot-privacy';
 import { EmptyState } from '../design-system/EmptyState';
 import { Activity, AlertTriangle, Award, BadgeCheck, BookCopy, Building2, CheckCircle2, ChevronLeft, ChevronRight, FileCheck2, FileSearch, Fingerprint, Globe2, Gavel, Headphones, KeyRound, Layers3, Plane, Plus, QrCode, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Stethoscope, UsersRound, WalletCards, XCircle, LifeBuoy, Trash2 } from 'lucide-react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { can } from '../../lib/permissions';
 import { auth } from '../../lib/firebase';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -37,6 +37,9 @@ const docAr=(s:string,ar:boolean)=>{if(!ar||!s)return s;let out=s;for(const [re,
 const docActionLabel=(a:string,ar:boolean)=>ar?(DOC_ACTION_AR[a]||a):a;
 const docIsAuto=(a:string)=>DOC_SAFE_AUTO.has(a);
 
+/* حمولة غرفة القيادة في بيئة العرض — من `src/data` باستيرادٍ ديناميكي لا يُنفَّذ خارجها. */
+const demoOwnerResponse=async(path:string)=>{if(!IS_DEMO_SESSION)return null;try{const mod=await import('../../data/demo-commercial');return mod.demoCommercialResponse(path)}catch{return null}};
+
 export const SuperAdminConsole: React.FC = () => {
  const store=useAppStore(); const {language,competition,participants,judges,auditLogs,organizations,featureFlags}=store; const ar=isAr(language);
  const modules=[
@@ -47,7 +50,7 @@ export const SuperAdminConsole: React.FC = () => {
   {key:'broadcast',ar:'البث',en:'Broadcast',descAr:'سطح عرض مستقل للحفل والبث دون منح صلاحيات التحكيم.',descEn:'Independent ceremony/broadcast surface without judging authority.',ready:true,readyAr:'سطح البث جاهز',readyEn:'Broadcast surface ready'},
   {key:'benchmark',ar:'المقارنة التشغيلية',en:'Operational benchmark',descAr:'يقارن الأداء بعد توفر تشغيل أو بيانات قياس حقيقية؛ لا يخترع أرقامًا.',descEn:'Compares performance once real runs or measurements exist; never invents metrics.',ready:store.benchmarkRuns.length>0,readyAr:store.benchmarkRuns.length?'بيانات قياس موجودة':'بانتظار تشغيل قياسي',readyEn:store.benchmarkRuns.length?'Benchmark data available':'Waiting for a benchmark run'}
  ]; const [tower,setTower]=useState<any>(null); const [towerError,setTowerError]=useState(''); const [selected,setSelected]=useState<any>(null); const [rescueResult,setRescueResult]=useState(''); const [busyAction,setBusyAction]=useState(''); const [confirmAction,setConfirmAction]=useState<{action:string;tenantId:string}|null>(null);
- const loadTower=async()=>{try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const r=await fetch('/api/owner/control-tower',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));setTower(body);setTowerError('')}catch(e){setTowerError((e as Error).message)}};
+ const loadTower=async()=>{try{const user=auth.currentUser;if(!user&&IS_DEMO_SESSION){const demo=await demoOwnerResponse('/api/owner/control-tower');if(demo){setTower(demo);setTowerError('');return}}if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const r=await fetch('/api/owner/control-tower',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));setTower(body);setTowerError('')}catch(e){setTowerError((e as Error).message)}};
  useEffect(()=>{void loadTower();const id=window.setInterval(()=>void loadTower(),20000);return()=>window.clearInterval(id)},[]);
  const m=tower?.metrics||{}; const health=tower?.platform; const attention=tower?.needsAttention||[]; const primary=selected||attention[0];
 /*
@@ -63,6 +66,8 @@ export const SuperAdminConsole: React.FC = () => {
  const [claimSync,setClaimSync]=useState<{busy:boolean;note:string;tone:'ok'|'error'|''}>({busy:false,note:'',tone:''});
  const syncClaims=async()=>{
   setClaimSync({busy:true,note:'',tone:''});
+  /* بيئة العرض بلا خادم هوية: تُقال النتيجة بأرقام فريقها المعزول، ولا يُرسل شيء. */
+  if(!auth.currentUser&&IS_DEMO_SESSION){setClaimSync({busy:false,tone:'ok',note:`تمت المزامنة: ${store.identityAccounts.length} حسابًا مُنحت صلاحياتها، و0 مُسحت صلاحياتها.`});return}
   try{
    const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');
    const token=await user.getIdToken();
@@ -82,7 +87,7 @@ export const SuperAdminConsole: React.FC = () => {
      :`تمت المزامنة: ${body.written} حسابًا مُنحت صلاحياتها، و${body.cleared} مُسحت صلاحياتها.`});
   }catch(err){setClaimSync({busy:false,tone:'error',note:err instanceof Error?err.message:'تعذّرت المزامنة.'})}
  };
- const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
+ const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');if(!auth.currentUser&&IS_DEMO_SESSION){setRescueResult(ar?`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`:`SAFE · RECHECK_SCHEDULED`);setTower((t:any)=>t?{...t,needsAttention:(t.needsAttention||[]).filter((d:any)=>!(d.safeActionCodes||[]).includes(action)||!docIsAuto(action)),metrics:{...t.metrics,autoHealedToday:(t.metrics?.autoHealedToday||0)+1}}:t);setSelected(null);setBusyAction('');return}try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
  const requestRescue=(action:string,tenantId:string)=>{if(docIsAuto(action))void runRescue(action,tenantId);else setConfirmAction({action,tenantId:tenantId||'__platform__'})};
  const [consoleTab,setConsoleTab]=useState<'health'|'commerce'|'governance'|'library'>('health');
  const consoleTabAnchor=useTabAnchor(consoleTab);

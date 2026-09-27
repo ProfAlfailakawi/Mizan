@@ -36,7 +36,7 @@ import type { AppStoreState } from '../lib/store-state';
 import { buildParticipantScopeRecord } from '../lib/participant-scope';
 import { computePanelScore } from '../lib/scoring-core';
 import { demoDigest } from '../lib/demo-authority';
-import { demoConsents, demoDevices, demoNotifications, demoOperationsRecords, demoPassports, demoTravel } from './demo-extras';
+import { demoConsents, demoDevices, demoIdentityGovernance, demoNotifications, demoOperationsRecords, demoPassports, demoTravel } from './demo-extras';
 import { ayahCountOf, fullQuranScope, ordinalToLocus, scopeFromJuzRange, scopeRanges } from '../lib/quran-scope';
 import {
   SEED_APPEALS,
@@ -367,29 +367,72 @@ function demoResults(participants: Participant[], submissions: JudgeSubmission[]
   return rows.sort((a, b) => a.categoryId.localeCompare(b.categoryId) || a.rank - b.rank);
 }
 
-function demoAuditLogs(participants: Participant[], committees: Committee[]): AuditEvent[] {
+/*
+ * سجلّ التدقيق — كل سطرٍ يصف ما وقع لمتسابقه، لا جملةً واحدة مكرّرة.
+ *
+ * كانت الأسطر تُنسخ من سطر البذرة الأول وتُكتب في حقولٍ لا يقرؤها السجلّ (`targetId`،
+ * `details`)، فبقي الملخّص والكيان والجهة من البذرة: ثلاثمئة سطرٍ كلها «توجيه المتسابق
+ * بلال يوسف (A-104)» باسم «مدير التشغيل»، في جهةٍ غير جهة العرض. والآن يحمل كل سطرٍ
+ * متسابقه ولجنته وفاعله الحقيقي من الكون نفسه، وبتسلسلٍ زمني صاعد عبر اليوم.
+ */
+const AUDIT_ACTIONS: ReadonlyArray<readonly [string, string, (p: string, c: string) => string, (p: string, c: string) => string]> = [
+  ['PARTICIPANT_CHECKED_IN', 'Participant', (p, c) => `تسجيل حضور ${p} عند البوابة وإسناده إلى ${c}`, (p, c) => `Checked in ${p} at the gate and routed to ${c}`],
+  ['QUESTION_SET_SEALED', 'QuestionSet', (p, c) => `ختم مجموعة أسئلة ${p} في ${c} قبل الكشف`, (p, c) => `Sealed question set for ${p} in ${c} before reveal`],
+  ['QUESTION_SET_REVEALED', 'QuestionSet', (p, c) => `كشف الموضع الأول لـ${p} بعد موافقة ${c}`, (p, c) => `Revealed the first passage for ${p} after ${c} approval`],
+  ['SESSION_STARTED', 'TestSession', (p, c) => `بدء جلسة ${p} أمام ${c}`, (p, c) => `Started ${p}'s session before ${c}`],
+  ['SESSION_COMPLETED', 'TestSession', (p, c) => `اكتمال جلسة ${p} في ${c} وقفل الإرسالات`, (p, c) => `Completed ${p}'s session in ${c}; submissions locked`],
+  ['SCORE_SUBMITTED', 'JudgeSubmission', (p, c) => `إرسال درجة ${p} من محكّم ${c}`, (p, c) => `Score submitted for ${p} by the ${c} judge`],
+  ['RESULT_SEALED', 'Result', (p, c) => `ختم نتيجة ${p} بعد مراجعة ${c}`, (p, c) => `Sealed ${p}'s result after ${c} review`],
+  ['APPEAL_OPENED', 'Appeal', (p) => `فتح تظلّم باسم ${p} وإحالته إلى رئيس التحكيم`, (p) => `Opened an appeal for ${p} and routed it to the head judge`],
+  ['APPEAL_RESOLVED', 'Appeal', (p) => `حسم تظلّم ${p} وتوثيق القرار`, (p) => `Resolved ${p}'s appeal and recorded the decision`],
+  ['INCIDENT_RAISED', 'Incident', (_p, c) => `بلاغ تشغيلي من ${c}: انقطاع قصير في الصوت`, (_p, c) => `Operational report from ${c}: brief audio dropout`],
+  ['QUEUE_TRANSFER', 'Participant', (p, c) => `نقل ${p} إلى طابور ${c} لموازنة الانتظار`, (p, c) => `Moved ${p} to the ${c} queue to balance waiting time`],
+  ['SCOPE_APPROVED', 'ParticipantScope', (p) => `اعتماد نطاق الحفظ الذي اختاره ${p}`, (p) => `Approved the memorisation scope chosen by ${p}`],
+  ['SCOPE_REJECTED', 'ParticipantScope', (p) => `إعادة نطاق ${p} للتصحيح: عدد الأجزاء لا يطابق الفئة`, (p) => `Returned ${p}'s scope: juz count does not match the category`],
+  ['JUDGE_CALIBRATED', 'JudgeProfile', (_p, c) => `معايرة محكّم ${c} على العيّنة المرجعية`, (_p, c) => `Calibrated the ${c} judge against the reference sample`],
+  ['COMMITTEE_PAUSED', 'Committee', (_p, c) => `استراحة مجدولة لـ${c} مع حفظ الطابور`, (_p, c) => `Scheduled break for ${c}; queue preserved`],
+];
+
+function demoAuditLogs(participants: Participant[], committees: Committee[], judges: JudgeProfile[]): AuditEvent[] {
   const template = clone(SEED_AUDIT_LOGS[0]);
-  const actions = [
-    'PARTICIPANT_CHECKED_IN', 'QUESTION_SET_SEALED', 'QUESTION_SET_REVEALED',
-    'SESSION_STARTED', 'SESSION_COMPLETED', 'SCORE_SUBMITTED', 'RESULT_SEALED',
-    'APPEAL_OPENED', 'APPEAL_RESOLVED', 'INCIDENT_RAISED', 'QUEUE_TRANSFER',
-    'SCOPE_APPROVED', 'SCOPE_REJECTED', 'JUDGE_CALIBRATED', 'COMMITTEE_PAUSED',
-  ];
-  return Array.from({ length: 320 }, (_, index) => {
+  const headOf = new Map(judges.map(j => [j.userId, j]));
+  const total = 320;
+  /* السجلّ يُحفظ الأحدث أولًا (انظر `finalizeAuditChain`)، فيُبنى صاعدًا ثم يُقلب. */
+  return Array.from({ length: total }, (_, index) => {
     const participant = pick(participants, index * 3);
     const committee = pick(committees, index);
+    const [action, entityType, summaryAr, summaryEn] = pick(AUDIT_ACTIONS, index);
+    const byDirector = index % 6 === 0;
+    const head = headOf.get(committee.headJudgeId);
+    const actorRole: AuditEvent['actorRole'] = byDirector ? 'comp_admin' : action === 'PARTICIPANT_CHECKED_IN' || action === 'QUEUE_TRANSFER' ? 'ops_manager' : 'head_judge';
+    const actorName = byDirector
+      ? 'مدير المسابقة (تجريبي)'
+      : actorRole === 'ops_manager' ? 'مدير التشغيل (تجريبي)' : `${head?.nameArabic || 'رئيس اللجنة'} — رئيس ${committee.nameArabic}`;
+    const who = `${participant.fullNameArabic} (${participant.code})`;
+    const whoEn = `${participant.fullName} (${participant.code})`;
+    const entityId = entityType === 'Committee' || entityType === 'Incident' || entityType === 'JudgeProfile' ? committee.id : participant.id;
     return {
       ...clone(template),
       id: `aud-demo-${index + 1}`,
-      action: pick(actions, index),
-      actorId: index % 6 === 0 ? 'usr-demo-admin' : committee.headJudgeId,
-      actorName: index % 6 === 0 ? 'مدير المسابقة (تجريبي)' : `رئيس ${committee.nameArabic}`,
-      targetId: participant.id,
-      targetType: 'participant',
-      timestamp: new Date(Date.UTC(2027, 1, 11, 6 + Math.floor(index / 32), (index * 7) % 60)).toISOString(),
-      details: `${pick(actions, index)} — ${participant.fullNameArabic} (${participant.code})`,
-    };
-  });
+      organizationId: DEMO_ORGANIZATION_ID,
+      competitionId: SEED_COMPETITION.id,
+      action,
+      actorId: byDirector ? 'usr-demo-admin' : actorRole === 'ops_manager' ? 'usr-demo-ops_manager' : committee.headJudgeId,
+      actorName,
+      actorRole,
+      entityType,
+      entityId,
+      humanSummaryArabic: summaryAr(who, committee.nameArabic),
+      humanSummaryEnglish: summaryEn(whoEn, committee.name),
+      /* البصمة تُحسب في المخزن عند أول تحقّق (`finalizeAuditChain`)؛ هذه علامة البذرة حتى ذلك الحين. */
+      currentStateHash: `DEMO:AUDIT-${index + 1}`,
+      /* من السادسة صباحًا إلى الثانية ظهرًا بتسلسلٍ صاعد: السجلّ يُقرأ زمنًا، وسطرٌ
+         يسبق سابقه في الوقت يوحي بعبثٍ في السلسلة. */
+      timestamp: new Date(Date.UTC(2027, 1, 11, 6, 0) + index * 90_000).toISOString(),
+      authenticationMethod: 'demo',
+      authenticationAssurance: 'demo',
+    } satisfies AuditEvent;
+  }).reverse();
 }
 
 /*
@@ -687,7 +730,7 @@ export function buildDemoUniverse(): DemoUniverse {
     participants,
     results,
     judgeSubmissions,
-    auditLogs: demoAuditLogs(participants, committees),
+    auditLogs: demoAuditLogs(participants, committees, judges),
     appeals: demoAppeals(results, participants),
     incidents: demoIncidents(committees),
     reviewCases: demoReviewCases(results, participants),
@@ -906,6 +949,8 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     auditLedgerSeals: operations.auditLedgerSeals,
     trainingRuns: operations.trainingRuns,
     quranSourceManifests: [...operations.quranSourceManifests, ...base.quranSourceManifests],
+    /* الفريق وصلاحياته وجلساته، وأثر الانقطاعات المحسومة — ما يقرؤه المدقّق و«الفريق والصلاحيات». */
+    ...demoIdentityGovernance(organization.id, competition.id, universe.judges, universe.committees, participants),
   };
 }
 
