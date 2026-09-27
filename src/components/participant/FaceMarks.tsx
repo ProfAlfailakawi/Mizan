@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowLeftRight, AudioWaveform, CircleDashed, CornerUpLeft, Hourglass, RotateCcw } from 'lucide-react';
 import type { FaceMark, FaceMarkKind } from '../../lib/face-reading';
 
 /*
@@ -67,6 +68,19 @@ export const FACE_MARK_STYLE: Record<FaceMarkKind, FaceMarkStyle> = {
   },
 };
 
+/*
+ * أيقونةُ كلِّ علامةٍ في الدليل: خطٌّ رفيعٌ من lucide بدل رموز يونيكود (↺ ⤴ ⇄ ○ ◍ ◐)
+ * التي يرسمها كلُّ خطٍّ بحجمٍ ووزنٍ مختلف. ويبقى `glyph` في الجدول مفتاحًا مميِّزًا للنوع.
+ */
+export const FACE_MARK_ICON: Record<FaceMarkKind, React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>> = {
+  repeat: RotateCcw,
+  skip: CornerUpLeft,
+  confusable: ArrowLeftRight,
+  lost: CircleDashed,
+  dwell: Hourglass,
+  strain: AudioWaveform,
+};
+
 /** ترتيبُ الأهمّية حين تجتمع علاماتٌ على كلمةٍ واحدة: أدلُّها على الحفظ أوّلًا. */
 const PRIORITY: FaceMarkKind[] = ['confusable', 'repeat', 'skip', 'lost', 'dwell', 'strain'];
 
@@ -110,14 +124,15 @@ export const FaceMarkLegend: React.FC<{ marks: readonly FaceMark[]; ar: boolean 
     <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2" aria-label={ar ? 'دليل العلامات' : 'Mark legend'}>
       {present.map(kind => {
         const style = FACE_MARK_STYLE[kind];
+        const Icon = FACE_MARK_ICON[kind];
         const count = marks.filter(m => m.kind === kind).length;
         return (
           <li key={kind} data-legend={kind} title={ar ? style.hintAr : style.hintEn}
-            className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#5b6460]">
-            <span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-md text-[11px]"
-              style={{ background: `${style.tint}22`, color: style.tint }}>{style.glyph}</span>
+            className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[var(--muted)]">
+            <span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-md"
+              style={{ background: `${style.tint}22`, color: style.tint }}><Icon size={12} strokeWidth={1.8} /></span>
             <span>{ar ? style.ar : style.en}</span>
-            <span className="tabular-nums text-[#6b716d]">{count}</span>
+            <span className="tabular-nums text-[var(--muted)]">{count}</span>
             <span className="sr-only">{ar ? style.hintAr : style.hintEn}</span>
           </li>
         );
