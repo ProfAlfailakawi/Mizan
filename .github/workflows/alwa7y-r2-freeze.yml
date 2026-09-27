@@ -26,14 +26,15 @@ jobs:
       - name: Fetch, verify, upload, re-verify
         run: |
           set -euo pipefail
-          while read -r name sha size; do
-            curl -fsSL --retry 3 -o "$name" "http://www.alwa7y.com/downloads/$name"
+          while read -r name sha size url; do
+            mkdir -p "$(dirname "$name")" "$(dirname "check-$name")"
+            curl -fsSL --retry 3 -o "$name" "${url:-http://www.alwa7y.com/downloads/$name}"
             [ "$(head -c4 "$name")" = "%PDF" ] || { echo "$name: not a PDF"; exit 1; }
             [ "$(stat -c%s "$name")" = "$size" ] || { echo "$name: size mismatch"; exit 1; }
             echo "$sha  $name" | sha256sum -c -
             key="crosswalk/alwa7y/$name"
             aws s3 cp "$name" "s3://$R2_BUCKET/$key" --endpoint-url "$R2_ENDPOINT" \
-              --metadata "sha256=$sha,source=http://www.alwa7y.com/downloads/$name" --only-show-errors
+              --metadata "sha256=$sha" --only-show-errors
             aws s3 cp "s3://$R2_BUCKET/$key" "check-$name" --endpoint-url "$R2_ENDPOINT" --only-show-errors
             echo "$sha  check-$name" | sha256sum -c -
             echo "FROZEN $key $sha $size"
@@ -42,4 +43,7 @@ jobs:
           TayseerSosy.pdf 46ce3d95a65fbeea9ebdf3cfc811425284ae6924fdb823d34cb43b3e955b0997 95169168
           TayseerKathir.pdf f327a21b6839328017ece6caef68b690bef6e716e7a6f32daa453cc99280aef5 89921415
           TayseerYakob.pdf fa43e9db3195eeac34a121bfba9919475613acbb51bd99e84cedcc752f586f55 92476408
+          corroborating/DarAlFikr-Bazzi.pdf f134497f2bcdf6d96c94174e0b0727d3d3702e102fdf3705f3f25a51b03ff9de 105716432 https://files.quranpedia.net/attachments/documents/BOOK_19501_1.pdf
+          corroborating/DarAlFikr-Rawh.pdf 42ca16366477c2bdb7133eb48549f3fa18303f02e2755e23e14fdb8d174a19fc 93857885 https://archive.org/download/pdvvvvvvvvvvvvvvvvvvfquran/%D8%B1%D9%88%D8%A7%D9%8A%D8%A9%20%D8%B1%D9%88%D8%AD%20%D9%88%D8%A8%D8%A7%D9%84%D9%87%D8%A7%D9%85%D8%B4%20%D9%85%D8%A7%20%D8%AE%D8%A7%D9%84%D9%81%20%D9%81%D9%8A%D9%87%20%D8%B1%D9%88%D9%8A%D8%B3%20%D9%85%D9%86%20%D9%82%D8%B1%D8%A7%D8%A1%D8%A9%20%D9%8A%D8%B9%D9%82%D9%88%D8%A8%20%D9%85%D9%86%20%D8%B7%D8%B1%D9%8A%D9%82%20%D8%A7%D9%84%D8%AF%D8%B1%D8%A9%20pdf%20quran%20%20%20%20%D9%85%D8%B5%D8%AD%D9%81%20%20.pdf
+          corroborating/Islamweb-Rawh.pdf c878bb22e23585119ccaeeb09db4a24b60a2999e471bf592eb85598c7574cb57 4069405 https://files.quranpedia.net/attachments/documents/BOOK_19554_1.pdf
           LIST

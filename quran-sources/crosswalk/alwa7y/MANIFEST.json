@@ -4,7 +4,7 @@
   "approval": {
     "by": "ميزان",
     "date": "2026-09-26",
-    "text": "اعتُمدت مصاحف التيسير من alwa7y.com مرجعًا لعدّ الآي وحدود الآيات للروايات: الدوري والسوسي والبزي وقنبل وروح."
+    "text": "اعتمدت ميزان مصاحف التيسير من alwa7y.com مرجعًا لعدّ الآي للروايات: الدوري والسوسي والبزي وقنبل وروح؛ وأكّدت اللجنة أن الموقع موثوق."
   },
   "version": "غير مذكور في أسماء الملفات ولا في صفحة التنزيلات؛ Last-Modified مسجَّل بدلًا منه",
   "storage": {
@@ -43,7 +43,8 @@
       "byteLength": 89921415,
       "pdfTitle": "مصحف التيسير بقراءة ابن كثير من طريق الشاطبية",
       "lastModified": "2023-03-25",
-      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)",
+      "note": "مصحف قراءةٍ كاملة لا روايةٍ واحدة؛ لا يفرّق بين الراويين في العدّ"
     },
     {
       "rawi": "yaqub (ruways + rawh, combined)",
@@ -53,13 +54,42 @@
       "byteLength": 92476408,
       "pdfTitle": "مصحف التيسير بقراءة يعقوب من طريق الدرة",
       "lastModified": "2022-02-07",
-      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)"
+      "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)",
+      "note": "مصحف قراءةٍ كاملة لا روايةٍ واحدة؛ لا يفرّق بين الراويين في العدّ"
     }
   ],
   "extraction": {
-    "scope": "per-surah ayah counts only — no ayah boundaries",
-    "method": "ayah-end markers detected by the vector outline of the marker ornament; marker digits classified from their outlines; every surah must read 1..n in order (gaps only where the mushaf omits a marker at a page end, each checked visually)",
+    "scope": "أعداد آي كل سورة فقط — لا حدود آيات",
+    "method": "طريقتان مستقلتان لكل مصحف: فهرس السور المطبوع (عدد آياتها) + قراءة علامات رؤوس الآي؛ وكل خلاف بينهما رُوجع بالنظر في الصفحة المطبوعة",
     "script": "scripts/alwa7y-extract/",
     "output": "extracted-counts.json"
-  }
+  },
+  "corroborating": [
+    {
+      "file": "corroborating/DarAlFikr-Bazzi.pdf",
+      "title": "المصحف الشريف برواية البزي عن ابن كثير وبالهامش رواية قنبل",
+      "publisher": "دار الفكر، 1432هـ، تحقيق توفيق إبراهيم ضمرة",
+      "url": "https://files.quranpedia.net/attachments/documents/BOOK_19501_1.pdf",
+      "page": "https://quranpedia.net/book/19501",
+      "sha256": "f134497f2bcdf6d96c94174e0b0727d3d3702e102fdf3705f3f25a51b03ff9de",
+      "byteLength": 105716432
+    },
+    {
+      "file": "corroborating/DarAlFikr-Rawh.pdf",
+      "title": "رواية روح وبالهامش ما خالف فيه رويس من قراءة يعقوب من طريق الدرة",
+      "publisher": "سلسلة دار الفكر نفسها (617 صفحة، نفس التصميم)",
+      "url": "https://archive.org/details/pdvvvvvvvvvvvvvvvvvvfquran",
+      "sha256": "42ca16366477c2bdb7133eb48549f3fa18303f02e2755e23e14fdb8d174a19fc",
+      "byteLength": 93857885
+    },
+    {
+      "file": "corroborating/Islamweb-Rawh.pdf",
+      "title": "مصحف برواية روح عن يعقوب",
+      "publisher": "الشبكة الإسلامية",
+      "url": "https://files.quranpedia.net/attachments/documents/BOOK_19554_1.pdf",
+      "page": "https://quranpedia.net/book/19554",
+      "sha256": "c878bb22e23585119ccaeeb09db4a24b60a2999e471bf592eb85598c7574cb57",
+      "byteLength": 4069405
+    }
+  ]
 }

@@ -27,6 +27,12 @@ for c in cnt:
             if len(V[i+k-1])==len(str(k)):
                 for v,ch in zip(V[i+k-1],str(k)): X.append(v);Y.append(ch)
     i+=c['count']
+for extra in ('dory7.json','sosy7.json'):
+    er=json.load(open(extra)); en=json.load(open(extra+'.final')); rd=json.load(open(extra+'.read'))
+    for r,n in zip(er,rd):
+        vs=[img(g) for g in split(groups(r['dig']))]
+        if n.isdigit() and len(vs)==len(n) and r['page']<=640:
+            for v,ch in zip(vs,n): X.append(v);Y.append(ch)
 X=np.array(X);Y=np.array(Y); print('train',len(X))
 def cls(v):
     d=((X-v)**2).sum(1); idx=d.argsort()[:5]; vals,cn=np.unique(Y[idx],return_counts=True); return vals[cn.argmax()]
