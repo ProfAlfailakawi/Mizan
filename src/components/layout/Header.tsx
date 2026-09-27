@@ -21,7 +21,7 @@ export const Header: React.FC = () => {
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-      <MizanLogo language={language} compact/>
+      <MizanLogo language={language} compact className="mizan-header-logo"/>
       <div className="min-w-0 hidden sm:block">
         <div className="flex items-center gap-2">
           {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[13px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
@@ -59,6 +59,11 @@ export const Header: React.FC = () => {
       <LanguageSwitcher compact/>
       <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
     </div>
+  </div>
+  {/* على الجوال لا يتّسع السطر للاسم بجانب الأزرار فكان ينضغط حرفًا حرفًا: يأخذ سطرًا وحده. */}
+  <div className="sm:hidden border-t border-[#DFDED7]/70 px-4 py-1.5 flex items-center gap-2 min-w-0">
+   <span className={`w-2 h-2 rounded-full shrink-0 ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
+   <span className="text-sm font-black text-[#2b332e] truncate" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
   </div>
   <CommandPalette open={searchOpen} onOpenChange={setSearchOpen}/><ClarityGuide open={helpOpen} onClose={()=>setHelpOpen(false)} role={currentUser.role} ar={language==='ar'}/>
   {emergencyFrozen&&<div className="bg-[#A34D43] text-white text-center text-xs font-bold py-2 px-4">{language==='ar'?'تم إيقاف الاستدعاء الجديد. الجلسات النشطة محفوظة ويمكن استئناف التشغيل بأمان.':'New dispatch paused. Active sessions are preserved and operations can resume safely.'}</div>}

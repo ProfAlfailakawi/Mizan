@@ -473,7 +473,7 @@ export default function App() {
     * يوم يتغيّر الشريط. ومصدرُ القيمة هو الشريط نفسه (`DEMO_BAR_SHELL_PADDING`)، فلا
     * يبقى رقمٌ ثانٍ هنا يفترق عن ارتفاعه.
     */}
-  <main style={{'--mizan-shell-pb':IS_DEMO_SESSION?DEMO_BAR_SHELL_PADDING:'0px',paddingBottom:'var(--mizan-shell-pb)'} as React.CSSProperties}><Page>{roleView()}</Page></main>
+  <main className="mizan-shell-main" style={{'--mizan-shell-pb':IS_DEMO_SESSION?DEMO_BAR_SHELL_PADDING:'0px',paddingBottom:'var(--mizan-shell-pb)'} as React.CSSProperties}><Page>{roleView()}</Page></main>
   <VenueSurfaces kiosk={kiosk} waitingBoard={waitingBoard} committeeBoard={committeeBoard} hallMap={hallMap} ceremony={ceremony} close={{kiosk:()=>setKiosk(false),waitingBoard:()=>setWaitingBoard(false),committeeBoard:()=>setCommitteeBoard(false),hallMap:()=>setHallMap(false),ceremony:()=>setCeremony(false)}}/>
   {/* خارج الترويسة عمدًا: شاشة البثّ لا ترويسة لها، ودون ذلك لا مخرج منها. */}
   <DemoBar/>

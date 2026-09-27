@@ -66,6 +66,14 @@ service cloud.firestore {
     function admin(orgId, competitionId) {
       return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
     }
+    // Append-only status history: the old entries unchanged, plus exactly one entry whose
+    // status is the new status. An empty prefix is checked by size, not by slicing to [0:0].
+    function appendsOneStatusEntry(prev, next, status) {
+      return next is list
+        && next.size() == prev.size() + 1
+        && (prev.size() == 0 || next[0:prev.size()] == prev)
+        && next[prev.size()].status == status;
+    }
     function closingTransition() {
       return request.resource.data.competition.status in ['completed','archived']
         && request.resource.data.competition.status != resource.data.competition.status;
@@ -205,9 +213,7 @@ service cloud.firestore {
               || (request.resource.data.status == 'tested' && resource.data.status in ['checked_in','in_queue','in_session'])
             )
             // History is append-only: the old entries unchanged, plus one entry for this transition.
-            && request.resource.data.statusHistory.size() == resource.data.get('statusHistory', []).size() + 1
-            && request.resource.data.statusHistory[0:resource.data.get('statusHistory', []).size()] == resource.data.get('statusHistory', [])
-            && request.resource.data.statusHistory[resource.data.get('statusHistory', []).size()].status == request.resource.data.status;
+            && appendsOneStatusEntry(resource.data.get('statusHistory', []), request.resource.data.statusHistory, request.resource.data.status);
           allow delete: if false;
         }
         match /judge_events/{eventId} {

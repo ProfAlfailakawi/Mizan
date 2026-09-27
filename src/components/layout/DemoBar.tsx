@@ -46,11 +46,11 @@ export const DemoBar: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-[220] border-t border-[#d8b86a] bg-[#faf3e2]/97 shadow-[0_-10px_30px_rgba(25,39,33,.10)] backdrop-blur"
-      style={{ height: DEMO_BAR_SHELL_PADDING }}
+      className="relative z-[220] min-h-14 border-t sm:fixed sm:inset-x-0 sm:bottom-0 sm:min-h-0 border-[#d8b86a] bg-[#faf3e2]/97 shadow-[0_-10px_30px_rgba(25,39,33,.10)] backdrop-blur"
+      style={{ ['--demo-bar-h' as string]: DEMO_BAR_SHELL_PADDING }}
       dir={ar ? 'rtl' : 'ltr'}
     >
-      <div className="mx-auto flex h-full max-w-7xl min-w-0 items-center gap-2 px-3 sm:px-5">
+      <div className="mx-auto flex min-h-14 sm:h-[var(--demo-bar-h)] max-w-7xl min-w-0 items-center gap-2 px-3 sm:px-5">
         <span
           role="status"
           aria-label={ar ? 'بيئة تجريبية معزولة ببيانات مصطنعة' : 'Isolated demo environment with synthetic data'}
