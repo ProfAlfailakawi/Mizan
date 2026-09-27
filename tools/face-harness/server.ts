@@ -13,7 +13,7 @@ import http from 'node:http';
 import { practiceFaceCatalogue, practiceFacePage } from '../../server/practice-face-service';
 import { normalizeScope, fullQuranScope } from '../../src/lib/quran-scope';
 
-export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-changed' | 'judging-changed-late' | 'teacher';
+export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging' | 'judging-closed' | 'judging-dropped' | 'judging-outage' | 'judging-changed' | 'judging-changed-late' | 'teacher';
 
 /*
  * ومسارُ السماع يُصطنع كذلك — وهذا أوّلُ ما يقول «أخطأت» في هذا النظام.
@@ -28,7 +28,7 @@ export type Scenario = 'happy' | 'reordered' | 'hanging' | 'failing' | 'judging'
 const SKIPPED_WORD_INDEX = 3;
 const HARNESS_MODEL = 'harness-model-1';
 /* السيناريوهاتُ التي يُفتح فيها بابُ الحكم. */
-const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-changed', 'judging-changed-late', 'teacher']);
+const OPEN_SCENARIOS: ReadonlySet<Scenario> = new Set(['judging', 'judging-dropped', 'judging-outage', 'judging-changed', 'judging-changed-late', 'teacher']);
 
 const RAWI = 'hafs';
 const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -80,9 +80,15 @@ export async function startHarnessServer(port: number, scenario: Scenario = 'hap
       /*
        * و`judging-dropped` تُسقط مقطعَ سماعٍ واحدًا بعطبٍ عابر — وهو أكثرُ ما يقع:
        * شبكةٌ تتعثّر، أو ٥٠٢، أو تجاوزُ حدّ. فيصير في ما سُمع **ثقب**، والمقابلةُ
-       * تقرأ الثقبَ إسقاطًا فتُخطّئ قارئًا مصيبًا. والمنتظَرُ ألّا يُحكم أصلًا.
+       * تقرأ الثقبَ إسقاطًا فتُخطّئ قارئًا مصيبًا — لو لم تُعِد النافذةُ التاليةُ صوتَه.
+       * وهي تعيده منذ نافذة اللحاق (#282): آخرُ مُثبَّتٍ لم يتقدّم بالطلب الساقط، فتبدأ
+       * التاليةُ قبله. فالمنتظَرُ أن يبقى الحكمُ كما في `judging` لا أن يُطرح.
+       *
+       * و`judging-outage` هي الثقبُ الحقيقيّ: السماعُ يسقط من المقطع الثالث إلى آخر
+       * التلاوة، فلا نافذةَ بعده تعيد صوتَه. والمنتظَرُ ألّا يُحكم، وأن يُقال لماذا.
        */
       if (scenario === 'judging-dropped' && index === 2) return json(res, { code: 'HARNESS_ASR_DROPPED' }, 502);
+      if (scenario === 'judging-outage' && index >= 2) return json(res, { code: 'HARNESS_ASR_DROPPED' }, 502);
       /*
        * و`judging-changed-late` يحكي ما يكشفه الخادمُ وحده: تقريرُ القياس استُبدل والطلبُ
        * في الطريق، فيردّ الخادمُ 409 بعد أن يعيد قراءةَ الباب — لا بوّابةً مختلفةً في الجواب.
