@@ -538,6 +538,8 @@ export interface Participant {
   registrationPayment?: { status: 'not_required' | 'pending' | 'paid' | 'refunded' | 'waived'; amountMinor: number; currency: string; receiptReference?: string; updatedAt: string };
   /** أثر تعديلات المتسابق بعد الإرسال: متى وأي الحقول — بلا القيم نفسها. */
   editHistory?: { at: string; fields: string[]; actor: 'participant' | 'staff' }[];
+  /** مصدر التأهّل حين دُعي المتسابق من مرحلة تصفيات (هرم التأهيل). */
+  qualifiedFrom?: { competitionId: string; participantId: string; qualificationId: string; rank: number; score: number; resultId: string; sealChecksum?: string };
   id: string;
   code: string; // e.g., A-104
   competitionId: string;

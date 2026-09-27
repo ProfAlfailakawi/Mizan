@@ -1,3 +1,4 @@
+import { ConflictOfInterestPanel } from '../admin/GovernancePanels';
 import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Bot, Check, FileCheck2, Gavel, Headphones, LockKeyhole, ShieldCheck, X, Activity } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -17,7 +18,7 @@ import { fetchJudgeCalibration, measureJudgingReliability, type ReliabilityRepor
 import { ReliabilityPanel } from './ReliabilityPanel';
 import { ScaleTendencyChart } from './ScaleTendencyChart';
 import { dualSealActive } from '../admin/ResultsDialogs';
-type Tab='reviews'|'appeals'|'panel'|'seal';
+type Tab='reviews'|'appeals'|'panel'|'seal'|'conflicts';
 // Severity was printed raw — "medium", "low" — inside an Arabic triage list, and
 // only two of the three levels were ever distinguished by tone.
 const SEVERITY:Record<string,{ar:string;en:string}>={
@@ -79,7 +80,8 @@ export const HeadJudgeInbox: React.FC = () => {
   {store.continuityIncidents.some(x=>x.status!=='RESOLVED')&&<ContinuityRecovery/>}
   {/* الأقسام كانت مكدّسة كلها ظاهرة: أربعة أقسام وخمسة رسوم قبل أن يصل رئيس التحكيم إلى عمله.
       صارت خلف تبويب واحد أعلى الشاشة، ويبقى بلاغ الاستمرارية وحده فوق التبويب لأنه حادث جارٍ. */}
-  <div className="mizan-tabs" role="tablist"><TabButton active={tab==='reviews'} onClick={()=>setTab('reviews')} icon={Gavel} label={ar?'مراجعات التحكيم':'Judging reviews'} count={pending.length}/><TabButton active={tab==='appeals'} onClick={()=>setTab('appeals')} icon={FileCheck2} label={ar?'الاعتراضات':'Appeals'} count={pendingAppeals.length}/><TabButton active={tab==='panel'} onClick={()=>setTab('panel')} icon={Activity} label={ar?'حالة اللجنة':'Panel health'} count={0}/><TabButton active={tab==='seal'} onClick={()=>setTab('seal')} icon={LockKeyhole} label={ar?'الختم والطوارئ':'Seal & emergency'} count={0}/></div>
+  <div className="mizan-tabs" role="tablist"><TabButton active={tab==='reviews'} onClick={()=>setTab('reviews')} icon={Gavel} label={ar?'مراجعات التحكيم':'Judging reviews'} count={pending.length}/><TabButton active={tab==='appeals'} onClick={()=>setTab('appeals')} icon={FileCheck2} label={ar?'الاعتراضات':'Appeals'} count={pendingAppeals.length}/><TabButton active={tab==='panel'} onClick={()=>setTab('panel')} icon={Activity} label={ar?'حالة اللجنة':'Panel health'} count={0}/><TabButton active={tab==='seal'} onClick={()=>setTab('seal')} icon={LockKeyhole} label={ar?'الختم والطوارئ':'Seal & emergency'} count={0}/><TabButton active={tab==='conflicts'} onClick={()=>setTab('conflicts')} icon={Gavel} label={ar?'تضارب المصالح':'Conflicts'} count={store.conflictCases.filter(c=>c.competitionId===competition.id&&c.status==='open').length}/></div>
+  {tab==='conflicts'&&<div className="mizan-surface p-5"><ConflictOfInterestPanel mode="review"/></div>}
   {tab==='panel'&&<>
   <ReliabilityPanel data={reliability} ar={ar}/>
   <JudgeCalibrationPanel judges={calibration.judges} scenario={calibration.scenario} ar={ar}/>
