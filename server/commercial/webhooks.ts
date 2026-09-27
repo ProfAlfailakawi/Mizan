@@ -167,6 +167,36 @@ export function pinnedHttpsPost(url: string, init: { headers: Record<string, str
   });
 }
 
+/**
+ * طلب HTTPS مثبَّت العنوان بأي طريقة، يعيد الحالة والجسم (بحدٍّ أقصى للحجم). يستخدمه نقل
+ * بوابات الدفع التي تعدّها الجهات: العنوان يكتبه مستخدم، فيُحلّ ويُفحص ثم يُثبَّت.
+ */
+export function pinnedHttpsRequest(url: string, init: { method: string; headers: Record<string, string>; body?: string }, address: string, timeoutMs = 15_000, maxBytes = 1_000_000): Promise<{ status: number; text: string }> {
+  const u = new URL(url);
+  if (u.protocol !== 'https:') return Promise.reject(new CommercialError('GATEWAY_URL_MUST_BE_HTTPS'));
+  if (isPrivateAddress(address)) return Promise.reject(new CommercialError('GATEWAY_URL_PRIVATE_NETWORK'));
+  const family = net.isIP(address) === 6 ? 6 : 4;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      protocol: 'https:', hostname: u.hostname, servername: net.isIP(u.hostname) ? undefined : u.hostname, port: u.port || 443,
+      path: `${u.pathname}${u.search}`, method: init.method, headers: { ...init.headers, ...(init.body !== undefined ? { 'content-length': Buffer.byteLength(init.body) } : {}) },
+      lookup: ((_host: string, options: { all?: boolean }, cb: (err: Error | null, a: unknown, f?: number) => void) => {
+        if (options?.all) cb(null, [{ address, family }]);
+        else cb(null, address, family);
+      }) as unknown as net.LookupFunction,
+      timeout: timeoutMs,
+    }, res => {
+      const chunks: Buffer[] = []; let size = 0;
+      res.on('data', (c: Buffer) => { size += c.length; if (size > maxBytes) { req.destroy(new Error('GATEWAY_RESPONSE_TOO_LARGE')); return; } chunks.push(c); });
+      res.on('end', () => resolve({ status: res.statusCode || 0, text: Buffer.concat(chunks).toString('utf8') }));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('GATEWAY_TIMEOUT')));
+    req.on('error', reject);
+    req.end(init.body);
+  });
+}
+
 /* الأدوار المسموح لها بالإبلاغ عن كل حدث — أضيق ما يكفي لمن يُنتج الحدث فعلًا. */
 export const DOMAIN_EVENT_REPORTERS: Record<string, string[]> = {
   'participant.checked_in': ['super_admin', 'org_admin', 'comp_admin', 'ops_manager', 'exception_host'],

@@ -155,6 +155,18 @@ export class PublicRegistrationService{
     await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])));
     return {participant:{id:next.id,code:next.code,status:next.status},changed};
   }
+  /**
+   * سياق الدفع الإلكتروني للمتسابق برابط رحلته: المسابقة ووثيقته ومسارها — كلها من الخادم،
+   * فلا يأتي من المتصفح مبلغ ولا جهة ولا مسار.
+   */
+  async paymentContext(competitionId:string,rawToken:string){
+    if(!this.store.getDocument)throw new Error('REGISTRATION_EDIT_NOT_CONFIGURED');
+    const journey=await this.resolve(competitionId,'participant',rawToken);
+    const competition=await this.store.getCompetition(competitionId);if(!competition)throw new Error('COMPETITION_NOT_FOUND');
+    const path=`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${String(journey.participantId)}`;
+    const participant=await this.store.getDocument(path) as unknown as Participant|null;if(!participant)throw new Error('PARTICIPANT_NOT_FOUND');
+    return {competition,participant,path};
+  }
   async resolve(competitionId:string,audience:'participant'|'guardian',rawToken:string){
     const value=clean(rawToken,120);if(!validPublicJourneyToken(value))throw new Error('JOURNEY_TOKEN_INVALID');
     const journey=await this.store.getJourney(publicTokenHash(value));if(!journey)throw new Error('JOURNEY_NOT_FOUND');

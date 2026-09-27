@@ -73,7 +73,10 @@ import type { TenantRecord } from './server/tenant-registry';
 import { decodePemFromEnv } from './server/pem';
 import { R2PrivateClient, r2ConfigFromEnv } from './server/r2-private';
 import { ControlTowerRepository } from './server/control-tower';
-import { paymentGatewayFromEnv } from './server/payments';
+import { paymentGatewayFromEnv, type GatewayTransport } from './server/payments';
+import { PAYMENT_PRESETS } from './server/payment-presets';
+import { assertWebhookUrl, assertPublicDestination, pinnedHttpsRequest } from './server/commercial/webhooks';
+import type { RegistrationPaymentIntentRecord } from './server/commercial/payment-gateways';
 import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type TelemetrySubject } from './server/ops-telemetry';
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
@@ -319,6 +322,44 @@ async function startServer() {
     if(!saasPlatform)return;
     void (async()=>{try{let org=organizationId;if(!org&&firestoreRepository){const row=await firestoreRepository.get(`public_competitions/${competitionId}`);org=String((row?.competition as any)?.organizationId||'')}if(org&&saasPlatform.organizationName(org))saasPlatform.emitWebhookEvent(org,type,{competitionId,...data})}catch(err){console.warn('[webhooks] domain event not queued:',err instanceof Error?err.message:err)}})();
   };
+  /*
+   * ناقل بوابات الجهات: العنوان يكتبه مدير الجهة، فيُرفض كل ما ليس HTTPS عامًّا، ويُحلّ الاسم
+   * ويُثبَّت العنوان لمنع القفز إلى الشبكة الداخلية (SSRF)، ولا تُتبع إعادة التوجيه.
+   */
+  const tenantGatewayTransport:GatewayTransport=async(url,init)=>{
+    assertWebhookUrl(url);
+    const [address]=await assertPublicDestination(url,async host=>(await dnsPromises.lookup(host,{all:true})).map(x=>x.address));
+    return pinnedHttpsRequest(url,init,address);
+  };
+  /*
+   * كتابة «مدفوع» في وثيقة المتسابق بعد تسوية نيّةٍ على الخادم. لا تُمسّ حالةٌ قرّرها المشرف
+   * (إعفاء أو استرداد)، ويُكتب حقل الدفع وحده بقناع تحديث فلا تضيع تعديلات متزامنة.
+   */
+  const recordRegistrationPaid=async(intent:RegistrationPaymentIntentRecord)=>{
+    if(!saasPlatform||intent.status!=='paid'||intent.purpose!=='registration_fee'||!intent.participantPath)return false;
+    if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');
+    const current=await firestoreRepository.get(intent.participantPath) as Record<string,any>|null;
+    if(!current)throw new Error('PARTICIPANT_NOT_FOUND');
+    const pay=current.registrationPayment||{};
+    if(!['waived','refunded'].includes(String(pay.status||''))&&!(pay.status==='paid'&&pay.intentId===intent.id)){
+      await firestoreRepository.patchFields(intent.participantPath,{registrationPayment:{...pay,status:'paid',amountMinor:intent.paidAmountMinor??intent.amountMinor,currency:intent.currency,receiptReference:`${intent.provider}:${intent.externalRef}`.slice(0,120),provider:intent.provider,intentId:intent.id,paidOnlineAt:intent.settledAt||new Date().toISOString(),updatedAt:new Date().toISOString()}});
+      emitDomainWebhook(intent.competitionId,'registration.updated',{participantId:intent.participantId,changedFields:['registrationPayment']},intent.organizationId);
+    }
+    saasPlatform.markRegistrationIntentRecorded(intent.id);
+    return true;
+  };
+  if(saasPlatform){
+    /* مراجعة دورية: عمليات دفع مفتوحة يُسأل عنها، ومدفوعة لم تُكتب بعد تُكتب. */
+    const reconcilePayments=async()=>{
+      for(const intent of saasPlatform!.registrationIntentsToReconcile()){
+        try{
+          const out=intent.status==='paid'?{intent}:await saasPlatform!.verifyRegistrationIntent(intent.id,tenantGatewayTransport);
+          if(out.intent.status==='paid')await recordRegistrationPaid(out.intent);
+        }catch(err){console.warn('[registration-payments] reconcile skipped:',intent.id,err instanceof Error?err.message:err)}
+      }
+    };
+    const paymentTimer=setInterval(()=>{void reconcilePayments()},Number(process.env.MIZAN_PAYMENT_RECONCILE_INTERVAL_MS||10*60_000));paymentTimer.unref?.();
+  }
   const publicRegistration=new PublicRegistrationService({
     /* التسجيل عملية كتابة رسمية، لذلك لا نقبل نسخة القرص كسلطة للفئات. شاشة الطالب
        تسجّل فقط مقابل الإسقاط المنشور فعليًا في Firestore؛ إذا كانت السحابة غير متاحة
@@ -1238,6 +1279,36 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
     try{const {key,...changes}=req.body||{};const out=await publicRegistration.editRegistration(String(req.params.competitionId||''),String(key||''),changes);if(out.changed.length)emitDomainWebhook(String(req.params.competitionId||''),'registration.updated',{participantId:out.participant.id,participantCode:out.participant.code,changedFields:out.changed});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return publicApiError(res,err)}
   });
+  /* الدفع الإلكتروني لرسوم التسجيل عبر بوابة الجهة (أو مشغّلها). المبلغ والعملة من وثيقة المتسابق على الخادم. */
+  const registrationPaymentView=(p:any,availability:{available:boolean;provider?:string;displayName?:string})=>({status:p?.registrationPayment?.status||'not_required',amountMinor:p?.registrationPayment?.amountMinor??0,currency:p?.registrationPayment?.currency||'',paidOnlineAt:p?.registrationPayment?.paidOnlineAt||null,online:availability});
+  app.post('/api/public/competitions/:competitionId/registration/payment/status',publicRegistrationRateLimit,async(req,res)=>{
+    if(!publicRegistration||!saasPlatform)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
+    try{
+      const ctx=await publicRegistration.paymentContext(String(req.params.competitionId||''),String(req.body?.key||''));
+      let participant:any=ctx.participant;
+      const latest=saasPlatform.latestRegistrationIntent(ctx.path);
+      if(latest&&participant.registrationPayment?.status==='pending'){
+        const out=latest.status==='created'?await saasPlatform.verifyRegistrationIntent(latest.id,tenantGatewayTransport).catch(()=>({intent:latest})):{intent:latest};
+        if(out.intent.status==='paid'&&await recordRegistrationPaid(out.intent))participant=(await publicRegistration.paymentContext(String(req.params.competitionId||''),String(req.body?.key||''))).participant;
+      }
+      res.setHeader('Cache-Control','no-store');
+      return res.json({payment:registrationPaymentView(participant,saasPlatform.publicPaymentAvailability(ctx.competition.organizationId))});
+    }catch(err){return publicApiError(res,err)}
+  });
+  app.post('/api/public/competitions/:competitionId/registration/payment/checkout',publicRegistrationRateLimit,async(req,res)=>{
+    if(!publicRegistration||!saasPlatform)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
+    try{
+      const competitionId=String(req.params.competitionId||''),key=String(req.body?.key||'');
+      const {competition,participant,path:participantPath}=await publicRegistration.paymentContext(competitionId,key);
+      const fee=participant.registrationPayment;
+      if(!fee||fee.status!=='pending'||!Number.isSafeInteger(fee.amountMinor)||fee.amountMinor<=0)return res.status(409).json({code:'REGISTRATION_PAYMENT_NOT_DUE',status:fee?.status||'not_required'});
+      const origin=publicOrigin(req),back=`${origin}/#journey?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(key)}`;
+      const out=await saasPlatform.startRegistrationCheckout({organizationId:competition.organizationId,competitionId:competition.id,participantId:participant.id,participantPath,amountMinor:fee.amountMinor,currency:fee.currency,description:`${competition.nameArabic||competition.name} — ${participant.code}`.slice(0,120),customer:{name:participant.fullName||participant.fullNameArabic,email:participant.email,phone:participant.phone},callbackUrl:`${back}&payment=return`,errorUrl:`${back}&payment=failed`,webhookUrlFor:id=>`${origin}/api/payments/webhook/gateways/${encodeURIComponent(id)}`},tenantGatewayTransport);
+      if('alreadyPaid' in out){await recordRegistrationPaid(out.intent).catch(()=>false);return res.status(409).json({code:'REGISTRATION_ALREADY_PAID'})}
+      res.setHeader('Cache-Control','no-store');
+      return res.status(201).json({paymentUrl:out.paymentUrl});
+    }catch(err){const code=err instanceof Error?err.message:'';if(code==='PAYMENT_GATEWAY_NOT_CONFIGURED')return res.status(409).json({code});if(/^PAYMENT_GATEWAY_/.test(code))return res.status(502).json({code:'PAYMENT_GATEWAY_UNAVAILABLE'});return publicApiError(res,err)}
+  });
   app.post('/api/public/journeys/resolve',journeyResolveRateLimit,async(req,res)=>{
     if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
     const audience=req.body?.audience==='guardian'?'guardian':'participant';
@@ -1459,6 +1530,24 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     if(settlement.status!=='paid')return res.status(202).json({accepted:true,status:settlement.status});
     try{const out=repo.settleInvoiceByReference(paymentGateway.name,settlement.externalRef,{amountMinor:settlement.amountMinor,currency:settlement.currency,paidAt:settlement.paidAt,method:settlement.method});return res.json({settled:true,alreadySettled:out.alreadySettled})}
     catch(err){const code=err instanceof Error?err.message:'PAYMENT_SETTLEMENT_FAILED';return res.status(code==='INVOICE_NOT_FOUND'?404:400).json({code})}
+  });
+  /* بوابات الدفع الخاصة بالجهات والمشغّلين: كلٌّ يختار بوابته ويضع مفاتيحه، والمال يذهب إلى حسابه. */
+  const gatewayOwner=(req:Request)=>{const t=String(req.params.ownerType||'');if(t!=='organization'&&t!=='operator')throw new Error('PAYMENT_GATEWAY_OWNER_INVALID');return {ownerType:t as 'organization'|'operator',ownerId:String(req.params.ownerId||'')}};
+  app.get('/api/saas/payment-gateways/presets',ownerRateLimit,commercialAuth,(_req,res)=>res.json({presets:PAYMENT_PRESETS}));
+  app.get('/api/saas/payment-gateways/:ownerType/:ownerId',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const o=gatewayOwner(req);const out=repo.listPaymentGateways(saasActor(req),o.ownerType,o.ownerId);return res.json({...out,webhookBase:`${publicOrigin(req)}/api/payments/webhook/gateways/`})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/payment-gateways/:ownerType/:ownerId',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const o=gatewayOwner(req);const b=req.body||{};const gateway=repo.savePaymentGateway(saasActor(req),o.ownerType,o.ownerId,{provider:b.provider,presetId:b.presetId,displayName:b.displayName,profile:b.profile,apiKey:String(b.apiKey||''),webhookSecret:String(b.webhookSecret||'')});return res.status(201).json({gateway,webhookUrl:`${publicOrigin(req)}/api/payments/webhook/gateways/${encodeURIComponent(gateway.id)}`})}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/payment-gateways/by-id/:id/test',ownerRateLimit,commercialAuth,async(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{const id=String(req.params.id||''),origin=publicOrigin(req);return res.json(await repo.testPaymentGateway(saasActor(req),id,{currency:String(req.body?.currency||'KWD'),amountMinor:Number(req.body?.amountMinor)||undefined,callbackUrl:`${origin}/#billing?gatewayTest=${encodeURIComponent(id)}`,webhookUrl:`${origin}/api/payments/webhook/gateways/${encodeURIComponent(id)}`},tenantGatewayTransport))}catch(err){return commercialError(res,err)}});
+  app.post('/api/saas/payment-gateways/by-id/:id/disable',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({gateway:repo.disablePaymentGateway(saasActor(req),String(req.params.id||''))})}catch(err){return commercialError(res,err)}});
+  app.get('/api/saas/organizations/:organizationId/registration-payments',ownerRateLimit,commercialAuth,(req,res)=>{const repo=saasAdmin(res);if(!repo)return;try{return res.json({intents:repo.registrationPaymentIntents(saasActor(req),String(req.params.organizationId||''),req.query.competitionId?String(req.query.competitionId):undefined)})}catch(err){return commercialError(res,err)}});
+  /* إشعار بوابة جهة: التوقيع إن وُجد، ثم استعلامٌ من البوابة بالمفتاح. الإشعار وحده لا يثبت سدادًا. */
+  app.post('/api/payments/webhook/gateways/:id',paymentWebhookRateLimit,async(req,res)=>{
+    const repo=saasPlatform;if(!repo)return res.status(503).json({code:'SAAS_PLATFORM_NOT_CONFIGURED'});
+    const raw=(req as any).rawBody as Buffer|undefined;
+    try{
+      const out=await repo.handleGatewayNotification(String(req.params.id||''),req.headers as Record<string,unknown>,Buffer.isBuffer(raw)?raw:Buffer.from(JSON.stringify(req.body??{})),tenantGatewayTransport);
+      if(out.intent.status==='paid')await recordRegistrationPaid(out.intent).catch(err=>console.warn('[registration-payments] record deferred to reconcile:',err instanceof Error?err.message:err));
+      return res.json({received:true,status:out.intent.status});
+    }catch(err){const code=err instanceof Error?err.message:'PAYMENT_NOTIFICATION_FAILED';const status=code==='PAYMENT_SIGNATURE_INVALID'?401:/NOT_FOUND/.test(code)?404:code==='PAYMENT_NOTIFICATION_UNREADABLE'?400:502;return res.status(status).json({code:/^PAYMENT_/.test(code)?code:'PAYMENT_NOTIFICATION_FAILED'})}
   });
   // Operator plans (their own packages) + billing for their organizations
   const opRoles=requireFirebaseRoles(['operator_owner','operator_admin']);
