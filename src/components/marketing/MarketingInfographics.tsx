@@ -157,7 +157,7 @@ export const LiveJudgingSimulator: React.FC = () => {
               style={{ background: 'var(--emerald-2)', width: isPlaying ? (activeToken === 3 ? '92%' : '75%') : '50%' }}
             />
           </div>
-          <div className="text-[10px] mizan-muted mt-1 text-center font-mono">2.1s · بالنبض</div>
+          <div className="text-[10px] mizan-muted mt-1 text-center tabular-nums">2.1s · بالنبض</div>
         </div>
 
         {/* مؤشر توافق المحكمين */}
@@ -184,7 +184,7 @@ export const LiveJudgingSimulator: React.FC = () => {
         <div className="p-3 rounded-2xl text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
           <div className="text-[10px] mizan-muted font-medium">درجة العيّنة</div>
           <div className="text-2xl font-black font-display text-[var(--emerald)] mt-0.5">{judgeScore.toFixed(1)}</div>
-          <div className="text-[9px] text-[var(--emerald-2)] font-mono flex items-center justify-center gap-1 mt-0.5">
+          <div className="text-[10px] font-medium text-[var(--emerald-2)] flex items-center justify-center gap-1 mt-0.5">
             <ShieldCheck size={11} /> مختومة بسلسلة
           </div>
         </div>
@@ -203,7 +203,7 @@ export const InteractiveEvolutionFlow: React.FC = () => {
       title: 'استقبال القاعة',
       traditional: { badge: 'كشف ورقي وطابور', detail: 'تأكيد الحضور يدوي وتأخر في انطلاق الجلسات' },
       mizan: { badge: 'مسح ضوئي ذكي', detail: 'دخول خلال 3 ثوانٍ وتوجيه فوري للقاعة المخصصة' },
-      metric: 'وفر 90% من الوقت',
+      metric: 'استقبالٌ أسرع',
     },
     {
       id: 1,
@@ -253,7 +253,7 @@ export const InteractiveEvolutionFlow: React.FC = () => {
                   : 'bg-[var(--canvas)] text-[var(--muted)] hover:bg-[var(--emerald-soft)]'
               }`}
             >
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[var(--gold-light)]' : 'bg-black/5 text-[var(--muted)]'}`}>
+              <span className={`text-[10px] tabular-nums px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[var(--gold-light)]' : 'bg-black/5 text-[var(--muted)]'}`}>
                 المرحلة 0{idx + 1}
               </span>
               <span className="text-xs font-extrabold">{s.title}</span>
@@ -386,7 +386,7 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
 
               <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[var(--venue-faint)]">
                 <span>عزل كامل 100%</span>
-                <span className="font-mono">Zero Cross-Access</span>
+                <span>لا وصول بين الجهات</span>
               </div>
             </div>
           ))}
@@ -404,7 +404,7 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-[var(--emerald-2)]/30 text-[var(--gold-light)] grid place-items-center mb-2">
                 <s.icon size={18} strokeWidth={1.6} />
               </div>
-              <div className="text-[10px] font-mono text-[var(--venue-faint)]">{s.step}</div>
+              <div className="text-[10px] tabular-nums text-[var(--venue-faint)]">{s.step}</div>
               <div className="text-sm font-black text-[var(--venue-ink)] mt-1">{s.title}</div>
               <div className="text-[11px] text-[var(--venue-muted)] mt-1">{s.desc}</div>
               {idx < 3 && (

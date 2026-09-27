@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck, Scale, Mic, WifiOff, QrCode, BadgeCheck, Users, Building2,
   Fingerprint, FileCheck2, Radio, Accessibility, Trophy, BookOpen, Layers,
-  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity,
+  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity, ArrowLeft,
 } from 'lucide-react';
 import { DnaStepper } from '../dna/DnaKit';
 import { MizanMark } from '../design-system/MizanLogo';
@@ -79,6 +79,9 @@ const CAPABILITIES: Array<{ icon: React.ElementType; title: string; line: string
   { icon: Radio, title: 'شاشات القاعة', tone: 'mizan-pictogram-ink', line: 'انتظار، وخريطة، وبث، وحفل ختامي — جاهزة.' },
   { icon: Accessibility, title: 'وصولٌ للجميع', tone: 'mizan-pictogram-neutral', line: 'حجم النص واللمس والتباين والحركة بيد المستخدم.' },
 ];
+
+/* قدرات الذكاء المعروضة في قسمها — والرقم في شريط الأرقام يُعدّ منها لا يُكتب باليد. */
+const AI_CAPABILITIES = ['محاذاة النص بالصوت', 'جودة الصوت', 'مراقبة الحفظ', 'تجويدٌ صوتي', 'نزاهة اللجنة', 'صعوبة الأسئلة', 'تنوّع بنك الأسئلة', 'صوت الانتقال'];
 
 /* ── الرحلة: إنفوجرافيك من خمس محطات ──────────────────────────────── */
 const JOURNEY: Array<{ icon: React.ElementType; step: string; title: string; line: string }> = [
@@ -197,7 +200,7 @@ export const MarketingSite: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen font-arabic" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
+    <div className="min-h-screen font-arabic overflow-x-clip" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
 
       {/* ══ شريط علوي: العلامة وحدها. لا دخول — كل جهة تدخل من نطاقها ══ */}
       <header className="sticky top-0 z-40 backdrop-blur" style={{ background: 'rgba(247,245,239,.86)', borderBottom: '1px solid var(--line)' }}>
@@ -254,7 +257,7 @@ export const MarketingSite: React.FC = () => {
         <div className="mizan-hero grid grid-cols-2 md:grid-cols-4 gap-y-8 py-8">
           {/* الرقم مشتقٌّ من ROLE_PERMISSIONS لا مكتوبٌ باليد — يحرسه marketing-claims.test.ts. */}
           <Stat value={String(GOVERNED_ROLES.length)} label="دورًا بصلاحياتٍ مفصولة" />
-          <Stat value="8" label="قدرات ذكاءٍ محكومة" />
+          <Stat value={String(AI_CAPABILITIES.length)} label="قدرات ذكاءٍ محكومة" />
           <Stat value="100%" label="قرارٍ مختوم في سجلٍّ متسلسل" />
           <Stat value="0" label="أوامر تكتبها لإطلاق جهة" />
         </div>
@@ -273,13 +276,16 @@ export const MarketingSite: React.FC = () => {
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">من فكرة المسابقة إلى صورة الفائز</h2>
         <div className="mt-8 dna-surface p-5 sm:p-7">
           <DnaStepper
+            className="mizan-mk-journey"
             size="lg"
             ariaLabel="رحلة المسابقة"
             steps={JOURNEY.map(s => ({ key: s.step, label: s.title, state: 'done' as const, icon: <s.icon size={20} strokeWidth={1.6} />, title: s.line }))}
           />
-          <ol className="mt-5 grid gap-3 sm:grid-cols-5 text-center" aria-hidden="true">
+          <ol className="mt-5 grid gap-2.5 sm:gap-3 sm:grid-cols-5 text-start sm:text-center" aria-hidden="true">
             {JOURNEY.map(s => (
-              <li key={s.step} className="text-[12px] leading-6 mizan-muted">{s.line}</li>
+              <li key={s.step} className="text-[12px] leading-6 mizan-muted">
+                <span className="sm:hidden font-bold" style={{ color: 'var(--ink)' }}>{s.title} · </span>{s.line}
+              </li>
             ))}
           </ol>
         </div>
@@ -353,10 +359,13 @@ export const MarketingSite: React.FC = () => {
         </div>
 
         {/* الخلاصة التي يفهمها المشتري: الفريق */}
-        <div className="mt-6 rounded-[24px] p-7 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--muted)' }}>24</div>
-          <div className="text-[13px] font-black mizan-muted">فريق تشغيل اليوم الواحد</div>
-          <div className="font-display text-[clamp(26px,4vw,44px)] font-black" style={{ color: 'var(--emerald)' }}>6</div>
+        <div className="mt-6 rounded-[24px] p-7 grid justify-items-center gap-2 text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
+          <div className="flex items-center justify-center gap-5">
+            <div className="font-display text-[clamp(26px,4vw,44px)] leading-none font-black" style={{ color: 'var(--muted)' }}>24</div>
+            <ArrowLeft size={22} strokeWidth={1.6} aria-hidden="true" style={{ color: 'var(--muted)' }} />
+            <div className="font-display text-[clamp(26px,4vw,44px)] leading-none font-black" style={{ color: 'var(--emerald)' }}>6</div>
+          </div>
+          <div className="text-[13px] font-bold mizan-muted">فريق تشغيل اليوم الواحد</div>
         </div>
       </Section>
 
@@ -394,7 +403,7 @@ export const MarketingSite: React.FC = () => {
 
           {/* القدرات، كلٌّ تُعتمد وحدها */}
           <div className="mt-10 flex flex-wrap gap-2.5">
-            {['محاذاة النص بالصوت', 'جودة الصوت', 'مراقبة الحفظ', 'تجويدٌ صوتي', 'نزاهة اللجنة', 'صعوبة الأسئلة', 'تنوّع بنك الأسئلة', 'صوت الانتقال'].map(c => (
+            {AI_CAPABILITIES.map(c => (
               <span key={c} className="rounded-full px-4 py-2 text-[12px] font-bold" style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)' }}>{c}</span>
             ))}
           </div>
