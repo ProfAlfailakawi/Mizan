@@ -494,6 +494,17 @@ export interface Competition {
   closedAt?: string;
   closedBy?: string;
   closureReason?: string;
+  /*
+   * سلسلة المسابقة ونُسَخها السنوية: «المسابقة الكبرى» سلسلةٌ، و2026 و2027 نسختان منها.
+   * اختيارية كلها — المسابقات القديمة تبقى كما هي وتُربط لاحقًا إن شاء صاحبها.
+   */
+  seriesId?: string;
+  seriesName?: string;
+  seriesNameArabic?: string;
+  editionLabel?: string;
+  previousEditionId?: string;
+  /** مصدر الإعداد عند النسخ: معرّف المسابقة المصدر وما نُسخ منها — لقطةٌ لا مرجعٌ حيّ. */
+  clonedFrom?: { competitionId: string; at: string; parts: string[] };
   /** Revision timestamp of the published/public projection when a competition is read through that projection. */
   updatedAt?: string;
   readinessChecklist: {

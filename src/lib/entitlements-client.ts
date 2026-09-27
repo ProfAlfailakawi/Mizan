@@ -22,6 +22,9 @@ export type EntitlementIssue =
   | 'LICENSE_NOT_FOUND'
   | 'PARTICIPANT_USAGE_REQUIRES_PUBLISHED_COMPETITION'
   | 'TENANT_SUSPENDED'
+  | 'TENANT_READ_ONLY'
+  | 'SUBSCRIPTION_IN_GRACE'
+  | 'SUBSCRIPTION_TERM_NOT_FOUND'
   | 'IDENTITY_REQUIRED'
   | 'COMMERCIAL_BACKEND_UNAVAILABLE'
   | 'ENTITLEMENT_CALL_FAILED';
@@ -38,6 +41,8 @@ const LIMIT_CODES = new Set<EntitlementIssue>([
   'ANNUAL_PARTICIPANT_LIMIT_REACHED',
   'ACTIVE_COMPETITION_LIMIT_REACHED',
   'TENANT_SUSPENDED',
+  'TENANT_READ_ONLY',
+  'SUBSCRIPTION_IN_GRACE',
 ]);
 
 const ok = (): EntitlementResult => ({ ok: true, limitReached: false });
@@ -63,15 +68,15 @@ async function post(path: string, body: unknown): Promise<EntitlementResult> {
   if (response.status === 503) return failed('COMMERCIAL_BACKEND_UNAVAILABLE');
   const payload = await response.json().catch(() => ({}));
   const code = String((payload as { code?: string }).code || '');
-  return failed((LIMIT_CODES.has(code as EntitlementIssue) || code === 'LICENSE_NOT_FOUND'
+  return failed((LIMIT_CODES.has(code as EntitlementIssue) || code === 'LICENSE_NOT_FOUND' || code === 'SUBSCRIPTION_TERM_NOT_FOUND'
     || code === 'PARTICIPANT_USAGE_REQUIRES_PUBLISHED_COMPETITION')
     ? code as EntitlementIssue
     : 'ENTITLEMENT_CALL_FAILED');
 }
 
 /**
- * يسجّل متسابقًا في عدّاد الاستعمال السنوي. النداء مُعاد الاستعمال على الخادم: تسجيل
- * المتسابق نفسه مرّتين في السنة نفسها يعيد الصفّ القائم ولا يضاعف العدّ.
+ * يسجّل متسابقًا في عدّاد استعمال دورة الاشتراك الحالية (لا السنة الميلادية). النداء مُعاد
+ * الاستعمال على الخادم: المتسابق نفسه مرّتين في الدورة نفسها يعيد الصفّ القائم ولا يضاعف العدّ.
  */
 export function recordParticipantUsage(input: { competitionId: string; participantId: string; organizationId?: string }) {
   return post('/api/saas/usage/participants', input);
