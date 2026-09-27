@@ -1,0 +1,27 @@
+/* Maps the shared DNA kit tokens onto Mizan's own palette (src/index.css). */
+:root {
+  --dna-canvas: var(--canvas);
+  --dna-surface: var(--surface);
+  --dna-surface-2: var(--surface-soft);
+  --dna-ink: var(--ink);
+  --dna-muted: var(--muted);
+  --dna-line: rgba(23, 27, 24, 0.09);
+  --dna-line-2: var(--line);
+  --dna-accent: var(--emerald);
+  --dna-accent-soft: var(--emerald-soft);
+  --dna-on-accent: var(--surface);
+  --dna-core: var(--ink-deep);
+  --dna-on-core: var(--surface);
+  --dna-warn: var(--amber);
+  --dna-warn-soft: var(--amber-soft);
+  --dna-danger: var(--danger);
+  --dna-danger-soft: var(--danger-soft);
+  --dna-info: var(--blue);
+  --dna-info-soft: var(--blue-soft);
+  --dna-r-lg: var(--radius-lg);
+  --dna-r: var(--radius-md);
+  --dna-r-sm: var(--radius-sm);
+  --dna-ease: var(--ease-brand);
+}
+/* Legacy global svg/button rules must not distort kit glyphs. */
+.dna-steps svg, .dna-ring svg { max-width: none; }
