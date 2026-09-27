@@ -48,8 +48,8 @@ export function useBrandInfo(): BrandInfo {
   const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name) || orgLatin;
   return {
     /* الترتيب: علامة المسابقة ثم الجهة، ثم علامة المضيف (المشغّل)، ثم ميزان أخيرًا. */
-    ar: brandArabic || brand?.displayNameArabic || hostWL?.productNameArabic || hostWL?.productName || 'ميزان',
-    en: brandEnglish || brand?.displayName || hostWL?.productName || 'MIZAN',
+    ar: brandArabic || hostWL?.productNameArabic || hostWL?.productName || brand?.displayNameArabic || 'ميزان',
+    en: brandEnglish || hostWL?.productName || brand?.displayName || 'MIZAN',
     logoUrl: comp?.logoUrl || brand?.logoUrl || hostWL?.logoUrl,
     hideMizanMark: !!hostWL && hostWL.brandingMode === 'full_white_label' && !hostWL.showPoweredByMizan,
     slogan: brand?.slogan,

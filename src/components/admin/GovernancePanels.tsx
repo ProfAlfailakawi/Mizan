@@ -122,6 +122,7 @@ export const QualificationPanel: React.FC = () => {
   const others = s.competitions.filter(c => c.id !== cid && c.organizationId === s.competition.organizationId);
   const [form, setForm] = useState({ parent: '', topN: '3', minScore: '', perCategory: true, stage: '' });
   const [result, setResult] = useState<{ ok: boolean; code?: string } | null>(null);
+  const [revoke, setRevoke] = useState<Record<string, string>>({});
   const tree = hierarchyOf(s.competitionRelationships, cid);
   const rels = s.competitionRelationships.filter(r => r.childCompetitionId === cid);
   const comp = (id: string) => { const c = s.competitions.find(x => x.id === id); return c ? (ar ? c.nameArabic : c.name || c.nameArabic) : id; };
@@ -147,7 +148,7 @@ export const QualificationPanel: React.FC = () => {
         <span>#{q.rank} · {pname(q.sourceParticipantId)} · {q.score}{q.evidence.sealChecksum ? ` · ${L(ar, 'مختوم', 'sealed')}` : ''}</span>
         <span className="flex items-center gap-2"><b>{STATUS[q.status][ar ? 0 : 1]}</b>
           {q.status === 'qualified' && <button className={btn2} onClick={() => setResult(s.setQualificationStatus(q.id, 'invited'))}>{L(ar, 'دعوة للمرحلة التالية', 'Invite to next stage')}</button>}
-          {(q.status === 'qualified' || q.status === 'invited' || q.status === 'accepted') && <button className="text-[11px] font-bold text-[#A34D43]" onClick={() => { const note = window.prompt(L(ar, 'سبب الإلغاء', 'Reason for revoking')) || ''; setResult(s.setQualificationStatus(q.id, 'revoked', note)); }}>{L(ar, 'إلغاء', 'Revoke')}</button>}
+          {(q.status === 'qualified' || q.status === 'invited' || q.status === 'accepted') && <><input aria-label={L(ar, 'سبب الإلغاء', 'Reason for revoking')} placeholder={L(ar, 'سبب الإلغاء', 'Revoke reason')} className={`${input} max-w-[10rem]`} value={revoke[q.id] || ''} onChange={e => setRevoke({ ...revoke, [q.id]: e.target.value })} /><button className="text-[11px] font-bold text-[#A34D43] disabled:opacity-50" disabled={(revoke[q.id] || '').trim().length < 5} onClick={() => setResult(s.setQualificationStatus(q.id, 'revoked', revoke[q.id]))}>{L(ar, 'إلغاء', 'Revoke')}</button></>}
         </span></li>)}</ul>
     </div>; })}
   </section>;
