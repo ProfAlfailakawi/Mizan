@@ -152,12 +152,12 @@ export const OperatorCommercialPanel: React.FC = () => {
   const locale = useLocale();
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [tab, setTab] = useState<'customers' | 'wallet' | 'pricing' | 'branding'>('customers');
+  const [tab, setTab] = useState<'customers' | 'wallet' | 'pricing' | 'branding' | 'payments'>('customers');
   const load = useCallback(async () => { try { setData(await api('/api/saas/operator/commercial')); setError(null); } catch (e) { setError(e as ApiError); } }, []);
   useEffect(() => { void load(); }, [load]);
   if (!data) return <div className="space-y-3"><ErrorBox error={error} />{!error && <div className="text-xs">{ct(locale, 'loading')}</div>}</div>;
   const s = data.summary, cur = s.currency;
-  const tabs: [typeof tab, CommercialKey][] = [['customers', 'customers'], ['wallet', 'ledger'], ['pricing', 'wholesalePrice'], ['branding', 'branding']];
+  const tabs: [typeof tab, CommercialKey][] = [['customers', 'customers'], ['wallet', 'ledger'], ['pricing', 'wholesalePrice'], ['branding', 'branding'], ['payments', 'paymentGateway']];
   return (
     <section className="space-y-4" aria-label={ct(locale, 'operator')}>
       <ErrorBox error={error} />
@@ -180,6 +180,7 @@ export const OperatorCommercialPanel: React.FC = () => {
       {tab === 'wallet' && <OperatorWallet data={data} reload={load} onError={setError} />}
       {tab === 'pricing' && <OperatorPricing data={data} reload={load} onError={setError} />}
       {tab === 'branding' && <BrandEditor ownerType="operator" ownerId={data.agreement?.operatorId || data.wallet?.operatorId || ''} />}
+      {tab === 'payments' && <PaymentGatewayPanel ownerType="operator" ownerId={data.agreement?.operatorId || data.wallet?.operatorId || ''} />}
     </section>
   );
 };
@@ -588,6 +589,102 @@ export const SsoSettingsPanel: React.FC = () => {
       <Field label={ar ? 'المجموعات' : 'Groups'}><input className={inputCls} dir="ltr" value={preview.groups} onChange={e => setPreview({ ...preview, groups: e.target.value })} /></Field>
       <Button variant="secondary" onClick={() => void test()}>{ar ? 'اقتراح الدور' : 'Suggest role'}</Button>
       {suggestion && <span role="status" className="text-xs font-bold">{suggestion}</span>}
+    </div>
+  </section>;
+};
+
+/*
+ * بوابة الدفع الخاصة بالجهة أو المشغّل — لتحصيل رسوم التسجيل من المتسابقين إلى حسابها مباشرة.
+ * تختار الجهة قالبًا (ماي فاتورة، تاب، سترايب) أو تلصق ملف بوابة أخرى، وتضع مفاتيحها، ثم
+ * تختبرها. المفاتيح تُرسل مرة واحدة إلى الخزنة المشفرة ولا تعود إلى المتصفح أبدًا.
+ */
+type GatewayPreset = { id: string; label: string; labelArabic: string; docsUrl: string; notes: string[]; notesArabic: string[]; profile: Record<string, unknown> };
+const GATEWAY_STATUS: Record<string, [string, string]> = { pending_test: ['بانتظار الاختبار', 'Awaiting test'], active: ['مفعّلة', 'Active'], disabled: ['معطّلة', 'Disabled'] };
+
+export const PaymentGatewayPanel: React.FC<{ ownerType: 'operator' | 'organization'; ownerId: string }> = ({ ownerType, ownerId }) => {
+  const locale = useLocale(); const ar = locale === 'ar';
+  const [presets, setPresets] = useState<GatewayPreset[]>([]);
+  const [data, setData] = useState<{ gateways: any[]; effective: any; webhookBase: string } | null>(null);
+  const [presetId, setPresetId] = useState('');
+  const [profileText, setProfileText] = useState('');
+  const [keys, setKeys] = useState({ apiKey: '', webhookSecret: '', displayName: '' });
+  const [testCurrency, setTestCurrency] = useState('KWD');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState<ApiError | null>(null);
+  const base = `/api/saas/payment-gateways/${ownerType}/${encodeURIComponent(ownerId)}`;
+  const load = useCallback(async () => {
+    if (!ownerId) return;
+    try { setData(await api(base)); setError(null); } catch (e) { setError(e as ApiError); }
+  }, [base, ownerId]);
+  useEffect(() => { void load(); void (async () => { try { setPresets((await api('/api/saas/payment-gateways/presets')).presets); } catch { /* القوالب اختيارية: يبقى الإدخال اليدوي متاحًا */ } })(); }, [load]);
+  const preset = presets.find(p => p.id === presetId);
+  const choose = (id: string) => { setPresetId(id); const p = presets.find(x => x.id === id); setProfileText(p ? JSON.stringify(p.profile, null, 2) : ''); };
+  const save = async () => {
+    setMessage('');
+    let profile: unknown;
+    try { profile = JSON.parse(profileText); } catch { setError(new ApiError('PAYMENT_PROFILE_JSON_INVALID')); return; }
+    try {
+      const r = await api(base, { method: 'POST', body: JSON.stringify({ presetId: presetId || undefined, provider: (profile as any)?.name, displayName: keys.displayName || preset?.label, profile, apiKey: keys.apiKey, webhookSecret: keys.webhookSecret }) });
+      setKeys({ apiKey: '', webhookSecret: '', displayName: '' });
+      setMessage(ar ? `حُفظت البوابة. عنوان الإشعار لإعدادات البوابة: ${r.webhookUrl}` : `Saved. Notification URL for the gateway settings: ${r.webhookUrl}`);
+      await load();
+    } catch (e) { setError(e as ApiError); }
+  };
+  const test = async (id: string) => {
+    setMessage('');
+    try {
+      const r = await api(`/api/saas/payment-gateways/by-id/${encodeURIComponent(id)}/test`, { method: 'POST', body: JSON.stringify({ currency: testCurrency }) });
+      setMessage(r.ok ? (ar ? 'نجح الاختبار وفُعّلت البوابة. لم يُخصم أي مبلغ.' : 'Test passed; the gateway is active. Nothing was charged.') : r.code === 'AWAITING_SIGNED_NOTIFICATION' ? (ar ? `أُنشئت صفحة دفع تجريبية. أكمل الدفع التجريبي لتُفعَّل البوابة عند وصول إشعارها الموقَّع: ${r.paymentUrl || ''}` : `Test checkout created. Complete the test payment; the signed notification activates the gateway: ${r.paymentUrl || ''}`) : (ar ? `فشل الاختبار: ${r.code}` : `Test failed: ${r.code}`));
+      await load();
+    } catch (e) { setError(e as ApiError); }
+  };
+  const disable = async (id: string) => { try { await api(`/api/saas/payment-gateways/by-id/${encodeURIComponent(id)}/disable`, { method: 'POST' }); await load(); } catch (e) { setError(e as ApiError); } };
+  if (!ownerId) return null;
+  return <section className="space-y-4" aria-label={ct(locale, 'paymentGateway')}>
+    <h2 className="text-base font-black">{ct(locale, 'paymentGateway')}</h2>
+    <p className="text-xs text-[#6a706c]">{ownerType === 'operator'
+      ? (ar ? 'بوابة المشغّل تُحصّل رسوم تسجيل جهاتك التي لم تعدّ بوابة خاصة بها. المال يذهب إلى حسابك لدى البوابة، لا إلى ميزان.' : 'Your gateway collects registration fees for your organizations that have no gateway of their own. Money goes to your gateway account, not to MIZAN.')
+      : (ar ? 'تُحصّل رسوم التسجيل من المتسابقين إلى حساب جهتكم لدى البوابة مباشرة. بلا بوابة مفعّلة يبقى التحصيل يدويًا.' : 'Registration fees are paid straight into your organization\'s gateway account. Without an active gateway, collection stays manual.')}</p>
+    <ErrorBox error={error} />
+    {message && <div role="status" className="break-all rounded-xl bg-[#e8f3ec] px-3 py-2 text-xs font-bold text-[#1f5b3c]">{message}</div>}
+    <div className="rounded-2xl border border-[#e2e0d9] bg-white p-4 text-xs">
+      <b>{ar ? 'البوابة الفعّالة الآن:' : 'Gateway in use now:'}</b>{' '}
+      {data?.effective ? `${data.effective.displayName} (${data.effective.ownerType === 'operator' ? (ar ? 'من المشغّل' : 'from operator') : (ar ? 'خاصة بكم' : 'your own')})` : (ar ? 'لا توجد — تحصيل يدوي' : 'None — manual collection')}
+    </div>
+    {!!data?.gateways.length && <ul className="divide-y divide-[#ebe9e2] rounded-2xl border border-[#e2e0d9] bg-white text-xs">
+      {data.gateways.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+        <span><b>{g.displayName}</b> · {g.provider} · <Badge variant={g.status === 'active' ? 'emerald' : 'neutral'}>{GATEWAY_STATUS[g.status]?.[ar ? 0 : 1] || g.status}</Badge>
+          {g.lastTest && <span className="ms-2 text-[#666c68]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? '✓' : g.lastTest.code}</span>}
+          <span className="block text-[11px] text-[#666c68]" dir="ltr">{data.webhookBase}{g.id}</span></span>
+        {g.status !== 'disabled' && <span className="flex gap-2">
+          {g.status === 'pending_test' && <Button size="sm" onClick={() => void test(g.id)}>{ar ? 'اختبار وتفعيل' : 'Test & activate'}</Button>}
+          <Button size="sm" variant="outline" onClick={() => void disable(g.id)}>{ar ? 'تعطيل' : 'Disable'}</Button>
+        </span>}
+      </li>)}
+    </ul>}
+    <div className="space-y-3 rounded-2xl border border-[#e2e0d9] bg-white p-4">
+      <h3 className="text-sm font-black">{ar ? 'إضافة بوابة' : 'Add a gateway'}</h3>
+      <Field label={ar ? 'القالب' : 'Template'}>
+        <select className={inputCls} value={presetId} onChange={e => choose(e.target.value)}>
+          <option value="">{ar ? 'بوابة أخرى — ألصق ملف الإعداد' : 'Other gateway — paste a profile'}</option>
+          {presets.map(p => <option key={p.id} value={p.id}>{ar ? p.labelArabic : p.label}</option>)}
+        </select>
+      </Field>
+      {preset && <div className="rounded-xl bg-[#fbf3e3] p-3 text-[11px] text-[#7a5413]">
+        <b>{ar ? 'قالب بدء، يلزم اختباره بمفاتيحكم قبل التحصيل:' : 'Starter template — test it with your keys before collecting:'}</b>
+        <ul className="ms-4 list-disc">{(ar ? preset.notesArabic : preset.notes).map(n => <li key={n}>{n}</li>)}</ul>
+        <a className="underline" href={preset.docsUrl} target="_blank" rel="noreferrer noopener">{ar ? 'وثائق البوابة' : 'Gateway documentation'}</a>
+      </div>}
+      <Field label={ar ? 'ملف البوابة (JSON)' : 'Gateway profile (JSON)'}><textarea className={`${inputCls} h-40 font-mono text-[11px]`} dir="ltr" spellCheck={false} value={profileText} onChange={e => setProfileText(e.target.value)} /></Field>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label={ar ? 'الاسم الظاهر' : 'Display name'}><input className={inputCls} value={keys.displayName} onChange={e => setKeys({ ...keys, displayName: e.target.value })} /></Field>
+        <Field label={ar ? 'المفتاح السرّي (API key)' : 'Secret API key'}><input type="password" autoComplete="off" className={inputCls} dir="ltr" value={keys.apiKey} onChange={e => setKeys({ ...keys, apiKey: e.target.value })} /></Field>
+        <Field label={ar ? 'سرّ توقيع الإشعار (اختياري)' : 'Notification signing secret (optional)'}><input type="password" autoComplete="off" className={inputCls} dir="ltr" value={keys.webhookSecret} onChange={e => setKeys({ ...keys, webhookSecret: e.target.value })} /></Field>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Button disabled={!profileText || !keys.apiKey} onClick={() => void save()}>{ct(locale, 'save')}</Button>
+        <Field label={ar ? 'عملة الاختبار' : 'Test currency'}><input className={`${inputCls} w-24`} dir="ltr" maxLength={3} value={testCurrency} onChange={e => setTestCurrency(e.target.value.toUpperCase())} /></Field>
+      </div>
     </div>
   </section>;
 };

@@ -27,6 +27,8 @@ import * as engine from './commercial/engine';
 import * as brand from './commercial/brand-discover';
 import * as hooks from './commercial/webhooks';
 import { ensureCommercialCollections, migrateCommercialSchema } from './commercial/migration';
+import * as pay from './commercial/payment-gateways';
+import { buildPaymentGateway, validatePaymentProfile, type GatewayTransport, type PaymentProviderProfile, type WebhookSettlement } from './payments';
 
 export type BillingSubjectType='operator'|'organization';
 export type SubscriptionStatus='trialing'|'active'|'past_due'|'canceled'|'unpaid';
@@ -106,6 +108,7 @@ interface State{
  idempotency:IdempotencyRecord[];resalePrices:OperatorResalePriceRecord[];ownershipEvents:OwnershipEvent[];migrationReports:CommercialMigrationReport[];
  brandProfiles:BrandProfileRecord[];customDomains:CustomDomainRecord[];discoverListings:PublishedCompetitionListing[];
  webhookEndpoints:WebhookEndpointRecord[];webhookDeliveries:WebhookDeliveryRecord[];
+ paymentGateways?:pay.PaymentGatewayConfigRecord[];registrationPaymentIntents?:pay.RegistrationPaymentIntentRecord[];
 }
 
 const now=()=>new Date().toISOString();
@@ -140,7 +143,7 @@ export class SaaSPlatformRepository{
  /** Run a commercial engine operation inside one atomic state write. */
  private tx<T>(actor:CommercialActor,fn:(ctx:engine.EngineCtx)=>T):T{return this.mutate(s=>fn(this.ctx(s,actor)))}
  private view<T>(fn:(s:State,at:number)=>T):T{return fn(this.read(),this.clock())}
- private empty():State{return {version:1,sequence:0,plans:[],operators:[],organizations:[],licenses:[],creditLedger:[],participantUsage:[],competitions:[],storageObjects:[],storageAccounts:[],storageMigrations:[],changeRequests:[],audit:[],subscriptions:[],invoices:[],planVersions:[],subscriptionTerms:[],operatorTiers:[],operatorAgreements:[],operatorWallets:[],walletLedger:[],idempotency:[],resalePrices:[],ownershipEvents:[],migrationReports:[],brandProfiles:[],customDomains:[],discoverListings:[],webhookEndpoints:[],webhookDeliveries:[]}}
+ private empty():State{return {version:1,sequence:0,plans:[],operators:[],organizations:[],licenses:[],creditLedger:[],participantUsage:[],competitions:[],storageObjects:[],storageAccounts:[],storageMigrations:[],changeRequests:[],audit:[],subscriptions:[],invoices:[],planVersions:[],subscriptionTerms:[],operatorTiers:[],operatorAgreements:[],operatorWallets:[],walletLedger:[],idempotency:[],resalePrices:[],ownershipEvents:[],migrationReports:[],brandProfiles:[],customDomains:[],discoverListings:[],webhookEndpoints:[],webhookDeliveries:[],paymentGateways:[],registrationPaymentIntents:[]}}
  private read():State{try{const s=JSON.parse(fs.readFileSync(this.file,'utf8')) as State;const out={...this.empty(),...s};ensureCommercialCollections(out);return out}catch{return this.empty()}}
  private write(s:State){const tmp=`${this.file}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(s,null,2),{mode:0o600});fs.renameSync(tmp,this.file);this.writeAnchor(s)}
  private get anchorFile(){return `${this.file}.audit-anchor.json`}
@@ -478,6 +481,89 @@ export class SaaSPlatformRepository{
  createWebhookEndpoint(actor:CommercialActor,organizationId:string,input:{url:string;events:string[]}){this.orgScope(actor,organizationId);if(!['super_admin','org_admin'].includes(actor.role))throw new Error('ORG_ADMIN_REQUIRED');if(!this.vault)throw new Error('WEBHOOK_SECRET_VAULT_NOT_CONFIGURED');const secret=`whsec_${crypto.randomBytes(24).toString('base64url')}`;return this.tx(actor,ctx=>{hooks.assertWebhookUrl(String(input.url||''));const ref=this.vault!.put({secret});const endpoint=hooks.createWebhookEndpoint(ctx,organizationId,input,ref);return {endpoint:{...endpoint,secretRef:undefined},signingSecret:secret}})}
  listWebhooks(actor:CommercialActor,organizationId:string){this.orgScope(actor,organizationId);return this.view(s=>({endpoints:s.webhookEndpoints.filter(e=>e.organizationId===organizationId).map(e=>({...e,secretRef:undefined})),deliveries:s.webhookDeliveries.filter(d=>d.organizationId===organizationId).slice(-100).reverse().map(d=>({...d,payload:undefined}))}))}
  disableWebhookEndpoint(actor:CommercialActor,organizationId:string,endpointId:string){this.orgScope(actor,organizationId);return this.mutate(s=>{const e=s.webhookEndpoints.find(x=>x.id===endpointId&&x.organizationId===organizationId);if(!e)throw new Error('WEBHOOK_NOT_FOUND');e.status='disabled';e.disabledReason='BY_USER';e.updatedAt=now();this.audit(s,actor,{organizationId,action:'WEBHOOK_ENDPOINT_DISABLED',entityType:'webhook_endpoint',entityId:e.id});return {...e,secretRef:undefined}})}
+ /* ── بوابات الدفع الخاصة بالجهات والمشغّلين (رسوم التسجيل) ── */
+ savePaymentGateway(actor:CommercialActor,ownerType:pay.GatewayOwnerType,ownerId:string,input:{provider?:string;presetId?:string;displayName?:string;profile:unknown;apiKey:string;webhookSecret?:string}){
+  if(!this.vault)throw new Error('PAYMENT_SECRET_VAULT_NOT_CONFIGURED');
+  if(!['operator','organization'].includes(ownerType))throw new Error('PAYMENT_GATEWAY_OWNER_INVALID');
+  pay.assertOwnerExists(this.read() as any,ownerType,ownerId);pay.assertGatewayManager(this.read() as any,actor,ownerType,ownerId);
+  const profile=input.profile as PaymentProviderProfile;const errors=validatePaymentProfile(profile);if(errors.length)throw new Error(`PAYMENT_PROFILE_INVALID:${errors[0]}`);
+  const apiKey=clean(input.apiKey,4000),webhookSecret=clean(input.webhookSecret,4000);if(!apiKey)throw new Error('PAYMENT_API_KEY_REQUIRED');
+  if(profile.webhook&&!profile.statusQuery&&!webhookSecret)throw new Error('PAYMENT_WEBHOOK_SECRET_REQUIRED');
+  const ref=this.vault.put({apiKey,webhookSecret});
+  try{return pay.redactGateway(this.tx(actor,ctx=>pay.saveGatewayConfig(ctx,{ownerType,ownerId,provider:clean(input.provider||profile.name||'gateway',40),presetId:input.presetId,displayName:input.displayName,profile:JSON.parse(JSON.stringify(profile)),secretRef:ref})))}
+  catch(err){this.vault.remove(ref);throw err}
+ }
+ listPaymentGateways(actor:CommercialActor,ownerType:pay.GatewayOwnerType,ownerId:string){const s=this.read() as any;pay.assertGatewayManager(s,actor,ownerType,ownerId);const effective=ownerType==='organization'?pay.effectiveGateway(s,ownerId):null;return {gateways:pay.listGateways(s,ownerType,ownerId),effective:effective?{id:effective.id,ownerType:effective.ownerType,provider:effective.provider,displayName:effective.displayName}:null}}
+ disablePaymentGateway(actor:CommercialActor,gatewayId:string){return pay.redactGateway(this.tx(actor,ctx=>pay.disableGateway(ctx,gatewayId)))}
+ private gatewayRuntime(config:pay.PaymentGatewayConfigRecord,transport:GatewayTransport){if(!this.vault)throw new Error('PAYMENT_SECRET_VAULT_NOT_CONFIGURED');const secret=this.vault.get(config.secretRef);return buildPaymentGateway(config.profile as unknown as PaymentProviderProfile,{apiKey:secret.apiKey,webhookSecret:secret.webhookSecret},config.provider,transport)}
+ /**
+  * اختبار البوابة بمفاتيح الجهة: إنشاء صفحة دفع حقيقية (بلا سداد) ثم الاستعلام عنها. نجاحهما
+  * يثبت العنوان والمفتاح وشكل الرد معًا، فتُفعَّل. بوابةٌ بلا استعلام تُفعَّل بإشعار سدادٍ موقَّع
+  * لعملية الاختبار نفسها.
+  */
+ async testPaymentGateway(actor:CommercialActor,gatewayId:string,input:{amountMinor?:number;currency:string;callbackUrl:string;webhookUrl?:string},transport:GatewayTransport){
+  const s=this.read() as any,config=(s.paymentGateways||[]).find((g:pay.PaymentGatewayConfigRecord)=>g.id===gatewayId) as pay.PaymentGatewayConfigRecord|undefined;
+  if(!config)throw new Error('PAYMENT_GATEWAY_NOT_FOUND');pay.assertGatewayManager(s,actor,config.ownerType,config.ownerId);if(config.status==='disabled')throw new Error('PAYMENT_GATEWAY_DISABLED');
+  const amountMinor=Number.isSafeInteger(input.amountMinor)&&Number(input.amountMinor)>0?Number(input.amountMinor):100,currency=clean(input.currency,3).toUpperCase();if(!/^[A-Z]{3}$/.test(currency))throw new Error('CURRENCY_INVALID');
+  let code='OK',ok=false,paymentUrl:string|undefined,externalRef:string|undefined;
+  try{
+   const gw=this.gatewayRuntime(config,transport);
+   const out=await gw.createCheckout({invoiceId:`TEST-${config.id}-${Date.now()}`,invoiceNumber:'TEST',amountMinor,currency,description:'MIZAN gateway test',customer:{name:'MIZAN Test'},callbackUrl:input.callbackUrl,errorUrl:input.callbackUrl,webhookUrl:input.webhookUrl});
+   paymentUrl=out.paymentUrl;externalRef=out.externalRef;
+   if(gw.canQueryStatus){const q=await gw.queryStatus(out.externalRef,currency);ok=!!q;code=q?`STATUS_${q.status.toUpperCase()}`:'STATUS_QUERY_UNREADABLE'}
+   else code='AWAITING_SIGNED_NOTIFICATION';
+  }catch(err){code=err instanceof Error?err.message.slice(0,80):'GATEWAY_TEST_FAILED'}
+  const organizationId=config.ownerType==='organization'?config.ownerId:'';
+  return this.tx(actor,ctx=>{
+   if(externalRef)pay.recordIntent(ctx,{gatewayConfigId:config.id,provider:config.provider,organizationId,competitionId:'',participantId:'',participantPath:'',amountMinor,currency,externalRef,purpose:'gateway_test'});
+   const g=pay.recordGatewayTest(ctx,config.id,{ok,code});
+   return {gateway:pay.redactGateway(g),ok,code,paymentUrl};
+  });
+ }
+ /** بوابة الجهة الفعّالة الآن للعرض العام: هل يمكن الدفع الإلكتروني؟ بلا أي تفاصيل حساسة. */
+ publicPaymentAvailability(organizationId:string){const g=pay.effectiveGateway(this.read() as any,organizationId);return g?{available:true,provider:g.provider,displayName:g.displayName}:{available:false}}
+ async startRegistrationCheckout(input:{organizationId:string;competitionId:string;participantId:string;participantPath:string;amountMinor:number;currency:string;description:string;customer:{name?:string;email?:string;phone?:string};callbackUrl:string;errorUrl:string;webhookUrlFor:(gatewayId:string)=>string},transport:GatewayTransport){
+  const s=this.read() as any,config=pay.effectiveGateway(s,input.organizationId);if(!config)throw new Error('PAYMENT_GATEWAY_NOT_CONFIGURED');
+  const previous=pay.latestIntentFor(s,input.participantPath);
+  if(previous?.status==='paid')return {intent:previous,alreadyPaid:true as const};
+  /* صفحة دفع لم تكتمل خلال نصف ساعة، بالمبلغ والبوابة نفسيهما، تُعاد بدل فتح عملية ثانية. */
+  if(previous&&previous.status==='created'&&previous.gatewayConfigId===config.id&&previous.amountMinor===input.amountMinor&&previous.currency===input.currency&&(previous as any).paymentUrl&&this.clock()-Date.parse(previous.createdAt)<30*60_000)return {intent:previous,paymentUrl:String((previous as any).paymentUrl),reused:true as const};
+  const gw=this.gatewayRuntime(config,transport);
+  const out=await gw.createCheckout({invoiceId:`${input.competitionId}-${input.participantId}`.slice(0,120),invoiceNumber:input.participantId,amountMinor:input.amountMinor,currency:input.currency,description:input.description,customer:input.customer,callbackUrl:input.callbackUrl,errorUrl:input.errorUrl,webhookUrl:input.webhookUrlFor(config.id)});
+  const intent=this.tx(SaaSPlatformRepository.SYSTEM,ctx=>{const row=pay.recordIntent(ctx,{gatewayConfigId:config.id,provider:config.provider,organizationId:input.organizationId,competitionId:input.competitionId,participantId:input.participantId,participantPath:input.participantPath,amountMinor:input.amountMinor,currency:input.currency,externalRef:out.externalRef,purpose:'registration_fee'});(row as any).paymentUrl=out.paymentUrl;return row});
+  return {intent,paymentUrl:out.paymentUrl};
+ }
+ latestRegistrationIntent(participantPath:string){return pay.latestIntentFor(this.read() as any,participantPath)}
+ /** يسأل البوابة عن نيّةٍ ويطبّق النتيجة. الخطأ الشبكي لا يغيّر شيئًا. */
+ async verifyRegistrationIntent(intentId:string,transport:GatewayTransport){
+  const s=this.read() as any,intent=(s.registrationPaymentIntents||[]).find((i:pay.RegistrationPaymentIntentRecord)=>i.id===intentId) as pay.RegistrationPaymentIntentRecord|undefined;if(!intent)throw new Error('PAYMENT_INTENT_NOT_FOUND');
+  if(intent.status==='paid')return {intent,changed:false};
+  const config=(s.paymentGateways||[]).find((g:pay.PaymentGatewayConfigRecord)=>g.id===intent.gatewayConfigId) as pay.PaymentGatewayConfigRecord|undefined;if(!config)throw new Error('PAYMENT_GATEWAY_NOT_FOUND');
+  const gw=this.gatewayRuntime(config,transport);if(!gw.canQueryStatus)return {intent,changed:false};
+  const q=await gw.queryStatus(intent.externalRef,intent.currency);if(!q)return {intent,changed:false};
+  return this.settle(intent.id,q);
+ }
+ private settle(intentId:string,q:Pick<WebhookSettlement,'status'|'amountMinor'|'currency'>){return this.tx(SaaSPlatformRepository.SYSTEM,ctx=>{const out=pay.applySettlement(ctx,intentId,q);
+  /* عملية اختبارٍ مدفوعة بإشعار موقّع تفعّل البوابة التي لا استعلام لها. */
+  if(out.changed&&out.intent.status==='paid'&&out.intent.purpose==='gateway_test'){const g=(ctx.s as any).paymentGateways?.find((x:pay.PaymentGatewayConfigRecord)=>x.id===out.intent.gatewayConfigId);if(g&&g.status==='pending_test')pay.recordGatewayTest({...ctx,actor:{...SaaSPlatformRepository.SYSTEM,role:'super_admin'}},g.id,{ok:true,code:'SIGNED_NOTIFICATION_PAID'})}
+  return out})}
+ /**
+  * إشعار وارد من بوابة جهةٍ ما. إن كان للملف توقيع يُتحقق منه ثم يُستعلم إن أمكن؛ وإلا يُستخرج
+  * المرجع ويُسأل عنه بالمفتاح السرّي. الإشعار وحده لا يُثبت سدادًا بلا توقيع صحيح.
+  */
+ async handleGatewayNotification(gatewayId:string,headers:Record<string,unknown>,raw:Buffer,transport:GatewayTransport){
+  const s=this.read() as any,config=(s.paymentGateways||[]).find((g:pay.PaymentGatewayConfigRecord)=>g.id===gatewayId) as pay.PaymentGatewayConfigRecord|undefined;if(!config||config.status==='disabled')throw new Error('PAYMENT_GATEWAY_NOT_FOUND');
+  const gw=this.gatewayRuntime(config,transport);
+  const signed=(config.profile as any).webhook?gw.verifyWebhook(headers,raw):null;
+  const ref=signed?.externalRef||gw.referenceFromNotification(raw);if(!ref)throw new Error('PAYMENT_NOTIFICATION_UNREADABLE');
+  const intent=pay.intentByReference(s,config.id,ref);if(!intent)throw new Error('PAYMENT_INTENT_NOT_FOUND');
+  if(gw.canQueryStatus){const q=await gw.queryStatus(intent.externalRef,intent.currency);return q?this.settle(intent.id,q):{intent,changed:false}}
+  if(!signed)throw new Error('PAYMENT_SIGNATURE_INVALID');
+  return this.settle(intent.id,signed);
+ }
+ registrationIntentsToReconcile(limit=50){return pay.intentsToReconcile(this.read() as any,this.clock(),limit)}
+ markRegistrationIntentRecorded(intentId:string){return this.tx(SaaSPlatformRepository.SYSTEM,ctx=>pay.markIntentRecorded(ctx,intentId))}
+ registrationPaymentIntents(actor:CommercialActor,organizationId:string,competitionId?:string){this.orgScope(actor,organizationId);return pay.intentsForOrganization(this.read() as any,organizationId,competitionId).map(i=>({...i,paymentUrl:undefined}))}
  /** Who should hear about renewals and overdue invoices now (communications triggers). Read-only. */
  communicationTargets(windowsDays:number[]=[30,7]){return this.view((s,at)=>{const renewals:{organizationId:string;name:string;email?:string;termId:string;endsAt:string;daysLeft:number;window:number}[]=[];for(const o of s.organizations){if(o.status!=='active')continue;const t=engine.currentTerm(s,o.id,at);if(!t)continue;if(s.subscriptionTerms.some(x=>x.renewedFromTermId===t.id))continue;const daysLeft=Math.ceil((Date.parse(t.endsAt)-at)/86400_000);const window=[...windowsDays].sort((a,b)=>a-b).find(w=>daysLeft<=w);if(window===undefined)continue;renewals.push({organizationId:o.id,name:o.officialName,email:o.legalEmail||o.operational.notificationEmail,termId:t.id,endsAt:t.endsAt,daysLeft,window})}const overdue=s.invoices.filter(i=>i.status==='open'&&i.subjectType==='organization'&&i.dueAt&&Date.parse(i.dueAt)<at).map(i=>{const o=s.organizations.find(x=>x.id===i.subjectId);return {organizationId:i.subjectId,name:o?.officialName||i.subjectId,email:o?.legalEmail||o?.operational.notificationEmail,invoiceId:i.id,invoiceNumber:i.number}});return {renewals,overdue}})}
  /** A domain event reported by an authenticated client: role-checked, org from identity, PII-free, deduplicated. */

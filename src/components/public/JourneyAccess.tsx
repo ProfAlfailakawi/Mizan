@@ -199,6 +199,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         {finished && <TestCompletePanel ar={ar} resultReady={!!journey.result || !!journey.certificate} onShowResult={() => { setShowResult(true); window.setTimeout(() => resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50); }} />}
         <details open={!finished} className="mizan-surface p-5 sm:p-6" data-journey-step={JOURNEY_ORDER[idx]}><summary className={`min-h-11 text-lg font-black ${finished ? 'cursor-pointer text-[var(--emerald)]' : 'list-none pointer-events-none'}`}>{finished ? (ar ? 'عرض مراحل رحلتك' : 'Show your journey steps') : (ar ? 'مسار الرحلة' : 'Journey')}</summary><div ref={currentStepRef} className="mt-5"><DnaStepper size="sm" ariaLabel={ar ? 'مسار الرحلة' : 'Journey'} stateText={ar ? undefined : { done: 'done', current: 'current', pending: 'upcoming', returned: 'returned', blocked: 'blocked' }} steps={steps.map(i => ({ key: String(i), label: stepLabel(i, ar), state: i < idx ? 'done' as const : i === idx ? 'current' as const : 'pending' as const }))} /></div></details>
         {!finished && <section className="grid sm:grid-cols-3 gap-3"><Info icon={CalendarClock} label={ar ? 'الموعد' : 'Time'} value={journey.arrivalSlot || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={MapPin} label={ar ? 'المكان' : 'Location'} value={journey.committee?.hall || journey.venueName || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={CircleDot} label={ar ? 'رقم دورك' : 'Queue number'} value={journey.queueNumber ? journey.queueNumber.toLocaleString(ar ? 'ar-EG' : 'en-US') : (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /></section>}
+        {audience === 'participant' && !finished && <RegistrationFeePanel ar={ar} competitionId={competition.id} token={token} />}
         {audience === 'participant' && !finished && ['submitted', 'under_review', 'approved'].includes(String(journey.status)) && competition.status === 'registration_open' && <RegistrationEditPanel ar={ar} competitionId={competition.id} token={token} />}
         {canPrepare && <section className="mizan-surface p-5 sm:p-6"><div className="mb-4"><div className="mizan-kicker">{ar ? 'التحضير للاختبار' : 'TEST PREPARATION'}</div><h2 className="mt-1 text-lg font-black">{ar ? 'تهيّأ قبل دورك' : 'Settle your range, breathing, and private rehearsal'}</h2><p className="mt-1 text-sm leading-7 text-[#646965]">{ar ? 'لك وحدك — لا تمسّ درجتك.' : 'This preparation is private; nothing is sent to the panel or affects your score.'}</p></div><WarmupSanctuary ar={ar} scopeText={ar ? journey.preparation?.scopeTextArabic || undefined : journey.preparation?.scopeTextEnglish || undefined} spreadAcrossZones={journey.preparation?.spreadAcrossZones} questionCount={journey.preparation?.questionCount} minutesPerQuestion={journey.preparation?.minutesPerQuestion} journeyPracticeAuth={{competitionId:journey.competitionId,key:token}}/></section>}
         {journey.committee && !finished && <section className="mizan-surface p-5"><div className="text-sm font-black text-[#656b66]">{ar ? 'اللجنة' : 'PANEL'}</div><div className="text-xl font-black mt-1">{journey.committee.code} · {ar ? journey.committee.nameArabic : journey.committee.name}</div></section>}
@@ -245,6 +246,54 @@ const Info = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
  * تعديل التسجيل قبل الإغلاق — برمز الرحلة نفسه. الحقول الفارغة تبقى كما هي، والخادم يعيد
  * التحقق كاملًا ويرفض بعد إغلاق التسجيل أو بعد الحضور، ويسجّل أيّ الحقول تغيّر.
  */
+/*
+ * رسوم التسجيل: تظهر فقط حين تكون مستحقة. الدفع يتم في صفحة بوابة الجهة نفسها، ثم يعود
+ * المتسابق هنا فيسأل الخادمُ البوابةَ عن النتيجة — الواجهة لا تقرّر أن الدفع تم.
+ */
+const RegistrationFeePanel: React.FC<{ ar: boolean; competitionId: string; token: string }> = ({ ar, competitionId, token }) => {
+  const [payment, setPayment] = useState<{ status: string; amountMinor: number; currency: string; online: { available: boolean; displayName?: string } } | null>(null);
+  const [state, setState] = useState<{ kind: 'idle' | 'busy' | 'error'; text?: string }>({ kind: 'idle' });
+  const returned = typeof window !== 'undefined' && /[?&]payment=(return|failed)/.exec(window.location.hash)?.[1];
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const r = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/registration/payment/status`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: token }) });
+        const body = await r.json().catch(() => ({}));
+        if (alive && r.ok) setPayment(body.payment);
+      } catch { /* الرسوم معلومة إضافية؛ تعذّرها لا يعطّل الرحلة */ }
+    })();
+    return () => { alive = false; };
+  }, [competitionId, token]);
+  if (!payment || payment.status === 'not_required') return null;
+  const amount = `${Math.floor(payment.amountMinor / 100)}.${String(payment.amountMinor % 100).padStart(2, '0')} ${payment.currency}`;
+  const pay = async () => {
+    setState({ kind: 'busy' });
+    try {
+      const r = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/registration/payment/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: token }) });
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 201 && typeof body.paymentUrl === 'string' && body.paymentUrl.startsWith('https://')) { window.location.assign(body.paymentUrl); return; }
+      if (body.code === 'REGISTRATION_ALREADY_PAID') { setPayment({ ...payment, status: 'paid' }); setState({ kind: 'idle' }); return; }
+      throw new Error(String(body.code || `HTTP_${r.status}`));
+    } catch (e) {
+      const code = e instanceof Error ? e.message : '';
+      setState({ kind: 'error', text: code === 'PAYMENT_GATEWAY_UNAVAILABLE' ? (ar ? 'بوابة الدفع لا تستجيب الآن. حاول بعد قليل.' : 'The payment gateway is not responding. Try again shortly.') : journeyError(code, ar) });
+    }
+  };
+  const STATUS: Record<string, [string, string]> = { pending: ['بانتظار السداد', 'Awaiting payment'], paid: ['مدفوعة', 'Paid'], waived: ['معفاة', 'Waived'], refunded: ['مستردّة', 'Refunded'] };
+  return <section className="mizan-surface p-5" aria-live="polite">
+    <div className="text-sm font-black text-[#656b66]">{ar ? 'رسوم التسجيل' : 'Registration fee'}</div>
+    <div className="mt-1 text-xl font-black" dir="ltr">{amount}</div>
+    <div className="mt-1 text-sm font-bold">{(STATUS[payment.status] || [payment.status, payment.status])[ar ? 0 : 1]}</div>
+    {payment.status === 'pending' && returned === 'return' && <p role="status" className="mt-2 text-xs text-[#646965]">{ar ? 'لم يصلنا تأكيد البوابة بعد. إن أتممت الدفع فسيظهر هنا خلال دقائق.' : 'The gateway has not confirmed yet. If you paid, it will show here within minutes.'}</p>}
+    {payment.status === 'pending' && returned === 'failed' && <p role="alert" className="mt-2 text-xs font-bold text-[#A34D43]">{ar ? 'لم تكتمل عملية الدفع. يمكنك المحاولة مرة أخرى.' : 'The payment was not completed. You can try again.'}</p>}
+    {payment.status === 'pending' && (payment.online.available
+      ? <button type="button" disabled={state.kind === 'busy'} onClick={() => void pay()} className="mt-3 min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? `ادفع الآن${payment.online.displayName ? ` عبر ${payment.online.displayName}` : ''}` : `Pay now${payment.online.displayName ? ` with ${payment.online.displayName}` : ''}`}</button>
+      : <p className="mt-2 text-xs text-[#646965]">{ar ? 'تُسدَّد الرسوم لدى الجهة المنظمة حسب تعليماتها.' : 'Pay the fee to the organizer as instructed.'}</p>)}
+    {state.text && <p role="alert" className="mt-2 text-xs font-bold text-[#A34D43]">{state.text}</p>}
+  </section>;
+};
+
 const RegistrationEditPanel: React.FC<{ ar: boolean; competitionId: string; token: string }> = ({ ar, competitionId, token }) => {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ fullNameArabic: '', fullName: '', email: '', phone: '' });

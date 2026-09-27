@@ -535,7 +535,7 @@ export interface Participant {
   /** إجابات الحقول المخصّصة في نموذج التسجيل (الحقول الظاهرة فقط وقت الإرسال). */
   customAnswers?: Record<string, string | number | boolean | string[] | undefined>;
   /** رسوم التسجيل التي تفرضها الجهة — ليست رسوم ميزان. */
-  registrationPayment?: { status: 'not_required' | 'pending' | 'paid' | 'refunded' | 'waived'; amountMinor: number; currency: string; receiptReference?: string; updatedAt: string };
+  registrationPayment?: { status: 'not_required' | 'pending' | 'paid' | 'refunded' | 'waived'; amountMinor: number; currency: string; receiptReference?: string; updatedAt: string; /** Set only by the server after the organization's gateway confirmed payment. */ provider?: string; intentId?: string; paidOnlineAt?: string };
   /** أثر تعديلات المتسابق بعد الإرسال: متى وأي الحقول — بلا القيم نفسها. */
   editHistory?: { at: string; fields: string[]; actor: 'participant' | 'staff' }[];
   /** مصدر التأهّل حين دُعي المتسابق من مرحلة تصفيات (هرم التأهيل). */

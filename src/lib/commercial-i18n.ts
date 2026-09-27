@@ -77,6 +77,7 @@ const T = {
   entry_expiration: { ar: 'انتهاء رصيد الالتزام', en: 'Commitment expiry' },
   // العلامة و Discover
   branding: { ar: 'العلامة التجارية', en: 'Branding' },
+  paymentGateway: { ar: 'بوابة الدفع', en: 'Payment gateway' },
   brandingMode: { ar: 'نمط العلامة', en: 'Branding mode' },
   mode_mizan: { ar: 'علامة ميزان', en: 'MIZAN brand' },
   mode_co_branded: { ar: 'علامة مشتركة', en: 'Co-branded' },
@@ -192,7 +193,15 @@ export function commercialErrorText(code: string, locale: string, details?: Reco
     GLOBAL_SYNDICATION_NOT_PERMITTED: ['النشر العالمي غير مسموح.', 'Global syndication is not permitted.'],
     IDENTITY_REQUIRED: ['يلزم تسجيل الدخول.', 'Sign-in required.'],
     SAAS_PLATFORM_NOT_CONFIGURED: ['منظومة الاشتراكات غير مهيأة في هذا النشر.', 'The commercial platform is not configured on this deployment.'],
+    PAYMENT_API_KEY_REQUIRED: ['أدخل المفتاح السرّي للبوابة.', 'Enter the gateway secret API key.'],
+    PAYMENT_WEBHOOK_SECRET_REQUIRED: ['هذه البوابة تُثبت السداد بإشعار موقَّع فقط، فيلزم سرّ التوقيع.', 'This gateway proves payment only by signed notification, so the signing secret is required.'],
+    PAYMENT_PROFILE_JSON_INVALID: ['ملف البوابة ليس JSON صالحًا.', 'The gateway profile is not valid JSON.'],
+    PAYMENT_SECRET_VAULT_NOT_CONFIGURED: ['خزنة الأسرار غير مهيأة في هذا النشر، فلا تُحفظ مفاتيح البوابات.', 'The secret vault is not configured on this deployment, so gateway keys cannot be stored.'],
+    ORG_BILLING_ADMIN_REQUIRED: ['إعداد بوابة الدفع لمدير الجهة أو مسؤول الفوترة.', 'Only the organization admin or billing admin can set up the payment gateway.'],
+    OPERATOR_OWNER_REQUIRED: ['إعداد بوابة المشغّل لمالك حساب المشغّل.', 'Only the operator owner can set up the operator gateway.'],
+    PAYMENT_GATEWAY_DISABLED: ['هذه البوابة معطّلة.', 'This gateway is disabled.'],
   };
+  if (code.startsWith('PAYMENT_PROFILE_INVALID:')) return ar ? `ملف البوابة ناقص أو غير آمن: ${code.split(':')[1]}` : `The gateway profile is incomplete or unsafe: ${code.split(':')[1]}`;
   const hit = known[code];
   if (hit) return ar ? hit[0] : hit[1];
   return ar ? 'تعذّرت العملية. أعد المحاولة أو تواصل مع الدعم.' : 'The operation failed. Try again or contact support.';
