@@ -51,6 +51,14 @@ const foreignCalls: [string, (repo: SaaSPlatformRepository, actor: any, theirs: 
   ['configureStorage', (r, a, t) => r.configureStorage(a, t, { provider: 'cloudflare_r2', container: 'bucket', secret: { k: 'v' } })],
   ['testStorage', (r, a, t) => r.testStorage(a, t, 'SA-1')],
   ['startMigration', (r, a, t) => r.startMigration(a, t, 'mizan')],
+  // الطبقة التجارية الجديدة: الفوترة والترقية والعلامة والـwebhooks كلها محروسة بالجهة.
+  ['organizationBilling', (r, a, t) => r.organizationBilling(a, t)],
+  ['requestDirectUpgrade', (r, a, t) => r.requestDirectUpgrade(a, t, 'PLAN-000001')],
+  ['scheduleDowngrade', (r, a, t) => r.scheduleDowngrade(a, t, null)],
+  ['brandFor', (r, a, t) => r.brandFor(a, 'organization', t)],
+  ['createWebhookEndpoint', (r, a, t) => r.createWebhookEndpoint(a, t, { url: 'https://example.com/hook', events: ['subscription.renewed'] })],
+  ['listWebhooks', (r, a, t) => r.listWebhooks(a, t)],
+  ['disableWebhookEndpoint', (r, a, t) => r.disableWebhookEndpoint(a, t, 'WH-1')],
 ];
 
 for (const [method, call] of foreignCalls) {
