@@ -468,3 +468,126 @@ export const NewEditionWizard: React.FC<{ open: boolean; sourceId?: string; onCl
     </div>
   );
 };
+
+/* ═════════════════════ النشر في Discover ═════════════════════ */
+
+/*
+ * نشر هذه المسابقة في دليل الاكتشاف: تُملأ الحقول العامة من إعداد المسابقة، ويختار المنظّم
+ * أين تظهر. خيارات الظهور تُعرض بحسب حقوق الجهة كما يعيدها الخادم، والخادم يتحقّق منها
+ * مرّة أخرى. لا يُرسل من إعداد المسابقة إلا الحقول العامة المسمّاة.
+ */
+export const DiscoverPublishPanel: React.FC = () => {
+  const locale = useLocale();
+  const store = useAppStore();
+  const c = store.competition;
+  const [rights, setRights] = useState<any>(null);
+  const [listing, setListing] = useState<any>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState(() => ({
+    title: c.name || c.nameArabic, titleArabic: c.nameArabic, summary: '', summaryArabic: '', city: '', mode: 'in_person' as 'online' | 'in_person' | 'hybrid',
+    ageRanges: '', languages: 'ar', memorizationLevels: '',
+    visibility: { organizationDirectory: true, operatorDirectory: false, globalSyndication: false },
+  }));
+  const load = useCallback(async () => {
+    try {
+      const [b, l] = await Promise.all([api('/api/saas/brand/organization/self'), api('/api/saas/organization/discover')]);
+      setRights(b.rights);
+      const mine = (l.listings || []).find((x: any) => x.competitionId === c.id);
+      if (mine) { setListing(mine); setForm(f => ({ ...f, title: mine.title, titleArabic: mine.titleArabic || '', summary: mine.summary || '', summaryArabic: mine.summaryArabic || '', city: mine.city || '', mode: mine.mode, ageRanges: mine.ageRanges.join(', '), languages: mine.languages.join(', '), memorizationLevels: mine.memorizationLevels.join(', '), visibility: mine.visibility })); }
+      setError(null);
+    } catch (e) { setError(e as ApiError); }
+  }, [c.id]);
+  useEffect(() => { void load(); }, [load]);
+  const list = (v: string) => v.split(',').map(x => x.trim()).filter(Boolean);
+  const publish = async () => {
+    setSaved(false);
+    try {
+      const body = {
+        competitionId: c.id, title: form.title, titleArabic: form.titleArabic, summary: form.summary, summaryArabic: form.summaryArabic,
+        registrationOpen: c.status === 'registration_open', registrationUrl: `/#register?comp=${encodeURIComponent(c.id)}`,
+        startsOn: c.startDate?.slice(0, 10) || undefined, endsOn: c.endDate?.slice(0, 10) || undefined, registrationClosesOn: c.registrationEndDate?.slice(0, 10) || undefined,
+        country: /^[A-Za-z]{2}$/.test(c.country || '') ? c.country : undefined, city: form.city, mode: form.mode,
+        publicCategories: c.categories.map(x => locale === 'ar' ? x.nameArabic : x.name), riwayat: [...new Set(c.categories.flatMap(x => [x.riwaya, ...(x.allowedRiwayat || [])]).filter(Boolean))],
+        ageRanges: list(form.ageRanges), languages: list(form.languages), memorizationLevels: list(form.memorizationLevels), visibility: form.visibility,
+      };
+      const r = await api('/api/saas/organization/discover', { method: 'POST', body: JSON.stringify(body) });
+      setListing(r.listing); setSaved(true); setError(null);
+    } catch (e) { setError(e as ApiError); }
+  };
+  const unpublish = async () => { try { const r = await api(`/api/saas/organization/discover/${listing.id}/unpublish`, { method: 'POST', body: '{}' }); setListing(r.listing); } catch (e) { setError(e as ApiError); } };
+  const toggle = (k: 'organizationDirectory' | 'operatorDirectory' | 'globalSyndication', allowed: boolean, label: CommercialKey) => allowed && (
+    <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={form.visibility[k]} onChange={e => setForm({ ...form, visibility: { ...form.visibility, [k]: e.target.checked } })} />{ct(locale, label)}</label>
+  );
+  return <section className="space-y-4" aria-label={ct(locale, 'discover')}>
+    <h2 className="text-base font-black">{ct(locale, 'discover')}</h2>
+    <ErrorBox error={error} />
+    {saved && <div role="status" className="rounded-xl bg-[#e8f3ec] px-3 py-2 text-xs font-bold text-[#1f5b3c]">{locale === 'ar' ? 'نُشرت بطاقة المسابقة.' : 'The listing was published.'}</div>}
+    {listing && <p className="text-xs text-[#454b47]">{listing.status === 'published' ? (locale === 'ar' ? 'منشورة' : 'Published') : (locale === 'ar' ? 'غير منشورة' : 'Unpublished')} · <span dir="ltr">{listing.publicSlug}</span></p>}
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label={ct(locale, 'nameArabic')}><input className={inputCls} value={form.titleArabic} onChange={e => setForm({ ...form, titleArabic: e.target.value })} /></Field>
+      <Field label={ct(locale, 'nameEnglish')}><input className={inputCls} dir="ltr" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></Field>
+      <Field label={locale === 'ar' ? 'نبذة بالعربية' : 'Arabic summary'}><textarea className={`${inputCls} min-h-20`} value={form.summaryArabic} onChange={e => setForm({ ...form, summaryArabic: e.target.value })} /></Field>
+      <Field label={locale === 'ar' ? 'نبذة بالإنجليزية' : 'English summary'}><textarea className={`${inputCls} min-h-20`} dir="ltr" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} /></Field>
+      <Field label={locale === 'ar' ? 'المدينة' : 'City'}><input className={inputCls} value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></Field>
+      <Field label={locale === 'ar' ? 'نوع المشاركة' : 'Mode'}><select className={inputCls} value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value as typeof form.mode })}>{(['in_person', 'online', 'hybrid'] as const).map(m => <option key={m} value={m}>{ct(locale, m)}</option>)}</select></Field>
+      <Field label={locale === 'ar' ? 'الفئات العمرية (مفصولة بفواصل)' : 'Age ranges (comma separated)'}><input className={inputCls} value={form.ageRanges} onChange={e => setForm({ ...form, ageRanges: e.target.value })} /></Field>
+      <Field label={locale === 'ar' ? 'مستويات الحفظ' : 'Memorization levels'}><input className={inputCls} value={form.memorizationLevels} onChange={e => setForm({ ...form, memorizationLevels: e.target.value })} /></Field>
+    </div>
+    <fieldset className="space-y-2 rounded-xl border border-[#e5e3dc] p-3"><legend className="px-1 text-xs font-black">{locale === 'ar' ? 'أين تظهر المسابقة؟' : 'Where does it appear?'}</legend>
+      {toggle('organizationDirectory', true, 'organizationDirectory')}
+      {toggle('operatorDirectory', !!rights?.operatorDirectory, 'operatorDirectory')}
+      {toggle('globalSyndication', !!rights?.globalSyndication, 'globalSyndication')}
+      <p className="text-[11px] text-[#6a706c]">{locale === 'ar' ? 'لا يُنشر شيء في شبكة ميزان العالمية إلا باختيارٍ صريح هنا.' : 'Nothing reaches the global MIZAN network unless chosen here.'}</p>
+    </fieldset>
+    <div className="flex flex-wrap gap-2"><Button onClick={() => void publish()}>{locale === 'ar' ? 'نشر / تحديث البطاقة' : 'Publish / update listing'}</Button>{listing?.status === 'published' && <Button variant="secondary" onClick={() => void unpublish()}>{locale === 'ar' ? 'إلغاء النشر' : 'Unpublish'}</Button>}</div>
+  </section>;
+};
+
+/* ═════════════════════ الدخول الموحّد (SSO) ═════════════════════ */
+
+const SSO_ROLES = ['org_admin', 'comp_admin', 'head_judge', 'judge', 'ops_manager', 'auditor', 'exception_host', 'delegation_manager', 'support_agent'];
+
+export const SsoSettingsPanel: React.FC = () => {
+  const locale = useLocale(); const ar = locale === 'ar';
+  const [form, setForm] = useState<any>({ protocol: 'saml', firebaseProviderId: 'saml.', displayName: '', allowedEmailDomains: '', groupsAttribute: 'groups', roleMapping: [] as { group: string; role: string }[], status: 'draft', preferSso: false });
+  const [error, setError] = useState<ApiError | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [preview, setPreview] = useState({ email: '', groups: '' });
+  const [suggestion, setSuggestion] = useState<string>('');
+  useEffect(() => { void (async () => { try { const r = await api('/api/saas/organization/sso'); if (r.config) setForm({ ...r.config, allowedEmailDomains: r.config.allowedEmailDomains.join(', ') }); } catch (e) { setError(e as ApiError); } })(); }, []);
+  const save = async () => {
+    setSaved(false);
+    try { const r = await api('/api/saas/organization/sso', { method: 'PUT', body: JSON.stringify({ ...form, allowedEmailDomains: String(form.allowedEmailDomains).split(',').map((x: string) => x.trim()).filter(Boolean) }) }); setForm({ ...r.config, allowedEmailDomains: r.config.allowedEmailDomains.join(', ') }); setSaved(true); setError(null); }
+    catch (e) { setError(e as ApiError); }
+  };
+  const test = async () => { try { const r = await api('/api/saas/organization/sso/preview', { method: 'POST', body: JSON.stringify({ email: preview.email, groups: preview.groups.split(',').map(x => x.trim()) }) }); setSuggestion(r.suggestion ? `${r.suggestion.role} (${r.suggestion.matchedGroup})` : (ar ? 'لا دور — يُرفض الدخول' : 'No role — access denied')); } catch (e) { setError(e as ApiError); } };
+  return <section className="space-y-4">
+    <h2 className="text-base font-black">{ar ? 'الدخول الموحّد للمؤسسة (SAML / OIDC)' : 'Enterprise single sign-on (SAML / OIDC)'}</h2>
+    <p className="text-xs text-[#6a706c]">{ar ? 'يتطلّب تفعيله تسجيل مزوّد الجهة في Firebase Identity Platform (شهادة المزوّد ومعرّف الكيان). الدور المقترح من المجموعات يمرّ بحوكمة الهويات، ولا يُمنح تلقائيًا.' : 'Requires the organization provider to be registered in Firebase Identity Platform. Group-based role suggestions still pass identity governance; nothing is granted automatically.'}</p>
+    {error && <div role="alert" className="rounded-2xl bg-[#f7ece9] px-4 py-3 text-xs font-bold text-[#874b43]">{error.code}</div>}
+    {saved && <div role="status" className="rounded-xl bg-[#e8f3ec] px-3 py-2 text-xs font-bold text-[#1f5b3c]">{ar ? 'حُفظ الإعداد.' : 'Saved.'}</div>}
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label={ar ? 'البروتوكول' : 'Protocol'}><select className={inputCls} value={form.protocol} onChange={e => setForm({ ...form, protocol: e.target.value, firebaseProviderId: `${e.target.value}.` })}><option value="saml">SAML</option><option value="oidc">OIDC</option></select></Field>
+      <Field label={ar ? 'معرّف المزوّد في Firebase' : 'Firebase provider id'}><input className={inputCls} dir="ltr" value={form.firebaseProviderId} onChange={e => setForm({ ...form, firebaseProviderId: e.target.value })} /></Field>
+      <Field label={ar ? 'الاسم على زرّ الدخول' : 'Button label'}><input className={inputCls} value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></Field>
+      <Field label={ar ? 'نطاقات البريد المسموحة' : 'Allowed email domains'}><input className={inputCls} dir="ltr" placeholder="university.edu, org.sa" value={form.allowedEmailDomains} onChange={e => setForm({ ...form, allowedEmailDomains: e.target.value })} /></Field>
+      <Field label={ar ? 'سمة المجموعات' : 'Groups attribute'}><input className={inputCls} dir="ltr" value={form.groupsAttribute} onChange={e => setForm({ ...form, groupsAttribute: e.target.value })} /></Field>
+      <Field label={ar ? 'الحالة' : 'Status'}><select className={inputCls} value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}><option value="draft">{ar ? 'مسودة' : 'Draft'}</option><option value="active">{ar ? 'مفعّل' : 'Active'}</option><option value="disabled">{ar ? 'معطّل' : 'Disabled'}</option></select></Field>
+    </div>
+    <fieldset className="rounded-xl border border-[#e5e3dc] p-3"><legend className="px-1 text-xs font-black">{ar ? 'خريطة المجموعات إلى الأدوار' : 'Group → role mapping'}</legend>
+      {form.roleMapping.map((m: any, i: number) => <div key={i} className="mb-2 flex flex-wrap gap-2">
+        <input aria-label={ar ? 'المجموعة' : 'Group'} className={`${inputCls} max-w-xs`} dir="ltr" value={m.group} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, group: e.target.value } : x) })} />
+        <select aria-label={ar ? 'الدور' : 'Role'} className={`${inputCls} max-w-[12rem]`} value={m.role} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, role: e.target.value } : x) })}>{SSO_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
+        <button type="button" className="text-xs font-bold text-[#A34D43]" onClick={() => setForm({ ...form, roleMapping: form.roleMapping.filter((_: any, j: number) => j !== i) })}>{ar ? 'حذف' : 'Remove'}</button></div>)}
+      <button type="button" className="text-xs font-bold text-[#214C40] underline" onClick={() => setForm({ ...form, roleMapping: [...form.roleMapping, { group: '', role: 'judge' }] })}>+</button>
+    </fieldset>
+    <Button onClick={() => void save()}>{ct(locale, 'save')}</Button>
+    <div className="flex flex-wrap items-end gap-2 rounded-xl border border-[#e5e3dc] p-3">
+      <Field label={ar ? 'تجربة: بريد' : 'Test: email'}><input className={inputCls} dir="ltr" value={preview.email} onChange={e => setPreview({ ...preview, email: e.target.value })} /></Field>
+      <Field label={ar ? 'المجموعات' : 'Groups'}><input className={inputCls} dir="ltr" value={preview.groups} onChange={e => setPreview({ ...preview, groups: e.target.value })} /></Field>
+      <Button variant="secondary" onClick={() => void test()}>{ar ? 'اقتراح الدور' : 'Suggest role'}</Button>
+      {suggestion && <span role="status" className="text-xs font-bold">{suggestion}</span>}
+    </div>
+  </section>;
+};

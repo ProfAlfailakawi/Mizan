@@ -17,6 +17,8 @@ export const SYNCED_COLLECTIONS = [
   'results', 'certificates', 'reviews', 'appeals', 'support_sessions', 'audit', 'quran_sources', 'session_checkpoints',
   // نطاق المتسابق المعتمد بيانٌ يقوم عليه سحب يوم المسابقة، فلا يجوز أن يعيش على جهاز واحد.
   'participant_scopes',
+  // تضارب المصالح وقراراته، والجدول الزمني المعتمد، وسجلّ التأهّل بين المراحل.
+  'conflict_cases', 'schedule_plans', 'qualifications',
 ] as const;
 export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 
@@ -46,6 +48,10 @@ const WRITERS: Record<SyncedCollection, Role[]> = {
   audit: [...ADMIN, ...PANEL, 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
   quran_sources: ['super_admin'],
   session_checkpoints: [...ADMIN, ...PANEL, 'ops_manager'],
+  /* المحكّم يعلن تضاربه بنفسه، ورئيس التحكيم والإدارة يقرّرون فيه؛ القواعد تحصر المحكّم في الإنشاء. */
+  conflict_cases: [...ADMIN, ...PANEL],
+  schedule_plans: [...ADMIN, 'ops_manager'],
+  qualifications: [...ADMIN],
 };
 
 /** هل يجوز لهذا الدور كتابة هذا النوع؟ نوع غير معروف يُرفض — لا يُفتح الباب بالصمت. */

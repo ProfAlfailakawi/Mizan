@@ -1,3 +1,4 @@
+import { ConflictOfInterestPanel } from '../admin/GovernancePanels';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
@@ -593,6 +594,7 @@ export const JudgeOS: React.FC = () => {
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
  </div>}
+ <details className="mizan-surface mt-7 p-5 text-start"><summary className="min-h-11 cursor-pointer text-sm font-black">{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</summary><div className="mt-4"><ConflictOfInterestPanel mode="judge"/></div></details>
  </div>;
 
  /*

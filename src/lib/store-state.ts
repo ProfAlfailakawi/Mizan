@@ -7,6 +7,12 @@
 import type { CompetitionClockState } from './competition-clock';
 import type { TieDecision } from './tie-resolution';
 import type { QueueWaitSample, SessionTempoSample } from './session-tempo';
+import type { ConflictCase } from './conflict-of-interest';
+import type { SchedulePlan, SchedulerInput } from './smart-scheduler';
+import type { CompetitionRelationship, QualificationRecord } from './qualification';
+
+/** A saved scheduler run: its exact input (so it can be recomputed and verified) and its output. */
+export interface SchedulePlanRecord { id: string; competitionId: string; organizationId: string; input: SchedulerInput; plan: SchedulePlan; status: 'draft' | 'published'; createdAt: string; createdBy: string; publishedAt?: string }
 import {
   User, Role, Organization, Competition, Participant, Committee, JudgeProfile, ResultRecord,
   ReviewCase, AIObservation, Certificate, AuditEvent, JudgeSubmission, IncidentRecord,
@@ -130,6 +136,11 @@ export interface AppStoreState {
   backups: BackupRecord[];
   retentionJobs: RetentionJob[];
   supportSessions: SupportSession[];
+  /* تضارب المصالح، والجداول الزمنية، وهرم التأهيل. */
+  conflictCases: ConflictCase[];
+  schedulePlans: SchedulePlanRecord[];
+  competitionRelationships: CompetitionRelationship[];
+  qualifications: QualificationRecord[];
   /* أين تُليت مواضع اليوم — يُكتب عند اكتمال كل جلسة، وتُبنى منه خريطة القاعة. */
   recitationLedger: RecitedPassageRecord[];
   remoteChecks: RemoteSessionCheck[];

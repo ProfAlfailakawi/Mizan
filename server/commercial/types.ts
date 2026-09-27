@@ -384,6 +384,7 @@ export interface WebhookDeliveryRecord {
   organizationId: string;
   eventId: string;
   eventType: WebhookEventType;
+  dedupeKey?: string;
   payload: string;
   attempts: number;
   status: 'pending' | 'delivered' | 'failed' | 'dead';

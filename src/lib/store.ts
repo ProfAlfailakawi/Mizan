@@ -59,6 +59,11 @@ import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenHeldByHolderOnly, journeyTok
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { cloneCompetitionConfiguration, type ClonePart } from './competition-clone';
+import { emitDomainEvent } from './domain-events';
+import { declareConflict, resolveConflict, judgeMayScore, type ConflictKind, type ConflictRelation, type ConflictDecision } from './conflict-of-interest';
+import { buildSchedule, withManualPin, withoutPin, type SchedulerInput, type TimeWindow, type JudgeAvailability } from './smart-scheduler';
+import { createRelationship, computeQualifiers, mergeQualifications, transitionQualification, invitationParticipant, type QualificationRule } from './qualification';
+import type { SchedulePlanRecord } from './store-state';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
 import { generateFairDraw, verifyFairDrawSelection, verifyFairDrawPublicProof, poolItemToCandidate, validateScopedSelection } from './fairdraw';
@@ -124,7 +129,7 @@ function hydrateSavedState(parsed: AppStoreState): AppStoreState {
       parsed.integrations = parsed.integrations || []; parsed.notifications = parsed.notifications || []; parsed.webhooks = parsed.webhooks || []; parsed.devices = parsed.devices || [];
       parsed.travelRecords = (parsed.travelRecords || []).filter(r=>!['trv-1','trv-2','trv-3'].includes(r.id)&&r.flightNumber!=='MZ 417'); parsed.consents = parsed.consents || []; parsed.importJobs = parsed.importJobs || []; parsed.shadowRuns = parsed.shadowRuns || [];
       parsed.participantPassport = parsed.participantPassport || []; parsed.judgePassport = parsed.judgePassport || []; parsed.trainingRuns = parsed.trainingRuns || [];
-      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||[]; parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||[]; parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||[]; parsed.roleGrants=parsed.roleGrants||[]; parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||[]; parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
+      parsed.backups = parsed.backups || []; parsed.retentionJobs = parsed.retentionJobs || []; parsed.supportSessions = parsed.supportSessions || []; parsed.conflictCases = parsed.conflictCases || []; parsed.schedulePlans = parsed.schedulePlans || []; parsed.competitionRelationships = parsed.competitionRelationships || []; parsed.qualifications = parsed.qualifications || []; parsed.remoteChecks = parsed.remoteChecks || []; parsed.audioRecordings = parsed.audioRecordings || []; parsed.featureFlags = parsed.featureFlags || []; parsed.quranSourceManifests=parsed.quranSourceManifests||[]; parsed.quranSourceContents=parsed.quranSourceContents||[]; parsed.questionGovernance=parsed.questionGovernance||[]; parsed.aiCapabilityValidations=parsed.aiCapabilityValidations||[]; parsed.operatingCostModel=parsed.operatingCostModel||{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0}; parsed.timeMachineScenarios=parsed.timeMachineScenarios||[]; parsed.quorumActions=parsed.quorumActions||[]; parsed.invariantViolations=parsed.invariantViolations||[]; parsed.evidenceNodes=parsed.evidenceNodes||[]; parsed.evidenceEdges=parsed.evidenceEdges||[]; parsed.publicResultRoots=parsed.publicResultRoots||[]; parsed.publicResultProofs=parsed.publicResultProofs||[]; parsed.localMeshSessions=parsed.localMeshSessions||[]; parsed.federationAttestations=parsed.federationAttestations||[]; parsed.protocolPackages=parsed.protocolPackages||[]; parsed.flightRecorderEntries=parsed.flightRecorderEntries||[]; parsed.integrityEnvelopes=parsed.integrityEnvelopes||[]; parsed.chaosDrills=parsed.chaosDrills||[]; parsed.accessibilityProfiles=parsed.accessibilityProfiles||[]; parsed.elasticityRecommendations=parsed.elasticityRecommendations||[]; parsed.journeyPasses=parsed.journeyPasses||[]; parsed.policyCompilations=parsed.policyCompilations||[]; parsed.contradictionIssues=parsed.contradictionIssues||[]; parsed.disasterPacks=parsed.disasterPacks||[]; parsed.deviceReassignments=parsed.deviceReassignments||[]; parsed.fatigueRecommendations=parsed.fatigueRecommendations||[]; parsed.competitionBenchmarks=parsed.competitionBenchmarks||[]; parsed.rehearsals=parsed.rehearsals||[]; parsed.scientificDatasets=parsed.scientificDatasets||[]; parsed.benchmarkRuns=parsed.benchmarkRuns||[]; parsed.variantLoci=parsed.variantLoci||[]; parsed.quranReferenceAudio=parsed.quranReferenceAudio||[]; parsed.quranCrossChecks=parsed.quranCrossChecks||[]; parsed.scientificAdjudications=parsed.scientificAdjudications||[]; parsed.scientificImpactReports=parsed.scientificImpactReports||[]; parsed.federationTrust=parsed.federationTrust||[]; parsed.ceremonyVaults=parsed.ceremonyVaults||[]; parsed.fairDrawProofs=parsed.fairDrawProofs||[]; parsed.questionRevealGates=parsed.questionRevealGates||[]; parsed.queueTransfers=parsed.queueTransfers||[]; parsed.identityAccounts=parsed.identityAccounts||[]; parsed.roleGrants=parsed.roleGrants||[]; parsed.identityInvitations=parsed.identityInvitations||[]; parsed.authSessions=parsed.authSessions||[]; parsed.passReissues=parsed.passReissues||[]; parsed.credentialLineages=parsed.credentialLineages||[]; parsed.sessionCheckpoints=parsed.sessionCheckpoints||[]; parsed.continuityIncidents=parsed.continuityIncidents||[]; parsed.sessionRecoveries=parsed.sessionRecoveries||[]; parsed.auditLedgerSeals=parsed.auditLedgerSeals||[]; parsed.competitionBlackBoxes=parsed.competitionBlackBoxes||[]; parsed.fairnessCourtRecords=parsed.fairnessCourtRecords||[]; parsed.acousticVenuePassports=parsed.acousticVenuePassports||[]; parsed.recitationDigitalTwins=parsed.recitationDigitalTwins||[]; parsed.mutashabihatTrapMaps=parsed.mutashabihatTrapMaps||[]; parsed.smartRoutingDecisions=parsed.smartRoutingDecisions||[]; parsed.appealCapsules=parsed.appealCapsules||[]; parsed.blindAnchorCalibrations=parsed.blindAnchorCalibrations||[]; parsed.integrityEntropySignals=parsed.integrityEntropySignals||[]; parsed.scientificCircuitBreakers=parsed.scientificCircuitBreakers||[]; parsed.mizanIntegrityPassports=parsed.mizanIntegrityPassports||[]; parsed.integrityCinemaRecords=parsed.integrityCinemaRecords||[]; parsed.certifiedVenueSeals=parsed.certifiedVenueSeals||[]; parsed.quranSourceManifests=(parsed.quranSourceManifests||[]).map(q=>({...q,certificationState:q.certificationState||(q.status==='approved'?'CERTIFIED':q.status==='retired'?'REVOKED':q.status==='reviewed'?'PENDING_REVIEW':'DEVELOPMENT'),revocationState:q.revocationState||(q.status==='retired'?'REVOKED':'ACTIVE'),immutable:q.immutable??q.status==='approved'})); parsed.aiCapabilityValidations=(parsed.aiCapabilityValidations||[]).map(v=>({...v,certificationState:v.certificationState||(v.status==='certified'?'CERTIFIED':v.status==='suspended'?'SUSPENDED':v.status==='validated'?'PENDING_VALIDATION':'RESEARCH')}));
   // Preserve history, revoke authority: no legacy role is remapped to an active role.
   parsed.roleGrants=(parsed.roleGrants||[]).map(grant=>isRetiredIdentityRole((grant as unknown as {role?:unknown}).role)?{...grant,status:'REVOKED' as const,reason:[grant.reason,'Retired identity authority'].filter(Boolean).join(' · ')}:grant);
   parsed.identityInvitations=(parsed.identityInvitations||[]).map(invitation=>isRetiredIdentityRole((invitation as unknown as {requestedRole?:unknown}).requestedRole)?{...invitation,status:'REVOKED' as const,activationTokenHash:undefined}:invitation);
@@ -178,7 +183,7 @@ function emptyInitialState(): AppStoreState {
     organization:INITIAL_ORGANIZATION,organizations:[INITIAL_ORGANIZATION],language:'ar',competition,competitions:[competition],
     participants:[],committees:[],judges:[],results:[],reviewCases:[],aiObservations:[],judgeSubmissions:[],certificates:[],auditLogs:[],incidents:[],appeals:[],tieDecisions:[],
     isOffline:false,emergencyFrozen:false,persistenceError:null,sealApprovals:[],
-    integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],supportSessions:[],recitationLedger:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
+    integrations:[],notifications:[],webhooks:[],devices:[],travelRecords:[],consents:[],importJobs:[],shadowRuns:[],participantPassport:[],judgePassport:[],trainingRuns:[],backups:[],retentionJobs:[],conflictCases:[],schedulePlans:[],competitionRelationships:[],qualifications:[],supportSessions:[],recitationLedger:[],remoteChecks:[],audioRecordings:[],featureFlags:[],
     quranSourceManifests:[],quranSourceContents:[],questionGovernance:[],aiCapabilityValidations:[],operatingCostModel:{baselineStaff:0,mizanStaff:0,hoursPerDay:0,days:0},
     timeMachineScenarios:[],quorumActions:[],invariantViolations:[],evidenceNodes:[],evidenceEdges:[],publicResultRoots:[],publicResultProofs:[],localMeshSessions:[],federationAttestations:[],protocolPackages:[],flightRecorderEntries:[],integrityEnvelopes:[],chaosDrills:[],accessibilityProfiles:[],elasticityRecommendations:[],journeyPasses:[],policyCompilations:[],contradictionIssues:[],disasterPacks:[],deviceReassignments:[],fatigueRecommendations:[],competitionBenchmarks:[],rehearsals:[],scientificDatasets:[],benchmarkRuns:[],variantLoci:[],quranReferenceAudio:[],quranCrossChecks:[],scientificAdjudications:[],scientificImpactReports:[],federationTrust:[],ceremonyVaults:[],fairDrawProofs:[],questionRevealGates:[],
     participantScopes:[],questionModels:[],questionModelBatches:[],scopeSimulations:[],scopeEngineSeals:[],questionQuarantines:[],questionReservations:[],fairnessReports:[],queueTransfers:[],
@@ -761,7 +766,7 @@ let firestoreSyncTimeout: ReturnType<typeof setTimeout> | null = null;
  * الدور يُفحص قبل الشبكة: لا معنى لإرسال كتابة سترفضها قواعد فايرستور، والرفض الصامت كان
  * يجعل عمل المحكّم يبدو محفوظًا وهو ليس كذلك. وأي فشل يُرفَع إلى حالة ظاهرة لا إلى سجلّ الطرفية.
  */
-async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>){
+async function persistScopedDocument(collectionName:string,id:string,data:Record<string,unknown>,scope?:{organizationId:string;competitionId:string}){
   /* لا يُعلَّق ما لا يملك هذا الدور كتابته أصلًا: لن يُرفع أبدًا، فتعليقه حَبْسٌ بلا فائدة. */
   if(!canWriteSyncedCollection(globalState.currentUser.role,collectionName))return false;
   markPendingWrite(collectionName,id,data);
@@ -775,7 +780,7 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
     /* قواعد فايرستور تربط الرفع بهوية المصادقة عبر uploaderUid لا عبر معرّفات النطاق المحلية:
        actorId وjudgeId معرّفات سجلّ ميزان (usr-...) لا تساوي uid فايربيس أبدًا، ومقارنتها به كانت
        ترفض رفع سجل التدقيق لكل الأدوار بلا استثناء. */
-    const write=()=>setDoc(doc(db,'organizations',globalState.competition.organizationId,'competitions',globalState.competition.id,collectionName,id),{...payload,organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
+    const orgId=scope?.organizationId||globalState.competition.organizationId,compId=scope?.competitionId||globalState.competition.id;const write=()=>setDoc(doc(db,'organizations',orgId,'competitions',compId,collectionName,id),{...payload,organizationId:orgId,competitionId:compId,uploaderUid:auth.currentUser.uid,updatedAt:new Date().toISOString()},{merge:true});
     try{await write();}
     catch(err){
       /* رفض صلاحية ورمز المصادقة أقدم من آخر مزامنة مطالبات؟ نجدّد الرمز إن حان التجديد،
@@ -1037,6 +1042,7 @@ function syncParticipantLifecycle(participant:Participant){
  */
 const PARTICIPANT_PROGRESS:RegistrationStatus[]=['submitted','under_review','approved','checked_in','in_queue','in_session','tested','appealed','certified'];
 function advanceParticipantStatus(participantId:string|undefined,status:RegistrationStatus,actor:string,reason?:string){
+  if(status==='tested'&&participantId){const tp=globalState.participants.find(p=>p.id===participantId);if(tp&&tp.status!=='tested')emitDomainEvent('judging.completed',{competitionId:tp.competitionId,subjectId:tp.id,participantCode:tp.code});}
   if(!participantId)return;
   const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);
   if(idx<0)return;
@@ -1388,6 +1394,13 @@ export function useAppStore() {
         watch('appeals', rows => { globalState.appeals = mergeById(globalState.appeals, rows, 'appeals'); });
         watch('tie_decisions', rows => { globalState.tieDecisions = mergeById(globalState.tieDecisions, rows, 'tie_decisions'); });
         watch('support_sessions', rows => { globalState.supportSessions = mergeById(globalState.supportSessions, rows, 'support_sessions'); });
+        watch('conflict_cases', rows => { globalState.conflictCases = mergeById(globalState.conflictCases, rows, 'conflict_cases'); });
+        watch('schedule_plans', rows => { globalState.schedulePlans = mergeById(globalState.schedulePlans, rows, 'schedule_plans'); });
+        watch('qualifications', rows => {
+          /* المجموعة تحمل نوعين: علاقات المراحل وسجلّات التأهّل، ويُفرَّقان بـ recordType. */
+          globalState.competitionRelationships = mergeById(globalState.competitionRelationships, rows.filter((r: any) => r.recordType === 'relationship'), 'qualifications');
+          globalState.qualifications = mergeById(globalState.qualifications, rows.filter((r: any) => r.recordType === 'qualification'), 'qualifications');
+        });
       }
       // A late unmount that raced the import still gets cleaned up here.
       if (cancelled) { unsubscribers.forEach(u => u()); unsubscribers.length = 0; }
@@ -1518,7 +1531,10 @@ export function useAppStore() {
 
   const committeeHasHardConflict = (committee: Committee, participant: Participant) => {
     const panelJudges = globalState.judges.filter(j => committee.judgeIds.includes(j.id) || committee.judgeIds.includes(j.userId));
-    return panelJudges.some(j => j.conflictsDeclared.some(c => c.hardConflict && (c.participantId === participant.id || (!!c.institution && !!participant.institution && c.institution.trim().toLowerCase() === participant.institution.trim().toLowerCase()))));
+    if (panelJudges.some(j => j.conflictsDeclared.some(c => c.hardConflict && (c.participantId === participant.id || (!!c.institution && !!participant.institution && c.institution.trim().toLowerCase() === participant.institution.trim().toLowerCase()))))) return true;
+    /* حالات تضارب المصالح المعلنة: المفتوحة، أو المحسومة بقرارٍ لا يسمح بالتحكيم، تُبعد اللجنة. */
+    const cases = globalState.conflictCases.filter(c => c.competitionId === globalState.competition.id);
+    return committee.judgeIds.some(j => !judgeMayScore(cases, j, participant).allowed);
   };
 
   /*
@@ -1707,6 +1723,7 @@ export function useAppStore() {
           'critical'
         );
       }
+      emitDomainEvent('participant.checked_in',{competitionId:globalState.competition.id,subjectId:p.id,participantCode:p.code});
       void persistScopedDocument('checkins',p.id,{participantId:p.id,participantCode:p.code,method,checkedInAt:updated.checkedInAt,assignedCommitteeId:updated.assignedCommitteeId,queueNumber:updated.queueNumber});
 
       const log: AuditEvent = {
@@ -2254,6 +2271,7 @@ export function useAppStore() {
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'RESULTS_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:'نشر النتائج وفق سياسة الإظهار الخاصة بالمسابقة.',humanSummaryEnglish:'Published results under this competition visibility policy.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     for(const r of competitionResults){ const p=globalState.participants.find(x=>x.id===r.participantId&&x.competitionId===globalState.competition.id); if(p){ appendParticipantNotifications(p,'result.published'); void publishPublicJourneyRecord(p); } }
     markCompetitionConfigChanged();
+    emitDomainEvent('results.published',{competitionId:globalState.competition.id,subjectId:globalState.competition.id});
     notify(); return true;
   };
 
@@ -2286,7 +2304,7 @@ export function useAppStore() {
       }catch{return{ok:false,code:'COMPETITION_CLOSE_SERVER_UNAVAILABLE'}}
     }
     const now=new Date().toISOString();const cid=globalState.competition.id;
-    globalState.competition={...globalState.competition,status:'completed',closedAt:now,closedBy:globalState.currentUser.id,closureReason:clean};
+    globalState.competition={...globalState.competition,status:'completed',closedAt:now,closedBy:globalState.currentUser.id,closureReason:clean};emitDomainEvent('competition.completed',{competitionId:globalState.competition.id,subjectId:globalState.competition.id});
     globalState.roleGrants=globalState.roleGrants.map(g=>g.competitionId===cid&&g.role!=='auditor'&&['ACTIVE','SUSPENDED','PENDING_APPROVAL'].includes(g.status)?{...g,status:'REVOKED'}:g);
     globalState.identityInvitations=globalState.identityInvitations.map(i=>i.competitionId===cid&&i.requestedRole!=='auditor'&&['READY','PENDING_APPROVAL'].includes(i.status)?{...i,status:'REVOKED'}:i);
     globalState.authSessions=globalState.authSessions.map(x=>x.competitionId===cid&&x.role!=='auditor'&&x.status==='ACTIVE'?{...x,status:'REVOKED',revokedAt:now,revokedBy:globalState.currentUser.id,revocationReason:'Competition permanently closed'}:x);
@@ -2344,6 +2362,7 @@ export function useAppStore() {
     };
 
     globalState.certificates = [newCert, ...globalState.certificates];
+    emitDomainEvent('certificate.issued',{competitionId:globalState.competition.id,subjectId:newCert.id,participantCode:globalState.participants.find(p=>p.id===newCert.participantId)?.code});
     const pIdx = globalState.participants.findIndex(p=>p.id===res.participantId&&p.competitionId===globalState.competition.id);
     if (pIdx >= 0) { const certified={ ...globalState.participants[pIdx], status:'certified' as const, statusHistory:[...globalState.participants[pIdx].statusHistory,{status:'certified' as const,timestamp:new Date().toISOString(),actor:'Certificate engine'}] }; globalState.participants[pIdx]=certified; syncParticipantLifecycle(certified); }
     const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
@@ -3906,6 +3925,162 @@ const prepareJourneyAccessBatch=async()=>{
   const approveSupportSession=(id:string)=>{const now=new Date().toISOString();globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'active',approvedBy:globalState.currentUser.id,updatedAt:now}:s);const x=globalState.supportSessions.find(s=>s.id===id);if(x)void persistScopedDocument('support_sessions',x.id,x as unknown as Record<string,unknown>);notify();};
   const endSupportSession=(id:string)=>{const now=new Date().toISOString();globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'ended',updatedAt:now,expiresAt:now}:s);const x=globalState.supportSessions.find(s=>s.id===id);if(x)void persistScopedDocument('support_sessions',x.id,x as unknown as Record<string,unknown>);notify();};
   const runRemoteCheck=(participantId:string)=>{const mediaReady=typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia; const online=typeof navigator==='undefined'?true:navigator.onLine; const r:RemoteSessionCheck={id:newId('remote'),participantId,competitionId:globalState.competition.id,identity:'pending',device:mediaReady?'passed':'failed',environment:'review',networkQuality:online?'good':'poor',recordingReady:mediaReady,suspiciousSignals:[]};globalState.remoteChecks=[r,...globalState.remoteChecks.filter(x=>x.participantId!==participantId)];notify();return r;};
+  /* ═══ تضارب المصالح، والجدولة، والتأهيل — أفعالٌ مُدقَّقة فوق وحداتٍ نقيّة ═══ */
+  const governanceAudit=(action:string,entityType:string,entityId:string,ar:string,en:string)=>{
+    const log:AuditEvent={id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action,entityType,entityId,humanSummaryArabic:ar,humanSummaryEnglish:en,currentStateHash:`${action}:${entityId}`} as AuditEvent;
+    globalState.auditLogs=[log,...globalState.auditLogs];
+    void persistScopedDocument('audit',log.id,log as unknown as Record<string,unknown>);
+  };
+  /** يعلن المحكّم (أو يُعلَن عنه) تضاربًا أو تنحّيًا أو امتناعًا بسببٍ مكتوب. */
+  const declareJudgeConflict=(input:{judgeId:string;participantId?:string;institution?:string;kind:ConflictKind;relation:ConflictRelation;reason:string})=>{
+    const role=globalState.currentUser.role;
+    if(!['judge','head_judge','super_admin','org_admin','comp_admin'].includes(role))return {ok:false as const,code:'NOT_AUTHORIZED'};
+    const judge=globalState.judges.find(j=>j.id===input.judgeId||j.userId===input.judgeId);
+    if(!judge)return {ok:false as const,code:'JUDGE_NOT_FOUND'};
+    if(role==='judge'&&judge.userId!==globalState.currentUser.id&&judge.id!==globalState.currentUser.id)return {ok:false as const,code:'JUDGE_CAN_ONLY_DECLARE_OWN'};
+    const committee=globalState.committees.find(c=>c.competitionId===globalState.competition.id&&(c.judgeIds.includes(judge.id)||c.judgeIds.includes(judge.userId)));
+    try{
+      const created=declareConflict(globalState.conflictCases,{id:newId('coi'),competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,judgeId:judge.id,declaredByUid:auth.currentUser?.uid||globalState.currentUser.id,participantId:input.participantId,institution:input.institution,kind:input.kind,relation:input.relation,reason:input.reason,committeeId:committee?.id,committeeJudgeIds:committee?.judgeIds||[],now:new Date().toISOString()});
+      if(!globalState.conflictCases.some(c=>c.id===created.id)){
+        globalState.conflictCases=[created,...globalState.conflictCases];
+        /* التضارب الصلب يُضاف إلى ملف المحكّم أيضًا، فيستمرّ أثره في التوجيه عبر المسابقات. */
+        if(created.hardConflict&&(created.participantId||created.institution)){globalState.judges=globalState.judges.map(j=>j.id===judge.id?{...j,conflictsDeclared:[...j.conflictsDeclared,{participantId:created.participantId,institution:created.institution,type:created.relation==='relative'?'relative':created.relation==='student'?'student':'institution',hardConflict:true}]}:j);}
+        void persistScopedDocument('conflict_cases',created.id,created as unknown as Record<string,unknown>);
+        governanceAudit('JUDGE_CONFLICT_DECLARED','ConflictCase',created.id,`إعلان ${created.kind==='recusal'?'تنحٍّ':created.kind==='abstention'?'امتناع':'تضارب مصالح'} من المحكّم ${judge.nameArabic||judge.name}`,`Judge ${judge.name} declared ${created.kind}`);
+      }
+      notify();return {ok:true as const,case:created};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'CONFLICT_FAILED'}}
+  };
+  /** قرار رئيس التحكيم أو الإدارة. التعيين الأصلي محفوظ في الحالة، والقرار يضاف ولا يمحو. */
+  const resolveJudgeConflict=(caseId:string,input:{decision:ConflictDecision;note:string;reassignedToCommitteeId?:string;replacementJudgeId?:string})=>{
+    const current=globalState.conflictCases.find(c=>c.id===caseId);
+    if(!current)return {ok:false as const,code:'CONFLICT_NOT_FOUND'};
+    try{
+      const resolved=resolveConflict(current,{...input,actorId:auth.currentUser?.uid||globalState.currentUser.id,actorRole:globalState.currentUser.role,now:new Date().toISOString()});
+      globalState.conflictCases=globalState.conflictCases.map(c=>c.id===caseId?resolved:c);
+      if(input.decision==='replaced_judge'&&resolved.originalAssignment.committeeId&&input.replacementJudgeId){
+        const cid=resolved.originalAssignment.committeeId;
+        globalState.committees=globalState.committees.map(k=>k.id===cid?{...k,judgeIds:k.judgeIds.map(j=>j===current.judgeId?input.replacementJudgeId!:j)}:k);
+        const k=globalState.committees.find(x=>x.id===cid);if(k)void persistScopedDocument('committees',k.id,k as unknown as Record<string,unknown>);
+      }
+      void persistScopedDocument('conflict_cases',resolved.id,resolved as unknown as Record<string,unknown>);
+      governanceAudit('JUDGE_CONFLICT_RESOLVED','ConflictCase',resolved.id,`حُسم تضارب المصالح: ${input.decision} — ${input.note}`,`Conflict resolved: ${input.decision} — ${input.note}`);
+      notify();return {ok:true as const,case:resolved};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'CONFLICT_FAILED'}}
+  };
+
+  /** رسوم التسجيل التي تفرضها الجهة: تسجيل التحصيل أو الاسترداد أو الإعفاء بمرجع إيصال، مُدقَّقًا. */
+  const setRegistrationPayment=(participantId:string,status:'paid'|'refunded'|'waived'|'pending',receiptReference?:string)=>{
+    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false as const,code:'NOT_AUTHORIZED'};
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);
+    if(!p)return {ok:false as const,code:'PARTICIPANT_NOT_FOUND'};
+    const fee=getCompetitionPolicy(globalState.competition).registration.fee;
+    const current=p.registrationPayment||(fee?{status:'pending' as const,amountMinor:fee.amountMinor,currency:fee.currency,updatedAt:new Date().toISOString()}:undefined);
+    if(!current)return {ok:false as const,code:'REGISTRATION_FEE_NOT_CONFIGURED'};
+    if(status==='refunded'&&current.status!=='paid')return {ok:false as const,code:'REFUND_REQUIRES_PAID'};
+    if((status==='paid'||status==='refunded')&&!String(receiptReference||'').trim())return {ok:false as const,code:'RECEIPT_REFERENCE_REQUIRED'};
+    const next={...p,registrationPayment:{...current,status,receiptReference:String(receiptReference||current.receiptReference||'').trim().slice(0,120)||undefined,updatedAt:new Date().toISOString()}};
+    globalState.participants=globalState.participants.map(x=>x.id===p.id?next:x);
+    void persistScopedDocument('participants',p.id,next as unknown as Record<string,unknown>);
+    governanceAudit('REGISTRATION_PAYMENT_UPDATED','Participant',p.id,`رسوم تسجيل ${p.code}: ${current.status} → ${status}`,`Registration fee ${p.code}: ${current.status} → ${status}`);
+    notify();return {ok:true as const};
+  };
+  /** يبني مدخلات الجدولة من حالة المسابقة، ويضيف ما يحدّده المنظّم (أيام، استراحات، صلاة، توفّر). */
+  const schedulerInputFromState=(options:{days:{date:string;start:string;end:string}[];breaks?:TimeWindow[];prayerBreaks?:TimeWindow[];transitionMinutes?:number;judgeAvailability?:JudgeAvailability[];pins?:SchedulerInput['pins'];hallCapacity?:Record<string,number>}):SchedulerInput=>{
+    const cid=globalState.competition.id;
+    const committees=globalState.committees.filter(c=>c.competitionId===cid);
+    const halls=[...new Set(committees.map(c=>c.venueHall||c.id))].map(h=>({id:h,name:h,capacity:options.hallCapacity?.[h]}));
+    const eligibleStatuses=['approved','checked_in','in_queue'];
+    return {
+      days:options.days,defaultSessionMinutes:20,transitionMinutes:options.transitionMinutes??5,breaks:options.breaks||[],prayerBreaks:options.prayerBreaks||[],
+      sessionMinutes:Object.fromEntries(globalState.competition.categories.map(c=>[c.id,Math.max(5,Number(c.targetDurationMinutes)||20)])),
+      halls,committees:committees.map(c=>({id:c.id,hallId:c.venueHall||c.id,assignedCategories:c.assignedCategories,judgeIds:c.judgeIds})),
+      participants:globalState.participants.filter(p=>p.competitionId===cid&&eligibleStatuses.includes(p.status)).map(p=>({id:p.id,categoryId:p.categoryId,institution:p.institution})),
+      judgeAvailability:options.judgeAvailability||[],conflicts:globalState.conflictCases.filter(c=>c.competitionId===cid),pins:options.pins||[],
+    };
+  };
+  const generateSchedule=(options:Parameters<typeof schedulerInputFromState>[0])=>{
+    if(!['super_admin','org_admin','comp_admin','ops_manager'].includes(globalState.currentUser.role))return {ok:false as const,code:'NOT_AUTHORIZED'};
+    try{
+      const input=schedulerInputFromState(options);const plan=buildSchedule(input);
+      const rec:SchedulePlanRecord={id:newId('sched'),competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,input,plan,status:'draft',createdAt:new Date().toISOString(),createdBy:globalState.currentUser.id};
+      globalState.schedulePlans=[rec,...globalState.schedulePlans];
+      void persistScopedDocument('schedule_plans',rec.id,rec as unknown as Record<string,unknown>);
+      governanceAudit('SCHEDULE_GENERATED','SchedulePlan',rec.id,`توليد جدول: ${plan.slots.length} موعدًا، و${plan.unscheduled.length} بلا موعد`,`Schedule generated: ${plan.slots.length} slots, ${plan.unscheduled.length} unscheduled`);
+      notify();return {ok:true as const,plan:rec};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'SCHEDULE_FAILED'}}
+  };
+  /** تعديل يدوي: تثبيت متسابق في لجنة ووقت، أو فكّ التثبيت — ثم يُعاد حساب الباقي حوله. */
+  const overrideScheduleSlot=(planId:string,change:{participantId:string;committeeId?:string;date?:string;start?:string;unpin?:boolean})=>{
+    const current=globalState.schedulePlans.find(p=>p.id===planId);
+    if(!current)return {ok:false as const,code:'SCHEDULE_NOT_FOUND'};
+    if(current.status==='published')return {ok:false as const,code:'SCHEDULE_PUBLISHED_LOCKED'};
+    try{
+      const input=change.unpin?withoutPin(current.input,change.participantId):withManualPin(current.input,{participantId:change.participantId,committeeId:String(change.committeeId),date:String(change.date),start:String(change.start)});
+      const plan=buildSchedule(input);
+      const rec={...current,input,plan};
+      globalState.schedulePlans=globalState.schedulePlans.map(p=>p.id===planId?rec:p);
+      void persistScopedDocument('schedule_plans',rec.id,rec as unknown as Record<string,unknown>);
+      governanceAudit('SCHEDULE_MANUAL_OVERRIDE','SchedulePlan',rec.id,change.unpin?`فكّ تثبيت موعد المتسابق ${change.participantId}`:`تثبيت يدوي للمتسابق ${change.participantId} في ${change.committeeId} ${change.date} ${change.start}`,`Manual schedule override for ${change.participantId}`);
+      notify();return {ok:true as const,plan:rec};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'SCHEDULE_FAILED'}}
+  };
+  const publishSchedule=(planId:string)=>{
+    const current=globalState.schedulePlans.find(p=>p.id===planId);
+    if(!current)return {ok:false as const,code:'SCHEDULE_NOT_FOUND'};
+    const now=new Date().toISOString();
+    globalState.schedulePlans=globalState.schedulePlans.map(p=>p.competitionId===current.competitionId&&p.status==='published'&&p.id!==planId?{...p,status:'draft' as const}:p.id===planId?{...p,status:'published' as const,publishedAt:now}:p);
+    const rec=globalState.schedulePlans.find(p=>p.id===planId)!;
+    void persistScopedDocument('schedule_plans',rec.id,rec as unknown as Record<string,unknown>);
+    governanceAudit('SCHEDULE_PUBLISHED','SchedulePlan',rec.id,'اعتماد الجدول الزمني','Schedule published');
+    notify();return {ok:true as const,plan:rec};
+  };
+
+  /** ربط هذه المسابقة بمرحلة أعلى: «هذه تصفيات لتلك». */
+  const linkQualifierTo=(parentCompetitionId:string,rule:QualificationRule,stageLabel?:string)=>{
+    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false as const,code:'NOT_AUTHORIZED'};
+    try{
+      const rel=createRelationship(globalState.competitionRelationships,{id:newId('qrel'),organizationId:globalState.competition.organizationId,parentCompetitionId,childCompetitionId:globalState.competition.id,stageLabel,rule,createdAt:new Date().toISOString(),createdBy:globalState.currentUser.id});
+      globalState.competitionRelationships=[rel,...globalState.competitionRelationships];
+      void persistScopedDocument('qualifications',rel.id,{...rel,recordType:'relationship'});
+      governanceAudit('QUALIFICATION_LINK_CREATED','CompetitionRelationship',rel.id,`ربط المسابقة تصفياتٍ لمرحلة ${parentCompetitionId}`,`Linked as qualifier for ${parentCompetitionId}`);
+      notify();return {ok:true as const,relationship:rel};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'QUALIFICATION_FAILED'}}
+  };
+  /** يحسب المتأهّلين من النتائج المختومة أو المنشورة وحدها، ولا يكرّر ولا يُحيي ملغًى. */
+  const computeQualifications=(relationshipId:string)=>{
+    const rel=globalState.competitionRelationships.find(r=>r.id===relationshipId);
+    if(!rel)return {ok:false as const,code:'QUALIFICATION_LINK_NOT_FOUND'};
+    const fresh=computeQualifiers(rel,globalState.results,new Date().toISOString(),globalState.currentUser.id,()=>newId('qual'));
+    const before=globalState.qualifications.length;
+    globalState.qualifications=mergeQualifications(globalState.qualifications,fresh);
+    const added=globalState.qualifications.slice(before);
+    for(const q of added)void persistScopedDocument('qualifications',q.id,{...q,recordType:'qualification'});
+    governanceAudit('QUALIFICATIONS_COMPUTED','CompetitionRelationship',rel.id,`احتساب المتأهّلين: ${added.length} جديد`,`Qualifiers computed: ${added.length} new`);
+    notify();return {ok:true as const,added:added.length};
+  };
+  const setQualificationStatus=(qualificationId:string,to:'invited'|'accepted'|'declined'|'revoked',note?:string)=>{
+    const q=globalState.qualifications.find(x=>x.id===qualificationId);
+    if(!q)return {ok:false as const,code:'QUALIFICATION_NOT_FOUND'};
+    try{
+      let next=q;
+      if(to==='invited'){
+        /* الدعوة تنشئ سجلّ متسابق «مسودة» في المرحلة المستهدفة بهويته ومصدر تأهّله، ولا تسجّله تلقائيًا. */
+        const source=globalState.participants.find(p=>p.id===q.sourceParticipantId);
+        const target=globalState.competitions.find(c=>c.id===q.targetCompetitionId);
+        if(!source||!target)return {ok:false as const,code:'QUALIFICATION_SOURCE_OR_TARGET_MISSING'};
+        const invited=invitationParticipant(q,source,{competitionId:target.id,organizationId:target.organizationId},{id:newId('part'),code:`Q-${Math.floor(Math.random()*9_000_000+1_000_000)}`},new Date().toISOString());
+        globalState.participants=[invited,...globalState.participants];
+        void persistScopedDocument('participants',invited.id,invited as unknown as Record<string,unknown>,{organizationId:target.organizationId,competitionId:target.id});
+        next={...transitionQualification(q,'invited',globalState.currentUser.id,new Date().toISOString(),note),targetParticipantId:invited.id};
+      }else next=transitionQualification(q,to,globalState.currentUser.id,new Date().toISOString(),note);
+      globalState.qualifications=globalState.qualifications.map(x=>x.id===q.id?next:x);
+      void persistScopedDocument('qualifications',next.id,{...next,recordType:'qualification'});
+      governanceAudit(`QUALIFICATION_${to.toUpperCase()}`,'QualificationRecord',next.id,`تأهّل ${q.sourceParticipantId}: ${q.status} → ${to}`,`Qualification ${q.status} → ${to}`);
+      notify();return {ok:true as const,qualification:next};
+    }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'QUALIFICATION_FAILED'}}
+  };
+
   /*
    * «إنشاء نسخة جديدة»: يُنسخ الإعداد وحده (انظر competition-clone.ts) — لا متسابقون ولا درجات
    * ولا نتائج ولا شهادات. والنسخة تبدأ مسودة، فلا تستهلك مقعد مسابقة نشطة حتى تُفتح.
@@ -4760,7 +4935,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, sessionStartFailureCode, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, exportCompetitionSnapshot, restoreCompetitionSnapshot,
+    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,

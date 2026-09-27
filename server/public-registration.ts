@@ -2,14 +2,18 @@ import crypto from 'crypto';
 import { CONSENT_BACKED_DOCUMENTS, consentVersionOf, isResolved, legalConfigFromEnv, resolveLegalDocument, type LegalChainLink, type LegalDocumentKind } from '../src/lib/legal-documents';
 import type {Competition,EligibilityCondition,Participant,RegistrationFieldDefinition} from '../src/types';
 import {getCompetitionPolicy} from '../src/lib/competition-config';
+import {isPlausibleEmail} from '../shared/email-shape';
+import {persistableCustomAnswers,validateAnswers,CORE_FIELD_IDS,type Answers} from '../src/lib/registration-form';
 import {categoryDistribution,categoryScopeOf,resolveQuestionCount} from '../src/lib/scope-engine';
 import {describeScope} from '../src/lib/quran-scope';
 
-export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string};
-export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>}
+export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string;customAnswers?:Record<string,unknown>};
+export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>;
+  /** قراءة وثيقة مفردة وكتابة تحديثاتٍ ذرّية — لازمتان لتعديل التسجيل قبل الإغلاق. */
+  getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>}
 
 const clean=(value:unknown,max=160)=>String(value??'').trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
-const emailOk=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)&&value.length<=254;
+const emailOk=(value:string)=>isPlausibleEmail(value);
 const ageOn=(dob:string,now:Date)=>{const birth=new Date(`${dob}T00:00:00Z`);if(!Number.isFinite(birth.getTime())||birth>now)return NaN;let age=now.getUTCFullYear()-birth.getUTCFullYear();const before=now.getUTCMonth()<birth.getUTCMonth()||(now.getUTCMonth()===birth.getUTCMonth()&&now.getUTCDate()<birth.getUTCDate());if(before)age--;return age};
 const compare=(actual:unknown,condition:EligibilityCondition)=>{const expected=condition.value;switch(condition.operator){case'eq':return String(actual)===String(expected);case'neq':return String(actual)!==String(expected);case'lte':return Number(actual)<=Number(expected);case'gte':return Number(actual)>=Number(expected);case'in':return Array.isArray(expected)&&expected.map(String).includes(String(actual));case'not_in':return Array.isArray(expected)&&!expected.map(String).includes(String(actual));case'exists':return condition.value?actual!==undefined&&actual!==null&&actual!=='':actual===undefined||actual===null||actual==='';default:return false}};
 const fieldValue=(field:RegistrationFieldDefinition,input:PublicRegistrationInput)=>({fullNameArabic:input.fullNameArabic,fullName:input.fullName,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,dateOfBirth:input.dateOfBirth,gender:input.gender,identity:input.nationalIdOrPassport}[field.id]??'');
@@ -50,7 +54,14 @@ export class PublicRegistrationService{
     if(!['public','hybrid'].includes(policy.registration.mode))throw new Error('COMPETITION_REGISTRATION_CLOSED');
     if(Number.isFinite(ends)&&now.getTime()>ends)throw new Error('COMPETITION_REGISTRATION_CLOSED');
     const input:PublicRegistrationInput={fullNameArabic:clean(raw.fullNameArabic,120),fullName:clean(raw.fullName,120),email:clean(raw.email,254).toLowerCase(),phone:clean(raw.phone,32),country:clean(raw.country,100),nationality:clean(raw.nationality,100),nationalIdOrPassport:clean(raw.nationalIdOrPassport,80),dateOfBirth:clean(raw.dateOfBirth,10),gender:raw.gender==='female'?'female':'male',categoryId:clean(raw.categoryId,120),riwaya:clean(raw.riwaya,120),guardianName:clean(raw.guardianName,120),consents:raw.consents||{}};
-    for(const field of policy.registration.fields.filter(x=>x.visible&&x.required))if(!String(fieldValue(field,input)).trim())throw new Error(`REGISTRATION_FIELD_REQUIRED:${field.id}`);
+    /* المحرّك المشترك: الحقول الأساسية وقيمها، ثم الحقول المخصّصة بشروط ظهورها ووجوبها. */
+    const answers=this.answersOf(policy.registration.fields,input,raw.customAnswers);
+    for(const error of validateAnswers(policy.registration.fields,answers,now)){
+      const field=policy.registration.fields.find(f=>f.id===error.fieldId);
+      if(!field?.custom&&error.code!=='REQUIRED')continue; /* الحقول الأساسية تُتحقَّق بقواعدها الخاصة أدناه */
+      throw new Error(error.code==='REQUIRED'||error.code==='CONSENT_REQUIRED'?`REGISTRATION_FIELD_REQUIRED:${error.fieldId}`:`REGISTRATION_FIELD_INVALID:${error.fieldId}:${error.code}`);
+    }
+    const customAnswers=persistableCustomAnswers(policy.registration.fields,answers,now);
     if(policy.registration.requireIdentityVerification&&!input.nationalIdOrPassport)throw new Error('REGISTRATION_IDENTITY_REQUIRED');
     if(input.email&&!emailOk(input.email))throw new Error('REGISTRATION_EMAIL_INVALID');
     if(input.phone&&!/^\+?[0-9٠-٩۰-۹ -]{7,24}$/.test(input.phone))throw new Error('REGISTRATION_PHONE_INVALID');
@@ -72,7 +83,7 @@ export class PublicRegistrationService{
     const journeyToken=token('journey'),guardianToken=token('guardian');
     const journeyAccessTokenHash=publicTokenHash(journeyToken),guardianAccessTokenHash=publicTokenHash(guardianToken);
     const participantId=`part-${crypto.randomUUID()}`,code=`A-${crypto.randomBytes(4).readUInt32BE(0).toString().slice(0,7).padStart(7,'0')}`,createdAt=now.toISOString();
-    const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:categoryReading,institution:'',specialNeeds:false,documents:[],status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,journeyTokenCustody:'holder_only',createdAt};
+    const participant:Participant={id:participantId,code,competitionId:competition.id,organizationId:competition.organizationId,fullName:input.fullName,fullNameArabic:input.fullNameArabic,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,nationalIdOrPassport:input.nationalIdOrPassport,dateOfBirth:input.dateOfBirth,gender:input.gender,categoryId:category.id,riwaya:categoryReading,institution:'',specialNeeds:false,documents:[],...(Object.keys(customAnswers).length?{customAnswers}:{}),...(policy.registration.fee&&policy.registration.fee.amountMinor>0?{registrationPayment:{status:'pending' as const,amountMinor:Math.floor(policy.registration.fee.amountMinor),currency:String(policy.registration.fee.currency).toUpperCase().slice(0,3),updatedAt:createdAt}}:{}),status,statusHistory:[{status:'submitted',timestamp:createdAt,actor:'Public registration API'},{status,timestamp:createdAt,actor:'Eligibility Engine',reason:status==='approved'?'Objective eligibility rules passed':'Policy requires human review'}],journeyAccessTokenHash,guardianAccessTokenHash,journeyTokenCustody:'holder_only',createdAt};
     const questionCount=resolveQuestionCount(category,policy),distribution=categoryDistribution(category,questionCount),scope=categoryScopeOf(category);
     /* النطاق البنيوي لا يُنشر هنا للفئة ذات الاختيار الشخصي: نطاقُ الفئة أبٌ للاختيار،
        وليس نطاقَ المتسابق. ينشره `publishPublicJourneyRecord` بعد ثبوت النطاق المعتمد. */
@@ -98,6 +109,46 @@ export class PublicRegistrationService{
     for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,...consentProvenance(kind),accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
     await this.store.create(documents);
     const base=origin.replace(/\/$/,'');return {participant:{id:participant.id,code:participant.code,status:participant.status,competitionId:participant.competitionId,fullName:participant.fullName,fullNameArabic:participant.fullNameArabic},journeyUrl:`${base}/#journey?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(journeyToken)}`,guardianUrl:`${base}/#guardian?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(guardianToken)}`,journeyAccessToken:journeyToken,guardianAccessToken:guardianToken};
+  }
+  private answersOf(fields:{id:string;custom?:boolean}[],input:PublicRegistrationInput,custom:unknown):Answers{
+    const answers:Answers={fullNameArabic:input.fullNameArabic,fullName:input.fullName,email:input.email,phone:input.phone,country:input.country,nationality:input.nationality,dateOfBirth:input.dateOfBirth,gender:input.gender,identity:input.nationalIdOrPassport};
+    const raw=custom&&typeof custom==='object'?custom as Record<string,unknown>:{};
+    for(const f of fields){if(!f.custom||(CORE_FIELD_IDS as readonly string[]).includes(f.id))continue;const v=raw[f.id];if(v!==undefined)answers[f.id]=v as Answers[string]}
+    return answers;
+  }
+  /*
+   * تعديل التسجيل بعد إرساله — برابط رحلة المتسابق نفسه، وقبل إغلاق التسجيل فقط، وما لم يحضر
+   * بعد. يُعاد التحقق كاملًا بقواعد النموذج الحالية، ولا تتغيّر الفئة ولا الرواية (تغييرهما
+   * يمرّ بالجهة). ويُسجَّل أيّ الحقول تغيّر ومتى، بلا القيم.
+   */
+  async editRegistration(competitionId:string,rawToken:string,raw:Partial<PublicRegistrationInput>){
+    if(!this.store.getDocument||!this.store.upsert)throw new Error('REGISTRATION_EDIT_NOT_CONFIGURED');
+    const journey=await this.resolve(competitionId,'participant',rawToken);
+    const competition=await this.store.getCompetition(competitionId);if(!competition)throw new Error('COMPETITION_NOT_FOUND');
+    const policy=getCompetitionPolicy(competition),now=this.now();
+    if((policy.registration.editPolicy||'until_deadline')==='never')throw new Error('REGISTRATION_EDIT_NOT_ALLOWED');
+    const ends=Date.parse(competition.registrationEndDate);
+    if(competition.status!=='registration_open'||(Number.isFinite(ends)&&now.getTime()>ends))throw new Error('REGISTRATION_LOCKED');
+    const path=`organizations/${competition.organizationId}/competitions/${competition.id}/participants/${String(journey.participantId)}`;
+    const current=await this.store.getDocument(path) as unknown as Participant|null;if(!current)throw new Error('PARTICIPANT_NOT_FOUND');
+    if(!['submitted','under_review','approved','draft'].includes(current.status))throw new Error('REGISTRATION_LOCKED');
+    const input:PublicRegistrationInput={fullNameArabic:clean(raw.fullNameArabic??current.fullNameArabic,120),fullName:clean(raw.fullName??current.fullName,120),email:clean(raw.email??current.email,254).toLowerCase(),phone:clean(raw.phone??current.phone,32),country:clean(raw.country??current.country,100),nationality:clean(raw.nationality??current.nationality,100),nationalIdOrPassport:clean(raw.nationalIdOrPassport??current.nationalIdOrPassport,80),dateOfBirth:clean(raw.dateOfBirth??current.dateOfBirth,10),gender:(raw.gender??current.gender)==='female'?'female':'male',categoryId:current.categoryId,riwaya:current.riwaya};
+    if(input.email&&!emailOk(input.email))throw new Error('REGISTRATION_EMAIL_INVALID');
+    if(input.phone&&!/^\+?[0-9٠-٩۰-۹ -]{7,24}$/.test(input.phone))throw new Error('REGISTRATION_PHONE_INVALID');
+    const age=ageOn(input.dateOfBirth,now);if(!Number.isInteger(age)||age<3||age>100)throw new Error('REGISTRATION_DATE_OF_BIRTH_INVALID');
+    const category=competition.categories.find(x=>x.id===input.categoryId);
+    if(category&&((category.minAge!==undefined&&age<category.minAge)||(category.maxAge!==undefined&&age>category.maxAge)))throw new Error('REGISTRATION_AGE_NOT_ELIGIBLE');
+    const answers=this.answersOf(policy.registration.fields,input,raw.customAnswers??current.customAnswers);
+    const errors=validateAnswers(policy.registration.fields,answers,now);
+    if(errors.length){const e=errors[0];throw new Error(e.code==='REQUIRED'||e.code==='CONSENT_REQUIRED'?`REGISTRATION_FIELD_REQUIRED:${e.fieldId}`:`REGISTRATION_FIELD_INVALID:${e.fieldId}:${e.code}`)}
+    const customAnswers=persistableCustomAnswers(policy.registration.fields,answers,now);
+    const next={...current,...input,customAnswers,categoryId:current.categoryId,riwaya:current.riwaya} as Participant;
+    const changed=(['fullNameArabic','fullName','email','phone','country','nationality','nationalIdOrPassport','dateOfBirth','gender'] as const).filter(k=>String((current as any)[k]??'')!==String((next as any)[k]??''));
+    for(const k of new Set([...Object.keys(current.customAnswers||{}),...Object.keys(customAnswers)]))if(JSON.stringify(current.customAnswers?.[k])!==JSON.stringify(customAnswers[k]))changed.push(`custom:${k}` as never);
+    if(!changed.length)return {participant:{id:current.id,code:current.code,status:current.status},changed:[]};
+    next.editHistory=[...(current.editHistory||[]),{at:now.toISOString(),fields:changed as string[],actor:'participant' as const}].slice(-50);
+    await this.store.upsert([{path,data:next as unknown as Record<string,unknown>}]);
+    return {participant:{id:next.id,code:next.code,status:next.status},changed};
   }
   async resolve(competitionId:string,audience:'participant'|'guardian',rawToken:string){
     const value=clean(rawToken,120);if(!validPublicJourneyToken(value))throw new Error('JOURNEY_TOKEN_INVALID');

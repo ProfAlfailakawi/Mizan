@@ -59,6 +59,7 @@ const foreignCalls: [string, (repo: SaaSPlatformRepository, actor: any, theirs: 
   ['createWebhookEndpoint', (r, a, t) => r.createWebhookEndpoint(a, t, { url: 'https://example.com/hook', events: ['subscription.renewed'] })],
   ['listWebhooks', (r, a, t) => r.listWebhooks(a, t)],
   ['disableWebhookEndpoint', (r, a, t) => r.disableWebhookEndpoint(a, t, 'WH-1')],
+  ['reportDomainEvent', (r, a, t) => r.reportDomainEvent(a, t, { type: 'results.published', competitionId: 'c1', subjectId: 'c1' })],
 ];
 
 for (const [method, call] of foreignCalls) {

@@ -311,6 +311,28 @@ service cloud.firestore {
           allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
           allow update, delete: if false;
         }
+        // تضارب المصالح: المحكّم يُنشئ إعلانه باسمه، ولا يقرّر فيه؛ القرار لرئيس التحكيم والإدارة.
+        // ولا يُحذف إعلانٌ ولا قرار — الأثر جزءٌ من نزاهة التحكيم.
+        match /conflict_cases/{caseId} {
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
+          allow create: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','comp_admin','head_judge'])
+              || (roleIs(['judge']) && request.resource.data.uploaderUid == request.auth.uid && request.resource.data.status == 'open'));
+          allow update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow delete: if false;
+        }
+        // الجدول الزمني: تكتبه الإدارة والعمليات، ويقرؤه من يدير اليوم.
+        match /schedule_plans/{planId} {
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge','judge','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
+          allow delete: if false;
+        }
+        // علاقات التأهّل وسجلّاته بين المراحل. الإدارة وحدها تكتبها، ولا يُحذف تأهّلٌ (يُلغى بسبب).
+        match /qualifications/{qualificationId} {
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
+          allow delete: if false;
+        }
         match /support_sessions/{supportId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','support_agent','ops_manager','head_judge']);
           allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge','support_agent']);

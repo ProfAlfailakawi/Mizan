@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, signInWithEmailAndPassword, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, signInWithEmailAndPassword, signInWithPopup, SAMLAuthProvider, OAuthProvider, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from 'firebase/auth';
 import { FlaskConical, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
@@ -57,6 +57,19 @@ export const AuthPortal:React.FC=()=>{
   window.location.reload();
  };
 
+ /*
+  * الدخول الموحّد: إن كان نطاق البريد لجهةٍ فعّلت SSO، يظهر زرّ الدخول عبر مزوّدها. التحقق
+  * يجري في Identity Platform، والصلاحية تبقى منحةً من حوكمة الهويات لا من المزوّد.
+  */
+ const [sso,setSso]=useState<{providerId:string;protocol:'saml'|'oidc';displayName:string;preferSso:boolean}|null>(null);
+ useEffect(()=>{const domain=email.split('@')[1]||'';if(!/\./.test(domain)){setSso(null);return}const t=window.setTimeout(()=>{fetch(`/api/public/sso/discover?email=${encodeURIComponent(email)}`).then(r=>r.ok?r.json():null).then(b=>setSso(b?.provider||null)).catch(()=>setSso(null))},400);return()=>window.clearTimeout(t)},[email]);
+ const signInWithSso=async()=>{
+  if(!sso)return;setBusy(true);setMessage('');
+  try{const provider=sso.protocol==='saml'?new SAMLAuthProvider(sso.providerId):new OAuthProvider(sso.providerId);const cred=await signInWithPopup(auth,provider);if(activationToken)await finishActivation(cred.user)}
+  catch(e){setMessage(ar?'تعذّر الدخول الموحّد. تأكد أن حسابك في جهتك مفعّل، أو ادخل بكلمة المرور.':'Organization sign-in failed. Check your organization account or use your password.')}
+  finally{setBusy(false)}
+ };
+
  const signIn=async()=>{
   setBusy(true);setMessage('');
   try{
@@ -111,6 +124,7 @@ export const AuthPortal:React.FC=()=>{
     {activating&&!existingMode&&<label className="block mt-4"><span className="text-sm font-black text-[#3f4642]">{ar?'تأكيد كلمة المرور':'Confirm password'}</span><div className="relative mt-2"><LockKeyhole className="w-5 h-5 absolute start-3 top-1/2 -translate-y-1/2 text-[#6a6f6c] pointer-events-none"/><input type="password" autoComplete="new-password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createInvitedAccount()} className="mizan-input mizan-input-icon-start min-h-14 text-base"/></div></label>}
     {message&&<div className="mt-4 rounded-xl bg-[#f3f1eb] px-3 py-2.5 text-xs font-semibold break-words">{message}</div>}
     <Button size="lg" className="w-full mt-6 min-h-14" disabled={busy||!email||!password||(activating&&!existingMode&&!confirmPassword)} onClick={()=>void(activating&&!existingMode?createInvitedAccount():signIn())} icon={<ShieldCheck className="w-5 h-5"/>}>{busy?'…':activating&&!existingMode?(ar?'إنشاء حسابي وتفعيله':'Create & activate my account'):(ar?'دخول':'Sign in')}</Button>
+    {sso&&<Button size="lg" variant="secondary" className="w-full mt-3 min-h-14" disabled={busy} onClick={()=>void signInWithSso()}>{ar?`الدخول عبر ${sso.displayName}`:`Sign in with ${sso.displayName}`}</Button>}
     {activating&&<button onClick={()=>{setExistingMode(v=>!v);setPassword('');setConfirmPassword('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{existingMode?(ar?'هذا أول حساب لي — اختر كلمة مرور جديدة':'This is my first account — choose a new password'):(ar?'لدي حساب بهذا البريد':'I already have an account with this email')}</button>}
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-12 mt-2 text-sm font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
     {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.

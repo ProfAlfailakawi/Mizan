@@ -9,6 +9,8 @@ import {bilingualName,  localizedCountry } from '../../lib/ui-language';
 import type { Participant } from '../../types';
 import { describeScope } from '../../lib/quran-scope';
 import { categoryScopeOf } from '../../lib/scope-engine';
+import { isFieldVisible, isFieldRequired, validateAnswers, type Answers } from '../../lib/registration-form';
+import type { RegistrationFieldDefinition } from '../../types';
 
 const hashParam=(name:string)=>{if(typeof window==='undefined')return '';const raw=window.location.hash.split('?')[1]||'';return new URLSearchParams(raw).get(name)||''};
 
@@ -30,8 +32,14 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
   void (async()=>{try{const response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}`);if(!response.ok)return;const payload=await response.json();if(!cancelled&&payload?.legal)setLegalDocuments(payload.legal)}catch{/* العرضُ بلا ناشرٍ أهونُ من عرضِ ناشرٍ مخترَع */}})();
   return()=>{cancelled=true}},[competition.id]);
  const requestedCategory=hashParam('category');
+ /* مسودة على هذا الجهاز: تُحفظ تلقائيًا وتُستعاد عند العودة، وتُمحى بعد الإرسال. لا تُرسَل إلى أي خادم. */
+ const draftKey=`mizan.registration-draft.${competition.id}`;
+ const readDraft=()=>{try{const raw=window.localStorage.getItem(draftKey);return raw?JSON.parse(raw):null}catch{return null}};
+ const [custom,setCustom]=useState<Answers>(()=>readDraft()?.custom||{});
+ const [draftRestored]=useState(()=>!!readDraft());
  const initialCategory=competition.categories.find(c=>c.id===requestedCategory)||competition.categories[0];
- const [form,setForm]=useState({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:''});
+ const [form,setForm]=useState(()=>({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:'',...(readDraft()?.form||{})}));
+ useEffect(()=>{if(submitted)return;const t=window.setTimeout(()=>{try{window.localStorage.setItem(draftKey,JSON.stringify({form,custom,savedAt:new Date().toISOString()}))}catch{/* التخزين المحلي غير متاح: النموذج يعمل بلا مسودة */}},600);return()=>window.clearTimeout(t)},[form,custom,submitted,draftKey]);
 
  useEffect(()=>{
   // App يحمل الإسقاط المنشور في المسارات العامة. لا نطلب latest من داخل النموذج ولا
@@ -64,11 +72,15 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
  const steps=[{ar:'بياناتي',en:'Profile'},{ar:'مشاركتي',en:'Entry'},{ar:'مراجعة',en:'Review'}];
  const reviewStep=steps.length-1;
  const fieldValue=(id:string)=>({fullNameArabic:form.fullNameArabic,fullName:form.fullName,email:form.email,phone:form.phone,country:form.country,nationality:form.nationality,dateOfBirth:form.dateOfBirth,gender:form.gender,identity:form.nationalIdOrPassport} as Record<string,string>)[id]??'';
- const requiredProfileFields=policy.registration.fields.filter(f=>f.visible&&f.required);
+ const now=new Date();
+ const answers:Answers={...custom,fullNameArabic:form.fullNameArabic,fullName:form.fullName,email:form.email,phone:form.phone,country:form.country,nationality:form.nationality,dateOfBirth:form.dateOfBirth,gender:form.gender,identity:form.nationalIdOrPassport};
+ const shownFields=policy.registration.fields.filter(f=>isFieldVisible(f,answers,now));
+ const customErrors=validateAnswers(policy.registration.fields.filter(f=>f.custom),answers,now);
+ const requiredProfileFields=shownFields.filter(f=>!f.custom&&isFieldRequired(f,answers,now));
  // البريد (إن كان ظاهرًا وله قيمة) لا يُقبل إلا بصيغة صحيحة قبل المتابعة.
  const emailField=policy.registration.fields.find(f=>f.visible&&f.type==='email');
  const emailOk=!emailField||(!emailField.required&&!form.email.trim())||isValidEmail(form.email);
- const canNext=step===0?(requiredProfileFields.every(f=>String(fieldValue(f.id)).trim().length>0)&&emailOk):step===1?readingOk:true;
+ const canNext=step===0?(requiredProfileFields.every(f=>String(fieldValue(f.id)).trim().length>0)&&emailOk&&customErrors.length===0):step===1?readingOk:true;
   const submit=async()=>{
     if(submitting||rateLimitWait>0||!requiredConsentsAccepted||!readingOk||(guardianRequired&&(!guardianAccepted||!guardianName.trim())))return;
     setSubmitting(true);
@@ -77,7 +89,7 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
       const response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({...form,guardianName,website:'',consents:{terms:termsAccepted,privacy:privacyAccepted,guardian:guardianRequired?guardianAccepted:false,audioRecording:policy.judging.requireAudioRecording?audioAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?aiProcessingAccepted:false}})
+        body:JSON.stringify({...form,customAnswers:custom,guardianName,website:'',consents:{terms:termsAccepted,privacy:privacyAccepted,guardian:guardianRequired?guardianAccepted:false,audioRecording:policy.judging.requireAudioRecording?audioAccepted:false,aiProcessing:policy.privacy.allowAiProcessing?aiProcessingAccepted:false}})
       });
       const body=await response.json().catch(()=>({}));
       if(!response.ok){
@@ -89,6 +101,7 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
         }
         throw new Error(String(body.code||`HTTP_${response.status}`));
       }
+      try{window.localStorage.removeItem(draftKey)}catch{/* لا شيء */}
       setSubmitted({...body.participant,journeyAccessToken:body.journeyAccessToken,guardianAccessToken:body.guardianAccessToken,journeyUrl:body.journeyUrl,guardianUrl:body.guardianUrl})
     }catch(error){
       const code=error instanceof Error?error.message:'SERVER_ERROR';
@@ -100,8 +113,9 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
   if(submitted) return <div className="max-w-xl mx-auto px-4 py-16"><div className="mizan-surface p-8 text-center"><span className="w-14 h-14 rounded-full bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><BadgeCheck className="w-7 h-7"/></span><div className="mizan-kicker mt-5">{submitted.code}</div><h1 className="text-2xl font-black mt-2">{submitted.status==='approved'?(ar?'تم قبول مشاركتك':'Participation approved'):(ar?'تم استلام طلبك':'Application received')}</h1><p className="text-sm text-[#636864] mt-2">{submitted.status==='approved'?(ar?'تم إنشاء ملفك ورحلتك فعليًا. احتفظ برابطك الخاص.':'Your participant record and journey are ready. Keep your private link.'):(ar?'تم إنشاء رحلتك، ويحتاج الطلب مراجعة وفق سياسة المسابقة.':'Your journey is ready while the application awaits policy review.')}</p><div className="mt-6 grid gap-2 sm:grid-cols-2"><Button onClick={()=>{if(onSuccess)onSuccess(submitted);else window.location.href=submitted.journeyUrl}}>{ar?'فتح رحلة الطالب':'Open participant journey'}</Button><Button variant="outline" onClick={()=>void navigator.clipboard.writeText(submitted.guardianUrl)}>{ar?'نسخ رابط ولي الأمر':'Copy guardian link'}</Button></div><p className="mt-4 text-[10px] leading-5 text-[#68706b]">{ar?'رابط ولي الأمر مستقل ويعمل من جهاز آخر. لن يظهر الرمزان الخامان مرة أخرى بعد مغادرة هذه الصفحة.':'The guardian link is independent and works on another device. Raw access codes are shown only now.'}</p></div></div>;
   return <div className="max-w-2xl mx-auto px-4 sm:px-6 py-7"><div className="mb-6"><div className="mizan-kicker">{ar?'التسجيل الإلكتروني':'ONLINE REGISTRATION'}</div><h1 className="text-3xl font-black mt-1">{bilingualName(competition,ar)}</h1><div className="flex items-center gap-1.5 mt-5">{steps.map((s,i)=><React.Fragment key={i}><span className={`w-8 h-8 rounded-full grid place-items-center text-xs font-black ${i<=step?'bg-[#214C40] text-white':'bg-[#e9e7e1] text-[#696f6b]'}`}>{i<step?<Check className="w-4 h-4"/>:i+1}</span>{i<steps.length-1&&<span className={`h-px flex-1 ${i<step?'bg-[#2F6555]':'bg-[#dcdad3]'}`}/>}</React.Fragment>)}</div></div>
   <div className="mizan-surface p-6 sm:p-8 min-h-[420px]">
-   {step===0&&<div className="space-y-5"><Title icon={UserRound} title={ar?'بياناتك':'Your profile'} sub={ar?'تظهر فقط الحقول التي اختارتها هذه المسابقة.':'Only fields enabled by this competition are shown.'}/><div className="grid sm:grid-cols-2 gap-4">{policy.registration.fields.filter(f=>f.visible).map(f=>{
- const label=(ar?f.labelArabic:f.labelEnglish)+(f.required?' *':''); const value=fieldValue(f.id);
+   {step===0&&<div className="space-y-5"><Title icon={UserRound} title={ar?'بياناتك':'Your profile'} sub={ar?'تظهر فقط الحقول التي اختارتها هذه المسابقة.':'Only fields enabled by this competition are shown.'}/>{draftRestored&&<p role="status" className="text-xs font-bold text-[#2F6555]">{ar?'استُعيدت مسودتك المحفوظة على هذا الجهاز.':'Your saved draft on this device was restored.'}</p>}<div className="grid sm:grid-cols-2 gap-4">{shownFields.map(f=>{
+ if(f.custom)return <CustomField key={f.id} field={f} ar={ar} value={custom[f.id]} required={isFieldRequired(f,answers,now)} error={customErrors.find(e=>e.fieldId===f.id)?.code} onChange={v=>setCustom(c=>({...c,[f.id]:v}))}/>;
+ const label=(ar?f.labelArabic:f.labelEnglish)+(isFieldRequired(f,answers,now)?' *':''); const value=fieldValue(f.id);
  const set=(raw:string)=>{ const map:Record<string,string>={fullNameArabic:'fullNameArabic',fullName:'fullName',email:'email',phone:'phone',country:'country',nationality:'nationality',dateOfBirth:'dateOfBirth',gender:'gender',identity:'nationalIdOrPassport'}; const key=map[f.id]; if(key)setForm(prev=>({...prev,[key]:normalizeFieldValue(f.id,f.type,raw)})); };
  // الدولة: قائمة كل دول العالم مع بحث سريع، بدل قائمة ثابتة قصيرة.
  if(f.id==='country'||f.id==='nationality'){const key=f.id;return <CountryField key={f.id} label={label} value={value} ar={ar} onChange={(v)=>setForm(prev=>({...prev,[key]:v}))}/>;}
@@ -161,3 +175,30 @@ const ReviewRow=({label,value}:{label:string;value:string})=><div className="py-
  */
 type ConsentDocument={published:boolean;publisher?:string;inherited?:boolean;version?:string;url?:string};
 const Consent=({checked,onChange,label,document:doc,ar}:{checked:boolean;onChange:(v:boolean)=>void;label:string;document?:ConsentDocument;ar?:boolean})=><label className="mizan-consent text-sm font-semibold text-[#4f5752]"><input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)} className="w-4 h-4 accent-[#214C40]"/><span>{label}{doc?.published&&doc.publisher?<span className="mt-1 block text-[10px] font-bold text-[#6b716d]">{doc.url?<a href={doc.url} target="_blank" rel="noreferrer noopener" className="underline">{ar?'اقرأ الوثيقة':'Read the document'}</a>:null}{doc.url?' · ':''}{ar?'صادرة عن':'Issued by'} {doc.publisher}{doc.version?` · ${ar?'نسخة':'v'} ${doc.version}`:''}</span>:null}</span></label>;
+
+/*
+ * حقلٌ مخصّص من منشئ النموذج. يُعرض بنوعه، ويعلن خطأه لقارئ الشاشة، ولا يظهر أصلًا إن
+ * أخفاه شرط — فالمخفيّ لا يُطلب ولا يُرسل.
+ */
+const CustomField:React.FC<{field:RegistrationFieldDefinition;ar:boolean;value:Answers[string];required:boolean;error?:string;onChange:(v:Answers[string])=>void}>=({field:f,ar,value,required,error,onChange})=>{
+ const id=`reg-${f.id}`;const label=(ar?f.labelArabic:f.labelEnglish)+(required?' *':'');const help=ar?f.helpArabic:f.helpEnglish;
+ const touched=value!==undefined&&value!=='';const showError=touched&&error&&error!=='REQUIRED';
+ const describedBy=[help?`${id}-help`:'',showError?`${id}-error`:''].filter(Boolean).join(' ')||undefined;
+ const errorText=showError?(ar?'قيمة غير صالحة لهذا الحقل.':'This value is not valid.'):'';
+ if(f.type==='section')return <div className="sm:col-span-2 border-t border-[#e5e3dc] pt-4"><h3 className="text-base font-black">{ar?f.labelArabic:f.labelEnglish}</h3>{help&&<p className="text-xs text-[#646965] mt-1">{help}</p>}</div>;
+ const wrap=(control:React.ReactNode,wide=false)=><div className={wide?'sm:col-span-2':''}><label htmlFor={id} className="block text-base font-black text-[#3f4642] mb-2">{label}</label>{control}{help&&<p id={`${id}-help`} className="mt-1 text-[11px] text-[#646965]">{help}</p>}{showError&&<p id={`${id}-error`} role="alert" className="mt-1 text-[11px] font-bold text-[#A34D43]">{errorText}</p>}</div>;
+ const common={id,'aria-describedby':describedBy,'aria-invalid':showError?true:undefined,'aria-required':required||undefined} as const;
+ switch(f.type){
+  case 'long_text':return wrap(<textarea {...common} value={String(value??'')} maxLength={f.maxLength||4000} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-28"/>,true);
+  case 'number':return wrap(<input {...common} type="number" inputMode="decimal" min={f.min} max={f.max} value={value===undefined?'':String(value)} onChange={e=>onChange(e.target.value===''?undefined:Number(e.target.value))} className="mizan-input text-base min-h-14" dir="ltr"/>);
+  case 'date':return wrap(<input {...common} type="date" value={String(value??'')} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-14"/>);
+  case 'email':return wrap(<input {...common} type="email" dir="ltr" value={String(value??'')} onChange={e=>onChange(e.target.value.trim())} className="mizan-input text-base min-h-14"/>);
+  case 'phone':return wrap(<input {...common} type="tel" dir="ltr" value={String(value??'')} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-14"/>);
+  case 'select':return wrap(<select {...common} value={String(value??'')} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-14"><option value=""/>{f.options?.map(o=><option key={o.value} value={o.value}>{ar?o.labelArabic:o.labelEnglish}</option>)}</select>);
+  case 'multi_select':{const list=Array.isArray(value)?value:[];return <fieldset className="sm:col-span-2" aria-describedby={describedBy}><legend className="text-base font-black text-[#3f4642] mb-2">{label}</legend><div className="flex flex-wrap gap-3">{f.options?.map(o=><label key={o.value} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={list.includes(o.value)} onChange={e=>onChange(e.target.checked?[...list,o.value]:list.filter(x=>x!==o.value))}/>{ar?o.labelArabic:o.labelEnglish}</label>)}</div>{help&&<p id={`${id}-help`} className="mt-1 text-[11px] text-[#646965]">{help}</p>}</fieldset>}
+  case 'country':return <div><CountryField label={label} value={String(value??'')} ar={ar} onChange={v=>onChange(v)}/></div>;
+  case 'checkbox':case 'consent':return <label className="sm:col-span-2 flex items-start gap-2 text-sm font-semibold"><input id={id} type="checkbox" aria-describedby={describedBy} checked={value===true} onChange={e=>onChange(e.target.checked)} className="mt-1 w-4 h-4 accent-[#214C40]"/><span>{label}{help&&<span id={`${id}-help`} className="block text-[11px] text-[#646965]">{help}</span>}</span></label>;
+  case 'file':return wrap(<p className="text-xs text-[#646965]">{ar?'تُرفع المستندات بعد التسجيل من رابط رحلتك الخاص.':'Documents are uploaded after registration from your private journey link.'}</p>);
+  default:return wrap(<input {...common} type="text" maxLength={f.maxLength||300} value={String(value??'')} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-14"/>);
+ }
+};

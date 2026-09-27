@@ -5,12 +5,15 @@ import {
   Activity, Award, BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Clock3, FileCheck2,
   Fingerprint, Gavel, LayoutDashboard, ListChecks, LockKeyhole, Network, Plus, QrCode, RadioTower, FileUp,
   ArrowRight, Search, Settings2, ShieldCheck, Sparkles, Trash2, UsersRound, MonitorX, MonitorDot, MapPin, Copy, XCircle, Globe2, Pencil, Share2,
-  AlertTriangle, WifiOff, Check, BookMarked
+  AlertTriangle, WifiOff, Check, BookMarked, ShieldAlert,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { SurfaceBoundary } from '../design-system/SurfaceBoundary';
 import { FIXED_END_PHRASE, getCompetitionPolicy } from '../../lib/competition-config';
 import { Category, Competition, CompetitionPolicy, IncidentRecord, RegistrationFieldDefinition } from '../../types';
+import { RegistrationFormBuilder } from './RegistrationFormBuilder';
+import { ConflictOfInterestPanel, SmartSchedulePanel, QualificationPanel, RegistrationPaymentsPanel } from './GovernancePanels';
+import { DiscoverPublishPanel } from './CommercialPanels';
 import { describeScope, scopeAyahCount, scopeMetrics } from '../../lib/quran-scope';
 import { categoryScopeOf } from '../../lib/scope-engine';
 import { Button } from '../design-system/Button';
@@ -37,7 +40,7 @@ import { TieDecisionPanel } from './TieDecisionPanel';
 
 const isAr=(language:string)=>language==='ar';
 type MainView='overview'|'design'|'engine'|'participants'|'operations'|'judging'|'results'|'enterprise';
-type PolicySection='identity'|'registration'|'judging'|'appeals'|'results'|'certificate';
+type PolicySection='identity'|'registration'|'judging'|'appeals'|'results'|'certificate'|'conflicts'|'schedule'|'qualification'|'discover';
 
 type Store=ReturnType<typeof useAppStore>;
 
@@ -189,7 +192,7 @@ const ScopeAndQuestions=({store,ar,policy,patchPolicy}:{store:Store;ar:boolean;p
 };
 
 const CompetitionDNA=({store,ar,policy,section,setSection,patchPolicy}:{store:Store;ar:boolean;policy:CompetitionPolicy;section:PolicySection;setSection:(s:PolicySection)=>void;patchPolicy:(fn:(p:CompetitionPolicy)=>void)=>void})=>{
- const {competition}=store; const sections:[PolicySection,React.ComponentType<{className?:string}>,string][]=[['identity',Fingerprint,ar?'الهوية والفئات':'Identity & categories'],['registration',FileCheck2,ar?'التسجيل والشروط':'Registration'],['judging',Gavel,ar?'التحكيم':'Judging'],['appeals',ListChecks,ar?'الاعتراضات':'Appeals'],['results',LockKeyhole,ar?'النتائج':'Results'],['certificate',Award,ar?'الشهادة':'Certificates']];
+ const {competition}=store; const sections:[PolicySection,React.ComponentType<{className?:string}>,string][]=[['identity',Fingerprint,ar?'الهوية والفئات':'Identity & categories'],['registration',FileCheck2,ar?'التسجيل والشروط':'Registration'],['judging',Gavel,ar?'التحكيم':'Judging'],['appeals',ListChecks,ar?'الاعتراضات':'Appeals'],['results',LockKeyhole,ar?'النتائج':'Results'],['certificate',Award,ar?'الشهادة':'Certificates'],['conflicts',ShieldAlert,ar?'تضارب المصالح':'Conflicts of interest'],['schedule',CalendarDays,ar?'الجدولة الذكية':'Smart schedule'],['qualification',Network,ar?'هرم التأهيل':'Qualification'],['discover',Globe2,ar?'دليل الاكتشاف':'Discover']];
  return <div className="space-y-4">
   <div className="grid lg:grid-cols-[220px_minmax(0,1fr)] gap-4 min-w-0">
    <div className="mizan-surface p-2 h-fit"><div className="grid grid-cols-2 lg:grid-cols-1 gap-1">{sections.map(([id,Icon,label])=><button key={id} onClick={()=>setSection(id)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-start ${section===id?'bg-[#E7EEE9] text-[#214C40]':'text-[#626a65] hover:bg-[#f2f0ea]'}`}><Icon className="w-4 h-4 shrink-0"/><span className="truncate min-w-0">{label}</span></button>)}</div></div>
@@ -200,6 +203,10 @@ const CompetitionDNA=({store,ar,policy,section,setSection,patchPolicy}:{store:St
     {section==='appeals'&&<AppealsSection ar={ar} policy={policy} patch={patchPolicy}/>} 
     {section==='results'&&<ResultPolicySection ar={ar} policy={policy} patch={patchPolicy}/>} 
     {section==='certificate'&&<CertificateSection store={store} ar={ar} policy={policy} patch={patchPolicy}/>} 
+    {section==='conflicts'&&<ConflictOfInterestPanel mode="review"/>}
+    {section==='schedule'&&<SmartSchedulePanel/>}
+    {section==='qualification'&&<QualificationPanel/>}
+    {section==='discover'&&<DiscoverPublishPanel/>}
    </div>
   </div>
  </div>;
@@ -310,7 +317,7 @@ const RegistrationSection=({ar,policy,patch}:{ar:boolean;policy:CompetitionPolic
 {policy.registration.autoApproveEligible&&policy.registration.requireIdentityVerification
   ?<p className="mt-2 rounded-xl bg-[#F5EDE2] px-3 py-2 text-xs font-bold leading-5 text-[#725630]">{ar?'الاعتماد التلقائي لا يعمل الآن: «التحقق من الهوية» مطلوب، فكل طلب يذهب إلى المراجعة. أطفئه أدناه ليعمل الاعتماد التلقائي.':'Automatic approval is inactive: identity verification is required, so every application routes to review.'}</p>
   :<p className="mt-2 text-[11px] leading-5 text-[#6a706c]">{ar?'أي حالة أهلية غير محسومة تبقى للمراجعة حتى مع الاعتماد التلقائي.':'Unresolved eligibility still routes to review even in automatic mode.'}</p>}
-<div className="mt-3 border-t border-[#e5e3dc] px-1"><Toggle value={policy.registration.requireIdentityVerification} onChange={v=>patch(p=>{p.registration.requireIdentityVerification=v})} label={ar?'تحقق من الهوية قبل الاعتماد':'Verify identity before approval'}/><Toggle value={policy.registration.requireGuardianForMinors} onChange={v=>patch(p=>{p.registration.requireGuardianForMinors=v})} label={ar?'ولي أمر للقاصر':'Guardian for minors'}/></div></div><div><div className="text-xs font-black text-[#606662] mb-2">{ar?'حقول التسجيل':'Registration fields'}</div><div className="divide-y divide-[#e5e3dc] border-y border-[#e5e3dc]">{policy.registration.fields.map((f,i)=><RegistrationFieldRow key={f.id} f={f} ar={ar} onVisible={v=>patch(p=>{p.registration.fields[i].visible=v})} onRequired={v=>patch(p=>{p.registration.fields[i].required=v})}/>)}</div></div><div className="rounded-xl bg-[#F2EADC] text-[#725630] p-3 text-xs">{ar?'شروط الفئة مثل العمر والجنس والنطاق تُطبّق فوق هذه الحقول، وأي حالة غير محسومة تذهب للمراجعة البشرية.':'Category rules such as age, gender and scope apply on top of these fields; unresolved cases go to human review.'}</div></div>;
+<div className="mt-3 border-t border-[#e5e3dc] px-1"><Toggle value={policy.registration.requireIdentityVerification} onChange={v=>patch(p=>{p.registration.requireIdentityVerification=v})} label={ar?'تحقق من الهوية قبل الاعتماد':'Verify identity before approval'}/><Toggle value={policy.registration.requireGuardianForMinors} onChange={v=>patch(p=>{p.registration.requireGuardianForMinors=v})} label={ar?'ولي أمر للقاصر':'Guardian for minors'}/></div></div><div><div className="text-xs font-black text-[#606662] mb-2">{ar?'حقول التسجيل':'Registration fields'}</div><div className="divide-y divide-[#e5e3dc] border-y border-[#e5e3dc]">{policy.registration.fields.map((f,i)=><RegistrationFieldRow key={f.id} f={f} ar={ar} onVisible={v=>patch(p=>{p.registration.fields[i].visible=v})} onRequired={v=>patch(p=>{p.registration.fields[i].required=v})}/>)}</div><div className="mt-4"><RegistrationFormBuilder ar={ar} registration={policy.registration} onChange={mutate=>patch(p=>{mutate(p.registration)})}/><RegistrationPaymentsPanel/></div></div><div className="rounded-xl bg-[#F2EADC] text-[#725630] p-3 text-xs">{ar?'شروط الفئة مثل العمر والجنس والنطاق تُطبّق فوق هذه الحقول، وأي حالة غير محسومة تذهب للمراجعة البشرية.':'Category rules such as age, gender and scope apply on top of these fields; unresolved cases go to human review.'}</div></div>;
 
 /* مشاركة رابط تسجيل هذه المسابقة: زرّ نسخ كبير، ومشاركة، ورمز QR — والرابط الخام لا يُعرض
    إلا حين يمنع المتصفح النسخ فيحتاجه المستخدم لينسخه بيده. */

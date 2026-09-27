@@ -297,28 +297,71 @@ Existing tests changed:
   notification center is unchanged; this change emits audit events and webhooks only.
 - SAML/enterprise SSO: no provider is configured and nothing was built.
 
-### NOT IMPLEMENTED / BLOCKED (explicitly out of this change)
-- **Webhook event coverage.** Webhooks are emitted for the subscription events only. The
-  competition-domain events (registration, check-in, judging, results, certificates) are
-  defined and signable, but they are not yet emitted from the Firestore-side flows.
-- **Discover publishing UI.** There is no publishing form in the competition screen yet.
-  Listings are published through the API
-  (`POST /api/saas/organization/discover`).
-- **Full app-chrome white label.** Host brand applies to the Discover page, the document title
-  and the favicon. The authenticated admin shell, login screen and email templates still render
-  MIZAN branding. Brand resolution data (`/api/public/brand`) is available for them to consume.
-- **Registration Form Builder extensions.** The existing field schema was not extended: no
-  conditional logic, no new field types, no autosave or resume.
-- **Workflows and planning:** conflict-of-interest/recusal workflow, Smart Scheduler,
-  qualification hierarchy.
-- **Participant registration payments** (organization-charged fees).
-- **Additional UI languages.** The namespace is ready; only AR and EN exist.
+### COMPLETED IN THE FOLLOW-UP CHANGE (second PR)
+- **Registration form builder** (`src/lib/registration-form.ts`, `RegistrationFormBuilder.tsx`):
+  13 field types, declarative `visibleWhen`/`requiredWhen` rules (including derived `age`),
+  identical validation in the browser and on the server, hidden-branch answers never stored,
+  schema validation in the builder.
+- **Drafts, autosave, edit:** device-local autosaved drafts restored on return; participants edit
+  their registration with their journey token until the deadline (`PUT
+  /api/public/competitions/:id/registration`), fully revalidated, locked after the deadline or
+  once checked in, with a per-field change log that records field names, not values.
+- **Registration fees set by the organization** (not MIZAN fees): `registration.fee` policy,
+  per-participant `registrationPayment` (pending/paid/refunded/waived) with receipt references
+  and audit. No payment gateway is connected; collection is recorded manually.
+- **Conflict of interest / recusal** (`conflict-of-interest.ts`): declare, recuse or abstain with a
+  reason; head judge/admin decides (reassign participant, replace judge, keep with reason,
+  reject); self-resolution blocked; the original assignment is snapshotted; routing and the
+  scheduler exclude conflicted panels. Firestore rules: a judge can only create an open case in
+  their own name; decisions are admin/head-judge only; nothing is deletable.
+- **Smart scheduler** (`smart-scheduler.ts`): deterministic, explainable timetable from days,
+  per-category session length, breaks, prayer breaks, transitions, hall capacity, judge
+  availability and conflicts; unscheduled items carry reasons; manual pins recompute around
+  them; draft → published with audit.
+- **Qualification hierarchy** (`qualification.ts`): `qualifier_for` links with cycle detection;
+  qualifiers computed only from sealed/published results with seal evidence; invitations
+  create a *draft* participant carrying `qualifiedFrom` provenance (no automatic registration);
+  status transitions with mandatory revoke reason.
+- **Competition-domain webhooks:** `registration.created/updated` from the server;
+  `participant.checked_in`, `judging.completed`, `results.published`, `certificate.issued`,
+  `competition.completed` reported by the client to `POST /api/saas/events`, where the server
+  derives the organization from identity, allow-lists event types per role, strips payloads to
+  IDs (no PII) and deduplicates.
+- **Webhook DNS pinning:** delivery goes over `https.request` with `lookup` pinned to the
+  address that passed the private-range check; SNI and certificate validation are kept.
+- **White label across the shell:** `/api/public/brand` is loaded before first render; title,
+  favicon and colour tokens applied; the shared logo/wordmark (header, login, splash, portals)
+  uses the host brand, and the MIZAN mark is hidden when the agreement allows.
+- **Discover publishing UI** in Competition settings → Discover, prefilled from the
+  competition, with only the visibility options the organization's rights allow.
+- **Automated communications** (`server/communications.ts`): one outbox for in-app, email, SMS
+  and WhatsApp; AR/EN templates for all listed triggers; dedupe; retries with backoff; masked
+  listings; triggers wired for registration confirmation, renewal approaching (30/7 days),
+  overdue payment, results published, certificate issued.
+- **Enterprise SSO** (`server/sso.ts`): per-organization SAML/OIDC configuration backed by
+  Firebase Identity Platform, email-domain discovery on the login screen, "Sign in with …"
+  button, least-privilege group→role suggestion (never platform/operator roles). Grants still go
+  through identity governance.
+
+### REQUIRES EXTERNAL PROVIDER / CONFIGURATION (after the follow-up)
+- Email/SMS/WhatsApp gateways: set `MIZAN_EMAIL_HTTP_*`, `MIZAN_SMS_HTTP_*`,
+  `MIZAN_WHATSAPP_HTTP_*`. Until then those messages are recorded as `provider_not_configured`.
+- SSO: upgrade the Firebase project to Identity Platform and register each organization's SAML
+  or OIDC provider there.
+- Payment gateway for organization registration fees.
+
+### STILL NOT IMPLEMENTED
+- **Incomplete-registration reminders:** drafts are stored on the participant's device only
+  (privacy by design), so the server cannot know about them. The template exists.
+- **Schedule-assigned / check-in reminders to participants:** the templates exist, but
+  participant contact details live in Firestore and the schedule is published client-side; no
+  server job sends them yet.
+- **Automatic role grants from SSO groups:** deliberately not done; the suggestion is shown to
+  admins and grants follow the existing governance flow.
+- **Additional UI languages** beyond Arabic and English (the namespaces are ready).
 - **MIZAN Passport** — future work by design.
-- **Multi-instance writes.** The SaaS store is a single-writer JSON file. Transactions are
-  serialized within one process, which is what guarantees the 150-seat and active-cap races,
-  but it is not safe for multiple concurrent server instances writing the same file. Scaling
-  horizontally requires moving the repository to a transactional database (e.g. Firestore
-  transactions), keeping the same engine functions.
+- **Multi-instance writes:** the SaaS, communications and SSO stores are single-writer JSON
+  files. Horizontal scaling requires a transactional database.
 
 ## 21. Remaining issues
 
