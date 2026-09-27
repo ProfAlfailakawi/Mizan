@@ -11,8 +11,9 @@ import { getCompetitionPolicy } from '../../lib/competition-config';
 import { bilingualName } from '../../lib/ui-language';
 import type { Category, ScopeSimulationRecord } from '../../types';
 import {
-  describeScope, fullQuranScope, scopeAyahCount, scopeFromJuzRange, scopeSignature, scopeSubtract, scopeUnion, type QuranScope,
+  describeScope, fullQuranScope, scopeAyahCount, scopeFromJuzRange, scopeMetrics, scopeSignature, scopeSubtract, scopeUnion, type QuranScope,
 } from '../../lib/quran-scope';
+import { DnaHeat, DnaIconTile, DnaRing } from '../dna/DnaKit';
 import {
   autoBalancedZones, describeZone, emptyZone, validateDistributionPlan, zoneQuestionTotal,
   type QuestionDistributionPlan, type QuestionZone,
@@ -288,6 +289,30 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
       <SectionHead ar={ar} kicker={ar ? 'توزيع الأسئلة' : 'QUESTION DISTRIBUTION'} title={ar ? 'من أين يأتي كل سؤال؟' : 'Where does each question come from?'}
         hint={ar ? 'كم سؤالًا يُسأل كل متسابق؟' : 'The question count is independent of the range size in both directions.'} />
 
+      {/* شريط الأجزاء الثلاثين: عرضٌ فقط لما يغطّيه نطاق الفئة ومناطقها — لا يغيّر شيئًا. */}
+      {(() => {
+        const m = scopeMetrics(scope);
+        const full = new Set(m.fullJuz), partial = new Set(m.partialJuz);
+        const zoneJuz = draft.mode === 'free' ? [] : draft.zones.map(z => { const zm = scopeMetrics(z.scope); return new Set([...zm.fullJuz, ...zm.partialJuz]); });
+        const cells = Array.from({ length: 30 }, (_, i) => {
+          const juz = i + 1;
+          const cover = full.has(juz) ? 1 : partial.has(juz) ? 0.5 : 0;
+          const zones = zoneJuz.filter(set => set.has(juz)).length;
+          const state = cover === 1 ? (ar ? 'كامل' : 'full') : cover ? (ar ? 'جزئي' : 'partial') : (ar ? 'خارج النطاق' : 'outside the range');
+          return { key: String(juz), value: cover, label: `${ar ? 'الجزء' : 'Juz'} ${juz} — ${state}${zones ? (ar ? ` · ${zones} منطقة` : ` · ${zones} zone${zones === 1 ? '' : 's'}`) : ''}` };
+        });
+        return (
+          <div className="dna-surface px-4 py-3.5">
+            <div className="flex items-center justify-between gap-3 text-xs font-bold text-[var(--muted)]">
+              <span>{ar ? 'الأجزاء في نطاق الفئة' : 'Juz in the category range'}</span>
+              <span className="tabular-nums" dir="ltr">{m.fullJuz.length + m.partialJuz.length}/30</span>
+            </div>
+            <DnaHeat className="mizan-juz-ribbon mt-2.5" cells={cells} max={1} columns={30} ariaLabel={ar ? `الأجزاء في نطاق الفئة: ${m.fullJuz.length} كامل و${m.partialJuz.length} جزئي من 30` : `Juz in range: ${m.fullJuz.length} full, ${m.partialJuz.length} partial of 30`} />
+            <div className="mt-1.5 flex justify-between text-[10px] font-medium tabular-nums text-[var(--muted)]" aria-hidden="true"><span>1</span><span>30</span></div>
+          </div>
+        );
+      })()}
+
       <div className="grid gap-3 sm:grid-cols-2">
         <NumberBox ar={ar} label={ar ? 'عدد الأسئلة لكل متسابق' : 'Questions per participant'} value={questionCount} min={1} max={40}
           onChange={v => store.setCategoryQuestionCount(category.id, v)} hint={ar ? 'يتقدّم على إعداد المسابقة العام.' : 'Overrides the competition-wide setting.'} />
@@ -526,20 +551,23 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
   return (
     <div className="space-y-5">
       {confirmDialog}
-      <div className={`rounded-2xl border p-5 ${readiness.ready ? 'border-[#cddbd3] bg-[#F7FAF8]' : 'border-[#e0c6c1] bg-[#F9F0EE]'}`} role="status">
+      <div className="dna-surface p-5" role="status">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className={`inline-flex items-center gap-2 text-lg font-black ${readiness.ready ? 'text-[#214C40]' : 'text-[#8a3f34]'}`}>
+          <div className="flex min-w-0 items-center gap-4">
+          <DnaRing value={readiness.passed} max={Math.max(1, readiness.checks.length)} size={60} stroke={5} tone={readiness.ready ? 'accent' : 'danger'} label={<span className="tabular-nums" dir="ltr">{readiness.passed}/{readiness.checks.length}</span>} ariaLabel={ar ? `${readiness.passed} من ${readiness.checks.length} فحصًا ناجحًا` : `${readiness.passed} of ${readiness.checks.length} checks passed`} />
+          <div className="min-w-0">
+            <h2 className={`inline-flex items-center gap-2 text-lg font-black ${readiness.ready ? 'text-[var(--emerald)]' : 'text-[var(--danger)]'}`}>
               {readiness.ready ? <ShieldCheck className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}
               {readiness.ready
                 ? (ar ? `جاهز — ${readiness.passed} من ${readiness.checks.length} فحصًا ناجحًا` : `Ready — ${readiness.passed} of ${readiness.checks.length} checks passed`)
                 : (ar ? `غير جاهز — ${readiness.critical} ${readiness.critical === 1 ? 'مشكلة حرجة' : 'مشكلات حرجة'}` : `Not ready — ${readiness.critical} critical issues`)}
             </h2>
-            <p className="mt-1 text-xs text-[#5b6460]">{ar ? 'المحرك لا يسمح بتشغيل مسابقة رسمية وفيها مشكلة حرجة.' : 'An official competition cannot run with a critical issue open.'}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">{ar ? 'المحرك لا يسمح بتشغيل مسابقة رسمية وفيها مشكلة حرجة.' : 'An official competition cannot run with a critical issue open.'}</p>
+          </div>
           </div>
           <Button onClick={() => void seal()} disabled={!readiness.ready} icon={<LockKeyhole className="h-4 w-4" />}>{ar ? 'تجميد الإعداد' : 'Freeze configuration'}</Button>
         </div>
-        {sealError && <p role="alert" className="mt-3 rounded-xl bg-[#F6E7E7] px-3 py-2 text-xs font-bold text-[#7A2E2E]">{sealError}</p>}
+        {sealError && <p role="alert" className="mt-3 rounded-xl bg-[var(--danger-soft)] px-3 py-2 text-xs font-bold text-[var(--danger)]">{sealError}</p>}
       </div>
 
       {runtimeHealth && runtimeHealth.source !== 'server' && (
@@ -548,16 +576,19 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
         </div>
       )}
 
-      <ul className="space-y-2">
+      <ul className="dna-surface divide-y divide-dashed divide-[var(--line)] overflow-hidden">
         {readiness.checks.map(check => (
-          <li key={check.id} className={`rounded-2xl border p-4 ${check.severity === 'critical' ? 'border-[#e0c6c1] bg-[#F9F0EE]' : check.severity === 'warning' ? 'border-[#e6d9c2] bg-[#FBF7F0]' : check.severity === 'recommendation' ? 'border-[#dfe6ea] bg-[#F4F7F9]' : 'border-[#e4e2da] bg-white'}`}>
+          <li key={check.id} data-severity={check.severity} className="p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#24302b]">
-                  {check.severity === 'passed' ? <CheckCircle2 className="h-4 w-4 text-[#214C40]" /> : check.severity === 'critical' ? <AlertTriangle className="h-4 w-4 text-[#8a3f34]" /> : <CircleAlert className="h-4 w-4 text-[#7d5e34]" />}
+              <div className="flex min-w-0 items-start gap-3">
+                <DnaIconTile size="sm" tone={check.severity === 'passed' ? 'accent' : check.severity === 'critical' ? 'danger' : check.severity === 'warning' ? 'warn' : 'info'}
+                  icon={check.severity === 'passed' ? <CheckCircle2 className="h-4 w-4" /> : check.severity === 'critical' ? <AlertTriangle className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />} />
+                <div className="min-w-0">
+                <h3 className="text-sm font-black text-[var(--ink)]">
                   {ar ? check.titleAr : check.titleEn}
                 </h3>
-                <p className="mt-1.5 text-xs leading-6 text-[#4f5752]">{ar ? check.detailAr : check.detailEn}</p>
+                <p className="mt-1 text-xs leading-6 text-[var(--muted)]">{ar ? check.detailAr : check.detailEn}</p>
+                </div>
               </div>
               {check.severity !== 'passed' && check.fix !== 'none' && (
                 check.id === 'escrow'
