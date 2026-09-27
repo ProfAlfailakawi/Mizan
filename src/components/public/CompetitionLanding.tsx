@@ -223,7 +223,7 @@ export const CompetitionLanding: React.FC = () => {
                           {category.winners.map(winner => (
                             <li key={`${winner.rank}-${winner.participantCode}`} className="flex items-center gap-2.5 text-[13px]">
                               <Trophy className="h-4 w-4 shrink-0 text-[#c9a227]" />
-                              <span className="min-w-0 flex-1 truncate font-bold">{ar ? winner.participantNameArabic : winner.participantName}</span>
+                              <span className="min-w-0 flex-1 break-words sm:truncate font-bold">{ar ? winner.participantNameArabic : winner.participantName}</span>
                               <span className="shrink-0 text-[11px] font-black text-[#67635a]">{ar ? winner.placeTitleArabic : winner.placeTitleEnglish}</span>
                               <span className="shrink-0 text-[11px] font-black tabular-nums text-[#1b5346]">{winner.percentage}%</span>
                             </li>

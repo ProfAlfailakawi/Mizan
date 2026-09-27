@@ -227,10 +227,83 @@ export function demoOrganizationUsage(organizationId = 'org-demo-mizan') {
   };
 }
 
+/*
+ * غرفة قيادة المنصّة (`/api/owner/control-tower`) في بيئة العرض.
+ *
+ * الشكل هو ما يبنيه `ControlTowerRepository.buildSnapshot` في الخادم حرفيًّا، والأرقام
+ * من الجهات الأربع أعلاه نفسها: ثلاث نشطة وواحدة موقوفة، ومسابقاتها الحيّة، وقضايا ثلاث
+ * تحتاج المالك — واحدةٌ يحلّها ميزان بضغطة، وواحدةٌ عند الجهة، وواحدةٌ محميّة بالنزاهة لا
+ * تُحلّ إلا بمسار حوكمة. فيرى الزائر كل صنفٍ من أصناف «ميزان Doctor» مرةً واحدة.
+ */
+export function demoOwnerControlTower() {
+  const now = new Date().toISOString();
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const signals = [
+    { key: 'api', label: 'واجهة ميزان', state: 'HEALTHY', source: 'probe', checkedAt: minutesAgo(1) },
+    { key: 'firestore', label: 'قاعدة البيانات', state: 'HEALTHY', source: 'probe', checkedAt: minutesAgo(1) },
+    { key: 'storage', label: 'تخزين الجهات', state: 'HEALTHY', source: 'probe', checkedAt: minutesAgo(2) },
+    { key: 'notifications', label: 'الإشعارات', state: 'DEGRADED', source: 'telemetry', checkedAt: minutesAgo(3), reason: 'مزوّد الرسائل القصيرة يردّ ببطء', tenantId: 'org-demo-hafiz' },
+    { key: 'edge', label: 'خوادم القاعات', state: 'HEALTHY', source: 'heartbeat', checkedAt: minutesAgo(1) },
+  ];
+  const needsAttention = [
+    {
+      id: 'diag-demo-1', code: 'NOTIFICATION_PROVIDER_SLOW', tenantId: 'org-demo-hafiz', classification: 'MIZAN_ACTION_REQUIRED', confidence: 'HIGH',
+      rootCause: 'SMS provider latency above threshold', evidence: [{ check: 'زمن ردّ المزوّد', state: 'DEGRADED', detail: '4.8 ثانية (الحدّ 2)' }, { check: 'رسائل فاشلة آخر ساعة', state: 'FAIL', detail: '37 من 612' }],
+      recommendedActions: ['notification.retry', 'provider.circuit_break'], safeActionCodes: ['notification.retry', 'provider.circuit_break', 'diagnostic.bundle.generate'],
+      doctorSummaryArabic: 'رسائل «اقترب دورك» تتأخّر لدى مؤسسة حفّاظ الخليج', doctorSummaryEnglish: 'Turn-soon SMS messages are delayed for Gulf Huffaz',
+    },
+    {
+      id: 'diag-demo-2', code: 'HOST_REQUIRED', tenantId: 'org-demo-nour', classification: 'TENANT_ACTION_REQUIRED', confidence: 'HIGH',
+      rootCause: 'HOST_REQUIRED', evidence: [{ check: 'نطاق الجهة', state: 'UNKNOWN', detail: 'لم يُضبط نطاق فرعي' }],
+      recommendedActions: ['domain.retest'], safeActionCodes: ['domain.retest'],
+      remedy: { kind: 'configure', actions: [], hintArabic: 'تضبط جمعية نور التلاوة نطاقها الفرعي من «إدارة الجهة ← الهوية»، ثم يُعاد الاختبار تلقائيًا.', hintEnglish: 'The tenant sets its subdomain, then the check re-runs automatically.' },
+      doctorSummaryArabic: 'جمعية نور التلاوة لم تضبط نطاقها بعد', doctorSummaryEnglish: 'Noor Tilawa has not configured its domain yet',
+    },
+    {
+      id: 'diag-demo-3', code: 'SEAL_QUORUM_PENDING', tenantId: 'org-demo-mizan', competitionId: 'comp-dubai-2027', classification: 'INTEGRITY_PROTECTED', confidence: 'MEDIUM',
+      rootCause: 'Result seal waiting for second approver', evidence: [{ check: 'نصاب الختم', state: 'UNKNOWN', detail: 'موافقة 1 من 2' }],
+      recommendedActions: [], safeActionCodes: [],
+      doctorSummaryArabic: 'ختم نتائج مسابقة ميزان ينتظر الموافقة الثانية', doctorSummaryEnglish: 'Mizan competition seal is waiting for the second approval',
+    },
+  ];
+  const active = DEMO_ORGS.filter(o => o.status === 'active');
+  return {
+    generatedAt: now,
+    platform: { state: 'DEGRADED', healthScore: 94, scoreAvailable: true, unknownSignals: 0, signals },
+    metrics: {
+      activeTenants: active.length,
+      liveCompetitions: active.reduce((n, o) => n + o.activeCompetitions, 0),
+      connectedUsers: 318,
+      connectedDevices: 46,
+      activeIncidents: 1,
+      degradedTenants: 1,
+      authFailureSpike: null,
+      notificationFailureRate: 0.06,
+      autoHealedToday: 4,
+      unresolvedProblems: needsAttention.length,
+      supportEscalations: 2,
+    },
+    needsAttention,
+    autoResolved: [],
+    incidents: [{ id: 'inc-demo-1', tenantId: 'org-demo-hafiz', severity: 'MEDIUM', status: 'MONITORING', title: 'تأخّر الرسائل القصيرة', openedAt: minutesAgo(42) }],
+    supportSessions: [],
+    knownErrors: [],
+    commercial: [],
+    killSwitches: [],
+    safeSnapshots: [],
+    breakGlass: [],
+    autoHealRuns: [],
+    telemetry: null,
+    playbooks: [],
+    summaryCadence: { daily: 'ملخّص يومي بالقضايا المفتوحة والإصلاحات التلقائية', weekly: 'ملخّص أسبوعي بالاتجاهات والجهات الأكثر ضجيجًا' },
+  };
+}
+
 /** يردّ حمولة العرض لمسار الخادم المطلوب، أو `null` إن لم يكن لهذا المسار مقابلٌ هنا. */
 export function demoCommercialResponse(path: string): unknown | null {
   if (path.startsWith('/api/saas/owner/dashboard')) return demoOwnerDashboard();
   if (path.startsWith('/api/saas/operator/dashboard')) return demoOperatorDashboard();
   if (path.startsWith('/api/saas/organization')) return demoOrganizationUsage();
+  if (path.startsWith('/api/owner/control-tower')) return demoOwnerControlTower();
   return null;
 }

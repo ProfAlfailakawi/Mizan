@@ -1,6 +1,7 @@
 import type { AICapability, FederationClaimType } from '../types';
 
 const AR_TOKENS:Record<string,string>={
+  registration_open:'التسجيل مفتوح', registration_closed:'التسجيل مغلق', judging_complete:'انتهى التحكيم', results_sealed:'النتائج معتمدة', results_published:'النتائج معلنة',
   CERTIFIED:'معتمد علميًا', PENDING_REVIEW:'بانتظار المراجعة', DEVELOPMENT:'بيئة تطوير', REVOKED:'ملغى', SUSPENDED:'موقوف', UNSUPPORTED:'غير مدعوم', BETA:'تجريبي', RESEARCH:'بحثي', PENDING_VALIDATION:'بانتظار التحقق',
   APPROVED_REFERENCE:'مرجع صوتي معتمد', REFERENCE:'مرجع', COMPLETED:'مكتمل', INVALIDATED:'ملغى', PASS:'ناجح', WARNING:'تنبيه', FAIL:'فشل', PASS_WITH_WARNINGS:'ناجح مع تنبيهات', READY:'جاهز',
   SEALED:'مختوم', REVEALED:'مكشوف', APPLIED:'تم التطبيق', PROPOSED:'مقترح', APPROVED:'معتمد', DISMISSED:'مرفوض', BLOCKED:'محظور', AUTHENTIC:'أصيل', NOT_FOUND:'غير موجود', INVALID_PROOF:'إثبات غير صالح',

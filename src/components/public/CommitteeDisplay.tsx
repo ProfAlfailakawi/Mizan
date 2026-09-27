@@ -243,13 +243,13 @@ const PanelChooser: React.FC<{ board: DisplayBoard; ar: boolean; missing: boolea
         : (ar ? 'يُحفظ الاختيار على هذا الجهاز، فيعود إليه بعد إعادة التشغيل بلا ضبطٍ جديد.' : 'The choice is stored on this device, so it returns after a restart.')}
     </p>
     {board.committees.length
-      ? <div className="grid sm:grid-cols-2 gap-3 mt-7 text-start">
+      ? <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-7 text-start">
           {board.committees.map((c) => <button key={c.committeeId} type="button" onClick={() => onPick(c.code || c.committeeId)}
-            className="rounded-3xl border border-white/12 bg-white/[.045] hover:bg-white/[.09] transition p-4 flex items-center gap-4 min-h-16">
+            className="rounded-3xl border border-white/12 bg-white/[.045] hover:bg-white/[.09] transition p-4 flex items-center gap-4 min-h-16 min-w-0 text-start">
             <span className="shrink-0 w-12 h-12 rounded-2xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums">{c.code}</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-black truncate">{bilingualName(c, ar)}</span>
-              <span className="block text-[11px] mizan-venue-muted truncate mt-0.5">{categoryLine(c.categories, ar)}{c.venueHall ? ` · ${c.venueHall}` : ''}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-black break-words sm:truncate">{bilingualName(c, ar)}</span>
+              <span className="block text-xs sm:text-[11px] mizan-venue-muted break-words sm:truncate mt-0.5">{categoryLine(c.categories, ar)}{c.venueHall ? ` · ${c.venueHall}` : ''}</span>
             </span>
           </button>)}
         </div>

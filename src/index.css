@@ -1853,6 +1853,22 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-journey__go{ grid-row:1 / span 2; grid-column:3; font-size:10.5px; font-weight:900; color:#214C40; border:1px solid #cfd6d2; border-radius:999px; padding:.3rem .7rem; background:#fff; white-space:nowrap }
 @media (max-width:520px){ .mizan-journey__hard li{ grid-template-columns:auto 1fr } .mizan-journey__go{ grid-column:1 / -1; grid-row:auto; justify-self:start } }
 
+/*
+ * الهاتف: حدٌّ أدنى للقراءة.
+ *
+ * الأوسمة والعناوين الصغيرة وتسميات الحقول كُتبت بـ ٩–١١px لسطح المكتب حيث تُقرأ عن قرب
+ * بشاشةٍ واسعة. وعلى هاتفٍ في اليد، في قاعةٍ مزدحمة، تصير نقاطًا. فتُرفع على العرض الضيّق
+ * وحده إلى ١٢px — ولا يتغيّر سطح المكتب بكسلًا. وتُستثنى شاشات القاعة (`mizan-venue-2`)
+ * فمقاساتها محسوبة للجدار.
+ */
+@media (max-width:639px){
+  :where(body) :not(.mizan-venue-2 *):is(.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[11\.5px\]){ font-size:12px; line-height:1.5 }
+  .mizan-badge-sm{ font-size:12px }
+  .mizan-field-label,.mizan-kicker,.mizan-code small{ font-size:12px }
+  /* التبويبات أهدافُ إبهامٍ على الهاتف: ٤٤px لا ٣٨. */
+  .mizan-tab,.mizan-tabs-sm .mizan-tab{ min-height:44px }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
@@ -1939,3 +1955,4 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 
 /* الترويسة على الجوال: العلامة وحدها، والاسم في سطره تحتها (Header.tsx). */
 @media (max-width:639px){.mizan-header-logo .mizan-wordmark{display:none}}
+

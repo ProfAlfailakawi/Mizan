@@ -39,7 +39,8 @@ const ok = (m) => console.log(`  ✓ ${m}`);
 const DEMO_ENTRY = 'جرّب النسخة التجريبية';
 /* شاشات الإدارة كما تظهر في شريط التبويبات على الهاتف. */
 const ADMIN_ROLE = 'مدير المسابقة';
-const VIEWS = ['اليوم', 'هوية المسابقة', 'النطاق والأسئلة', 'المشاركون', 'التشغيل', 'التحكيم', 'النتائج', 'المؤسسة'];
+/* على الهاتف تُختصر بعض التسميات («الهوية»، «الأسئلة»)؛ فيُقبل الاسمان. */
+const VIEWS = ['اليوم', 'هوية المسابقة|الهوية', 'النطاق والأسئلة|الأسئلة', 'المشاركون', 'التشغيل', 'التحكيم', 'النتائج', 'المؤسسة'];
 
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM || undefined });
 const ctx = await browser.newContext({ viewport: { width: WIDTH, height: 844 }, locale: 'ar', deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -130,7 +131,7 @@ if (!entered) { note(`تعذّر الدخول بدور «${ADMIN_ROLE}» — ل�
 let visited = 0;
 
 for (const view of VIEWS) {
-  const tab = page.locator('button:visible', { hasText: new RegExp(`^\\s*${view}\\s*$`) }).first();
+  const tab = page.locator('button:visible', { hasText: new RegExp(`^\\s*(?:${view})\\s*$`) }).first();
   if (!await tab.count()) { note(`«${view}» لم تظهر في شريط التبويبات، فلم تُقَس`); continue }
   await tab.click().catch(() => {});
   await page.waitForTimeout(1600);
