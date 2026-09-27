@@ -1534,7 +1534,8 @@ export function useAppStore() {
     if (panelJudges.some(j => j.conflictsDeclared.some(c => c.hardConflict && (c.participantId === participant.id || (!!c.institution && !!participant.institution && c.institution.trim().toLowerCase() === participant.institution.trim().toLowerCase()))))) return true;
     /* حالات تضارب المصالح المعلنة: المفتوحة، أو المحسومة بقرارٍ لا يسمح بالتحكيم، تُبعد اللجنة. */
     const cases = globalState.conflictCases.filter(c => c.competitionId === globalState.competition.id);
-    return committee.judgeIds.some(j => !judgeMayScore(cases, j, participant).allowed);
+    const uids = judgeUidMap();
+    return committee.judgeIds.some(j => !judgeMayScore(cases, j, participant, uids).allowed);
   };
 
   /*
@@ -3926,6 +3927,8 @@ const prepareJourneyAccessBatch=async()=>{
   const endSupportSession=(id:string)=>{const now=new Date().toISOString();globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'ended',updatedAt:now,expiresAt:now}:s);const x=globalState.supportSessions.find(s=>s.id===id);if(x)void persistScopedDocument('support_sessions',x.id,x as unknown as Record<string,unknown>);notify();};
   const runRemoteCheck=(participantId:string)=>{const mediaReady=typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia; const online=typeof navigator==='undefined'?true:navigator.onLine; const r:RemoteSessionCheck={id:newId('remote'),participantId,competitionId:globalState.competition.id,identity:'pending',device:mediaReady?'passed':'failed',environment:'review',networkQuality:online?'good':'poor',recordingReady:mediaReady,suspiciousSignals:[]};globalState.remoteChecks=[r,...globalState.remoteChecks.filter(x=>x.participantId!==participantId)];notify();return r;};
   /* ═══ تضارب المصالح، والجدولة، والتأهيل — أفعالٌ مُدقَّقة فوق وحداتٍ نقيّة ═══ */
+  /** judgeId → Firebase uid, from the judge's identity grant; used to verify judge-declared conflict cases. */
+  const judgeUidMap=()=>Object.fromEntries(globalState.judges.map(j=>{const g=globalState.roleGrants.find(x=>x.id===j.identityGrantId);const a=g?globalState.identityAccounts.find(x=>x.id===g.accountId):undefined;return [j.id,a?.firebaseUid]}));
   const governanceAudit=(action:string,entityType:string,entityId:string,ar:string,en:string)=>{
     const log:AuditEvent={id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action,entityType,entityId,humanSummaryArabic:ar,humanSummaryEnglish:en,currentStateHash:`${action}:${entityId}`} as AuditEvent;
     globalState.auditLogs=[log,...globalState.auditLogs];
@@ -3940,7 +3943,7 @@ const prepareJourneyAccessBatch=async()=>{
     if(role==='judge'&&judge.userId!==globalState.currentUser.id&&judge.id!==globalState.currentUser.id)return {ok:false as const,code:'JUDGE_CAN_ONLY_DECLARE_OWN'};
     const committee=globalState.committees.find(c=>c.competitionId===globalState.competition.id&&(c.judgeIds.includes(judge.id)||c.judgeIds.includes(judge.userId)));
     try{
-      const created=declareConflict(globalState.conflictCases,{id:newId('coi'),competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,judgeId:judge.id,declaredByUid:auth.currentUser?.uid||globalState.currentUser.id,participantId:input.participantId,institution:input.institution,kind:input.kind,relation:input.relation,reason:input.reason,committeeId:committee?.id,committeeJudgeIds:committee?.judgeIds||[],now:new Date().toISOString()});
+      const created=declareConflict(globalState.conflictCases,{id:newId('coi'),competitionId:globalState.competition.id,organizationId:globalState.competition.organizationId,judgeId:judge.id,declaredByUid:auth.currentUser?.uid||globalState.currentUser.id,declaredByRole:role,participantId:input.participantId,institution:input.institution,kind:input.kind,relation:input.relation,reason:input.reason,committeeId:committee?.id,committeeJudgeIds:committee?.judgeIds||[],now:new Date().toISOString()});
       if(!globalState.conflictCases.some(c=>c.id===created.id)){
         globalState.conflictCases=[created,...globalState.conflictCases];
         /* التضارب الصلب يُضاف إلى ملف المحكّم أيضًا، فيستمرّ أثره في التوجيه عبر المسابقات. */
@@ -3958,6 +3961,12 @@ const prepareJourneyAccessBatch=async()=>{
     try{
       const resolved=resolveConflict(current,{...input,actorId:auth.currentUser?.uid||globalState.currentUser.id,actorRole:globalState.currentUser.role,now:new Date().toISOString()});
       globalState.conflictCases=globalState.conflictCases.map(c=>c.id===caseId?resolved:c);
+      /* نقل المتسابق يُطبَّق فعلًا: تُحدَّث لجنته المعيّنة وتُحفظ، لا يُسجَّل القرار وحده. */
+      if(input.decision==='reassigned_participant'&&current.participantId&&input.reassignedToCommitteeId){
+        const pid=current.participantId,target=input.reassignedToCommitteeId;
+        globalState.participants=globalState.participants.map(p=>p.id===pid?{...p,assignedCommitteeId:target}:p);
+        const moved=globalState.participants.find(p=>p.id===pid);if(moved)void persistScopedDocument('participants',moved.id,moved as unknown as Record<string,unknown>);
+      }
       if(input.decision==='replaced_judge'&&resolved.originalAssignment.committeeId&&input.replacementJudgeId){
         const cid=resolved.originalAssignment.committeeId;
         globalState.committees=globalState.committees.map(k=>k.id===cid?{...k,judgeIds:k.judgeIds.map(j=>j===current.judgeId?input.replacementJudgeId!:j)}:k);
@@ -3996,7 +4005,7 @@ const prepareJourneyAccessBatch=async()=>{
       sessionMinutes:Object.fromEntries(globalState.competition.categories.map(c=>[c.id,Math.max(5,Number(c.targetDurationMinutes)||20)])),
       halls,committees:committees.map(c=>({id:c.id,hallId:c.venueHall||c.id,assignedCategories:c.assignedCategories,judgeIds:c.judgeIds})),
       participants:globalState.participants.filter(p=>p.competitionId===cid&&eligibleStatuses.includes(p.status)).map(p=>({id:p.id,categoryId:p.categoryId,institution:p.institution})),
-      judgeAvailability:options.judgeAvailability||[],conflicts:globalState.conflictCases.filter(c=>c.competitionId===cid),pins:options.pins||[],
+      judgeAvailability:options.judgeAvailability||[],conflicts:globalState.conflictCases.filter(c=>c.competitionId===cid),pins:options.pins||[],judgeUids:judgeUidMap(),
     };
   };
   const generateSchedule=(options:Parameters<typeof schedulerInputFromState>[0])=>{
@@ -4029,9 +4038,11 @@ const prepareJourneyAccessBatch=async()=>{
     const current=globalState.schedulePlans.find(p=>p.id===planId);
     if(!current)return {ok:false as const,code:'SCHEDULE_NOT_FOUND'};
     const now=new Date().toISOString();
+    const demoted=new Set(globalState.schedulePlans.filter(p=>p.competitionId===current.competitionId&&p.status==='published'&&p.id!==planId).map(p=>p.id));
     globalState.schedulePlans=globalState.schedulePlans.map(p=>p.competitionId===current.competitionId&&p.status==='published'&&p.id!==planId?{...p,status:'draft' as const}:p.id===planId?{...p,status:'published' as const,publishedAt:now}:p);
     const rec=globalState.schedulePlans.find(p=>p.id===planId)!;
-    void persistScopedDocument('schedule_plans',rec.id,rec as unknown as Record<string,unknown>);
+    /* كل خطةٍ تغيّرت حالتها تُحفظ — المعتمدة الجديدة والسابقة التي أُعيدت مسودة — فلا يبقى جدولان معتمدان في السحابة. */
+    for(const p of globalState.schedulePlans)if(p.id===planId||demoted.has(p.id))void persistScopedDocument('schedule_plans',p.id,p as unknown as Record<string,unknown>);
     governanceAudit('SCHEDULE_PUBLISHED','SchedulePlan',rec.id,'اعتماد الجدول الزمني','Schedule published');
     notify();return {ok:true as const,plan:rec};
   };

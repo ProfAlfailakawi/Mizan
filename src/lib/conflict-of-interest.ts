@@ -22,6 +22,8 @@ export interface ConflictCase {
   organizationId: string;
   judgeId: string;
   declaredByUid: string;
+  /** Role of the declarer. A judge-declared case is binding only when the declarer is that judge (see judgeMayScore). */
+  declaredByRole?: string;
   participantId?: string;
   institution?: string;
   kind: ConflictKind;
@@ -53,6 +55,8 @@ export interface DeclareInput {
   organizationId: string;
   judgeId: string;
   declaredByUid: string;
+  /** Role of the declarer. A judge-declared case is binding only when the declarer is that judge (see judgeMayScore). */
+  declaredByRole?: string;
   participantId?: string;
   institution?: string;
   kind: ConflictKind;
@@ -73,7 +77,7 @@ export function declareConflict(existing: readonly ConflictCase[], input: Declar
   const duplicate = existing.find(c => c.status === 'open' && c.judgeId === input.judgeId && c.participantId === input.participantId && (c.institution || '') === (input.institution || ''));
   if (duplicate) return duplicate;
   return {
-    id: input.id, competitionId: input.competitionId, organizationId: input.organizationId, judgeId: input.judgeId, declaredByUid: input.declaredByUid,
+    id: input.id, competitionId: input.competitionId, organizationId: input.organizationId, judgeId: input.judgeId, declaredByUid: input.declaredByUid, declaredByRole: input.declaredByRole,
     participantId: input.participantId, institution: String(input.institution || '').trim() || undefined, kind: input.kind, relation: input.relation,
     /* التنحّي والتضارب مع طالبٍ أو قريبٍ صلبٌ دائمًا؛ الامتناع لسببٍ آخر يُراجَع. */
     hardConflict: input.kind === 'recusal' || ['student', 'relative'].includes(input.relation),
@@ -114,11 +118,24 @@ export function resolveConflict(c: ConflictCase, input: ResolveInput): ConflictC
   };
 }
 
+/**
+ * Is an open case binding? A reviewer-declared case always is. A judge-declared case is binding
+ * only when its authenticated declarer is the judge it names — otherwise one judge could forge a
+ * case against another and block them. Unverified cases stay visible for the head judge to rule on.
+ */
+export function caseIsBinding(c: ConflictCase, judgeUids?: Record<string, string | undefined>) {
+  if (c.status === 'resolved') return true;
+  if (c.declaredByRole !== 'judge') return true;
+  const uid = judgeUids?.[c.judgeId];
+  return !!uid && uid === c.declaredByUid;
+}
+
 /** May this judge score this participant, given the conflict cases? */
-export function judgeMayScore(cases: readonly ConflictCase[], judgeId: string, participant: { id: string; institution?: string }): { allowed: boolean; caseId?: string } {
+export function judgeMayScore(cases: readonly ConflictCase[], judgeId: string, participant: { id: string; institution?: string }, judgeUids?: Record<string, string | undefined>): { allowed: boolean; caseId?: string } {
   const inst = String(participant.institution || '').trim().toLowerCase();
   for (const c of cases) {
     if (c.judgeId !== judgeId) continue;
+    if (!caseIsBinding(c, judgeUids)) continue;
     const matches = c.participantId ? c.participantId === participant.id : !!inst && String(c.institution || '').trim().toLowerCase() === inst;
     if (!matches) continue;
     if (c.status === 'open') return { allowed: false, caseId: c.id };
@@ -128,6 +145,6 @@ export function judgeMayScore(cases: readonly ConflictCase[], judgeId: string, p
 }
 
 /** Committees in which no panel judge is blocked for this participant. */
-export function eligibleCommittees<T extends { id: string; judgeIds: string[] }>(committees: readonly T[], cases: readonly ConflictCase[], participant: { id: string; institution?: string }): T[] {
-  return committees.filter(k => k.judgeIds.every(j => judgeMayScore(cases, j, participant).allowed));
+export function eligibleCommittees<T extends { id: string; judgeIds: string[] }>(committees: readonly T[], cases: readonly ConflictCase[], participant: { id: string; institution?: string }, judgeUids?: Record<string, string | undefined>): T[] {
+  return committees.filter(k => k.judgeIds.every(j => judgeMayScore(cases, j, participant, judgeUids).allowed));
 }
