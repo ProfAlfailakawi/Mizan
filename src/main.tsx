@@ -8,6 +8,9 @@ import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
 import {installAppUpdate} from './lib/app-update';
 import {installInputNormalization} from './lib/input-validation';
+import { loadHostBrand } from './lib/host-brand';
+/* علامة المضيف تُجلب قبل أول رسم، فلا تومض «ميزان» على نطاق مشغّلٍ بعلامة بيضاء. */
+loadHostBrand();
 
 // Must run before the first lazy route resolves, so a chunk minted by a previous deploy can
 // recover instead of leaving a venue screen blank.

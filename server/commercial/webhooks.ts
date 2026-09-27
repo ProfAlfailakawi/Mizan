@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import net from 'net';
+import https from 'https';
 import { CommercialError, type CommercialState, type EngineCtx } from './engine';
 import { WEBHOOK_EVENT_TYPES, type WebhookDeliveryRecord, type WebhookEndpointRecord, type WebhookEventType } from './types';
 
@@ -95,13 +96,15 @@ export function createWebhookEndpoint(ctx: EngineCtx, organizationId: string, in
 }
 
 /** Enqueue one delivery per subscribed endpoint. Called inside the transaction that caused the event. */
-export function enqueueWebhookEvent(ctx: EngineCtx, organizationId: string, type: WebhookEventType, data: Record<string, unknown>) {
+export function enqueueWebhookEvent(ctx: EngineCtx, organizationId: string, type: WebhookEventType, data: Record<string, unknown>, dedupeKey?: string) {
+  /* الحدث نفسه (الحضور نفسه، الشهادة نفسها) لا يُرسل مرتين ولو أُبلغ عنه مرتين. */
+  if (dedupeKey && ctx.s.webhookDeliveries.some(d => d.organizationId === organizationId && d.eventType === type && d.dedupeKey === dedupeKey)) return [];
   const endpoints = ctx.s.webhookEndpoints.filter(e => e.organizationId === organizationId && e.status === 'active' && e.events.includes(type));
   if (!endpoints.length) return [];
   const eventId = `evt_${crypto.randomUUID()}`;
   const payload = JSON.stringify({ id: eventId, type, created: iso(ctx.at), organizationId, apiVersion: 'v1', data });
   return endpoints.map(e => {
-    const d: WebhookDeliveryRecord = { id: ctx.nextId('WHD'), endpointId: e.id, organizationId, eventId, eventType: type, payload, attempts: 0, status: 'pending', nextAttemptAt: iso(ctx.at), createdAt: iso(ctx.at) };
+    const d: WebhookDeliveryRecord = { id: ctx.nextId('WHD'), endpointId: e.id, organizationId, eventId, eventType: type, dedupeKey, payload, attempts: 0, status: 'pending', nextAttemptAt: iso(ctx.at), createdAt: iso(ctx.at) };
     ctx.s.webhookDeliveries.push(d);
     return d;
   });
@@ -136,4 +139,48 @@ export function recordDeliveryAttempt(ctx: EngineCtx, deliveryId: string, attemp
     }
   }
   return d;
+}
+
+/*
+ * الإرسال مثبَّتٌ على العنوان الذي تحقّقنا منه: `lookup` يعيد العنوان المفحوص نفسه، فلا يستطيع
+ * خادم DNS أن يبدّل الإجابة بين الفحص والاتصال (DNS rebinding). ويبقى اسم المضيف في SNI
+ * والتحقق من الشهادة، فالتثبيت لا يُضعف TLS. ولا تُتبع إعادة التوجيه.
+ */
+export function pinnedHttpsPost(url: string, init: { headers: Record<string, string>; body: string }, address: string, timeoutMs = 10_000): Promise<{ status: number }> {
+  const u = new URL(url);
+  if (u.protocol !== 'https:') return Promise.reject(new CommercialError('WEBHOOK_URL_MUST_BE_HTTPS'));
+  if (isPrivateAddress(address)) return Promise.reject(new CommercialError('WEBHOOK_URL_PRIVATE_NETWORK'));
+  const family = net.isIP(address) === 6 ? 6 : 4;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      protocol: 'https:', hostname: u.hostname, servername: net.isIP(u.hostname) ? undefined : u.hostname, port: u.port || 443,
+      path: `${u.pathname}${u.search}`, method: 'POST', headers: { ...init.headers, 'content-length': Buffer.byteLength(init.body) },
+      lookup: ((_host: string, options: { all?: boolean }, cb: (err: Error | null, a: unknown, f?: number) => void) => {
+        if (options?.all) cb(null, [{ address, family }]);
+        else cb(null, address, family);
+      }) as unknown as net.LookupFunction,
+      timeout: timeoutMs,
+    }, res => { res.resume(); resolve({ status: res.statusCode || 0 }); });
+    req.on('timeout', () => req.destroy(new Error('WEBHOOK_TIMEOUT')));
+    req.on('error', reject);
+    req.end(init.body);
+  });
+}
+
+/* الأدوار المسموح لها بالإبلاغ عن كل حدث — أضيق ما يكفي لمن يُنتج الحدث فعلًا. */
+export const DOMAIN_EVENT_REPORTERS: Record<string, string[]> = {
+  'participant.checked_in': ['super_admin', 'org_admin', 'comp_admin', 'ops_manager', 'exception_host'],
+  'judging.completed': ['super_admin', 'org_admin', 'comp_admin', 'head_judge', 'judge'],
+  'results.published': ['super_admin', 'org_admin', 'comp_admin'],
+  'certificate.issued': ['super_admin', 'org_admin', 'comp_admin'],
+  'competition.completed': ['super_admin', 'org_admin'],
+};
+
+/** Sanitised, PII-free payload for a client-reported domain event. */
+export function domainEventPayload(input: Record<string, unknown>) {
+  const id = (v: unknown, max = 120) => String(v ?? '').replace(/[^A-Za-z0-9_:.-]/g, '').slice(0, max);
+  const out: Record<string, string> = { competitionId: id(input.competitionId), subjectId: id(input.subjectId) };
+  if (input.participantCode) out.participantCode = id(input.participantCode, 40);
+  if (!out.competitionId || !out.subjectId) throw new CommercialError('DOMAIN_EVENT_SUBJECT_REQUIRED');
+  return out;
 }

@@ -59,6 +59,7 @@ import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenHeldByHolderOnly, journeyTok
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { cloneCompetitionConfiguration, type ClonePart } from './competition-clone';
+import { emitDomainEvent } from './domain-events';
 import { declareConflict, resolveConflict, judgeMayScore, type ConflictKind, type ConflictRelation, type ConflictDecision } from './conflict-of-interest';
 import { buildSchedule, withManualPin, withoutPin, type SchedulerInput, type TimeWindow, type JudgeAvailability } from './smart-scheduler';
 import { createRelationship, computeQualifiers, mergeQualifications, transitionQualification, invitationParticipant, type QualificationRule } from './qualification';
@@ -1041,6 +1042,7 @@ function syncParticipantLifecycle(participant:Participant){
  */
 const PARTICIPANT_PROGRESS:RegistrationStatus[]=['submitted','under_review','approved','checked_in','in_queue','in_session','tested','appealed','certified'];
 function advanceParticipantStatus(participantId:string|undefined,status:RegistrationStatus,actor:string,reason?:string){
+  if(status==='tested'&&participantId){const tp=globalState.participants.find(p=>p.id===participantId);if(tp&&tp.status!=='tested')emitDomainEvent('judging.completed',{competitionId:tp.competitionId,subjectId:tp.id,participantCode:tp.code});}
   if(!participantId)return;
   const idx=globalState.participants.findIndex(p=>p.id===participantId&&p.competitionId===globalState.competition.id);
   if(idx<0)return;
@@ -1721,6 +1723,7 @@ export function useAppStore() {
           'critical'
         );
       }
+      emitDomainEvent('participant.checked_in',{competitionId:globalState.competition.id,subjectId:p.id,participantCode:p.code});
       void persistScopedDocument('checkins',p.id,{participantId:p.id,participantCode:p.code,method,checkedInAt:updated.checkedInAt,assignedCommitteeId:updated.assignedCommitteeId,queueNumber:updated.queueNumber});
 
       const log: AuditEvent = {
@@ -2268,6 +2271,7 @@ export function useAppStore() {
     globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'RESULTS_PUBLISHED',entityType:'Competition',entityId:globalState.competition.id,humanSummaryArabic:'نشر النتائج وفق سياسة الإظهار الخاصة بالمسابقة.',humanSummaryEnglish:'Published results under this competition visibility policy.',currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     for(const r of competitionResults){ const p=globalState.participants.find(x=>x.id===r.participantId&&x.competitionId===globalState.competition.id); if(p){ appendParticipantNotifications(p,'result.published'); void publishPublicJourneyRecord(p); } }
     markCompetitionConfigChanged();
+    emitDomainEvent('results.published',{competitionId:globalState.competition.id,subjectId:globalState.competition.id});
     notify(); return true;
   };
 
@@ -2300,7 +2304,7 @@ export function useAppStore() {
       }catch{return{ok:false,code:'COMPETITION_CLOSE_SERVER_UNAVAILABLE'}}
     }
     const now=new Date().toISOString();const cid=globalState.competition.id;
-    globalState.competition={...globalState.competition,status:'completed',closedAt:now,closedBy:globalState.currentUser.id,closureReason:clean};
+    globalState.competition={...globalState.competition,status:'completed',closedAt:now,closedBy:globalState.currentUser.id,closureReason:clean};emitDomainEvent('competition.completed',{competitionId:globalState.competition.id,subjectId:globalState.competition.id});
     globalState.roleGrants=globalState.roleGrants.map(g=>g.competitionId===cid&&g.role!=='auditor'&&['ACTIVE','SUSPENDED','PENDING_APPROVAL'].includes(g.status)?{...g,status:'REVOKED'}:g);
     globalState.identityInvitations=globalState.identityInvitations.map(i=>i.competitionId===cid&&i.requestedRole!=='auditor'&&['READY','PENDING_APPROVAL'].includes(i.status)?{...i,status:'REVOKED'}:i);
     globalState.authSessions=globalState.authSessions.map(x=>x.competitionId===cid&&x.role!=='auditor'&&x.status==='ACTIVE'?{...x,status:'REVOKED',revokedAt:now,revokedBy:globalState.currentUser.id,revocationReason:'Competition permanently closed'}:x);
@@ -2358,6 +2362,7 @@ export function useAppStore() {
     };
 
     globalState.certificates = [newCert, ...globalState.certificates];
+    emitDomainEvent('certificate.issued',{competitionId:globalState.competition.id,subjectId:newCert.id,participantCode:globalState.participants.find(p=>p.id===newCert.participantId)?.code});
     const pIdx = globalState.participants.findIndex(p=>p.id===res.participantId&&p.competitionId===globalState.competition.id);
     if (pIdx >= 0) { const certified={ ...globalState.participants[pIdx], status:'certified' as const, statusHistory:[...globalState.participants[pIdx].statusHistory,{status:'certified' as const,timestamp:new Date().toISOString(),actor:'Certificate engine'}] }; globalState.participants[pIdx]=certified; syncParticipantLifecycle(certified); }
     const passCat=globalState.competition.categories.find(c=>c.id===res.categoryId); globalState.participantPassport=[{id:newId('pp'),participantId:res.participantId,competitionId:globalState.competition.id,competitionName:storedCompetitionName(true),categoryName:passCat?.name||res.categoryName,year:globalState.competition.startDate.slice(0,4),result:`${res.rank} / ${res.finalScore}`,certificateNumber:certNumber,verified:true},...globalState.participantPassport.filter(x=>!(x.participantId===res.participantId&&x.competitionId===globalState.competition.id))];
@@ -3964,6 +3969,22 @@ const prepareJourneyAccessBatch=async()=>{
     }catch(err){return {ok:false as const,code:err instanceof Error?err.message:'CONFLICT_FAILED'}}
   };
 
+  /** رسوم التسجيل التي تفرضها الجهة: تسجيل التحصيل أو الاسترداد أو الإعفاء بمرجع إيصال، مُدقَّقًا. */
+  const setRegistrationPayment=(participantId:string,status:'paid'|'refunded'|'waived'|'pending',receiptReference?:string)=>{
+    if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return {ok:false as const,code:'NOT_AUTHORIZED'};
+    const p=globalState.participants.find(x=>x.id===participantId&&x.competitionId===globalState.competition.id);
+    if(!p)return {ok:false as const,code:'PARTICIPANT_NOT_FOUND'};
+    const fee=getCompetitionPolicy(globalState.competition).registration.fee;
+    const current=p.registrationPayment||(fee?{status:'pending' as const,amountMinor:fee.amountMinor,currency:fee.currency,updatedAt:new Date().toISOString()}:undefined);
+    if(!current)return {ok:false as const,code:'REGISTRATION_FEE_NOT_CONFIGURED'};
+    if(status==='refunded'&&current.status!=='paid')return {ok:false as const,code:'REFUND_REQUIRES_PAID'};
+    if((status==='paid'||status==='refunded')&&!String(receiptReference||'').trim())return {ok:false as const,code:'RECEIPT_REFERENCE_REQUIRED'};
+    const next={...p,registrationPayment:{...current,status,receiptReference:String(receiptReference||current.receiptReference||'').trim().slice(0,120)||undefined,updatedAt:new Date().toISOString()}};
+    globalState.participants=globalState.participants.map(x=>x.id===p.id?next:x);
+    void persistScopedDocument('participants',p.id,next as unknown as Record<string,unknown>);
+    governanceAudit('REGISTRATION_PAYMENT_UPDATED','Participant',p.id,`رسوم تسجيل ${p.code}: ${current.status} → ${status}`,`Registration fee ${p.code}: ${current.status} → ${status}`);
+    notify();return {ok:true as const};
+  };
   /** يبني مدخلات الجدولة من حالة المسابقة، ويضيف ما يحدّده المنظّم (أيام، استراحات، صلاة، توفّر). */
   const schedulerInputFromState=(options:{days:{date:string;start:string;end:string}[];breaks?:TimeWindow[];prayerBreaks?:TimeWindow[];transitionMinutes?:number;judgeAvailability?:JudgeAvailability[];pins?:SchedulerInput['pins'];hallCapacity?:Record<string,number>}):SchedulerInput=>{
     const cid=globalState.competition.id;
@@ -4914,7 +4935,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, sessionStartFailureCode, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
+    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,

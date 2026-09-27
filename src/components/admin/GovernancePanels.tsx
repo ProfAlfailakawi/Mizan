@@ -152,3 +152,28 @@ export const QualificationPanel: React.FC = () => {
     </div>; })}
   </section>;
 };
+
+/* ═══ رسوم التسجيل (تفرضها الجهة) ═══ */
+export const RegistrationPaymentsPanel: React.FC = () => {
+  const s = useAppStore(); const ar = s.language === 'ar';
+  const [q, setQ] = useState('');
+  const [refs, setRefs] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<{ ok: boolean; code?: string } | null>(null);
+  const rows = s.participants.filter(p => p.competitionId === s.competition.id && p.registrationPayment && `${p.code} ${p.fullName} ${p.fullNameArabic}`.toLowerCase().includes(q.toLowerCase()));
+  const money = (m: number, c: string) => `${Math.floor(m / 100)}.${String(m % 100).padStart(2, '0')} ${c}`;
+  const STATUS: Record<string, [string, string]> = { pending: ['معلّق', 'Pending'], paid: ['مدفوع', 'Paid'], refunded: ['مسترد', 'Refunded'], waived: ['معفى', 'Waived'], not_required: ['غير مطلوب', 'Not required'] };
+  if (!rows.length && !q) return null;
+  return <section className="mt-4 space-y-2 rounded-2xl border border-[#e5e3dc] p-4">
+    <h3 className="text-sm font-black">{L(ar, 'تحصيل رسوم التسجيل', 'Registration fee collection')}</h3>
+    <input type="search" aria-label={L(ar, 'بحث', 'Search')} className={input} value={q} onChange={e => setQ(e.target.value)} />
+    <Result r={result} ar={ar} />
+    <ul className="divide-y divide-[#ebe9e2] text-xs">{rows.map(p => { const pay = p.registrationPayment!; return <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+      <span>{p.code} · {ar ? p.fullNameArabic : p.fullName} · {money(pay.amountMinor, pay.currency)} · <b>{STATUS[pay.status][ar ? 0 : 1]}</b>{pay.receiptReference ? ` · ${pay.receiptReference}` : ''}</span>
+      <span className="flex flex-wrap items-center gap-2">
+        <input aria-label={L(ar, 'مرجع الإيصال', 'Receipt reference')} placeholder={L(ar, 'مرجع الإيصال', 'Receipt ref.')} className={`${input} max-w-[9rem]`} value={refs[p.id] || ''} onChange={e => setRefs({ ...refs, [p.id]: e.target.value })} />
+        {pay.status !== 'paid' && <button className={btn2} onClick={() => setResult(s.setRegistrationPayment(p.id, 'paid', refs[p.id]))}>{L(ar, 'مدفوع', 'Mark paid')}</button>}
+        {pay.status === 'paid' && <button className={btn2} onClick={() => setResult(s.setRegistrationPayment(p.id, 'refunded', refs[p.id]))}>{L(ar, 'استرداد', 'Refund')}</button>}
+        {pay.status === 'pending' && <button className={btn2} onClick={() => setResult(s.setRegistrationPayment(p.id, 'waived'))}>{L(ar, 'إعفاء', 'Waive')}</button>}
+      </span></li>; })}</ul>
+  </section>;
+};

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../lib/store';
 import type { BrandDisplayPlacements } from '../../types';
+import { isWhiteLabel, useHostBrand } from '../../lib/host-brand';
 
 export interface BrandInfo {
   ar: string;
@@ -14,6 +15,8 @@ export interface BrandInfo {
   address?: string;
   addressArabic?: string;
   placements: Required<BrandDisplayPlacements>;
+  /** علامة بيضاء كاملة تسمح اتفاقيتها بإخفاء ميزان: لا يُرسم رمز ميزان مكان الشعار. */
+  hideMizanMark?: boolean;
 }
 
 // معرّفات النظام (مثل MZ-ORG-000016) يجب ألا تظهر كاسم علامة في الترويسة.
@@ -24,6 +27,8 @@ const cleanName = (v?: string): string | undefined => (isSystemId(v) ? undefined
 
 export function useBrandInfo(): BrandInfo {
   const s = useAppStore();
+  const host = useHostBrand();
+  const hostWL = isWhiteLabel(host) ? host : null;
   const brand = s.organization?.brand;
   const comp = s.competition;
   const rawPlacements = brand?.displayPlacements || {};
@@ -42,9 +47,11 @@ export function useBrandInfo(): BrandInfo {
   const brandArabic = cleanName(comp?.displayNameArabic) || cleanName(brand?.displayNameArabic) || cleanName(brand?.nameArabic) || orgArabic;
   const brandEnglish = cleanName(comp?.displayName) || cleanName(brand?.displayName) || cleanName(brand?.name) || orgLatin;
   return {
-    ar: brandArabic || brand?.displayNameArabic || 'ميزان',
-    en: brandEnglish || brand?.displayName || 'MIZAN',
-    logoUrl: comp?.logoUrl || brand?.logoUrl,
+    /* الترتيب: علامة المسابقة ثم الجهة، ثم علامة المضيف (المشغّل)، ثم ميزان أخيرًا. */
+    ar: brandArabic || brand?.displayNameArabic || hostWL?.productNameArabic || hostWL?.productName || 'ميزان',
+    en: brandEnglish || brand?.displayName || hostWL?.productName || 'MIZAN',
+    logoUrl: comp?.logoUrl || brand?.logoUrl || hostWL?.logoUrl,
+    hideMizanMark: !!hostWL && hostWL.brandingMode === 'full_white_label' && !hostWL.showPoweredByMizan,
     slogan: brand?.slogan,
     sloganArabic: brand?.sloganArabic,
     websiteUrl: brand?.websiteUrl,
@@ -297,6 +304,8 @@ export const MizanLogo: React.FC<LogoProps> = ({
             onError={() => setImgFailed(true)}
             className={`${markSize} object-contain`}
           />
+        ) : brandInfo.hideMizanMark ? (
+          <span aria-hidden="true" className={`${markSize} grid place-items-center rounded-2xl text-lg font-black`} style={{ background: 'var(--brand-primary, #214C40)', color: '#fff' }}>{(ar ? brandInfo.ar : brandInfo.en).trim().charAt(0)}</span>
         ) : (
           <MizanMark className={markSize} tone={tone} decorative />
         )
