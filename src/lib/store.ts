@@ -58,6 +58,7 @@ import { calibrateJudges } from '../../server/judge-calibration';
 import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenHeldByHolderOnly, journeyTokenWithheldLocally, redactStateForLocalSnapshot } from './local-snapshot-privacy';
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
+import { cloneCompetitionConfiguration, type ClonePart } from './competition-clone';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
 import { generateFairDraw, verifyFairDrawSelection, verifyFairDrawPublicProof, poolItemToCandidate, validateScopedSelection } from './fairdraw';
@@ -3905,18 +3906,20 @@ const prepareJourneyAccessBatch=async()=>{
   const approveSupportSession=(id:string)=>{const now=new Date().toISOString();globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'active',approvedBy:globalState.currentUser.id,updatedAt:now}:s);const x=globalState.supportSessions.find(s=>s.id===id);if(x)void persistScopedDocument('support_sessions',x.id,x as unknown as Record<string,unknown>);notify();};
   const endSupportSession=(id:string)=>{const now=new Date().toISOString();globalState.supportSessions=globalState.supportSessions.map(s=>s.id===id?{...s,status:'ended',updatedAt:now,expiresAt:now}:s);const x=globalState.supportSessions.find(s=>s.id===id);if(x)void persistScopedDocument('support_sessions',x.id,x as unknown as Record<string,unknown>);notify();};
   const runRemoteCheck=(participantId:string)=>{const mediaReady=typeof navigator!=='undefined'&&!!navigator.mediaDevices?.getUserMedia; const online=typeof navigator==='undefined'?true:navigator.onLine; const r:RemoteSessionCheck={id:newId('remote'),participantId,competitionId:globalState.competition.id,identity:'pending',device:mediaReady?'passed':'failed',environment:'review',networkQuality:online?'good':'poor',recordingReady:mediaReady,suspiciousSignals:[]};globalState.remoteChecks=[r,...globalState.remoteChecks.filter(x=>x.participantId!==participantId)];notify();return r;};
-  const cloneCompetition=(nameArabic?:string,nameEnglish?:string)=>{
-    const source=globalState.competition;const base=JSON.parse(JSON.stringify(source)) as Competition;base.id=newId('comp');
-    base.nameArabic=nameArabic||source.nameArabic;base.name=nameEnglish||source.name;base.edition='';
-    base.status='draft';base.startDate='';base.endDate='';base.registrationStartDate='';base.registrationEndDate='';
-    base.totalRegistered=0;base.totalApproved=0;base.totalAttended=0;base.currentDay=0;
-    const rule={...base.ruleSet,id:newId('rule'),frozenAt:undefined,version:`${base.ruleSet.version}-new-edition`};
-    base.ruleSet=rule;base.ruleSets=[rule];base.policy={...getCompetitionPolicy(base),updatedAt:new Date().toISOString(),frozenAt:undefined};
-    base.categories=base.categories.map(c=>({...c,id:newId('cat'),competitionId:base.id,ruleSetId:rule.id}));
-    base.readinessChecklist={datesConfigured:false,categoriesConfigured:base.categories.length>0,ruleSetFrozen:false,judgesAssigned:false,quranSourceLocked:false,devicesRegistered:false,certificatesReady:false};
+  /*
+   * «إنشاء نسخة جديدة»: يُنسخ الإعداد وحده (انظر competition-clone.ts) — لا متسابقون ولا درجات
+   * ولا نتائج ولا شهادات. والنسخة تبدأ مسودة، فلا تستهلك مقعد مسابقة نشطة حتى تُفتح.
+   */
+  const cloneCompetition=(nameArabic?:string,nameEnglish?:string,options:{sourceId?:string;editionLabel?:string;parts?:readonly ClonePart[]}={})=>{
+    if(!can(globalState.currentUser.role,'competition.create'))return null;
+    const source=(options.sourceId&&globalState.competitions.find(c=>c.id===options.sourceId))||globalState.competition;
+    if(globalState.currentUser.role!=='super_admin'&&source.organizationId!==globalState.currentUser.organizationId&&source.organizationId!==globalState.organization.id)return null;
+    const base=cloneCompetitionConfiguration(source,{newId:newId('comp'),newIdFor:newId,nameArabic,nameEnglish,editionLabel:options.editionLabel,parts:options.parts});
+    base.policy=getCompetitionPolicy(base);
+    if(!source.seriesId){const seriesId=base.seriesId;globalState.competitions=globalState.competitions.map(c=>c.id===source.id?{...c,seriesId,seriesName:base.seriesName,seriesNameArabic:base.seriesNameArabic}:c);}
     globalState.competitions=[base,...globalState.competitions];globalState.competition=base;
-    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:base.organizationId,competitionId:base.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_NEW_EDITION_CREATED',entityType:'Competition',entityId:base.id,humanSummaryArabic:`بدء إصدار جديد مستقل من ${source.nameArabic}`,humanSummaryEnglish:`Started a clean new edition of ${source.name}`,currentStateHash:`edition:${base.id}`},...globalState.auditLogs];
-    notify();return base;
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:base.organizationId,competitionId:base.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'COMPETITION_NEW_EDITION_CREATED',entityType:'Competition',entityId:base.id,humanSummaryArabic:`إنشاء نسخة جديدة مستقلة من ${source.nameArabic}${base.editionLabel?` (${base.editionLabel})`:''} — نُسخ الإعداد فقط: ${base.clonedFrom?.parts.join('، ')}`,humanSummaryEnglish:`Created a new edition of ${source.name} from its configuration only (${base.clonedFrom?.parts.join(', ')})`,currentStateHash:`edition:${base.id}:from:${source.id}`},...globalState.auditLogs];
+    markCompetitionConfigChanged();notify();return base;
   };
   const exportCompetitionSnapshot=()=>JSON.stringify({version:2,exportedAt:new Date().toISOString(),organizationId:globalState.competition.organizationId,competition:globalState.competition,judges:globalState.judges,participants:globalState.participants.filter(p=>p.competitionId===globalState.competition.id),committees:globalState.committees.filter(c=>c.competitionId===globalState.competition.id),results:globalState.results.filter(r=>r.competitionId===globalState.competition.id),certificates:globalState.certificates.filter(c=>c.competitionId===globalState.competition.id),appeals:globalState.appeals.filter(a=>a.competitionId===globalState.competition.id),reviews:globalState.reviewCases.filter(r=>r.competitionId===globalState.competition.id),supportSessions:globalState.supportSessions.filter(x=>x.competitionId===globalState.competition.id),auditLogs:globalState.auditLogs.filter(a=>a.competitionId===globalState.competition.id)},null,2);
   // Restore/import counterpart to exportCompetitionSnapshot. Replaces the imported competition's
