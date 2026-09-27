@@ -67,7 +67,7 @@ async function newPage(width, height, label) {
  *
  * والانتظارُ بالظهور لا بالتوقيت: رقمٌ ثابت يمرّ أحيانًا ويسقط أحيانًا على الآلة نفسها.
  */
-const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+const DEMO_ENTRY = 'جرّب النسخة التجريبية';
 /*
  * `networkidle` ليست ما ينتظره هذا الفحص.
  *
@@ -96,7 +96,7 @@ async function openPage(page, url, ready, label, what, timeout = 45000) {
 }
 
 async function enterDemo(page, label) {
-  const entry = page.locator(`button[aria-label="${DEMO_ENTRY}"]`).first();
+  const entry = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
   try { await entry.waitFor({ state: 'visible', timeout: 20000 }); } catch {
     note(`[${label}] مدخل الاستعراض لم يظهر خلال ٢٠ ثانية`); return false;
   }
