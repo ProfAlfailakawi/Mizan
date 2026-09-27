@@ -127,7 +127,18 @@ export function caseIsBinding(c: ConflictCase, judgeUids?: Record<string, string
   if (c.status === 'resolved') return true;
   if (c.declaredByRole !== 'judge') return true;
   const uid = judgeUids?.[c.judgeId];
-  return !!uid && uid === c.declaredByUid;
+  /* محكّمٌ بلا هويةٍ مربوطة لا يمكن التحقق منه: يبقى الإعلان ملزمًا احتياطًا للنزاهة
+     (يُبعد المحكّم ولا يُقرِّبه)، ويظهر لرئيس التحكيم «غير قابل للتحقق» ليحسمه. */
+  if (!uid) return true;
+  return uid === c.declaredByUid;
+}
+
+/** For the review UI: 'verified', 'forged' (declarer is another judge) or 'unverifiable' (no identity link). */
+export function caseVerification(c: ConflictCase, judgeUids?: Record<string, string | undefined>): 'verified' | 'forged' | 'unverifiable' {
+  if (c.declaredByRole !== 'judge') return 'verified';
+  const uid = judgeUids?.[c.judgeId];
+  if (!uid) return 'unverifiable';
+  return uid === c.declaredByUid ? 'verified' : 'forged';
 }
 
 /** May this judge score this participant, given the conflict cases? */
