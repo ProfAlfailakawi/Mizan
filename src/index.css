@@ -1227,29 +1227,6 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 .mizan-declare-hint{ font-size:calc(11px * var(--mizan-text-scale)); color:var(--muted); }
 @media (prefers-reduced-motion: reduce){ .mizan-declare-critical[data-confirming="true"]{ animation:none } }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Participant journey stepper
-   Completed and current steps shared one emerald fill, so "done" and "you are
-   here" were indistinguishable — and the distinction was carried by colour
-   alone, which is exactly what WCAG 1.4.1 warns against. The current step now
-   also differs in ring, weight and label, and announces itself.
-   ═══════════════════════════════════════════════════════════════════════════ */
-.mizan-step{
-  width:36px; height:36px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
-  font-size:calc(12px * var(--mizan-text-scale)); font-weight:800;
-  background:#eeece6; color:#5f655f; border:1px solid transparent;
-}
-.mizan-step[data-state="done"]{ background:var(--emerald); color:#fff; }
-/* "You are here": filled, ringed and lifted — three signals, not one. */
-.mizan-step[data-state="current"]{
-  background:var(--emerald); color:#fff;
-  box-shadow:0 0 0 4px rgba(33,76,64,.16); transform:scale(1.06);
-}
-.mizan-step-label{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); text-align:center; }
-.mizan-step-label[data-state="current"]{ color:var(--emerald); font-weight:800; }
-.mizan-step-rule{ height:2px; flex:1; border-radius:999px; background:#dddcd5; }
-.mizan-step-rule[data-done="true"]{ background:var(--emerald-2); }
-
 /* The arrival code is the participant's identity in the hall — it is what the
    board calls and what the gate scans. It was a 11px neutral chip. */
 .mizan-code{

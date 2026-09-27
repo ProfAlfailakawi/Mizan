@@ -6,6 +6,11 @@ declare module 'react/jsx-runtime' { export const jsx:any; export const jsxs:any
 declare module 'react-dom/client' { export function createRoot(...args:any[]): any; }
 declare module 'lucide-react' {
  export const Loader2: any;
+ export const DoorOpen: any;
+ export const CornerUpLeft: any;
+ export const CircleDashed: any;
+ export const Hourglass: any;
+ export const AudioWaveform: any;
  export const BookOpenCheck: any;
  export const EyeOff: any;
  export const Eye: any;

@@ -1,5 +1,9 @@
-/* Maps the shared DNA kit tokens onto Mizan's own palette (src/index.css). */
-:root {
+/* Note: the kit resets .dna-steps { margin: 0 } outside any cascade layer, so margins on a
+   stepper root use Tailwind's important form (!mt-5) or a wrapper element. */
+
+/* Maps the shared DNA kit tokens onto Mizan's own palette (src/index.css).
+   :root:root outranks the kit's own :root defaults whatever the bundle order. */
+:root:root {
   --dna-canvas: var(--canvas);
   --dna-surface: var(--surface);
   --dna-surface-2: var(--surface-soft);
@@ -23,5 +27,41 @@
   --dna-r-sm: var(--radius-sm);
   --dna-ease: var(--ease-brand);
 }
-/* Legacy global svg/button rules must not distort kit glyphs. */
-.dna-steps svg, .dna-ring svg { max-width: none; }
+/* Venue (dark) screens: the kit reads the venue palette instead of the page one. */
+.mizan-dna-venue {
+  --dna-surface: var(--venue);
+  --dna-surface-2: var(--venue-surface);
+  --dna-ink: var(--venue-ink);
+  --dna-muted: var(--venue-muted);
+  --dna-line: var(--venue-line);
+  --dna-line-2: rgba(255, 255, 255, 0.18);
+  --dna-accent: var(--gold-light);
+  --dna-accent-soft: rgba(232, 203, 147, 0.14);
+  --dna-on-accent: var(--venue-deep);
+}
+
+/* JudgeOS gate rail sits on the judge's paper (--jc-paper), whose tone changes per judge theme. */
+.mizan-judge-gates {
+  --dna-ink: var(--jc-paper-ink);
+  --dna-muted: color-mix(in srgb, var(--jc-paper-ink) 80%, var(--jc-paper));
+  --dna-surface: color-mix(in srgb, var(--jc-paper) 55%, var(--surface));
+  --dna-line-2: color-mix(in srgb, var(--jc-paper-ink) 22%, transparent);
+}
+[data-judge-mode="on"] .mizan-judge-gates.dna-steps .dna-lbl { font-size: 16px; }
+
+/* Marketing journey: large nodes on wide screens, calmer nodes on a phone. */
+@media (max-width: 639.98px) {
+  .dna-steps.mizan-mk-journey[data-size] { --node: 36px; --icon: 16px; }
+}
+
+/* Juz ribbon (question engine): a slim ribbon read in the page's own direction, juz 1 first. */
+.dna-heat.mizan-juz-ribbon { direction: inherit; gap: 2px; }
+.dna-heat.mizan-juz-ribbon .dna-heatc { aspect-ratio: auto; block-size: 14px; min-inline-size: 0; border-radius: 3px; }
+/* On a phone the page belongs to the mushaf once the passage is open: the rail keeps its
+   nodes and the labels stay for screen readers only. */
+@media (max-width: 639.98px) {
+  .mizan-judge-gates--compact.dna-steps .dna-lbl {
+    position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+}
