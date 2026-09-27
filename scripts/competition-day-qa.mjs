@@ -80,7 +80,7 @@ const clickIf = async (label) => {
  * المدخل التجريبي صار أيقونةً صامتة بلا نصٍّ مرئي (بطلب صاحب المنتج)، ووصفُه في
  * `aria-label`. فيُلتقط من الوصف لا من النصّ، ويبقى نصُّ الزرّ القديم مقبولًا إن عاد.
  */
-const DEMO_ENTRY = 'استعراض النظام ببيانات تجريبية';
+const DEMO_ENTRY = 'جرّب النسخة التجريبية';
 const ROLE_OPTION = { 'المحكم': 'محكّم', 'المدقق': 'مدقّق' };
 
 const enterRole = async (label) => {
@@ -89,7 +89,7 @@ const enterRole = async (label) => {
    * لا يُنتظر سكونُ الشبكة: ذاك شرطٌ على الشبكة لا على الصفحة، ويتعلّق بكلّ ما تلمسه
    * الصفحةُ ممّا لا يعنينا. يُنتظر المدخلُ نفسُه — وهو شرطُ ما بعده.
    */
-  const demoEntry = page.locator(`button:visible[aria-label="${DEMO_ENTRY}"]`).first();
+  const demoEntry = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
   await demoEntry.waitFor({ state: 'visible', timeout: 45000 }).catch(() => {});
   const demoEntryByText = page.locator('button:visible', { hasText: DEMO_ENTRY }).first();
   const entryButton = await demoEntry.count() ? demoEntry : (await demoEntryByText.count() ? demoEntryByText : null);
