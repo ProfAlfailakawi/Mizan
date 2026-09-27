@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DnaStepper } from '../dna/DnaKit';
 import { bilingualName } from '../../lib/ui-language';
 import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamber';
 import { Ratio } from '../design-system/Ratio';
 import { CompletionSeal } from '../participant/CompletionSeal';
-import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock } from 'lucide-react';
+import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock, BookOpen } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
@@ -642,6 +643,17 @@ export const JudgeOS: React.FC = () => {
   {/* الورقة — الضوء كلّه عليها، وهي أوّل ما يُقرأ في اتجاه القراءة. */}
   <div className="mizan-judge-page">
    <div className="mizan-judge-paper">
+
+    {/* مسار البوابات: الميكروفون ← الحضور ← الموافقة ← التلاوة ← القفل — رسمٌ للحالة القائمة لا أكثر. */}
+    {(()=>{const locked=!!activeSession.isLocked;const ending=activeSession.questionPhase==='TRANSITION'&&isLastQuestion;const quorum=questionRevealed||(required>0&&approved>=required);
+     const st=(done:boolean,current:boolean)=>done?'done' as const:current?'current' as const:'pending' as const;
+     return <DnaStepper className={`mizan-judge-gates !mb-3 shrink-0${questionRevealed?' mizan-judge-gates--compact':''}`} size="sm" ariaLabel={ar?'مسار البوابات':'Gate rail'} stateText={ar?undefined:{done:'done',current:'current',pending:'upcoming',returned:'returned',blocked:'blocked'}} steps={[
+      {key:'mic',label:ar?'الميكروفون':'Microphone',state:st(micRecording||locked,true),icon:micRecording||locked?undefined:<Mic className="w-3.5 h-3.5"/>},
+      {key:'presence',label:ar?'الحضور':'Presence',state:st(participantPresent||questionRevealed||locked,micRecording),icon:participantPresent||questionRevealed||locked?undefined:<UserCheck className="w-3.5 h-3.5"/>},
+      {key:'approval',label:ar?'الموافقة':'Approval',state:st(quorum||locked,micRecording&&participantPresent),badge:participantPresent&&required>0&&!questionRevealed&&!locked?`${approved}/${required}`:undefined,icon:quorum||locked?undefined:<ShieldCheck className="w-3.5 h-3.5"/>},
+      {key:'recitation',label:ar?'التلاوة':'Recitation',state:st(locked||ending,questionRevealed),icon:locked||ending?undefined:<BookOpen className="w-3.5 h-3.5"/>},
+      {key:'lock',label:ar?'القفل':'Lock',state:st(locked,ending),icon:locked?undefined:<LockKeyhole className="w-3.5 h-3.5"/>},
+     ]}/>})()}
 
     {/*
      * استثناء عبر الفئات — يقف فوق كل شيء ولا يُطوى.
