@@ -23,6 +23,7 @@ import { Metric } from '../design-system/Metric';
 import { DetailRow } from '../design-system/DetailRow';
 import { useConfirm } from '../design-system/ConfirmDialog';
 import { OfficialQuranLibrary } from './OfficialQuranLibrary';
+import { demoRescueRepairs } from '../../lib/demo-identity';
 
 const isAr=(l:string)=>l==='ar';
 
@@ -40,6 +41,16 @@ const docIsAuto=(a:string)=>DOC_SAFE_AUTO.has(a);
 /* حمولة غرفة القيادة في بيئة العرض — من `src/data` باستيرادٍ ديناميكي لا يُنفَّذ خارجها. */
 const demoOwnerResponse=async(path:string)=>{if(!IS_DEMO_SESSION)return null;try{const mod=await import('../../data/demo-commercial');return mod.demoCommercialResponse(path)}catch{return null}};
 
+/*
+ * نتيجة إجراء الإنقاذ في بيئة العرض — لا يبلغ الخادم شيء.
+ * «تقرير التشخيص» يجمع أدلّة ولا يصلح شيئًا: يبقى التنبيه ولا يُعدّ إصلاحًا تلقائيًا.
+ */
+export const demoRescueOutcome=(action:string,_tenantId:string,ar:boolean):{repairs:boolean;message:string}=>{
+ if(action==='diagnostic.bundle.generate')return {repairs:false,message:ar?'وُلّد تقرير التشخيص. التنبيه باقٍ حتى يُعالج سببه.':'Diagnostic report generated. The alert stays until its cause is fixed.'};
+ if(!demoRescueRepairs(action,docIsAuto(action)))return {repairs:false,message:ar?`سُجّل الإجراء للاعتماد: ${docActionLabel(action,true)}`:'QUEUED_FOR_APPROVAL'};
+ return {repairs:true,message:ar?`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`:'SAFE · RECHECK_SCHEDULED'};
+};
+
 export const SuperAdminConsole: React.FC = () => {
  const store=useAppStore(); const {language,competition,participants,judges,auditLogs,organizations,featureFlags}=store; const ar=isAr(language);
  const modules=[
@@ -50,7 +61,7 @@ export const SuperAdminConsole: React.FC = () => {
   {key:'broadcast',ar:'البث',en:'Broadcast',descAr:'سطح عرض مستقل للحفل والبث دون منح صلاحيات التحكيم.',descEn:'Independent ceremony/broadcast surface without judging authority.',ready:true,readyAr:'سطح البث جاهز',readyEn:'Broadcast surface ready'},
   {key:'benchmark',ar:'المقارنة التشغيلية',en:'Operational benchmark',descAr:'يقارن الأداء بعد توفر تشغيل أو بيانات قياس حقيقية؛ لا يخترع أرقامًا.',descEn:'Compares performance once real runs or measurements exist; never invents metrics.',ready:store.benchmarkRuns.length>0,readyAr:store.benchmarkRuns.length?'بيانات قياس موجودة':'بانتظار تشغيل قياسي',readyEn:store.benchmarkRuns.length?'Benchmark data available':'Waiting for a benchmark run'}
  ]; const [tower,setTower]=useState<any>(null); const [towerError,setTowerError]=useState(''); const [selected,setSelected]=useState<any>(null); const [rescueResult,setRescueResult]=useState(''); const [busyAction,setBusyAction]=useState(''); const [confirmAction,setConfirmAction]=useState<{action:string;tenantId:string}|null>(null);
- const loadTower=async()=>{try{const user=auth.currentUser;if(!user&&IS_DEMO_SESSION){const demo=await demoOwnerResponse('/api/owner/control-tower');if(demo){setTower(demo);setTowerError('');return}}if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const r=await fetch('/api/owner/control-tower',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));setTower(body);setTowerError('')}catch(e){setTowerError((e as Error).message)}};
+ const loadTower=async()=>{try{/* بيئة العرض لا تبلغ الخادم الحقيقي أبدًا، ولو كان في التبويب مالكٌ مسجَّل الدخول. */if(IS_DEMO_SESSION){const demo=await demoOwnerResponse('/api/owner/control-tower');if(demo){setTower(demo);setTowerError('')}else setTowerError(ar?'غرفة القيادة غير متاحة في البيئة التجريبية.':'Control tower unavailable in the demo.');return}const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const r=await fetch('/api/owner/control-tower',{headers:{authorization:`Bearer ${token}`},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));setTower(body);setTowerError('')}catch(e){setTowerError((e as Error).message)}};
  useEffect(()=>{void loadTower();const id=window.setInterval(()=>void loadTower(),20000);return()=>window.clearInterval(id)},[]);
  const m=tower?.metrics||{}; const health=tower?.platform; const attention=tower?.needsAttention||[]; const primary=selected||attention[0];
 /*
@@ -67,7 +78,7 @@ export const SuperAdminConsole: React.FC = () => {
  const syncClaims=async()=>{
   setClaimSync({busy:true,note:'',tone:''});
   /* بيئة العرض بلا خادم هوية: تُقال النتيجة بأرقام فريقها المعزول، ولا يُرسل شيء. */
-  if(!auth.currentUser&&IS_DEMO_SESSION){setClaimSync({busy:false,tone:'ok',note:`تمت المزامنة: ${store.identityAccounts.length} حسابًا مُنحت صلاحياتها، و0 مُسحت صلاحياتها.`});return}
+  if(IS_DEMO_SESSION){setClaimSync({busy:false,tone:'ok',note:`تمت المزامنة: ${store.identityAccounts.length} حسابًا مُنحت صلاحياتها، و0 مُسحت صلاحياتها.`});return}
   try{
    const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');
    const token=await user.getIdToken();
@@ -87,7 +98,7 @@ export const SuperAdminConsole: React.FC = () => {
      :`تمت المزامنة: ${body.written} حسابًا مُنحت صلاحياتها، و${body.cleared} مُسحت صلاحياتها.`});
   }catch(err){setClaimSync({busy:false,tone:'error',note:err instanceof Error?err.message:'تعذّرت المزامنة.'})}
  };
- const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');if(!auth.currentUser&&IS_DEMO_SESSION){setRescueResult(ar?`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`:`SAFE · RECHECK_SCHEDULED`);setTower((t:any)=>t?{...t,needsAttention:(t.needsAttention||[]).filter((d:any)=>!(d.safeActionCodes||[]).includes(action)||!docIsAuto(action)),metrics:{...t.metrics,autoHealedToday:(t.metrics?.autoHealedToday||0)+1}}:t);setSelected(null);setBusyAction('');return}try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
+ const runRescue=async(action:string,tenantId:string)=>{setBusyAction(action);setRescueResult('');if(IS_DEMO_SESSION){const demoRescue=demoRescueOutcome(action,tenantId,ar);setRescueResult(demoRescue.message);if(demoRescue.repairs)setTower((t:any)=>t?{...t,needsAttention:(t.needsAttention||[]).filter((d:any)=>!(d.safeActionCodes||[]).includes(action)),metrics:{...t.metrics,autoHealedToday:(t.metrics?.autoHealedToday||0)+1}}:t);if(demoRescue.repairs)setSelected(null);setBusyAction('');return}try{const user=auth.currentUser;if(!user)throw new Error(ar?'تلزم هوية المالك.':'Owner identity required.');const token=await user.getIdToken();const reason=`إصلاح عبر ميزان Doctor: ${docActionLabel(action,true)}`;const r=await fetch('/api/owner/rescue-actions',{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({action,tenantId:tenantId||'__platform__',reason,idempotencyKey:crypto.randomUUID()})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));const queuedForApproval=body.verification==='QUEUED_FOR_APPROVAL';setRescueResult(ar?(queuedForApproval?`أُرسل الإجراء للاعتماد: ${docActionLabel(action,true)}`:`سُجّل الإجراء الآمن وسيعيد الخادم الفحص: ${docActionLabel(action,true)}`):`${body.safety} · ${body.verification}`);void loadTower()}catch(e){setRescueResult(ar?`تعذّر التنفيذ: ${docAr((e as Error).message,true)}`:(e as Error).message)}finally{setBusyAction('')}};
  const requestRescue=(action:string,tenantId:string)=>{if(docIsAuto(action))void runRescue(action,tenantId);else setConfirmAction({action,tenantId:tenantId||'__platform__'})};
  const [consoleTab,setConsoleTab]=useState<'health'|'commerce'|'governance'|'library'>('health');
  const consoleTabAnchor=useTabAnchor(consoleTab);
@@ -252,7 +263,7 @@ export const DelegationPortal: React.FC = () => {
 
 export const AuditorConsole: React.FC = () => {
  const store=useAppStore(); const {language,auditLogs,competition,identityAccounts,authSessions,passReissues,continuityIncidents,sessionRecoveries,auditLedgerSeals}=store; const ar=isAr(language); const [q,setQ]=useState(''); const [selectedId,setSelectedId]=useState(''); const [verifyMsg,setVerifyMsg]=useState(''); const [serverAudit,setServerAudit]=useState<{rows:any[];verification?:{valid:boolean;count:number;lastHash?:string}}|null>(null);
- useEffect(()=>{const u=auth.currentUser;if(!u)return;void (async()=>{try{const token=await u.getIdToken();const r=await fetch('/api/identity/audit?limit=500',{headers:{authorization:`Bearer ${token}`}});if(r.ok)setServerAudit(await r.json())}catch{}})()},[]);
+ useEffect(()=>{if(IS_DEMO_SESSION)return;const u=auth.currentUser;if(!u)return;void (async()=>{try{const token=await u.getIdToken();const r=await fetch('/api/identity/audit?limit=500',{headers:{authorization:`Bearer ${token}`}});if(r.ok)setServerAudit(await r.json())}catch{}})()},[]);
  const logs=auditLogs.filter(x=>`${auditActionLabel(x.action,ar)} ${x.actorName} ${roleLabel(x.actorRole,ar)} ${x.entityType} ${x.entityId} ${x.humanSummaryArabic} ${x.humanSummaryEnglish} ${x.reason||''} ${x.sessionId||''}`.toLowerCase().includes(q.toLowerCase())); const selected=auditLogs.find(x=>x.id===selectedId)||logs[0];
  const verify=async()=>{const r=await store.verifyAuditLedger();setVerifyMsg(r.valid?(ar?`السلسلة سليمة · ${auditLogs.length} حدثًا · ${String(r.headHash||'').slice(0,16)}…`:`Chain verified · ${auditLogs.length} events · ${String(r.headHash||'').slice(0,16)}…`):(ar?'فشل التحقق من سلسلة التدقيق.':'Audit chain verification failed.'))};
  return <PortalFrame kicker={ar?'التدقيق':'AUDIT'} title={ar?'دفتر الأدلة التشغيلي':'Operational evidence ledger'} subtitle={ar?'قراءة وتحقق فقط. ترى من فعل ماذا ومتى ومن أي جلسة، دون امتلاك صلاحية تعديل المسابقة من هذا المسار.':'Read and verify only. Trace who did what, when, and from which session without mutation authority.'}>
