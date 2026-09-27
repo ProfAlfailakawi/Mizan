@@ -82,6 +82,7 @@ import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
 import type { WebhookEventType } from './server/commercial/types';
 import { CommunicationsService, InAppProvider, providersFromEnv, type Recipient } from './server/communications';
+import { runParticipantReminders, type ReminderSource } from './server/participant-reminders';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
@@ -442,6 +443,21 @@ async function startServer() {
   if(communications&&saasPlatform){
     const remind=()=>{try{const t=saasPlatform!.communicationTargets();for(const r of t.renewals)communicate('renewal_approaching',`${r.termId}:${r.window}`,[{channel:'in_app',address:r.organizationId,locale:'ar',organizationId:r.organizationId},...(r.email?[{channel:'email' as const,address:r.email,locale:'ar' as const,organizationId:r.organizationId}]:[])],{organization:r.name,date:r.endsAt.slice(0,10),days:r.daysLeft});for(const o of t.overdue)communicate('payment_failed',o.invoiceId,[{channel:'in_app',address:o.organizationId,locale:'ar',organizationId:o.organizationId},...(o.email?[{channel:'email' as const,address:o.email,locale:'ar' as const,organizationId:o.organizationId}]:[])],{invoice:o.invoiceNumber});void communications!.dispatch()}catch(err){console.error('[communications] reminder cycle failed:',err)}};
     setTimeout(remind,15_000).unref?.();const commTimer=setInterval(remind,15*60_000);commTimer.unref?.();
+  }
+  if(communications&&firestoreRepository){
+    /*
+     * تذكير المتسابقين بمواعيدهم من الجدول المعتمد في Firestore. المسابقات من الإسقاط العام
+     * المنشور، والجدول المعتمد لكل مسابقة، ووثيقة كل متسابق فيه — كلها قراءة بصلاحية الخادم.
+     */
+    const fsRepo=firestoreRepository;
+    const reminderSource:ReminderSource={
+      competitions:async()=>{const out=[];for(const p of await fsRepo.listDocumentPaths('public_competitions',500)){const row=await fsRepo.get(p).catch(()=>null);const c=(row as any)?.competition;if(c?.id&&c?.organizationId)out.push({id:String(c.id),organizationId:String(c.organizationId),name:String(c.name||''),nameArabic:c.nameArabic?String(c.nameArabic):undefined,timezone:c.timezone?String(c.timezone):undefined,venueName:c.venueName?String(c.venueName):undefined,status:String(c.status||'')})}return out},
+      publishedPlan:async c=>{const base=`organizations/${c.organizationId}/competitions/${c.id}/schedule_plans`;let best:any=null;for(const p of await fsRepo.listDocumentPaths(base,200)){const row:any=await fsRepo.get(p).catch(()=>null);if(row?.status==='published'&&(!best||String(row.publishedAt||'')>String(best.publishedAt||'')))best=row}return best?{id:String(best.id),status:'published',slots:Array.isArray(best.plan?.slots)?best.plan.slots:[],halls:Array.isArray(best.input?.halls)?best.input.halls:[]}:null},
+      participant:async(c,id)=>{const safe=String(id).replace(/[^a-zA-Z0-9_-]/g,'');if(!safe)return null;const row:any=await fsRepo.get(`organizations/${c.organizationId}/competitions/${c.id}/participants/${safe}`).catch(()=>null);return row?{id:safe,status:String(row.status||''),email:row.email,phone:row.phone,fullName:row.fullName,fullNameArabic:row.fullNameArabic,preferredLanguage:row.preferredLanguage,communicationOptOut:row.communicationOptOut===true}:null},
+    };
+    const channels=()=>{const st=communications!.status();return {whatsapp:st.some(c=>c.channel==='whatsapp'&&c.configured),sms:st.some(c=>c.channel==='sms'&&c.configured)}};
+    const remindParticipants=()=>{void runParticipantReminders(reminderSource,r=>communicate(r.trigger,r.subjectKey,r.recipients,r.vars),Date.now(),channels()).catch(err=>console.warn('[participant-reminders] cycle failed:',err instanceof Error?err.message:err))};
+    const participantTimer=setInterval(remindParticipants,Number(process.env.MIZAN_PARTICIPANT_REMINDER_INTERVAL_MS||30*60_000));participantTimer.unref?.();
   }
   /*
    * السلطة لا تُفعَّل على مسار غير دائم: موافقة نصاب تختفي، أو بذرة التُزم بها ولم تُكشف تضيع،
