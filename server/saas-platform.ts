@@ -510,7 +510,9 @@ export class SaaSPlatformRepository{
    const gw=this.gatewayRuntime(config,transport);
    const out=await gw.createCheckout({invoiceId:`TEST-${config.id}-${Date.now()}`,invoiceNumber:'TEST',amountMinor,currency,description:'MIZAN gateway test',customer:{name:'MIZAN Test'},callbackUrl:input.callbackUrl,errorUrl:input.callbackUrl,webhookUrl:input.webhookUrl});
    paymentUrl=out.paymentUrl;externalRef=out.externalRef;
-   if(gw.canQueryStatus){const q=await gw.queryStatus(out.externalRef,currency);ok=!!q;code=q?`STATUS_${q.status.toUpperCase()}`:'STATUS_QUERY_UNREADABLE'}
+   if(gw.canQueryStatus){const q=await gw.queryStatus(out.externalRef,currency);
+    /* لا تُفعَّل بوابة لا يقرأ ملفها المبلغ والعملة من ردّ الاستعلام: لن تستطيع إثبات أي سداد. */
+    ok=!!q&&q.amountMinor!==undefined&&!!q.currency;code=!q?'STATUS_QUERY_UNREADABLE':!ok?'STATUS_QUERY_MISSING_AMOUNT_OR_CURRENCY':`STATUS_${q.status.toUpperCase()}`}
    else code='AWAITING_SIGNED_NOTIFICATION';
   }catch(err){code=err instanceof Error?err.message.slice(0,80):'GATEWAY_TEST_FAILED'}
   const organizationId=config.ownerType==='organization'?config.ownerId:'';
@@ -552,7 +554,8 @@ export class SaaSPlatformRepository{
   * المرجع ويُسأل عنه بالمفتاح السرّي. الإشعار وحده لا يُثبت سدادًا بلا توقيع صحيح.
   */
  async handleGatewayNotification(gatewayId:string,headers:Record<string,unknown>,raw:Buffer,transport:GatewayTransport){
-  const s=this.read() as any,config=(s.paymentGateways||[]).find((g:pay.PaymentGatewayConfigRecord)=>g.id===gatewayId) as pay.PaymentGatewayConfigRecord|undefined;if(!config||config.status==='disabled')throw new Error('PAYMENT_GATEWAY_NOT_FOUND');
+  const s=this.read() as any,config=(s.paymentGateways||[]).find((g:pay.PaymentGatewayConfigRecord)=>g.id===gatewayId) as pay.PaymentGatewayConfigRecord|undefined;/* بوابة عُطّلت أو استُبدلت لا تفتح عمليات جديدة، لكن إشعارات عملياتها القائمة تُقبل وتُسوّى. */
+  if(!config)throw new Error('PAYMENT_GATEWAY_NOT_FOUND');
   const gw=this.gatewayRuntime(config,transport);
   const signed=(config.profile as any).webhook?gw.verifyWebhook(headers,raw):null;
   const ref=signed?.externalRef||gw.referenceFromNotification(raw);if(!ref)throw new Error('PAYMENT_NOTIFICATION_UNREADABLE');

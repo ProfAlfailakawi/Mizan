@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { declareConflict, resolveConflict, judgeMayScore, eligibleCommittees, type ConflictCase } from '../src/lib/conflict-of-interest';
+import { declareConflict, resolveConflict, judgeMayScore, eligibleCommittees, caseIsBinding, caseVerification, type ConflictCase } from '../src/lib/conflict-of-interest';
 import { buildSchedule, withManualPin, withoutPin, toMin, type SchedulerInput } from '../src/lib/smart-scheduler';
 import { createRelationship, computeQualifiers, mergeQualifications, transitionQualification, invitationParticipant, hierarchyOf } from '../src/lib/qualification';
 import type { Participant, ResultRecord } from '../src/types';
@@ -154,11 +154,21 @@ test('review fix: store applies participant reassignment and persists schedule d
 test('review fix: a judge without a linked identity keeps binding conflicts (fail safe), and the UI can tell the three cases apart', async () => {
   const { caseIsBinding, caseVerification } = await import('../src/lib/conflict-of-interest');
   const c = declareConflict([], { ...base, id: 'n', judgeId: 'unlinked', declaredByUid: 'uid-x', declaredByRole: 'judge', participantId: 'p1', kind: 'recusal', relation: 'other', reason: 'self recusal without grant' });
-  assert.equal(caseIsBinding(c, {}), true);
-  assert.equal(judgeMayScore([c], 'unlinked', { id: 'p1' }, {}).allowed, false);
-  assert.equal(caseVerification(c, {}), 'unverifiable');
+  assert.equal(caseIsBinding(c, { unlinked: undefined }), true);
+  assert.equal(judgeMayScore([c], 'unlinked', { id: 'p1' }, { unlinked: undefined }).allowed, false);
+  assert.equal(caseVerification(c, { unlinked: undefined }), 'unverifiable');
   assert.equal(caseVerification(c, { unlinked: 'uid-x' }), 'verified');
   assert.equal(caseVerification(c, { unlinked: 'uid-other' }), 'forged');
   const store = fs.readFileSync('src/lib/store.ts', 'utf8');
   for (const code of ['CONFLICT_TARGET_COMMITTEE_NOT_FOUND', 'CONFLICT_TARGET_COMMITTEE_WRONG_CATEGORY', 'CONFLICT_TARGET_COMMITTEE_CONFLICTED']) assert.ok(store.includes(code), code);
+});
+
+test('a judge-declared case naming an identifier that is no known judge binds nobody', () => {
+  const c = { id: 'x', competitionId: 'c', judgeId: 'user-of-someone', participantId: 'p1', declaredByRole: 'judge', declaredByUid: 'uid-attacker', status: 'open' } as any;
+  const known = { 'judge-1': 'uid-1', 'user-1': 'uid-1' };
+  assert.equal(caseIsBinding(c, known), false);
+  assert.equal(caseVerification(c, known), 'forged');
+  assert.equal(caseIsBinding({ ...c, judgeId: 'user-1' }, known), false, 'the stored userId form is canonicalised and checked against its uid');
+  assert.equal(caseIsBinding({ ...c, judgeId: 'user-1', declaredByUid: 'uid-1' }, known), true);
+  assert.equal(caseIsBinding({ ...c, judgeId: 'judge-2' }, { ...known, 'judge-2': undefined }), true, 'a known judge without a linked identity stays fail-safe binding');
 });

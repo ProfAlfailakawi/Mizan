@@ -205,3 +205,32 @@ test('a webhook-only gateway is trusted only through a valid signature', setup(a
   assert.equal((await c.repo.handleGatewayNotification(g.id, { 'x-sig': sig(testBody) }, testBody, transport)).intent.status, 'paid');
   assert.equal(c.repo.listPaymentGateways(orgAdmin(c.mine), 'organization', c.mine).gateways[0].status, 'active', 'a signed paid test notification activates the gateway');
 }));
+
+test('a "paid" answer without a readable amount and currency never settles, and such a profile cannot activate', setup(async c => {
+  const state = { status: 'INITIATED', amount: '5.250', currency: '' };
+  const { transport } = fakeGateway(state);
+  const g = save(c, orgAdmin(c.mine), 'organization', c.mine);
+  const t = await testCall(c, orgAdmin(c.mine), g.id, transport);
+  assert.equal(t.ok, false);
+  assert.equal(t.code, 'STATUS_QUERY_MISSING_AMOUNT_OR_CURRENCY');
+  state.currency = 'KWD';
+  await testCall(c, orgAdmin(c.mine), g.id, transport);
+  const out = await checkout(c, c.mine, transport, 'P9', 525);
+  state.status = 'CAPTURED'; state.currency = '';
+  const r = await c.repo.verifyRegistrationIntent(out.intent.id, transport);
+  assert.equal(r.intent.status, 'created');
+  assert.equal(r.intent.failureCode, 'SETTLEMENT_UNVERIFIABLE');
+}));
+
+test('a replaced or disabled gateway still settles payments it already started, but opens no new ones', setup(async c => {
+  const state = { status: 'INITIATED', amount: '5.250', currency: 'KWD' };
+  const { transport } = fakeGateway(state);
+  const g = save(c, orgAdmin(c.mine), 'organization', c.mine);
+  await testCall(c, orgAdmin(c.mine), g.id, transport);
+  const out = await checkout(c, c.mine, transport, 'P7', 525);
+  c.repo.disablePaymentGateway(orgAdmin(c.mine), g.id);
+  await assert.rejects(() => checkout(c, c.mine, transport, 'P8', 525), /PAYMENT_GATEWAY_NOT_CONFIGURED/);
+  state.status = 'CAPTURED';
+  const note = Buffer.from(JSON.stringify({ id: out.intent.externalRef }));
+  assert.equal((await c.repo.handleGatewayNotification(g.id, {}, note, transport)).intent.status, 'paid');
+}));

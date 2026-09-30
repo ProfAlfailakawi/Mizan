@@ -49,6 +49,7 @@ const myFatoorah = (host: string): PaymentProviderProfile => ({
     referencePath: 'Data.InvoiceId',
     amountPath: 'Data.InvoiceValue',
     amountUnit: 'major',
+    currencyPath: 'Data.InvoiceTransactions.0.Currency',
     paidValues: ['Paid'],
     failedValues: ['Canceled', 'Expired'],
   },
@@ -64,10 +65,12 @@ export const PAYMENT_PRESETS: PaymentPreset[] = [
     notes: [
       'Uses the test host apitest.myfatoorah.com with a test API token.',
       'InvoiceValue is compared in the account currency; keep the fee currency equal to the MyFatoorah account currency.',
+      'The currency is read from the first transaction (Data.InvoiceTransactions[0].Currency); the activation test fails if your account returns it elsewhere — adjust currencyPath then.',
     ],
     notesArabic: [
       'يستخدم خادم الاختبار apitest.myfatoorah.com برمز اختبار.',
       'تُقارن قيمة الفاتورة بعملة الحساب، فاجعل عملة الرسوم مطابقة لعملة حساب ماي فاتورة.',
+      'تُقرأ العملة من أول عملية (Data.InvoiceTransactions[0].Currency)؛ ويفشل اختبار التفعيل إن أعادها حسابكم في موضع آخر، فعدّل currencyPath حينها.',
     ],
     profile: myFatoorah('apitest.myfatoorah.com'),
   },

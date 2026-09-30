@@ -90,6 +90,14 @@ export class PublicCertificateRegistry{
     return {certificateNumber:rec.certificateNumber,competitionName:rec.competitionName,organizationName:rec.organizationName,issuedAt:rec.issuedAt,disclosed:rec.disclosed,certificateVersion:rec.certificateVersion};
   }
 
+  /** للجواز: الحكم نفسه مع المسابقة ورمز المتسابق للمطابقة — لا شيء غير ما على الشهادة. */
+  passportCheck(number:string){
+    const verdict=this.verify(number);
+    if(verdict.state==='NOT_FOUND')return {state:'NOT_FOUND' as const};
+    const rec=this.read(number)!;
+    return {state:verdict.state,competitionId:rec.competitionId,participantCode:rec.disclosed.participantCode,rank:rec.disclosed.rank,finalScore:rec.disclosed.finalScore,categoryName:rec.disclosed.categoryName,organizationName:rec.organizationName,issuedAt:rec.issuedAt};
+  }
+
   /** الحكم يُعاد حسابه من محتوى السجل في كل مرة، فلا يُصدَّق حقل مخزَّن يقول «صحيحة». */
   verify(number:string):CertificateVerdict{
     const rec=this.read(number);
