@@ -1,0 +1,772 @@
+{
+ "_source": "«البيان في عدّ آي القرآن» للداني، تحقيق غانم قدوري الحمد (الكويت 1414هـ)، ص79–80 وأبواب المفردات والاشتراك — كما نقله بحثٌ خارجي بنصوصه (27 سبتمبر–1 أكتوبر 2026). وفيه أيضًا: مجموع المختلف فيه 247 موضعًا.",
+ "_absentByDesign": [
+  {
+   "surah": 2,
+   "word": "ولا شهيد",
+   "note": "لا يعدّه أحد في quran-ws؛ والداني يردّ نسبته إلى المكي"
+  }
+ ],
+ "anchors": [
+  {
+   "surah": 2,
+   "kufiAyah": 114,
+   "word": "خائفين",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 2,
+   "kufiAyah": 235,
+   "word": "معروفا",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 3,
+   "kufiAyah": 49,
+   "word": "إسرائيل",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 5,
+   "kufiAyah": 23,
+   "word": "غالبون",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 9,
+   "kufiAyah": 3,
+   "word": "المشركين",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 35,
+   "kufiAyah": 41,
+   "word": "تزولا",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 47,
+   "kufiAyah": 15,
+   "word": "للشاربين",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 57,
+   "kufiAyah": 27,
+   "word": "الإنجيل",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 78,
+   "kufiAyah": 40,
+   "word": "قريبا",
+   "daniGroup": "انفرد البصري بعدّها",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 98,
+   "kufiAyah": 5,
+   "word": "الدين",
+   "daniGroup": "انفرد البصري بعدّها (وحُكيت موافقة الشامي)",
+   "mustCount": [
+    "basri"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "makki"
+   ]
+  },
+  {
+   "surah": 8,
+   "kufiAyah": 62,
+   "word": "وبالمؤمنين",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 11,
+   "kufiAyah": 74,
+   "word": "لوط",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 14,
+   "kufiAyah": 33,
+   "word": "والنهار",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 20,
+   "kufiAyah": 33,
+   "word": "كثيرا",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 20,
+   "kufiAyah": 34,
+   "word": "كثيرا",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 26,
+   "kufiAyah": 92,
+   "word": "تعبدون",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 35,
+   "kufiAyah": 16,
+   "word": "جديد",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 35,
+   "kufiAyah": 19,
+   "word": "والبصير",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 35,
+   "kufiAyah": 20,
+   "word": "النور",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 37,
+   "kufiAyah": 22,
+   "word": "يعبدون",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 38,
+   "kufiAyah": 37,
+   "word": "وغواص",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 55,
+   "kufiAyah": 43,
+   "word": "المجرمون",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 56,
+   "kufiAyah": 35,
+   "word": "إنشاء",
+   "daniGroup": "انفرد البصري بتركها",
+   "mustCount": [
+    "kufi",
+    "makki",
+    "madani-first",
+    "madani-last",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 7,
+   "kufiAyah": 29,
+   "word": "الدين",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 8,
+   "kufiAyah": 36,
+   "word": "يغلبون",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 20,
+   "kufiAyah": 40,
+   "word": "فتونا",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 29,
+   "kufiAyah": 65,
+   "word": "الدين",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 31,
+   "kufiAyah": 32,
+   "word": "الدين",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 35,
+   "kufiAyah": 7,
+   "word": "شديد",
+   "daniGroup": "عدّها البصري والشامي",
+   "mustCount": [
+    "basri",
+    "dimashqi"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  },
+  {
+   "surah": 22,
+   "kufiAyah": 43,
+   "word": "لوط",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 41,
+   "kufiAyah": 13,
+   "word": "وثمود",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 56,
+   "kufiAyah": 15,
+   "word": "موضونة",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 79,
+   "kufiAyah": 33,
+   "word": "ولأنعامكم",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 80,
+   "kufiAyah": 32,
+   "word": "ولأنعامكم",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 84,
+   "kufiAyah": 7,
+   "word": "بيمينه",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 84,
+   "kufiAyah": 10,
+   "word": "ظهره",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 101,
+   "kufiAyah": 6,
+   "word": "موازينه",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 101,
+   "kufiAyah": 8,
+   "word": "موازينه",
+   "daniGroup": "تركها البصري والشامي",
+   "mustCount": [
+    "kufi",
+    "makki"
+   ],
+   "mustNotCount": [
+    "basri",
+    "dimashqi"
+   ]
+  },
+  {
+   "surah": 38,
+   "kufiAyah": 84,
+   "word": "أقول",
+   "daniGroup": "«وفي ص بخلاف عن البصري»: أيوب يترك (6204)، الجحدري يعدّ (6205)",
+   "mustCount": [
+    "kufi"
+   ],
+   "mustNotCount": [
+    "basri"
+   ]
+  },
+  {
+   "surah": 22,
+   "kufiAyah": 78,
+   "word": "المسلمين",
+   "daniGroup": "انفرد المكي بعدّها",
+   "mustCount": [
+    "makki"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "basri"
+   ]
+  },
+  {
+   "surah": 56,
+   "kufiAyah": 47,
+   "word": "يقولون",
+   "daniGroup": "انفرد المكي بعدّها",
+   "mustCount": [
+    "makki"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "basri"
+   ]
+  },
+  {
+   "surah": 72,
+   "kufiAyah": 22,
+   "word": "أحد",
+   "daniGroup": "انفرد المكي بعدّها",
+   "mustCount": [
+    "makki"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "basri"
+   ]
+  },
+  {
+   "surah": 73,
+   "kufiAyah": 15,
+   "word": "رسولا",
+   "daniGroup": "انفرد المكي بعدّها",
+   "mustCount": [
+    "makki"
+   ],
+   "mustNotCount": [
+    "kufi",
+    "basri"
+   ]
+  },
+  {
+   "surah": 55,
+   "kufiAyah": 10,
+   "word": "للأنام",
+   "daniGroup": "انفرد المكي بتركها",
+   "mustCount": [
+    "kufi",
+    "basri"
+   ],
+   "mustNotCount": [
+    "makki"
+   ]
+  },
+  {
+   "surah": 56,
+   "kufiAyah": 42,
+   "word": "وحميم",
+   "daniGroup": "انفرد المكي بتركها",
+   "mustCount": [
+    "kufi",
+    "basri"
+   ],
+   "mustNotCount": [
+    "makki"
+   ]
+  },
+  {
+   "surah": 72,
+   "kufiAyah": 22,
+   "word": "ملتحدا",
+   "daniGroup": "انفرد المكي بتركها",
+   "mustCount": [
+    "kufi",
+    "basri"
+   ],
+   "mustNotCount": [
+    "makki"
+   ]
+  },
+  {
+   "surah": 91,
+   "kufiAyah": 14,
+   "word": "فعقروها",
+   "daniGroup": "انفرد بها المدني الأول في رواية ابن شاذان (وقيل وافقه المكي)",
+   "mustCount": [
+    "madani-first"
+   ],
+   "mustNotCount": [
+    "makki",
+    "kufi",
+    "basri"
+   ]
+  },
+  {
+   "surah": 37,
+   "kufiAyah": 167,
+   "word": "ليقولون",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "kufi"
+   ],
+   "mustNotCount": [
+    "madani-first"
+   ]
+  },
+  {
+   "surah": 80,
+   "kufiAyah": 24,
+   "word": "طعامه",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "kufi"
+   ],
+   "mustNotCount": [
+    "madani-first"
+   ]
+  },
+  {
+   "surah": 81,
+   "kufiAyah": 26,
+   "word": "تذهبون",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "kufi"
+   ],
+   "mustNotCount": [
+    "madani-first"
+   ]
+  },
+  {
+   "surah": 67,
+   "kufiAyah": 9,
+   "word": "نذير",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "madani-last",
+    "makki"
+   ],
+   "mustNotCount": [
+    "madani-first"
+   ]
+  },
+  {
+   "surah": 3,
+   "kufiAyah": 92,
+   "word": "تحبون",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "madani-last",
+    "makki"
+   ],
+   "mustNotCount": [
+    "madani-first"
+   ]
+  },
+  {
+   "surah": 3,
+   "kufiAyah": 97,
+   "word": "إبراهيم",
+   "daniGroup": "خلاف أبي جعفر وشيبة داخل المدني الأول",
+   "mustCount": [
+    "madani-first"
+   ],
+   "mustNotCount": [
+    "kufi"
+   ]
+  }
+ ]
+}

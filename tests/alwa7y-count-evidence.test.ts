@@ -100,3 +100,22 @@ test('حزمة أبي عمرو معدودةٌ بالمدني الأول لا ب�
   ).mismatches.map((m) => m.surah), [37, 80, 81]);
   assert.equal(pkg.reduce((a, b) => a + b, 0), 6217);
 });
+
+/*
+ * الدليل الثاني على «مكان» الحدّ لا عدده فقط: كل موضعٍ نصّ عليه الداني في أبواب المفردات
+ * والاشتراك يجب أن يكون في quran-ws بالكلمة نفسها وبالحكم نفسه.
+ */
+test('مواضع الداني المنصوصة (٥٣) تطابق حدود quran-ws كلمةً وحكمًا', () => {
+  const anchors = JSON.parse(fs.readFileSync(path.join(ROOT, 'dani-anchors.json'), 'utf8')).anchors;
+  const strip = (s: string) => s.replace(/[ً-ٰٟۖ-ۭـ]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
+  assert.equal(anchors.length, 53);
+  for (const a of anchors) {
+    const primitive = boundaryDocument.surahs[String(a.surah)]?.[String(a.kufiAyah)];
+    const points = [...(primitive?.internal ?? []), ...(primitive?.end ? [primitive.end] : [])];
+    const point = points.find((p) => strip(p.word).endsWith(strip(a.word)));
+    assert.ok(point, `${a.surah}:${a.kufiAyah} ${a.word}`);
+    for (const s of a.mustCount) assert.ok(point.counted_by.includes(s), `${a.surah}:${a.kufiAyah} ${a.word} ⟵ ${s}`);
+    for (const s of a.mustNotCount) assert.ok(!point.counted_by.includes(s), `${a.surah}:${a.kufiAyah} ${a.word} ⟵ ليس ${s}`);
+  }
+});
