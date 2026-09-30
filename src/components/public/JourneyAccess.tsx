@@ -8,6 +8,8 @@ import { Badge } from '../design-system/Badge';
 import { WarmupSanctuary } from '../participant/WarmupSanctuary';
 import { TestCompletePanel } from '../participant/CompletionSeal';
 import { JOURNEY_ORDER, displayParticipantName, formatParticipantCode, journeyStepIndex } from '../../lib/journey-progress';
+import { pl, plf, usePublicLocale } from '../../lib/public-i18n';
+import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
 
 type Audience = 'participant' | 'guardian';
 type PublicJourney = {
@@ -44,12 +46,12 @@ const tokenFromHash = () => {
 const stepLabel = (index: number, ar: boolean) => {
   const arLabels = ['تم استلام الطلب', 'المراجعة', 'تم الاعتماد', 'الحضور', 'الانتظار', 'التحكيم', 'اكتمل التحكيم', 'اعتراض', 'النتيجة/الشهادة'];
   const enLabels = ['Application received', 'Review', 'Approved', 'Check-in', 'Waiting', 'Judging', 'Judging complete', 'Appeal', 'Result / certificate'];
-  return (ar ? arLabels : enLabels)[index];
+  return pl(arLabels[index], enLabels[index]);
 };
 
 export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) => {
   const { competition, language } = useAppStore();
-  const ar = language === 'ar';
+  const { arabicData: ar, rtl, bcp47 } = usePublicLocale(language);
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const storageKey = `mizan_public_${audience}_${competition.id}`;
   const [token, setToken] = useState('');
@@ -162,19 +164,20 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
     window.location.hash = `verify?certificate=${encodeURIComponent(journey.certificate.number)}`;
   };
 
-  return <div className="min-h-screen bg-[#FAF8F2] text-[#171B18]" dir={ar ? 'rtl' : 'ltr'}>
+  return <div className="min-h-screen bg-[#FAF8F2] text-[#171B18]" dir={rtl ? 'rtl' : 'ltr'}>
     <header className="border-b border-[#e5dfd0] bg-[#FAF8F2]/95">
       <div className="max-w-4xl mx-auto h-16 px-4 flex items-center justify-between">
         <MizanLogo language={language} compact />
-        <a href={`#competition?comp=${competition.id}`} className="text-xs font-black text-[#214C40] inline-flex items-center gap-2"><Arrow className="w-4 h-4" />{ar ? 'واجهة المسابقة' : 'Competition page'}</a>
+        <PublicLanguageSwitcher />
+        <a href={`#competition?comp=${competition.id}`} className="text-xs font-black text-[#214C40] inline-flex items-center gap-2"><Arrow className="w-4 h-4" />{pl('واجهة المسابقة', 'Competition page')}</a>
       </div>
     </header>
     <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
       {!journey ? <section className="mizan-surface max-w-xl mx-auto p-6 sm:p-8 text-center">
         <div className="mx-auto w-20 h-20 rounded-3xl bg-[#E7EEE9] text-[#214C40] grid place-items-center">{audience === 'guardian' ? <UsersRound className="w-10 h-10" /> : <UserRound className="w-10 h-10" />}</div>
-        <div className="mizan-kicker mt-5">{audience === 'guardian' ? (ar ? 'دخول ولي الأمر' : 'GUARDIAN ACCESS') : (ar ? 'رحلة المتسابق' : 'PARTICIPANT JOURNEY')}</div>
-        <h1 className="text-3xl font-black mt-2">{audience === 'guardian' ? (ar ? 'تابع ابنك بلا حساب وكلمة مرور' : 'Follow the journey without an account') : (ar ? 'تابع رحلتك في المسابقة' : 'Follow your competition journey')}</h1>
-        <p className="text-base text-[#636864] leading-7 mt-3">{ar ? 'اكتب الرمز الذي أرسلته الجهة. بلا حساب ولا كلمة مرور.' : 'Use the private journey code sent by the organizer. This device remembers it after the first use; no account or password is required.'}</p>
+        <div className="mizan-kicker mt-5">{audience === 'guardian' ? (pl('دخول ولي الأمر', 'GUARDIAN ACCESS')) : (pl('رحلة المتسابق', 'PARTICIPANT JOURNEY'))}</div>
+        <h1 className="text-3xl font-black mt-2">{audience === 'guardian' ? (pl('تابع ابنك بلا حساب وكلمة مرور', 'Follow the journey without an account')) : (pl('تابع رحلتك في المسابقة', 'Follow your competition journey'))}</h1>
+        <p className="text-base text-[#636864] leading-7 mt-3">{pl('اكتب الرمز الذي أرسلته الجهة. بلا حساب ولا كلمة مرور.', 'Use the private journey code sent by the organizer. This device remembers it after the first use; no account or password is required.')}</p>
         {/*
           * «من أين آتي بالرمز؟» سؤالٌ كان بلا جواب في الشاشة.
           *
@@ -183,30 +186,28 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
           * بالضرورة، ويُقال هنا من أين يأتي بدل أن يُترك يُخمّن.
           */}
         {audience === 'guardian' && <div className="mt-4 rounded-2xl border border-[#e3e6e0] bg-[#f7f9f6] p-4 text-start">
-          <div className="text-sm font-black text-[#24463a]">{ar ? 'من أين آتي بالرمز؟' : 'Where do I get the code?'}</div>
-          <p className="mt-1.5 text-sm leading-7 text-[#5b6460]">{ar
-            ? 'من رسالة الجهة بعد قبول ابنك: افتح الرابط فقط. رقم المتسابق لا يصلح هنا لأنه معلن في الكشوف.'
-            : 'The organizer sends it once the application is approved: a private link or QR in the registration message. Open the link directly. The participant number does not work here — it is public on the roster, so anyone knowing it could read the journey.'}</p>
+          <div className="text-sm font-black text-[#24463a]">{pl('من أين آتي بالرمز؟', 'Where do I get the code?')}</div>
+          <p className="mt-1.5 text-sm leading-7 text-[#5b6460]">{pl('من رسالة الجهة بعد قبول ابنك: افتح الرابط فقط. رقم المتسابق لا يصلح هنا لأنه معلن في الكشوف.', 'The organizer sends it once the application is approved: a private link or QR in the registration message. Open the link directly. The participant number does not work here — it is public on the roster, so anyone knowing it could read the journey.')}</p>
         </div>}
-        <div className="mt-6 flex flex-col sm:flex-row gap-3"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void submit(); }} className="mizan-input flex-1 min-h-14 text-lg" dir="ltr" placeholder={ar ? 'رمز الرحلة الخاص' : 'Private journey code'} /><Button size="lg" className="min-h-14" disabled={!input.trim() || loading} onClick={() => void submit()}>{loading ? '…' : (ar ? 'دخول' : 'Open')}</Button></div>
+        <div className="mt-6 flex flex-col sm:flex-row gap-3"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void submit(); }} className="mizan-input flex-1 min-h-14 text-lg" dir="ltr" placeholder={pl('رمز الرحلة الخاص', 'Private journey code')} /><Button size="lg" className="min-h-14" disabled={!input.trim() || loading} onClick={() => void submit()}>{loading ? '…' : (pl('دخول', 'Open'))}</Button></div>
         {error && <div role="alert" className="mt-4 rounded-xl bg-[#F4E6E3] text-[#87483f] p-3 text-xs font-bold">{error}</div>}
-        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#68706b]"><LockKeyhole className="w-4 h-4" />{ar ? 'رمزٌ خاص وآمن.' : 'The opaque code can be revoked and replaced by the organizer.'}</div>
+        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#68706b]"><LockKeyhole className="w-4 h-4" />{pl('رمزٌ خاص وآمن.', 'The opaque code can be revoked and replaced by the organizer.')}</div>
       </section> : <div className="space-y-4">
         <section className="mizan-surface p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5"><div><div className="mizan-kicker">{audience === 'guardian' ? (ar ? 'متابعة ولي الأمر' : 'GUARDIAN VIEW') : (ar ? 'رحلتي في المسابقة' : 'MY JOURNEY')}</div><h1 className="text-3xl sm:text-4xl font-black mt-2">{displayParticipantName(ar ? journey.participantNameArabic || journey.participantName : journey.participantName || journey.participantNameArabic, journey.participantCode, ar)}</h1><div className="text-base text-[#4f5752] mt-2"><span className="font-black tabular-nums" dir="ltr">{formatParticipantCode(journey.participantCode)}</span> · {ar ? journey.competitionNameArabic : journey.competitionName}</div></div><Badge variant="emerald" className="text-sm">{stepLabel(idx, ar)}</Badge></div>
-          {next && !finished && <div className="mt-6 rounded-2xl bg-[#E7EEE9] text-[#214C40] p-5 flex items-center gap-4"><Arrow className="w-8 h-8 shrink-0" aria-hidden="true" /><div><div className="text-sm font-black">{ar ? 'الخطوة التالية' : 'Next'}</div><div className="text-xl font-black mt-1">{next}</div></div></div>}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5"><div><div className="mizan-kicker">{audience === 'guardian' ? (pl('متابعة ولي الأمر', 'GUARDIAN VIEW')) : (pl('رحلتي في المسابقة', 'MY JOURNEY'))}</div><h1 className="text-3xl sm:text-4xl font-black mt-2">{displayParticipantName(ar ? journey.participantNameArabic || journey.participantName : journey.participantName || journey.participantNameArabic, journey.participantCode, ar)}</h1><div className="text-base text-[#4f5752] mt-2"><span className="font-black tabular-nums" dir="ltr">{formatParticipantCode(journey.participantCode)}</span> · {ar ? journey.competitionNameArabic : journey.competitionName}</div></div><Badge variant="emerald" className="text-sm">{stepLabel(idx, ar)}</Badge></div>
+          {next && !finished && <div className="mt-6 rounded-2xl bg-[#E7EEE9] text-[#214C40] p-5 flex items-center gap-4"><Arrow className="w-8 h-8 shrink-0" aria-hidden="true" /><div><div className="text-sm font-black">{pl('الخطوة التالية', 'Next')}</div><div className="text-xl font-black mt-1">{next}</div></div></div>}
         </section>
         {finished && <TestCompletePanel ar={ar} resultReady={!!journey.result || !!journey.certificate} onShowResult={() => { setShowResult(true); window.setTimeout(() => resultRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50); }} />}
-        <details open={!finished} className="mizan-surface p-5 sm:p-6" data-journey-step={JOURNEY_ORDER[idx]}><summary className={`min-h-11 text-lg font-black ${finished ? 'cursor-pointer text-[var(--emerald)]' : 'list-none pointer-events-none'}`}>{finished ? (ar ? 'عرض مراحل رحلتك' : 'Show your journey steps') : (ar ? 'مسار الرحلة' : 'Journey')}</summary><div ref={currentStepRef} className="mt-5"><DnaStepper size="sm" ariaLabel={ar ? 'مسار الرحلة' : 'Journey'} stateText={ar ? undefined : { done: 'done', current: 'current', pending: 'upcoming', returned: 'returned', blocked: 'blocked' }} steps={steps.map(i => ({ key: String(i), label: stepLabel(i, ar), state: i < idx ? 'done' as const : i === idx ? 'current' as const : 'pending' as const }))} /></div></details>
-        {!finished && <section className="grid sm:grid-cols-3 gap-3"><Info icon={CalendarClock} label={ar ? 'الموعد' : 'Time'} value={journey.arrivalSlot || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={MapPin} label={ar ? 'المكان' : 'Location'} value={journey.committee?.hall || journey.venueName || (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /><Info icon={CircleDot} label={ar ? 'رقم دورك' : 'Queue number'} value={journey.queueNumber ? journey.queueNumber.toLocaleString(ar ? 'ar-EG' : 'en-US') : (ar ? 'لم يحدد بعد' : 'Not assigned yet')} /></section>}
-        {audience === 'participant' && (journey.certificate || finished) && <a href={`#passport?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(token)}`} className="mizan-surface block p-5 text-sm font-black text-[#214C40] underline">{ar ? 'أضف هذه المشاركة إلى جواز ميزان (اختياري)' : 'Add this to your MIZAN Passport (optional)'}</a>}
+        <details open={!finished} className="mizan-surface p-5 sm:p-6" data-journey-step={JOURNEY_ORDER[idx]}><summary className={`min-h-11 text-lg font-black ${finished ? 'cursor-pointer text-[var(--emerald)]' : 'list-none pointer-events-none'}`}>{finished ? (pl('عرض مراحل رحلتك', 'Show your journey steps')) : (pl('مسار الرحلة', 'Journey'))}</summary><div ref={currentStepRef} className="mt-5"><DnaStepper size="sm" ariaLabel={pl('مسار الرحلة', 'Journey')} stateText={ar ? undefined : { done: 'done', current: 'current', pending: 'upcoming', returned: 'returned', blocked: 'blocked' }} steps={steps.map(i => ({ key: String(i), label: stepLabel(i, ar), state: i < idx ? 'done' as const : i === idx ? 'current' as const : 'pending' as const }))} /></div></details>
+        {!finished && <section className="grid sm:grid-cols-3 gap-3"><Info icon={CalendarClock} label={pl('الموعد', 'Time')} value={journey.arrivalSlot || (pl('لم يحدد بعد', 'Not assigned yet'))} /><Info icon={MapPin} label={pl('المكان', 'Location')} value={journey.committee?.hall || journey.venueName || (pl('لم يحدد بعد', 'Not assigned yet'))} /><Info icon={CircleDot} label={pl('رقم دورك', 'Queue number')} value={journey.queueNumber ? journey.queueNumber.toLocaleString(bcp47) : (pl('لم يحدد بعد', 'Not assigned yet'))} /></section>}
+        {audience === 'participant' && (journey.certificate || finished) && <a href={`#passport?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(token)}`} className="mizan-surface block p-5 text-sm font-black text-[#214C40] underline">{pl('أضف هذه المشاركة إلى جواز ميزان (اختياري)', 'Add this to your MIZAN Passport (optional)')}</a>}
         {audience === 'participant' && !finished && <RegistrationFeePanel ar={ar} competitionId={competition.id} token={token} />}
         {audience === 'participant' && !finished && ['submitted', 'under_review', 'approved'].includes(String(journey.status)) && competition.status === 'registration_open' && <RegistrationEditPanel ar={ar} competitionId={competition.id} token={token} />}
-        {canPrepare && <section className="mizan-surface p-5 sm:p-6"><div className="mb-4"><div className="mizan-kicker">{ar ? 'التحضير للاختبار' : 'TEST PREPARATION'}</div><h2 className="mt-1 text-lg font-black">{ar ? 'تهيّأ قبل دورك' : 'Settle your range, breathing, and private rehearsal'}</h2><p className="mt-1 text-sm leading-7 text-[#646965]">{ar ? 'لك وحدك — لا تمسّ درجتك.' : 'This preparation is private; nothing is sent to the panel or affects your score.'}</p></div><WarmupSanctuary ar={ar} scopeText={ar ? journey.preparation?.scopeTextArabic || undefined : journey.preparation?.scopeTextEnglish || undefined} spreadAcrossZones={journey.preparation?.spreadAcrossZones} questionCount={journey.preparation?.questionCount} minutesPerQuestion={journey.preparation?.minutesPerQuestion} journeyPracticeAuth={{competitionId:journey.competitionId,key:token}}/></section>}
-        {journey.committee && !finished && <section className="mizan-surface p-5"><div className="text-sm font-black text-[#656b66]">{ar ? 'اللجنة' : 'PANEL'}</div><div className="text-xl font-black mt-1">{journey.committee.code} · {ar ? journey.committee.nameArabic : journey.committee.name}</div></section>}
-        {journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><ShieldCheck className="w-7 h-7 text-[#2F6555] mx-auto" /><div className="mizan-kicker mt-3">{ar ? 'النتيجة المعتمدة' : 'PUBLISHED RESULT'}</div><div className="text-4xl font-black mt-2">{journey.result.score}</div><div className="text-xl font-black text-[#3f4642] mt-2">{ar ? 'الترتيب' : 'Rank'} #{journey.result.rank}</div>{journey.certificate && <button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[#214C40]">{ar ? 'التحقق من الشهادة' : 'Verify certificate'}</button>}</section>}
-        {journey.certificate && !journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><Award className="w-7 h-7 text-[#2F6555] mx-auto" /><div className="mizan-kicker mt-3">{ar ? 'الشهادة جاهزة' : 'CERTIFICATE READY'}</div><div className="text-sm font-black mt-2" dir="ltr">{journey.certificate.number}</div><button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[#214C40]">{ar ? 'التحقق من الشهادة' : 'Verify certificate'}</button></section>}
-        <div className="text-center"><button onClick={() => { localStorage.removeItem(storageKey); setJourney(null); setToken(''); setInput(''); setError(''); }} className="min-h-11 px-4 text-xs font-bold text-[#6b716d]">{ar ? 'استخدام بطاقة رحلة أخرى' : 'Use another journey pass'}</button></div>
+        {canPrepare && <section className="mizan-surface p-5 sm:p-6"><div className="mb-4"><div className="mizan-kicker">{pl('التحضير للاختبار', 'TEST PREPARATION')}</div><h2 className="mt-1 text-lg font-black">{pl('تهيّأ قبل دورك', 'Settle your range, breathing, and private rehearsal')}</h2><p className="mt-1 text-sm leading-7 text-[#646965]">{pl('لك وحدك — لا تمسّ درجتك.', 'This preparation is private; nothing is sent to the panel or affects your score.')}</p></div><WarmupSanctuary ar={ar} scopeText={ar ? journey.preparation?.scopeTextArabic || undefined : journey.preparation?.scopeTextEnglish || undefined} spreadAcrossZones={journey.preparation?.spreadAcrossZones} questionCount={journey.preparation?.questionCount} minutesPerQuestion={journey.preparation?.minutesPerQuestion} journeyPracticeAuth={{competitionId:journey.competitionId,key:token}}/></section>}
+        {journey.committee && !finished && <section className="mizan-surface p-5"><div className="text-sm font-black text-[#656b66]">{pl('اللجنة', 'PANEL')}</div><div className="text-xl font-black mt-1">{journey.committee.code} · {ar ? journey.committee.nameArabic : journey.committee.name}</div></section>}
+        {journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><ShieldCheck className="w-7 h-7 text-[#2F6555] mx-auto" /><div className="mizan-kicker mt-3">{pl('النتيجة المعتمدة', 'PUBLISHED RESULT')}</div><div className="text-4xl font-black mt-2">{journey.result.score}</div><div className="text-xl font-black text-[#3f4642] mt-2">{pl('الترتيب', 'Rank')} #{journey.result.rank}</div>{journey.certificate && <button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[#214C40]">{pl('التحقق من الشهادة', 'Verify certificate')}</button>}</section>}
+        {journey.certificate && !journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><Award className="w-7 h-7 text-[#2F6555] mx-auto" /><div className="mizan-kicker mt-3">{pl('الشهادة جاهزة', 'CERTIFICATE READY')}</div><div className="text-sm font-black mt-2" dir="ltr">{journey.certificate.number}</div><button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[#214C40]">{pl('التحقق من الشهادة', 'Verify certificate')}</button></section>}
+        <div className="text-center"><button onClick={() => { localStorage.removeItem(storageKey); setJourney(null); setToken(''); setInput(''); setError(''); }} className="min-h-11 px-4 text-xs font-bold text-[#6b716d]">{pl('استخدام بطاقة رحلة أخرى', 'Use another journey pass')}</button></div>
       </div>}
     </main>
   </div>;
@@ -236,9 +237,9 @@ const journeyError = (code: string, ar: boolean) => {
     FIRESTORE_UNAVAILABLE: ['خدمة الرحلات غير متاحة مؤقتًا. أعد المحاولة بعد قليل.', 'Journey service is temporarily unavailable. Please retry shortly.'],
   };
   const key = code.split(':')[0];
-  if (labels[key]) return labels[key][ar ? 0 : 1];
-  if (code === 'Failed to fetch' || code.startsWith('HTTP_')) return ar ? 'تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.' : 'Could not connect to the server. Check your network and retry.';
-  return ar ? 'حدث خطأ في الخادم. أعد المحاولة لاحقًا.' : 'A server error occurred. Please retry later.';
+  if (labels[key]) return pl(...(labels[key] as [string, string]));
+  if (code === 'Failed to fetch' || code.startsWith('HTTP_')) return pl('تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.', 'Could not connect to the server. Check your network and retry.');
+  return pl('حدث خطأ في الخادم. أعد المحاولة لاحقًا.', 'A server error occurred. Please retry later.');
 };
 
 const Info = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) => <div className="mizan-surface p-5 flex items-center gap-4"><Icon className="w-9 h-9 shrink-0 text-[#2F6555]" aria-hidden="true" /><div><div className="text-sm text-[#565d59]">{label}</div><div className="text-xl font-black mt-1">{value}</div></div></div>;
@@ -278,19 +279,19 @@ const RegistrationFeePanel: React.FC<{ ar: boolean; competitionId: string; token
       throw new Error(String(body.code || `HTTP_${r.status}`));
     } catch (e) {
       const code = e instanceof Error ? e.message : '';
-      setState({ kind: 'error', text: code === 'PAYMENT_GATEWAY_UNAVAILABLE' ? (ar ? 'بوابة الدفع لا تستجيب الآن. حاول بعد قليل.' : 'The payment gateway is not responding. Try again shortly.') : journeyError(code, ar) });
+      setState({ kind: 'error', text: code === 'PAYMENT_GATEWAY_UNAVAILABLE' ? (pl('بوابة الدفع لا تستجيب الآن. حاول بعد قليل.', 'The payment gateway is not responding. Try again shortly.')) : journeyError(code, ar) });
     }
   };
   const STATUS: Record<string, [string, string]> = { pending: ['بانتظار السداد', 'Awaiting payment'], paid: ['مدفوعة', 'Paid'], waived: ['معفاة', 'Waived'], refunded: ['مستردّة', 'Refunded'] };
   return <section className="mizan-surface p-5" aria-live="polite">
-    <div className="text-sm font-black text-[#656b66]">{ar ? 'رسوم التسجيل' : 'Registration fee'}</div>
+    <div className="text-sm font-black text-[#656b66]">{pl('رسوم التسجيل', 'Registration fee')}</div>
     <div className="mt-1 text-xl font-black" dir="ltr">{amount}</div>
-    <div className="mt-1 text-sm font-bold">{(STATUS[payment.status] || [payment.status, payment.status])[ar ? 0 : 1]}</div>
-    {payment.status === 'pending' && returned === 'return' && <p role="status" className="mt-2 text-xs text-[#646965]">{ar ? 'لم يصلنا تأكيد البوابة بعد. إن أتممت الدفع فسيظهر هنا خلال دقائق.' : 'The gateway has not confirmed yet. If you paid, it will show here within minutes.'}</p>}
-    {payment.status === 'pending' && returned === 'failed' && <p role="alert" className="mt-2 text-xs font-bold text-[#A34D43]">{ar ? 'لم تكتمل عملية الدفع. يمكنك المحاولة مرة أخرى.' : 'The payment was not completed. You can try again.'}</p>}
+    <div className="mt-1 text-sm font-bold">{pl(...((STATUS[payment.status] || [payment.status, payment.status]) as [string, string]))}</div>
+    {payment.status === 'pending' && returned === 'return' && <p role="status" className="mt-2 text-xs text-[#646965]">{pl('لم يصلنا تأكيد البوابة بعد. إن أتممت الدفع فسيظهر هنا خلال دقائق.', 'The gateway has not confirmed yet. If you paid, it will show here within minutes.')}</p>}
+    {payment.status === 'pending' && returned === 'failed' && <p role="alert" className="mt-2 text-xs font-bold text-[#A34D43]">{pl('لم تكتمل عملية الدفع. يمكنك المحاولة مرة أخرى.', 'The payment was not completed. You can try again.')}</p>}
     {payment.status === 'pending' && (payment.online.available
-      ? <button type="button" disabled={state.kind === 'busy'} onClick={() => void pay()} className="mt-3 min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? `ادفع الآن${payment.online.displayName ? ` عبر ${payment.online.displayName}` : ''}` : `Pay now${payment.online.displayName ? ` with ${payment.online.displayName}` : ''}`}</button>
-      : <p className="mt-2 text-xs text-[#646965]">{ar ? 'تُسدَّد الرسوم لدى الجهة المنظمة حسب تعليماتها.' : 'Pay the fee to the organizer as instructed.'}</p>)}
+      ? <button type="button" disabled={state.kind === 'busy'} onClick={() => void pay()} className="mt-3 min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{payment.online.displayName ? plf('ادفع الآن عبر {{g}}', 'Pay now with {{g}}', { g: payment.online.displayName }) : pl('ادفع الآن', 'Pay now')}</button>
+      : <p className="mt-2 text-xs text-[#646965]">{pl('تُسدَّد الرسوم لدى الجهة المنظمة حسب تعليماتها.', 'Pay the fee to the organizer as instructed.')}</p>)}
     {state.text && <p role="alert" className="mt-2 text-xs font-bold text-[#A34D43]">{state.text}</p>}
   </section>;
 };
@@ -308,19 +309,19 @@ const RegistrationEditPanel: React.FC<{ ar: boolean; competitionId: string; toke
       const r = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/registration`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: token, ...changes }) });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(String(body.code || `HTTP_${r.status}`));
-      setState({ kind: 'ok', text: ar ? 'حُفظت التعديلات.' : 'Your changes were saved.' });
+      setState({ kind: 'ok', text: pl('حُفظت التعديلات.', 'Your changes were saved.') });
       setForm({ fullNameArabic: '', fullName: '', email: '', phone: '' });
     } catch (e) {
       const code = e instanceof Error ? e.message : '';
       const locked = code.startsWith('REGISTRATION_LOCKED') || code.startsWith('REGISTRATION_EDIT_NOT_ALLOWED');
-      setState({ kind: 'error', text: locked ? (ar ? 'انتهت فترة تعديل التسجيل.' : 'The registration can no longer be edited.') : journeyError(code, ar) });
+      setState({ kind: 'error', text: locked ? (pl('انتهت فترة تعديل التسجيل.', 'The registration can no longer be edited.')) : journeyError(code, ar) });
     }
   };
   return <section className="mizan-surface p-5">
-    <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="min-h-11 text-sm font-black text-[#214C40] underline">{ar ? 'تعديل بيانات التسجيل' : 'Edit my registration'}</button>
+    <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} className="min-h-11 text-sm font-black text-[#214C40] underline">{pl('تعديل بيانات التسجيل', 'Edit my registration')}</button>
     {open && <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      {(Object.keys(form) as (keyof typeof form)[]).map(k => <label key={k} className="block text-xs font-bold">{labels[k][ar ? 0 : 1]}<input className="mizan-input mt-1" dir={k === 'fullNameArabic' ? 'rtl' : 'ltr'} placeholder={ar ? 'اتركه فارغًا إن لم يتغيّر' : 'Leave empty if unchanged'} value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} /></label>)}
-      <div className="sm:col-span-2"><button type="button" disabled={state.kind === 'busy'} onClick={() => void save()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? 'حفظ التعديلات' : 'Save changes'}</button></div>
+      {(Object.keys(form) as (keyof typeof form)[]).map(k => <label key={k} className="block text-xs font-bold">{pl(...(labels[k] as [string, string]))}<input className="mizan-input mt-1" dir={k === 'fullNameArabic' ? 'rtl' : 'ltr'} placeholder={pl('اتركه فارغًا إن لم يتغيّر', 'Leave empty if unchanged')} value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} /></label>)}
+      <div className="sm:col-span-2"><button type="button" disabled={state.kind === 'busy'} onClick={() => void save()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{pl('حفظ التعديلات', 'Save changes')}</button></div>
       {state.text && <p role={state.kind === 'error' ? 'alert' : 'status'} className={`sm:col-span-2 text-xs font-bold ${state.kind === 'error' ? 'text-[#A34D43]' : 'text-[#2F6555]'}`}>{state.text}</p>}
     </div>}
   </section>;

@@ -7,6 +7,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useAppStore } from '../../lib/store';
+import { pl, usePublicLocale } from '../../lib/public-i18n';
+import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
 
 type Entry = { id: string; competitionId: string; competitionName: string; competitionNameArabic?: string; organizationName?: string; year?: number; categoryName?: string; riwaya?: string; kind: 'certificate' | 'participation'; certificateNumber?: string; rank?: number; finalScore?: number; verification?: string };
 type Passport = { id: string; displayName: string; languages: string[]; visibility?: 'private' | 'public'; entries: Entry[] };
@@ -33,7 +35,7 @@ const ERR: Record<string, [string, string]> = {
   JOURNEY_NOT_FOUND: ['رابط الرحلة غير صحيح.', 'The journey link is not valid.'],
   PASSPORT_NOT_FOUND: ['لم يُعثر على الجواز.', 'Passport not found.'],
 };
-const errText = (code: string, ar: boolean) => (ERR[code] || ['تعذّرت العملية. حاول مرة أخرى.', 'Something went wrong. Try again.'])[ar ? 0 : 1];
+const errText = (code: string, _ar: boolean) => pl(...(ERR[code] || ['تعذّرت العملية. حاول مرة أخرى.', 'Something went wrong. Try again.']));
 const VERDICT: Record<string, [string, string, string]> = {
   AUTHENTIC: ['شهادة موثّقة', 'Verified certificate', 'text-[#1f5b3c] bg-[#e8f3ec]'],
   REVOKED: ['شهادة مُبطلة', 'Revoked certificate', 'text-[#874b43] bg-[#f7ece9]'],
@@ -48,18 +50,18 @@ const EntryCard: React.FC<{ e: Entry; ar: boolean; onRemove?: () => void }> = ({
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div><div className="text-base font-black">{ar ? e.competitionNameArabic || e.competitionName : e.competitionName || e.competitionNameArabic}</div>
         <div className="mt-1 text-xs text-[#646965]">{[e.organizationName, e.year, e.categoryName, e.riwaya].filter(Boolean).join(' · ')}</div></div>
-      <span className={`rounded-full px-3 py-1 text-[11px] font-black ${v[2]}`}>{ar ? v[0] : v[1]}</span>
+      <span className={`rounded-full px-3 py-1 text-[11px] font-black ${v[2]}`}>{pl(v[0], v[1])}</span>
     </div>
-    {(e.rank || e.finalScore !== undefined) && <div className="mt-2 text-sm font-bold">{e.rank ? `${ar ? 'الترتيب' : 'Rank'} #${e.rank}` : ''}{e.finalScore !== undefined ? ` · ${ar ? 'الدرجة' : 'Score'} ${e.finalScore}` : ''}</div>}
+    {(e.rank || e.finalScore !== undefined) && <div className="mt-2 text-sm font-bold">{e.rank ? `${pl('الترتيب', 'Rank')} #${e.rank}` : ''}{e.finalScore !== undefined ? ` · ${pl('الدرجة', 'Score')} ${e.finalScore}` : ''}</div>}
     <div className="mt-2 flex flex-wrap gap-3 text-xs">
-      {e.certificateNumber && <a className="font-bold text-[#214C40] underline" href={`#verify?cert=${encodeURIComponent(e.certificateNumber)}`}>{ar ? 'تحقّق من الشهادة' : 'Verify certificate'} <span dir="ltr">{e.certificateNumber}</span></a>}
-      {onRemove && <button type="button" className="font-bold text-[#A34D43]" onClick={onRemove}>{ar ? 'إزالة من الجواز' : 'Remove'}</button>}
+      {e.certificateNumber && <a className="font-bold text-[#214C40] underline" href={`#verify?cert=${encodeURIComponent(e.certificateNumber)}`}>{pl('تحقّق من الشهادة', 'Verify certificate')} <span dir="ltr">{e.certificateNumber}</span></a>}
+      {onRemove && <button type="button" className="font-bold text-[#A34D43]" onClick={onRemove}>{pl('إزالة من الجواز', 'Remove')}</button>}
     </div>
   </li>;
 };
 
 export const PassportView: React.FC = () => {
-  const { language } = useAppStore(); const ar = language === 'ar';
+  const { language } = useAppStore(); const { arabicData: ar } = usePublicLocale(language);
   const params = hashParams();
   const publicId = params.get('id') || '';
   const [passport, setPassport] = useState<Passport | null>(null);
@@ -98,52 +100,52 @@ export const PassportView: React.FC = () => {
   const [confirmErase, setConfirmErase] = useState(false);
   const erase = () => run(async () => { await post('/api/public/passports/me/erase', { token }); writeToken(''); setToken(''); setPassport(null); setConfirmErase(false); });
 
-  const header = <div className="mb-6"><div className="mizan-kicker">MIZAN PASSPORT</div><h1 className="mt-1 text-3xl font-black">{ar ? 'جواز ميزان' : 'MIZAN Passport'}</h1></div>;
+  const header = <div className="mb-6"><div className="mb-3 flex justify-end"><PublicLanguageSwitcher /></div><div className="mizan-kicker">MIZAN PASSPORT</div><h1 className="mt-1 text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div>;
 
   if (publicId) return <main className="mx-auto max-w-2xl px-4 py-8">{header}
     {error && <p role="alert" className="rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {passport && <><div className="mizan-surface p-5"><div className="text-2xl font-black">{passport.displayName}</div>{!!passport.languages.length && <div className="mt-1 text-xs text-[#646965]" dir="ltr">{passport.languages.join(' · ')}</div>}
-      <p className="mt-2 text-[11px] text-[#646965]">{ar ? 'كل شهادة هنا يُعاد التحقق منها من سجل الشهادات العام لحظة العرض.' : 'Every certificate here is re-verified against the public certificate registry as you view it.'}</p></div>
+      <p className="mt-2 text-[11px] text-[#646965]">{pl('كل شهادة هنا يُعاد التحقق منها من سجل الشهادات العام لحظة العرض.', 'Every certificate here is re-verified against the public certificate registry as you view it.')}</p></div>
       <ul className="mt-4 space-y-3">{passport.entries.map(e => <EntryCard key={e.id} e={e} ar={ar} />)}</ul></>}
   </main>;
 
   return <main className="mx-auto max-w-2xl px-4 py-8">{header}
-    <p className="mb-4 text-sm leading-7 text-[#646965]">{ar ? 'سجلّ اختياري لمشاركاتك وشهاداتك الموثّقة. خاصّ بك حتى تختار نشره، ويُحفظ مفتاحه على هذا الجهاز فقط — احتفظ برابط هذه الصفحة.' : 'An optional record of your verified participations and certificates. Private until you publish it; its key is kept on this device only.'}</p>
+    <p className="mb-4 text-sm leading-7 text-[#646965]">{pl('سجلّ اختياري لمشاركاتك وشهاداتك الموثّقة. خاصّ بك حتى تختار نشره، ويُحفظ مفتاحه على هذا الجهاز فقط — احتفظ برابط هذه الصفحة.', 'An optional record of your verified participations and certificates. Private until you publish it; its key is kept on this device only.')}</p>
     {error && <p role="alert" className="mb-4 rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {!passport && <div className="mizan-surface space-y-3 p-5">
-      <label className="block text-xs font-bold">{ar ? 'الاسم الظاهر (اختياري الآن)' : 'Display name (optional for now)'}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
-      <button type="button" disabled={busy} onClick={() => void create()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? 'أنشئ جوازي' : 'Create my passport'}</button>
+      <label className="block text-xs font-bold">{pl('الاسم الظاهر (اختياري الآن)', 'Display name (optional for now)')}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
+      <button type="button" disabled={busy} onClick={() => void create()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{pl('أنشئ جوازي', 'Create my passport')}</button>
     </div>}
     {passport && <div className="space-y-4">
       <section className="mizan-surface space-y-3 p-5">
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs font-bold">{ar ? 'الاسم الظاهر' : 'Display name'}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
-          <label className="block text-xs font-bold">{ar ? 'اللغات (رموز مثل ar, en)' : 'Languages (codes like ar, en)'}<input className="mizan-input mt-1" dir="ltr" value={form.languages} onChange={e => setForm({ ...form, languages: e.target.value })} /></label>
+          <label className="block text-xs font-bold">{pl('الاسم الظاهر', 'Display name')}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
+          <label className="block text-xs font-bold">{pl('اللغات (رموز مثل ar, en)', 'Languages (codes like ar, en)')}<input className="mizan-input mt-1" dir="ltr" value={form.languages} onChange={e => setForm({ ...form, languages: e.target.value })} /></label>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" disabled={busy} onClick={() => void save()} className="min-h-11 rounded-full border border-[#214C40] px-5 text-sm font-bold text-[#214C40]">{ar ? 'حفظ' : 'Save'}</button>
+          <button type="button" disabled={busy} onClick={() => void save()} className="min-h-11 rounded-full border border-[#214C40] px-5 text-sm font-bold text-[#214C40]">{pl('حفظ', 'Save')}</button>
           {passport.visibility === 'public'
-            ? <button type="button" disabled={busy} onClick={() => void save('private')} className="min-h-11 rounded-full border px-5 text-sm font-bold">{ar ? 'إخفاء (جعله خاصًا)' : 'Make private'}</button>
-            : <button type="button" disabled={busy} onClick={() => void save('public')} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? 'نشر الجواز' : 'Publish'}</button>}
-          <span className="text-xs font-bold">{passport.visibility === 'public' ? (ar ? 'منشور' : 'Public') : (ar ? 'خاص' : 'Private')}</span>
+            ? <button type="button" disabled={busy} onClick={() => void save('private')} className="min-h-11 rounded-full border px-5 text-sm font-bold">{pl('إخفاء (جعله خاصًا)', 'Make private')}</button>
+            : <button type="button" disabled={busy} onClick={() => void save('public')} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{pl('نشر الجواز', 'Publish')}</button>}
+          <span className="text-xs font-bold">{passport.visibility === 'public' ? (pl('منشور', 'Public')) : (pl('خاص', 'Private'))}</span>
         </div>
         {passport.visibility === 'public' && <div className="flex flex-wrap items-center gap-4 rounded-xl bg-[#F5F2EB] p-3">
-          {qr && <img src={qr} alt={ar ? 'رمز الاستجابة السريعة لصفحة الجواز العامة' : 'QR code for the public passport page'} className="h-28 w-28" />}
+          {qr && <img src={qr} alt={pl('رمز الاستجابة السريعة لصفحة الجواز العامة', 'QR code for the public passport page')} className="h-28 w-28" />}
           <a className="break-all text-xs font-bold text-[#214C40] underline" dir="ltr" href={publicUrl}>{publicUrl}</a>
         </div>}
       </section>
       <section className="mizan-surface space-y-2 p-5">
-        <h2 className="text-sm font-black">{ar ? 'أضف مشاركة' : 'Add a participation'}</h2>
-        <p className="text-xs text-[#646965]">{ar ? 'ألصق رابط رحلتك الخاص الذي وصلك عند التسجيل. تُضاف الشهادة تلقائيًا إن صدرت وثبتت.' : 'Paste the private journey link you received at registration. The certificate is added automatically if issued and verified.'}</p>
-        <input aria-label={ar ? 'رابط الرحلة' : 'Journey link'} className="mizan-input" dir="ltr" value={journeyLink} onChange={e => setJourneyLink(e.target.value)} />
-        <button type="button" disabled={busy || !journeyLink} onClick={() => void addEntry()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{ar ? 'إضافة' : 'Add'}</button>
+        <h2 className="text-sm font-black">{pl('أضف مشاركة', 'Add a participation')}</h2>
+        <p className="text-xs text-[#646965]">{pl('ألصق رابط رحلتك الخاص الذي وصلك عند التسجيل. تُضاف الشهادة تلقائيًا إن صدرت وثبتت.', 'Paste the private journey link you received at registration. The certificate is added automatically if issued and verified.')}</p>
+        <input aria-label={pl('رابط الرحلة', 'Journey link')} className="mizan-input" dir="ltr" value={journeyLink} onChange={e => setJourneyLink(e.target.value)} />
+        <button type="button" disabled={busy || !journeyLink} onClick={() => void addEntry()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{pl('إضافة', 'Add')}</button>
       </section>
       <ul className="space-y-3">{passport.entries.map(e => <EntryCard key={e.id} e={e} ar={ar} onRemove={() => void remove(e.id)} />)}</ul>
       <section className="rounded-2xl border border-[#e5c9c4] p-4 text-xs">
-        {!confirmErase ? <button type="button" className="font-bold text-[#A34D43]" onClick={() => setConfirmErase(true)}>{ar ? 'محو الجواز نهائيًا' : 'Erase passport permanently'}</button>
-          : <span className="flex flex-wrap items-center gap-2"><b>{ar ? 'سيُمحى الجواز وكل ما فيه ولا يمكن استرجاعه.' : 'The passport and everything in it will be erased.'}</b>
-            <button type="button" disabled={busy} className="rounded-full bg-[#A34D43] px-4 py-2 font-bold text-white" onClick={() => void erase()}>{ar ? 'تأكيد المحو' : 'Confirm'}</button>
-            <button type="button" className="font-bold" onClick={() => setConfirmErase(false)}>{ar ? 'تراجع' : 'Cancel'}</button></span>}
+        {!confirmErase ? <button type="button" className="font-bold text-[#A34D43]" onClick={() => setConfirmErase(true)}>{pl('محو الجواز نهائيًا', 'Erase passport permanently')}</button>
+          : <span className="flex flex-wrap items-center gap-2"><b>{pl('سيُمحى الجواز وكل ما فيه ولا يمكن استرجاعه.', 'The passport and everything in it will be erased.')}</b>
+            <button type="button" disabled={busy} className="rounded-full bg-[#A34D43] px-4 py-2 font-bold text-white" onClick={() => void erase()}>{pl('تأكيد المحو', 'Confirm')}</button>
+            <button type="button" className="font-bold" onClick={() => setConfirmErase(false)}>{pl('تراجع', 'Cancel')}</button></span>}
       </section>
     </div>}
   </main>;
