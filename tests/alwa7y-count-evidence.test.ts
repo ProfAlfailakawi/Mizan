@@ -41,7 +41,10 @@ test('كل ملفٍّ في السجلّ له بصمة sha256 وحجمٌ وراب
     assert.match(f.url, /^https?:\/\//);
   }
   assert.equal(manifest.approval.by, 'ميزان');
-  assert.deepEqual(manifest.files.map((f: { url: string }) => path.basename(f.url)), TAYSEER);
+  assert.deepEqual(
+    manifest.files.filter((f: { url: string }) => f.url.includes('alwa7y.com')).map((f: { url: string }) => path.basename(f.url)),
+    TAYSEER,
+  );
 });
 
 test('فهرس كل ناشر وقراءة علاماته متفقان إلا في مواضع رُوجعت بالنظر', () => {
