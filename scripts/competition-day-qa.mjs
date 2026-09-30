@@ -82,6 +82,9 @@ const clickIf = async (label) => {
  */
 const DEMO_ENTRY = 'جرّب النسخة التجريبية';
 const ROLE_OPTION = { 'المحكم': 'محكّم', 'المدقق': 'مدقّق' };
+/* يُطابَق الدورُ بلا تشكيل: حُذفت الشدّةُ من أسماء الأدوار في المنتقي («محكم»، «مدقق»)
+   فصار الفحصُ يبحث عن اسمٍ لم يعد مكتوبًا كذلك ويقول «تعذّر الدخول» عن بابٍ سليم. */
+const bare = (t) => t.normalize('NFC').replace(/[\u064B-\u0652\u0670\u0640]/g, '').trim();
 
 const enterRole = async (label) => {
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
@@ -104,8 +107,9 @@ const enterRole = async (label) => {
   for (let i = 0; i < await pickers.count(); i++) {
     const picker = pickers.nth(i);
     const options = await picker.locator('option').allInnerTexts();
-    if (!options.includes(option)) continue;
-    const chosen = await picker.selectOption({ label: option }).then(() => true).catch(() => false);
+    const match = options.find((o) => bare(o) === bare(option));
+    if (!match) continue;
+    const chosen = await picker.selectOption({ label: match }).then(() => true).catch(() => false);
     if (chosen) { await page.waitForTimeout(2500); return true; }
   }
 
