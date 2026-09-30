@@ -198,6 +198,8 @@ export function applySettlement(ctx: EngineCtx, intentId: string, result: Settle
   i.lastCheckedAt = t;
   if (i.status === 'paid') return { intent: i, changed: false };
   if (result.status === 'paid') {
+    /* «مدفوع» بلا مبلغ أو عملة مقروءين لا يُثبت شيئًا: ملفٌّ ناقص أو ردٌّ مشوّه لا يُسجّل سدادًا. */
+    if (result.amountMinor === undefined || !result.currency) { i.failureCode = 'SETTLEMENT_UNVERIFIABLE'; ctx.audit({ organizationId: i.organizationId, action: 'REGISTRATION_PAYMENT_MISMATCH', entityType: 'registration_payment_intent', entityId: i.id, reason: 'unverifiable' }); return { intent: i, changed: false }; }
     if (result.amountMinor !== undefined && result.amountMinor !== i.amountMinor) { i.failureCode = 'AMOUNT_MISMATCH'; ctx.audit({ organizationId: i.organizationId, action: 'REGISTRATION_PAYMENT_MISMATCH', entityType: 'registration_payment_intent', entityId: i.id, reason: 'amount' }); return { intent: i, changed: false }; }
     if (result.currency && result.currency.toUpperCase() !== i.currency) { i.failureCode = 'CURRENCY_MISMATCH'; ctx.audit({ organizationId: i.organizationId, action: 'REGISTRATION_PAYMENT_MISMATCH', entityType: 'registration_payment_intent', entityId: i.id, reason: 'currency' }); return { intent: i, changed: false }; }
     i.status = 'paid';

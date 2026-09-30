@@ -126,6 +126,8 @@ export function resolveConflict(c: ConflictCase, input: ResolveInput): ConflictC
 export function caseIsBinding(c: ConflictCase, judgeUids?: Record<string, string | undefined>) {
   if (c.status === 'resolved') return true;
   if (c.declaredByRole !== 'judge') return true;
+  /* معرّفٌ لا يعود إلى أي محكّم معروف لا يُبعد أحدًا: لا يُصنع تضاربٌ ملزم ضد هويةٍ لم تُثبت. */
+  if (judgeUids && !Object.prototype.hasOwnProperty.call(judgeUids, c.judgeId)) return false;
   const uid = judgeUids?.[c.judgeId];
   /* محكّمٌ بلا هويةٍ مربوطة لا يمكن التحقق منه: يبقى الإعلان ملزمًا احتياطًا للنزاهة
      (يُبعد المحكّم ولا يُقرِّبه)، ويظهر لرئيس التحكيم «غير قابل للتحقق» ليحسمه. */
@@ -136,6 +138,7 @@ export function caseIsBinding(c: ConflictCase, judgeUids?: Record<string, string
 /** For the review UI: 'verified', 'forged' (declarer is another judge) or 'unverifiable' (no identity link). */
 export function caseVerification(c: ConflictCase, judgeUids?: Record<string, string | undefined>): 'verified' | 'forged' | 'unverifiable' {
   if (c.declaredByRole !== 'judge') return 'verified';
+  if (judgeUids && !Object.prototype.hasOwnProperty.call(judgeUids, c.judgeId)) return 'forged';
   const uid = judgeUids?.[c.judgeId];
   if (!uid) return 'unverifiable';
   return uid === c.declaredByUid ? 'verified' : 'forged';
