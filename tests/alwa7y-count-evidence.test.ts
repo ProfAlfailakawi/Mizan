@@ -42,7 +42,7 @@ test('كل ملفٍّ في السجلّ له بصمة sha256 وحجمٌ وراب
   }
   assert.equal(manifest.approval.by, 'ميزان');
   assert.deepEqual(
-    manifest.files.filter((f: { url: string }) => f.url.includes('alwa7y.com')).map((f: { url: string }) => path.basename(f.url)),
+    manifest.files.filter((f: { url: string }) => { const host = new URL(f.url).hostname; return host === 'alwa7y.com' || host.endsWith('.alwa7y.com'); }).map((f: { url: string }) => path.basename(f.url)),
     TAYSEER,
   );
 });
