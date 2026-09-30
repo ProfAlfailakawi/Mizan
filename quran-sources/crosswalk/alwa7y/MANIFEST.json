@@ -56,6 +56,17 @@
       "lastModified": "2022-02-07",
       "pdfKind": "vector text, per-page word-glyph fonts (no usable Unicode text layer)",
       "note": "مصحف قراءةٍ كاملة لا روايةٍ واحدة؛ لا يفرّق بين الراويين في العدّ"
+    },
+    {
+      "rawi": "qunbul (standalone)",
+      "url": "https://archive.org/download/tayseer_kombol/pdf",
+      "r2Key": "crosswalk/alwa7y/TayseerKombol-2015.pdf",
+      "sha256": "86a0fec9b7accf139b8a956182284c2d4b682cd42b11d179315d112d4cdae0a4",
+      "byteLength": 78074901,
+      "pdfTitle": "مصحف التيسير برواية قنبل عن ابن كثير وبالهامش ما خالفه فيه حفص",
+      "lastModified": "2015-11-04 (نسخة أرشيف الإنترنت)",
+      "pdfKind": "vector text; 637 pages",
+      "note": "مصحف تيسير مستقل لقنبل وحده (طبعة 2015) — جاء من أرشيف الإنترنت لا من alwa7y.com؛ تعريفه لا يذكر مجموعًا للآي، فهو شاهدٌ بالحدود لا بالمجموع"
     }
   ],
   "extraction": {
@@ -99,6 +110,14 @@
       "page": "https://islamhouse.com/ar/books/2827224/",
       "sha256": "73e87b3719db73aff75b8f226e4bafebe5fa3ba78e01b571889f7c222c8a8de3",
       "byteLength": 31962644
+    },
+    {
+      "file": "corroborating/Hamito-Tasheef.pdf",
+      "title": "من جنايات التصحيف على علم المصحف الشريف",
+      "publisher": "عبد الهادي حميتو، دار الموطأ أبوظبي 2017",
+      "url": "https://wadod.net/library/43/4338.pdf",
+      "sha256": "4b8125c3114692db4e2f11b6e74a8338c3439a729a14dda5794772ed2d5c0cfb",
+      "byteLength": 1277577
     }
   ],
   "declaredMethods": {
