@@ -84,6 +84,7 @@ import type { WebhookEventType } from './server/commercial/types';
 import { CommunicationsService, InAppProvider, providersFromEnv, type Recipient } from './server/communications';
 import { runParticipantReminders, type ReminderSource } from './server/participant-reminders';
 import { RegistrationReminderStore, runRegistrationReminders } from './server/registration-reminders';
+import { PassportStore, type CertificateCheck } from './server/passport';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
@@ -2848,6 +2849,31 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     try{return res.json({certificate:certificateRegistry.revoke(number,identity.organizationId,String(req.body?.reason||''))})}
     catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_REVOKE_FAILED';return res.status(code==='CERTIFICATE_NOT_FOUND'?404:code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
   });
+  /*
+   * MIZAN Passport: سجل اختياري يملكه المتسابق برمزٍ سرّي. لا يدخله إلا ما يثبته الخادم برمز الرحلة
+   * وسجل الشهادات، وهو خاصّ حتى يختار صاحبه نشره.
+   */
+  const passports=saasDir?new PassportStore(path.join(saasDir,'passports','passports.json')):null;
+  const passportCheck:CertificateCheck=number=>{if(!certificateRegistry||!CERTIFICATE_NUMBER_RE.test(number))return {state:'NOT_FOUND'};try{return certificateRegistry.passportCheck(number)}catch{return {state:'NOT_FOUND'}}};
+  const passportError=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PASSPORT_FAILED';const status=/TOKEN_INVALID|JOURNEY_TOKEN|JOURNEY_REVOKED/.test(code)?401:/NOT_FOUND/.test(code)?404:/CLAIMED_ELSEWHERE|CERTIFICATE_/.test(code)?409:400;return res.status(status).json({code:/^(PASSPORT_|JOURNEY_)/.test(code)?code:'PASSPORT_FAILED'})};
+  app.post('/api/public/passports',publicRegistrationRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});try{res.setHeader('Cache-Control','no-store');return res.status(201).json(passports.create(String(req.body?.displayName||'')))}catch(err){return passportError(res,err)}});
+  app.post('/api/public/passports/me',publicRegistrationRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});try{res.setHeader('Cache-Control','no-store');return res.json({passport:passports.owner(String(req.body?.token||''))})}catch(err){return passportError(res,err)}});
+  app.post('/api/public/passports/me/update',publicRegistrationRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});try{const b=req.body||{};return res.json({passport:passports.update(String(b.token||''),{displayName:b.displayName,languages:b.languages,visibility:b.visibility})})}catch(err){return passportError(res,err)}});
+  app.post('/api/public/passports/me/entries',publicRegistrationRateLimit,async(req,res)=>{
+    if(!passports||!publicRegistration)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});
+    try{
+      const competitionId=String(req.body?.competitionId||''),key=String(req.body?.journeyKey||'');
+      const journey:any=await publicRegistration.resolve(competitionId,'participant',key);
+      const {competition,participant,path:participationPath}=await publicRegistration.paymentContext(competitionId,key);
+      if(['withdrawn','rejected','disqualified','draft'].includes(String(participant.status)))return res.status(409).json({code:'PASSPORT_PARTICIPATION_NOT_ELIGIBLE'});
+      const category=competition.categories.find(c=>c.id===participant.categoryId) as any;
+      const year=Number(String(competition.startDate||competition.registrationEndDate||'').slice(0,4));
+      return res.status(201).json(passports.addEntry(String(req.body?.token||''),{participationPath,participantCode:String(journey.participantCode||participant.code),competitionId:competition.id,competitionName:competition.name,competitionNameArabic:competition.nameArabic,year:Number.isInteger(year)&&year>2000?year:undefined,categoryName:category?.nameArabic||category?.name,riwaya:participant.riwaya,certificateNumber:journey.certificate?.number?String(journey.certificate.number):undefined},passportCheck));
+    }catch(err){return passportError(res,err)}
+  });
+  app.post('/api/public/passports/me/entries/remove',publicRegistrationRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});try{return res.json({passport:passports.removeEntry(String(req.body?.token||''),String(req.body?.entryId||''))})}catch(err){return passportError(res,err)}});
+  app.post('/api/public/passports/me/erase',publicRegistrationRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});try{return res.json({erased:passports.erase(String(req.body?.token||''))})}catch(err){return passportError(res,err)}});
+  app.get('/api/public/passports/:id',certificateVerifyRateLimit,(req,res)=>{if(!passports)return res.status(503).json({code:'PASSPORT_NOT_CONFIGURED'});const view=passports.publicView(String(req.params.id||''),passportCheck);res.setHeader('Cache-Control','no-store');return view?res.json({passport:view}):res.status(404).json({code:'PASSPORT_NOT_FOUND'})});
   app.get('/api/public/certificates/:number',certificateVerifyRateLimit,(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const number=String(req.params.number??'').trim();
