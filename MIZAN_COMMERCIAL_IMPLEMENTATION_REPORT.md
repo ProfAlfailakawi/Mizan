@@ -348,20 +348,59 @@ Existing tests changed:
   `MIZAN_WHATSAPP_HTTP_*`. Until then those messages are recorded as `provider_not_configured`.
 - SSO: upgrade the Firebase project to Identity Platform and register each organization's SAML
   or OIDC provider there.
-- Payment gateway for organization registration fees.
+- Payment gateway for registration fees: each organization (or its operator) adds its own
+  gateway from its dashboard. The MyFatoorah, Tap and Stripe templates were written from public
+  documentation and have not been run against a live account. Each one must pass the activation
+  test with the owner's own keys before it collects money.
+
+### DONE IN THE SECOND FOLLOW-UP (#321, #323)
+- **Per-organization / per-operator payment gateways** (`server/commercial/payment-gateways.ts`,
+  `server/payments.ts`, `server/payment-presets.ts`):
+  - **Keys:** stored in the encrypted vault and never returned to the browser.
+  - **Activation:** only after a real checkout plus a status query succeed.
+  - **Settlement:** confirmed by querying the gateway with the secret key or by a valid
+    signature. Amount and currency must match exactly, and settlement is idempotent.
+  - **Network safety:** tenant-supplied URLs go through a DNS-pinned transport that blocks
+    private networks.
+  - **Reconciliation:** a job re-checks open payments every 10 minutes.
+- **Schedule and check-in reminders** (`server/participant-reminders.ts`):
+  - built from the published schedule, in the competition's time zone;
+  - a slot notice is sent when a slot is set and again only if it changes;
+  - a check-in reminder is sent the day before.
+- **Incomplete-registration reminders** (`server/registration-reminders.ts`):
+  - **Opt-in:** the participant asks for it explicitly; only the email and the competition are
+    stored.
+  - **Sending:** one reminder, cancelled if registration is completed or via the email link.
+  - **Retention:** records are deleted after sending or after 21 days.
+- **MIZAN Passport** (`server/passport.ts`, `#passport`):
+  - **Holder key and privacy:** the key is held by the participant, and the passport is private
+    by default.
+  - **Adding entries:** participations are added with the participant's journey link.
+  - **Certificates:** attached only if the public registry verifies them, and re-verified on
+    every public view.
+  - **Ownership and erasure:** one participation can belong to only one passport, and the
+    holder can erase everything.
+- **Participant-page languages:**
+  - **Languages added:** Urdu (RTL), Indonesian, French and Turkish, alongside Arabic and
+    English.
+  - **Completeness:** enforced by `tests/public-i18n.test.ts`.
+  - **Review status:** the four new languages are machine-assisted and marked
+    `pending_native_review`.
+- **Currency precision at the gateway boundary** (`shared/currency.ts`):
+  - **At the gateway:** amounts use ISO 4217 decimal places (KWD = 3).
+  - **In storage:** amounts stay in hundredths, as before.
 
 ### STILL NOT IMPLEMENTED
-- **Incomplete-registration reminders:** drafts are stored on the participant's device only
-  (privacy by design), so the server cannot know about them. The template exists.
-- **Schedule-assigned / check-in reminders to participants:** the templates exist, but
-  participant contact details live in Firestore and the schedule is published client-side; no
-  server job sends them yet.
 - **Automatic role grants from SSO groups:** deliberately not done; the suggestion is shown to
   admins and grants follow the existing governance flow.
-- **Additional UI languages** beyond Arabic and English (the namespaces are ready).
-- **MIZAN Passport** — future work by design.
-- **Multi-instance writes:** the SaaS, communications and SSO stores are single-writer JSON
-  files. Horizontal scaling requires a transactional database.
+- **Additional languages in the admin dashboards:** only the participant pages have them.
+- **Native-speaker review** of the Urdu, Indonesian, French and Turkish translations.
+- **Multi-instance writes:**
+  - **Current state:** production deliberately runs `--max-instances=1`.
+  - **Single-writer file stores:** the SaaS, communications, reminders, passport, seal,
+    certificate and audit stores are all single-writer files.
+  - **What scaling needs:** moving them to transactional Firestore, in stages. This awaits the
+    owner's decision.
 
 ## 21. Remaining issues
 
