@@ -376,7 +376,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-wordmark.is-inverse .mizan-wordmark-rule i { background:linear-gradient(90deg,transparent,var(--gold-light)); }
 .mizan-wordmark.is-inverse .mizan-wordmark-rule i:last-of-type { background:linear-gradient(270deg,transparent,var(--gold-light)); }
 .mizan-wordmark-tagline {
-  font-size:calc(12px * var(--mizan-text-scale)); font-weight:500; color:#66706a; letter-spacing:.01em;
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:500; color:#656b66; letter-spacing:.01em;
 }
 .mizan-wordmark.is-inverse .mizan-wordmark-tagline { color:rgba(245,240,228,.62); }
 
@@ -1134,14 +1134,19 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   border-radius:999px; border:1px solid var(--bd-line); background:var(--bd-soft); color:var(--bd-ink);
   font-weight:600;
 }
-.mizan-badge-sm{ font-size:calc(11px * var(--mizan-text-scale)); padding:.25rem .625rem; }
-.mizan-badge-md{ font-size:calc(12px * var(--mizan-text-scale)); padding:.375rem .75rem; gap:.5rem; }
+.mizan-badge-sm{ font-size:calc(12px * var(--mizan-text-scale)); padding:.25rem .625rem; }
+.mizan-badge-md{ font-size:calc(12.5px * var(--mizan-text-scale)); padding:.375rem .75rem; gap:.5rem; }
+/* أرضيةُ القراءة على الشاشة: ٩–١٠px لا تُقرأ بالعربية حتى على سطح المكتب. تُرفع إلى ١١px
+   خارج شاشات القاعة (مقاساتها محسوبة للجدار)، ولا تمسّ الطباعة. والهاتف يرفعها أكثر أدناه. */
+@media screen and (min-width:640px){
+  :where(body) :not(.mizan-venue-2 *):is(.text-\[9px\],.text-\[10px\]){ font-size:11px; line-height:1.5 }
+}
 .mizan-badge-dot{ width:6px; height:6px; border-radius:999px; background:var(--bd-dot); flex:0 0 auto; }
 .bd-emerald{ --bd-soft:var(--emerald-soft); --bd-ink:var(--emerald);  --bd-line:#cbdad2; --bd-dot:var(--emerald-2) }
 .bd-amber  { --bd-soft:var(--amber-soft);   --bd-ink:#7d5e34;         --bd-line:#e4d5bd; --bd-dot:var(--amber) }
 .bd-blue   { --bd-soft:var(--blue-soft);    --bd-ink:var(--blue);     --bd-line:#d5e0e5; --bd-dot:var(--blue) }
 .bd-rose   { --bd-soft:var(--danger-soft);  --bd-ink:#8d4038;         --bd-line:#e8cfca; --bd-dot:var(--danger) }
-.bd-neutral{ --bd-soft:#efeee9;             --bd-ink:#5c635e;         --bd-line:#deddd7; --bd-dot:#6f7671 }
+.bd-neutral{ --bd-soft:#efeee9;             --bd-ink:#59615c;         --bd-line:#deddd7; --bd-dot:#656b66 }
 
 /* ── Stat ──────────────────────────────────────────────────────────────────── */
 .mizan-stat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-1); }
@@ -1847,6 +1852,9 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   .mizan-field-label,.mizan-kicker,.mizan-code small{ font-size:12px }
   /* التبويبات أهدافُ إبهامٍ على الهاتف: ٤٤px لا ٣٨. */
   .mizan-tab,.mizan-tabs-sm .mizan-tab{ min-height:44px }
+  /* تبويبٌ يلتفّ وحده إلى سطرٍ أخير كان يبدو يتيمًا؛ تتمدّد الحبّات لتملأ كلَّ سطر. */
+  .mizan-tabs{ width:100% }
+  .mizan-tabs > .mizan-tab{ flex:1 1 auto }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

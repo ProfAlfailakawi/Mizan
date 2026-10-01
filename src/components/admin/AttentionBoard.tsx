@@ -134,7 +134,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-black leading-6 text-[#222623]">{item.title}</span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#6b716c]">
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#656b66]">
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone.dot }} aria-hidden />
                 {ar ? kind.ar : kind.en}
@@ -149,7 +149,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     </ol>
 
     {/* ما لم يتّسع له المكان يُقال عددًا، لا يُبتلع بصمت. */}
-    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#6b716c]">
+    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#656b66]">
       {ar ? `و${sorted.length - max} بندًا آخر` : `and ${sorted.length - max} more`}
     </div>}
   </section>;

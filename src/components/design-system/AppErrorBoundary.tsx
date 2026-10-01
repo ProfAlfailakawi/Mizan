@@ -67,7 +67,7 @@ class Boundary extends React.Component<Props, State> {
           >
             مسح بيانات هذا الجهاز وإعادة التحميل
           </button>
-          <p className="mt-3 text-[11px] leading-5 text-[#6b716c]">
+          <p className="mt-3 text-[11px] leading-5 text-[#656b66]">
             لن يُحذف شيء من حسابك. سيُطلب منك تسجيل الدخول من جديد فقط.
           </p>
           <p className="mt-4 text-[10px] text-[#656b66]" dir="ltr">{String(this.state.error?.message || '').slice(0, 160)}</p>
