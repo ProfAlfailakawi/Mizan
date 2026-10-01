@@ -275,7 +275,7 @@ html[data-mizan-text="xl"]    { --mizan-text-scale: 1.32; }
 /* Legibility floor for the pervasive micro-typography. !important is intentional:
    it overrides the Tailwind arbitrary-size utilities regardless of layer order, and it
    is the accessibility baseline rather than a per-component style choice. */
-.text-\[8px\]  { font-size: calc(10px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
+.text-\[8px\]  { font-size: calc(11px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
 .text-\[9px\]  { font-size: calc(11px   * var(--mizan-text-scale)) !important; line-height: 1.55; }
 .text-\[10px\] { font-size: calc(11.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
 .text-\[11px\] { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
@@ -315,7 +315,10 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 .mizan-ticket-issued{transform:translate(-50%,22px);opacity:1}
 .mizan-ticket-cut{position:absolute;top:13px;left:22px;right:22px;border-top:1px dashed #bbb8ae;color:#696f6b;height:15px;display:flex;justify-content:flex-end;align-items:flex-start}
 .mizan-ticket-cut svg{transform:translateY(-7px);background:#fffefb}
-.mizan-ticket-label{font-size:9px;font-weight:900;letter-spacing:.12em;color:#696f6b}
+.mizan-ticket-label{font-size:calc(11.5px * var(--mizan-text-scale));font-weight:900;letter-spacing:.12em;color:#696f6b}
+html[lang="ar"] .mizan-ticket-label{letter-spacing:0}
+/* Arabic letters are joined: Tailwind tracking utilities pull them apart. */
+html[lang="ar"] :is(.tracking-wide,.tracking-wider,.tracking-widest):not([lang="en"]):not([dir="ltr"]){letter-spacing:0}
 .mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
 .mizan-ticket-meta{font-size:10px;font-weight:800;color:#5f6862;margin-top:12px}
 .mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}
