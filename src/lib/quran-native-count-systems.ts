@@ -42,7 +42,8 @@ export type QuranNativeCountSystemId =
    */
   | 'BASRI_ABU_AMR_TAYSEER'
   | 'MAKKI_IBN_KATHIR_TAYSEER'
-  | 'BASRI_YAQUB_RAWH_TAYSEER';
+  | 'BASRI_YAQUB_RAWH_TAYSEER'
+  | 'BASRI_YAQUB_RUWAYS_TAYSEER';
 
 /** عدد آيات كل سورة (١..١١٤) في كل نظام عدّ — مستخرجٌ من الأثر المثبَّت. */
 export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly number[]> = {
@@ -124,6 +125,7 @@ export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly
   BASRI_ABU_AMR_TAYSEER: TAYSEER_COUNT_SYSTEMS.BASRI_ABU_AMR_TAYSEER.perSurahAyahCounts,
   MAKKI_IBN_KATHIR_TAYSEER: TAYSEER_COUNT_SYSTEMS.MAKKI_IBN_KATHIR_TAYSEER.perSurahAyahCounts,
   BASRI_YAQUB_RAWH_TAYSEER: TAYSEER_COUNT_SYSTEMS.BASRI_YAQUB_RAWH_TAYSEER.perSurahAyahCounts,
+  BASRI_YAQUB_RUWAYS_TAYSEER: TAYSEER_COUNT_SYSTEMS.BASRI_YAQUB_RUWAYS_TAYSEER.perSurahAyahCounts,
 };
 
 type MeasuredDeliverySystemId = 'MADANI_AKHIR' | 'MAKKI_IBN_KATHIR_DELIVERY' | 'BASRI_ABU_AMR_DELIVERY';

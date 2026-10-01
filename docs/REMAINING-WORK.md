@@ -97,7 +97,11 @@ cross-reading fallback      : FORBIDDEN
 al-bazzi, qunbul:        makki          -> MAKKI_IBN_KATHIR_TAYSEER: ACTIVATED (114/114)
 al-duri-abu-amr, al-susi: basri         -> BASRI_ABU_AMR_TAYSEER:    ACTIVATED (114/114)
 rawh:                    basri-jahdari  -> BASRI_YAQUB_RAWH_TAYSEER: ACTIVATED (114/114)
+ruways:                  basri-jahdari  -> BASRI_YAQUB_RUWAYS_TAYSEER: ACTIVATED (114/114)
 ```
+
+ورويس لحق بروح في اليوم نفسه («كل شيء على مصحف التيسير»)، ومعه إصلاح كلمةٍ تالفة في حزمته
+(البقرة ١١٤ «خَآئِفِينلَ» ← «خَآئِفِينَ»).
 
 * البناء: `src/lib/quran-tayseer-resegmentation.ts` (الأوصاف والبصمات) و
   `src/lib/quran-tayseer-resegment-core.ts` (التحويل) و`scripts/quran-tayseer-resegment.ts`
