@@ -143,7 +143,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
         {data.history.length === 0 ? <p className="text-xs text-[#666c68]">{ct(locale, 'noHistory')}</p> : (
           <ul className="divide-y divide-[#ebe9e2] text-xs">
             {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-2 py-2">
-              <span>{formatDate(t.startsAt, locale)} → {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
+              <span>{formatDate(t.startsAt, locale)} {locale === 'ar' ? '←' : '→'} {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
               <span dir="ltr">{t.participantsUsed.toLocaleString()} / {t.participantAllowance.toLocaleString()}</span>
             </li>)}
           </ul>
@@ -173,7 +173,7 @@ export const OperatorCommercialPanel: React.FC = () => {
         <Stat label={ct(locale, 'walletBalance')} value={formatMoney(s.balanceMinor, cur, locale)} />
         <Stat label={ct(locale, 'annualCommitment')} value={formatMoney(s.annualCommitmentMinor, cur, locale)} hint={`${ct(locale, 'spent')}: ${formatMoney(s.spentThisAgreementMinor, cur, locale)}`} />
         <Stat label={ct(locale, 'tier')} value={data.tier ? (locale === 'ar' ? data.tier.nameArabic : data.tier.name) : '—'} hint={s.discountBps !== undefined ? `${ct(locale, 'discount')}: ${s.discountBps / 100}%` : undefined} />
-        <Stat label={ct(locale, 'agreementDates')} value={data.agreement ? `${formatDate(data.agreement.startsAt, locale)} → ${formatDate(termLastDay(data.agreement.endsAt), locale)}` : '—'} />
+        <Stat label={ct(locale, 'agreementDates')} value={data.agreement ? `${formatDate(data.agreement.startsAt, locale)} ${locale === 'ar' ? '←' : '→'} ${formatDate(termLastDay(data.agreement.endsAt), locale)}` : '—'} />
         <Stat label={ct(locale, 'customers')} value={s.customerOrganizations} hint={`${ct(locale, 'activeCustomers')}: ${s.activeCustomerSubscriptions}`} />
         <Stat label={ct(locale, 'upcomingRenewals')} value={s.upcomingRenewals} />
         <Stat label={ct(locale, 'pendingRenewals')} value={s.pendingRenewals} />
@@ -212,7 +212,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
   return (
     <div className="space-y-4">
       <div className="mizan-panel overflow-x-auto p-4">
-        <table className="w-full min-w-[720px] text-start text-xs">
+        <table className="w-full min-w-[720px] text-start text-xs [&_td]:px-2.5 [&_th]:px-2.5">
           <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
             <td className="py-2 font-bold">{c.officialName}</td><td>{c.planName || '—'}</td>

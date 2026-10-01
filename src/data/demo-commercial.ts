@@ -276,20 +276,20 @@ export function demoOwnerControlTower() {
   ];
   const needsAttention = [
     {
-      id: 'diag-demo-1', code: 'NOTIFICATION_PROVIDER_SLOW', tenantId: 'org-demo-hafiz', classification: 'MIZAN_ACTION_REQUIRED', confidence: 'HIGH',
+      id: 'diag-demo-1', code: 'NOTIFICATION_PROVIDER_SLOW', tenantId: 'org-demo-hafiz', tenantName: (DEMO_ORGS.find(o => o.id === 'org-demo-hafiz') || { shortName: 'org-demo-hafiz' }).shortName, classification: 'MIZAN_ACTION_REQUIRED', confidence: 'HIGH',
       rootCause: 'SMS provider latency above threshold', evidence: [{ check: 'زمن ردّ المزوّد', state: 'DEGRADED', detail: '4.8 ثانية (الحدّ 2)' }, { check: 'رسائل فاشلة آخر ساعة', state: 'FAIL', detail: '37 من 612' }],
       recommendedActions: ['notification.retry', 'provider.circuit_break'], safeActionCodes: ['notification.retry', 'provider.circuit_break', 'diagnostic.bundle.generate'],
       doctorSummaryArabic: 'رسائل «اقترب دورك» تتأخّر لدى مؤسسة حفّاظ الخليج', doctorSummaryEnglish: 'Turn-soon SMS messages are delayed for Gulf Huffaz',
     },
     {
-      id: 'diag-demo-2', code: 'HOST_REQUIRED', tenantId: 'org-demo-nour', classification: 'TENANT_ACTION_REQUIRED', confidence: 'HIGH',
+      id: 'diag-demo-2', code: 'HOST_REQUIRED', tenantId: 'org-demo-nour', tenantName: (DEMO_ORGS.find(o => o.id === 'org-demo-nour') || { shortName: 'org-demo-nour' }).shortName, classification: 'TENANT_ACTION_REQUIRED', confidence: 'HIGH',
       rootCause: 'HOST_REQUIRED', evidence: [{ check: 'نطاق الجهة', state: 'UNKNOWN', detail: 'لم يُضبط نطاق فرعي' }],
       recommendedActions: ['domain.retest'], safeActionCodes: ['domain.retest'],
       remedy: { kind: 'configure', actions: [], hintArabic: 'تضبط جمعية نور التلاوة نطاقها الفرعي من «إدارة الجهة ← الهوية»، ثم يُعاد الاختبار تلقائيًا.', hintEnglish: 'The tenant sets its subdomain, then the check re-runs automatically.' },
       doctorSummaryArabic: 'جمعية نور التلاوة لم تضبط نطاقها بعد', doctorSummaryEnglish: 'Noor Tilawa has not configured its domain yet',
     },
     {
-      id: 'diag-demo-3', code: 'SEAL_QUORUM_PENDING', tenantId: 'org-demo-mizan', competitionId: 'comp-dubai-2027', classification: 'INTEGRITY_PROTECTED', confidence: 'MEDIUM',
+      id: 'diag-demo-3', code: 'SEAL_QUORUM_PENDING', tenantId: 'org-demo-mizan', tenantName: (DEMO_ORGS.find(o => o.id === 'org-demo-mizan') || { shortName: 'org-demo-mizan' }).shortName, competitionId: 'comp-dubai-2027', classification: 'INTEGRITY_PROTECTED', confidence: 'MEDIUM',
       rootCause: 'Result seal waiting for second approver', evidence: [{ check: 'نصاب الختم', state: 'UNKNOWN', detail: 'موافقة 1 من 2' }],
       recommendedActions: [], safeActionCodes: [],
       doctorSummaryArabic: 'ختم نتائج مسابقة ميزان ينتظر الموافقة الثانية', doctorSummaryEnglish: 'Mizan competition seal is waiting for the second approval',
