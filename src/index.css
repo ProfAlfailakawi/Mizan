@@ -1870,6 +1870,34 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 }
 
 
+/* ───────── r6: هدوء بصري — مربّعات الاختيار وحقول الوقت بلغة الموقع بدل الأزرق الافتراضي للمتصفح ───────── */
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input) {
+  appearance:none; -webkit-appearance:none; flex:0 0 auto; width:1.1rem; height:1.1rem; min-width:1.1rem; min-height:1.1rem; align-self:center; margin:0;
+  border:1.5px solid #aeb5b0; border-radius:.4rem; background:#fffefb center/78% no-repeat; cursor:pointer;
+  vertical-align:middle; transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):hover:not(:disabled) { border-color:var(--emerald-2); }
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):checked {
+  background-color:var(--emerald); border-color:var(--emerald);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fffefb' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.4'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):focus-visible { outline:none; box-shadow:0 0 0 3px rgba(47,101,85,.22); }
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):disabled { opacity:.45; cursor:not-allowed; }
+/* مربّع محكّم اللجنة: يبقى عنصر الاختيار الحقيقي (لوحة المفاتيح وقارئ الشاشة) لكنه شفّاف فوق الشريحة كلها. */
+.mizan-chip-input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; z-index:1; }
+.mizan-panel-chip { border-radius:.9rem; }
+.mizan-panel-chip:has(.mizan-chip-input:focus-visible) { outline:2px solid var(--emerald-2); outline-offset:2px; }
+/* حقول الوقت والتاريخ الأصلية: نفس الحدّ والخلفية، وأرقام متناسقة، ومؤشّر منتقاة بلون الموقع. */
+input[type="time"], input[type="date"] { font-variant-numeric:tabular-nums; accent-color:var(--emerald); }
+:where(input[type="time"], input[type="date"]) { color:var(--ink); background-color:#fffefb; }
+.mizan-input-dark[type="time"]::-webkit-calendar-picker-indicator, .mizan-input-dark[type="date"]::-webkit-calendar-picker-indicator { filter:invert(1); }
+input[type="time"]::-webkit-datetime-edit, input[type="date"]::-webkit-datetime-edit { padding:0; }
+input[type="time"]::-webkit-datetime-edit-hour-field:focus, input[type="time"]::-webkit-datetime-edit-minute-field:focus, input[type="time"]::-webkit-datetime-edit-ampm-field:focus,
+input[type="date"]::-webkit-datetime-edit-day-field:focus, input[type="date"]::-webkit-datetime-edit-month-field:focus, input[type="date"]::-webkit-datetime-edit-year-field:focus { background:var(--emerald-soft); color:var(--emerald); border-radius:5px; outline:none; }
+input[type="time"]::-webkit-datetime-edit-ampm-field { color:var(--muted); font-size:.85em; }
+input[type="time"]::-webkit-calendar-picker-indicator, input[type="date"]::-webkit-calendar-picker-indicator { opacity:.55; cursor:pointer; filter:invert(27%) sepia(18%) saturate(900%) hue-rotate(110deg) brightness(.9); }
+input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity:.9; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
@@ -1956,4 +1984,3 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 
 /* الترويسة على الجوال: العلامة وحدها، والاسم في سطره تحتها (Header.tsx). */
 @media (max-width:639px){.mizan-header-logo .mizan-wordmark{display:none}}
-
