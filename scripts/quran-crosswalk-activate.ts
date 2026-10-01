@@ -24,6 +24,7 @@ import {
   type ForwardBoundaryMapping,
 } from '../src/lib/quran-count-boundary-mapping';
 import { QURAN_WS_BOUNDARY_SOURCE } from '../src/lib/quran-count-boundary-source';
+import { withNamedVariants } from '../src/lib/quran-count-boundary-variants';
 
 /**
  * Each entry is one *independent* claim.  `basri` is deliberately listed twice: Mizan carries two
@@ -34,15 +35,19 @@ export const CROSSWALK_CANDIDATE_SYSTEMS = [
   { sourceSystem: 'dimashqi', nativeSystem: 'DIMASHQI' as QuranNativeCountSystemId, rawis: ['hisham', 'ibn-dhakwan'] },
   { sourceSystem: 'madani-first', nativeSystem: 'MADANI_AWWAL' as QuranNativeCountSystemId, rawis: ['ibn-wardan', 'ibn-jammaz'] },
   { sourceSystem: 'basri', nativeSystem: 'BASRI_YAQUB_RUWAYS' as QuranNativeCountSystemId, rawis: ['ruways'] },
-  { sourceSystem: 'basri', nativeSystem: 'BASRI_YAQUB_RAWH' as QuranNativeCountSystemId, rawis: ['rawh'] },
   /*
    * الروايات المُسلَّمة من مرآة المجمع: ترقيمُها مقيسٌ من بايتاتها، فتُجرَّب كلٌّ منها على
    * النظام المنشور المتوقَّع لها. وما لم يطابق ١١٤/١١٤ لا يُفعَّل ولا يُقرَّب — ويُسمَّى
    * في التقرير بسورته، فيعرف المالك ما الذي يلزمه بالضبط بدل «غير جاهز».
    */
   { sourceSystem: 'madani-last', nativeSystem: 'MADANI_AKHIR' as QuranNativeCountSystemId, rawis: ['warsh', 'qalun'] },
-  { sourceSystem: 'makki', nativeSystem: 'MAKKI_IBN_KATHIR_DELIVERY' as QuranNativeCountSystemId, rawis: ['al-bazzi', 'qunbul'] },
-  { sourceSystem: 'basri', nativeSystem: 'BASRI_ABU_AMR_DELIVERY' as QuranNativeCountSystemId, rawis: ['al-duri-abu-amr', 'al-susi'] },
+  /*
+   * الخمس التالية تُسلَّم من حزمٍ أُعيد تقسيمها على عدّ مصاحف التيسير المعتمدة (قرار اللجنة،
+   * 1 أكتوبر 2026). وما زال الجسرُ يُثبت كلَّ رواية بمطابقة ١١٤/١١٤، لا بالقرار وحده.
+   */
+  { sourceSystem: 'makki', nativeSystem: 'MAKKI_IBN_KATHIR_TAYSEER' as QuranNativeCountSystemId, rawis: ['al-bazzi', 'qunbul'] },
+  { sourceSystem: 'basri', nativeSystem: 'BASRI_ABU_AMR_TAYSEER' as QuranNativeCountSystemId, rawis: ['al-duri-abu-amr', 'al-susi'] },
+  { sourceSystem: 'basri-jahdari', nativeSystem: 'BASRI_YAQUB_RAWH_TAYSEER' as QuranNativeCountSystemId, rawis: ['rawh'] },
 ] as const;
 
 export const GENERATED_EVIDENCE_PATH = 'src/lib/quran-crosswalk-boundary-evidence.generated.ts';
@@ -148,7 +153,8 @@ export interface ActivationResult {
 export function runCrosswalkActivation(repoRoot = process.cwd()): ActivationResult {
   const bytes = loadFrozenBoundaryBytes(repoRoot);
   const integrity = verifyFrozenBytes(bytes);
-  const document = parseBoundaryDocument(bytes);
+  // الأوجهُ المسمّاة (البصري على قول الجحدري) تُبنى فوق البايتات المجمَّدة ولا تمسّها.
+  const document = withNamedVariants(parseBoundaryDocument(bytes));
   const mappingCache = new Map<string, ForwardBoundaryMapping>();
   const validations: SystemValidation[] = [];
   const activated: ActivationResult['activated'] = [];

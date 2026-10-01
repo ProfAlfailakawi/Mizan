@@ -54,6 +54,7 @@
     "quran:verify-local": "tsx scripts/kfgqpc-verify-local.ts",
     "quran:stage-archives": "tsx scripts/kfgqpc-stage-archives.ts",
     "quran:mirror-freeze": "tsx scripts/kfgqpc-mirror-freeze.ts",
+    "quran:tayseer-resegment": "tsx scripts/quran-tayseer-resegment.ts",
     "qa:face-listens": "tsx tools/face-harness/run-all.ts",
     "qa:live-listen": "tsx tools/live-listen/run.ts",
     "quran:asr-conformance": "tsx scripts/asr-conformance.ts",

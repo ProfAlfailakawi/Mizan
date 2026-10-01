@@ -1,0 +1,1200 @@
+{
+ "_description": "كل دمجٍ وقسمةٍ وإصلاحٍ أُجري لإعادة تقسيم الحزم الخمس على عدّ مصاحف التيسير. يولّده `npm run quran:tayseer-resegment`.",
+ "rawis": [
+  {
+   "rawiId": "al-duri-abu-amr",
+   "base": {
+    "file": "al-duri-abu-amr.kfgqpc-mirror.json.deflate",
+    "sha256": "f65ed00fcac4a49e2fcd072f952587f69f12b25ce9fc2914dcb058a732fc57f1",
+    "verses": 6217
+   },
+   "artifact": {
+    "file": "al-duri-abu-amr.tayseer-basri.json.deflate",
+    "sha256": "ce6b41442186eb56af132a02770851a4d49ec2cc399f8c7db58089c5344cdeab",
+    "verses": 6204
+   },
+   "packageModel": "حزمة المجمّع للدوري والسوسي على المدني الأول برواية شيبة (6217): تعدّ «مما تحبون» وتترك «مقام إبراهيم»، وتعدّ «وإن كانوا ليقولون» و«إلى طعامه» و«فأين تذهبون» — وهي مواضع خلاف أبي جعفر وشيبة الستة في البيان للداني. وquran-ws يحمل المدني الأول على رواية أبي جعفر.",
+   "targetModel": "العدّ البصري كما في quran-ws (6204، قول أيوب بن المتوكل) — يطابق فهرس مصحفَي التيسير للدوري والسوسي ١١٤/١١٤.",
+   "tayseerMushaf": "TayseerDoryBasry.pdf",
+   "disputedEndsVerified": 115,
+   "merges": [
+    {
+     "surah": 2,
+     "packageAyah": 217,
+     "word": "ينفقون"
+    },
+    {
+     "surah": 2,
+     "packageAyah": 255,
+     "word": "النور"
+    },
+    {
+     "surah": 3,
+     "packageAyah": 91,
+     "word": "تحبون"
+    },
+    {
+     "surah": 6,
+     "packageAyah": 1,
+     "word": "والنور"
+    },
+    {
+     "surah": 7,
+     "packageAyah": 36,
+     "word": "النار"
+    },
+    {
+     "surah": 7,
+     "packageAyah": 136,
+     "word": "إسرائيل"
+    },
+    {
+     "surah": 8,
+     "packageAyah": 63,
+     "word": "وبالمؤمنين"
+    },
+    {
+     "surah": 9,
+     "packageAyah": 70,
+     "word": "وثمود"
+    },
+    {
+     "surah": 11,
+     "packageAyah": 73,
+     "word": "لوط"
+    },
+    {
+     "surah": 11,
+     "packageAyah": 85,
+     "word": "مؤمنين"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 1,
+     "word": "النور"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 6,
+     "word": "النور"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 22,
+     "word": "جديد"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 35,
+     "word": "والنهار"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 32,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 33,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 38,
+     "word": "مني"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 84,
+     "word": "أسفا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 87,
+     "word": "موسى"
+    },
+    {
+     "surah": 22,
+     "packageAyah": 41,
+     "word": "لوط"
+    },
+    {
+     "surah": 26,
+     "packageAyah": 92,
+     "word": "تعبدون"
+    },
+    {
+     "surah": 27,
+     "packageAyah": 33,
+     "word": "شديد"
+    },
+    {
+     "surah": 29,
+     "packageAyah": 28,
+     "word": "السبيل"
+    },
+    {
+     "surah": 30,
+     "packageAyah": 54,
+     "word": "المجرمون"
+    },
+    {
+     "surah": 32,
+     "packageAyah": 9,
+     "word": "جديد"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 16,
+     "word": "جديد"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 19,
+     "word": "والبصير"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 20,
+     "word": "النور"
+    },
+    {
+     "surah": 37,
+     "packageAyah": 22,
+     "word": "يعبدون"
+    },
+    {
+     "surah": 38,
+     "packageAyah": 36,
+     "word": "وغواص"
+    },
+    {
+     "surah": 39,
+     "packageAyah": 18,
+     "word": "الأنهار"
+    },
+    {
+     "surah": 40,
+     "packageAyah": 53,
+     "word": "الكتاب"
+    },
+    {
+     "surah": 40,
+     "packageAyah": 71,
+     "word": "الحميم"
+    },
+    {
+     "surah": 41,
+     "packageAyah": 12,
+     "word": "وثمود"
+    },
+    {
+     "surah": 55,
+     "packageAyah": 33,
+     "word": "نار"
+    },
+    {
+     "surah": 55,
+     "packageAyah": 42,
+     "word": "المجرمون"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 17,
+     "word": "موضونة"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 24,
+     "word": "عين"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 37,
+     "word": "إنشاء"
+    },
+    {
+     "surah": 65,
+     "packageAyah": 9,
+     "word": "الألباب"
+    },
+    {
+     "surah": 69,
+     "packageAyah": 24,
+     "word": "بشماله"
+    },
+    {
+     "surah": 71,
+     "packageAyah": 24,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 73,
+     "packageAyah": 1,
+     "word": "المزمل"
+    },
+    {
+     "surah": 79,
+     "packageAyah": 33,
+     "word": "ولأنعامكم"
+    },
+    {
+     "surah": 80,
+     "packageAyah": 32,
+     "word": "ولأنعامكم"
+    },
+    {
+     "surah": 84,
+     "packageAyah": 7,
+     "word": "بيمينه"
+    },
+    {
+     "surah": 84,
+     "packageAyah": 10,
+     "word": "ظهره"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 15,
+     "word": "ونعمه"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 17,
+     "word": "رزقه"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 25,
+     "word": "بجهنم"
+    },
+    {
+     "surah": 91,
+     "packageAyah": 14,
+     "word": "فعقروها"
+    },
+    {
+     "surah": 96,
+     "packageAyah": 15,
+     "word": "ينته"
+    },
+    {
+     "surah": 101,
+     "packageAyah": 5,
+     "word": "موازينه"
+    },
+    {
+     "surah": 101,
+     "packageAyah": 7,
+     "word": "موازينه"
+    },
+    {
+     "surah": 106,
+     "packageAyah": 4,
+     "word": "جوع"
+    }
+   ],
+   "splits": [
+    {
+     "surah": 2,
+     "packageAyah": 113,
+     "word": "خائفين",
+     "offset": 1
+    },
+    {
+     "surah": 2,
+     "packageAyah": 196,
+     "word": "الألباب",
+     "offset": 0
+    },
+    {
+     "surah": 2,
+     "packageAyah": 233,
+     "word": "معروفا",
+     "offset": 0
+    },
+    {
+     "surah": 2,
+     "packageAyah": 253,
+     "word": "القيوم",
+     "offset": 0
+    },
+    {
+     "surah": 3,
+     "packageAyah": 48,
+     "word": "إسرائيل",
+     "offset": 0
+    },
+    {
+     "surah": 5,
+     "packageAyah": 25,
+     "word": "غالبون",
+     "offset": 0
+    },
+    {
+     "surah": 7,
+     "packageAyah": 28,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 8,
+     "packageAyah": 36,
+     "word": "يغلبون",
+     "offset": 0
+    },
+    {
+     "surah": 9,
+     "packageAyah": 3,
+     "word": "المشركين",
+     "offset": 0
+    },
+    {
+     "surah": 11,
+     "packageAyah": 118,
+     "word": "مختلفين",
+     "offset": 0
+    },
+    {
+     "surah": 13,
+     "packageAyah": 25,
+     "word": "باب",
+     "offset": 0
+    },
+    {
+     "surah": 14,
+     "packageAyah": 27,
+     "word": "السماء",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 32,
+     "word": "زرعا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 83,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 83,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 87,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 89,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 99,
+     "word": "أعمالا",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 40,
+     "word": "فتونا",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 88,
+     "word": "فنسي",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 104,
+     "word": "صفصفا",
+     "offset": 0
+    },
+    {
+     "surah": 24,
+     "packageAyah": 36,
+     "word": "والآصال",
+     "offset": 0
+    },
+    {
+     "surah": 24,
+     "packageAyah": 42,
+     "word": "بالأبصار",
+     "offset": 1
+    },
+    {
+     "surah": 29,
+     "packageAyah": 65,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 30,
+     "packageAyah": 3,
+     "word": "سنين",
+     "offset": 0
+    },
+    {
+     "surah": 31,
+     "packageAyah": 31,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 35,
+     "packageAyah": 7,
+     "word": "شديد",
+     "offset": 0
+    },
+    {
+     "surah": 35,
+     "packageAyah": 41,
+     "word": "تزولا",
+     "offset": -1
+    },
+    {
+     "surah": 35,
+     "packageAyah": 43,
+     "word": "تبديلا",
+     "offset": 0
+    },
+    {
+     "surah": 39,
+     "packageAyah": 16,
+     "word": "عباد",
+     "offset": 0
+    },
+    {
+     "surah": 44,
+     "packageAyah": 43,
+     "word": "البطون",
+     "offset": 0
+    },
+    {
+     "surah": 47,
+     "packageAyah": 16,
+     "word": "للشاربين",
+     "offset": 0
+    },
+    {
+     "surah": 52,
+     "packageAyah": 1,
+     "word": "والطور",
+     "offset": 0
+    },
+    {
+     "surah": 55,
+     "packageAyah": 2,
+     "word": "الإنسان",
+     "offset": 0
+    },
+    {
+     "surah": 56,
+     "packageAyah": 27,
+     "word": "تأثيما",
+     "offset": 0
+    },
+    {
+     "surah": 57,
+     "packageAyah": 26,
+     "word": "الإنجيل",
+     "offset": 0
+    },
+    {
+     "surah": 78,
+     "packageAyah": 40,
+     "word": "قريبا",
+     "offset": 0
+    },
+    {
+     "surah": 79,
+     "packageAyah": 37,
+     "word": "طغى",
+     "offset": 0
+    },
+    {
+     "surah": 86,
+     "packageAyah": 15,
+     "word": "كيدا",
+     "offset": 0
+    },
+    {
+     "surah": 98,
+     "packageAyah": 5,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 99,
+     "packageAyah": 6,
+     "word": "أشتاتا",
+     "offset": 0
+    },
+    {
+     "surah": 107,
+     "packageAyah": 6,
+     "word": "يراءون",
+     "offset": 0
+    }
+   ],
+   "repairs": []
+  },
+  {
+   "rawiId": "al-susi",
+   "base": {
+    "file": "al-susi.kfgqpc-mirror.json.deflate",
+    "sha256": "5c46e77bbc050bc69688ab156dd71a8b689fb5a1af7e971e12703f3c7f894f82",
+    "verses": 6217
+   },
+   "artifact": {
+    "file": "al-susi.tayseer-basri.json.deflate",
+    "sha256": "1f2db8582a47bb57e9a99471001f76c97d5461e166d4de6036d491b117ff71b8",
+    "verses": 6204
+   },
+   "packageModel": "حزمة المجمّع للدوري والسوسي على المدني الأول برواية شيبة (6217): تعدّ «مما تحبون» وتترك «مقام إبراهيم»، وتعدّ «وإن كانوا ليقولون» و«إلى طعامه» و«فأين تذهبون» — وهي مواضع خلاف أبي جعفر وشيبة الستة في البيان للداني. وquran-ws يحمل المدني الأول على رواية أبي جعفر.",
+   "targetModel": "العدّ البصري كما في quran-ws (6204، قول أيوب بن المتوكل) — يطابق فهرس مصحفَي التيسير للدوري والسوسي ١١٤/١١٤.",
+   "tayseerMushaf": "TayseerSosy.pdf",
+   "disputedEndsVerified": 115,
+   "merges": [
+    {
+     "surah": 2,
+     "packageAyah": 217,
+     "word": "ينفقون"
+    },
+    {
+     "surah": 2,
+     "packageAyah": 255,
+     "word": "النور"
+    },
+    {
+     "surah": 3,
+     "packageAyah": 91,
+     "word": "تحبون"
+    },
+    {
+     "surah": 6,
+     "packageAyah": 1,
+     "word": "والنور"
+    },
+    {
+     "surah": 7,
+     "packageAyah": 36,
+     "word": "النار"
+    },
+    {
+     "surah": 7,
+     "packageAyah": 136,
+     "word": "إسرائيل"
+    },
+    {
+     "surah": 8,
+     "packageAyah": 63,
+     "word": "وبالمؤمنين"
+    },
+    {
+     "surah": 9,
+     "packageAyah": 70,
+     "word": "وثمود"
+    },
+    {
+     "surah": 11,
+     "packageAyah": 73,
+     "word": "لوط"
+    },
+    {
+     "surah": 11,
+     "packageAyah": 85,
+     "word": "مؤمنين"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 1,
+     "word": "النور"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 6,
+     "word": "النور"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 22,
+     "word": "جديد"
+    },
+    {
+     "surah": 14,
+     "packageAyah": 35,
+     "word": "والنهار"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 32,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 33,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 38,
+     "word": "مني"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 84,
+     "word": "أسفا"
+    },
+    {
+     "surah": 20,
+     "packageAyah": 87,
+     "word": "موسى"
+    },
+    {
+     "surah": 22,
+     "packageAyah": 41,
+     "word": "لوط"
+    },
+    {
+     "surah": 26,
+     "packageAyah": 92,
+     "word": "تعبدون"
+    },
+    {
+     "surah": 27,
+     "packageAyah": 33,
+     "word": "شديد"
+    },
+    {
+     "surah": 29,
+     "packageAyah": 28,
+     "word": "السبيل"
+    },
+    {
+     "surah": 30,
+     "packageAyah": 54,
+     "word": "المجرمون"
+    },
+    {
+     "surah": 32,
+     "packageAyah": 9,
+     "word": "جديد"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 16,
+     "word": "جديد"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 19,
+     "word": "والبصير"
+    },
+    {
+     "surah": 35,
+     "packageAyah": 20,
+     "word": "النور"
+    },
+    {
+     "surah": 37,
+     "packageAyah": 22,
+     "word": "يعبدون"
+    },
+    {
+     "surah": 38,
+     "packageAyah": 36,
+     "word": "وغواص"
+    },
+    {
+     "surah": 39,
+     "packageAyah": 18,
+     "word": "الأنهار"
+    },
+    {
+     "surah": 40,
+     "packageAyah": 53,
+     "word": "الكتاب"
+    },
+    {
+     "surah": 40,
+     "packageAyah": 71,
+     "word": "الحميم"
+    },
+    {
+     "surah": 41,
+     "packageAyah": 12,
+     "word": "وثمود"
+    },
+    {
+     "surah": 55,
+     "packageAyah": 33,
+     "word": "نار"
+    },
+    {
+     "surah": 55,
+     "packageAyah": 42,
+     "word": "المجرمون"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 17,
+     "word": "موضونة"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 24,
+     "word": "عين"
+    },
+    {
+     "surah": 56,
+     "packageAyah": 37,
+     "word": "إنشاء"
+    },
+    {
+     "surah": 65,
+     "packageAyah": 9,
+     "word": "الألباب"
+    },
+    {
+     "surah": 69,
+     "packageAyah": 24,
+     "word": "بشماله"
+    },
+    {
+     "surah": 71,
+     "packageAyah": 24,
+     "word": "كثيرا"
+    },
+    {
+     "surah": 73,
+     "packageAyah": 1,
+     "word": "المزمل"
+    },
+    {
+     "surah": 79,
+     "packageAyah": 33,
+     "word": "ولأنعامكم"
+    },
+    {
+     "surah": 80,
+     "packageAyah": 32,
+     "word": "ولأنعامكم"
+    },
+    {
+     "surah": 84,
+     "packageAyah": 7,
+     "word": "بيمينه"
+    },
+    {
+     "surah": 84,
+     "packageAyah": 10,
+     "word": "ظهره"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 15,
+     "word": "ونعمه"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 17,
+     "word": "رزقه"
+    },
+    {
+     "surah": 89,
+     "packageAyah": 25,
+     "word": "بجهنم"
+    },
+    {
+     "surah": 91,
+     "packageAyah": 14,
+     "word": "فعقروها"
+    },
+    {
+     "surah": 96,
+     "packageAyah": 15,
+     "word": "ينته"
+    },
+    {
+     "surah": 101,
+     "packageAyah": 5,
+     "word": "موازينه"
+    },
+    {
+     "surah": 101,
+     "packageAyah": 7,
+     "word": "موازينه"
+    },
+    {
+     "surah": 106,
+     "packageAyah": 4,
+     "word": "جوع"
+    }
+   ],
+   "splits": [
+    {
+     "surah": 2,
+     "packageAyah": 113,
+     "word": "خائفين",
+     "offset": 1
+    },
+    {
+     "surah": 2,
+     "packageAyah": 196,
+     "word": "الألباب",
+     "offset": 0
+    },
+    {
+     "surah": 2,
+     "packageAyah": 233,
+     "word": "معروفا",
+     "offset": 0
+    },
+    {
+     "surah": 2,
+     "packageAyah": 253,
+     "word": "القيوم",
+     "offset": 0
+    },
+    {
+     "surah": 3,
+     "packageAyah": 48,
+     "word": "إسرائيل",
+     "offset": 0
+    },
+    {
+     "surah": 5,
+     "packageAyah": 25,
+     "word": "غالبون",
+     "offset": 0
+    },
+    {
+     "surah": 7,
+     "packageAyah": 28,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 8,
+     "packageAyah": 36,
+     "word": "يغلبون",
+     "offset": 0
+    },
+    {
+     "surah": 9,
+     "packageAyah": 3,
+     "word": "المشركين",
+     "offset": 0
+    },
+    {
+     "surah": 11,
+     "packageAyah": 118,
+     "word": "مختلفين",
+     "offset": 0
+    },
+    {
+     "surah": 13,
+     "packageAyah": 25,
+     "word": "باب",
+     "offset": 0
+    },
+    {
+     "surah": 14,
+     "packageAyah": 27,
+     "word": "السماء",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 32,
+     "word": "زرعا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 83,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 83,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 87,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 89,
+     "word": "سببا",
+     "offset": 0
+    },
+    {
+     "surah": 18,
+     "packageAyah": 99,
+     "word": "أعمالا",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 40,
+     "word": "فتونا",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 88,
+     "word": "فنسي",
+     "offset": 0
+    },
+    {
+     "surah": 20,
+     "packageAyah": 104,
+     "word": "صفصفا",
+     "offset": 0
+    },
+    {
+     "surah": 24,
+     "packageAyah": 36,
+     "word": "والآصال",
+     "offset": 0
+    },
+    {
+     "surah": 24,
+     "packageAyah": 42,
+     "word": "بالأبصار",
+     "offset": 1
+    },
+    {
+     "surah": 29,
+     "packageAyah": 65,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 30,
+     "packageAyah": 3,
+     "word": "سنين",
+     "offset": 0
+    },
+    {
+     "surah": 31,
+     "packageAyah": 31,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 35,
+     "packageAyah": 7,
+     "word": "شديد",
+     "offset": 0
+    },
+    {
+     "surah": 35,
+     "packageAyah": 41,
+     "word": "تزولا",
+     "offset": -1
+    },
+    {
+     "surah": 35,
+     "packageAyah": 43,
+     "word": "تبديلا",
+     "offset": 0
+    },
+    {
+     "surah": 39,
+     "packageAyah": 16,
+     "word": "عباد",
+     "offset": 0
+    },
+    {
+     "surah": 44,
+     "packageAyah": 43,
+     "word": "البطون",
+     "offset": 0
+    },
+    {
+     "surah": 47,
+     "packageAyah": 16,
+     "word": "للشاربين",
+     "offset": 0
+    },
+    {
+     "surah": 52,
+     "packageAyah": 1,
+     "word": "والطور",
+     "offset": 0
+    },
+    {
+     "surah": 55,
+     "packageAyah": 2,
+     "word": "الإنسان",
+     "offset": 0
+    },
+    {
+     "surah": 56,
+     "packageAyah": 27,
+     "word": "تأثيما",
+     "offset": 0
+    },
+    {
+     "surah": 57,
+     "packageAyah": 26,
+     "word": "الإنجيل",
+     "offset": 0
+    },
+    {
+     "surah": 78,
+     "packageAyah": 40,
+     "word": "قريبا",
+     "offset": 0
+    },
+    {
+     "surah": 79,
+     "packageAyah": 37,
+     "word": "طغى",
+     "offset": 0
+    },
+    {
+     "surah": 86,
+     "packageAyah": 15,
+     "word": "كيدا",
+     "offset": 0
+    },
+    {
+     "surah": 98,
+     "packageAyah": 5,
+     "word": "الدين",
+     "offset": 0
+    },
+    {
+     "surah": 99,
+     "packageAyah": 6,
+     "word": "أشتاتا",
+     "offset": 0
+    },
+    {
+     "surah": 107,
+     "packageAyah": 6,
+     "word": "يراءون",
+     "offset": 0
+    }
+   ],
+   "repairs": [
+    {
+     "surah": 71,
+     "packageAyah": 26,
+     "moved": "نَارٗا",
+     "evidence": "حزمة السوسي تُنهي الآية عند «فأدخلوا» وتبدأ التالية بـ«نارا»؛ وكلُّ أعداد quran-ws وحزمةُ الدوري من الناشر نفسه ومصحفُ التيسير للسوسي (ص 571: «فأدخلوا نارا ㉕») تجعل الحدّ بعد «نارا». وهو الفرق الوحيد بين حدود الحزمتين في 6217 موضعًا."
+    }
+   ]
+  },
+  {
+   "rawiId": "al-bazzi",
+   "base": {
+    "file": "al-bazzi.kfgqpc-mirror.json.deflate",
+    "sha256": "5f510078c5df7437b9d383e9cf234be8d1bbe4423b6f1499ca3f556a7a8bc810",
+    "verses": 6220
+   },
+   "artifact": {
+    "file": "al-bazzi.tayseer-makki.json.deflate",
+    "sha256": "1a738083b4e084fca37013cf8248f10a1fcb02f7eac34c329a2302c104f07dd9",
+    "verses": 6219
+   },
+   "packageModel": "حزمة المجمّع للبزي وقنبل على المكي مع عدّ «عذابًا قريبًا» (6220) — كمصحف دار الفكر.",
+   "targetModel": "العدّ المكي على ترجيح الداني (6219): لا تُعدّ «عذابًا قريبًا» — يطابق فهرس مصحف التيسير لابن كثير ١١٤/١١٤.",
+   "tayseerMushaf": "TayseerKathir.pdf",
+   "disputedEndsVerified": 118,
+   "merges": [
+    {
+     "surah": 78,
+     "packageAyah": 40,
+     "word": "قريبا"
+    }
+   ],
+   "splits": [],
+   "repairs": []
+  },
+  {
+   "rawiId": "qunbul",
+   "base": {
+    "file": "qunbul.kfgqpc-mirror.json.deflate",
+    "sha256": "6e7bfee6fa282b8df4ef369fb05519ae690ee7ad1a1c90fc27df25ed5ab9d4db",
+    "verses": 6220
+   },
+   "artifact": {
+    "file": "qunbul.tayseer-makki.json.deflate",
+    "sha256": "0bf4429f0d063183e2dbfc4fa38321524b81e80d9e3c46e78514998730a4fd6b",
+    "verses": 6219
+   },
+   "packageModel": "حزمة المجمّع للبزي وقنبل على المكي مع عدّ «عذابًا قريبًا» (6220) — كمصحف دار الفكر.",
+   "targetModel": "العدّ المكي على ترجيح الداني (6219): لا تُعدّ «عذابًا قريبًا» — يطابق فهرس مصحف التيسير لابن كثير ١١٤/١١٤.",
+   "tayseerMushaf": "TayseerKathir.pdf",
+   "disputedEndsVerified": 118,
+   "merges": [
+    {
+     "surah": 78,
+     "packageAyah": 40,
+     "word": "قريبا"
+    }
+   ],
+   "splits": [],
+   "repairs": []
+  },
+  {
+   "rawiId": "rawh",
+   "base": {
+    "file": "QiraahRawh.json.deflate",
+    "sha256": "01e680bf68fdfe050aa49097f253c628d8e3455836fbe63210b6ee95a689e036",
+    "verses": 6206
+   },
+   "artifact": {
+    "file": "QiraahRawh.tayseer-basri-jahdari.json.deflate",
+    "sha256": "ef8370b304cbec3df75044426baa7d8eb8e96542448f335e0c4b7c4ffcf165a5",
+    "verses": 6205
+   },
+   "packageModel": "حزمة إسلام ويب لروح (6206): بصريةٌ إلا أنها تعدّ موضعَي الانشقاق «كتابه بيمينه» و«وراء ظهره» على المدني.",
+   "targetModel": "العدّ البصري على قول عاصم الجحدري (6205): يعدّ «قال فالحق والحق أقول» في ص. الداني: «وفي ص بخلاف عن البصري: والحق أقول»؛ ومصحف التيسير ليعقوب: «والأول [6205] هو ما تم اعتماده».",
+   "tayseerMushaf": "TayseerYakob.pdf",
+   "disputedEndsVerified": 104,
+   "merges": [
+    {
+     "surah": 84,
+     "packageAyah": 7,
+     "word": "بيمينه"
+    },
+    {
+     "surah": 84,
+     "packageAyah": 10,
+     "word": "ظهره"
+    }
+   ],
+   "splits": [
+    {
+     "surah": 38,
+     "packageAyah": 82,
+     "word": "أقول",
+     "offset": 0
+    }
+   ],
+   "repairs": []
+  }
+ ]
+}

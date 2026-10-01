@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { withBlockedReading } from './support-blocked-reading';
 
 import { CANONICAL_RAWI_IDS } from '../src/lib/canonical-readings';
 import { crosswalkCoverage } from '../src/lib/quran-locus-crosswalk';
@@ -61,18 +62,23 @@ test('the readiness answers match the live ones, reading by reading', () => {
   }
 });
 
-test('the five blocked readings are still blocked, by name and with their surahs', () => {
-  // عدُّها هنا لا يُغني عن تسميتها: ملخّصٌ يقول «خمسٌ محجوبة» ويخطئ في أيِّها لا يُفيد.
-  const blocked = CANONICAL_RAWI_IDS.filter(id => !isReadingQuestionSafe(id));
-  assert.deepEqual(blocked.sort(), ['al-bazzi', 'al-duri-abu-amr', 'al-susi', 'qunbul', 'rawh'].sort());
-  for (const rawiId of blocked) {
-    const blockers = readingQuestionBlockers(rawiId);
-    assert.equal(blockers.length, 1, rawiId);
-    assert.match(blockers[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/, rawiId);
+test('no reading is blocked today, and the five once blocked are safe on Tayseer evidence', () => {
+  /*
+   * كانت خمسٌ محجوبة (البزي وقنبل والدوري والسوسي وروح) حتى اعتمدت اللجنة مصاحف التيسير
+   * وأُعيد تقسيم حزمها عليها. فيُسمَّين هنا بأسمائهن: أمانُهن من دليلٍ لا من تليين شرط.
+   */
+  assert.deepEqual(CANONICAL_RAWI_IDS.filter(id => !isReadingQuestionSafe(id)), []);
+  for (const rawiId of ['al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi', 'rawh']) {
+    assert.equal(isReadingQuestionSafe(rawiId), true, rawiId);
+    assert.deepEqual(readingQuestionBlockers(rawiId), [], rawiId);
+    assert.match(String(crosswalkCoverage(rawiId).countSystem), /_TAYSEER$/, rawiId);
   }
-  for (const rawiId of CANONICAL_RAWI_IDS.filter(id => isReadingQuestionSafe(id))) {
-    assert.deepEqual(readingQuestionBlockers(rawiId), [], `${rawiId} is safe and must report no blocker`);
-  }
+  // وصيغةُ السبب حين يقع الحجب: مُسمّاةٌ بسورها.
+  withBlockedReading('al-susi', [2, 18, 20, 22, 24, 26, 27], () => {
+    const blockers = readingQuestionBlockers('al-susi');
+    assert.equal(blockers.length, 1);
+    assert.equal(blockers[0], 'CROSSWALK_UNRESOLVED_SURAHS:7:2، 18، 20، 22، 24، 26 و1 غيرها');
+  });
 });
 
 test('an unresolvable or unknown reading is never reported safe', () => {
@@ -85,9 +91,12 @@ test('an unresolvable or unknown reading is never reported safe', () => {
 
 test('a category is safe only when every reading it offers is safe', () => {
   assert.equal(categoryReadingsQuestionSafe('حفص عن عاصم'), true);
+  assert.equal(categoryReadingsQuestionSafe('حفص عن عاصم / السوسي'), true);
   // فئةٌ تجمع روايةً آمنة وأخرى محجوبة ليست آمنة — ولا تُقبل بنصفها.
-  assert.equal(categoryReadingsQuestionSafe('حفص عن عاصم / السوسي'), false);
-  assert.deepEqual(categoryUnsafeReadings('حفص عن عاصم / السوسي'), ['al-susi']);
+  withBlockedReading('al-susi', [84], () => {
+    assert.equal(categoryReadingsQuestionSafe('حفص عن عاصم / السوسي'), false);
+    assert.deepEqual(categoryUnsafeReadings('حفص عن عاصم / السوسي'), ['al-susi']);
+  });
   assert.deepEqual(categoryUnsafeReadings('حفص عن عاصم'), []);
 });
 

@@ -19,6 +19,7 @@ import {
   nativeAyahCountOf,
 } from '../src/lib/quran-native-count-systems';
 import { QURAN_WS_BOUNDARY_SOURCE } from '../src/lib/quran-count-boundary-source';
+import { buildForwardBoundaryMapping, compareForwardCounts } from '../src/lib/quran-count-boundary-mapping';
 import {
   CROSSWALK_CANDIDATE_SYSTEMS,
   loadFrozenBoundaryBytes,
@@ -47,6 +48,9 @@ import {
 } from '../src/lib/quran-locus-crosswalk';
 
 const ACTIVATION = runCrosswalkActivation();
+const BOUNDARY_DOCUMENT = parseBoundaryDocument(loadFrozenBoundaryBytes());
+const countsAgainst = (sourceSystem: string, nativeSystem: keyof typeof NATIVE_SURAH_AYAH_COUNTS) =>
+  compareForwardCounts(buildForwardBoundaryMapping(BOUNDARY_DOCUMENT, sourceSystem, ayahCountOf), NATIVE_SURAH_AYAH_COUNTS[nativeSystem]);
 
 // ── pin & integrity ──────────────────────────────────────────────────────────────────────────
 
@@ -146,25 +150,31 @@ test('madani-first target counts match the pinned Ibn Jammaz package', () => {
 
 test('generic basri is validated independently against Ruways and against Rawh', () => {
   const ruways = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RUWAYS');
-  const rawh = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RAWH');
+  const rawh = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RAWH_TAYSEER');
   assert.ok(ruways && rawh, 'each Yaqub rawi must be proved on its own, never by sharing a generic system');
   assert.equal(ruways!.sourceSystem, 'basri');
-  assert.equal(rawh!.sourceSystem, 'basri');
-  // The two claims are genuinely independent: they reach opposite verdicts on the same source.
-  assert.notEqual(ruways!.exact114, rawh!.exact114);
+  assert.equal(rawh!.sourceSystem, 'basri-jahdari');
+  assert.equal(ruways!.exact114, true);
+  assert.equal(rawh!.exact114, true);
+  // Rawh could not ride on Ruways' proof: generic basri (Ayyub) misses al-Jahdari's Sad 38:84.
+  assert.deepEqual(countsAgainst('basri', 'BASRI_YAQUB_RAWH_TAYSEER').mismatches, [{ surah: 38, generated: 85, expected: 86 }]);
 });
 
 test('basri validation activates Ruways on an exact 114/114 match', () => expectExact('BASRI_YAQUB_RUWAYS'));
 
 test('a single mismatched surah fails closed and activates nothing for that rawi', () => {
-  const rawh = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RAWH')!;
-  assert.equal(rawh.exact114, false);
-  assert.equal(rawh.mismatches.length, 1, 'the block is one surah wide — and one is enough');
-  assert.deepEqual(rawh.mismatches[0], { surah: 84, generated: 23, expected: 25 });
-  assert.equal(ACTIVATION.activated.some(a => a.config.nativeSystem === 'BASRI_YAQUB_RAWH'), false);
+  /*
+   * يُثبَت على بيانات حقيقية لا مصطنعة: حزمةُ روح قبل إعادة تقسيمها (BASRI_YAQUB_RAWH، 6206)
+   * تخالف البصريَّ في سورةٍ واحدة — وسورةٌ واحدة تكفي لئلّا يُفعَّل لها شيء.
+   */
+  const old = countsAgainst('basri', 'BASRI_YAQUB_RAWH');
+  assert.equal(old.exact, false);
+  assert.equal(old.mismatches.length, 1, 'the block is one surah wide — and one is enough');
+  assert.deepEqual(old.mismatches[0], { surah: 84, generated: 23, expected: 25 });
+  // ولا يدخل نظامُ الحزمة القديمة الجسرَ بحال: روحٌ يُجسَر بنظام التيسير وحده.
+  assert.equal(ACTIVATION.validations.some(v => v.nativeSystem === 'BASRI_YAQUB_RAWH'), false);
   assert.equal(GENERATED_BOUNDARY_SYSTEMS.some(s => s.nativeSystem === 'BASRI_YAQUB_RAWH'), false);
-  assert.equal(CROSSWALK_ACTIVATED_RAWIS.includes('rawh'), false);
-  assert.equal(COMMITTEE_CROSSWALK_ROWS.some(row => row.rawiId === 'rawh'), false);
+  assert.ok(COMMITTEE_CROSSWALK_ROWS.filter(row => row.rawiId === 'rawh').every(row => row.evidence.some(e => e.includes('BASRI_YAQUB_RAWH_TAYSEER'))));
 });
 
 test('no automatic activation on a partial match', () => {
@@ -290,16 +300,15 @@ test('no UNRESOLVED locus remains for any reading marked question-ready', () => 
 });
 
 test('activation moved exactly the proved readings to question-ready', () => {
-  for (const rawiId of ['hisham', 'ibn-dhakwan', 'ibn-wardan', 'ibn-jammaz', 'ruways']) {
+  const proved = ['hisham', 'ibn-dhakwan', 'ibn-wardan', 'ibn-jammaz', 'ruways', 'warsh', 'qalun',
+    'al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi', 'rawh'];
+  for (const rawiId of proved) {
     const coverage = crosswalkCoverage(rawiId);
     assert.equal(coverage.questionSafe, true, `${rawiId} must be question-safe on proved evidence`);
     assert.equal(coverage.unresolvedLoci, 0);
     assert.equal(coverage.mappingComplete, true, `${rawiId} mapping must be complete, not merely unblocked`);
   }
-  // Rawh stays blocked. Readiness logic was not relaxed to reach a round number.
-  const rawh = crosswalkCoverage('rawh');
-  assert.equal(rawh.questionSafe, false);
-  assert.ok(rawh.unresolvedLoci > 0);
+  assert.deepEqual([...CROSSWALK_ACTIVATED_RAWIS].sort(), [...proved].sort());
 });
 
 // ── startup cost ─────────────────────────────────────────────────────────────────────────────

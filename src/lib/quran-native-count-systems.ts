@@ -15,6 +15,7 @@
 
 import { QURAN_SURAH_TOTAL, ayahCountOf } from './quran-canon';
 import { DELIVERY_COUNT_SYSTEMS } from './quran-delivery-count-evidence.generated';
+import { TAYSEER_COUNT_SYSTEMS } from './quran-tayseer-count-evidence.generated';
 
 /**
  * أنظمة العدّ المستعملة في ميزان. `KUFIC` هو عدّ المصحف المدني المعتمد canonical في ميزان،
@@ -33,7 +34,15 @@ export type QuranNativeCountSystemId =
    */
   | 'MADANI_AKHIR'
   | 'MAKKI_IBN_KATHIR_DELIVERY'
-  | 'BASRI_ABU_AMR_DELIVERY';
+  | 'BASRI_ABU_AMR_DELIVERY'
+  /*
+   * الثلاثة التالية عدُّ مصاحف التيسير التي اعتمدتها اللجنة (1 أكتوبر 2026)، مقيسةً من الحزم
+   * المعاد تقسيمها عليها (`src/lib/quran-tayseer-resegmentation.ts`) بعد أن طابقت فهارسَ تلك
+   * المصاحف المطبوعة ١١٤/١١٤. وأسماء `_DELIVERY` أعلاه باقيةٌ وصفًا لبايتات المرآة كما وصلت.
+   */
+  | 'BASRI_ABU_AMR_TAYSEER'
+  | 'MAKKI_IBN_KATHIR_TAYSEER'
+  | 'BASRI_YAQUB_RAWH_TAYSEER';
 
 /** عدد آيات كل سورة (١..١١٤) في كل نظام عدّ — مستخرجٌ من الأثر المثبَّت. */
 export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly number[]> = {
@@ -112,6 +121,9 @@ export const NATIVE_SURAH_AYAH_COUNTS: Record<QuranNativeCountSystemId, readonly
    * ويثبت اختبارٌ أنها ما زالت تطابق `quran-sources/delivery-counts/` حرفًا بحرف.
    */
   ...deliveryMeasuredCounts(),
+  BASRI_ABU_AMR_TAYSEER: TAYSEER_COUNT_SYSTEMS.BASRI_ABU_AMR_TAYSEER.perSurahAyahCounts,
+  MAKKI_IBN_KATHIR_TAYSEER: TAYSEER_COUNT_SYSTEMS.MAKKI_IBN_KATHIR_TAYSEER.perSurahAyahCounts,
+  BASRI_YAQUB_RAWH_TAYSEER: TAYSEER_COUNT_SYSTEMS.BASRI_YAQUB_RAWH_TAYSEER.perSurahAyahCounts,
 };
 
 type MeasuredDeliverySystemId = 'MADANI_AKHIR' | 'MAKKI_IBN_KATHIR_DELIVERY' | 'BASRI_ABU_AMR_DELIVERY';

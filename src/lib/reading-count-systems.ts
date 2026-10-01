@@ -16,6 +16,7 @@
 
 import { CANONICAL_RAWI_IDS } from './canonical-readings';
 import { QURAN_FULL_TEXT_CANDIDATES } from './quran-candidate-sources';
+import { tayseerResegmentationFor } from './quran-tayseer-resegmentation';
 import type { QuranNativeCountSystemId } from './quran-native-count-systems';
 import { DELIVERY_COUNT_EVIDENCE_BUILD, DELIVERY_COUNT_SYSTEMS } from './quran-delivery-count-evidence.generated';
 
@@ -71,6 +72,8 @@ const MIRROR_MEASURED: Record<string, ReadingCountSystem> = (() => {
   for (const entry of DELIVERY_COUNT_SYSTEMS) {
     for (const pkg of entry.packages) {
       if (pkg.rawiId === 'hafs') continue; // حفصٌ قانونيٌّ بالتعريف، والقياس يؤكّده لا يغيّره.
+      // والمعاد تقسيمها على عدّ التيسير تُسلَّم من أثرها الجديد، فعدُّها عدُّه لا عدُّ المرآة.
+      if (tayseerResegmentationFor(pkg.rawiId)) continue;
       map[pkg.rawiId] = {
         rawiId: pkg.rawiId,
         system: entry.system as QuranNativeCountSystemId,
@@ -95,7 +98,9 @@ export const READING_COUNT_SYSTEMS: ReadonlyMap<string, ReadingCountSystem> = ((
         rawiId,
         system: candidate.nativeCountSystem,
         assurance: 'VERIFIED_FROM_PINNED_ARTIFACT',
-        note: `عُدَّت آيات كل سورة من بايتات ${candidate.upstreamPath} عند الـcommit المثبَّت (${candidate.expectedVerseCount} آية).`,
+        note: candidate.resegmentedFrom
+          ? `عدُّ مصحف التيسير المعتمد: حزمة ${candidate.resegmentedFrom.artifactFileName} (${candidate.resegmentedFrom.verseCount} آية) أُعيد تقسيمها عليه بلا تغيير كلمة، فطابقت فهرسه المطبوع ١١٤/١١٤ (${candidate.expectedVerseCount} آية).`
+          : `عُدَّت آيات كل سورة من بايتات ${candidate.upstreamPath} عند الـcommit المثبَّت (${candidate.expectedVerseCount} آية).`,
       });
       continue;
     }

@@ -15,6 +15,11 @@
 
 import type { QuranSourceAuthority } from './quran-source-authority';
 import type { QuranNativeCountSystemId } from './quran-native-count-systems';
+import {
+  TAYSEER_COMMITTEE_DECISION_DATE,
+  TAYSEER_COMMITTEE_DECISION_REFERENCE,
+  tayseerResegmentationFor,
+} from './quran-tayseer-resegmentation';
 
 export type QuranCandidateReviewState =
   | 'PENDING_SCHOLAR_REVIEW'
@@ -97,6 +102,51 @@ export interface QuranCandidateSource {
   permissionState: QuranCandidatePermissionState;
   committeeDecision: QuranCandidateCommitteeDecision;
   caveat?: string;
+  /**
+   * حين يكون الأثرُ المسلَّم حزمةً أُعيد تقسيمها على عدّ مصاحف التيسير: الأثرُ الأصل كما وصل
+   * ببصمته وعدّه. الكلماتُ هي هي، والذي تغيّر مواضعُ الحدود وحدها — والتفصيل في
+   * `src/lib/quran-tayseer-resegmentation.ts`.
+   */
+  resegmentedFrom?: {
+    artifactFileName: string;
+    sha256: string;
+    verseCount: number;
+    nativeCountSystem: QuranNativeCountSystemId;
+  };
+}
+
+/*
+ * قرار اللجنة (1 أكتوبر 2026): مصاحف التيسير هي المعتمدة في عدّ الآي. فالروايات الخمس التي
+ * أُعيد تقسيمها تُسلَّم من أثرها الجديد، والقرارُ مربوطٌ ببصمته هو لا ببصمة الأصل.
+ */
+function withTayseerResegmentation(source: QuranCandidateSource): QuranCandidateSource {
+  const r = tayseerResegmentationFor(source.rawiId);
+  if (!r) return source;
+  if (r.baseArtifactSha256 !== source.expectedCompressedSha256) {
+    throw new Error(`TAYSEER_BASE_NOT_THE_PINNED_ARTIFACT:${source.rawiId}`);
+  }
+  return {
+    ...source,
+    artifactFileName: r.artifactFileName,
+    expectedCompressedSha256: r.artifactSha256,
+    expectedVerseCount: r.verseCount,
+    nativeCountSystem: r.nativeCountSystem,
+    committeeDecision: {
+      state: 'APPROVED',
+      authority: 'MIZAN_SCIENTIFIC_COMMITTEE',
+      reference: TAYSEER_COMMITTEE_DECISION_REFERENCE,
+      decidedAt: TAYSEER_COMMITTEE_DECISION_DATE,
+      boundUpstreamCommit: source.upstreamCommit,
+      boundCompressedSha256: r.artifactSha256,
+    },
+    resegmentedFrom: {
+      artifactFileName: source.artifactFileName || (source.upstreamPath.split('/').pop() as string),
+      sha256: source.expectedCompressedSha256,
+      verseCount: source.expectedVerseCount,
+      nativeCountSystem: source.nativeCountSystem,
+    },
+    caveat: `${source.caveat ? `${source.caveat} ` : ''}أُعيد تقسيم رؤوس آيها على عدّ مصحف التيسير المعتمد (${r.verseCount} آية) بلا تغيير كلمة.`,
+  };
 }
 
 /**
@@ -149,7 +199,7 @@ const candidate = (
  * ضغطها وعدّ سورها وآياتها. وتطابقُ بصمتَي إسحاق وإدريس ليس خطأً: المتنان متطابقان
  * بايتًا ببايت في المصدر المنشور، وهذا مسجَّلٌ في `caveat` ولا يُختلق له فرق.
  */
-export const ISLAMWEB_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
+export const ISLAMWEB_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = ([
   candidate('hisham', 'hisham', 'QiraahHisham.json.deflate', 6226, 'DIMASHQI',
     '399099727eca6b684b25e48af98d794715b9cbd19e3b15da2a729ae717a522b8'),
   candidate('ibn-dhakwan', 'ibn-dhakwan', 'QiraahIbnDhakwan.json.deflate', 6226, 'DIMASHQI',
@@ -188,7 +238,7 @@ export const ISLAMWEB_FULL_TEXT_CANDIDATES: readonly QuranCandidateSource[] = [
     'a08d17124aab7b543e0029aabeeea06c20471286eddfe6a97f31eec69ae2eae9',
     'المصدر upstream وثّق تطابق متن إدريس مع إسحاق؛ يُحفظ هذا القيد في provenance ولا يُختلق فرق غير موجود في المصدر.',
   ),
-] as const;
+] as const).map(withTayseerResegmentation);
 
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -252,7 +302,7 @@ const mirrorCandidate = (
   caveat: 'نصٌّ نشره المجمّع ووصل من مرآةٍ عامّة مثبَّتة. ليست حزمةَ المجمّع الرسميّة المضغوطة، ولم تُطابَق ببصمة MD5+SHA-1 الرسميّة.',
 });
 
-export const KFGQPC_MIRROR_CANDIDATES: readonly QuranCandidateSource[] = [
+export const KFGQPC_MIRROR_CANDIDATES: readonly QuranCandidateSource[] = ([
   mirrorCandidate('hafs', 'hafs', 'hafs/data/hafsData_v18.json',
     '5d8bb91726e482839d0057633cb1973031e4d706fa9604eea5e08892f20ba140',
     6236, 'KUFIC',
@@ -285,7 +335,7 @@ export const KFGQPC_MIRROR_CANDIDATES: readonly QuranCandidateSource[] = [
     '3a0377bd943def12711b15cc71a65214fb902a5df70240b87df13c7b516a7888',
     6220, 'MAKKI_IBN_KATHIR_DELIVERY',
     '6e7bfee6fa282b8df4ef369fb05519ae690ee7ad1a1c90fc27df25ed5ab9d4db'),
-] as const;
+] as const).map(withTayseerResegmentation);
 
 /*
  * **كلُّ** المرشَّحين — لا قائمةَ ثانيةً تُنسى.

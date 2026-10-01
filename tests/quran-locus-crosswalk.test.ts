@@ -49,11 +49,17 @@ test('every row in the default Mizan crosswalk comes from pinned evidence — no
  * هشام المقابل للآية ١٠ قانونيًّا غير معلوم بلا دليل — ولا يجوز اختلاقه.
  */
 test('a locus in a surah whose native count differs is refused unless a row proves it', () => {
-  // روحٌ ما زال بلا دليل: سورةٌ واحدة تخالف، وواحدة تكفي لإبقاء الباب مغلقًا.
-  const blocked = MIZAN_IDENTITY_CROSSWALK.toNative('rawh', { surah: 2, ayah: 10 });
+  // بلا صفّ دليل: سورةٌ يخالف عدُّها لا يُخترع لها موضع — جدولٌ فارغ يُبقي الباب مغلقًا.
+  const blocked = new QuranCrosswalkTable([], 'no-evidence').toNative('rawh', { surah: 2, ayah: 10 });
   assert.equal(blocked.assurance, 'UNRESOLVED');
   assert.equal(blocked.native, undefined, 'no native locus may be invented for a diverging count');
   assert.match(String(blocked.reason), /^NATIVE_COUNT_DIVERGES:2:286:287$/);
+
+  // وبالدليل (عدّ التيسير، البصري على قول الجحدري) يُحلّ: «الم» ليست آيةً عند البصريين.
+  const rawh = MIZAN_IDENTITY_CROSSWALK.toNative('rawh', { surah: 2, ayah: 10 });
+  assert.equal(rawh.assurance, 'EVIDENCED_ROW');
+  assert.deepEqual(rawh.native, { surah: 2, ayah: 9 });
+  assert.ok(rawh.evidence.includes('system:basri-jahdari->BASRI_YAQUB_RAWH_TAYSEER'));
 
   // وهشامٌ محلولٌ بدليلٍ منصوص لا بافتراض: ٢:١٠ تُقسَم آيتين في العدّ الدمشقي.
   const evidenced = MIZAN_IDENTITY_CROSSWALK.toNative('hisham', { surah: 2, ayah: 10 });
@@ -161,10 +167,15 @@ test('the evidence file carries only what the pinned artifact proves, and says w
   const COMMITTEE_CROSSWALK_ROWS = committeeCrosswalkRows();
   assert.equal(COMMITTEE_CROSSWALK_ROWS.length, MIZAN_IDENTITY_CROSSWALK.size);
   assert.deepEqual([...CROSSWALK_ACTIVATED_RAWIS].sort(),
-    ['hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan', 'qalun', 'ruways', 'warsh'].sort());
-  // وما لم يُثبت لا يدخل: روحٌ بلا صفٍّ واحد، فيبقى محجوبًا عن السؤال.
-  assert.equal(COMMITTEE_CROSSWALK_ROWS.some(r => r.rawiId === 'rawh'), false);
-  assert.equal(crosswalkCoverage('rawh').questionSafe, false);
+    ['al-bazzi', 'al-duri-abu-amr', 'al-susi', 'hisham', 'ibn-dhakwan', 'ibn-jammaz', 'ibn-wardan',
+      'qalun', 'qunbul', 'rawh', 'ruways', 'warsh'].sort());
+  // وكلُّ صفٍّ لروايةٍ من الخمس يحمل نظامَ التيسير الذي أُثبتت عليه، لا نظامَ حزمتها القديمة.
+  for (const rawiId of ['al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi', 'rawh']) {
+    const rows = COMMITTEE_CROSSWALK_ROWS.filter(r => r.rawiId === rawiId);
+    assert.ok(rows.length > 0, rawiId);
+    assert.ok(rows.every(r => r.evidence.some(e => /->[A-Z_]+_TAYSEER$/.test(e))), rawiId);
+    assert.equal(crosswalkCoverage(rawiId).questionSafe, true, rawiId);
+  }
   assert.equal(crosswalkCoverage('hisham').questionSafe, true);
 });
 
