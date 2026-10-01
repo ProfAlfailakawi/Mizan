@@ -35,20 +35,21 @@ export interface CountModel {
   evidence: string;
 }
 
-/** إصلاحٌ مسمّى لعيبٍ في الحزمة الأصل: حدٌّ وُضع قبل كلمته بكلمة. */
-export interface BoundaryRepair {
-  surah: number;
-  /** رقم السطر في الحزمة الأصل الذي انتهى قبل أوانه. */
-  packageAyah: number;
-  /** الكلمات (كما في الحزمة) التي تُنقل من أول السطر التالي إلى آخر هذا السطر. */
-  moveWords: readonly string[];
-  evidence: string;
-}
+/**
+ * إصلاحٌ مسمّى لعيبٍ في الحزمة الأصل — نوعان لا ثالث لهما:
+ *   - حدٌّ وُضع قبل كلمته (`moveWords`): تُنقل الكلمات من أول السطر التالي إلى آخر هذا.
+ *   - كلمةٌ تالفةُ الترميز (`replaceWord`): حرفٌ دخيلٌ في كلمةٍ واحدة بعينها.
+ * وكلاهما يُفشل البناء إن لم يجد نصَّه بالضبط، ويُسجَّل في التقرير بدليله.
+ */
+export type BoundaryRepair =
+  | { surah: number; packageAyah: number; moveWords: readonly string[]; evidence: string }
+  | { surah: number; packageAyah: number; replaceWord: { from: string; to: string }; evidence: string };
 
 export type TayseerNativeCountSystemId =
   | 'BASRI_ABU_AMR_TAYSEER'
   | 'MAKKI_IBN_KATHIR_TAYSEER'
-  | 'BASRI_YAQUB_RAWH_TAYSEER';
+  | 'BASRI_YAQUB_RAWH_TAYSEER'
+  | 'BASRI_YAQUB_RUWAYS_TAYSEER';
 
 export interface TayseerResegmentation {
   rawiId: string;
@@ -119,6 +120,13 @@ const RAWH_PACKAGE: CountModel = {
   ],
   drop: [],
   evidence: 'حزمة إسلام ويب لروح (6206): بصريةٌ إلا أنها تعدّ موضعَي الانشقاق «كتابه بيمينه» و«وراء ظهره» على المدني.',
+};
+
+const RUWAYS_PACKAGE: CountModel = {
+  base: 'basri',
+  add: [],
+  drop: [],
+  evidence: 'حزمة إسلام ويب لرويس (6204): البصري على قول أيوب بن المتوكل كما في quran-ws، لا يعدّ «والحق أقول».',
 };
 
 const RAWH_TARGET: CountModel = {
@@ -212,7 +220,30 @@ export const TAYSEER_RESEGMENTATIONS: readonly TayseerResegmentation[] = [
     artifactSha256: 'ef8370b304cbec3df75044426baa7d8eb8e96542448f335e0c4b7c4ffcf165a5',
     verseCount: 6205,
   },
+  {
+    rawiId: 'ruways',
+    baseArtifactFileName: 'QiraahRuways.json.deflate',
+    baseArtifactSha256: 'df236a65d32ce0a68b6326c1811628cf143283e2ec788d82c0521ce1ee0ac1c6',
+    baseVerseCount: 6204,
+    packageModel: RUWAYS_PACKAGE,
+    // مصحف التيسير ليعقوب يعتمد قول الجحدري (6205) ليعقوب كلّه — بروايتيه.
+    targetModel: RAWH_TARGET,
+    tayseerMushaf: 'TayseerYakob.pdf',
+    repairs: [{
+      surah: 2,
+      packageAyah: 113,
+      replaceWord: { from: 'خَآئِفِينلَ', to: 'خَآئِفِينَ' },
+      evidence:
+        'كلمةٌ تالفة الترميز في حزمة رويس: «خائفين» دخلتها لامٌ زائدة («خَآئِفِينلَ»). وهي في حزمة روح من الناشر نفسه '
+        + '«خَآئِفِينَ»، وكذلك في حفص وفي كل مصحف. ويقع فيها حدٌّ مختلف فيه (البقرة ١١٤ «إلا خائفين» يعدّها البصري)، فكشفها التحقّق.',
+    }],
+    nativeCountSystem: 'BASRI_YAQUB_RUWAYS_TAYSEER',
+    artifactFileName: 'QiraahRuways.tayseer-basri-jahdari.json.deflate',
+    artifactSha256: '5fd47765ab7e47a9e08f25a4591fbd90c73ef256044007001a689fef8c6c4155',
+    verseCount: 6205,
+  },
 ];
+
 
 export const TAYSEER_RESEGMENTATION_BY_RAWI = new Map(TAYSEER_RESEGMENTATIONS.map(r => [r.rawiId, r] as const));
 

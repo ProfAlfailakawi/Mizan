@@ -149,18 +149,23 @@ test('madani-first target counts match the pinned Ibn Jammaz package', () => {
 });
 
 test('generic basri is validated independently against Ruways and against Rawh', () => {
-  const ruways = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RUWAYS');
+  const ruways = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RUWAYS_TAYSEER');
   const rawh = ACTIVATION.validations.find(v => v.nativeSystem === 'BASRI_YAQUB_RAWH_TAYSEER');
   assert.ok(ruways && rawh, 'each Yaqub rawi must be proved on its own, never by sharing a generic system');
-  assert.equal(ruways!.sourceSystem, 'basri');
+  assert.equal(ruways!.sourceSystem, 'basri-jahdari');
   assert.equal(rawh!.sourceSystem, 'basri-jahdari');
   assert.equal(ruways!.exact114, true);
   assert.equal(rawh!.exact114, true);
-  // Rawh could not ride on Ruways' proof: generic basri (Ayyub) misses al-Jahdari's Sad 38:84.
+  // Neither could ride on generic basri (Ayyub): it misses al-Jahdari's Sad 38:84 for both.
   assert.deepEqual(countsAgainst('basri', 'BASRI_YAQUB_RAWH_TAYSEER').mismatches, [{ surah: 38, generated: 85, expected: 86 }]);
+  assert.deepEqual(countsAgainst('basri', 'BASRI_YAQUB_RUWAYS_TAYSEER').mismatches, [{ surah: 38, generated: 85, expected: 86 }]);
 });
 
-test('basri validation activates Ruways on an exact 114/114 match', () => expectExact('BASRI_YAQUB_RUWAYS'));
+test('basri validation activates Ruways on an exact 114/114 match', () => {
+  // رويس اليوم على عدّ التيسير (قول الجحدري، 6205). وحزمتُه الأصل كانت البصريَّ على قول أيوب تمامًا.
+  expectExact('BASRI_YAQUB_RUWAYS_TAYSEER');
+  assert.equal(countsAgainst('basri', 'BASRI_YAQUB_RUWAYS').exact, true);
+});
 
 test('a single mismatched surah fails closed and activates nothing for that rawi', () => {
   /*

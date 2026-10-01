@@ -34,7 +34,6 @@ import { withNamedVariants } from '../src/lib/quran-count-boundary-variants';
 export const CROSSWALK_CANDIDATE_SYSTEMS = [
   { sourceSystem: 'dimashqi', nativeSystem: 'DIMASHQI' as QuranNativeCountSystemId, rawis: ['hisham', 'ibn-dhakwan'] },
   { sourceSystem: 'madani-first', nativeSystem: 'MADANI_AWWAL' as QuranNativeCountSystemId, rawis: ['ibn-wardan', 'ibn-jammaz'] },
-  { sourceSystem: 'basri', nativeSystem: 'BASRI_YAQUB_RUWAYS' as QuranNativeCountSystemId, rawis: ['ruways'] },
   /*
    * الروايات المُسلَّمة من مرآة المجمع: ترقيمُها مقيسٌ من بايتاتها، فتُجرَّب كلٌّ منها على
    * النظام المنشور المتوقَّع لها. وما لم يطابق ١١٤/١١٤ لا يُفعَّل ولا يُقرَّب — ويُسمَّى
@@ -48,6 +47,7 @@ export const CROSSWALK_CANDIDATE_SYSTEMS = [
   { sourceSystem: 'makki', nativeSystem: 'MAKKI_IBN_KATHIR_TAYSEER' as QuranNativeCountSystemId, rawis: ['al-bazzi', 'qunbul'] },
   { sourceSystem: 'basri', nativeSystem: 'BASRI_ABU_AMR_TAYSEER' as QuranNativeCountSystemId, rawis: ['al-duri-abu-amr', 'al-susi'] },
   { sourceSystem: 'basri-jahdari', nativeSystem: 'BASRI_YAQUB_RAWH_TAYSEER' as QuranNativeCountSystemId, rawis: ['rawh'] },
+  { sourceSystem: 'basri-jahdari', nativeSystem: 'BASRI_YAQUB_RUWAYS_TAYSEER' as QuranNativeCountSystemId, rawis: ['ruways'] },
 ] as const;
 
 export const GENERATED_EVIDENCE_PATH = 'src/lib/quran-crosswalk-boundary-evidence.generated.ts';

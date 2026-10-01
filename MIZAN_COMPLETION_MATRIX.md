@@ -28,7 +28,7 @@
 | الدوري عن الكسائي | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ابن وردان عن أبي جعفر | ISLAMWEB_DERIVED | ✅ | MADANI_AWWAL | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ابن جماز عن أبي جعفر | ISLAMWEB_DERIVED | ✅ | MADANI_AWWAL | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
-| رويس عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RUWAYS | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| رويس عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RUWAYS_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | روح عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RAWH_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | إسحاق عن خلف العاشر | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | إدريس عن خلف العاشر | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |

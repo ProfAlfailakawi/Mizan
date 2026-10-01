@@ -47,10 +47,22 @@ test('the build reproduces every committed artifact byte for byte, and the regis
   }
 });
 
-test('not one word is added, dropped or moved out of order', () => {
+test('not one word is added, dropped or moved out of order — except a named corrupted word', () => {
   for (const r of TAYSEER_RESEGMENTATIONS) {
-    assert.deepEqual(wordsOf(tableOf(r.artifactFileName)), wordsOf(tableOf(r.baseArtifactFileName)), r.rawiId);
+    const fixes = new Map(r.repairs.flatMap(x => ('replaceWord' in x ? [[x.replaceWord.from, x.replaceWord.to] as const] : [])));
+    const base = wordsOf(tableOf(r.baseArtifactFileName));
+    const after = wordsOf(tableOf(r.artifactFileName));
+    assert.deepEqual(after, base.map(w => fixes.get(w) ?? w), r.rawiId);
+    // والكلمةُ التالفة تُستبدل في موضعها الوحيد، ولا يبقى منها أثر.
+    for (const [from] of fixes) {
+      assert.equal(base.filter(w => w === from).length, 1, `${r.rawiId}: ${from} occurs once`);
+      assert.equal(after.includes(from), false);
+    }
   }
+  // رويس: «خائفين» دخلتها لامٌ زائدة (U+0644 U+064E) — والإصلاحُ يحذفهما وحدهما.
+  const ruways = TAYSEER_RESEGMENTATIONS.find(x => x.rawiId === 'ruways')!.repairs[0];
+  assert.ok('replaceWord' in ruways);
+  if ('replaceWord' in ruways) assert.equal(ruways.replaceWord.from, `${ruways.replaceWord.to.slice(0, -1)}\u0644\u064e`);
 });
 
 test('every artifact matches its printed Tayseer index 114/114', () => {
@@ -70,6 +82,7 @@ test('the scale of each change is exactly what the evidence calls for', () => {
     'al-bazzi': [1, 0, 0],
     qunbul: [1, 0, 0],
     rawh: [2, 1, 0],
+    ruways: [0, 1, 1],
   });
   // ابن كثير: الدمجُ الوحيد هو «عذابًا قريبًا». روح: الانشقاق دمجان، والقسمةُ «والحق أقول».
   const bazzi = BUILDS.find(b => b.rawiId === 'al-bazzi')!.log;

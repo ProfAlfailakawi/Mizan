@@ -218,7 +218,7 @@ export const GENERATED_CROSSWALK_COVERAGE: Readonly<Record<string, CrosswalkCove
   },
   "ruways": {
     "rawiId": "ruways",
-    "countSystem": "BASRI_YAQUB_RUWAYS",
+    "countSystem": "BASRI_YAQUB_RUWAYS_TAYSEER",
     "countAssurance": "VERIFIED_FROM_PINNED_ARTIFACT",
     "canonicalAyahTotal": 6236,
     "resolvedLoci": 6236,

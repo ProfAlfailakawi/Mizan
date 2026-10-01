@@ -122,8 +122,18 @@ function applyRepairs(table: PackageTable, repairs: readonly BoundaryRepair[], l
   for (const r of repairs) {
     const rows = out[String(r.surah)].map(x => ({ ...x }));
     const cur = rows[r.packageAyah - 1];
+    if (!cur) throw new ResegmentError(`REPAIR_ROW_MISSING:${r.surah}:${r.packageAyah}`);
+    if ('replaceWord' in r) {
+      const tokens = words(cur.text);
+      const hits = tokens.filter(t => t === r.replaceWord.from).length;
+      if (hits !== 1) throw new ResegmentError(`REPAIR_WORD_NOT_UNIQUE:${r.surah}:${r.packageAyah}:${hits}`);
+      cur.text = tokens.map(t => (t === r.replaceWord.from ? r.replaceWord.to : t)).join(' ');
+      out[String(r.surah)] = rows;
+      log.repairs.push({ surah: r.surah, packageAyah: r.packageAyah, moved: `${r.replaceWord.from} → ${r.replaceWord.to}` });
+      continue;
+    }
     const next = rows[r.packageAyah];
-    if (!cur || !next) throw new ResegmentError(`REPAIR_ROW_MISSING:${r.surah}:${r.packageAyah}`);
+    if (!next) throw new ResegmentError(`REPAIR_ROW_MISSING:${r.surah}:${r.packageAyah + 1}`);
     const nextWords = words(next.text);
     const moving = nextWords.slice(0, r.moveWords.length);
     if (moving.join(' ') !== r.moveWords.join(' ')) {
@@ -237,9 +247,10 @@ export function resegmentPackage(input: ResegmentInput): { table: PackageTable; 
     out[String(surah)] = next;
   }
 
-  // الضمان الأخير: الكلماتُ هي هي بترتيبها.
+  // الضمان الأخير: الكلماتُ هي هي بترتيبها — إلا الكلمةَ التالفة المسمّاة في إصلاحٍ بعينه.
   const flat = (t: PackageTable) => Object.keys(t).sort((a, b) => Number(a) - Number(b)).flatMap(s => t[s].flatMap(r => words(r.text)));
-  const before = flat(input.table);
+  const replacements = new Map(input.repairs.flatMap(r => ('replaceWord' in r ? [[r.replaceWord.from, r.replaceWord.to] as const] : [])));
+  const before = flat(input.table).map(w => replacements.get(w) ?? w);
   const after = flat(out);
   if (before.length !== after.length || before.some((w, i) => w !== after[i])) throw new ResegmentError('WORDS_CHANGED');
   return { table: out, log };
