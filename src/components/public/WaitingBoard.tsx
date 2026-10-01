@@ -181,7 +181,7 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     <div className="flex items-center justify-between gap-2 min-w-0">
       <span className="shrink-0 w-11 h-11 rounded-xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums text-sm">{slice.code}</span>
       <span className="min-w-0 text-end">
-        <span className="mizan-board-tag text-[10px]">{categoryLine(slice.categories, ar)}</span>
+        <span className="mizan-board-tag text-[11px]" title={categoryLine(slice.categories, ar)}>{categoryLine(slice.categories, ar)}</span>
       </span>
     </div>
 

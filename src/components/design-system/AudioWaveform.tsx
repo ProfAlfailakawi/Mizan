@@ -13,8 +13,11 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
   height = 36,
   className = ''
 }) => {
+  /* No random bars: a waveform that jitters on its own reads as live audio when there is
+     none. The idle state is a flat, neutral baseline; only `active` moves, and it moves on
+     a deterministic curve rather than invented noise. */
   const [levels, setLevels] = useState<number[]>(() =>
-    Array.from({ length: barsCount }, () => 20 + Math.random() * 60)
+    Array.from({ length: barsCount }, () => 15)
   );
 
   useEffect(() => {
@@ -26,9 +29,8 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       setLevels(
         Array.from({ length: barsCount }, (_, idx) => {
           // Natural sine-modulated fluctuation
-          const base = 20 + Math.sin(Date.now() / 200 + idx * 0.4) * 35;
-          const noise = Math.random() * 25;
-          return Math.min(100, Math.max(12, base + noise));
+          const base = 32 + Math.sin(Date.now() / 200 + idx * 0.4) * 35;
+          return Math.min(100, Math.max(12, base));
         })
       );
     }, 120);
@@ -44,10 +46,10 @@ export const AudioWaveform: React.FC<AudioWaveformProps> = ({
       {levels.map((lvl, i) => (
         <div
           key={i}
-          className="w-1 bg-emerald-600 rounded-full transition-all duration-100 ease-out"
+          className="w-1 bg-current rounded-full transition-all duration-100 ease-out"
           style={{
             height: `${Math.max(4, (lvl / 100) * height)}px`,
-            opacity: active ? 0.35 + (lvl / 100) * 0.65 : 0.2
+            opacity: active ? 0.35 + (lvl / 100) * 0.65 : 0.22
           }}
         />
       ))}
