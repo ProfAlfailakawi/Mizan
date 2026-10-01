@@ -12,6 +12,8 @@
  * شاشة يقول ذلك.
  */
 
+import { demoDate } from './demo-clock';
+
 const GB = 1024 ** 3;
 const iso = (daysFromNow: number) => new Date(Date.now() + daysFromNow * 86_400_000).toISOString();
 const month = (back: number) => {
@@ -66,7 +68,7 @@ const usageOf = (org: (typeof DEMO_ORGS)[number]) => ({
   },
 });
 
-const invoices = () => {
+const baseInvoices = () => {
   const rows: Record<string, unknown>[] = [];
   DEMO_ORGS.forEach((org, orgIndex) => {
     for (let back = 0; back < 6; back++) {
@@ -110,7 +112,7 @@ const operatorSubscription = () => ({
   status: 'active', currency: 'KWD', amountMinor: 120_000, interval: 'month', startedAt: iso(-330), renewsAt: iso(20), currentPeriodEnd: iso(20), autoRenew: true, openAmountMinor: 120_000,
 });
 
-const subscriptions = () => [...DEMO_ORGS.map((org, index) => ({
+const baseSubscriptions = () => [...DEMO_ORGS.map((org, index) => ({
   currentPeriodEnd: iso(180 - index * 20), autoRenew: org.status !== 'suspended', openAmountMinor: index < 2 ? 250_000 + index * 75_000 : 0, operatorName: DEMO_OPERATOR.name,
   id: `SUB-DEMO-${index + 1}`,
   subjectType: 'organization',
@@ -125,6 +127,14 @@ const subscriptions = () => [...DEMO_ORGS.map((org, index) => ({
   startedAt: iso(-360 + index * 10),
   renewsAt: iso(180 - index * 20),
 })), operatorSubscription()];
+
+/* طبقة الكتابة المحاكاة (ذاكرة التبويب وحدها): تُصحَّح بها القراءات اللاحقة فيرى المالك أثر نقرته. */
+const EXTRA_INVOICES: Record<string, unknown>[] = [];
+const EXTRA_SUBSCRIPTIONS: Record<string, unknown>[] = [];
+const INVOICE_PATCH = new Map<string, Record<string, unknown>>();
+const SUBSCRIPTION_PATCH = new Map<string, Record<string, unknown>>();
+const invoices = () => [...baseInvoices(), ...EXTRA_INVOICES].map(r => ({ ...r, ...(INVOICE_PATCH.get(String(r.id)) || {}) }));
+const subscriptions = () => [...baseSubscriptions(), ...EXTRA_SUBSCRIPTIONS].map(r => ({ ...r, ...(SUBSCRIPTION_PATCH.get(String(r.id)) || {}) }));
 
 const byCurrency = (rows: Record<string, unknown>[]) => {
   const total = rows.reduce((sum, r) => sum + Number(r.amountMinor || 0), 0);
@@ -433,7 +443,7 @@ const DEMO_BRAND = {
 
 const DEMO_LISTINGS = {
   listings: [{
-    id: 'LST-DEMO-1', competitionId: 'comp-dubai-2027', title: 'MIZAN International Quran Competition 2027', titleArabic: 'مسابقة ميزان القرآنية الدولية 2027',
+    id: 'LST-DEMO-1', competitionId: 'comp-dubai-2027', title: 'MIZAN International Quran Competition 2026', titleArabic: 'مسابقة ميزان القرآنية الدولية 2026',
     summary: 'Recitation and memorization tracks for four age groups, judged by blind panels.', summaryArabic: 'مسارات الحفظ والتلاوة لأربع فئات عمرية، بتحكيم لجانٍ مستقلة.',
     city: 'دبي', mode: 'in_person', ageRanges: ['8-12', '13-17', '18-25'], languages: ['ar', 'en'], memorizationLevels: ['خمسة أجزاء', 'عشرة أجزاء', 'المصحف كاملًا'],
     visibility: { organizationDirectory: true, operatorDirectory: true, globalSyndication: false }, status: 'published', publicSlug: 'mizan-international-2027',
@@ -476,7 +486,7 @@ function demoLedgerCsv() {
 export function demoDiscoverDirectory(query = '', registrationOpenOnly = false) {
   const base = (over: Record<string, unknown> & { title: string; titleArabic: string; institutionName: string }) => ({ summary: '', summaryArabic: '', country: '', city: '', mode: 'in_person', riwayat: ['حفص عن عاصم'] as string[], registrationOpen: true, ...over });
   const all = [
-    base({ publicSlug: 'mizan-international-2027', title: 'MIZAN International Quran Competition 2027', titleArabic: 'مسابقة ميزان القرآنية الدولية 2027', institutionName: 'جهة ميزان التجريبية للمسابقات القرآنية', summaryArabic: 'مسارات الحفظ والتلاوة لأربع فئات عمرية، بتحكيم لجانٍ مستقلة.', summary: 'Recitation and memorization tracks for four age groups, judged by blind panels.', country: 'AE', city: 'دبي', startsOn: '2027-02-10', endsOn: '2027-02-15', registrationUrl: '/#register?comp=comp-dubai-2027' }),
+    base({ publicSlug: 'mizan-international-2027', title: 'MIZAN International Quran Competition 2026', titleArabic: 'مسابقة ميزان القرآنية الدولية 2026', institutionName: 'جهة ميزان التجريبية للمسابقات القرآنية', summaryArabic: 'مسارات الحفظ والتلاوة لأربع فئات عمرية، بتحكيم لجانٍ مستقلة.', summary: 'Recitation and memorization tracks for four age groups, judged by blind panels.', country: 'AE', city: 'دبي', startsOn: demoDate(-1), endsOn: demoDate(4), registrationUrl: '/#register?comp=comp-dubai-2027' }),
     base({ publicSlug: 'hufaz-gulf-youth-2027', title: 'Gulf Huffaz Youth Cup 2027', titleArabic: 'كأس حفّاظ الخليج للناشئة 2027', institutionName: 'مؤسسة حفّاظ الخليج', summaryArabic: 'منافسة سنوية لحفظ القرآن الكريم للفئة من 8 إلى 15 سنة.', summary: 'Annual memorization contest for ages 8 to 15.', country: 'SA', city: 'الرياض', startsOn: '2027-03-18', endsOn: '2027-03-21', mode: 'hybrid', registrationUrl: '/#register?comp=comp-hufaz-2027' }),
     base({ publicSlug: 'noor-tilawa-2026', title: 'Noor Tilawa Recitation Award', titleArabic: 'جائزة نور التلاوة', institutionName: 'جمعية نور التلاوة', summaryArabic: 'جائزة التلاوة المجوّدة عن بُعد، بقراءة ورش عن نافع.', summary: 'Remote tajweed recitation award (Warsh).', country: 'JO', city: 'عمّان', startsOn: '2026-11-12', endsOn: '2026-11-14', mode: 'online', riwayat: ['ورش عن نافع'], registrationUrl: '/#register?comp=comp-noor-2026' }),
     base({ publicSlug: 'sakina-spring-2026', title: 'Sakina Spring Contest 2026', titleArabic: 'مسابقة السكينة الربيعية 2026', institutionName: 'دار السكينة للقرآن', summaryArabic: 'اختُتمت المسابقة وأُعلنت النتائج.', summary: 'Concluded; results published.', country: 'MA', city: 'الدار البيضاء', startsOn: '2026-04-10', endsOn: '2026-04-12', registrationOpen: false }),
@@ -504,4 +514,92 @@ export function demoCommercialResponse(path: string): unknown | null {
   if (path.startsWith('/api/saas/organization')) return demoOrganizationUsage();
   if (path.startsWith('/api/owner/control-tower')) return demoOwnerControlTower();
   return null;
+}
+
+let simSeq = 0;
+const simId = (prefix: string) => `${prefix}-DEMO-NEW-${++simSeq}`;
+const parseBody = (init?: { body?: unknown }): Record<string, any> => {
+  try { return typeof init?.body === 'string' ? JSON.parse(init.body) : {}; } catch { return {}; }
+};
+
+/**
+ * كتابةٌ محاكاة في بيئة العرض فقط — لا شبكة ولا خادم ولا Firestore.
+ * تُنفَّذ في ذاكرة التبويب فتُرى آثارها في القراءات اللاحقة حتى يُعاد تحميل الصفحة أو «إعادة تعيين البيانات».
+ * ما لا أثر ظاهرًا له (اختبار بوابة، تذكير، تحقق نطاق...) يُجاب بنجاحٍ محاكى `{ ok: true, simulated: true }`.
+ */
+export function demoCommercialWrite(path: string, init?: { method?: string; body?: unknown }): unknown {
+  const method = (init?.method || 'POST').toUpperCase();
+  const body = parseBody(init);
+  const ok = { ok: true, simulated: true, demo: true };
+  const clean = path.split('?')[0];
+
+  if (method === 'POST' && /^\/api\/saas\/(owner|operator)\/organizations$|^\/api\/saas\/operator\/customers$/.test(clean)) {
+    const n = DEMO_ORGS.length + 1;
+    const org = {
+      id: simId('org'), officialName: String(body.officialName || 'جهة تجريبية جديدة'), shortName: String(body.shortName || body.officialName || 'جديدة'),
+      country: String(body.country || 'الكويت'), status: 'active', operatorId: String(body.operatorId || DEMO_OPERATOR.id), tenantId: `tenant-demo-new-${n}`,
+      licenseId: `LIC-DEMO-${n}`, planId: String(body.planId || DEMO_PLANS[0].id), mizanBytes: 0, externalBytes: 0, activeCompetitions: 0, participants: 0,
+    } as (typeof DEMO_ORGS)[number];
+    DEMO_ORGS.push(org);
+    return { ...ok, organization: org };
+  }
+  const orgDel = /^\/api\/saas\/owner\/organizations\/([^/]+)$/.exec(clean);
+  if (orgDel && method === 'DELETE') { const i = DEMO_ORGS.findIndex(o => o.id === decodeURIComponent(orgDel[1])); if (i >= 0) DEMO_ORGS.splice(i, 1); return ok; }
+  if (orgDel && method === 'PUT') {
+    const org = DEMO_ORGS.find(o => o.id === decodeURIComponent(orgDel[1]));
+    if (org) Object.assign(org, Object.fromEntries(Object.entries(body).filter(([k, v]) => k in org && v !== undefined && v !== '')));
+    return { ...ok, organization: org };
+  }
+  if (method === 'PUT' && /^\/api\/saas\/(owner|operator)\/plans$/.test(clean)) {
+    const isOp = clean.includes('/operator/');
+    const existing = body.id ? DEMO_PLANS.find(p => p.id === body.id) : undefined;
+    const limits = { activeCompetitions: Number(body.limits?.activeCompetitions) || 1, annualParticipants: Number(body.limits?.annualParticipants) || 100, storageBytes: Number(body.limits?.storageBytes) || 10 * GB };
+    if (existing) Object.assign(existing, { name: String(body.name || existing.name), active: body.active !== false, limits });
+    else DEMO_PLANS.push({ id: simId('PLAN'), name: String(body.name || 'باقة جديدة'), active: body.active !== false, ownerOperatorId: isOp ? DEMO_OPERATOR.id : undefined, limits });
+    return ok;
+  }
+  const planDel = /^\/api\/saas\/(owner|operator)\/plans\/([^/]+)$/.exec(clean);
+  if (planDel && method === 'DELETE') { const i = DEMO_PLANS.findIndex(p => p.id === decodeURIComponent(planDel[2])); if (i >= 0) DEMO_PLANS.splice(i, 1); return ok; }
+
+  const base = /^\/api\/saas\/(?:owner|operator)\/billing/.exec(clean) ? clean.replace(/\/(subscriptions|invoices).*$/, '') : '';
+  if (base && method === 'POST' && /\/invoices$/.test(clean)) {
+    const [subjectType, subjectId] = [String(body.subjectType || 'organization'), String(body.subjectId || DEMO_ORGS[0].id)];
+    const org = DEMO_ORGS.find(o => o.id === subjectId);
+    const amountMinor = Number(body.amountMinor) || 0;
+    const row = {
+      id: simId('INV'), number: `MZN-${iso(0).slice(0, 7).replace('-', '')}-N${String(EXTRA_INVOICES.length + 1).padStart(3, '0')}`, daysOverdue: 0,
+      lines: [{ description: String(body.note || 'فاتورة يدوية (محاكاة)'), amountMinor }], subjectType, subjectId,
+      subjectName: org?.officialName || (subjectId === DEMO_OPERATOR.id ? DEMO_OPERATOR.name : subjectId), planId: org?.planId, currency: String(body.currency || 'KWD'),
+      amountMinor, status: 'open', issuedAt: iso(0), dueAt: body.dueAt ? new Date(String(body.dueAt)).toISOString() : iso(14), overdue: false,
+    };
+    EXTRA_INVOICES.push(row);
+    return { ...ok, invoice: row };
+  }
+  const inv = /\/invoices\/([^/]+)\/(pay|void|remind|checkout)$/.exec(clean);
+  if (inv && method === 'POST') {
+    const id = decodeURIComponent(inv[1]);
+    if (inv[2] === 'pay') INVOICE_PATCH.set(id, { status: 'paid', paidAt: iso(0), overdue: false, daysOverdue: 0 });
+    if (inv[2] === 'void') INVOICE_PATCH.set(id, { status: 'void', overdue: false, daysOverdue: 0 });
+    /* لا رابط دفع حقيقي في العرض: تُترك الفاتورة مفتوحة ويُعاد نجاحٌ محاكى بلا `paymentUrl`. */
+    return ok;
+  }
+  if (base && method === 'POST' && /\/subscriptions$/.test(clean)) {
+    const subjectId = String(body.subjectId || DEMO_ORGS[0].id);
+    const org = DEMO_ORGS.find(o => o.id === subjectId);
+    const plan = DEMO_PLANS.find(p => p.id === body.planId) || DEMO_PLANS[0];
+    const row = {
+      id: simId('SUB'), subjectType: String(body.subjectType || 'organization'), subjectId, subjectName: org?.officialName || subjectId, planId: plan.id, planName: plan.name,
+      status: 'active', currency: 'KWD', amountMinor: 250_000, interval: 'year', startedAt: body.startsAt ? new Date(String(body.startsAt)).toISOString() : iso(0),
+      renewsAt: iso(365), currentPeriodEnd: iso(365), autoRenew: true, openAmountMinor: 0, operatorName: DEMO_OPERATOR.name,
+    };
+    EXTRA_SUBSCRIPTIONS.push(row);
+    return { ...ok, subscription: row };
+  }
+  const sub = /\/subscriptions\/([^/]+)\/(cancel|auto-renew)$/.exec(clean);
+  if (sub && method === 'POST') {
+    const id = decodeURIComponent(sub[1]);
+    SUBSCRIPTION_PATCH.set(id, sub[2] === 'cancel' ? { status: 'canceled', autoRenew: false } : { ...(SUBSCRIPTION_PATCH.get(id) || {}), autoRenew: body.autoRenew !== false });
+    return ok;
+  }
+  return ok;
 }

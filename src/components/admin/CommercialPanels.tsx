@@ -22,6 +22,7 @@ async function api(path: string, init?: RequestInit & { idempotencyKey?: string 
     if (IS_DEMO_SESSION && !init) {
       try { const demo = (await import('../../data/demo-commercial')).demoCommercialResponse(path); if (demo !== null && demo !== undefined) return demo; } catch { /* يسقط إلى الرفض أدناه */ }
     }
+    if (IS_DEMO_SESSION && init) return (await import('../../data/demo-commercial')).demoCommercialWrite(path, init);
     throw new ApiError('IDENTITY_REQUIRED');
   }
   const token = await user.getIdToken();
