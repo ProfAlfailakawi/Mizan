@@ -69,7 +69,7 @@ export const NotificationCenter:React.FC=()=>{
  const selectedRecipients=selectedUserIds.map(id=>recipientById.get(id)).filter(Boolean) as RecipientRow[];
  const recipientSelectionMissing=!replyingTo&&((targetType==='user'&&selectedUserIds.length!==1)||(targetType==='users'&&!selectedUserIds.length));
  return <>
-  <button type="button" onClick={()=>setOpen(true)} className="relative grid h-11 w-11 place-items-center rounded-xl text-[#66706a] transition hover:bg-[#efede7]" title={ar?'الإشعارات':'Notifications'} aria-label={ar?`الإشعارات، ${unread} غير مقروء`:`Notifications, ${unread} unread`}>
+  <button type="button" onClick={()=>setOpen(true)} className="relative grid h-11 w-11 place-items-center rounded-xl text-[#656b66] transition hover:bg-[#efede7]" title={ar?'الإشعارات':'Notifications'} aria-label={ar?`الإشعارات، ${unread} غير مقروء`:`Notifications, ${unread} unread`}>
    <Bell className="h-[18px] w-[18px]"/>{unread>0&&<span className="absolute end-1 top-1 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#A34D43] px-1 text-[8px] font-black leading-none text-white ring-2 ring-[#F7F5EF]">{unread>99?'99+':unread}</span>}
   </button>
   <Modal isOpen={open} onClose={()=>setOpen(false)} title={ar?'الإشعارات':'Notifications'} subtitle={ar?'كل سياق في صندوقه.':'One inbox per context.'} maxWidth="3xl">

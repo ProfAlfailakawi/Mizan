@@ -101,6 +101,8 @@ declare module 'lucide-react' {
  export const ListChecks: any;
  export const LockKeyhole: any;
  export const Mail: any;
+ export const MessageSquareText: any;
+ export const MessageCircle: any;
  export const MapPin: any;
  export const Mic: any;
  export const Mic2: any;

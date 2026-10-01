@@ -113,11 +113,11 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
           const Icon = s.icon;
           return (
             <React.Fragment key={s.key}>
-              <div className="flex flex-col items-center gap-1.5 text-center min-w-14 shrink-0">
-                <span className={`w-12 h-12 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-5 h-5" /></span>
-                <span className={`text-xs font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
+              <div className="flex flex-col items-center gap-1.5 text-center w-14 sm:w-auto sm:min-w-14 shrink-0">
+                <span className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-4 h-4 sm:w-5 sm:h-5" /></span>
+                <span className={`text-xs leading-tight font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
               </div>
-              {i < steps.length - 1 && <div className={`flex-1 min-w-3 h-0.5 mx-1 rounded-full ${steps[i + 1].done || steps[i + 1].active ? 'bg-[#bcd0c7]' : 'bg-[#e6e4dd]'}`} />}
+              {i < steps.length - 1 && <div className={`flex-1 min-w-1 sm:min-w-3 h-0.5 sm:mx-1 rounded-full ${steps[i + 1].done || steps[i + 1].active ? 'bg-[#bcd0c7]' : 'bg-[#e6e4dd]'}`} />}
             </React.Fragment>
           );
         })}
