@@ -121,14 +121,19 @@ test('question safety is derived from real count evidence and names its blocked 
     assert.equal(coverage.resolvedLoci + coverage.unresolvedLoci + coverage.assumedLoci, coverage.canonicalAyahTotal);
   }
 
-  // وروحٌ وحده باقٍ: سورةٌ واحدة تخالف أعدادَ حزمته، وواحدة تكفي للفشل المغلق.
-  for (const rawiId of ['rawh']) {
+  /*
+   * والخمس التي كانت محجوبة (البزي وقنبل والدوري والسوسي وروح) أُعيد تقسيم حزمها على عدّ
+   * مصاحف التيسير المعتمدة فطابقت فهارسها ١١٤/١١٤، فصار كلُّ موضعٍ لها بصفّ دليل — بلا افتراض.
+   */
+  for (const rawiId of ['al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi', 'rawh']) {
     const coverage = crosswalkCoverage(rawiId);
-    assert.ok(coverage.unresolvedLoci > 0, rawiId);
-    assert.ok(coverage.surahsRequiringEvidence.length > 0, rawiId);
-    assert.equal(isReadingQuestionSafe(rawiId), false, rawiId);
-    assert.match(readingQuestionBlockers(rawiId)[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
-    assert.equal(coverage.resolvedLoci + coverage.unresolvedLoci + coverage.assumedLoci, coverage.canonicalAyahTotal);
+    assert.equal(coverage.countAssurance, 'VERIFIED_FROM_PINNED_ARTIFACT', rawiId);
+    assert.equal(coverage.unresolvedLoci, 0, rawiId);
+    assert.equal(coverage.assumedLoci, 0, `${rawiId} may not resolve any locus by assumption`);
+    assert.deepEqual(coverage.surahsRequiringEvidence, [], rawiId);
+    assert.equal(isReadingQuestionSafe(rawiId), true, rawiId);
+    assert.deepEqual(readingQuestionBlockers(rawiId), [], rawiId);
+    assert.match(String(countSystemForReading(rawiId)!.system), /_TAYSEER$/, rawiId);
   }
   /*
    * حفصٌ قانونيٌّ بالتعريف. والسبعة الباقية من مرآة المجمع قِيس ترقيمُها من بايتاتها
@@ -142,18 +147,6 @@ test('question safety is derived from real count evidence and names its blocked 
   assert.equal(countSystemForReading('shubah')!.system, 'KUFIC', 'Shubah really is Kufic — measured, not assumed');
   for (const rawiId of CANONICAL_RAWI_IDS) {
     assert.notEqual(countSystemForReading(rawiId)!.assurance, 'UNVERIFIED', rawiId);
-  }
-
-  /*
-   * وأربعٌ من المرآة قِيس ترقيمُها ولم يطابق أيَّ نظامٍ منشورٍ في المصدر المثبَّت، فتُحجب
-   * عن السؤال. حجبُها ليس تراجعًا: هو استبدالُ افتراضٍ صامتٍ خاطئ بمنعٍ مسمًّى بسورته.
-   */
-  for (const rawiId of ['al-bazzi', 'qunbul', 'al-duri-abu-amr', 'al-susi']) {
-    const coverage = crosswalkCoverage(rawiId);
-    assert.equal(coverage.assumedLoci, 0, `${rawiId} may not resolve any locus by assumption`);
-    assert.ok(coverage.unresolvedLoci > 0, rawiId);
-    assert.equal(isReadingQuestionSafe(rawiId), false, rawiId);
-    assert.match(readingQuestionBlockers(rawiId)[0], /^CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
   }
 });
 

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { withBlockedReading } from './support-blocked-reading';
 import assert from 'node:assert/strict';
 
 import { SEED_CATEGORIES, SEED_COMPETITION } from '../src/data/seed-data';
@@ -104,21 +105,20 @@ test('an ambiguous reading is refused instead of guessed', () => {
   const out = plan([row({ riwaya: 'الدوري' })]);
   assert.deepEqual(codesOf(out), ['PARTICIPANT_IMPORT_READING_UNRESOLVED']);
   assert.equal(out.errors[0].column, 'riwaya');
-  /*
-   * والاسم الكامل يفرّق بين الدوريَّين: الدوري عن أبي عمرو ≠ الدوري عن الكسائي. وهو اليوم
-   * محجوبٌ لسببٍ آخر (ترقيم حزمته المقيس لا يطابق أيَّ نظامٍ منشور)، فيُردّ بسبب الجسر
-   * لا بالغموض — والفرق بين السببين هو المقصود هنا.
-   */
-  const duriAbuAmr = plan([row({ riwaya: 'الدوري عن أبي عمرو' })]);
-  assert.deepEqual(codesOf(duriAbuAmr), ['PARTICIPANT_IMPORT_READING_NOT_QUESTION_READY']);
+  // والاسم الكامل يفرّق بين الدوريَّين، وكلاهما اليوم مُثبَت الجسر فيُقبل.
+  assert.deepEqual(codesOf(plan([row({ riwaya: 'الدوري عن أبي عمرو' })])), []);
   assert.deepEqual(codesOf(plan([row({ riwaya: 'الدوري عن الكسائي' })])), []);
 });
 
 test('a reading whose locus crosswalk is incomplete is refused at import, not on the day', () => {
-  // روحٌ هو الباقي بلا جسرٍ مكتمل، فهو الذي يُردّ عند الاستيراد.
-  const out = plan([row({ riwaya: 'روح عن يعقوب' })]);
-  assert.deepEqual(codesOf(out), ['PARTICIPANT_IMPORT_READING_NOT_QUESTION_READY']);
-  assert.match(out.errors[0].message, /جسر مواضع/);
+  // لا روايةَ محجوبةً اليوم، فيُحاكى الحجبُ في الملخّص الذي يقرؤه الاستيراد نفسه.
+  withBlockedReading('rawh', [84], () => {
+    const out = plan([row({ riwaya: 'روح عن يعقوب' })]);
+    assert.deepEqual(codesOf(out), ['PARTICIPANT_IMPORT_READING_NOT_QUESTION_READY']);
+    assert.match(out.errors[0].message, /جسر مواضع/);
+  });
+  // وبعد رفع الحجب يمرّ — فالذي ردّه الحجبُ لا غيره.
+  assert.deepEqual(codesOf(plan([row({ riwaya: 'روح عن يعقوب' })])), []);
 });
 
 test('a reading whose crosswalk was proved from the pinned artifact is accepted at import', () => {

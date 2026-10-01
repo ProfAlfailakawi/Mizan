@@ -65,7 +65,10 @@ export function measureRawi(rawiId: string, repoRoot = process.cwd()): number[] 
   const source = QURAN_FULL_TEXT_CANDIDATE_BY_RAWI.get(rawiId);
   if (!source) throw new Error(`QURAN_CANDIDATE_SOURCE_UNKNOWN:${rawiId}`);
   const file = path.resolve(repoRoot, 'quran-sources/islamweb-derived', `${source.upstreamPath.split('/').pop()}`);
-  const verses = parseCandidateRawDeflate(fs.readFileSync(file), source);
+  // هذا قياسُ الحزمة **الأصل** كما وصلت (موضوعُ خطاب اللجنة)، فيُقابَل بعدّها الأصل لا بعدّ
+  // الأثر المعاد تقسيمه على التيسير.
+  const original = source.resegmentedFrom ? { ...source, expectedVerseCount: source.resegmentedFrom.verseCount } : source;
+  const verses = parseCandidateRawDeflate(fs.readFileSync(file), original);
   const counts = new Array<number>(114).fill(0);
   for (const verse of verses) counts[verse.sura_no - 1] += 1;
   return counts;

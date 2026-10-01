@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { withBlockedReading } from './support-blocked-reading';
 
 import { CANONICAL_RAWI_IDS, CANONICAL_READINGS } from '../src/lib/canonical-readings';
 import { PINNED_DELIVERED_RAWI_IDS } from '../src/lib/delivered-readings';
@@ -102,12 +103,14 @@ test('basic text comparison generalises wherever text and a resolved crosswalk b
 });
 
 test('a reading blocked at the crosswalk is blocked for comparison too, by the same named reason', () => {
-  const blocked = CANONICAL_RAWI_IDS.filter(rawiId => !crosswalkCoverage(rawiId).questionSafe);
-  assert.ok(blocked.length > 0, 'this guard is only meaningful while something is still blocked');
-  for (const rawiId of blocked) {
-    const verdict = capabilityFor(rawiId, 'BASIC_TEXT_COMPARISON');
-    assert.equal(verdict.state, 'UNAVAILABLE', rawiId);
-    assert.match(String(verdict.reason), /^UNAVAILABLE_CROSSWALK_UNRESOLVED:\d+$/, rawiId);
+  // لا روايةَ محجوبةً اليوم، فيُحاكى الحجبُ لكلٍّ منها في الملخّص الذي يقرؤه سجلُّ القدرات.
+  assert.deepEqual(CANONICAL_RAWI_IDS.filter(rawiId => !crosswalkCoverage(rawiId).questionSafe), []);
+  for (const rawiId of CANONICAL_RAWI_IDS) {
+    withBlockedReading(rawiId, [84], () => {
+      const verdict = capabilityFor(rawiId, 'BASIC_TEXT_COMPARISON');
+      assert.equal(verdict.state, 'UNAVAILABLE', rawiId);
+      assert.match(String(verdict.reason), /^UNAVAILABLE_CROSSWALK_UNRESOLVED:\d+$/, rawiId);
+    });
   }
 });
 

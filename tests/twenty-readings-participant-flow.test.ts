@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { withBlockedReading } from './support-blocked-reading';
 import assert from 'node:assert/strict';
 
 import { SEED_COMPETITION, SEED_PARTICIPANTS } from '../src/data/seed-data';
@@ -110,16 +111,17 @@ for (const reading of CANONICAL_READINGS) {
  * السبب بسورته حتى يعرف المنظّم ما ينقص.
  */
 test('a category on a reading with unresolved loci is blocked by the compiler, with its reason', () => {
-  const blocked = CANONICAL_READINGS.filter(r => !isReadingQuestionSafe(r.rawiId));
-  assert.ok(blocked.length > 0, 'this test is only meaningful while some readings await crosswalk evidence');
-
-  for (const reading of blocked) {
-    const competition = { ...SEED_COMPETITION, categories: [categoryFor(reading.labelArabic, `cat-${reading.rawiId}`)] };
-    const list = detectContradictions({ competition, quranSources: [], aiValidations: [], availableQualifiedJudges: 99, committeeCount: 1 });
-    const crosswalk = list.find(i => /crosswalk/i.test(i.title));
-    assert.ok(crosswalk, `${reading.rawiId} must raise a crosswalk finding`);
-    assert.equal(crosswalk!.severity, 'BLOCKER');
-    assert.match(String(crosswalk!.evidence?.[0] ?? ''), /CROSSWALK_UNRESOLVED_SURAHS:\d+:/);
+  // العشرون اليوم مُثبَتة الجسر، فيُحاكى الحجبُ لكلّ روايةٍ بدورها في الملخّص الذي يقرؤه المُجمِّع.
+  assert.equal(CANONICAL_READINGS.filter(r => !isReadingQuestionSafe(r.rawiId)).length, 0);
+  for (const reading of CANONICAL_READINGS) {
+    withBlockedReading(reading.rawiId, [78, 84], () => {
+      const competition = { ...SEED_COMPETITION, categories: [categoryFor(reading.labelArabic, `cat-${reading.rawiId}`)] };
+      const list = detectContradictions({ competition, quranSources: [], aiValidations: [], availableQualifiedJudges: 99, committeeCount: 1 });
+      const crosswalk = list.find(i => /crosswalk/i.test(i.title));
+      assert.ok(crosswalk, `${reading.rawiId} must raise a crosswalk finding`);
+      assert.equal(crosswalk!.severity, 'BLOCKER');
+      assert.match(String(crosswalk!.evidence?.[0] ?? ''), /CROSSWALK_UNRESOLVED_SURAHS:2:78، 84/);
+    });
   }
 });
 

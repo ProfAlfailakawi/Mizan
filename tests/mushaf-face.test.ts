@@ -181,7 +181,7 @@ test('العدُّ القانونيُّ لا يُقابَل بالترقيم ا�
   assert.ok(bridged > raw, `بالجسر ${bridged} وبلا جسر ${raw} — لم يظهر الفرق`);
 });
 
-test('على الحزم الثماني: الأوجهُ تتبع ما يُحلّ جسرُها — والموقوفةُ تسقط بالصواب', () => {
+test('على الحزم الثماني: الأوجهُ تتبع ما يُحلّ جسرُها — والآيةُ العابرة وحدها تُسقط وجهها', () => {
   const measured: Record<string, number> = {};
   for (const rawiId of ['hafs', 'warsh', 'shubah', 'qalun', 'al-duri-abu-amr', 'al-susi', 'al-bazzi', 'qunbul']) {
     const pkg = loadIslamwebReadingPackage(rawiId);
@@ -196,11 +196,14 @@ test('على الحزم الثماني: الأوجهُ تتبع ما يُحلّ 
   assert.ok(measured.warsh >= 590 && measured.warsh < 604, `ورش ${measured.warsh}`);
   assert.equal(measured.qalun, measured.warsh, 'ورشٌ وقالونُ من نظام عدٍّ واحد فليَسقط منهما سواء');
   /*
-   * والبزّيُّ من الروايات الخمس الموقوفة: جسرُها غيرُ محلول، فأكثرُ أوجهها لا تُعرض.
-   * وهذا هو **الصواب** لا عطب: العائقُ نفسُه الذي يمنع أسئلتها يمنع أوجهها.
+   * والأربعُ التي أُعيد تقسيمها على عدّ التيسير صار جسرُها محلولًا (وكان البزّيُّ دون ٤٠٠
+   * وجهٍ قبله)، فلا يسقط منها إلا وجهُ آيةٍ عابرة — كورشٍ وقالون تمامًا. وللدوري والسوسي
+   * وجهٌ واحدٌ أكثر سقوطًا: آياتٌ ضمّها الدمجُ عبر صفحتين.
    */
-  assert.ok(measured['al-bazzi'] < 400, `البزّي ${measured['al-bazzi']} — عُرضت أوجهٌ بجسرٍ غير محلول`);
-  assert.ok(measured['al-bazzi'] > 0, 'سقطت أوجهُ البزّي كلُّها');
+  assert.equal(measured['al-bazzi'], measured.warsh, `البزّي ${measured['al-bazzi']}`);
+  assert.equal(measured.qunbul, measured['al-bazzi']);
+  assert.equal(measured['al-duri-abu-amr'], measured.warsh - 1, `الدوري ${measured['al-duri-abu-amr']}`);
+  assert.equal(measured['al-susi'], measured['al-duri-abu-amr']);
 });
 
 test('موضعٌ لا يُحلّ قانونيًّا لا يُعدّ داخل النطاق — فشلٌ مغلق', () => {

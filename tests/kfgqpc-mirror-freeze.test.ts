@@ -63,12 +63,23 @@ test('every frozen artifact on disk is the exact bytes the record pins', async (
    * البايتات التي ستُقرأ يوم المسابقة.
    */
   assert.equal(KFGQPC_MIRROR_CANDIDATES.length, 8);
+  const digestOf = (name: string) => {
+    const file = path.join(ROOT, 'quran-sources', 'kfgqpc-mirror-derived', name);
+    assert.ok(fs.existsSync(file), `${name}: the frozen artifact must be committed`);
+    return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  };
   for (const source of KFGQPC_MIRROR_CANDIDATES) {
-    const file = path.join(ROOT, 'quran-sources', 'kfgqpc-mirror-derived', frozenFileName(source.rawiId));
-    assert.ok(fs.existsSync(file), `${source.rawiId}: the frozen artifact must be committed`);
-    const digest = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-    assert.equal(digest, source.expectedCompressedSha256, `${source.rawiId}: artifact drifted from its pin`);
-    assert.equal(source.artifactFileName, frozenFileName(source.rawiId));
+    // الأثرُ المُسلَّم: بصمتُه هي المثبَّتة في السجلّ.
+    assert.equal(digestOf(source.artifactFileName as string), source.expectedCompressedSha256,
+      `${source.rawiId}: artifact drifted from its pin`);
+    if (source.resegmentedFrom) {
+      // والمعاد تقسيمُه على عدّ التيسير: أصلُه المجمَّد من المرآة باقٍ ببصمته، فالسلسلة كاملة.
+      assert.equal(source.resegmentedFrom.artifactFileName, frozenFileName(source.rawiId));
+      assert.equal(digestOf(source.resegmentedFrom.artifactFileName), source.resegmentedFrom.sha256,
+        `${source.rawiId}: the mirror base drifted from its pin`);
+    } else {
+      assert.equal(source.artifactFileName, frozenFileName(source.rawiId));
+    }
   }
 });
 
@@ -192,9 +203,15 @@ test('the frozen artifacts on disk actually carry the Mushaf geometry', () => {
       assert.ok(v.line_end >= v.line_start, `${source.rawiId} ${v.sura_no}:${v.aya_no} نهايةٌ قبل بداية`);
     }
   }
-  assert.equal(verses, 49774, `عدد الآي ${verses}`);
-  assert.equal(located, 49748, `الآياتُ ذاتُ الموضع ${located}`);
-  assert.equal(crossing, 26, `الآياتُ العابرةُ صفحتين ${crossing}`);
+  /*
+   * ٤٩٧٤٦ = آيُ الثماني بعد إعادة تقسيم أربعٍ منها على عدّ التيسير (الدوري والسوسي ٦٢٠٤،
+   * البزي وقنبل ٦٢١٩). وكانت ٢٦ آيةً تعبر صفحتين في المرآة، وزادت ستًّا: آياتٌ ضمّها الدمجُ
+   * من آخر صفحةٍ وأول تاليتها (ثلاثٌ في الدوري وثلاثٌ في السوسي)، فلا تُعطى موضعًا واحدًا
+   * — كالقاعدة في كل آيةٍ عابرة.
+   */
+  assert.equal(verses, 49746, `عدد الآي ${verses}`);
+  assert.equal(located, 49714, `الآياتُ ذاتُ الموضع ${located}`);
+  assert.equal(crossing, 32, `الآياتُ العابرةُ صفحتين ${crossing}`);
   assert.equal(pages.size, 604, `صفحاتُ المصحف المغطّاة ${pages.size}`);
 });
 

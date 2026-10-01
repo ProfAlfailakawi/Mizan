@@ -14,10 +14,10 @@
 |---|---|---|---|---|---|---|---|---|---|
 | قالون عن نافع | KFGQPC_MIRROR_DERIVED | ✅ | MADANI_AKHIR | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ورش عن نافع | KFGQPC_MIRROR_DERIVED | ✅ | MADANI_AKHIR | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
-| البزي عن ابن كثير | KFGQPC_MIRROR_DERIVED | ✅ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
-| قنبل عن ابن كثير | KFGQPC_MIRROR_DERIVED | ✅ | MAKKI_IBN_KATHIR_DELIVERY | ❌ 3686 موضعًا في 52 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
-| الدوري عن أبي عمرو | KFGQPC_MIRROR_DERIVED | ✅ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
-| السوسي عن أبي عمرو | KFGQPC_MIRROR_DERIVED | ✅ | BASRI_ABU_AMR_DELIVERY | ❌ 3162 موضعًا في 43 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
+| البزي عن ابن كثير | KFGQPC_MIRROR_DERIVED | ✅ | MAKKI_IBN_KATHIR_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| قنبل عن ابن كثير | KFGQPC_MIRROR_DERIVED | ✅ | MAKKI_IBN_KATHIR_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| الدوري عن أبي عمرو | KFGQPC_MIRROR_DERIVED | ✅ | BASRI_ABU_AMR_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
+| السوسي عن أبي عمرو | KFGQPC_MIRROR_DERIVED | ✅ | BASRI_ABU_AMR_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | هشام عن ابن عامر | ISLAMWEB_DERIVED | ✅ | DIMASHQI | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ابن ذكوان عن ابن عامر | ISLAMWEB_DERIVED | ✅ | DIMASHQI | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | شعبة عن عاصم | KFGQPC_MIRROR_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
@@ -29,7 +29,7 @@
 | ابن وردان عن أبي جعفر | ISLAMWEB_DERIVED | ✅ | MADANI_AWWAL | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | ابن جماز عن أبي جعفر | ISLAMWEB_DERIVED | ✅ | MADANI_AWWAL | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | رويس عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RUWAYS | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
-| روح عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RAWH | ❌ 3800 موضعًا في 46 سورة | ✅ أثر مثبَّت | ❌ | ❌ | حفص | BLOCKED |
+| روح عن يعقوب | ISLAMWEB_DERIVED | ✅ | BASRI_YAQUB_RAWH_TAYSEER | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | إسحاق عن خلف العاشر | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 | إدريس عن خلف العاشر | ISLAMWEB_DERIVED | ✅ | KUFIC | ✅ 6236/6236 | ✅ أثر مثبَّت | ✅ | ✅ | حفص | RELEASE_READY |
 <!-- END GENERATED -->

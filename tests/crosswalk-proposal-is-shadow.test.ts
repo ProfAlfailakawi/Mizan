@@ -52,13 +52,16 @@ test('a surah enters the proposal only when every canonical boundary landed', ()
 
 test('generating a proposal changes nothing about what may be asked', () => {
   const before = crosswalkCoverage('rawh');
+  const rowsBefore = MIZAN_IDENTITY_CROSSWALK.rowsFor('rawh').length;
   proposeForReading('rawh');
   const after = crosswalkCoverage('rawh');
   assert.deepEqual(after, before, 'the working coverage is untouched by deriving a proposal');
-  // روحٌ محجوبٌ قبل الاشتقاق وبعده — والمقترحُ لا يفتح له بابًا.
-  assert.equal(isReadingQuestionSafe('rawh'), false);
-  assert.equal(MIZAN_IDENTITY_CROSSWALK.rowsFor('rawh').length, 0);
-  assert.equal(COMMITTEE_CROSSWALK_ROWS.some(r => r.rawiId === 'rawh'), false);
+  // صفوفُ روح هي صفوفُ دليل التيسير قبل الاشتقاق وبعده — والمقترحُ لا يضيف صفًّا ولا يغيّره.
+  assert.equal(MIZAN_IDENTITY_CROSSWALK.rowsFor('rawh').length, rowsBefore);
+  const rawhRows = COMMITTEE_CROSSWALK_ROWS.filter(r => r.rawiId === 'rawh');
+  assert.ok(rawhRows.length > 0);
+  assert.ok(rawhRows.every(r => r.evidence.includes('system:basri-jahdari->BASRI_YAQUB_RAWH_TAYSEER')),
+    'every Rawh row comes from the pinned boundary evidence, none from a proposal');
 });
 
 /*
@@ -95,8 +98,8 @@ test('every reading still blocked today is covered by the proposal targets', () 
    * تكون **كلُّ** روايةٍ محجوبة إمّا مشمولةً بالمقترح وإمّا مسمّاةً بسببها في المصفوفة.
    */
   const blockedToday = CANONICAL_RAWI_IDS.filter(rawiId => !isReadingQuestionSafe(rawiId));
-  assert.deepEqual(blockedToday.sort(),
-    ['al-bazzi', 'al-duri-abu-amr', 'al-susi', 'qunbul', 'rawh'].sort());
+  // لا محجوبَ اليوم: الخمسُ الأخيرة حُسمت بعدّ مصاحف التيسير المعتمدة لا بالمقترح.
+  assert.deepEqual(blockedToday, []);
   for (const rawiId of blockedToday) {
     const covered = targets.includes(rawiId) || !PINNED_DELIVERED_RAWI_IDS.includes(rawiId);
     assert.ok(covered, `${rawiId} is blocked, has a pinned artifact, and yet no proposal is produced for it`);

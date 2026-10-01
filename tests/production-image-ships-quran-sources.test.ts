@@ -37,6 +37,12 @@ test('every registered pinned artifact actually exists in the tree with its appr
     assert.ok(fs.existsSync(file), `${source.rawiId}: ${name} is committed`);
     assert.ok(fs.statSync(file).size > 1000, `${source.rawiId}: ${name} is not a placeholder`);
     registered.get(root)!.add(name);
+    // أصلُ الحزمة المعاد تقسيمها يُشحن أيضًا: هو مُدخَلُ البناء الذي تُعاد منه البصمة.
+    if (source.resegmentedFrom) {
+      const base = path.join(root, source.resegmentedFrom.artifactFileName);
+      assert.ok(fs.existsSync(base), `${source.rawiId}: base ${source.resegmentedFrom.artifactFileName} is committed`);
+      registered.get(root)!.add(source.resegmentedFrom.artifactFileName);
+    }
   }
   // ولا ملفّ زائد في أيّ جذر: كل ما فيه مسجَّلٌ في السجلّ.
   for (const root of roots) {
