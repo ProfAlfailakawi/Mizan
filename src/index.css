@@ -191,6 +191,11 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-consent { display:inline-flex; align-items:center; justify-content:flex-start; gap:.65rem; width:auto; max-width:100%; line-height:1.7; }
 .mizan-consent input[type="checkbox"] { flex:0 0 auto; margin:0; align-self:center; }
 .mizan-consent > span { display:inline-block; }
+/* Phones (portrait and landscape): every checkbox keeps its drawn size, but the label
+   around it becomes a tap area of at least 40×40. Desktop is untouched. */
+@media (max-width:639px), (max-height:500px){
+  label:has(> input[type="checkbox"]){ min-width:40px; min-height:40px }
+}
 .mizan-field-label { display:block; color:#686f6b; font-size:10px; font-weight:800; margin:0 0 6px; }
 /* نظام التبويب الموحد: شريط حبات واحد لكل أقسام المنصة، بحركة هادئة تحترم تفضيل تقليل الحركة. */
 /* الحبّة النشطة كانت تُسقط ظلًّا خارج إطار الشريط فتبدو مقصوصةً عند حافته؛ الشريط الآن
