@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DnaStepper } from '../dna/DnaKit';
 import { ArrowLeft, ArrowRight, BadgeCheck, Check, FileCheck2, UserRound } from 'lucide-react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Button } from '../design-system/Button';
 import { normalizeFieldValue, isValidEmail } from '../../lib/input-normalize';
@@ -89,6 +89,13 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
     setSubmitting(true);
     setSubmitError('');
     try{
+      /* البيئة التجريبية لا ترسل شيئًا إلى أي خادم: يُعرض إيصال الاستلام بمفتاحٍ توضيحي فقط، ولا يُنشأ متسابق. */
+      if(IS_DEMO_SESSION){
+        try{window.localStorage.removeItem(draftKey)}catch{/* لا شيء */}
+        const here=`${window.location.origin}${window.location.pathname}`;
+        setSubmitted({id:'prt-demo-registration',code:'D-2027',status:'approved',journeyAccessToken:'demo-journey-key',guardianAccessToken:'demo-guardian-key',journeyUrl:`${here}#journey?comp=${encodeURIComponent(competition.id)}&key=demo-journey-key`,guardianUrl:`${here}#guardian?comp=${encodeURIComponent(competition.id)}&key=demo-guardian-key`} as any);
+        return;
+      }
       const response=await fetch(`/api/public/competitions/${encodeURIComponent(competition.id)}/register`,{
         method:'POST',
         headers:{'content-type':'application/json'},

@@ -2,8 +2,8 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import { DnaStepper } from '../dna/DnaKit';
 import {Bell,BellRing,Check,CheckCircle2,ChevronDown,ChevronLeft,Clock3,Layers3,Mail,Search,ShieldCheck,Sparkles,UserRound,UsersRound} from 'lucide-react';
 import {auth} from '../../lib/firebase';
-import {useAppStore} from '../../lib/store';
-import {serverErrorLabel} from '../../lib/ui-language';
+import {useAppStore,IS_DEMO_SESSION} from '../../lib/store';
+import {serverErrorLabel,bilingualName} from '../../lib/ui-language';
 import {Modal} from '../design-system/Modal';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
@@ -26,7 +26,7 @@ const roleName=(role:string,ar:boolean)=>({super_admin:ar?'مدير المنصة
 const timeText=(iso:string,ar:boolean)=>{const d=new Date(iso);if(Number.isNaN(d.getTime()))return '—';return new Intl.DateTimeFormat(ar?'ar-KW-u-nu-latn':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(d)};
 
 export const NotificationCenter:React.FC=()=>{
- const {language,currentUser,competition}=useAppStore();const ar=language==='ar';const production=true;
+ const {language,currentUser,competition,organization}=useAppStore();const ar=language==='ar';const production=true;
  const [open,setOpen]=useState(false),[composeOpen,setComposeOpen]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [allRows,setAllRows]=useState<NotificationRow[]>([]),[unread,setUnread]=useState(0),[tab,setTab]=useState<Tab>('all'),[query,setQuery]=useState(''),[contextKey,setContextKey]=useState('');
  const [title,setTitle]=useState(''),[body,setBody]=useState(''),[category,setCategory]=useState<Category>('admin'),[priority,setPriority]=useState<Priority>('normal'),[targetType,setTargetType]=useState<TargetType>('organization'),[targetValue,setTargetValue]=useState(''),[targetRole,setTargetRole]=useState('judge'),[sending,setSending]=useState(false);
@@ -35,7 +35,7 @@ export const NotificationCenter:React.FC=()=>{
  const [composeStep,setComposeStep]=useState<'to'|'message'>('to');
  const [expandedId,setExpandedId]=useState('');
  const canSend=['super_admin','support_agent','operator_owner','operator_admin','org_admin','comp_admin'].includes(currentUser.role);
- const api=useCallback(async(path:string,init:RequestInit={})=>{const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');const token=await u.getIdToken();const r=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,'content-type':'application/json',...(init.headers||{})},cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data.code||`HTTP_${r.status}`));return data},[]);
+ const api=useCallback(async(path:string,init:RequestInit={})=>{/* الصندوق التجريبي: القراءة من صناديق مصطنعة، والكتابة تُقبَل في ذاكرة الواجهة فقط ولا تُرسل إلى أي مكان. */if(IS_DEMO_SESSION){const m=await import('../../data/demo-inbox');if((init.method||'GET')!=='GET')return {ok:true};if(path.startsWith('/api/notifications/recipients'))return m.demoRecipients(organization.id,competition.id);return m.demoInbox(currentUser.role,competition.id,bilingualName(competition,ar),organization.id)}const u=auth.currentUser;if(!u)throw new Error('IDENTITY_REQUIRED');const token=await u.getIdToken();const r=await fetch(path,{...init,headers:{authorization:`Bearer ${token}`,'content-type':'application/json',...(init.headers||{})},cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data.code||`HTTP_${r.status}`));return data},[ar,currentUser.role,competition.id,competition.name,competition.nameArabic,organization.id]);
  const load=useCallback(async(silent=false)=>{if(!production)return;if(!silent)setLoading(true);try{const data=await api('/api/notifications');setAllRows(Array.isArray(data.notifications)?data.notifications:[]);setUnread(Number(data.unread||0));setError('')}catch(e){setError(serverErrorLabel(e instanceof Error?e.message:'NOTIFICATION_CENTER_UNAVAILABLE',ar))}finally{if(!silent)setLoading(false)}},[api,production]);
  const loadRecipients=useCallback(async()=>{if(!production||!canSend)return;setRecipientsLoading(true);try{const data=await api('/api/notifications/recipients');setRecipients(Array.isArray(data.recipients)?data.recipients:[])}catch(e){setError(serverErrorLabel(e instanceof Error?e.message:'NOTIFICATION_RECIPIENTS_FAILED',ar))}finally{setRecipientsLoading(false)}},[api,production,canSend]);
  useEffect(()=>{if(!production)return;void load(true);const id=window.setInterval(()=>void load(true),45_000);return()=>window.clearInterval(id)},[load,production]);

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DnaStepper } from '../dna/DnaKit';
 import { ArrowLeft, ArrowRight, Award, BadgeCheck, CalendarClock, CircleDot, LockKeyhole, MapPin, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -50,7 +50,7 @@ const stepLabel = (index: number, ar: boolean) => {
 };
 
 export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) => {
-  const { competition, language } = useAppStore();
+  const { competition, language, participants, results, certificates, committees } = useAppStore();
   const { arabicData: ar, rtl, bcp47 } = usePublicLocale(language);
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const storageKey = `mizan_public_${audience}_${competition.id}`;
@@ -74,6 +74,27 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
       setError('');
     }
     try {
+      /* البيئة التجريبية: الرحلة تُبنى من متسابقٍ في الصندوق نفسه (له نتيجة وشهادة) بدل خادمٍ غير موجود. */
+      if (IS_DEMO_SESSION) {
+        const result = results.find(r => r.competitionId === competition.id && participants.some(p => p.id === r.participantId));
+        const p = participants.find(x => x.id === result?.participantId) || participants.find(x => x.competitionId === competition.id);
+        if (!p) throw new Error('JOURNEY_NOT_FOUND');
+        const committee = committees.find(c => c.id === p.assignedCommitteeId);
+        const cert = certificates.find(c => c.participantId === p.id);
+        const demo: PublicJourney = {
+          organizationId: p.organizationId, competitionId: competition.id, participantId: p.id, audience,
+          competitionName: competition.name, competitionNameArabic: competition.nameArabic, participantCode: p.code,
+          participantName: p.fullName, participantNameArabic: p.fullNameArabic, status: result ? 'result_published' : p.status,
+          arrivalSlot: p.arrivalSlot || null, queueNumber: p.queueNumber ?? null, venueName: (competition as { venueName?: string }).venueName || null,
+          committee: committee ? { code: committee.code || committee.id, name: committee.name, nameArabic: committee.nameArabic, hall: (committee as { hall?: string }).hall || null } : null,
+          result: result ? { score: result.finalScore, rank: result.rank || 1, status: 'published' } : null,
+          certificate: cert ? { number: cert.certificateNumber } : null,
+          preparation: { scopeTextArabic: 'خمسة أجزاء متتالية من أول الجزء السادس عشر', scopeTextEnglish: 'Five consecutive parts starting at Juz 16', spreadAcrossZones: true, questionCount: 3, minutesPerQuestion: 4 },
+          revoked: false, updatedAt: new Date().toISOString(),
+        };
+        setJourney(demo); setToken(clean); setError('');
+        return;
+      }
       const response = await fetch('/api/public/journeys/resolve', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

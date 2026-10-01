@@ -17,7 +17,13 @@ class ApiError extends Error { constructor(public code: string, public details?:
 
 async function api(path: string, init?: RequestInit & { idempotencyKey?: string }) {
   const user = auth.currentUser;
-  if (!user || IS_DEMO_SESSION) throw new ApiError('IDENTITY_REQUIRED');
+  if (!user || IS_DEMO_SESSION) {
+    /* بيئة العرض: القراءة تُجاب من حمولاتٍ مصطنعة تُستورد ديناميكيًّا؛ والكتابة تُرفض كما كانت. */
+    if (IS_DEMO_SESSION && !init) {
+      try { const demo = (await import('../../data/demo-commercial')).demoCommercialResponse(path); if (demo !== null && demo !== undefined) return demo; } catch { /* يسقط إلى الرفض أدناه */ }
+    }
+    throw new ApiError('IDENTITY_REQUIRED');
+  }
   const token = await user.getIdToken();
   const res = await fetch(path, {
     ...init,
