@@ -340,7 +340,6 @@ html[lang="ar"]{ --font-display:"IBM Plex Sans Arabic","Noto Sans Arabic",system
 html[lang="ar"] .font-display{ font-feature-settings:normal; }
 html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 
-
 /* ═══════════════════════════════════════════════════════════════════════════
    MIZAN brand system — mark, wordmark, motion
    The mark is geometry only (MizanLogo.tsx); every movement lives here so the
@@ -1861,6 +1860,15 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   .mizan-tabs{ width:100% }
   .mizan-tabs > .mizan-tab{ flex:1 1 auto }
 }
+
+/* الأفقي القصير (هاتفٌ مُدار): شريط بيئة العرض يرقّ إلى 44px — قدرَ هدف اللمس لا أكثر —
+   فيستعيد المحتوى سطرًا، والحشوةُ المحجوزة تتبعه عبر `:has()` فلا يغطّي آخر صفّ. */
+@media (min-width:640px) and (max-height:500px){
+  .mizan-demo-bar{--demo-bar-h:2.75rem!important;box-shadow:0 -4px 14px rgba(25,39,33,.08)}
+  .mizan-demo-bar-row{min-height:0}
+  body:has(.mizan-demo-bar) .mizan-shell-main{--mizan-shell-pb:2.75rem!important}
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
