@@ -958,6 +958,8 @@ const launchPlaceholderActive=()=>globalState.competition.id==='comp-pending-set
  */
 type JourneyPublishOutcome='PUBLISHED'|'OFFLINE'|'NOT_SIGNED_IN'|'ROLE_CANNOT_PUBLISH'|'LAUNCH_PLACEHOLDER'|'NO_TOKENS'|'CLOUD_REJECTED';
 async function publishPublicJourneyRecord(participant:Participant,revoked=false):Promise<JourneyPublishOutcome>{
+  /* العرض: النشر العام محاكى محليًا — لا شبكة ولا سحابة. */
+  if(IS_DEMO_SESSION)return 'PUBLISHED' as JourneyPublishOutcome;
   if(globalState.isOffline)return 'OFFLINE';
   if(!auth.currentUser)return 'NOT_SIGNED_IN';
   /* المحكّم هو من يُنهي الجلسة، فيملك تقديم الحالة وحدها في البطاقة (القواعد تقصره على
@@ -2736,7 +2738,18 @@ const prepareJourneyAccessBatch=async()=>{
   const publicCompetition=await publishPublicCompetitionRecord();
   if(!publicCompetition.ok)return {participants:[] as Participant[],failed:candidates.map(p=>p.id),publicationFailure:publicCompetition.reason};
   const ready:Participant[]=[],failed:string[]=[];
-  for(const participant of candidates){const out=await ensureParticipantJourneyAccess(participant.id);if(out&&!journeyAccessFailure)ready.push(out);else failed.push(participant.id)}
+  /* العرض: رموز محلية دفعةً واحدة وإشعارٌ واحد — بطاقةٌ بطاقةً كانت تُعيد رسم قائمة المئات في كل مرّة. */
+  if(IS_DEMO_SESSION){
+    for(const participant of candidates){
+      const idx=globalState.participants.findIndex(p=>p.id===participant.id);if(idx<0){failed.push(participant.id);continue}
+      const cur=globalState.participants[idx];const j=cur.journeyAccessToken||newId('journey'),g=cur.guardianAccessToken||newId('guardian');
+      const next={...cur,journeyAccessToken:j,guardianAccessToken:g,journeyAccessTokenHash:await sha256(j),guardianAccessTokenHash:await sha256(g)};
+      globalState.participants[idx]=next;ready.push(next);
+    }
+    notify();
+    return {participants:ready,failed,publicationFailure:''};
+  }
+  for(const participant of candidates){/* يُترك للمتصفّح أن يرسم بين بطاقةٍ وأخرى: تحديثاتٌ متراصّة بلا استراحة تتجاوز حدّ عمق تحديث React. */await new Promise<void>(r=>setTimeout(r,0));const out=await ensureParticipantJourneyAccess(participant.id);if(out&&!journeyAccessFailure)ready.push(out);else failed.push(participant.id)}
   return {participants:ready,failed,publicationFailure:''};
 };
 
@@ -3324,6 +3337,8 @@ const prepareJourneyAccessBatch=async()=>{
   };
 
   const publishPublicCompetitionRecord=async():Promise<{ok:boolean;reason:string}>=>{
+    /* العرض: النشر العام محاكى محليًا. */
+    if(IS_DEMO_SESSION)return {ok:true,reason:''};
     /* لا نغيّر هوية مسودة محلية ما لم يكن الطلب نفسه مخوّلًا وقابلًا للنشر. */
     if(globalState.isOffline)return {ok:false,reason:'الجهاز دون إنترنت الآن، ولا يمكن نشر صفحة التسجيل العامة حتى يعود الاتصال.'};
     if(!auth.currentUser)return {ok:false,reason:'يلزم تسجيل الدخول لنشر صفحة التسجيل العامة.'};

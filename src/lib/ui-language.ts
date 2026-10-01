@@ -125,7 +125,19 @@ const AR_AUDIT_ACTIONS:Record<string,string>={
   AUDIT_LEDGER_SEALED:'ختم سجل التدقيق', SCIENTIFIC_DATASET_REGISTERED:'تسجيل حزمة علمية',
   LOCAL_MESH_STARTED:'بدء الشبكة المحلية', LOCAL_MESH_RECONCILED:'مصالحة الشبكة المحلية',
   FEDERATION_ATTESTATION_ISSUED:'إصدار إثبات اتحادي', OPERATIONAL_REHEARSAL_COMPLETED:'إكمال بروفة تشغيلية',
+  QUESTION_SET_SEALED:'ختم مجموعة أسئلة', QUESTION_SET_REVEALED:'كشف مجموعة أسئلة', SESSION_STARTED:'بدء جلسة', SESSION_COMPLETED:'اكتمال جلسة',
+  SCORE_SUBMITTED:'إرسال درجة', APPEAL_OPENED:'فتح تظلّم', APPEAL_RESOLVED:'حسم تظلّم', INCIDENT_RAISED:'بلاغ تشغيلي', QUEUE_TRANSFER:'نقل بين الطوابير',
+  SCOPE_APPROVED:'اعتماد نطاق', SCOPE_REJECTED:'إعادة نطاق للتصحيح', JUDGE_CALIBRATED:'معايرة محكّم', COMMITTEE_PAUSED:'استراحة لجنة'
 };
+const AR_AUDIT_ENTITIES:Record<string,string>={
+  Participant:'متسابق', QuestionSet:'مجموعة أسئلة', TestSession:'جلسة اختبار', JudgeSubmission:'تقييم محكّم', Result:'نتيجة', Appeal:'تظلّم', Incident:'بلاغ',
+  ParticipantScope:'نطاق متسابق', JudgeProfile:'محكّم', Committee:'لجنة'
+};
+/** نوع الكيان في دفتر التدقيق: بالعربية في الواجهة العربية، والرمز الخام يبقى في السجل. */
+export function auditEntityLabel(value:string|undefined|null, ar:boolean){
+  if(!value)return '—';
+  return ar?(AR_AUDIT_ENTITIES[value]||value):value;
+}
 export function auditActionLabel(value:string|undefined|null, ar:boolean){
   if(!value)return '—';
   if(!ar)return value.replaceAll('_',' ').toLowerCase();
