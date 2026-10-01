@@ -1,3 +1,4 @@
+import { AuditDayRibbon } from './AuditDayRibbon';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { participantMatchesIdentityQuery } from '../../lib/local-snapshot-privacy';
@@ -276,6 +277,7 @@ export const AuditorConsole: React.FC = () => {
   {verifyMsg&&<div className="rounded-xl bg-[#E7EEE9] text-[#214C40] px-4 py-3 text-xs font-bold">{verifyMsg}</div>}
   {/* تشريح ما بعد الجلسة: على مستوى اللجنة فقط، ولا يظهر ما لم تكفِ العيّنة. */}
   <CommitteeIntegrityNote ar={ar}/>
+  <AuditDayRibbon events={auditLogs} ar={ar}/>
   <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_.9fr] gap-4 [&>*]:min-w-0"><div className="mizan-surface overflow-hidden"><div className="p-4 flex items-center justify-between gap-3 border-b border-[#e5e3dc]"><div className="relative max-w-sm flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#696f6b]"/><input aria-label={ar?'ابحث في سجل التدقيق':'Search the audit trail'} value={q} onChange={e=>setQ(e.target.value)} className="mizan-input mizan-input-icon-start text-sm" placeholder={ar?'اسم، إجراء، جلسة، كيان':'Person, action, session, entity'}/></div><Badge variant="neutral" dot={false}>{competition.ruleSet.version}</Badge></div><div className="divide-y divide-[#e5e3dc] max-h-[680px] overflow-y-auto">{logs.map(log=><button key={log.id} onClick={()=>setSelectedId(log.id)} className={`w-full text-start p-4 sm:px-5 transition ${selected?.id===log.id?'bg-[#f3f6f4]':'hover:bg-[#fbfaf6]'}`}><div className="flex items-center justify-between gap-3"><div className="text-xs font-black text-[#3a423d]">{ar?log.humanSummaryArabic:log.humanSummaryEnglish}</div><span className="text-xs text-[#696e6b] shrink-0">{new Date(log.timestamp).toLocaleString(ar?'ar-KW':'en-US')}</span></div>{/* الخط الأحادي كان مناسبًا لرمز إنجليزي؛ وبعد تعريب الفعل والدور صار يفكّك الحروف العربية.
      يبقى أحاديًا للرقم التسلسلي وحده — وهو ما يُقرأ رقمًا لا كلمة. */}
 <div className="text-xs text-[#656b66] mt-1.5"><span className="font-mono" dir="ltr">#{log.sequence||'—'}</span> · {auditActionLabel(log.action,ar)} · {log.actorName} · {roleLabel(log.actorRole,ar)}</div></button>)}</div></div>

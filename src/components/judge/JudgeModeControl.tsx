@@ -76,7 +76,7 @@ export const JudgeModeControl: React.FC<{ ar: boolean; prefs: JudgeModePrefs; on
     </button>
     {open && <div id={panelId} role="group" aria-label={label} className="mizan-judge-modepanel">
       <label className="mizan-judge-modeswitch">
-        <input type="checkbox" checked={prefs.enabled} onChange={e => onChange({ enabled: e.target.checked })} />
+        <input data-native-check type="checkbox" checked={prefs.enabled} onChange={e => onChange({ enabled: e.target.checked })} />
         <span>{ar ? 'وضع المحكّم: خطٌّ أكبر وأهدافُ لمسٍ أوسع' : 'Judge mode: larger text & touch targets'}</span>
       </label>
       <div className="mizan-judge-modethemes" role="radiogroup" aria-label={ar ? 'سمة العرض' : 'Display theme'}>
