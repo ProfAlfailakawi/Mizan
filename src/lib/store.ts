@@ -1296,7 +1296,8 @@ function persistLocalSnapshot(): boolean {
     if (IS_DEMO_SESSION) {
       /* البيئة التجريبية تكتب إلى مفتاحها وحدها، وفي sessionStorage لا localStorage:
          تبقى داخل التبويب، وتختفي بإغلاقه، ولا تلمس لقطة أي حساب حقيقي بأي حال. */
-      window.sessionStorage.setItem(DEMO_STATE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
+      /* كون العرض كبير وقد يتجاوز حصّة sessionStorage: الحالة حيّة في الذاكرة على أي حال، فإخفاقُ النسخ لا يُعرض خطأً أحمر في وجه العارض. */
+      try { window.sessionStorage.setItem(DEMO_STATE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState))); } catch { /* في الذاكرة فقط */ }
       if (globalState.persistenceError && !globalState.persistenceError.code.startsWith('CLOUD_')) globalState.persistenceError = null;
       return true;
     }

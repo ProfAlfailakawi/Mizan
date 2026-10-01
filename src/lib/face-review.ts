@@ -72,6 +72,12 @@ export function attemptFrom(
 
 /** سببُ التعذّر يُقال بلغة الطالب، ولا يُعرض رمزٌ داخليّ في وجهه. */
 export function faceNote(code: string, ar: boolean): string {
+  /* البيئة التجريبية: صفحات المصحف وتحليل الاستماع من الحزم الرسمية والخادم، ولا يُصنَّع نصٌّ قرآني هنا — يُقال ذلك صراحةً بدل «انتهت جلستك». */
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('mizan_demo_active_v1') === 'true') {
+      return ar ? 'وجه المصحف وتحليل الاستماع يأتيان من الحزم الرسمية والخادم، ويظهران في النسخة الكاملة. هذه بيئة تجريبية لا تعرض نصًّا قرآنيًّا مصنَّعًا.' : 'The mushaf face and listening analysis come from the official packages and server and appear in the full version. This demo never shows synthesised Quran text.';
+    }
+  } catch { /* لا تخزين: يسقط إلى الرسائل العادية */ }
   if (/READING_UNKNOWN/.test(code)) return ar ? 'روايتُك ليست من الروايات التي تحمل حزمُها مواضعَ صفحات بعد.' : 'Your reading has no page-positioned package yet.';
   if (/NOT_WHOLE|NOT_IN_PACKAGE/.test(code)) return ar ? 'هذا الوجهُ ناقصٌ في حزمة روايتك، فلا يُعرض. جرّب وجهًا آخر.' : 'That face is incomplete in your reading package.';
   if (/NOT_CONFIGURED|BACKEND/.test(code)) return ar ? 'خدمةُ الاستماع غيرُ مهيّأةٍ الآن، فالوجهُ مفتوحٌ للمراجعة بلا تحليل.' : 'The listening service is not available — review without analysis.';

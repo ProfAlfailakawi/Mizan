@@ -561,7 +561,7 @@ export function demoCommercialWrite(path: string, init?: { method?: string; body
   const planDel = /^\/api\/saas\/(owner|operator)\/plans\/([^/]+)$/.exec(clean);
   if (planDel && method === 'DELETE') { const i = DEMO_PLANS.findIndex(p => p.id === decodeURIComponent(planDel[2])); if (i >= 0) DEMO_PLANS.splice(i, 1); return ok; }
 
-  const base = /^\/api\/saas\/(?:owner|operator)\/billing/.exec(clean) ? clean.replace(/\/(subscriptions|invoices).*$/, '') : '';
+  const base = /^\/api\/saas\/(?:owner|operator)\//.test(clean) ? clean : '';
   if (base && method === 'POST' && /\/invoices$/.test(clean)) {
     const [subjectType, subjectId] = [String(body.subjectType || 'organization'), String(body.subjectId || DEMO_ORGS[0].id)];
     const org = DEMO_ORGS.find(o => o.id === subjectId);

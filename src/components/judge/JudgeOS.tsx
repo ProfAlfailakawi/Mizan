@@ -6,7 +6,7 @@ import { maskParticipantForJudge, resolveBlindness } from '../../lib/blind-chamb
 import { Ratio } from '../design-system/Ratio';
 import { CompletionSeal } from '../participant/CompletionSeal';
 import { AlertTriangle, Check, CircleDot, CornerDownLeft, RotateCcw, SkipForward, Sparkles, Volume2, Mic, MicOff, LockKeyhole, UserCheck, ShieldCheck, Square, ChevronDown, Users, Clock, BookOpen } from 'lucide-react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { JudgeModeControl, useJudgeMode } from './JudgeModeControl';
 import { errorMessageArabic } from '../../lib/error-catalog';
 import { getCompetitionPolicy, getEnabledJudgeActions } from '../../lib/competition-config';
@@ -692,7 +692,7 @@ export const JudgeOS: React.FC = () => {
      <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[#656b66]">{audioState==='failed'?(ar?'لا تبدأ التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل تشغيل الميكروفون.':'This competition requires session recording; the passage stays sealed until the microphone is running.')}</p>
      <div className="mx-auto mt-5 flex max-w-xs items-end justify-center gap-[3px]" aria-hidden="true">{Array.from({length:24}).map((_,i)=>{const on=micLevel*24>i;return <span key={i} className={`w-1.5 rounded-full transition-[height,background-color] duration-75 ${on?(i>19?'bg-[#A34D43]':i>14?'bg-[#9B7542]':'bg-[#2F6555]'):'bg-[#e8e6df]'}`} style={{height:`${6+i*0.75}px`}}/>})}</div>
      <div className="mt-2.5 text-[10px] font-black text-[#656b66]">{ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}</div>
-     <div className="mt-5"><Button onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تجهيز الميكروفون':'Prepare microphone')}</Button></div>
+     <div className="mt-5"><Button onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تجهيز الميكروفون':'Prepare microphone')}</Button>{IS_DEMO_SESSION&&<Button variant="outline" className="ms-2" onClick={()=>setAudioState('ready')}>{ar?'متابعة بلا ميكروفون (عرض تجريبي)':'Continue without microphone (demo)'}</Button>}</div>
      <p className="mx-auto mt-3.5 max-w-sm text-[10px] font-bold leading-5 text-[#656b66]">{ar?'بمجرد أن يعمل التسجيل يظهر تأكيد الحضور وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'Once recording runs, presence and panel approval appear next — they do not wait on the level meter.'}</p>
     </div>}
 
