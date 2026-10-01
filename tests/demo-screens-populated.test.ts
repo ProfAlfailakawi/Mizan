@@ -44,3 +44,44 @@ test('demo: platform owner control tower has a payload', () => {
   assert.ok(tower.platform.scoreAvailable);
   assert.ok(tower.needsAttention.length > 0);
 });
+
+test('demo: commercial panels (subscription, operator, platform, brand, SSO, gateways) have payloads', () => {
+  const billing = demoCommercialResponse('/api/saas/organization/billing') as { usage: { participantAllowance: number; participantsRemaining: number }; limits: { effective: Record<string, number> }; catalog: unknown[]; history: unknown[] };
+  assert.ok(billing.usage.participantAllowance > 0 && billing.usage.participantsRemaining > 0);
+  assert.ok(billing.limits.effective.participantAllowance > 0 && billing.catalog.length > 0 && billing.history.length > 0);
+
+  const op = demoCommercialResponse('/api/saas/operator/commercial') as { customers: unknown[]; ledger: { balanceAfterMinor: number }[]; pricing: unknown[]; summary: { balanceMinor: number }; agreement: { operatorId: string } };
+  assert.ok(op.customers.length >= 4 && op.pricing.length > 0 && op.ledger.length >= 8);
+  assert.equal(op.ledger[0].balanceAfterMinor, op.summary.balanceMinor, 'wallet balance equals the newest ledger balance');
+
+  const owner = demoCommercialResponse('/api/saas/owner/commercial') as { plans: unknown[]; tiers: unknown[]; report: { agreements: unknown[]; operators: unknown[] } };
+  assert.ok(owner.plans.length > 0 && owner.tiers.length > 0 && owner.report.agreements.length > 0 && owner.report.operators.length > 0);
+
+  assert.ok((demoCommercialResponse('/api/saas/brand/organization/org-demo-mizan') as { domains: unknown[] }).domains.length > 0);
+  assert.ok((demoCommercialResponse('/api/saas/organization/discover') as { listings: unknown[] }).listings.length > 0);
+  assert.ok((demoCommercialResponse('/api/saas/organization/sso') as { config: { roleMapping: unknown[] } }).config.roleMapping.length > 0);
+  assert.ok((demoCommercialResponse('/api/saas/payment-gateways/organization/org-demo-mizan') as { gateways: unknown[] }).gateways.length > 0);
+  assert.ok((demoCommercialResponse('/api/saas/payment-gateways/presets') as { presets: unknown[] }).presets.length > 0);
+  assert.equal(typeof demoCommercialResponse('/api/saas/owner/wallet/ledger?format=csv'), 'string');
+
+  const dash = demoCommercialResponse('/api/saas/owner/dashboard') as { billing: { invoices: { number: string; daysOverdue: number }[] } };
+  assert.ok(dash.billing.invoices.every(i => i.number && Number.isFinite(i.daysOverdue)), 'invoice rows never render undefined');
+});
+
+test('demo: operator team and inbox are populated', async () => {
+  const g = demoIdentityGovernance(ORG, COMPETITION, u.judges, u.committees, u.participants);
+  assert.ok(g.identityAccounts.filter(a => a.organizationId === '__operator__:OP-DEMO-1').length >= 3);
+  const { demoInbox } = await import('../src/data/demo-inbox');
+  for (const role of ['judge', 'head_judge', 'comp_admin', 'participant', 'ops_manager', 'auditor', 'org_admin']) {
+    const inbox = demoInbox(role, COMPETITION, 'مسابقة تجريبية', ORG);
+    assert.ok(inbox.notifications.length >= 5 && inbox.unread > 0, `${role} inbox`);
+  }
+});
+
+test('demo: public Discover directory lists open and closed competitions', async () => {
+  const { demoDiscoverDirectory } = await import('../src/data/demo-commercial');
+  const all = demoDiscoverDirectory();
+  assert.ok(all.listings.length >= 3 && all.listings.some(l => !l.registrationOpen));
+  assert.ok(demoDiscoverDirectory('', true).listings.every(l => l.registrationOpen));
+  assert.equal(demoDiscoverDirectory('دبي').listings.length, 1);
+});

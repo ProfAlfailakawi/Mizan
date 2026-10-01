@@ -191,6 +191,25 @@ export function demoIdentityGovernance(
     addAccount(judge.userId, judge.nameArabic, `${judge.userId.replace('usr-', '')}@demo.mizan.test`, isHead ? 'head_judge' : 'judge', committee?.id, STAFF.length + i, committee?.status !== 'offline');
   });
 
+  /* فريق المشغّل المعتمد: مالكٌ ومديران، بنطاق `__operator__:<id>` الذي تقرؤه لوحة «الجهات» عند المشغّل. */
+  const operatorScope = '__operator__:OP-DEMO-1';
+  ([['usr-demo-operator_owner', 'مالك المشغّل (تجريبي)', 'operator_owner'], ['usr-demo-operator_admin', 'مدير المشغّل (تجريبي)', 'operator_admin'], ['usr-demo-operator_admin-2', 'منسّق حسابات المشغّل (تجريبي)', 'operator_admin']] as const).forEach(([id, displayName, role], i) => {
+    identityAccounts.push({
+      id, firebaseUid: id, email: `demo.${id.replace('usr-demo-', '')}@mizan.test`, displayName, organizationId: operatorScope, status: 'ACTIVE',
+      createdAt: '2026-06-02T09:00:00.000Z', createdBy: 'usr-demo-super_admin', activatedAt: '2026-06-03T10:00:00.000Z',
+      lastAuthenticatedAt: at(7, 15 + i * 9), mfaRequired: role === 'operator_owner', identityAssurance: 'DEMO',
+    });
+    roleGrants.push({
+      id: `grant-${id}`, accountId: id, role, organizationId: operatorScope, status: 'ACTIVE', requestedAt: '2026-06-02T09:00:00.000Z',
+      requestedBy: 'usr-demo-super_admin', approvedAt: '2026-06-02T12:00:00.000Z', approvedBy: 'usr-demo-super_admin',
+      validFrom: '2026-06-03T00:00:00.000Z', expiresAt: '2027-06-02T23:59:00.000Z', reason: 'تشغيل حسابات المشغّل المعتمد', dualApprovalRequired: false,
+    });
+    authSessions.push({
+      id: `auth-${id}`, accountId: id, firebaseUid: id, organizationId: operatorScope, role, deviceId: `dev-demo-operator-${i + 1}`, deviceName: 'حاسوب مكتب المشغّل',
+      openedAt: at(7, 20 + i), lastSeenAt: at(13, 40 + i), expiresAt: at(20), status: i < 2 ? 'ACTIVE' : 'ENDED', authenticationAssurance: role === 'operator_owner' ? 'MFA' : 'SINGLE_FACTOR', ipHint: `10.30.${1 + i}.x`,
+    });
+  });
+
   const invitation = (index: number, displayName: string, requestedRole: Role, status: IdentityInvitationRecord['status'], committeeId?: string): IdentityInvitationRecord => ({
     id: `inv-demo-${index}`, email: `invite${index}@demo.mizan.test`, displayName, organizationId, requestedRole, competitionId, committeeId, status,
     createdAt: at(6, 10 * index), createdBy: 'usr-demo-admin', approvedAt: status === 'READY' ? at(6, 10 * index + 5) : undefined,
@@ -200,6 +219,7 @@ export function demoIdentityGovernance(
     invitation(1, 'عبدالرحمن الشمّري', 'judge', 'PENDING_APPROVAL', committees[4]?.id),
     invitation(2, 'حصة العتيبي', 'ops_manager', 'READY'),
     invitation(3, 'يعقوب البلوشي', 'exception_host', 'READY'),
+    { ...invitation(4, 'ليلى الحمادي', 'operator_admin', 'READY'), organizationId: operatorScope, competitionId: undefined },
   ];
 
   const reissued = participants.filter(p => p.checkedInAt).slice(3, 6);

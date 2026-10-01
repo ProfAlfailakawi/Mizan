@@ -81,13 +81,13 @@ export const IdentityGovernance:React.FC<{competitionId?:string;organizationId?:
  useEffect(()=>{if(!production)return;const id=window.setInterval(()=>void loadRemote(),30_000);return()=>window.clearInterval(id)},[production,loadRemote]);
  useEffect(()=>{const apply=()=>{const q=identityHashParams();if(!q)return;const requestedTab=q.get('tab');if(requestedTab&&['grants','passwords','sessions','invite'].includes(requestedTab))setTab(requestedTab as AccessTab);setFocusedRequestId(q.get('requestId')||'')};apply();window.addEventListener('hashchange',apply);return()=>window.removeEventListener('hashchange',apply)},[]);
 
- const devGrants=useMemo(()=>operatorScoped?[]:s.roleGrants.filter(g=>g.organizationId===scopeOrgId&&['ACTIVE','SUSPENDED'].includes(g.status)&&(!competitionId||g.competitionId===competitionId)),[s.roleGrants,scopeOrgId,competitionId,operatorScoped]);
+ const devGrants=useMemo(()=>s.roleGrants.filter(g=>g.organizationId===scopeOrgId&&['ACTIVE','SUSPENDED'].includes(g.status)&&(!competitionId||g.competitionId===competitionId)),[s.roleGrants,scopeOrgId,competitionId]);
  const ids=useMemo(()=>new Set(devGrants.map(g=>g.accountId)),[devGrants]);
  const devAccounts=useMemo(()=>s.identityAccounts.filter(a=>a.organizationId===scopeOrgId&&ids.has(a.id)&&!s.roleGrants.some(g=>g.accountId===a.id&&g.role==='super_admin'&&g.status==='ACTIVE')),[s.identityAccounts,s.roleGrants,scopeOrgId,ids]);
  const accounts=production?(remote?.accounts||[]):devAccounts;
  const grants=production?(remote?.grants||[]):devGrants;
- const invitations=production?(remote?.invitations||[]):operatorScoped?[]:s.identityInvitations.filter(i=>i.organizationId===scopeOrgId&&i.status!=='REVOKED'&&(!competitionId||i.competitionId===competitionId));
- const sessions=production?(remote?.sessions||[]):operatorScoped?[]:s.authSessions.filter(x=>x.organizationId===scopeOrgId&&(!competitionId||(x as any).competitionId===competitionId));
+ const invitations=production?(remote?.invitations||[]):s.identityInvitations.filter(i=>i.organizationId===scopeOrgId&&i.status!=='REVOKED'&&(!competitionId||i.competitionId===competitionId));
+ const sessions=production?(remote?.sessions||[]):s.authSessions.filter(x=>x.organizationId===scopeOrgId&&(!competitionId||(x as any).competitionId===competitionId));
  const passwordResetRequests:PasswordResetRow[]=production?(remote?.passwordResetRequests||[]):[];
  const activePasswordRequests=passwordResetRequests.filter(x=>x.status==='PENDING'||x.status==='ISSUED');
  const pendingInvitations=invitations.filter((x:any)=>x.status==='READY'||x.status==='PENDING_APPROVAL');

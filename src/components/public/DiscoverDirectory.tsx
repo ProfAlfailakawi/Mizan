@@ -6,7 +6,7 @@
  * كاملة لا يظهر اسم ميزان إلا إن اختار المشغّل إظهار «يعمل بميزان».
  */
 import React, { useEffect, useState } from 'react';
-import { useAppStore } from '../../lib/store';
+import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { ct } from '../../lib/commercial-i18n';
 
 interface Listing { publicSlug: string; title: string; titleArabic?: string; summary?: string; summaryArabic?: string; institutionName: string; registrationOpen: boolean; registrationUrl?: string; startsOn?: string; endsOn?: string; country?: string; city?: string; mode: 'online' | 'in_person' | 'hybrid'; riwayat: string[]; ageRanges: string[] }
@@ -24,6 +24,10 @@ export const DiscoverDirectory: React.FC = () => {
     if (q.trim()) params.set('q', q.trim());
     if (openOnly) params.set('registrationOpen', 'true');
     const t = window.setTimeout(() => {
+      if (IS_DEMO_SESSION) {
+        void import('../../data/demo-commercial').then(m => { if (ctl.signal.aborted) return; setData(m.demoDiscoverDirectory(q, openOnly) as any); setFailed(false); });
+        return;
+      }
       fetch(`/api/public/discover?${params}`, { signal: ctl.signal }).then(r => r.ok ? r.json() : Promise.reject(r.status))
         .then(d => { setData(d); setFailed(false); }).catch(() => { if (!ctl.signal.aborted) setFailed(true); });
     }, 250);
