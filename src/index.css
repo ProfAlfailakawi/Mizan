@@ -1444,7 +1444,7 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 
 /* وسم الفئة: هوية اللجنة التي يبحث عنها الواقف في الممر. ذهبٌ هادئ لا يزاحم الكود. */
 .mizan-board-tag{
-  display:inline-flex; align-items:center; gap:.3rem; max-width:100%;
+  display:inline-block; vertical-align:middle; max-width:100%;
   padding:.2rem .55rem; border-radius:999px;
   background:rgba(232,203,147,.12); border:1px solid rgba(232,203,147,.22);
   color:#e8cb93; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;

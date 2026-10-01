@@ -45,7 +45,7 @@ export const Header: React.FC = () => {
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
         <summary className="list-none w-11 h-11 grid place-items-center rounded-xl hover:bg-[#efede7] text-[#66706a] cursor-pointer" aria-label={language==='ar'?'المزيد':'More'}><Menu className="w-4 h-4"/></summary>
-        <div className="absolute right-0 top-12 z-50 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-[#e2e0d8] bg-white p-1.5 shadow-[0_18px_45px_rgba(25,39,33,.16)]">
+        <div className="absolute start-0 top-12 z-50 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-[#e2e0d8] bg-white p-1.5 shadow-[0_18px_45px_rgba(25,39,33,.16)]">
           <button onClick={()=>setSearchOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><Search className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'بحث سريع':'Quick search'}</button>
           {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[#66706a]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
         </div>
