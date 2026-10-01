@@ -15,6 +15,7 @@
  *
  * كل الأسماء والأرقام مخترعة. صيغتها عربية/خليجية لتقرأ الشاشات طبيعية، ولا تطابق أحدًا.
  */
+import { demoDate, demoIso, demoUtc } from './demo-clock';
 import type {
   AppealRecord,
   AuditEvent,
@@ -266,8 +267,8 @@ function demoParticipants(committees: Committee[]): Participant[] {
       institution: `مركز تحفيظ القرآن الكريم — ${pick(COUNTRIES, index)[0].split(' (')[0]}`,
       status,
       statusHistory: [
-        { status: 'submitted' as const, timestamp: '2026-11-12T09:00:00Z', actor: 'participant' },
-        { status: 'approved' as const, timestamp: '2026-11-14T14:20:00Z', actor: 'AI Eligibility Engine' },
+        { status: 'submitted' as const, timestamp: demoIso(-45), actor: 'participant' },
+        { status: 'approved' as const, timestamp: demoIso(-43,'14:20:00Z'), actor: 'AI Eligibility Engine' },
       ],
       assignedCommitteeId: status === 'submitted' || status === 'approved' ? undefined : committee.id,
       queueNumber: inQueue ? 1 + (index % 20) : undefined,
@@ -275,7 +276,7 @@ function demoParticipants(committees: Committee[]): Participant[] {
       /* وفدٌ قائم: بوابة مدير الوفد تُرشّح على `delegation-current`، فبلا إسنادٍ
          هنا كانت تفتح على قائمةٍ فارغة رغم وجود مئتين وأربعين متسابقًا. */
       delegationId: index % 13 === 0 ? 'delegation-current' : undefined,
-      checkedInAt: status === 'submitted' || status === 'approved' ? undefined : '2027-02-11T08:45:12Z',
+      checkedInAt: status === 'submitted' || status === 'approved' ? undefined : demoIso(0,'08:45:12Z'),
       promisedWaitMinutes: inQueue ? 5 + Math.floor(random() * 40) : undefined,
     };
   });
@@ -316,7 +317,7 @@ function demoResults(participants: Participant[], submissions: JudgeSubmission[]
     const status = resultStatusFor(participant, index);
     const committee = committees.find(c => c.id === participant.assignedCommitteeId);
     const head = judges.find(j => j.userId === committee?.headJudgeId);
-    const sealedAt = new Date(Date.UTC(2027, 1, 11, 15, (index * 3) % 60)).toISOString();
+    const sealedAt = demoUtc(15, (index * 3) % 60).toISOString();
     const serverSealSha256 = demoDigest(`${participant.id}|${panel.finalScore}|${sealedAt}`);
     return {
       ...clone(template),
@@ -428,7 +429,7 @@ function demoAuditLogs(participants: Participant[], committees: Committee[], jud
       currentStateHash: `DEMO:AUDIT-${index + 1}`,
       /* من السادسة صباحًا إلى الثانية ظهرًا بتسلسلٍ صاعد: السجلّ يُقرأ زمنًا، وسطرٌ
          يسبق سابقه في الوقت يوحي بعبثٍ في السلسلة. */
-      timestamp: new Date(Date.UTC(2027, 1, 11, 6, 0) + index * 90_000).toISOString(),
+      timestamp: new Date(demoUtc(6, 0).getTime() + index * 90_000).toISOString(),
       authenticationMethod: 'demo',
       authenticationAssurance: 'demo',
     } satisfies AuditEvent;
@@ -477,7 +478,7 @@ function demoJudgeSubmissions(participants: Participant[], judges: JudgeProfile[
         criterionScores,
         totalScore: round2(Object.values(criterionScores).reduce((a, b) => a + b, 0)),
         eventsCount: Math.floor(random() * 4),
-        submittedAt: new Date(Date.UTC(2027, 1, 11, 7 + (p % 9), (p * 5) % 60, j * 40)).toISOString(),
+        submittedAt: demoUtc(7 + (p % 9), (p * 5) % 60, j * 40).toISOString(),
         locked: true,
       });
     });
@@ -516,7 +517,7 @@ function demoAppeals(results: ResultRecord[], participants: Participant[]): Appe
       grounds,
       reasonText,
       status: index % 4 === 0 ? 'submitted' : index % 4 === 1 ? 'under_review' : index % 4 === 2 ? 'accepted' : 'rejected',
-      createdAt: new Date(Date.UTC(2027, 1, 11, 14, index * 6)).toISOString(),
+      createdAt: demoUtc(14, index * 6).toISOString(),
     };
   });
 }
@@ -544,8 +545,8 @@ function demoIncidents(committees: Committee[]): IncidentRecord[] {
     severity: index === 2 ? 'critical' : index % 2 === 0 ? 'moderate' : 'low',
     status: index === 0 ? 'active' : index === 1 ? 'investigating' : index === 5 ? 'investigating' : 'resolved',
     occurrences: index === 0 ? 3 : 1,
-    reportedAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11)).toISOString(),
-    lastOccurredAt: new Date(Date.UTC(2027, 1, 11, 9 + index, index * 11 + 20)).toISOString(),
+    reportedAt: demoUtc(9 + index, index * 11).toISOString(),
+    lastOccurredAt: demoUtc(9 + index, index * 11 + 20).toISOString(),
   }));
 }
 
@@ -600,7 +601,7 @@ function demoCertificates(results: ResultRecord[], participants: Participant[]):
   return results
     .filter(result => result.status === 'sealed' && certified.has(result.participantId))
     .map((result, index) => {
-      const certificateNumber = `MZN-2027-DXB27-${result.participantCode.replace(/[^A-Za-z0-9]/g, '')}`;
+      const certificateNumber = `MZN-2026-DXB26-${result.participantCode.replace(/[^A-Za-z0-9]/g, '')}`;
       return {
         ...clone(template),
         id: `cert-demo-${index + 1}`,
@@ -616,8 +617,8 @@ function demoCertificates(results: ResultRecord[], participants: Participant[]):
         awardTextArabic: result.rank <= 3
           ? `تشهد الأمانة العامة للمسابقة بأن المتسابق أتمّ اختبارات فئته بجدارة ونال ${result.awardTitleArabic} بدرجة ${result.finalScore.toFixed(2)}.`
           : 'تشهد الأمانة العامة للمسابقة بإتمام المشاركة وفق لائحة المسابقة المعتمدة، سائلين الله له القبول والتوفيق.',
-        issueDate: '2027-02-11',
-        issuedTimestamp: '2027-02-11T17:30:00Z',
+        issueDate: demoDate(0),
+        issuedTimestamp: demoIso(0,'17:30:00Z'),
         verificationToken: demoDigest(certificateNumber).slice(0, 24),
         verificationUrl: `/verify/${certificateNumber}`,
         qrPayload: `/verify/${certificateNumber}`,
@@ -705,7 +706,7 @@ function demoRecitationLedger(participants: Participant[], categories: Category[
             surah: locus.surah,
             startAyah: locus.ayah,
             endAyah: Math.min(surahEnd, locus.ayah + 3),
-            recordedAt: new Date(Date.UTC(2027, 1, 11, 7 + (index % 9), (index * 5) % 60)).toISOString(),
+            recordedAt: demoUtc(7 + (index % 9), (index * 5) % 60).toISOString(),
           });
           break;
         }
@@ -835,7 +836,7 @@ export function demoParticipantScopes(
         selection: scopeFromJuzRange(firstJuz, firstJuz + 7),
         version: 1,
         status: 'approved',
-        now: '2027-02-09T09:00:00Z',
+        now: demoIso(-2),
       }),
     );
   });
@@ -886,13 +887,14 @@ export function buildDemoInitialState(base: AppStoreState): AppStoreState {
     ...base.competition,
     id: SEED_COMPETITION.id,
     organizationId: organization.id,
-    name: SEED_COMPETITION.name,
-    nameArabic: SEED_COMPETITION.nameArabic,
     edition: SEED_COMPETITION.edition,
     country: SEED_COMPETITION.country,
     timezone: SEED_COMPETITION.timezone,
-    startDate: SEED_COMPETITION.startDate,
-    endDate: SEED_COMPETITION.endDate,
+    startDate: demoDate(-1),
+    endDate: demoDate(4),
+    registrationEndDate: demoDate(-12),
+    name: 'MIZAN Demo International Quran Competition 2026',
+    nameArabic: 'مسابقة ميزان القرآنية الدولية التجريبية 2026',
     status: SEED_COMPETITION.status,
     categories,
     venueName: SEED_COMPETITION.venueName,
@@ -981,6 +983,6 @@ function demoIntegrations(organizationId: string): IntegrationConfig[] {
     status,
     endpoint,
     secretRef: `vault://demo/${kind}`,
-    lastCheckedAt: new Date(Date.UTC(2027, 1, 11, 6, 30 + index)).toISOString(),
+    lastCheckedAt: demoUtc(6, 30 + index).toISOString(),
   }));
 }

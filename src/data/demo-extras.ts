@@ -16,7 +16,8 @@ import type {
 } from '../types';
 import { demoDigest } from '../lib/demo-authority';
 
-const at = (hour: number, minute = 0) => new Date(Date.UTC(2027, 1, 11, hour, minute)).toISOString();
+import { demoIso, demoUtc } from './demo-clock';
+const at = (hour: number, minute = 0) => demoUtc(hour, minute).toISOString();
 
 export function demoDevices(competitionId: string, committees: Committee[]): DeviceRecord[] {
   const rows: DeviceRecord[] = [];
@@ -65,10 +66,10 @@ export function demoConsents(competitionId: string, participants: Participant[])
   const kinds: ConsentRecord['kind'][] = ['terms', 'privacy', 'audio_recording', 'human_review'];
   const rows: ConsentRecord[] = [];
   participants.forEach((p, i) => {
-    kinds.forEach(kind => rows.push({ id: `cns-demo-${p.id}-${kind}`, participantId: p.id, competitionId, kind, version: '2027.1', accepted: true, acceptedAt: p.statusHistory?.[0]?.timestamp || at(6), publisher: 'جهة ميزان التجريبية للمسابقات القرآنية', publisherLevel: 'organization', documentEffectiveDate: '2026-10-01' }));
+    kinds.forEach(kind => rows.push({ id: `cns-demo-${p.id}-${kind}`, participantId: p.id, competitionId, kind, version: '2026.1', accepted: true, acceptedAt: p.statusHistory?.[0]?.timestamp || at(6), publisher: 'جهة ميزان التجريبية للمسابقات القرآنية', publisherLevel: 'organization', documentEffectiveDate: '2026-09-01' }));
     /* القاصر يحتاج موافقة وليّه: من وُلد بعد ٢٠٠٩ في هذا العرض. */
-    if (Number(String(p.dateOfBirth || '').slice(0, 4)) >= 2009) rows.push({ id: `cns-demo-${p.id}-guardian`, participantId: p.id, competitionId, kind: 'guardian', version: '2027.1', accepted: true, acceptedAt: at(6, i % 60), guardianName: `ولي أمر ${p.fullNameArabic}`, publisher: 'جهة ميزان التجريبية للمسابقات القرآنية', publisherLevel: 'organization' });
-    if (i % 4 !== 3) rows.push({ id: `cns-demo-${p.id}-ai`, participantId: p.id, competitionId, kind: 'ai_processing', version: '2027.1', accepted: i % 9 !== 0, acceptedAt: at(6, i % 60) });
+    if (Number(String(p.dateOfBirth || '').slice(0, 4)) >= 2009) rows.push({ id: `cns-demo-${p.id}-guardian`, participantId: p.id, competitionId, kind: 'guardian', version: '2026.1', accepted: true, acceptedAt: at(6, i % 60), guardianName: `ولي أمر ${p.fullNameArabic}`, publisher: 'جهة ميزان التجريبية للمسابقات القرآنية', publisherLevel: 'organization' });
+    if (i % 4 !== 3) rows.push({ id: `cns-demo-${p.id}-ai`, participantId: p.id, competitionId, kind: 'ai_processing', version: '2026.1', accepted: i % 9 !== 0, acceptedAt: at(6, i % 60) });
   });
   return rows;
 }
@@ -77,7 +78,7 @@ export function demoTravel(competitionId: string, participants: Participant[]): 
   const flights = ['EK 2512', 'SV 554', 'QR 1017', 'MS 912', 'TK 762', 'GF 504', 'WY 611'];
   return participants.filter(p => p.delegationId === 'delegation-current').map((p, i) => ({
     id: `trv-demo-${i + 1}`, competitionId, delegationId: 'delegation-current', participantId: p.id,
-    flightNumber: flights[i % flights.length], arrivalAirport: i % 4 === 0 ? 'DWC' : 'DXB', arrivalAt: new Date(Date.UTC(2027, 1, 9, 6 + (i % 12), (i * 13) % 60)).toISOString(),
+    flightNumber: flights[i % flights.length], arrivalAirport: i % 4 === 0 ? 'DWC' : 'DXB', arrivalAt: demoUtc(6 + (i % 12), (i * 13) % 60, 0, -2).toISOString(),
     hotel: i % 2 ? 'فندق روضة البستان' : 'فندق جراند حياة دبي', room: `${3 + (i % 6)}${String(10 + i).padStart(2, '0')}`,
     transportStatus: i % 5 === 0 ? 'pending' : i % 5 === 1 ? 'scheduled' : 'completed', companionCount: i % 3 === 0 ? 1 : 0,
     notes: i % 6 === 0 ? 'يحتاج مرافقه وجبات خاصة' : i % 7 === 0 ? 'وصول متأخر — استقبال ليلي' : undefined,
@@ -89,13 +90,13 @@ export function demoPassports(competitionId: string, participants: Participant[]
   const participantPassport: ParticipantPassportEntry[] = [];
   results.forEach(r => {
     const cert = certOf.get(r.participantId);
-    if (cert) participantPassport.push({ id: `pp-demo-${r.id}`, participantId: r.participantId, competitionId, competitionName: 'MIZAN Demo International Quran Competition 2027', categoryName: r.categoryName, year: '2027', result: `${r.rank} / ${r.finalScore}`, certificateNumber: cert.certificateNumber, verified: true });
+    if (cert) participantPassport.push({ id: `pp-demo-${r.id}`, participantId: r.participantId, competitionId, competitionName: 'MIZAN Demo International Quran Competition 2026', categoryName: r.categoryName, year: '2026', result: `${r.rank} / ${r.finalScore}`, certificateNumber: cert.certificateNumber, verified: true });
   });
   /* سجلٌّ سابق لبعضهم: جوازٌ بصفحةٍ واحدة لا يُري معنى الجواز. */
-  participants.filter(p => p.status === 'certified').slice(0, 12).forEach((p, i) => participantPassport.push({ id: `pp-demo-hist-${i + 1}`, participantId: p.id, competitionId: 'comp-demo-2026', competitionName: 'MIZAN Regional Quran Competition 2026', categoryName: 'Ten Juz Memorization', year: '2026', result: `${2 + (i % 5)} / ${(88 + (i % 9) * 1.1).toFixed(2)}`, certificateNumber: `MZN-2026-REG26-${p.code.replace(/[^A-Za-z0-9]/g, '')}`, verified: true }));
+  participants.filter(p => p.status === 'certified').slice(0, 12).forEach((p, i) => participantPassport.push({ id: `pp-demo-hist-${i + 1}`, participantId: p.id, competitionId: 'comp-demo-2025', competitionName: 'MIZAN Regional Quran Competition 2025', categoryName: 'Ten Juz Memorization', year: '2025', result: `${2 + (i % 5)} / ${(88 + (i % 9) * 1.1).toFixed(2)}`, certificateNumber: `MZN-2025-REG25-${p.code.replace(/[^A-Za-z0-9]/g, '')}`, verified: true }));
   const judgePassport = judges.map(j => {
     const committee = committees.find(c => c.id === j.assignedCommitteeId);
-    return { id: `jp-demo-${j.id}`, judgeId: j.userId || j.id, competitionId, competitionName: 'MIZAN Demo International Quran Competition 2027', role: committee?.headJudgeId === j.userId ? 'head_judge' : 'judge', riwayat: j.certifiedRiwayat || ['Hafs'], calibrationScore: j.calibrationScore, completedSessions: committee?.completedCount || 0, verified: true };
+    return { id: `jp-demo-${j.id}`, judgeId: j.userId || j.id, competitionId, competitionName: 'MIZAN Demo International Quran Competition 2026', role: committee?.headJudgeId === j.userId ? 'head_judge' : 'judge', riwayat: j.certifiedRiwayat || ['Hafs'], calibrationScore: j.calibrationScore, completedSessions: committee?.completedCount || 0, verified: true };
   });
   return { participantPassport, judgePassport };
 }
@@ -110,8 +111,8 @@ export function demoOperationsRecords(organizationId: string, competitionId: str
     return row;
   });
   const trainingRuns: TrainingRun[] = [
-    { id: 'trn-demo-1', competitionId, type: 'judge_practice', status: 'completed', startedAt: '2027-02-09T09:00:00Z', score: 94.5, notes: 'معايرة المحكّمين على ثماني تلاوات مرجعية' },
-    { id: 'trn-demo-2', competitionId, type: 'operations_dry_run', status: 'completed', startedAt: '2027-02-10T16:00:00Z', score: 91, notes: 'بروفة يوم كامل بمئة متسابق افتراضي' },
+    { id: 'trn-demo-1', competitionId, type: 'judge_practice', status: 'completed', startedAt: demoIso(-2), score: 94.5, notes: 'معايرة المحكّمين على ثماني تلاوات مرجعية' },
+    { id: 'trn-demo-2', competitionId, type: 'operations_dry_run', status: 'completed', startedAt: demoIso(-1,'16:00:00Z'), score: 91, notes: 'بروفة يوم كامل بمئة متسابق افتراضي' },
     { id: 'trn-demo-3', competitionId, type: 'sandbox', status: 'ready', notes: 'بيئة تدريب للمتطوعين الجدد' },
   ];
   const quranSourceManifests: QuranSourceManifestRecord[] = [{
@@ -166,13 +167,13 @@ export function demoIdentityGovernance(
   const addAccount = (id: string, displayName: string, email: string, role: Role, committeeId: string | undefined, index: number, online: boolean) => {
     identityAccounts.push({
       id, firebaseUid: id, email, displayName, organizationId, status: 'ACTIVE',
-      createdAt: '2027-01-05T09:00:00.000Z', createdBy: 'usr-demo-org_admin', activatedAt: '2027-01-06T10:00:00.000Z',
+      createdAt: demoIso(-21,'09:00:00.000Z'), createdBy: 'usr-demo-org_admin', activatedAt: demoIso(-20,'10:00:00.000Z'),
       lastAuthenticatedAt: at(online ? 7 : 6, (index * 7) % 60), mfaRequired: ['comp_admin', 'org_admin', 'auditor'].includes(role), identityAssurance: 'DEMO',
     });
     roleGrants.push({
       id: `grant-${id}`, accountId: id, role, organizationId, competitionId: role === 'org_admin' ? undefined : competitionId, committeeId,
-      status: 'ACTIVE', requestedAt: '2027-01-05T09:00:00.000Z', requestedBy: 'usr-demo-org_admin', approvedAt: '2027-01-05T12:00:00.000Z',
-      approvedBy: role === 'org_admin' ? 'usr-demo-admin' : 'usr-demo-org_admin', validFrom: '2027-02-10T00:00:00.000Z', expiresAt: '2027-02-14T23:59:00.000Z',
+      status: 'ACTIVE', requestedAt: demoIso(-21,'09:00:00.000Z'), requestedBy: 'usr-demo-org_admin', approvedAt: demoIso(-21,'12:00:00.000Z'),
+      approvedBy: role === 'org_admin' ? 'usr-demo-admin' : 'usr-demo-org_admin', validFrom: demoIso(-1,'00:00:00.000Z'), expiresAt: demoIso(4,'23:59:00.000Z'),
       reason: committeeId ? 'تكليف تحكيم في مسابقة ٢٠٢٧' : 'فريق تشغيل مسابقة ٢٠٢٧', dualApprovalRequired: ['head_judge', 'auditor'].includes(role),
     });
     authSessions.push({
@@ -213,7 +214,7 @@ export function demoIdentityGovernance(
   const invitation = (index: number, displayName: string, requestedRole: Role, status: IdentityInvitationRecord['status'], committeeId?: string): IdentityInvitationRecord => ({
     id: `inv-demo-${index}`, email: `invite${index}@demo.mizan.test`, displayName, organizationId, requestedRole, competitionId, committeeId, status,
     createdAt: at(6, 10 * index), createdBy: 'usr-demo-admin', approvedAt: status === 'READY' ? at(6, 10 * index + 5) : undefined,
-    approvedBy: status === 'READY' ? 'usr-demo-org_admin' : undefined, expiresAt: '2027-02-18T00:00:00.000Z',
+    approvedBy: status === 'READY' ? 'usr-demo-org_admin' : undefined, expiresAt: demoIso(8,'00:00:00.000Z'),
   });
   const identityInvitations = [
     invitation(1, 'عبدالرحمن الشمّري', 'judge', 'PENDING_APPROVAL', committees[4]?.id),
