@@ -585,7 +585,7 @@ export const JudgeOS: React.FC = () => {
     {maskParticipantForJudge(p,blindness,ar).displayName!==p.code&&<span className="font-mono text-xs font-black text-[#656b66]" dir="ltr">{p.code}</span>}
     <span className="min-w-0 flex-1 truncate text-base font-black" dir="auto">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
     <span className="shrink-0 text-xs font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
-    <Button size="sm" variant={turn?'primary':'outline'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
+    <Button size="sm" variant={turn?'primary':'outline'} className={turn?undefined:'!opacity-0 pointer-events-none'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
    </li>})}
   </ul>
   <p className="mt-3 text-xs leading-6 text-[#696f6b]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
