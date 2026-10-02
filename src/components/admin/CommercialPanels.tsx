@@ -106,7 +106,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
       <h2 id="subscription-heading" className="text-base font-black">{ct(locale, 'subscription')}</h2>
       <ErrorBox error={error} />
       {notice && <div role="status" className="rounded-2xl bg-[#e8f3ec] px-4 py-3 text-xs font-bold text-[#1f5b3c]">{notice}</div>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:first-child]:col-span-2 [&>*:last-child]:col-span-2 lg:[&>*:first-child]:col-span-1 lg:[&>*:last-child]:col-span-1">
         <Stat label={ct(locale, 'currentPlan')} value={planName(data.plan) || '—'} />
         <Stat label={ct(locale, 'termStart')} value={formatDate(data.term?.startsAt, locale)} />
         <Stat label={ct(locale, 'termEnd')} value={formatDate(termLastDay(data.term?.endsAt), locale)} />
