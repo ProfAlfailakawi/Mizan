@@ -20,9 +20,18 @@ import { MizanLogo } from '../design-system/MizanLogo';
  * «من أنت؟» — لا يُعرض عليه ثلاثة أبوابٍ متساوية.
  */
 
+/*
+ * التاريخ المجرّد (2026-10-02) يُقرأ يومًا تقويميًا محليًا لا لحظةً بتوقيت UTC: وإلا بدا في
+ * المتصفحات غرب UTC قبل يومه بيوم، فيظهر «آخر يوم» يوم الأمس وتختفي نافذة التسجيل مبكرًا.
+ */
+const calendarDay = (iso: string): Date => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
+};
+
 const dateText = (iso: string | undefined, ar: boolean) => {
   if (!iso) return '';
-  const d = new Date(iso);
+  const d = calendarDay(iso);
   if (Number.isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat(ar ? 'ar-KW-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
 };
@@ -36,7 +45,7 @@ const periodText = (start?: string, end?: string, ar = true) => {
 /* أيام صحيحة بين اليوم وتاريخٍ حقيقي؛ لا تُحسب إن كان التاريخ غير صالح. */
 const daysUntil = (iso?: string): number | null => {
   if (!iso) return null;
-  const d = new Date(iso);
+  const d = calendarDay(iso);
   if (Number.isNaN(d.getTime())) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   d.setHours(0, 0, 0, 0);
@@ -67,7 +76,9 @@ export const CompetitionLanding: React.FC = () => {
 
   /* هوية الجهة: ما وُجد فعلًا فقط. شعار المسابقة يتقدّم على شعار الجهة. */
   const brand = store.organization?.brand;
-  const pendingOrg = store.organization?.id === 'org-pending-setup';
+  /* المتجر قد يحمل جهةً حُمّلت قبل هذه المسابقة (موظفٌ فتح رابط مسابقة جهة أخرى): لا تُنسب هويتها
+     إلى هذه المسابقة إلا إذا كانت هي جهتها فعلًا. */
+  const pendingOrg = store.organization?.id === 'org-pending-setup' || !store.organization || store.organization.id !== competition.organizationId;
   const compLogo = safeLogo(competition.logoUrl);
   const orgLogo = pendingOrg ? undefined : safeLogo(brand?.logoUrl);
   const orgName = pendingOrg ? '' : (ar
@@ -84,7 +95,7 @@ export const CompetitionLanding: React.FC = () => {
     registration_open: { icon: DoorOpen, label: ar ? 'التسجيل مفتوح' : 'Registration open', tone: 'gold' },
     registration_closed: { icon: Lock, label: ar ? 'أُغلق التسجيل' : 'Registration closed', tone: 'calm' },
     live: { icon: Radio, label: ar ? 'المسابقة جارية' : 'Live now', tone: 'gold' },
-    paused: { icon: Radio, label: ar ? 'المسابقة جارية' : 'Live now', tone: 'gold' },
+    paused: { icon: Hourglass, label: ar ? 'متوقفة مؤقتًا' : 'Paused', tone: 'calm' },
     judging_complete: { icon: Gavel, label: ar ? 'اكتمل التحكيم' : 'Judging complete', tone: 'calm' },
     results_sealed: { icon: Gavel, label: ar ? 'اكتمل التحكيم' : 'Judging complete', tone: 'calm' },
     results_published: { icon: Sparkles, label: ar ? 'النتائج معلنة' : 'Results announced', tone: 'gold' },
