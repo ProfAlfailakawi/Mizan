@@ -54,14 +54,14 @@ export const DemoBar: React.FC = () => {
         <span
           role="status"
           aria-label={ar ? 'بيئة تجريبية معزولة ببيانات مصطنعة' : 'Isolated demo environment with synthetic data'}
-          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-black tracking-wide text-[#8a6a1c]"
+          className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-black tracking-wide text-[#8a6a1c]"
         >
           <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
           <span className="hidden sm:inline">{ar ? 'بيئة تجريبية' : 'DEMO'}</span>
         </span>
 
         <label className="inline-flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
-          <span className="hidden shrink-0 text-xs font-black text-[#8a6a1c] sm:inline">{ar ? 'الدور' : 'Role'}</span>
+          <span className="hidden shrink-0 text-[13px] font-black text-[#8a6a1c] sm:inline">{ar ? 'الدور' : 'Role'}</span>
           <select
             value={currentUser.role}
             onChange={event => setDemoRole(event.target.value as Role)}
