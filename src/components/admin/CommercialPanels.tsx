@@ -65,7 +65,7 @@ const Progress: React.FC<{ label: string; used: number; total: number }> = ({ la
   const tone = pct >= 95 ? '#a2453a' : pct >= 85 ? '#b7791f' : '#1f6f4a';
   return (
     <div>
-      <div className="flex items-center justify-between text-xs"><span className="font-bold">{label}</span><span dir="ltr">{used.toLocaleString()} / {total.toLocaleString()}</span></div>
+      <div className="flex items-center justify-between text-xs"><span className="font-bold">{label}</span><span dir="ltr">{used.toLocaleString('en-US')} / {total.toLocaleString('en-US')}</span></div>
       <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={used} className="mt-2 h-2.5 rounded-full bg-[#ebe9e2]">
         <div className="h-2.5 rounded-full" style={{ width: `${pct}%`, background: tone }} />
       </div>
@@ -113,7 +113,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
       <div className="mizan-panel space-y-4 p-5">
         <Progress label={ct(locale, 'participantsUsed')} used={u.participantsUsed} total={u.participantAllowance} />
         <Progress label={ct(locale, 'activeCompetitions')} used={u.activeCompetitions} total={u.activeCompetitionAllowance} />
-        <div className="text-xs text-[#454b47]">{ct(locale, 'remaining')}: <b dir="ltr">{u.participantsRemaining.toLocaleString()}</b></div>
+        <div className="text-xs text-[#454b47]">{ct(locale, 'remaining')}: <b dir="ltr">{u.participantsRemaining.toLocaleString('en-US')}</b></div>
         {warn && <div role="status" className="rounded-xl bg-[#fbf3e3] px-3 py-2 text-xs font-bold text-[#7a5413]">{ct(locale, warn as CommercialKey)}</div>}
       </div>
       {data.limits && Object.keys(data.limits.override || {}).length > 0 && (
@@ -131,7 +131,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
             <div className="grid gap-3 sm:grid-cols-3">
               {larger.map((p: any) => <div key={p.id} className="rounded-2xl border border-[#e2e0d9] p-4">
                 <div className="font-black">{planName(p)}</div>
-                <div className="text-xs text-[#666c68]">{p.participantAllowance.toLocaleString()} · {p.activeCompetitionAllowance} {ct(locale, 'activeCompetitions')}</div>
+                <div className="text-xs text-[#666c68]">{p.participantAllowance.toLocaleString('en-US')} · {p.activeCompetitionAllowance} {ct(locale, 'activeCompetitions')}</div>
                 <div className="my-2 text-sm font-bold">{formatMoney(p.publicPriceMinor, p.currency, locale)}</div>
                 <Button size="sm" loading={busy} onClick={() => void upgrade(p.id)}>{ct(locale, 'upgrade')}</Button>
               </div>)}
@@ -144,7 +144,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
           <ul className="divide-y divide-[#ebe9e2] text-xs">
             {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-2 py-2">
               <span>{formatDate(t.startsAt, locale)} {locale === 'ar' ? '←' : '→'} {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
-              <span dir="ltr">{t.participantsUsed.toLocaleString()} / {t.participantAllowance.toLocaleString()}</span>
+              <span dir="ltr">{t.participantsUsed.toLocaleString('en-US')} / {t.participantAllowance.toLocaleString('en-US')}</span>
             </li>)}
           </ul>
         )}
@@ -227,7 +227,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
         <h3 className="text-sm font-black sm:col-span-2">{ct(locale, 'activateCustomer')}</h3>
         <Field label={ct(locale, 'nameArabic')}><input required className={inputCls} value={form.officialName} onChange={e => setForm({ ...form, officialName: e.target.value })} /></Field>
         <Field label={ct(locale, 'nameEnglish')}><input required className={inputCls} value={form.shortName} onChange={e => setForm({ ...form, shortName: e.target.value })} /></Field>
-        <Field label="ISO country"><input required maxLength={2} className={inputCls} dir="ltr" value={form.country} onChange={e => setForm({ ...form, country: e.target.value.toUpperCase() })} /></Field>
+        <Field label={locale === 'ar' ? 'رمز الدولة (ISO)' : 'ISO country'}><input required maxLength={2} className={inputCls} dir="ltr" value={form.country} onChange={e => setForm({ ...form, country: e.target.value.toUpperCase() })} /></Field>
         <Field label={ct(locale, 'currentPlan')}>
           <select required className={inputCls} value={form.planId} onChange={e => setForm({ ...form, planId: e.target.value })}>
             <option value="" />
@@ -330,11 +330,11 @@ export const BrandEditor: React.FC<{ ownerType: 'operator' | 'organization'; own
           </select>
         </Field>
         <Field label={ct(locale, 'productName')}><input className={inputCls} value={form.productName || ''} onChange={e => setForm({ ...form, productName: e.target.value })} /></Field>
-        <Field label="Logo URL (https)"><input className={inputCls} dir="ltr" value={form.logoUrl || ''} onChange={e => setForm({ ...form, logoUrl: e.target.value })} /></Field>
-        <Field label="Favicon URL (https)"><input className={inputCls} dir="ltr" value={form.faviconUrl || ''} onChange={e => setForm({ ...form, faviconUrl: e.target.value })} /></Field>
-        <Field label="Primary color"><input className={inputCls} dir="ltr" placeholder="#1f6f4a" value={form.primaryColor || ''} onChange={e => setForm({ ...form, primaryColor: e.target.value })} /></Field>
+        <Field label={locale === 'ar' ? 'رابط الشعار (HTTPS)' : 'Logo URL (https)'}><input className={inputCls} dir="ltr" value={form.logoUrl || ''} onChange={e => setForm({ ...form, logoUrl: e.target.value })} /></Field>
+        <Field label={locale === 'ar' ? 'رابط أيقونة التبويب (HTTPS)' : 'Favicon URL (https)'}><input className={inputCls} dir="ltr" value={form.faviconUrl || ''} onChange={e => setForm({ ...form, faviconUrl: e.target.value })} /></Field>
+        <Field label={locale === 'ar' ? 'اللون الأساسي' : 'Primary color'}><input className={inputCls} dir="ltr" placeholder="#1f6f4a" value={form.primaryColor || ''} onChange={e => setForm({ ...form, primaryColor: e.target.value })} /></Field>
         <Field label={ct(locale, 'discover')}><input className={inputCls} value={form.directoryName || ''} onChange={e => setForm({ ...form, directoryName: e.target.value })} /></Field>
-        <Field label="Support email"><input className={inputCls} dir="ltr" value={form.supportEmail || ''} onChange={e => setForm({ ...form, supportEmail: e.target.value })} /></Field>
+        <Field label={locale === 'ar' ? 'بريد الدعم' : 'Support email'}><input className={inputCls} dir="ltr" value={form.supportEmail || ''} onChange={e => setForm({ ...form, supportEmail: e.target.value })} /></Field>
         {data.rights.hideMizanBrand && form.brandingMode === 'full_white_label' && (
           <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={form.showPoweredByMizan !== false} onChange={e => setForm({ ...form, showPoweredByMizan: e.target.checked })} />{ct(locale, 'poweredBy')}</label>
         )}
@@ -390,7 +390,7 @@ export const PlatformCommercialPanel: React.FC = () => {
         <h3 className="mb-2 text-sm font-black">{ct(locale, 'catalog')}</h3>
         <table className="w-full min-w-[640px] text-start text-xs"><tbody>{data.plans.map((p: any) => <tr key={p.id} className="border-t border-[#ebe9e2]">
           <td className="py-2 font-bold">{p.name}</td><td>{p.custom ? 'Custom' : formatMoney(p.publicPriceMinor, p.currency, locale)}</td>
-          <td>{p.participantAllowance.toLocaleString()}</td><td>{p.activeCompetitionAllowance}</td>
+          <td>{p.participantAllowance.toLocaleString('en-US')}</td><td>{p.activeCompetitionAllowance}</td>
           <td>{p.upcomingVersion ? `→ ${formatMoney(p.upcomingVersion.publicPriceMinor, p.currency, locale)} (${formatDate(p.upcomingVersion.effectiveFrom, locale)})` : ''}</td>
         </tr>)}</tbody></table>
         <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e => { e.preventDefault(); void run(() => api(`/api/saas/owner/plans/${encodeURIComponent(price.planId)}/versions`, { method: 'POST', body: JSON.stringify({ publicPriceMinor: Math.round(Number(price.amount) * 100), effectiveFrom: price.effectiveFrom ? new Date(price.effectiveFrom).toISOString() : undefined }) })); }}>
@@ -685,7 +685,7 @@ export const PaymentGatewayPanel: React.FC<{ ownerType: 'operator' | 'organizati
       <Field label={ar ? 'ملف البوابة (JSON)' : 'Gateway profile (JSON)'}><textarea className={`${inputCls} h-40 font-mono text-[11px]`} dir="ltr" spellCheck={false} value={profileText} onChange={e => setProfileText(e.target.value)} /></Field>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label={ar ? 'الاسم الظاهر' : 'Display name'}><input className={inputCls} value={keys.displayName} onChange={e => setKeys({ ...keys, displayName: e.target.value })} /></Field>
-        <Field label={ar ? 'المفتاح السرّي (API key)' : 'Secret API key'}><input type="password" autoComplete="off" className={inputCls} dir="ltr" value={keys.apiKey} onChange={e => setKeys({ ...keys, apiKey: e.target.value })} /></Field>
+        <Field label={ar ? 'المفتاح السرّي للواجهة البرمجية' : 'Secret API key'}><input type="password" autoComplete="off" className={inputCls} dir="ltr" value={keys.apiKey} onChange={e => setKeys({ ...keys, apiKey: e.target.value })} /></Field>
         <Field label={ar ? 'سرّ توقيع الإشعار (اختياري)' : 'Notification signing secret (optional)'}><input type="password" autoComplete="off" className={inputCls} dir="ltr" value={keys.webhookSecret} onChange={e => setKeys({ ...keys, webhookSecret: e.target.value })} /></Field>
       </div>
       <div className="flex flex-wrap items-end gap-2">

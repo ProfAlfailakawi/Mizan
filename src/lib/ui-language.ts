@@ -168,7 +168,11 @@ export function localizedCountry(raw: string | undefined, ar: boolean): string {
   if (!raw) return '';
   const m = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   if (!m) return raw;
-  return ar ? m[2].trim() : m[1].trim();
+  /* الترتيب يختلف بين مصدر وآخر: «Jordan (الأردن)» و«الأردن (Jordan)». نختار الجزء بحسب خطّه لا موضعه. */
+  const outer = m[1].trim(), inner = m[2].trim();
+  const isArabic = (v: string) => /[\u0600-\u06FF]/.test(v);
+  if (isArabic(outer) === isArabic(inner)) return ar ? inner : outer;
+  return ar ? (isArabic(inner) ? inner : outer) : (isArabic(inner) ? outer : inner);
 }
 
 /*
@@ -328,6 +332,21 @@ const AR_DEVICE_ROLE: Record<string, string> = {
 export function deviceRoleLabel(value: string | undefined | null, ar: boolean): string {
   if (!value) return '—';
   return ar ? (AR_DEVICE_ROLE[value] || value) : value;
+}
+
+/*
+ * مصدر الجهاز في مخطط الموقع: «Laptop 1» و«TV 2» و«Additional device required» كانت تُطبع خامة.
+ * القيمة تبقى في البيانات كما هي، والعرض بالعربية؛ وما لا نعرفه يُعرض كما هو.
+ */
+const AR_DEVICE_SOURCE: Record<string, string> = {
+  Laptop: 'حاسوب محمول', Desktop: 'حاسوب مكتبي', Tablet: 'جهاز لوحي', TV: 'شاشة', 'Mini PC': 'حاسوب مصغّر',
+};
+export function deviceSourceLabel(value: string | undefined | null, ar: boolean): string {
+  if (!value) return '—';
+  if (!ar) return value;
+  if (value === 'Additional device required') return 'يلزم جهاز إضافي';
+  const m = value.match(/^(Laptop|Desktop|Tablet|TV|Mini PC) (\d+)$/);
+  return m ? `${AR_DEVICE_SOURCE[m[1]]} ${m[2]}` : value;
 }
 
 /* قنوات الإشعار. */

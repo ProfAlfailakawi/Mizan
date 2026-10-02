@@ -100,7 +100,7 @@ export const PassportView: React.FC = () => {
   const [confirmErase, setConfirmErase] = useState(false);
   const erase = () => run(async () => { await post('/api/public/passports/me/erase', { token }); writeToken(''); setToken(''); setPassport(null); setConfirmErase(false); });
 
-  const header = <div className="mb-6"><div className="mb-3 flex justify-end"><PublicLanguageSwitcher /></div><div className="mizan-kicker">MIZAN PASSPORT</div><h1 className="mt-1 text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div>;
+  const header = <div className="mb-6"><div className="mb-3 flex justify-end"><PublicLanguageSwitcher /></div>{!ar && <div className="mizan-kicker">MIZAN PASSPORT</div>}<h1 className="mt-1 text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div>;
 
   if (publicId) return <main className="mx-auto max-w-2xl px-4 py-8">{header}
     {error && <p role="alert" className="rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
