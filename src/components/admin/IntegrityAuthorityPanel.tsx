@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../lib/display-format';
 import React, {useCallback, useEffect, useState} from 'react';
 import {CheckCircle2, Clock3, KeyRound, Lock, ShieldAlert} from 'lucide-react';
 import {Badge} from '../design-system/Badge';
@@ -155,7 +156,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="mizan-proof-code" dir="ltr" title={c.seedCommitmentHash}>{shortHash(c.seedCommitmentHash)}</div>
-                          <div className="mt-1 text-xs text-[#646965]" dir="ltr">{new Date(c.committedAt).toLocaleString()}</div>
+                          <div className="mt-1 text-xs text-[#646965]" dir="ltr">{displayDateTime(c.committedAt,true)}</div>
                         </div>
                         <div className="flex items-center gap-2">
                           {c.status === 'COMMITTED'

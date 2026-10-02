@@ -1,3 +1,4 @@
+import { displayDateTimeMedium } from '../../lib/display-format';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import { Mini } from '../design-system/Field';
 import {
@@ -42,7 +43,7 @@ export const activationQrValue=(token:string,origin?:string)=>{
  return new TextEncoder().encode(link).length<=78?link:`MZI1|${token}`;
 };
 
-const dateText=(value:unknown,ar:boolean)=>{if(!value)return ar?'لا يوجد نشاط بعد':'No activity yet';const d=new Date(String(value));if(Number.isNaN(d.getTime()))return ar?'غير متاح':'Unavailable';return new Intl.DateTimeFormat(ar?'ar-KW-u-nu-latn':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(d)};
+const dateText=(value:unknown,ar:boolean)=>{if(!value)return ar?'لا يوجد نشاط بعد':'No activity yet';const d=new Date(String(value));if(Number.isNaN(d.getTime()))return ar?'غير متاح':'Unavailable';return displayDateTimeMedium(d,ar)};
 const inviteStatus=(status:string,ar:boolean)=>({READY:ar?'بانتظار التفعيل':'Awaiting activation',ACTIVATED:ar?'تم التفعيل':'Activated',EXPIRED:ar?'انتهت الدعوة':'Expired',REVOKED:ar?'ملغاة':'Revoked',PENDING_APPROVAL:ar?'بانتظار الاعتماد':'Awaiting approval'} as Record<string,string>)[status]||(ar?'حالة غير معروفة':'Unknown status');
 const resetStatus=(status:string,ar:boolean)=>({PENDING:ar?'طلب جديد':'New request',ISSUED:ar?'تم إنشاء رابط':'Link issued',USED:ar?'تم تغيير كلمة المرور':'Password changed',EXPIRED:ar?'انتهت الصلاحية':'Expired',REVOKED:ar?'ملغى':'Revoked'} as Record<string,string>)[status]||(ar?'حالة غير معروفة':'Unknown status');
 const identityHashParams=()=>{if(typeof window==='undefined'||!window.location.hash.startsWith('#identity'))return null;return new URLSearchParams(window.location.hash.split('?')[1]||'')};

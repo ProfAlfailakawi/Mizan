@@ -41,12 +41,12 @@ export function buildDeploymentPlan(competition:Competition, profile:DeploymentP
     principleAr: profile==='lean'?'استفد من الموجود أولًا: كمبيوتر عادي + متصفح + شاشة انتظار. الطابعة والكشك المخصص اختياريان.':profile==='balanced'?'أجهزة مخصصة فقط في نقاط الاحتكاك العالية، مع إعادة استخدام بقية الأجهزة.':'تجهيز مخصص واحتياطي أعلى للفعاليات الكبرى والبث الرسمي.',
     principleEn: profile==='lean'?'Reuse what already exists: a normal computer + browser + waiting display. Printer and dedicated kiosk are optional.':profile==='balanced'?'Dedicated hardware only at high-friction points; reuse the rest.':'Dedicated and redundant hardware for major official events.',
     items:[
-      {id:'gate',labelAr:'بوابة الحضور',labelEn:'Arrival gate',quantity:gateStations,required:true,noteAr:'كمبيوتر مكتبي أو لابتوب يكفي؛ وضع ملء الشاشة يحوله إلى Kiosk.',noteEn:'Any desktop or laptop works; fullscreen mode turns it into a kiosk.'},
+      {id:'gate',labelAr:'بوابة الحضور',labelEn:'Arrival gate',quantity:gateStations,required:true,noteAr:'كمبيوتر مكتبي أو لابتوب يكفي؛ وضع ملء الشاشة يحوله إلى بوابة خدمة ذاتية.',noteEn:'Any desktop or laptop works; fullscreen mode turns it into a kiosk.'},
       {id:'scanner',labelAr:'مسح QR',labelEn:'QR scanning',quantity:gateStations,required:false,noteAr:'كاميرا الجهاز تكفي. قارئ USB خيار للسرعة فقط.',noteEn:'Device camera is enough. USB scanner is only a speed upgrade.'},
       {id:'ticket',labelAr:'رقم الانتظار',labelEn:'Queue ticket',quantity:publicDisplays,required:true,noteAr:'الرقم يظهر على الشاشة وهاتف المتسابق؛ لا حاجة لطباعة ورق.',noteEn:'Number appears on screen and participant phone; no paper required.'},
-      {id:'judge',labelAr:'محطات التحكيم',labelEn:'Judge stations',quantity:judgeStations,required:true,noteAr:'متصفح على جهاز موجود؛ Judge Pad اختياري.',noteEn:'Browser on existing hardware; Judge Pad is optional.'},
-      {id:'display',labelAr:'شاشات الانتظار',labelEn:'Waiting displays',quantity:publicDisplays,required:true,noteAr:'أي TV/شاشة مع متصفح أو HDMI.',noteEn:'Any TV/display with browser or HDMI.'},
-      {id:'edge',labelAr:'استمرارية محلية',labelEn:'Local continuity',quantity:edgeServers,required:policy.operations.offlineContinuity,noteAr:'Mini PC واحد يكفي للوضع الاقتصادي؛ الثاني احتياطي في Premium.',noteEn:'One mini PC is enough in lean mode; Premium adds standby.'},
+      {id:'judge',labelAr:'محطات التحكيم',labelEn:'Judge stations',quantity:judgeStations,required:true,noteAr:'متصفح على جهاز موجود؛ لوحة المحكم المخصصة اختيارية.',noteEn:'Browser on existing hardware; Judge Pad is optional.'},
+      {id:'display',labelAr:'شاشات الانتظار',labelEn:'Waiting displays',quantity:publicDisplays,required:true,noteAr:'أي شاشة مع متصفح أو HDMI.',noteEn:'Any TV/display with browser or HDMI.'},
+      {id:'edge',labelAr:'استمرارية محلية',labelEn:'Local continuity',quantity:edgeServers,required:policy.operations.offlineContinuity,noteAr:'حاسوب مصغّر واحد يكفي للوضع الاقتصادي؛ والثاني احتياطي في الوضع المتقدم.',noteEn:'One mini PC is enough in lean mode; Premium adds standby.'},
       {id:'printer',labelAr:'طابعة',labelEn:'Printer',quantity:printers,required:false,noteAr:'اختيارية فقط إذا اشترطت الجهة تذاكر أو بطاقات ورقية.',noteEn:'Optional only when paper tickets/badges are required.'}
     ]
   };

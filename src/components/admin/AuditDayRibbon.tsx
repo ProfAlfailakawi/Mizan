@@ -19,7 +19,7 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
       const d = new Date(e.timestamp); if (Number.isNaN(d.getTime())) continue;
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       let row = m.get(key);
-      if (!row) { row = { label: d.toLocaleDateString(ar ? 'ar-KW' : 'en-US'), hours: Array(24).fill(0), risk: Array(24).fill(false), total: 0, sensitive: 0, ts: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() }; m.set(key, row); }
+      if (!row) { row = { label: d.toLocaleDateString(ar ? 'ar-KW-u-nu-latn' : 'en-US'), hours: Array(24).fill(0), risk: Array(24).fill(false), total: 0, sensitive: 0, ts: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() }; m.set(key, row); }
       const h = d.getHours(); row.hours[h]++; row.total++;
       if (isSensitiveAuditAction(e.action)) { row.risk[h] = true; row.sensitive++; }
     }

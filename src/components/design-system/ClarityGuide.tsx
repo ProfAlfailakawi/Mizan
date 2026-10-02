@@ -40,7 +40,7 @@ const ROLE_GUIDE:Partial<Record<Role,{titleAr:string;titleEn:string;steps:Step[]
  ]},
  auditor:{titleAr:'أثبت، لا تفترض',titleEn:'Verify, do not assume',steps:[
   {titleAr:'تتبّع المصدر',titleEn:'Trace provenance',noteAr:'انتقل من النتيجة إلى السياسة والمصدر والبصمة والموافقات.',noteEn:'Trace the result to policy, source, hash, and approvals.'},
-  {titleAr:'تحقق من الإثبات',titleEn:'Verify proof',noteAr:'الختم، Merkle، السحب العادل، والشهادة لها أدلة قابلة للفحص.',noteEn:'Seal, Merkle, FairDraw, and certificate evidence can be checked.'},
+  {titleAr:'تحقق من الإثبات',titleEn:'Verify proof',noteAr:'الختم، شجرة ميركل، السحب العادل، والشهادة لها أدلة قابلة للفحص.',noteEn:'Seal, Merkle, FairDraw, and certificate evidence can be checked.'},
  ]},
 };
 

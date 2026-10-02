@@ -58,7 +58,7 @@ export const VenueLockButton:React.FC<{surface:string;ar:boolean;onLocked:(l:Ven
   const submit=async()=>{
     setErr('');
     if(step==='set'){
-      if(!isValidPin(pin)){setErr(ar?'الرمز من ٤ إلى ٨ أرقام.':'The code must be 4 to 8 digits.');return}
+      if(!isValidPin(pin)){setErr(ar?'الرمز من 4 إلى 8 أرقام.':'The code must be 4 to 8 digits.');return}
       if(isWeakPin(pin)){setErr(ar?'رمز متكرّر أو متسلسل يسهل تخمينه على جهاز عام.':'A repeated or sequential code is easy to guess on a public device.');return}
       setStep('repeat');setConfirm('');return;
     }

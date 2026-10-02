@@ -890,7 +890,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
                 <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
                   <ScanSearch className="w-3.5 h-3.5" />
-                  <span>{ar ? 'الترويسة العلوية (Top Header)' : 'Top Header'}</span>
+                  <span>{ar ? 'الترويسة العلوية' : 'Top Header'}</span>
                 </div>
                 <PlacementToggle label={ar ? 'إظهار الشعار الرسمي' : 'Show Brand Logo'} checked={placements.showHeaderLogo} onChange={v => setPlacements(p => ({ ...p, showHeaderLogo: v }))} />
                 <PlacementToggle label={ar ? 'إظهار الشعار اللفظي (السلوجن)' : 'Show Slogan / Tagline'} checked={placements.showHeaderSlogan} onChange={v => setPlacements(p => ({ ...p, showHeaderSlogan: v }))} />
@@ -901,7 +901,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
                 <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5" />
-                  <span>{ar ? 'تذييل الصفحات العام (Global Footer)' : 'Global Footer'}</span>
+                  <span>{ar ? 'تذييل الصفحات العام' : 'Global Footer'}</span>
                 </div>
                 <PlacementToggle label={ar ? 'إظهار أرقام التواصل والدعم' : 'Show Phone & Support Email'} checked={placements.showFooterContact} onChange={v => setPlacements(p => ({ ...p, showFooterContact: v }))} />
                 <PlacementToggle label={ar ? 'إظهار العنوان والمقر الجغرافي' : 'Show Address / HQ Location'} checked={placements.showFooterAddress} onChange={v => setPlacements(p => ({ ...p, showFooterAddress: v }))} />

@@ -293,7 +293,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
 
       <div className="rounded-[28px] border border-white/10 bg-white/[.035] p-6">
         <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[.15em] mizan-venue-muted">
-          <span>{ar ? '٦٠٤ صفحة' : '604 PAGES'}</span>
+          <span>{ar ? '604 صفحة' : '604 PAGES'}</span>
           <span>{ar ? `${covered} صفحة تُليت اليوم` : `${covered} pages today`}</span>
         </div>
         <div dir="ltr" role="img" aria-label={ar ? `تغطية ${percent} بالمئة من صفحات المصحف` : `${percent}% Mushaf coverage`}

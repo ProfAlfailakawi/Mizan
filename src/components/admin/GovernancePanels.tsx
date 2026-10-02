@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../lib/display-format';
 /*
  * لوحات الحوكمة التشغيلية: تضارب المصالح (للمحكّم ولرئيس التحكيم)، الجدولة الذكية مع
  * التعديل اليدوي، وهرم التأهيل. كل فعلٍ هنا يمرّ بأفعال المخزن المُدقَّقة، والقواعد في
@@ -95,7 +96,7 @@ export const SmartSchedulePanel: React.FC = () => {
     <div className="flex flex-wrap items-end gap-3"><label className="text-xs font-bold">{L(ar, 'دقائق الانتقال بين الجلسات', 'Transition minutes')}<input type="number" min={0} className={`${input} max-w-[7rem]`} value={transition} onChange={e => setTransition(Number(e.target.value) || 0)} /></label>
       <button className={btn} onClick={() => { const r = s.generateSchedule({ days, breaks, prayerBreaks: prayers, transitionMinutes: transition }); setResult(r); if (r.ok) setSelected(r.plan.id); }}>{L(ar, 'توليد الجدول', 'Generate schedule')}</button><Result r={result} ar={ar} /></div>
     {plan && <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-xs"><select aria-label={L(ar, 'النسخة', 'Version')} className={`${input} max-w-xs`} value={plan.id} onChange={e => setSelected(e.target.value)}>{plans.map(p => <option key={p.id} value={p.id}>{new Date(p.createdAt).toLocaleString()} · {p.status}</option>)}</select>
+      <div className="flex flex-wrap items-center gap-2 text-xs"><select aria-label={L(ar, 'النسخة', 'Version')} className={`${input} max-w-xs`} value={plan.id} onChange={e => setSelected(e.target.value)}>{plans.map(p => <option key={p.id} value={p.id}>{displayDateTime(p.createdAt,ar)} · {p.status}</option>)}</select>
         <span>{plan.plan.slots.length} {L(ar, 'موعدًا', 'slots')} · {plan.plan.unscheduled.length} {L(ar, 'بلا موعد', 'unscheduled')}</span>
         {plan.status !== 'published' && <button className={btn2} onClick={() => setResult(s.publishSchedule(plan.id))}>{L(ar, 'اعتماد الجدول', 'Publish schedule')}</button>}</div>
       {byDay.map(([date, list]) => <div key={date} className="overflow-x-auto rounded-2xl border border-[#e5e3dc]"><table className="w-full min-w-[640px] text-start text-xs"><caption className="p-2 text-start font-black">{date}</caption>

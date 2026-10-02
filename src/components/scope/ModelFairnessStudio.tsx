@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../lib/display-format';
 import React, { useMemo, useState } from 'react';
 import { BadgeCheck, Download, FileText } from 'lucide-react';
 import type { ExposureProfile } from '../../lib/exposure-risk';
@@ -141,7 +142,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-black text-[#24302b]">{ar ? report.titleArabic : report.titleEnglish}</p>
-                    <p className="mt-0.5 text-[10px] text-[#696f6b]">{new Date(report.generatedAt).toLocaleString(ar ? 'ar' : 'en')} · <code>{report.reportHash.slice(0, 16)}</code></p>
+                    <p className="mt-0.5 text-[10px] text-[#696f6b]">{displayDateTime(report.generatedAt,ar)} · <code>{report.reportHash.slice(0, 16)}</code></p>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setReportOpen(report)}>{ar ? 'اعرض' : 'View'}</Button>

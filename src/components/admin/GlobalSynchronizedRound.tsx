@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../lib/display-format';
 import React, { useMemo } from 'react';
 import { Globe2, Waypoints, ShieldCheck, LockKeyhole, CircleDot } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
@@ -58,7 +59,7 @@ export const GlobalSynchronizedRound: React.FC = () => {
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--amber-soft)] p-5">
           <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--amber)]"><Waypoints className="w-4 h-4"/>{ar?'آخر جذر نتائج موثّق':'LATEST VERIFIED RESULT ROOT'}</div>
           <div className={`mt-3 text-xs sm:text-sm break-all text-[var(--ink)] min-h-[2.5em] ${latestRoot?"font-mono":""}`}>{latestRoot?.merkleRoot || (ar?'لم يُنشأ جذر نتائج بعد':'No result root has been created yet')}</div>
-          <div className="mt-2 text-[13px] text-[var(--muted)]">{latestRoot ? new Date(latestRoot.createdAt).toLocaleString(ar?'ar-KW':'en') : (ar?'يظهر بعد وجود نتائج فعلية قابلة للختم.':'It appears only after actual results can be sealed.')}</div>
+          <div className="mt-2 text-[13px] text-[var(--muted)]">{latestRoot ? displayDateTime(latestRoot.createdAt,ar) : (ar?'يظهر بعد وجود نتائج فعلية قابلة للختم.':'It appears only after actual results can be sealed.')}</div>
         </div>
       </div>
 
