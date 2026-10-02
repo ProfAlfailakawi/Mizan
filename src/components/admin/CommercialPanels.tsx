@@ -178,7 +178,7 @@ export const OperatorCommercialPanel: React.FC = () => {
     <section className="space-y-4" aria-label={ct(locale, 'operator')}>
       <ErrorBox error={error} />
       {!data.agreement && <div role="status" className="rounded-2xl bg-[#fbf3e3] px-4 py-3 text-xs font-bold text-[#7a5413]">{ct(locale, 'noAgreement')}</div>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:nth-child(3)]:col-span-2 [&>*:nth-child(4)]:col-span-2 lg:[&>*:nth-child(3)]:col-span-1 lg:[&>*:nth-child(4)]:col-span-1">
         <Stat label={ct(locale, 'walletBalance')} value={formatMoney(s.balanceMinor, cur, locale)} />
         <Stat label={ct(locale, 'annualCommitment')} value={formatMoney(s.annualCommitmentMinor, cur, locale)} hint={`${ct(locale, 'spent')}: ${formatMoney(s.spentThisAgreementMinor, cur, locale)}`} />
         <Stat label={ct(locale, 'tier')} value={data.tier ? (locale === 'ar' ? data.tier.nameArabic : data.tier.name) : '—'} hint={s.discountBps !== undefined ? `${ct(locale, 'discount')}: ${s.discountBps / 100}%` : undefined} />
@@ -230,7 +230,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
           <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
             <td className="py-2 font-bold">{c.officialName}</td><td>{c.planName || '—'}</td>
-            <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr">{c.participantsUsed} / {c.participantAllowance}</td>
+            <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr"><div>{c.participantsUsed} / {c.participantAllowance}</div>{c.participantAllowance > 0 && <div className="mt-1 h-1.5 w-24 rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}</td>
             <td>{formatDate(termLastDay(c.renewalDate), locale)}</td><td>{ct(locale, `state_${c.accessState}` as CommercialKey)}</td>
             <td>{formatMoney(c.walletCostMinor, c.currency, locale)}</td><td dir="ltr">{c.domain || '—'}</td>
             <td><Button size="sm" variant="secondary" loading={busy === c.organizationId} onClick={() => void renew(c.organizationId)}>{ct(locale, 'renew')}</Button></td>
@@ -394,7 +394,7 @@ export const PlatformCommercialPanel: React.FC = () => {
     <section className="space-y-4">
       <ErrorBox error={error} />
       <h2 className="text-base font-black">{ct(locale, 'reports')}</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
         <Stat label={ct(locale, 'directRecurring')} value={sums(r.directAnnualRecurring)} />
         <Stat label={ct(locale, 'wholesaleSales')} value={sums(r.operatorWholesaleSales12m)} />
         <Stat label={ct(locale, 'walletBalances')} value={sums(r.walletBalances)} />
