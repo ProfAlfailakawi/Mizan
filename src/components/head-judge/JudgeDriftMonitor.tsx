@@ -125,21 +125,22 @@ export const JudgeDriftMonitor: React.FC = () => {
         const open = signals.filter((s) => s.attention && !ackd[s.judgeId]);
         const rest = signals.filter((s) => !(s.attention && !ackd[s.judgeId]));
         const handled = rest.filter((s) => s.attention).length;
-        const stable = rest.length - handled;
         const R = 18, C = 2 * Math.PI * R;
-        const share = signals.length ? rest.length / signals.length : 0;
+        // نفس مجموعة الشارة في الرأس (attention) كي لا يتناقض العدّان بعد «رتّبت استراحة».
+        const calm = signals.length - flagged.length;
+        const share = signals.length ? calm / signals.length : 0;
         return <>
           <div className="mt-5 flex items-center gap-4 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-4">
-            <div className="relative w-14 h-14 shrink-0" role="img" aria-label={`${rest.length}/${signals.length}`}>
+            <div className="relative w-14 h-14 shrink-0" role="img" aria-label={`${calm}/${signals.length}`}>
               <svg viewBox="0 0 44 44" className="w-14 h-14 -rotate-90">
                 <circle cx="22" cy="22" r={R} fill="none" stroke="#ebe9e2" strokeWidth="4" />
                 <circle cx="22" cy="22" r={R} fill="none" stroke="#2f6555" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${C * share} ${C}`} />
               </svg>
-              <span className="absolute inset-0 grid place-items-center text-sm font-black" dir="ltr">{rest.length}/{signals.length}</span>
+              <span className="absolute inset-0 grid place-items-center text-sm font-black" dir="ltr">{calm}/{signals.length}</span>
             </div>
             <div className="flex flex-wrap gap-2 text-[13px] font-black">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F1E5] px-3 py-1 text-[#7d5e34]"><span className="w-2 h-2 rounded-full bg-[#9a6a2f]" />{open.length} {ar ? 'تنبيه' : 'flag'}</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1 text-[#214C40]"><span className="w-2 h-2 rounded-full bg-[#2f6555]" />{stable} {ar ? 'مستقر' : 'Stable'}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F1E5] px-3 py-1 text-[#7d5e34]"><span className="w-2 h-2 rounded-full bg-[#9a6a2f]" />{flagged.length} {ar ? 'تنبيه' : 'flag'}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1 text-[#214C40]"><span className="w-2 h-2 rounded-full bg-[#2f6555]" />{calm} {ar ? 'مستقر' : 'Stable'}</span>
               {handled > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1 text-[#214C40]"><ShieldCheck className="w-3.5 h-3.5" />{handled}</span>}
             </div>
           </div>
