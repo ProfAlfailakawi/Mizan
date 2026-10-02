@@ -32,7 +32,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -165,16 +165,36 @@ jobs:
           EXPECTED_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
-          service_json="$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
-            --project="$GCP_PROJECT_ID" \
-            --region="$GCP_REGION" \
-            --platform=managed \
-            --format=json)"
 
-          ready_revision="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
-          created_revision="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
-          service_url="$(jq -r '.status.url // empty' <<<"$service_json")"
-          deployed_sha="$(jq -r '.metadata.labels["mizan-git-sha"] // empty' <<<"$service_json")"
+          describe_service() {
+            gcloud run services describe "$CLOUD_RUN_SERVICE" \
+              --project="$GCP_PROJECT_ID" \
+              --region="$GCP_REGION" \
+              --platform=managed \
+              --format=json
+          }
+
+          # نجاحُ Cloud Build لا يعني أن Cloud Run أعلن جاهزيّة آخر مراجعة: خطوة `bind-engines`
+          # تُنشئ مراجعةً ثانية (`services update`) بعد نشر الصورة، وحقلُ `latestReadyRevisionName`
+          # يلحق بها بعد لحظات. وقراءةٌ واحدة فور انتهاء البناء كانت تحكم بالفشل على نشرٍ سليم
+          # (created=…01130 ready=…01129). فيُنتظر استقرارُ الخدمة حتى ١٠ دقائق، ولا يُحكم من قراءةٍ واحدة.
+          service_json=""
+          ready_revision=""
+          created_revision=""
+          service_url=""
+          deployed_sha=""
+          for attempt in $(seq 1 60); do
+            service_json="$(describe_service)"
+            ready_revision="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
+            created_revision="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
+            service_url="$(jq -r '.status.url // empty' <<<"$service_json")"
+            deployed_sha="$(jq -r '.metadata.labels["mizan-git-sha"] // empty' <<<"$service_json")"
+            if [[ -n "$ready_revision" && -n "$service_url" && "$created_revision" == "$ready_revision" ]]; then
+              break
+            fi
+            echo "Revision not settled yet (attempt $attempt/60): created=${created_revision:-none} ready=${ready_revision:-none}; retrying in 10s..."
+            sleep 10
+          done
 
           if [[ -z "$ready_revision" || -z "$service_url" ]]; then
             echo 'Cloud Run has no ready revision or service URL after deployment.' >&2
@@ -182,6 +202,21 @@ jobs:
           fi
           if [[ "$created_revision" != "$ready_revision" ]]; then
             echo "Newest Cloud Run revision is not ready: created=$created_revision ready=$ready_revision" >&2
+            # مراجعةٌ لم تجهز بعد عشر دقائق عطبٌ حقيقيّ (غالبًا إقلاعٌ يسقط): يُطبع سببُه هنا
+            # بدل أن يُترك لمن يفتح كونسول GCP.
+            echo "::group::Revision $created_revision conditions"
+            gcloud run revisions describe "$created_revision" \
+              --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --platform=managed \
+              --format='yaml(status.conditions,status.logUrl)' 2>&1 || true
+            echo "::endgroup::"
+            echo "::group::Service conditions and traffic"
+            jq '{conditions: .status.conditions, traffic: .status.traffic}' <<<"$service_json" || true
+            echo "::endgroup::"
+            echo "::group::Failed revision logs (last 40 lines)"
+            gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$CLOUD_RUN_SERVICE\" AND resource.labels.revision_name=\"$created_revision\" AND severity>=WARNING" \
+              --project "$GCP_PROJECT_ID" --freshness 1h --limit 40 --order desc \
+              --format='value(timestamp,textPayload,jsonPayload.message)' 2>&1 || echo "(no permission to read service logs)"
+            echo "::endgroup::"
             exit 1
           fi
           if [[ "$deployed_sha" != "$EXPECTED_SHA" ]]; then
