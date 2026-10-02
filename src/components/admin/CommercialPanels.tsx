@@ -10,7 +10,7 @@ import { auth } from '../../lib/firebase';
 import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { ct, commercialErrorText, formatDate, formatMoney, termLastDay, type CommercialKey } from '../../lib/commercial-i18n';
 import { CLONE_PARTS, suggestNextEditionLabel, type ClonePart } from '../../lib/competition-clone';
-import { Check, Building2, UsersRound } from 'lucide-react';
+import { Check, Gauge, Building2, UsersRound } from 'lucide-react';
 import { DnaStat } from '../dna/DnaKit';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -106,7 +106,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
       <h2 id="subscription-heading" className="text-base font-black">{ct(locale, 'subscription')}</h2>
       <ErrorBox error={error} />
       {notice && <div role="status" className="rounded-2xl bg-[#e8f3ec] px-4 py-3 text-xs font-bold text-[#1f5b3c]">{notice}</div>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:first-child]:col-span-2 [&>*:last-child]:col-span-2 lg:[&>*:first-child]:col-span-1 lg:[&>*:last-child]:col-span-1">
         <Stat label={ct(locale, 'currentPlan')} value={planName(data.plan) || '—'} />
         <Stat label={ct(locale, 'termStart')} value={formatDate(data.term?.startsAt, locale)} />
         <Stat label={ct(locale, 'termEnd')} value={formatDate(termLastDay(data.term?.endsAt), locale)} />
@@ -120,8 +120,15 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
       </div>
       {data.limits && Object.keys(data.limits.override || {}).length > 0 && (
         <div className="mizan-panel p-5 text-xs">
-          <table className="w-full text-start"><thead><tr><th scope="col" /><th scope="col">{ct(locale, 'limitsBase')}</th><th scope="col">{ct(locale, 'limitsOverride')}</th><th scope="col">{ct(locale, 'limitsEffective')}</th></tr></thead>
-            <tbody>{(['participantAllowance', 'activeCompetitionAllowance'] as const).map(k => <tr key={k}><th scope="row" className="py-1">{ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')}</th><td>{data.limits.base[k]}</td><td>{data.limits.override[k] ?? '—'}</td><td className="font-black">{data.limits.effective[k]}</td></tr>)}</tbody></table>
+          <div className="space-y-3">{(['participantAllowance', 'activeCompetitionAllowance'] as const).map(k => (
+            <div key={k} role="group" aria-label={ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')} className="rounded-2xl bg-[#f3f1eb] p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-black text-[#171b18]"><Gauge className="h-4 w-4 text-[#2F6555]" strokeWidth={1.75} />{ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')}</div>
+              <dl className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'limitsBase')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{Number(data.limits.base[k]).toLocaleString('en-US')}</dd></div>
+                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'limitsOverride')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{data.limits.override[k] == null ? '—' : Number(data.limits.override[k]).toLocaleString('en-US')}</dd></div>
+                <div className="rounded-xl bg-[#e6efe9] px-1 py-2"><dt className="text-[11px] font-bold text-[#2F6555]">{ct(locale, 'limitsEffective')}</dt><dd className="mt-0.5 text-sm font-black text-[#1f5b3c]" dir="ltr">{Number(data.limits.effective[k]).toLocaleString('en-US')}</dd></div>
+              </dl>
+            </div>))}</div>
         </div>
       )}
       {data.pendingPlanChange && <div className="text-xs">{ct(locale, 'pendingChange')}: <b>{data.pendingPlanChange.name}</b> — {formatDate(data.pendingPlanChange.effectiveAt, locale)}</div>}
@@ -171,7 +178,7 @@ export const OperatorCommercialPanel: React.FC = () => {
     <section className="space-y-4" aria-label={ct(locale, 'operator')}>
       <ErrorBox error={error} />
       {!data.agreement && <div role="status" className="rounded-2xl bg-[#fbf3e3] px-4 py-3 text-xs font-bold text-[#7a5413]">{ct(locale, 'noAgreement')}</div>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:nth-child(3)]:col-span-2 [&>*:nth-child(4)]:col-span-2 lg:[&>*:nth-child(3)]:col-span-1 lg:[&>*:nth-child(4)]:col-span-1">
         <Stat label={ct(locale, 'walletBalance')} value={formatMoney(s.balanceMinor, cur, locale)} />
         <Stat label={ct(locale, 'annualCommitment')} value={formatMoney(s.annualCommitmentMinor, cur, locale)} hint={`${ct(locale, 'spent')}: ${formatMoney(s.spentThisAgreementMinor, cur, locale)}`} />
         <Stat label={ct(locale, 'tier')} value={data.tier ? (locale === 'ar' ? data.tier.nameArabic : data.tier.name) : '—'} hint={s.discountBps !== undefined ? `${ct(locale, 'discount')}: ${s.discountBps / 100}%` : undefined} />
@@ -223,7 +230,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
           <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
             <td className="py-2 font-bold">{c.officialName}</td><td>{c.planName || '—'}</td>
-            <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr">{c.participantsUsed} / {c.participantAllowance}</td>
+            <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr"><div>{c.participantsUsed} / {c.participantAllowance}</div>{c.participantAllowance > 0 && <div className="mt-1 h-1.5 w-24 rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}</td>
             <td>{formatDate(termLastDay(c.renewalDate), locale)}</td><td>{ct(locale, `state_${c.accessState}` as CommercialKey)}</td>
             <td>{formatMoney(c.walletCostMinor, c.currency, locale)}</td><td dir="ltr">{c.domain || '—'}</td>
             <td><Button size="sm" variant="secondary" loading={busy === c.organizationId} onClick={() => void renew(c.organizationId)}>{ct(locale, 'renew')}</Button></td>
@@ -387,7 +394,7 @@ export const PlatformCommercialPanel: React.FC = () => {
     <section className="space-y-4">
       <ErrorBox error={error} />
       <h2 className="text-base font-black">{ct(locale, 'reports')}</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1">
         <Stat label={ct(locale, 'directRecurring')} value={sums(r.directAnnualRecurring)} />
         <Stat label={ct(locale, 'wholesaleSales')} value={sums(r.operatorWholesaleSales12m)} />
         <Stat label={ct(locale, 'walletBalances')} value={sums(r.walletBalances)} />
