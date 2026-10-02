@@ -123,7 +123,7 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3 min-w-0">{brand.logoUrl
      ?<img src={brand.logoUrl} alt="" className="w-10 h-10 rounded-xl object-contain bg-white/8 border border-white/10 p-1 shrink-0"/>
      :<span aria-hidden className="w-10 h-10 rounded-xl bg-white/8 border border-white/10 grid place-items-center font-black text-[#dbe7df] shrink-0">{gateMark}</span>}
-    <div className="min-w-0"><div className="font-black truncate">{gateTitle}</div><div className="text-[10px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
+    <div className="min-w-0"><div className="font-black truncate">{gateTitle}</div><div className="text-[11px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 shrink-0 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
    <div className="my-auto max-w-lg w-full mx-auto">
     {!done?<div className="text-center">
       <div className="w-52 h-52 rounded-[32px] border border-white/15 bg-white/[.035] grid place-items-center mx-auto relative overflow-hidden">
