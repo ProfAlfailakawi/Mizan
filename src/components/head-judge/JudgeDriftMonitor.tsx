@@ -146,7 +146,7 @@ export const JudgeDriftMonitor: React.FC = () => {
           {open.length > 0 && <div className="mt-3 grid md:grid-cols-2 gap-3">{open.map(renderCard)}</div>}
           {rest.length > 0 && <details className="group mt-3 rounded-2xl border border-[#e4e2db] bg-[#fffefb]">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
-              <span className="inline-flex items-center gap-2 text-sm font-black"><UsersRound className="w-4 h-4 text-[#646965]" aria-hidden="true" />{ar ? 'محكم' : 'Judges'} <span dir="ltr">{rest.length}</span></span>
+              <span className="inline-flex items-center gap-2 text-sm font-black"><UsersRound className="w-4 h-4 text-[#646965]" aria-hidden="true" />{ar ? 'محكم' : 'Judge'} <span dir="ltr">{rest.length}</span></span>
               <ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true" />
             </summary>
             <div className="grid md:grid-cols-2 gap-3 p-3 pt-0">{rest.map(renderCard)}</div>
