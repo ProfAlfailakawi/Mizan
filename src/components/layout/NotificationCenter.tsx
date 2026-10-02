@@ -1,3 +1,4 @@
+import { displayDateTimeMedium } from '../../lib/display-format';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import { DnaStepper } from '../dna/DnaKit';
 import {Bell,BellRing,Check,CheckCircle2,ChevronDown,ChevronLeft,Clock3,Layers3,Mail,Search,ShieldCheck,Sparkles,UserRound,UsersRound} from 'lucide-react';
@@ -23,7 +24,7 @@ const categoryMeta=(ar:boolean):Record<Category,{label:string;hint:string}>=>({
  support:{label:ar?'الدعم':'Support',hint:ar?'رسائل الدعم والإجراءات':'Support messages'},
 });
 const roleName=(role:string,ar:boolean)=>({super_admin:ar?'مدير المنصة':'Platform admin',operator_owner:ar?'مالك المشغّل':'Operator owner',operator_admin:ar?'مدير المشغّل':'Operator admin',org_admin:ar?'مدير الجهة':'Organization admin',comp_admin:ar?'مدير المسابقة':'Competition admin',head_judge:ar?'رئيس التحكيم':'Head judge',judge:ar?'محكم':'Judge',ops_manager:ar?'مدير التشغيل':'Operations manager',exception_host:ar?'مكتب الاستثناء':'Exception desk',delegation_manager:ar?'مسؤول وفد':'Delegation manager',broadcast_operator:ar?'مشغل الحفل':'Broadcast operator',support_agent:ar?'الدعم':'Support',participant:ar?'متسابق':'Participant',guardian:ar?'ولي أمر':'Guardian',auditor:ar?'مدقق':'Auditor'} as Record<string,string>)[role]||role.replaceAll('_',' ');
-const timeText=(iso:string,ar:boolean)=>{const d=new Date(iso);if(Number.isNaN(d.getTime()))return '—';return new Intl.DateTimeFormat(ar?'ar-KW-u-nu-latn':'en-GB',{dateStyle:'medium',timeStyle:'short'}).format(d)};
+const timeText=(iso:string,ar:boolean)=>{const d=new Date(iso);if(Number.isNaN(d.getTime()))return '—';return displayDateTimeMedium(d,ar)};
 
 export const NotificationCenter:React.FC=()=>{
  const {language,currentUser,competition,organization}=useAppStore();const ar=language==='ar';const production=true;

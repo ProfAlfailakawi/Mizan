@@ -1,3 +1,4 @@
+import { displayDateTimeMedium } from '../../lib/display-format';
 import React from 'react';
 import { BadgeCheck, Printer, ShieldCheck, X } from 'lucide-react';
 import type { buildParticipantFairnessEvidence } from '../../lib/judging-integrity';
@@ -12,7 +13,7 @@ type Receipt = ReturnType<typeof buildParticipantFairnessEvidence>;
 const fmt = (iso: string | undefined, ar: boolean) => {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(ar ? 'ar-SA-u-nu-latn-ca-gregory' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? iso : displayDateTimeMedium(d, ar);
 };
 
 const RESULT_STATUS: Record<string, [string, string]> = {

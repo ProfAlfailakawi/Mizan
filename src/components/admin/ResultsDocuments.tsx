@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../lib/display-format';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Award, Download, FileText, Link2, Printer } from 'lucide-react';
@@ -77,7 +78,7 @@ const SheetHeader: React.FC<{ input: SheetInput; title: string; subtitle: string
     </div>
     <div style={{ textAlign: 'center', minWidth: 86 }}>
       <SealMark size={70} />
-      <div style={{ fontSize: 9, color: MUTED, marginTop: 4 }}>{new Date().toLocaleString(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+      <div style={{ fontSize: 9, color: MUTED, marginTop: 4 }}>{displayDateTime(new Date(), ar)}</div>
     </div>
   </header>;
 };

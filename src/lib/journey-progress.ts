@@ -54,7 +54,8 @@ export const formatParticipantCode = (code: string | null | undefined): string =
   const raw = String(code ?? '').trim();
   const m = /^([A-Za-z]{0,3})-?(\d{4,})$/.exec(raw);
   if (!m) return raw;
-  const grouped = m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  /* أربعة أرقام فما دون تبقى متصلة («A-1004»)؛ التجميع للأطول فقط. */
+  const grouped = m[2].length <= 4 ? m[2] : m[2].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return m[1] ? `${m[1].toUpperCase()}-${grouped}` : grouped;
 };
 
