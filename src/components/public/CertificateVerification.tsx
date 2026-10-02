@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { certificateCodeFromLocation, certificateVerifyUrl, fetchPublicCertificateVerdict, type PublicCertificateView } from '../../lib/certificate-verification';
-import { Link2, Printer, Search, ShieldCheck } from 'lucide-react';
+import { Fingerprint, Link2, Printer, ScanLine, Search, ShieldCheck } from 'lucide-react';
 import { RealQRCode } from '../design-system/RealQRCode';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
@@ -117,7 +117,7 @@ export const CertificateVerification: React.FC = () => {
           {publicView.disclosed.rank!==undefined&&<DetailRow label={ar?'الترتيب':'Rank'} value={`#${publicView.disclosed.rank}`}/>}
           <DetailRow label={ar?'تاريخ الإصدار':'Issued'} value={publicView.issuedAt.slice(0,10)}/>
         </div>
-        <p className="mt-6 text-[10px] leading-5 text-[#6b706c]">{ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}</p>
+        <BriefNote className="mt-6" icon={ShieldCheck} short={ar?'حكم الخادم، لا المتصفح':'Server verdict, not browser'} full={ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}/>
         <div className="mt-6 inline-block bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(publicView.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
     </VerdictShell>}
 
@@ -135,8 +135,8 @@ export const CertificateVerification: React.FC = () => {
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-5">
             <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(activeCert.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
             <div className="text-center sm:text-start max-w-xs">
-              <div className="text-[10px] font-black text-[#3f4744]">{ar?'امسح الرمز للتحقق مباشرة':'Scan to verify directly'}</div>
-              <p className="text-[9px] leading-4 text-[#6b706c] mt-1.5">{ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}</p>
+              <div className="inline-flex items-center gap-1.5 text-xs font-black text-[#3f4744]"><ScanLine className="h-4 w-4" aria-hidden="true"/>{ar?'امسح الرمز للتحقق مباشرة':'Scan to verify directly'}</div>
+              <BriefNote className="mt-1.5" icon={Fingerprint} short={ar?'يُفحص من السجل لا الورقة':'Checked against the record'} full={ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}/>
               <Button className="mt-3 no-print" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
             </div>
           </div>
@@ -163,19 +163,25 @@ const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.
 const EvidenceChain=({chain,ar}:{chain:{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[];ar:boolean})=>{
   if(!chain.length)return null;
   return <div className="mt-7 text-start max-w-lg mx-auto">
-    <div className="flex items-center gap-2 text-[9px] font-black tracking-[.14em] text-[#6b706c]"><Link2 className="w-3.5 h-3.5"/>{ar?'سلسلة الأدلة':'EVIDENCE CHAIN'}</div>
+    <div className="flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#6b706c]"><Link2 className="w-3.5 h-3.5"/>{ar?'سلسلة الأدلة':'EVIDENCE CHAIN'}</div>
     <ol className="mt-3 relative ps-5">
       <span aria-hidden className="absolute start-[5px] top-2 bottom-2 w-px bg-[#dedcd4]"/>
       {chain.map(l=><li key={l.id} className="relative py-2">
         <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] ${l.present?'bg-[#2F6555]':'bg-[#c9c6bd]'}`}/>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[11px] font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
-          {!l.present&&<span className="text-[9px] text-[#646965]">{ar?'غير مرتبطة':'not linked'}</span>}
+          <span className="text-xs font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
+          {!l.present&&<span className="text-xs text-[#646965]">{ar?'غير مرتبطة':'not linked'}</span>}
         </div>
-        {l.hash&&<div className="font-mono text-[9px] text-[#646965] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
+        {l.hash&&<div className="font-mono text-[11px] text-[#646965] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
       </li>)}
     </ol>
-    <p className="text-[9px] leading-4 text-[#6b706c] mt-2">{ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}</p>
+    <BriefNote className="mt-2" icon={Fingerprint} short={ar?'لكل حلقة بصمة مستقلة':'Each link has its own digest'} full={ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}/>
   </div>;
 };
 
+
+
+/* ملاحظة موجزة: أيقونة + عبارة قصيرة ظاهرة، والنص الكامل باقٍ للقارئ وفي التلميح. عرض فقط. */
+function BriefNote({icon:Icon,short,full,className=''}:{icon:React.ComponentType<{className?:string;'aria-hidden'?:boolean}>;short:string;full:string;className?:string}){
+  return <p className={`inline-flex items-center gap-1.5 text-xs font-bold leading-5 text-[#5f6561] ${className}`} title={full}><Icon className="h-4 w-4 shrink-0" aria-hidden={true}/><span className="sr-only">{full}</span><span aria-hidden="true">{short}</span></p>;
+}

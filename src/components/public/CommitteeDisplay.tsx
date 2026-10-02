@@ -127,7 +127,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
                   {tag.label}{tag.scopeLabel && tag.scopeLabel !== tag.label ? ` · ${tag.scopeLabel}` : ''}
                 </span>)
               : <span className="mizan-board-tag is-full text-[11px] opacity-70">{categoryLine([], ar)}</span>}
-            {slice.venueHall && <span className="text-[11px] mizan-venue-faint">· {slice.venueHall}</span>}
+            {slice.venueHall && <span className="text-base mizan-venue-faint">· {slice.venueHall}</span>}
           </div>
         </div>
       </div>
@@ -157,7 +157,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
       >
         <span className="mizan-call-halo" aria-hidden />
         <div className="relative z-[1]">
-          <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الآن' : 'NOW CALLING'}</div>
+          <div className="text-base font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الآن' : 'NOW CALLING'}</div>
           {slice.nowCalling
             ? <div className="mizan-call-code mizan-venue-code mt-4 sm:mt-6" dir="ltr">{slice.nowCalling.code}</div>
             : <div className="mt-8 sm:mt-12 mb-4 text-2xl sm:text-4xl font-black mizan-venue-faint">{ar ? 'لا يوجد استدعاء' : 'No active call'}</div>}
@@ -180,7 +180,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
     <footer className="space-y-3">
       <section className="rounded-[26px] border border-white/10 bg-white/[.03] px-5 py-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-[11px] font-black tracking-[.17em] mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
+          <div className="text-base font-black tracking-[.17em] mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
           <UsersRound className="w-4 h-4 mizan-venue-muted" aria-hidden />
         </div>
         {slice.next.length

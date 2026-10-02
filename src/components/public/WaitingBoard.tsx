@@ -84,7 +84,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
     <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
-          <div className="text-[11px] font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'NOW SERVING'}</div>
+          <div className="text-base font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'NOW SERVING'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
           <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName({ name: board.competitionName, nameArabic: board.competitionNameArabic }, ar)}</div>
         </div>
@@ -149,7 +149,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
           */}
           <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
             <span key={board.totalCompleted} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-4 h-4" /></span>
-            <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-[10px] mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
+            <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-base mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
           </div>
         </div>
       </footer>
@@ -166,8 +166,8 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
  * إلا وله معنى، ولا يقرأ أحدٌ بياناتٍ قديمة ظنًّا أنها الآن.
  */
 export const FreshnessLine: React.FC<{ state: ReturnType<typeof boardAge>['state']; ageSeconds: number; ar: boolean }> = ({ state, ageSeconds, ar }) => {
-  if (state === 'STALE') return <div className="text-[11px] font-black text-[#f0c9a0] mt-0.5">{ar ? `التحديث متوقف · ${describeAge(ageSeconds, ar)}` : `Updates stopped · ${describeAge(ageSeconds, false)}`}</div>;
-  if (state === 'LAGGING') return <div className="text-[11px] font-bold mizan-venue-muted mt-0.5">{ar ? `آخر تحديث ${describeAge(ageSeconds, ar)}` : `Updated ${describeAge(ageSeconds, false)}`}</div>;
+  if (state === 'STALE') return <div className="text-base font-black text-[#f0c9a0] mt-0.5">{ar ? `التحديث متوقف · ${describeAge(ageSeconds, ar)}` : `Updates stopped · ${describeAge(ageSeconds, false)}`}</div>;
+  if (state === 'LAGGING') return <div className="text-base font-bold mizan-venue-muted mt-0.5">{ar ? `آخر تحديث ${describeAge(ageSeconds, ar)}` : `Updated ${describeAge(ageSeconds, false)}`}</div>;
   return null;
 };
 
@@ -186,7 +186,7 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     </div>
 
     <div key={slice.nowCalling?.code || 'idle'} className={`rounded-2xl px-3 py-3 text-center ${slice.nowCalling ? 'mizan-call-arrive bg-white/[.06]' : ''}`}>
-      <div className="text-[10px] font-black tracking-[.14em] mizan-venue-faint">{ar ? 'الآن' : 'NOW'}</div>
+      <div className="text-base font-black tracking-[.14em] mizan-venue-faint">{ar ? 'الآن' : 'NOW'}</div>
       {slice.nowCalling
         ? <div className="mizan-board-code mizan-venue-code mt-1.5" dir="ltr">{slice.nowCalling.code}</div>
         : <div className="mt-2 mb-0.5 text-sm font-black mizan-venue-faint">{offline ? (ar ? 'متوقفة' : 'Offline') : (ar ? '—' : '—')}</div>}
@@ -206,13 +206,13 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     </div>
 
     {/* لجنةٌ شاغرة وأمامها منتظرون: عطبٌ تشغيليّ يُقال، لا حكمٌ على سرعة اللجنة. */}
-    {slice.stalled && <div className="text-[10px] font-black text-[#f0c9a0]">{ar ? 'شاغرة — لم يُنادَ أحد بعد' : 'Free — nobody called yet'}</div>}
+    {slice.stalled && <div className="text-base font-black text-[#f0c9a0]">{ar ? 'شاغرة — لم يُنادَ أحد بعد' : 'Free — nobody called yet'}</div>}
   </section>;
 };
 
 const Stat = ({ icon: Icon, n, t }: { icon: React.ComponentType<{ className?: string }>; n: number; t: string }) => (
   <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
     <Icon className="w-4 h-4 text-[#b9cec4]" />
-    <div><div className="text-xl font-black tabular-nums">{n}</div><div className="text-[10px] mizan-venue-faint">{t}</div></div>
+    <div><div className="text-xl font-black tabular-nums">{n}</div><div className="text-base mizan-venue-faint">{t}</div></div>
   </div>
 );
