@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AdvisoryNote } from '../design-system/AdvisoryNote';
-import { Activity, Coffee, TrendingDown, Gauge, ShieldCheck } from 'lucide-react';
+import { Activity, Coffee, TrendingDown, Gauge, ShieldCheck, ChevronDown, UsersRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
@@ -86,8 +86,8 @@ export const JudgeDriftMonitor: React.FC = () => {
       </div>
 
       {!enoughRealEvidence && <div className="mt-5 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-8 text-center"><Activity className="w-6 h-6 text-[#696f6b] mx-auto"/><div className="text-sm font-black mt-3">{ar?'لا توجد بيانات تحكيم كافية بعد':'Not enough real judging data yet'}</div><p className="text-[13px] text-[#696f6b] mt-2 leading-6">{ar?'يبدأ عدّاد الانحراف بعد وصول أحكام فعلية من المحكمين — من ملاحظات الجلسة الجارية أو من أحكام اليوم المقفلة. لا ينشئ ميزان محكمين أو إحصاءات تجريبية عندما لا تكون اللجان قد بدأت.':'The drift monitor starts only after real judging arrives — live session marks or today’s locked scores. MIZAN does not create preview judges or statistics before panels actually work.'}</p></div>}
-      {enoughRealEvidence && <div className="mt-5 grid md:grid-cols-2 gap-3">
-        {signals.map((s) => {
+      {enoughRealEvidence && (() => {
+        const renderCard = (s: typeof signals[number]) => {
           const judgeEvents = events.filter((e) => e.judgeId === s.judgeId).sort((a, b) => a.relativeSeconds - b.relativeSeconds);
           const detail = computeJudgeDrift(judgeEvents, { driftSigma: 2 });
           const acked = ackd[s.judgeId];
@@ -120,8 +120,39 @@ export const JudgeDriftMonitor: React.FC = () => {
               {s.attention && acked && <div className="mt-3 flex items-center gap-1.5 text-[13px] font-bold text-[#2f6555]"><ShieldCheck className="w-4 h-4" />{ar ? 'تمت المعالجة بشريًا' : 'Handled by a human'}</div>}
             </div>
           );
-        })}
-      </div>}
+        };
+        // الإشارات التي تنتظر قرارًا بشريًا تبقى ظاهرة؛ والباقي (مستقر أو عولج) داخل تفصيل مغلق.
+        const open = signals.filter((s) => s.attention && !ackd[s.judgeId]);
+        const rest = signals.filter((s) => !(s.attention && !ackd[s.judgeId]));
+        const handled = rest.filter((s) => s.attention).length;
+        const stable = rest.length - handled;
+        const R = 18, C = 2 * Math.PI * R;
+        const share = signals.length ? rest.length / signals.length : 0;
+        return <>
+          <div className="mt-5 flex items-center gap-4 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-4">
+            <div className="relative w-14 h-14 shrink-0" role="img" aria-label={`${rest.length}/${signals.length}`}>
+              <svg viewBox="0 0 44 44" className="w-14 h-14 -rotate-90">
+                <circle cx="22" cy="22" r={R} fill="none" stroke="#ebe9e2" strokeWidth="4" />
+                <circle cx="22" cy="22" r={R} fill="none" stroke="#2f6555" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${C * share} ${C}`} />
+              </svg>
+              <span className="absolute inset-0 grid place-items-center text-sm font-black" dir="ltr">{rest.length}/{signals.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[13px] font-black">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F1E5] px-3 py-1 text-[#7d5e34]"><span className="w-2 h-2 rounded-full bg-[#9a6a2f]" />{open.length} {ar ? 'تنبيه' : 'flag'}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1 text-[#214C40]"><span className="w-2 h-2 rounded-full bg-[#2f6555]" />{stable} {ar ? 'مستقر' : 'Stable'}</span>
+              {handled > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1 text-[#214C40]"><ShieldCheck className="w-3.5 h-3.5" />{handled}</span>}
+            </div>
+          </div>
+          {open.length > 0 && <div className="mt-3 grid md:grid-cols-2 gap-3">{open.map(renderCard)}</div>}
+          {rest.length > 0 && <details className="group mt-3 rounded-2xl border border-[#e4e2db] bg-[#fffefb]">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-2 text-sm font-black"><UsersRound className="w-4 h-4 text-[#646965]" aria-hidden="true" />{ar ? 'محكم' : 'Judges'} <span dir="ltr">{rest.length}</span></span>
+              <ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="grid md:grid-cols-2 gap-3 p-3 pt-0">{rest.map(renderCard)}</div>
+          </details>}
+        </>;
+      })()}
 
       <div className="mt-4"><AdvisoryNote>
         {ar ? 'إشارة مساندة لرئيس التحكيم فقط، ولا تظهر للمحكم ولا تغيّر درجة. المقارنة ذاتية (كل محكم مع نفسه) وتعتمد على أحداث التحكيم الحقيقية فقط.' : 'Advisory to the Head Judge only — never shown to the judge and never a score change. The comparison is self-referential and uses real judging events only.'}
