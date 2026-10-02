@@ -126,13 +126,13 @@ export const CorridorScreen: React.FC<{
       <div className="flex h-full flex-col p-6 sm:p-10">
         <header className="flex items-start justify-between gap-6">
           <div className="min-w-0">
-            <div className="text-[11px] font-black tracking-[.2em] text-[#c6b58a]">{ar ? CORRIDOR_PANEL_LABEL[panel] : panel.toUpperCase()}</div>
+            <div className="text-base font-black tracking-[.2em] text-[#c6b58a]">{ar ? CORRIDOR_PANEL_LABEL[panel] : panel.toUpperCase()}</div>
             <h1 className="mt-1 truncate text-xl font-black sm:text-2xl">{title}</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-end">
               <div className="text-2xl font-black tabular-nums sm:text-3xl" dir="ltr">{venueClock(now)}</div>
-              <div className="mt-1 text-[10px] font-bold mizan-venue-muted">{describeAge(age.ageSeconds, ar)}</div>
+              <div className="mt-1 text-base font-bold mizan-venue-muted">{describeAge(age.ageSeconds, ar)}</div>
             </div>
             {onClose && <button onClick={onClose} aria-label={ar ? 'إغلاق' : 'Close'} className="grid h-11 w-11 place-items-center rounded-xl text-white/50 hover:bg-white/10"><X className="h-5 w-5" /></button>}
           </div>
@@ -216,7 +216,7 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
 
   return (
     <section className="flex h-full flex-col justify-center rounded-[32px] border border-white/10 bg-white/[.03] p-8 text-center sm:p-12">
-      <div className="inline-flex items-center justify-center gap-2 text-[11px] font-black tracking-[.18em] text-[#c6b58a]">
+      <div className="inline-flex items-center justify-center gap-2 text-base font-black tracking-[.18em] text-[#c6b58a]">
         <BookOpen className="h-4 w-4" />{ar ? 'من المصحف' : 'FROM THE MUSHAF'}
       </div>
 
@@ -276,7 +276,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
   return (
     <section className="grid h-full gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
       <div className="flex flex-col justify-between rounded-[28px] border border-white/10 bg-gradient-to-b from-[#17362b] to-[#122019] p-7">
-        <div className="inline-flex items-center gap-2 text-[11px] font-black tracking-[.18em] text-[#c6b58a]"><Sparkles className="h-4 w-4" />{ar ? 'ختمة القاعة' : 'HALL KHATMĀT'}</div>
+        <div className="inline-flex items-center gap-2 text-base font-black tracking-[.18em] text-[#c6b58a]"><Sparkles className="h-4 w-4" />{ar ? 'ختمة القاعة' : 'HALL KHATMĀT'}</div>
         <div>
           <div className="text-[clamp(3.5rem,7vw,5.5rem)] font-black leading-none tabular-nums">{agg?.khatmatCompleted || 0}</div>
           <p className="mt-3 text-sm text-white/55">{ar ? 'ختمة كاملة أتمّتها هذه القاعة اليوم' : 'complete recitations of the whole Quran today'}</p>
@@ -292,7 +292,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
       </div>
 
       <div className="rounded-[28px] border border-white/10 bg-white/[.035] p-6">
-        <div className="mb-3 flex items-center justify-between text-[11px] font-black tracking-[.15em] mizan-venue-muted">
+        <div className="mb-3 flex items-center justify-between text-base font-black tracking-[.15em] mizan-venue-muted">
           <span>{ar ? '604 صفحة' : '604 PAGES'}</span>
           <span>{ar ? `${covered} صفحة تُليت اليوم` : `${covered} pages today`}</span>
         </div>
@@ -313,7 +313,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
 const Tile: React.FC<{ value: string; label: string }> = ({ value, label }) => (
   <div className="rounded-2xl bg-white/[.06] p-3 text-center">
     <div className="text-xl font-black tabular-nums" dir="ltr">{value}</div>
-    <div className="mt-1 text-[10px] text-white/45">{label}</div>
+    <div className="mt-1 text-base text-white/45">{label}</div>
   </div>
 );
 
@@ -334,11 +334,11 @@ const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board
           <article key={slice.committeeId} className="flex items-center gap-4 rounded-[22px] border border-white/10 bg-white/[.035] px-5 py-4">
             <span className="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl bg-white/10 px-2 text-sm font-black tabular-nums">{slice.code}</span>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold mizan-venue-muted">{ar ? 'الآن' : 'NOW'}</div>
+              <div className="text-base font-bold mizan-venue-muted">{ar ? 'الآن' : 'NOW'}</div>
               <div className="truncate text-2xl font-black tabular-nums text-[#e0c894]" dir="ltr">{slice.nowCalling?.code || '—'}</div>
             </div>
             <div className="shrink-0 text-end">
-              <div className="text-[10px] font-bold mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
+              <div className="text-base font-bold mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
               <div className="text-sm font-black tabular-nums text-white/75" dir="ltr">{slice.next[0]?.code || '—'}</div>
               <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-white/45"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
             </div>

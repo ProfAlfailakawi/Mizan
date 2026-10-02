@@ -28,6 +28,8 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
  // Full-screen venue modes open over the app, but had no Escape and no dialog
  // semantics: a keyboard or screen-reader user had no way back out.
  const venueRef = useRef<HTMLDivElement|null>(null);
+ // تسميات الشاشة الكبيرة ≥16px؛ اللوحة المضمّنة تبقى كما كانت.
+ const lbl = variant === 'screen' ? 'text-base' : 'text-[11px]';
  useDialogBehavior(!!onClose, onClose||(()=>{}), venueRef, {autoFocus:false});
   const store = useAppStore();
   const ar = store.language === 'ar';
@@ -48,7 +50,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
     <div className={variant === 'screen' ? 'min-h-full p-5 sm:p-8 lg:p-10 flex flex-col' : ''}>
       <header className="flex items-start justify-between gap-5">
         <div>
-          <div className="text-[10px] font-black tracking-[.2em] text-[#c6b58a]">{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>
+          <div className={`${lbl} font-black tracking-[.2em] text-[#c6b58a]`}>{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1 flex items-center gap-3">{ar ? 'اليوم تُتلى في هذه القاعة' : 'Recited in this hall today'}</h1>
           <div className="text-xs mizan-venue-muted mt-1">{bilingualName(store.competition,ar)}</div>
         </div>
@@ -61,7 +63,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
       <section className="mt-6 grid lg:grid-cols-[1fr_1.6fr] gap-5">
         {/* Khatmah counter */}
         <div className="rounded-[28px] border border-white/10 bg-gradient-to-b from-[#17362b] to-[#122019] p-6 sm:p-7 flex flex-col justify-between">
-          <div className="flex items-center gap-2 text-[11px] font-black tracking-[.15em] text-[#c6b58a]"><Sparkles className="w-4 h-4" />{ar ? 'ختمات القاعة' : 'HALL KHATMĀT'}</div>
+          <div className={`flex items-center gap-2 ${lbl} font-black tracking-[.15em] text-[#c6b58a]`}><Sparkles className="w-4 h-4" />{ar ? 'ختمات القاعة' : 'HALL KHATMĀT'}</div>
           <div className="my-4">
             <div className="text-[86px] leading-none font-black tracking-tight text-white tabular-nums">{agg.khatmatCompleted}</div>
             <div className="text-sm text-white/55 mt-2">{ar ? `أتمت القاعة تلاوة القرآن كاملًا ${toArabicOrdinal(agg.khatmatCompleted, ar)}` : `Complete recitations of the whole Quran`}</div>
@@ -79,7 +81,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
         {/* 604-page heat grid */}
         <div className="rounded-[28px] border border-white/10 bg-white/[.035] p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] font-black tracking-[.15em] mizan-venue-muted">{ar ? '604 صفحة' : '604 PAGES'}</div>
+            <div className={`${lbl} font-black tracking-[.15em] mizan-venue-muted`}>{ar ? '604 صفحة' : '604 PAGES'}</div>
             <div className="flex items-center gap-2 text-[10px] mizan-venue-muted">
               <span>{ar ? 'أقل' : 'less'}</span>
               <span className="inline-flex gap-0.5">{[0.05, 0.3, 0.55, 0.8, 1].map((t, i) => <span key={i} className="w-3 h-3 rounded-[3px]" style={{ background: pageColor(t * max, max) }} />)}</span>
@@ -100,7 +102,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
 
       {/* Per-juz ribbon */}
       <section className="mt-5 rounded-[24px] border border-white/10 bg-white/[.025] p-4 sm:p-5">
-        <div className="text-[11px] font-black tracking-[.15em] mizan-venue-muted mb-3">{ar ? 'تغطية الأجزاء' : 'JUZ COVERAGE'}</div>
+        <div className={`${lbl} font-black tracking-[.15em] mizan-venue-muted mb-3`}>{ar ? 'تغطية الأجزاء' : 'JUZ COVERAGE'}</div>
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))' }}>
           {agg.byJuz.map((j) => {
             const pct = j.coveredPages / 20.13;
@@ -116,12 +118,12 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
 
       {agg.liveLoci.length > 0 && (
         <section className="mt-4 flex items-center gap-3 overflow-x-auto rounded-2xl border border-[#c49a5d]/20 bg-[#c49a5d]/[.06] px-4 py-3">
-          <span className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-black text-[#d9c193]"><BookOpen className="w-4 h-4" />{ar ? 'يُتلى الآن' : 'Reciting now'}</span>
+          <span className={`shrink-0 inline-flex items-center gap-1.5 ${lbl} font-black text-[#d9c193]`}><BookOpen className="w-4 h-4" />{ar ? 'يُتلى الآن' : 'Reciting now'}</span>
           {agg.liveLoci.map((l, i) => <span key={i} className="shrink-0 rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white/80">{l.label} · {ar ? 'ص' : 'p.'}{l.page}</span>)}
         </section>
       )}
 
-      <footer className={`${variant === 'screen' ? 'mt-auto pt-6' : 'mt-4'} text-[11px] mizan-venue-faint leading-6`}>
+      <footer className={`${variant === 'screen' ? 'mt-auto pt-6' : 'mt-4'} ${lbl} mizan-venue-faint leading-6`}>
         {ar
           ? (agg.totalRecitations ? 'هذه الخريطة تعرض فقط مواضع تلاوة موجودة فعليًا في الجلسة الحية التي يملكها النظام الآن. لا توجد إسقاطات أو يوم تمثيلي أو تعبئة تقديرية.' : 'لا توجد تلاوات فعلية مسجلة لهذه الخريطة بعد. لذلك تبقى الخريطة فارغة بدل إنشاء تغطية أو ختمات افتراضية.')
           : (agg.totalRecitations ? 'This map shows only recitation loci the system actually holds for the live session. No projections or representative-day filling is used.' : 'No real recitation loci are recorded yet, so the map stays empty instead of inventing coverage or khatmah counts.')}

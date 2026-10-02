@@ -10,6 +10,8 @@ import { auth } from '../../lib/firebase';
 import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { ct, commercialErrorText, formatDate, formatMoney, termLastDay, type CommercialKey } from '../../lib/commercial-i18n';
 import { CLONE_PARTS, suggestNextEditionLabel, type ClonePart } from '../../lib/competition-clone';
+import { Check, Building2, UsersRound } from 'lucide-react';
+import { DnaStat } from '../dna/DnaKit';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 
@@ -211,6 +213,11 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
   };
   return (
     <div className="space-y-4">
+      {/* ملخص من صفوف الجدول نفسها أدناه: عرض فقط، لا حساب فوترة ولا مبالغ. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DnaStat icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label={ct(locale, 'customers')} value={<span className="tabular-nums">{data.customers.length}</span>} />
+        <DnaStat icon={<UsersRound className="h-5 w-5" aria-hidden="true" />} tone="sky" label={ct(locale, 'participantsUsed')} value={<span className="tabular-nums" dir="ltr">{data.customers.reduce((n: number, c: any) => n + (Number(c.participantsUsed) || 0), 0)} / {data.customers.reduce((n: number, c: any) => n + (Number(c.participantAllowance) || 0), 0)}</span>} />
+      </div>
       <div className="mizan-panel overflow-x-auto p-4">
         <table className="w-full min-w-[720px] text-start text-xs [&_td]:px-2.5 [&_th]:px-2.5">
           <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
@@ -661,7 +668,7 @@ export const PaymentGatewayPanel: React.FC<{ ownerType: 'operator' | 'organizati
     {!!data?.gateways.length && <ul className="divide-y divide-[#ebe9e2] rounded-2xl border border-[#e2e0d9] bg-white text-xs">
       {data.gateways.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
         <span><b>{g.displayName}</b> · {g.provider} · <Badge variant={g.status === 'active' ? 'emerald' : 'neutral'}>{GATEWAY_STATUS[g.status]?.[ar ? 0 : 1] || g.status}</Badge>
-          {g.lastTest && <span className="ms-2 text-[#666c68]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? '✓' : g.lastTest.code}</span>}
+          {g.lastTest && <span className="ms-2 text-[#666c68]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? <Check className="inline h-3.5 w-3.5 align-text-bottom" aria-label={ar ? 'نجح' : 'Passed'} /> : g.lastTest.code}</span>}
           <span className="block text-[11px] text-[#666c68]" dir="ltr">{data.webhookBase}{g.id}</span></span>
         {g.status !== 'disabled' && <span className="flex gap-2">
           {g.status === 'pending_test' && <Button size="sm" onClick={() => void test(g.id)}>{ar ? 'اختبار وتفعيل' : 'Test & activate'}</Button>}

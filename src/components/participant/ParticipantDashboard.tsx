@@ -1,9 +1,9 @@
 import { displayTime, displayNumber } from '../../lib/display-format';
 import React, { useMemo, useRef, useState } from 'react';
-import { DnaStepper } from '../dna/DnaKit';
+import { DnaRing, DnaStepper } from '../dna/DnaKit';
 import { CertificateModal } from '../admin/ResultsDocuments';
 import { localizedCountry } from '../../lib/ui-language';
-import { Award, BadgeCheck, BookOpen, Printer, AlertTriangle, Trophy, CalendarClock, Check, FileText, MapPin, QrCode, ShieldCheck, Sparkles, ArrowLeftRight} from 'lucide-react';
+import { Award, BadgeCheck, BookOpen, Printer, AlertTriangle, Trophy, CalendarClock, Check, FileText, MapPin, QrCode, ShieldCheck, Sparkles, ArrowLeftRight, ArrowLeft, ArrowRight, Clock, Info} from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { describeScope, scopeMetrics } from '../../lib/quran-scope';
@@ -90,6 +90,7 @@ export const ParticipantDashboard: React.FC = () => {
   });
   return outcome.standings.get(participant.id);
  },[result?.id,result?.finalScore,results.length,competition.id,participant?.id,policy.results.awards]);
+ const competingThreshold=normalizeAwardPolicy(policy.results.awards).competingThresholdPercentage;
  const resultVisible=policy.results.visibility==='immediate'||policy.results.visibility==='private_only'||result?.status==='published'||result?.status==='sealed';
  const passPayload=makeMizanPassPayload(participant.code);
  const queueEstimate=store.getQueueEstimate(participant.id);
@@ -133,13 +134,22 @@ export const ParticipantDashboard: React.FC = () => {
    <div className="flex items-start gap-3">
     <span className="w-9 h-9 rounded-xl bg-white grid place-items-center shrink-0"><ArrowLeftRight className="w-4 h-4 text-[#7a5c2e]"/></span>
     <div className="min-w-0">
-     <div className="text-xs font-black text-[#604724]">{ar?`تغيّرت لجنتك: من ${participant.lastQueueTransfer.fromCommitteeCode} إلى ${participant.lastQueueTransfer.toCommitteeCode}`:`Your panel changed: ${participant.lastQueueTransfer.fromCommitteeCode} → ${participant.lastQueueTransfer.toCommitteeCode}`}</div>
-     {participant.lastQueueTransfer.equityApplied
-      ?<p className="text-[11px] text-[#6b5b45] mt-1.5 leading-6">{ar
+     <div className="text-xs font-black text-[#604724]">{ar?'تغيّرت لجنتك':'Your panel changed'}</div>
+     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-black text-[#604724]">
+      <span className="rounded-lg bg-white px-2.5 py-1 tabular-nums">{participant.lastQueueTransfer.fromCommitteeCode}</span>
+      {ar?<ArrowLeft className="h-4 w-4" aria-hidden="true"/>:<ArrowRight className="h-4 w-4" aria-hidden="true"/>}
+      <span className="rounded-lg bg-white px-2.5 py-1 tabular-nums">{participant.lastQueueTransfer.toCommitteeCode}</span>
+      <span className="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs tabular-nums"><Clock className="h-3.5 w-3.5" aria-hidden="true"/>{ar?`انتظرت ${participant.lastQueueTransfer.waitedMinutes} د`:`waited ${participant.lastQueueTransfer.waitedMinutes} min`}</span>
+      {participant.lastQueueTransfer.equityApplied&&<span className="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs tabular-nums">{ar?`#${participant.lastQueueTransfer.positionIfAppended} ← #${participant.lastQueueTransfer.fairPosition}`:`#${participant.lastQueueTransfer.positionIfAppended} → #${participant.lastQueueTransfer.fairPosition}`}</span>}
+     </div>
+     <details className="mt-1.5 text-xs leading-6 text-[#6b5b45]"><summary className="inline-flex cursor-pointer list-none items-center gap-1 font-bold"><Info className="h-3.5 w-3.5" aria-hidden="true"/>{ar?'التفاصيل':'Details'}</summary>
+      {participant.lastQueueTransfer.equityApplied
+       ?<p className="mt-1">{ar
         ?`انتظارك السابق محسوب لك: انتظرت ${participant.lastQueueTransfer.waitedMinutes} دقيقة، فلم تبدأ من آخر الطابور. كان موضعك سيكون رقم ${participant.lastQueueTransfer.positionIfAppended}، وصار رقم ${participant.lastQueueTransfer.fairPosition}.`
         :`Your earlier wait counts: you had waited ${participant.lastQueueTransfer.waitedMinutes} min, so you did not restart at the back. You would have been ${participant.lastQueueTransfer.positionIfAppended}; you are ${participant.lastQueueTransfer.fairPosition}.`}</p>
-      :<p className="text-[11px] text-[#6b5b45] mt-1.5 leading-6">{ar?`انتقل دورك معك. انتظرت ${participant.lastQueueTransfer.waitedMinutes} دقيقة قبل النقل.`:`Your turn moved with you. You had waited ${participant.lastQueueTransfer.waitedMinutes} min before the move.`}</p>}
-     <div className="text-[10px] text-[#8a7a62] mt-2">{ar?'السبب: ':'Reason: '}{participant.lastQueueTransfer.reason}</div>
+       :<p className="mt-1">{ar?`انتقل دورك معك. انتظرت ${participant.lastQueueTransfer.waitedMinutes} دقيقة قبل النقل.`:`Your turn moved with you. You had waited ${participant.lastQueueTransfer.waitedMinutes} min before the move.`}</p>}
+      <div className="mt-1 text-[#8a7a62]">{ar?'السبب: ':'Reason: '}{participant.lastQueueTransfer.reason}</div>
+     </details>
     </div>
    </div>
   </section>}
@@ -164,7 +174,7 @@ export const ParticipantDashboard: React.FC = () => {
     categoryName={ar?(category?.nameArabic||category?.name):category?.name}
     finalScore={result.finalScore}
     sealed={result.status==='sealed'||result.status==='published'}/></div>
-   <div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><Trophy className="mx-auto h-7 w-7 text-[#89673a]"/><div className="mt-1 text-4xl font-black">#{result.rank||'—'}</div><div className="text-sm font-bold text-[#646965] mt-1">{ar?'الترتيب':'Rank'}</div></div>{standing?<div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-5 grid place-items-center text-center"><div><Award className="mx-auto h-7 w-7 text-[#214C40]"/><div className="mt-2 text-lg font-black leading-7 text-[#214C40]">{describeStanding(standing,ar)}</div></div></div>:<div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-4xl font-black">{result.finalScore.toFixed(2)}</div><div className="text-sm font-bold text-[#646965] mt-1">{ar?'الدرجة':'Score'}</div></div>}</div>{standing&&<p className="mt-2 text-center text-xs leading-6 text-[#646965]">{ar?'المركز بنسبة معلنة مسبقًا.':'Places follow a percentage published in advance.'}</p>}</>}<div className="mt-5 grid grid-cols-2 gap-3 text-sm font-black text-[#214C40]">{policy.appeals.enabled&&resultVisible&&<button onClick={()=>setShowAppeal(true)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#cddbd3] bg-white px-3 hover:bg-[#F7FAF8]"><AlertTriangle className="h-5 w-5"/>{ar?'اعتراض':'Appeal'}</button>}<button onClick={()=>setShowReceipt(true)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#cddbd3] bg-white px-3 hover:bg-[#F7FAF8]"><Printer className="h-5 w-5"/>{ar?'إيصال النزاهة':'Fairness receipt'}</button></div></section>}
+   <div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><Trophy className="mx-auto h-7 w-7 text-[#89673a]"/><div className="mt-1 text-4xl font-black">#{result.rank||'—'}</div><div className="text-sm font-bold text-[#646965] mt-1">{ar?'الترتيب':'Rank'}</div></div>{standing?<div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-5 grid place-items-center text-center"><div className="grid justify-items-center gap-2"><DnaRing value={standing.percentage} max={100} size={72} stroke={6} tone="accent" label={<span className="text-sm font-black tabular-nums">{displayNumber(standing.percentage,ar)}٪</span>} sublabel={undefined} ariaLabel={ar?`${standing.percentage}٪ من الدرجة الكاملة، وعتبة «ضمن المنافسة» ${competingThreshold}٪`:`${standing.percentage}% of the full score; the in-contention threshold is ${competingThreshold}%`}/><div className="text-lg font-black leading-7 text-[#214C40]">{describeStanding(standing,ar)}</div><div className="inline-flex items-center gap-1 text-xs font-bold text-[#646965]"><Award className="h-3.5 w-3.5" aria-hidden="true"/>{ar?`العتبة ${displayNumber(competingThreshold,ar)}٪`:`Threshold ${competingThreshold}%`}</div></div></div>:<div className="rounded-2xl bg-[#f1efe9] p-5 text-center"><div className="text-4xl font-black">{result.finalScore.toFixed(2)}</div><div className="text-sm font-bold text-[#646965] mt-1">{ar?'الدرجة':'Score'}</div></div>}</div>{standing&&<p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-[#646965]"><Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/>{ar?'المركز بنسبة معلنة مسبقًا.':'Places follow a percentage published in advance.'}</p>}</>}<div className="mt-5 grid grid-cols-2 gap-3 text-sm font-black text-[#214C40]">{policy.appeals.enabled&&resultVisible&&<button onClick={()=>setShowAppeal(true)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#cddbd3] bg-white px-3 hover:bg-[#F7FAF8]"><AlertTriangle className="h-5 w-5"/>{ar?'اعتراض':'Appeal'}</button>}<button onClick={()=>setShowReceipt(true)} className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#cddbd3] bg-white px-3 hover:bg-[#F7FAF8]"><Printer className="h-5 w-5"/>{ar?'إيصال النزاهة':'Fairness receipt'}</button></div></section>}
    {/* النطاق ثابت حسب الفئة؛ لا توجد شاشة اختيار ثانية للمتسابق. سطرٌ واحد بأيقونة، والأرقام التفصيلية تحت «التفاصيل» لمن يريدها. */}
    {scopeResolution&&!finished&&<details className="mizan-surface group p-5 sm:p-6"><summary className="flex cursor-pointer list-none items-center gap-4 min-h-12"><span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#E7EEE9] text-[#214C40]"><BookOpen className="h-7 w-7"/></span><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-[#646965]">{ar?'نطاق الفئة':'Category range'}</span><span className="block text-xl font-black">{scopeResolution.blocked?(ar?'لم يُحدَّد بعد':'Not set yet'):describeScope(scopeResolution.scope,ar)}</span></span>{!scopeResolution.blocked&&<span className="shrink-0 text-sm font-bold text-[#214C40] underline-offset-4 group-open:hidden">{ar?'التفاصيل':'Details'}</span>}</summary><p className="mt-3 text-sm leading-7 text-[#646965]">{scopeResolution.blocked?(ar?'راجع إدارة المسابقة.':'Contact the organizer.'):(ar?'لن تُسأل خارج هذا النطاق.':'You will only be asked within this range.')}</p>{!scopeResolution.blocked&&<ScopeCounts scope={scopeResolution.scope} ar={ar}/>}</details>}
   </>}

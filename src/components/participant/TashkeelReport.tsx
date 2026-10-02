@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpenCheck, Loader2, Mic, RotateCcw, Square, Volume2 } from 'lucide-react';
+import { AudioLines, BookOpenCheck, Languages, Loader2, Mic, RotateCcw, Square, Volume2, Waves } from 'lucide-react';
 import type { TashkeelBenchmark, TashkeelFinding, TashkeelKind, TashkeelMode } from '../../lib/quran-intelligence';
 import type { UnclearAyah } from '../../lib/tashkeel-run';
 import { arabicIndicDigits } from '../judge/AyahMark';
@@ -67,6 +67,9 @@ export const TASHKEEL_STYLE: Record<TashkeelKind, { ar: string; en: string; tint
   tajweed: { ar: 'تجويد', en: 'Tajweed', tint: '#7A4EA3', glyph: '〰' },
   letter: { ar: 'حرف', en: 'Letter', tint: '#A3341F', glyph: 'ح' },
 };
+
+/* أيقونةٌ لكل نوع — عرضٌ فقط، والنوع نفسه يبقى مكتوبًا بجوارها. */
+const KIND_ICON: Record<TashkeelKind, React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>> = { tashkeel: AudioLines, tajweed: Waves, letter: Languages };
 
 /** سببُ التعذّر بكلامٍ يفهمه الطالب — ولا يُعرض رمزُ خطأ. */
 export function tashkeelFailureNote(code: string, ar: boolean): string {
@@ -157,7 +160,7 @@ export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, ca
           <div className="mizan-tashkeel__legend">
             {(['tashkeel', 'tajweed', 'letter'] as TashkeelKind[]).filter(k => counts(k)).map(k => (
               <span key={k} className="mizan-tashkeel__chip" style={{ ['--k' as string]: TASHKEEL_STYLE[k].tint }}>
-                {ar ? TASHKEEL_STYLE[k].ar : TASHKEEL_STYLE[k].en} · {n(counts(k))}
+                {React.createElement(KIND_ICON[k], { className: 'me-1 inline h-3.5 w-3.5 align-text-bottom', 'aria-hidden': true })}{ar ? TASHKEEL_STYLE[k].ar : TASHKEEL_STYLE[k].en} · {n(counts(k))}
               </span>
             ))}
           </div>
@@ -169,7 +172,7 @@ export const TashkeelReport: React.FC<Props> = ({ ar, state, wordOf, onRetry, ca
                   {rows.map(({ finding, word }, i) => (
                     <li key={`${finding.wordIndex}-${i}`} className="mizan-tashkeel__row" data-kind={finding.kind} style={{ ['--k' as string]: TASHKEEL_STYLE[finding.kind].tint }}>
                       <span className="mizan-tashkeel__word font-quran">{word?.text ?? '—'}</span>
-                      <span className="mizan-tashkeel__kind">{ar ? TASHKEEL_STYLE[finding.kind].ar : TASHKEEL_STYLE[finding.kind].en}</span>
+                      <span className="mizan-tashkeel__kind">{React.createElement(KIND_ICON[finding.kind], { className: 'me-1 inline h-3.5 w-3.5 align-text-bottom', 'aria-hidden': true })}{ar ? TASHKEEL_STYLE[finding.kind].ar : TASHKEEL_STYLE[finding.kind].en}</span>
                       <span className="mizan-tashkeel__msg">{ar ? finding.messageAr : finding.messageEn}</span>
                       <span className="mizan-tashkeel__hear">
                         {onListen && canListen?.(finding.wordIndex) && (

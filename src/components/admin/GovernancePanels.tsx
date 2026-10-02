@@ -5,6 +5,7 @@ import { displayDateTime } from '../../lib/display-format';
  * وحداتٍ نقيّة مختبرة؛ هذه المكوّنات تعرض وتجمع المدخلات فقط.
  */
 import React, { useMemo, useState } from 'react';
+import { Pin } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { caseVerification, type ConflictDecision, type ConflictKind, type ConflictRelation } from '../../lib/conflict-of-interest';
 import { hierarchyOf } from '../../lib/qualification';
@@ -101,7 +102,7 @@ export const SmartSchedulePanel: React.FC = () => {
         {plan.status !== 'published' && <button className={btn2} onClick={() => setResult(s.publishSchedule(plan.id))}>{L(ar, 'اعتماد الجدول', 'Publish schedule')}</button>}</div>
       {byDay.map(([date, list]) => <div key={date} className="overflow-x-auto rounded-2xl border border-[#e5e3dc]"><table className="w-full min-w-[640px] text-start text-xs"><caption className="p-2 text-start font-black">{date}</caption>
         <thead><tr className="text-[#6a706c]"><th scope="col" className="p-2">{L(ar, 'الوقت', 'Time')}</th><th scope="col">{L(ar, 'اللجنة', 'Panel')}</th><th scope="col">{L(ar, 'القاعة', 'Hall')}</th><th scope="col">{L(ar, 'المتسابق', 'Participant')}</th><th scope="col">{L(ar, 'سبب الاختيار', 'Why')}</th></tr></thead>
-        <tbody>{list.map(x => <tr key={x.participantId} className="border-t border-[#ebe9e2]"><td className="p-2" dir="ltr">{x.start}–{x.end}{x.pinned ? ' 📌' : ''}</td><td>{x.committeeId}</td><td>{x.hallId}</td><td>{pname(x.participantId)}</td><td className="text-[#6a706c]">{x.reason}</td></tr>)}</tbody></table></div>)}
+        <tbody>{list.map(x => <tr key={x.participantId} className="border-t border-[#ebe9e2]"><td className="p-2" dir="ltr">{x.start}–{x.end}{x.pinned ? <Pin className="ms-1 inline h-3.5 w-3.5 align-text-bottom" aria-label="pinned" /> : null}</td><td>{x.committeeId}</td><td>{x.hallId}</td><td>{pname(x.participantId)}</td><td className="text-[#6a706c]">{x.reason}</td></tr>)}</tbody></table></div>)}
       {plan.plan.unscheduled.length > 0 && <div className="rounded-2xl bg-[#F5EDE2] p-3 text-xs"><b>{L(ar, 'تعذّرت جدولتهم', 'Could not be scheduled')}</b><ul className="mt-1 list-disc ps-5">{plan.plan.unscheduled.map(u => <li key={u.participantId}>{pname(u.participantId)} — {UNSCHED[u.reason][ar ? 0 : 1]}{u.detail ? ` (${u.detail})` : ''}</li>)}</ul></div>}
       {plan.status !== 'published' && <form className="flex flex-wrap items-end gap-2 rounded-2xl border border-[#e5e3dc] p-3" onSubmit={e => { e.preventDefault(); setResult(s.overrideScheduleSlot(plan.id, move)); }}>
         <b className="w-full text-xs">{L(ar, 'تعديل يدوي (تثبيت متسابق في لجنة ووقت)', 'Manual override (pin a participant)')}</b>

@@ -211,7 +211,7 @@ const ScopeAndQuestions=({store,ar,policy,patchPolicy}:{store:Store;ar:boolean;p
  const [tab,setTab]=useState<'scope'|'questions'>('scope');
  const tabAnchor=useTabAnchor(tab);
  return <div className="space-y-4">
-  <div><h1 className="text-2xl sm:text-3xl font-black">{ar?'النطاق والأسئلة':'Scope & questions'}</h1><p className="text-sm text-[#626864] mt-1.5">{ar?'من أين يُسأل المتسابق، وكيف يُختار سؤاله.':'Where participants are asked from, and how their questions are chosen.'}</p></div>
+  <div><h1 className="flex items-center gap-2 text-2xl sm:text-3xl font-black">{ar?'النطاق والأسئلة':'Scope & questions'}<Hint ar={ar} text={ar?'من أين يُسأل المتسابق، وكيف يُختار سؤاله.':'Where participants are asked from, and how their questions are chosen.'}/></h1></div>
   <div role="tablist" ref={tabAnchor} aria-label={ar?'النطاق والأسئلة':'Scope & questions'} className="mizan-tabs">
    {([['scope',BookMarked,ar?'النطاق':'Scope'],['questions',Sparkles,ar?'الأسئلة':'Questions']] as const).map(([id,Icon,label])=><button key={id} type="button" role="tab" aria-selected={tab===id} onClick={()=>setTab(id)} className={`mizan-tab ${tab===id?'is-active':''}`}><Icon className="w-4 h-4"/>{label}</button>)}
   </div>
@@ -911,7 +911,8 @@ const Toggle=({value,onChange,label}:{value:boolean;onChange:(v:boolean)=>void;l
 const Chip=({active=false,amber=false,onClick,children}:{active?:boolean;amber?:boolean;onClick:()=>void;children:React.ReactNode})=><button type="button" onClick={onClick} className={`px-2.5 py-1.5 rounded-lg text-[13px] font-bold ${active?(amber?'bg-[#F2EADC] text-[#7d5e34]':'bg-[#E7EEE9] text-[#214C40]'):'bg-[#efede7] text-[#777]'}`}>{children}</button>;
 const NavButton=({active,onClick,icon:Icon,label}:{active:boolean;onClick:()=>void;icon:React.ComponentType<{className?:string}>;label:string})=><button onClick={onClick} className={`w-full min-h-12 flex items-center gap-3 px-3.5 py-3 rounded-xl text-[15px] font-bold transition ${active?'bg-[#214C40] text-white':'text-[#626a65] hover:bg-[#efede7] hover:text-[#303733]'}`}><Icon className="w-5 h-5 shrink-0"/><span>{label}</span></button>;
 const TinySelect=({value,onChange,children}:{value:string;onChange:(v:string)=>void;children:React.ReactNode})=><select value={value} onChange={e=>onChange(e.target.value)} className="mizan-input text-sm font-semibold text-[#303733]">{children}</select>;
-const SectionTitle=({title,subtitle}:{title:string;subtitle:string})=><div><h2 className="text-xl font-black text-[#202622]">{title}</h2><p className="text-sm leading-7 text-[#555c58] mt-1.5 max-w-2xl">{subtitle}</p></div>;
+/* الوصف تحت العنوان صار خلف أيقونة (i): النص كما هو، ويُفتح بطلب المستخدم. */
+const SectionTitle=({title,subtitle}:{title:string;subtitle:string})=>{const ar=useAppStore().language==='ar';return <div><h2 className="flex items-center gap-2 text-xl font-black text-[#202622]">{title}{subtitle&&<Hint ar={ar} text={subtitle}/>}</h2></div>};
 const Control=({label,children,hint}:{label:string;children:React.ReactNode;hint?:React.ReactNode})=><label className="block"><span className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-black text-[#686f6a]">{label}{hint}</span>{children}</label>;
 const TextControl=({label,value,onChange,type='text',kind}:{label:string;value:string;onChange:(v:string)=>void;type?:string;kind?:'arabic'|'latin'})=><Control label={label}><input type={type} value={value} onChange={e=>onChange(e.target.value)} lang={kind==='arabic'?'ar':kind==='latin'?'en':undefined} data-mizan-kind={kind} dir={kind==='latin'||type==='email'?'ltr':undefined} className="mizan-input text-sm font-semibold"/></Control>;
 /*

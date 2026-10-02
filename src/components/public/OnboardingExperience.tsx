@@ -238,7 +238,7 @@ const SlideDetail: React.FC<{kind: SceneKind; ar: boolean}> = ({kind, ar}) => {
   }
   return (
     <div className="mzo-step">
-      <span className="mzo-step-n">✓</span>
+      <span className="mzo-step-n"><Check className="h-3.5 w-3.5" aria-hidden="true"/></span>
       <span className="mzo-step-t">
         {ar
           ? 'تُراجَع الشهادة برمز تحقق عام دون الحاجة إلى حساب داخل ميزان.'
