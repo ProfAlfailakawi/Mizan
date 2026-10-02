@@ -703,7 +703,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       key={mode}
                       type="button"
                       onClick={() => setPreviewBg(mode)}
-                      className={`px-2 py-0.5 rounded-lg border transition ${
+                      className={`min-h-11 min-w-11 px-2.5 py-0.5 rounded-lg border transition ${
                         previewBg === mode
                           ? 'border-[#214C40] bg-[#214C40] text-white'
                           : 'border-[#DFDED7] bg-white text-[#656b66] hover:bg-[#FAF9F5]'
