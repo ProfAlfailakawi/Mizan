@@ -218,6 +218,10 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
   .mizan-tabs-scroll:dir(rtl), .mizan-fade-end:dir(rtl) { -webkit-mask-image:linear-gradient(to right,transparent 0,#000 24px); mask-image:linear-gradient(to right,transparent 0,#000 24px); }
   .mizan-fade-end { padding-inline-end:24px; }
 }
+@media (min-width:640px){
+  details.mizan-numbers::details-content { content-visibility:visible; display:block; }
+  details.mizan-numbers > :not(summary) { display:block; }
+}
 @media (prefers-reduced-motion:reduce){ .mizan-tab { transition:none; } }
 /* الملاحظة الاستشارية الموحدة: عبارة «لا يمس الدرجة» بصوت بصري واحد بدل إحدى عشرة صياغة رمادية. */
 .mizan-advisory { display:flex; align-items:flex-start; gap:.6rem; padding:.8rem 1rem; border-radius:14px; background:linear-gradient(135deg,#E7EEE9,#f3f8f5); color:#214C40; font-size:12px; font-weight:700; line-height:1.8; border-inline-start:3px solid #2F6555; }
