@@ -151,9 +151,10 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
         <h3 className="mb-2 text-sm font-black">{ct(locale, 'history')}</h3>
         {data.history.length === 0 ? <p className="text-xs text-[#666c68]">{ct(locale, 'noHistory')}</p> : (
           <ul className="divide-y divide-[#ebe9e2] text-xs">
-            {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-2 py-2">
+            {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-x-2 gap-y-1.5 py-3">
               <span>{formatDate(t.startsAt, locale)} {locale === 'ar' ? '←' : '→'} {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
               <span dir="ltr">{t.participantsUsed.toLocaleString('en-US')} / {t.participantAllowance.toLocaleString('en-US')}</span>
+              {t.participantAllowance > 0 && <div className="h-1.5 w-full rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((t.participantsUsed / t.participantAllowance) * 100))}%` }} /></div>}
             </li>)}
           </ul>
         )}
