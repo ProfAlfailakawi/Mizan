@@ -1996,3 +1996,6 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 
 /* الترويسة على الجوال: العلامة وحدها، والاسم في سطره تحتها (Header.tsx). */
 @media (max-width:639px){.mizan-header-logo .mizan-wordmark{display:none}}
+
+/* ملخّص التفاصيل المطويّة: يُخفى سهم المتصفح القديم (iOS) فيبقى الشيفرون الظاهر وحده. */
+details.mizan-collapse>summary::-webkit-details-marker{ display:none }
