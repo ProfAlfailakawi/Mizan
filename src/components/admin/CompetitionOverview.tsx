@@ -1,5 +1,5 @@
 import { displayTime } from '../../lib/display-format';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DnaRing, DnaStepper } from '../dna/DnaKit';
 import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { BLIND_LEVELS, resolveBlindness } from '../../lib/blind-chamber';
@@ -152,6 +152,13 @@ const JOURNEY:{ar:string;en:string;icon:React.ComponentType<{className?:string}>
  {ar:'النتائج',en:'Results',icon:Award},
  {ar:'الشهادات',en:'Certificates',icon:BadgeCheck},
 ];
+/* على الهاتف مطويّ وعلى الشاشات الأعرض مفتوح؛ يتبع تغيّر العرض (تدوير/تحجيم) دون المساس بطيّ المستخدم بين التغييرين. */
+const NumbersDetails=({summary,children}:{summary:React.ReactNode;children:React.ReactNode})=>{
+ const ref=useRef<HTMLDetailsElement>(null);
+ const wide=()=>typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width:639px)').matches;
+ useEffect(()=>{if(typeof window==='undefined'||!window.matchMedia)return;const mq=window.matchMedia('(max-width:639px)');const on=()=>{if(ref.current)ref.current.open=!mq.matches};mq.addEventListener('change',on);return()=>mq.removeEventListener('change',on)},[]);
+ return <details ref={ref} className="group mizan-numbers" open={wide()}>{summary}{children}</details>;
+};
 export const journeyStepOf=(status:string)=>({draft:0,configured:0,registration_open:1,registration_closed:2,live:3,paused:3,judging_complete:4,results_sealed:4,results_published:5,completed:6,archived:6} as Record<string,number>)[status]??0;
 const formatDay=(iso:string,ar:boolean)=>{if(!iso)return '';const d=new Date(`${iso}T00:00:00`);return Number.isNaN(d.getTime())?iso:d.toLocaleDateString(ar?'ar-KW-u-nu-latn':'en-GB',{day:'numeric',month:'long',year:'numeric'})};
 
@@ -190,7 +197,7 @@ const Overview=({store,ar,attention,readiness,onConfigure,goTo}:{store:Store;ar:
    {publishSuccess&&<div role="status" className="mt-5 rounded-xl bg-[#E7EEE9] text-[#214C40] p-4 text-sm font-bold">{ar?'تم فتح المسابقة ونشر واجهتها العامة بنجاح.':'Competition is open and its public page is published.'}</div>}{publishIssues.length>0&&<div role="status" className="mt-5 rounded-xl bg-[#F2EADC] text-[#725630] p-4 text-sm font-bold"><div>{ar?'قبل فتح المسابقة أكمل التالي:':'Complete these before opening the competition:'}</div><ul className="mt-2 list-disc list-inside space-y-1">{publishIssues.map(x=><li key={x}>{x}</li>)}</ul></div>}</section>
   <SetupPath ar={ar} steps={setupSteps}/>
   {publicPageReady&&<section><ShareRegistration c={competition} ar={ar}/></section>}
-  <details className="group mizan-numbers" open={typeof window==='undefined'||!window.matchMedia||window.matchMedia('(min-width: 640px)').matches}><summary className="mizan-surface flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:hidden [&::-webkit-details-marker]:hidden"><span className="text-sm font-black">{ar?'أرقام المسابقة':'Competition numbers'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="mt-3 sm:mt-0"><section className="grid grid-cols-1 sm:grid-cols-3 gap-3"><MetricCard icon={UsersRound} value={participants.length} label={ar?'مشارك مسجَّل':'Registered'}/><MetricCard icon={Clock3} value={participants.filter(p=>p.status==='in_queue').length} label={ar?'ينتظرون دورهم':'Waiting their turn'}/><MetricCard icon={Gavel} value={committees.filter(c=>c.status!=='offline').length} label={ar?'لجنة تعمل':'Panels working'}/></section></div></details>
+  <NumbersDetails summary={<summary className="mizan-surface flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 sm:hidden [&::-webkit-details-marker]:hidden"><span className="text-sm font-black">{ar?'أرقام المسابقة':'Competition numbers'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary>}><div className="mt-3 sm:mt-0"><section className="grid grid-cols-1 sm:grid-cols-3 gap-3"><MetricCard icon={UsersRound} value={participants.length} label={ar?'مشارك مسجَّل':'Registered'}/><MetricCard icon={Clock3} value={participants.filter(p=>p.status==='in_queue').length} label={ar?'ينتظرون دورهم':'Waiting their turn'}/><MetricCard icon={Gavel} value={committees.filter(c=>c.status!=='offline').length} label={ar?'لجنة تعمل':'Panels working'}/></section></div></NumbersDetails>
   <section className="grid xl:grid-cols-[1.35fr_.65fr] gap-4 [&>*]:min-w-0">
    <div className="mizan-surface p-5 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="mizan-kicker">{ar?'نبض المسابقة':'COMPETITION PULSE'}</div><h2 className="text-lg font-black mt-0.5">{ar?'رحلة المسابقة':'Competition journey'}</h2></div>{readiness.length>0&&canPublish&&<button type="button" onClick={onConfigure} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[#F5EDE2] px-3 text-xs font-black text-[#7a5a2f]"><CircleAlert className="w-4 h-4"/>{ar?`${readiness.length} لإكمال الإعداد`:`${readiness.length} to finish setup`}</button>}</div>
     <div className="relative mt-5"><div aria-hidden className="pointer-events-none absolute top-7 hidden h-0.5 rounded-full bg-[var(--line)] sm:block" style={{insetInlineStart:'8.333%',insetInlineEnd:'8.333%'}}><div className="h-full rounded-full bg-[var(--emerald)] transition-all" style={{width:`${Math.min(step,5)/5*100}%`}}/></div>
