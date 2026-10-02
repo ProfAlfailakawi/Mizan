@@ -595,7 +595,7 @@ export const JudgeOS: React.FC = () => {
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
  </div>}
- <details className="mizan-surface mt-7 p-5 text-start"><summary className="min-h-11 cursor-pointer text-sm font-black">{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</summary><div className="mt-4"><ConflictOfInterestPanel mode="judge"/></div></details>
+ <details className="group mizan-surface mt-7 text-start"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 [&::-webkit-details-marker]:hidden"><span className="inline-flex items-center gap-2 text-sm font-black"><ShieldCheck className="w-4 h-4 text-[#646965]" aria-hidden="true"/>{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="px-5 pb-5"><ConflictOfInterestPanel mode="judge"/></div></details>
  </div>;
 
  /*
