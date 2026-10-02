@@ -10,7 +10,7 @@ import { auth } from '../../lib/firebase';
 import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { ct, commercialErrorText, formatDate, formatMoney, termLastDay, type CommercialKey } from '../../lib/commercial-i18n';
 import { CLONE_PARTS, suggestNextEditionLabel, type ClonePart } from '../../lib/competition-clone';
-import { Check, Gauge, Building2, UsersRound } from 'lucide-react';
+import { Check, Gauge, Building2, UsersRound, WalletCards } from 'lucide-react';
 import { DnaStat } from '../dna/DnaKit';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
@@ -151,9 +151,10 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
         <h3 className="mb-2 text-sm font-black">{ct(locale, 'history')}</h3>
         {data.history.length === 0 ? <p className="text-xs text-[#666c68]">{ct(locale, 'noHistory')}</p> : (
           <ul className="divide-y divide-[#ebe9e2] text-xs">
-            {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-2 py-2">
+            {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-x-2 gap-y-1.5 py-3">
               <span>{formatDate(t.startsAt, locale)} {locale === 'ar' ? '←' : '→'} {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
               <span dir="ltr">{t.participantsUsed.toLocaleString('en-US')} / {t.participantAllowance.toLocaleString('en-US')}</span>
+              {t.participantAllowance > 0 && <div className="h-1.5 w-full rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((t.participantsUsed / t.participantAllowance) * 100))}%` }} /></div>}
             </li>)}
           </ul>
         )}
@@ -225,7 +226,31 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
         <DnaStat icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label={ct(locale, 'customers')} value={<span className="tabular-nums">{data.customers.length}</span>} />
         <DnaStat icon={<UsersRound className="h-5 w-5" aria-hidden="true" />} tone="sky" label={ct(locale, 'participantsUsed')} value={<span className="tabular-nums" dir="ltr">{data.customers.reduce((n: number, c: any) => n + (Number(c.participantsUsed) || 0), 0)} / {data.customers.reduce((n: number, c: any) => n + (Number(c.participantAllowance) || 0), 0)}</span>} />
       </div>
-      <div className="mizan-panel overflow-x-auto p-4">
+      <div className="space-y-3 sm:hidden">
+        {data.customers.map((c: any) => (
+          <article key={c.organizationId} className="mizan-panel p-4">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E7EEE9] text-[#2F6555]"><Building2 className="h-5 w-5" strokeWidth={1.75} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-black">{c.officialName}</div>
+                <div className="mt-0.5 text-[11px] font-bold text-[#666c68]">{c.planName || '—'}{c.term ? ` · #${c.term.termIndex}` : ''}</div>
+              </div>
+              <span className="shrink-0 rounded-full bg-[#f0eee8] px-2.5 py-1 text-[11px] font-black">{ct(locale, `state_${c.accessState}` as CommercialKey)}</span>
+            </div>
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#666c68]"><span>{ct(locale, 'participantsUsed')}</span><span dir="ltr">{c.participantsUsed} / {c.participantAllowance}</span></div>
+              {c.participantAllowance > 0 && <div className="mt-1.5 h-2 rounded-full bg-[#ebe9e2]"><div className="h-2 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'renewalDate')}</dt><dd className="mt-0.5 font-black">{formatDate(termLastDay(c.renewalDate), locale)}</dd></div>
+              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'walletCost')}</dt><dd className="mt-0.5 font-black">{formatMoney(c.walletCostMinor, c.currency, locale)}</dd></div>
+              <div className="col-span-2 rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'customDomain')}</dt><dd className="mt-0.5 font-black" dir="ltr">{c.domain || '—'}</dd></div>
+            </dl>
+            <Button className="mt-3 min-h-11 w-full" size="sm" variant="secondary" loading={busy === c.organizationId} onClick={() => void renew(c.organizationId)}>{ct(locale, 'renew')}</Button>
+          </article>
+        ))}
+      </div>
+      <div className="mizan-panel hidden overflow-x-auto p-4 sm:block">
         <table className="w-full min-w-[720px] text-start text-xs [&_td]:px-2.5 [&_th]:px-2.5">
           <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
@@ -282,7 +307,22 @@ const OperatorWallet: React.FC<{ data: any; reload: () => Promise<void>; onError
             {['commitment', 'top_up', 'license_activation', 'license_renewal', 'plan_upgrade', 'refund', 'admin_adjustment', 'expiration'].map(t => <option key={t} value={t}>{ct(locale, `entry_${t}` as CommercialKey)}</option>)}
           </select>
         </label>
-        <table className="w-full min-w-[640px] text-start text-xs">
+        <ul className="divide-y divide-[#ebe9e2] sm:hidden">
+          {rows.map((e: any) => (
+            <li key={e.id} className="flex items-center gap-3 py-3">
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${e.amountMinor < 0 ? 'bg-[#f6e7e3] text-[#874b43]' : 'bg-[#E7EEE9] text-[#2F6555]'}`}><WalletCards className="h-[18px] w-[18px]" strokeWidth={1.75} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black">{ct(locale, `entry_${e.type}` as CommercialKey)}</div>
+                <div className="mt-0.5 text-[11px] text-[#666c68]">{formatDate(e.createdAt, locale)}{e.reason ? ` · ${e.reason}` : ''}</div>
+              </div>
+              <div className="shrink-0 text-end">
+                <div dir="ltr" className={`text-xs font-black ${e.amountMinor < 0 ? 'text-[#874b43]' : 'text-[#1f5b3c]'}`}>{formatMoney(e.amountMinor, e.currency, locale)}</div>
+                <div dir="ltr" className="mt-0.5 text-[11px] text-[#666c68]">{formatMoney(e.balanceAfterMinor, e.currency, locale)}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <table className="hidden w-full min-w-[640px] text-start text-xs sm:table">
           <tbody>{rows.map((e: any) => <tr key={e.id} className="border-t border-[#ebe9e2]">
             <td className="py-2">{formatDate(e.createdAt, locale)}</td><td>{ct(locale, `entry_${e.type}` as CommercialKey)}</td>
             <td dir="ltr" className={e.amountMinor < 0 ? 'text-[#874b43]' : 'text-[#1f5b3c]'}>{formatMoney(e.amountMinor, e.currency, locale)}</td>
@@ -304,7 +344,26 @@ const OperatorPricing: React.FC<{ data: any; reload: () => Promise<void>; onErro
     catch (err) { onError(err as ApiError); }
   };
   return (
-    <div className="mizan-panel overflow-x-auto p-4">
+    <>
+    <div className="space-y-3 sm:hidden">
+      {data.pricing.map((p: any) => (
+        <article key={p.id} className="mizan-panel p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E7EEE9] text-[#2F6555]"><WalletCards className="h-5 w-5" strokeWidth={1.75} /></span>
+            <div className="min-w-0 flex-1 text-sm font-black">{p.name}</div>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'publicPrice')}</dt><dd className="mt-0.5 font-black">{p.custom ? '—' : formatMoney(p.publicPriceMinor, p.currency, locale)}</dd></div>
+            <div className="rounded-xl bg-[#e6efe9] px-3 py-2"><dt className="text-[11px] font-bold text-[#2F6555]">{ct(locale, 'wholesalePrice')}</dt><dd className="mt-0.5 font-black">{formatMoney(p.wholesalePriceMinor, p.currency, locale)}</dd></div>
+          </dl>
+          <div className="mt-3 flex items-end gap-2">
+            <label className="min-w-0 flex-1 text-[11px] font-bold text-[#666c68]">{ct(locale, 'resalePrice')}<input aria-label={`${ct(locale, 'resalePrice')} ${p.name}`} className={`${inputCls} mt-1 min-h-11`} dir="ltr" placeholder={p.resalePriceMinor !== undefined ? String(p.resalePriceMinor / 100) : ''} value={draft[p.id] ?? ''} onChange={e => setDraft({ ...draft, [p.id]: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+            <Button className="min-h-11" size="sm" variant="secondary" disabled={draft[p.id] === undefined} onClick={() => void save(p)}>{ct(locale, 'save')}</Button>
+          </div>
+        </article>
+      ))}
+    </div>
+    <div className="mizan-panel hidden overflow-x-auto p-4 sm:block">
       <table className="w-full min-w-[640px] text-start text-xs">
         <thead><tr>{(['currentPlan', 'publicPrice', 'wholesalePrice', 'resalePrice'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th /></tr></thead>
         <tbody>{data.pricing.map((p: any) => <tr key={p.id} className="border-t border-[#ebe9e2]">
@@ -315,6 +374,7 @@ const OperatorPricing: React.FC<{ data: any; reload: () => Promise<void>; onErro
         </tr>)}</tbody>
       </table>
     </div>
+    </>
   );
 };
 
