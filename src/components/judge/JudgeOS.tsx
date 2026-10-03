@@ -580,12 +580,12 @@ export const JudgeOS: React.FC = () => {
  {!!committeeQueue.length&&<div className="mizan-surface mt-8 p-5 text-start">
   <h2 className="text-lg font-black">{ar?'من ينتظر دوره':'Who is waiting'}</h2>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
-   {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex items-center gap-3 px-3 py-3 ${turn?'bg-[#F7FAF8]':'opacity-60'}`}>
+   {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 ${turn?'bg-[#F7FAF8]':'opacity-60'}`}>
     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black tabular-nums ${turn?'bg-[#214C40] text-white':'bg-[#f1efe9] text-[#656b66]'}`}>{i+1}</span>
     {maskParticipantForJudge(p,blindness,ar).displayName!==p.code&&<span className="font-mono text-xs font-black text-[#656b66]" dir="ltr">{p.code}</span>}
-    <span className="min-w-0 flex-1 truncate text-base font-black" dir="auto">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
+    <span className="min-w-[5.5rem] flex-1 truncate text-base font-black" dir="auto">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
     <span className="shrink-0 text-xs font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
-    <Button size="sm" variant={turn?'primary':'outline'} className={turn?undefined:'!opacity-0 pointer-events-none'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
+    <Button size="sm" variant={turn?'primary':'outline'} className={turn?undefined:'!opacity-0 pointer-events-none max-sm:hidden'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
    </li>})}
   </ul>
   <p className="mt-3 text-xs leading-6 text-[#696f6b]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
