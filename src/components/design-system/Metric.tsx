@@ -49,9 +49,9 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
   }
   return (
     <div className={`mizan-surface p-3 sm:p-4 ${className}`}>
-      <div className="flex items-start justify-between gap-2 sm:gap-3">
+      <div className={`flex items-start justify-between gap-2 sm:gap-3 ${typeof value === 'string' && value.length > 9 ? 'max-[400px]:flex-col-reverse' : ''}`}>
         <div className="min-w-0">
-          <div className="text-2xl font-black tabular-nums">{value}</div>
+          <div className={`${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{value}</div>
           <div className="mt-1 text-[11px] text-[#666c68]">{label}</div>
         </div>
         {Icon && (
