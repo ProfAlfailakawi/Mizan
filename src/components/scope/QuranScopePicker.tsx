@@ -214,7 +214,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
               const active = scopeAyahCount(scopeSubtract(built, scope)) === 0 && scopeAyahCount(scopeSubtract(scope, built)) === 0;
               return (
                 <button key={preset.id} type="button" disabled={locked} onClick={() => { const clipped = clipToParent(built); setJuzGuard(exactJuzGuard(clipped)); setRangeError(''); emit(clipped); }} aria-pressed={active}
-                  className={`min-h-10 rounded-xl border px-3.5 text-xs font-black transition disabled:opacity-45 ${active ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dcdad2] bg-white text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
+                  className={`min-h-11 rounded-xl border px-3.5 text-xs font-black transition disabled:opacity-45 ${active ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dcdad2] bg-white text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
                   {arabic ? preset.ar : preset.en}
                 </button>
               );
