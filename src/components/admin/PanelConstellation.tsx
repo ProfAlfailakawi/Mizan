@@ -25,7 +25,7 @@ export const PanelConstellation: React.FC<{
     ? `${members} من ${judges.length} محكمًا في اللجنة${head ? ` · الرئيس ${nm(head)}` : ''}`
     : `${members} of ${judges.length} judges on this panel${head ? ` · chair ${nm(head)}` : ''}`;
   return (
-    <figure className="mx-auto mt-2 flex w-full max-w-[176px] flex-col items-center" data-testid="panel-constellation">
+    <figure className="mx-auto mt-2 flex w-full max-w-[240px] flex-col items-center" data-testid="panel-constellation">
       <svg viewBox="0 0 240 240" role="img" aria-label={label} className="h-auto w-full">
         <circle cx={C} cy={C} r={R} fill="none" stroke="#e4e2db" strokeWidth="1" strokeDasharray="2 4" />
         {judges.map((j, i) => { if (!isSelected(j)) return null; const [x, y] = pos(i); return <line key={`l-${j.id}`} x1={C} y1={C} x2={x} y2={y} stroke="#2F6555" strokeOpacity="0.22" strokeWidth="1.2" />; })}
@@ -34,8 +34,8 @@ export const PanelConstellation: React.FC<{
           return (
             <g key={j.id}>
               <title>{nm(j)}</title>
-              <circle cx={x} cy={y} r={h ? 11 : 9.5} fill={sel ? '#214C40' : '#fffefb'} stroke={h ? '#B98B4E' : sel ? '#214C40' : '#cfd5d0'} strokeWidth={h ? 2.4 : 1.4} />
-              <text x={x} y={y + 3.4} textAnchor="middle" fontSize="9.5" fontWeight="800" fill={sel ? '#fffefb' : '#8a918c'}>{initialOf(nm(j))}</text>
+              <circle cx={x} cy={y} r={h ? 13 : 12} fill={sel ? '#214C40' : '#fffefb'} stroke={h ? '#B98B4E' : sel ? '#214C40' : '#cfd5d0'} strokeWidth={h ? 2.4 : 1.4} />
+              <text x={x} y={y + 4} textAnchor="middle" fontSize="11.5" fontWeight="800" fill={sel ? '#fffefb' : '#8a918c'}>{initialOf(nm(j))}</text>
             </g>
           );
         })}
