@@ -133,13 +133,13 @@ export const QuestionEngineWorkspace: React.FC = () => {
 };
 
 const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; onSelect: (id: string) => void; policy: ReturnType<typeof getCompetitionPolicy> }> = ({ store, ar, selectedId, onSelect, policy }) => (
-  <div className="flex gap-2 overflow-x-auto pb-1">
+  <div className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] lg:overflow-visible">
     {store.competition.categories.map(category => {
       const scope = categoryScopeOf(category);
       const needsScope = scopeAyahCount(scope) === 0;
       return (
         <button key={category.id} type="button" onClick={() => onSelect(category.id)} aria-pressed={selectedId === category.id}
-          className={`min-w-[200px] max-w-[85%] shrink-0 rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:bg-[#f7f5ef]'}`}>
+          className={`min-w-[200px] max-w-[85%] shrink-0 lg:min-w-0 lg:max-w-none rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:bg-[#f7f5ef]'}`}>
           <div className="flex items-start justify-between gap-2">
             <span className="min-w-0 truncate text-sm font-black text-[#24302b]">{bilingualName(category, ar)}</span>
             {needsScope
