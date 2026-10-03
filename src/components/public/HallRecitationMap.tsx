@@ -49,13 +49,13 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
   const body = (
     <div className={variant === 'screen' ? 'min-h-full p-5 sm:p-8 lg:p-10 flex flex-col' : ''}>
       <header className="flex items-start justify-between gap-5">
-        <div>
+        <div className="min-w-0">
           <div className={`${lbl} font-black tracking-[.2em] text-[#c6b58a]`}>{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>
           <h1 className="text-2xl sm:text-3xl font-black mt-1 flex items-center gap-3">{ar ? 'اليوم تُتلى في هذه القاعة' : 'Recited in this hall today'}</h1>
           <div className="text-xs mizan-venue-muted mt-1">{bilingualName(store.competition,ar)}</div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.totalRecitations>0 ? (ar ? 'حي · بيانات فعلية' : 'Live · real data') : (ar ? 'بانتظار تلاوة فعلية' : 'Waiting for real recitation')}</span>
+          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#c49a5d]/30 bg-[#c49a5d]/10 px-3 py-1.5 text-[11px] font-black text-[#d9c193]"><Radio className="w-3.5 h-3.5" />{agg.totalRecitations>0 ? (ar ? 'حي · بيانات فعلية' : 'Live · real data') : (ar ? 'بانتظار تلاوة فعلية' : 'Waiting for real recitation')}</span>
           {onClose && <button onClick={onClose} className="w-11 h-11 shrink-0 rounded-xl hover:bg-white/10 grid place-items-center text-white/55"><X className="w-5 h-5" /></button>}
         </div>
       </header>
