@@ -128,7 +128,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
         const tone = TONE[item.tone || 'info'];
         const Icon = kind.icon;
         const age = since(item.at, ar);
-        return <li key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e9e7e1] bg-[#fbfaf7] px-3.5 py-3">
+        return <li key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e9e7e1] bg-[#fbfaf7] px-3.5 py-3" style={{ borderInlineStartWidth: 3, borderInlineStartColor: tone.dot }}>
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl" style={{ background: `${kind.bar}1f`, color: kind.bar }}>
             <Icon className="h-4 w-4" aria-hidden />
           </span>
@@ -136,7 +136,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
             <span className="block text-sm font-black leading-6 text-[#222623]">{item.title}</span>
             <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#656b66]">
               <span className="inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone.dot }} aria-hidden />
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: kind.bar }} aria-hidden />
                 {ar ? kind.ar : kind.en}
               </span>
               {age && <span className="tabular-nums">· {age}</span>}

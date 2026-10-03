@@ -71,7 +71,7 @@ export const JudgeDriftMonitor: React.FC = () => {
     <section className="mizan-surface p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="w-11 h-11 rounded-2xl bg-[#F2EADC] text-[#7d5e34] grid place-items-center"><Gauge className="w-5 h-5" /></span>
+          <span className="w-11 h-11 shrink-0 rounded-2xl bg-[#F2EADC] text-[#7d5e34] grid place-items-center"><Gauge className="w-5 h-5" /></span>
           <div>
             <div className="mizan-kicker">{ar ? 'مراقبة انحراف المحكم' : 'JUDGE DRIFT'}</div>
             <h2 className="text-lg font-black mt-0.5">{ar ? 'عدّاد الإرهاق الصامت' : 'Silent fatigue monitor'}</h2>
@@ -131,12 +131,12 @@ export const JudgeDriftMonitor: React.FC = () => {
         const share = signals.length ? calm / signals.length : 0;
         return <>
           <div className="mt-5 flex items-center gap-4 rounded-2xl border border-[#e4e2db] bg-[#fffefb] p-4">
-            <div className="relative w-14 h-14 shrink-0" role="img" aria-label={`${calm}/${signals.length}`}>
-              <svg viewBox="0 0 44 44" className="w-14 h-14 -rotate-90">
+            <div className="relative w-[72px] h-[72px] shrink-0" role="img" aria-label={`${calm}/${signals.length}`}>
+              <svg viewBox="0 0 44 44" className="w-[72px] h-[72px] -rotate-90">
                 <circle cx="22" cy="22" r={R} fill="none" stroke="#ebe9e2" strokeWidth="4" />
                 <circle cx="22" cy="22" r={R} fill="none" stroke="#2f6555" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${C * share} ${C}`} />
               </svg>
-              <span className="absolute inset-0 grid place-items-center text-sm font-black" dir="ltr">{calm}/{signals.length}</span>
+              <span className="absolute inset-0 grid place-items-center text-[13px] font-black tabular-nums" dir="ltr">{calm}/{signals.length}</span>
             </div>
             <div className="flex flex-wrap gap-2 text-[13px] font-black">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F1E5] px-3 py-1 text-[#7d5e34]"><span className="w-2 h-2 rounded-full bg-[#9a6a2f]" />{flagged.length} {ar ? 'تنبيه' : 'flag'}</span>

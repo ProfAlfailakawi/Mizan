@@ -181,7 +181,7 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
     tajweedOn={tajweedOn} onToggleTajweed={()=>setTajweedOn(v=>!v)} tajweedScopeNote={delivery?.tajweedScopeNote}
     sourceLabel={surfaceAuthorityLabel} loaded={checked}
     frame={inCockpit?{pageAspect,pages:Math.max(1,loadedLoci.length||loci.length)}:null}/>}
-  {!delivery&&!hasOfficialPage&&checked&&<DemoQuranNotice ar={ar} what="page"/>}
+  {!delivery&&!hasOfficialPage&&checked&&<DemoQuranNotice ar={ar} what="page" className="!my-2 !py-3"/>}
   {delivery&&audioOpen&&<div className="mizan-mushaf-drawer"><PassageAudio reading={readingKey} ayat={delivery.ayat} ar={ar} onActive={setActive}/></div>}
   {delivery&&divergenceOpen&&<div className="mizan-mushaf-drawer"><DivergenceRadar reading={readingKey} surah={delivery.surah} startAyah={delivery.startAyah} endAyah={delivery.endAyah} ar={ar}/></div>}
   <div className="mizan-mushaf-tools mizan-mushaf-bar px-4 sm:px-5 py-2 border-t border-[#e5e1d7] flex items-center justify-between gap-2 text-[9px] text-[#676c68]">
