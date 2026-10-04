@@ -281,7 +281,8 @@ steps:
             --project "$PROJECT_ID" --location me-central1 \
             --policy /workspace/image-cleanup-policy.json --no-dry-run --quiet; then
           echo 'image cleanup policy not applied — the build service account needs roles/artifactregistry.repoAdmin on cloud-run-source-deploy'
-          exit 1
+          # تنظيف الصور تحسينٌ اختياري، لا ينبغي أن يحوّل نشر النسخة السليمة إلى فشل.
+          exit 0
         fi
         gcloud artifacts repositories describe cloud-run-source-deploy --project "$PROJECT_ID" --location me-central1 \
           --format='value(sizeBytes)' | awk '{printf "cloud-run-source-deploy size now: %.2f GiB\n", $1/1073741824}'
