@@ -6,7 +6,6 @@ import type { Request, Response } from 'express-serve-static-core';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import { QuestionEscrowRepository } from './server/question-escrow';
 import { firebaseSecondFactorPresent, verifyFirebaseBaseIdToken, verifyFirebaseIdToken } from './server/firebase-auth';
 import { claimsFromGrant, writeIdentityClaims, claimsWritable, claimsWritability } from './server/firebase-claims';
@@ -2925,7 +2924,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
   app.use('/api/align',createAlignmentRouter({manager:alignmentManager,auth:alignmentAuth,mode:'SHADOW_ONLY',devCanonicalHash:alignmentDevSynth?((spec)=>{try{return devHafsPassage(spec.startAyah,spec.endAyah).canonicalTextHash}catch{return undefined}}):undefined}));
   setInterval(()=>alignmentManager.reap(10*60_000),60_000).unref?.();
 
-  if(!isProd){const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');
+  if(!isProd){const {createServer:createViteServer}=await import('vite');const vite=await createViteServer({server:{middlewareMode:true},appType:'spa'});app.use(vite.middlewares)}else{const distPath=path.join(process.cwd(),'dist');
     /*
      * Caching contract for a hashed build.
      *
