@@ -8,8 +8,17 @@ const workflow = fs.readFileSync(
   path.join(process.cwd(), '.github', 'workflows', 'runtime-dependency-security.yml'),
   'utf8',
 );
+const npmrc = fs.readFileSync(path.join(process.cwd(), '.npmrc'), 'utf8');
+const lock = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package-lock.json'), 'utf8'));
 
-test('Cloud Run runtime omits peer-only mobile dependencies', () => {
+test('optional peer adapters do not enter the locked install tree', () => {
+  assert.ok(npmrc.includes('legacy-peer-deps=true'),
+    'web/server install must not auto-install Firebase Auth’s unused React Native adapter tree');
+  assert.equal(Boolean(lock.packages['node_modules/react-native']), false,
+    'the lockfile must not carry the optional React Native runtime tree');
+});
+
+test('Cloud Run runtime omits optional mobile dependencies', () => {
   const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:22.20.0-bookworm-slim AS runtime'));
   assert.ok(runtimeStage.includes('npm ci --omit=dev --omit=peer'),
     'the production image must not auto-install React Native/Metro peers that Mizan never executes');
