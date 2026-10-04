@@ -4,7 +4,7 @@
 FROM node:22.20.0-bookworm-slim AS build
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
@@ -41,10 +41,10 @@ FROM node:22.20.0-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080 NPM_CONFIG_UPDATE_NOTIFIER=false
 
-COPY package.json package-lock.json ./
-# Firebase Auth declares a React-Native persistence adapter as a peer. npm may otherwise
-# auto-install the whole React Native/Metro toolchain into Cloud Run although Mizan never
-# executes it. Keep the runtime image equal to the audited web/server dependency surface.
+COPY package.json package-lock.json .npmrc ./
+# Firebase Auth declares a React-Native persistence adapter as an optional peer. The
+# committed .npmrc/lock omit this unused mobile toolchain; keep Cloud Run on the same
+# audited web/server dependency surface as CI.
 RUN npm ci --omit=dev --omit=peer --ignore-scripts --no-audit --no-fund && npm cache clean --force
 
 COPY --from=build /app/dist ./dist

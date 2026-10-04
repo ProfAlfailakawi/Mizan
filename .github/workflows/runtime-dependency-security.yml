@@ -25,9 +25,9 @@ jobs:
         with:
           node-version-file: package.json
           cache: npm
-      # Cloud Run لا يشحن peer-only mobile adapters. Firebase Auth يعلن AsyncStorage
-      # كـpeer، وnpm قد يجرّ وراءه React Native/Metro كاملًا رغم أن ميزان تطبيق ويب/خادم.
-      # نفحص هنا المجموعة نفسها التي تُثبَّت في مرحلة runtime داخل Dockerfile، لا build deps.
+      # ملف .npmrc وملف القفل يمنعان تثبيت شجرة React Native/Metro الاختيارية التي يعلنها
+      # Firebase Auth لتطبيقات الهاتف؛ ميزان تطبيق ويب/خادم. نفحص هنا سطح runtime نفسه
+      # الذي يثبته Dockerfile، لا اعتماديات البناء.
       - name: تثبيت اعتماديات وقت التشغيل الفعلية من ملف القفل
         run: npm ci --omit=dev --omit=peer
       # ثغرةٌ وُجدت، وقياسٌ تعذّر — أحمران لا يُخلط أحدهما بالآخر.

@@ -8,9 +8,20 @@ const workflow = fs.readFileSync(
   path.join(process.cwd(), '.github', 'workflows', 'runtime-dependency-security.yml'),
   'utf8',
 );
+const npmrc = fs.readFileSync(path.join(process.cwd(), '.npmrc'), 'utf8');
+const lock = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package-lock.json'), 'utf8'));
 
-test('Cloud Run runtime omits peer-only mobile dependencies', () => {
+test('optional peer adapters do not enter the locked install tree', () => {
+  assert.ok(npmrc.includes('legacy-peer-deps=true'),
+    'web/server install must not auto-install Firebase Auth’s unused React Native adapter tree');
+  assert.equal(Boolean(lock.packages['node_modules/react-native']), false,
+    'the lockfile must not carry the optional React Native runtime tree');
+});
+
+test('Cloud Run runtime omits optional mobile dependencies', () => {
   const runtimeStage = dockerfile.slice(dockerfile.indexOf('FROM node:22.20.0-bookworm-slim AS runtime'));
+  assert.ok(runtimeStage.includes('COPY package.json package-lock.json .npmrc ./'),
+    'the runtime image must copy the peer-resolution config before npm ci');
   assert.ok(runtimeStage.includes('npm ci --omit=dev --omit=peer'),
     'the production image must not auto-install React Native/Metro peers that Mizan never executes');
 });
@@ -31,10 +42,12 @@ test('the security gate is not weakened with error swallowing or advisory allowl
     'do not silence individual advisories instead of fixing the shipped dependency surface');
 });
 
-test('build stage still installs peer dependencies for compatibility checks but runtime does not ship them', () => {
+test('build and runtime consume the same locked peer-resolution policy', () => {
   const runtimeMarker = dockerfile.indexOf('FROM node:22.20.0-bookworm-slim AS runtime');
   const buildStage = dockerfile.slice(0, runtimeMarker);
   const runtimeStage = dockerfile.slice(runtimeMarker);
   assert.ok(buildStage.includes('npm ci --ignore-scripts --no-audit --no-fund'));
+  assert.ok(buildStage.includes('COPY package.json package-lock.json .npmrc ./'),
+    'the build stage must use the same peer-resolution config as the checked-in lock');
   assert.ok(runtimeStage.includes('--omit=peer'));
 });
