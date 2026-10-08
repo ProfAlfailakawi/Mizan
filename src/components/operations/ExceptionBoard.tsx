@@ -39,6 +39,17 @@ const clockOf = (at?: string) => {
   return Number.isFinite(t.getTime()) ? `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` : '';
 };
 
+/** Correct Arabic count phrase (singular / dual / 3-10 plural / 11+ singular), digit isolated as LTR. */
+const moreCasesAr = (n: number) => {
+  if (n === 1) return 'وحالة أخرى واحدة.';
+  if (n === 2) return 'وحالتان أخريان.';
+  return (
+    <>
+      و<bdi dir="ltr" className="tabular-nums">{n}</bdi> {n <= 10 ? 'حالات أخرى' : 'حالة أخرى'}.
+    </>
+  );
+};
+
 export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; severityLabel?: (value: string) => string }> = ({ items, ar, severityLabel }) => {
   const counts = useMemo(() => ({
     incident: items.filter(x => x.kind === 'incident').length,
@@ -93,7 +104,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
       </ul>
       {items.length > 8 && (
         <p className="border-t border-[#eeece5] px-5 py-2.5 text-xs font-bold text-[#696f6b]">
-          {ar ? `و${items.length - 8} حالة أخرى.` : `And ${items.length - 8} more.`}
+          {ar ? moreCasesAr(items.length - 8) : `And ${items.length - 8} more.`}
         </p>
       )}
     </section>
