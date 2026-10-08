@@ -960,8 +960,6 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   .mizan-judge-quran{ min-height:19rem }
   .mizan-judge-os .mizan-mushaf-bar{ padding-block:.5rem }
   .mizan-judge-os .mizan-mushaf-tools{ min-height:40px; padding-block:.3rem }
-  /* التنبيهات تُقال ولا تمنع: تنزل تحت المصحف فلا تزاحمه، وتبقى مقروءةً بالتمرير. */
-  .mizan-judge-notes{ order:5; margin:.6rem 0 0 }
 }
 
 /* ── الذيل: الإنهاء، وبجانبه التراجع صامتًا ──────────────────────────── */
