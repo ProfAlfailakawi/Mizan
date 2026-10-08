@@ -113,7 +113,7 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
           const Icon = s.icon;
           return (
             <React.Fragment key={s.key}>
-              <div className="flex flex-col items-center gap-1.5 text-center w-14 sm:w-auto sm:min-w-14 shrink-0">
+              <div className="flex flex-col items-center gap-1.5 text-center w-11 min-[360px]:w-12 min-[390px]:w-14 sm:w-auto sm:min-w-14 shrink-0">
                 <span className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-4 h-4 sm:w-5 sm:h-5" /></span>
                 <span className={`text-xs leading-tight font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
               </div>
