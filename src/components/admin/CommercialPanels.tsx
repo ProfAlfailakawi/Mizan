@@ -322,7 +322,7 @@ const OperatorWallet: React.FC<{ data: any; reload: () => Promise<void>; onError
             </li>
           ))}
         </ul>
-        <table className="hidden w-full min-w-[640px] text-start text-xs sm:table">
+        <table className="hidden w-full min-w-[640px] text-start text-xs sm:table [&_td]:px-3">
           <tbody>{rows.map((e: any) => <tr key={e.id} className="border-t border-[#ebe9e2]">
             <td className="py-2">{formatDate(e.createdAt, locale)}</td><td>{ct(locale, `entry_${e.type}` as CommercialKey)}</td>
             <td dir="ltr" className={e.amountMinor < 0 ? 'text-[#874b43]' : 'text-[#1f5b3c]'}>{formatMoney(e.amountMinor, e.currency, locale)}</td>
