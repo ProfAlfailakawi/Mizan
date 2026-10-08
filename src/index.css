@@ -919,7 +919,9 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-action[data-weight="high"]{ --ja-weight:4px; --ja-weight-o:1 }
 .mizan-judge-action[data-weight="mid"] { --ja-weight:3px; --ja-weight-o:.8 }
 .mizan-judge-action[data-weight="low"] { --ja-weight:2px; --ja-weight-o:.55 }
-.mizan-judge-label{ font-size:calc(18px * var(--mizan-text-scale)); font-weight:700; line-height:1.15; position:relative; z-index:2 }
+/* `truncate` على الوسم يقصّ كل ما تحت خطّ السطر: نقاط الباء والجيم وذيل الراء. فيُعطى السطر
+   ارتفاعًا يتّسع للحروف الممتدّة، ويُسترجع بهامشٍ سالب فلا يتغيّر ارتفاع المفتاح. */
+.mizan-judge-label{ font-size:calc(18px * var(--mizan-text-scale)); font-weight:700; line-height:1.15; padding-block:.28em; margin-block:-.28em; position:relative; z-index:2 }
 .mizan-judge-cost{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-faint); font-variant-numeric:tabular-nums; position:relative; z-index:2 }
 /* العدّاد رقمٌ كبير بلون المعيار: يُقرأ من بُعد ذراع، ويغيب عند الصفر */
 .mizan-judge-count{
@@ -946,6 +948,19 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   transform-origin:100% 50%; animation:mzDrain .42s linear forwards;
 }
 @keyframes mzDrain{ from{ transform:scaleX(1) } to{ transform:scaleX(0) } }
+
+/* هاتفٌ قصير (360×640 وأمثاله): ثلاثة مفاتيح في الصف بدل اثنين، فتنزل اللوحة صفًّا كاملًا
+   ويأخذ سطح المصحف ما كان يضيع في الأسفل. والورقة تُمرَّر إن ضاقت، فلا يُحشر النصّ في شريطٍ رفيع. */
+@media (max-width:1023px) and (max-height:720px){
+  .mizan-judge-pad{ grid-template-columns:repeat(3,minmax(0,1fr)) }
+  .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:auto }
+  .mizan-judge-pad > :last-child:nth-child(3n+1){ grid-column:1 / -1 }
+  .mizan-judge-action{ padding-inline:.6rem }
+  .mizan-judge-paper{ overflow-y:auto; overscroll-behavior:contain; padding:.7rem .85rem .85rem }
+  .mizan-judge-quran{ min-height:19rem }
+  .mizan-judge-os .mizan-mushaf-bar{ padding-block:.5rem }
+  .mizan-judge-os .mizan-mushaf-tools{ min-height:40px; padding-block:.3rem }
+}
 
 /* ── الذيل: الإنهاء، وبجانبه التراجع صامتًا ──────────────────────────── */
 .mizan-judge-bottom{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.45rem; align-items:stretch }
