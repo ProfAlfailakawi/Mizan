@@ -55,10 +55,10 @@ const ErrorBox: React.FC<{ error: ApiError | null }> = ({ error }) => {
 };
 
 const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string }> = ({ label, value, hint }) => (
-  <div className="rounded-2xl border border-[#e2e0d9] bg-white p-4">
+  <div className="rounded-2xl border border-[#e2e0d9] bg-white p-3.5 min-[400px]:p-4">
     <div className="text-[11px] font-bold text-[#666c68]">{label}</div>
-    <div className="mt-1 text-lg font-black text-[#171b18]" dir="auto">{value}</div>
-    {hint && <div className="mt-1 text-[11px] text-[#666c68]">{hint}</div>}
+    <div className="mt-1 whitespace-nowrap text-[clamp(13px,4.2vw,18px)] font-black text-[#171b18]" dir="auto">{value}</div>
+    {hint && <div className="mt-1 text-[11px] text-[#666c68] [text-wrap:balance]">{hint}</div>}
   </div>
 );
 
