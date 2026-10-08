@@ -736,7 +736,7 @@ export const PaymentGatewayPanel: React.FC<{ ownerType: 'operator' | 'organizati
       {data.gateways.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
         <span><b>{g.displayName}</b> · {g.provider} · <Badge variant={g.status === 'active' ? 'emerald' : 'neutral'}>{GATEWAY_STATUS[g.status]?.[ar ? 0 : 1] || g.status}</Badge>
           {g.lastTest && <span className="ms-2 text-[#666c68]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? <Check className="inline h-3.5 w-3.5 align-text-bottom" aria-label={ar ? 'نجح' : 'Passed'} /> : g.lastTest.code}</span>}
-          <span className="block text-[11px] text-[#666c68]" dir="ltr">{data.webhookBase}{g.id}</span></span>
+          <span className="block break-all text-[11px] text-[#666c68]" dir="ltr">{data.webhookBase}{g.id}</span></span>
         {g.status !== 'disabled' && <span className="flex gap-2">
           {g.status === 'pending_test' && <Button size="sm" onClick={() => void test(g.id)}>{ar ? 'اختبار وتفعيل' : 'Test & activate'}</Button>}
           <Button size="sm" variant="outline" onClick={() => void disable(g.id)}>{ar ? 'تعطيل' : 'Disable'}</Button>

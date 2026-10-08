@@ -55,12 +55,12 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
           <h2 className="mt-0.5 text-sm font-black">{ar ? 'ما يحتاج قرارًا الآن' : 'What needs a decision now'}</h2>
         </div>
         {/* العدّادات بأنواعها: الجواب الأول قبل النزول إلى التفصيل. */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {(Object.keys(KIND_STYLE) as ExceptionKind[]).filter(k => counts[k] > 0).map(kind => {
             const style = KIND_STYLE[kind];
             const Icon = style.icon;
             return (
-              <span key={kind} className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[13px] font-black" style={{ background: style.tint, color: style.dot }}>
+              <span key={kind} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[13px] font-black" style={{ background: style.tint, color: style.dot }}>
                 <Icon className="h-3.5 w-3.5" />
                 <span className="tabular-nums">{counts[kind]}</span>
                 <span className="font-bold opacity-80">{ar ? style.ar : style.en}</span>

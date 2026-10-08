@@ -19,7 +19,7 @@ export const Header: React.FC = () => {
  // في البيئة التجريبية لا توجد جلسة هوية تُنهى؛ الخروج يمحو الصندوق التجريبي وحده.
  const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} signOutAndReload() };
  return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
-  <div className="max-w-[1500px] mx-auto h-16 px-4 sm:px-6 flex items-center justify-between gap-3">
+  <div className="max-w-[1500px] mx-auto h-16 px-4 max-[340px]:px-2 sm:px-6 flex items-center justify-between gap-3 max-[340px]:gap-2">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
       <MizanLogo language={language} compact className="mizan-header-logo"/>
       <div className="min-w-0 hidden sm:block">
@@ -40,7 +40,7 @@ export const Header: React.FC = () => {
         </div>
       </div>
     </div>
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="flex items-center gap-1 max-[340px]:gap-0 shrink-0">
       <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#656b66]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#656b66]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
@@ -50,14 +50,14 @@ export const Header: React.FC = () => {
           {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[#656b66]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
         </div>
       </details>
-      {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'text-[#656b66]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
+      {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 max-[340px]:w-8 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'text-[#656b66]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
       {/* شارة البيئة التجريبية وأدواتها انتقلت إلى `DemoBar` على مستوى التطبيق:
           الترويسة لا تُعرض لدور «مشغّل البثّ» أصلًا، فلا يصحّ أن يسكن فيها المخرج
           الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
-      <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
+      <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 max-[340px]:ms-0 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
     </div>
   </div>
   {/* على الجوال لا يتّسع السطر للاسم بجانب الأزرار فكان ينضغط حرفًا حرفًا: يأخذ سطرًا وحده. */}

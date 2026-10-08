@@ -44,7 +44,7 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
 
    <main className="flex-1 grid place-items-center px-3"><div className="w-full max-w-5xl text-center">
     {!authorized?<div className="max-w-xl mx-auto">
-      <Pictogram icon={LockKeyhole} size="lg" tone="ink" className="mx-auto [&>*]:!bg-white/[.06] [&>*]:!text-[#d8e4dd]"/>
+      <Pictogram icon={LockKeyhole} size="lg" tone="ink" className="mx-auto [&>.mizan-pictogram-scene]:!bg-white/[.06] [&>svg]:!text-[#d8e4dd]"/>
       <div className="text-[10px] font-black tracking-[.22em] text-[#b9cfc4] mt-6">{ar?'خزنة الحفل':'CEREMONY VAULT'}</div>
       <h1 className="text-3xl sm:text-5xl font-black mt-4 tracking-tight">{ar?'مختومة':'SEALED'}</h1>
       {reveal&&<div className="text-5xl font-black tabular-nums mt-6"><Ratio value={reveal.approvals.length} of={reveal.authorizedRoles?.length||0}/></div>}
