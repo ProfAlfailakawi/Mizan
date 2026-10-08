@@ -54,11 +54,12 @@ const ErrorBox: React.FC<{ error: ApiError | null }> = ({ error }) => {
   return <div role="alert" aria-live="assertive" className="rounded-2xl bg-[#f7ece9] px-4 py-3 text-xs font-bold text-[#874b43]">{commercialErrorText(error.code, locale, error.details)}</div>;
 };
 
-const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string }> = ({ label, value, hint }) => (
+const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string; meter?: number }> = ({ label, value, hint, meter }) => (
   <div className="rounded-2xl border border-[#e2e0d9] bg-white p-3.5 min-[400px]:p-4">
     <div className="text-[11px] font-bold text-[#666c68]">{label}</div>
     <div className="mt-1 whitespace-nowrap text-[clamp(13px,4.2vw,18px)] font-black text-[#171b18]" dir="auto">{value}</div>
     {hint && <div className="mt-1 text-[11px] text-[#666c68] [text-wrap:balance]">{hint}</div>}
+    {meter !== undefined && Number.isFinite(meter) && <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#ebe9e2]"><div className="h-full rounded-full bg-[#2F6555]" style={{ width: `${Math.max(0, Math.min(1, meter)) * 100}%` }} /></div>}
   </div>
 );
 
@@ -181,7 +182,7 @@ export const OperatorCommercialPanel: React.FC = () => {
       {!data.agreement && <div role="status" className="rounded-2xl bg-[#fbf3e3] px-4 py-3 text-xs font-bold text-[#7a5413]">{ct(locale, 'noAgreement')}</div>}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*:nth-child(3)]:col-span-2 [&>*:nth-child(4)]:col-span-2 lg:[&>*:nth-child(3)]:col-span-1 lg:[&>*:nth-child(4)]:col-span-1">
         <Stat label={ct(locale, 'walletBalance')} value={formatMoney(s.balanceMinor, cur, locale)} />
-        <Stat label={ct(locale, 'annualCommitment')} value={formatMoney(s.annualCommitmentMinor, cur, locale)} hint={`${ct(locale, 'spent')}: ${formatMoney(s.spentThisAgreementMinor, cur, locale)}`} />
+        <Stat label={ct(locale, 'annualCommitment')} value={formatMoney(s.annualCommitmentMinor, cur, locale)} hint={`${ct(locale, 'spent')}: ${formatMoney(s.spentThisAgreementMinor, cur, locale)}`} meter={s.annualCommitmentMinor > 0 ? s.spentThisAgreementMinor / s.annualCommitmentMinor : undefined} />
         <Stat label={ct(locale, 'tier')} value={data.tier ? (locale === 'ar' ? data.tier.nameArabic : data.tier.name) : '—'} hint={s.discountBps !== undefined ? `${ct(locale, 'discount')}: ${s.discountBps / 100}%` : undefined} />
         <Stat label={ct(locale, 'agreementDates')} value={data.agreement ? `${formatDate(data.agreement.startsAt, locale)} ${locale === 'ar' ? '←' : '→'} ${formatDate(termLastDay(data.agreement.endsAt), locale)}` : '—'} />
         <Stat label={ct(locale, 'customers')} value={s.customerOrganizations} hint={`${ct(locale, 'activeCustomers')}: ${s.activeCustomerSubscriptions}`} />
