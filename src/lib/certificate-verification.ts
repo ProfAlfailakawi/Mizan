@@ -22,12 +22,13 @@ export function certificateVerifyUrl(origin:string,certificateNumber:string){
 
 /** الرقم قد يصل في استعلام الصفحة أو داخل الجزء بعد #، فيُقرأ الاثنان. */
 export function certificateCodeFromLocation(search:string,hash:string):string{
- const fromSearch=new URLSearchParams(String(search||'').replace(/^\?/,'')).get('cert');
- if(fromSearch)return fromSearch;
+ const fromSearch=new URLSearchParams(String(search||'').replace(/^\?/,''));
  const raw=String(hash||'');
  const q=raw.indexOf('?');
- if(q<0)return '';
- return new URLSearchParams(raw.slice(q+1)).get('cert')||'';
+ const fromHash=new URLSearchParams(q<0?'':raw.slice(q+1));
+ /* `cert` هو الاسم القانوني (رموز QR والجواز والروابط المطبوعة) وله الأسبقية دائمًا كما كان.
+    و`certificate` اسمٌ بديل تستعمله صفحة الرحلة: يُقرأ فقط حين لا يوجد `cert`. */
+ return fromSearch.get('cert')||fromHash.get('cert')||fromSearch.get('certificate')||fromHash.get('certificate')||'';
 }
 
 export interface PublicCertificateView{certificateNumber:string;competitionName:string;organizationName?:string;issuedAt:string;certificateVersion:string;disclosed:{participantCode:string;participantName?:string;categoryName?:string;finalScore?:number;rank?:number;status?:string}}

@@ -95,6 +95,15 @@ test('the printed link opens the verification page and carries the number back',
  assert.equal(certificateCodeFromLocation('','#verify'),'');
 });
 
+test('the verify page accepts `certificate` as an alias of `cert`, and `cert` keeps priority',()=>{
+ assert.equal(certificateCodeFromLocation('','#verify?certificate=MZN-ALIAS-1'),'MZN-ALIAS-1','the journey link prefills the number');
+ assert.equal(certificateCodeFromLocation('?certificate=MZN-ALIAS-2','#verify'),'MZN-ALIAS-2');
+ assert.equal(certificateCodeFromLocation('','#verify?cert=MZN-A&certificate=MZN-B'),'MZN-A','cert wins when both are present');
+ assert.equal(certificateCodeFromLocation('?certificate=MZN-B','#verify?cert=MZN-A'),'MZN-A','a hash cert still beats a search alias');
+ assert.equal(certificateCodeFromLocation('?cert=MZN-S','#verify?certificate=MZN-B'),'MZN-S');
+ assert.equal(certificateCodeFromLocation('','#verify?other=1'),'');
+});
+
 test('a number that is not a certificate number never reaches the network',async()=>{
  const {fetchPublicCertificateVerdict,revokeCertificateInRegistry,isCertificateNumber}=await import('../src/lib/certificate-verification');
  for(const bad of ['../../etc/passwd','MZN 1','http://evil.example/x','MZN/../../x','','..','MZN?a=b','MZN#f'])assert.equal(isCertificateNumber(bad),false,`${bad} must not pass as a certificate number`);
