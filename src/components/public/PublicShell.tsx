@@ -38,6 +38,7 @@ export const PublicShell: React.FC<{ children: React.ReactNode }> = ({ children 
 /* #passport: لغته من منتقي اللغات العام (usePublicLocale) الذي يضبط اتجاه المستند — فالإطار يتبعه لا لغة التطبيق. */
 export const LocalizedPublicShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { language } = useAppStore();
-  const { rtl } = usePublicLocale(language);
-  return <Frame rtl={rtl} language={language} t={pl}>{children}</Frame>;
+  const { rtl, arabicData } = usePublicLocale(language);
+  /* الشعار أيضًا يتبع اللغة الفعّالة: عربيٌّ للعربية والأردية، لاتينيٌّ لغيرهما. */
+  return <Frame rtl={rtl} language={arabicData ? 'ar' : 'en'} t={pl}>{children}</Frame>;
 };
