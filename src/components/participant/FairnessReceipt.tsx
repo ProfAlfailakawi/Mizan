@@ -3,7 +3,7 @@ import React from 'react';
 import { BadgeCheck, Printer, ShieldCheck, X } from 'lucide-react';
 import type { buildParticipantFairnessEvidence } from '../../lib/judging-integrity';
 import { formatParticipantCode } from '../../lib/journey-progress';
-import { FairDrawExplainer } from './FairDrawExplainer';
+import { RevealGateExplainer } from './RevealGateExplainer';
 
 /*
  * «إيصال النزاهة» كان ملف JSON يُنزَّل — لا يفتحه المتسابق ولا يفهمه أهله. صار ورقةً
@@ -69,7 +69,7 @@ export const FairnessReceipt: React.FC<{ receipt: Receipt; ar: boolean; particip
         <Row label={ar ? 'عدد الأسئلة' : 'Questions'} value={q.questions} />
         <Row label={ar ? 'لم يُكشف أي سؤال قبل حضورك' : 'No question revealed before you were present'} value={q.questions === 0 ? '—' : q.allRevealedAfterPresence ? (ar ? 'نعم' : 'Yes') : (ar ? 'لا' : 'No')} ok={q.questions > 0 && q.allRevealedAfterPresence} />
       </dl>
-      <FairDrawExplainer ar={ar} count={q.questions} />
+      <RevealGateExplainer ar={ar} gates={q.gates} />
       </>}
 
       <h3 className="mt-6 text-lg font-black text-[#214C40]">{ar ? 'التحكيم' : 'Judging'}</h3>
