@@ -85,7 +85,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="text-base font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'NOW SERVING'}</div>
-          <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
           <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName({ name: board.competitionName, nameArabic: board.competitionNameArabic }, ar)}</div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -181,7 +181,7 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     <div className="flex items-center justify-between gap-2 min-w-0">
       <span className="shrink-0 w-11 h-11 rounded-xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums text-sm">{slice.code}</span>
       <span className="min-w-0 text-end">
-        <span className="mizan-board-tag text-[12px]" title={categoryLine(slice.categories, ar)}>{categoryLine(slice.categories, ar)}</span>
+        <span className="mizan-board-tag is-wrap text-[12px]" title={categoryLine(slice.categories, ar)}>{categoryLine(slice.categories, ar)}</span>
       </span>
     </div>
 

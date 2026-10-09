@@ -75,11 +75,11 @@ export const CertificateVerification: React.FC = () => {
     <section className="mizan-surface p-6 sm:p-8 text-center">
       <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
       <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
-      <h1 className="text-2xl sm:text-3xl font-black mt-1">{ar?'تحقق مستقل من الشهادة':'Certificate verification'}</h1>
+      <h1 className="font-display text-2xl sm:text-3xl font-black mt-1">{ar?'تحقق مستقل من الشهادة':'Certificate verification'}</h1>
       <p className="text-xs text-[#636864] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p>
       {policy.certificates.publicVerification&&<div className="max-w-md mx-auto flex gap-2 mt-6">
         <div className="relative flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#696f6b]"/><input value={searchCode} onChange={e=>setSearchCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void verify()} placeholder="MZN-…" className="w-full rounded-xl border border-[#dcdad2] bg-white ps-10 pe-3 py-3 text-sm font-mono"/></div>
-        <Button variant={searchCode.trim()?'primary':'outline'} className="disabled:opacity-100 disabled:text-[var(--muted)]" disabled={!searchCode.trim()} onClick={()=>void verify()}>{ar?'تحقق':'Verify'}</Button>
+        <Button variant={searchCode.trim()?'primary':'outline'} className="mz-btn-idle" disabled={!searchCode.trim()} onClick={()=>void verify()}>{ar?'تحقق':'Verify'}</Button>
       </div>}
       {policy.certificates.publicVerification&&!submittedCode&&<div aria-hidden="true" className="max-w-md mx-auto mt-6 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-soft)]/60 p-4 text-start select-none">
         <div className="mizan-kicker">{ar?'هكذا تبدو النتيجة':'WHAT A RESULT LOOKS LIKE'}</div>
