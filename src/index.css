@@ -1428,6 +1428,13 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
   /* قِيس: ٤٨px يُقرأ من ٣٫٢ م على 55" — وشاشة القاعة تُقرأ من وسطها لا من أمامها. */
   font-size:clamp(1.6rem, 4.4vw, 9rem); line-height:1; letter-spacing:-.035em;
   font-weight:900; font-variant-numeric:tabular-nums;
+  /* الكود سطرٌ واحد دائمًا: «D-» فوق «1183» يُقرأ رقمين. وحيث تدعم المتصفحات حاويةَ الخليّة
+     يتبع الحرفُ عرضَ الخليّة لا عرضَ الشاشة فيتّسع الكود لها مهما ضاقت أو كثرت الأعمدة. */
+  white-space:nowrap; text-align:center;
+}
+@supports (width:1cqi){
+  .mizan-board-cell{ container-type:inline-size; }
+  .mizan-board-cell .mizan-board-code{ font-size:clamp(1.6rem, 25cqi, 9rem); }
 }
 .mizan-board-next{
   font-size:clamp(1.5rem, 3.4vw, 7rem); line-height:1; letter-spacing:-.03em;
@@ -1470,6 +1477,10 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
      ويضيق كودها معها حتى لا يُقرأ إلا من ثلاثة أمتار. ٢٠rem تعطي خمسة، وهي لقطة 5×2. */
   grid-template-columns:repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
 }
+/* اثنتا عشرة لجنة (سعة الصفحة) تتّسع في صفّين على شاشةٍ عريضة بدل ثلاثة صفوف تُخفي التذييل. */
+@media (min-width:1700px){
+  .mizan-board-grid:has(> :nth-child(11)){ grid-template-columns:repeat(6, minmax(0,1fr)); }
+}
 .mizan-board-cell{
   background:var(--venue-surface); border:1px solid var(--venue-line);
   border-radius:var(--radius-md); padding:clamp(.85rem, 1.4vw, 1.35rem);
@@ -1483,7 +1494,10 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
   display:inline-block; vertical-align:middle; max-width:100%;
   padding:.2rem .55rem; border-radius:999px;
   background:rgba(232,203,147,.12); border:1px solid rgba(232,203,147,.22);
-  color:#e8cb93; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  color:var(--gold-light); font-weight:800;
+  /* سطران لا سطرٌ مقصوص: اسمٌ ينتهي بـ«…» لا يدلّ الواقفَ على لجنته. */
+  white-space:normal; overflow:hidden; line-height:1.45; border-radius:14px;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;
 }
 /*
  * الوسم الكامل: حيث تتّسع الشاشة، يُقرأ اسم الفرع كلّه.
@@ -2029,3 +2043,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 .mz-skeleton { background:linear-gradient(90deg,var(--surface-soft) 25%,#f8f6f0 50%,var(--surface-soft) 75%); background-size:200% 100%; animation:mzShimmer 1.4s linear infinite; border-radius:12px; }
 @keyframes mzShimmer { from { background-position:200% 0 } to { background-position:-200% 0 } }
 @media (prefers-reduced-motion:reduce){ .mz-orb-glow { animation:none } .mz-enter { animation:none; opacity:1 } .mz-skeleton { animation:none } }
+
+/* شاشةٌ 4K تُقرأ من بُعد: النصوص الصغيرة (الترويسة والوسوم والعدّادات) كانت تُرسم بمقاس 1080p
+   فتبدو على لوحٍ بعرض 3840 نُتفًا. التكبير يخصّ سطح الانتظار وحده، والكود يتبع عرض خليّته. */
+@media (min-width:3000px){ .mizan-venue-zoom { zoom:1.8; } }
+@media (min-width:2300px) and (max-width:2999px){ .mizan-venue-zoom { zoom:1.35; } }

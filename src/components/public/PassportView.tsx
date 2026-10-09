@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useAppStore } from '../../lib/store';
 import { pl, usePublicLocale } from '../../lib/public-i18n';
+import { MizanPictogram } from '../design-system/MizanPictogram';
 import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
 
 type Entry = { id: string; competitionId: string; competitionName: string; competitionNameArabic?: string; organizationName?: string; year?: number; categoryName?: string; riwaya?: string; kind: 'certificate' | 'participation'; certificateNumber?: string; rank?: number; finalScore?: number; verification?: string };
@@ -100,7 +101,7 @@ export const PassportView: React.FC = () => {
   const [confirmErase, setConfirmErase] = useState(false);
   const erase = () => run(async () => { await post('/api/public/passports/me/erase', { token }); writeToken(''); setToken(''); setPassport(null); setConfirmErase(false); });
 
-  const header = <div className="mb-6"><div className="mb-3 flex justify-end"><PublicLanguageSwitcher /></div>{!ar && <div className="mizan-kicker">MIZAN PASSPORT</div>}<h1 className="mt-1 text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div>;
+  const header = <div className="mb-6 flex items-start justify-between gap-3"><div>{!ar && <div className="mizan-kicker">MIZAN PASSPORT</div>}<h1 className="font-display mt-1 text-2xl sm:text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div><PublicLanguageSwitcher /></div>;
 
   if (publicId) return <main className="mx-auto max-w-2xl px-4 py-8">{header}
     {error && <p role="alert" className="rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
@@ -112,7 +113,9 @@ export const PassportView: React.FC = () => {
   return <main className="mx-auto max-w-2xl px-4 py-8">{header}
     <p className="mb-4 text-sm leading-7 text-[#646965]">{pl('سجلّ اختياري لمشاركاتك وشهاداتك الموثّقة. خاصّ بك حتى تختار نشره، ويُحفظ مفتاحه على هذا الجهاز فقط — احتفظ برابط هذه الصفحة.', 'An optional record of your verified participations and certificates. Private until you publish it; its key is kept on this device only.')}</p>
     {error && <p role="alert" className="mb-4 rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
-    {!passport && <div className="mizan-surface space-y-3 p-5">
+    {!passport && <div className="mizan-surface space-y-4 p-5 sm:p-6">
+      <div className="flex items-center gap-4"><MizanPictogram kind="pass" size="lg" tone="emerald" />
+        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[var(--muted)]">{[pl('أنشئ جوازك', 'Create it'), pl('أضف مشاركاتك', 'Add your entries'), pl('انشره إن شئت', 'Publish if you wish')].map((t, i) => <li key={t} className="inline-flex items-center gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--emerald-soft)] text-[10px] text-[var(--emerald)]">{i + 1}</span>{t}</li>)}</ol></div>
       <label className="block text-xs font-bold">{pl('الاسم الظاهر (اختياري الآن)', 'Display name (optional for now)')}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
       <button type="button" disabled={busy} onClick={() => void create()} className="min-h-11 rounded-full bg-[#214C40] px-5 text-sm font-bold text-white">{pl('أنشئ جوازي', 'Create my passport')}</button>
     </div>}
