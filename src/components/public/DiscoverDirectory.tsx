@@ -6,10 +6,19 @@
  * كاملة لا يظهر اسم ميزان إلا إن اختار المشغّل إظهار «يعمل بميزان».
  */
 import React, { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, CalendarDays, MapPin, Search, WifiOff } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { ct } from '../../lib/commercial-i18n';
 
 interface Listing { publicSlug: string; title: string; titleArabic?: string; summary?: string; summaryArabic?: string; institutionName: string; registrationOpen: boolean; registrationUrl?: string; startsOn?: string; endsOn?: string; country?: string; city?: string; mode: 'online' | 'in_person' | 'hybrid'; riwayat: string[]; ageRanges: string[] }
+
+/* يومٌ تقويميٌّ محلي (2026-09-25) لا لحظةٌ بتوقيت UTC، بتنسيق اللغة: لا تاريخ ISO خامًا أمام القارئ. */
+const dayText = (iso: string | undefined, locale: string): string => {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  if (!d || Number.isNaN(d.getTime())) return iso || '';
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-KW-u-nu-latn' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+};
 
 export const DiscoverDirectory: React.FC = () => {
   const { language } = useAppStore();
@@ -40,32 +49,41 @@ export const DiscoverDirectory: React.FC = () => {
     if (brand.faviconUrl) { const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]'); if (link) link.href = brand.faviconUrl; }
   }, [brand, locale]);
   const accent = brand?.primaryColor || '#1f6f4a';
+  const loading = !data && !failed;
+  const Arrow = locale === 'ar' ? ArrowLeft : ArrowRight;
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-      <header className="mb-6 flex flex-wrap items-center gap-3">
-        {brand?.logoUrl && <img src={brand.logoUrl} alt="" className="h-10 w-auto" />}
-        <h1 className="text-2xl font-black" style={{ color: accent }}>{brand ? ((locale === 'ar' && brand.directoryNameArabic) || brand.directoryName) : ct(locale, 'discoverTitle')}</h1>
+    <div className="min-h-screen" style={{ background: 'var(--canvas)' }}>
+    <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      <header className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-4 px-5 py-6 sm:px-8 sm:py-8">
+        {brand?.logoUrl && <img src={brand.logoUrl} alt="" className="h-12 w-auto" />}
+        <div className="min-w-0">
+          <div className="mizan-kicker">{ct(locale, 'discover')}</div>
+          <h1 className="font-display mt-1 text-2xl sm:text-3xl font-black leading-snug" style={{ color: accent }}>{brand ? ((locale === 'ar' && brand.directoryNameArabic) || brand.directoryName) : ct(locale, 'discoverTitle')}</h1>
+        </div>
       </header>
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <label className="flex-1 min-w-[16rem]"><span className="sr-only">{ct(locale, 'search')}</span>
-          <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-xl border border-[#d8d6ce] bg-white px-3 py-2 text-sm focus:outline-none focus-visible:ring-2" /></label>
-        <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} />{ct(locale, 'registrationOpen')}</label>
+      <div className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-3 p-3" style={{ ['--i' as string]: 1 }}>
+        <label className="relative flex-1 min-w-[14rem]"><span className="sr-only">{ct(locale, 'search')}</span>
+          <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3.5 h-4 w-4 text-[var(--muted)]" />
+          <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] ps-10 pe-3 text-sm focus:outline-none focus-visible:ring-2" /></label>
+        <label className="flex min-h-11 items-center gap-2 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" className="h-4 w-4" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
       </div>
-      {failed && <p role="alert" className="text-sm text-[#874b43]">{ct(locale, 'discoverEmpty')}</p>}
+      {failed && !data && <div role="alert" className="mizan-surface flex items-center gap-3 p-5 text-sm text-[var(--danger)]"><WifiOff aria-hidden="true" className="h-5 w-5 shrink-0" />{ct(locale, 'discoverFailed')}</div>}
+      {loading && <ul className="grid gap-4 sm:grid-cols-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <li key={i} className="mizan-surface p-5 space-y-3"><div className="mz-skeleton h-5 w-2/3" /><div className="mz-skeleton h-3 w-1/2" /><div className="mz-skeleton h-3 w-full" /><div className="mz-skeleton h-9 w-28" /></li>)}</ul>}
       <ul className="grid gap-4 sm:grid-cols-2" aria-live="polite">
-        {data?.listings.map(l => <li key={l.publicSlug} className="rounded-3xl border border-[#e2e0d9] bg-white p-5">
-          <h2 className="text-base font-black">{(locale === 'ar' && l.titleArabic) || l.title}</h2>
-          <p className="text-xs text-[#666c68]">{l.institutionName}{l.city ? ` · ${l.city}` : ''}{l.country ? ` · ${l.country}` : ''} · {ct(locale, l.mode)}</p>
-          {((locale === 'ar' && l.summaryArabic) || l.summary) && <p className="mt-2 text-sm">{(locale === 'ar' && l.summaryArabic) || l.summary}</p>}
-          <p className="mt-2 text-xs">{l.startsOn || ''}{l.endsOn ? ` → ${l.endsOn}` : ''}{l.riwayat.length ? ` · ${l.riwayat.join('، ')}` : ''}</p>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs font-bold" style={{ color: l.registrationOpen ? accent : '#666c68' }}>{ct(locale, l.registrationOpen ? 'registrationOpen' : 'registrationClosed')}</span>
-            {l.registrationOpen && l.registrationUrl && <a href={l.registrationUrl} className="rounded-full px-4 py-2 text-xs font-bold text-white" style={{ background: accent }}>{ct(locale, 'register')}</a>}
+        {data?.listings.map((l, i) => <li key={l.publicSlug} style={{ ['--i' as string]: i }} className="mizan-surface mz-enter flex flex-col p-5 sm:p-6">
+          <h2 className="font-display text-base sm:text-lg font-black leading-snug">{(locale === 'ar' && l.titleArabic) || l.title}</h2>
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--muted)]"><MapPin aria-hidden="true" className="h-3.5 w-3.5" />{l.institutionName}{l.city ? ` · ${l.city}` : ''}{l.country ? ` · ${l.country}` : ''} · {ct(locale, l.mode)}</p>
+          {((locale === 'ar' && l.summaryArabic) || l.summary) && <p className="mt-3 text-sm leading-6">{(locale === 'ar' && l.summaryArabic) || l.summary}</p>}
+          <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--muted)]"><CalendarDays aria-hidden="true" className="h-3.5 w-3.5" />{dayText(l.startsOn, locale)}{l.endsOn && l.endsOn !== l.startsOn ? ` — ${dayText(l.endsOn, locale)}` : ''}{l.riwayat.length ? ` · ${l.riwayat.join('، ')}` : ''}</p>
+          <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+            <span className="text-xs font-bold" style={{ color: l.registrationOpen ? accent : 'var(--muted)' }}>{ct(locale, l.registrationOpen ? 'registrationOpen' : 'registrationClosed')}</span>
+            {l.registrationOpen && l.registrationUrl && <a href={l.registrationUrl} className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-5 text-xs font-bold text-white" style={{ background: accent }}>{ct(locale, 'register')}<Arrow aria-hidden="true" className="h-4 w-4" /></a>}
           </div>
         </li>)}
       </ul>
-      {data && data.listings.length === 0 && <p className="text-sm text-[#666c68]">{ct(locale, 'discoverEmpty')}</p>}
-      {brand?.showPoweredByMizan && <footer className="mt-10 text-center text-[11px] text-[#666c68]">{ct(locale, 'poweredByMizan')}</footer>}
+      {data && data.listings.length === 0 && <p className="mizan-surface p-6 text-center text-sm text-[var(--muted)]">{ct(locale, 'discoverEmpty')}</p>}
+      {brand?.showPoweredByMizan && <footer className="mt-10 text-center text-[11px] text-[var(--muted)]">{ct(locale, 'poweredByMizan')}</footer>}
     </main>
+    </div>
   );
 };
