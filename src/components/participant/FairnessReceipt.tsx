@@ -3,6 +3,7 @@ import React from 'react';
 import { BadgeCheck, Printer, ShieldCheck, X } from 'lucide-react';
 import type { buildParticipantFairnessEvidence } from '../../lib/judging-integrity';
 import { formatParticipantCode } from '../../lib/journey-progress';
+import { FairDrawExplainer } from './FairDrawExplainer';
 
 /*
  * «إيصال النزاهة» كان ملف JSON يُنزَّل — لا يفتحه المتسابق ولا يفهمه أهله. صار ورقةً
@@ -41,7 +42,7 @@ export const FairnessReceipt: React.FC<{ receipt: Receipt; ar: boolean; particip
     ...j.independenceCommitments.map((c, i) => ({ label: ar ? `التزام المحكّم ${i + 1}` : `Judge commitment ${i + 1}`, value: c.commitmentHash })),
   ];
   return <div role="dialog" aria-modal="true" aria-label={ar ? 'إيصال النزاهة' : 'Fairness receipt'} className="mizan-receipt-overlay fixed inset-0 z-50 overflow-y-auto bg-black/30 backdrop-blur-sm p-4 sm:p-8" dir={ar ? 'rtl' : 'ltr'}>
-    <style>{`@media print{body *{visibility:hidden!important}.mizan-receipt-sheet,.mizan-receipt-sheet *{visibility:visible!important}.mizan-receipt-overlay{position:static!important;background:none!important;padding:0!important;overflow:visible!important}.mizan-receipt-sheet{position:absolute;inset:0 0 auto 0;box-shadow:none!important;border:0!important;margin:0!important;max-width:none!important}.mizan-receipt-actions{display:none!important}}`}</style>
+    <style>{`@media print{body *{visibility:hidden!important}.mizan-receipt-sheet,.mizan-receipt-sheet *{visibility:visible!important}.mizan-receipt-overlay{position:static!important;background:none!important;padding:0!important;overflow:visible!important}.mizan-receipt-sheet{position:absolute;inset:0 0 auto 0;box-shadow:none!important;border:0!important;margin:0!important;max-width:none!important}.mizan-receipt-actions,.mizan-receipt-explain{display:none!important}}`}</style>
     <div className="mizan-receipt-sheet mx-auto max-w-xl rounded-3xl border border-[#e3dfd3] bg-[#FFFEFB] p-6 sm:p-9 shadow-2xl">
       <div className="mizan-receipt-actions mb-4 flex items-center justify-between gap-3">
         <button type="button" onClick={() => window.print()} className="inline-flex min-h-14 items-center gap-2 rounded-2xl bg-[#214C40] px-6 text-lg font-black text-white"><Printer className="h-5 w-5" />{ar ? 'طباعة' : 'Print'}</button>
@@ -68,6 +69,7 @@ export const FairnessReceipt: React.FC<{ receipt: Receipt; ar: boolean; particip
         <Row label={ar ? 'عدد الأسئلة' : 'Questions'} value={q.questions} />
         <Row label={ar ? 'لم يُكشف أي سؤال قبل حضورك' : 'No question revealed before you were present'} value={q.questions === 0 ? '—' : q.allRevealedAfterPresence ? (ar ? 'نعم' : 'Yes') : (ar ? 'لا' : 'No')} ok={q.questions > 0 && q.allRevealedAfterPresence} />
       </dl>
+      <FairDrawExplainer ar={ar} count={q.questions} />
       </>}
 
       <h3 className="mt-6 text-lg font-black text-[#214C40]">{ar ? 'التحكيم' : 'Judging'}</h3>
