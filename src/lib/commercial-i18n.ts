@@ -91,6 +91,7 @@ const T = {
   discover: { ar: 'دليل المسابقات', en: 'Discover' },
   discoverTitle: { ar: 'اكتشف المسابقات القرآنية', en: 'Discover Quran competitions' },
   discoverEmpty: { ar: 'لا توجد مسابقات منشورة تطابق البحث.', en: 'No published competitions match.' },
+  discoverFailed: { ar: 'تعذّر تحميل الدليل الآن. تحقّق من الاتصال ثم أعد المحاولة.', en: 'The directory could not be loaded. Check your connection and try again.' },
   registrationOpen: { ar: 'التسجيل مفتوح', en: 'Registration open' },
   registrationClosed: { ar: 'التسجيل مغلق', en: 'Registration closed' },
   register: { ar: 'سجّل الآن', en: 'Register' },

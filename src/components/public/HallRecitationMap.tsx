@@ -51,7 +51,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className={`${lbl} font-black tracking-[.2em] text-[#c6b58a]`}>{ar ? 'خريطة تلاوة القاعة' : 'HALL RECITATION MAP'}</div>
-          <h1 className="text-2xl sm:text-3xl font-black mt-1 flex items-center gap-3">{ar ? 'اليوم تُتلى في هذه القاعة' : 'Recited in this hall today'}</h1>
+          <h1 className="font-display text-2xl sm:text-3xl font-black mt-1 flex items-center gap-3">{ar ? 'اليوم تُتلى في هذه القاعة' : 'Recited in this hall today'}</h1>
           <div className="text-xs mizan-venue-muted mt-1">{bilingualName(store.competition,ar)}</div>
         </div>
         <div className="flex items-center gap-3">

@@ -113,7 +113,7 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <span className="shrink-0 grid place-items-center rounded-2xl bg-[#dbe7df] text-[#16372d] font-black tabular-nums w-14 h-14 sm:w-[4.5rem] sm:h-[4.5rem] text-xl sm:text-3xl">{slice.code}</span>
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-3xl font-black truncate">{bilingualName(slice, ar)}</h1>
+          <h1 className="font-display text-xl sm:text-3xl font-black truncate">{bilingualName(slice, ar)}</h1>
           {/*
             * اسم الفرع يُقرأ كاملًا أو لا يُقرأ.
             *
@@ -236,7 +236,7 @@ const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolea
 const PanelChooser: React.FC<{ board: DisplayBoard; ar: boolean; missing: boolean; onPick: (id: string) => void }> = ({ board, ar, missing, onPick }) => (
   <div className="my-auto py-10 max-w-3xl mx-auto w-full text-center">
     <MonitorX className="w-8 h-8 mx-auto mizan-venue-muted" aria-hidden />
-    <h1 className="text-2xl sm:text-3xl font-black mt-4">{ar ? 'أيّ لجنةٍ تعرض هذه الشاشة؟' : 'Which panel is this screen?'}</h1>
+    <h1 className="font-display text-2xl sm:text-3xl font-black mt-4">{ar ? 'أيّ لجنةٍ تعرض هذه الشاشة؟' : 'Which panel is this screen?'}</h1>
     <p className="text-xs mizan-venue-faint mt-3 leading-6">
       {missing
         ? (ar ? 'اللجنة المطلوبة في الرابط غير موجودة في هذه المسابقة. اختر لجنةً من القائمة.' : 'The panel named in the link is not part of this competition. Choose one below.')

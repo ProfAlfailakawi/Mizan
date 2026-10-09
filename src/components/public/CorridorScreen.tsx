@@ -127,7 +127,7 @@ export const CorridorScreen: React.FC<{
         <header className="flex items-start justify-between gap-6">
           <div className="min-w-0">
             <div className="text-base font-black tracking-[.2em] text-[#c6b58a]">{ar ? CORRIDOR_PANEL_LABEL[panel] : panel.toUpperCase()}</div>
-            <h1 className="mt-1 truncate text-xl font-black sm:text-2xl">{title}</h1>
+            <h1 className="font-display mt-1 truncate text-xl font-black sm:text-2xl">{title}</h1>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-end">
@@ -225,7 +225,7 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
           ? <p className="font-quran text-[clamp(1.6rem,3.6vw,3.2rem)] leading-[2.05] text-white/95">{text.join(' ')}</p>
           : unavailable
             ? <div className="flex h-full flex-col items-center justify-center">
-              <div className="font-quran text-[clamp(3rem,8vw,6.5rem)] leading-none text-[#e0c894]">{ar ? `سورة ${name}` : name}</div>
+              <div className="font-quran text-[clamp(3rem,8vw,6.5rem)] leading-[1.7] text-[#e0c894]">{ar ? `سورة ${name}` : name}</div>
               <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-5">
                 <Tile value={String(locus.ayah)} label={ar ? 'الآية' : 'ayah'} />
                 <Tile value={String(page)} label={ar ? 'الصفحة' : 'page'} />
