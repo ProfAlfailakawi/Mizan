@@ -58,7 +58,7 @@ section:has(button[data-listens]) > header::after {
   background: radial-gradient(circle at 1rem 50%, #d9e8e1 0 5px, transparent 6px), #fbfcfa;
   padding-inline-start: 1.75rem;
   color: #456157;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1.5;
   animation: mizan-breathing-cue 10s ease-in-out infinite;

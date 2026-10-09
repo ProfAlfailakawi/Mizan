@@ -117,6 +117,7 @@ export const CertificateVerification: React.FC = () => {
 
     {!activeCert && publicView && verification && verification!=='NOT_FOUND' && <VerdictShell badge={<Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>} number={publicView.certificateNumber}>
         <h2 className="text-2xl sm:text-3xl font-black mt-3">{publicView.disclosed.participantName||publicView.disclosed.participantCode}</h2>
+        {verification!=='AUTHENTIC'&&<p role="alert" className="mx-auto mt-4 max-w-lg rounded-xl border border-[#e5c9c4] bg-[#f7ece9] px-4 py-2.5 text-sm font-black text-[#874b43]">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة ولم تعد معتمدة.':'This certificate was revoked by the issuer and is no longer valid.'):(ar?'تعذّر إثبات هذه الشهادة؛ لا تُعتمد.':'This certificate could not be proven; do not rely on it.')}</p>}
         <p className="text-sm text-[#616762] mt-2">{publicView.competitionName}</p>
         {publicView.organizationName&&<p className="text-xs font-bold text-[#214C40] mt-2">{publicView.organizationName}</p>}
         <div className="max-w-lg mx-auto mt-6 border-y border-[#e5e3dc] divide-y divide-[#e5e3dc] text-sm">
@@ -125,8 +126,8 @@ export const CertificateVerification: React.FC = () => {
           {publicView.disclosed.rank!==undefined&&<DetailRow label={ar?'الترتيب':'Rank'} value={`#${publicView.disclosed.rank}`}/>}
           <DetailRow label={ar?'تاريخ الإصدار':'Issued'} value={publicView.issuedAt.slice(0,10)}/>
         </div>
-        <BriefNote className="mt-6" icon={ShieldCheck} short={ar?'حكم الخادم، لا المتصفح':'Server verdict, not browser'} full={ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}/>
-        <div className="mt-6 inline-block bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(publicView.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
+        <div className="mt-6 flex flex-col items-center gap-4"><BriefNote icon={ShieldCheck} short={ar?'حكم الخادم، لا المتصفح':'Server verdict, not browser'} full={ar?'صدر الحكم من سجل الشهادات العام على الخادم، لا من هذا المتصفح: أُعيد حساب بصمة الحزمة وبرهان الاشتمال عند كل طلب. ولا يُعرض هنا إلا ما هو مطبوع على الشهادة نفسها.':'The verdict comes from the public certificate registry on the server, not from this browser: the package hash and inclusion proof are recomputed on every request. Only what is printed on the certificate itself is shown here.'}/>
+        <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(publicView.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div></div>
     </VerdictShell>}
 
     {activeCert && verification && verification!=='NOT_FOUND' && <VerdictShell badge={<Badge variant={label[verification].variant} dot={false}>{ar?label[verification].ar:label[verification].en}</Badge>} number={activeCert.certificateNumber}>
