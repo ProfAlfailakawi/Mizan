@@ -420,12 +420,16 @@
   color: var(--jf-on);
 }
 .dna-steps[data-journey] .dna-stepi[data-state='current'] .dna-node {
-  box-shadow: inset 0 0 0 2px var(--jf), 0 0 0 4px color-mix(in srgb, var(--jf) 14%, transparent);
-  color: var(--dna-ink);
+  /* current = the same solid fill as done, told apart by its soft outer ring */
+  background: var(--jf);
+  color: var(--jf-on);
+  --halo-rest: 0 0 0 4px color-mix(in srgb, var(--jf) 28%, transparent);
+  box-shadow: var(--halo-rest);
   /* static ring: the kit's infinite halo is off in reveal mode, and a remembered/remounted journey
-     must not replay any motion. The halo plays only on the station the intro just lit (data-just). */
+     must not replay any motion. The halo plays only on the last station the intro lit (data-just). */
   animation: none;
 }
+.dna-steps[data-journey] .dna-stepi[data-state='done'] .dna-node { --halo-rest: 0 0 0 0 transparent; }
 .dna-steps[data-journey] .dna-stepi[data-just] .dna-node {
   animation: dna-journey-halo 1.5s var(--dna-ease) 1 both;
 }
@@ -447,22 +451,57 @@
   block-size: 2px;
   border-radius: 2px;
   background: var(--jf);
+  /* hidden until the fill starts: a scaleX(0) 2px line can still paint a sliver */
+  opacity: 0;
   transform: scaleX(0);
   transform-origin: 0 50%;
-  transition: transform calc(var(--journey-step, 600ms) * 0.8) var(--dna-ease);
+  transition: transform calc(var(--journey-step, 600ms) * 0.8) var(--dna-ease), opacity 0s linear calc(var(--journey-step, 600ms) * 0.8);
 }
-[dir='rtl'] .dna-steps[data-journey] .dna-stepi + .dna-stepi::after { transform-origin: 100% 50%; }
-.dna-steps[data-journey] .dna-stepi + .dna-stepi[data-link='done']::after { transform: scaleX(1); }
+/* Fill from the inline-start side. :dir() follows the nearest dir attribute (an LTR block inside an RTL page fills
+   from the left); the attribute selector is only the fallback for engines without :dir(). */
+.dna-steps[data-journey]:dir(rtl) .dna-stepi + .dna-stepi::after { transform-origin: 100% 50%; }
+@supports not selector(:dir(rtl)) {
+  [dir='rtl'] .dna-steps[data-journey] .dna-stepi + .dna-stepi::after { transform-origin: 100% 50%; }
+}
+.dna-steps[data-journey] .dna-stepi + .dna-stepi[data-link='done']::after {
+  opacity: 1;
+  transform: scaleX(1);
+  transition: transform calc(var(--journey-step, 600ms) * 0.8) var(--dna-ease), opacity 0s;
+}
 .dna-steps[data-journey][data-size='xs'] .dna-stepi + .dna-stepi::after {
   inset-block-start: calc(var(--node) / 2 - 0.75px);
   inset-inline-start: calc(-50% + var(--node) / 2 + 2px);
   inline-size: calc(100% - var(--node) - 4px);
   block-size: 1.5px;
 }
-/* one soft ring that settles; never loops in reveal mode */
+/* while the rail is armed but nothing has lit yet there is nothing to animate: no transition may play from a
+   previous (final) frame into the unlit one */
+.dna-steps[data-journey][data-reveal='0'] :is(.dna-stepi, .dna-node, .dna-lbl),
+.dna-steps[data-journey][data-reveal='0'] .dna-stepi::before,
+.dna-steps[data-journey][data-reveal='0'] .dna-stepi::after { transition: none; }
+/* one soft ring that settles on the node's own resting look (--halo-rest), so removing the attribute is seamless */
 @keyframes dna-journey-halo {
   0% { box-shadow: inset 0 0 0 2px var(--jf), 0 0 0 0 color-mix(in srgb, var(--jf) 38%, transparent); }
-  100% { box-shadow: inset 0 0 0 2px var(--jf), 0 0 0 9px color-mix(in srgb, var(--jf) 0%, transparent); }
+  70% { box-shadow: inset 0 0 0 2px var(--jf), 0 0 0 9px color-mix(in srgb, var(--jf) 0%, transparent); }
+  100% { box-shadow: inset 0 0 0 2px var(--jf), var(--halo-rest, 0 0 0 0 transparent); }
+}
+
+/* Long rails on a phone (e.g. the 8-step participant journey): the columns are too narrow for words, so only the
+   numbered nodes are drawn and the labels stay in the accessibility tree (clipped, not removed). The page already
+   names the current step in text next to the rail. */
+@media (max-width: 640px) {
+  .dna-steps.dna-steps--phone-dots .dna-lbl {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .dna-steps.dna-steps--phone-dots .dna-stepi { gap: 0; }
 }
 
 /* ---------- timeline ---------- */

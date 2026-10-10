@@ -135,9 +135,15 @@ export interface DnaStepperProps {
   /** Wait for the host's real data before starting (the rail stays unlit meanwhile). */
   hold?: boolean;
   stepMs?: number;
+  /**
+   * Journey (gold) look without the intro. Defaults to `reveal`, so a rail that stops animating
+   * (e.g. a finished journey) keeps the same colours instead of jumping back to the kit accent.
+   */
+  journey?: boolean;
 }
 
-export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className, reveal = false, playKey, hold, stepMs }: DnaStepperProps) {
+export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className, reveal = false, playKey, hold, stepMs, journey }: DnaStepperProps) {
+  const journeyLook = journey ?? reveal;
   const text = { ...DEFAULT_STATE_TEXT, ...stateText };
   const labels = showLabels && size !== 'xs';
   const target = journeyTarget(steps.map((s) => s.state));
@@ -151,7 +157,7 @@ export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, s
       className={cx('dna', 'dna-steps', className)}
       data-size={size}
       aria-label={ariaLabel}
-      data-journey={reveal ? '' : undefined}
+      data-journey={journeyLook ? '' : undefined}
       data-reveal={reveal ? (lit ?? 'done') : undefined}
       style={reveal ? ({ '--journey-step': `${intro.stepMs}ms` } as React.CSSProperties) : undefined}
     >
@@ -166,8 +172,7 @@ export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, s
             className="dna-stepi"
             data-state={step.state}
             data-link={link}
-            data-lit={reveal && (step.state === 'done' || step.state === 'current') ? '' : undefined}
-            data-just={reveal && intro.just === i ? '' : undefined}
+            data-just={reveal && intro.just === i && i === target - 1 ? '' : undefined}
             data-stamp={stamped ? 'true' : undefined}
             aria-current={real === 'current' ? 'step' : undefined}
             title={step.title ?? (size === 'xs' && typeof step.label === 'string' ? step.label : undefined)}

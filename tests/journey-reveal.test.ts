@@ -81,3 +81,22 @@ test('a11y and key-switch contracts stay in the source (aria uses the real state
   assert.match(hook, /keyRef\.current !== playKey/);
   assert.match(hook, /\[target, enabled, playKey\]/);
 });
+
+test('polish contracts: nearest-dir fill origin, one halo on the last lit station, settle clears it, no first-frame flash', async () => {
+  const fs = await import('node:fs');
+  const css = fs.readFileSync(new URL('../src/components/dna/dna.css', import.meta.url), 'utf8');
+  // :dir() follows the nearest dir attribute; the [dir] selector exists only as the fallback for engines without it
+  assert.match(css, /\.dna-steps\[data-journey\]:dir\(rtl\) \.dna-stepi \+ \.dna-stepi::after \{ transform-origin: 100% 50%; \}/);
+  assert.match(css, /@supports not selector\(:dir\(rtl\)\)/);
+  // the connector fill is hidden (not just scaled to 0) until it starts
+  assert.match(css, /opacity: 0;\s*transform: scaleX\(0\)/);
+  // armed-but-unlit rails never transition from a previous frame
+  assert.match(css, /\[data-reveal='0'\]/);
+  const kit = fs.readFileSync(new URL('../src/components/dna/DnaKit.tsx', import.meta.url), 'utf8');
+  assert.match(kit, /intro\.just === i && i === target - 1/);
+  assert.doesNotMatch(kit, /data-lit/);
+  const hook = fs.readFileSync(new URL('../src/components/dna/useJourneyReveal.ts', import.meta.url), 'utf8');
+  assert.match(hook, /setLitBoth\(null\); setJust\(null\)/);
+  assert.match(hook, /canArmIntro\(enabled, target, playKey\)/);
+  assert.match(hook, /Math\.max\(ms, JOURNEY_HALO_MS\)/);
+});

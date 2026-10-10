@@ -11,6 +11,8 @@ import * as React from 'react';
  * all start at `null`, so the final state is what is drawn.
  */
 
+/** Length of the one-shot halo on the last lit station (keep in sync with dna.css and index.css). */
+export const JOURNEY_HALO_MS = 1550;
 const STORE_KEY = 'mizan:journey-played';
 const playedKeys = new Set<string>();
 
@@ -103,6 +105,13 @@ export interface JourneyRevealOptions {
   startDelayMs?: number;
 }
 
+/** Can the intro run for this rail right now (before it is measured)? Mirrors the arming checks in the hook. */
+function canArmIntro(enabled: boolean, target: number, playKey?: string | null): boolean {
+  if (!enabled || target <= 0 || typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  return !journeyAlreadyPlayed(playKey);
+}
+
 export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
   target,
   count,
@@ -114,14 +123,21 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
   startDelayMs = 250,
 }: JourneyRevealOptions) {
   const ref = React.useRef<T | null>(null);
-  const [lit, setLit] = React.useState<number | null>(null);
+  // Armed from the very first render when the intro can run, so the first committed frame is already unlit.
+  // Starting from the final state and flipping it in a layout effect lets CSS transitions animate the filled
+  // rail back to empty (a visible flash). A rail that then proves unmeasurable falls back to the real state.
+  const arm0 = React.useRef<boolean | null>(null);
+  if (arm0.current === null) arm0.current = canArmIntro(enabled, target, playKey);
+  const armedAtMount = arm0.current === true;
+  const [lit, setLit] = React.useState<number | null>(armedAtMount ? 0 : null);
   const [just, setJust] = React.useState<number | null>(null);
-  const [armed, setArmed] = React.useState(false);
+  const [armed, setArmed] = React.useState(armedAtMount);
   const [started, setStarted] = React.useState(false);
   const thresholdRef = React.useRef(threshold);
   const keyRef = React.useRef(playKey);
-  const decidedRef = React.useRef(false); // play-once per mount: set when armed or permanently skipped
-  const litRef = React.useRef<number | null>(null);
+  const decidedRef = React.useRef(armedAtMount); // play-once per mount: set when armed or permanently skipped
+  const pendingMeasure = React.useRef(armedAtMount); // armed at first render, geometry not checked yet
+  const litRef = React.useRef<number | null>(armedAtMount ? 0 : null);
   const ms = stepMs ?? journeyStepMs(count);
   const setLitBoth = (v: number | null) => { litRef.current = v; setLit(v); };
 
@@ -138,6 +154,20 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
       setArmed(false);
       setLitBoth(null);
       setJust(null);
+      pendingMeasure.current = false;
+    }
+    if (pendingMeasure.current) {
+      pendingMeasure.current = false;
+      const first = ref.current?.getBoundingClientRect();
+      if (!first || first.height <= 0 || first.width <= 0) {
+        // Not measurable (collapsed/hidden): show the real state and stay re-armable.
+        decidedRef.current = false;
+        setArmed(false);
+        setLitBoth(null);
+        return;
+      }
+      thresholdRef.current = journeyEffectiveThreshold(threshold, first.height, window.innerHeight);
+      return;
     }
     if (decidedRef.current || !enabled || typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || journeyAlreadyPlayed(playKey)) { decidedRef.current = true; return; }
@@ -175,9 +205,11 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
   React.useEffect(() => {
     if (!started) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const settle = () => { setLitBoth(null); setArmed(false); setStarted(false); };
+    // `just` is cleared with the rest so a settled rail carries no halo attribute that a remount could replay.
+    const settle = () => { setLitBoth(null); setJust(null); setArmed(false); setStarted(false); };
     const run = (cur: number) => {
-      if (cur >= target) { timer = setTimeout(settle, ms); return; }
+      // Let the last station's one-shot halo finish before settling (its end frame equals the settled look).
+      if (cur >= target) { timer = setTimeout(settle, Math.max(ms, JOURNEY_HALO_MS)); return; }
       timer = setTimeout(() => { setLitBoth(cur + 1); setJust(cur); run(cur + 1); }, cur === 0 ? startDelayMs : ms);
     };
     run(litRef.current ?? 0);

@@ -1958,7 +1958,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
           mask-size: 100% 100%, 80px 80px; mask-composite: intersect;
 }
 .mz-halo-once { animation:mzHaloOnce 1.5s var(--ease-brand) 1; }
-@keyframes mzHaloOnce { from { box-shadow:0 0 0 0 color-mix(in srgb,var(--gold-light) 45%,transparent) } to { box-shadow:0 0 0 14px color-mix(in srgb,var(--gold-light) 0%,transparent) } }
+/* The landing's current node carries a static ring-4 (a box-shadow); the keyframes keep it so the halo adds to it and the ring never blinks off. */
+@keyframes mzHaloOnce { from { box-shadow:0 0 0 4px color-mix(in srgb,var(--gold-light) 25%,transparent), 0 0 0 4px color-mix(in srgb,var(--gold-light) 45%,transparent) } to { box-shadow:0 0 0 4px color-mix(in srgb,var(--gold-light) 25%,transparent), 0 0 0 16px color-mix(in srgb,var(--gold-light) 0%,transparent) } }
 .mz-enter { animation:mzLift .6s var(--ease-brand) both; animation-delay:calc(var(--i,0) * 70ms + 80ms); }
 .mz-skeleton { background:linear-gradient(90deg,var(--surface-soft) 25%,#f8f6f0 50%,var(--surface-soft) 75%); background-size:200% 100%; animation:mzShimmer 1.4s linear infinite; border-radius:12px; }
 @keyframes mzShimmer { from { background-position:200% 0 } to { background-position:-200% 0 } }
