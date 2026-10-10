@@ -9,6 +9,7 @@ import {
 import { buildWinnersArchive } from '../../lib/winners-archive';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
+import { useJourneyReveal } from '../dna/useJourneyReveal';
 
 /*
  * الصفحة العامة للمسابقة — أول ما يراه من لا يعرف ميزان، وآخر ما يقرؤه قبل أن يقرّر
@@ -138,6 +139,9 @@ export const CompetitionLanding: React.FC = () => {
     { icon: Gavel, label: ar ? 'التحكيم' : 'Judging', hint: ar ? 'يوم تلاوتك' : 'Your recitation day' },
     { icon: Award, label: ar ? 'الشهادة' : 'Certificate', hint: ar ? 'نتيجتك وشهادتك' : 'Result and certificate' },
   ];
+
+  /* ظهور الرحلة مرةً واحدة عند التمرير: يضيء حتى الخطوة الجارية فعلًا (stepNow) ولا يتجاوزها. */
+  const stepsReveal = useJourneyReveal<HTMLOListElement>({ target: Math.min(stepNow + 1, steps.length), count: steps.length, playKey: `landing:${competition.id}` });
 
   /* حقائق الغلاف: ما وُجد منها فقط. الشرطة ليست معلومة. */
   const facts = [
@@ -436,23 +440,33 @@ export const CompetitionLanding: React.FC = () => {
             )}
           </div>
 
-          <ol className="mt-9 flex flex-col sm:flex-row gap-7 sm:gap-0" aria-label={ar ? 'مراحل المشاركة' : 'Participation steps'}>
+          <ol ref={stepsReveal.ref} className="mt-9 flex flex-col sm:flex-row gap-7 sm:gap-0" aria-label={ar ? 'مراحل المشاركة' : 'Participation steps'}>
             {steps.map((st, i) => {
-              const done = i < stepNow, current = i === stepNow;
+              /* الحالة الحقيقية تحكم؛ المقدّمة تكشف ما هو مضاء فعلًا بالتتابع وحسب. */
+              const real = i < stepNow ? 'done' : i === stepNow ? 'current' : 'pending';
+              const shown = stepsReveal.lit === null || i < stepsReveal.lit;
+              const done = real === 'done' && shown, current = real === 'current' && shown;
+              /* الوصلة بعد هذه المحطة تمتلئ مع إضاءتها فقط، وتقف عند الجارية. */
+              const linkFilled = done;
               return (
-                <li key={i} aria-current={current ? 'step' : undefined} style={{ ["--i" as string]: i }} className="mz-enter relative flex-1 flex sm:flex-col items-center sm:text-center gap-4 sm:gap-0">
+                <li key={i} aria-current={real === 'current' ? 'step' : undefined} style={{ ["--i" as string]: i }} className="mz-enter relative flex-1 flex sm:flex-col items-center sm:text-center gap-4 sm:gap-0">
                   {i < steps.length - 1 && (
-                    <span aria-hidden="true" className={`absolute z-0 start-6 top-12 -bottom-7 w-0.5 sm:start-1/2 sm:top-6 sm:bottom-auto sm:h-0.5 sm:w-full ${done ? 'bg-[var(--gold-light)]' : 'bg-[#F6F3EA]/20'}`} />
+                    <span aria-hidden="true" className="absolute z-0 start-6 top-12 -bottom-7 w-0.5 sm:start-1/2 sm:top-6 sm:bottom-auto sm:h-0.5 sm:w-full bg-[#F6F3EA]/20 overflow-hidden">
+                      <span
+                        className={`absolute inset-0 bg-[var(--gold-light)] origin-top ltr:sm:origin-left rtl:sm:origin-right transition-transform duration-500 ease-[var(--ease-brand)] motion-reduce:transition-none ${linkFilled ? 'scale-y-100 sm:scale-y-100 sm:scale-x-100' : 'scale-y-0 sm:scale-y-100 sm:scale-x-0'}`}
+                      />
+                    </span>
                   )}
-                  <span className={`relative z-10 w-12 h-12 rounded-full grid place-items-center shrink-0 transition ${current ? 'bg-[var(--gold-light)] text-[#11241f] ring-4 ring-[var(--gold-light)]/25' : done ? 'bg-[var(--gold-light)]/90 text-[#11241f]' : 'bg-[var(--ink-night)] text-[#F6F3EA]/70 border border-[#F6F3EA]/25'}`}>
+                  <span className={`relative z-10 w-12 h-12 rounded-full grid place-items-center shrink-0 transition ${current ? 'bg-[var(--gold-light)] text-[#11241f] ring-4 ring-[var(--gold-light)]/25 mz-halo-once' : done ? 'bg-[var(--gold-light)]/90 text-[#11241f]' : 'bg-[var(--ink-night)] text-[#F6F3EA]/70 border border-[#F6F3EA]/25'}`}>
                     {done ? <Check className="w-5 h-5" /> : <st.icon className="w-5 h-5" />}
                   </span>
                   <div className="sm:mt-3 min-w-0">
                     <div className={`text-[15px] font-black ${current || done ? 'text-[#F6F3EA]' : 'text-[#F6F3EA]/75'}`}>
                       {st.label}
-                      {current && <span className="ms-2 align-middle rounded-full bg-[var(--gold-light)] px-2 py-0.5 text-[10px] font-black text-[#11241f]">{ar ? 'الآن' : 'Now'}</span>}
+                      {real === 'current' && <span className="ms-2 align-middle rounded-full bg-[var(--gold-light)] px-2 py-0.5 text-[10px] font-black text-[#11241f]">{ar ? 'الآن' : 'Now'}</span>}
                     </div>
                     <div className="mt-0.5 text-[12px] leading-5 text-[#F6F3EA]/65">{st.hint}</div>
+                    <span className="sr-only">{real === 'done' ? (ar ? 'مكتملة' : 'Completed') : real === 'current' ? (ar ? 'الخطوة الحالية' : 'Current step') : (ar ? 'لاحقة' : 'Upcoming')}</span>
                   </div>
                 </li>
               );

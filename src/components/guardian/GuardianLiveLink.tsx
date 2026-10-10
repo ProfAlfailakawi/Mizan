@@ -4,6 +4,7 @@ import { useAppStore } from '../../lib/store';
 import { queueOrderValue } from '../../lib/judging-integrity';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
+import { DnaStepper } from '../dna/DnaKit';
 import type { Participant } from '../../types';
 
 // "Your child is with the panel now." A consent-gated, privacy-safe live thread for a guardian:
@@ -107,21 +108,20 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
         {stage === 'queued' && position > 1 && <div className="text-xs text-white/55 mt-2">{ar ? `يسبقه ${position - 1} في الطابور` : `${position - 1} ahead in the queue`}</div>}
       </div>
 
-      {/* Journey rail */}
-      <div className="mt-5 flex items-center justify-between overflow-x-auto pb-1 -mx-1 px-1">
-        {steps.map((s, i) => {
+      {/* Journey rail: the shared DnaStepper. The intro plays on the first load only (per child, per tab);
+          live queue/stage updates afterwards just move the one station that really changed. */}
+      <DnaStepper
+        className="!mt-5"
+        size="md"
+        reveal
+        playKey={`guardian:${child.id}`}
+        ariaLabel={ar ? 'مراحل متابعة ابنك' : 'Live journey stages'}
+        stateText={ar ? { current: 'الحالية' } : { done: 'done', current: 'current', pending: 'upcoming', returned: 'returned', blocked: 'blocked' }}
+        steps={steps.map((s) => {
           const Icon = s.icon;
-          return (
-            <React.Fragment key={s.key}>
-              <div className="flex flex-col items-center gap-1.5 text-center w-11 min-[360px]:w-12 min-[390px]:w-14 sm:w-auto sm:min-w-14 shrink-0">
-                <span className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full grid place-items-center ${s.done ? 'bg-[#214C40] text-white' : s.active ? 'bg-[#F2EADC] text-[#7d5e34] ring-2 ring-[#d7c39e]' : 'bg-[#eeece6] text-[#656b66]'}`}><Icon className="w-4 h-4 sm:w-5 sm:h-5" /></span>
-                <span className={`text-xs leading-tight font-bold ${s.active ? 'text-[#7d5e34]' : s.done ? 'text-[#214C40]' : 'text-[#656b66]'}`}>{ar ? s.ar : s.en}</span>
-              </div>
-              {i < steps.length - 1 && <div className={`flex-1 min-w-1 sm:min-w-3 h-0.5 sm:mx-1 rounded-full ${steps[i + 1].done || steps[i + 1].active ? 'bg-[#bcd0c7]' : 'bg-[#e6e4dd]'}`} />}
-            </React.Fragment>
-          );
+          return { key: s.key, label: ar ? s.ar : s.en, icon: <Icon className="w-4 h-4" />, state: s.done ? 'done' as const : s.active ? 'current' as const : 'pending' as const };
         })}
-      </div>
+      />
 
       {/* Consent-gated actions */}
       {consent ? (

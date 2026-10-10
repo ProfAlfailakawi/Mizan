@@ -27,6 +27,17 @@
   --dna-r-sm: var(--radius-sm);
   --dna-ease: var(--ease-brand);
 }
+/* Journey steppers (`reveal`) fill with brand gold; steppers without `reveal` keep the emerald accent.
+   Dark ink on gold keeps the number/check glyphs above 4.5:1; on the venue the light gold takes the venue black. */
+.dna-steps[data-journey] {
+  --journey-fill: var(--gold);
+  --journey-on-fill: var(--ink);
+}
+.mizan-dna-venue .dna-steps[data-journey],
+.dna-steps[data-journey].mizan-dna-venue {
+  --journey-fill: var(--gold-light);
+  --journey-on-fill: var(--venue-deep);
+}
 /* Venue (dark) screens: the kit reads the venue palette instead of the page one. */
 .mizan-dna-venue {
   --dna-surface: var(--venue);
