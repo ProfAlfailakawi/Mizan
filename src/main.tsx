@@ -4,6 +4,7 @@ import App from './App.tsx';
 import './index.css';
 import './components/dna/dna-theme.css';
 import './mushaf-participant-polish.css';
+import './beauty-pass.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';

@@ -1,0 +1,44 @@
+/* Beauty pass: depth, display numerals and a short entrance.
+   Presentation only; keyed to dedicated mz-bp-* classes and the .mizan-surface
+   design-system card. Motion is opacity/transform inside
+   prefers-reduced-motion: no-preference (no blur). Loaded last. */
+
+/* cards: a faint emerald wash at the top so a white card reads as lifted */
+.mizan-surface {
+  background-image: linear-gradient(180deg, rgba(231, 238, 233, 0.38), rgba(231, 238, 233, 0) 110px);
+}
+
+/* judge roster hero icon: layered tile with a gold ring */
+.mz-bp-hero-tile {
+  background: linear-gradient(150deg, #f3f8f4, #dbe7df) !important;
+  box-shadow: 0 0 0 6px rgba(33, 76, 64, 0.06), 0 0 0 7px rgba(155, 117, 66, 0.22), 0 18px 30px -16px rgba(33, 76, 64, 0.55);
+}
+
+/* judge roster counters: display numerals on a tinted tile */
+.mz-bp-stat {
+  position: relative;
+  background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 70%);
+  box-shadow: inset 0 0 0 1px rgba(33, 76, 64, 0.1), 0 14px 24px -20px rgba(33, 76, 64, 0.5);
+}
+.mz-bp-stat > svg {
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(33, 76, 64, 0.12);
+}
+.mz-bp-stat > div:first-of-type {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 9vw, 3rem);
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes mzBpRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .mizan-shell-main > div > .mizan-surface,
+  .mz-bp-hero-tile,
+  .mz-bp-stat { animation: mzBpRise 0.5s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }
+  .mz-bp-stat:nth-child(2) { animation-delay: 0.08s; }
+}
