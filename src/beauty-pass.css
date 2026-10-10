@@ -323,3 +323,13 @@
 }
 html[data-mizan-motion="reduced"] .mz-bp-atmos::before,
 html[data-mizan-motion="reduced"] .mz-bp-scanline { animation: none; }
+
+/* forced colors drops background images: give gradient-text headings their system colour back */
+@media (forced-colors: active) {
+  .mz-bp-title,
+  .mz-bp-winner {
+    background-image: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+}
