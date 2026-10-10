@@ -277,6 +277,8 @@ export const MarketingSite: React.FC = () => {
         <div className="mt-8 dna-surface p-5 sm:p-7">
           <DnaStepper
             className="mizan-mk-journey"
+            reveal
+            playKey="marketing-journey"
             size="lg"
             ariaLabel="رحلة المسابقة"
             steps={JOURNEY.map(s => ({ key: s.step, label: s.title, state: 'done' as const, icon: <s.icon size={20} strokeWidth={1.6} />, title: s.line }))}
