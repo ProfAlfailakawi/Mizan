@@ -221,7 +221,7 @@ const Shell: React.FC<{ venueRef: { current: HTMLDivElement | null }; ar: boolea
     role={onClose?"dialog":undefined}
     aria-modal={onClose?true:undefined}
     aria-label={ar?'شاشة اللجنة':'Committee display'}
-    className={`fixed inset-0 z-50 mizan-venue-2 text-white font-arabic overflow-auto ${stale ? 'mizan-board-stale' : ''}`}
+    className={`fixed inset-0 z-50 mizan-venue-2 mz-bp-atmos mz-bp-board text-white font-arabic overflow-auto ${stale ? 'mizan-board-stale' : ''}`}
   >
     <div className="min-h-full p-5 sm:p-8 lg:p-10 flex flex-col">
       {onClose && floatingClose && <div className="absolute top-4 end-4 z-10">

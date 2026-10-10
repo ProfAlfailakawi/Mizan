@@ -79,13 +79,13 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
     role={onClose?"dialog":undefined}
     aria-modal={onClose?true:undefined}
     aria-label={ar?'شاشة الانتظار':'Waiting display'}
-    className={`fixed inset-0 z-50 mizan-venue-2 mizan-venue-zoom text-white font-arabic overflow-auto ${age.state === 'STALE' ? 'mizan-board-stale' : ''}`}
+    className={`fixed inset-0 z-50 mizan-venue-2 mz-bp-atmos mz-bp-board mizan-venue-zoom text-white font-arabic overflow-auto ${age.state === 'STALE' ? 'mizan-board-stale' : ''}`}
   >
     <div className="min-h-full p-5 sm:p-8 lg:p-10 pb-20 flex flex-col">
       <header className="flex items-start justify-between gap-5">
         <div className="min-w-0">
           <div className="text-base font-black tracking-[.2em] mizan-venue-muted">{ar ? 'الدور الآن' : 'NOW SERVING'}</div>
-          <h1 className="font-display text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
+          <h1 className="mz-bp-title font-display text-2xl sm:text-3xl font-black mt-1">{ar ? 'قاعة الانتظار' : 'Waiting Hall'}</h1>
           <div className="text-xs mizan-venue-muted mt-1 truncate">{bilingualName({ name: board.competitionName, nameArabic: board.competitionNameArabic }, ar)}</div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
@@ -147,7 +147,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
             الانتظار يصير تقدّمًا حين يُرى مجموعه: القاعة ترى ما أنجزته اليوم، وكل
             اكتمالٍ يومض مرّة. المفتاح هو العدد، فتغيّره يعيد تشغيل الومضة بلا مؤقّت.
           */}
-          <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
+          <div className="mz-bp-bstat rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
             <span key={board.totalCompleted} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-4 h-4" /></span>
             <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-base mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
           </div>
@@ -177,9 +177,9 @@ export const FreshnessLine: React.FC<{ state: ReturnType<typeof boardAge>['state
  */
 const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slice, ar }) => {
   const offline = slice.status === 'offline';
-  return <section className={`mizan-board-cell ${offline ? 'is-offline' : ''} ${slice.status === 'testing' ? 'is-testing' : ''} ${slice.stalled ? 'is-stalled' : ''}`}>
+  return <section className={`mizan-board-cell mz-bp-cell ${offline ? 'is-offline' : ''} ${slice.status === 'testing' ? 'is-testing' : ''} ${slice.stalled ? 'is-stalled' : ''}`}>
     <div className="flex items-center justify-between gap-2 min-w-0">
-      <span className="shrink-0 w-11 h-11 rounded-xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums text-sm">{slice.code}</span>
+      <span className="mz-bp-cell-badge shrink-0 w-11 h-11 rounded-xl bg-[#dbe7df] text-[#16372d] grid place-items-center font-black tabular-nums text-sm">{slice.code}</span>
       <span className="min-w-0 text-end">
         <span className="mizan-board-tag is-wrap text-[12px]" title={categoryLine(slice.categories, ar)}>{categoryLine(slice.categories, ar)}</span>
       </span>
@@ -211,7 +211,7 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
 };
 
 const Stat = ({ icon: Icon, n, t }: { icon: React.ComponentType<{ className?: string }>; n: number; t: string }) => (
-  <div className="rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
+  <div className="mz-bp-bstat rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
     <Icon className="w-4 h-4 text-[#b9cec4]" />
     <div><div className="text-xl font-black tabular-nums">{n}</div><div className="text-base mizan-venue-faint">{t}</div></div>
   </div>

@@ -122,7 +122,7 @@ export const CorridorScreen: React.FC<{
   const title = ar ? (board.competitionNameArabic || competition.nameArabic) : (board.competitionName || competition.name);
 
   return (
-    <div ref={venueRef} className="fixed inset-0 z-50 mizan-venue-deep text-white font-arabic overflow-hidden" dir={ar ? 'rtl' : 'ltr'}>
+    <div ref={venueRef} className="fixed inset-0 z-50 mizan-venue-deep mz-bp-atmos mz-bp-board text-white font-arabic overflow-hidden" dir={ar ? 'rtl' : 'ltr'}>
       <div className="flex h-full flex-col p-6 sm:p-10">
         <header className="flex items-start justify-between gap-6">
           <div className="min-w-0">
