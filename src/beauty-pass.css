@@ -36,9 +36,62 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  @keyframes mzBpRise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes mzBpRise { from { opacity: 0; transform: translateY(12px); } }
   .mizan-shell-main > div > .mizan-surface,
   .mz-bp-hero-tile,
   .mz-bp-stat { animation: mzBpRise 0.5s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }
-  .mz-bp-stat:nth-child(2) { animation-delay: 0.08s; }
+}
+
+/* ---- shared Metric card (delegation, auditor, support, overview ...): display numerals + gradient icon tile ---- */
+.mz-bp-metric { position: relative; overflow: hidden; }
+.mz-bp-metric::after {
+  content: "";
+  position: absolute;
+  inset-block-end: -38px;
+  inset-inline-start: -28px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(33, 76, 64, 0.08), transparent 70%);
+  pointer-events: none;
+}
+.mz-bp-metric-value {
+  font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.mz-bp-metric-icon.is-green {
+  background-image: linear-gradient(145deg, #f6faf7, #d6e6dc);
+  box-shadow: inset 0 0 0 1px rgba(33, 76, 64, 0.14), 0 8px 14px -10px rgba(33, 76, 64, 0.55);
+}
+.mz-bp-metric-icon.is-amber {
+  background-image: linear-gradient(145deg, #faf4e8, #ecdcc0);
+  box-shadow: inset 0 0 0 1px rgba(139, 104, 55, 0.2), 0 8px 14px -10px rgba(139, 104, 55, 0.55);
+}
+
+/* ---- head judge: five tabs wrap as a 2-column grid, the odd last tab spans the row (no orphan) ---- */
+@media (max-width: 639px) {
+  .mz-bp-tabgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  /* labels wrap inside their track (the base tab is nowrap inside an overflow-hidden row) */
+  .mz-bp-tabgrid > .mizan-tab { justify-content: center; min-width: 0; white-space: normal; text-align: center; line-height: 1.25; padding: 6px 0.6rem; overflow-wrap: anywhere; }
+}
+@media (max-width: 259px) {
+  .mz-bp-tabgrid { grid-template-columns: minmax(0, 1fr); }
+  .mz-bp-tabgrid > .mizan-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* ---- head judge inbox carousel: snap, and a wider fade so the peeking card reads as "more", not as a clipped glitch ---- */
+@media (max-width: 1023px) {
+  .mz-bp-inbox { scroll-snap-type: x proximity; scroll-padding-inline: 8px; }
+  .mz-bp-inbox > button { scroll-snap-align: start; }
+  .mz-bp-inbox.mizan-fade-end {
+    padding-inline-end: 56px;
+    -webkit-mask-image: linear-gradient(to left, transparent 0, #000 56px);
+    mask-image: linear-gradient(to left, transparent 0, #000 56px);
+  }
+  .mz-bp-inbox.mizan-fade-end:dir(rtl) {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 56px);
+    mask-image: linear-gradient(to right, transparent 0, #000 56px);
+  }
 }

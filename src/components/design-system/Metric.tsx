@@ -48,14 +48,14 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     );
   }
   return (
-    <div className={`mizan-surface p-3 sm:p-4 ${className}`}>
+    <div className={`mz-bp-metric mizan-surface p-3 sm:p-4 ${className}`}>
       <div className={`flex items-start justify-between gap-2 sm:gap-3 max-[340px]:flex-col-reverse ${typeof value === 'string' && value.length > 9 ? 'max-[400px]:flex-col-reverse' : ''}`}>
         <div className="min-w-0">
-          <div className={`${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{value}</div>
+          <div className={`mz-bp-metric-value ${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{value}</div>
           <div className="mt-1 text-[11px] text-[#666c68]">{label}</div>
         </div>
         {Icon && (
-          <div className={`grid h-8 w-8 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl ${tone === 'amber' ? 'bg-[#f4ecdf] text-[#8b6837]' : 'bg-[#e8f0eb] text-[#28594a]'}`}>
+          <div className={`mz-bp-metric-icon ${tone === 'amber' ? 'is-amber' : 'is-green'} grid h-8 w-8 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl ${tone === 'amber' ? 'bg-[#f4ecdf] text-[#8b6837]' : 'bg-[#e8f0eb] text-[#28594a]'}`}>
             <Icon className="h-4 w-4" />
           </div>
         )}
