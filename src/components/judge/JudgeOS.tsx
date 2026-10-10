@@ -846,5 +846,5 @@ export const JudgeOS: React.FC = () => {
 
 const specialtyAr=(v:string)=>({memorization:'الحفظ',tajweed:'التجويد',performance:'الأداء',waqf_ibtida:'الوقف والابتداء',all:'شامل'} as Record<string,string>)[v]||v;
 const formatTime=(s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-const HeadphonesEmpty=()=> <div className="w-20 h-20 rounded-3xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-10 h-10"/></div>;
-const JudgeStat=({icon:Icon,value,label,strong}:{icon:React.ComponentType<{className?:string}>;value:number;label:string;strong?:boolean})=><div className={`rounded-2xl p-3 sm:p-4 text-center ${strong?'bg-[#E7EEE9] text-[#214C40]':'bg-[#f1efe9] text-[#3f4642]'}`}><Icon className="mx-auto h-6 w-6"/><div className="mt-1 text-3xl font-black tabular-nums">{value}</div><div className="mt-0.5 text-xs sm:text-sm font-bold">{label}</div></div>;
+const HeadphonesEmpty=()=> <div className="mz-bp-hero-tile w-20 h-20 rounded-3xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-10 h-10"/></div>;
+const JudgeStat=({icon:Icon,value,label,strong}:{icon:React.ComponentType<{className?:string}>;value:number;label:string;strong?:boolean})=><div className={`mz-bp-stat rounded-2xl p-3 sm:p-4 text-center ${strong?'bg-[#E7EEE9] text-[#214C40]':'bg-[#f1efe9] text-[#3f4642]'}`}><Icon className="mx-auto h-6 w-6"/><div className="mt-1 text-3xl font-black tabular-nums">{value}</div><div className="mt-0.5 text-xs sm:text-sm font-bold">{label}</div></div>;
