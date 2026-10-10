@@ -73,7 +73,11 @@
 /* ---- head judge: five tabs wrap as a 2-column grid, the odd last tab spans the row (no orphan) ---- */
 @media (max-width: 639px) {
   .mz-bp-tabgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
-  .mz-bp-tabgrid > .mizan-tab { justify-content: center; }
+  /* labels wrap inside their track (the base tab is nowrap inside an overflow-hidden row) */
+  .mz-bp-tabgrid > .mizan-tab { justify-content: center; min-width: 0; white-space: normal; text-align: center; line-height: 1.25; padding: 6px 0.6rem; overflow-wrap: anywhere; }
+}
+@media (max-width: 259px) {
+  .mz-bp-tabgrid { grid-template-columns: minmax(0, 1fr); }
   .mz-bp-tabgrid > .mizan-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 
