@@ -6,6 +6,7 @@
  */
 import * as React from 'react';
 import './dna.css';
+import { journeyDisplayState, journeyTarget, useJourneyReveal } from './useJourneyReveal';
 
 export type DnaTone =
   | 'accent'
@@ -121,25 +122,54 @@ export interface DnaStepperProps {
   ariaLabel?: string;
   stateText?: Partial<Record<DnaStepState, string>>;
   className?: string;
+  /**
+   * Opt-in "journey" look: when the rail first scrolls into view its already-true stations
+   * light one after another (node fill, then the connector). The `state` props stay the
+   * truth: the intro never lights a station that is not done/current and never goes past the
+   * real current one. Plays once per mount (and once per `playKey` per tab); data updates
+   * afterwards only animate their own single transition. Reduced motion renders the final state.
+   */
+  reveal?: boolean;
+  /** Entity id so a remount of the same journey does not replay the intro. */
+  playKey?: string | null;
+  /** Wait for the host's real data before starting (the rail stays unlit meanwhile). */
+  hold?: boolean;
+  stepMs?: number;
 }
 
-export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className }: DnaStepperProps) {
+export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className, reveal = false, playKey, hold, stepMs }: DnaStepperProps) {
   const text = { ...DEFAULT_STATE_TEXT, ...stateText };
   const labels = showLabels && size !== 'xs';
+  const target = journeyTarget(steps.map((s) => s.state));
+  const intro = useJourneyReveal({ target, count: steps.length, stepMs, enabled: reveal, hold, playKey });
+  const lit = reveal ? intro.lit : null;
+  // Visual state only: assistive tech always gets the real state (aria-current and the sr text below).
+  const shown = steps.map((s, i) => ({ ...s, state: journeyDisplayState(s.state, i, target, lit) }));
   return (
-    <ol className={cx('dna', 'dna-steps', className)} data-size={size} aria-label={ariaLabel}>
-      {steps.map((step, i) => {
-        const prev = i > 0 ? steps[i - 1] : null;
+    <ol
+      ref={reveal ? intro.ref : undefined}
+      className={cx('dna', 'dna-steps', className)}
+      data-size={size}
+      aria-label={ariaLabel}
+      data-journey={reveal ? '' : undefined}
+      data-reveal={reveal ? (lit ?? 'done') : undefined}
+      style={reveal ? ({ '--journey-step': `${intro.stepMs}ms` } as React.CSSProperties) : undefined}
+    >
+      {shown.map((step, i) => {
+        const prev = i > 0 ? shown[i - 1] : null;
         const link = !prev ? 'none' : step.state === 'returned' ? 'returned' : prev.state === 'done' ? 'done' : 'pending';
         const stamped = Boolean(step.stamp) && step.state === 'done';
+        const real = steps[i].state;
         return (
           <li
             key={step.key}
             className="dna-stepi"
             data-state={step.state}
             data-link={link}
+            data-lit={reveal && (step.state === 'done' || step.state === 'current') ? '' : undefined}
+            data-just={reveal && intro.just === i ? '' : undefined}
             data-stamp={stamped ? 'true' : undefined}
-            aria-current={step.state === 'current' ? 'step' : undefined}
+            aria-current={real === 'current' ? 'step' : undefined}
             title={step.title ?? (size === 'xs' && typeof step.label === 'string' ? step.label : undefined)}
           >
             <span className="dna-node" aria-hidden="true">
@@ -160,7 +190,7 @@ export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, s
               {step.badge != null && step.badge !== false && <span className="dna-bdg">{step.badge}</span>}
             </span>
             <span className={labels ? 'dna-lbl' : 'dna-sr'}>{step.label}</span>
-            <span className="dna-sr">{text[step.state]}</span>
+            <span className="dna-sr">{text[real]}</span>
           </li>
         );
       })}

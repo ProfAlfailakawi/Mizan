@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {useAppStore} from '../../lib/store';
 import {MizanLogo, MizanMark} from '../design-system/MizanLogo';
+import {DnaStepper} from '../dna/DnaKit';
 
 /*
  * Onboarding.
@@ -215,15 +216,16 @@ const SlideDetail: React.FC<{kind: SceneKind; ar: boolean}> = ({kind, ar}) => {
     const steps = ar
       ? ['حضور المتسابق', 'اكتمال نصاب اللجنة', 'كشف موثّق ومسجّل']
       : ['Participant present', 'Panel quorum met', 'Audited reveal'];
+    /* شرحٌ لمسار الكشف لا حالةٌ حيّة: تتتابع المحطات مرةً واحدة عند أول ظهور ثم تثبت (وتُعرض مكتملةً فورًا لمن طلب تقليل الحركة). */
     return (
-      <div className="grid sm:grid-cols-3 gap-2">
-        {steps.map((t, i) => (
-          <div className="mzo-step" key={t}>
-            <span className="mzo-step-n">{String(i + 1).padStart(2, '0')}</span>
-            <span className="mzo-step-t">{t}</span>
-          </div>
-        ))}
-      </div>
+      <DnaStepper
+        size="md"
+        reveal
+        playKey="onboarding-custody"
+        ariaLabel={ar ? 'مسار الكشف الموثّق' : 'Audited reveal path'}
+        stateText={ar ? { done: 'خطوة' } : { done: 'step' }}
+        steps={steps.map((t, i) => ({ key: String(i), label: t, state: 'done' as const }))}
+      />
     );
   }
   if (kind === 'roles') {

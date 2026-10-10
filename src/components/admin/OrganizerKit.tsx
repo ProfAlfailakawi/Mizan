@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleHelp, Info, Lock } from 'lucide-react';
 import { DnaRing } from '../dna/DnaKit';
+import { useJourneyReveal } from '../dna/useJourneyReveal';
 import { Ratio } from '../design-system/Ratio';
 
 /*
@@ -116,8 +117,12 @@ export const ToolTile: React.FC<{ icon: Icon; title: string; hint: string; reaso
 
 export interface SetupStep { id: string; icon: Icon; title: string; note: string; done: boolean; onGo: () => void; cta?: string; busy?: boolean }
 
-export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[] }> = ({ ar, steps }) => {
+export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: string }> = ({ ar, steps, playKey }) => {
   const doneCount = steps.filter(s => s.done).length;
+  /* حركةٌ واحدة هادئة على الحلقة وحدها: تمتلئ حتى العدد الحقيقي ولا تتجاوزه. الخطوات تُنجَز بأي ترتيب،
+     فلا تسلسل على البطاقات ولا يُعلَّم شيءٌ غير منجز. تسمية القارئ الآلي تبقى بالعدد الحقيقي دائمًا. */
+  const ringReveal = useJourneyReveal<HTMLSpanElement>({ target: doneCount, count: steps.length, stepMs: 450, playKey });
+  const ringValue = ringReveal.lit ?? doneCount;
   const allDone = doneCount === steps.length;
   const nextIndex = steps.findIndex(s => !s.done);
   const [expanded, setExpanded] = useState(false);
@@ -126,7 +131,7 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[] }> = ({ ar, s
   return (
     <section aria-label={ar ? 'خطوات إعداد المسابقة' : 'Competition setup steps'} className="mizan-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-4">
-        <DnaRing value={doneCount} max={steps.length} size={64} stroke={6} tone="accent" label={allDone ? <Check className="h-6 w-6" /> : <span className="text-base font-black tabular-nums"><Ratio value={doneCount} of={steps.length} /></span>} ariaLabel={ar ? `${doneCount} من ${steps.length} خطوات` : `${doneCount} of ${steps.length} steps`} />
+        <span ref={ringReveal.ref} className="inline-flex"><DnaRing value={ringValue} max={steps.length} size={64} stroke={6} tone="accent" label={allDone ? <Check className="h-6 w-6" /> : <span className="text-base font-black tabular-nums"><Ratio value={doneCount} of={steps.length} /></span>} ariaLabel={ar ? `${doneCount} من ${steps.length} خطوات` : `${doneCount} of ${steps.length} steps`} /></span>
         <div className="min-w-0 flex-1">
           <div className="mizan-kicker">{ar ? 'ابدأ من هنا' : 'START HERE'}</div>
           <h2 className="mt-0.5 text-lg font-black">{allDone ? (ar ? 'الإعداد مكتمل' : 'Setup complete') : (ar ? 'خطوات إعداد مسابقتك' : 'Set up your competition')}</h2>
