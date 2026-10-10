@@ -95,3 +95,231 @@
     mask-image: linear-gradient(to right, transparent 0, #000 56px);
   }
 }
+
+/* =====================================================================
+   Venue screens (kiosk, ceremony, public boards) and sign-in.
+   Presentation only. Every rule is keyed to a dedicated mz-bp-* class;
+   atmosphere lives on pseudo-elements so no existing background shorthand
+   or !important rule can reset it.
+   ===================================================================== */
+
+/* ---- shared dark atmosphere: gold light from above, emerald from below, a faint eight-point star lattice ---- */
+.mz-bp-atmos::before,
+.mz-bp-atmos::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.mz-bp-atmos::before {
+  background:
+    radial-gradient(ellipse 70% 46% at 50% -10%, rgba(232, 203, 147, 0.17), transparent 70%),
+    radial-gradient(ellipse 58% 44% at 104% 108%, rgba(63, 125, 104, 0.26), transparent 70%),
+    radial-gradient(ellipse 46% 38% at -4% 102%, rgba(232, 203, 147, 0.08), transparent 70%);
+}
+.mz-bp-atmos::after {
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='none' stroke='%23e8cb93' stroke-width='1'%3E%3Crect x='24' y='24' width='40' height='40'/%3E%3Crect x='24' y='24' width='40' height='40' transform='rotate(45 44 44)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 88px 88px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000, transparent 75%);
+}
+
+/* display titles: pale ivory sliding to warm gold */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .mz-bp-title {
+    background-image: linear-gradient(180deg, #fbf8ef 30%, #e8cb93 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    padding-block: 0.12em;
+    margin-block: -0.12em;
+  }
+}
+
+/* ---- kiosk: scanner frame with gold corner brackets and a sweeping line ---- */
+.mz-bp-scanframe {
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 55%);
+  box-shadow: 0 0 0 10px rgba(232, 203, 147, 0.045), 0 0 70px -10px rgba(232, 203, 147, 0.22), inset 0 0 40px rgba(0, 0, 0, 0.25);
+}
+.mz-bp-scanframe::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  z-index: 2;
+  pointer-events: none;
+  --mz-bp-c: #e8cb93;
+  background:
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) top left / 26px 3px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) top left / 3px 26px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) top right / 26px 3px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) top right / 3px 26px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) bottom left / 26px 3px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) bottom left / 3px 26px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) bottom right / 26px 3px no-repeat,
+    linear-gradient(var(--mz-bp-c), var(--mz-bp-c)) bottom right / 3px 26px no-repeat;
+}
+.mz-bp-scanline {
+  height: 2px;
+  background-image: linear-gradient(90deg, transparent, #e8cb93 50%, transparent);
+  box-shadow: 0 0 14px 2px rgba(232, 203, 147, 0.45);
+}
+.mz-bp-scanframe .mz-bp-scanline { z-index: 1; }
+
+/* check-in welcome card */
+.mz-bp-done {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(170deg, rgba(232, 203, 147, 0.1), rgba(255, 255, 255, 0) 45%);
+  box-shadow: 0 30px 60px -34px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.mz-bp-done::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 18%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e8cb93, transparent);
+}
+.mz-bp-done-check {
+  box-shadow: 0 0 0 8px rgba(219, 231, 223, 0.1), 0 0 0 18px rgba(219, 231, 223, 0.05), 0 0 46px rgba(219, 231, 223, 0.3);
+}
+
+/* ---- ceremony: a spotlight cone over the stage ---- */
+.mz-bp-stage::before {
+  background:
+    conic-gradient(from 180deg at 50% -6%, transparent 158deg, rgba(232, 203, 147, 0.2) 180deg, transparent 202deg),
+    radial-gradient(ellipse 60% 40% at 50% -8%, rgba(232, 203, 147, 0.26), transparent 72%),
+    radial-gradient(ellipse 70% 36% at 50% 112%, rgba(63, 125, 104, 0.3), transparent 72%);
+}
+.mz-bp-seal {
+  box-shadow: 0 0 0 12px rgba(232, 203, 147, 0.05), 0 0 0 13px rgba(232, 203, 147, 0.28), 0 0 70px rgba(232, 203, 147, 0.18);
+}
+.mz-bp-medal {
+  box-shadow: 0 0 0 8px rgba(216, 195, 155, 0.1), 0 0 0 9px rgba(216, 195, 155, 0.3), 0 0 54px rgba(216, 195, 155, 0.28);
+}
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .mz-bp-winner {
+    background-image: linear-gradient(180deg, #ffffff 25%, #e8cb93 150%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    padding-block: 0.1em;
+  }
+}
+.mz-bp-score {
+  background-image: linear-gradient(160deg, rgba(232, 203, 147, 0.16), rgba(232, 203, 147, 0.03));
+  border-color: rgba(232, 203, 147, 0.34);
+  box-shadow: 0 18px 40px -22px rgba(232, 203, 147, 0.5);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---- public boards: lifted panel cells and counter tiles ---- */
+.mz-bp-cell {
+  position: relative;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 48%);
+  box-shadow: 0 26px 44px -30px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.mz-bp-cell::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline: 16%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(232, 203, 147, 0.7), transparent);
+  pointer-events: none;
+}
+.mz-bp-cell .mizan-board-code { text-shadow: 0 0 30px rgba(232, 203, 147, 0.26); }
+.mz-bp-cell-badge {
+  background-image: linear-gradient(150deg, #f4f9f5, #cfe0d6);
+  box-shadow: 0 0 0 3px rgba(219, 231, 223, 0.1), 0 8px 16px -8px rgba(0, 0, 0, 0.6);
+}
+.mz-bp-bstat {
+  background-image: linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 28px -22px rgba(0, 0, 0, 0.7);
+}
+.mz-bp-bstat > svg,
+.mz-bp-bstat > .mizan-done-mark {
+  box-sizing: border-box;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.55rem;
+  border-radius: 0.75rem;
+  background: rgba(219, 231, 223, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(219, 231, 223, 0.16);
+}
+.mz-bp-bstat > .mizan-done-mark { display: grid; place-items: center; }
+.mz-bp-bstat > .mizan-done-mark > svg { width: 1.1rem; height: 1.1rem; }
+.mz-bp-bstat .tabular-nums { font-variant-numeric: lining-nums tabular-nums; }
+
+/* ---- sign-in: emerald dawn behind the card, gold hairline on its crown ---- */
+.mz-bp-login { position: relative; isolation: isolate; overflow: hidden; }
+.mz-bp-login::before,
+.mz-bp-login::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.mz-bp-login::before {
+  background:
+    radial-gradient(ellipse 80% 38% at 50% -6%, rgba(33, 76, 64, 0.16), transparent 72%),
+    radial-gradient(ellipse 50% 30% at 100% 100%, rgba(155, 117, 66, 0.12), transparent 72%),
+    radial-gradient(ellipse 50% 30% at 0% 100%, rgba(33, 76, 64, 0.08), transparent 72%);
+}
+.mz-bp-login::after {
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='88' height='88' viewBox='0 0 88 88'%3E%3Cg fill='none' stroke='%23214c40' stroke-width='1'%3E%3Crect x='24' y='24' width='40' height='40'/%3E%3Crect x='24' y='24' width='40' height='40' transform='rotate(45 44 44)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 88px 88px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000, transparent 72%);
+  mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000, transparent 72%);
+}
+.mz-bp-login-brand { position: relative; }
+.mz-bp-login-brand::before {
+  content: "";
+  position: absolute;
+  inset: -26px -46px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 70%);
+}
+.mizan-surface.mz-bp-login-card {
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 0 1px rgba(33, 76, 64, 0.04), 0 36px 64px -38px rgba(33, 76, 64, 0.5);
+}
+.mz-bp-login-card::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline: 22%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, transparent, #b98f52, transparent);
+  pointer-events: none;
+}
+.mizan-btn.mz-bp-cta { position: relative; overflow: hidden; }
+.mizan-btn.mz-bp-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.13) 50%, transparent 62%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes mzBpGlow { from { transform: scale(1); } to { transform: scale(1.07); } }
+  @keyframes mzBpSweep { from { transform: translateY(-74px); } to { transform: translateY(74px); } }
+  .mz-bp-atmos::before { animation: mzBpGlow 14s ease-in-out infinite alternate; transform-origin: 50% 0; }
+  .mz-bp-scanline { animation: mzBpSweep 2.6s ease-in-out infinite alternate backwards; }
+  .mz-bp-scanframe,
+  .mz-bp-done,
+  .mizan-surface.mz-bp-login-card { animation: mzBpRise 0.55s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }
+}
+html[data-mizan-motion="reduced"] .mz-bp-atmos::before,
+html[data-mizan-motion="reduced"] .mz-bp-scanline { animation: none; }
