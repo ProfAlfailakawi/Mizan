@@ -457,7 +457,7 @@ export const CompetitionLanding: React.FC = () => {
                       />
                     </span>
                   )}
-                  <span className={`relative z-10 w-12 h-12 rounded-full grid place-items-center shrink-0 transition ${current ? 'bg-[var(--gold-light)] text-[#11241f] ring-4 ring-[var(--gold-light)]/25 mz-halo-once' : done ? 'bg-[var(--gold-light)]/90 text-[#11241f]' : 'bg-[var(--ink-night)] text-[#F6F3EA]/70 border border-[#F6F3EA]/25'}`}>
+                  <span className={`relative z-10 w-12 h-12 rounded-full grid place-items-center shrink-0 transition ${current ? 'bg-[var(--gold-light)] text-[#11241f] ring-4 ring-[var(--gold-light)]/25' + (stepsReveal.just === i ? ' mz-halo-once' : '') : done ? 'bg-[var(--gold-light)]/90 text-[#11241f]' : 'bg-[var(--ink-night)] text-[#F6F3EA]/70 border border-[#F6F3EA]/25'}`}>
                     {done ? <Check className="w-5 h-5" /> : <st.icon className="w-5 h-5" />}
                   </span>
                   <div className="sm:mt-3 min-w-0">

@@ -59,3 +59,25 @@ test('effective threshold is always attainable for tall rails and never below th
   assert.equal(journeyEffectiveThreshold(0.5, 100000, 800), 0.05);
   assert.equal(journeyEffectiveThreshold(0.5, 0, 800), 0.5);
 });
+
+test('css: the journey halo is gated on data-just, never on the current state alone', async () => {
+  const fs = await import('node:fs');
+  const css = fs.readFileSync(new URL('../src/components/dna/dna.css', import.meta.url), 'utf8');
+  const block = css.slice(css.indexOf('journey (opt-in'));
+  const current = /\.dna-steps\[data-journey\] \.dna-stepi\[data-state='current'\] \.dna-node \{[^}]*\}/.exec(block)?.[0] ?? '';
+  assert.match(current, /animation: none/);
+  assert.doesNotMatch(current, /dna-journey-halo/);
+  assert.match(block, /\[data-journey\] \.dna-stepi\[data-just\] \.dna-node \{\s*animation: dna-journey-halo/);
+  const land = fs.readFileSync(new URL('../src/components/public/CompetitionLanding.tsx', import.meta.url), 'utf8');
+  assert.match(land, /stepsReveal\.just === i \? ' mz-halo-once'/);
+});
+
+test('a11y and key-switch contracts stay in the source (aria uses the real state; playKey resets the hook)', async () => {
+  const fs = await import('node:fs');
+  const kit = fs.readFileSync(new URL('../src/components/dna/DnaKit.tsx', import.meta.url), 'utf8');
+  assert.match(kit, /aria-current=\{real === 'current'/);
+  assert.match(kit, /\{text\[real\]\}/);
+  const hook = fs.readFileSync(new URL('../src/components/dna/useJourneyReveal.ts', import.meta.url), 'utf8');
+  assert.match(hook, /keyRef\.current !== playKey/);
+  assert.match(hook, /\[target, enabled, playKey\]/);
+});

@@ -119,6 +119,7 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
   const [armed, setArmed] = React.useState(false);
   const [started, setStarted] = React.useState(false);
   const thresholdRef = React.useRef(threshold);
+  const keyRef = React.useRef(playKey);
   const decidedRef = React.useRef(false); // play-once per mount: set when armed or permanently skipped
   const litRef = React.useRef<number | null>(null);
   const ms = stepMs ?? journeyStepMs(count);
@@ -128,6 +129,16 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
   // that mounts with nothing lit (data still loading) arms on its first 0 -> >0 transition instead of
   // being settled forever. A rail that is not measurable (collapsed) or has no lit station stays real.
   React.useLayoutEffect(() => {
+    // The same mounted rail reused for another entity starts clean: old observer/ticker are torn down by
+    // the effects' deps, and nothing of the previous key's lit/armed state carries over.
+    if (keyRef.current !== playKey) {
+      keyRef.current = playKey;
+      decidedRef.current = false;
+      setStarted(false);
+      setArmed(false);
+      setLitBoth(null);
+      setJust(null);
+    }
     if (decidedRef.current || !enabled || typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || journeyAlreadyPlayed(playKey)) { decidedRef.current = true; return; }
     if (target <= 0) return;
@@ -138,7 +149,7 @@ export function useJourneyReveal<T extends HTMLElement = HTMLOListElement>({
     setArmed(true);
     setLitBoth(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, enabled]);
+  }, [target, enabled, playKey]);
 
   // Wait for the rail to really be on screen (ratio, not just 1px) at an attainable threshold.
   React.useEffect(() => {

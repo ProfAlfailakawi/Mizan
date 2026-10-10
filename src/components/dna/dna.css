@@ -422,9 +422,11 @@
 .dna-steps[data-journey] .dna-stepi[data-state='current'] .dna-node {
   box-shadow: inset 0 0 0 2px var(--jf), 0 0 0 4px color-mix(in srgb, var(--jf) 14%, transparent);
   color: var(--dna-ink);
-  animation: dna-journey-halo 1.5s var(--dna-ease) 1 both;
+  /* static ring: the kit's infinite halo is off in reveal mode, and a remembered/remounted journey
+     must not replay any motion. The halo plays only on the station the intro just lit (data-just). */
+  animation: none;
 }
-.dna-steps[data-journey] .dna-stepi[data-state='done'][data-just] .dna-node {
+.dna-steps[data-journey] .dna-stepi[data-just] .dna-node {
   animation: dna-journey-halo 1.5s var(--dna-ease) 1 both;
 }
 .dna-steps[data-journey] .dna-stepi[data-stamp='true'][data-state='done'] .dna-node {
