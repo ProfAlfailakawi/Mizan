@@ -147,8 +147,8 @@ export const CertificateVerification: React.FC = () => {
             <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(activeCert.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
             <div className="text-center sm:text-start max-w-xs">
               <div className="inline-flex items-center gap-1.5 text-xs font-black text-[#3f4744]"><ScanLine className="h-4 w-4" aria-hidden="true"/>{ar?'امسح الرمز للتحقق مباشرة':'Scan to verify directly'}</div>
-              <BriefNote className="mt-1.5" icon={Fingerprint} short={ar?'يُفحص من السجل لا الورقة':'Checked against the record'} full={ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}/>
-              <Button className="mt-3 no-print" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
+              <BriefNote className="mt-2 !flex justify-center sm:justify-start" icon={Fingerprint} short={ar?'يُفحص من السجل لا الورقة':'Checked against the record'} full={ar?'يفتح الرمز صفحة التحقق هذه ومعه رقم الشهادة، فيُعاد الفحص من المصدر لا من الورقة.':'The code opens this verification page with the certificate number, so the check runs against the record — not the paper.'}/>
+              <div className="mt-3 no-print"><Button className="no-print" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button></div>
             </div>
           </div>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[color:var(--muted)] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
@@ -189,7 +189,7 @@ const EvidenceChain=({chain,ar,playKey}:{chain:{id:string;labelArabic:string;lab
           <span className="text-xs font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
           {!l.present&&<span className="text-xs text-[color:var(--muted)]">{ar?'غير مرتبطة':'not linked'}</span>}
         </div>
-        {l.hash&&<div className="font-mono text-[11px] text-[color:var(--muted)] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
+        {l.hash&&<div className="font-mono text-[11px] text-[color:var(--muted)] mt-0.5 break-all"><bdi dir="ltr">{l.hash.slice(0,32)}…</bdi></div>}
       </li>)}
     </ol>
     <BriefNote className="mt-2" icon={Fingerprint} short={ar?'لكل حلقة بصمة مستقلة':'Each link has its own digest'} full={ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}/>

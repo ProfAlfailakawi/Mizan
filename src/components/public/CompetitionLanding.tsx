@@ -363,7 +363,7 @@ export const CompetitionLanding: React.FC = () => {
                     <h3 className="text-lg font-black">{ar ? edition.titleArabic : edition.title}</h3>
                     <span className="text-[12px] font-bold text-[#7c6f52]">{[edition.edition, edition.year].filter(Boolean).join(' · ')}</span>
                   </header>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 [&>*]:w-full sm:[&>*]:w-[calc((100%-1rem)/2)]">
                     {edition.categories.map(category => (
                       <div key={category.categoryId} className="rounded-2xl bg-[#FBF9F3] p-4">
                         <div className="text-[12px] font-black text-[#3E4A43]">{ar ? category.categoryNameArabic : category.categoryName}</div>
