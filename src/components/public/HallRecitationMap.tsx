@@ -6,6 +6,8 @@ import { BookOpen, Sparkles, X, Radio } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { buildHallRecitation } from '../../lib/hall-recitation';
 import { pageToJuz } from '../../lib/mushaf-map';
+import { DnaCountUp } from '../dna/DnaKit';
+import { useHallMotion } from './useHallMotion';
 
 // Live Hall Recitation Map — "today this hall recited the whole Quran."
 // A privacy-safe, meters-readable visualization of every Mushaf page the hall has touched,
@@ -38,6 +40,8 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
 
   const agg = useMemo(() => buildHallRecitation(store), [store.participants, store.activeSession, store.competition, store.questionGovernance, store.recitationLedger]);
   const max = agg.hottestPage.count || 1;
+  // Calm one-shot motion only (count-up + bar draw on first mount, glow on a page that just rose, one halo per new khatmah).
+  const motion = useHallMotion(agg.pages, agg.khatmatCompleted, `hall:${store.competition.id}`);
 
   /*
    * `min-h-full` لا `min-h-screen`: حاوية التمرير تحمل حشوًا سفليًا لزرّ قفل الجهاز
@@ -65,12 +69,12 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
         <div className="rounded-[28px] border border-white/10 bg-gradient-to-b from-[#17362b] to-[#122019] p-6 sm:p-7 flex flex-col justify-between">
           <div className={`flex items-center gap-2 ${lbl} font-black tracking-[.15em] text-[#c6b58a]`}><Sparkles className="w-4 h-4" />{ar ? 'ختمات القاعة' : 'HALL KHATMĀT'}</div>
           <div className="my-4">
-            <div className="text-[86px] leading-none font-black tracking-tight text-white tabular-nums">{agg.khatmatCompleted}</div>
+            <div className="text-[86px] leading-none font-black tracking-tight text-white tabular-nums"><span className="dna-goldhalo inline-block" data-halo={motion.khatmahDone ? '' : undefined}><DnaCountUp value={agg.khatmatCompleted} playKey={`hall:${store.competition.id}:khatmah`} /></span></div>
             <div className="text-sm text-white/55 mt-2">{ar ? `أتمت القاعة تلاوة القرآن كاملًا ${toArabicOrdinal(agg.khatmatCompleted, ar)}` : `Complete recitations of the whole Quran`}</div>
           </div>
           <div>
             <div className="flex items-center justify-between text-[11px] text-white/50 mb-2"><span>{ar ? 'نحو الختمة التالية' : 'Toward next khatmah'}</span><span className="font-black text-[#d9c193]">{Math.round(agg.partialKhatmahPct * 100)}%</span></div>
-            <div className="h-2.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#2f6555] to-[#c49a5d]" style={{ width: `${Math.max(2, agg.partialKhatmahPct * 100)}%` }} /></div>
+            <div ref={motion.bar.ref} className="h-2.5 rounded-full bg-white/10 overflow-hidden"><div data-draw={motion.bar.phase ?? undefined} className="dna-drawx h-full rounded-full bg-gradient-to-r from-[#2f6555] to-[#c49a5d]" style={{ width: `${Math.max(2, agg.partialKhatmahPct * 100)}%` }} /></div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Stat n={`${Math.round(agg.coveragePct * 100)}%`} t={ar ? 'من المصحف' : 'of the Mushaf'} />
               <Stat n={displayNumber(agg.totalRecitations, ar)} t={ar ? 'تلاوة موضع' : 'passage recitations'} />
@@ -90,7 +94,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
           </div>
           <div className="grid gap-[3px] [grid-template-columns:repeat(17,minmax(0,1fr))] sm:[grid-template-columns:repeat(26,minmax(0,1fr))] lg:[grid-template-columns:repeat(34,minmax(0,1fr))]" dir="ltr" role="img" aria-label={ar ? `تغطية ${Math.round(agg.coveragePct * 100)} بالمئة من صفحات المصحف` : `${Math.round(agg.coveragePct * 100)}% Mushaf coverage`}>
             {agg.pages.map((count, i) => (
-              <span key={i} title={`${ar ? 'صفحة' : 'p.'} ${i + 1} · ${ar ? 'الجزء' : 'juz'} ${pageToJuz(i + 1)} · ${count}`} className="aspect-square rounded-[2.5px] transition-colors duration-500" style={{ background: pageColor(count, max) }} />
+              <span key={i} title={`${ar ? 'صفحة' : 'p.'} ${i + 1} · ${ar ? 'الجزء' : 'juz'} ${pageToJuz(i + 1)} · ${count}`} className="dna-pageglow aspect-square rounded-[2.5px] transition-colors duration-500" data-rose={motion.rose(i) ? '' : undefined} style={{ background: pageColor(count, max) }} />
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between text-[10px] mizan-venue-muted">

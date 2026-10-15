@@ -1,4 +1,6 @@
 import React, { useMemo } from 'react';
+import { useFirstView } from '../dna/useMotion';
+import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
 
 /*
  * شريط الأيام لدفتر التدقيق: يومٌ في كل سطر، وساعاته الأربع والعشرون أعمدةٌ بارتفاع عدد الأحداث،
@@ -25,11 +27,12 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
     }
     return [...m.values()].sort((a, b) => b.ts - a.ts).slice(0, maxDays);
   }, [events, ar, maxDays]);
+  const view = useFirstView<HTMLElement>({ enabled: days.length > 0, playKey: 'audit-day-ribbon', threshold: 0.3, settleMs: 1500 });
   if (!days.length) return null;
   const peak = Math.max(1, ...days.flatMap(d => d.hours));
   const totalSensitive = days.reduce((n, d) => n + d.sensitive, 0);
   return (
-    <section className="mizan-surface p-4 sm:p-5" aria-label={ar ? 'شريط أيام السجل' : 'Audit day ribbon'} data-testid="audit-day-ribbon">
+    <section ref={view.ref} className="mizan-surface p-4 sm:p-5" aria-label={ar ? 'شريط أيام السجل' : 'Audit day ribbon'} data-testid="audit-day-ribbon">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="mizan-kicker">{ar ? 'شريط الأيام' : 'DAY RIBBON'}</div>
         <div className="flex items-center gap-3 text-[11px] font-bold text-[#646965]">
@@ -45,7 +48,7 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
               {d.hours.map((n, h) => (
                 <div key={h} className="relative flex h-full flex-col items-center justify-end" title={`${String(h).padStart(2, '0')}:00 — ${n}`}>
                   {d.risk[h] && <span className="mb-0.5 h-2 w-2 rounded-full bg-[#C08A2E] ring-2 ring-[#F5EDE2]" />}
-                  <span className={`w-full rounded-sm ${n ? 'bg-[#9fb8ad]' : 'bg-[#eceae4]'}`} style={{ height: n ? `${Math.max(12, (n / peak) * 70)}%` : '3px' }} />
+                  <span data-draw={n ? view.phase ?? undefined : undefined} className={`dna-drawy w-full rounded-sm ${n ? 'bg-[#9fb8ad]' : 'bg-[#eceae4]'}`} style={{ height: n ? `${Math.max(12, (n / peak) * 70)}%` : '3px', ['--i' as string]: h, ['--dstep' as string]: '22ms' } as React.CSSProperties} />
                 </div>
               ))}
             </div>

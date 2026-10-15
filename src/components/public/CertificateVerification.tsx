@@ -9,6 +9,8 @@ import { Badge } from '../design-system/Badge';
 import { MizanPictogram } from '../design-system/MizanPictogram';
 import { ScaleLoader } from '../design-system/ScaleLoader';
 import { DetailRow } from '../design-system/DetailRow';
+import { useFirstView } from '../dna/useMotion';
+import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
 
 type VerificationState='AUTHENTIC'|'REVOKED'|'NOT_FOUND'|'INVALID_PROOF'|'UNREACHABLE';
 
@@ -140,7 +142,7 @@ export const CertificateVerification: React.FC = () => {
             {policy.certificates.showRank&&activeCert.rank&&<DetailRow label={ar?'الترتيب':'Rank'} value={`#${activeCert.rank}`}/>} 
             <DetailRow label={ar?'تاريخ الإصدار':'Issued'} value={activeCert.issueDate}/>
           </div>
-          <EvidenceChain chain={chain} ar={ar}/>
+          <EvidenceChain chain={chain} ar={ar} playKey="cert-evidence-chain"/>
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-5">
             <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(activeCert.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
             <div className="text-center sm:text-start max-w-xs">
@@ -169,14 +171,20 @@ const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.
  * الحلقات التي تقوم عليها الأصالة، معروضة لا موصوفة: من المصحف المعتمد إلى الشهادة.
  * الحلقة الغائبة تُعرض غائبةً — إخفاؤها يجعل السلسلة تبدو أقوى مما هي.
  */
-const EvidenceChain=({chain,ar}:{chain:{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[];ar:boolean})=>{
+const EvidenceChain=({chain,ar,playKey}:{chain:{id:string;labelArabic:string;labelEnglish:string;hash?:string;present:boolean}[];ar:boolean;playKey?:string})=>{
+  /* يُضاء بعد ظهور الحكم لا قبله، مرةً واحدة: من المصحف المعتمد نحو الشهادة. الحلقة الغائبة لا تُضاء أبدًا،
+     وتبقى الحلقات (ونصّها وبصمتها) مقروءةً من أول إطار؛ الحركة لونٌ فقط. */
+  const STEP_MS=140;
+  const lead=(()=>{let n=0;while(n<chain.length&&chain[n].present)n++;return n})();
+  const view=useFirstView<HTMLOListElement>({playKey,threshold:.4,settleMs:chain.length*STEP_MS+700});
   if(!chain.length)return null;
   return <div className="mt-7 text-start max-w-lg mx-auto">
     <div className="flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#6b706c]"><Link2 className="w-3.5 h-3.5"/>{ar?'سلسلة الأدلة':'EVIDENCE CHAIN'}</div>
-    <ol className="mt-3 relative ps-5">
+    <ol ref={view.ref} className="mt-3 relative ps-5">
       <span aria-hidden className="absolute start-[5px] top-2 bottom-2 w-px bg-[#dedcd4]"/>
-      {chain.map(l=><li key={l.id} className="relative py-2">
-        <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] ${l.present?'bg-[#2F6555]':'bg-[#c9c6bd]'}`}/>
+      {lead>1&&<span aria-hidden className="absolute start-[5px] top-2 w-px origin-top bg-[#2F6555]" style={{height:`${((lead-.5)/chain.length)*100}%`,transform:view.phase==='pending'?'scaleY(0)':'scaleY(1)',transition:view.phase?`transform ${Math.max(1,lead-1)*STEP_MS}ms var(--ease-brand)`:undefined}}/>}
+      {chain.map((l,i)=><li key={l.id} className="relative py-2">
+        <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] transition-colors duration-300 ${l.present&&view.phase!=='pending'?'bg-[#2F6555]':'bg-[#c9c6bd]'}`} style={view.phase==='play'&&l.present?{transitionDelay:`${i*STEP_MS}ms`}:undefined}/>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
           {!l.present&&<span className="text-xs text-[#646965]">{ar?'غير مرتبطة':'not linked'}</span>}

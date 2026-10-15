@@ -16,7 +16,7 @@ const STYLE = `
 @keyframes mizan-seal-halo{0%,100%{transform:scale(1);opacity:.35}50%{transform:scale(1.12);opacity:.1}}
 @keyframes mizan-seal-turn{from{transform:rotate(0)}to{transform:rotate(45deg)}}
 .mizan-seal{animation:mizan-seal-in .7s cubic-bezier(.2,.8,.2,1) both}
-.mizan-seal-halo{animation:mizan-seal-halo 3.2s ease-in-out infinite;transform-origin:center}
+.mizan-seal-halo{opacity:.35;animation:mizan-seal-halo 3.2s ease-in-out 1;transform-origin:center}
 .mizan-seal-star{animation:mizan-seal-turn 1.4s cubic-bezier(.2,.8,.2,1) both;transform-origin:50% 50%}
 .mizan-seal-check{stroke-dasharray:60;animation:mizan-seal-check .6s .45s ease-out both}
 @media (prefers-reduced-motion:reduce){.mizan-seal,.mizan-seal-halo,.mizan-seal-star,.mizan-seal-check{animation:none}}

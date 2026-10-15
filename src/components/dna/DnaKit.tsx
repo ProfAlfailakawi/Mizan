@@ -7,6 +7,7 @@
 import * as React from 'react';
 import './dna.css';
 import { journeyDisplayState, journeyTarget, useJourneyReveal } from './useJourneyReveal';
+import { useChangedKeys, useCountUp, useFirstView, useValueFlash } from './useMotion';
 
 export type DnaTone =
   | 'accent'
@@ -73,21 +74,86 @@ export function DnaLive({ on = true, label, className }: { on?: boolean; label: 
   );
 }
 
+/**
+ * A number that rolls 0 -> value once per `playKey` (per tab session) when it first scrolls into view, then
+ * always shows the live value (refreshes snap, never re-roll). The final text comes from the caller's own
+ * `format`; assistive tech always reads the final value. Reduced motion / no IntersectionObserver: final value.
+ */
+export function DnaCountUp({
+  value,
+  format,
+  playKey,
+  enabled = true,
+  durationMs,
+  className,
+}: {
+  value: number;
+  format?: (n: number) => string;
+  playKey?: string | null;
+  enabled?: boolean;
+  durationMs?: number;
+  className?: string;
+}) {
+  const fmt = format ?? ((n: number) => String(n));
+  const cu = useCountUp<HTMLSpanElement>({ value, playKey, enabled, durationMs });
+  return (
+    <span ref={cu.ref} className={cx('dna-cu', className)}>
+      {cu.rolling ? (
+        <>
+          <span className="dna-sr">{fmt(value)}</span>
+          <span aria-hidden="true">{fmt(cu.value)}</span>
+        </>
+      ) : (
+        fmt(value)
+      )}
+    </span>
+  );
+}
+
+/** Wraps a live figure so that, when `value` moves after first paint, it gets ONE soft tint (never on first render, never a count-up). */
+export function DnaFlashValue({
+  value,
+  dir = 'any',
+  tone,
+  className,
+  children,
+}: {
+  value: number;
+  dir?: 'any' | 'drop' | 'rise';
+  tone?: 'gold' | 'light';
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const on = useValueFlash(value, dir);
+  return (
+    <span className={cx('inline-block rounded-lg', className)} data-mz-flash={on ? tone ?? '' : undefined}>
+      {children ?? value}
+    </span>
+  );
+}
+
 export function DnaCount({
   value,
   icon,
   label,
   className,
+  countUp = false,
+  playKey,
+  format,
 }: {
   value: React.ReactNode;
   icon?: React.ReactNode;
   label?: string;
   className?: string;
+  /** Opt-in: roll a numeric `value` from 0 once when it first scrolls into view. */
+  countUp?: boolean;
+  playKey?: string | null;
+  format?: (n: number) => string;
 }) {
   return (
     <span className={cx('dna', 'dna-count', className)} title={label} aria-label={label ? `${label}: ${String(value)}` : undefined}>
       {icon}
-      {value}
+      {countUp && typeof value === 'number' ? <DnaCountUp value={value} format={format} playKey={playKey} /> : value}
     </span>
   );
 }
@@ -140,14 +206,27 @@ export interface DnaStepperProps {
    * (e.g. a finished journey) keeps the same colours instead of jumping back to the kit accent.
    */
   journey?: boolean;
+  /**
+   * Opt-in, for rails that are not a `reveal` journey: after the first paint, a station whose state really changes
+   * gets ONE soft halo (data-just). Never on first render, never looping; the current node is static at rest.
+   */
+  haloOnChange?: boolean;
+  /** Opt-in: a station badge (count) that changes value after first paint gets one brief tint. */
+  flashBadges?: boolean;
 }
 
-export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className, reveal = false, playKey, hold, stepMs, journey }: DnaStepperProps) {
+export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, stateText, className, reveal = false, playKey, hold, stepMs, journey, haloOnChange = false, flashBadges = false }: DnaStepperProps) {
   const journeyLook = journey ?? reveal;
   const text = { ...DEFAULT_STATE_TEXT, ...stateText };
   const labels = showLabels && size !== 'xs';
   const target = journeyTarget(steps.map((s) => s.state));
   const intro = useJourneyReveal({ target, count: steps.length, stepMs, enabled: reveal, hold, playKey });
+  const changedStates = useChangedKeys(
+    haloOnChange && !reveal ? Object.fromEntries(steps.map((s) => [s.key, s.state])) : {},
+  );
+  const changedBadges = useChangedKeys(
+    flashBadges ? Object.fromEntries(steps.map((s) => [s.key, typeof s.badge === 'number' || typeof s.badge === 'string' ? s.badge : null])) : {},
+  );
   const lit = reveal ? intro.lit : null;
   // Visual state only: assistive tech always gets the real state (aria-current and the sr text below).
   const shown = steps.map((s, i) => ({ ...s, state: journeyDisplayState(s.state, i, target, lit) }));
@@ -172,7 +251,7 @@ export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, s
             className="dna-stepi"
             data-state={step.state}
             data-link={link}
-            data-just={reveal && intro.just === i && i === target - 1 ? '' : undefined}
+            data-just={(reveal && intro.just === i && i === target - 1) || changedStates.has(step.key) ? '' : undefined}
             data-stamp={stamped ? 'true' : undefined}
             aria-current={real === 'current' ? 'step' : undefined}
             title={step.title ?? (size === 'xs' && typeof step.label === 'string' ? step.label : undefined)}
@@ -192,7 +271,7 @@ export function DnaStepper({ steps, size = 'md', showLabels = true, ariaLabel, s
                   <CheckGlyph />
                 </span>
               )}
-              {step.badge != null && step.badge !== false && <span className="dna-bdg">{step.badge}</span>}
+              {step.badge != null && step.badge !== false && <span className="dna-bdg" data-mz-flash={changedBadges.has(step.key) ? '' : undefined}>{step.badge}</span>}
             </span>
             <span className={labels ? 'dna-lbl' : 'dna-sr'}>{step.label}</span>
             <span className="dna-sr">{text[real]}</span>
@@ -220,22 +299,30 @@ export function DnaTimeline({
   maxHeight,
   wrapMeta = false,
   className,
+  reveal = false,
+  playKey,
 }: {
   items: DnaEvent[];
   ariaLabel?: string;
   maxHeight?: number | string;
   wrapMeta?: boolean;
   className?: string;
+  /** Opt-in: dots and connectors appear in order once, when the list first scrolls into view. Text is always readable. */
+  reveal?: boolean;
+  playKey?: string | null;
 }) {
+  const view = useFirstView<HTMLOListElement>({ enabled: reveal, playKey, threshold: 0.3 });
   return (
     <ol
+      ref={reveal ? view.ref : undefined}
       className={cx('dna', 'dna-tline', className)}
       aria-label={ariaLabel}
       data-wrap={wrapMeta ? 'true' : undefined}
+      data-draw={view.phase ?? undefined}
       style={maxHeight != null ? { maxHeight, overflowY: 'auto' } : undefined}
     >
-      {items.map((item) => (
-        <li key={item.key} className="dna-tli" data-dna-tone={item.tone ?? 'accent'}>
+      {items.map((item, i) => (
+        <li key={item.key} className="dna-tli" data-dna-tone={item.tone ?? 'accent'} style={view.phase ? ({ '--i': Math.min(i, 6) } as React.CSSProperties) : undefined}>
           <span className="dna-dot" aria-hidden="true">
             {item.icon ?? <span className="dna-pip" />}
           </span>
@@ -309,18 +396,28 @@ export interface DnaRingProps {
   sublabel?: React.ReactNode;
   ariaLabel?: string;
   className?: string;
+  /** Opt-in: the arc draws from empty once, when the ring first scrolls into view (once per `playKey`). A later drop snaps. */
+  draw?: boolean;
+  playKey?: string | null;
 }
 
-export function DnaRing({ value, max = 100, size = 52, stroke = 4, tone = 'accent', label, sublabel, ariaLabel, className }: DnaRingProps) {
+export function DnaRing({ value, max = 100, size = 52, stroke = 4, tone = 'accent', label, sublabel, ariaLabel, className, draw = false, playKey }: DnaRingProps) {
   const has = typeof value === 'number' && Number.isFinite(value) && max > 0;
   const fraction = has ? Math.min(1, Math.max(0, (value as number) / max)) : 0;
+  const view = useFirstView<HTMLDivElement>({ enabled: draw, playKey, threshold: 0.4, settleMs: 1100 });
+  const prevFraction = React.useRef(fraction);
+  const dropped = draw && fraction < prevFraction.current;
+  React.useEffect(() => { prevFraction.current = fraction; });
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const mid = size / 2;
   return (
     <div
+      ref={draw ? view.ref : undefined}
       className={cx('dna', 'dna-ring', className)}
       data-dna-tone={tone}
+      data-draw={view.phase ?? undefined}
+      data-snap={dropped ? '' : undefined}
       style={{ inlineSize: size, blockSize: size }}
       role="img"
       aria-label={ariaLabel}
@@ -336,7 +433,7 @@ export function DnaRing({ value, max = 100, size = 52, stroke = 4, tone = 'accen
             fill="none"
             strokeWidth={stroke}
             strokeLinecap="round"
-            strokeDasharray={`${c * fraction} ${c}`}
+            strokeDasharray={view.phase === 'pending' ? `0 ${c}` : `${c * fraction} ${c}`}
             transform={`rotate(-90 ${mid} ${mid})`}
           />
         )}
@@ -402,6 +499,8 @@ export function DnaSpark({
   tone = 'accent',
   ariaLabel,
   className,
+  draw = false,
+  playKey,
 }: {
   values: number[];
   width?: number;
@@ -409,7 +508,11 @@ export function DnaSpark({
   tone?: DnaTone;
   ariaLabel?: string;
   className?: string;
+  /** Opt-in: the line draws once on first view, then the area and end dot fade in. */
+  draw?: boolean;
+  playKey?: string | null;
 }) {
+  const view = useFirstView<SVGSVGElement>({ enabled: draw, playKey, threshold: 0.4, settleMs: 1600 });
   const clean = values.filter((v) => Number.isFinite(v));
   if (clean.length < 2) return null;
   const min = Math.min(...clean);
@@ -425,8 +528,10 @@ export function DnaSpark({
   const last = pts[pts.length - 1];
   return (
     <svg
+      ref={draw ? view.ref : undefined}
       className={cx('dna', 'dna-spark', className)}
       data-dna-tone={tone}
+      data-draw={view.phase ?? undefined}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
@@ -435,7 +540,7 @@ export function DnaSpark({
       aria-hidden={ariaLabel ? undefined : true}
     >
       <path className="dna-sparka" d={area} />
-      <path className="dna-sparkl" d={line} />
+      <path className="dna-sparkl" d={line} pathLength={1} />
       <circle cx={last[0]} cy={last[1]} r={2.6} />
     </svg>
   );
@@ -480,6 +585,8 @@ export function DnaHeat({
   tone = 'accent',
   ariaLabel,
   className,
+  reveal = false,
+  playKey,
 }: {
   cells: Array<{ key: string; value: number; label?: string }>;
   max?: number;
@@ -487,23 +594,29 @@ export function DnaHeat({
   tone?: DnaTone;
   ariaLabel?: string;
   className?: string;
+  /** Opt-in: cells fade in once, in order, when the strip first scrolls into view. */
+  reveal?: boolean;
+  playKey?: string | null;
 }) {
   const top = max ?? Math.max(0, ...cells.map((c) => c.value));
+  const view = useFirstView<HTMLDivElement>({ enabled: reveal, playKey, threshold: 0.4 });
   return (
     <div
+      ref={reveal ? view.ref : undefined}
       className={cx('dna', 'dna-heat', className)}
       data-dna-tone={tone}
+      data-draw={view.phase ?? undefined}
       role="img"
       aria-label={ariaLabel}
       style={{ ['--cols' as string]: columns ?? cells.length } as React.CSSProperties}
     >
-      {cells.map((cell) => (
+      {cells.map((cell, i) => (
         <span
           key={cell.key}
           className="dna-heatc"
           data-zero={cell.value <= 0 ? 'true' : undefined}
           title={cell.label}
-          style={{ ['--v' as string]: top > 0 ? Math.min(1, cell.value / top) : 0 } as React.CSSProperties}
+          style={{ ['--v' as string]: top > 0 ? Math.min(1, cell.value / top) : 0, ['--i' as string]: Math.min(i, 24) } as React.CSSProperties}
         />
       ))}
     </div>

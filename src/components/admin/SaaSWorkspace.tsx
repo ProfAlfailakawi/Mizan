@@ -150,7 +150,7 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine,gateway}:{billing:a
  return <div className="space-y-4">
   <ErrorNote code={error}/>
   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-   <Metric icon={WalletCards} value={summary.activeSubscriptions||0} label="اشتراك نشط"/>
+   <Metric countUp icon={WalletCards} value={summary.activeSubscriptions||0} label="اشتراك نشط"/>
    <Metric icon={BadgeCheck} value={line(summary.collected||[])} label="محصّل"/>
    <Metric icon={AlertTriangle} value={line(summary.outstanding||[])} label="غير محصّل" tone="amber"/>
    <Metric icon={AlertTriangle} value={line(summary.overdue||[])} label={`متأخر · ${summary.overdueInvoices||0} فاتورة`} tone="amber"/>
