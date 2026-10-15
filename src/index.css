@@ -1984,7 +1984,6 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 /* زرٌّ لم يحنْ وقته (حقلٌ ناقص): حيادٌ بحدٍّ رقيق لا أخضرُ باهت يُظنّ نشطًا ضعيفًا. */
 .mizan-btn.mz-btn-idle:disabled { background:var(--surface-soft); color:var(--muted); border:1px solid var(--line); box-shadow:none; opacity:1; }
 
-.text-\[10\.5px\], .text-\[11\.5px\] { font-size: calc(12px * var(--mizan-text-scale)) !important; line-height: 1.5; }
 
 /* Demo bar is fixed along the bottom on desktop: full-screen venue surfaces stop above it so their
    bottom controls (lock device, status line) are not covered. */
