@@ -1,6 +1,8 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { formatParticipantCode } from '../../lib/journey-progress';
+import { useFirstView } from '../dna/useMotion';
+import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
 
 /*
  * بطاقة التلاوة — الوجه الذي يخرج من ميزان إلى الناس.
@@ -31,6 +33,8 @@ export interface RecitationResultCardProps {
 export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
   ar, participantName, participantCode, riwaya, categoryName, finalScore, sealed,
 }) => {
+  // The score only fades and rises once (never rolls digits): the number is the verdict and reads as-is from the first frame.
+  const scoreView = useFirstView<HTMLDivElement>({ playKey: `score:${participantCode}`, threshold: 0.5 });
   return (
     <section
       dir={ar ? 'rtl' : 'ltr'}
@@ -54,7 +58,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
       {/* الدرجة: الرقم وحده كبيرًا، لأن هذا هو ما يُشارك. */}
       <div className="mt-7 rounded-[22px] border border-white/10 bg-white/[.04] p-6 text-center">
         <div className="text-[11px] font-black tracking-[.14em] text-[#c6b58a]">{ar ? 'الدرجة المعتمدة' : 'FINAL SCORE'}</div>
-        <div className="mt-2 text-[64px] font-black leading-none tabular-nums text-white" dir="ltr">{finalScore.toFixed(2)}</div>
+        <div ref={scoreView.ref} data-draw={scoreView.phase ?? undefined} className="dna-drawblock mt-2 text-[64px] font-black leading-none tabular-nums text-white" dir="ltr">{finalScore.toFixed(2)}</div>
         <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-white/55">
           <ShieldCheck className="h-3.5 w-3.5 text-[#8fbfa9]" />
           {sealed ? (ar ? 'مختومة — لا تُعدَّل' : 'Sealed to the hash chain — immutable') : (ar ? 'معتمدة وبانتظار الختم' : 'Approved, pending seal')}

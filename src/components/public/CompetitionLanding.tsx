@@ -10,6 +10,8 @@ import { buildWinnersArchive } from '../../lib/winners-archive';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { useJourneyReveal } from '../dna/useJourneyReveal';
+import { useFirstView } from '../dna/useMotion';
+import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
 
 /*
  * الصفحة العامة للمسابقة — أول ما يراه من لا يعرف ميزان، وآخر ما يقرؤه قبل أن يقرّر
@@ -179,6 +181,8 @@ export const CompetitionLanding: React.FC = () => {
     })),
     excludeCompetitionId: competition.id,
   }), [store.competitions, store.results, competition.id]);
+  // The winners archive settles into place once (the whole list together, no per-row chain); text is readable at once.
+  const archiveView = useFirstView<HTMLDivElement>({ enabled: archive.length > 0, playKey: `archive:${competition.id}`, threshold: 0.15 });
 
   return (
     <div className="min-h-screen bg-[var(--canvas-warm)] text-[#171B18] antialiased" dir={ar ? 'rtl' : 'ltr'}>
@@ -351,7 +355,7 @@ export const CompetitionLanding: React.FC = () => {
                 : 'Built from sealed results, with the percentages as they were achieved. A place nobody reached is listed as withheld rather than quietly dropped.'}
             </p>
 
-            <div className="mt-6 space-y-4">
+            <div ref={archiveView.ref} data-draw={archiveView.phase ?? undefined} className="dna-drawblock mt-6 space-y-4">
               {archive.map(edition => (
                 <article key={edition.competitionId} className="rounded-3xl border border-[#e7e2d6] bg-white p-6">
                   <header className="flex flex-wrap items-baseline justify-between gap-3">
@@ -449,7 +453,7 @@ export const CompetitionLanding: React.FC = () => {
               /* الوصلة بعد هذه المحطة تمتلئ مع إضاءتها فقط، وتقف عند الجارية. */
               const linkFilled = done;
               return (
-                <li key={i} aria-current={real === 'current' ? 'step' : undefined} style={{ ["--i" as string]: i }} className="mz-enter relative flex-1 flex sm:flex-col items-center sm:text-center gap-4 sm:gap-0">
+                <li key={i} aria-current={real === 'current' ? 'step' : undefined} style={{ ["--i" as string]: i }} className="relative flex-1 flex sm:flex-col items-center sm:text-center gap-4 sm:gap-0">
                   {i < steps.length - 1 && (
                     <span aria-hidden="true" className="absolute z-0 start-6 top-12 -bottom-7 w-0.5 sm:start-1/2 sm:top-6 sm:bottom-auto sm:h-0.5 sm:w-full bg-[#F6F3EA]/20 overflow-hidden">
                       <span
