@@ -144,7 +144,8 @@ export function useCountUp<T extends HTMLElement = HTMLElement>({ value, playKey
         if (!entries.some((e) => e.isIntersecting && e.intersectionRatio >= need.current - 0.01)) return;
         io.disconnect();
         if (playKey) markJourneyPlayed(drawKey(playKey));
-        setStage(typeof document !== 'undefined' && document.hidden ? 'rest' : 'run');
+        // The stored reduced-motion profile may have been applied after the first render: re-check before rolling.
+        setStage(typeof document !== 'undefined' && document.hidden ? 'rest' : !motionAllowed() ? 'rest' : 'run');
       },
       { threshold: [need.current] },
     );
@@ -160,7 +161,7 @@ export function useCountUp<T extends HTMLElement = HTMLElement>({ value, playKey
     const tick = (now: number) => {
       const p = Math.min(1, (now - t0) / dur);
       const target = latest.current;
-      if (p >= 1) { setShown(target); setStage('rest'); return; }
+      if (p >= 1 || !motionAllowed()) { setShown(target); setStage('rest'); return; }
       const raw = target * brandEase(p);
       setShown(Number.isInteger(target) ? Math.round(raw) : raw);
       raf = requestAnimationFrame(tick);
