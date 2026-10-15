@@ -281,7 +281,8 @@ export const CompetitionLanding: React.FC = () => {
               </div>
             </div>
 
-            <div className={`mt-6 grid gap-4 ${categories.length === 1 ? 'max-w-md' : categories.length === 2 || categories.length === 4 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {/* صفوفٌ مرنة تتوسّط: ما يبقى في الصف الأخير (5 = 3+2، 7 = 3+3+1) يقف في الوسط بعرض أخواته نفسه بدل أن يتيم عند الطرف. */}
+            <div className={`mt-6 flex flex-wrap justify-center gap-4 ${categories.length === 1 ? 'max-w-md' : ''}`}>
               {categories.map((cat, ci) => {
                 const glyph = BRANCH_GLYPHS[ci % BRANCH_GLYPHS.length];
                 const rows = [
@@ -304,7 +305,7 @@ export const CompetitionLanding: React.FC = () => {
                 ].filter(Boolean) as { icon: IconC; text: string; label: string }[];
 
                 return (
-                  <article key={cat.id} style={{ ["--i" as string]: ci }} className="mz-enter group h-full flex flex-col rounded-3xl border border-[#e7e2d6] bg-white p-6 transition hover:border-[#c9bfa6] hover:shadow-[0_18px_44px_rgba(23,45,38,.07)]">
+                  <article key={cat.id} style={{ ["--i" as string]: ci }} className={`mz-enter group w-full flex flex-col ${categories.length === 1 ? '' : categories.length === 2 || categories.length === 4 ? 'sm:w-[calc((100%-1rem)/2)]' : 'sm:w-[calc((100%-1rem)/2)] lg:w-[calc((100%-2rem)/3)]'} rounded-3xl border border-[#e7e2d6] bg-white p-6 transition hover:border-[#c9bfa6] hover:shadow-[0_18px_44px_rgba(23,45,38,.07)]`}>
                     <div className="flex items-start justify-between gap-3">
                       <span style={{ background: glyph.bg, color: glyph.fg }} className="w-11 h-11 rounded-2xl grid place-items-center shrink-0"><glyph.icon className="w-5 h-5" /></span>
                     </div>

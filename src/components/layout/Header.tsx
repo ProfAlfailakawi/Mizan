@@ -22,7 +22,7 @@ export const Header: React.FC = () => {
   <div className="max-w-[1500px] mx-auto h-16 px-4 max-[340px]:px-2 sm:px-6 flex items-center justify-between gap-3 max-[340px]:gap-2">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
       <MizanLogo language={language} compact className="mizan-header-logo"/>
-      <div className="min-w-0 hidden sm:block">
+      <div className="min-w-0 hidden min-[56rem]:block">
         <div className="flex items-center gap-2">
           {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[13px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
           <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[var(--emerald-2)]':'bg-[var(--amber)]'}`}/>
