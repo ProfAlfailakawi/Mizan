@@ -610,7 +610,7 @@ const ParticipantsView=({store,ar,query,setQuery,filtered}:{store:Store;ar:boole
  const saveEdit=()=>{if(!editP)return;store.updateParticipant(editP.id,{fullNameArabic:ef.fullNameArabic.trim(),fullName:ef.fullName.trim(),country:ef.country.trim(),categoryId:ef.categoryId});setEditP(null)};
  const deleteP=async(p:Store['participants'][number])=>{if(!(await confirm({
   title:ar?'حذف المتسابق؟':'Delete participant?',
-  body:ar?`سيُحذف ${ar?p.fullNameArabic:p.fullName} (${p.code}) من هذه المسابقة. لا يمكن التراجع. ومن دخل لجنة أو له نتيجة لا يُحذف أصلًا؛ أوقفه بدل ذلك.`:`${p.fullName} (${p.code}) will be removed from this competition. This cannot be undone.`,
+  body:ar?`سيُحذف ${ar?p.fullNameArabic:p.fullName} (${isolateCodes(p.code)}) من هذه المسابقة. لا يمكن التراجع. ومن دخل لجنة أو له نتيجة لا يُحذف أصلًا؛ أوقفه بدل ذلك.`:`${p.fullName} (${p.code}) will be removed from this competition. This cannot be undone.`,
   confirmLabel:ar?'حذف':'Delete',tone:'destructive'})))return;const ok=store.removeParticipant(p.id);if(!ok)setPassError(ar?'لا يمكن حذف متسابق دخل لجنة أو له نتيجة. أوقفه بدل حذفه.':'Cannot delete a participant who entered a panel or has a result.')};
  const openPass=async(id:string)=>{setPassBusy(true);setPassError('');const published=await store.republishPublicCompetition();if(!published.ok){setPassError(published.reason);setPassBusy(false);return}let p=await store.ensureParticipantJourneyAccess(id);if(!p&&store.lastJourneyAccessFailure()==='TOKEN_WITHHELD_ON_THIS_DEVICE'){const ok=await confirm({title:ar?'إعادة إصدار البطاقة؟':'Reissue Pass?',body:ar?'رمز الرحلة الأصلي غير متاح على هذا الجهاز. إعادة الإصدار ستبطل QR السابق فورًا. هل تريد إعادة إصدار QR وفتح البطاقة؟':'The original journey token is unavailable on this device. Reissuing will invalidate the previous QR immediately. Reissue and open the pass?',confirmLabel:ar?'إعادة إصدار':'Reissue',tone:'destructive'});if(ok)p=await store.reissueParticipantJourneyAccess(id)}if(p){setPass(p);setPassError(journeyIssueNote(store.lastJourneyAccessFailure(),ar)||journeyIssueNote(store.lastJourneyAccessNotice(),ar))}else setPassError(journeyIssueNote(store.lastJourneyAccessFailure()||'UNKNOWN',ar));setPassBusy(false)};
  const origin=typeof window!=='undefined'?window.location.origin:'';
@@ -811,6 +811,7 @@ const PanelCard=({c,store,ar,specialtyOptions,toggleJudge,toggleJudgeSpecialty,c
 import { CertificateModal, ResultsSheetModal, previewCertificate, type SheetKind } from './ResultsDocuments';
 import { PublishDialog, SealDialog, dualSealActive } from './ResultsDialogs';
 import type { Certificate } from '../../types';
+import { isolateCodes } from '../design-system/BidiText';
 import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 const ResultsView=({store,ar}:{store:Store;ar:boolean})=>{const policy=getCompetitionPolicy(store.competition);
  const competitionId=store.competition.id;
