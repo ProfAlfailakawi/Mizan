@@ -12,9 +12,9 @@
   </defs>
   <rect width="120" height="120" fill="#F7F5EF"/>
   <g transform="translate(60 60) scale(.7) translate(-60 -60) translate(0 3)">
-    <path d="M60 2.5 64.6 8.6 60 14.7 55.4 8.6Z" fill="url(#g)"/>
-    <path d="M39.5 90C34.5 81.5 30.8 70.5 32.2 54 34 35 56.4 28 60 20c3.6 8 26 15 27.8 34 1.4 16.5-2.3 27.5-7.3 36"
-          fill="none" stroke="url(#a)" stroke-width="6.8" stroke-linecap="round" stroke-linejoin="miter" stroke-miterlimit="7"/>
+    <path d="M60 2.5 64.6 8.6 60.9 13.2V34h-1.8V13.2L55.4 8.6Z" fill="url(#g)"/>
+    <path d="M22 41H98" fill="none" stroke="url(#a)" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M22 41 21 60.5M22 41 44 64.5M98 41 99 60.5M98 41 76 64.5" fill="none" stroke="url(#a)" stroke-width="1.8" stroke-linecap="round"/>
     <path d="M60 96c-12-8.5-26.5-11-40-9-.5 6 4 11.5 11.5 13.5 13.5 0 22.5 2 28.5 5.5Z" fill="url(#a)"/>
     <path d="M60 96c12-8.5 26.5-11 40-9 .5 6-4 11.5-11.5 13.5-13.5 0-22.5 2-28.5 5.5Z" fill="url(#a)"/>
     <path d="M60 71c-13.5-9.5-27-13.5-40-11.5 2 8.5 2 19 0 27.5 13.5-2 28 .5 40 9Z" fill="url(#p)" stroke="#D8B172" stroke-width="1.5" stroke-linejoin="round"/>
