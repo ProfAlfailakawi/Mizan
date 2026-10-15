@@ -274,7 +274,7 @@ export const SEED_COMPETITION: Competition = {
   nameArabic: 'مسابقة ميزان القرآنية الدولية التجريبية 2027',
   edition: 'النسخة الدولية الرابعة عشرة',
   country: 'الإمارات العربية المتحدة (United Arab Emirates)',
-  timezone: 'Asia/Dubai',
+  timezone: 'Asia/Kuwait',
   status: 'registration_open',
   automationLevel: 'autopilot',
   startDate: '2027-02-10',
