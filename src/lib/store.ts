@@ -169,7 +169,7 @@ const INITIAL_RULESET: RuleSet = {
 
 const INITIAL_COMPETITION: Competition = {
   id:'comp-pending-setup',organizationId:INITIAL_ORGANIZATION.id,
-  name:'Competition pending setup',nameArabic:'مسابقة قيد الإعداد',edition:'',country:'',timezone:'',
+  name:'Competition pending setup',nameArabic:'مسابقة قيد الإعداد',edition:'',country:'',timezone:'Asia/Kuwait',
   status:'draft',automationLevel:'assisted',startDate:'',endDate:'',registrationStartDate:'',registrationEndDate:'',
   categories:[],ruleSet:INITIAL_RULESET,ruleSets:[INITIAL_RULESET],venueName:'',venuesCount:0,
   totalRegistered:0,totalApproved:0,totalAttended:0,currentDay:0,totalDays:0,
@@ -2982,7 +2982,7 @@ const prepareJourneyAccessBatch=async()=>{
     };
     // New competitions start as the buyer's empty configuration, not a prefilled template.
     base.displayName=undefined;base.displayNameArabic=undefined;base.logoUrl=undefined;
-    base.country='';base.timezone='';base.venueName='';base.venuesCount=0;base.totalDays=0;
+    base.country='';base.timezone='Asia/Kuwait';base.venueName='';base.venuesCount=0;base.totalDays=0;
     base.ruleSet={...base.ruleSet,id:newId('ruleset'),name:'',criteria:[],frozenAt:undefined};base.ruleSets=[base.ruleSet];
     delete (base as any).policy;
     globalState.competitions = [base, ...globalState.competitions];

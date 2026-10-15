@@ -55,7 +55,7 @@ export function launchCompetition(template: Competition, organizationId: string)
     logoUrl: undefined,
     edition: '',
     country: '',
-    timezone: '',
+    timezone: 'Asia/Kuwait',
     startDate: '',
     endDate: '',
     registrationStartDate: '',
