@@ -7,6 +7,8 @@ import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { locusToPage, pageToJuz, surahAyahCount } from '../../lib/mushaf-map';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, describeAge, venueClock, type DisplayBoard } from '../../lib/display-board';
+import { DnaCountUp } from '../dna/DnaKit';
+import { useHallMotion } from './useHallMotion';
 
 /*
  * شاشة الممرّ.
@@ -266,6 +268,8 @@ const pageGlow = (count: number, max: number): string => {
 const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board }) => {
   const agg = board?.recitation;
   const pages = agg?.pages || [];
+  // Calm one-shot motion only; the rotation timing is untouched and a live refresh never re-rolls anything.
+  const motion = useHallMotion(pages, agg?.khatmatCompleted || 0, `corridor:${board?.competitionId ?? 'hall'}`);
   const max = Math.max(1, ...pages);
   const covered = agg?.coveredPages || 0;
   const percent = Math.round((covered / Math.max(1, pages.length || 604)) * 100);
@@ -274,16 +278,16 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
   const toward = pages.length ? Math.round((pages.filter(n => n >= next).length / pages.length) * 100) : 0;
 
   return (
-    <section className="grid h-full gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
+    <section className="dna-panelfade grid h-full gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
       <div className="flex flex-col justify-between rounded-[28px] border border-white/10 bg-gradient-to-b from-[#17362b] to-[#122019] p-7">
         <div className="inline-flex items-center gap-2 text-base font-black tracking-[.18em] text-[#c6b58a]"><Sparkles className="h-4 w-4" />{ar ? 'ختمة القاعة' : 'HALL KHATMĀT'}</div>
         <div>
-          <div className="text-[clamp(3.5rem,7vw,5.5rem)] font-black leading-none tabular-nums">{agg?.khatmatCompleted || 0}</div>
+          <div className="text-[clamp(3.5rem,7vw,5.5rem)] font-black leading-none tabular-nums"><span className="dna-goldhalo inline-block" data-halo={motion.khatmahDone ? '' : undefined}><DnaCountUp value={agg?.khatmatCompleted || 0} playKey={`corridor:${board?.competitionId ?? 'hall'}:khatmah`} /></span></div>
           <p className="mt-3 text-sm text-white/55">{ar ? 'ختمة كاملة أتمّتها هذه القاعة اليوم' : 'complete recitations of the whole Quran today'}</p>
         </div>
         <div>
           <div className="mb-2 flex items-center justify-between text-[11px] text-white/50"><span>{ar ? 'نحو الختمة التالية' : 'Toward next'}</span><span className="font-black text-[#d9c193]" dir="ltr">{toward}%</span></div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
+          <div ref={motion.bar.ref} className="h-2.5 overflow-hidden rounded-full bg-white/10"><span data-draw={motion.bar.phase ?? undefined} className="dna-drawx block h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Tile value={`${percent}%`} label={ar ? 'من المصحف' : 'of the Mushaf'} />
             <Tile value={String(agg?.totalRecitations || 0)} label={ar ? 'تلاوة موضع' : 'passages'} />
@@ -299,7 +303,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
         <div dir="ltr" role="img" aria-label={ar ? `تغطية ${percent} بالمئة من صفحات المصحف` : `${percent}% Mushaf coverage`}
           className="grid gap-[3px] [grid-template-columns:repeat(26,minmax(0,1fr))] lg:[grid-template-columns:repeat(34,minmax(0,1fr))]">
           {(pages.length ? pages : new Array(604).fill(0)).map((count, i) => (
-            <span key={i} className="aspect-square rounded-[2.5px] transition-colors duration-700" style={{ background: pageGlow(count, max) }} />
+            <span key={i} className="dna-pageglow aspect-square rounded-[2.5px] transition-colors duration-700" data-rose={motion.rose(i) ? '' : undefined} style={{ background: pageGlow(count, max) }} />
           ))}
         </div>
         <p className="mt-3 text-[11px] leading-5 text-white/35">
@@ -322,7 +326,7 @@ const Tile: React.FC<{ value: string; label: string }> = ({ value, label }) => (
 const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board }) => {
   const panels = (board?.committees || []).filter(c => c.status !== 'offline');
   return (
-    <section className="flex h-full flex-col">
+    <section className="dna-panelfade flex h-full flex-col">
       <div className="grid grid-cols-3 gap-4">
         <Tile value={String(board?.totalWaiting ?? 0)} label={ar ? 'في الانتظار' : 'waiting'} />
         <Tile value={String(board?.activePanels ?? panels.length)} label={ar ? 'لجنة تعمل' : 'active panels'} />

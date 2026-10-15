@@ -38,8 +38,8 @@
 @media (prefers-reduced-motion: no-preference) {
   @keyframes mzBpRise { from { opacity: 0; transform: translateY(12px); } }
   .mizan-shell-main > div > .mizan-surface,
-  .mz-bp-hero-tile,
-  .mz-bp-stat { animation: mzBpRise 0.5s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }
+  /* .mz-bp-stat (JudgeOS tallies) is deliberately absent: judging surfaces do not animate. */
+  .mz-bp-hero-tile { animation: mzBpRise 0.5s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }
 }
 
 /* ---- shared Metric card (delegation, auditor, support, overview ...): display numerals + gradient icon tile ---- */
@@ -315,8 +315,9 @@
 @media (prefers-reduced-motion: no-preference) {
   @keyframes mzBpGlow { from { transform: scale(1); } to { transform: scale(1.07); } }
   @keyframes mzBpSweep { from { transform: translateY(-74px); } to { transform: translateY(74px); } }
-  .mz-bp-atmos::before { animation: mzBpGlow 14s ease-in-out infinite alternate; transform-origin: 50% 0; }
-  .mz-bp-scanline { animation: mzBpSweep 2.6s ease-in-out infinite alternate backwards; }
+  /* calm: the venue wall glow and the idle-kiosk scan line rest still (keyframes stay defined for reuse). */
+  .mz-bp-atmos::before { animation: none; transform-origin: 50% 0; }
+  .mz-bp-scanline { animation: none; }
   .mz-bp-scanframe,
   .mz-bp-done,
   .mizan-surface.mz-bp-login-card { animation: mzBpRise 0.55s var(--ease-brand, cubic-bezier(0.22, 0.78, 0.24, 1)) backwards; }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { DnaCountUp, DnaFlashValue } from '../dna/DnaKit';
 
 /*
  * المقياس: رقمٌ واسمه.
@@ -19,13 +20,27 @@ export interface MetricProps {
   variant?: 'card' | 'soft' | 'inline' | 'caption';
   tone?: 'green' | 'amber';
   className?: string;
+  /** Opt-in: a numeric value rolls 0 -> value once, the first time the tile scrolls into view (once per `playKey`). */
+  countUp?: boolean;
+  playKey?: string;
+  /** Opt-in for live screens: a numeric value that changes after first paint gets one brief tint (no count-up). */
+  flash?: boolean;
 }
 
-export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, variant = 'card', tone = 'green', className = '' }) => {
+export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, variant = 'card', tone = 'green', className = '', countUp = false, playKey, flash = false }) => {
+  /* Only plain numbers move; text values (and money lines) render exactly as before. */
+  const shown: React.ReactNode =
+    typeof value === 'number'
+      ? flash
+        ? <DnaFlashValue value={value}>{value}</DnaFlashValue>
+        : countUp
+          ? <DnaCountUp value={value} playKey={playKey ?? `metric:${label}`} />
+          : value
+      : value;
   if (variant === 'inline') {
     return (
       <div className={`text-end ${className}`}>
-        <div className="text-3xl font-black tabular-nums">{value}</div>
+        <div className="text-3xl font-black tabular-nums">{shown}</div>
         <div className="text-[11px] font-black tracking-[.13em] text-[color:var(--muted)]">{label}</div>
       </div>
     );
@@ -42,7 +57,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
   if (variant === 'soft') {
     return (
       <div className={`mizan-surface-soft p-3 ${className}`}>
-        <div className="text-2xl font-black tabular-nums">{value}</div>
+        <div className="text-2xl font-black tabular-nums">{shown}</div>
         <div className="text-[11px] text-[color:var(--muted)] mt-1">{label}</div>
       </div>
     );
@@ -51,7 +66,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     <div className={`mz-bp-metric mizan-surface p-3 sm:p-4 ${className}`}>
       <div className={`flex items-start justify-between gap-2 sm:gap-3 max-[340px]:flex-col-reverse ${typeof value === 'string' && value.length > 9 ? 'max-[400px]:flex-col-reverse' : ''}`}>
         <div className="min-w-0">
-          <div className={`mz-bp-metric-value ${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{value}</div>
+          <div className={`mz-bp-metric-value ${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{shown}</div>
           <div className="mt-1 text-[11px] text-[color:var(--muted)]">{label}</div>
         </div>
         {Icon && (

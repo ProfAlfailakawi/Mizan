@@ -302,7 +302,9 @@
   background: var(--dna-accent-soft);
   color: var(--dna-accent);
   box-shadow: inset 0 0 0 2px var(--dna-accent), 0 0 0 4px color-mix(in srgb, var(--dna-accent) 12%, transparent);
-  animation: dna-halo 2.8s var(--dna-ease) infinite;
+  /* static at rest: the ring above is the whole look. The old looping dna-halo keyframes stay defined; a
+     one-shot halo is drawn by .dna-stepi[data-just] (opt-in `haloOnChange`) when a station really changes. */
+  animation: none;
 }
 .dna-stepi[data-state='returned'] .dna-node {
   background: var(--dna-warn-soft);
@@ -1072,6 +1074,128 @@ button.dna-hubn:focus-visible .dna-hubt { transform: translateY(-2px); }
   block-size: 18px !important;
 }
 
+/* ---------- calm one-shot motion (first-view draw / count / change highlight) ----------
+   Everything here is opt-in through a data attribute that JS only sets when motion may run; with no attribute
+   (SSR, tests, reduced motion, a key that already played) the element is simply in its final state.
+   Only transform / opacity / stroke-dashoffset / outline-colour are animated. */
+.dna-cu { font-variant-numeric: tabular-nums; }
+
+/* ring: the existing stroke-dasharray transition, a touch slower for the first draw; drops snap */
+.dna-ring[data-draw] .dna-ringv { transition-duration: 0.9s; }
+.dna-ring[data-snap] .dna-ringv { transition: none; }
+
+/* sparkline: line draws (pathLength=1), then the area and end dot fade in */
+.dna-spark[data-draw] .dna-sparkl { stroke-dasharray: 1; }
+.dna-spark[data-draw='pending'] .dna-sparkl { stroke-dashoffset: 1; }
+.dna-spark[data-draw='play'] .dna-sparkl { stroke-dashoffset: 0; transition: stroke-dashoffset 0.9s var(--dna-ease); }
+.dna-spark[data-draw='pending'] .dna-sparka,
+.dna-spark[data-draw='pending'] circle { opacity: 0; }
+.dna-spark[data-draw='play'] .dna-sparka,
+.dna-spark[data-draw='play'] circle { animation: dna-fade-in 0.5s var(--dna-ease) 0.7s 1 backwards; }
+
+/* timeline: dots pop and connectors grow in reading order; the text is never hidden */
+.dna-tline[data-draw='pending'] .dna-dot { opacity: 0; transform: scale(0.6); }
+.dna-tline[data-draw='pending'] .dna-tli:not(:last-child)::after { transform: scaleY(0); }
+.dna-tline[data-draw] .dna-tli:not(:last-child)::after { transform-origin: 50% 0; }
+.dna-tline[data-draw='play'] .dna-dot { animation: dna-pop 0.36s var(--dna-ease) calc(var(--i, 0) * 40ms) 1 backwards; }
+.dna-tline[data-draw='play'] .dna-tli:not(:last-child)::after { animation: dna-grow-y 0.36s var(--dna-ease) calc(var(--i, 0) * 40ms + 120ms) 1 backwards; }
+
+/* heat strip: cells fade in once, in order */
+.dna-heat[data-draw='pending'] .dna-heatc { opacity: 0; }
+.dna-heat[data-draw='play'] .dna-heatc { animation: dna-fade-in 0.4s var(--dna-ease) calc(var(--i, 0) * 28ms) 1 backwards; }
+
+/* bars (host adds .dna-drawx / .dna-drawy to the bar and data-draw from useFirstView): scale from the
+   inline-start edge (right in RTL) or from the baseline; stagger with --i and --dstep */
+.dna-drawx { transform-origin: 0 50%; }
+.dna-drawx:dir(rtl) { transform-origin: 100% 50%; }
+@supports not selector(:dir(rtl)) {
+  [dir='rtl'] .dna-drawx { transform-origin: 100% 50%; }
+}
+.dna-drawy { transform-origin: 50% 100%; }
+.dna-drawx[data-draw='pending'] { transform: scaleX(0); }
+.dna-drawy[data-draw='pending'] { transform: scaleY(0); }
+.dna-drawx[data-draw='play'] { animation: dna-grow-x 0.6s var(--dna-ease) calc(var(--i, 0) * var(--dstep, 60ms)) 1 backwards; }
+.dna-drawy[data-draw='play'] { animation: dna-grow-y 0.6s var(--dna-ease) calc(var(--i, 0) * var(--dstep, 60ms)) 1 backwards; }
+
+/* a block that rises into place together (stack of many rows: one shared trigger, no per-row chain) */
+.dna-drawblock[data-draw='pending'] { opacity: 0; transform: translateY(8px); }
+.dna-drawblock[data-draw='play'] { animation: dna-rise-in 0.5s var(--dna-ease) 1 backwards; }
+
+/* panel crossfade (rotating venue panels): opacity only, content is readable from the first frame */
+.dna-panelfade { animation: dna-fade-in 0.6s var(--dna-ease) 1 backwards; }
+
+/* one soft change highlight: outline colour fades from an accent tint to nothing (~1.2s), never loops */
+[data-mz-flash] {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  animation: dna-flash 1.2s var(--dna-ease) 1;
+}
+[data-mz-flash='gold'] { animation-name: dna-flash-gold; }
+[data-mz-flash='light'] { animation-name: dna-flash-light; }
+
+/* a station that really changed: one ring that expands and fades (pseudo-element, transform + opacity only) */
+.dna-steps:not([data-journey]) .dna-stepi[data-just] .dna-node::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--dna-accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: dna-node-halo 1.5s var(--dna-ease) 1;
+}
+
+/* a completed khatmah: one gold ring around the number */
+.dna-goldhalo { position: relative; }
+.dna-goldhalo[data-halo]::after {
+  content: '';
+  position: absolute;
+  inset: -0.12em -0.3em;
+  border-radius: 999px;
+  border: 2px solid var(--gold-light, #e8cb93);
+  opacity: 0;
+  pointer-events: none;
+  animation: dna-gold-halo 1.6s var(--dna-ease) 1;
+}
+
+/* a page whose tally just rose: it swells and settles, with a fading outline */
+.dna-pageglow[data-rose] {
+  position: relative;
+  z-index: 1;
+  outline: 1.5px solid transparent;
+  animation: dna-page-glow 1.4s var(--dna-ease) 1;
+}
+
+@keyframes dna-fade-in { from { opacity: 0; } }
+@keyframes dna-pop { from { opacity: 0; transform: scale(0.6); } }
+@keyframes dna-grow-x { from { transform: scaleX(0); } }
+@keyframes dna-grow-y { from { transform: scaleY(0); } }
+@keyframes dna-rise-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes dna-flash {
+  from { outline-color: color-mix(in srgb, var(--emerald, #214c40) 42%, transparent); }
+  to { outline-color: transparent; }
+}
+@keyframes dna-flash-gold {
+  from { outline-color: color-mix(in srgb, var(--gold, #b98b4e) 55%, transparent); }
+  to { outline-color: transparent; }
+}
+@keyframes dna-flash-light {
+  from { outline-color: color-mix(in srgb, var(--gold-light, #e8cb93) 60%, transparent); }
+  to { outline-color: transparent; }
+}
+@keyframes dna-node-halo {
+  0% { opacity: 0.75; transform: scale(0.92); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes dna-gold-halo {
+  0% { opacity: 0.85; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+@keyframes dna-page-glow {
+  0% { transform: scale(1.9); outline-color: color-mix(in srgb, var(--gold-light, #e8cb93) 80%, transparent); }
+  100% { transform: none; outline-color: transparent; }
+}
+
 /* ---------- motion safety ---------- */
 @media (prefers-reduced-motion: reduce) {
   .dna-hub .dna-hubln,
@@ -1085,4 +1209,42 @@ button.dna-hubn:focus-visible .dna-hubt { transform: translateY(-2px); }
   .dna-steps[data-journey] .dna-stepi + .dna-stepi::after,
   .dna-steps[data-journey] .dna-lbl,
   .dna-steps[data-journey] .dna-node { transition: none !important; animation: none !important; }
+  /* new one-shot effects show their final state at once */
+  [data-mz-flash],
+  .dna-tline[data-draw] .dna-dot,
+  .dna-tline[data-draw] .dna-tli::after,
+  .dna-heat[data-draw] .dna-heatc,
+  .dna-drawx,
+  .dna-drawy,
+  .dna-drawblock,
+  .dna-panelfade,
+  .dna-spark[data-draw] .dna-sparkl,
+  .dna-spark[data-draw] .dna-sparka,
+  .dna-spark[data-draw] circle,
+  .dna-stepi[data-just] .dna-node::after,
+  .dna-goldhalo[data-halo]::after,
+  .dna-pageglow[data-rose] { animation: none !important; transition: none !important; }
+  [data-mz-flash],
+  .dna-pageglow[data-rose] { outline-color: transparent !important; }
+  .dna-stepi[data-just] .dna-node::after,
+  .dna-goldhalo[data-halo]::after { opacity: 0 !important; }
 }
+/* the app's own reduced-motion switch gets the same final-state-at-once treatment */
+html[data-mizan-motion='reduced'] [data-mz-flash],
+html[data-mizan-motion='reduced'] .dna-tline[data-draw] .dna-dot,
+html[data-mizan-motion='reduced'] .dna-tline[data-draw] .dna-tli::after,
+html[data-mizan-motion='reduced'] .dna-heat[data-draw] .dna-heatc,
+html[data-mizan-motion='reduced'] .dna-drawx,
+html[data-mizan-motion='reduced'] .dna-drawy,
+html[data-mizan-motion='reduced'] .dna-drawblock,
+html[data-mizan-motion='reduced'] .dna-panelfade,
+html[data-mizan-motion='reduced'] .dna-spark[data-draw] .dna-sparkl,
+html[data-mizan-motion='reduced'] .dna-spark[data-draw] .dna-sparka,
+html[data-mizan-motion='reduced'] .dna-spark[data-draw] circle,
+html[data-mizan-motion='reduced'] .dna-stepi[data-just] .dna-node::after,
+html[data-mizan-motion='reduced'] .dna-goldhalo[data-halo]::after,
+html[data-mizan-motion='reduced'] .dna-pageglow[data-rose] { animation: none !important; transition: none !important; }
+html[data-mizan-motion='reduced'] [data-mz-flash],
+html[data-mizan-motion='reduced'] .dna-pageglow[data-rose] { outline-color: transparent !important; }
+html[data-mizan-motion='reduced'] .dna-stepi[data-just] .dna-node::after,
+html[data-mizan-motion='reduced'] .dna-goldhalo[data-halo]::after { opacity: 0 !important; }

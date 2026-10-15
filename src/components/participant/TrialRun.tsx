@@ -452,7 +452,7 @@ const TrialQuestion: React.FC<{
       </div>
 
       {listening
-        ? <p className="flex items-center justify-center gap-1.5 text-[11px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
+        ? <p className="flex items-center justify-center gap-1.5 text-[11px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 motion-safe:animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
         : <p className="text-center text-[11px] font-bold text-[color:var(--muted)]">{ar ? 'التتبّع غير متاح الآن؛ الموضع والمؤقّت يعملان.' : 'Tracking is unavailable; the locus and clock still run.'}</p>}
 
       <div className="flex flex-wrap gap-2">

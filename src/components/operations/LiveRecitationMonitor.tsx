@@ -65,7 +65,7 @@ export const LiveRecitationMonitor: React.FC<{
 const LiveRow: React.FC<{ row: LiveRecitationRow; ar: boolean }> = ({ row, ar }) => (
   <li data-committee={row.committeeId} className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e4e2da] bg-white px-3.5 py-3">
     <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--emerald-2)] opacity-70" />
+      <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--emerald-2)] opacity-40" />
       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--emerald-2)]" />
     </span>
     <span className="min-w-0 flex-1 truncate text-xs font-black text-[#39423d]">

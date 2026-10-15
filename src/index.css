@@ -612,7 +612,9 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mzo-scene::after{
   content:""; position:absolute; inset:-40% -60%; pointer-events:none; z-index:1;
   background:linear-gradient(74deg,transparent 42%,rgba(255,255,255,.45) 50%,transparent 58%);
-  animation:mzSheen 9s ease-in-out 1.6s infinite;
+  /* finite: two sweeps, then rests off to the side (the end frame of mzSheen), so nothing jumps */
+  transform:translateX(120%);
+  animation:mzSheen 9s ease-in-out 1.6s 2 backwards;
 }
 .mzo-stage{ position:absolute; inset:0; z-index:2; display:grid; place-items:center; }
 
@@ -625,9 +627,9 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   border:1px solid rgba(255,255,255,.96);
   box-shadow:0 24px 64px rgba(24,58,48,.1), inset 0 0 0 1px rgba(18,63,53,.045); }
 
-.mzo-orbit{ position:absolute; inset:0; animation:mzSpin 34s linear infinite; }
+.mzo-orbit{ position:absolute; inset:0; animation:mzSpin 34s linear 1; }
 @keyframes mzSpin{ to { transform:rotate(360deg) } }
-.mzo-orbit > *{ position:absolute; animation:mzSpin 34s linear infinite reverse; }
+.mzo-orbit > *{ position:absolute; animation:mzSpin 34s linear 1 reverse; }
 
 /* Sealed-question scene */
 /* A sealed document with the stamp hanging off its corner reads far more clearly
@@ -645,7 +647,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   box-shadow:0 12px 26px rgba(18,63,53,.28), inset 0 0 0 3px rgba(255,255,255,.14);
   animation:mzPop .6s var(--ease-brand) .5s both; }
 .mzo-seal-wax::after{ content:""; position:absolute; inset:-9px; border-radius:999px;
-  border:1px dashed rgba(184,139,78,.5); animation:mzSpin 22s linear infinite; }
+  border:1px dashed rgba(184,139,78,.5); animation:mzSpin 22s linear 1; }
 
 /* Role scene */
 .mzo-grid{ position:relative; z-index:3; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:74%; }
@@ -672,7 +674,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   font-size:calc(12px * var(--mizan-text-scale)); font-weight:600;
   animation:mzLift .5s var(--ease-brand) 1.1s both; }
 
-.mzo-float{ position:absolute; z-index:3; animation:mzBreathe 7s ease-in-out infinite; }
+.mzo-float{ position:absolute; z-index:3; animation:mzBreathe 7s ease-in-out 3; }
 .mzo-float:nth-of-type(2){ animation-delay:-2.3s } .mzo-float:nth-of-type(3){ animation-delay:-4.6s }
 
 @media (max-width:1023px){
@@ -1577,7 +1579,7 @@ html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
 .mizan-board-cell.is-stalled{ animation:mzStallBreathe 3.6s ease-in-out infinite; }
 
 /* لحظة الإنجاز: ومضةٌ خضراء هادئة حين يُنهي متسابقٌ جلسته. الانتظار يصير تقدّمًا. */
-@keyframes mzDoneMark{ 0%{ opacity:0; transform:scale(.7) } 30%{ opacity:1; transform:scale(1) } 100%{ opacity:0; transform:scale(1) } }
+@keyframes mzDoneMark{ 0%{ opacity:0; transform:scale(.7) } 30%{ opacity:1; transform:scale(1) } 100%{ opacity:1; transform:scale(1) } }
 .mizan-done-mark{ animation:mzDoneMark 2.6s var(--ease-brand) 1 both; }
 
 @media (prefers-reduced-motion: reduce){
@@ -1725,12 +1727,14 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   box-shadow:0 0 0 1.5px rgba(176,122,42,.55), 0 0 18px 4px rgba(226,180,92,.35);
   mix-blend-mode:multiply;
   transition:left .22s cubic-bezier(.2,.8,.2,1), top .22s cubic-bezier(.2,.8,.2,1), width .22s ease, height .22s ease;
-  animation:mizan-live-breathe 1.8s ease-in-out infinite;
+  /* the page is the Quran: the pen only moves with the reciter (the position transition above); the breathing loop
+     is retired and its keyframes stay defined. */
+  animation:none;
 }
 .mizan-live-pen::after{
   content:""; position:absolute; inset-inline:12%; bottom:6%; height:3px; border-radius:3px;
   background:linear-gradient(90deg, transparent, #B07A2A, transparent);
-  animation:mizan-live-stroke 1.1s ease-in-out infinite;
+  animation:none; /* was an endless stroke loop over the Mushaf page; keyframes kept */
 }
 .mizan-live-fault{
   background:color-mix(in srgb, var(--fault) 9%, transparent);
@@ -1875,6 +1879,9 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-journey__cell:not(:disabled):hover,.mizan-journey__cell:focus-visible{ outline:2px solid #214C40; outline-offset:0 }
 .mizan-journey__cell:disabled{ opacity:.55 }
 .mizan-journey__cell.is-current{ outline:2px solid #1f2420 !important; outline-offset:1px !important; opacity:1 }
+/* الصفحة التي أُنهيت تلاوتها للتوّ: تنتفخ ثم تستقر مرةً واحدة، بعد التلاوة لا في أثنائها. */
+.mizan-journey__cell[data-just]{ position:relative; z-index:1; animation:mizanCellJust 1.4s var(--ease-brand) 1; }
+@keyframes mizanCellJust{ 0%{ transform:scale(2.2); } 100%{ transform:none; } }
 .is-none.mizan-journey__cell,.mizan-journey__swatch.is-none{ background:#ece8dc }
 .is-strong.mizan-journey__cell,.mizan-journey__swatch.is-strong{ background:#2f7a5b }
 .is-review.mizan-journey__cell,.mizan-journey__swatch.is-review{ background:#d9a441 }
@@ -1952,7 +1959,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 /* ── الصفحات العامة: ألوان مشتقّة، دخولٌ متدرّج، وزخرفة هندسية هادئة ───────────────
    الألوان القديمة المكتوبة حرفيًا في الصفحة صارت رموزًا بالقيمة نفسها (تطابق بكسلي). */
 @keyframes mzGlowDrift { 0%,100% { opacity:.42; transform:scale(1) } 50% { opacity:.62; transform:scale(1.06) } }
-.mz-orb-glow { background:#1b5346; opacity:.5; animation:mzGlowDrift 9s ease-in-out infinite; }
+.mz-orb-glow { background:#1b5346; opacity:.5; /* calm: static glow; mzGlowDrift keyframes stay defined */ }
 /* نجمةٌ ثمانية (رُبع الحزب) تتكرّر خطًّا ذهبيًا باهتًا: زخرفة لا تحمل معنى ولا تُقرأ. */
 .mz-arabesque {
   opacity:.12; pointer-events:none; background-color:var(--gold-light);

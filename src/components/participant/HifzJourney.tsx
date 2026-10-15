@@ -3,6 +3,8 @@ import { BookMarked, Flame, Target } from 'lucide-react';
 import { arabicIndicDigits } from '../judge/AyahMark';
 import { surahNameArabic } from '../../lib/quran-canon';
 import type { FaceAttempt, AttemptWordKind } from '../../lib/face-memory';
+import { useChangedKeys, useRiseCount } from '../dna/useMotion';
+import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
 import { hardWords, journeySummary, JUZ_START_PAGES, neediestPage, pageMemory, type Ledger, type PageState } from '../../lib/hifz-journey';
 
 /*
@@ -53,6 +55,10 @@ export const HifzJourney: React.FC<{
   const summary = useMemo(() => journeySummary(attempts, now, ledger), [attempts, now, ledger]);
   const hard = useMemo(() => hardWords(attempts, now), [attempts, now]);
   const n = (x: number) => (ar ? arabicIndicDigits(x) : String(x));
+  /* حركةٌ هادئة بعد التلاوة فقط: الصفحة التي زادت تلاواتها تُضاء مرةً، والسلسلة إن زادت تُعدّ مرةً. لا شيء في أثناء التلاوة. */
+  const tallies = useMemo(() => Object.fromEntries([...memory].map(([page, m]) => [String(page), m.attempts])), [memory]);
+  const justPractised = useChangedKeys(tallies, 'rise');
+  const streakShown = useRiseCount(summary.streak);
   if (!attempts.length && !Object.keys(ledger?.pages ?? {}).length) return null;
 
   const neediest = neediestPage(attempts, now, practisable, current, ledger);
@@ -64,7 +70,7 @@ export const HifzJourney: React.FC<{
         <span className="mizan-journey__title">{ar ? 'رحلةُ حفظك' : 'Your hifz journey'}</span>
         <span className="mizan-journey__stats">
           {summary.streak > 0 && (
-            <span data-streak={summary.streak}><Flame className="h-3.5 w-3.5" aria-hidden="true" />{ar ? `${n(summary.streak)} ${summary.streak === 1 ? 'يوم' : 'أيّام'} متتالية` : `${summary.streak}-day streak`}</span>
+            <span data-streak={summary.streak}><Flame className="h-3.5 w-3.5" aria-hidden="true" />{ar ? `${n(streakShown)} ${summary.streak === 1 ? 'يوم' : 'أيّام'} متتالية` : `${streakShown}-day streak`}</span>
           )}
           <span>{ar ? `${n(summary.pages)} وجهًا تُلي` : `${summary.pages} faces recited`}</span>
           {summary.weak > 0 && <span className="mizan-journey__weak">{ar ? `${n(summary.weak)} تحتاج عودة` : `${summary.weak} to revisit`}</span>}
@@ -101,7 +107,7 @@ export const HifzJourney: React.FC<{
                       : `Page ${page} · juz ${k + 1} · ${STATE_LABEL[state][1]}${m ? ` · ${m.attempts}×, last ${ago(m.lastAt, now, false)}` : ''}`;
                     return (
                       <button key={page} type="button" disabled={!open} title={label} aria-label={label}
-                        data-page={page} data-state={state} data-current={page === current ? '' : undefined}
+                        data-page={page} data-state={state} data-current={page === current ? '' : undefined} data-just={justPractised.size <= 3 && justPractised.has(String(page)) ? '' : undefined}
                         aria-current={page === current ? 'page' : undefined}
                         className={`mizan-journey__cell is-${state}${page === current ? ' is-current' : ''}`}
                         onClick={() => onPractise(page)} />

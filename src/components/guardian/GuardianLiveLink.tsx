@@ -5,6 +5,7 @@ import { queueOrderValue } from '../../lib/judging-integrity';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { DnaStepper } from '../dna/DnaKit';
+import { useChangeFlash } from '../dna/useMotion';
 import type { Participant } from '../../types';
 
 // "Your child is with the panel now." A consent-gated, privacy-safe live thread for a guardian:
@@ -42,6 +43,8 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
 
   const stage: Stage = result ? 'result' : child.status === 'in_session' ? 'in_committee' : child.status === 'in_queue' ? 'queued' : child.checkedInAt ? 'arrived' : 'registered';
 
+  // One soft highlight on the headline when the stage or the queue position really changes (never on first paint).
+  const headlineFlash = useChangeFlash(`${stage}:${position}`);
   const steps: { key: Stage; icon: React.ComponentType<{ className?: string }>; ar: string; en: string; done: boolean; active: boolean }[] = [
     { key: 'registered', icon: Check, ar: 'مسجّل', en: 'Registered', done: true, active: stage === 'registered' },
     { key: 'arrived', icon: MapPin, ar: 'وصل القاعة', en: 'Arrived', done: !!child.checkedInAt || ['queued', 'in_committee', 'result'].includes(stage), active: stage === 'arrived' },
@@ -96,7 +99,7 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
       </div>
 
       {/* Live headline */}
-      <div className="mt-4 rounded-2xl bg-gradient-to-b from-[#20493d] to-[#17362b] text-white p-5">
+      <div data-mz-flash={headlineFlash ? 'light' : undefined} className="mt-4 rounded-2xl bg-gradient-to-b from-[#20493d] to-[#17362b] text-white p-5">
         <div className="text-[11px] text-white/50 font-black">{ar ? child.fullNameArabic : child.fullName} · {child.code}</div>
         <div className="text-2xl sm:text-3xl font-black mt-1 leading-snug">
           {stage === 'in_committee' ? (ar ? `${firstName} الآن أمام ${committee?.code || 'اللجنة'}` : `${firstName} is now with ${committee?.code || 'the panel'}`)

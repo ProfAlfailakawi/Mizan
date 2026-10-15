@@ -91,7 +91,7 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
     {!recording
      ? <Button size="sm" onClick={()=>void start()} icon={<Mic className="w-4 h-4"/>}>{ar?'سجّل تلاوتك':'Record yourself'}</Button>
      : <Button size="sm" variant="outline" onClick={stop} icon={<Square className="w-4 h-4"/>}>{ar?'إيقاف التسجيل':'Stop recording'}</Button>}
-    {recording&&<span className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#9B3B2F]"><span className="w-2 h-2 rounded-full bg-[#9B3B2F] animate-pulse"/>{ar?'يسجّل…':'Recording…'}</span>}
+    {recording&&<span className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#9B3B2F]"><span className="w-2 h-2 rounded-full bg-[#9B3B2F] motion-safe:animate-pulse"/>{ar?'يسجّل…':'Recording…'}</span>}
     {selfUrl&&!recording&&<Button size="sm" variant="ghost" onClick={discard} icon={<Trash2 className="w-4 h-4"/>}>{ar?'حذف':'Discard'}</Button>}
    </div>
    {micError&&<p className="mt-2 text-[11px] text-[#9B3B2F]">{micError}</p>}
