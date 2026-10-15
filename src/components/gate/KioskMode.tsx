@@ -126,7 +126,7 @@ export const KioskMode: React.FC<{onClose?:()=>void}> = ({onClose}) => {
     <div className="min-w-0"><div className="font-black truncate">{gateTitle}</div><div className="text-[11px] text-white/50">{ar?'حضور ذاتي':'Self check-in'}</div></div></div>{onClose&&<button onClick={()=>{stopCamera();onClose()}} className="w-11 h-11 shrink-0 rounded-xl grid place-items-center hover:bg-white/10 text-white/60" aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></button>}</div>
    <div className="my-auto max-w-lg w-full mx-auto">
     {!done?<div className="text-center">
-      <div className="mz-bp-scanframe w-52 h-52 rounded-[32px] border border-white/15 bg-white/[.035] grid place-items-center mx-auto relative overflow-hidden">
+      <div className="mz-bp-scanframe w-52 h-52 rounded-[32px] border border-white/15 bg-white/[.035] grid place-items-center mx-auto mb-7 relative overflow-hidden">
        {(camera==='active'||camera==='starting')?<video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" aria-label={ar?'كاميرا مسح رمز الاستجابة السريعة':'QR scanner camera'}/>:<><QrCode className="w-20 h-20 text-[#b9cec4] stroke-[1.3]"/><span className="mz-bp-scanline absolute start-7 end-7 h-px bg-[#b9cec4]/60"/></>}
        {(camera==='active'||camera==='starting')&&<span className="absolute inset-5 rounded-2xl border border-white/70 pointer-events-none"/>}
       </div>

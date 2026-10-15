@@ -2081,3 +2081,6 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة على الجوال: العلامة وحدها، والاسم في سطره تحتها (Header.tsx). */
 @media (max-width:639px){.mizan-header-logo .mizan-wordmark{display:none}}
+
+/* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
+@media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}

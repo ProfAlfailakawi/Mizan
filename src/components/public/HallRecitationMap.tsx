@@ -92,7 +92,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
               <span>{ar ? 'أكثر' : 'more'}</span>
             </div>
           </div>
-          <div className="grid gap-[3px] [grid-template-columns:repeat(17,minmax(0,1fr))] sm:[grid-template-columns:repeat(26,minmax(0,1fr))] lg:[grid-template-columns:repeat(34,minmax(0,1fr))]" dir="ltr" role="img" aria-label={ar ? `تغطية ${Math.round(agg.coveragePct * 100)} بالمئة من صفحات المصحف` : `${Math.round(agg.coveragePct * 100)}% Mushaf coverage`}>
+          <div className="grid gap-[3px] [grid-template-columns:repeat(17,minmax(0,1fr))] sm:[grid-template-columns:repeat(26,minmax(0,1fr))] lg:[grid-template-columns:repeat(34,minmax(0,1fr))] min-[112.5rem]:[grid-template-columns:repeat(40,minmax(0,1fr))]" dir="ltr" role="img" aria-label={ar ? `تغطية ${Math.round(agg.coveragePct * 100)} بالمئة من صفحات المصحف` : `${Math.round(agg.coveragePct * 100)}% Mushaf coverage`}>
             {agg.pages.map((count, i) => (
               <span key={i} title={`${ar ? 'صفحة' : 'p.'} ${i + 1} · ${ar ? 'الجزء' : 'juz'} ${pageToJuz(i + 1)} · ${count}`} className="dna-pageglow aspect-square rounded-[2.5px] transition-colors duration-500" data-rose={motion.rose(i) ? '' : undefined} style={{ background: pageColor(count, max) }} />
             ))}
@@ -107,7 +107,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
       {/* Per-juz ribbon */}
       <section className="mt-5 rounded-[24px] border border-white/10 bg-white/[.025] p-4 sm:p-5">
         <div className={`${lbl} font-black tracking-[.15em] mizan-venue-muted mb-3`}>{ar ? 'تغطية الأجزاء' : 'JUZ COVERAGE'}</div>
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))' }}>
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(56px,1fr))] lg:[grid-template-columns:repeat(15,minmax(0,1fr))] min-[112.5rem]:[grid-template-columns:repeat(30,minmax(0,1fr))]">
           {agg.byJuz.map((j) => {
             const pct = j.coveredPages / 20.13;
             return (

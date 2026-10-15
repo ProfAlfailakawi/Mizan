@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DnaStepper } from '../dna/DnaKit';
-import { ArrowLeft, ArrowRight, BadgeCheck, Check, FileCheck2, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BadgeCheck, Check, ChevronDown, FileCheck2, UserRound } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { Button } from '../design-system/Button';
@@ -163,7 +163,7 @@ const CountryField:React.FC<{label:string;value:string;ar:boolean;onChange:(v:st
  return <label className="block relative"><span className="block text-base font-black text-[#3f4642] mb-2">{label}</span>
   <button type="button" onClick={()=>setOpen(o=>!o)} className="w-full rounded-xl border border-[#dcdad2] bg-white px-3 py-3 text-sm text-start flex items-center justify-between gap-2">
    <span className={value?'':'text-[#9a9f9b]'}>{shown}</span>
-   <ArrowLeft className={`w-4 h-4 shrink-0 transition ${open?'-rotate-90':'rotate-90'}`}/>
+   <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 text-[#5f6761] transition ${open?'rotate-180':''}`}/>
   </button>
   {open&&<div className="absolute z-20 mt-1 w-full rounded-xl border border-[#dcdad2] bg-white shadow-lg overflow-hidden">
    <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder={pl('ابحث عن دولة…', 'Search country…')} className="w-full border-b border-[#eceae3] px-3 py-2.5 text-sm outline-none"/>
