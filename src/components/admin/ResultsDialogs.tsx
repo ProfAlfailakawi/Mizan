@@ -24,8 +24,8 @@ export const dualSealActive = (store: Store) =>
 
 const Step: React.FC<{ done: boolean; title: string; detail: string }> = ({ done, title, detail }) => (
   <li className="flex items-start gap-3 rounded-2xl border border-[#e4e2db] bg-white px-4 py-3">
-    {done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#2F6555]" /> : <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#a39f94]" />}
-    <span className="min-w-0"><span className="block text-xs font-black">{title}</span><span className="mt-0.5 block text-xs leading-5 text-[#646965]">{detail}</span></span>
+    {done ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--emerald-2)]" /> : <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-[#a39f94]" />}
+    <span className="min-w-0"><span className="block text-xs font-black">{title}</span><span className="mt-0.5 block text-xs leading-5 text-[color:var(--muted)]">{detail}</span></span>
   </li>
 );
 
@@ -59,11 +59,11 @@ export const SealDialog: React.FC<{ open: boolean; store: Store; ar: boolean; on
     <div className="flex items-center gap-4 rounded-2xl bg-[#F2F7F4] p-4">
       <SealMark size={64} />
       <div className="min-w-0 flex-1">
-        <div className="text-2xl font-black tabular-nums">{sealed}<span className="text-sm text-[#646965]"> / {results.length}</span></div>
-        <div className="text-[13px] text-[#646965]">{ar ? 'نتيجة مختومة الآن' : 'results currently sealed'}</div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><span className="block h-full rounded-full bg-gradient-to-l from-[#214C40] to-[#a8834a] transition-all" style={{ width: `${results.length ? Math.round((sealed / results.length) * 100) : 0}%` }} /></div>
+        <div className="text-2xl font-black tabular-nums">{sealed}<span className="text-sm text-[color:var(--muted)]"> / {results.length}</span></div>
+        <div className="text-[13px] text-[color:var(--muted)]">{ar ? 'نتيجة مختومة الآن' : 'results currently sealed'}</div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white"><span className="block h-full rounded-full bg-gradient-to-l from-[var(--emerald)] to-[#a8834a] transition-all" style={{ width: `${results.length ? Math.round((sealed / results.length) * 100) : 0}%` }} /></div>
       </div>
-      {dual && <div className="text-center"><div className="text-3xl font-black tabular-nums text-[#214C40]">{approvers.length}/2</div><div className="text-xs text-[#646965]">{ar ? 'اعتماد' : 'approvals'}</div></div>}
+      {dual && <div className="text-center"><div className="text-3xl font-black tabular-nums text-[color:var(--emerald)]">{approvers.length}/2</div><div className="text-xs text-[color:var(--muted)]">{ar ? 'اعتماد' : 'approvals'}</div></div>}
     </div>
     <ol className="mt-4 space-y-2">
       {dual ? <>
@@ -72,13 +72,13 @@ export const SealDialog: React.FC<{ open: boolean; store: Store; ar: boolean; on
       </> : <Step done={sealed === results.length && results.length > 0} title={ar ? 'ختمٌ بيد من يملكه' : 'Sealed by an authorized role'} detail={ar ? 'لجان هذه المسابقة من محكّمٍ واحد، فيقع الختم باعتمادٍ واحد. ومن يختم لا ينشر: النشر لشخصٍ آخر.' : 'Single-judge panels: one approval seals. Whoever seals cannot publish.'} />}
       <Step done={pendingAppeals === 0} title={ar ? 'لا اعتراضات معلّقة' : 'No pending appeals'} detail={pendingAppeals ? (ar ? `${pendingAppeals} اعتراض ينتظر الحسم — يمكن الختم، لكن الإغلاق ينتظرها.` : `${pendingAppeals} appeals pending.`) : (ar ? 'حُسمت الاعتراضات كلها.' : 'All appeals resolved.')} />
     </ol>
-    {outcome && <div role="status" className={`mt-4 rounded-xl p-3 text-xs font-bold leading-5 ${outcome.ok ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#F5EDE2] text-[#7a5a2f]'}`}>{outcome.text}</div>}
+    {outcome && <div role="status" className={`mt-4 rounded-xl p-3 text-xs font-bold leading-5 ${outcome.ok ? 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'bg-[#F5EDE2] text-[#7a5a2f]'}`}>{outcome.text}</div>}
     <div className="mt-5 flex flex-wrap items-center gap-2">
       <Button disabled={busy || !canSeal || !results.length} onClick={() => void run()} icon={<LockKeyhole className="h-4 w-4" />}>{busy ? (ar ? 'جارٍ الختم…' : 'Sealing…') : dual ? (ar ? 'سجّل اعتمادي' : 'Record my approval') : (ar ? 'اختم النتائج الآن' : 'Seal now')}</Button>
       {IS_DEMO_SESSION && role !== 'head_judge' && <Button variant="outline" onClick={() => setDemoRole('head_judge')} icon={<UserRound className="h-4 w-4" />}>{ar ? 'اعتمد بصفة رئيس اللجنة' : 'Approve as head judge'}</Button>}
       <Button variant="ghost" onClick={onClose}>{ar ? 'إغلاق' : 'Close'}</Button>
     </div>
-    {IS_DEMO_SESSION && <p className="mt-3 text-xs leading-5 text-[#696f6b]">{ar ? 'في بيئة العرض: إن ختمتَ بنفسك فالنشر يحتاج شخصًا آخر (مدير الجهة). وإن ختم رئيسُ اللجنة من صندوقه، نشرتَ أنت من هنا.' : 'Demo: if you seal yourself, another person (organization admin) must publish. If the head judge seals, you can publish from here.'}</p>}
+    {IS_DEMO_SESSION && <p className="mt-3 text-xs leading-5 text-[color:var(--muted)]">{ar ? 'في بيئة العرض: إن ختمتَ بنفسك فالنشر يحتاج شخصًا آخر (مدير الجهة). وإن ختم رئيسُ اللجنة من صندوقه، نشرتَ أنت من هنا.' : 'Demo: if you seal yourself, another person (organization admin) must publish. If the head judge seals, you can publish from here.'}</p>}
   </Modal>;
 };
 
@@ -106,23 +106,23 @@ export const PublishDialog: React.FC<{ open: boolean; store: Store; ar: boolean;
 
   return <Modal isOpen onClose={onClose} title={ar ? 'نشر النتائج' : 'Publish results'} subtitle={ar ? `الإظهار: ${uiToken(policy.results.visibility, true)}` : `Visibility: ${uiToken(policy.results.visibility, false)}`} maxWidth="xl">
     {published || outcome?.ok
-      ? <div className="rounded-3xl bg-gradient-to-b from-[#E7EEE9] to-white p-6 text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#214C40] text-white"><Globe2 className="h-8 w-8" /></div>
+      ? <div className="rounded-3xl bg-gradient-to-b from-[var(--emerald-soft)] to-white p-6 text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[var(--emerald)] text-white"><Globe2 className="h-8 w-8" /></div>
         <div className="mt-4 text-xl font-black">{ar ? 'النتائج منشورة' : 'Results are published'}</div>
-        <p className="mt-2 text-xs leading-6 text-[#646965]">{outcome?.text || (ar ? `${results.length} نتيجة منشورة في ${byCategory.length} فئات.` : `${results.length} results across ${byCategory.length} categories.`)}</p>
+        <p className="mt-2 text-xs leading-6 text-[color:var(--muted)]">{outcome?.text || (ar ? `${results.length} نتيجة منشورة في ${byCategory.length} فئات.` : `${results.length} results across ${byCategory.length} categories.`)}</p>
       </div>
       : <>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length}</div><div className="text-xs text-[#646965]">{ar ? 'نتيجة' : 'results'}</div></div>
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length - unsealed.length}</div><div className="text-xs text-[#646965]">{ar ? 'مختومة' : 'sealed'}</div></div>
-          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{byCategory.length}</div><div className="text-xs text-[#646965]">{ar ? 'فئة' : 'categories'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length}</div><div className="text-xs text-[color:var(--muted)]">{ar ? 'نتيجة' : 'results'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{results.length - unsealed.length}</div><div className="text-xs text-[color:var(--muted)]">{ar ? 'مختومة' : 'sealed'}</div></div>
+          <div className="rounded-2xl bg-[#f1efe9] p-3"><div className="text-xl font-black">{byCategory.length}</div><div className="text-xs text-[color:var(--muted)]">{ar ? 'فئة' : 'categories'}</div></div>
         </div>
         <ul className="mt-3 divide-y divide-[#ece9e1] rounded-2xl border border-[#e4e2db] bg-white px-4">
-          {byCategory.map(({ c, n }) => <li key={c.id} className="flex items-center justify-between py-2 text-xs"><span className="font-bold">{ar ? c.nameArabic : c.name}</span><span className="tabular-nums text-[#646965]">{n}</span></li>)}
+          {byCategory.map(({ c, n }) => <li key={c.id} className="flex items-center justify-between py-2 text-xs"><span className="font-bold">{ar ? c.nameArabic : c.name}</span><span className="tabular-nums text-[color:var(--muted)]">{n}</span></li>)}
         </ul>
         {unsealed.length > 0 && <div className="mt-3 rounded-xl bg-[#F5EDE2] p-3 text-xs font-bold leading-5 text-[#7a5a2f]">{ar ? `${unsealed.length} نتيجة لم تُختم بعد. لا يُنشر إلا ما خُتم كله.` : `${unsealed.length} results are not sealed yet.`}<button type="button" onClick={onSeal} className="ms-2 underline">{ar ? 'اذهب إلى الختم' : 'Go to sealing'}</button></div>}
         {!unsealed.length && sealedBySelf && <div className="mt-3 rounded-xl bg-[#F5EDE2] p-3 text-xs font-bold leading-5 text-[#7a5a2f]">{ar ? 'أنت من ختم هذه النتائج، ومن يختم لا ينشر. ينشرها مدير آخر.' : 'You sealed these results; another admin must publish.'}</div>}
-        {outcome && !outcome.ok && <div role="status" className="mt-3 rounded-xl bg-[#F4E6E3] p-3 text-xs font-bold leading-5 text-[#8a473f]">{outcome.text}</div>}
+        {outcome && !outcome.ok && <div role="status" className="mt-3 rounded-xl bg-[var(--danger-soft)] p-3 text-xs font-bold leading-5 text-[#8a473f]">{outcome.text}</div>}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <Button disabled={busy || unsealed.length > 0 || !results.length} onClick={() => void run()} icon={<ShieldCheck className="h-4 w-4" />}>{busy ? (ar ? 'جارٍ النشر…' : 'Publishing…') : (ar ? 'انشر الآن' : 'Publish now')}</Button>
           {IS_DEMO_SESSION && sealedBySelf && !unsealed.length && <Button variant="outline" onClick={() => { try { window.location.hash = '#manage-competition'; } catch { /* */ } setDemoRole('org_admin'); }} icon={<UserRound className="h-4 w-4" />}>{ar ? 'انشر بصفة مدير الجهة' : 'Publish as organization admin'}</Button>}

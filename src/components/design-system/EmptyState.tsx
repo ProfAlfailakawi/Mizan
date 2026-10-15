@@ -22,7 +22,7 @@ export const EmptyState: React.FC<{
       <Icon className="h-5 w-5" />
     </span>
     <p className="mt-4 text-sm font-black text-[#2c3330]">{title}</p>
-    {hint && <p className="mx-auto mt-2 max-w-sm text-[11px] leading-5 text-[#636864]">{hint}</p>}
+    {hint && <p className="mx-auto mt-2 max-w-sm text-[11px] leading-5 text-[color:var(--muted)]">{hint}</p>}
     {action && <div className="mt-5 flex justify-center">{action}</div>}
   </div>
 );

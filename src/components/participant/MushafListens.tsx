@@ -1159,12 +1159,12 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         <div>
           <div className="mizan-kicker">{ar ? 'اختبار ذكي' : 'SMART PRACTICE'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'اقرأ… والمصحف يتابعك' : 'Recite… the Mushaf follows'}</h2>
-          <p className="mt-1 max-w-xl text-[10px] leading-5 text-[#5f6663]">
+          <p className="mt-1 max-w-xl text-[11px] leading-5 text-[#5f6663]">
             {ar
               ? 'صفحة المصحف الحقيقية من روايتك، كما يراها المحكّم. اقرأها بصوتك؛ وبعد الانتهاء يعيد لك ميزان مواضع المراجعة بلا درجة ولا ازدحام.'
               : 'The real printed page for your reading, exactly as the judge sees it. Recite aloud; when you finish, MIZAN returns only the places worth reviewing — no score and no clutter.'}
           </p>
-          <p className="mt-1 text-[9px] font-bold text-[#6b716d]">{ar?'لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك.':'Your voice is not recorded, nothing is sent to the judging panel, and this never affects your score.'}</p>
+          <p className="mt-1 text-[11px] font-bold text-[#6b716d]">{ar?'لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك.':'Your voice is not recorded, nothing is sent to the judging panel, and this never affects your score.'}</p>
         </div>
       </header>
 
@@ -1188,7 +1188,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           <div className="flex flex-wrap items-center justify-center gap-2">
             {stage === 'ready' && analysed && (
               <button onClick={() => void begin()} data-listens="yes" disabled={listenerWarming || listenerDown} data-listener={listenerState}
-                className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[#214C40]'}`}>
+                className={`inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-black text-white transition ${listenerWarming ? 'cursor-wait bg-[#6f8a80]' : 'bg-[var(--emerald)]'}`}>
                 <Mic className={`h-4 w-4 ${listenerWarming ? 'motion-safe:animate-pulse' : ''}`} aria-hidden="true" />
                 {listenerWarming
                   ? (ar ? `المستمع يستيقظ… ${warmSeconds.toLocaleString('ar-EG')} ث` : `Listener waking… ${warmSeconds}s`)
@@ -1210,7 +1210,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               </p>
             )}
             {stage === 'asking' && (
-              <span className="inline-flex items-center gap-2 rounded-2xl bg-[#E7EEE9] px-5 py-2.5 text-xs font-black text-[#214C40]" data-stage="asking" role="status" aria-live="polite">
+              <span className="inline-flex items-center gap-2 rounded-2xl bg-[var(--emerald-soft)] px-5 py-2.5 text-xs font-black text-[color:var(--emerald)]" data-stage="asking" role="status" aria-live="polite">
                 <Mic className="h-4 w-4 motion-safe:animate-pulse" aria-hidden="true" />{ar ? 'جارٍ فتح الميكروفون…' : 'Opening microphone…'}
               </span>
             )}
@@ -1232,7 +1232,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
               */}
             {analysed && (stage === 'ready' || stage === 'reciting') && (
               <button onClick={() => setVeiled(v => !v)} aria-pressed={veiled} data-veil={veiled ? 'on' : 'off'}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black transition ${veiled ? 'border-[#b89a55] bg-[#f6eed8] text-[#6b4f18]' : 'border-[#cfd6d2] bg-white text-[#214C40]'}`}>
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black transition ${veiled ? 'border-[#b89a55] bg-[#f6eed8] text-[#6b4f18]' : 'border-[#cfd6d2] bg-white text-[color:var(--emerald)]'}`}>
                 {veiled ? <Eye className="h-4 w-4" aria-hidden="true" /> : <EyeOff className="h-4 w-4" aria-hidden="true" />}
                 {veiled ? (ar ? 'أظهِر الصفحة' : 'Show the page') : (ar ? 'اختبر حفظك' : 'Test your memory')}
               </button>
@@ -1247,7 +1247,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
             )}
             {stage === 'report' && (
               <button onClick={() => void draw(`${owner}:${Date.now()}`)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-[#cfd6d2] bg-white px-5 py-2.5 text-xs font-black text-[#214C40]">
+                className="inline-flex items-center gap-2 rounded-2xl border border-[#cfd6d2] bg-white px-5 py-2.5 text-xs font-black text-[color:var(--emerald)]">
                 <RotateCcw className="h-4 w-4" aria-hidden="true" />{ar ? 'وجهٌ آخر' : 'Another face'}
               </button>
             )}
@@ -1280,7 +1280,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           />
 
           {gateNote && (
-            <p className="text-center text-[10px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
+            <p className="text-center text-[11px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
           )}
 
           {stage === 'report' && (
@@ -1306,7 +1306,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           )}
 
           {stage === 'report' && (
-            <p className="text-center text-[10px] leading-5 text-[#6b716d]">
+            <p className="text-center text-[11px] leading-5 text-[#6b716d]">
               {ar
                 ? 'وتاريخُ مراجعتك محفوظٌ في هذا الجهاز وحده — لا يُرفع ولا تُسأل عنه لجنة، ويذهب بمسح بيانات المتصفّح.'
                 : 'Your review history lives on this device only — never uploaded, and lost if you clear browser data.'}

@@ -210,7 +210,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
       {judged && !!mistakes!.length && <div className="mt-3"><FaceMistakeLegend mistakes={mistakes!} ar={ar} /></div>}
 
       {judged && !!addedCount(mistakes!) && (
-        <p className="mt-2 text-center text-[10px] leading-5 text-[#6b716d]" data-added-words={addedCount(mistakes!)}>
+        <p className="mt-2 text-center text-[11px] leading-5 text-[#6b716d]" data-added-words={addedCount(mistakes!)}>
           {ar
             ? `وسُمعت ${addedCount(mistakes!)} كلمةً لا موضعَ لها في هذا الوجه — وأكثرُ ما يأتي هذا من ضجيجٍ أو صدًى.`
             : `${addedCount(mistakes!)} heard words have no place on this face — most often noise or echo.`}
@@ -222,7 +222,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
       {measurableMarks && <UnmeasurableNote measurable={measurableMarks} ar={ar} />}
 
       {choiceNote && (
-        <p className="mt-4 text-center text-[10px] leading-5 text-[#6b716d]">{choiceNote}</p>
+        <p className="mt-4 text-center text-[11px] leading-5 text-[#6b716d]">{choiceNote}</p>
       )}
 
       {/*
@@ -232,7 +232,7 @@ export const MushafFaceSurface: React.FC<MushafFaceSurfaceProps> = ({
         * يسمع كلماتٍ، فقولُ «لا يعرف ماذا قلت» حينئذٍ **كذب**. ويبقى الثابتُ: لا
         * درجة، ولا حكمَ في المسابقة إلا للبشر.
         */}
-      <p className="mt-5 text-center text-[10px] leading-5 text-[#6b716d]">
+      <p className="mt-5 text-center text-[11px] leading-5 text-[#6b716d]">
         {judged
           ? (ar
             ? 'وما تحته خطٌّ سمعه محرّكٌ قِيس على روايتك بعينها — سماعُ آلةٍ لا حكمُ لجنة، والآلةُ تخطئ. فما شككتَ فيه فارجع إلى مصحفك. ولا درجة هنا، والحكمُ في المسابقة للبشر وحدهم.'
@@ -281,8 +281,8 @@ const FaceIndicesRow: React.FC<{ indices: FaceIndices; ar: boolean; frameUnit: '
       {cells.map(cell => (
         <div key={cell.key} data-index={cell.key} className="rounded-2xl bg-[#f4f2ec] p-3 text-center">
           <dd className="text-sm font-black tabular-nums text-[#39423d]" dir="ltr">{cell.value}</dd>
-          <dt className="mt-0.5 text-[10px] leading-4 text-[#5f6663]">{cell.label}</dt>
-          {cell.note && <div className="text-[9px] text-[#6b716d]">{cell.note}</div>}
+          <dt className="mt-0.5 text-[11px] leading-4 text-[#5f6663]">{cell.label}</dt>
+          {cell.note && <div className="text-[11px] text-[#6b716d]">{cell.note}</div>}
         </div>
       ))}
     </dl>
@@ -303,7 +303,7 @@ const UnmeasurableNote: React.FC<{ measurable: readonly FaceMarkKind[]; ar: bool
   const names = missing.map(k => (ar ? FACE_MARK_STYLE[k].ar : FACE_MARK_STYLE[k].en)).join(ar ? '، ' : ', ');
   return (
     <p data-unmeasurable={missing.join(',')}
-      className="mt-4 rounded-2xl border border-[#dfe3e0] bg-[#f4f6f5] p-3 text-center text-[10px] font-bold leading-5 text-[#5f6663]">
+      className="mt-4 rounded-2xl border border-[#dfe3e0] bg-[#f4f6f5] p-3 text-center text-[11px] font-bold leading-5 text-[#5f6663]">
       {ar
         ? `لم يُنظر في: ${names}. قياسُها يحتاج تلاوةً مرجعيّةً مُعتمدةً لروايتك، وهي غيرُ متوفّرةٍ بعد — فخلوُّ وجهك منها ليس شهادةً لك بها.`
         : `Not examined here: ${names}. These need a certified reference recitation for your reading, which is not yet available — their absence is not a verdict in your favour.`}

@@ -47,7 +47,7 @@ export const FairDrawParityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   if (!review) {
     return (
-      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[#656b66]">
+      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[color:var(--muted)]">
         <span className="mizan-status-orb" aria-hidden="true"/>
         {ar
           ? `تكافؤ الحِمل الذهني بين ${report.participantCount} أطقم مسحوبة ضمن الهامش — أوسع فارق ${gap}٪.`

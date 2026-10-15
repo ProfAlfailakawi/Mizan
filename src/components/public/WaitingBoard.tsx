@@ -200,7 +200,7 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
     {/* طول الطابور يُرى قبل أن يُقرأ. */}
     <QueueRibbon total={slice.waitingCount} ar={ar} className="text-[#b9cec4] min-h-4" />
 
-    <div className="flex items-center justify-between gap-2 text-[10px] mizan-venue-muted font-bold">
+    <div className="flex items-center justify-between gap-2 text-[11px] mizan-venue-muted font-bold">
       <span>{ar ? `${slice.waitingCount} منتظرًا` : `${slice.waitingCount} waiting`}</span>
       <span className="truncate">{describeWait(slice.estimatedWaitMinutes, ar)}</span>
     </div>

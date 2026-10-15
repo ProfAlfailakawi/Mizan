@@ -19,6 +19,6 @@ export const FieldBox: React.FC<{ label: string; children: React.ReactNode }> = 
 export const Mini: React.FC<{ n: React.ReactNode; t: string; center?: boolean }> = ({ n, t, center }) => (
   <div className={`rounded-xl bg-[#f3f1eb] p-3 ${center ? 'text-center' : ''}`}>
     <div className="text-lg font-black tabular-nums">{n}</div>
-    <div className="text-[11px] text-[#656b66] mt-1">{t}</div>
+    <div className="text-[11px] text-[color:var(--muted)] mt-1">{t}</div>
   </div>
 );

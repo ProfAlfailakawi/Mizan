@@ -30,11 +30,11 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
   return (
     <section className="mizan-surface overflow-hidden">
       <div className="flex items-start gap-3 p-5 sm:p-6">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#E7EEE9] text-[#214C40]"><ShieldCheck className="h-5 w-5" /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--emerald-soft)] text-[color:var(--emerald)]"><ShieldCheck className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
           <div className="mizan-kicker">{ar ? 'موثوقية التحكيم' : 'JUDGING RELIABILITY'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'قياس بالإعماء، لا شهادة حسن سيرة' : 'Measured blind, not asserted'}</h2>
-          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[#636864]">
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[color:var(--muted)]">
             {ar
               ? 'تلاواتٌ سبق تحكيمها أُعيدت على محكّم آخر دون أن يعلم أنها مُعادة، ثم قِيس الفرق بين الحكمين. لا يغيّر هذا أي درجة مختومة، ولا يُنسب فرقٌ إلى محكّم بعينه.'
               : 'Already-judged recitations were re-judged by another judge who was not told they were re-judged, and the two verdicts were compared. No sealed score changes, and no difference is attributed to a named judge.'}
@@ -48,7 +48,7 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
         <Cell
           label={ar ? `اتفاق ضمن ±${data.toleranceUsed}` : `Agreement within ±${data.toleranceUsed}`}
           value={data.sufficientSample
-            ? <span className={`tabular-nums ${strong ? 'text-[#214C40]' : 'text-[#8a6738]'}`}>{Math.round(data.agreementRate * 100)}%</span>
+            ? <span className={`tabular-nums ${strong ? 'text-[color:var(--emerald)]' : 'text-[#8a6738]'}`}>{Math.round(data.agreementRate * 100)}%</span>
             : <span className="text-sm font-black text-[#6b706c]">{ar ? 'عيّنة صغيرة' : 'sample too small'}</span>}
         />
         <Cell label={ar ? 'متوسط الفرق' : 'Mean difference'} value={<span className="tabular-nums">{data.meanAbsoluteDifference}</span>} />
@@ -94,8 +94,8 @@ export const ReliabilityPanel: React.FC<{ data: ReliabilityView | null; ar: bool
 };
 
 const Cell: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="bg-[#fffefb] px-5 py-4">
+  <div className="bg-[var(--surface)] px-5 py-4">
     <div className="text-2xl font-black text-[#2c3330]">{value}</div>
-    <div className="mt-1 text-xs text-[#646965]">{label}</div>
+    <div className="mt-1 text-xs text-[color:var(--muted)]">{label}</div>
   </div>
 );

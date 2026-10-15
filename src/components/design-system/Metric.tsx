@@ -41,7 +41,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     return (
       <div className={`text-end ${className}`}>
         <div className="text-3xl font-black tabular-nums">{shown}</div>
-        <div className="text-[9px] font-black tracking-[.13em] text-[#646965]">{label}</div>
+        <div className="text-[11px] font-black tracking-[.13em] text-[color:var(--muted)]">{label}</div>
       </div>
     );
   }
@@ -49,8 +49,8 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
   if (variant === 'caption') {
     return (
       <div className={`mizan-surface-soft p-3 min-w-0 ${className}`}>
-        <div className="text-[9px] text-[#666b67]">{label}</div>
-        <div className="text-[10px] font-black mt-1 truncate">{value}</div>
+        <div className="text-[11px] text-[#666b67]">{label}</div>
+        <div className="text-[11px] font-black mt-1 truncate">{value}</div>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     return (
       <div className={`mizan-surface-soft p-3 ${className}`}>
         <div className="text-2xl font-black tabular-nums">{shown}</div>
-        <div className="text-[10px] text-[#646965] mt-1">{label}</div>
+        <div className="text-[11px] text-[color:var(--muted)] mt-1">{label}</div>
       </div>
     );
   }
@@ -67,7 +67,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
       <div className={`flex items-start justify-between gap-2 sm:gap-3 max-[340px]:flex-col-reverse ${typeof value === 'string' && value.length > 9 ? 'max-[400px]:flex-col-reverse' : ''}`}>
         <div className="min-w-0">
           <div className={`mz-bp-metric-value ${typeof value === 'string' && value.length > 9 ? 'text-xl sm:text-2xl' : 'text-2xl'} font-black tabular-nums`}>{shown}</div>
-          <div className="mt-1 text-[11px] text-[#666c68]">{label}</div>
+          <div className="mt-1 text-[11px] text-[color:var(--muted)]">{label}</div>
         </div>
         {Icon && (
           <div className={`mz-bp-metric-icon ${tone === 'amber' ? 'is-amber' : 'is-green'} grid h-8 w-8 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl ${tone === 'amber' ? 'bg-[#f4ecdf] text-[#8b6837]' : 'bg-[#e8f0eb] text-[#28594a]'}`}>

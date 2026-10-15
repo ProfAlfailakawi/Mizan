@@ -22,7 +22,7 @@ import { Button } from '../design-system/Button';
  */
 
 const TONE: Record<CloudCheck['state'], { box: string; icon: React.ComponentType<{ className?: string }>; iconColor: string }> = {
-  ok: { box: 'border-[#cddbd3] bg-[#F7FAF8]', icon: CheckCircle2, iconColor: 'text-[#214C40]' },
+  ok: { box: 'border-[#cddbd3] bg-[#F7FAF8]', icon: CheckCircle2, iconColor: 'text-[color:var(--emerald)]' },
   blocked: { box: 'border-[#e0c6c1] bg-[#F9F0EE]', icon: AlertTriangle, iconColor: 'text-[#8a3f34]' },
   warning: { box: 'border-[#e6d9c2] bg-[#FBF7F0]', icon: CircleAlert, iconColor: 'text-[#7d5e34]' },
   unknown: { box: 'border-[#dfe6ea] bg-[#F4F7F9]', icon: CircleHelp, iconColor: 'text-[#5b6b76]' },
@@ -89,7 +89,7 @@ export const CloudDiagnostics: React.FC = () => {
       <div className={`rounded-2xl border p-5 ${result.ready ? 'border-[#cddbd3] bg-[#F7FAF8]' : 'border-[#e0c6c1] bg-[#F9F0EE]'}`} role="status">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className={`inline-flex items-center gap-2 text-lg font-black ${result.ready ? 'text-[#214C40]' : 'text-[#8a3f34]'}`}>
+            <h2 className={`inline-flex items-center gap-2 text-lg font-black ${result.ready ? 'text-[color:var(--emerald)]' : 'text-[#8a3f34]'}`}>
               {result.ready ? <CheckCircle2 className="h-5 w-5" /> : <CloudRain className="h-5 w-5" />}
               {summariseCloud(result, ar)}
             </h2>
@@ -124,7 +124,7 @@ export const CloudDiagnostics: React.FC = () => {
               </h3>
               <p className="mt-1.5 text-[13px] leading-6 text-[#4f5752]">{ar ? item.detailAr : item.detailEn}</p>
               {item.state !== 'ok' && (
-                <p className="mt-1.5 text-xs font-black text-[#696f6b]">
+                <p className="mt-1.5 text-xs font-black text-[color:var(--muted)]">
                   {ar ? `يصلحها: ${item.ownerAr}` : `Fixed by: ${item.ownerEn}`}
                 </p>
               )}
@@ -133,7 +133,7 @@ export const CloudDiagnostics: React.FC = () => {
         })}
       </ul>
 
-      <p className="text-xs leading-5 text-[#696f6b]">
+      <p className="text-xs leading-5 text-[color:var(--muted)]">
         {ar
           ? 'لا تُعرض هنا مفاتيح ولا أسرار — أسماء الحقول وحالتها فقط. وزرّ الإصلاح لا يمنح دورًا ولا جهة ولا مسابقة: يعيد كتابة ما قرّره سجلّ الهويات أصلًا.'
           : 'No keys or secrets appear here — only field names and their state. The repair button grants no role, organization or competition: it rewrites what the identity registry already decided.'}

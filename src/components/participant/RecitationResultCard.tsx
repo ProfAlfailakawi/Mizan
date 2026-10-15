@@ -74,7 +74,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
         * يُشكِّك فيه من يقرؤه.
         */}
 
-      <p className="mt-5 text-center text-[10px] leading-5 text-white/35">
+      <p className="mt-5 text-center text-[11px] leading-5 text-white/35">
         {ar
           ? 'حكمُ المحكّمين وحدهم.'
           : 'Scoring is human. Nothing unpublished appears here, and no other participant’s data is included.'}

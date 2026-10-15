@@ -154,7 +154,7 @@ export const CorridorScreen: React.FC<{
               <span className="relative h-1.5 overflow-hidden rounded-full bg-white/20 transition-all duration-500" style={{ width: i === index ? 56 : 10 }}>
                 {i === index && <span key={`${p}-${index}`} className="absolute inset-y-0 start-0 rounded-full bg-[#c49a5d]" style={{ animation: `mizan-corridor-fill ${step}s linear forwards` }} />}
               </span>
-              <span className={`text-[10px] font-black ${i === index ? 'text-[#e0c894]' : 'text-white/35'}`}>{ar ? CORRIDOR_PANEL_LABEL[p] : p}</span>
+              <span className={`text-[11px] font-black ${i === index ? 'text-[#e0c894]' : 'text-white/35'}`}>{ar ? CORRIDOR_PANEL_LABEL[p] : p}</span>
             </span>)}
             <style>{'@keyframes mizan-corridor-fill{from{width:0}to{width:100%}}'}</style>
           </footer>
@@ -287,7 +287,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
         </div>
         <div>
           <div className="mb-2 flex items-center justify-between text-[11px] text-white/50"><span>{ar ? 'نحو الختمة التالية' : 'Toward next'}</span><span className="font-black text-[#d9c193]" dir="ltr">{toward}%</span></div>
-          <div ref={motion.bar.ref} className="h-2.5 overflow-hidden rounded-full bg-white/10"><span data-draw={motion.bar.phase ?? undefined} className="dna-drawx block h-full rounded-full bg-gradient-to-r from-[#2f6555] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
+          <div ref={motion.bar.ref} className="h-2.5 overflow-hidden rounded-full bg-white/10"><span data-draw={motion.bar.phase ?? undefined} className="dna-drawx block h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Tile value={`${percent}%`} label={ar ? 'من المصحف' : 'of the Mushaf'} />
             <Tile value={String(agg?.totalRecitations || 0)} label={ar ? 'تلاوة موضع' : 'passages'} />
@@ -306,7 +306,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
             <span key={i} className="dna-pageglow aspect-square rounded-[2.5px] transition-colors duration-700" data-rose={motion.rose(i) ? '' : undefined} style={{ background: pageGlow(count, max) }} />
           ))}
         </div>
-        <p className="mt-3 text-[10px] leading-5 text-white/35">
+        <p className="mt-3 text-[11px] leading-5 text-white/35">
           {ar ? 'تجميع على مستوى الصفحة لما تُلي اليوم. لا يُربط بمتسابق ولا يقول من قرأ ماذا.' : 'Page-level aggregate of today’s recitation. Never linked to a participant.'}
         </p>
       </div>
@@ -344,7 +344,7 @@ const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board
             <div className="shrink-0 text-end">
               <div className="text-base font-bold mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
               <div className="text-sm font-black tabular-nums text-white/75" dir="ltr">{slice.next[0]?.code || '—'}</div>
-              <div className="mt-1 inline-flex items-center gap-1 text-[10px] text-white/45"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
+              <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-white/45"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
             </div>
           </article>
         ))}

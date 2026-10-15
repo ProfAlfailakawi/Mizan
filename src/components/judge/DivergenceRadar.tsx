@@ -18,8 +18,8 @@ import { AdvisoryNote } from '../design-system/AdvisoryNote';
 
 const Bar:React.FC<{label:string;value:number}>=({label,value})=>(
  <div className="flex items-center gap-2">
-  <span className="text-[9px] text-[#6b716d] w-16 shrink-0">{label}</span>
-  <span className="h-1 flex-1 rounded-full bg-[#e7e3d9] overflow-hidden"><span className="block h-full rounded-full bg-[#2F6555]/70" style={{width:`${Math.round(Math.max(0,Math.min(1,value))*100)}%`}}/></span>
+  <span className="text-[11px] text-[#6b716d] w-16 shrink-0">{label}</span>
+  <span className="h-1 flex-1 rounded-full bg-[#e7e3d9] overflow-hidden"><span className="block h-full rounded-full bg-[var(--emerald-2)]/70" style={{width:`${Math.round(Math.max(0,Math.min(1,value))*100)}%`}}/></span>
  </div>);
 
 export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:number;endAyah:number;ar:boolean}>=({reading,surah,startAyah,endAyah,ar})=>{
@@ -45,16 +45,16 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
   <button type="button" onClick={()=>setOpen(o=>!o)} aria-expanded={open}
    className="w-full min-h-[68px] px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3 text-start">
    <span className="flex items-center gap-2.5 min-w-0">
-    <span className="w-8 h-8 rounded-xl bg-[#EEF3F0] text-[#2F6555] grid place-items-center shrink-0"><GitBranch className="w-4 h-4"/></span>
+    <span className="w-8 h-8 rounded-xl bg-[#EEF3F0] text-[color:var(--emerald-2)] grid place-items-center shrink-0"><GitBranch className="w-4 h-4"/></span>
     <span className="min-w-0">
-     <span className="block text-[10px] font-black truncate">{ar?'مفترقات المتشابهات':'Divergence points'}</span>
-     <span className="block text-[9px] text-[#6b716d] truncate">
+     <span className="block text-[11px] font-black truncate">{ar?'مفترقات المتشابهات':'Divergence points'}</span>
+     <span className="block text-[11px] text-[#6b716d] truncate">
       {points.length?(ar?`${points.length} موضع التباس في هذا المقطع`:`${points.length} fork${points.length>1?'s':''} in this passage`):(ar?'لا مفترقات في هذا المقطع':'No forks in this passage')}
       {load?` · ${load.label}`:''}
      </span>
      {load&&<span className="mt-2 flex items-center gap-2" aria-label={ar?`مؤشر مفترقات المتشابهات ${Math.round(load.score*100)}٪`:`Divergence indicator ${Math.round(load.score*100)}%`}>
-      <span className="h-1.5 w-28 sm:w-36 max-w-[32vw] rounded-full bg-[#e6e2d8] overflow-hidden"><span className="block h-full rounded-full bg-[#2F6555] transition-[width] duration-300" style={{width:`${Math.max(6,Math.round(load.score*100))}%`}}/></span>
-      <span className="text-[9px] font-black tabular-nums text-[#2F6555]" dir="ltr">{Math.round(load.score*100)}%</span>
+      <span className="h-1.5 w-28 sm:w-36 max-w-[32vw] rounded-full bg-[#e6e2d8] overflow-hidden"><span className="block h-full rounded-full bg-[var(--emerald-2)] transition-[width] duration-300" style={{width:`${Math.max(6,Math.round(load.score*100))}%`}}/></span>
+      <span className="text-[11px] font-black tabular-nums text-[color:var(--emerald-2)]" dir="ltr">{Math.round(load.score*100)}%</span>
      </span>}
     </span>
    </span>
@@ -62,8 +62,8 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
   </button>
 
   {open&&<div className="px-4 sm:px-5 pb-4 space-y-4">
-   {difficulty&&<div className="rounded-2xl bg-[#f7f5ef] p-3.5 space-y-2">
-    <div className="flex items-center gap-2 text-[9px] font-black text-[#59615c]"><Gauge className="w-3.5 h-3.5"/>{ar?'متجه الصعوبة — مقيس من النص':'Difficulty vector — measured from the text'}</div>
+   {difficulty&&<div className="rounded-2xl bg-[var(--canvas)] p-3.5 space-y-2">
+    <div className="flex items-center gap-2 text-[11px] font-black text-[#59615c]"><Gauge className="w-3.5 h-3.5"/>{ar?'متجه الصعوبة — مقيس من النص':'Difficulty vector — measured from the text'}</div>
     <Bar label={ar?'متشابهات':'Mutashabihat'} value={difficulty.mutashabihat}/>
     <Bar label={ar?'كلمات نادرة':'Rare words'} value={difficulty.rareWords}/>
     <Bar label={ar?'تقارب الأواخر':'Ending echo'} value={difficulty.endingSimilarity}/>
@@ -71,15 +71,15 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
    </div>}
 
    {points.map((p,i)=><div key={`${p.ayah}-${p.wordIndex}-${i}`} className="rounded-2xl bg-white border border-[#eae6dc] p-3.5">
-    <div className="text-[9px] font-black text-[#6b716d]">{ar?'آية':'Ayah'} {p.ayah} · {ar?'المشترك':'shared'}</div>
+    <div className="text-[11px] font-black text-[#6b716d]">{ar?'آية':'Ayah'} {p.ayah} · {ar?'المشترك':'shared'}</div>
     <div className="font-quran text-[15px] leading-8 text-[#2a312c] mt-1">{p.sharedPhrase}</div>
     <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
      <span className="inline-flex items-baseline gap-1.5">
-      <span className="text-[9px] text-[#6b716d]">{ar?'هنا':'here'}</span>
-      <span className="font-quran text-[15px] font-black text-[#214C40]">{p.expectedWord}</span>
+      <span className="text-[11px] text-[#6b716d]">{ar?'هنا':'here'}</span>
+      <span className="font-quran text-[15px] font-black text-[color:var(--emerald)]">{p.expectedWord}</span>
      </span>
      {p.branches.map((b,k)=><span key={k} className="inline-flex items-baseline gap-1.5">
-      <span className="text-[9px] text-[#8a6a33]">{b.surahNameArabic||''} {b.at.surah}:{b.at.ayah}</span>
+      <span className="text-[11px] text-[#8a6a33]">{b.surahNameArabic||''} {b.at.surah}:{b.at.ayah}</span>
       <span className="font-quran text-[15px] text-[#7a5a24]">{b.nextWord}</span>
      </span>)}
     </div>

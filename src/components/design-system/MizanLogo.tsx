@@ -90,9 +90,9 @@ export function useBrandName(): { ar: string; en: string; logoUrl?: string } {
  *
  * The previous MizanMark drew an unrelated pair of scale pans, so the product and the
  * approved identity disagreed on every screen. This is the approved mark rebuilt as
- * geometry: an ogee mihrab arch, an open muṣḥaf, the gold qalam rising through the spine,
+ * geometry: a balance beam, an open muṣḥaf, the gold qalam rising through the spine,
  * and the diamond finial. It carries the double reading the name asks for — the qalam is
- * also the beam of a balance, the two pages its pans.
+ * the axis of a balance, the two pages its pans. No dome, mihrab or crescent (brand rule).
  *
  * Parts are individually classed (mz-arch, mz-page…) so motion lives in CSS
  * (see "MIZAN brand motion" in src/index.css) and this file stays pure geometry.
@@ -101,10 +101,12 @@ export function useBrandName(): { ar: string; en: string; logoUrl?: string } {
 export type MizanTone = 'brand' | 'inverse' | 'mono';
 
 const PATHS = {
-  finial: 'M60 2.5 64.6 8.6 60 14.7 55.4 8.6Z',
-  // Ogee arch, drawn as one stroke so the apex keeps a true mitred point.
-  arch:
-    'M39.5 90C34.5 81.5 30.8 70.5 32.2 54 34 35 56.4 28 60 20c3.6 8 26 15 27.8 34 1.4 16.5-2.3 27.5-7.3 36',
+  // Finial diamond with its stem: the upper end of the balance axis.
+  finial: 'M60 2.5 64.6 8.6 60.9 13.2V34h-1.8V13.2L55.4 8.6Z',
+  // Balance beam (was a dome-like arch; the brand has no mosque or crescent motif).
+  arch: 'M22 41H98',
+  // Fine suspension lines from the beam ends down to the two pages (the pans).
+  chains: 'M22 41 21 60.5M22 41 44 64.5M98 41 99 60.5M98 41 76 64.5',
   pageRight: 'M60 71c13.5-9.5 27-13.5 40-11.5-2 8.5-2 19 0 27.5-13.5-2-28 .5-40 9Z',
   pageLeft: 'M60 71c-13.5-9.5-27-13.5-40-11.5 2 8.5 2 19 0 27.5 13.5-2 28 .5 40 9Z',
   // Leaf creases: the second page under the top one. Fades out on its own at icon sizes.
@@ -181,10 +183,15 @@ export const MizanMark: React.FC<MarkProps> = ({
           d={PATHS.arch}
           pathLength={100}
           stroke={mono ? 'currentColor' : `url(#mzArch${uid})`}
-          strokeWidth={6.8}
+          strokeWidth={4.6}
           strokeLinecap="round"
-          strokeLinejoin="miter"
-          strokeMiterlimit={7}
+        />
+        <path
+          className="mz-chains"
+          d={PATHS.chains}
+          stroke={mono ? 'currentColor' : `url(#mzArch${uid})`}
+          strokeWidth={1.8}
+          strokeLinecap="round"
         />
 
         <g className="mz-book">
@@ -246,13 +253,8 @@ export const MizanWordmark: React.FC<WordmarkProps> = ({
       <span className="mizan-wordmark-name" dir={ar ? 'rtl' : 'ltr'}>
         {ar ? brand.ar : brand.en}
       </span>
-      {/* data-no-localize keeps ArabicInterfaceGuard from rewriting the Latin
-          half of the lockup while the app is in Arabic. */}
-      {ar && (
-        <span className="mizan-wordmark-rule" aria-hidden="true" data-no-localize="true">
-          <i /><b>{brand.en}</b><i />
-        </span>
-      )}
+      {/* In Arabic the Latin «MIZAN» line is intentionally not drawn (brand rule:
+          the Arabic name is the only word in Arabic mode). */}
       {tagline && <span className="mizan-wordmark-tagline">{tagline}</span>}
     </span>
   );

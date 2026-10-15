@@ -53,7 +53,7 @@ export const MathematicalBoundPanel: React.FC<{
         <div className="min-w-0">
           <div className="mizan-kicker">{ar ? 'الحدّ الرياضي' : 'MATHEMATICAL BOUND'}</div>
           <h2 className="mt-1 text-xl font-black sm:text-2xl">{ar ? 'ما أفضل ما كان ممكنًا؟ وكم بَعُد ميزان عنه؟' : 'What was mathematically best, and how far is Mizan from it?'}</h2>
-          <p className="mt-2 max-w-2xl text-xs leading-6 text-[#666c68]">
+          <p className="mt-2 max-w-2xl text-xs leading-6 text-[color:var(--muted)]">
             {ar
               ? 'هذا ليس محرّك السحب. محرّك السحب يعمل على الخط ولا يعرف من سيأتي بعد. وهذا يحلّ المسألة كاملةً خارج الخط، فيقول الحدّ الذي لا ينزل تحته أيُّ توزيع — ثم يقارن. ولا يُشغَّل أثناء المسابقة.'
               : 'This is not the draw engine. The draw engine works online and cannot see who comes next. This solves the whole problem offline and states the bound no allocation can beat — then compares. It never runs during the competition.'}
@@ -122,7 +122,7 @@ const Headline: React.FC<{ ar: boolean; outcome: Extract<OracleOutcome, { ok: tr
     <div className={`rounded-2xl border p-5 ${infeasible ? 'border-[#e0c6c1] bg-[#F9F0EE]' : matched ? 'border-[#cddbd3] bg-[#F7FAF8]' : 'border-[#e6d9b8] bg-[#FBF7EC]'}`} role="status">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {matched ? <BadgeCheck className="h-5 w-5 text-[#214C40]" /> : <Target className="h-5 w-5 text-[#7a6a33]" />}
+          {matched ? <BadgeCheck className="h-5 w-5 text-[color:var(--emerald)]" /> : <Target className="h-5 w-5 text-[#7a6a33]" />}
           <span className="text-sm font-black">{STATUS_LABEL[result.minMaxReuse.status] || result.minMaxReuse.status}</span>
         </div>
         {outcome.syntheticData && <Badge variant="blue">{ar ? 'بيانات اصطناعية' : 'Synthetic data'}</Badge>}
@@ -145,7 +145,7 @@ const Headline: React.FC<{ ar: boolean; outcome: Extract<OracleOutcome, { ok: tr
             value={!proven ? (ar ? 'لم يُحسم' : 'undecided') : matched ? (ar ? 'لا يوجد فارق مثبت' : 'no proven difference') : `+${maxReuse?.gap}`} />
         </dl>
       )}
-      <p className="mt-3 text-xs font-medium leading-6 text-[#666c68]">
+      <p className="mt-3 text-xs font-medium leading-6 text-[color:var(--muted)]">
         {infeasible
           ? (ar ? 'الاستحالة هنا رياضية لا خلل في المحرّك: لا خوارزمية تستطيع ما لا يستطيعه العدد.' : 'The impossibility is mathematical, not an engine defect.')
           : matched
@@ -169,7 +169,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
   <div className="space-y-4">
     <section className="mizan-surface p-4">
       <h3 className="text-sm font-black">{ar ? 'الفجوة عن الأمثل، بُعدًا بُعدًا' : 'Optimality gap, dimension by dimension'}</h3>
-      <p className="mt-1 text-[11px] font-medium leading-5 text-[#666c68]">
+      <p className="mt-1 text-[11px] font-medium leading-5 text-[color:var(--muted)]">
         {ar
           ? 'كل بُعدٍ يُحلّ وحده: فالأمثل في «أقلّ تكرار» ليس هو الأمثل في «تكافؤ الصعوبة». ولا تُجمع هذه في نسبةٍ واحدة، لأن الجمع يخفي أيَّها تدهور.'
           : 'Each dimension is solved alone; they are never averaged into one score, because averaging hides which one regressed.'}
@@ -191,10 +191,10 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
                 <td className="py-1.5 font-bold">{ar ? row.ar : row.dimension}</td>
                 <td className="py-1.5 text-end tabular-nums">{row.optimum ?? '—'}</td>
                 <td className="py-1.5 text-end tabular-nums">{row.achieved}</td>
-                <td className={`py-1.5 text-end font-black tabular-nums ${row.gap === null ? 'text-[#5b6460]' : row.gap > 0 ? 'text-[#a2503f]' : 'text-[#214C40]'}`}>
+                <td className={`py-1.5 text-end font-black tabular-nums ${row.gap === null ? 'text-[#5b6460]' : row.gap > 0 ? 'text-[#a2503f]' : 'text-[color:var(--emerald)]'}`}>
                   {row.gap === null ? (ar ? 'لم يُحسم' : 'undecided') : row.gap === 0 ? (ar ? 'صفر' : 'zero') : `+${row.gap}`}
                 </td>
-                <td className="py-1.5 text-end text-[10px] font-bold text-[#5b6460]">{STATUS_LABEL[row.status] || row.status}</td>
+                <td className="py-1.5 text-end text-[11px] font-bold text-[#5b6460]">{STATUS_LABEL[row.status] || row.status}</td>
               </tr>
             ))}
           </tbody>
@@ -212,7 +212,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
         <Row ar={ar} label={ar ? 'عدد فحوص الحلّال' : 'Solver probes'} value={result.minMaxReuse.probes} />
         <Row ar={ar} label={ar ? 'زمن التحليل' : 'Analysis time'} value={`${result.elapsedMs} ms`} />
       </dl>
-      <p className="mt-2 text-[11px] font-medium leading-5 text-[#666c68]">
+      <p className="mt-2 text-[11px] font-medium leading-5 text-[color:var(--muted)]">
         {ar
           ? 'الحدّ السريع يبقى كما هو في تقارير العدالة؛ والقويّ يُحسب هنا وحده لأنه أبطأ. وحدٌّ أدنى يعلو على الأمثل الحقيقي ليس حدًّا أدنى بل خطأ — وهذا مفحوصٌ بالعدّ الشامل على حالاتٍ صغيرة.'
           : 'The fast bound stays in the fairness reports; the strong one is computed only here. A lower bound above the true optimum is not a bound but a bug — checked exhaustively on small cases.'}
@@ -222,7 +222,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
     {result.regret && (
       <section className="mizan-surface p-4">
         <h3 className="text-sm font-black">{ar ? 'ندم العدالة' : 'Fairness regret'}</h3>
-        <p className="mt-1 text-[11px] font-medium leading-6 text-[#666c68]">
+        <p className="mt-1 text-[11px] font-medium leading-6 text-[color:var(--muted)]">
           {ar
             ? 'ما خسره ميزان لأنه يعمل على الخط ولا يعرف الغيب: يُعاد حلّ المسألة بمعرفةٍ تامّة بعد انتهائها، ثم يُقاس الفرق. وهذا وحده القياس الصادق لنجاح «حماية المتسابقين القادمين».'
             : 'What Mizan lost by working online without knowledge of the future — the honest measure of future-contestant protection.'}
@@ -243,7 +243,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
           {result.minMaxReuse.feasibility.certificates.slice(0, 4).map((certificate, index) => (
             <li key={`${certificate.kind}-${index}`} className="rounded-xl border border-[#e0c6c1] bg-[#F9F0EE] p-3 text-xs font-bold leading-6 text-[#7a3b31]">
               {ar ? certificate.ar : certificate.en}
-              <span className="mt-1 block text-[10px] font-medium text-[#7a3b31]">
+              <span className="mt-1 block text-[11px] font-medium text-[#7a3b31]">
                 {ar ? 'القيود الحابسة: ' : 'Binding constraints: '}{certificate.bindingConstraints.join('، ')}
               </span>
             </li>

@@ -14,7 +14,7 @@ import { Pictogram } from './Pictogram';
 /** سطرٌ في قائمة تفاصيل: اسمٌ على يمينه وقيمةٌ على يساره، بينهما خطّ القائمة. */
 export const DetailRow: React.FC<{ label: string; value: React.ReactNode; className?: string }> = ({ label, value, className = '' }) => (
   <div className={`py-3 flex items-center justify-between gap-4 ${className}`}>
-    <span className="text-xs text-[#646965]">{label}</span>
+    <span className="text-xs text-[color:var(--muted)]">{label}</span>
     <span className="text-xs font-bold text-[#303733] text-end tabular-nums">{value}</span>
   </div>
 );
@@ -30,7 +30,7 @@ export const PanelHeading: React.FC<{
     <Pictogram icon={icon} size="md" />
     <div className="min-w-0">
       <h2 className="text-lg font-black">{title}</h2>
-      {subtitle && <p className="text-xs text-[#646965] mt-1 max-w-2xl leading-6">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-[color:var(--muted)] mt-1 max-w-2xl leading-6">{subtitle}</p>}
     </div>
   </div>
 );

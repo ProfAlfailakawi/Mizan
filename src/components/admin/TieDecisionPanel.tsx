@@ -57,11 +57,11 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   return <section className="mizan-surface p-5 sm:p-6">
     <div className="flex items-start gap-2.5">
-      <Scale className="mt-0.5 h-5 w-5 shrink-0 text-[#9B7542]" />
+      <Scale className="mt-0.5 h-5 w-5 shrink-0 text-[color:var(--amber)]" />
       <div className="min-w-0">
         <div className="mizan-kicker">{ar ? 'قرار الإدارة' : 'ADMINISTRATIVE DECISION'}</div>
         <h2 className="mt-1 font-extrabold">{ar ? 'مراكز موقوفة على تعادل' : 'Places on hold for a tie'}</h2>
-        <p className="mt-1 text-[13px] leading-6 text-[#666c68]">
+        <p className="mt-1 text-[13px] leading-6 text-[color:var(--muted)]">
           {ar
             ? 'اللجنة قيّمت وانتهت إلى تساوٍ، وقواعد كسر التعادل المعلنة لم تفصل. الفصل بعد ذلك قرار إداري بسبب مكتوب — ولا يُعلن المركز قبله.'
             : 'The committee scored and arrived at a tie, and the published tie-break rules did not separate them. Breaking it is an administrative decision with a written reason — and the place is not announced before it.'}
@@ -69,7 +69,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
       </div>
     </div>
 
-    {!mayDecide && <div role="status" className="mt-4 rounded-xl bg-[#F2EADC] px-3.5 py-3 text-[13px] font-bold leading-6 text-[#725630]">
+    {!mayDecide && <div role="status" className="mt-4 rounded-xl bg-[var(--amber-soft)] px-3.5 py-3 text-[13px] font-bold leading-6 text-[#725630]">
       {ar
         ? 'هذه القرارات للإدارة (مدير المسابقة أو مدير الجهة). ما تراه هنا للعلم لا للفصل.'
         : 'These decisions belong to the administration (competition or organization admin). This view is informational.'}
@@ -85,7 +85,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
 
         {mayDecide && activeKey !== tie.group.key && <div className="mt-3 flex justify-end">
           <button type="button" onClick={() => start(tie.group.key, tie.group.participants.map(p => p.participantId))}
-            className="rounded-lg bg-[#214C40] px-3 py-2 text-[13px] font-black text-white">
+            className="rounded-lg bg-[var(--emerald)] px-3 py-2 text-[13px] font-black text-white">
             {ar ? 'تسجيل قرار الإدارة' : 'Record the decision'}
           </button>
         </div>}
@@ -93,11 +93,11 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
         {mayDecide && activeKey === tie.group.key && <div className="mt-3 space-y-3 border-t border-[#ece9e1] pt-3">
           <div className="flex flex-wrap gap-2" role="group" aria-label={ar ? 'نوع القرار' : 'Decision type'}>
             <button type="button" aria-pressed={mode === 'shared'} onClick={() => setMode('shared')}
-              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'shared' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
+              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'shared' ? 'bg-[var(--emerald)] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
               {ar ? 'يُشرَّك المركز بينهم' : 'Share the place'}
             </button>
             <button type="button" aria-pressed={mode === 'ordered'} onClick={() => setMode('ordered')}
-              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'ordered' ? 'bg-[#214C40] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
+              className={`rounded-lg px-3 py-2 text-[13px] font-black ${mode === 'ordered' ? 'bg-[var(--emerald)] text-white' : 'bg-[#F3F1EB] text-[#4f5752]'}`}>
               {ar ? 'ترتيب معلن تكتبه الإدارة' : 'An ordering the administration writes'}
             </button>
           </div>
@@ -136,7 +136,7 @@ export const TieDecisionPanel: React.FC<{ ar: boolean }> = ({ ar }) => {
             <button type="button" onClick={() => setActiveKey('')} className="rounded-lg bg-[#F3F1EB] px-3 py-2 text-[13px] font-black text-[#4f5752]">
               {ar ? 'إلغاء' : 'Cancel'}
             </button>
-            <button type="button" onClick={() => submit(tie.group.key)} className="rounded-lg bg-[#214C40] px-3 py-2 text-[13px] font-black text-white">
+            <button type="button" onClick={() => submit(tie.group.key)} className="rounded-lg bg-[var(--emerald)] px-3 py-2 text-[13px] font-black text-white">
               {ar ? 'تسجيل القرار' : 'Record decision'}
             </button>
           </div>

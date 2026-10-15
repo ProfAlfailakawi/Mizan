@@ -78,9 +78,9 @@ export const CertificateVerification: React.FC = () => {
       <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
       <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
       <h1 className="font-display text-2xl sm:text-3xl font-black mt-1">{ar?'تحقق مستقل من الشهادة':'Certificate verification'}</h1>
-      <p className="text-xs text-[#636864] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p>
+      <p className="text-xs text-[color:var(--muted)] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p>
       {policy.certificates.publicVerification&&<div className="max-w-md mx-auto flex gap-2 mt-6">
-        <div className="relative flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#696f6b]"/><input value={searchCode} onChange={e=>setSearchCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void verify()} placeholder="MZN-…" className="w-full rounded-xl border border-[#dcdad2] bg-white ps-10 pe-3 py-3 text-sm font-mono"/></div>
+        <div className="relative flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)]"/><input value={searchCode} onChange={e=>setSearchCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void verify()} placeholder="MZN-…" className="w-full rounded-xl border border-[#dcdad2] bg-white ps-10 pe-3 py-3 text-sm font-mono"/></div>
         <Button variant={searchCode.trim()?'primary':'outline'} className="mz-btn-idle" disabled={!searchCode.trim()} onClick={()=>void verify()}>{ar?'تحقق':'Verify'}</Button>
       </div>}
       {policy.certificates.publicVerification&&!submittedCode&&<div aria-hidden="true" className="max-w-md mx-auto mt-6 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-soft)]/60 p-4 text-start select-none">
@@ -88,7 +88,7 @@ export const CertificateVerification: React.FC = () => {
         <div className="mt-3 flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--emerald-soft)] text-[var(--emerald-2)]"><ShieldCheck className="h-4 w-4"/></span>
           <div className="flex-1 space-y-1.5"><div className="h-2.5 w-2/3 rounded-full bg-[var(--line)]"/><div className="h-2 w-1/2 rounded-full bg-[var(--line)]/70"/></div>
-          <span className="rounded-full border border-[var(--line)] px-2.5 py-0.5 text-[10px] font-black text-[var(--muted)]">{ar?'أصيلة':'AUTHENTIC'}</span>
+          <span className="rounded-full border border-[var(--line)] px-2.5 py-0.5 text-[11px] font-black text-[var(--muted)]">{ar?'أصيلة':'AUTHENTIC'}</span>
         </div>
       </div>}
     </section>
@@ -121,7 +121,7 @@ export const CertificateVerification: React.FC = () => {
         <h2 className="text-2xl sm:text-3xl font-black mt-3">{publicView.disclosed.participantName||publicView.disclosed.participantCode}</h2>
         {verification!=='AUTHENTIC'&&<p role="alert" className="mx-auto mt-4 max-w-lg rounded-xl border border-[#e5c9c4] bg-[#f7ece9] px-4 py-2.5 text-sm font-black text-[#874b43]">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة ولم تعد معتمدة.':'This certificate was revoked by the issuer and is no longer valid.'):(ar?'تعذّر إثبات هذه الشهادة؛ لا تُعتمد.':'This certificate could not be proven; do not rely on it.')}</p>}
         <p className="text-sm text-[#616762] mt-2">{publicView.competitionName}</p>
-        {publicView.organizationName&&<p className="text-xs font-bold text-[#214C40] mt-2">{publicView.organizationName}</p>}
+        {publicView.organizationName&&<p className="text-xs font-bold text-[color:var(--emerald)] mt-2">{publicView.organizationName}</p>}
         <div className="max-w-lg mx-auto mt-6 border-y border-[#e5e3dc] divide-y divide-[#e5e3dc] text-sm">
           {publicView.disclosed.categoryName&&<DetailRow label={ar?'الفئة':'Category'} value={publicView.disclosed.categoryName}/>}
           {publicView.disclosed.finalScore!==undefined&&<DetailRow label={ar?'الدرجة':'Score'} value={publicView.disclosed.finalScore.toFixed(2)}/>}
@@ -136,7 +136,7 @@ export const CertificateVerification: React.FC = () => {
         {verification==='AUTHENTIC'?<>
           <h2 className="text-2xl sm:text-3xl font-black mt-3">{ar?activeCert.participantNameArabic:activeCert.participantName}</h2>
           <p className="text-sm text-[#616762] mt-2">{ar?activeCert.competitionNameArabic:activeCert.competitionName}</p>
-          <p className="text-xs font-bold text-[#214C40] mt-4">{ar?activeCert.categoryNameArabic:activeCert.categoryName}</p>
+          <p className="text-xs font-bold text-[color:var(--emerald)] mt-4">{ar?activeCert.categoryNameArabic:activeCert.categoryName}</p>
           <div className="max-w-lg mx-auto mt-6 border-y border-[#e5e3dc] divide-y divide-[#e5e3dc] text-sm">
             {policy.certificates.showScore&&activeCert.score>0&&<DetailRow label={ar?'الدرجة':'Score'} value={activeCert.score.toFixed(2)}/>} 
             {policy.certificates.showRank&&activeCert.rank&&<DetailRow label={ar?'الترتيب':'Rank'} value={`#${activeCert.rank}`}/>} 
@@ -151,19 +151,19 @@ export const CertificateVerification: React.FC = () => {
               <Button className="mt-3 no-print" size="sm" variant="outline" onClick={()=>window.print()} icon={<Printer className="w-4 h-4"/>}>{ar?'طباعة':'Print'}</Button>
             </div>
           </div>
-        </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[#646965] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
+        </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[color:var(--muted)] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
     </VerdictShell>}
   </div>;
 };
 
 /* حالتا «تعذّر التحقق» و«غير موجودة» كانتا قالبين متطابقين حرفًا بحرف إلا في الجملة. */
-const StatusCard:React.FC<{title:string;body:string;action?:React.ReactNode}>=({title,body,action})=><section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="text-lg font-black mt-3">{title}</h2><p className="text-xs text-[#646965] mt-1.5 leading-6 max-w-md mx-auto">{body}</p>{action&&<div className="mt-5">{action}</div>}</section>;
+const StatusCard:React.FC<{title:string;body:string;action?:React.ReactNode}>=({title,body,action})=><section className="mizan-surface p-8 text-center"><div className="mx-auto w-fit"><MizanPictogram kind="certificate"/></div><h2 className="text-lg font-black mt-3">{title}</h2><p className="text-xs text-[color:var(--muted)] mt-1.5 leading-6 max-w-md mx-auto">{body}</p>{action&&<div className="mt-5">{action}</div>}</section>;
 
 /* وبطاقتا النتيجة (العامة والكاملة) كانتا تعيدان بناء الإطار نفسه: الخلفية والدرع الغائر
    والشارة ورقم الشهادة. الإطار واحد، وما يختلف هو ما يُوضع داخله. */
 /* وثيقةُ التحقّق هي ما يُطبع، لا الصفحةُ التي حولها. */
-const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.ReactNode}>=({badge,number,children})=><section data-mizan-print className="bg-[#fffefb] border border-[#e2e0d9] rounded-3xl p-7 sm:p-10 text-center relative overflow-hidden">
-  <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[#214C40]/[.035]"/>
+const VerdictShell:React.FC<{badge:React.ReactNode;number:string;children:React.ReactNode}>=({badge,number,children})=><section data-mizan-print className="bg-[var(--surface)] border border-[#e2e0d9] rounded-3xl p-7 sm:p-10 text-center relative overflow-hidden">
+  <ShieldCheck className="absolute -end-10 -bottom-10 w-44 h-44 text-[color:var(--emerald)]/[.035]"/>
   <div className="relative">{badge}<div className="mizan-kicker mt-5">{number}</div>{children}</div>
 </section>;
 
@@ -182,14 +182,14 @@ const EvidenceChain=({chain,ar,playKey}:{chain:{id:string;labelArabic:string;lab
     <div className="flex items-center gap-2 text-xs font-black tracking-[.14em] text-[#6b706c]"><Link2 className="w-3.5 h-3.5"/>{ar?'سلسلة الأدلة':'EVIDENCE CHAIN'}</div>
     <ol ref={view.ref} className="mt-3 relative ps-5">
       <span aria-hidden className="absolute start-[5px] top-2 bottom-2 w-px bg-[#dedcd4]"/>
-      {lead>1&&<span aria-hidden className="absolute start-[5px] top-2 w-px origin-top bg-[#2F6555]" style={{height:`${((lead-.5)/chain.length)*100}%`,transform:view.phase==='pending'?'scaleY(0)':'scaleY(1)',transition:view.phase?`transform ${Math.max(1,lead-1)*STEP_MS}ms var(--ease-brand)`:undefined}}/>}
+      {lead>1&&<span aria-hidden className="absolute start-[5px] top-2 w-px origin-top bg-[var(--emerald-2)]" style={{height:`${((lead-.5)/chain.length)*100}%`,transform:view.phase==='pending'?'scaleY(0)':'scaleY(1)',transition:view.phase?`transform ${Math.max(1,lead-1)*STEP_MS}ms var(--ease-brand)`:undefined}}/>}
       {chain.map((l,i)=><li key={l.id} className="relative py-2">
-        <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[#fffefb] transition-colors duration-300 ${l.present&&view.phase!=='pending'?'bg-[#2F6555]':'bg-[#c9c6bd]'}`} style={view.phase==='play'&&l.present?{transitionDelay:`${i*STEP_MS}ms`}:undefined}/>
+        <span aria-hidden className={`absolute start-[-15px] top-3.5 w-[11px] h-[11px] rounded-full border-2 border-[color:var(--surface)] transition-colors duration-300 ${l.present&&view.phase!=='pending'?'bg-[var(--emerald-2)]':'bg-[#c9c6bd]'}`} style={view.phase==='play'&&l.present?{transitionDelay:`${i*STEP_MS}ms`}:undefined}/>
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs font-bold text-[#2c3330]">{ar?l.labelArabic:l.labelEnglish}</span>
-          {!l.present&&<span className="text-xs text-[#646965]">{ar?'غير مرتبطة':'not linked'}</span>}
+          {!l.present&&<span className="text-xs text-[color:var(--muted)]">{ar?'غير مرتبطة':'not linked'}</span>}
         </div>
-        {l.hash&&<div className="font-mono text-[11px] text-[#646965] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
+        {l.hash&&<div className="font-mono text-[11px] text-[color:var(--muted)] mt-0.5 break-all">{l.hash.slice(0,32)}…</div>}
       </li>)}
     </ol>
     <BriefNote className="mt-2" icon={Fingerprint} short={ar?'لكل حلقة بصمة مستقلة':'Each link has its own digest'} full={ar?'كل حلقة بصمة مستقلة؛ تغيّر أي منها يكسر التحقق أعلاه.':'Each link is an independent digest; changing any one of them breaks the verification above.'}/>

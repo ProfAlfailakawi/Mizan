@@ -32,7 +32,7 @@ export const RevealGateExplainer: React.FC<{ ar: boolean; gates: Gate[] }> = ({ 
 
   return <section className="mizan-receipt-explain mt-4 rounded-2xl bg-[#F3F6F3] p-4" aria-label={ar ? 'كيف يُكشف كل سؤال؟' : 'How each question is revealed'}
     onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-    <h4 className="text-base font-black text-[#214C40]">{ar ? 'كيف يُكشف كل سؤال؟' : 'How is each question revealed?'}</h4>
+    <h4 className="text-base font-black text-[color:var(--emerald)]">{ar ? 'كيف يُكشف كل سؤال؟' : 'How is each question revealed?'}</h4>
     <div className="mt-3 flex flex-wrap items-center justify-center gap-3" aria-hidden="true">
       {shown.map((g, i) => {
         const r = Math.min(reached(g), step);
@@ -44,7 +44,7 @@ export const RevealGateExplainer: React.FC<{ ar: boolean; gates: Gate[] }> = ({ 
             borderColor: done ? '#214C40' : r === 0 ? '#cfd8d2' : '#B98B4E',
             transform: `translateY(${done ? -4 : 0}px)`,
             transitionDelay: `${i * 90}ms`,
-          }}><Icon className="h-6 w-6 text-[#214C40]" /></span>;
+          }}><Icon className="h-6 w-6 text-[color:var(--emerald)]" /></span>;
       })}
     </div>
     <ol className="mt-4 grid gap-2">
@@ -53,13 +53,13 @@ export const RevealGateExplainer: React.FC<{ ar: boolean; gates: Gate[] }> = ({ 
         const on = i === step;
         return <li key={i}>
           <button type="button" onClick={() => { setStep(i); setPaused(true); }} aria-current={on ? 'step' : undefined}
-            className={`w-full rounded-xl border px-3 py-2 text-start transition-all duration-500 ${on ? 'border-[#214C40] bg-white shadow-sm' : 'border-transparent opacity-60'}`}>
+            className={`w-full rounded-xl border px-3 py-2 text-start transition-all duration-500 ${on ? 'border-[color:var(--emerald)] bg-white shadow-sm' : 'border-transparent opacity-60'}`}>
             <span className="text-base font-black text-[#17352D]">{title}</span>
             <span className="block text-sm leading-6 text-[#4f5752]">{text}</span>
           </button>
         </li>;
       })}
     </ol>
-    <p className="mt-2 text-xs leading-6 text-[#646965]">{ar ? 'هذا ما تسجّله بوابة الكشف في إيصالك. كل بطاقة تعكس مرحلة سؤالٍ فعلاً، وإن لم يكتمل سؤال فتقف بطاقته عند مرحلته.' : 'This is what the reveal gate records in your receipt. Each card reflects how far a real question got; an unfinished question stops at its stage.'}</p>
+    <p className="mt-2 text-xs leading-6 text-[color:var(--muted)]">{ar ? 'هذا ما تسجّله بوابة الكشف في إيصالك. كل بطاقة تعكس مرحلة سؤالٍ فعلاً، وإن لم يكتمل سؤال فتقف بطاقته عند مرحلته.' : 'This is what the reveal gate records in your receipt. Each card reflects how far a real question got; an unfinished question stops at its stage.'}</p>
   </section>;
 };

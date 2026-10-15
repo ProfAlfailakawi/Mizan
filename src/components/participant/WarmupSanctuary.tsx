@@ -82,8 +82,8 @@ export const WarmupSanctuary: React.FC<WarmupSanctuaryProps> = ({ ar, minutesPer
       onToggle={e => setOpen((e.currentTarget as HTMLDetailsElement).open)}
     >
       <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-4 py-3 text-[11px] font-black text-[#59615c]">
-        <span className="flex items-center gap-2"><Wind className="h-3.5 w-3.5 text-[#2F6555]" />{ar ? 'التهيئة قبل دورك' : 'Settle before your turn'}</span>
-        <span className="text-[9px] font-bold text-[#656b66]">{ar ? 'اختياري' : 'optional'}</span>
+        <span className="flex items-center gap-2"><Wind className="h-3.5 w-3.5 text-[color:var(--emerald-2)]" />{ar ? 'التهيئة قبل دورك' : 'Settle before your turn'}</span>
+        <span className="text-[11px] font-bold text-[color:var(--muted)]">{ar ? 'اختياري' : 'optional'}</span>
       </summary>
       <div className="px-4 pb-5">
         <div className="mizan-tabs" role="tablist" aria-label={ar ? 'أبواب التهيئة' : 'Preparation'}>
@@ -149,12 +149,12 @@ const BreathDoor: React.FC<{ ar: boolean; active: boolean }> = ({ ar, active }) 
               transform: `scale(${scale})`, transition: `transform ${seconds}s ease-in-out`,
             }}
           />
-          <span className="relative text-[21px] font-black tracking-tight text-[#214C40]">{PHASE_TEXT[ar ? 'ar' : 'en'][phase]}</span>
+          <span className="relative text-[21px] font-black tracking-tight text-[color:var(--emerald)]">{PHASE_TEXT[ar ? 'ar' : 'en'][phase]}</span>
         </div>
       </div>
       {/* الحالة تُقال لقارئ الشاشة نصًّا، فالدائرة وحدها لا تصل إليه. */}
       <p role="status" aria-live="polite" className="sr-only">{PHASE_TEXT[ar ? 'ar' : 'en'][phase]}</p>
-      <p className="text-center text-[10px] leading-5 text-[#656b66]">
+      <p className="text-center text-[11px] leading-5 text-[color:var(--muted)]">
         {ar
           ? 'تنفّس حجابي متوازن: شهيق أربع، حبس أربع، زفير ست. لا يُسجَّل شيء ولا يصل اللجنة منه شيء.'
           : 'Balanced diaphragmatic breathing: in for four, hold for four, out for six. Nothing is recorded and nothing reaches the panel.'}
@@ -201,11 +201,11 @@ const RehearsalDoor: React.FC<{ ar: boolean; minutesPerQuestion?: number }> = ({
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#e4e2da] bg-white p-4">
         <div>
           <div className="text-3xl font-black tabular-nums leading-none">{clock(elapsed)}</div>
-          <div className="mt-1 text-[10px] font-bold text-[#666a67]">{ar ? `من ${clock(limit)}` : `of ${clock(limit)}`}</div>
+          <div className="mt-1 text-[11px] font-bold text-[#666a67]">{ar ? `من ${clock(limit)}` : `of ${clock(limit)}`}</div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setRunning(x => !x)}
-            className="min-h-11 rounded-2xl bg-[#214C40] px-4 text-xs font-black text-white">
+            className="min-h-11 rounded-2xl bg-[var(--emerald)] px-4 text-xs font-black text-white">
             {running ? (ar ? 'إيقاف' : 'Pause') : elapsed ? (ar ? 'متابعة' : 'Resume') : (ar ? 'ابدأ البروفة' : 'Start')}
           </button>
           <button type="button" onClick={reset} aria-label={ar ? 'إعادة' : 'Reset'}
@@ -218,16 +218,16 @@ const RehearsalDoor: React.FC<{ ar: boolean; minutesPerQuestion?: number }> = ({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {SLIPS.map(slip => (
           <button key={slip.id} type="button" onClick={() => mark(slip.id, slip.ar, slip.en)}
-            className="min-h-14 rounded-2xl border border-[#e2e0d9] bg-white px-3 py-2 text-start text-[11px] font-black leading-5 text-[#5e6661] transition hover:bg-[#f7f5ef]">
+            className="min-h-14 rounded-2xl border border-[#e2e0d9] bg-white px-3 py-2 text-start text-[11px] font-black leading-5 text-[#5e6661] transition hover:bg-[var(--canvas)]">
             <span className="block truncate">{ar ? slip.ar : slip.en}</span>
-            {!!marks[slip.id] && <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6536]"><Check className="h-3 w-3" />{ar ? countAr(marks[slip.id]) : `${marks[slip.id]}×`}</span>}
+            {!!marks[slip.id] && <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#8a6536]"><Check className="h-3 w-3" />{ar ? countAr(marks[slip.id]) : `${marks[slip.id]}×`}</span>}
           </button>
         ))}
       </div>
 
       <p role="status" aria-live="polite" className="sr-only">{announce}</p>
 
-      <div className={`rounded-xl px-3.5 py-3 text-[11px] font-bold leading-6 ${total ? 'bg-[#F5EDE2] text-[#7a5a2f]' : 'bg-[#E7EEE9] text-[#214C40]'}`}>
+      <div className={`rounded-xl px-3.5 py-3 text-[11px] font-bold leading-6 ${total ? 'bg-[#F5EDE2] text-[#7a5a2f]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`}>
         {total
           ? (ar
             ? `رصدت ${countAr(total)} في هذه البروفة. أعِد المقطع الذي تكرّرت فيه الزلّة؛ التكرار في موضعٍ واحد علامةُ ضبطٍ لا علامةُ خوف.`
@@ -262,8 +262,8 @@ const JourneyListenDoor: React.FC<{ ar:boolean; access:JourneyPracticeAuth }> = 
     return()=>{live=false};
   },[access.competitionId,access.key,ar,retry]);
 
-  if(state==='loading')return <div className="pt-4"><div className="rounded-2xl border border-[#e4e2da] bg-white p-6 text-center"><div className="mx-auto h-8 w-8 rounded-full border-2 border-[#d9dfdb] border-t-[#214C40] motion-safe:animate-spin"/><div className="mt-3 text-xs font-black text-[#214C40]">{ar?'يُهيَّأ المصحف لروايتك…':'Preparing your Mushaf…'}</div><p className="mt-1 text-[10px] leading-5 text-[#6b716d]">{ar?'يُثبت ميزان نطاقك وروايتك أولًا، ثم يفتح الميكروفون لك وحدك.':'MIZAN verifies your range and reading before the microphone can open.'}</p></div></div>;
-  if(state==='blocked'||!context)return <div className="pt-4"><div className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-4 text-center"><div role="status" className="text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</div><button type="button" onClick={()=>setRetry(x=>x+1)} className="mt-3 min-h-10 rounded-xl border border-[#d7c39d] bg-white/70 px-4 text-[10px] font-black text-[#6b4f18] transition hover:bg-white">{ar?'إعادة المحاولة':'Try again'}</button></div></div>;
+  if(state==='loading')return <div className="pt-4"><div className="rounded-2xl border border-[#e4e2da] bg-white p-6 text-center"><div className="mx-auto h-8 w-8 rounded-full border-2 border-[#d9dfdb] border-t-[color:var(--emerald)] motion-safe:animate-spin"/><div className="mt-3 text-xs font-black text-[color:var(--emerald)]">{ar?'يُهيَّأ المصحف لروايتك…':'Preparing your Mushaf…'}</div><p className="mt-1 text-[11px] leading-5 text-[#6b716d]">{ar?'يُثبت ميزان نطاقك وروايتك أولًا، ثم يفتح الميكروفون لك وحدك.':'MIZAN verifies your range and reading before the microphone can open.'}</p></div></div>;
+  if(state==='blocked'||!context)return <div className="pt-4"><div className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-4 text-center"><div role="status" className="text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</div><button type="button" onClick={()=>setRetry(x=>x+1)} className="mt-3 min-h-10 rounded-xl border border-[#d7c39d] bg-white/70 px-4 text-[11px] font-black text-[#6b4f18] transition hover:bg-white">{ar?'إعادة المحاولة':'Try again'}</button></div></div>;
 
   return <div className="pt-4"><MushafListens ar={ar} scope={context.scope} deliveryReading={context.deliveryReading} listening={context.listening} owner={context.owner} journeyAuth={access}/></div>;
 };
@@ -356,7 +356,7 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
     <div className="pt-4 space-y-3">
       <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
         <div className="mizan-kicker">{ar ? 'يستمع إليك ويتابع موضعك' : 'IT LISTENS AND FOLLOWS'}</div>
-        <h3 className="mt-1 text-sm font-black text-[#214C40]">{passage.label}</h3>
+        <h3 className="mt-1 text-sm font-black text-[color:var(--emerald)]">{passage.label}</h3>
         <p className="mt-1.5 text-[11px] leading-6 text-[#3c4541]">
           {ar
             ? 'اقرأ المقطع بصوتك، ويتابع النظام أين وصلت. هذا تدريبك وحدك: لا يُسجَّل صوتك، ولا يصل اللجنة منه شيء، ولا يُحتسب في درجتك. الدرجة للمحكّم وحده.'
@@ -366,9 +366,9 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
 
       <div className="flex flex-wrap items-center gap-2">
         {state !== 'live'
-          ? <button type="button" onClick={() => void start()} disabled={state === 'asking' || state === 'blocked'} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#214C40] px-4 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{state === 'asking' ? (ar ? 'جارٍ الإذن…' : 'Asking…') : (ar ? 'ابدأ القراءة' : 'Start')}</button>
-          : <button type="button" onClick={stop} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#d9dfdb] px-4 text-xs font-black text-[#214C40]"><Square className="h-4 w-4" />{ar ? 'أوقف' : 'Stop'}</button>}
-        {state === 'live' && <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#2F6555]"><span className="h-2 w-2 motion-safe:animate-pulse rounded-full bg-[#2F6555]" />{ar ? 'يستمع' : 'listening'}</span>}
+          ? <button type="button" onClick={() => void start()} disabled={state === 'asking' || state === 'blocked'} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--emerald)] px-4 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{state === 'asking' ? (ar ? 'جارٍ الإذن…' : 'Asking…') : (ar ? 'ابدأ القراءة' : 'Start')}</button>
+          : <button type="button" onClick={stop} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#d9dfdb] px-4 text-xs font-black text-[color:var(--emerald)]"><Square className="h-4 w-4" />{ar ? 'أوقف' : 'Stop'}</button>}
+        {state === 'live' && <span className="inline-flex items-center gap-1.5 text-[11px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 motion-safe:animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع' : 'listening'}</span>}
       </div>
 
       {(state === 'live' || last) && (
@@ -397,7 +397,7 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
 const Cell: React.FC<{ ar: boolean; value: string; label: string; tone?: 'calm' | 'warn' }> = ({ value, label, tone = 'calm' }) => (
   <div className={`rounded-xl p-3 text-center ${tone === 'warn' ? 'bg-[#fdf1f1]' : 'bg-[#f1efe9]'}`}>
     <div className="text-lg font-black tabular-nums">{value}</div>
-    <div className="mt-1 text-[10px] text-[#646965]">{label}</div>
+    <div className="mt-1 text-[11px] text-[color:var(--muted)]">{label}</div>
   </div>
 );
 

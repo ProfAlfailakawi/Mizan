@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { BadgeCheck, CircleAlert, Flame, Scale, Settings2, TriangleAlert } from 'lucide-react';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * ما يحتاج تدخّلك — لوحةٌ تُقرأ بلمحة، لا قائمةُ عناوينَ متساوية.
@@ -57,10 +58,10 @@ function since(at: string | undefined, ar: boolean): string {
   if (!Number.isFinite(ms) || ms < 0) return '';
   const min = Math.floor(ms / 60000);
   if (min < 1) return ar ? 'الآن' : 'now';
-  if (min < 60) return ar ? `منذ ${min} د` : `${min}m ago`;
+  if (min < 60) return ar ? arPlural(min, AR_NOUNS.minuteAgo) : `${min}m ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return ar ? `منذ ${hr} س` : `${hr}h ago`;
-  return ar ? `منذ ${Math.floor(hr / 24)} ي` : `${Math.floor(hr / 24)}d ago`;
+  if (hr < 24) return ar ? arPlural(hr, AR_NOUNS.hourAgo) : `${hr}h ago`;
+  return ar ? arPlural(Math.floor(hr / 24), AR_NOUNS.day) : `${Math.floor(hr / 24)}d ago`;
 }
 
 export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; title?: string; hint?: string; max?: number }> = ({ items, ar, title, hint, max = 6 }) => {
@@ -84,8 +85,8 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     return <section className="mizan-surface p-5 sm:p-6">
       <Head ar={ar} title={title} hint={hint} />
       <div className="mt-5 rounded-2xl border border-[#dfe7e1] bg-[#f2f6f3] py-9 text-center">
-        <BadgeCheck className="mx-auto h-7 w-7 text-[#2F6555]" aria-hidden />
-        <div className="mt-2.5 text-sm font-black text-[#214C40]">{ar ? 'لا شيء مفتوح' : 'Nothing open'}</div>
+        <BadgeCheck className="mx-auto h-7 w-7 text-[color:var(--emerald-2)]" aria-hidden />
+        <div className="mt-2.5 text-sm font-black text-[color:var(--emerald)]">{ar ? 'لا شيء مفتوح' : 'Nothing open'}</div>
         <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-[#5f6b64]">
           {ar ? 'لا أعطال ولا حالات مراجعة تنتظر قرارك. ما لا يظهر هنا يسير وحده.' : 'No faults or review cases are waiting on you. Anything not listed here is running on its own.'}
         </p>
@@ -101,7 +102,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
       <div className="flex items-end gap-3">
         <div className="text-[44px] font-black leading-none tabular-nums text-[#20241f]" dir="ltr">{items.length}</div>
         <div className="pb-1 text-[13px] font-bold leading-5 text-[#666d68]">
-          {ar ? 'بندًا مفتوحًا' : 'open items'}
+          {ar ? arPlural(items.length, AR_NOUNS.openItem) : 'open items'}
           {critical > 0 && <div className="mt-0.5 inline-flex items-center gap-1 text-[#8a453c]">
             <Flame className="h-3 w-3" aria-hidden />{ar ? `${critical} منها حرج` : `${critical} critical`}
           </div>}
@@ -122,7 +123,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
         style={{ width: `${(n / items.length) * 100}%`, background: KIND[kind].bar }} />)}
     </div>
 
-    <ol className="mt-4 space-y-1.5">
+    <ol className="mt-4 grid items-stretch gap-1.5 lg:grid-cols-2 lg:gap-2">
       {sorted.slice(0, max).map((item) => {
         const kind = KIND[item.kind];
         const tone = TONE[item.tone || 'info'];
@@ -134,7 +135,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-black leading-6 text-[#222623]">{item.title}</span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#656b66]">
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[color:var(--muted)]">
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: kind.bar }} aria-hidden />
                 {ar ? kind.ar : kind.en}
@@ -149,8 +150,8 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     </ol>
 
     {/* ما لم يتّسع له المكان يُقال عددًا، لا يُبتلع بصمت. */}
-    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#656b66]">
-      {ar ? `و${sorted.length - max} بندًا آخر` : `and ${sorted.length - max} more`}
+    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[color:var(--muted)]">
+      {ar ? arPlural(sorted.length - max, AR_NOUNS.moreItems) : `and ${sorted.length - max} more`}
     </div>}
   </section>;
 };
@@ -159,7 +160,7 @@ const Head: React.FC<{ ar: boolean; title?: string; hint?: string }> = ({ ar, ti
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0">
       <h2 className="text-lg font-extrabold">{title || (ar ? 'ما لم يُغلق بعد' : 'Still open')}</h2>
-      {hint && <p className="mt-1.5 text-xs leading-5 text-[#696f6b]">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs leading-5 text-[color:var(--muted)]">{hint}</p>}
     </div>
     <CircleAlert className="h-5 w-5 shrink-0 text-[#89673a]" aria-hidden />
   </div>

@@ -93,7 +93,7 @@ export const TajweedLegend:React.FC<{spans:TajweedSpan[];ar:boolean}>=({spans,ar
  const present=useMemo(()=>{const s=new Set(spans.map(x=>x.rule));return LEGEND_ORDER.filter(r=>s.has(r))},[spans]);
  if(!present.length)return null;
  return <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
-  {present.map(r=><span key={r} className="inline-flex items-center gap-1.5 text-[9px] text-[#59615c]">
+  {present.map(r=><span key={r} className="inline-flex items-center gap-1.5 text-[11px] text-[#59615c]">
    <span className="w-2 h-2 rounded-full shrink-0" style={{background:RULE_COLOR[r]}}/>
    {ar?LABELS[r]:r.replace(/_/g,' ')}
   </span>)}

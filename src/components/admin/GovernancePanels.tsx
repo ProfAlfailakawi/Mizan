@@ -12,10 +12,10 @@ import { hierarchyOf } from '../../lib/qualification';
 
 const L = (ar: boolean, a: string, e: string) => (ar ? a : e);
 const input = 'mizan-input text-sm';
-const btn = 'rounded-full bg-[#214C40] px-4 py-2 text-xs font-bold text-white disabled:opacity-50';
-const btn2 = 'rounded-full border border-[#214C40]/25 px-3 py-1.5 text-xs font-bold text-[#214C40]';
+const btn = 'rounded-full bg-[var(--emerald)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50';
+const btn2 = 'rounded-full border border-[color:var(--emerald)]/25 px-3 py-1.5 text-xs font-bold text-[color:var(--emerald)]';
 
-const Result: React.FC<{ r: { ok: boolean; code?: string } | null; ar: boolean }> = ({ r, ar }) => r ? <p role={r.ok ? 'status' : 'alert'} className={`text-xs font-bold ${r.ok ? 'text-[#2F6555]' : 'text-[#A34D43]'}`}>{r.ok ? L(ar, 'تم.', 'Done.') : `${L(ar, 'تعذّر', 'Failed')}: ${r.code}`}</p> : null;
+const Result: React.FC<{ r: { ok: boolean; code?: string } | null; ar: boolean }> = ({ r, ar }) => r ? <p role={r.ok ? 'status' : 'alert'} className={`text-xs font-bold ${r.ok ? 'text-[color:var(--emerald-2)]' : 'text-[color:var(--danger)]'}`}>{r.ok ? L(ar, 'تم.', 'Done.') : `${L(ar, 'تعذّر', 'Failed')}: ${r.code}`}</p> : null;
 
 const KIND: Record<ConflictKind, [string, string]> = { declared_conflict: ['تضارب مصالح', 'Conflict of interest'], recusal: ['تنحٍّ', 'Recusal'], abstention: ['امتناع', 'Abstention'] };
 const RELATION: Record<ConflictRelation, [string, string]> = { student: ['طالبي', 'My student'], relative: ['قريب', 'Relative'], institution: ['مؤسستي', 'My institution'], employer: ['جهة عملي', 'Employer'], prior_judging: ['حكّمته سابقًا بصفةٍ مؤثّرة', 'Prior judging role'], other: ['سبب آخر', 'Other'] };
@@ -50,7 +50,7 @@ export const ConflictOfInterestPanel: React.FC<{ mode: 'judge' | 'review' }> = (
     <ul className="space-y-2">{cases.map(c => {
       const d = decision[c.id] || { decision: 'reassigned_participant' as ConflictDecision, note: '', committeeId: '', judgeId: '' };
       return <li key={c.id} className="rounded-2xl border border-[#e5e3dc] bg-white p-4 text-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2"><b>{judgeName(c.judgeId)} — {KIND[c.kind][ar ? 0 : 1]} · {RELATION[c.relation][ar ? 0 : 1]}</b><span className={`rounded-full px-2 py-0.5 font-bold ${c.status === 'open' ? 'bg-[#F5EDE2] text-[#725630]' : 'bg-[#E7EEE9] text-[#214C40]'}`}>{c.status === 'open' ? L(ar, 'مفتوح', 'Open') : L(ar, 'محسوم', 'Resolved')}</span>{c.status === 'open' && caseVerification(c, uidMap) === 'forged' && <span className="rounded-full bg-[#F4E6E3] px-2 py-0.5 font-bold text-[#87483f]">{L(ar, 'غير موثَّق: لم يُعلنه المحكّم نفسه (لا يُلزم)', 'Unverified: not declared by that judge (not binding)')}</span>}{c.status === 'open' && caseVerification(c, uidMap) === 'unverifiable' && <span className="rounded-full bg-[#F5EDE2] px-2 py-0.5 font-bold text-[#725630]">{L(ar, 'لا يمكن التحقق: المحكّم بلا هوية مربوطة (يُلزم احتياطًا)', 'Unverifiable: judge has no linked identity (binding as a precaution)')}</span>}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><b>{judgeName(c.judgeId)} — {KIND[c.kind][ar ? 0 : 1]} · {RELATION[c.relation][ar ? 0 : 1]}</b><span className={`rounded-full px-2 py-0.5 font-bold ${c.status === 'open' ? 'bg-[#F5EDE2] text-[#725630]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`}>{c.status === 'open' ? L(ar, 'مفتوح', 'Open') : L(ar, 'محسوم', 'Resolved')}</span>{c.status === 'open' && caseVerification(c, uidMap) === 'forged' && <span className="rounded-full bg-[var(--danger-soft)] px-2 py-0.5 font-bold text-[#87483f]">{L(ar, 'غير موثَّق: لم يُعلنه المحكّم نفسه (لا يُلزم)', 'Unverified: not declared by that judge (not binding)')}</span>}{c.status === 'open' && caseVerification(c, uidMap) === 'unverifiable' && <span className="rounded-full bg-[#F5EDE2] px-2 py-0.5 font-bold text-[#725630]">{L(ar, 'لا يمكن التحقق: المحكّم بلا هوية مربوطة (يُلزم احتياطًا)', 'Unverifiable: judge has no linked identity (binding as a precaution)')}</span>}</div>
         <div className="mt-1 text-[#4f5752]">{c.participantId ? name(c.participantId) : c.institution} · {c.reason}</div>
         <div className="mt-1 text-[#6a706c]">{L(ar, 'التعيين الأصلي', 'Original assignment')}: {c.originalAssignment.committeeId || '—'} ({c.originalAssignment.judgeIds.length})</div>
         {c.resolution && <div className="mt-2 rounded-xl bg-[#f4f2ec] p-2">{DECISION[c.resolution.decision][ar ? 0 : 1]} — {c.resolution.note}{c.resolution.reassignedToCommitteeId ? ` → ${c.resolution.reassignedToCommitteeId}` : ''}{c.resolution.replacementJudgeId ? ` → ${judgeName(c.resolution.replacementJudgeId)}` : ''}</div>}
@@ -87,7 +87,7 @@ export const SmartSchedulePanel: React.FC = () => {
       {withDate && <input type="date" aria-label={L(ar, 'اليوم', 'Day')} className={`${input} max-w-[10rem]`} value={r.date} onChange={e => set(list.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} />}
       <input type="time" aria-label={L(ar, 'من', 'From')} className={`${input} max-w-[8rem]`} value={r.start} onChange={e => set(list.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} />
       <input type="time" aria-label={L(ar, 'إلى', 'To')} className={`${input} max-w-[8rem]`} value={r.end} onChange={e => set(list.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} />
-      <button type="button" className="text-xs font-bold text-[#A34D43]" onClick={() => set(list.filter((_, j) => j !== i))}>{L(ar, 'حذف', 'Remove')}</button></div>)}
+      <button type="button" className="text-xs font-bold text-[color:var(--danger)]" onClick={() => set(list.filter((_, j) => j !== i))}>{L(ar, 'حذف', 'Remove')}</button></div>)}
     <button type="button" className={btn2} onClick={() => set([...list, { date: '', start: '09:00', end: '09:15' }])}>+</button></fieldset>;
   const UNSCHED: Record<string, [string, string]> = { NO_COMMITTEE_FOR_CATEGORY: ['لا لجنة لفئته', 'No panel for the category'], ALL_COMMITTEES_CONFLICTED: ['كل اللجان عليها تضارب مصالح', 'Every panel is conflicted'], NO_CAPACITY: ['لا سعة في الأيام المحددة', 'No capacity in the given days'], PIN_INVALID: ['تثبيت يدوي غير صالح', 'Invalid manual pin'] };
   return <section className="space-y-4">
@@ -134,7 +134,7 @@ export const QualificationPanel: React.FC = () => {
   return <section className="space-y-4">
     <h2 className="text-base font-black">{L(ar, 'هرم التأهيل', 'Qualification hierarchy')}</h2>
     {(tree.up.length > 0 || tree.down.length > 0) && <ol className="flex flex-wrap items-center gap-2 text-xs" aria-label={L(ar, 'المراحل', 'Stages')}>
-      {[...tree.down.map(r => r.childCompetitionId).reverse(), cid, ...tree.up.map(r => r.parentCompetitionId)].map((id, i, all) => <li key={`${id}-${i}`} className="flex items-center gap-2"><span className={`rounded-full px-3 py-1 ${id === cid ? 'bg-[#214C40] text-white' : 'bg-[#f4f2ec]'}`}>{comp(id)}</span>{i < all.length - 1 && <span aria-hidden="true">←</span>}</li>)}
+      {[...tree.down.map(r => r.childCompetitionId).reverse(), cid, ...tree.up.map(r => r.parentCompetitionId)].map((id, i, all) => <li key={`${id}-${i}`} className="flex items-center gap-2"><span className={`rounded-full px-3 py-1 ${id === cid ? 'bg-[var(--emerald)] text-white' : 'bg-[#f4f2ec]'}`}>{comp(id)}</span>{i < all.length - 1 && <span aria-hidden="true">←</span>}</li>)}
     </ol>}
     <form className="grid gap-3 rounded-2xl border border-[#e5e3dc] p-4 sm:grid-cols-2" onSubmit={e => { e.preventDefault(); setResult(s.linkQualifierTo(form.parent, { topN: form.topN ? Number(form.topN) : undefined, minScore: form.minScore ? Number(form.minScore) : undefined, perCategory: form.perCategory }, form.stage || undefined)); }}>
       <label className="text-xs font-bold">{L(ar, 'هذه المسابقة تصفياتٌ لـ', 'This competition qualifies for')}<select className={input} value={form.parent} onChange={e => setForm({ ...form, parent: e.target.value })}><option value="" />{others.map(c => <option key={c.id} value={c.id}>{comp(c.id)}</option>)}</select></label>
@@ -151,7 +151,7 @@ export const QualificationPanel: React.FC = () => {
         <span>#{q.rank} · {pname(q.sourceParticipantId)} · {q.score}{q.evidence.sealChecksum ? ` · ${L(ar, 'مختوم', 'sealed')}` : ''}</span>
         <span className="flex items-center gap-2"><b>{STATUS[q.status][ar ? 0 : 1]}</b>
           {q.status === 'qualified' && <button className={btn2} onClick={() => setResult(s.setQualificationStatus(q.id, 'invited'))}>{L(ar, 'دعوة للمرحلة التالية', 'Invite to next stage')}</button>}
-          {(q.status === 'qualified' || q.status === 'invited' || q.status === 'accepted') && <><input aria-label={L(ar, 'سبب الإلغاء', 'Reason for revoking')} placeholder={L(ar, 'سبب الإلغاء', 'Revoke reason')} className={`${input} max-w-[10rem]`} value={revoke[q.id] || ''} onChange={e => setRevoke({ ...revoke, [q.id]: e.target.value })} /><button className="text-[11px] font-bold text-[#A34D43] disabled:opacity-50" disabled={(revoke[q.id] || '').trim().length < 5} onClick={() => setResult(s.setQualificationStatus(q.id, 'revoked', revoke[q.id]))}>{L(ar, 'إلغاء', 'Revoke')}</button></>}
+          {(q.status === 'qualified' || q.status === 'invited' || q.status === 'accepted') && <><input aria-label={L(ar, 'سبب الإلغاء', 'Reason for revoking')} placeholder={L(ar, 'سبب الإلغاء', 'Revoke reason')} className={`${input} max-w-[10rem]`} value={revoke[q.id] || ''} onChange={e => setRevoke({ ...revoke, [q.id]: e.target.value })} /><button className="text-[11px] font-bold text-[color:var(--danger)] disabled:opacity-50" disabled={(revoke[q.id] || '').trim().length < 5} onClick={() => setResult(s.setQualificationStatus(q.id, 'revoked', revoke[q.id]))}>{L(ar, 'إلغاء', 'Revoke')}</button></>}
         </span></li>)}</ul>
     </div>; })}
   </section>;

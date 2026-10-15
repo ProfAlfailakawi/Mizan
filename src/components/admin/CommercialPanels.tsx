@@ -56,10 +56,10 @@ const ErrorBox: React.FC<{ error: ApiError | null }> = ({ error }) => {
 
 const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string; meter?: number; nowrap?: boolean }> = ({ label, value, hint, meter, nowrap }) => (
   <div className="rounded-2xl border border-[#e2e0d9] bg-white p-3.5 min-[400px]:p-4">
-    <div className="text-[11px] font-bold text-[#666c68]">{label}</div>
+    <div className="text-[11px] font-bold text-[color:var(--muted)]">{label}</div>
     <div className={nowrap ? 'mt-1 whitespace-nowrap text-[clamp(13px,4.2vw,18px)] font-black text-[#171b18]' : 'mt-1 text-lg font-black text-[#171b18]'} dir="auto">{value}</div>
-    {hint && <div className="mt-1 text-[11px] text-[#666c68] [text-wrap:balance]">{hint}</div>}
-    {meter !== undefined && Number.isFinite(meter) && <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#ebe9e2]"><div className="h-full rounded-full bg-[#2F6555]" style={{ width: `${Math.max(0, Math.min(1, meter)) * 100}%` }} /></div>}
+    {hint && <div className="mt-1 text-[11px] text-[color:var(--muted)] [text-wrap:balance]">{hint}</div>}
+    {meter !== undefined && Number.isFinite(meter) && <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#ebe9e2]"><div className="h-full rounded-full bg-[var(--emerald-2)]" style={{ width: `${Math.max(0, Math.min(1, meter)) * 100}%` }} /></div>}
   </div>
 );
 
@@ -92,7 +92,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
   const qs = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
   const load = useCallback(async () => { try { setData(await api(`/api/saas/organization/billing${qs}`)); setError(null); } catch (e) { setError(e as ApiError); } }, [qs]);
   useEffect(() => { void load(); }, [load]);
-  if (!data) return <div className="space-y-3"><ErrorBox error={error} />{!error && <div className="text-xs text-[#666c68]">{ct(locale, 'loading')}</div>}</div>;
+  if (!data) return <div className="space-y-3"><ErrorBox error={error} />{!error && <div className="text-xs text-[color:var(--muted)]">{ct(locale, 'loading')}</div>}</div>;
   const u = data.usage;
   const warn = u.warningThresholdBps >= 10_000 ? 'warnFull' : u.warningThresholdBps >= 8_500 ? 'warnHigh' : u.warningThresholdBps >= 7_000 ? 'warn70' : null;
   const upgrade = async (planId: string) => {
@@ -123,11 +123,11 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
         <div className="mizan-panel p-5 text-xs">
           <div className="space-y-3">{(['participantAllowance', 'activeCompetitionAllowance'] as const).map(k => (
             <div key={k} role="group" aria-label={ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')} className="rounded-2xl bg-[#f3f1eb] p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-black text-[#171b18]"><Gauge className="h-4 w-4 text-[#2F6555]" strokeWidth={1.75} />{ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')}</div>
+              <div className="mb-2 flex items-center gap-2 text-xs font-black text-[#171b18]"><Gauge className="h-4 w-4 text-[color:var(--emerald-2)]" strokeWidth={1.75} />{ct(locale, k === 'participantAllowance' ? 'participantsUsed' : 'activeCompetitions')}</div>
               <dl className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'limitsBase')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{Number(data.limits.base[k]).toLocaleString('en-US')}</dd></div>
-                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'limitsOverride')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{data.limits.override[k] == null ? '—' : Number(data.limits.override[k]).toLocaleString('en-US')}</dd></div>
-                <div className="rounded-xl bg-[#e6efe9] px-1 py-2"><dt className="text-[11px] font-bold text-[#2F6555]">{ct(locale, 'limitsEffective')}</dt><dd className="mt-0.5 text-sm font-black text-[#1f5b3c]" dir="ltr">{Number(data.limits.effective[k]).toLocaleString('en-US')}</dd></div>
+                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'limitsBase')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{Number(data.limits.base[k]).toLocaleString('en-US')}</dd></div>
+                <div className="rounded-xl bg-white px-1 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'limitsOverride')}</dt><dd className="mt-0.5 text-sm font-black" dir="ltr">{data.limits.override[k] == null ? '—' : Number(data.limits.override[k]).toLocaleString('en-US')}</dd></div>
+                <div className="rounded-xl bg-[#e6efe9] px-1 py-2"><dt className="text-[11px] font-bold text-[color:var(--emerald-2)]">{ct(locale, 'limitsEffective')}</dt><dd className="mt-0.5 text-sm font-black text-[#1f5b3c]" dir="ltr">{Number(data.limits.effective[k]).toLocaleString('en-US')}</dd></div>
               </dl>
             </div>))}</div>
         </div>
@@ -141,7 +141,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
             <div className="grid gap-3 sm:grid-cols-3">
               {larger.map((p: any) => <div key={p.id} className="rounded-2xl border border-[#e2e0d9] p-4">
                 <div className="font-black">{planName(p)}</div>
-                <div className="text-xs text-[#666c68]">{p.participantAllowance.toLocaleString('en-US')} · {p.activeCompetitionAllowance} {ct(locale, 'activeCompetitions')}</div>
+                <div className="text-xs text-[color:var(--muted)]">{p.participantAllowance.toLocaleString('en-US')} · {p.activeCompetitionAllowance} {ct(locale, 'activeCompetitions')}</div>
                 <div className="my-2 text-sm font-bold">{formatMoney(p.publicPriceMinor, p.currency, locale)}</div>
                 <Button size="sm" loading={busy} onClick={() => void upgrade(p.id)}>{ct(locale, 'upgrade')}</Button>
               </div>)}
@@ -150,7 +150,7 @@ export const OrganizationSubscriptionPanel: React.FC<{ organizationId?: string }
         )}
       <div className="mizan-panel p-5">
         <h3 className="mb-2 text-sm font-black">{ct(locale, 'history')}</h3>
-        {data.history.length === 0 ? <p className="text-xs text-[#666c68]">{ct(locale, 'noHistory')}</p> : (
+        {data.history.length === 0 ? <p className="text-xs text-[color:var(--muted)]">{ct(locale, 'noHistory')}</p> : (
           <ul className="divide-y divide-[#ebe9e2] text-xs">
             {data.history.map((t: any) => <li key={t.id} className="flex flex-wrap justify-between gap-x-2 gap-y-1.5 py-3">
               <span>{formatDate(t.startsAt, locale)} {locale === 'ar' ? '←' : '→'} {formatDate(termLastDay(t.endsAt), locale)}{t.legacy ? ' (legacy)' : ''}</span>
@@ -190,7 +190,7 @@ export const OperatorCommercialPanel: React.FC = () => {
         <Stat label={ct(locale, 'pendingRenewals')} value={s.pendingRenewals} />
         <Stat label={ct(locale, 'suspendedCustomers')} value={s.suspendedCustomers} />
       </div>
-      {data.legacyCreditBalance !== 0 && <p className="text-xs text-[#666c68]">{ct(locale, 'legacyCredits')}: {data.legacyCreditBalance}</p>}
+      {data.legacyCreditBalance !== 0 && <p className="text-xs text-[color:var(--muted)]">{ct(locale, 'legacyCredits')}: {data.legacyCreditBalance}</p>}
       <div role="tablist" className="mizan-tabs">
         {tabs.map(([id, key]) => <button key={id} role="tab" aria-selected={tab === id} className={`mizan-tab ${tab === id ? 'is-active' : ''}`} onClick={() => setTab(id)}>{ct(locale, key)}</button>)}
       </div>
@@ -231,21 +231,21 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
         {data.customers.map((c: any) => (
           <article key={c.organizationId} className="mizan-panel p-4">
             <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E7EEE9] text-[#2F6555]"><Building2 className="h-5 w-5" strokeWidth={1.75} /></span>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--emerald-soft)] text-[color:var(--emerald-2)]"><Building2 className="h-5 w-5" strokeWidth={1.75} /></span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-black">{c.officialName}</div>
-                <div className="mt-0.5 text-[11px] font-bold text-[#666c68]">{c.planName || '—'}{c.term ? ` · #${c.term.termIndex}` : ''}</div>
+                <div className="mt-0.5 text-[11px] font-bold text-[color:var(--muted)]">{c.planName || '—'}{c.term ? ` · #${c.term.termIndex}` : ''}</div>
               </div>
               <span className="shrink-0 rounded-full bg-[#f0eee8] px-2.5 py-1 text-[11px] font-black">{ct(locale, `state_${c.accessState}` as CommercialKey)}</span>
             </div>
             <div className="mt-3">
-              <div className="flex items-center justify-between text-[11px] font-bold text-[#666c68]"><span>{ct(locale, 'participantsUsed')}</span><span dir="ltr">{c.participantsUsed} / {c.participantAllowance}</span></div>
+              <div className="flex items-center justify-between text-[11px] font-bold text-[color:var(--muted)]"><span>{ct(locale, 'participantsUsed')}</span><span dir="ltr">{c.participantsUsed} / {c.participantAllowance}</span></div>
               {c.participantAllowance > 0 && <div className="mt-1.5 h-2 rounded-full bg-[#ebe9e2]"><div className="h-2 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'renewalDate')}</dt><dd className="mt-0.5 font-black">{formatDate(termLastDay(c.renewalDate), locale)}</dd></div>
-              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'walletCost')}</dt><dd className="mt-0.5 font-black">{formatMoney(c.walletCostMinor, c.currency, locale)}</dd></div>
-              <div className="col-span-2 rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'customDomain')}</dt><dd className="mt-0.5 font-black" dir="ltr">{c.domain || '—'}</dd></div>
+              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'renewalDate')}</dt><dd className="mt-0.5 font-black">{formatDate(termLastDay(c.renewalDate), locale)}</dd></div>
+              <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'walletCost')}</dt><dd className="mt-0.5 font-black">{formatMoney(c.walletCostMinor, c.currency, locale)}</dd></div>
+              <div className="col-span-2 rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'customDomain')}</dt><dd className="mt-0.5 font-black" dir="ltr">{c.domain || '—'}</dd></div>
             </dl>
             <Button className="mt-3 min-h-11 w-full" size="sm" variant="secondary" loading={busy === c.organizationId} onClick={() => void renew(c.organizationId)}>{ct(locale, 'renew')}</Button>
           </article>
@@ -253,7 +253,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
       </div>
       <div className="mizan-panel hidden overflow-x-auto p-4 sm:block">
         <table className="w-full min-w-[720px] text-start text-xs [&_td]:px-2.5 [&_th]:px-2.5">
-          <thead><tr className="text-[#666c68]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
+          <thead><tr className="text-[color:var(--muted)]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
             <td className="py-2 font-bold">{c.officialName}</td><td>{c.planName || '—'}</td>
             <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr"><div>{c.participantsUsed} / {c.participantAllowance}</div>{c.participantAllowance > 0 && <div className="mt-1 h-1.5 w-24 rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}</td>
@@ -311,14 +311,14 @@ const OperatorWallet: React.FC<{ data: any; reload: () => Promise<void>; onError
         <ul className="divide-y divide-[#ebe9e2] sm:hidden">
           {rows.map((e: any) => (
             <li key={e.id} className="flex items-center gap-3 py-3">
-              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${e.amountMinor < 0 ? 'bg-[#f6e7e3] text-[#874b43]' : 'bg-[#E7EEE9] text-[#2F6555]'}`}><WalletCards className="h-[18px] w-[18px]" strokeWidth={1.75} /></span>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${e.amountMinor < 0 ? 'bg-[#f6e7e3] text-[#874b43]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald-2)]'}`}><WalletCards className="h-[18px] w-[18px]" strokeWidth={1.75} /></span>
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-black">{ct(locale, `entry_${e.type}` as CommercialKey)}</div>
-                <div className="mt-0.5 text-[11px] text-[#666c68]">{formatDate(e.createdAt, locale)}{e.reason ? ` · ${e.reason}` : ''}</div>
+                <div className="mt-0.5 text-[11px] text-[color:var(--muted)]">{formatDate(e.createdAt, locale)}{e.reason ? ` · ${e.reason}` : ''}</div>
               </div>
               <div className="shrink-0 text-end">
                 <div dir="ltr" className={`text-xs font-black ${e.amountMinor < 0 ? 'text-[#874b43]' : 'text-[#1f5b3c]'}`}>{formatMoney(e.amountMinor, e.currency, locale)}</div>
-                <div dir="ltr" className="mt-0.5 text-[11px] text-[#666c68]">{formatMoney(e.balanceAfterMinor, e.currency, locale)}</div>
+                <div dir="ltr" className="mt-0.5 text-[11px] text-[color:var(--muted)]">{formatMoney(e.balanceAfterMinor, e.currency, locale)}</div>
               </div>
             </li>
           ))}
@@ -350,15 +350,15 @@ const OperatorPricing: React.FC<{ data: any; reload: () => Promise<void>; onErro
       {data.pricing.map((p: any) => (
         <article key={p.id} className="mizan-panel p-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#E7EEE9] text-[#2F6555]"><WalletCards className="h-5 w-5" strokeWidth={1.75} /></span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--emerald-soft)] text-[color:var(--emerald-2)]"><WalletCards className="h-5 w-5" strokeWidth={1.75} /></span>
             <div className="min-w-0 flex-1 text-sm font-black">{p.name}</div>
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[#666c68]">{ct(locale, 'publicPrice')}</dt><dd className="mt-0.5 font-black">{p.custom ? '—' : formatMoney(p.publicPriceMinor, p.currency, locale)}</dd></div>
-            <div className="rounded-xl bg-[#e6efe9] px-3 py-2"><dt className="text-[11px] font-bold text-[#2F6555]">{ct(locale, 'wholesalePrice')}</dt><dd className="mt-0.5 font-black">{formatMoney(p.wholesalePriceMinor, p.currency, locale)}</dd></div>
+            <div className="rounded-xl bg-[#f3f1eb] px-3 py-2"><dt className="text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'publicPrice')}</dt><dd className="mt-0.5 font-black">{p.custom ? '—' : formatMoney(p.publicPriceMinor, p.currency, locale)}</dd></div>
+            <div className="rounded-xl bg-[#e6efe9] px-3 py-2"><dt className="text-[11px] font-bold text-[color:var(--emerald-2)]">{ct(locale, 'wholesalePrice')}</dt><dd className="mt-0.5 font-black">{formatMoney(p.wholesalePriceMinor, p.currency, locale)}</dd></div>
           </dl>
           <div className="mt-3 flex items-end gap-2">
-            <label className="min-w-0 flex-1 text-[11px] font-bold text-[#666c68]">{ct(locale, 'resalePrice')}<input aria-label={`${ct(locale, 'resalePrice')} ${p.name}`} className={`${inputCls} mt-1 min-h-11`} dir="ltr" placeholder={p.resalePriceMinor !== undefined ? String(p.resalePriceMinor / 100) : ''} value={draft[p.id] ?? ''} onChange={e => setDraft({ ...draft, [p.id]: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+            <label className="min-w-0 flex-1 text-[11px] font-bold text-[color:var(--muted)]">{ct(locale, 'resalePrice')}<input aria-label={`${ct(locale, 'resalePrice')} ${p.name}`} className={`${inputCls} mt-1 min-h-11`} dir="ltr" placeholder={p.resalePriceMinor !== undefined ? String(p.resalePriceMinor / 100) : ''} value={draft[p.id] ?? ''} onChange={e => setDraft({ ...draft, [p.id]: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
             <Button className="min-h-11" size="sm" variant="secondary" disabled={draft[p.id] === undefined} onClick={() => void save(p)}>{ct(locale, 'save')}</Button>
           </div>
         </article>
@@ -419,7 +419,7 @@ export const BrandEditor: React.FC<{ ownerType: 'operator' | 'organization'; own
         <div className="mizan-panel space-y-3 p-5">
           <h3 className="text-sm font-black">{ct(locale, 'customDomain')}</h3>
           <div className="flex flex-wrap gap-2"><input aria-label={ct(locale, 'customDomain')} className={`${inputCls} max-w-sm`} dir="ltr" placeholder="discover.example.org" value={host} onChange={e => setHost(e.target.value)} /><Button variant="secondary" onClick={() => void addDomain()}>{ct(locale, 'save')}</Button></div>
-          <p className="text-[11px] text-[#666c68]">{ct(locale, 'dnsInstruction')} {ct(locale, 'sslNote')}</p>
+          <p className="text-[11px] text-[color:var(--muted)]">{ct(locale, 'dnsInstruction')} {ct(locale, 'sslNote')}</p>
           <ul className="space-y-2 text-xs">{data.domains.map((d: any) => <li key={d.id} className="rounded-xl border border-[#e2e0d9] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2"><b dir="ltr">{d.hostname}</b><Badge variant={d.status === 'active' ? 'emerald' : 'amber'}>{d.status}</Badge></div>
             {d.status !== 'active' && <div className="mt-2 break-all font-mono text-[11px]" dir="ltr">TXT {d.verificationRecord} = {d.verificationToken}</div>}
@@ -524,7 +524,7 @@ export const NewEditionWizard: React.FC<{ open: boolean; sourceId?: string; onCl
     <div className="fixed inset-0 z-[190] overflow-y-auto bg-[#16241f]/45 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="edition-title">
       <div className="mx-auto max-w-2xl rounded-3xl bg-white p-6 shadow-xl">
         <h2 id="edition-title" className="text-lg font-black">{ct(locale, 'newEdition')}</h2>
-        <p className="mt-1 text-xs text-[#666c68]" aria-live="polite">{step} / 4</p>
+        <p className="mt-1 text-xs text-[color:var(--muted)]" aria-live="polite">{step} / 4</p>
         {step === 1 && <div className="mt-4 space-y-3"><Field label={ct(locale, 'cloneFrom')}><select autoFocus className={inputCls} value={src} onChange={e => setSrc(e.target.value)}>{candidates.map(c => <option key={c.id} value={c.id}>{locale === 'ar' ? c.nameArabic : c.name || c.nameArabic}{c.editionLabel || c.edition ? ` — ${c.editionLabel || c.edition}` : ''}</option>)}</select></Field></div>}
         {step === 2 && <div className="mt-4 grid gap-3">
           <Field label={ct(locale, 'editionLabel')}><input autoFocus className={inputCls} value={label} onChange={e => setLabel(e.target.value)} /></Field>
@@ -662,8 +662,8 @@ export const SsoSettingsPanel: React.FC = () => {
       {form.roleMapping.map((m: any, i: number) => <div key={i} className="mb-2 flex flex-wrap gap-2">
         <input aria-label={ar ? 'المجموعة' : 'Group'} className={`${inputCls} max-w-xs`} dir="ltr" value={m.group} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, group: e.target.value } : x) })} />
         <select aria-label={ar ? 'الدور' : 'Role'} className={`${inputCls} max-w-[12rem]`} value={m.role} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, role: e.target.value } : x) })}>{SSO_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
-        <button type="button" className="text-xs font-bold text-[#A34D43]" onClick={() => setForm({ ...form, roleMapping: form.roleMapping.filter((_: any, j: number) => j !== i) })}>{ar ? 'حذف' : 'Remove'}</button></div>)}
-      <button type="button" className="text-xs font-bold text-[#214C40] underline" onClick={() => setForm({ ...form, roleMapping: [...form.roleMapping, { group: '', role: 'judge' }] })}>+</button>
+        <button type="button" className="text-xs font-bold text-[color:var(--danger)]" onClick={() => setForm({ ...form, roleMapping: form.roleMapping.filter((_: any, j: number) => j !== i) })}>{ar ? 'حذف' : 'Remove'}</button></div>)}
+      <button type="button" className="text-xs font-bold text-[color:var(--emerald)] underline" onClick={() => setForm({ ...form, roleMapping: [...form.roleMapping, { group: '', role: 'judge' }] })}>+</button>
     </fieldset>
     <Button onClick={() => void save()}>{ct(locale, 'save')}</Button>
     <div className="flex flex-wrap items-end gap-2 rounded-xl border border-[#e5e3dc] p-3">
@@ -736,8 +736,8 @@ export const PaymentGatewayPanel: React.FC<{ ownerType: 'operator' | 'organizati
     {!!data?.gateways.length && <ul className="divide-y divide-[#ebe9e2] rounded-2xl border border-[#e2e0d9] bg-white text-xs">
       {data.gateways.map(g => <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
         <span><b>{g.displayName}</b> · {g.provider} · <Badge variant={g.status === 'active' ? 'emerald' : 'neutral'}>{GATEWAY_STATUS[g.status]?.[ar ? 0 : 1] || g.status}</Badge>
-          {g.lastTest && <span className="ms-2 text-[#666c68]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? <Check className="inline h-3.5 w-3.5 align-text-bottom" aria-label={ar ? 'نجح' : 'Passed'} /> : g.lastTest.code}</span>}
-          <span className="block break-all text-[11px] text-[#666c68]" dir="ltr">{data.webhookBase}{g.id}</span></span>
+          {g.lastTest && <span className="ms-2 text-[color:var(--muted)]">{ar ? 'آخر اختبار' : 'Last test'}: {formatDate(g.lastTest.at, locale)} · {g.lastTest.ok ? <Check className="inline h-3.5 w-3.5 align-text-bottom" aria-label={ar ? 'نجح' : 'Passed'} /> : g.lastTest.code}</span>}
+          <span className="block break-all text-[11px] text-[color:var(--muted)]" dir="ltr">{data.webhookBase}{g.id}</span></span>
         {g.status !== 'disabled' && <span className="flex gap-2">
           {g.status === 'pending_test' && <Button size="sm" onClick={() => void test(g.id)}>{ar ? 'اختبار وتفعيل' : 'Test & activate'}</Button>}
           <Button size="sm" variant="outline" onClick={() => void disable(g.id)}>{ar ? 'تعطيل' : 'Disable'}</Button>

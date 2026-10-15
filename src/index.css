@@ -12,7 +12,7 @@
     --surface: #fffefb;
     --surface-soft: #f1efe8;
     --ink: #171b18;
-    --muted: #696f6b;
+    --muted: #656b66;
     --line: #dfded7;
     --emerald: #214c40;
     --emerald-2: #2f6555;
@@ -100,7 +100,7 @@
   border-radius: var(--radius-md);
 }
 .mizan-kicker {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -198,17 +198,17 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 @media (max-width:639px), (max-height:500px){
   label:has(> input[type="checkbox"]){ min-width:40px; min-height:40px }
 }
-.mizan-field-label { display:block; color:#686f6b; font-size:11px; font-weight:800; margin:0 0 6px; }
+.mizan-field-label { display:block; color:#686f6b; font-size:12px; font-weight:800; margin:0 0 6px; }
 /* نظام التبويب الموحد: شريط حبات واحد لكل أقسام المنصة، بحركة هادئة تحترم تفضيل تقليل الحركة. */
 /* الحبّة النشطة كانت تُسقط ظلًّا خارج إطار الشريط فتبدو مقصوصةً عند حافته؛ الشريط الآن
    يحتوي ظلَّها (overflow) والظل صار داخليًّا لا يتجاوز حدود الحبّة نفسها. */
 .mizan-tabs { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; width:fit-content; max-width:100%; padding:6px; border:1px solid #e2e0d8; border-radius:18px; background:#fbfaf7; overflow:hidden; }
-.mizan-tab { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:38px; padding:0 .95rem; border-radius:12px; font-size:12px; font-weight:900; line-height:1.2; white-space:nowrap; color:#5d645f; transition:color .18s ease, background-color .18s ease, transform .12s ease; }
+.mizan-tab { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:44px; padding:0 .95rem; border-radius:12px; font-size:12px; font-weight:900; line-height:1.2; white-space:nowrap; color:#5d645f; transition:color .18s ease, background-color .18s ease, transform .12s ease; }
 .mizan-tab:hover { background:#f0eee8; }
 .mizan-tab:active { transform:scale(.965); }
 .mizan-tab.is-active { background:#214C40; color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.12); }
 .mizan-tabs-sm { padding:4px; gap:4px; border-radius:14px; }
-.mizan-tabs-sm .mizan-tab { min-height:32px; padding:0 .8rem; font-size:11px; border-radius:10px; }
+.mizan-tabs-sm .mizan-tab { min-height:40px; padding:0 .8rem; font-size:12px; border-radius:10px; }
 /* شريط تبويب فرعي داخل قسم: أخفّ وزنًا كي لا ينافس الشريط الرئيسي فوقه. */
 .mizan-tabs-sub { background:transparent; border-color:#e7e5de; }
 .mizan-tabs-sub .mizan-tab.is-active { background:#E7EEE9; color:#214C40; box-shadow:inset 0 0 0 1px rgba(33,76,64,.18); }
@@ -243,7 +243,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 .mizan-pictogram-blue { color:#435f70;background:#eaf0f3; }.mizan-pictogram-blue .mizan-pictogram-dot,.mizan-pictogram-blue .mizan-pictogram-plane{background:#7799aa}
 .mizan-pictogram-neutral { color:#59615c;background:#f0eee8; }.mizan-pictogram-neutral .mizan-pictogram-dot,.mizan-pictogram-neutral .mizan-pictogram-plane{background:#9fa49f}
 /* ── Mizan mark micro-loader ─────────────────────────────────────────────
-   محمّل العلامة: قوس المحراب والمصحف والقلم يتجمّعون مرة واحدة بترتيب قراءة
+   محمّل العلامة: عارضة الميزان والمصحف والقلم يتجمّعون مرة واحدة بترتيب قراءة
    العلامة (حركة mizan-mark.is-animated الموجودة أصلًا) ثم خمول نبضي هادئ.
    لا كفّتي ميزان عدليّ — القراءة المزدوجة قائمة في العلامة ذاتها. */
 .mizan-mark-loader { position:relative; display:inline-grid; place-items:center; color:var(--emerald-2); flex:0 0 auto; }
@@ -278,7 +278,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 @keyframes mzScalePulse { 0%,100% { opacity:1 } 50% { opacity:.45 } }
 
 .mizan-trust-mark { width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:#202924;color:#fff;border:1px solid rgba(255,255,255,.06); }
-.mizan-proof-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;overflow-wrap:anywhere; }
+.mizan-proof-code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;overflow-wrap:anywhere; }
 @media (max-width:639px){ .mizan-surface{border-radius:20px}.mizan-hero{border-radius:22px}.mizan-panel{border-radius:17px} }
 
 /* Invisible Accessibility — applied from system preference or a user-selected profile.
@@ -294,12 +294,12 @@ html[data-mizan-text="xl"]    { --mizan-text-scale: 1.32; }
 /* Legibility floor for the pervasive micro-typography. !important is intentional:
    it overrides the Tailwind arbitrary-size utilities regardless of layer order, and it
    is the accessibility baseline rather than a per-component style choice. */
-.text-\[8px\]  { font-size: calc(11px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
-.text-\[9px\]  { font-size: calc(11px   * var(--mizan-text-scale)) !important; line-height: 1.55; }
-.text-\[10px\] { font-size: calc(11.5px * var(--mizan-text-scale)) !important; line-height: 1.55; }
+.text-\[8px\]  { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
+.text-\[9px\]  { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.55; }
+.text-\[10px\] { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.55; }
 .text-\[11px\] { font-size: calc(12px   * var(--mizan-text-scale)) !important; line-height: 1.5; }
-.mizan-kicker, .mizan-ticket-label { font-size: calc(11.5px * var(--mizan-text-scale)); }
-.mizan-field-label { font-size: calc(11px * var(--mizan-text-scale)); }
+.mizan-kicker, .mizan-ticket-label { font-size: calc(12px * var(--mizan-text-scale)); }
+.mizan-field-label { font-size: calc(12px * var(--mizan-text-scale)); }
 .mizan-proof-code  { font-size: calc(12px * var(--mizan-text-scale)); }
 /* Full-bleed dark venue screens (Gate / Waiting Hall / Hall Map / Ceremony) are read from
    meters away — give their micro-labels an extra push so they stay legible across a hall.
@@ -334,12 +334,12 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 .mizan-ticket-issued{transform:translate(-50%,22px);opacity:1}
 .mizan-ticket-cut{position:absolute;top:13px;left:22px;right:22px;border-top:1px dashed #bbb8ae;color:#696f6b;height:15px;display:flex;justify-content:flex-end;align-items:flex-start}
 .mizan-ticket-cut svg{transform:translateY(-7px);background:#fffefb}
-.mizan-ticket-label{font-size:calc(11.5px * var(--mizan-text-scale));font-weight:900;letter-spacing:.12em;color:#696f6b}
+.mizan-ticket-label{font-size:calc(12px * var(--mizan-text-scale));font-weight:900;letter-spacing:.12em;color:#696f6b}
 html[lang="ar"] .mizan-ticket-label{letter-spacing:0}
 /* Arabic letters are joined: Tailwind tracking utilities pull them apart. */
 html[lang="ar"] :is(.tracking-wide,.tracking-wider,.tracking-widest):not([lang="en"]):not([dir="ltr"]){letter-spacing:0}
 .mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
-.mizan-ticket-meta{font-size:11px;font-weight:800;color:#5f6862;margin-top:12px}
+.mizan-ticket-meta{font-size:12px;font-weight:800;color:#5f6862;margin-top:12px}
 .mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}
 
 /* Brand refresh — soft authority */
@@ -385,7 +385,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .is-stacked .mizan-wordmark-rule i { width:clamp(26px,5vw,52px); }
 .mizan-wordmark-rule b {
   font-family:var(--font-sans); font-weight:600; font-style:normal;
-  font-size:calc(9px * var(--mizan-text-scale)); letter-spacing:.42em; text-indent:.42em;
+  font-size:calc(12px * var(--mizan-text-scale)); letter-spacing:.42em; text-indent:.42em;
   color:var(--gold); white-space:nowrap;
 }
 .is-stacked .mizan-wordmark-rule b { font-size:calc(12px * var(--mizan-text-scale)); }
@@ -413,8 +413,9 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 @keyframes mzTrack  { from { transform:scaleX(0) } to { transform:scaleX(1) } }
 
 /* Animated mark: parts assemble in the order the brand is read —
-   arch, book, qalam, orb, finial. */
+   beam, book, qalam, orb, finial. */
 .mizan-mark.is-animated .mz-arch   { stroke-dasharray:100; animation:mzDraw .92s var(--ease-brand) .05s both }
+.mizan-mark.is-animated .mz-chains { animation:mzLoaderIn .4s ease .55s both }
 .mizan-mark.is-animated .mz-page-l,
 .mizan-mark.is-animated .mz-cover-l{ transform-origin:60px 96px; --mz-fold:9deg; animation:mzUnfold .6s var(--ease-brand) .5s both }
 .mizan-mark.is-animated .mz-page-r,
@@ -538,7 +539,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 @media (min-width:1024px){ .mzo-body{ grid-template-columns:1.02fr .98fr; } }
 
 .mzo-eyebrow{ display:inline-flex; align-items:center; gap:.5rem;
-  font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:#856941; }
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:#856941; }
 .mzo-eyebrow::before{ content:""; width:18px; height:1px; background:linear-gradient(90deg,var(--gold),transparent); }
 [dir="ltr"] .mzo-eyebrow::before{ background:linear-gradient(90deg,var(--gold),transparent); }
 .mzo-title{
@@ -556,12 +557,12 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 
 .mzo-chip{ display:inline-flex; align-items:center; gap:.45rem; border:1px solid #e6e0d2;
   background:rgba(255,255,255,.72); border-radius:999px; padding:.5rem .82rem;
-  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; color:#4d5a53; box-shadow:var(--shadow-1); }
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:#4d5a53; box-shadow:var(--shadow-1); }
 .mzo-chip svg{ color:var(--emerald-2); }
 
 .mzo-step{ display:flex; gap:.7rem; align-items:flex-start; border:1px solid #e6e1d4;
   background:rgba(255,255,255,.62); border-radius:16px; padding:.8rem .9rem; }
-.mzo-step-n{ font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:700;
+.mzo-step-n{ font-family:var(--font-sans); font-size:calc(12px * var(--mizan-text-scale)); font-weight:700;
   letter-spacing:.1em; color:var(--gold); padding-top:2px; }
 .mzo-step-t{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:#465349; line-height:1.6; }
 
@@ -662,7 +663,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mzo-proof-row{ display:flex; align-items:center; gap:.55rem; padding:.55rem 0; }
 .mzo-proof-row + .mzo-proof-row{ border-top:1px solid #efe9db; }
 .mzo-proof-hash{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:calc(10px * var(--mizan-text-scale)); color:#686f6a; letter-spacing:.02em; }
+  font-size:calc(12px * var(--mizan-text-scale)); color:#686f6a; letter-spacing:.02em; }
 .mzo-proof-tick{ width:22px; height:22px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
   background:var(--emerald-soft); color:var(--emerald); animation:mzPop .45s var(--ease-brand) both; }
 .mzo-proof-row:nth-child(1) .mzo-proof-tick{ animation-delay:.5s }
@@ -670,7 +671,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mzo-proof-row:nth-child(3) .mzo-proof-tick{ animation-delay:.94s }
 .mzo-proof-seal{ margin-top:.7rem; border-radius:14px; background:var(--emerald); color:#fff;
   display:flex; align-items:center; justify-content:center; gap:.5rem; padding:.6rem;
-  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600;
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:600;
   animation:mzLift .5s var(--ease-brand) 1.1s both; }
 
 .mzo-float{ position:absolute; z-index:3; animation:mzBreathe 7s ease-in-out 3; }
@@ -685,7 +686,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
    stuck unless the user is told to press Next. The hint is static text and the CTA gets a
    quiet gold ring; neither animates. */
 .mzo-hint{ display:none; align-items:center; gap:.4rem; margin-top:.85rem;
-  font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; color:#856941; }
+  font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:#856941; }
 .mzo-root[data-manual] .mzo-hint{ display:inline-flex; }
 .mzo-root[data-manual] .mzo-cta{ box-shadow:0 0 0 3px rgba(184,139,78,.28), 0 12px 30px rgba(23,75,63,.18); }
 /* The rail's fill is the auto-advance timer; with no timer it must not read as one. */
@@ -846,13 +847,13 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
    فيحجب زمن الجلسة والخصم في أول ثوانيها. */
 @media (min-width:1024px){ .mizan-judge-strip{ inset-inline-end:clamp(272px,27vw,344px) } }
 .mizan-judge-strip .js-who{ font-family:var(--font-display); font-size:calc(16px * var(--mizan-text-scale)); font-weight:800; letter-spacing:-.01em; min-width:0 }
-.mizan-judge-strip .js-fact{ font-size:calc(11.5px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-muted); white-space:nowrap }
+.mizan-judge-strip .js-fact{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-muted); white-space:nowrap }
 .mizan-judge-strip .js-fact b{ color:var(--venue-ink); font-weight:700 }
 .mizan-judge-strip .js-div{ width:1px; height:18px; background:var(--venue-line); flex:0 0 auto }
 .mizan-judge-strip .js-dots{ display:inline-flex; gap:3px; vertical-align:middle }
 .mizan-judge-strip .js-dots i{ width:15px; height:3px; border-radius:99px; background:var(--venue-line) }
 .mizan-judge-strip .js-dots i[data-on]{ background:#8ec5a8 }
-.mizan-judge-strip .js-rub{ display:inline-flex; align-items:center; gap:.3rem; font-size:calc(10.5px * var(--mizan-text-scale)); font-weight:700; color:var(--venue-muted) }
+.mizan-judge-strip .js-rub{ display:inline-flex; align-items:center; gap:.3rem; font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; color:var(--venue-muted) }
 .mizan-judge-strip .js-rub i{ width:7px; height:7px; border-radius:2px; background:var(--ja-ink,var(--venue-faint)) }
 /* المقبض: أثرٌ رفيع يقول أين تُلمس، ويغيب حين يظهر الشريط */
 .mizan-judge-handle{
@@ -888,7 +889,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-hud .m{ display:flex; flex-direction:column; gap:.2rem; min-width:0 }
 .mizan-judge-hud .m:last-child{ align-items:flex-end }
 .mizan-judge-hud b{ font-family:var(--font-display); font-size:calc(26px * var(--mizan-text-scale)); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.03em }
-.mizan-judge-hud span{ font-size:calc(10px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-faint) }
+.mizan-judge-hud span{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-faint) }
 .mizan-judge-hud .m[data-loss] b{ color:var(--jc-gold) }
 .mizan-judge-hud .m[data-loss][data-zero] b{ color:var(--venue-faint) }
 
@@ -941,7 +942,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-action:focus-visible{ outline:3px solid var(--ja-ring); outline-offset:2px }
 .mizan-judge-key{
   position:absolute; z-index:2; top:.5rem; inset-inline-end:.6rem;
-  font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:600;
+  font-family:var(--font-sans); font-size:calc(12px * var(--mizan-text-scale)); font-weight:600;
   color:var(--venue-faint); opacity:.55; line-height:1;
 }
 @media (hover:none){ .mizan-judge-key{ display:none } }
@@ -1001,7 +1002,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 /* لوحةٌ ساكنة: يُقال سببها بدل أن تُترك فارغة */
 .mizan-judge-note{
   align-self:end; border:1px solid var(--venue-line); border-radius:14px; background:rgba(255,255,255,.022);
-  padding:.7rem .8rem; font-size:calc(11px * var(--mizan-text-scale)); font-weight:600; line-height:1.7; color:var(--venue-muted);
+  padding:.7rem .8rem; font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; line-height:1.7; color:var(--venue-muted);
 }
 
 /*
@@ -1147,7 +1148,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 .mizan-mushaf-sheet__tools button{ min-height:32px }
 .mizan-mushaf-sheet__foot{
   flex:0 0 auto; display:flex; justify-content:center; padding-top:.2rem;
-  font-size:10px; color:#666b68;
+  font-size:12px; color:#666b68;
 }
 .mizan-judge-os .mizan-mushaf-sheet .mizan-mushaf-sheet__text[data-fill="short"],
 .mizan-mushaf-sheet__text[data-fill="short"]{ text-align:center; text-align-last:center }
@@ -1174,7 +1175,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 /* أرضيةُ القراءة على الشاشة: ٩–١٠px لا تُقرأ بالعربية حتى على سطح المكتب. تُرفع إلى ١١px
    خارج شاشات القاعة (مقاساتها محسوبة للجدار)، ولا تمسّ الطباعة. والهاتف يرفعها أكثر أدناه. */
 @media screen and (min-width:640px){
-  :where(body) :not(.mizan-venue-2 *):is(.text-\[9px\],.text-\[10px\]){ font-size:11px; line-height:1.5 }
+  :where(body) :not(.mizan-venue-2 *):is(.text-\[9px\],.text-\[10px\]){ font-size:12px; line-height:1.5 }
 }
 .mizan-badge-dot{ width:6px; height:6px; border-radius:999px; background:var(--bd-dot); flex:0 0 auto; }
 .bd-emerald{ --bd-soft:var(--emerald-soft); --bd-ink:var(--emerald);  --bd-line:#cbdad2; --bd-dot:var(--emerald-2) }
@@ -1185,7 +1186,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 
 /* ── Stat ──────────────────────────────────────────────────────────────────── */
 .mizan-stat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-1); }
-.mizan-stat-label{ font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:var(--muted); }
+.mizan-stat-label{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; letter-spacing:.06em; color:var(--muted); }
 .mizan-stat-icon{ padding:.5rem; border-radius:var(--radius-sm); background:var(--emerald-soft); color:var(--emerald); border:1px solid #cbdad2; display:inline-grid; place-items:center; }
 .mizan-stat-value{ font-size:clamp(24px,2.4vw,30px); font-weight:800; letter-spacing:-.03em; color:var(--ink); font-variant-numeric:tabular-nums; }
 .mizan-stat-foot{ margin-top:.5rem; display:flex; align-items:center; gap:.5rem; font-size:calc(12px * var(--mizan-text-scale)); color:var(--muted); }
@@ -1229,7 +1230,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 .mizan-palette-row:hover,
 .mizan-palette-row[data-active="true"]{ background:var(--surface-soft); }
 .mizan-palette-row[data-active="true"]{ box-shadow:inset 2px 0 0 var(--emerald); }
-.mizan-palette-key{ font-family:var(--font-sans); font-size:calc(10px * var(--mizan-text-scale)); font-weight:600;
+.mizan-palette-key{ font-family:var(--font-sans); font-size:calc(12px * var(--mizan-text-scale)); font-weight:600;
   border:1px solid var(--line); border-radius:7px; padding:.2rem .4rem; color:var(--muted); }
 
 /* ── Role menu ─────────────────────────────────────────────────────────────── */
@@ -1267,7 +1268,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   animation:mzDeclarePulse 1.1s ease-in-out infinite;
 }
 @keyframes mzDeclarePulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(163,77,67,.34) } 50%{ box-shadow:0 0 0 5px rgba(163,77,67,0) } }
-.mizan-declare-hint{ font-size:calc(11px * var(--mizan-text-scale)); color:var(--muted); }
+.mizan-declare-hint{ font-size:calc(12px * var(--mizan-text-scale)); color:var(--muted); }
 @media (prefers-reduced-motion: reduce){ .mizan-declare-critical[data-confirming="true"]{ animation:none } }
 
 /* The arrival code is the participant's identity in the hall — it is what the
@@ -1277,7 +1278,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   font-family:var(--font-sans); font-size:clamp(22px,3.4vw,28px); font-weight:800;
   color:var(--emerald); font-variant-numeric:tabular-nums;
 }
-.mizan-code small{ font-family:var(--font-arabic); font-size:calc(11px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); letter-spacing:0; }
+.mizan-code small{ font-family:var(--font-arabic); font-size:calc(12px * var(--mizan-text-scale)); font-weight:700; color:var(--muted); letter-spacing:0; }
 
 /* One governed implementation, two quiet top-level workspaces: operations and judging.
    ما يظهر في كل وضع يُقرَّر في المكوّن نفسه. كان هنا مُحدِّدٌ يعدّ الأقسام بترتيبها
@@ -1681,7 +1682,7 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 }
 .mizan-mushaf-band__range{
   font-family:var(--font-arabic);
-  font-size:11px; font-weight:800; color:#8A7438; letter-spacing:.02em;
+  font-size:12px; font-weight:800; color:#8A7438; letter-spacing:.02em;
   font-variant-numeric:tabular-nums;
 }
 
@@ -1775,14 +1776,14 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-slip-card__head{ display:flex; align-items:center; gap:.65rem }
 .mizan-slip-card__icon{ display:grid; place-items:center; width:2rem; height:2rem; border-radius:.75rem; background:#f1e2bd; color:#7a5a1c; flex:0 0 auto }
 .mizan-slip-card__title{ font-size:13px; font-weight:900; color:#5e4413 }
-.mizan-slip-card__where{ font-size:11px; font-weight:700; color:#8a6d33; margin-top:.1rem }
+.mizan-slip-card__where{ font-size:12px; font-weight:700; color:#8a6d33; margin-top:.1rem }
 .mizan-slip-card__fork{ margin-top:.75rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:.6rem }
 .mizan-slip-card__shared, .mizan-slip-card__branch b{ letter-spacing:0 !important; word-spacing:normal; font-family:var(--font-quran) }
 .mizan-slip-card__shared{ font-size:1.35rem; color:#3a3325; padding:.2rem .6rem; border-radius:.8rem; background:rgba(255,255,255,.6) }
 .mizan-slip-card__branches{ display:inline-flex; flex-direction:column; gap:.35rem; position:relative; padding-inline-start:.9rem }
 .mizan-slip-card__branches::before{ content:""; position:absolute; inset-inline-start:0; top:18%; bottom:18%; width:10px; border:2px solid #d9c38e; border-inline-end:0; border-radius:8px 0 0 8px }
 .mizan-slip-card__branch{ display:inline-flex; align-items:baseline; gap:.5rem; padding:.25rem .7rem; border-radius:.8rem }
-.mizan-slip-card__branch em{ font-style:normal; font-size:11px; font-weight:800; min-width:4.2rem }
+.mizan-slip-card__branch em{ font-style:normal; font-size:12px; font-weight:800; min-width:4.2rem }
 .mizan-slip-card__branch b{ font-size:1.45rem; font-weight:400 }
 .mizan-slip-card__branch.is-yours{ background:rgba(95,163,135,.14); color:#1f4d3f }
 .mizan-slip-card__branch.is-other{ background:rgba(163,52,31,.08); color:#8a2f1f }
@@ -1801,14 +1802,14 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-tashkeel__head{ display:flex; align-items:center; gap:.7rem }
 .mizan-tashkeel__icon{ display:grid; place-items:center; width:2.1rem; height:2.1rem; border-radius:.8rem; background:#e4e8f1; color:#3e4c78; flex:0 0 auto }
 .mizan-tashkeel__title{ font-size:14px; font-weight:900; color:#26304d }
-.mizan-tashkeel__sub{ font-size:11.5px; font-weight:700; color:#5b6272; margin-top:.15rem; line-height:1.7 }
-.mizan-tashkeel__retry{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.8rem; border:1px solid #cfd3de; background:#fff; padding:.4rem .7rem; font-size:11px; font-weight:900; color:#3e4c78 }
+.mizan-tashkeel__sub{ font-size:12px; font-weight:700; color:#5b6272; margin-top:.15rem; line-height:1.7 }
+.mizan-tashkeel__retry{ display:inline-flex; align-items:center; gap:.35rem; border-radius:.8rem; border:1px solid #cfd3de; background:#fff; padding:.4rem .7rem; font-size:12px; font-weight:900; color:#3e4c78 }
 .mizan-tashkeel__bar{ margin-top:.8rem; height:4px; border-radius:99px; background:#e6e2d6; overflow:hidden }
 .mizan-tashkeel__bar > span{ display:block; height:100%; background:linear-gradient(90deg,#4A5A86,#7A4EA3); transition:width .4s ease }
 .mizan-tashkeel__legend{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.85rem }
-.mizan-tashkeel__chip{ font-size:11px; font-weight:900; padding:.2rem .6rem; border-radius:99px; color:var(--k); background:color-mix(in srgb, var(--k) 10%, transparent); border:1px solid color-mix(in srgb, var(--k) 28%, transparent) }
+.mizan-tashkeel__chip{ font-size:12px; font-weight:900; padding:.2rem .6rem; border-radius:99px; color:var(--k); background:color-mix(in srgb, var(--k) 10%, transparent); border:1px solid color-mix(in srgb, var(--k) 28%, transparent) }
 .mizan-tashkeel__list{ margin-top:.8rem; display:grid; gap:.7rem }
-.mizan-tashkeel__ayah-no{ font-size:11px; font-weight:900; color:#666b68; margin-bottom:.35rem }
+.mizan-tashkeel__ayah-no{ font-size:12px; font-weight:900; color:#666b68; margin-bottom:.35rem }
 .mizan-tashkeel__ayah ul{ display:grid; gap:.35rem }
 .mizan-tashkeel__row{
   display:grid; grid-template-columns:auto auto 1fr auto; align-items:center; gap:.65rem;
@@ -1817,11 +1818,11 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 }
 [dir="rtl"] .mizan-tashkeel__row{ box-shadow:inset -3px 0 0 var(--k) }
 .mizan-tashkeel__word{ font-size:1.45rem; color:#1f2420; letter-spacing:0 !important; line-height:1.6 }
-.mizan-tashkeel__kind{ font-size:11px; font-weight:900; color:var(--k); padding:.12rem .45rem; border-radius:99px; background:color-mix(in srgb, var(--k) 10%, transparent) }
+.mizan-tashkeel__kind{ font-size:12px; font-weight:900; color:var(--k); padding:.12rem .45rem; border-radius:99px; background:color-mix(in srgb, var(--k) 10%, transparent) }
 .mizan-tashkeel__msg{ font-size:12px; font-weight:700; color:#3a3f3b; line-height:1.7 }
-.mizan-tashkeel__foot{ margin-top:.8rem; font-size:11px; line-height:1.8; color:#6b716d; text-align:center }
-.mizan-tashkeel-note{ margin-inline:auto; max-width:44rem; text-align:center; font-size:11px; line-height:1.8; color:#6b716d }
-.mizan-tashkeel__badge{ display:inline-block; margin-inline-start:.5rem; padding:.1rem .5rem; border-radius:99px; font-size:11px; font-weight:900; vertical-align:middle; background:#f3ead6; color:#6b4f18; border:1px solid #e2d3ae }
+.mizan-tashkeel__foot{ margin-top:.8rem; font-size:12px; line-height:1.8; color:#6b716d; text-align:center }
+.mizan-tashkeel-note{ margin-inline:auto; max-width:44rem; text-align:center; font-size:12px; line-height:1.8; color:#6b716d }
+.mizan-tashkeel__badge{ display:inline-block; margin-inline-start:.5rem; padding:.1rem .5rem; border-radius:99px; font-size:12px; font-weight:900; vertical-align:middle; background:#f3ead6; color:#6b4f18; border:1px solid #e2d3ae }
 .mizan-tashkeel__badge[data-tashkeel-mode="open"]{ background:#E7EEE9; color:#214C40; border-color:#bcd6c9 }
 .mizan-tashkeel__unclear{ margin-top:.9rem }
 .mizan-tashkeel__unclear ul{ display:grid; gap:.35rem }
@@ -1830,7 +1831,7 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   display:inline-flex; align-items:center; gap:.3rem; min-height:32px; padding:0 .65rem;
   border-radius:999px; border:1px solid color-mix(in srgb, var(--k) 35%, transparent);
   background:color-mix(in srgb, var(--k) 8%, white); color:var(--k);
-  font-size:11px; font-weight:900; white-space:nowrap;
+  font-size:12px; font-weight:900; white-space:nowrap;
 }
 .mizan-tashkeel__hear{ display:inline-flex; gap:.35rem; flex-wrap:wrap; justify-content:flex-end }
 .mizan-tashkeel__listen:hover{ background:color-mix(in srgb, var(--k) 14%, white) }
@@ -1860,17 +1861,17 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .mizan-journey__summary::-webkit-details-marker{ display:none }
 .mizan-journey__icon{ display:inline-grid; place-items:center; width:30px; height:30px; border-radius:10px; background:#E7EEE9; color:#214C40 }
 .mizan-journey__title{ font-size:13px; font-weight:900; color:#1f2420 }
-.mizan-journey__stats{ display:flex; flex-wrap:wrap; gap:.4rem; margin-inline-start:auto; font-size:11px; font-weight:800; color:#5f6663 }
+.mizan-journey__stats{ display:flex; flex-wrap:wrap; gap:.4rem; margin-inline-start:auto; font-size:12px; font-weight:800; color:#5f6663 }
 .mizan-journey__stats > span{ display:inline-flex; align-items:center; gap:.25rem; padding:.15rem .55rem; border-radius:99px; background:#f4f2ec }
 .mizan-journey__stats > span[data-streak]{ background:#fff1e0; color:#9a4b0d }
 .mizan-journey__weak{ background:#fbe9e5 !important; color:#8f2d1c }
 .mizan-journey__body{ padding:0 .9rem .9rem }
-.mizan-journey__legend{ display:flex; flex-wrap:wrap; gap:.75rem; font-size:11px; font-weight:800; color:#5f6663; margin-bottom:.5rem }
+.mizan-journey__legend{ display:flex; flex-wrap:wrap; gap:.75rem; font-size:12px; font-weight:800; color:#5f6663; margin-bottom:.5rem }
 .mizan-journey__legend span{ display:inline-flex; align-items:center; gap:.3rem }
 .mizan-journey__swatch{ display:inline-block; width:10px; height:10px; border-radius:3px }
 .mizan-journey__map{ display:grid; gap:3px }
 .mizan-journey__juz{ display:grid; grid-template-columns:1.4rem 1fr; align-items:center; gap:.35rem }
-.mizan-journey__juz-no{ font-size:11px; font-weight:800; color:#6b716d; text-align:center; font-variant-numeric:tabular-nums }
+.mizan-journey__juz-no{ font-size:12px; font-weight:800; color:#6b716d; text-align:center; font-variant-numeric:tabular-nums }
 .mizan-journey__cells{ display:grid; grid-template-columns:repeat(23, minmax(0, 16px)); gap:2px }
 .mizan-journey__cell{ aspect-ratio:1; border-radius:2.5px; border:0; padding:0; min-width:0; min-height:0 !important; height:auto }
 .mizan-journey__neediest{ display:inline-flex; align-items:center; gap:.4rem; margin:.1rem 0 .7rem; padding:.55rem 1rem; border-radius:14px; background:#214C40; color:#fff; font-size:12px; font-weight:900 }
@@ -1885,15 +1886,15 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 .is-strong.mizan-journey__cell,.mizan-journey__swatch.is-strong{ background:#2f7a5b }
 .is-review.mizan-journey__cell,.mizan-journey__swatch.is-review{ background:#d9a441 }
 .is-weak.mizan-journey__cell,.mizan-journey__swatch.is-weak{ background:#c0472f }
-.mizan-journey__hint{ margin-top:.45rem; font-size:11px; line-height:1.7; color:#6b716d }
+.mizan-journey__hint{ margin-top:.45rem; font-size:12px; line-height:1.7; color:#6b716d }
 .mizan-journey__hard{ margin-top:.9rem }
 .mizan-journey__hard h4{ display:flex; align-items:center; gap:.35rem; font-size:12px; font-weight:900; color:#1f2420 }
 .mizan-journey__hard ol{ margin-top:.5rem; display:grid; gap:.4rem }
 .mizan-journey__hard li{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.2rem .65rem; padding:.45rem .7rem; border-radius:12px; background:#fff; border:1px solid #ebe6d8 }
 .mizan-journey__word{ grid-row:span 2; font-size:1.5rem; line-height:1.6; color:#1f2420 }
-.mizan-journey__where{ font-size:11px; font-weight:800; color:#3a3f3b }
-.mizan-journey__kinds{ grid-column:2; font-size:11px; color:#6b716d }
-.mizan-journey__go{ grid-row:1 / span 2; grid-column:3; font-size:11px; font-weight:900; color:#214C40; border:1px solid #cfd6d2; border-radius:999px; padding:.3rem .7rem; background:#fff; white-space:nowrap }
+.mizan-journey__where{ font-size:12px; font-weight:800; color:#3a3f3b }
+.mizan-journey__kinds{ grid-column:2; font-size:12px; color:#6b716d }
+.mizan-journey__go{ grid-row:1 / span 2; grid-column:3; font-size:12px; font-weight:900; color:#214C40; border:1px solid #cfd6d2; border-radius:999px; padding:.3rem .7rem; background:#fff; white-space:nowrap }
 @media (max-width:520px){ .mizan-journey__hard li{ grid-template-columns:auto 1fr } .mizan-journey__go{ grid-column:1 / -1; grid-row:auto; justify-self:start } }
 
 /*
@@ -1925,17 +1926,20 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
 
 
 /* ───────── r6: هدوء بصري — مربّعات الاختيار وحقول الوقت بلغة الموقع بدل الأزرق الافتراضي للمتصفح ───────── */
+/* The drawn box stays 1.1rem; a transparent .825rem border makes the real hit area 2.75rem (44px)
+   and the negative margin keeps the layout footprint unchanged. The visible outline is an inset shadow. */
 input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input) {
-  appearance:none; -webkit-appearance:none; flex:0 0 auto; width:1.1rem; height:1.1rem; min-width:1.1rem; min-height:1.1rem; align-self:center; margin:0;
-  border:1.5px solid #aeb5b0; border-radius:.4rem; background:#fffefb center/78% no-repeat; cursor:pointer;
-  vertical-align:middle; transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  --cb-line:#aeb5b0;
+  appearance:none; -webkit-appearance:none; flex:0 0 auto; box-sizing:border-box; width:2.75rem; height:2.75rem; min-width:2.75rem; min-height:2.75rem; align-self:center; margin:-.825rem;
+  border:.825rem solid transparent; border-radius:calc(.4rem + .825rem); background:#fffefb center/78% no-repeat; background-clip:padding-box; box-shadow:inset 0 0 0 1.5px var(--cb-line); cursor:pointer;
+  vertical-align:middle; transition:background-color .15s ease, box-shadow .15s ease;
 }
-input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):hover:not(:disabled) { border-color:var(--emerald-2); }
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):hover:not(:disabled) { --cb-line:var(--emerald-2); }
 input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):checked {
-  background-color:var(--emerald); border-color:var(--emerald);
+  --cb-line:var(--emerald); background-color:var(--emerald);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fffefb' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.4l3 3 6-6.4'/%3E%3C/svg%3E");
 }
-input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):focus-visible { outline:none; box-shadow:0 0 0 3px rgba(47,101,85,.22); }
+input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):focus-visible { outline:3px solid rgba(47,101,85,.28); outline-offset:-.95rem; }
 input[type="checkbox"]:not([data-native-check]):not(.mizan-chip-input):disabled { opacity:.45; cursor:not-allowed; }
 /* مربّع محكّم اللجنة: يبقى عنصر الاختيار الحقيقي (لوحة المفاتيح وقارئ الشاشة) لكنه شفّاف فوق الشريحة كلها. */
 .mizan-chip-input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; z-index:1; }
@@ -1979,6 +1983,17 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 
 /* زرٌّ لم يحنْ وقته (حقلٌ ناقص): حيادٌ بحدٍّ رقيق لا أخضرُ باهت يُظنّ نشطًا ضعيفًا. */
 .mizan-btn.mz-btn-idle:disabled { background:var(--surface-soft); color:var(--muted); border:1px solid var(--line); box-shadow:none; opacity:1; }
+
+
+/* Demo bar is fixed along the bottom on desktop: full-screen venue surfaces stop above it so their
+   bottom controls (lock device, status line) are not covered. */
+@media (min-width:640px){
+  html[data-demo-bar="on"] .fixed.inset-0:is(.mizan-venue,.mizan-venue-2,.mizan-venue-deep){ bottom:var(--mizan-demo-bar-h,3.5rem); }
+  html[data-demo-bar="on"] .mizan-venue-lock-dock{ bottom:calc(var(--mizan-demo-bar-h,3.5rem) + 1rem); }
+}
+
+/* A checkbox's label is its hit area: at least 44px on every viewport. */
+label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min-width:44px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
@@ -2042,7 +2057,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 .mizan-judge-os[data-judge-theme="hall"] .mizan-judge-finish[data-armed="true"]{ background:var(--jc-gold); color:#ffffff }
 .mizan-judge-os[data-judge-theme="hall"] .mizan-judge-action{ background:#ffffff; border-color:rgba(0,0,0,.30) }
 .mizan-judge-os[data-judge-theme="hall"] .mizan-judge-key{ opacity:1 }
-.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"]){ color:#2f3833 }
+.mizan-judge-os[data-judge-theme="hall"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"],[class*="text-[color:var(--muted)]"]){ color:#2f3833 }
 
 /* ── «ليلي»: معتمٌ دافئ قليل الوهج، والورقة مطفأةٌ لا تبهر العين (≥ 4.5:1) ── */
 .mizan-judge-os[data-judge-theme="night"]{
@@ -2057,7 +2072,7 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
 .mizan-judge-os[data-judge-theme="night"] .jt-performance{ --ja-ink:#c8a978 }
 .mizan-judge-os[data-judge-theme="night"] .mizan-judge-strip{ background:rgba(6,9,8,.95) }
 .mizan-judge-os[data-judge-theme="night"] .mizan-judge-finish{ color:#c8a978 }
-.mizan-judge-os[data-judge-theme="night"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"]){ color:#3f403a }
+.mizan-judge-os[data-judge-theme="night"] .mizan-judge-page :is([class*="text-[#5"],[class*="text-[#6"],[class*="text-[color:var(--muted)]"]){ color:#3f403a }
 .mizan-judge-os[data-judge-theme="night"] .mizan-mushaf-page{ filter:brightness(.86) sepia(.08) }
 
 /* الهاتف: شريط بيئة العرض يجري في تدفّق الصفحة أسفلها لا مثبّتًا فوقها، فلا يحجب زرًّا

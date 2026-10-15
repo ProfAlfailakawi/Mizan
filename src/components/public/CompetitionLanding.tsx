@@ -193,7 +193,7 @@ export const CompetitionLanding: React.FC = () => {
               {showLogo && <img src={logo} alt={compLogo ? (ar ? 'شعار المسابقة' : 'Competition logo') : (ar ? 'شعار الجهة' : 'Organizer logo')} onError={() => setLogoFailed(true)} className="w-10 h-10 rounded-xl object-contain bg-white border border-[#e7e2d6] shrink-0" />}
               <div className="min-w-0 leading-tight">
                 {orgName && <div className="text-sm font-black truncate">{orgName}</div>}
-                <div className="text-[10px] font-bold text-[#5f5b52] tracking-wide">{ar ? 'بمنظومة ميزان' : 'Powered by MIZAN'}</div>
+                <div className="text-[11px] font-bold text-[#5f5b52] tracking-wide">{ar ? 'بمنظومة ميزان' : 'Powered by MIZAN'}</div>
               </div>
             </div>
           ) : (
@@ -413,7 +413,7 @@ export const CompetitionLanding: React.FC = () => {
                   </div>
                 </a>
                 <p className="mt-2.5 flex items-start gap-2 text-[13px] leading-6 text-[#5d594f]">
-                  <d.needIcon className="w-4 h-4 mt-1 shrink-0 text-[#9B7542]" />{d.need}
+                  <d.needIcon className="w-4 h-4 mt-1 shrink-0 text-[color:var(--amber)]" />{d.need}
                 </p>
                 {d.key === 'participant' && registrationOpen && (
                   <a href={`#register?comp=${competition.id}`} className="mt-auto pt-4 inline-flex">
@@ -467,7 +467,7 @@ export const CompetitionLanding: React.FC = () => {
                   <div className="sm:mt-3 min-w-0">
                     <div className={`text-[15px] font-black ${current || done ? 'text-[#F6F3EA]' : 'text-[#F6F3EA]/75'}`}>
                       {st.label}
-                      {real === 'current' && <span className="ms-2 align-middle rounded-full bg-[var(--gold-light)] px-2 py-0.5 text-[10px] font-black text-[#11241f]">{ar ? 'الآن' : 'Now'}</span>}
+                      {real === 'current' && <span className="ms-2 align-middle rounded-full bg-[var(--gold-light)] px-2 py-0.5 text-[11px] font-black text-[#11241f]">{ar ? 'الآن' : 'Now'}</span>}
                     </div>
                     <div className="mt-0.5 text-[12px] leading-5 text-[#F6F3EA]/65">{st.hint}</div>
                     <span className="sr-only">{real === 'done' ? (ar ? 'مكتملة' : 'Completed') : real === 'current' ? (ar ? 'الخطوة الحالية' : 'Current step') : (ar ? 'لاحقة' : 'Upcoming')}</span>

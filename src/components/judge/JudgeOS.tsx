@@ -565,7 +565,7 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
- if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[#646965] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[#656b66] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[#696f6b] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
+ if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[color:var(--muted)] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[11px] text-[color:var(--muted)] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[11px] text-[color:var(--muted)] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
  if(!participant) return <div className="max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
   <h1 className="text-3xl sm:text-4xl font-black mt-5">{nextQueued?(ar?'المتسابق التالي جاهز':'Next participant is ready'):rosterCounts.awaiting?(ar?'لا أحد في الطابور بعد':'Nobody in the queue yet'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
   {/* أرقام الكشف كانت سطرًا صغيرًا واحدًا بنقاط فاصلة؛ صارت بطاقات: رقم كبير وكلمة. */}
@@ -575,27 +575,27 @@ export const JudgeOS: React.FC = () => {
   </div>
   <p className="sr-only">{ar?`${rosterCounts.total} متسابقًا في هذه المسابقة.`:`${rosterCounts.total} participants in this competition.`}</p>
   {nextQueued&&<Button size="xl" className="mt-7 min-h-16 min-w-64" icon={<UserCheck className="w-6 h-6"/>} disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'ابدأ مع المتسابق التالي':'Start with the next participant')}</Button>}
-  {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[#F4E6E3] text-[#88473f] px-4 py-3 text-sm font-bold leading-6">{startError}</div>}
+  {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[var(--danger-soft)] text-[#88473f] px-4 py-3 text-sm font-bold leading-6">{startError}</div>}
  </div>
  {!!committeeQueue.length&&<div className="mizan-surface mt-8 p-5 text-start">
   <h2 className="text-lg font-black">{ar?'من ينتظر دوره':'Who is waiting'}</h2>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
    {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 ${turn?'bg-[#F7FAF8]':'opacity-60'}`}>
-    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black tabular-nums ${turn?'bg-[#214C40] text-white':'bg-[#f1efe9] text-[#656b66]'}`}>{i+1}</span>
-    {maskParticipantForJudge(p,blindness,ar).displayName!==p.code&&<span className="font-mono text-xs font-black text-[#656b66]" dir="ltr">{p.code}</span>}
+    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-black tabular-nums ${turn?'bg-[var(--emerald)] text-white':'bg-[#f1efe9] text-[color:var(--muted)]'}`}>{i+1}</span>
+    {maskParticipantForJudge(p,blindness,ar).displayName!==p.code&&<span className="font-mono text-xs font-black text-[color:var(--muted)]" dir="ltr">{p.code}</span>}
     <span className="min-w-[5.5rem] flex-1 truncate text-base font-black" dir="auto">{maskParticipantForJudge(p,blindness,ar).displayName}</span>
     <span className="shrink-0 text-xs font-black text-[#5f6663]">{turn?(ar?'صاحب الدور':'Next'):(ar?PARTICIPANT_WAIT_LABEL[p.status]||'ينتظر':'')}</span>
     <Button size="sm" variant={turn?'primary':'outline'} className={turn?undefined:'!opacity-0 pointer-events-none max-sm:hidden'} disabled={!turn||!!startingId} title={turn?undefined:(ar?'الترتيب مُلزم: يُنادى صاحب الدور أولًا. تأخُّر متسابقٍ يُعالَج من غرفة العمليات.':'Order is binding: the next in line is called first.')} onClick={()=>void callParticipant(p.id)}>{startingId===p.id?(ar?'جارٍ التجهيز…':'Preparing…'):(ar?'ابدأ جلسته':'Start')}</Button>
    </li>})}
   </ul>
-  <p className="mt-3 text-xs leading-6 text-[#696f6b]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
-  {!!awaitingArrival.length&&<p className="mt-1 text-xs leading-6 text-[#696f6b]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
-  {committeeQueue.length>24&&<p className="mt-1.5 text-[10px] text-[#696f6b]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
+  <p className="mt-3 text-xs leading-6 text-[color:var(--muted)]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
+  {!!awaitingArrival.length&&<p className="mt-1 text-xs leading-6 text-[color:var(--muted)]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
+  {committeeQueue.length>24&&<p className="mt-1.5 text-[11px] text-[color:var(--muted)]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
  </div>}
- {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[#646965]">
+ {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[color:var(--muted)]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
  </div>}
- <details className="group mizan-surface mt-7 text-start"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 [&::-webkit-details-marker]:hidden"><span className="inline-flex items-center gap-2 text-sm font-black"><ShieldCheck className="w-4 h-4 text-[#646965]" aria-hidden="true"/>{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="px-5 pb-5"><ConflictOfInterestPanel mode="judge"/></div></details>
+ <details className="group mizan-surface mt-7 text-start"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 [&::-webkit-details-marker]:hidden"><span className="inline-flex items-center gap-2 text-sm font-black"><ShieldCheck className="w-4 h-4 text-[color:var(--muted)]" aria-hidden="true"/>{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="px-5 pb-5"><ConflictOfInterestPanel mode="judge"/></div></details>
  </div>;
 
  /*
@@ -673,7 +673,7 @@ export const JudgeOS: React.FC = () => {
         ?`فئته «${bilingualName(participantCategory,true)||'—'}»، ونطاقها هو ما يُسأل فيه — لا تخصّص هذه اللجنة. الموضع صحيح وإن بدا خارج ما اعتدتموه، والتقييم يكون بمسطرة فئته هو.`
         :`His category is “${bilingualName(participantCategory,false)||'—'}”, and its scope governs the questions. The passage is correct even if unfamiliar, and he is scored by his own rubric.`}
       </p>
-      <div className="text-[10px] text-[#8a7a62] mt-1.5">{ar?'اعتمده: ':'Approved by: '}{participant.crossCategoryException.approvedBy} · {participant.crossCategoryException.reason}</div>
+      <div className="text-[11px] text-[#8a7a62] mt-1.5">{ar?'اعتمده: ':'Approved by: '}{participant.crossCategoryException.approvedBy} · {participant.crossCategoryException.reason}</div>
      </div>
     </div>}
 
@@ -681,19 +681,19 @@ export const JudgeOS: React.FC = () => {
     <div className="mizan-judge-notes space-y-2 empty:hidden shrink-0 mb-3">
      {micGateApplies&&micRecording&&!micHeard&&!micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] px-3.5 py-2.5 text-[11px] font-bold leading-5 text-[#6b4f18] flex flex-wrap items-center gap-2"><Mic className="w-3.5 h-3.5 shrink-0"/><span className="flex-1 min-w-0">{ar?'التسجيل يعمل. ومؤشّر المستوى لم يتحرّك بعد — وقد يكون لأن التلاوة لم تبدأ، أو لأن هذا المتصفّح لا يعرض المستوى. إن كنت تسمع المتسابق فالجلسة تُسجَّل.':'Recording is running. The level meter has not moved yet — the recitation may not have started, or this browser may not report levels. If you can hear the participant, the session is being recorded.'}</span><Button size="sm" variant="outline" onClick={()=>void restartAudio()}>{ar?'إعادة الفحص':'Re-check'}</Button></div>}
      {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-3.5 py-2.5 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-3.5 h-3.5 shrink-0"/><span className="sr-only">{ar?'هذا المتصفّح لا يعرض مؤشّر مستوى الصوت، والتسجيل يعمل. لا شيء مطلوب منك هنا — تحقّق من وضوح الصوت بعد أول تلاوة.':'This browser does not show a live level meter, and recording is running. Nothing is required of you here — check the audio after the first recitation.'}</span><span aria-hidden="true" title={ar?'هذا المتصفّح لا يعرض مؤشّر مستوى الصوت، والتسجيل يعمل. لا شيء مطلوب منك هنا — تحقّق من وضوح الصوت بعد أول تلاوة.':'This browser does not show a live level meter, and recording is running. Nothing is required of you here — check the audio after the first recitation.'}>{ar?'لا مؤشّر مستوى — التسجيل يعمل':'No level meter — recording runs'}</span></div>}
-     {secureError&&<div role="alert" className="rounded-2xl bg-[#F4E6E3] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5 flex items-start gap-2"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5"/><span>{secureMode?(ar?'تعذر الوصول الآمن إلى كبسولة السؤال. لن يعرض ميزان نسخة محلية بديلة.':'Secure question capsule unavailable. MIZAN will not fall back to local question plaintext.'):secureError}{secureMode&&<span className="opacity-60 font-mono ms-1">{secureError}</span>}</span></div>}
-     {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"><div><div className="text-[12px] font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[10px] text-[#806b4d] mt-0.5">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، وسؤالٌ واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required; only one question per session.'}</div></div><Button size="sm" variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على التبديل':'Approve replacement')}</Button></div>}
+     {secureError&&<div role="alert" className="rounded-2xl bg-[var(--danger-soft)] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5 flex items-start gap-2"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5"/><span>{secureMode?(ar?'تعذر الوصول الآمن إلى كبسولة السؤال. لن يعرض ميزان نسخة محلية بديلة.':'Secure question capsule unavailable. MIZAN will not fall back to local question plaintext.'):secureError}{secureMode&&<span className="opacity-60 font-mono ms-1">{secureError}</span>}</span></div>}
+     {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"><div><div className="text-[12px] font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[11px] text-[#806b4d] mt-0.5">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، وسؤالٌ واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required; only one question per session.'}</div></div><Button size="sm" variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على التبديل':'Approve replacement')}</Button></div>}
     </div>
 
     {/* ── بوابة الميكروفون ────────────────────────────────────────────────── */}
     {micGateApplies&&!micRecording&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
-     <div className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${audioState==='failed'?'bg-[#F4E6E3] text-[#A34D43]':'bg-[#EEF2EF] text-[#214C40]'}`}>{audioState==='failed'?<MicOff className="h-6 w-6"/>:<Mic className="h-6 w-6"/>}</div>
+     <div className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${audioState==='failed'?'bg-[var(--danger-soft)] text-[color:var(--danger)]':'bg-[#EEF2EF] text-[color:var(--emerald)]'}`}>{audioState==='failed'?<MicOff className="h-6 w-6"/>:<Mic className="h-6 w-6"/>}</div>
      <h2 className="mt-4 text-base font-black text-[#20241f]">{audioState==='failed'?(ar?'تعذّر تشغيل الميكروفون':'Microphone unavailable'):(ar?'تأكيد الميكروفون قبل بدء الأسئلة':'Confirm the microphone first')}</h2>
-     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[#656b66]">{audioState==='failed'?(ar?'لا تبدأ التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل تشغيل الميكروفون.':'This competition requires session recording; the passage stays sealed until the microphone is running.')}</p>
-     <div className="mx-auto mt-5 flex max-w-xs items-end justify-center gap-[3px]" aria-hidden="true">{Array.from({length:24}).map((_,i)=>{const on=micLevel*24>i;return <span key={i} className={`w-1.5 rounded-full transition-[height,background-color] duration-75 ${on?(i>19?'bg-[#A34D43]':i>14?'bg-[#9B7542]':'bg-[#2F6555]'):'bg-[#e8e6df]'}`} style={{height:`${6+i*0.75}px`}}/>})}</div>
-     <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-black text-[#656b66]" title={ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}><Clock className="h-3.5 w-3.5" aria-hidden="true"/><span className="sr-only">{ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}</span><span aria-hidden="true">{ar?'الشريط بعد التجهيز':'Meter after setup'}</span></div>
+     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[color:var(--muted)]">{audioState==='failed'?(ar?'لا تبدأ التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل تشغيل الميكروفون.':'This competition requires session recording; the passage stays sealed until the microphone is running.')}</p>
+     <div className="mx-auto mt-5 flex max-w-xs items-end justify-center gap-[3px]" aria-hidden="true">{Array.from({length:24}).map((_,i)=>{const on=micLevel*24>i;return <span key={i} className={`w-1.5 rounded-full transition-[height,background-color] duration-75 ${on?(i>19?'bg-[var(--danger)]':i>14?'bg-[var(--amber)]':'bg-[var(--emerald-2)]'):'bg-[#e8e6df]'}`} style={{height:`${6+i*0.75}px`}}/>})}</div>
+     <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-black text-[color:var(--muted)]" title={ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}><Clock className="h-3.5 w-3.5" aria-hidden="true"/><span className="sr-only">{ar?'الشريط يعمل بعد تجهيز الميكروفون':'The level meter starts once the microphone is prepared'}</span><span aria-hidden="true">{ar?'الشريط بعد التجهيز':'Meter after setup'}</span></div>
      <div className="mt-5"><Button onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تجهيز الميكروفون':'Prepare microphone')}</Button>{IS_DEMO_SESSION&&<Button variant="outline" className="ms-2" onClick={()=>setAudioState('ready')}>{ar?'متابعة بلا ميكروفون (عرض تجريبي)':'Continue without microphone (demo)'}</Button>}</div>
-     <p className="mx-auto mt-3.5 inline-flex max-w-sm items-center gap-1.5 text-xs font-bold text-[#656b66]" title={ar?'بمجرد أن يعمل التسجيل يظهر تأكيد الحضور وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'Once recording runs, presence and panel approval appear next — they do not wait on the level meter.'}><UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/><span className="sr-only">{ar?'بمجرد أن يعمل التسجيل يظهر تأكيد الحضور وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'Once recording runs, presence and panel approval appear next — they do not wait on the level meter.'}</span><span aria-hidden="true">{ar?'بعد التسجيل: الحضور والموافقة':'Next: presence and approval'}</span></p>
+     <p className="mx-auto mt-3.5 inline-flex max-w-sm items-center gap-1.5 text-xs font-bold text-[color:var(--muted)]" title={ar?'بمجرد أن يعمل التسجيل يظهر تأكيد الحضور وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'Once recording runs, presence and panel approval appear next — they do not wait on the level meter.'}><UserCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true"/><span className="sr-only">{ar?'بمجرد أن يعمل التسجيل يظهر تأكيد الحضور وموافقة المحكمين، ولا ينتظر ذلك وصول الصوت إلى الشريط.':'Once recording runs, presence and panel approval appear next — they do not wait on the level meter.'}</span><span aria-hidden="true">{ar?'بعد التسجيل: الحضور والموافقة':'Next: presence and approval'}</span></p>
     </div>}
 
     {/* ── بوابتا الحضور والموافقة ─────────────────────────────────────────── */}
@@ -710,13 +710,13 @@ export const JudgeOS: React.FC = () => {
     {!questionRevealed&&!activeSession.isLocked&&micRecording&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#f0eee7] text-[#313a35]"><LockKeyhole className="h-6 w-6"/></div>
      <h2 className="mt-4 text-base font-black">{ar?'الموضع مستورٌ حتى يُؤذَن':'The passage stays sealed'}</h2>
-     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[#636864]">{!participantPresent
+     <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[color:var(--muted)]">{!participantPresent
       ?(ar?'أكّد أن المتسابق جالسٌ أمامك، ثم تُفتح خطوة الموافقة.':'Confirm the participant is seated before you; the approval step opens next.')
       :(ar?'بقيت موافقتك لتُفتح السورة وحدودها.':'Your approval is what opens the surah and its bounds.')}</p>
      <div className="mt-5">{!participantPresent
       ?<Button icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>
       :<Button disabled={approvedByMe} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}</div>
-     {participantPresent&&required>0&&<div className="mt-3 text-[10px] font-black tabular-nums text-[#5f6663]">{ar?`الموافقات: ${approved} من ${required}`:`Approvals: ${approved} of ${required}`}</div>}
+     {participantPresent&&required>0&&<div className="mt-3 text-[11px] font-black tabular-nums text-[#5f6663]">{ar?`الموافقات: ${approved} من ${required}`:`Approvals: ${approved} of ${required}`}</div>}
     </div>}
 
     {/* ── الموضع ─────────────────────────────────────────────────────────── */}
@@ -726,13 +726,13 @@ export const JudgeOS: React.FC = () => {
       {openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio(true)} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}
       {(alignmentConfigured||followReady)&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
       {(alignmentConfigured||followReady)&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}
-      {secureMode&&secureRuntime?.diversityMetrics&&<span className="text-[10px] font-bold text-[#656b66]">{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`)}</span>}
+      {secureMode&&secureRuntime?.diversityMetrics&&<span className="text-[11px] font-bold text-[color:var(--muted)]">{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`)}</span>}
      </div>
     </>}
 
     {/* ── بين موضعين، وبعد القفل ─────────────────────────────────────────── */}
     {micRecording&&questionRevealed&&!activeSession.isLocked&&activeSession.questionPhase==='TRANSITION'&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
-     <Square className="mx-auto h-6 w-6 text-[#214C40]"/>
+     <Square className="mx-auto h-6 w-6 text-[color:var(--emerald)]"/>
      <div className="mt-3 text-sm font-black">{isLastQuestion?(ar?'انتهى آخر موضع. اعتمد تقييمك عندما تكون جاهزًا.':'Final passage ended. Submit when ready.'):(ar?'تم إيقاف الموضع. انتقل إلى السؤال التالي.':'Passage stopped. Move to the next question.')}</div>
      <div className="mt-4">{isLastQuestion
       ?<Button onClick={submitAndLock} icon={<Check className="w-4 h-4"/>}>{ar?'اعتماد وقفل':'Submit & lock'}</Button>
@@ -743,15 +743,15 @@ export const JudgeOS: React.FC = () => {
      <div role="status" aria-live="polite">
       <CompletionSeal size="md"/>
       <div className="mt-4 text-3xl font-black text-[#17352D]">{ar?'انتهت الجلسة':'Session complete'}</div>
-      <div className="mt-2 text-base font-black text-[#214C40]">{ar?'تم اعتماد تقييمك وقفله':'Your assessment is locked'}</div>
+      <div className="mt-2 text-base font-black text-[color:var(--emerald)]">{ar?'تم اعتماد تقييمك وقفله':'Your assessment is locked'}</div>
       <div className="mt-1 text-sm text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
      </div>
-     {reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
+     {reviewAvailable&&<div className="mt-2 text-[11px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
      {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
      {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
     </div>}
 
-    {startError&&<div role="alert" className="mt-3 shrink-0 rounded-xl bg-[#F4E6E3] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5">{startError}</div>}
+    {startError&&<div role="alert" className="mt-3 shrink-0 rounded-xl bg-[var(--danger-soft)] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5">{startError}</div>}
    </div>
   </div>
 
@@ -760,7 +760,7 @@ export const JudgeOS: React.FC = () => {
 
    <div className="mizan-judge-hud">
     <div className="m" data-loss="true" data-zero={deductions===0?'true':undefined}>
-     <b dir="ltr">{showRunningScore?`−${deductions.toFixed(2)}`:String(activeSession.events.filter(e=>!e.reversed).length)}</b>
+     <b dir="ltr">{showRunningScore?(deductions.toFixed(2)==='0.00'?'0.00':`−${deductions.toFixed(2)}`):String(activeSession.events.filter(e=>!e.reversed).length)}</b>
      <span>{showRunningScore?(ar?'الخصم':'Deducted'):(ar?'الملاحظات':'Marks')}</span>
     </div>
     <JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update}/>
@@ -801,12 +801,12 @@ export const JudgeOS: React.FC = () => {
        </div>}
 
       {directMode&&<div className="mizan-judge-direct">
-       <div className="text-[10px] font-black" style={{color:'var(--venue-faint)'}}>{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
+       <div className="text-[11px] font-black" style={{color:'var(--venue-faint)'}}>{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
        {visibleCriteria.map(c=><label key={c.id} className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{border:'1px solid var(--venue-line)',background:'rgba(255,255,255,.022)'}}>
-        <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[10px] font-semibold" style={{color:'var(--venue-faint)'}}>{ar?'من':'of'} {c.maxScore}</span></span>
+        <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[11px] font-semibold" style={{color:'var(--venue-faint)'}}>{ar?'من':'of'} {c.maxScore}</span></span>
         <input aria-label={bilingualName(c,ar)} type="number" min="0" max={c.maxScore} step={policy.judging.directScoreStep||.25} value={directScores[c.id]??c.maxScore} onChange={e=>setDirectScores(v=>({...v,[c.id]:Math.min(c.maxScore,Math.max(0,Number(e.target.value)))}))} className="w-20 min-h-11 shrink-0 rounded-xl px-2 text-center text-lg font-black" style={{border:'1px solid var(--venue-line)',background:'rgba(0,0,0,.25)',color:'var(--venue-ink)'}}/>
        </label>)}
-       <div className="text-[10px] leading-5" style={{color:'var(--venue-faint)'}}>{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
+       <div className="text-[11px] leading-5" style={{color:'var(--venue-faint)'}}>{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
       </div>}
 
       <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>
@@ -846,5 +846,5 @@ export const JudgeOS: React.FC = () => {
 
 const specialtyAr=(v:string)=>({memorization:'الحفظ',tajweed:'التجويد',performance:'الأداء',waqf_ibtida:'الوقف والابتداء',all:'شامل'} as Record<string,string>)[v]||v;
 const formatTime=(s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-const HeadphonesEmpty=()=> <div className="mz-bp-hero-tile w-20 h-20 rounded-3xl bg-[#E7EEE9] text-[#214C40] grid place-items-center mx-auto"><Volume2 className="w-10 h-10"/></div>;
-const JudgeStat=({icon:Icon,value,label,strong}:{icon:React.ComponentType<{className?:string}>;value:number;label:string;strong?:boolean})=><div className={`mz-bp-stat rounded-2xl p-3 sm:p-4 text-center ${strong?'bg-[#E7EEE9] text-[#214C40]':'bg-[#f1efe9] text-[#3f4642]'}`}><Icon className="mx-auto h-6 w-6"/><div className="mt-1 text-3xl font-black tabular-nums">{value}</div><div className="mt-0.5 text-xs sm:text-sm font-bold">{label}</div></div>;
+const HeadphonesEmpty=()=> <div className="mz-bp-hero-tile w-20 h-20 rounded-3xl bg-[var(--emerald-soft)] text-[color:var(--emerald)] grid place-items-center mx-auto"><Volume2 className="w-10 h-10"/></div>;
+const JudgeStat=({icon:Icon,value,label,strong}:{icon:React.ComponentType<{className?:string}>;value:number;label:string;strong?:boolean})=><div className={`mz-bp-stat rounded-2xl p-3 sm:p-4 text-center ${strong?'bg-[var(--emerald-soft)] text-[color:var(--emerald)]':'bg-[#f1efe9] text-[#3f4642]'}`}><Icon className="mx-auto h-6 w-6"/><div className="mt-1 text-3xl font-black tabular-nums">{value}</div><div className="mt-0.5 text-xs sm:text-sm font-bold">{label}</div></div>;

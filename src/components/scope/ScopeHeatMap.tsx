@@ -14,11 +14,11 @@ import { EmptyState } from '../design-system/EmptyState';
  */
 
 const RISK_STYLE: Record<JuzHeatCell['exhaustionRisk'], { bg: string; ink: string; ar: string; en: string; bar: string }> = {
-  none: { bg: 'bg-[#f4f2ec]', ink: 'text-[#696f6b]', ar: 'بلا طلب', en: 'No demand', bar: 'bg-[#d7d5cd]' },
-  low: { bg: 'bg-[#E7EEE9]', ink: 'text-[#214C40]', ar: 'مريح', en: 'Comfortable', bar: 'bg-[#2F6555]' },
+  none: { bg: 'bg-[#f4f2ec]', ink: 'text-[color:var(--muted)]', ar: 'بلا طلب', en: 'No demand', bar: 'bg-[#d7d5cd]' },
+  low: { bg: 'bg-[var(--emerald-soft)]', ink: 'text-[color:var(--emerald)]', ar: 'مريح', en: 'Comfortable', bar: 'bg-[var(--emerald-2)]' },
   medium: { bg: 'bg-[#E8EEF1]', ink: 'text-[#3c5566]', ar: 'متوسط', en: 'Moderate', bar: 'bg-[#496477]' },
-  high: { bg: 'bg-[#F2EADC]', ink: 'text-[#7d5e34]', ar: 'مرتفع', en: 'High', bar: 'bg-[#9b7542]' },
-  critical: { bg: 'bg-[#F4E6E3]', ink: 'text-[#8a3f34]', ar: 'حرج', en: 'Critical', bar: 'bg-[#a34d43]' },
+  high: { bg: 'bg-[var(--amber-soft)]', ink: 'text-[#7d5e34]', ar: 'مرتفع', en: 'High', bar: 'bg-[var(--amber)]' },
+  critical: { bg: 'bg-[var(--danger-soft)]', ink: 'text-[#8a3f34]', ar: 'حرج', en: 'Critical', bar: 'bg-[var(--danger)]' },
 };
 
 export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean }> = ({ analysis, arabic }) => {
@@ -51,24 +51,24 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
                 aria-label={arabic
                   ? `الجزء ${row.juz}: ${row.participantCount} متسابقًا، ${row.supply} موضعًا متاحًا، الضغط ${style.ar}`
                   : `Juz ${row.juz}: ${row.participantCount} participants, ${row.supply} loci, pressure ${style.en}`}
-                className={`min-h-[74px] rounded-xl border p-2 text-start transition ${style.bg} ${focus === row.juz ? 'border-[#214C40] ring-2 ring-[#214C40]/20' : 'border-transparent hover:border-[#cddbd3]'}`}>
+                className={`min-h-[74px] rounded-xl border p-2 text-start transition ${style.bg} ${focus === row.juz ? 'border-[color:var(--emerald)] ring-2 ring-[color:var(--emerald)]/20' : 'border-transparent hover:border-[#cddbd3]'}`}>
                 <div className="flex items-baseline justify-between gap-1">
                   <span className={`text-sm font-black tabular-nums ${style.ink}`}>{row.juz}</span>
-                  <span className={`text-[9px] font-bold ${style.ink}`}>{arabic ? style.ar : style.en}</span>
+                  <span className={`text-[11px] font-bold ${style.ink}`}>{arabic ? style.ar : style.en}</span>
                 </div>
-                <div className={`mt-1 flex items-baseline gap-1 text-[10px] font-black tabular-nums ${style.ink}`}>
-                  <span>{row.participantCount}</span><span className="text-[8px] font-bold opacity-75">{arabic ? 'متسابقًا' : 'part.'}</span>
+                <div className={`mt-1 flex items-baseline gap-1 text-[11px] font-black tabular-nums ${style.ink}`}>
+                  <span>{row.participantCount}</span><span className="text-[11px] font-bold opacity-75">{arabic ? 'متسابقًا' : 'part.'}</span>
                 </div>
                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
                   <div className={`h-full rounded-full ${style.bar}`} style={{ width: `${Math.max(3, Math.round((row.participantCount / maxParticipants) * 100))}%` }} />
                 </div>
-                <div className="mt-1 text-[9px] text-[#656b67]">{arabic ? `${row.supply} موضعًا` : `${row.supply} loci`}</div>
+                <div className="mt-1 text-[11px] text-[#656b67]">{arabic ? `${row.supply} موضعًا` : `${row.supply} loci`}</div>
                 <span className="sr-only">{arabic ? `من ${surahNameArabic(bounds.start.surah)} ${bounds.start.ayah}` : `from ${surahNameEnglish(bounds.start.surah)} ${bounds.start.ayah}`}</span>
               </button>
             );
           })}
         </div>
-        <ul className="mt-2 flex flex-wrap gap-3 text-[10px] font-bold text-[#656b67]">
+        <ul className="mt-2 flex flex-wrap gap-3 text-[11px] font-bold text-[#656b67]">
           {(Object.keys(RISK_STYLE) as JuzHeatCell['exhaustionRisk'][]).map(key => (
             <li key={key} className="inline-flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${RISK_STYLE[key].bar}`} aria-hidden="true" />
@@ -81,8 +81,8 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
       {cell && (
         <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4" role="status">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-black text-[#214C40]">{arabic ? `الجزء ${cell.juz}` : `Juz ${cell.juz}`}</h3>
-            <span className="text-[10px] font-bold text-[#656b67]">
+            <h3 className="text-sm font-black text-[color:var(--emerald)]">{arabic ? `الجزء ${cell.juz}` : `Juz ${cell.juz}`}</h3>
+            <span className="text-[11px] font-bold text-[#656b67]">
               {arabic ? `يبدأ عند ${surahNameArabic(juzBounds(cell.juz).start.surah)} ${juzBounds(cell.juz).start.ayah}` : `starts at ${surahNameEnglish(juzBounds(cell.juz).start.surah)} ${juzBounds(cell.juz).start.ayah}`}
             </span>
           </div>
@@ -109,7 +109,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
             {analysis.bottlenecks.map(cluster => (
               <li key={cluster.signature} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
                 <span className="min-w-0 text-[11px] font-black text-[#3c4541]">{cluster.label}</span>
-                <span className="text-[10px] font-bold tabular-nums text-[#7d5e34]">
+                <span className="text-[11px] font-bold tabular-nums text-[#7d5e34]">
                   {arabic ? `${cluster.participantCount} متسابقًا · ${cluster.demand} سحبة على ${cluster.supply} موضعًا · إعادة ${cluster.averageReuse}×` : `${cluster.participantCount} participants · ${cluster.demand} draws over ${cluster.supply} loci · reuse ${cluster.averageReuse}×`}
                 </span>
               </li>
@@ -123,7 +123,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[520px] text-[11px]">
             <thead>
-              <tr className="text-[9px] font-black tracking-[.1em] text-[#696f6b]">
+              <tr className="text-[11px] font-black tracking-[.1em] text-[color:var(--muted)]">
                 <th className="pb-2 text-start">{arabic ? 'النطاق' : 'Range'}</th>
                 <th className="pb-2 text-end">{arabic ? 'متسابقون' : 'Participants'}</th>
                 <th className="pb-2 text-end">{arabic ? 'سحوبات' : 'Draws'}</th>
@@ -140,7 +140,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
                   <td className="py-2 text-end tabular-nums">{cluster.supply}</td>
                   <td className="py-2 text-end">
                     {cluster.sufficientForStrictNoRepeat
-                      ? <span className="inline-flex items-center gap-1 font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{arabic ? 'نعم' : 'Yes'}</span>
+                      ? <span className="inline-flex items-center gap-1 font-black text-[color:var(--emerald)]"><CheckCircle2 className="h-3.5 w-3.5" />{arabic ? 'نعم' : 'Yes'}</span>
                       : <span className="inline-flex items-center gap-1 font-black text-[#8a3f34]"><AlertTriangle className="h-3.5 w-3.5" />{arabic ? 'لا' : 'No'}</span>}
                   </td>
                 </tr>
@@ -155,7 +155,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
 
 const Stat: React.FC<{ label: string; value: React.ReactNode; tight?: boolean }> = ({ label, value, tight }) => (
   <div className={`min-w-0 rounded-xl ${tight ? 'bg-white/80 px-2.5 py-2' : 'mizan-surface-soft p-3'}`}>
-    <div className="text-[9px] font-bold text-[#656b67]">{label}</div>
+    <div className="text-[11px] font-bold text-[#656b67]">{label}</div>
     <div className="mt-0.5 text-lg font-black tabular-nums text-[#24302b]">{value}</div>
   </div>
 );

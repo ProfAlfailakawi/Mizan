@@ -69,7 +69,7 @@ export const LiveJudgingSimulator: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="dna-btn text-[11px] font-bold flex items-center gap-1.5"
+            className="dna-btn min-h-11 text-[11px] font-bold flex items-center gap-1.5"
             aria-label={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
           >
             {isPlaying ? (
@@ -111,7 +111,7 @@ export const LiveJudgingSimulator: React.FC = () => {
               >
                 <span>{t.word}</span>
                 <span
-                  className={`text-[9px] font-arabic font-normal mt-3 px-1.5 py-0.5 rounded ${
+                  className={`text-[11px] font-arabic font-normal mt-3 px-1.5 py-0.5 rounded ${
                     isActive ? 'bg-[var(--surface)] text-[var(--emerald)]' : 'text-transparent'
                   }`}
                 >
@@ -157,7 +157,7 @@ export const LiveJudgingSimulator: React.FC = () => {
               style={{ background: 'var(--emerald-2)', width: isPlaying ? (activeToken === 3 ? '92%' : '75%') : '50%' }}
             />
           </div>
-          <div className="text-[10px] mizan-muted mt-1 text-center tabular-nums">2.1s · بالنبض</div>
+          <div className="text-[11px] mizan-muted mt-1 text-center tabular-nums">2.1 ث · بالنبض</div>
         </div>
 
         {/* مؤشر توافق المحكمين */}
@@ -182,9 +182,9 @@ export const LiveJudgingSimulator: React.FC = () => {
 
         {/* النتيجة والختم الفوري */}
         <div className="p-3 rounded-2xl text-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)' }}>
-          <div className="text-[10px] mizan-muted font-medium">درجة العيّنة</div>
+          <div className="text-[11px] mizan-muted font-medium">درجة العيّنة</div>
           <div className="text-2xl font-black font-display text-[var(--emerald)] mt-0.5">{judgeScore.toFixed(1)}</div>
-          <div className="text-[10px] font-medium text-[var(--emerald-2)] flex items-center justify-center gap-1 mt-0.5">
+          <div className="text-[11px] font-medium text-[var(--emerald-2)] flex items-center justify-center gap-1 mt-0.5">
             <ShieldCheck size={11} /> مختومة بسلسلة
           </div>
         </div>
@@ -253,7 +253,7 @@ export const InteractiveEvolutionFlow: React.FC = () => {
                   : 'bg-[var(--canvas)] text-[var(--muted)] hover:bg-[var(--emerald-soft)]'
               }`}
             >
-              <span className={`text-[10px] tabular-nums px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[var(--gold-light)]' : 'bg-black/5 text-[var(--muted)]'}`}>
+              <span className={`text-[11px] tabular-nums px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-[var(--gold-light)]' : 'bg-black/5 text-[var(--muted)]'}`}>
                 المرحلة 0{idx + 1}
               </span>
               <span className="text-xs font-extrabold">{s.title}</span>
@@ -377,14 +377,14 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
             >
               <div className="flex items-center justify-between text-[11px] mb-3">
                 <span className="font-mono text-[var(--gold-light)] font-bold">{org.domain}</span>
-                <span className="inline-flex items-center gap-1 text-[10px] text-[var(--gold-light)]">
+                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--gold-light)]">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--gold-light)]" /> آمن ومستقل
                 </span>
               </div>
               <div className="text-base font-black text-[var(--venue-ink)]">{org.name}</div>
               <div className="text-xs text-[var(--venue-muted)] mt-2">{org.db}</div>
 
-              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-[var(--venue-faint)]">
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-[var(--venue-faint)]">
                 <span>عزل كامل 100%</span>
                 <span>لا وصول بين الجهات</span>
               </div>
@@ -404,7 +404,7 @@ export const SecurityAndArchitectureInfographic: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-[var(--emerald-2)]/30 text-[var(--gold-light)] grid place-items-center mb-2">
                 <s.icon size={18} strokeWidth={1.6} />
               </div>
-              <div className="text-[10px] tabular-nums text-[var(--venue-faint)]">{s.step}</div>
+              <div className="text-[11px] tabular-nums text-[var(--venue-faint)]">{s.step}</div>
               <div className="text-sm font-black text-[var(--venue-ink)] mt-1">{s.title}</div>
               <div className="text-[11px] text-[var(--venue-muted)] mt-1">{s.desc}</div>
               {idx < 3 && (

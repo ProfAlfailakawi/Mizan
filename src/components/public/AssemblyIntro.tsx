@@ -89,7 +89,7 @@ export const AssemblyIntro: React.FC = () => {
   return (
     <div
       aria-hidden={leaving || undefined}
-      className={`mz-ovt-veil fixed inset-0 z-[70] bg-[#F7F5EF] pointer-events-none overflow-hidden${leaving ? ' mz-ovt-veil--skip' : ''}`}
+      className={`mz-ovt-veil fixed inset-0 z-[70] bg-[var(--canvas)] pointer-events-none overflow-hidden${leaving ? ' mz-ovt-veil--skip' : ''}`}
     >
       <div aria-hidden="true" className="absolute inset-0 grid place-items-center">
         <div className="relative">
@@ -124,7 +124,7 @@ export const AssemblyIntro: React.FC = () => {
               {CHIPS.map(({ icon: Icon, side, dx, dy, delay }, i) => (
                 <span
                   key={i}
-                  className="mz-ovt-chip absolute top-1/2 left-1/2 w-[40px] h-[40px] -mt-5 -ml-5 rounded-xl border border-[#DFDED7] bg-[#FFFEFB] grid place-items-center text-[#214C40] shadow-[0_1px_2px_rgba(23,27,24,.06)]"
+                  className="mz-ovt-chip absolute top-1/2 left-1/2 w-[40px] h-[40px] -mt-5 -ml-5 rounded-xl border border-[#DFDED7] bg-[var(--surface)] grid place-items-center text-[color:var(--emerald)] shadow-[0_1px_2px_rgba(23,27,24,.06)]"
                   style={{
                     '--mzx': `${side * PAN_X + dx}px`,
                     '--mzy': `${PAN_Y + dy}px`,
@@ -147,7 +147,7 @@ export const AssemblyIntro: React.FC = () => {
       <button
         type="button"
         onClick={skip}
-        className="mz-ovt-skip absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-auto px-5 py-2 rounded-full border border-[#DFDED7] bg-[#FFFEFB]/80 text-[13px] text-[#6B7069] hover:text-[#214C40] hover:border-[#C9C7BC] transition-colors"
+        className="mz-ovt-skip absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-auto px-5 py-2 rounded-full border border-[#DFDED7] bg-[var(--surface)]/80 text-[13px] text-[#6B7069] hover:text-[color:var(--emerald)] hover:border-[#C9C7BC] transition-colors"
       >
         تخطي
       </button>

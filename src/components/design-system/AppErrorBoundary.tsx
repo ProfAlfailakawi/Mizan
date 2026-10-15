@@ -51,7 +51,7 @@ class Boundary extends React.Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div dir="rtl" className="min-h-screen grid place-items-center bg-[#f7f5ef] p-5 font-arabic">
+      <div dir="rtl" className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5 font-arabic">
         <div className="mizan-surface max-w-lg w-full p-8 text-center">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#F6E7E7] text-[#7A2E2E]">
             <AlertTriangle className="h-7 w-7" />
@@ -63,14 +63,14 @@ class Boundary extends React.Component<Props, State> {
           </p>
           <button
             onClick={this.recover}
-            className="mt-6 w-full rounded-2xl bg-[#214C40] px-6 py-3 text-sm font-black text-white"
+            className="mt-6 w-full rounded-2xl bg-[var(--emerald)] px-6 py-3 text-sm font-black text-white"
           >
             مسح بيانات هذا الجهاز وإعادة التحميل
           </button>
-          <p className="mt-3 text-[11px] leading-5 text-[#656b66]">
+          <p className="mt-3 text-[11px] leading-5 text-[color:var(--muted)]">
             لن يُحذف شيء من حسابك. سيُطلب منك تسجيل الدخول من جديد فقط.
           </p>
-          <p className="mt-4 break-all text-[11px] text-[#656b66]" dir="ltr">{String(this.state.error?.message || '').slice(0, 160)}</p>
+          <p className="mt-4 break-all text-[11px] text-[color:var(--muted)]" dir="ltr">{String(this.state.error?.message || '').slice(0, 160)}</p>
         </div>
       </div>
     );

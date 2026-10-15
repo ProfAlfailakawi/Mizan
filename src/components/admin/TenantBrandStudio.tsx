@@ -50,7 +50,7 @@ const CopyChip: React.FC<{ value: string; label: string }> = ({ value, label }) 
     <button
       type="button"
       onClick={() => { try { void navigator.clipboard?.writeText(value); setDone(true); setTimeout(() => setDone(false), 1600); } catch { /* النسخ غير متاح في هذا المتصفح */ } }}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-[#DAD8D0] bg-white px-2 py-1 text-xs font-black text-[#2F6555] hover:bg-[#F3F1EB]"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-[#DAD8D0] bg-white px-2 py-1 text-xs font-black text-[color:var(--emerald-2)] hover:bg-[#F3F1EB]"
       aria-label={label}
     >
       {done ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}{done ? 'تم النسخ' : 'نسخ'}
@@ -73,11 +73,11 @@ const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }
         {steps.map((s, i) => (
           <li key={s.t} className="relative rounded-xl border border-[#E9E7E0] bg-white p-3">
             <div className="flex items-center gap-2">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#214C40] text-[13px] font-black text-white">{i + 1}</span>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#EBF2EE] text-[#214C40]"><s.icon className="h-4 w-4" /></span>
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--emerald)] text-[13px] font-black text-white">{i + 1}</span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#EBF2EE] text-[color:var(--emerald)]"><s.icon className="h-4 w-4" /></span>
               <span className="text-xs font-black text-[#171b18]">{s.t}</span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-[#656b66]">{s.d}</p>
+            <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">{s.d}</p>
           </li>
         ))}
       </ol>
@@ -89,7 +89,7 @@ const DomainHowTo: React.FC<{ ar: boolean; baseDomain: string; domain?: string }
           { k: ar ? 'القيمة' : 'Value', v: host, copy: true },
         ].map(row => (
           <div key={row.k} className="flex flex-wrap items-center justify-between gap-2 p-2.5">
-            <dt className="text-xs font-black text-[#656b66]">{row.k}</dt>
+            <dt className="text-xs font-black text-[color:var(--muted)]">{row.k}</dt>
             <dd className="flex min-w-0 items-center gap-2">
               <span dir="ltr" className="text-[13px] font-bold break-all [overflow-wrap:anywhere]">{row.v}</span>
               {row.copy && <CopyChip value={row.v} label={ar ? `نسخ ${row.k}` : `Copy ${row.k}`} />}
@@ -139,7 +139,7 @@ export const TenantDomainRequestCard: React.FC = () => {
   return (
     <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 sm:p-6 shadow-sm space-y-5">
       <div className="flex items-center gap-2">
-        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]"><Globe className="w-5 h-5" /></span>
+        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[color:var(--emerald)]"><Globe className="w-5 h-5" /></span>
         <div>
           <div className="mizan-kicker">{ar ? 'النطاق والوصول' : 'DOMAIN & ACCESS'}</div>
           <h3 className="text-base font-extrabold text-[#171b18]">{ar ? 'عنوان بوابتك' : 'Your portal address'}</h3>
@@ -148,7 +148,7 @@ export const TenantDomainRequestCard: React.FC = () => {
 
       {live
         ? <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex flex-wrap items-center gap-2 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'بوابتك تعمل على:' : 'Your portal is live at:'}<span dir="ltr" className="break-all [overflow-wrap:anywhere]">{live}</span></div>
-        : <p className="text-xs leading-relaxed text-[#636864]">{ar ? 'لم يُربط نطاق ببوابتك بعد. أتمم الخطوات أدناه ثم اطلب الربط، ونتكفّل نحن بالتثبيت والتحقق.' : 'No domain is connected yet. Complete the steps below, then request the connection.'}</p>}
+        : <p className="text-xs leading-relaxed text-[color:var(--muted)]">{ar ? 'لم يُربط نطاق ببوابتك بعد. أتمم الخطوات أدناه ثم اطلب الربط، ونتكفّل نحن بالتثبيت والتحقق.' : 'No domain is connected yet. Complete the steps below, then request the connection.'}</p>}
 
       <label className="block">
         <span className="mizan-field-label">{ar ? 'النطاق الذي تريده' : 'The domain you want'}</span>
@@ -160,7 +160,7 @@ export const TenantDomainRequestCard: React.FC = () => {
       </label>
 
       {sent && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'وصل طلبك. سنتحقق من السجل ونفعّل نطاقك.' : 'Request received. We will verify and activate your domain.'}</div>}
-      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
+      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[color:var(--danger)]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
 
       <DomainHowTo ar={ar} baseDomain={baseDomain} domain={normalizeDomain(wanted) || customDomains[0]} />
     </section>
@@ -220,13 +220,13 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
   return (
     <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 sm:p-6 shadow-sm space-y-5">
       <div className="flex items-center gap-2">
-        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]"><Globe className="w-5 h-5" /></span>
+        <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[color:var(--emerald)]"><Globe className="w-5 h-5" /></span>
         <div>
           <div className="mizan-kicker">{ar ? 'النطاق والوصول' : 'DOMAIN & ACCESS'}</div>
           <h3 className="text-base font-extrabold text-[#171b18]">{ar ? 'نطاق الجهة على ميزان' : 'Tenant domain'}</h3>
         </div>
       </div>
-      <p className="text-xs leading-relaxed text-[#636864] max-w-2xl">
+      <p className="text-xs leading-relaxed text-[color:var(--muted)] max-w-2xl">
         {ar ? 'اختر نطاقًا فرعيًا سهلًا يصل منه الجميع إلى بوابتك، أو اربط نطاقك الخاص باحترافية. يكفي إدخال العنوان هنا؛ نتكفّل بالباقي.' : 'Pick a friendly subdomain or connect your own custom domain. Enter the address here and we handle the rest.'}
       </p>
 
@@ -235,9 +235,9 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
       {/* النطاق الفرعي */}
       <label className="block">
         <span className="mizan-field-label">{ar ? 'النطاق الفرعي' : 'Subdomain'}</span>
-        <div className="flex items-stretch mt-1 rounded-xl border border-[#DAD8D0] overflow-hidden focus-within:border-[#2F6555]">
+        <div className="flex items-stretch mt-1 rounded-xl border border-[#DAD8D0] overflow-hidden focus-within:border-[color:var(--emerald-2)]">
           <input dir="ltr" lang="en" disabled={locked} className="flex-1 px-3 py-2.5 text-sm outline-none bg-white disabled:bg-[#f5f4f0] disabled:text-[#5f6862]" value={subdomain} onChange={e => setSubdomain(normalizeDomain(e.target.value))} placeholder="a" />
-          {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[13px] font-bold text-[#656b66] border-s border-[#E4E2DB]">{suffix}</span>}
+          {suffix && <span dir="ltr" className="grid place-items-center px-3 bg-[#F3F1EB] text-[13px] font-bold text-[color:var(--muted)] border-s border-[#E4E2DB]">{suffix}</span>}
         </div>
         <span className="mt-1 block text-xs text-[#8d7a52]">{ar ? 'حروف لاتينية وأرقام وشرطة فقط.' : 'Lowercase letters, digits and hyphen only.'}</span>
       </label>
@@ -253,7 +253,7 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
           <div className="mt-3 space-y-2">
             {customDomains.map(d => (
               <div key={d} className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E2DB] bg-[#FAFAF7] px-3 py-2">
-                <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[#2F6555] shrink-0" />{d}</span>
+                <span dir="ltr" className="flex items-center gap-2 text-xs font-bold text-[#2b312d] break-all [overflow-wrap:anywhere]"><Link2 className="w-3.5 h-3.5 text-[color:var(--emerald-2)] shrink-0" />{d}</span>
                 {!locked && <button type="button" aria-label={ar ? `حذف ${d}` : `Remove ${d}`} onClick={() => removeDomain(d)} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-[#ead9d5] text-[#94564d] hover:bg-[#f7ece9]"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
@@ -263,13 +263,13 @@ export const TenantDomainCard: React.FC<{ orgId?: string; getUrl?: string; patch
       </div>
 
       {ok && <div className="rounded-xl bg-[#EAF5EF] border border-[#BDE0CB] p-3 flex items-center gap-2.5 text-xs font-bold text-[#1F5E39]"><CheckCircle2 className="w-4 h-4 shrink-0" />{ar ? 'تم حفظ النطاق بنجاح.' : 'Domain saved successfully.'}</div>}
-      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
+      {err && <div className="rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[color:var(--danger)]"><XCircle className="w-4 h-4 shrink-0" />{err}</div>}
 
       {!locked && <div className="flex justify-end">
         <Button icon={saving ? undefined : <Check className="w-4 h-4" />} onClick={requestSave} disabled={saving || !canSaveNow}>{saving ? (ar ? 'جارٍ الحفظ…' : 'Saving…') : (ar ? 'حفظ النطاق' : 'Save domain')}</Button>
       </div>}
 
-      {confirmOpen && <div className="fixed inset-0 z-[200] grid place-items-center bg-[#16241f]/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-3xl border border-white/60 bg-[#fffefb] p-6 shadow-2xl"><div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#2F6555]" /><h3 className="font-black">{ar ? 'تأكيد اعتماد النطاق' : 'Confirm domain'}</h3></div><p className="mt-3 text-xs leading-6 text-[#5b625d]">{ar ? 'بعد الحفظ يُعتمد النطاق ويُقفل، ولا يمكنك تغييره إلا بالتواصل مع مالك المنصة. هل تريد المتابعة؟' : 'After saving, the domain is locked and can only be changed by contacting the platform owner. Continue?'}</p><div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={() => setConfirmOpen(false)}>{ar ? 'إلغاء' : 'Cancel'}</Button><Button disabled={saving} onClick={() => { setConfirmOpen(false); void save(); }}>{ar ? 'اعتماد وحفظ' : 'Confirm & save'}</Button></div></div></div>}
+      {confirmOpen && <div className="fixed inset-0 z-[200] grid place-items-center bg-[#16241f]/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-3xl border border-white/60 bg-[var(--surface)] p-6 shadow-2xl"><div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[color:var(--emerald-2)]" /><h3 className="font-black">{ar ? 'تأكيد اعتماد النطاق' : 'Confirm domain'}</h3></div><p className="mt-3 text-xs leading-6 text-[#5b625d]">{ar ? 'بعد الحفظ يُعتمد النطاق ويُقفل، ولا يمكنك تغييره إلا بالتواصل مع مالك المنصة. هل تريد المتابعة؟' : 'After saving, the domain is locked and can only be changed by contacting the platform owner. Continue?'}</p><div className="mt-5 flex justify-end gap-2"><Button variant="ghost" onClick={() => setConfirmOpen(false)}>{ar ? 'إلغاء' : 'Cancel'}</Button><Button disabled={saving} onClick={() => { setConfirmOpen(false); void save(); }}>{ar ? 'اعتماد وحفظ' : 'Confirm & save'}</Button></div></div></div>}
     </section>
   );
 };
@@ -295,7 +295,7 @@ interface ImageProbeResult {
 const PlacementToggle: React.FC<{ label: React.ReactNode; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
   <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="w-full flex items-center justify-between gap-3 py-2 text-xs">
     <span className="text-[#4a504c] font-bold text-start">{label}</span>
-    <span className={`w-9 h-5 shrink-0 rounded-full p-0.5 transition ${checked ? 'bg-[#214C40]' : 'bg-[#d8d6cd]'}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${checked ? 'ms-auto' : ''}`} /></span>
+    <span className={`w-9 h-5 shrink-0 rounded-full p-0.5 transition ${checked ? 'bg-[var(--emerald)]' : 'bg-[#d8d6cd]'}`}><span className={`block w-4 h-4 rounded-full bg-white transition ${checked ? 'ms-auto' : ''}`} /></span>
   </button>
 );
 
@@ -563,7 +563,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[#214C40]">
+              <span className="inline-flex p-2 rounded-xl bg-[#EBF2EE] text-[color:var(--emerald)]">
                 <Sparkles className="w-5 h-5" />
               </span>
               <div>
@@ -573,7 +573,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                 </h2>
               </div>
             </div>
-            <p className="mt-1.5 text-xs text-[#636864] leading-relaxed max-w-2xl">
+            <p className="mt-1.5 text-xs text-[color:var(--muted)] leading-relaxed max-w-2xl">
               {ar
                 ? 'خصص شعار الجهة واسمها وسلوجنها وبيانات التواصل، وتحكم بدقة في أي واجهات تظهر فيها، مع فحص ذكي يضمن نقاء الشعار ويمنع رفع الروابط المكسورة.'
                 : 'Configure your logo, name, slogan and contacts, precisely control where each appears across the system, backed by an intelligent validator preventing broken assets.'}
@@ -581,12 +581,12 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           </div>
 
           {/* عداد جودة الهوية */}
-          <div className="rounded-2xl bg-[#F7F5EF] border border-[#E0DED7] p-3 text-center sm:min-w-[170px] shrink-0">
-            <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider">
+          <div className="rounded-2xl bg-[var(--canvas)] border border-[#E0DED7] p-3 text-center sm:min-w-[170px] shrink-0">
+            <div className="text-xs font-bold text-[color:var(--muted)] uppercase tracking-wider">
               {ar ? 'مؤشر اكتمال الهوية' : 'Brand Health Score'}
             </div>
             <div className="mt-1 flex items-center justify-center gap-2">
-              <span className="text-2xl font-black text-[#214C40]">{healthScore}%</span>
+              <span className="text-2xl font-black text-[color:var(--emerald)]">{healthScore}%</span>
               <Badge variant={healthScore >= 80 ? 'emerald' : healthScore >= 50 ? 'amber' : 'neutral'} dot={false}>
                 {healthScore >= 80 ? (ar ? 'ممتاز' : 'Optimal') : healthScore >= 50 ? (ar ? 'جيد' : 'Good') : (ar ? 'بحاجة إكمال' : 'Incomplete')}
               </Badge>
@@ -602,7 +602,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           </div>
         )}
         {serverError && (
-          <div className="mt-4 rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[#A34D43]">
+          <div className="mt-4 rounded-xl bg-[#FDF2F0] border border-[#F1C4BD] p-3 flex items-center gap-2.5 text-xs font-bold text-[color:var(--danger)]">
             <XCircle className="w-4 h-4 shrink-0" />
             <span>{serverError}</span>
           </div>
@@ -624,7 +624,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Camera className="w-4 h-4 text-[#2F6555]" />
+                <Camera className="w-4 h-4 text-[color:var(--emerald-2)]" />
                 <h3 className="font-extrabold text-sm">{ar ? 'شعار الجهة واختبار النقاء' : 'Logo & Clarity Inspector'}</h3>
               </div>
               <Badge
@@ -648,7 +648,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   className="mizan-input flex-1 text-xs font-mono"
                 />
                 <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DFDED7] bg-white hover:bg-[#FAF9F5] text-xs font-bold text-[#4a504c] shrink-0 transition">
-                  <FileUp className="w-3.5 h-3.5 text-[#2F6555]" />
+                  <FileUp className="w-3.5 h-3.5 text-[color:var(--emerald-2)]" />
                   <span>{ar ? 'رفع ملف' : 'Upload'}</span>
                   <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                 </label>
@@ -661,8 +661,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     ? 'bg-[#FDF9F0] border-[#F2E0BA] text-[#8F6517]'
                     : 'bg-[#F2F8F4] border-[#CCE5D6] text-[#1E5D38]'
                   : probe.status === 'broken'
-                  ? 'bg-[#FDF2F0] border-[#F1C4BD] text-[#A34D43]'
-                  : 'bg-[#FAF9F5] border-[#E8E6DF] text-[#656b66]'
+                  ? 'bg-[#FDF2F0] border-[#F1C4BD] text-[color:var(--danger)]'
+                  : 'bg-[#FAF9F5] border-[#E8E6DF] text-[color:var(--muted)]'
               }`}>
                 <div className="flex items-start gap-2">
                   {probe.status === 'valid' ? (
@@ -691,7 +691,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             {/* معاينة تباين الشعار وخلفياته */}
             <div className="pt-2 border-t border-[#EAE8E1]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[13px] font-bold text-[#656b66]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
+                <span className="text-[13px] font-bold text-[color:var(--muted)]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
                 <div className="flex gap-1 text-xs font-bold">
                   {([
                     ['light', ar ? 'فاتح' : 'Light'],
@@ -705,8 +705,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       onClick={() => setPreviewBg(mode)}
                       className={`min-h-11 min-w-11 px-2.5 py-0.5 rounded-lg border transition ${
                         previewBg === mode
-                          ? 'border-[#214C40] bg-[#214C40] text-white'
-                          : 'border-[#DFDED7] bg-white text-[#656b66] hover:bg-[#FAF9F5]'
+                          ? 'border-[color:var(--emerald)] bg-[var(--emerald)] text-white'
+                          : 'border-[#DFDED7] bg-white text-[color:var(--muted)] hover:bg-[#FAF9F5]'
                       }`}
                     >
                       {label}
@@ -719,7 +719,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <div
                 className={`h-24 rounded-xl border border-[#DFDED7] grid place-items-center transition-all p-3 ${
                   previewBg === 'light'
-                    ? 'bg-[#F7F5EF]'
+                    ? 'bg-[var(--canvas)]'
                     : previewBg === 'dark'
                     ? 'bg-[#0D1E18]'
                     : previewBg === 'parchment'
@@ -734,7 +734,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     className="max-h-16 max-w-full object-contain drop-shadow-sm"
                   />
                 ) : (
-                  <span className={`text-xs font-bold ${previewBg === 'dark' ? 'text-[#d6ded9]' : 'text-[#656b66]'}`}>
+                  <span className={`text-xs font-bold ${previewBg === 'dark' ? 'text-[#d6ded9]' : 'text-[color:var(--muted)]'}`}>
                     {ar ? 'يظهر الشعار المفحوص هنا' : 'Verified logo appears here'}
                   </span>
                 )}
@@ -747,7 +747,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           {/* 2. بيانات الاسم والسلوجن ومعلومات الاتصال */}
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#2F6555]" />
+              <Building2 className="w-4 h-4 text-[color:var(--emerald-2)]" />
               <h3 className="font-extrabold text-sm">{ar ? 'المعلومات المؤسسية والتواصل' : 'Organization Details & Contact'}</h3>
             </div>
 
@@ -803,7 +803,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <label className="block">
                 <span className="mizan-field-label">{ar ? 'الموقع الإلكتروني الرسمي' : 'Official Website URL'}</span>
                 <div className="relative">
-                  <Globe className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
+                  <Globe className="w-3.5 h-3.5 absolute start-3 top-3 text-[color:var(--amber)]" />
                   <input
                     type="url"
                     dir="ltr"
@@ -818,7 +818,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <label className="block">
                 <span className="mizan-field-label">{ar ? 'أرقام التواصل / الهاتف' : 'Official Phone / WhatsApp'}</span>
                 <div className="relative">
-                  <Headphones className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
+                  <Headphones className="w-3.5 h-3.5 absolute start-3 top-3 text-[color:var(--emerald-2)]" />
                   <input
                     type="tel"
                     value={phoneNumber}
@@ -833,7 +833,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <label className="block">
                 <span className="mizan-field-label">{ar ? 'البريد الإلكتروني الرسمي للاستفسارات' : 'Support / Inquiries Email'}</span>
                 <div className="relative">
-                  <Mail className="w-3.5 h-3.5 absolute start-3 top-3 text-[#2F6555]" />
+                  <Mail className="w-3.5 h-3.5 absolute start-3 top-3 text-[color:var(--emerald-2)]" />
                   <input
                     type="email"
                     dir="ltr"
@@ -848,7 +848,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               <label className="block">
                 <span className="mizan-field-label">{ar ? 'العنوان الجغرافي / المقر' : 'Official Headquarters / Location'}</span>
                 <div className="relative">
-                  <MapPin className="w-3.5 h-3.5 absolute start-3 top-3 text-[#9B7542]" />
+                  <MapPin className="w-3.5 h-3.5 absolute start-3 top-3 text-[color:var(--amber)]" />
                   <input
                     type="text"
                     lang="ar" data-mizan-kind="arabic"
@@ -871,15 +871,15 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           <section className="rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-[#2F6555]" />
+                <Settings2 className="w-4 h-4 text-[color:var(--emerald-2)]" />
                 <h3 className="font-extrabold text-sm">{ar ? 'مصفوفة خيارات ومواضع العرض' : 'Display Placements Matrix'}</h3>
               </div>
-              <span className="text-[13px] text-[#656b66]">
+              <span className="text-[13px] text-[color:var(--muted)]">
                 {ar ? 'أين يظهر كل عنصر في واجهات النظام؟' : 'Control visibility per surface'}
               </span>
             </div>
 
-            <p className="text-xs text-[#636864] leading-relaxed">
+            <p className="text-xs text-[color:var(--muted)] leading-relaxed">
               {ar
                 ? 'حدد بدقة الأماكن التي ترغب بظهور الشعار والسلوجن والعنوان ورقم الهاتف والموقع فيها:'
                 : 'Configure toggle visibility across headers, footers, certificates, and hall screens:'}
@@ -888,7 +888,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             <div className="grid sm:grid-cols-2 gap-3">
               {/* مجموعة الترويسة */}
               <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
-                <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
+                <div className="text-xs font-extrabold text-[color:var(--emerald)] flex items-center gap-1.5">
                   <ScanSearch className="w-3.5 h-3.5" />
                   <span>{ar ? 'الترويسة العلوية' : 'Top Header'}</span>
                 </div>
@@ -899,7 +899,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
               {/* مجموعة التذييل */}
               <div className="p-3.5 rounded-xl border border-[#E8E6DF] bg-[#FAF9F5] space-y-2.5">
-                <div className="text-xs font-extrabold text-[#214C40] flex items-center gap-1.5">
+                <div className="text-xs font-extrabold text-[color:var(--emerald)] flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5" />
                   <span>{ar ? 'تذييل الصفحات العام' : 'Global Footer'}</span>
                 </div>
@@ -920,7 +920,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
           {/* أزرار الحفظ والإجراءات */}
           <div className="flex items-center justify-between gap-4 pt-2">
-            <div className="text-xs text-[#A34D43] font-bold">
+            <div className="text-xs text-[color:var(--danger)] font-bold">
               {validationErrors.length > 0 && validationErrors.join(' · ')}
             </div>
             <Button
@@ -938,7 +938,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
           <div className="sticky top-20 rounded-2xl border border-[#DFDED7] bg-white p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ScanSearch className="w-4 h-4 text-[#2F6555]" />
+                <ScanSearch className="w-4 h-4 text-[color:var(--emerald-2)]" />
                 <h3 className="font-extrabold text-sm">{ar ? 'المعاينة الحية الفورية' : 'Live Multi-Surface Simulator'}</h3>
               </div>
               <Badge variant="neutral" dot={false}>
@@ -947,7 +947,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             </div>
 
             {/* أزرار اختيار السطح المطلوب معاينته */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-[#F7F5EF] rounded-xl text-[13px] font-bold">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-[var(--canvas)] rounded-xl text-[13px] font-bold">
               {([
                 ['header', ar ? 'الترويسة' : 'Header'],
                 ['footer', ar ? 'التذييل' : 'Footer'],
@@ -960,8 +960,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                   onClick={() => setPreviewSurface(surface)}
                   className={`py-1.5 px-2 rounded-lg transition text-center ${
                     previewSurface === surface
-                      ? 'bg-white text-[#214C40] shadow-sm font-extrabold'
-                      : 'text-[#656b66] hover:text-[#171b18]'
+                      ? 'bg-white text-[color:var(--emerald)] shadow-sm font-extrabold'
+                      : 'text-[color:var(--muted)] hover:text-[#171b18]'
                   }`}
                 >
                   {label}
@@ -974,15 +974,15 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 1. معاينة الترويسة */}
               {previewSurface === 'header' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[color:var(--muted)] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة الترويسة العلوية للنظام' : 'Header Simulation'}
                   </div>
-                  <div className="border border-[#DFDED7] bg-[#F7F5EF] rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="border border-[#DFDED7] bg-[var(--canvas)] rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-2.5 min-w-0">
                       {placements.showHeaderLogo && logoUrl && probe.status !== 'broken' ? (
                         <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
                       ) : (
-                        <div className="w-8 h-8 rounded-lg bg-[#214C40] text-white font-bold grid place-items-center text-xs">
+                        <div className="w-8 h-8 rounded-lg bg-[var(--emerald)] text-white font-bold grid place-items-center text-xs">
                           م
                         </div>
                       )}
@@ -991,7 +991,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                           {nameArabic || nameEnglish || (ar ? 'اسم الجهة' : 'Organization Name')}
                         </div>
                         {placements.showHeaderSlogan && sloganArabic && (
-                          <div className="text-xs text-[#2F6555] font-medium truncate">
+                          <div className="text-xs text-[color:var(--emerald-2)] font-medium truncate">
                             {sloganArabic}
                           </div>
                         )}
@@ -1000,7 +1000,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
                     <div className="flex items-center gap-2">
                       {placements.showHeaderContact && (phoneNumber || supportEmail) && (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[#214C40] flex items-center gap-1" dir="ltr">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] text-[color:var(--emerald)] flex items-center gap-1" dir="ltr">
                           <Headphones className="w-2.5 h-2.5" />
                           <span>{phoneNumber || supportEmail}</span>
                         </span>
@@ -1008,7 +1008,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       <div className="w-5 h-5 rounded-full bg-[#DFDED7]" />
                     </div>
                   </div>
-                  <p className="text-xs text-[#656b66] text-center">
+                  <p className="text-xs text-[color:var(--muted)] text-center">
                     {ar ? 'تظهر الترويسة بهذا التنسيق لجميع المحكمين والمسؤولين والزوّار.' : 'This layout appears for all staff and attendees.'}
                   </p>
                 </div>
@@ -1017,7 +1017,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 2. معاينة التذييل */}
               {previewSurface === 'footer' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[color:var(--muted)] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة تذييل الصفحات العام' : 'Footer Simulation'}
                   </div>
                   <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-3 shadow-xs text-[13px]">
@@ -1030,26 +1030,26 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#4a504c] text-xs">
                       {placements.showFooterWebsite && websiteUrl && (
-                        <div className="flex items-center gap-1 text-[#214C40]">
+                        <div className="flex items-center gap-1 text-[color:var(--emerald)]">
                           <Globe className="w-3 h-3" />
                           <span>{websiteUrl.replace(/^https?:\/\//i, '')}</span>
                         </div>
                       )}
                       {placements.showFooterContact && phoneNumber && (
                         <div className="flex items-center gap-1">
-                          <Headphones className="w-3 h-3 text-[#2F6555]" />
+                          <Headphones className="w-3 h-3 text-[color:var(--emerald-2)]" />
                           <span dir="ltr">{phoneNumber}</span>
                         </div>
                       )}
                       {placements.showFooterAddress && addressArabic && (
-                        <div className="flex items-center gap-1 text-[#656b66]">
-                          <MapPin className="w-3 h-3 text-[#9B7542]" />
+                        <div className="flex items-center gap-1 text-[color:var(--muted)]">
+                          <MapPin className="w-3 h-3 text-[color:var(--amber)]" />
                           <span>{addressArabic}</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="text-[11px] text-[#656b66] pt-1">
+                    <div className="text-[11px] text-[color:var(--muted)] pt-1">
                       © {new Date().getFullYear()} {nameArabic || nameEnglish}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
                     </div>
                   </div>
@@ -1059,7 +1059,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 3. معاينة الشهادة الرسمية */}
               {previewSurface === 'certificate' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[color:var(--muted)] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة الشهادة والوثائق المطبوعة' : 'Certificate Stamp Preview'}
                   </div>
                   <div className="border border-[#D4C5B0] bg-[#FFFDF8] rounded-xl p-4 text-center space-y-2.5 shadow-xs relative">
@@ -1067,11 +1067,11 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       {logoUrl && probe.status !== 'broken' ? (
                         <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
                       ) : (
-                        <Award className="w-6 h-6 text-[#9B7542]" />
+                        <Award className="w-6 h-6 text-[color:var(--amber)]" />
                       )}
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-[#9B7542] uppercase tracking-widest">
+                      <div className="text-xs font-bold text-[color:var(--amber)] uppercase tracking-widest">
                         {ar ? 'شهادة إتقان قرآنية معتمدة' : 'Official Certificate'}
                       </div>
                       <div className="text-xs font-black text-[#171b18] mt-0.5">
@@ -1085,9 +1085,9 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                     </div>
 
                     {placements.showOnCertificates && (
-                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[11px] text-[#656b66]">
+                      <div className="pt-2 border-t border-[#EAE4D7] flex items-center justify-between text-[11px] text-[color:var(--muted)]">
                         <span>{websiteUrl ? websiteUrl.replace(/^https?:\/\//i, '') : 'quran-verify.org'}</span>
-                        <span className="inline-flex items-center gap-1 font-bold text-[#214C40]"><ShieldCheck className="w-3 h-3"/>{ar?'قابلة للتحقق':'Verifiable'}</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-[color:var(--emerald)]"><ShieldCheck className="w-3 h-3"/>{ar?'قابلة للتحقق':'Verifiable'}</span>
                       </div>
                     )}
                   </div>
@@ -1097,7 +1097,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
               {/* 4. معاينة البوابة العامة والتسجيل */}
               {previewSurface === 'public' && (
                 <div className="p-4 space-y-3">
-                  <div className="text-xs font-bold text-[#656b66] uppercase tracking-wider text-center">
+                  <div className="text-xs font-bold text-[color:var(--muted)] uppercase tracking-wider text-center">
                     {ar ? 'محاكاة بوابة التسجيل والجمهور' : 'Public Registration Card'}
                   </div>
                   <div className="border border-[#DFDED7] bg-white rounded-xl p-4 space-y-2.5 shadow-xs">
@@ -1105,20 +1105,20 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
                       {logoUrl && probe.status !== 'broken' ? (
                         <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg border border-[#E8E6DF] p-1" />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-[#214C40] text-white font-bold grid place-items-center text-sm">
+                        <div className="w-10 h-10 rounded-lg bg-[var(--emerald)] text-white font-bold grid place-items-center text-sm">
                           م
                         </div>
                       )}
                       <div>
                         <div className="font-black text-xs text-[#171b18]">{nameArabic || nameEnglish}</div>
-                        <div className="text-xs text-[#656b66]">{sloganArabic || (ar ? 'البوابة الرسمية للمتسابقين والجمهور' : 'Official Public Portal')}</div>
+                        <div className="text-xs text-[color:var(--muted)]">{sloganArabic || (ar ? 'البوابة الرسمية للمتسابقين والجمهور' : 'Official Public Portal')}</div>
                       </div>
                     </div>
 
                     {placements.showOnPublicPortal && (
-                      <div className="p-2 rounded-lg bg-[#F7F5EF] text-xs text-[#4a504c] space-y-1">
-                        {websiteUrl && <div className="truncate"><span className="text-[#656b66]">{ar ? 'الموقع: ' : 'Web: '}</span>{websiteUrl}</div>}
-                        {phoneNumber && <div><span className="text-[#656b66]">{ar ? 'الهاتف: ' : 'Phone: '}</span><span dir="ltr">{phoneNumber}</span></div>}
+                      <div className="p-2 rounded-lg bg-[var(--canvas)] text-xs text-[#4a504c] space-y-1">
+                        {websiteUrl && <div className="truncate"><span className="text-[color:var(--muted)]">{ar ? 'الموقع: ' : 'Web: '}</span>{websiteUrl}</div>}
+                        {phoneNumber && <div><span className="text-[color:var(--muted)]">{ar ? 'الهاتف: ' : 'Phone: '}</span><span dir="ltr">{phoneNumber}</span></div>}
                       </div>
                     )}
                   </div>
@@ -1127,8 +1127,8 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
             </div>
 
             {/* شروط وضوابط النقاء لضمان عدم رفع ملف مكسور */}
-            <div className="rounded-xl border border-[#DFDED7] bg-[#FAF9F5] p-3 space-y-1.5 text-[13px] text-[#656b66]">
-              <div className="flex items-center gap-1.5 font-bold text-[#214C40]">
+            <div className="rounded-xl border border-[#DFDED7] bg-[#FAF9F5] p-3 space-y-1.5 text-[13px] text-[color:var(--muted)]">
+              <div className="flex items-center gap-1.5 font-bold text-[color:var(--emerald)]">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>{ar ? 'شروط اعتماد الشعار للنظام:' : 'Brand Asset Quality Criteria:'}</span>
               </div>

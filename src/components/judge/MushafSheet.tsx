@@ -213,20 +213,20 @@ export const MushafSheet: React.FC<MushafSheetProps> = ({
     <div className={framed ? 'mizan-mushaf-sheet__tools' : 'mt-6 flex flex-col items-center gap-2.5'}>
       <button
         type="button" onClick={onToggleTajweed} aria-pressed={tajweedOn}
-        className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl border border-[#e0dcd2] text-[9px] font-black text-[#59615c] hover:bg-[#f7f5ef]"
+        className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl border border-[#e0dcd2] text-[11px] font-black text-[#59615c] hover:bg-[var(--canvas)]"
       >
         <Highlighter className="w-3.5 h-3.5" />
         {tajweedOn ? (ar ? 'إخفاء أحكام التجويد' : 'Hide tajweed') : (ar ? 'إظهار أحكام التجويد' : 'Show tajweed')}
       </button>
       {tajweedOn && <TajweedLegend spans={allTajweed} ar={ar} />}
       {tajweedOn && tajweedScopeNote && !framed && (
-        <p className="max-w-xl text-center text-[9px] leading-5 text-[#636864]">{tajweedScopeNote}</p>
+        <p className="max-w-xl text-center text-[11px] leading-5 text-[color:var(--muted)]">{tajweedScopeNote}</p>
       )}
     </div>
   );
 
   const foot = (!loaded || place) && (
-    <div className={framed ? 'mizan-mushaf-sheet__foot' : 'mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[9px] text-[#666b68]'}>
+    <div className={framed ? 'mizan-mushaf-sheet__foot' : 'mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] text-[#666b68]'}>
       {!loaded && <span>{ar ? 'جارٍ تحميل أصل الصفحة…' : 'Loading the page master…'}</span>}
       {place && <span className="font-black text-[#8A7438]" dir={ar ? 'rtl' : 'ltr'}>{place}</span>}
     </div>

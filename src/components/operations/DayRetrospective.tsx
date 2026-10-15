@@ -26,11 +26,11 @@ export const DayRetrospective: React.FC = () => {
   return <section className="mizan-surface p-5 sm:p-6">
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
       <div className="flex items-start gap-3">
-        <span className="w-11 h-11 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center"><History className="w-5 h-5" /></span>
+        <span className="w-11 h-11 rounded-xl bg-[var(--emerald-soft)] text-[color:var(--emerald)] grid place-items-center"><History className="w-5 h-5" /></span>
         <div>
           <div className="mizan-kicker">{ar ? 'مراجعة اليوم' : 'DAY RETROSPECTIVE'}</div>
           <h2 className="font-black mt-1">{ar ? 'ما قُدّر مقابل ما وقع' : 'What was planned against what happened'}</h2>
-          <p className="text-[13px] text-[#646965] mt-2 max-w-2xl leading-5">
+          <p className="text-[13px] text-[color:var(--muted)] mt-2 max-w-2xl leading-5">
             {ar
               ? 'يقارن زمن الجلسة المُعدّ بما فعلته كل لجنة، وصدقَ الأرقام المعروضة على المنتظرين، وما اضطُرّت إليه القاعة من نقلٍ واستثناء. الغرض إعدادُ السنة القادمة، لا تقييمُ أحد.'
               : 'Compares configured session length with what each panel actually did, how honest the displayed waits were, and what the hall had to improvise. For next year’s setup — not for judging anyone.'}
@@ -56,27 +56,27 @@ export const DayRetrospective: React.FC = () => {
 
       {/* إيقاع كل لجنة مقابل ما قُدّر لها — الفارق هو الدرس، لا الترتيب. */}
       <div className="rounded-2xl border border-[#dfddd6] p-4">
-        <div className="text-xs font-black text-[#646965]">{ar ? 'زمن الجلسة: المُعدّ مقابل المقيس' : 'SESSION LENGTH: CONFIGURED VS MEASURED'}</div>
+        <div className="text-xs font-black text-[color:var(--muted)]">{ar ? 'زمن الجلسة: المُعدّ مقابل المقيس' : 'SESSION LENGTH: CONFIGURED VS MEASURED'}</div>
         <ul className="mt-2.5 divide-y divide-[#e6e4dd]">
           {report.panels.map(p => <li key={p.committeeId} className="py-2.5 flex items-center justify-between gap-3 text-[13px]">
             <span className="font-black shrink-0">{p.code}</span>
-            <span className="text-[#646965] truncate">{ar ? `أنجز ${p.completed}` : `${p.completed} completed`}</span>
+            <span className="text-[color:var(--muted)] truncate">{ar ? `أنجز ${p.completed}` : `${p.completed} completed`}</span>
             <span className="tabular-nums shrink-0">
               {p.measuredMinutes === null
-                ? <span className="text-[#646965]">{ar ? `${p.configuredMinutes}د · عيّنة قليلة` : `${p.configuredMinutes}m · too few`}</span>
-                : <span className={Math.abs(p.driftMinutes || 0) >= 2 ? 'font-black text-[#725630]' : 'text-[#646965]'}>
+                ? <span className="text-[color:var(--muted)]">{ar ? `${p.configuredMinutes}د · عيّنة قليلة` : `${p.configuredMinutes}m · too few`}</span>
+                : <span className={Math.abs(p.driftMinutes || 0) >= 2 ? 'font-black text-[#725630]' : 'text-[color:var(--muted)]'}>
                     {p.configuredMinutes} → {p.measuredMinutes} {ar ? 'د' : 'm'}
                     {p.driftMinutes ? ` (${p.driftMinutes > 0 ? '+' : ''}${p.driftMinutes})` : ''}
                   </span>}
             </span>
           </li>)}
-          {!report.panels.length && <li className="py-3 text-[13px] text-[#646965]">{ar ? 'لا لجان في هذه المسابقة.' : 'No panels in this competition.'}</li>}
+          {!report.panels.length && <li className="py-3 text-[13px] text-[color:var(--muted)]">{ar ? 'لا لجان في هذه المسابقة.' : 'No panels in this competition.'}</li>}
         </ul>
       </div>
 
       {/* التقدير يُحاسَب: الشيء الوحيد في المنصّة الذي كان يَعِد ولا يُراجَع. */}
       <div className="rounded-2xl bg-[#f1efe9] px-4 py-3">
-        <div className="text-xs font-black text-[#646965]">{ar ? 'صدق الأرقام المعروضة على المنتظرين' : 'HONESTY OF THE WAITS WE SHOWED'}</div>
+        <div className="text-xs font-black text-[color:var(--muted)]">{ar ? 'صدق الأرقام المعروضة على المنتظرين' : 'HONESTY OF THE WAITS WE SHOWED'}</div>
         <p className="text-[13px] mt-1.5 leading-5">{describeEtaAccuracy(report.eta, ar)}</p>
       </div>
 
@@ -97,7 +97,7 @@ export const DayRetrospective: React.FC = () => {
 };
 
 const Figure = ({ n, t, tone = 'plain' }: { n: number; t: string; tone?: 'plain' | 'warn' }) => (
-  <div className={`rounded-xl px-4 py-3 ${tone === 'warn' ? 'bg-[#F2EADC] text-[#725630]' : 'bg-[#f1efe9] text-[#171b18]'}`}>
+  <div className={`rounded-xl px-4 py-3 ${tone === 'warn' ? 'bg-[var(--amber-soft)] text-[#725630]' : 'bg-[#f1efe9] text-[#171b18]'}`}>
     <div className="text-lg font-black tabular-nums">{n}</div>
     <div className="text-xs opacity-75">{t}</div>
   </div>

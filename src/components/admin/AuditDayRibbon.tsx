@@ -35,7 +35,7 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
     <section ref={view.ref} className="mizan-surface p-4 sm:p-5" aria-label={ar ? 'شريط أيام السجل' : 'Audit day ribbon'} data-testid="audit-day-ribbon">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="mizan-kicker">{ar ? 'شريط الأيام' : 'DAY RIBBON'}</div>
-        <div className="flex items-center gap-3 text-[11px] font-bold text-[#646965]">
+        <div className="flex items-center gap-3 text-[11px] font-bold text-[color:var(--muted)]">
           <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-[#C08A2E] ring-2 ring-[#F5EDE2]" />{ar ? `حدث حسّاس (${totalSensitive})` : `Sensitive (${totalSensitive})`}</span>
           <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm bg-[#9fb8ad]" />{ar ? 'أحداث الساعة' : 'Events / hour'}</span>
         </div>
@@ -52,11 +52,11 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
                 </div>
               ))}
             </div>
-            <div className="text-xs font-black text-[#214C40] tabular-nums sm:text-end">{d.total}{d.sensitive ? <span className="ms-1.5 text-[#8a6a2c]">· {d.sensitive}</span> : null}</div>
+            <div className="text-xs font-black text-[color:var(--emerald)] tabular-nums sm:text-end">{d.total}{d.sensitive ? <span className="ms-1.5 text-[#8a6a2c]">· {d.sensitive}</span> : null}</div>
           </div>
         ))}
       </div>
-      <div dir="ltr" className="mt-1 grid gap-[2px] text-[10px] font-bold text-[#656b67] sm:ms-[calc(3.5rem+0.75rem)] sm:me-[calc(8.5rem+0.75rem)]" style={{ gridTemplateColumns: 'repeat(24,minmax(0,1fr))' }} aria-hidden>{[0, 6, 12, 18, 23].map(h => <span key={h} className="text-center tabular-nums" style={{ gridColumn: `${h + 1} / span 1`, justifySelf: 'center' }}>{String(h).padStart(2, '0')}</span>)}</div>
+      <div dir="ltr" className="mt-1 grid gap-[2px] text-[11px] font-bold text-[#656b67] sm:ms-[calc(3.5rem+0.75rem)] sm:me-[calc(8.5rem+0.75rem)]" style={{ gridTemplateColumns: 'repeat(24,minmax(0,1fr))' }} aria-hidden>{[0, 6, 12, 18, 23].map(h => <span key={h} className="text-center tabular-nums" style={{ gridColumn: `${h + 1} / span 1`, justifySelf: 'center' }}>{String(h).padStart(2, '0')}</span>)}</div>
     </section>
   );
 };

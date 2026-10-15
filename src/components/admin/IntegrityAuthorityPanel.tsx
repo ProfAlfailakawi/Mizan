@@ -70,11 +70,11 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
   return (
     <section className="mizan-surface overflow-hidden">
       <header className="flex items-start gap-3 border-b border-[#e5e1d7] bg-[#f7f4ec] p-5 sm:p-6">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#E7EEE9] text-[#214C40]"><KeyRound className="h-5 w-5" /></span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--emerald-soft)] text-[color:var(--emerald)]"><KeyRound className="h-5 w-5" /></span>
         <div className="min-w-0">
           <div className="mizan-kicker">{ar ? 'سلطة النزاهة' : 'INTEGRITY AUTHORITY'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'محفوظة على الخادم، لا في هذا الجهاز' : 'Held on the server, not on this device'}</h2>
-          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[#636864]">
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[color:var(--muted)]">
             {ar
               ? 'الموافقات وبذور القرعة تُحفظ وتُفرَض على الخادم بهوية مُصدَّقة. ما يظهر هنا لا يستطيع هذا المتصفح تغييره.'
               : 'Approvals and draw seeds are held and enforced on the server under an authenticated identity. Nothing shown here can be changed from this browser.'}
@@ -99,11 +99,11 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                   const mine = q.approvals.some((a) => a.actorId === currentUserId);
                   const needed = q.minimumApprovals || q.requiredRoleGroups.length;
                   return (
-                    <li key={q.id} className="rounded-2xl border border-[#e5e2da] bg-[#fffefb] p-4">
+                    <li key={q.id} className="rounded-2xl border border-[#e5e2da] bg-[var(--surface)] p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-xs font-black">{ar ? (ACTION_AR[q.action] || q.action) : q.action}</div>
-                          <div className="mt-1 text-xs text-[#646965]">
+                          <div className="mt-1 text-xs text-[color:var(--muted)]">
                             {ar ? 'اعتمادات مستقلة ' : 'Independent approvals '}
                             <Ratio value={q.approvals.length} of={needed} label={ar ? `${q.approvals.length} من ${needed} اعتمادات` : `${q.approvals.length} of ${needed} approvals`} />
                           </div>
@@ -117,7 +117,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                             <Button size="sm" loading={busy === q.id} onClick={() => void act(q.id, () => approveQuorum(q.id))}>{ar ? 'اعتماد' : 'Approve'}</Button>
                           )}
                           {mine && q.status !== 'executed' && (
-                            <span className="inline-flex items-center gap-1 text-xs font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'اعتمدتُه' : 'You approved'}</span>
+                            <span className="inline-flex items-center gap-1 text-xs font-black text-[color:var(--emerald)]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'اعتمدتُه' : 'You approved'}</span>
                           )}
                           <Badge variant={statusTone(q.status)}>{uiToken(q.status,ar)}</Badge>
                         </div>
@@ -140,7 +140,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                 {ar ? 'التزام جديد' : 'New commitment'}
               </Button>
             </div>
-            <p className="mt-2 text-xs leading-5 text-[#646965]">
+            <p className="mt-2 text-xs leading-5 text-[color:var(--muted)]">
               {ar
                 ? 'البذرة تُولَّد عند الخادم ولا تخرج منه. يُنشر التزامها الآن، ويُكشف عنها لاحقًا — والمدّة بين اللحظتين هي ما يُثبت أن الالتزام سبق معرفة النتيجة.'
                 : 'The seed is generated on the server and never leaves it. Its commitment is published now and revealed later — the gap between the two is what shows the commitment preceded knowing the outcome.'}
@@ -156,7 +156,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="mizan-proof-code" dir="ltr" title={c.seedCommitmentHash}>{shortHash(c.seedCommitmentHash)}</div>
-                          <div className="mt-1 text-xs text-[#646965]" dir="ltr">{displayDateTime(c.committedAt,true)}</div>
+                          <div className="mt-1 text-xs text-[color:var(--muted)]" dir="ltr">{displayDateTime(c.committedAt,true)}</div>
                         </div>
                         <div className="flex items-center gap-2">
                           {c.status === 'COMMITTED'
@@ -173,7 +173,7 @@ export const IntegrityAuthorityPanel: React.FC<{competitionId: string; currentUs
                         <div className="mt-2 rounded-2xl bg-[#f5f3ed] px-4 py-3">
                           <div className="mizan-proof-code break-all" dir="ltr">{shown.seed}</div>
                           <div className="mt-1 text-[11px] text-[#6b706c]">{ar ? 'البذرة كاملة — تُنسخ للتحقّق المستقل.' : 'Full seed — copy it for independent verification.'}</div>
-                          <div className="mt-1 text-xs font-black text-[#214C40]">
+                          <div className="mt-1 text-xs font-black text-[color:var(--emerald)]">
                             {ar ? 'فاصل الالتزام عن الكشف: ' : 'Commit-to-reveal gap: '}<span dir="ltr">{mmss(shown.separationMs)}</span>
                           </div>
                         </div>

@@ -23,6 +23,6 @@ const paths:Record<MizanPictogramKind,React.ReactNode>={
  'alignment':<><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="1.5"/><circle cx="14" cy="12" r="1.5"/><circle cx="11" cy="17" r="1.5"/></>
 };
 export const MizanPictogram:React.FC<{kind:MizanPictogramKind;size?:'sm'|'md'|'lg';tone?:'ink'|'emerald'|'amber'|'red';className?:string}>=({kind,size='md',tone='ink',className=''})=>{
- const px=size==='sm'?'w-9 h-9':size==='lg'?'w-16 h-16':'w-11 h-11';const toneClass=tone==='emerald'?'bg-[#E7EEE9] text-[#214C40]':tone==='amber'?'bg-[#F3EBDD] text-[#8A6536]':tone==='red'?'bg-[#F5E7E4] text-[#984F46]':'bg-[#F0EEE8] text-[#2d3732]';
+ const px=size==='sm'?'w-9 h-9':size==='lg'?'w-16 h-16':'w-11 h-11';const toneClass=tone==='emerald'?'bg-[var(--emerald-soft)] text-[color:var(--emerald)]':tone==='amber'?'bg-[#F3EBDD] text-[#8A6536]':tone==='red'?'bg-[#F5E7E4] text-[#984F46]':'bg-[#F0EEE8] text-[#2d3732]';
  return <span className={`${px} ${toneClass} rounded-2xl inline-grid place-items-center shrink-0 ${className}`}><svg viewBox="0 0 24 24" className={size==='lg'?'w-8 h-8':'w-5 h-5'} fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg></span>
 };
