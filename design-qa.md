@@ -1,9 +1,9 @@
 # Design QA — Competition judging workspace
 
 - Result: **Passed**
-- Reference: `/Users/prof.ahmadalfailakawi/Desktop/Screenshot 2026-09-09 at 6.42.00 AM.png`
-- Implementation screenshot: `/Users/prof.ahmadalfailakawi/.codex/visualizations/2026/09/09/01a08437-664b-7973-bc5d-8760bcaa5fef/judging-tab-viewport.png`
-- Side-by-side comparison: `/Users/prof.ahmadalfailakawi/.codex/visualizations/2026/09/09/01a08437-664b-7973-bc5d-8760bcaa5fef/judging-reference-comparison.png`
+- Reference: the owner's mock-up screenshot of the judging workspace (supplied in chat on 2026-09-09; not stored in the repository)
+- Implementation screenshot: viewport capture of the Judging tab (taken during the session; not stored in the repository)
+- Side-by-side comparison: reference vs. capture, reviewed in the session (not stored in the repository)
 - Browser viewport: 1273 × 716
 - Verified state: Arabic, competition manager, dedicated Judging tab selected, three real panels and two governed judges visible.
 
