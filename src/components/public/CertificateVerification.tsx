@@ -142,7 +142,7 @@ export const CertificateVerification: React.FC = () => {
             {policy.certificates.showRank&&activeCert.rank&&<DetailRow label={ar?'الترتيب':'Rank'} value={`#${activeCert.rank}`}/>} 
             <DetailRow label={ar?'تاريخ الإصدار':'Issued'} value={activeCert.issueDate}/>
           </div>
-          <EvidenceChain chain={chain} ar={ar} playKey={`cert:${activeCert.certificateNumber}`}/>
+          <EvidenceChain chain={chain} ar={ar} playKey="cert-evidence-chain"/>
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-5">
             <div className="bg-white p-2 rounded-2xl border border-[#e0ded6]"><RealQRCode value={verifyUrl(activeCert.certificateNumber)} size={116} label={ar?'رمز التحقق من الشهادة':'Certificate verification code'}/></div>
             <div className="text-center sm:text-start max-w-xs">
