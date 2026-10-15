@@ -368,7 +368,7 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
         {state !== 'live'
           ? <button type="button" onClick={() => void start()} disabled={state === 'asking' || state === 'blocked'} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#214C40] px-4 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{state === 'asking' ? (ar ? 'جارٍ الإذن…' : 'Asking…') : (ar ? 'ابدأ القراءة' : 'Start')}</button>
           : <button type="button" onClick={stop} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#d9dfdb] px-4 text-xs font-black text-[#214C40]"><Square className="h-4 w-4" />{ar ? 'أوقف' : 'Stop'}</button>}
-        {state === 'live' && <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#2F6555]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#2F6555]" />{ar ? 'يستمع' : 'listening'}</span>}
+        {state === 'live' && <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#2F6555]"><span className="h-2 w-2 motion-safe:animate-pulse rounded-full bg-[#2F6555]" />{ar ? 'يستمع' : 'listening'}</span>}
       </div>
 
       {(state === 'live' || last) && (
