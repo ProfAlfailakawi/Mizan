@@ -41,7 +41,7 @@ export const Header: React.FC = () => {
       </div>
     </div>
     <div className="flex items-center gap-1 max-[340px]:gap-0 shrink-0">
-      <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
+      {!superAdmin&&<EmergencyControl iconOnly showLabel/>}<button onClick={()=>setSearchOpen(true)} className="hidden sm:inline-flex min-w-11 h-11 items-center justify-center gap-1.5 xl:px-3 rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/><span className="hidden xl:inline text-xs font-bold">{language==='ar'?'بحث':'Search'}</span></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:inline-flex min-w-11 h-11 items-center justify-center gap-1.5 xl:px-3 rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'مساعدة — شرح مبسط':'Help — plain-language guide'}><CircleHelp className="w-4 h-4"/><span className="hidden xl:inline text-xs font-bold">{language==='ar'?'مساعدة':'Help'}</span></button>}
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
         <summary className="list-none w-11 h-11 grid place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)] cursor-pointer" aria-label={language==='ar'?'المزيد':'More'}><Menu className="w-4 h-4"/></summary>
@@ -51,7 +51,6 @@ export const Header: React.FC = () => {
         </div>
       </details>
       {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 max-[340px]:w-8 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[var(--amber-soft)] text-[#8a6738]':'text-[color:var(--muted)]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
-      {!superAdmin&&<EmergencyControl iconOnly/>}
       {/* شارة البيئة التجريبية وأدواتها انتقلت إلى `DemoBar` على مستوى التطبيق:
           الترويسة لا تُعرض لدور «مشغّل البثّ» أصلًا، فلا يصحّ أن يسكن فيها المخرج
           الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}

@@ -9,6 +9,8 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, CalendarDays, MapPin, Search, WifiOff } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
 import { ct } from '../../lib/commercial-i18n';
+import { MizanLogo } from '../design-system/MizanLogo';
+import { EmptyState } from '../design-system/EmptyState';
 
 interface Listing { publicSlug: string; title: string; titleArabic?: string; summary?: string; summaryArabic?: string; institutionName: string; registrationOpen: boolean; registrationUrl?: string; startsOn?: string; endsOn?: string; country?: string; city?: string; mode: 'online' | 'in_person' | 'hybrid'; riwayat: string[]; ageRanges: string[] }
 
@@ -58,9 +60,20 @@ export const DiscoverDirectory: React.FC = () => {
   /* بين الطلبين تبقى القائمة السابقة باهتة (لا فراغ يومض)، وعند فشل الطلب تُسحب ويظهر الفشل. */
   const shown = failed ? [] : (data?.listings ?? []);
   const Arrow = locale === 'ar' ? ArrowLeft : ArrowRight;
+  const BackArrow = locale === 'ar' ? ArrowRight : ArrowLeft;
   return (
-    <div className="min-h-screen" style={{ background: 'var(--canvas)' }}>
-    <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen" style={{ background: 'var(--canvas)' }} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    {/* Same frame idea as #verify: the logo and a way out. Under a white-label directory the
+        MIZAN mark appears only if the operator chose «powered by», as the header note says. */}
+    <div className="border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+        {(!brand || brand.showPoweredByMizan)
+          ? <a href="#" className="inline-flex min-h-11 items-center rounded-xl" aria-label={ct(locale, 'discoverBack')}><MizanLogo language={locale} compact /></a>
+          : <span />}
+        <a href="#" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-bold text-[color:var(--emerald)] hover:underline"><BackArrow aria-hidden="true" className="h-4 w-4" />{ct(locale, 'discoverBack')}</a>
+      </div>
+    </div>
+    <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
       <header className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-4 px-5 py-6 sm:px-8 sm:py-8">
         {brand?.logoUrl && <img src={brand.logoUrl} alt="" className="h-12 w-auto" />}
         <div className="min-w-0">
@@ -72,7 +85,7 @@ export const DiscoverDirectory: React.FC = () => {
         <label className="relative flex-1 min-w-[14rem]"><span className="sr-only">{ct(locale, 'search')}</span>
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3.5 h-4 w-4 text-[var(--muted)]" />
           <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] ps-10 pe-3 text-sm focus:outline-none focus-visible:ring-2" /></label>
-        <label className="flex min-h-11 items-center gap-2 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" className="h-4 w-4" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" className="h-5 w-5" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
       </div>
       {failed && <div role="alert" className="mizan-surface flex items-center gap-3 p-5 text-sm text-[var(--danger)]"><WifiOff aria-hidden="true" className="h-5 w-5 shrink-0" />{ct(locale, 'discoverFailed')}</div>}
       {loading && <ul className="grid gap-4 sm:grid-cols-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <li key={i} className="mizan-surface p-5 space-y-3"><div className="mz-skeleton h-5 w-2/3" /><div className="mz-skeleton h-3 w-1/2" /><div className="mz-skeleton h-3 w-full" /><div className="mz-skeleton h-9 w-28" /></li>)}</ul>}
@@ -88,7 +101,13 @@ export const DiscoverDirectory: React.FC = () => {
           </div>
         </li>)}
       </ul>
-      {fresh && data && data.listings.length === 0 && <p className="mizan-surface p-6 text-center text-sm text-[var(--muted)]">{ct(locale, 'discoverEmpty')}</p>}
+      {fresh && data && data.listings.length === 0 && (() => {
+        const filtered = q.trim() !== '' || openOnly;
+        return <div className="mizan-surface"><EmptyState icon={Search} title={ct(locale, filtered ? 'discoverEmpty' : 'discoverNoneYet')} hint={filtered ? ct(locale, 'discoverEmptyHint') : undefined}
+          action={filtered
+            ? <button type="button" onClick={() => { setQ(''); setOpenOnly(false); }} className="inline-flex min-h-11 items-center rounded-full px-5 text-xs font-bold text-white" style={{ background: accent }}>{ct(locale, 'discoverShowAll')}</button>
+            : <a href="#" className="inline-flex min-h-11 items-center rounded-full px-5 text-xs font-bold text-white" style={{ background: accent }}>{ct(locale, 'discoverBack')}</a>} /></div>;
+      })()}
       {brand?.showPoweredByMizan && <footer className="mt-10 text-center text-[11px] text-[var(--muted)]">{ct(locale, 'poweredByMizan')}</footer>}
     </main>
     </div>

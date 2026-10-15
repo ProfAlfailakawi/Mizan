@@ -102,7 +102,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
       <div className="flex items-end gap-3">
         <div className="text-[44px] font-black leading-none tabular-nums text-[#20241f]" dir="ltr">{items.length}</div>
         <div className="pb-1 text-[13px] font-bold leading-5 text-[#666d68]">
-          {ar ? 'بندًا مفتوحًا' : 'open items'}
+          {ar ? arPlural(items.length, AR_NOUNS.openItem) : 'open items'}
           {critical > 0 && <div className="mt-0.5 inline-flex items-center gap-1 text-[#8a453c]">
             <Flame className="h-3 w-3" aria-hidden />{ar ? `${critical} منها حرج` : `${critical} critical`}
           </div>}
@@ -123,7 +123,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
         style={{ width: `${(n / items.length) * 100}%`, background: KIND[kind].bar }} />)}
     </div>
 
-    <ol className="mt-4 space-y-1.5">
+    <ol className="mt-4 grid items-stretch gap-1.5 lg:grid-cols-2 lg:gap-2">
       {sorted.slice(0, max).map((item) => {
         const kind = KIND[item.kind];
         const tone = TONE[item.tone || 'info'];

@@ -39,6 +39,7 @@ export const AR_NOUNS = {
   day: { one: 'منذ يوم', two: 'منذ يومين', few: 'منذ {n} أيام', many: 'منذ {n} يومًا', other: 'منذ {n} يوم' },
   minuteAgo: { one: 'منذ دقيقة', two: 'منذ دقيقتين', few: 'منذ {n} دقائق', many: 'منذ {n} دقيقة', other: 'منذ {n} دقيقة' },
   hourAgo: { one: 'منذ ساعة', two: 'منذ ساعتين', few: 'منذ {n} ساعات', many: 'منذ {n} ساعة', other: 'منذ {n} ساعة' },
+  openItem: { one: 'بند مفتوح', two: 'بندان مفتوحان', few: 'بنود مفتوحة', many: 'بندًا مفتوحًا', other: 'بند مفتوح' },
   moreItems: { one: 'وبند آخر', two: 'وبندان آخران', few: 'و{n} بنود أخرى', many: 'و{n} بندًا آخر', other: 'و{n} بند آخر' },
   escalatedIssue: { one: 'قضية مصعّدة واحدة', two: 'قضيتان مصعّدتان', few: '{n} قضايا مصعّدة', many: '{n} قضية مصعّدة', other: '{n} قضية مصعّدة' },
   competition: { one: 'مسابقة', two: 'مسابقتان', few: 'مسابقات', many: 'مسابقة', other: 'مسابقة' },
