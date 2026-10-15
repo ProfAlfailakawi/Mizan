@@ -4,6 +4,21 @@ import fs from 'node:fs';
 import { brandEase, motionAllowed } from '../src/components/dna/useMotion';
 
 const read = (p: string) => fs.readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+/** Drops /* ... *\/ comments by scanning (no regex replace, so nothing can be left half-stripped). */
+function stripCssComments(css: string): string {
+  let out = '';
+  let at = 0;
+  while (at < css.length) {
+    const open = css.indexOf('/*', at);
+    if (open === -1) { out += css.slice(at); break; }
+    out += css.slice(at, open);
+    const close = css.indexOf('*/', open + 2);
+    if (close === -1) break;
+    at = close + 2;
+  }
+  return out;
+}
+
 const dna = read('components/dna/dna.css');
 const index = read('index.css');
 const beauty = read('beauty-pass.css');
@@ -72,7 +87,7 @@ test('calm list: loops became finite or static, and nothing was deleted', () => 
   assert.match(beauty, /\.mz-bp-atmos::before \{ animation: none/);
   assert.match(beauty, /\.mz-bp-scanline \{ animation: none/);
   assert.match(beauty, /@keyframes mzBpGlow/);
-  assert.doesNotMatch((beauty.match(/@media \(prefers-reduced-motion: no-preference\) \{\s*@keyframes mzBpRise[\s\S]*?\n\}/)?.[0] ?? '').replace(/\/\*[\s\S]*?\*\//g, ''), /mz-bp-stat/);
+  assert.doesNotMatch(stripCssComments(beauty.match(/@media \(prefers-reduced-motion: no-preference\) \{\s*@keyframes mzBpRise[\s\S]*?\n\}/)?.[0] ?? ''), /mz-bp-stat/);
   assert.doesNotMatch(index.match(/\.mizan-live-pen\{[\s\S]*?\n\}/)?.[0] ?? '', /infinite|mizan-live-breathe/);
   assert.doesNotMatch(index.match(/\.mizan-live-pen::after\{[\s\S]*?\n\}/)?.[0] ?? '', /infinite/);
   assert.match(index, /\.mizan-live-pen\{[\s\S]*?transition:left/, 'the pen still follows the reciter');
