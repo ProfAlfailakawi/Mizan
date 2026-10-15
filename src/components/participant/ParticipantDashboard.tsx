@@ -23,6 +23,7 @@ import { RecitationResultCard } from './RecitationResultCard';
 import { deliveryReadingKeyFor } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
 import { deriveJourneyStage, displayParticipantName, formatParticipantCode } from '../../lib/journey-progress';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
 const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Approve'},{ar:'الحضور',en:'Arrive'},{ar:'الاختبار',en:'Recite'},{ar:'الشهادة',en:'Certificate'}];
@@ -150,7 +151,7 @@ export const ParticipantDashboard: React.FC = () => {
      <details className="mt-1.5 text-xs leading-6 text-[#6b5b45]"><summary className="inline-flex cursor-pointer list-none items-center gap-1 font-bold"><Info className="h-3.5 w-3.5" aria-hidden="true"/>{ar?'التفاصيل':'Details'}</summary>
       {participant.lastQueueTransfer.equityApplied
        ?<p className="mt-1">{ar
-        ?`انتظارك السابق محسوب لك: انتظرت ${participant.lastQueueTransfer.waitedMinutes} دقيقة، فلم تبدأ من آخر الطابور. كان موضعك سيكون رقم ${participant.lastQueueTransfer.positionIfAppended}، وصار رقم ${participant.lastQueueTransfer.fairPosition}.`
+        ?`انتظارك السابق محسوب لك: انتظرت ${arPlural(participant.lastQueueTransfer.waitedMinutes, AR_NOUNS.minute)}، فلم تبدأ من آخر الطابور. كان موضعك سيكون رقم ${participant.lastQueueTransfer.positionIfAppended}، وصار رقم ${participant.lastQueueTransfer.fairPosition}.`
         :`Your earlier wait counts: you had waited ${participant.lastQueueTransfer.waitedMinutes} min, so you did not restart at the back. You would have been ${participant.lastQueueTransfer.positionIfAppended}; you are ${participant.lastQueueTransfer.fairPosition}.`}</p>
        :<p className="mt-1">{ar?`انتقل دورك معك. انتظرت ${participant.lastQueueTransfer.waitedMinutes} دقيقة قبل النقل.`:`Your turn moved with you. You had waited ${participant.lastQueueTransfer.waitedMinutes} min before the move.`}</p>}
       <div className="mt-1 text-[#8a7a62]">{ar?'السبب: ':'Reason: '}{participant.lastQueueTransfer.reason}</div>

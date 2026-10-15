@@ -4,6 +4,8 @@ import { IS_DEMO_SESSION, useAppStore } from '../../lib/store';
 import { useBoardPublisherStatus } from '../../lib/use-board-publisher';
 import { describePublisherRole } from '../../lib/board-lease';
 import { Badge } from '../design-system/Badge';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
+import { isolateCodes } from '../design-system/BidiText';
 
 /*
  * شاشات القاعة: من ينشرها، وكيف تُفتح.
@@ -68,7 +70,7 @@ export const HallScreenPublisher: React.FC = () => {
   const panelFacts: Record<string, string> = {
     mushaf: ar ? `${new Set(recited.map(x => x.surah)).size} سورة تُليت منها اليوم` : `${new Set(recited.map(x => x.surah)).size} surahs recited today`,
     khatmah: ar ? `${recited.length} موضعًا تُلي` : `${recited.length} passages recited`,
-    queue: ar ? `${waiting} في الانتظار · ${committees.filter(c => c.status !== 'offline').length} لجنة` : `${waiting} waiting · ${committees.filter(c => c.status !== 'offline').length} panels`,
+    queue: ar ? `${waiting} في الانتظار · ${arPlural(committees.filter(c => c.status !== 'offline').length, AR_NOUNS.committee)}` : `${waiting} waiting · ${committees.filter(c => c.status !== 'offline').length} panels`,
   };
 
   /* الحافظة الحديثة تُرفض في إطارٍ مضمَّن أو صفحةٍ غير آمنة — وهناك كان الزرّ لا يفعل شيئًا.
@@ -122,7 +124,7 @@ export const HallScreenPublisher: React.FC = () => {
         url={hallLink} ar={ar} copied={copied === 'hall'} failed={copied === 'hall:failed'} onCopy={() => void copy('hall', hallLink)} onOpen={() => open(hallLink)} />
       {committees.map(c => <LinkRow
         key={c.id}
-        label={ar ? `شاشة اللجنة ${c.code}` : `Panel screen ${c.code}`}
+        label={ar ? `شاشة اللجنة ${isolateCodes(c.code)}` : `Panel screen ${c.code}`}
         url={panelLink(c.code)} ar={ar} copied={copied === c.id} failed={copied === `${c.id}:failed`} onCopy={() => void copy(c.id, panelLink(c.code))} onOpen={() => open(panelLink(c.code))} />)}
       {!committees.length && <div className="rounded-xl bg-[#f1efe9] px-4 py-3 text-[13px] text-[color:var(--muted)]">
         {ar ? 'لا لجان بعد — شاشة القاعة وحدها متاحة.' : 'No panels yet — only the hall screen is available.'}

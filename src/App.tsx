@@ -348,7 +348,6 @@ export default function App() {
  const [onboardingOpen,setOnboardingOpen]=useState(()=>IS_DEMO_SESSION?false:!onboardingWasSeen());
  const [tenantSuspended,setTenantSuspended]=useState(false);
  const [kiosk,setKiosk]=useState(false); const [ceremony,setCeremony]=useState(false); const [waitingBoard,setWaitingBoard]=useState(false); const [committeeBoard,setCommitteeBoard]=useState(false); const [hallMap,setHallMap]=useState(false); const [hash,setHash]=useState(window.location.hash);
- useEffect(()=>{if(IS_DEMO_SESSION){document.documentElement.setAttribute('data-demo-bar','on');return()=>document.documentElement.removeAttribute('data-demo-bar')}},[]);
  useEffect(()=>{const fn=()=>setHash(window.location.hash);window.addEventListener('hashchange',fn);return()=>window.removeEventListener('hashchange',fn)},[]);
  useEffect(()=>{const fn=(ev:Event)=>{const surface=(ev as CustomEvent<string>).detail; if(surface==='kiosk')setKiosk(true); else if(surface==='waitingBoard')setWaitingBoard(true); else if(surface==='committeeBoard')setCommitteeBoard(true); else if(surface==='hallMap')setHallMap(true); else if(surface==='ceremony')setCeremony(true);}; window.addEventListener('mizan:open-venue',fn as EventListener); return()=>window.removeEventListener('mizan:open-venue',fn as EventListener)},[]);
  /* الجهة صاحبة هذا النطاق: يسأل المتصفح مرة واحدة عند الإقلاع، فتظهر هوية الجهة (اسمها

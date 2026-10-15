@@ -13,7 +13,7 @@ export const BidiText: React.FC<{ text: string | undefined | null }> = ({ text }
   const value = String(text ?? '');
   const parts = value.split(CODE);
   if (parts.length === 1) return <>{value}</>;
-  return <>{parts.map((part, i) => (i % 2 === 1 ? <bdi key={i} dir="ltr">{part}</bdi> : part))}</>;
+  return <>{parts.map((part, i) => (i % 2 === 1 ? <bdi key={i} dir="ltr" style={{ whiteSpace: 'nowrap' }}>{part}</bdi> : part))}</>;
 };
 
 /** Plain-string counterpart (alerts, dialog bodies): isolates each code with LRI…PDI. */

@@ -16,6 +16,7 @@ import { scopeRecordIsUsable, type ParticipantScopeRecord } from './participant-
 import { theoreticalRepeatFloor, type RepeatPolicy } from './repeat-policy';
 import { candidatesInScope, uniqueLocusCount, type QuestionCandidate } from './question-engine';
 import type { Category } from '../types';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 export type ScopeCheckSeverity = 'critical' | 'warning' | 'recommendation' | 'passed';
 export type ScopeCheckFix = 'category_scope' | 'selection_rules' | 'zones' | 'question_policy' | 'participant_scopes' | 'pool' | 'models' | 'seal' | 'none';
@@ -91,7 +92,7 @@ export function buildScopeReadiness(input: ScopeReadinessInput): { checks: Scope
   }
   checks.push(missingScope.length
     ? { id: 'participant_scope', severity: 'critical', titleAr: 'نطاق المتسابقين', titleEn: 'Participant scopes', fix: 'participant_scopes',
-        detailAr: `${missingScope.length} متسابقًا في فئة اختيارية بلا نطاق معتمد (${missingScope.slice(0, 5).join('، ')}${missingScope.length > 5 ? '…' : ''}). نطاق الحفظ المعتمد لهؤلاء يحتاج مراجعة قبل التشغيل.`,
+        detailAr: `${arPlural(missingScope.length, AR_NOUNS.participant)} في فئة اختيارية بلا نطاق معتمد (${missingScope.slice(0, 5).join('، ')}${missingScope.length > 5 ? '…' : ''}). نطاق الحفظ المعتمد لهؤلاء يحتاج مراجعة قبل التشغيل.`,
         detailEn: `${missingScope.length} participants in selectable categories have no approved scope (${missingScope.slice(0, 5).join(', ')}${missingScope.length > 5 ? '…' : ''}).` }
     : pass('participant_scope', 'نطاق المتسابقين', 'Participant scopes', 'كل متسابق في فئة اختيارية يملك نطاقًا معتمدًا.', 'Every participant in a selectable category has an approved scope.'));
   if (invalidScope.length) {

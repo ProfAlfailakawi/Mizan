@@ -102,6 +102,7 @@ import { buildDisasterPack, generateEncryptionKey, encryptJson, privacySafeBench
 
 import { AppStoreState, STORAGE_KEY, type TieDecisionRecord } from './store-state';
 import { revokeMatchingSessions, grantReissueInvitations } from './demo-identity';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
 const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_ROLE;
@@ -2644,7 +2645,7 @@ export function useAppStore() {
     };
     globalState.tieDecisions = [record, ...globalState.tieDecisions];
     void persistScopedDocument('tie_decisions', record.id, record as unknown as Record<string, unknown>);
-    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'TIE_DECIDED',entityType:'AwardPlace',entityId:record.id,humanSummaryArabic:`فصلت الإدارة في تعادل ${open.place.titleArabic} بين ${open.group.participants.length} متسابقين — ${record.outcome==='shared'?'تشريك المركز':'ترتيب معلن'} · ${record.reason}`,humanSummaryEnglish:`Administration decided the ${open.place.titleEnglish} tie among ${open.group.participants.length} participants — ${record.outcome==='shared'?'place shared':'explicit ordering'} · ${record.reason}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
+    globalState.auditLogs=[{id:newId('aud'),timestamp:new Date().toISOString(),organizationId:globalState.competition.organizationId,competitionId:globalState.competition.id,actorId:globalState.currentUser.id,actorName:globalState.currentUser.name,actorRole:globalState.currentUser.role,action:'TIE_DECIDED',entityType:'AwardPlace',entityId:record.id,humanSummaryArabic:`فصلت الإدارة في تعادل ${open.place.titleArabic} بين ${arPlural(open.group.participants.length, AR_NOUNS.participant, true)} — ${record.outcome==='shared'?'تشريك المركز':'ترتيب معلن'} · ${record.reason}`,humanSummaryEnglish:`Administration decided the ${open.place.titleEnglish} tie among ${open.group.participants.length} participants — ${record.outcome==='shared'?'place shared':'explicit ordering'} · ${record.reason}`,currentStateHash:`PENDING:${newId('audit')}`},...globalState.auditLogs];
     notify();
     return { ok: true as const, decision: record };
   };
@@ -4421,7 +4422,7 @@ const prepareJourneyAccessBatch=async()=>{
     const entries:FlightRecorderEntry[]=[];
     for(const row of rows.sort((a,b)=>a.timestamp.localeCompare(b.timestamp))){const checksum=await hashCanonical({competitionId:globalState.competition.id,...row});entries.push({id:newId('flight'),competitionId:globalState.competition.id,timestamp:row.timestamp,stream:row.stream,sourceType:row.sourceType,sourceId:row.sourceId,summaryArabic:row.ar,summaryEnglish:row.en,checksum});}
     globalState.flightRecorderEntries=[...entries,...globalState.flightRecorderEntries.filter(x=>x.competitionId!==globalState.competition.id)];
-    auditTrustAction('FLIGHT_RECORDER_REBUILT','Competition',globalState.competition.id,`إعادة بناء مسجل الرحلة: ${entries.length} حدثًا`,`Rebuilt flight recorder: ${entries.length} event(s)`);notify();return entries;
+    auditTrustAction('FLIGHT_RECORDER_REBUILT','Competition',globalState.competition.id,`إعادة بناء مسجل الرحلة: ${arPlural(entries.length, AR_NOUNS.event)}`,`Rebuilt flight recorder: ${entries.length} event(s)`);notify();return entries;
   };
 
   const createIntegrityEnvelope=async(participantId:string)=>{
@@ -4519,7 +4520,7 @@ const prepareJourneyAccessBatch=async()=>{
     const modeEnglish=input.mode==='PRESERVE_ORIGINAL_TURN'?'preserving original arrival priority':input.mode==='EQUITY_BY_WAITING_TIME'?'placed by the waiting time each had already served':'at the end of the queue';
     const exceptionArabic=exceptionIds.size?` · استثناء عبر الفئات لـ${exceptionIds.size}: يُحكَّمون بنطاق فئتهم لا بتخصّص اللجنة`:'';
     const exceptionEnglish=exceptionIds.size?` · cross-category exception for ${exceptionIds.size}: judged on their own category scope, not the panel's specialty`:'';
-    auditTrustAction('QUEUE_TRANSFER_APPLIED','QueueTransfer',record.id,`نقل ${plan.selectedIds.length} متسابقًا من ${source.code} إلى ${target.code} ${modeArabic}${exceptionArabic}`,`Moved ${plan.selectedIds.length} participant(s) from ${source.code} to ${target.code} ${modeEnglish}${exceptionEnglish}`);
+    auditTrustAction('QUEUE_TRANSFER_APPLIED','QueueTransfer',record.id,`نقل ${arPlural(plan.selectedIds.length, AR_NOUNS.participant)} من ${source.code} إلى ${target.code} ${modeArabic}${exceptionArabic}`,`Moved ${plan.selectedIds.length} participant(s) from ${source.code} to ${target.code} ${modeEnglish}${exceptionEnglish}`);
     refreshQueueNotifications();notify();return {ok:true,record} as const;
   };
 
@@ -4648,7 +4649,7 @@ const prepareJourneyAccessBatch=async()=>{
     for(const id of [...byParticipant.keys()]){const p=globalState.participants.find(x=>x.id===id&&x.competitionId===globalState.competition.id);if(p){appendParticipantNotifications(p,`queue.transferred:${stamp}`);syncParticipantLifecycle(p);}}
     auditTrustAction(
       'DISTRIBUTION_PLAN_APPLIED','Competition',globalState.competition.id,
-      `تنفيذ خطة توزيع موجة: ${assigned} متسابقًا، ${plan.drawsUsed} قرعة تعادل${exceptional.size?`، و${exceptional.size} استثناءً عبر الفئات يُحكَّمون بنطاق فئتهم`:''}، بصمة ${plan.planHash.slice(0,12)}`,
+      `تنفيذ خطة توزيع موجة: ${arPlural(assigned, AR_NOUNS.participant)}، ${plan.drawsUsed} قرعة تعادل${exceptional.size?`، و${exceptional.size} استثناءً عبر الفئات يُحكَّمون بنطاق فئتهم`:''}، بصمة ${plan.planHash.slice(0,12)}`,
       `Applied a wave distribution plan: ${assigned} participants, ${plan.drawsUsed} tie draws${exceptional.size?`, ${exceptional.size} cross-category exceptions judged on their own scope`:''}, commitment ${plan.planHash.slice(0,12)}`
     );
     refreshQueueNotifications();notify();

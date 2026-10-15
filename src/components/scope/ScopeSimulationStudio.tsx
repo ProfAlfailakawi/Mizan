@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, CheckCircle2, PlayCircle, RotateCcw, ShieldChe
 import type { ScopeSimulationRecord } from '../../types';
 import { Button } from '../design-system/Button';
 import { EmptyState } from '../design-system/EmptyState';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * استوديو المحاكاة.
@@ -98,7 +99,7 @@ export const ScopeSimulationStudio: React.FC<{
                     : (arabic ? 'رُصدت مخالفات تحتاج معالجة' : 'Violations were detected')}
               </h3>
               <span className="text-[11px] font-bold text-[#656b67]">
-                {arabic ? `${latest.participantCount} متسابقًا · ${latest.draws} سحبة · ${latest.runtimeMs} مللي ثانية` : `${latest.participantCount} participants · ${latest.draws} draws · ${latest.runtimeMs} ms`}
+                {arabic ? `${arPlural(latest.participantCount, AR_NOUNS.participant)} · ${latest.draws} سحبة · ${latest.runtimeMs} مللي ثانية` : `${latest.participantCount} participants · ${latest.draws} draws · ${latest.runtimeMs} ms`}
               </span>
             </div>
             {served === 0 && (
@@ -163,7 +164,7 @@ export const ScopeSimulationStudio: React.FC<{
                   <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[11px]">
                     <span className="font-bold text-[#3c4541]">{row.label}</span>
                     <span className="tabular-nums text-[#656b67]">
-                      {arabic ? `${row.participantCount} متسابقًا · تكرار ${(row.metrics as Record<string, number>).totalRepeats}` : `${row.participantCount} participants · repeats ${(row.metrics as Record<string, number>).totalRepeats}`}
+                      {arabic ? `${arPlural(row.participantCount, AR_NOUNS.participant)} · تكرار ${(row.metrics as Record<string, number>).totalRepeats}` : `${row.participantCount} participants · repeats ${(row.metrics as Record<string, number>).totalRepeats}`}
                     </span>
                   </li>
                 ))}

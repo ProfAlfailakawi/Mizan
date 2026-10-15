@@ -4,6 +4,7 @@ import { useAppStore } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
 import type { DistributionPlan } from '../../lib/distribution-plan';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * توزيع الموجة.
@@ -45,7 +46,7 @@ export const WaveDistribution: React.FC = () => {
     try {
       const out = await s.applyDistributionPlan(plan);
       if (out.ok) {
-        setResult({ ok: true, message: ar ? `نُفِّذت الخطة: أُسند ${out.assigned} متسابقًا مع حفظ أسبقية الوصول.` : `Applied: ${out.assigned} participants routed, arrival priority preserved.` });
+        setResult({ ok: true, message: ar ? `نُفِّذت الخطة: أُسند ${arPlural(out.assigned, AR_NOUNS.participant)} مع حفظ أسبقية الوصول.` : `Applied: ${out.assigned} participants routed, arrival priority preserved.` });
         setPlan(null);
       } else setResult({ ok: false, message: reasonText(out.reason, ar) });
     } finally { setBusy(false) }

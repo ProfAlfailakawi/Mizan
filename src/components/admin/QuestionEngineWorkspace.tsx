@@ -30,6 +30,7 @@ import { Badge } from '../design-system/Badge';
 import { EmptyState } from '../design-system/EmptyState';
 import { useConfirm } from '../design-system/ConfirmDialog';
 import { fetchRuntimeHealth, type MizanRuntimeHealth } from '../../lib/runtime-capabilities';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * مساحة عمل محرك النطاق والأسئلة.
@@ -148,7 +149,7 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
           </div>
           <p className="mt-1.5 truncate text-xs font-bold text-[#5b6460]">{needsScope ? (ar ? 'يحتاج تحديد نطاق' : 'Needs a range') : describeScope(scope, ar)}</p>
           <p className="mt-1 text-xs text-[color:var(--muted)]">
-            {ar ? `${resolveQuestionCount(category, policy)} أسئلة · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} متسابقًا` : `${resolveQuestionCount(category, policy)} questions · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} participants`}
+            {ar ? `${arPlural(resolveQuestionCount(category, policy), AR_NOUNS.question)} · ${arPlural(store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length, AR_NOUNS.participant)}` : `${resolveQuestionCount(category, policy)} questions · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} participants`}
           </p>
         </button>
       );
@@ -507,7 +508,7 @@ const SimulationTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) =
     setBusy(true); setError(null);
     void (async () => {
       try {
-        const outcome = await store.runScopeSimulation({ ...state, label: ar ? `محاكاة ${state.participantCount} متسابقًا` : `${state.participantCount}-participant run` });
+        const outcome = await store.runScopeSimulation({ ...state, label: ar ? `محاكاة ${arPlural(state.participantCount, AR_NOUNS.participant)}` : `${state.participantCount}-participant run` });
         if (!outcome.ok) setError(ar ? 'لا يوجد متسابقون ولا فئات بنطاق صالح لتشغيل المحاكاة عليها.' : 'There is nothing with a valid range to simulate.');
       } catch (e) {
         setError(ar ? 'تعذّر تشغيل المحاكاة. راجع نطاقات الفئات ثم أعد المحاولة.' : 'The simulation could not run. Check the category ranges and try again.');

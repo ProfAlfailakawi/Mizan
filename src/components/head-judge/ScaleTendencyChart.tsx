@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * ميل المسطرة — مرسومًا لا مسرودًا.
@@ -66,7 +67,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
               <div className="min-w-0">
                 <div className="truncate text-xs font-black text-[#39423d]">{name}</div>
                 <div className="mt-0.5 text-[11px] font-bold text-[color:var(--muted)]">
-                  {code ? `${code} · ` : ''}{row.sessions ? (ar ? `${row.sessions} جلسة` : `${row.sessions} sessions`) : (ar ? 'ميل مرصود' : 'observed')}
+                  {code ? `${code} · ` : ''}{row.sessions ? (ar ? `${arPlural(row.sessions, AR_NOUNS.session)}` : `${row.sessions} sessions`) : (ar ? 'ميل مرصود' : 'observed')}
                 </div>
               </div>
 

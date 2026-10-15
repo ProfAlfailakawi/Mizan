@@ -31,6 +31,7 @@ export const DiscoverDirectory: React.FC = () => {
   const key = `${q.trim()}|${openOnly}`;
   const [loaded, setLoaded] = useState<{ key: string; payload: { brand: any; listings: Listing[] } } | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const data = loaded?.payload ?? null;
   const fresh = loaded?.key === key;
   const failed = failedKey === key;
@@ -48,7 +49,7 @@ export const DiscoverDirectory: React.FC = () => {
         .then(d => { if (ctl.signal.aborted) return; setLoaded({ key, payload: d }); setFailedKey(null); }).catch(() => { if (!ctl.signal.aborted) setFailedKey(key); });
     }, 250);
     return () => { ctl.abort(); window.clearTimeout(t); };
-  }, [key]);
+  }, [key, attempt]);
   const brand = data?.brand;
   useEffect(() => {
     if (!brand) return;
@@ -87,7 +88,7 @@ export const DiscoverDirectory: React.FC = () => {
           <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] ps-10 pe-3 text-sm focus:outline-none focus-visible:ring-2" /></label>
         <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
       </div>
-      {failed && <div role="alert" className="mizan-surface flex items-center gap-3 p-5 text-sm text-[var(--danger)]"><WifiOff aria-hidden="true" className="h-5 w-5 shrink-0" />{ct(locale, 'discoverFailed')}</div>}
+      {failed && <div role="alert" className="mizan-surface flex flex-wrap items-center gap-3 p-5 text-sm text-[var(--danger)]"><WifiOff aria-hidden="true" className="h-5 w-5 shrink-0" />{ct(locale, 'discoverFailed')}<button type="button" onClick={() => { setFailedKey(null); setAttempt(a => a + 1); }} className="ms-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-[var(--line)] bg-[var(--surface)] px-5 text-xs font-bold text-[color:var(--emerald)]">{ct(locale, 'discoverRetry')}</button></div>}
       {loading && <ul className="grid gap-4 sm:grid-cols-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <li key={i} className="mizan-surface p-5 space-y-3"><div className="mz-skeleton h-5 w-2/3" /><div className="mz-skeleton h-3 w-1/2" /><div className="mz-skeleton h-3 w-full" /><div className="mz-skeleton h-9 w-28" /></li>)}</ul>}
       <ul className={`grid gap-4 sm:grid-cols-2 transition-opacity ${!fresh && !failed ? 'opacity-60' : ''}`} aria-live="polite" aria-busy={!fresh && !failed}>
         {shown.map((l, i) => <li key={l.publicSlug} style={{ ['--i' as string]: i }} className="mizan-surface mz-enter flex flex-col p-5 sm:p-6">

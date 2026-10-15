@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="MIZAN">
-  <!-- Simplified mark for 16/32px favicons only: bolder beam and axis, no chains, no finial. -->
-  <defs>
-    <linearGradient id="a" x1="26" y1="30" x2="94" y2="96" gradientUnits="userSpaceOnUse"><stop stop-color="#123F35"/><stop offset="1" stop-color="#2C6656"/></linearGradient>
-  </defs>
+  <!-- 16/32px favicon only: the balance reduced to its silhouette (beam, axis, base, two pans). -->
   <rect width="120" height="120" rx="26" fill="#F7F5EF"/>
-  <path d="M16 34H104" stroke="#123F35" stroke-width="11" stroke-linecap="round"/>
-  <path d="M60 12V104" stroke="#B98B4E" stroke-width="9" stroke-linecap="round"/>
-  <circle cx="60" cy="34" r="10" fill="#E8CB93" stroke="#B98B4E" stroke-width="3"/>
-  <path d="M60 104c-12-8.5-26.5-11-44-9v-6c14-2 32 1 44 10Z M60 104c12-8.5 26.5-11 44-9v-6c-14-2-32 1-44 10Z" fill="#2C6656"/>
-  <path d="M60 86c-13-9-28-13-44-11 2 8 2 11 0 14 16-2 31 1 44 10Z" fill="#FFFDF6" stroke="#B98B4E" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M60 86c13-9 28-13 44-11-2 8-2 11 0 14-16-2-31 1-44 10Z" fill="#FFFDF6" stroke="#B98B4E" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M60 22V98M26 98H94" stroke="#123F35" stroke-width="12" stroke-linecap="round"/>
+  <path d="M14 30H106" stroke="#123F35" stroke-width="12" stroke-linecap="round"/>
+  <path d="M10 46H48a19 19 0 0 1-38 0ZM72 46H110a19 19 0 0 1-38 0Z" fill="#B98B4E"/>
+  <circle cx="60" cy="18" r="9" fill="#E8CB93" stroke="#B98B4E" stroke-width="3"/>
 </svg>

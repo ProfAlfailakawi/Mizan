@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleHelp, Info, Lock } fro
 import { DnaRing } from '../dna/DnaKit';
 import { useJourneyReveal } from '../dna/useJourneyReveal';
 import { Ratio } from '../design-system/Ratio';
+import { arPlural } from '../../lib/arabic-plural';
 
 /*
  * أدوات بصرية لمساحة المنظّم: ثلاث قطع صغيرة تُقرأ بلا شرح.
@@ -131,7 +132,7 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: st
   return (
     <section aria-label={ar ? 'خطوات إعداد المسابقة' : 'Competition setup steps'} className="mizan-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-4">
-        <span ref={ringReveal.ref} className="inline-flex"><DnaRing value={ringValue} max={steps.length} size={64} stroke={6} tone="accent" label={allDone ? <Check className="h-6 w-6" /> : <span className="text-base font-black tabular-nums"><Ratio value={doneCount} of={steps.length} /></span>} ariaLabel={ar ? `${doneCount} من ${steps.length} خطوات` : `${doneCount} of ${steps.length} steps`} /></span>
+        <span ref={ringReveal.ref} className="inline-flex"><DnaRing value={ringValue} max={steps.length} size={64} stroke={6} tone="accent" label={allDone ? <Check className="h-6 w-6" /> : <span className="text-base font-black tabular-nums"><Ratio value={doneCount} of={steps.length} /></span>} ariaLabel={ar ? `${doneCount} من ${arPlural(steps.length,{one:'خطوة واحدة',two:'خطوتان',few:'{n} خطوات',many:'{n} خطوة',other:'{n} خطوة'})}` : `${doneCount} of ${steps.length} steps`} /></span>
         <div className="min-w-0 flex-1">
           <div className="mizan-kicker">{ar ? 'ابدأ من هنا' : 'START HERE'}</div>
           <h2 className="mt-0.5 text-lg font-black">{allDone ? (ar ? 'الإعداد مكتمل' : 'Setup complete') : (ar ? 'خطوات إعداد مسابقتك' : 'Set up your competition')}</h2>

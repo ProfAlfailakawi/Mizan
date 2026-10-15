@@ -6,6 +6,7 @@ import { queueOrderValue, queueTransferImpact } from '../../lib/judging-integrit
 import { accruedWaitMinutes, equityWarranted, recommendFairPosition } from '../../lib/queue-equity';
 import { Button } from '../design-system/Button';
 import { Badge } from '../design-system/Badge';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 export const QueueJustice:React.FC=()=>{
  const s=useAppStore(),ar=s.language==='ar';
@@ -51,7 +52,7 @@ export const QueueJustice:React.FC=()=>{
    <div className="text-xs font-black text-[color:var(--muted)]">{ar?'ما يستردّه العدل':'WHAT EQUITY RECOVERS'}</div>
    {recovered.length?<ul className="mt-2.5 divide-y divide-[#e6e4dd] max-h-44 overflow-auto">{recovered.map(({p,rec})=><li key={p.id} className="py-2 flex items-center justify-between gap-3 text-[13px]">
     <span className="font-black">{p.code}</span>
-    <span className="text-[color:var(--muted)]">{ar?`انتظر ${rec.waitedMinutes} دقيقة`:`waited ${rec.waitedMinutes} min`}</span>
+    <span className="text-[color:var(--muted)]">{ar?`انتظر ${arPlural(rec.waitedMinutes, AR_NOUNS.minute)}`:`waited ${rec.waitedMinutes} min`}</span>
     <span className="font-black tabular-nums">{ar?`${rec.positionIfAppended} ← ${rec.fairPosition}`:`${rec.positionIfAppended} → ${rec.fairPosition}`}</span>
    </li>)}</ul>
    :<div className="mt-2 text-xs text-[color:var(--muted)] leading-5">{ar?'لا أحد يخسر مركزًا بهذا النقل، فلا حاجة إلى استثناء على ترتيب الوصول.':'Nobody loses a place in this move, so no exception to arrival order is needed.'}</div>}
