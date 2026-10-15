@@ -1,4 +1,5 @@
 import type { Committee } from '../types';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 /*
  * إيقاع الجلسات — ما تفعله اللجنة فعلًا، لا ما قُدّر لها.
@@ -157,6 +158,6 @@ export function describeEtaAccuracy(a: EtaAccuracy, ar = true): string {
   const late = a.biasMinutes > 0;
   const dir = ar ? (late ? 'أطول من الوعد' : 'أقصر من الوعد') : (late ? 'longer than promised' : 'shorter than promised');
   return ar
-    ? `خطأٌ وسيطه ${a.medianAbsoluteErrorMinutes} دقيقة، والانتظار ${dir} بـ${Math.abs(a.biasMinutes)} دقيقة وسطيًّا. و${Math.round(a.withinFiveMinutesRate * 100)}٪ وقعوا داخل خمس دقائق من الوعد.`
+    ? `خطأٌ وسيطه ${arPlural(a.medianAbsoluteErrorMinutes, AR_NOUNS.minute)}، والانتظار ${dir} بـ${Math.abs(a.biasMinutes)} دقيقة وسطيًّا. و${Math.round(a.withinFiveMinutesRate * 100)}٪ وقعوا داخل خمس دقائق من الوعد.`
     : `Median error ${a.medianAbsoluteErrorMinutes} min; waits run ${dir} by ${Math.abs(a.biasMinutes)} min on average. ${Math.round(a.withinFiveMinutesRate * 100)}% landed within five minutes of the promise.`;
 }

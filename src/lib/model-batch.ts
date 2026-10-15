@@ -20,6 +20,7 @@ import { QuestionAllocationEngine, candidatesInScope, locusKeyOf, uniqueLocusCou
 import type { RepeatPolicy } from './repeat-policy';
 import { aggregateFairness, buildQuestionModel } from './model-fairness';
 import { theoreticalRepeatFloor } from './repeat-policy';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 export interface BatchParticipant {
   participantId: string;
@@ -270,7 +271,7 @@ export function applyQuarantine(input: {
     averageReuseAfter: floor.averageReuse,
     canContinue,
     summaryArabic: canContinue
-      ? `حُجر ${quarantined.size} موضعًا، فبطل ${invalidated.length} نموذجًا وتأثر ${affected.length} متسابقًا. بقي ${remainingUniqueLoci} موضعًا صالحًا، ومتوسط إعادة الاستعمال المتوقع ${floor.averageReuse}.`
+      ? `حُجر ${quarantined.size} موضعًا، فبطل ${invalidated.length} نموذجًا وتأثر ${arPlural(affected.length, AR_NOUNS.participant)}. بقي ${remainingUniqueLoci} موضعًا صالحًا، ومتوسط إعادة الاستعمال المتوقع ${floor.averageReuse}.`
       : `حُجر ${quarantined.size} موضعًا ولم يبقَ موضع صالح واحد. لا يمكن الاستمرار قبل توسيع البنك.`,
     summaryEnglish: canContinue
       ? `${quarantined.size} loci quarantined; ${invalidated.length} models invalidated affecting ${affected.length} participants. ${remainingUniqueLoci} loci remain, expected reuse ${floor.averageReuse}.`

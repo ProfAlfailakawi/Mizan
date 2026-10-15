@@ -1,4 +1,5 @@
 import React from 'react';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 export interface ConstellationJudge { id: string; userId?: string; name: string; nameArabic?: string }
 
@@ -22,7 +23,7 @@ export const PanelConstellation: React.FC<{
   const members = judges.filter(isSelected).length;
   const pos = (i: number) => { const a = -Math.PI / 2 + (i / n) * Math.PI * 2; return [C + R * Math.cos(a), C + R * Math.sin(a)] as const; };
   const label = ar
-    ? `${members} من ${judges.length} محكمًا في اللجنة${head ? ` · الرئيس ${nm(head)}` : ''}`
+    ? `${members} من ${arPlural(judges.length, AR_NOUNS.judge, true)} في اللجنة${head ? ` · الرئيس ${nm(head)}` : ''}`
     : `${members} of ${judges.length} judges on this panel${head ? ` · chair ${nm(head)}` : ''}`;
   return (
     <figure className="mx-auto mt-2 flex w-full max-w-[240px] flex-col items-center" data-testid="panel-constellation">

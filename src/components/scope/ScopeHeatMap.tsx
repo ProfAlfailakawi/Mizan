@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Flame, Info, Users } from 'lucide-react';
 import type { DemandAnalysis, JuzHeatCell } from '../../lib/scope-demand';
 import { juzBounds, surahNameArabic, surahNameEnglish } from '../../lib/quran-canon';
 import { EmptyState } from '../design-system/EmptyState';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * خريطة ازدحام المصحف.
@@ -49,7 +50,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
             return (
               <button key={row.juz} type="button" onClick={() => setFocus(focus === row.juz ? null : row.juz)} aria-pressed={focus === row.juz}
                 aria-label={arabic
-                  ? `الجزء ${row.juz}: ${row.participantCount} متسابقًا، ${row.supply} موضعًا متاحًا، الضغط ${style.ar}`
+                  ? `الجزء ${row.juz}: ${arPlural(row.participantCount, AR_NOUNS.participant)}، ${row.supply} موضعًا متاحًا، الضغط ${style.ar}`
                   : `Juz ${row.juz}: ${row.participantCount} participants, ${row.supply} loci, pressure ${style.en}`}
                 className={`min-h-[74px] rounded-xl border p-2 text-start transition ${style.bg} ${focus === row.juz ? 'border-[color:var(--emerald)] ring-2 ring-[color:var(--emerald)]/20' : 'border-transparent hover:border-[#cddbd3]'}`}>
                 <div className="flex items-baseline justify-between gap-1">
@@ -110,7 +111,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
               <li key={cluster.signature} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
                 <span className="min-w-0 text-[11px] font-black text-[#3c4541]">{cluster.label}</span>
                 <span className="text-[11px] font-bold tabular-nums text-[#7d5e34]">
-                  {arabic ? `${cluster.participantCount} متسابقًا · ${cluster.demand} سحبة على ${cluster.supply} موضعًا · إعادة ${cluster.averageReuse}×` : `${cluster.participantCount} participants · ${cluster.demand} draws over ${cluster.supply} loci · reuse ${cluster.averageReuse}×`}
+                  {arabic ? `${arPlural(cluster.participantCount, AR_NOUNS.participant)} · ${cluster.demand} سحبة على ${cluster.supply} موضعًا · إعادة ${cluster.averageReuse}×` : `${cluster.participantCount} participants · ${cluster.demand} draws over ${cluster.supply} loci · reuse ${cluster.averageReuse}×`}
                 </span>
               </li>
             ))}

@@ -1,5 +1,6 @@
 import type { Committee, IncidentRecord, Participant, QueueTransferRecord } from '../types';
 import { committeeTempo, etaAccuracy, type EtaAccuracy, type QueueWaitSample, type SessionTempoSample } from './session-tempo';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 /*
  * ماذا حدث اليوم فعلًا.
@@ -150,7 +151,7 @@ export function buildDayRetrospective(input: DayRetrospectiveInput): DayRetrospe
     lessons.push({
       titleArabic: eta.biasMinutes > 0 ? 'الأرقام المعروضة كانت تَعِد بأقصر مما وقع' : 'الأرقام المعروضة كانت تَعِد بأطول مما وقع',
       titleEnglish: eta.biasMinutes > 0 ? 'Displayed waits promised shorter than reality' : 'Displayed waits promised longer than reality',
-      detailArabic: `ميلُ التقدير ${Math.abs(eta.biasMinutes)} دقيقة، و${Math.round(eta.withinFiveMinutesRate * 100)}٪ فقط وقعوا داخل خمس دقائق من الوعد. ورقمٌ يُخلف يُفقد الثقة في كل رقمٍ بعده.`,
+      detailArabic: `ميلُ التقدير ${arPlural(Math.abs(eta.biasMinutes), AR_NOUNS.minute)}، و${Math.round(eta.withinFiveMinutesRate * 100)}٪ فقط وقعوا داخل خمس دقائق من الوعد. ورقمٌ يُخلف يُفقد الثقة في كل رقمٍ بعده.`,
       detailEnglish: `Estimate bias ${Math.abs(eta.biasMinutes)} min; only ${Math.round(eta.withinFiveMinutesRate * 100)}% landed within five minutes. A number that misses costs every number after it.`,
     });
   }

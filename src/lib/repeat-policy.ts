@@ -1,3 +1,4 @@
+import { arPlural, AR_NOUNS } from './arabic-plural';
 /*
  * سياسة التكرار.
  *
@@ -96,8 +97,8 @@ export function repeatConstraints(policy: RepeatPolicy): RepeatConstraint[] {
   if (policy.noRepeatWithinParticipant) list.push({ id: 'no_repeat_for_participant', rank: 'MUST', ar: 'لا يُعاد الموضع للمتسابق نفسه', en: 'A locus is never returned to the same participant' });
   if (policy.mode === 'strict_no_repeat') list.push({ id: 'strict_unique', rank: 'MUST', ar: 'لا يتكرر الموضع في المسابقة كلها', en: 'No locus repeats anywhere in the competition' });
   if (policy.maxUsesPerQuestion) list.push({ id: 'max_uses', rank: 'MUST', ar: `لا يتجاوز استعمال الموضع ${policy.maxUsesPerQuestion} مرات`, en: `A locus is used at most ${policy.maxUsesPerQuestion} times` });
-  if (policy.minimumParticipantGap) list.push({ id: 'participant_gap', rank: 'PREFER', ar: `مباعدة ${policy.minimumParticipantGap} متسابقًا على الأقل بين استعمالين`, en: `At least ${policy.minimumParticipantGap} participants between reuses` });
-  if (policy.minimumMinutesGap) list.push({ id: 'time_gap', rank: 'PREFER', ar: `مباعدة ${policy.minimumMinutesGap} دقيقة على الأقل بين استعمالين`, en: `At least ${policy.minimumMinutesGap} minutes between reuses` });
+  if (policy.minimumParticipantGap) list.push({ id: 'participant_gap', rank: 'PREFER', ar: `مباعدة ${arPlural(policy.minimumParticipantGap, AR_NOUNS.participant)} على الأقل بين استعمالين`, en: `At least ${policy.minimumParticipantGap} participants between reuses` });
+  if (policy.minimumMinutesGap) list.push({ id: 'time_gap', rank: 'PREFER', ar: `مباعدة ${arPlural(policy.minimumMinutesGap, AR_NOUNS.minute)} على الأقل بين استعمالين`, en: `At least ${policy.minimumMinutesGap} minutes between reuses` });
   if (policy.neighborhoodAyahRadius > 0) list.push({ id: 'neighborhood', rank: 'PREFER', ar: `تجنّب بداية على بعد ${policy.neighborhoodAyahRadius} آيات أو أقل من موضع مستعمل`, en: `Avoid starts within ${policy.neighborhoodAyahRadius} ayat of a recently used locus` });
   if ((policy.neighborhoodJuzRadius || 0) > 0) list.push({ id: 'neighborhood_juz', rank: 'PREFER', ar: policy.neighborhoodJuzRadius === 1 ? 'تجنّب سؤالين من الجزء نفسه في نموذج واحد' : `تجنّب سؤالين بينهما ${policy.neighborhoodJuzRadius} أجزاء أو أقل في نموذج واحد`, en: `Avoid two questions within ${policy.neighborhoodJuzRadius} juz of each other in one model` });
   if (policy.roomAware) list.push({ id: 'room_separation', rank: 'PREFER', ar: 'تجنّب إعادة الاستعمال في القاعة نفسها', en: 'Avoid reuse inside the same hall' });

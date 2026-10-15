@@ -21,6 +21,7 @@ import type { RepeatPolicy } from './repeat-policy';
 import { describeRepeatPolicy, repeatConstraints, theoreticalRepeatFloor } from './repeat-policy';
 import { hashCanonical } from './trust-protocol';
 import { QUESTION_ENGINE_VERSION } from './question-engine';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 type Row = { labelArabic: string; labelEnglish: string; value: string; note?: string };
 type Section = FairnessReportRecord['sections'][number];
@@ -179,7 +180,7 @@ export async function buildFairnessReport(input: FairnessReportInput): Promise<F
           labelArabic: `عنق زجاجة · ${cluster.label}`,
           labelEnglish: `Bottleneck · ${cluster.label}`,
           value: `طلب ${cluster.demand} · عرض ${cluster.supply}`,
-          note: `${cluster.participantCount} متسابقًا في هذا العنقود`,
+          note: `${arPlural(cluster.participantCount, AR_NOUNS.participant)} في هذا العنقود`,
         })),
       ] satisfies Row[],
     });

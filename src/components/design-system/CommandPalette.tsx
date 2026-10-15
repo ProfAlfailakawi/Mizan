@@ -3,6 +3,7 @@ import { bilingualName, uiToken } from '../../lib/ui-language';
 import { createPortal } from 'react-dom';
 import { Award, Search, UserRound, X } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 type Result = { id: string; kind: string; title: string; meta: string };
 
@@ -118,7 +119,7 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
             <div className="p-8 text-center text-xs text-[#686e69]">{ar ? 'لا نتائج' : 'No results'}</div>
           )}
         </div>
-        <div className="sr-only" role="status" aria-live="polite">{q ? (ar ? `${results.length} نتيجة` : `${results.length} results`) : ''}</div>
+        <div className="sr-only" role="status" aria-live="polite">{q ? (ar ? `${arPlural(results.length, AR_NOUNS.result)}` : `${results.length} results`) : ''}</div>
       </div>
     </div>,
     document.body,

@@ -6,6 +6,7 @@ import { useScreenAwake } from '../../lib/use-screen-awake';
 import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
 import { QueueRibbon } from '../design-system/QueueRibbon';
+import { isolateCodes } from '../design-system/BidiText';
 import {
   HALL_NEXT_DEPTH, HALL_PAGE_CAPACITY, HALL_PAGE_SECONDS, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait, paginatePanels, venueClock,
   type CommitteeBoardSlice, type DisplayBoard,
@@ -121,7 +122,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
         {/* النداء نصًّا لقارئ الشاشة: الوميض وحده لا يصل الكفيف. */}
         <p aria-live="polite" className="sr-only">
           {calling.length
-            ? calling.map((c) => ar ? `اللجنة ${c.code} تنادي ${c.nowCalling!.code}` : `Panel ${c.code} calling ${c.nowCalling!.code}`).join('، ')
+            ? calling.map((c) => ar ? `اللجنة ${isolateCodes(c.code)} تنادي ${isolateCodes(c.nowCalling!.code)}` : `Panel ${c.code} calling ${c.nowCalling!.code}`).join('، ')
             : (ar ? 'لا يوجد استدعاء حاليًا' : 'No active call')}
         </p>
       </main>

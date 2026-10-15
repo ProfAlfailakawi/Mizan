@@ -95,6 +95,7 @@ const T = {
   discoverEmptyHint: { ar: 'جرّب كلمة أخرى، أو أزل تصفية «التسجيل مفتوح» لترى كل المسابقات المنشورة.', en: 'Try another word, or clear the “Registration open” filter to see every published competition.' },
   discoverShowAll: { ar: 'عرض كل المسابقات', en: 'Show all competitions' },
   discoverNoneYet: { ar: 'لا توجد مسابقات منشورة بعد. عند نشر أي مسابقة ستظهر هنا.', en: 'Nothing is published yet. Competitions appear here once they are published.' },
+  discoverRetry: { ar: 'إعادة المحاولة', en: 'Try again' },
   discoverFailed: { ar: 'تعذّر تحميل الدليل الآن. تحقّق من الاتصال ثم أعد المحاولة.', en: 'The directory could not be loaded. Check your connection and try again.' },
   registrationOpen: { ar: 'التسجيل مفتوح', en: 'Registration open' },
   registrationClosed: { ar: 'التسجيل مغلق', en: 'Registration closed' },

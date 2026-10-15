@@ -26,11 +26,13 @@ function fallbackCategory(n: number): Intl.LDMLPluralRule {
   return 'other';
 }
 
-export function arPlural(n: number, forms: PluralForms): string {
+/** `oblique`: after a preposition the dual takes -ين / -تين («بين متسابقين»). */
+export function arPlural(n: number, forms: PluralForms, oblique = false): string {
   const count = Math.abs(Number.isFinite(n) ? n : 0);
   const r = arRules();
   const cat = r ? r.select(count) : fallbackCategory(count);
-  const form = forms[cat] ?? forms.other;
+  let form = forms[cat] ?? forms.other;
+  if (oblique && cat === 'two') form = form.replace(/ان(?=\s|$)/g, 'ين');
   return form.replace(/\{n\}/g, String(n));
 }
 
@@ -53,4 +55,19 @@ export const AR_NOUNS = {
   judge: { one: 'محكّم واحد', two: 'محكّمان', few: '{n} محكّمين', many: '{n} محكّمًا', other: '{n} محكّم' },
   participant: { one: 'متسابق واحد', two: 'متسابقان', few: '{n} متسابقين', many: '{n} متسابقًا', other: '{n} متسابق' },
   alert: { one: 'تنبيه واحد', two: 'تنبيهان', few: '{n} تنبيهات', many: '{n} تنبيهًا', other: '{n} تنبيه' },
+  session: { one: 'جلسة واحدة', two: 'جلستان', few: '{n} جلسات', many: '{n} جلسة', other: '{n} جلسة' },
+  result: { one: 'نتيجة واحدة', two: 'نتيجتان', few: '{n} نتائج', many: '{n} نتيجة', other: '{n} نتيجة' },
+  minute: { one: 'دقيقة واحدة', two: 'دقيقتان', few: '{n} دقائق', many: '{n} دقيقة', other: '{n} دقيقة' },
+  category: { one: 'فئة واحدة', two: 'فئتان', few: '{n} فئات', many: '{n} فئة', other: '{n} فئة' },
+  question: { one: 'سؤال واحد', two: 'سؤالان', few: '{n} أسئلة', many: '{n} سؤالًا', other: '{n} سؤال' },
+  pageN: { one: 'صفحة واحدة', two: 'صفحتان', few: '{n} صفحات', many: '{n} صفحة', other: '{n} صفحة' },
+  request: { one: 'طلب واحد', two: 'طلبان', few: '{n} طلبات', many: '{n} طلبًا', other: '{n} طلب' },
+  caseN: { one: 'حالة واحدة', two: 'حالتان', few: '{n} حالات', many: '{n} حالة', other: '{n} حالة' },
+  device: { one: 'جهاز واحد', two: 'جهازان', few: '{n} أجهزة', many: '{n} جهازًا', other: '{n} جهاز' },
+  note: { one: 'ملاحظة واحدة', two: 'ملاحظتان', few: '{n} ملاحظات', many: '{n} ملاحظة', other: '{n} ملاحظة' },
+  dayN: { one: 'يوم واحد', two: 'يومان', few: '{n} أيام', many: '{n} يومًا', other: '{n} يوم' },
+  hourN: { one: 'ساعة واحدة', two: 'ساعتان', few: '{n} ساعات', many: '{n} ساعة', other: '{n} ساعة' },
+  event: { one: 'حدث واحد', two: 'حدثان', few: '{n} أحداث', many: '{n} حدثًا', other: '{n} حدث' },
+  attendee: { one: 'مشارك واحد', two: 'مشاركان', few: '{n} مشاركين', many: '{n} مشاركًا', other: '{n} مشارك' },
+  itemN: { one: 'بند واحد', two: 'بندان', few: '{n} بنود', many: '{n} بندًا', other: '{n} بند' },
 } satisfies Record<string, PluralForms>;

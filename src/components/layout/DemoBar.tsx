@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FlaskConical, RefreshCw, X } from 'lucide-react';
 import {
   useAppStore,
@@ -40,6 +40,12 @@ export { DEMO_BAR_HEIGHT_REM, DEMO_BAR_SHELL_PADDING } from './demo-shell';
    تجريبية مستقلة كانت تتقادم كلما تغيّرت التسمية في المنتج. */
 export const DemoBar: React.FC = () => {
   const { language, currentUser } = useAppStore();
+  /* Full-screen venue surfaces stop above the bar only while the bar is really mounted. */
+  useEffect(() => {
+    if (!IS_DEMO_SESSION) return;
+    document.documentElement.setAttribute('data-demo-bar', 'on');
+    return () => document.documentElement.removeAttribute('data-demo-bar');
+  }, []);
   if (!IS_DEMO_SESSION) return null;
   const ar = language === 'ar';
   const label = (role: Role) => roleLabel(role, ar);

@@ -7,6 +7,7 @@ import { bilingualName } from '../../lib/ui-language';
 import { Button } from '../design-system/Button';
 import { QueueRibbon } from '../design-system/QueueRibbon';
 import { FreshnessLine } from './WaitingBoard';
+import { isolateCodes } from '../design-system/BidiText';
 import {
   PANEL_NEXT_DEPTH, boardAge, buildDisplayBoard, categoryLine, describePanelStatus,
   describeWait, selectCommitteeSlices, venueClock, type DisplayBoard,
@@ -172,8 +173,8 @@ export const CommitteeDisplay: React.FC<{ panelKeys?: string[]; rotateSeconds?: 
       {/* قارئ الشاشة يسمع النداء نصًّا؛ الوميض وحده لا يصل الكفيف. */}
       <p aria-live="polite" className="sr-only">
         {slice.nowCalling
-          ? (ar ? `اللجنة ${slice.code} تنادي ${slice.nowCalling.code}` : `Panel ${slice.code} is calling ${slice.nowCalling.code}`)
-          : (ar ? `اللجنة ${slice.code}: لا يوجد استدعاء` : `Panel ${slice.code}: no active call`)}
+          ? (ar ? `اللجنة ${isolateCodes(slice.code)} تنادي ${isolateCodes(slice.nowCalling.code)}` : `Panel ${slice.code} is calling ${slice.nowCalling.code}`)
+          : (ar ? `اللجنة ${isolateCodes(slice.code)}: لا يوجد استدعاء` : `Panel ${slice.code}: no active call`)}
       </p>
     </main>
 

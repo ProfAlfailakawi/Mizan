@@ -1,6 +1,7 @@
 import type { Category, Committee, Participant } from '../types';
 import { queueOrderValue } from './judging-integrity';
 import { MUSHAF_TOTAL_PAGES, locusToPage } from './mushaf-map';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 /*
  * إسقاط شاشات القاعة.
@@ -160,8 +161,8 @@ export function categoryLine(tags: BoardCategoryTag[], ar = true): string {
   if (tags.length === 1) return tags[0].label;
   if (!ar) return `${tags.length} categories`;
   if (tags.length === 2) return 'فئتان';
-  if (tags.length <= 10) return `${tags.length} فئات`;
-  return `${tags.length} فئة`;
+  if (tags.length <= 10) return `${arPlural(tags.length, AR_NOUNS.category)}`;
+  return `${arPlural(tags.length, AR_NOUNS.category)}`;
 }
 
 /* ── الإسقاط ─────────────────────────────────────────────────────────────── */
@@ -351,7 +352,7 @@ export function describeAge(ageSeconds: number, ar = true): string {
   if (s < 5) return 'الآن';
   if (s < 60) return s <= 10 ? `قبل ${s} ثوانٍ` : `قبل ${s} ثانية`;
   const m = Math.floor(s / 60);
-  return m === 1 ? 'قبل دقيقة' : m === 2 ? 'قبل دقيقتين' : m <= 10 ? `قبل ${m} دقائق` : `قبل ${m} دقيقة`;
+  return m === 1 ? 'قبل دقيقة' : m === 2 ? 'قبل دقيقتين' : m <= 10 ? `قبل ${arPlural(m, AR_NOUNS.minute, true)}` : `قبل ${arPlural(m, AR_NOUNS.minute, true)}`;
 }
 
 /** الزمن المتوقّع بعبارة تُقرأ. الصفر ليس «٠ دقيقة» بل «لا انتظار». */
@@ -365,7 +366,7 @@ export function describeWait(minutes: number, ar = true): string {
   if (m < 60) return `${m} دقيقة تقريبًا`;
   const h = Math.floor(m / 60);
   const rest = m % 60;
-  const hours = h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : `${h} ساعات`;
+  const hours = h === 1 ? 'ساعة' : h === 2 ? 'ساعتان' : `${arPlural(h, AR_NOUNS.hourN)}`;
   return rest ? `${hours} و${rest} دقيقة تقريبًا` : `${hours} تقريبًا`;
 }
 

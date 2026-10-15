@@ -1,3 +1,4 @@
+import { arPlural, AR_NOUNS } from './arabic-plural';
 /*
  * ساعة المسابقة: ساعةٌ واحدة تحكم اليوم، لا ساعةُ كلِّ جهاز.
  *
@@ -120,7 +121,7 @@ export function competitionClockStatus(
     ar: stale
       ? `آخر مطابقة مع الجهاز المرجعي مضى عليها ${Math.round(ageSeconds / 60)} دقيقة؛ الفرق المحفوظ ما زال مستعملًا.`
       : far
-        ? `ساعة هذا الجهاز ${direction} ${minutes} دقيقة عن ساعة المسابقة، والفرق مطبَّق فلا يختلّ الحجز.`
+        ? `ساعة هذا الجهاز ${direction} ${arPlural(minutes, AR_NOUNS.minute)} عن ساعة المسابقة، والفرق مطبَّق فلا يختلّ الحجز.`
         : 'ساعة هذا الجهاز مطابقة لساعة المسابقة.',
     en: stale
       ? `Last sync with the reference device was ${Math.round(ageSeconds / 60)} minutes ago; the stored offset is still in use.`

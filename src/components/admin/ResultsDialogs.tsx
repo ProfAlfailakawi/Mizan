@@ -6,6 +6,7 @@ import { sealFailureLabel, uiToken } from '../../lib/ui-language';
 import { Modal } from '../design-system/Modal';
 import { Button } from '../design-system/Button';
 import { SealMark } from './ResultsDocuments';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * ختمُ النتائج ونشرُها — كلٌّ في نافذةٍ تقول ما سيقع قبل أن يقع.
@@ -48,7 +49,7 @@ export const SealDialog: React.FC<{ open: boolean; store: Store; ar: boolean; on
     setBusy(true); setOutcome(null);
     try {
       const out = await store.sealResults() as { sealed?: boolean; reason?: string; message?: string; approvals?: number; checksum?: string };
-      if (out?.sealed) setOutcome({ ok: true, text: ar ? `خُتمت ${results.length} نتيجة. البصمة ${String(out.checksum || '').slice(0, 16)}…` : `${results.length} results sealed. Digest ${String(out.checksum || '').slice(0, 16)}…` });
+      if (out?.sealed) setOutcome({ ok: true, text: ar ? `خُتمت ${arPlural(results.length, AR_NOUNS.result)}. البصمة ${String(out.checksum || '').slice(0, 16)}…` : `${results.length} results sealed. Digest ${String(out.checksum || '').slice(0, 16)}…` });
       else if (out?.reason === 'independent_quorum_required') setOutcome({ ok: true, text: ar ? `سُجّل اعتمادك (${out.approvals || 1}/2). يكتمل الختم حين يعتمد الطرف الثاني من دورٍ آخر.` : `Your approval is recorded (${out.approvals || 1}/2). Sealing completes when the second role approves.` });
       else setOutcome({ ok: false, text: sealFailureLabel(out, ar) });
     } catch { setOutcome({ ok: false, text: ar ? 'تعذّر الختم. أعد المحاولة.' : 'Sealing failed. Try again.' }); }
@@ -109,7 +110,7 @@ export const PublishDialog: React.FC<{ open: boolean; store: Store; ar: boolean;
       ? <div className="rounded-3xl bg-gradient-to-b from-[var(--emerald-soft)] to-white p-6 text-center">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[var(--emerald)] text-white"><Globe2 className="h-8 w-8" /></div>
         <div className="mt-4 text-xl font-black">{ar ? 'النتائج منشورة' : 'Results are published'}</div>
-        <p className="mt-2 text-xs leading-6 text-[color:var(--muted)]">{outcome?.text || (ar ? `${results.length} نتيجة منشورة في ${byCategory.length} فئات.` : `${results.length} results across ${byCategory.length} categories.`)}</p>
+        <p className="mt-2 text-xs leading-6 text-[color:var(--muted)]">{outcome?.text || (ar ? `${results.length} نتيجة منشورة في ${arPlural(byCategory.length, AR_NOUNS.category, true)}.` : `${results.length} results across ${byCategory.length} categories.`)}</p>
       </div>
       : <>
         <div className="grid grid-cols-3 gap-2 text-center">

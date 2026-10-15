@@ -1,5 +1,6 @@
 import type { Participant } from '../types';
 import { queueOrderValue } from './judging-integrity';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 /*
  * عدالة الانتظار عند النقل.
@@ -104,7 +105,7 @@ export function recommendFairPosition(input: {
     orderKey: orderKeyForPosition(queue, fairPosition),
     reasonArabic: passes.length
       ? `انتظر ${waitedMinutes} دقيقة قبل النقل، فيتقدّم على ${passes.length} ممن انتظروا أقلّ منه، ويصير رقم ${fairPosition} بدل ${positionIfAppended}.`
-      : `انتظر ${waitedMinutes} دقيقة، ولم ينتظر أحدٌ في اللجنة الهدف أقلّ منه — فموضعه آخر الطابور بلا تنازل.`,
+      : `انتظر ${arPlural(waitedMinutes, AR_NOUNS.minute)}، ولم ينتظر أحدٌ في اللجنة الهدف أقلّ منه — فموضعه آخر الطابور بلا تنازل.`,
     reasonEnglish: passes.length
       ? `Waited ${waitedMinutes} min before the move, so he goes ahead of ${passes.length} who waited less — position ${fairPosition} instead of ${positionIfAppended}.`
       : `Waited ${waitedMinutes} min, and nobody in the target queue waited less — the tail is already his fair place.`,

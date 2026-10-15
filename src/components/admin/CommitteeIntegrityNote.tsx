@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { UsersRound } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { analyzeCommitteeIntegrity, type ScoreEvent } from '../../lib/committee-integrity';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * نزاهة اللجان — تشريح بعد الجلسة، في يد المدقّق.
@@ -76,7 +77,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
       <div className="flex items-center gap-2 px-1 text-xs font-bold text-[color:var(--muted)]">
         <span className="mizan-status-orb" aria-hidden="true"/>
         {ar
-          ? `إشارات نزاهة اللجان سليمة عبر ${measured.length} لجنة — رصد مستقل وخصم متكافئ بين الوفود.`
+          ? `إشارات نزاهة اللجان سليمة عبر ${arPlural(measured.length, AR_NOUNS.committee)} — رصد مستقل وخصم متكافئ بين الوفود.`
           : `Committee integrity signals are clear across ${measured.length} committees — independent submission and even regional deduction.`}
       </div>
     );

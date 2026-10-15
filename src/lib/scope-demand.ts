@@ -14,6 +14,7 @@ import { candidatesInScope, uniqueLocusCount, locusKeyOf, type QuestionCandidate
 import { resolveZoneSlots, type QuestionDistributionPlan } from './question-zones';
 import { isScopeSubsetOf, scopeUnion } from './quran-scope';
 import { theoreticalRepeatFloor, type RepeatPolicy } from './repeat-policy';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 export interface DemandParticipant {
   participantId: string;
@@ -191,7 +192,7 @@ export function recommendPolicy(analysis: DemandAnalysis, policy: RepeatPolicy):
     out.push({
       id: `shortfall-${cluster.signature}`,
       severity: 'warning',
-      ar: `«${cluster.label}»: ${cluster.participantCount} متسابقًا، و${cluster.supply} موضعًا، فسيتكرر كل موضع ${cluster.averageReuse} مرة في المتوسط. إضافة ${Math.max(0, cluster.demand - cluster.supply)} موضعًا تُنهي التكرار الحتمي.`,
+      ar: `«${cluster.label}»: ${arPlural(cluster.participantCount, AR_NOUNS.participant)}، و${cluster.supply} موضعًا، فسيتكرر كل موضع ${cluster.averageReuse} مرة في المتوسط. إضافة ${Math.max(0, cluster.demand - cluster.supply)} موضعًا تُنهي التكرار الحتمي.`,
       en: `"${cluster.label}": ${cluster.participantCount} participants against ${cluster.supply} loci — average reuse ${cluster.averageReuse}. Adding ${Math.max(0, cluster.demand - cluster.supply)} loci removes unavoidable repetition.`,
       action: { kind: 'add_loci', value: Math.max(0, cluster.demand - cluster.supply) },
     });

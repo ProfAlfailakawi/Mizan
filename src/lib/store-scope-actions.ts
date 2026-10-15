@@ -46,6 +46,7 @@ import {
 } from './scope-engine';
 import { planCategoryMigration } from './scope-migration';
 import { buildScopeReadiness } from './scope-readiness';
+import { arPlural, AR_NOUNS } from './arabic-plural';
 
 /** ما يحتاجه المحرك من مضيفه — ولا شيء غيره. */
 export interface ScopeEngineHost {
@@ -437,7 +438,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
     });
     const record: ScopeSimulationRecord = {
       id: newId('sim'), organizationId: S().competition.organizationId, competitionId: S().competition.id,
-      label: options?.label || `محاكاة ${participants.length} متسابقًا`,
+      label: options?.label || `محاكاة ${arPlural(participants.length, AR_NOUNS.participant)}`,
       seed, participantCount: result.metrics.participants, draws: result.metrics.draws,
       metrics: result.metrics as unknown as Record<string, unknown>,
       clusters: result.perCluster,
@@ -517,7 +518,7 @@ export function createScopeEngineActions(host: ScopeEngineHost) {
       budget: { timeBudgetMs: options?.timeBudgetMs ?? 20_000, maxEdges: 3_000_000 },
     });
     host.audit('FAIRNESS_ORACLE_RUN', 'ScopeSimulation', S().competition.id,
-      `سؤال المِرصد الرياضي على ${participants.length} متسابقًا: ${describeOracleStatus(result.minMaxReuse)}`,
+      `سؤال المِرصد الرياضي على ${arPlural(participants.length, AR_NOUNS.participant, true)}: ${describeOracleStatus(result.minMaxReuse)}`,
       `Asked the mathematical oracle over ${participants.length} participants: ${result.minMaxReuse.status}`);
     return { ok: true as const, result, headline: describeOracleStatus(result.minMaxReuse), syntheticData: !real.length };
   };

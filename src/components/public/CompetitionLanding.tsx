@@ -12,6 +12,7 @@ import { MizanLogo } from '../design-system/MizanLogo';
 import { useJourneyReveal } from '../dna/useJourneyReveal';
 import { useFirstView } from '../dna/useMotion';
 import '../dna/dna.css'; // styles for the data-draw / data-mz-flash attributes these hooks set
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * الصفحة العامة للمسابقة — أول ما يراه من لا يعرف ميزان، وآخر ما يقرؤه قبل أن يقرّر
@@ -300,7 +301,7 @@ export const CompetitionLanding: React.FC = () => {
                 const chips: { icon: IconC; text: string; label: string }[] = [
                   { icon: UserRound, text: gender, label: ar ? 'الفئة' : 'Open to' },
                   ageText && { icon: Users, text: ageText, label: ar ? 'العمر' : 'Age' },
-                  cat.targetDurationMinutes ? { icon: Clock3, text: ar ? `${cat.targetDurationMinutes} دقيقة` : `${cat.targetDurationMinutes} min`, label: ar ? 'زمن الجلسة' : 'Session' } : null,
+                  cat.targetDurationMinutes ? { icon: Clock3, text: ar ? `${arPlural(cat.targetDurationMinutes, AR_NOUNS.minute)}` : `${cat.targetDurationMinutes} min`, label: ar ? 'زمن الجلسة' : 'Session' } : null,
                 ].filter(Boolean) as { icon: IconC; text: string; label: string }[];
 
                 return (
