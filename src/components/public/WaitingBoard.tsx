@@ -149,7 +149,7 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
           */}
           <div className="mz-bp-bstat rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
             <span key={board.totalCompleted} className="mizan-done-mark text-[#7fae9a]"><CheckCircle2 className="w-4 h-4" /></span>
-            <div><div className="text-xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-base mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
+            <div><div className="text-xl min-[112.5rem]:text-4xl font-black tabular-nums">{board.totalCompleted}</div><div className="text-base mizan-venue-faint">{ar ? 'أُنجز اليوم' : 'Completed today'}</div></div>
           </div>
         </div>
       </footer>
@@ -213,6 +213,6 @@ const PanelCell: React.FC<{ slice: CommitteeBoardSlice; ar: boolean }> = ({ slic
 const Stat = ({ icon: Icon, n, t }: { icon: React.ComponentType<{ className?: string }>; n: number; t: string }) => (
   <div className="mz-bp-bstat rounded-2xl border border-white/8 px-4 py-3 flex items-center gap-3">
     <Icon className="w-4 h-4 text-[#b9cec4]" />
-    <div><div className="text-xl font-black tabular-nums">{n}</div><div className="text-base mizan-venue-faint">{t}</div></div>
+    <div><div className="text-xl min-[112.5rem]:text-4xl font-black tabular-nums">{n}</div><div className="text-base mizan-venue-faint">{t}</div></div>
   </div>
 );

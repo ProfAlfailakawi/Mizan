@@ -316,7 +316,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
 
 const Tile: React.FC<{ value: string; label: string }> = ({ value, label }) => (
   <div className="rounded-2xl bg-white/[.06] p-3 text-center">
-    <div className="text-xl font-black tabular-nums" dir="ltr">{value}</div>
+    <div className="text-xl min-[112.5rem]:text-3xl font-black tabular-nums" dir="ltr">{value}</div>
     <div className="mt-1 text-base text-white/45">{label}</div>
   </div>
 );
@@ -333,17 +333,18 @@ const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board
         <Tile value={String(board?.totalCompleted ?? 0)} label={ar ? 'أنهوا اليوم' : 'completed today'} />
       </div>
 
-      <div className="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden sm:grid-cols-2 xl:grid-cols-3">
+      {/* ستّة أعمدة بعرض عمودين لكل بطاقة: ما يبقى في الصف الأخير يقف في الوسط بدل أن يتيم عند الطرف. */}
+      <div className="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden sm:grid-cols-4 xl:grid-cols-6">
         {panels.slice(0, 12).map(slice => (
-          <article key={slice.committeeId} className="flex items-center gap-4 rounded-[22px] border border-white/10 bg-white/[.035] px-5 py-4">
+          <article key={slice.committeeId} className="flex items-center gap-4 rounded-[22px] border border-white/10 bg-white/[.035] px-5 py-4 sm:col-span-2 max-xl:[&:nth-child(2n+1):last-child]:col-start-2 xl:[&:nth-child(3n+1):last-child]:col-start-3 xl:[&:nth-child(3n+1):nth-last-child(2)]:col-start-2">
             <span className="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl bg-white/10 px-2 text-sm font-black tabular-nums">{slice.code}</span>
             <div className="min-w-0 flex-1">
               <div className="text-base font-bold mizan-venue-muted">{ar ? 'الآن' : 'NOW'}</div>
-              <div className="truncate text-2xl font-black tabular-nums text-[#e0c894]" dir="ltr">{slice.nowCalling?.code || '—'}</div>
+              <div className="truncate text-2xl min-[112.5rem]:text-4xl font-black tabular-nums text-[#e0c894]" dir="ltr">{slice.nowCalling?.code || '—'}</div>
             </div>
             <div className="shrink-0 text-end">
               <div className="text-base font-bold mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
-              <div className="text-sm font-black tabular-nums text-white/75" dir="ltr">{slice.next[0]?.code || '—'}</div>
+              <div className="text-sm min-[112.5rem]:text-xl font-black tabular-nums text-white/75" dir="ltr">{slice.next[0]?.code || '—'}</div>
               <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-white/45"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
             </div>
           </article>
