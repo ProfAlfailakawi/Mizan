@@ -1578,7 +1578,7 @@ html[data-mizan-motion="reduced"] .mizan-call-live{ animation:none !important; }
 .mizan-board-cell.is-stalled{ animation:mzStallBreathe 3.6s ease-in-out infinite; }
 
 /* لحظة الإنجاز: ومضةٌ خضراء هادئة حين يُنهي متسابقٌ جلسته. الانتظار يصير تقدّمًا. */
-@keyframes mzDoneMark{ 0%{ opacity:0; transform:scale(.7) } 30%{ opacity:1; transform:scale(1) } 100%{ opacity:0; transform:scale(1) } }
+@keyframes mzDoneMark{ 0%{ opacity:0; transform:scale(.7) } 30%{ opacity:1; transform:scale(1) } 100%{ opacity:1; transform:scale(1) } }
 .mizan-done-mark{ animation:mzDoneMark 2.6s var(--ease-brand) 1 both; }
 
 @media (prefers-reduced-motion: reduce){
