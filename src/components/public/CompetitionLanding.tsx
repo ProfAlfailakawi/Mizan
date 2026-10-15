@@ -282,7 +282,7 @@ export const CompetitionLanding: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className={`mt-6 grid gap-4 ${categories.length === 1 ? 'max-w-md' : categories.length === 2 || categories.length === 4 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
               {categories.map((cat, ci) => {
                 const glyph = BRANCH_GLYPHS[ci % BRANCH_GLYPHS.length];
                 const rows = [
