@@ -40,6 +40,13 @@ function useReveal<T extends HTMLElement>() {
   return { ref, style: { opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateY(14px)', transition: 'opacity .7s var(--ease-brand), transform .7s var(--ease-brand)' } as React.CSSProperties };
 }
 
+const NAV_LINKS = [
+  { href: '#kayf', label: 'كيف تعمل' },
+  { href: '#ma-tahsal', label: 'ما تحصل عليه' },
+  { href: '#nazaha', label: 'النزاهة' },
+  { href: '#man-nahn', label: 'من نحن' },
+];
+
 const Section: React.FC<{ children: React.ReactNode; className?: string; id?: string }> = ({ children, className = '', id }) => {
   const r = useReveal<HTMLElement>();
   return <section id={id} ref={r.ref} style={r.style} className={`mizan-page ${className}`}>{children}</section>;
@@ -186,7 +193,7 @@ const ContactForm: React.FC = () => {
         <Mail size={17} /> أرسل الطلب
       </button>
       <div className="text-[11px] text-center" style={{ color: 'var(--muted)' }}>
-        أو راسلنا مباشرةً على <a href={`mailto:${CONTACT_TO}`} className="font-black" style={{ color: 'var(--emerald)' }}>{CONTACT_TO}</a>
+        أو راسلنا مباشرةً على <a href={`mailto:${CONTACT_TO}`} className="inline-flex min-h-11 items-center px-1 font-black" style={{ color: 'var(--emerald)' }}>{CONTACT_TO}</a>
       </div>
     </div>
   );
@@ -213,8 +220,14 @@ export const MarketingSite: React.FC = () => {
                 <div className="text-[10px] font-bold mizan-muted mt-1">منصّة مسابقات القرآن</div>
               </div>
             </div>
-            <a href="#tawasul" className="rounded-xl px-4 h-10 grid place-items-center text-[12px] font-black text-white" style={{ background: 'var(--emerald)' }}>تواصل معنا</a>
+            <nav aria-label="أقسام الصفحة" className="hidden md:flex items-center gap-1 text-[13px] font-bold">
+              {NAV_LINKS.map(l => <a key={l.href} href={l.href} className="inline-flex min-h-11 items-center rounded-xl px-3 hover:bg-[var(--surface-soft)]">{l.label}</a>)}
+            </nav>
+            <a href="#tawasul" className="rounded-xl px-4 h-11 grid place-items-center text-[12px] font-black text-white" style={{ background: 'var(--emerald)' }}>تواصل معنا</a>
           </div>
+          <nav aria-label="أقسام الصفحة" className="md:hidden -mx-4 flex gap-1 overflow-x-auto px-4 pb-2 text-[12px] font-bold">
+            {NAV_LINKS.map(l => <a key={l.href} href={l.href} className="inline-flex min-h-11 shrink-0 items-center rounded-xl px-3" style={{ background: 'var(--surface-soft)' }}>{l.label}</a>)}
+          </nav>
         </div>
       </header>
 
@@ -247,7 +260,7 @@ export const MarketingSite: React.FC = () => {
             <div className="absolute -inset-6 -z-10 rounded-[40px]" style={{ background: 'radial-gradient(60% 60% at 70% 30%, rgba(185,139,78,.16), transparent 70%)' }} />
             {/* لقطةٌ حقيقية من شاشة التحكيم — لا رسمٌ تخيّلي ولا وعدٌ مصوَّر. */}
             <img src="/marketing/hero-mushaf.png" alt="المصحف الرسمي في شاشة التحكيم: البقرة ١٤٢–١٤٤ بنص مجمع الملك فهد" loading="eager" width={945} height={1180}
-              className="w-full rounded-[26px]" style={{ border: '1px solid var(--line)', boxShadow: 'var(--shadow-4)' }} />
+              className="w-full rounded-[26px] max-lg:h-[360px] max-lg:object-cover max-lg:object-top" style={{ border: '1px solid var(--line)', boxShadow: 'var(--shadow-4)' }} />
           </div>
         </div>
       </Section>
@@ -294,7 +307,7 @@ export const MarketingSite: React.FC = () => {
       </Section>
 
       {/* ══ ٤) القدرات: شبكة أيقونات ══ */}
-      <Section>
+      <Section id="ma-tahsal">
         <Kicker>ما تحصل عليه</Kicker>
         <h2 className="font-display text-[clamp(24px,3.6vw,36px)] font-black mt-3 mizan-title">ثمانُ قدراتٍ تفصل ميزان عمّا سواه</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -351,7 +364,7 @@ export const MarketingSite: React.FC = () => {
             { src: '/marketing/no-staff-certificate.png', t: 'الشهادة', s: 'إثباتٌ عام برقمٍ واحد.' },
           ].map(c => (
             <figure key={c.src} className="mizan-panel overflow-hidden mizan-surface-hover">
-              <img src={c.src} alt={c.t} loading="lazy" width={1400} height={800} className="w-full block" style={{ borderBottom: '1px solid var(--line)' }} />
+              <img src={c.src} alt={c.t} loading="lazy" width={1400} height={800} className="block w-full max-sm:w-[170%] max-sm:max-w-none" style={{ borderBottom: '1px solid var(--line)' }} />
               <figcaption className="p-4">
                 <div className="text-[14px] font-black mizan-title">{c.t}</div>
                 <div className="mt-1 text-[12px] leading-5 mizan-muted">{c.s}</div>
@@ -394,7 +407,7 @@ export const MarketingSite: React.FC = () => {
               { src: '/marketing/ai-parity.png', t: 'تكافؤ القرعة', s: 'هل حمل المتسابقان العبء نفسه؟ يقيس مجموع الصعوبة والمتشابهات والتجويد بجانب إعدادات السحب، ويُنبّه عند الفارق.' },
             ].map(c => (
               <figure key={c.src} className="rounded-[22px] overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-2)' }}>
-                <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="w-full block" />
+                <img src={c.src} alt={c.t} loading="lazy" width={1500} height={700} className="block w-full max-sm:w-[165%] max-sm:max-w-none" />
                 <figcaption className="p-5" style={{ borderTop: '1px solid var(--line)' }}>
                   <div className="text-[14px] font-black">{c.t}</div>
                   <div className="text-[13px] leading-6 mt-1.5" style={{ color: 'var(--muted)' }}>{c.s}</div>
@@ -430,7 +443,7 @@ export const MarketingSite: React.FC = () => {
       </section>
 
       {/* ══ ٥) النزاهة: قلب البيع ══ */}
-      <section className="mt-4" style={{ color: 'var(--ink)' }}>
+      <section id="nazaha" className="mt-4 scroll-mt-20" style={{ color: 'var(--ink)' }}>
         <Section className="!py-16">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-10 items-center">
             <div>
@@ -477,7 +490,7 @@ export const MarketingSite: React.FC = () => {
       </Section>
 
       {/* ══ ٧) من نحن ══ */}
-      <Section>
+      <Section id="man-nahn">
         <div className="mizan-hero grid md:grid-cols-[auto_1fr] gap-7 items-center !py-9">
           <div className="mizan-trust-mark !w-20 !h-20 !rounded-[24px]"><MizanMark className="w-11 h-11" tone="inverse" decorative /></div>
           <div>
@@ -523,7 +536,7 @@ export const MarketingSite: React.FC = () => {
       <footer className="mizan-page !pt-2 !pb-10">
         <div className="flex flex-wrap items-center justify-between gap-4 pt-6 text-[12px] font-bold mizan-muted" style={{ borderTop: '1px solid var(--line)' }}>
           <div className="flex items-center gap-2.5"><MizanMark className="w-6 h-6" decorative /> ميزان — جميع الحقوق محفوظة</div>
-          <a href="#tawasul" className="font-black" style={{ color: 'var(--emerald)' }}>تواصل معنا</a>
+          <a href="#tawasul" className="inline-flex min-h-11 min-w-11 items-center px-3 font-black" style={{ color: 'var(--emerald)' }}>تواصل معنا</a>
         </div>
       </footer>
     </div>
