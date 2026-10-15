@@ -5,6 +5,7 @@ import { useAppStore } from '../../lib/store';
 import { Badge } from '../design-system/Badge';
 import { Button } from '../design-system/Button';
 import { computeAllJudgeDrift, computeJudgeDrift, type JudgeEventLike } from '../../lib/judge-drift';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 // Silent Judge Drift — a Head-Judge-only advisory. It NEVER alters a score. It watches whether a
 // judge has grown harsher than their own morning baseline and, past a 2σ threshold, gently
@@ -79,7 +80,7 @@ export const JudgeDriftMonitor: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? `${flagged.length} تنبيه` : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
+          <Badge variant={flagged.length ? 'amber' : 'emerald'}>{flagged.length ? (ar ? arPlural(flagged.length,AR_NOUNS.alert) : `${flagged.length} flag`) : (ar ? 'مستقر' : 'Stable')}</Badge>
           {/* من أين قُرئ هذا الرقم: ملاحظات الجلسة القائمة، أم أحكام اليوم المقفلة. */}
           {enoughRealEvidence && <span className="text-[11px] font-bold text-[#6b706c]">{source === 'live' ? (ar ? 'من ملاحظات الجلسة الجارية' : 'from the live session') : (ar ? `من ${events.length} حكمًا مقفلًا اليوم` : `from ${events.length} locked scores today`)}</span>}
         </div>

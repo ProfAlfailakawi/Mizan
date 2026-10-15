@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { BadgeCheck, CircleAlert, Flame, Scale, Settings2, TriangleAlert } from 'lucide-react';
+import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 
 /*
  * ما يحتاج تدخّلك — لوحةٌ تُقرأ بلمحة، لا قائمةُ عناوينَ متساوية.
@@ -57,10 +58,10 @@ function since(at: string | undefined, ar: boolean): string {
   if (!Number.isFinite(ms) || ms < 0) return '';
   const min = Math.floor(ms / 60000);
   if (min < 1) return ar ? 'الآن' : 'now';
-  if (min < 60) return ar ? `منذ ${min} د` : `${min}m ago`;
+  if (min < 60) return ar ? arPlural(min, AR_NOUNS.minuteAgo) : `${min}m ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return ar ? `منذ ${hr} س` : `${hr}h ago`;
-  return ar ? `منذ ${Math.floor(hr / 24)} ي` : `${Math.floor(hr / 24)}d ago`;
+  if (hr < 24) return ar ? arPlural(hr, AR_NOUNS.hourAgo) : `${hr}h ago`;
+  return ar ? arPlural(Math.floor(hr / 24), AR_NOUNS.day) : `${Math.floor(hr / 24)}d ago`;
 }
 
 export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; title?: string; hint?: string; max?: number }> = ({ items, ar, title, hint, max = 6 }) => {
@@ -150,7 +151,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
 
     {/* ما لم يتّسع له المكان يُقال عددًا، لا يُبتلع بصمت. */}
     {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#656b66]">
-      {ar ? `و${sorted.length - max} بندًا آخر` : `and ${sorted.length - max} more`}
+      {ar ? arPlural(sorted.length - max, AR_NOUNS.moreItems) : `and ${sorted.length - max} more`}
     </div>}
   </section>;
 };
