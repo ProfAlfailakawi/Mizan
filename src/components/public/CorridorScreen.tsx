@@ -283,7 +283,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
         </div>
         <div>
           <div className="mb-2 flex items-center justify-between text-[11px] text-white/50"><span>{ar ? 'نحو الختمة التالية' : 'Toward next'}</span><span className="font-black text-[#d9c193]" dir="ltr">{toward}%</span></div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[#2f6555] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Tile value={`${percent}%`} label={ar ? 'من المصحف' : 'of the Mushaf'} />
             <Tile value={String(agg?.totalRecitations || 0)} label={ar ? 'تلاوة موضع' : 'passages'} />

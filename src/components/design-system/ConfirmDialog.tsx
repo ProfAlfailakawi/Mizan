@@ -67,7 +67,7 @@ export function useConfirm(ar: boolean) {
       maxWidth="md"
     >
       <div className="flex gap-4">
-        <span className={`shrink-0 w-11 h-11 rounded-2xl grid place-items-center ${destructive ? 'bg-[#F6E7E7] text-[#7A2E2E]' : 'bg-[#EEF2EF] text-[#214C40]'}`}>
+        <span className={`shrink-0 w-11 h-11 rounded-2xl grid place-items-center ${destructive ? 'bg-[#F6E7E7] text-[#7A2E2E]' : 'bg-[#EEF2EF] text-[color:var(--emerald)]'}`}>
           {destructive ? <AlertTriangle className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
         </span>
         <div className="min-w-0 flex-1">

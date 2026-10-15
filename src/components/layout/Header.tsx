@@ -18,19 +18,19 @@ export const Header: React.FC = () => {
  const superAdmin=currentUser.role==='super_admin';
  // في البيئة التجريبية لا توجد جلسة هوية تُنهى؛ الخروج يمحو الصندوق التجريبي وحده.
  const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} signOutAndReload() };
- return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[#F7F5EF]/92 backdrop-blur-md">
+ return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[var(--canvas)]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 max-[340px]:px-2 sm:px-6 flex items-center justify-between gap-3 max-[340px]:gap-2">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
       <MizanLogo language={language} compact className="mizan-header-logo"/>
       <div className="min-w-0 hidden sm:block">
         <div className="flex items-center gap-2">
           {(() => { const person = (language==='ar' ? (currentUser.nameArabic||currentUser.name) : currentUser.name)?.trim(); return person ? <span className="text-[13px] font-black text-[#2b332e] truncate max-w-[32vw]" title={person}>{person}</span> : null; })()}
-          <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
-          <span className="text-xs text-[#636864] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${competition.status==='live'?'bg-[var(--emerald-2)]':'bg-[var(--amber)]'}`}/>
+          <span className="text-xs text-[color:var(--muted)] truncate max-w-[min(44vw,460px)]" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
           {brandInfo.placements.showHeaderContact && (brandInfo.phoneNumber || brandInfo.supportEmail) && (
             <a
               href={brandInfo.phoneNumber ? `tel:${brandInfo.phoneNumber}` : `mailto:${brandInfo.supportEmail}`}
-              className="hidden xl:inline-flex items-center gap-1 text-xs text-[#2F6555] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
+              className="hidden xl:inline-flex items-center gap-1 text-xs text-[color:var(--emerald-2)] font-bold px-2 py-0.5 rounded-full bg-[#EBF2EE] hover:bg-[#DCEAE2] transition"
               title={language==='ar'?'رقم التواصل والدعم المعتمد':'Official support contact'}
             >
               <Headphones className="w-3 h-3"/>
@@ -41,31 +41,31 @@ export const Header: React.FC = () => {
       </div>
     </div>
     <div className="flex items-center gap-1 max-[340px]:gap-0 shrink-0">
-      <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#656b66]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[#656b66]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
+      <button onClick={()=>setSearchOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'بحث سريع':'Quick search'} aria-label={language==='ar'?'بحث سريع':'Quick search'}><Search className="w-4 h-4"/></button>{!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="hidden sm:grid w-11 h-11 place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)]" title={language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'} aria-label={language==='ar'?'شرح مبسط':'Plain-language guide'}><CircleHelp className="w-4 h-4"/></button>}
       {/* على الجوال كانت نصف الوظائف تختفي بصمت؛ قائمة «المزيد» تُبقيها في متناول إبهام واحد. */}
       <details className="relative sm:hidden">
-        <summary className="list-none w-11 h-11 grid place-items-center rounded-xl hover:bg-[#efede7] text-[#656b66] cursor-pointer" aria-label={language==='ar'?'المزيد':'More'}><Menu className="w-4 h-4"/></summary>
+        <summary className="list-none w-11 h-11 grid place-items-center rounded-xl hover:bg-[#efede7] text-[color:var(--muted)] cursor-pointer" aria-label={language==='ar'?'المزيد':'More'}><Menu className="w-4 h-4"/></summary>
         <div className="fixed start-2 top-16 z-50 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-[#e2e0d8] bg-white p-1.5 shadow-[0_18px_45px_rgba(25,39,33,.16)]">
-          <button onClick={()=>setSearchOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><Search className="w-4 h-4 text-[#656b66]"/>{language==='ar'?'بحث سريع':'Quick search'}</button>
-          {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[#656b66]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
+          <button onClick={()=>setSearchOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><Search className="w-4 h-4 text-[color:var(--muted)]"/>{language==='ar'?'بحث سريع':'Quick search'}</button>
+          {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[color:var(--muted)]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
         </div>
       </details>
-      {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 max-[340px]:w-8 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[#F2EADC] text-[#8a6738]':'text-[#656b66]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
+      {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 max-[340px]:w-8 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[var(--amber-soft)] text-[#8a6738]':'text-[color:var(--muted)]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
       {!superAdmin&&<EmergencyControl iconOnly/>}
       {/* شارة البيئة التجريبية وأدواتها انتقلت إلى `DemoBar` على مستوى التطبيق:
           الترويسة لا تُعرض لدور «مشغّل البثّ» أصلًا، فلا يصحّ أن يسكن فيها المخرج
           الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
-      <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 max-[340px]:ms-0 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[#F4E6E3] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
+      <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 max-[340px]:ms-0 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[var(--danger-soft)] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
     </div>
   </div>
   {/* على الجوال لا يتّسع السطر للاسم بجانب الأزرار فكان ينضغط حرفًا حرفًا: يأخذ سطرًا وحده. */}
   <div className="sm:hidden border-t border-[#DFDED7]/70 px-4 py-1.5 flex items-center gap-2 min-w-0">
-   <span className={`w-2 h-2 rounded-full shrink-0 ${competition.status==='live'?'bg-[#2F6555]':'bg-[#9B7542]'}`}/>
+   <span className={`w-2 h-2 rounded-full shrink-0 ${competition.status==='live'?'bg-[var(--emerald-2)]':'bg-[var(--amber)]'}`}/>
    <span className="text-sm font-black text-[#2b332e] truncate" title={bilingualName(competition,language==='ar')}>{bilingualName(competition,language==='ar')}</span>
   </div>
   <CommandPalette open={searchOpen} onOpenChange={setSearchOpen}/><ClarityGuide open={helpOpen} onClose={()=>setHelpOpen(false)} role={currentUser.role} ar={language==='ar'}/>
-  {emergencyFrozen&&<div className="bg-[#A34D43] text-white text-center text-xs font-bold py-2 px-4">{language==='ar'?'تم إيقاف الاستدعاء الجديد. الجلسات النشطة محفوظة ويمكن استئناف التشغيل بأمان.':'New dispatch paused. Active sessions are preserved and operations can resume safely.'}</div>}
+  {emergencyFrozen&&<div className="bg-[var(--danger)] text-white text-center text-xs font-bold py-2 px-4">{language==='ar'?'تم إيقاف الاستدعاء الجديد. الجلسات النشطة محفوظة ويمكن استئناف التشغيل بأمان.':'New dispatch paused. Active sessions are preserved and operations can resume safely.'}</div>}
  </header>
 }

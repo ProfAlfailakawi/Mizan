@@ -38,7 +38,7 @@ export const WaqfGuide: React.FC<{ text?: string; ayah?: number | null; ar: bool
   return (
     <div className="border-t border-[#e5e1d7] px-4 sm:px-5 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="text-[9px] font-black text-[#59615c]">
+        <span className="text-[11px] font-black text-[#59615c]">
           {ayah ? (ar ? `الوقف في الآية ${ayah}` : `Waqf in ayah ${ayah}`) : (ar ? 'الوقف في هذا المقطع' : 'Waqf in this passage')}
         </span>
         {marks.map(m => {
@@ -48,13 +48,13 @@ export const WaqfGuide: React.FC<{ text?: string; ayah?: number | null; ar: bool
               key={m.codePoint}
               className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 ${strict ? 'border-[#e2c9a8] bg-[#fbf6ec]' : 'border-[#e3e1da] bg-[#f8f6ef]'}`}
             >
-              <b className={`font-quran text-[13px] leading-none ${strict ? 'text-[#7a5a2f]' : 'text-[#214C40]'}`}>{m.labelArabic}</b>
-              <span className="text-[9px] font-bold text-[#59615c]">{m.officialMeaning}</span>
+              <b className={`font-quran text-[13px] leading-none ${strict ? 'text-[#7a5a2f]' : 'text-[color:var(--emerald)]'}`}>{m.labelArabic}</b>
+              <span className="text-[11px] font-bold text-[#59615c]">{m.officialMeaning}</span>
             </span>
           );
         })}
       </div>
-      <p className="mt-2 text-[9px] leading-4 text-[#656b66]">
+      <p className="mt-2 text-[11px] leading-4 text-[color:var(--muted)]">
         {ar
           ? 'العلامات من نصّ المصحف المعتمد نفسه، ومعانيها من جدول علامات مجمع الملك فهد. للتعلّم فقط: لا يُقيَّم وقفك هنا.'
           : 'Marks come from the certified Muṣḥaf text itself, meanings from the KFGQPC symbol registry. For learning only: your stops are not assessed here.'}

@@ -139,7 +139,7 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
       const needsScope = scopeAyahCount(scope) === 0;
       return (
         <button key={category.id} type="button" onClick={() => onSelect(category.id)} aria-pressed={selectedId === category.id}
-          className={`min-w-[200px] max-w-[85%] shrink-0 lg:min-w-0 lg:max-w-none rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:bg-[#f7f5ef]'}`}>
+          className={`min-w-[200px] max-w-[85%] shrink-0 lg:min-w-0 lg:max-w-none rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[color:var(--emerald)] bg-[var(--emerald-soft)]' : 'border-[#dcdad2] bg-white hover:bg-[var(--canvas)]'}`}>
           <div className="flex items-start justify-between gap-2">
             <span className="min-w-0 truncate text-sm font-black text-[#24302b]">{bilingualName(category, ar)}</span>
             {needsScope
@@ -147,7 +147,7 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
               : <Badge>{ar ? 'ثابت للفئة' : 'Category range'}</Badge>}
           </div>
           <p className="mt-1.5 truncate text-xs font-bold text-[#5b6460]">{needsScope ? (ar ? 'يحتاج تحديد نطاق' : 'Needs a range') : describeScope(scope, ar)}</p>
-          <p className="mt-1 text-xs text-[#696f6b]">
+          <p className="mt-1 text-xs text-[color:var(--muted)]">
             {ar ? `${resolveQuestionCount(category, policy)} أسئلة · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} متسابقًا` : `${resolveQuestionCount(category, policy)} questions · ${store.participants.filter(p => p.competitionId === store.competition.id && p.categoryId === category.id).length} participants`}
           </p>
         </button>
@@ -203,7 +203,7 @@ const ScopeTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = (
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efeee8] pt-4">
         <span />
         <div className="flex items-center gap-2">
-          {saved && <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1.5 text-xs font-black text-[#214C40]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'حُفظ النطاق' : 'Range saved'}</span>}
+          {saved && <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-[var(--emerald-soft)] px-3 py-1.5 text-xs font-black text-[color:var(--emerald)]"><CheckCircle2 className="h-3.5 w-3.5" />{ar ? 'حُفظ النطاق' : 'Range saved'}</span>}
           {dirty && <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>{ar ? 'تراجع' : 'Revert'}</Button>}
           <Button size="sm" disabled={!dirty || scopeAyahCount(scope) === 0} onClick={save}>{ar ? 'حفظ النطاق' : 'Save range'}</Button>
         </div>
@@ -225,7 +225,7 @@ const PassageLength: React.FC<{ ar: boolean; value: number; onChange: (v: number
     <div className="text-sm font-black text-[#24302b]">{ar ? 'طول مقطع السؤال' : 'Question passage length'}</div>
     <div className="mt-3 flex items-center justify-between gap-3">
       <button type="button" aria-label={ar ? 'إنقاص' : 'Decrease'} onClick={() => onChange(Math.max(1, value - 1))} className="h-12 w-12 rounded-xl border border-[#dcdad2] text-2xl font-black">−</button>
-      <div className="min-w-0 flex-1 text-center"><div className="text-xl font-black tabular-nums">{quarterLabel(value, ar)}</div><div className="text-xs text-[#656b66]">{ar ? 'الزيادة كل مرة: ربع وجه' : 'increments by quarter page'}</div></div>
+      <div className="min-w-0 flex-1 text-center"><div className="text-xl font-black tabular-nums">{quarterLabel(value, ar)}</div><div className="text-xs text-[color:var(--muted)]">{ar ? 'الزيادة كل مرة: ربع وجه' : 'increments by quarter page'}</div></div>
       <button type="button" aria-label={ar ? 'زيادة' : 'Increase'} onClick={() => onChange(value + 1)} className="h-12 w-12 rounded-xl border border-[#dcdad2] text-2xl font-black">+</button>
     </div>
   </div>
@@ -317,7 +317,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
         <NumberBox ar={ar} label={ar ? 'عدد الأسئلة لكل متسابق' : 'Questions per participant'} value={questionCount} min={1} max={40}
           onChange={v => store.setCategoryQuestionCount(category.id, v)} hint={ar ? 'يتقدّم على إعداد المسابقة العام.' : 'Overrides the competition-wide setting.'} />
         <label className="block">
-          <span className="block text-xs font-black tracking-[.1em] text-[#696f6b]">{ar ? 'طريقة التوزيع' : 'Distribution mode'}</span>
+          <span className="block text-xs font-black tracking-[.1em] text-[color:var(--muted)]">{ar ? 'طريقة التوزيع' : 'Distribution mode'}</span>
           <select value={draft.mode} onChange={e => {
             const mode = e.target.value as QuestionDistributionPlan['mode'];
             setPlan(mode === 'auto_balanced'
@@ -382,7 +382,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                 </div>
                 <p className="mt-1 text-xs font-bold text-[#5b6460]">{describeZone(zone, ar)}</p>
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs font-black text-[#2F6555]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
+                  <summary className="cursor-pointer text-xs font-black text-[color:var(--emerald-2)]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
                   <div className="mt-3"><QuranScopePicker value={zone.scope} onChange={next => patchZone(index, { scope: next })} arabic={ar} parentScope={scope} idPrefix={`zone-${zone.id}`} /></div>
                 </details>
               </li>
@@ -393,7 +393,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
             <NumberBox ar={ar} label={ar ? 'أسئلة حرة خارج المناطق' : 'Open questions outside zones'} value={draft.freeQuestionCount || 0} min={0} max={20} onChange={v => setPlan({ ...draft, freeQuestionCount: v })} />
           )}
 
-          <div className={`rounded-xl px-3.5 py-3 text-xs font-bold ${errors.length ? 'bg-[#F6E7E7] text-[#7A2E2E]' : 'bg-[#E7EEE9] text-[#214C40]'}`} role="status">
+          <div className={`rounded-xl px-3.5 py-3 text-xs font-bold ${errors.length ? 'bg-[#F6E7E7] text-[#7A2E2E]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`} role="status">
             {errors.length
               ? errors.map(x => <div key={x.code + (x.zoneId || '')}>{ar ? x.ar : x.en}</div>)
               : (ar ? `مجموع أسئلة المناطق ${zoneQuestionTotal(draft)} ويطابق عدد أسئلة المتسابق.` : `Zones request ${zoneQuestionTotal(draft)} questions, matching the participant count.`)}
@@ -450,7 +450,7 @@ const PolicyTab: React.FC<{ store: Store; ar: boolean; category?: Category }> = 
       </div>
 
       <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4">
-        <h3 className="inline-flex items-center gap-2 text-sm font-black text-[#214C40]"><Target className="h-4 w-4" />{ar ? 'ما الذي يلتزم به المحرك؟' : 'What the engine guarantees'}</h3>
+        <h3 className="inline-flex items-center gap-2 text-sm font-black text-[color:var(--emerald)]"><Target className="h-4 w-4" />{ar ? 'ما الذي يلتزم به المحرك؟' : 'What the engine guarantees'}</h3>
         <ul className="mt-2 space-y-1.5 text-xs leading-6 text-[#3c4541]">
           <li><strong>{ar ? 'قاطع:' : 'MUST:'}</strong> {ar ? 'داخل نطاق المتسابق، وبروايته، ومن منطقته، ومعتمدًا، وبلا تكرار داخل نموذجه.' : 'Inside the participant range and reading, from its zone, approved, and never repeated inside one model.'}</li>
           <li><strong>{ar ? 'مفضَّل:' : 'PREFER:'}</strong> {ar ? 'تنوّع السور، والمباعدة الزمنية، وأقل انكشاف، وحماية المواضع النادرة للقادمين — ويُسجَّل كل تنازل عنها بسببه.' : 'Surah diversity, separation, low exposure and protecting scarce loci — every relaxation is recorded with its reason.'}</li>
@@ -486,7 +486,7 @@ const DemandTab: React.FC<{ store: Store; ar: boolean }> = ({ store, ar }) => {
         ? <p role="alert" className="rounded-xl bg-[#F6E7E7] px-3.5 py-3 text-xs font-bold text-[#7A2E2E]">{ar ? 'تعذّر حساب الازدحام. راجع نطاقات الفئات ثم افتح هذه الشاشة مرة أخرى.' : 'The demand map could not be computed. Check the category ranges and reopen this screen.'}</p>
         : analysis
           ? <ScopeHeatMap analysis={analysis} arabic={ar} />
-          : <div role="status" className="rounded-2xl border border-[#e4e2da] bg-white p-10 text-center text-xs font-bold text-[#696f6b]">{ar ? 'جارٍ حساب الازدحام…' : 'Computing demand…'}</div>}
+          : <div role="status" className="rounded-2xl border border-[#e4e2da] bg-white p-10 text-center text-xs font-bold text-[color:var(--muted)]">{ar ? 'جارٍ حساب الازدحام…' : 'Computing demand…'}</div>}
     </div>
   );
 };
@@ -611,7 +611,7 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
               <li className="font-black">{ar ? 'يُنصح بإعادة المحاكاة قبل التشغيل.' : 'Re-run the simulation before going live.'}</li>
             </ul>
           ) : (
-            <p className="mt-2 text-xs text-[#214C40]">{ar ? 'لم يتغيّر شيء منذ التجميد.' : 'Nothing has changed since the freeze.'}</p>
+            <p className="mt-2 text-xs text-[color:var(--emerald)]">{ar ? 'لم يتغيّر شيء منذ التجميد.' : 'Nothing has changed since the freeze.'}</p>
           )}
         </div>
       )}
@@ -621,9 +621,9 @@ const ReadinessTab: React.FC<{ store: Store; ar: boolean; onNavigate: (tab: Tab)
 
 const ModeCard: React.FC<{ active: boolean; ar: boolean; title: string; body: string; onClick: () => void }> = ({ active, title, body, onClick }) => (
   <button type="button" onClick={onClick} aria-pressed={active}
-    className={`rounded-2xl border p-4 text-start transition ${active ? 'border-[#214C40] bg-[#E7EEE9]' : 'border-[#dcdad2] bg-white hover:bg-[#f7f5ef]'}`}>
+    className={`rounded-2xl border p-4 text-start transition ${active ? 'border-[color:var(--emerald)] bg-[var(--emerald-soft)]' : 'border-[#dcdad2] bg-white hover:bg-[var(--canvas)]'}`}>
     <div className="flex items-center gap-2">
-      <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${active ? 'border-[#214C40] bg-[#214C40]' : 'border-[#c6c4bc]'}`}>
+      <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${active ? 'border-[color:var(--emerald)] bg-[var(--emerald)]' : 'border-[#c6c4bc]'}`}>
         {active && <span className="h-2 w-2 rounded-full bg-white" />}
       </span>
       <span className="text-sm font-black text-[#24302b]">{title}</span>
@@ -642,13 +642,13 @@ const NumberBox: React.FC<{ ar: boolean; label: string; value: number; min: numb
         className="min-w-0 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
       <button type="button" className="mizan-step-btn" aria-label="+" onClick={() => onChange(Math.min(max, value + step))}>+</button>
     </div>
-    {hint && <span className="mt-1 block text-xs leading-5 text-[#696f6b]">{hint}</span>}
+    {hint && <span className="mt-1 block text-xs leading-5 text-[color:var(--muted)]">{hint}</span>}
   </label>
 );
 
 const Toggle: React.FC<{ ar: boolean; checked: boolean; label: string; onChange: (value: boolean) => void }> = ({ checked, label, onChange }) => (
   <label className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-[#e4e2da] bg-white px-3 py-2">
-    <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="h-4 w-4 shrink-0 accent-[#214C40]" />
+    <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="h-4 w-4 shrink-0 accent-[var(--emerald)]" />
     <span className="text-sm font-bold leading-6 text-[#3f4642]">{label}</span>
   </label>
 );

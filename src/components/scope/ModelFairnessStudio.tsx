@@ -108,7 +108,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
       <div>
         <div className="mizan-kicker">{ar ? 'عدالة التوزيع' : 'DISTRIBUTION FAIRNESS'}</div>
         <h2 className="mt-1 text-lg font-black">{ar ? 'هل نال الجميع أسئلةً متكافئة؟' : 'Did everyone get comparable questions?'}</h2>
-        <p className="mt-1.5 max-w-2xl text-xs leading-6 text-[#666c68]">
+        <p className="mt-1.5 max-w-2xl text-xs leading-6 text-[color:var(--muted)]">
           {ar
             ? 'تقريرٌ واحد يُجيب عن سؤالٍ واحد: هل تكافأت الأسئلة بين المتسابقين؟ أرقامٌ بلا اسم متسابق، تُصدَّر وتُحفظ.'
             : 'One report answering one question: were questions comparable across participants? Figures only, no participant names.'}
@@ -127,7 +127,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
           <h3 className="flex items-center gap-2 text-sm font-black text-[#24302b]"><FileText className="h-4 w-4" />{ar ? 'تقرير عدالة وتوزيع الأسئلة' : 'Fairness and distribution report'}</h3>
           <Button size="sm" icon={<BadgeCheck className="h-4 w-4" />} loading={busy} onClick={() => void buildReport()}>{ar ? 'أصدر التقرير' : 'Issue report'}</Button>
         </div>
-        <p className="mt-1.5 text-[11px] leading-6 text-[#666c68]">
+        <p className="mt-1.5 text-[11px] leading-6 text-[color:var(--muted)]">
           {ar
             ? 'ليس شهادة علمية — لا جهة علمية أصدرته. هو بيان ما فعله المحرك بالأرقام، وفيه الحدّ الأدنى الرياضي للتكرار وكم زدنا عليه. وبلا اسم متسابق ولا كوده.'
             : 'Not a scientific certificate — no scientific body issued it. It states what the engine did, including the mathematical reuse bound and our excess over it, with no participant identities.'}
@@ -142,7 +142,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[12px] font-black text-[#24302b]">{ar ? report.titleArabic : report.titleEnglish}</p>
-                    <p className="mt-0.5 text-[10px] text-[#696f6b]">{displayDateTime(report.generatedAt,ar)} · <code>{report.reportHash.slice(0, 16)}</code></p>
+                    <p className="mt-0.5 text-[10px] text-[color:var(--muted)]">{displayDateTime(report.generatedAt,ar)} · <code>{report.reportHash.slice(0, 16)}</code></p>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setReportOpen(report)}>{ar ? 'اعرض' : 'View'}</Button>
@@ -161,7 +161,7 @@ export const ModelFairnessStudio: React.FC<{ store: Store; ar: boolean; category
 
 const Tile: React.FC<{ label: string; value: number; tone?: 'calm' | 'warn' }> = ({ label, value, tone = 'calm' }) => (
   <div className={`rounded-xl border p-3 ${tone === 'warn' ? 'border-[#e8d6b8] bg-[#fdf6e8]' : 'border-[#e4e2da] bg-[#fbfaf6]'}`}>
-    <div className="text-[10px] font-black tracking-[.08em] text-[#696f6b]">{label}</div>
+    <div className="text-[10px] font-black tracking-[.08em] text-[color:var(--muted)]">{label}</div>
     <div className="mt-1 text-lg font-black tabular-nums text-[#24302b]">{value}</div>
   </div>
 );
@@ -185,7 +185,7 @@ const ReportView: React.FC<{ report: FairnessReportRecord; ar: boolean; onClose:
           <dl className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
             {section.rows.map((row, index) => (
               <div key={`${section.id}-${index}`} className="rounded-xl border border-[#e4e2da] bg-white px-3 py-2">
-                <dt className="text-[10px] font-black text-[#696f6b]">{ar ? row.labelArabic : row.labelEnglish}</dt>
+                <dt className="text-[10px] font-black text-[color:var(--muted)]">{ar ? row.labelArabic : row.labelEnglish}</dt>
                 <dd className="mt-0.5 text-[12px] font-black tabular-nums text-[#24302b]">{row.value}</dd>
                 {row.note && <p className="mt-0.5 text-[10px] leading-5 text-[#5b6460]">{row.note}</p>}
               </div>
@@ -206,7 +206,7 @@ const ReportView: React.FC<{ report: FairnessReportRecord; ar: boolean; onClose:
         </ul>
       )}
       <p className="rounded-xl border border-[#e4e2da] bg-white p-3 text-[10px] leading-6 text-[#5b6460]">{ar ? report.honestyNoteArabic : report.honestyNoteEnglish}</p>
-      <p className="text-[10px] text-[#696f6b]">{ar ? 'بصمة التقرير' : 'Report hash'}: <code>{report.reportHash}</code></p>
+      <p className="text-[10px] text-[color:var(--muted)]">{ar ? 'بصمة التقرير' : 'Report hash'}: <code>{report.reportHash}</code></p>
     </div>
   </div>
 );

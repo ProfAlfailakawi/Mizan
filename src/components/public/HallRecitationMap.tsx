@@ -70,7 +70,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
           </div>
           <div>
             <div className="flex items-center justify-between text-[11px] text-white/50 mb-2"><span>{ar ? 'نحو الختمة التالية' : 'Toward next khatmah'}</span><span className="font-black text-[#d9c193]">{Math.round(agg.partialKhatmahPct * 100)}%</span></div>
-            <div className="h-2.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#2f6555] to-[#c49a5d]" style={{ width: `${Math.max(2, agg.partialKhatmahPct * 100)}%` }} /></div>
+            <div className="h-2.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, agg.partialKhatmahPct * 100)}%` }} /></div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Stat n={`${Math.round(agg.coveragePct * 100)}%`} t={ar ? 'من المصحف' : 'of the Mushaf'} />
               <Stat n={displayNumber(agg.totalRecitations, ar)} t={ar ? 'تلاوة موضع' : 'passage recitations'} />

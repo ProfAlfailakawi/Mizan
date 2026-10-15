@@ -42,9 +42,9 @@ export const PanelConstellation: React.FC<{
         <circle cx={C} cy={C} r="27" fill={head ? '#E7EEE9' : '#fffefb'} stroke={head ? '#B98B4E' : '#cfd5d0'} strokeWidth="2" strokeDasharray={head ? undefined : '3 4'} />
         <text x={C} y={C + 8} textAnchor="middle" fontSize="22" fontWeight="900" fill={head ? '#214C40' : '#a2a8a4'}>{head ? initialOf(nm(head)) : '·'}</text>
       </svg>
-      <figcaption className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-bold text-[#646965]">
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-2 border-[#B98B4E] bg-[#E7EEE9]" />{ar ? 'الرئيس' : 'Chair'}</span>
-        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-[#214C40]" />{ar ? 'في اللجنة' : 'On panel'}</span>
+      <figcaption className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-bold text-[color:var(--muted)]">
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-2 border-[#B98B4E] bg-[var(--emerald-soft)]" />{ar ? 'الرئيس' : 'Chair'}</span>
+        <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--emerald)]" />{ar ? 'في اللجنة' : 'On panel'}</span>
         <span className="inline-flex items-center gap-1.5"><i aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border border-[#cfd5d0] bg-white" />{ar ? 'خارجها' : 'Not assigned'}</span>
       </figcaption>
     </figure>

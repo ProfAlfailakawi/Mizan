@@ -52,12 +52,12 @@ export const Hint: React.FC<{ ar: boolean; text: string; className?: string }> =
         onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
         className="-m-3 grid h-11 w-11 place-items-center rounded-full"
       >
-        <span className={`grid h-5 w-5 place-items-center rounded-full transition ${open ? 'bg-[#214C40] text-white' : 'bg-[#EAF0EC] text-[#2F6555] hover:bg-[#dce8e1]'}`}>
+        <span className={`grid h-5 w-5 place-items-center rounded-full transition ${open ? 'bg-[var(--emerald)] text-white' : 'bg-[#EAF0EC] text-[color:var(--emerald-2)] hover:bg-[#dce8e1]'}`}>
           <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       </button>
       {open && (
-        <span ref={note} style={{ transform: shift ? `translateX(${shift}px)` : undefined }} role="note" className="absolute start-0 top-full z-40 mt-2 w-64 max-w-[78vw] rounded-xl border border-[#cfe0d6] bg-white px-3.5 py-2.5 text-start text-xs font-bold leading-6 text-[#214C40] shadow-[0_14px_36px_rgba(23,53,45,.16)]">
+        <span ref={note} style={{ transform: shift ? `translateX(${shift}px)` : undefined }} role="note" className="absolute start-0 top-full z-40 mt-2 w-64 max-w-[78vw] rounded-xl border border-[#cfe0d6] bg-white px-3.5 py-2.5 text-start text-xs font-bold leading-6 text-[color:var(--emerald)] shadow-[0_14px_36px_rgba(23,53,45,.16)]">
           {text}
         </span>
       )}
@@ -69,7 +69,7 @@ export const Hint: React.FC<{ ar: boolean; text: string; className?: string }> =
 
 export const StatStrip: React.FC<{ items: { icon: Icon; value: React.ReactNode; label: string; tone?: 'green' | 'amber' | 'blue' | 'grey' }[]; className?: string }> = ({ items, className = '' }) => {
   const tones = {
-    green: 'bg-[#E7EEE9] text-[#214C40]',
+    green: 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]',
     amber: 'bg-[#F5EDE2] text-[#7a5a2f]',
     blue: 'bg-[#E6EEF3] text-[#2C4F66]',
     grey: 'bg-[#EFEDE7] text-[#4f5752]',
@@ -81,7 +81,7 @@ export const StatStrip: React.FC<{ items: { icon: Icon; value: React.ReactNode; 
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${tones[it.tone || 'green']}`}><it.icon className="h-5 w-5" /></span>
           <span className="min-w-0">
             <span className="block text-2xl font-black leading-none tabular-nums text-[#17352D]">{it.value}</span>
-            <span className="mt-1 block truncate text-xs font-bold text-[#666c68]">{it.label}</span>
+            <span className="mt-1 block truncate text-xs font-bold text-[color:var(--muted)]">{it.label}</span>
           </span>
         </div>
       ))}
@@ -100,15 +100,15 @@ export const ToolTile: React.FC<{ icon: Icon; title: string; hint: string; reaso
       onClick={onClick}
       className={`group flex min-h-[88px] items-center gap-4 rounded-2xl border p-4 text-start transition ${disabled ? 'cursor-not-allowed border-[#e7e5de] bg-[#faf9f5]' : 'border-[#d9e4de] bg-white hover:border-[#9ab0a8] hover:shadow-[0_10px_28px_rgba(33,76,64,.08)]'}`}
     >
-      <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${disabled ? 'bg-[#efede7] text-[#9aa19c]' : 'bg-[#E7EEE9] text-[#214C40]'}`}><I className="h-8 w-8" /></span>
+      <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${disabled ? 'bg-[#efede7] text-[#9aa19c]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`}><I className="h-8 w-8" /></span>
       <span className="min-w-0 flex-1">
         <span className={`block text-base font-black ${disabled ? 'text-[#6c716e]' : 'text-[#17352D]'}`}>{title}</span>
-        <span className="mt-0.5 block text-[13px] leading-5 text-[#666c68]">{hint}</span>
+        <span className="mt-0.5 block text-[13px] leading-5 text-[color:var(--muted)]">{hint}</span>
         {disabled && reason && (
           <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-[#F5EDE2] px-2.5 py-1 text-xs font-black text-[#7a5a2f]"><Lock className="h-3 w-3" aria-hidden="true" />{reason}</span>
         )}
       </span>
-      {!disabled && <Arrow className="h-5 w-5 shrink-0 text-[#9aa39d] transition group-hover:text-[#214C40]" aria-hidden="true" />}
+      {!disabled && <Arrow className="h-5 w-5 shrink-0 text-[#9aa39d] transition group-hover:text-[color:var(--emerald)]" aria-hidden="true" />}
     </button>
   );
 };
@@ -137,7 +137,7 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: st
           <h2 className="mt-0.5 text-lg font-black">{allDone ? (ar ? 'الإعداد مكتمل' : 'Setup complete') : (ar ? 'خطوات إعداد مسابقتك' : 'Set up your competition')}</h2>
         </div>
         {allDone && (
-          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(v => !v)} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[#d9e4de] px-3 text-xs font-black text-[#214C40] hover:bg-[#f1f6f3]">
+          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(v => !v)} className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[#d9e4de] px-3 text-xs font-black text-[color:var(--emerald)] hover:bg-[#f1f6f3]">
             {expanded ? (ar ? 'إخفاء' : 'Hide') : (ar ? 'عرض الخطوات' : 'Show steps')}
             <ChevronDown className={`h-4 w-4 transition ${expanded ? 'rotate-180' : ''}`} />
           </button>
@@ -154,19 +154,19 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: st
                   type="button"
                   onClick={s.onGo}
                   aria-current={next ? 'step' : undefined}
-                  className={`flex h-full w-full flex-row items-center gap-3 rounded-2xl border p-3.5 text-start transition xl:flex-col xl:items-start xl:gap-2.5 ${s.done ? 'border-[#d3e2d9] bg-[#F4F8F5] hover:bg-[#ecf3ef]' : next ? 'border-[#214C40] bg-white shadow-[0_10px_28px_rgba(33,76,64,.12)] ring-2 ring-[#214C40]/10' : 'border-[#e7e5de] bg-[#fbfaf7] hover:bg-white'}`}
+                  className={`flex h-full w-full flex-row items-center gap-3 rounded-2xl border p-3.5 text-start transition xl:flex-col xl:items-start xl:gap-2.5 ${s.done ? 'border-[#d3e2d9] bg-[#F4F8F5] hover:bg-[#ecf3ef]' : next ? 'border-[color:var(--emerald)] bg-white shadow-[0_10px_28px_rgba(33,76,64,.12)] ring-2 ring-[color:var(--emerald)]/10' : 'border-[#e7e5de] bg-[#fbfaf7] hover:bg-white'}`}
                 >
                   <span className="flex shrink-0 items-center">
-                    <span className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${s.done ? 'bg-[#214C40] text-white' : next ? 'bg-[#E7EEE9] text-[#214C40]' : 'bg-[#efede7] text-[#666c68]'}`}>
+                    <span className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${s.done ? 'bg-[var(--emerald)] text-white' : next ? 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'bg-[#efede7] text-[color:var(--muted)]'}`}>
                       {s.done ? <Check className="h-6 w-6" /> : <s.icon className="h-6 w-6" />}
                       <span aria-hidden="true" className={`absolute -top-1.5 -end-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-white text-[10px] font-black tabular-nums ${s.done ? 'bg-[#2E7D5B] text-white' : next ? 'bg-[#C08A2E] text-white' : 'bg-[#d8d6ce] text-[#59615c]'}`}>{i + 1}</span>
                     </span>
                   </span>
                   <span className="min-w-0 flex-1 xl:flex-none">
-                    <span className={`block text-sm font-black ${s.done ? 'text-[#214C40]' : next ? 'text-[#17352D]' : 'text-[#5a615c]'}`}>{s.title}</span>
+                    <span className={`block text-sm font-black ${s.done ? 'text-[color:var(--emerald)]' : next ? 'text-[#17352D]' : 'text-[#5a615c]'}`}>{s.title}</span>
                     <span className="mt-0.5 block text-xs leading-5 text-[#6a706c]">{s.note}</span>
                     {next && (
-                      <span className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[#214C40] px-3 text-xs font-black text-white">
+                      <span className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[var(--emerald)] px-3 text-xs font-black text-white">
                         {s.busy ? (ar ? 'لحظة…' : 'One moment…') : (s.cta || (ar ? 'ابدأ' : 'Start'))}<Arrow className="h-3.5 w-3.5" />
                       </span>
                     )}

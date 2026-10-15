@@ -64,11 +64,11 @@ export const TrialSteps: React.FC<TrialStepsProps> = ({ ar, listening }) => {
           >
             <span
               aria-hidden="true"
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${step.muted ? 'bg-[#f1efe9] text-[#656b66]' : 'bg-[#E7EEE9] text-[#214C40]'}`}
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${step.muted ? 'bg-[#f1efe9] text-[color:var(--muted)]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`}
             >
               <step.Icon className="h-4 w-4" />
             </span>
-            <span className={`text-[10px] font-black leading-4 ${step.muted ? 'text-[#656b66]' : 'text-[#39423d]'}`}>{step.label}</span>
+            <span className={`text-[10px] font-black leading-4 ${step.muted ? 'text-[color:var(--muted)]' : 'text-[#39423d]'}`}>{step.label}</span>
             <span className="sr-only">{step.hint}</span>
           </li>
         </React.Fragment>

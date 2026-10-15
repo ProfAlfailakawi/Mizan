@@ -27,7 +27,7 @@ export const CompletionSeal: React.FC<{ size?: 'md' | 'lg' }> = ({ size = 'lg' }
   const px = size === 'lg' ? 148 : 104;
   return <span className="mizan-seal relative mx-auto grid place-items-center" style={{ width: px, height: px }} aria-hidden="true">
     <style>{STYLE}</style>
-    <span className="mizan-seal-halo absolute inset-0 rounded-full bg-[#2F6555]" />
+    <span className="mizan-seal-halo absolute inset-0 rounded-full bg-[var(--emerald-2)]" />
     <svg viewBox="0 0 100 100" width={px} height={px} className="relative">
       <g className="mizan-seal-star">
         <rect x="18" y="18" width="64" height="64" rx="6" fill="#214C40" />
@@ -57,8 +57,8 @@ export const TestCompletePanel: React.FC<{
     <p className="mt-4 text-lg leading-8 text-[#3f4642]">{ar ? 'لا يلزمك أي شيء آخر اليوم.' : 'Nothing else is needed from you today.'}</p>
     {resultReady
       ? <div className="mt-7 flex flex-col items-center gap-3">
-          {onShowResult && <button type="button" onClick={onShowResult} className="mizan-no-print inline-flex min-h-16 min-w-64 items-center justify-center gap-3 rounded-2xl bg-[#214C40] px-8 text-xl font-black text-white shadow-lg shadow-[#214C40]/20 hover:bg-[#1a3d33] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#E8CB93]"><Award className="h-7 w-7" />{ar ? 'عرض النتيجة' : 'Show result'}</button>}
-          {onShowCertificate && <button type="button" onClick={onShowCertificate} className="mizan-no-print inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-[#cddbd3] bg-white px-6 text-lg font-black text-[#214C40]">{ar ? 'عرض الشهادة' : 'Show certificate'}</button>}
+          {onShowResult && <button type="button" onClick={onShowResult} className="mizan-no-print inline-flex min-h-16 min-w-64 items-center justify-center gap-3 rounded-2xl bg-[var(--emerald)] px-8 text-xl font-black text-white shadow-lg shadow-[color:var(--emerald)]/20 hover:bg-[#1a3d33] focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#E8CB93]"><Award className="h-7 w-7" />{ar ? 'عرض النتيجة' : 'Show result'}</button>}
+          {onShowCertificate && <button type="button" onClick={onShowCertificate} className="mizan-no-print inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-[#cddbd3] bg-white px-6 text-lg font-black text-[color:var(--emerald)]">{ar ? 'عرض الشهادة' : 'Show certificate'}</button>}
         </div>
       : <div className="mx-auto mt-7 flex max-w-md items-center gap-4 rounded-2xl border border-[#e3dcc8] bg-[#FBF6EA] p-5 text-start">
           <Clock className="h-9 w-9 shrink-0 text-[#89673a]" aria-hidden="true" />

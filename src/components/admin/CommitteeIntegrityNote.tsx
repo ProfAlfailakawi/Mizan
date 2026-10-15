@@ -73,7 +73,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
 
   if (!flagged.length) {
     return (
-      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[#656b66]">
+      <div className="flex items-center gap-2 px-1 text-xs font-bold text-[color:var(--muted)]">
         <span className="mizan-status-orb" aria-hidden="true"/>
         {ar
           ? `إشارات نزاهة اللجان سليمة عبر ${measured.length} لجنة — رصد مستقل وخصم متكافئ بين الوفود.`

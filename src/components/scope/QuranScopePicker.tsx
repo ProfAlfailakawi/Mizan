@@ -79,8 +79,8 @@ function clampToRanges(value: number, ranges: AyahRange[]): number {
 
 const cellTone = (selected: boolean, allowed: boolean) =>
   !allowed ? 'border-[#e6e4dd] bg-[#f4f2ec] text-[#b3b1a9] cursor-not-allowed'
-    : selected ? 'border-[#214C40] bg-[#214C40] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18)]'
-      : 'border-[#dcdad2] bg-white text-[#39423d] hover:border-[#2F6555] hover:bg-[#f2f7f4]';
+    : selected ? 'border-[color:var(--emerald)] bg-[var(--emerald)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18)]'
+      : 'border-[#dcdad2] bg-white text-[#39423d] hover:border-[color:var(--emerald-2)] hover:bg-[#f2f7f4]';
 
 export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onChange, arabic, parentScope, disabled, readOnly, heat, idPrefix = 'scope' }) => {
   const [advanced, setAdvanced] = useState(false);
@@ -214,7 +214,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
               const active = scopeAyahCount(scopeSubtract(built, scope)) === 0 && scopeAyahCount(scopeSubtract(scope, built)) === 0;
               return (
                 <button key={preset.id} type="button" disabled={locked} onClick={() => { const clipped = clipToParent(built); setJuzGuard(exactJuzGuard(clipped)); setRangeError(''); emit(clipped); }} aria-pressed={active}
-                  className={`min-h-11 rounded-xl border px-3.5 text-xs font-black transition disabled:opacity-45 ${active ? 'border-[#214C40] bg-[#E7EEE9] text-[#214C40]' : 'border-[#dcdad2] bg-white text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
+                  className={`min-h-11 rounded-xl border px-3.5 text-xs font-black transition disabled:opacity-45 ${active ? 'border-[color:var(--emerald)] bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'border-[#dcdad2] bg-white text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
                   {arabic ? preset.ar : preset.en}
                 </button>
               );
@@ -227,7 +227,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
       <div>
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="mizan-kicker">{arabic ? 'الأجزاء' : 'JUZ'}</div>
-          {!readOnly && <p className="text-[10px] text-[#696f6b]">{arabic ? 'اضغط جزءًا لإضافته، ثم اضغط آخر مع الاستمرار على Shift لاختيار ما بينهما.' : 'Tap a juz to add it, then Shift-tap another to take the range between them.'}</p>}
+          {!readOnly && <p className="text-[10px] text-[color:var(--muted)]">{arabic ? 'اضغط جزءًا لإضافته، ثم اضغط آخر مع الاستمرار على Shift لاختيار ما بينهما.' : 'Tap a juz to add it, then Shift-tap another to take the range between them.'}</p>}
         </div>
         <div className="grid grid-cols-5 sm:grid-cols-6 lg:grid-cols-10 gap-1.5" role="group" aria-label={arabic ? 'اختيار الأجزاء' : 'Select juz'}>
           {Array.from({ length: QURAN_JUZ_TOTAL }, (_, i) => i + 1).map(juz => {
@@ -239,9 +239,9 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
                 aria-pressed={complete || partial}
                 aria-label={arabic ? `الجزء ${juz}${partial ? ' (جزئي)' : ''}${row ? ` — ${row.participants} متسابقًا` : ''}` : `Juz ${juz}${partial ? ' (partial)' : ''}`}
                 onClick={e => toggleJuz(juz, (e as unknown as { shiftKey?: boolean }).shiftKey === true)}
-                className={`relative min-h-12 rounded-xl border text-sm font-black tabular-nums transition ${cellTone(complete, allowed)} ${partial ? '!border-[#9b7542] !bg-[#F2EADC] !text-[#7d5e34]' : ''}`}>
+                className={`relative min-h-12 rounded-xl border text-sm font-black tabular-nums transition ${cellTone(complete, allowed)} ${partial ? '!border-[color:var(--amber)] !bg-[var(--amber-soft)] !text-[#7d5e34]' : ''}`}>
                 <span>{juz}</span>
-                {partial && <span className="absolute inset-x-2 bottom-1 text-[8px] font-bold">{arabic ? 'جزئي' : 'part'}</span>}
+                {partial && <span className="absolute inset-x-2 bottom-1 text-[11px] font-bold">{arabic ? 'جزئي' : 'part'}</span>}
                 {row && row.participants > 0 && (
                   <span aria-hidden="true" className="absolute inset-x-1.5 bottom-1 h-1 rounded-full bg-current opacity-30">
                     <span className="block h-1 rounded-full bg-current" style={{ width: `${Math.round((row.participants / maxHeat) * 100)}%` }} />
@@ -270,7 +270,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
       {advanced && !readOnly && (
         <div className="space-y-4 rounded-2xl border border-[#e4e2da] bg-[#fbfaf7] p-4">
           {juzGuard && guardMetrics && (
-            <div className="rounded-xl border border-[#cddbd3] bg-[#F7FAF8] px-3 py-2 text-[10px] font-bold leading-5 text-[#214C40]">
+            <div className="rounded-xl border border-[#cddbd3] bg-[#F7FAF8] px-3 py-2 text-[10px] font-bold leading-5 text-[color:var(--emerald)]">
               {arabic
                 ? `التفاصيل الدقيقة مقيدة بـ ${guardLabel}. السور والآيات الخارجة عن الجزء المحدد مخفية ولن يقبلها النظام.`
                 : `Fine editing is constrained to the selected ${guardLabel}. Out-of-range surahs and ayat are hidden and rejected.`}
@@ -280,7 +280,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
           <div>
             <div className="flex items-center justify-between gap-3">
               <span className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><Layers className="w-4 h-4" />{arabic ? 'اختيار بالأحزاب' : 'By hizb'}</span>
-              <span className="text-[10px] font-bold text-[#696f6b]">{selectedHizb.size ? (arabic ? `${selectedHizb.size} حزبًا كاملًا` : `${selectedHizb.size} complete`) : (arabic ? 'لا شيء' : 'none')}</span>
+              <span className="text-[10px] font-bold text-[color:var(--muted)]">{selectedHizb.size ? (arabic ? `${selectedHizb.size} حزبًا كاملًا` : `${selectedHizb.size} complete`) : (arabic ? 'لا شيء' : 'none')}</span>
             </div>
             <div className="mt-2 grid grid-cols-6 gap-1 sm:grid-cols-10 lg:grid-cols-12" role="group" aria-label={arabic ? 'اختيار الأحزاب' : 'Select hizb'}>
               {Array.from({ length: QURAN_HIZB_TOTAL }, (_, i) => i + 1).map(hizb => {
@@ -291,25 +291,25 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
                     aria-pressed={complete || partial}
                     aria-label={arabic ? `الحزب ${hizb}${partial ? ' (جزئي)' : ''}` : `Hizb ${hizb}${partial ? ' (partial)' : ''}`}
                     onClick={() => toggleHizb(hizb)}
-                    className={`min-h-10 rounded-lg border text-[11px] font-black tabular-nums transition ${cellTone(complete, allowed)} ${partial ? '!border-[#9b7542] !bg-[#F2EADC] !text-[#7d5e34]' : ''}`}>
+                    className={`min-h-10 rounded-lg border text-[11px] font-black tabular-nums transition ${cellTone(complete, allowed)} ${partial ? '!border-[color:var(--amber)] !bg-[var(--amber-soft)] !text-[#7d5e34]' : ''}`}>
                     {hizb}
                   </button>
                 );
               })}
             </div>
-            <p className="mt-1.5 text-[10px] leading-5 text-[#696f6b]">{arabic ? 'الحزب نصف الجزء؛ ستون حزبًا في المصحف. اختياره يعدّل النطاق نفسه الذي تعدّله الأجزاء.' : 'A hizb is half a juz; sixty in the Mushaf. Selecting one edits the same scope the juz grid edits.'}</p>
+            <p className="mt-1.5 text-[10px] leading-5 text-[color:var(--muted)]">{arabic ? 'الحزب نصف الجزء؛ ستون حزبًا في المصحف. اختياره يعدّل النطاق نفسه الذي تعدّله الأجزاء.' : 'A hizb is half a juz; sixty in the Mushaf. Selecting one edits the same scope the juz grid edits.'}</p>
           </div>
 
           <div>
             <button type="button" onClick={() => setSurahOpen(v => !v)} className="flex w-full items-center justify-between gap-3 text-start">
               <span className="inline-flex items-center gap-2 text-xs font-black text-[#39423d]"><BookOpen className="w-4 h-4" />{arabic ? 'اختيار بالسور' : 'By surah'}</span>
-              <span className="text-[10px] font-bold text-[#696f6b]">{selectedSurahs.size ? (arabic ? `${selectedSurahs.size} سورة كاملة` : `${selectedSurahs.size} complete`) : (arabic ? 'لا شيء' : 'none')}</span>
+              <span className="text-[10px] font-bold text-[color:var(--muted)]">{selectedSurahs.size ? (arabic ? `${selectedSurahs.size} سورة كاملة` : `${selectedSurahs.size} complete`) : (arabic ? 'لا شيء' : 'none')}</span>
             </button>
             {surahOpen && (
               <div className="mt-3 space-y-2">
                 <label className="relative block">
                   <span className="sr-only">{arabic ? 'بحث عن سورة' : 'Search surah'}</span>
-                  <Search className="pointer-events-none absolute inset-inline-start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#696f6b] start-3" />
+                  <Search className="pointer-events-none absolute inset-inline-start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted)] start-3" />
                   <input value={surahQuery} onChange={e => setSurahQuery(e.target.value)} placeholder={arabic ? 'ابحث باسم السورة أو رقمها' : 'Search by name or number'}
                     className="mizan-input ps-10 text-xs" />
                 </label>
@@ -317,7 +317,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
                   <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
                     {surahOptions.map(surah => (
                       <button key={surah} type="button" onClick={() => toggleSurah(surah)} aria-pressed={selectedSurahs.has(surah)}
-                        className={`flex min-h-10 items-center justify-between gap-2 rounded-lg px-2.5 text-[11px] font-bold transition ${selectedSurahs.has(surah) ? 'bg-[#E7EEE9] text-[#214C40]' : 'text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
+                        className={`flex min-h-10 items-center justify-between gap-2 rounded-lg px-2.5 text-[11px] font-bold transition ${selectedSurahs.has(surah) ? 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'text-[#5b6460] hover:bg-[#f4f2ec]'}`}>
                         <span className="min-w-0 truncate">{surah}. {arabic ? surahNameArabic(surah) : surahNameEnglish(surah)}</span>
                         {selectedSurahs.has(surah) && <Check className="h-3.5 w-3.5 shrink-0" />}
                       </button>
@@ -368,7 +368,7 @@ export const QuranScopePicker: React.FC<QuranScopePickerProps> = ({ value, onCha
         </ul>
       )}
       {metrics.assurance === 'DERIVED_PROPORTIONAL' && (
-        <p className="flex items-start gap-2 text-[10px] leading-5 text-[#696f6b]">
+        <p className="flex items-start gap-2 text-[10px] leading-5 text-[color:var(--muted)]">
           <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {arabic ? 'حدود الأحزاب والأرباع والصفحات مشتقة تناسبيًا من جدول الأجزاء، ويمكن ضبطها على آية بعينها من «سور ومقاطع وآيات».' : 'Hizb, rub and page bounds are derived proportionally; adjust them to an exact ayah from “Surahs, segments and ayat”.'}
         </p>
@@ -407,7 +407,7 @@ const LocusField: React.FC<{
   };
   return (
     <label className="block min-w-0">
-      <span className="block text-[9px] font-black tracking-[.1em] text-[#696f6b]">{label}</span>
+      <span className="block text-[11px] font-black tracking-[.1em] text-[color:var(--muted)]">{label}</span>
       {kind === 'surah' ? (
         <select value={value} onChange={e => onChange(Number(e.target.value))} className="mizan-input mt-1 text-[11px]">
           {options.map(surah => (
@@ -423,7 +423,7 @@ const LocusField: React.FC<{
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitAyah(); e.currentTarget.blur(); } }}
             aria-valuemin={floor} aria-valuemax={rangeCeiling}
             className="mizan-input mt-1 text-[11px] tabular-nums" />
-          {ayahRanges && <span className="mt-1 block text-[8px] font-bold leading-4 text-[#696f6b]">{arabic ? `المسموح: ${allowedText}` : `Allowed: ${allowedText}`}</span>}
+          {ayahRanges && <span className="mt-1 block text-[11px] font-bold leading-4 text-[color:var(--muted)]">{arabic ? `المسموح: ${allowedText}` : `Allowed: ${allowedText}`}</span>}
         </>
       )}
     </label>
@@ -439,14 +439,14 @@ export const ScopeSummary: React.FC<{ scope: QuranScope; arabic: boolean; compac
     [arabic ? 'الآيات' : 'Ayat', fmt(metrics.ayahCount), ListChecks],
   ];
   return (
-    <div className={`rounded-3xl border border-[#cddbd3] bg-gradient-to-br from-[#F7FAF8] to-[#E7EEE9] ${compact ? 'p-3' : 'p-4 sm:p-5'}`} role="status" aria-live="polite">
-      <p className="text-sm font-black text-[#214C40]">{describeScope(scope, arabic)}</p>
+    <div className={`rounded-3xl border border-[#cddbd3] bg-gradient-to-br from-[#F7FAF8] to-[var(--emerald-soft)] ${compact ? 'p-3' : 'p-4 sm:p-5'}`} role="status" aria-live="polite">
+      <p className="text-sm font-black text-[color:var(--emerald)]">{describeScope(scope, arabic)}</p>
       <dl className="mt-3 grid grid-cols-2 gap-3">
         {tiles.map(([label, value, Icon]) => (
           <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#214C40] text-white"><Icon className="h-6 w-6" /></span>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--emerald)] text-white"><Icon className="h-6 w-6" /></span>
             <div className="min-w-0">
-              <dd className={`${compact ? 'text-2xl' : 'text-2xl sm:text-3xl'} font-black leading-none tabular-nums text-[#214C40]`}>{value}</dd>
+              <dd className={`${compact ? 'text-2xl' : 'text-2xl sm:text-3xl'} font-black leading-none tabular-nums text-[color:var(--emerald)]`}>{value}</dd>
               <dt className="mt-1 text-xs font-bold text-[#5b6460]">{label}</dt>
             </div>
           </div>

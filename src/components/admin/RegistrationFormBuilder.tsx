@@ -41,9 +41,9 @@ const ConditionEditor: React.FC<{ ar: boolean; title: string; value: Registratio
         {OPS.map(o => <option key={o} value={o}>{OP_LABEL[o][ar ? 0 : 1]}</option>)}
       </select>
       {!['exists', 'not_exists'].includes(c.operator) && <input aria-label={ar ? 'القيمة' : 'Value'} className="mizan-input !min-h-9 max-w-[10rem] text-xs" value={Array.isArray(c.value) ? c.value.join(',') : String(c.value ?? '')} onChange={e => set(i, { value: parseValue(c.operator, e.target.value) })} />}
-      <button type="button" className="text-[#A34D43] font-bold" onClick={() => { const next = list.filter((_, j) => j !== i); onChange(next.length ? next : undefined); }}>{ar ? 'حذف' : 'Remove'}</button>
+      <button type="button" className="text-[color:var(--danger)] font-bold" onClick={() => { const next = list.filter((_, j) => j !== i); onChange(next.length ? next : undefined); }}>{ar ? 'حذف' : 'Remove'}</button>
     </div>)}
-    <button type="button" className="text-xs font-bold text-[#214C40] underline" onClick={() => onChange([...list, { field: 'age', operator: 'lt', value: 12 }])}>{ar ? '+ شرط' : '+ Condition'}</button>
+    <button type="button" className="text-xs font-bold text-[color:var(--emerald)] underline" onClick={() => onChange([...list, { field: 'age', operator: 'lt', value: 12 }])}>{ar ? '+ شرط' : '+ Condition'}</button>
   </fieldset>;
 };
 
@@ -56,14 +56,14 @@ export const RegistrationFormBuilder: React.FC<{ ar: boolean; registration: Regi
   const move = (id: string, dir: -1 | 1) => onChange(r => { const i = r.fields.findIndex(x => x.id === id); const j = i + dir; if (i < 0 || j < 0 || j >= r.fields.length) return; [r.fields[i], r.fields[j]] = [r.fields[j], r.fields[i]]; });
   return <div className="space-y-3">
     <div className="flex items-center justify-between"><div className="text-xs font-black text-[#606662]">{ar ? 'حقول مخصّصة وشروط' : 'Custom fields & conditions'}</div>
-      <button type="button" className="rounded-full border border-[#214C40]/25 px-3 py-1.5 text-xs font-bold text-[#214C40]" onClick={() => { const f = newField(customs.length); onChange(r => { r.fields.push(f); }); setOpenId(f.id); }}>{ar ? '+ إضافة حقل' : '+ Add field'}</button></div>
-    {problems.length > 0 && <div role="alert" className="rounded-xl bg-[#F4E6E3] p-2 text-[11px] font-bold text-[#87483f]">{problems.join(' · ')}</div>}
+      <button type="button" className="rounded-full border border-[color:var(--emerald)]/25 px-3 py-1.5 text-xs font-bold text-[color:var(--emerald)]" onClick={() => { const f = newField(customs.length); onChange(r => { r.fields.push(f); }); setOpenId(f.id); }}>{ar ? '+ إضافة حقل' : '+ Add field'}</button></div>
+    {problems.length > 0 && <div role="alert" className="rounded-xl bg-[var(--danger-soft)] p-2 text-[11px] font-bold text-[#87483f]">{problems.join(' · ')}</div>}
     <ul className="space-y-2">{customs.map(f => <li key={f.id} className="rounded-xl border border-[#e5e3dc] bg-white">
       <div className="flex flex-wrap items-center gap-2 p-3">
         <button type="button" aria-expanded={openId === f.id} className="flex-1 text-start text-sm font-bold" onClick={() => setOpenId(openId === f.id ? '' : f.id)}>{ar ? f.labelArabic : f.labelEnglish} <span className="text-[11px] font-normal text-[#6a706c]">· {TYPE_LABEL[f.type][ar ? 0 : 1]}{f.required ? (ar ? ' · مطلوب' : ' · required') : ''}{f.visibleWhen?.length ? (ar ? ' · مشروط' : ' · conditional') : ''}</span></button>
         <button type="button" aria-label={ar ? 'أعلى' : 'Move up'} className="px-2 text-xs" onClick={() => move(f.id, -1)}>↑</button>
         <button type="button" aria-label={ar ? 'أسفل' : 'Move down'} className="px-2 text-xs" onClick={() => move(f.id, 1)}>↓</button>
-        <button type="button" className="px-2 text-xs font-bold text-[#A34D43]" onClick={() => onChange(r => { r.fields = r.fields.filter(x => x.id !== f.id); })}>{ar ? 'حذف' : 'Delete'}</button>
+        <button type="button" className="px-2 text-xs font-bold text-[color:var(--danger)]" onClick={() => onChange(r => { r.fields = r.fields.filter(x => x.id !== f.id); })}>{ar ? 'حذف' : 'Delete'}</button>
       </div>
       {openId === f.id && <div className="grid gap-3 border-t border-[#e5e3dc] p-3 sm:grid-cols-2">
         <label className="text-xs font-bold">{ar ? 'التسمية بالعربية' : 'Arabic label'}<input className="mizan-input mt-1 text-sm" value={f.labelArabic} onChange={e => update(f.id, { labelArabic: e.target.value })} /></label>

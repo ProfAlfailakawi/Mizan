@@ -61,7 +61,7 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
  return <section className="rounded-[26px] border border-[#dad7cd] bg-[#fdfbf5] overflow-hidden">
   <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]">
    <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'استوديو التدرّب':'PRACTICE STUDIO'}</div>
-    <div className="text-[9px] text-[#646965] truncate">{ar?'اسمع، تابع الكلمة، ثم سجّل نفسك':'Listen, follow the word, then record yourself'}</div></div>
+    <div className="text-[11px] text-[color:var(--muted)] truncate">{ar?'اسمع، تابع الكلمة، ثم سجّل نفسك':'Listen, follow the word, then record yourself'}</div></div>
    <Badge variant="emerald">{ar?'المصدر: مجمع الملك فهد':'KFGQPC SOURCE'}</Badge>
   </div>
 
@@ -69,13 +69,13 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
    {passage
     ? <div className="font-quran text-center text-xl sm:text-[1.9rem] leading-[2.2] text-[#202622]">
        {passage.ayat.map((a,i)=><React.Fragment key={a.ayah}>{i?' ':''}
-        <span className={a.ayah===activeAyah?'rounded-lg px-1.5 py-0.5 bg-[#E7EEE9] transition-colors duration-300':'transition-colors duration-300'}>
+        <span className={a.ayah===activeAyah?'rounded-lg px-1.5 py-0.5 bg-[var(--emerald-soft)] transition-colors duration-300':'transition-colors duration-300'}>
          {a.ayah===activeAyah&&activeWords.length
           ? <TajweedAyahWords text={a.text} enabled={false} words={activeWords} activeWord={active?.word??-1}/>
           : a.text}
         </span></React.Fragment>)}
       </div>
-    : <p className="text-center text-[10px] text-[#646965] py-6">{ar?'جارٍ تحميل المقطع…':'Loading the passage…'}</p>}
+    : <p className="text-center text-[10px] text-[color:var(--muted)] py-6">{ar?'جارٍ تحميل المقطع…':'Loading the passage…'}</p>}
   </div>
 
   {passage&&<PassageAudio reading={reading} ayat={passage.ayat} ar={ar} onActive={setActive}/>}
@@ -96,10 +96,10 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
    </div>
    {micError&&<p className="mt-2 text-[10px] text-[#9B3B2F]">{micError}</p>}
    {selfUrl&&<div className="mt-3">
-    <div className="text-[9px] font-black text-[#59615c] mb-1.5">{ar?'تلاوتك':'Your recitation'}</div>
+    <div className="text-[11px] font-black text-[#59615c] mb-1.5">{ar?'تلاوتك':'Your recitation'}</div>
     <audio src={selfUrl} controls className="w-full"/>
    </div>}
-   <p className="mt-3 text-[9px] leading-4 text-[#646965]">
+   <p className="mt-3 text-[11px] leading-4 text-[color:var(--muted)]">
     {ar?'تسجيلك يبقى في متصفّحك ولا يُرفع ولا يدخل سجلّ المسابقة، ويُحذف بمغادرة الصفحة. لا يوجد تقييم آلي هنا؛ التدرّب للسماع والمقارنة، والحكم للبشر في موضعه.'
        :'Your recording stays in this browser, is never uploaded or added to competition records, and is discarded when you leave. Nothing here is scored; practice is for listening and comparison, and judging stays with people.'}
    </p>

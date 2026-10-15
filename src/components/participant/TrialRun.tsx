@@ -153,11 +153,11 @@ export const TrialRun: React.FC<TrialRunProps> = ({ ar, scope, questionCount, mi
         <div className="min-w-0">
           <div className="mizan-kicker">{ar ? 'تجربة كاملة' : 'FULL TRIAL'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'جرّب يومك قبل يومك' : 'Rehearse your day before it comes'}</h2>
-          <p className="mt-1 text-[10px] leading-5 text-[#656b66]">
+          <p className="mt-1 text-[10px] leading-5 text-[color:var(--muted)]">
             {ar ? 'مواضع من نطاقك، مؤقّت كمؤقّت اللجنة، وميكروفونك مفتوح — بلا تسجيل وبلا درجة.' : 'Loci from your own range, the panel’s clock, your microphone open — no recording, no score.'}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7EEE9] px-3 py-1.5 text-[10px] font-black text-[#214C40]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--emerald-soft)] px-3 py-1.5 text-[10px] font-black text-[color:var(--emerald)]">
           <ShieldCheck className="h-3.5 w-3.5" />{ar ? 'تدريب لا يُحتسب' : 'Practice only'}
         </span>
       </header>
@@ -202,10 +202,10 @@ const TrialIntro: React.FC<{ ar: boolean; total: number; limit: number; listenin
 
     {note && <p className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</p>}
 
-    <button type="button" onClick={onStart} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#214C40] px-5 text-sm font-black text-white">
+    <button type="button" onClick={onStart} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-sm font-black text-white">
       <PlayCircle className="h-4.5 w-4.5" />{ar ? 'ابدأ التجربة' : 'Start the trial'}
     </button>
-    <p className="text-center text-[10px] leading-5 text-[#696f6b]">
+    <p className="text-center text-[10px] leading-5 text-[color:var(--muted)]">
       {ar
         ? 'المواضع هنا تُسحب من نطاقك من جدول المصحف، ولا تمسّ خزنة السؤال المعتمدة. ما تراه هنا ليس ما ستُسأل عنه.'
         : 'These loci are drawn from your range in the canonical table, never from the certified question vault.'}
@@ -216,7 +216,7 @@ const TrialIntro: React.FC<{ ar: boolean; total: number; limit: number; listenin
 const Stat: React.FC<{ value: string; label: string }> = ({ value, label }) => (
   <div className="rounded-2xl bg-white/70 p-3 text-center ring-1 ring-[#e4e2da]">
     <div className="text-xl font-black tabular-nums">{value}</div>
-    <div className="mt-0.5 text-[10px] text-[#646965]">{label}</div>
+    <div className="mt-0.5 text-[10px] text-[color:var(--muted)]">{label}</div>
   </div>
 );
 
@@ -286,7 +286,7 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
 
   return (
     <div className="space-y-4 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#E7EEE9] text-[#214C40]"><Mic className="h-6 w-6" /></div>
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--emerald-soft)] text-[color:var(--emerald)]"><Mic className="h-6 w-6" /></div>
       <div>
         <h3 className="text-base font-black">{ar ? 'تأكد أن صوتك يصل' : 'Confirm your voice arrives'}</h3>
         <p className="mx-auto mt-1.5 max-w-md text-[11px] leading-6 text-[#5b6460]">
@@ -302,7 +302,7 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
           return <span key={i} className="w-[5px] rounded-full transition-[height] duration-75" style={{ height, background: on ? '#2F6555' : '#e0ded7' }} />;
         })}
       </div>
-      <p role="status" aria-live="polite" className="text-[11px] font-black text-[#214C40]">
+      <p role="status" aria-live="polite" className="text-[11px] font-black text-[color:var(--emerald)]">
         {state === 'live' ? (proven ? (ar ? 'صوتك يصل بوضوح' : 'Your voice is arriving') : (ar ? 'أسمِعنا صوتك…' : 'Say something…')) : state === 'asking' ? (ar ? 'جارٍ طلب الإذن…' : 'Asking…') : ' '}
       </p>
 
@@ -310,8 +310,8 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         {state !== 'live'
-          ? <button type="button" onClick={() => void open()} disabled={state === 'asking'} className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#214C40] px-5 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{ar ? 'افتح الميكروفون' : 'Open microphone'}</button>
-          : <button type="button" onClick={() => { stop(); onReady(); }} disabled={!proven} className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#214C40] px-5 text-xs font-black text-white disabled:opacity-45"><ChevronLeft className="h-4 w-4 rtl:rotate-180" />{ar ? 'ابدأ الموضع الأول' : 'Start the first locus'}</button>}
+          ? <button type="button" onClick={() => void open()} disabled={state === 'asking'} className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-xs font-black text-white disabled:opacity-50"><Mic className="h-4 w-4" />{ar ? 'افتح الميكروفون' : 'Open microphone'}</button>
+          : <button type="button" onClick={() => { stop(); onReady(); }} disabled={!proven} className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-xs font-black text-white disabled:opacity-45"><ChevronLeft className="h-4 w-4 rtl:rotate-180" />{ar ? 'ابدأ الموضع الأول' : 'Start the first locus'}</button>}
         <button type="button" onClick={() => { stop(); onCancel(); }} className="min-h-11 rounded-2xl border border-[#e0ded7] px-4 text-xs font-black text-[#59615c]">{ar ? 'إلغاء' : 'Cancel'}</button>
       </div>
     </div>
@@ -419,12 +419,12 @@ const TrialQuestion: React.FC<{
 
       <div className="rounded-[22px] border border-[#cddbd3] bg-[#F7FAF8] p-5 text-center">
         <div className="mizan-kicker">{ar ? `الموضع ${order} من ${total}` : `Locus ${order} of ${total}`}</div>
-        <h3 className="mt-2 text-xl font-black text-[#214C40]">{locusLabel(locus, ar)}</h3>
+        <h3 className="mt-2 text-xl font-black text-[color:var(--emerald)]">{locusLabel(locus, ar)}</h3>
         {openingAsked
-          ? <p className={opening ? 'font-quran mt-4 text-[1.55rem] leading-[2.1] text-[#202622]' : 'mt-3 text-[11px] text-[#656b66]'}>
+          ? <p className={opening ? 'font-quran mt-4 text-[1.55rem] leading-[2.1] text-[#202622]' : 'mt-3 text-[11px] text-[color:var(--muted)]'}>
               {opening || (ar ? 'تعذّر جلب المطلع الآن — اقرأ من أول الآية المذكورة.' : 'The opening could not be loaded; start from the ayah above.')}
             </p>
-          : <button type="button" onClick={() => void revealOpening()} className="mt-4 min-h-10 rounded-xl border border-[#cddbd3] bg-white px-4 text-[11px] font-black text-[#214C40]">
+          : <button type="button" onClick={() => void revealOpening()} className="mt-4 min-h-10 rounded-xl border border-[#cddbd3] bg-white px-4 text-[11px] font-black text-[color:var(--emerald)]">
               {ar ? 'لقّنّي المطلع' : 'Show the opening'}
             </button>}
       </div>
@@ -436,7 +436,7 @@ const TrialQuestion: React.FC<{
               <circle cx="24" cy="24" r="20" fill="none" stroke="#eceae3" strokeWidth="4" />
               <circle cx="24" cy="24" r="20" fill="none" stroke={urgent ? '#9B3B2F' : '#2F6555'} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${ratio * 125.6} 125.6`} />
             </svg>
-            <Timer className={`h-4 w-4 ${urgent ? 'text-[#9B3B2F]' : 'text-[#2F6555]'}`} />
+            <Timer className={`h-4 w-4 ${urgent ? 'text-[#9B3B2F]' : 'text-[color:var(--emerald-2)]'}`} />
           </span>
           <div>
             <div className={`text-2xl font-black tabular-nums leading-none ${urgent ? 'text-[#9B3B2F]' : ''}`}>{clock(Math.max(0, left))}</div>
@@ -452,11 +452,11 @@ const TrialQuestion: React.FC<{
       </div>
 
       {listening
-        ? <p className="flex items-center justify-center gap-1.5 text-[10px] font-black text-[#2F6555]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#2F6555]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
-        : <p className="text-center text-[10px] font-bold text-[#696f6b]">{ar ? 'التتبّع غير متاح الآن؛ الموضع والمؤقّت يعملان.' : 'Tracking is unavailable; the locus and clock still run.'}</p>}
+        ? <p className="flex items-center justify-center gap-1.5 text-[10px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
+        : <p className="text-center text-[10px] font-bold text-[color:var(--muted)]">{ar ? 'التتبّع غير متاح الآن؛ الموضع والمؤقّت يعملان.' : 'Tracking is unavailable; the locus and clock still run.'}</p>}
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => close('self')} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#214C40] px-5 text-sm font-black text-white">
+        <button type="button" onClick={() => close('self')} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-sm font-black text-white">
           <Square className="h-4 w-4" />{order === total ? (ar ? 'أنهيت — اعرض التقرير' : 'Finish') : (ar ? 'أنهيت هذا الموضع' : 'Done with this locus')}
         </button>
         <button type="button" onClick={() => close('skipped')} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-[#e0ded7] px-4 text-xs font-black text-[#59615c]">
@@ -470,7 +470,7 @@ const TrialQuestion: React.FC<{
 const Pill: React.FC<{ value: string; label: string; tone?: 'calm' | 'warn' }> = ({ value, label, tone = 'calm' }) => (
   <div className={`rounded-xl px-3 py-2 ${tone === 'warn' ? 'bg-[#fdf1f1]' : 'bg-[#f1efe9]'}`}>
     <div className="text-base font-black tabular-nums leading-none">{value}</div>
-    <div className="mt-1 text-[9px] text-[#646965]">{label}</div>
+    <div className="mt-1 text-[11px] text-[color:var(--muted)]">{label}</div>
   </div>
 );
 
@@ -498,7 +498,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#E7EEE9] text-[#214C40]"><CheckCircle2 className="h-6 w-6" /></div>
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--emerald-soft)] text-[color:var(--emerald)]"><CheckCircle2 className="h-6 w-6" /></div>
         <h3 className="mt-3 text-lg font-black">{ar ? 'انتهت تجربتك' : 'Trial complete'}</h3>
         <p className="mx-auto mt-1.5 max-w-md text-[11px] leading-6 text-[#5b6460]">
           {ar ? 'هذا وصف لما جرى في تجربتك وحدها، لا درجة ولا تنبّؤ بها. لم يُحفظ صوتك ولم يصل اللجنة من هذا شيء.' : 'A description of your own run — not a score and not a prediction. Nothing was stored or sent.'}
@@ -523,7 +523,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-[#39423d]">{i + 1}. {locusLabel(locus, ar)}</div>
-                  <div className="mt-1 text-[10px] font-bold text-[#656b66]">
+                  <div className="mt-1 text-[10px] font-bold text-[color:var(--muted)]">
                     {!o ? (ar ? 'لم يُقرأ' : 'not read')
                       : o.ended === 'skipped' ? (ar ? 'تخطّيته' : 'skipped')
                       : `${clock(o.seconds)} · ${listened ? (o.heard ? (o.lost === 0 ? (ar ? 'تتبّعك بلا انقطاع' : 'tracked throughout') : ar ? `فقد أثرك ${countAr(o.lost)}${o.stumbles.length ? ` — أوّلها عند ${describeStumble(o.stumbles[0], true)}` : ''}` : `lost ${o.lost}×${o.stumbles.length ? ` — first at ${describeStumble(o.stumbles[0], false)}` : ''}`) : (ar ? 'لم يصل صوتٌ واضح' : 'no clear audio')) : (ar ? 'بلا تتبّع' : 'no tracking')}`}
@@ -537,7 +537,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
         })}
       </ul>
 
-      <div className={`rounded-2xl p-4 text-[11px] font-bold leading-6 ${hardest ? 'bg-[#F5EDE2] text-[#7a5a2f]' : 'bg-[#E7EEE9] text-[#214C40]'}`}>
+      <div className={`rounded-2xl p-4 text-[11px] font-bold leading-6 ${hardest ? 'bg-[#F5EDE2] text-[#7a5a2f]' : 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]'}`}>
         {!listened
           ? (ar ? 'جرت تجربتك بلا تتبّع صوتي، فالزمن وحده هو ما قيس فيها. راجع مواضعك التي ضاق عليك وقتها.' : 'This run had no tracking; only time was measured.')
           : hardest
@@ -549,7 +549,7 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
 
       {note && <p className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-[11px] font-bold leading-6 text-[#6b4f18]">{note}</p>}
 
-      <button type="button" onClick={onRestart} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d9dfdb] px-5 text-sm font-black text-[#214C40]">
+      <button type="button" onClick={onRestart} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d9dfdb] px-5 text-sm font-black text-[color:var(--emerald)]">
         <RotateCcw className="h-4 w-4" />{ar ? 'تجربة أخرى بمواضع جديدة' : 'Run again with new loci'}
       </button>
     </div>

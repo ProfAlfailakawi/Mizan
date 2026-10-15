@@ -85,8 +85,8 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     return <section className="mizan-surface p-5 sm:p-6">
       <Head ar={ar} title={title} hint={hint} />
       <div className="mt-5 rounded-2xl border border-[#dfe7e1] bg-[#f2f6f3] py-9 text-center">
-        <BadgeCheck className="mx-auto h-7 w-7 text-[#2F6555]" aria-hidden />
-        <div className="mt-2.5 text-sm font-black text-[#214C40]">{ar ? 'لا شيء مفتوح' : 'Nothing open'}</div>
+        <BadgeCheck className="mx-auto h-7 w-7 text-[color:var(--emerald-2)]" aria-hidden />
+        <div className="mt-2.5 text-sm font-black text-[color:var(--emerald)]">{ar ? 'لا شيء مفتوح' : 'Nothing open'}</div>
         <p className="mx-auto mt-1.5 max-w-xs text-xs leading-5 text-[#5f6b64]">
           {ar ? 'لا أعطال ولا حالات مراجعة تنتظر قرارك. ما لا يظهر هنا يسير وحده.' : 'No faults or review cases are waiting on you. Anything not listed here is running on its own.'}
         </p>
@@ -135,7 +135,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-black leading-6 text-[#222623]">{item.title}</span>
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[#656b66]">
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-[color:var(--muted)]">
               <span className="inline-flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: kind.bar }} aria-hidden />
                 {ar ? kind.ar : kind.en}
@@ -150,7 +150,7 @@ export const AttentionBoard: React.FC<{ items: AttentionItem[]; ar: boolean; tit
     </ol>
 
     {/* ما لم يتّسع له المكان يُقال عددًا، لا يُبتلع بصمت. */}
-    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[#656b66]">
+    {sorted.length > max && <div className="mt-2.5 text-center text-xs font-bold text-[color:var(--muted)]">
       {ar ? arPlural(sorted.length - max, AR_NOUNS.moreItems) : `and ${sorted.length - max} more`}
     </div>}
   </section>;
@@ -160,7 +160,7 @@ const Head: React.FC<{ ar: boolean; title?: string; hint?: string }> = ({ ar, ti
   <div className="flex items-start justify-between gap-3">
     <div className="min-w-0">
       <h2 className="text-lg font-extrabold">{title || (ar ? 'ما لم يُغلق بعد' : 'Still open')}</h2>
-      {hint && <p className="mt-1.5 text-xs leading-5 text-[#696f6b]">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs leading-5 text-[color:var(--muted)]">{hint}</p>}
     </div>
     <CircleAlert className="h-5 w-5 shrink-0 text-[#89673a]" aria-hidden />
   </div>

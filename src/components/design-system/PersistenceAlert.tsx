@@ -34,7 +34,7 @@ export const PersistenceAlert: React.FC = () => {
   const severe = persistenceError.code !== 'CLOUD_WRITE_FAILED';
   return (
     <div role="alert" aria-live="assertive"
-      className={`sticky top-0 z-50 w-full px-4 py-2.5 flex items-start gap-2.5 text-[11px] font-bold ${severe ? 'bg-[#7d2f26] text-white' : 'bg-[#F2EADC] text-[#6b5230]'}`}>
+      className={`sticky top-0 z-50 w-full px-4 py-2.5 flex items-start gap-2.5 text-[11px] font-bold ${severe ? 'bg-[#7d2f26] text-white' : 'bg-[var(--amber-soft)] text-[#6b5230]'}`}>
       <AlertTriangle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
       <span className="min-w-0">
         {ar ? 'تنبيه حفظ: ' : 'Saving alert: '}{ar ? guidance.ar : guidance.en}

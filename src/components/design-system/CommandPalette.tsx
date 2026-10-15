@@ -106,12 +106,12 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
               onClick={() => choose(r)}
               className="mizan-palette-row"
             >
-              <span className="w-9 h-9 rounded-xl bg-[#E7EEE9] text-[#214C40] grid place-items-center shrink-0" aria-hidden="true">
+              <span className="w-9 h-9 rounded-xl bg-[var(--emerald-soft)] text-[color:var(--emerald)] grid place-items-center shrink-0" aria-hidden="true">
                 {r.kind === 'participant' ? <UserRound className="w-4 h-4" /> : r.kind === 'certificate' ? <Award className="w-4 h-4" /> : <Search className="w-4 h-4" />}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold truncate">{r.title}</span>
-                <span className="block text-[10px] text-[#656b66] mt-1">{r.meta}</span>
+                <span className="block text-[10px] text-[color:var(--muted)] mt-1">{r.meta}</span>
               </span>
             </button>
           )) : (

@@ -42,7 +42,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
     <section className="mizan-surface overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e5e3dc] px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#F2EADC] text-[#7d5e34]"><ShieldCheck className="h-5 w-5" /></span>
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--amber-soft)] text-[#7d5e34]"><ShieldCheck className="h-5 w-5" /></span>
           <div>
             <div className="mizan-kicker">{ar ? 'مراجعة مساندة' : 'ADVISORY'}</div>
             <h3 className="mt-0.5 text-sm font-black">{ar ? 'ميل المسطرة — من أبعد عن لجنته' : 'Scale tendency — who stands furthest from their panel'}</h3>
@@ -65,7 +65,7 @@ export const ScaleTendencyChart: React.FC<{ rows: ScaleTendencyRow[]; ar: boolea
             <li key={row.judgeId} className="grid grid-cols-[minmax(96px,1.1fr)_2fr_auto] items-center gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="truncate text-xs font-black text-[#39423d]">{name}</div>
-                <div className="mt-0.5 text-[11px] font-bold text-[#656b66]">
+                <div className="mt-0.5 text-[11px] font-bold text-[color:var(--muted)]">
                   {code ? `${code} · ` : ''}{row.sessions ? (ar ? `${row.sessions} جلسة` : `${row.sessions} sessions`) : (ar ? 'ميل مرصود' : 'observed')}
                 </div>
               </div>

@@ -37,9 +37,9 @@ export const TenantFooter: React.FC = () => {
                 href={brand.websiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 hover:text-[#214C40] transition"
+                className="inline-flex items-center gap-1.5 hover:text-[color:var(--emerald)] transition"
               >
-                <Globe className="w-3.5 h-3.5 text-[#2F6555]" />
+                <Globe className="w-3.5 h-3.5 text-[color:var(--emerald-2)]" />
                 <span>{brand.websiteUrl?.replace(/^https?:\/\//i, '').replace(/\/$/, '')}</span>
               </a>
             )}
@@ -47,9 +47,9 @@ export const TenantFooter: React.FC = () => {
             {hasContact && brand.phoneNumber && (
               <a
                 href={`tel:${brand.phoneNumber}`}
-                className="inline-flex items-center gap-1.5 hover:text-[#214C40] transition"
+                className="inline-flex items-center gap-1.5 hover:text-[color:var(--emerald)] transition"
               >
-                <Headphones className="w-3.5 h-3.5 text-[#2F6555]" />
+                <Headphones className="w-3.5 h-3.5 text-[color:var(--emerald-2)]" />
                 <span dir="ltr">{brand.phoneNumber}</span>
               </a>
             )}
@@ -57,16 +57,16 @@ export const TenantFooter: React.FC = () => {
             {hasContact && brand.supportEmail && (
               <a
                 href={`mailto:${brand.supportEmail}`}
-                className="inline-flex items-center gap-1.5 hover:text-[#214C40] transition"
+                className="inline-flex items-center gap-1.5 hover:text-[color:var(--emerald)] transition"
               >
-                <Mail className="w-3.5 h-3.5 text-[#2F6555]" />
+                <Mail className="w-3.5 h-3.5 text-[color:var(--emerald-2)]" />
                 <span>{brand.supportEmail}</span>
               </a>
             )}
 
             {hasAddress && (
-              <div className="inline-flex items-center gap-1.5 text-[#656b66]">
-                <MapPin className="w-3.5 h-3.5 text-[#9B7542]" />
+              <div className="inline-flex items-center gap-1.5 text-[color:var(--muted)]">
+                <MapPin className="w-3.5 h-3.5 text-[color:var(--amber)]" />
                 <span>{ar ? brand.addressArabic : (brand.address || brand.addressArabic)}</span>
               </div>
             )}
@@ -74,12 +74,12 @@ export const TenantFooter: React.FC = () => {
         </div>
 
         {/* سطر الحقوق والاعتماد */}
-        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-[#656b66]">
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-[color:var(--muted)]">
           <div>
             © {new Date().getFullYear()} {ar ? brand.ar : brand.en}. {ar ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
           </div>
-          <div className="inline-flex items-center gap-1.5 text-[#636864]">
-            <ShieldCheck className="w-3 h-3 text-[#2F6555]" />
+          <div className="inline-flex items-center gap-1.5 text-[color:var(--muted)]">
+            <ShieldCheck className="w-3 h-3 text-[color:var(--emerald-2)]" />
             <span>{ar ? 'مدعوم بنظام ميزان المحكَّم للمسابقات القرآنية' : 'Powered by MIZAN Quranic Competition Infrastructure'}</span>
           </div>
         </div>

@@ -81,7 +81,7 @@ export const VenueLockButton:React.FC<{surface:string;ar:boolean;onLocked:(l:Ven
         {err&&<p className="text-[10px] text-[#f0b3aa] mt-3">{err}</p>}
         <div className="flex gap-2 mt-4">
           <button type="button" onClick={()=>{setOpen(false);setPin('');setConfirm('');setStep('set');setErr('')}} className="flex-1 min-h-11 rounded-xl bg-white/5 text-white/70 text-[11px] font-black">{ar?'إلغاء':'Cancel'}</button>
-          <button type="button" onClick={()=>void submit()} className="flex-1 min-h-11 rounded-xl bg-[#2F6555] text-white text-[11px] font-black">{step==='set'?(ar?'متابعة':'Continue'):(ar?'اقفل':'Lock')}</button>
+          <button type="button" onClick={()=>void submit()} className="flex-1 min-h-11 rounded-xl bg-[var(--emerald-2)] text-white text-[11px] font-black">{step==='set'?(ar?'متابعة':'Continue'):(ar?'اقفل':'Lock')}</button>
         </div>
       </div>
     </div>}
@@ -127,7 +127,7 @@ export const VenueUnlockGuard:React.FC<{lock:VenueLock;ar:boolean;onUnlocked:()=
         {blockedMs>0&&<p className="text-[10px] text-[#f0c9a0] mt-3">{ar?`محاولات خاطئة متتابعة — انتظر ${Math.ceil(blockedMs/1000)} ثانية.`:`Repeated wrong attempts — wait ${Math.ceil(blockedMs/1000)}s.`}</p>}
         <div className="flex gap-2 mt-4">
           <button type="button" onClick={()=>{setAsking(false);setPin('');setErr('')}} className="flex-1 min-h-11 rounded-xl bg-white/5 text-white/70 text-[11px] font-black">{ar?'رجوع':'Back'}</button>
-          <button type="button" disabled={blockedMs>0} onClick={()=>void attempt()} className="flex-1 min-h-11 rounded-xl bg-[#2F6555] text-white text-[11px] font-black disabled:opacity-40">{ar?'افتح':'Unlock'}</button>
+          <button type="button" disabled={blockedMs>0} onClick={()=>void attempt()} className="flex-1 min-h-11 rounded-xl bg-[var(--emerald-2)] text-white text-[11px] font-black disabled:opacity-40">{ar?'افتح':'Unlock'}</button>
         </div>
       </div>
     </div>}

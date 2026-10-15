@@ -63,7 +63,7 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
  return <section className="rounded-[26px] border border-[#dad7cd] bg-[#fdfbf5] overflow-hidden">
   <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]">
    <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'إعادة تشغيل التلاوة':'RECITATION REPLAY'}</div>
-    <div className="text-[9px] text-[#646965] truncate">{ar?'الصوت والموضع وحالة التتبّع معًا — عرض أدلة لا درجة':'Audio, position and tracking together — evidence only, never scored'}</div></div>
+    <div className="text-[11px] text-[color:var(--muted)] truncate">{ar?'الصوت والموضع وحالة التتبّع معًا — عرض أدلة لا درجة':'Audio, position and tracking together — evidence only, never scored'}</div></div>
    {/* الزمن يُعزل اتجاهه: «0:04 / 1:20» داخل فقرة عربية ينقلب فيصير الموضع مدةً والمدة موضعًا. */}
    <span dir="ltr" className="shrink-0 text-[10px] font-black tabular-nums text-[#59615c]">{mmss(posMs)} / {mmss(durMs)}</span>
   </div>
@@ -74,11 +74,11 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
     ? <div className="font-quran text-center text-xl sm:text-[1.7rem] leading-[2.1] text-[#202622]">
        <TajweedAyahWords text={activeAyahText.text} enabled={false} words={activeWords} activeWord={current?.wordIndex??-1}/>
       </div>
-    : <p className="text-center text-[10px] text-[#646965] py-4">{ar?'لا يوجد رصد موضع عند هذه اللحظة.':'No tracked position at this moment.'}</p>}
-   {current&&<div className="mt-4 flex items-center justify-center gap-2 text-[9px] font-black">
+    : <p className="text-center text-[10px] text-[color:var(--muted)] py-4">{ar?'لا يوجد رصد موضع عند هذه اللحظة.':'No tracked position at this moment.'}</p>}
+   {current&&<div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-black">
     <span className="rounded-lg px-2 py-1" style={{background:'#efeae0',color:markTone(current)}}>{markLabel(current,ar)}</span>
     {activeAyah!==null&&<span className="text-[#59615c]">{ar?`آية ${activeAyah}`:`Ayah ${activeAyah}`}</span>}
-    {typeof current.confidence==='number'&&<span className="text-[#646965]">{ar?'ثقة':'confidence'} {(current.confidence*100).toFixed(0)}%</span>}
+    {typeof current.confidence==='number'&&<span className="text-[color:var(--muted)]">{ar?'ثقة':'confidence'} {(current.confidence*100).toFixed(0)}%</span>}
    </div>}
   </div>
 
@@ -89,7 +89,7 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
      onChange={e=>seek(Number(e.target.value))}
      aria-label={ar?'موضع التشغيل':'Playback position'}
      className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent cursor-pointer"/>
-    <div aria-hidden className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-[#e3ded1] overflow-hidden"><div className="h-full bg-[#214C40]" style={{width:`${progress*100}%`}}/></div>
+    <div aria-hidden className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-[#e3ded1] overflow-hidden"><div className="h-full bg-[var(--emerald)]" style={{width:`${progress*100}%`}}/></div>
     {durMs>0&&notable.map((m,i)=><button key={i} type="button" onClick={()=>seek(m.offsetMs)}
       title={`${markLabel(m,ar)} · ${mmss(m.offsetMs)}`} aria-label={`${markLabel(m,ar)} ${mmss(m.offsetMs)}`}
       className="absolute top-0 h-full w-3 -translate-x-1/2 grid place-items-center"
@@ -100,15 +100,15 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
    <div className="mt-2 flex items-center justify-between gap-3">
     <div className="flex items-center gap-1.5">
      <button type="button" onClick={()=>setPlaying(p=>!p)} aria-label={ar?(playing?'إيقاف':'تشغيل'):(playing?'Pause':'Play')}
-      className="w-11 h-11 rounded-xl bg-[#214C40] text-white grid place-items-center">{playing?<Pause className="w-4 h-4"/>:<Play className="w-4 h-4"/>}</button>
+      className="w-11 h-11 rounded-xl bg-[var(--emerald)] text-white grid place-items-center">{playing?<Pause className="w-4 h-4"/>:<Play className="w-4 h-4"/>}</button>
      <button type="button" onClick={()=>seek(0)} aria-label={ar?'من البداية':'Restart'} className="w-11 h-11 rounded-xl border border-[#dcdad2] grid place-items-center text-[#59615c]"><RotateCcw className="w-4 h-4"/></button>
     </div>
     <div className="flex items-center gap-1.5">
-     <button type="button" onClick={()=>step(-1)} disabled={!notable.length} aria-label={ar?'العلامة السابقة':'Previous marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[9px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1"><ChevronRight className="w-3.5 h-3.5"/>{ar?'السابقة':'Prev'}</button>
-     <button type="button" onClick={()=>step(1)} disabled={!notable.length} aria-label={ar?'العلامة التالية':'Next marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[9px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1">{ar?'التالية':'Next'}<ChevronLeft className="w-3.5 h-3.5"/></button>
+     <button type="button" onClick={()=>step(-1)} disabled={!notable.length} aria-label={ar?'العلامة السابقة':'Previous marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1"><ChevronRight className="w-3.5 h-3.5"/>{ar?'السابقة':'Prev'}</button>
+     <button type="button" onClick={()=>step(1)} disabled={!notable.length} aria-label={ar?'العلامة التالية':'Next marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1">{ar?'التالية':'Next'}<ChevronLeft className="w-3.5 h-3.5"/></button>
     </div>
    </div>
-   {!notable.length&&<p className="mt-2 text-[9px] text-[#646965]">{ar?'لا توجد لحظات مُعلَّمة في هذه الجلسة.':'No flagged moments in this session.'}</p>}
+   {!notable.length&&<p className="mt-2 text-[11px] text-[color:var(--muted)]">{ar?'لا توجد لحظات مُعلَّمة في هذه الجلسة.':'No flagged moments in this session.'}</p>}
   </div>
 
   <audio ref={elRef} src={recordingUrl} preload="metadata"

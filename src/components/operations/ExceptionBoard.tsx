@@ -103,7 +103,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
         })}
       </ul>
       {items.length > 8 && (
-        <p className="border-t border-[#eeece5] px-5 py-2.5 text-xs font-bold text-[#696f6b]">
+        <p className="border-t border-[#eeece5] px-5 py-2.5 text-xs font-bold text-[color:var(--muted)]">
           {ar ? moreCasesAr(items.length - 8) : `And ${items.length - 8} more.`}
         </p>
       )}

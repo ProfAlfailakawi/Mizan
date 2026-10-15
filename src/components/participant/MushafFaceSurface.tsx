@@ -282,7 +282,7 @@ const FaceIndicesRow: React.FC<{ indices: FaceIndices; ar: boolean; frameUnit: '
         <div key={cell.key} data-index={cell.key} className="rounded-2xl bg-[#f4f2ec] p-3 text-center">
           <dd className="text-sm font-black tabular-nums text-[#39423d]" dir="ltr">{cell.value}</dd>
           <dt className="mt-0.5 text-[10px] leading-4 text-[#5f6663]">{cell.label}</dt>
-          {cell.note && <div className="text-[9px] text-[#6b716d]">{cell.note}</div>}
+          {cell.note && <div className="text-[11px] text-[#6b716d]">{cell.note}</div>}
         </div>
       ))}
     </dl>

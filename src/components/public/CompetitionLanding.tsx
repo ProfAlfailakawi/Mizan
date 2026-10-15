@@ -409,7 +409,7 @@ export const CompetitionLanding: React.FC = () => {
                   </div>
                 </a>
                 <p className="mt-2.5 flex items-start gap-2 text-[13px] leading-6 text-[#5d594f]">
-                  <d.needIcon className="w-4 h-4 mt-1 shrink-0 text-[#9B7542]" />{d.need}
+                  <d.needIcon className="w-4 h-4 mt-1 shrink-0 text-[color:var(--amber)]" />{d.need}
                 </p>
                 {d.key === 'participant' && registrationOpen && (
                   <a href={`#register?comp=${competition.id}`} className="mt-auto pt-4 inline-flex">

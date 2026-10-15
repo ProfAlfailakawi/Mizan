@@ -40,10 +40,10 @@ export const LiveRecitationMonitor: React.FC<{
     <section className="mizan-surface p-5" aria-label={ar ? 'التلاوة الجارية' : 'Live recitation'}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#E7EEE9] text-[#214C40]"><RadioTower className="h-4 w-4" /></span>
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--emerald-soft)] text-[color:var(--emerald)]"><RadioTower className="h-4 w-4" /></span>
           <div>
             <div className="text-sm font-black">{ar ? 'التلاوة الجارية' : 'Live recitation'}</div>
-            <div className="text-xs font-bold text-[#656b66]">{ar ? 'غرفة العمليات وحدها — ولا يُعرض هنا رقمٌ لم يُعلن' : 'Operations only — nothing unannounced is shown'}</div>
+            <div className="text-xs font-bold text-[color:var(--muted)]">{ar ? 'غرفة العمليات وحدها — ولا يُعرض هنا رقمٌ لم يُعلن' : 'Operations only — nothing unannounced is shown'}</div>
           </div>
         </div>
         <span className="text-xs font-black tabular-nums text-[#5f6663]" data-live-count={rows.length}>
@@ -65,8 +65,8 @@ export const LiveRecitationMonitor: React.FC<{
 const LiveRow: React.FC<{ row: LiveRecitationRow; ar: boolean }> = ({ row, ar }) => (
   <li data-committee={row.committeeId} className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e4e2da] bg-white px-3.5 py-3">
     <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
-      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2F6555] opacity-70" />
-      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#2F6555]" />
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--emerald-2)] opacity-70" />
+      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--emerald-2)]" />
     </span>
     <span className="min-w-0 flex-1 truncate text-xs font-black text-[#39423d]">
       {(ar ? row.committeeNameArabic : undefined) || row.committeeName}
@@ -76,7 +76,7 @@ const LiveRow: React.FC<{ row: LiveRecitationRow; ar: boolean }> = ({ row, ar })
       {row.elapsedSeconds === undefined ? '—' : clock(row.elapsedSeconds)}
     </span>
     <span
-      className={`inline-flex shrink-0 items-center gap-1 text-xs font-black ${row.audioOk ? 'text-[#2F6555]' : 'text-[#8a5a2b]'}`}
+      className={`inline-flex shrink-0 items-center gap-1 text-xs font-black ${row.audioOk ? 'text-[color:var(--emerald-2)]' : 'text-[#8a5a2b]'}`}
       title={row.audioOk ? (ar ? 'مدخل الصوت مثبَت' : 'Audio input verified') : (ar ? 'لم تُثبت سلامة مدخل الصوت لهذه اللجنة' : 'Audio input not verified for this panel')}
     >
       {row.audioOk ? <Mic2 className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
