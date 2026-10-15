@@ -47,7 +47,7 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
    <span className="flex items-center gap-2.5 min-w-0">
     <span className="w-8 h-8 rounded-xl bg-[#EEF3F0] text-[color:var(--emerald-2)] grid place-items-center shrink-0"><GitBranch className="w-4 h-4"/></span>
     <span className="min-w-0">
-     <span className="block text-[10px] font-black truncate">{ar?'مفترقات المتشابهات':'Divergence points'}</span>
+     <span className="block text-[11px] font-black truncate">{ar?'مفترقات المتشابهات':'Divergence points'}</span>
      <span className="block text-[11px] text-[#6b716d] truncate">
       {points.length?(ar?`${points.length} موضع التباس في هذا المقطع`:`${points.length} fork${points.length>1?'s':''} in this passage`):(ar?'لا مفترقات في هذا المقطع':'No forks in this passage')}
       {load?` · ${load.label}`:''}

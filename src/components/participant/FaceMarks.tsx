@@ -128,7 +128,7 @@ export const FaceMarkLegend: React.FC<{ marks: readonly FaceMark[]; ar: boolean 
         const count = marks.filter(m => m.kind === kind).length;
         return (
           <li key={kind} data-legend={kind} title={ar ? style.hintAr : style.hintEn}
-            className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[var(--muted)]">
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--muted)]">
             <span aria-hidden="true" className="grid h-5 w-5 place-items-center rounded-md"
               style={{ background: `${style.tint}22`, color: style.tint }}><Icon size={12} strokeWidth={1.8} /></span>
             <span>{ar ? style.ar : style.en}</span>

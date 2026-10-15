@@ -88,7 +88,7 @@ export const FaceMistakeLegend: React.FC<{ mistakes: readonly Mistake[]; ar: boo
   const kinds = PRIORITY.filter(kind => mistakes.some(m => m.kind === kind));
   if (!kinds.length) return null;
   return (
-    <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[10px] font-bold text-[#5f6663]" data-mistake-legend={kinds.length}>
+    <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] font-bold text-[#5f6663]" data-mistake-legend={kinds.length}>
       {kinds.map(kind => {
         const style = FACE_MISTAKE_STYLE[kind];
         const count = mistakes.filter(m => m.kind === kind).length;

@@ -82,7 +82,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
         <div className="rounded-[28px] border border-white/10 bg-white/[.035] p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3">
             <div className={`${lbl} font-black tracking-[.15em] mizan-venue-muted`}>{ar ? '604 صفحة' : '604 PAGES'}</div>
-            <div className="flex items-center gap-2 text-[10px] mizan-venue-muted">
+            <div className="flex items-center gap-2 text-[11px] mizan-venue-muted">
               <span>{ar ? 'أقل' : 'less'}</span>
               <span className="inline-flex gap-0.5">{[0.05, 0.3, 0.55, 0.8, 1].map((t, i) => <span key={i} className="w-3 h-3 rounded-[3px]" style={{ background: pageColor(t * max, max) }} />)}</span>
               <span>{ar ? 'أكثر' : 'more'}</span>
@@ -93,7 +93,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
               <span key={i} title={`${ar ? 'صفحة' : 'p.'} ${i + 1} · ${ar ? 'الجزء' : 'juz'} ${pageToJuz(i + 1)} · ${count}`} className="aspect-square rounded-[2.5px] transition-colors duration-500" style={{ background: pageColor(count, max) }} />
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between text-[10px] mizan-venue-muted">
+          <div className="mt-3 flex items-center justify-between text-[11px] mizan-venue-muted">
             <span>{agg.hottestPage.page>0 ? (ar ? `أكثر صفحة تلاوةً: ${agg.hottestPage.page}` : `Hottest page: ${agg.hottestPage.page}`) : (ar?'لا توجد صفحة مسجلة بعد':'No recorded page yet')}</span>
             <span>{ar ? `${agg.coveredPages} صفحة تُليت` : `${agg.coveredPages} pages recited`}</span>
           </div>
@@ -109,7 +109,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
             return (
               <div key={j.juz} className="rounded-xl bg-white/[.04] px-2 py-2 text-center" title={`${ar ? 'الجزء' : 'Juz'} ${j.juz}`}>
                 <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1.5"><div className="h-full rounded-full bg-[#7fae9c]" style={{ width: `${Math.min(100, pct * 100)}%` }} /></div>
-                <div className="text-[10px] font-black text-white/70 tabular-nums">{j.juz}</div>
+                <div className="text-[11px] font-black text-white/70 tabular-nums">{j.juz}</div>
               </div>
             );
           })}
@@ -136,7 +136,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
 };
 
 const Stat: React.FC<{ n: string | number; t: string }> = ({ n, t }) => (
-  <div className="rounded-2xl bg-white/[.05] px-3 py-2.5"><div className="text-2xl font-black tabular-nums">{n}</div><div className="text-[10px] mizan-venue-muted mt-0.5">{t}</div></div>
+  <div className="rounded-2xl bg-white/[.05] px-3 py-2.5"><div className="text-2xl font-black tabular-nums">{n}</div><div className="text-[11px] mizan-venue-muted mt-0.5">{t}</div></div>
 );
 
 function toArabicOrdinal(n: number, ar: boolean): string {

@@ -56,7 +56,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
                   <span className={`text-sm font-black tabular-nums ${style.ink}`}>{row.juz}</span>
                   <span className={`text-[11px] font-bold ${style.ink}`}>{arabic ? style.ar : style.en}</span>
                 </div>
-                <div className={`mt-1 flex items-baseline gap-1 text-[10px] font-black tabular-nums ${style.ink}`}>
+                <div className={`mt-1 flex items-baseline gap-1 text-[11px] font-black tabular-nums ${style.ink}`}>
                   <span>{row.participantCount}</span><span className="text-[11px] font-bold opacity-75">{arabic ? 'متسابقًا' : 'part.'}</span>
                 </div>
                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
@@ -68,7 +68,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
             );
           })}
         </div>
-        <ul className="mt-2 flex flex-wrap gap-3 text-[10px] font-bold text-[#656b67]">
+        <ul className="mt-2 flex flex-wrap gap-3 text-[11px] font-bold text-[#656b67]">
           {(Object.keys(RISK_STYLE) as JuzHeatCell['exhaustionRisk'][]).map(key => (
             <li key={key} className="inline-flex items-center gap-1.5">
               <span className={`h-2.5 w-2.5 rounded-full ${RISK_STYLE[key].bar}`} aria-hidden="true" />
@@ -82,7 +82,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
         <div className="rounded-2xl border border-[#cddbd3] bg-[#F7FAF8] p-4" role="status">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-black text-[color:var(--emerald)]">{arabic ? `الجزء ${cell.juz}` : `Juz ${cell.juz}`}</h3>
-            <span className="text-[10px] font-bold text-[#656b67]">
+            <span className="text-[11px] font-bold text-[#656b67]">
               {arabic ? `يبدأ عند ${surahNameArabic(juzBounds(cell.juz).start.surah)} ${juzBounds(cell.juz).start.ayah}` : `starts at ${surahNameEnglish(juzBounds(cell.juz).start.surah)} ${juzBounds(cell.juz).start.ayah}`}
             </span>
           </div>
@@ -109,7 +109,7 @@ export const ScopeHeatMap: React.FC<{ analysis: DemandAnalysis; arabic: boolean 
             {analysis.bottlenecks.map(cluster => (
               <li key={cluster.signature} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2">
                 <span className="min-w-0 text-[11px] font-black text-[#3c4541]">{cluster.label}</span>
-                <span className="text-[10px] font-bold tabular-nums text-[#7d5e34]">
+                <span className="text-[11px] font-bold tabular-nums text-[#7d5e34]">
                   {arabic ? `${cluster.participantCount} متسابقًا · ${cluster.demand} سحبة على ${cluster.supply} موضعًا · إعادة ${cluster.averageReuse}×` : `${cluster.participantCount} participants · ${cluster.demand} draws over ${cluster.supply} loci · reuse ${cluster.averageReuse}×`}
                 </span>
               </li>

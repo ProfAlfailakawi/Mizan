@@ -132,7 +132,7 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
             <div className="text-xs leading-5 text-[color:var(--muted)] mt-1">{notifyDenied ? (ar ? 'المتصفح لا يسمح بالتنبيهات. تابع من هذه الصفحة، فهي تتحدّث تلقائيًا.' : 'The browser blocks notifications. Follow this page instead; it updates on its own.') : notify ? (ar ? 'سيصلك تنبيه عند دخول اللجنة وعند صدور النتيجة، ما دامت هذه الصفحة مفتوحة.' : 'You will be notified at panel entry and at the result, while this page stays open.') : (ar ? 'عند دخول اللجنة وصدور النتيجة' : 'Panel entry & result reveal')}</div>
           </button>
           {shareLink ? <button onClick={() => void copy()} className="rounded-2xl border border-[#dcdad2] bg-white p-4 text-start hover:border-[#bcc7c1] transition">
-            <div className="flex items-center justify-between"><Share2 className="w-6 h-6 text-[#666b67]" />{copied && <span className="text-[10px] font-black text-[color:var(--emerald)]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
+            <div className="flex items-center justify-between"><Share2 className="w-6 h-6 text-[#666b67]" />{copied && <span className="text-[11px] font-black text-[color:var(--emerald)]">{ar ? 'نُسخ' : 'Copied'}</span>}</div>
             <div className="text-base font-black mt-3">{ar ? 'رابط العائلة الخاص' : 'Private family link'}</div>
             <div className="text-xs leading-5 text-[color:var(--muted)] mt-1">{shareNote || (ar ? 'للعائلة فقط — لا تنشره.' : 'View-only. This link is your private key — share it with family only.')}</div>
           </button> : <div className="rounded-2xl border border-dashed border-[#dcdad2] bg-[#faf9f5] p-4 text-start">

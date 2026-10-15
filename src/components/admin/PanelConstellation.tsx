@@ -35,7 +35,7 @@ export const PanelConstellation: React.FC<{
             <g key={j.id}>
               <title>{nm(j)}</title>
               <circle cx={x} cy={y} r={h ? 13 : 12} fill={sel ? '#214C40' : '#fffefb'} stroke={h ? '#B98B4E' : sel ? '#214C40' : '#cfd5d0'} strokeWidth={h ? 2.4 : 1.4} />
-              <text x={x} y={y + 4} textAnchor="middle" fontSize="11.5" fontWeight="800" fill={sel ? '#fffefb' : '#8a918c'}>{initialOf(nm(j))}</text>
+              <text x={x} y={y + 4} textAnchor="middle" fontSize="12" fontWeight="800" fill={sel ? '#fffefb' : '#8a918c'}>{initialOf(nm(j))}</text>
             </g>
           );
         })}

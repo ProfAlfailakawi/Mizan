@@ -62,10 +62,10 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
 
  return <section className="rounded-[26px] border border-[#dad7cd] bg-[#fdfbf5] overflow-hidden">
   <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]">
-   <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'إعادة تشغيل التلاوة':'RECITATION REPLAY'}</div>
+   <div className="min-w-0"><div className="text-[11px] font-black truncate">{ar?'إعادة تشغيل التلاوة':'RECITATION REPLAY'}</div>
     <div className="text-[11px] text-[color:var(--muted)] truncate">{ar?'الصوت والموضع وحالة التتبّع معًا — عرض أدلة لا درجة':'Audio, position and tracking together — evidence only, never scored'}</div></div>
    {/* الزمن يُعزل اتجاهه: «0:04 / 1:20» داخل فقرة عربية ينقلب فيصير الموضع مدةً والمدة موضعًا. */}
-   <span dir="ltr" className="shrink-0 text-[10px] font-black tabular-nums text-[#59615c]">{mmss(posMs)} / {mmss(durMs)}</span>
+   <span dir="ltr" className="shrink-0 text-[11px] font-black tabular-nums text-[#59615c]">{mmss(posMs)} / {mmss(durMs)}</span>
   </div>
 
   {/* الموضع في المصحف عند هذه اللحظة */}
@@ -74,7 +74,7 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
     ? <div className="font-quran text-center text-xl sm:text-[1.7rem] leading-[2.1] text-[#202622]">
        <TajweedAyahWords text={activeAyahText.text} enabled={false} words={activeWords} activeWord={current?.wordIndex??-1}/>
       </div>
-    : <p className="text-center text-[10px] text-[color:var(--muted)] py-4">{ar?'لا يوجد رصد موضع عند هذه اللحظة.':'No tracked position at this moment.'}</p>}
+    : <p className="text-center text-[11px] text-[color:var(--muted)] py-4">{ar?'لا يوجد رصد موضع عند هذه اللحظة.':'No tracked position at this moment.'}</p>}
    {current&&<div className="mt-4 flex items-center justify-center gap-2 text-[11px] font-black">
     <span className="rounded-lg px-2 py-1" style={{background:'#efeae0',color:markTone(current)}}>{markLabel(current,ar)}</span>
     {activeAyah!==null&&<span className="text-[#59615c]">{ar?`آية ${activeAyah}`:`Ayah ${activeAyah}`}</span>}

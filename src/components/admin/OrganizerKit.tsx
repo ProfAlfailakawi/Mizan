@@ -159,14 +159,14 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: st
                   <span className="flex shrink-0 items-center">
                     <span className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${s.done ? 'bg-[var(--emerald)] text-white' : next ? 'bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'bg-[#efede7] text-[color:var(--muted)]'}`}>
                       {s.done ? <Check className="h-6 w-6" /> : <s.icon className="h-6 w-6" />}
-                      <span aria-hidden="true" className={`absolute -top-1.5 -end-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-white text-[10px] font-black tabular-nums ${s.done ? 'bg-[#2E7D5B] text-white' : next ? 'bg-[#C08A2E] text-white' : 'bg-[#d8d6ce] text-[#59615c]'}`}>{i + 1}</span>
+                      <span aria-hidden="true" className={`absolute -top-1.5 -end-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-white text-[11px] font-black tabular-nums ${s.done ? 'bg-[#2E7D5B] text-white' : next ? 'bg-[#C08A2E] text-white' : 'bg-[#d8d6ce] text-[#59615c]'}`}>{i + 1}</span>
                     </span>
                   </span>
                   <span className="min-w-0 flex-1 xl:flex-none">
                     <span className={`block text-sm font-black ${s.done ? 'text-[color:var(--emerald)]' : next ? 'text-[#17352D]' : 'text-[#5a615c]'}`}>{s.title}</span>
                     <span className="mt-0.5 block text-xs leading-5 text-[#6a706c]">{s.note}</span>
                     {next && (
-                      <span className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[var(--emerald)] px-3 text-xs font-black text-white">
+                      <span className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-[var(--emerald)] px-3 text-xs font-black text-white">
                         {s.busy ? (ar ? 'لحظة…' : 'One moment…') : (s.cta || (ar ? 'ابدأ' : 'Start'))}<Arrow className="h-3.5 w-3.5" />
                       </span>
                     )}

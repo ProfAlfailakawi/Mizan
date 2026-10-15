@@ -85,7 +85,7 @@ export const DiscoverDirectory: React.FC = () => {
         <label className="relative flex-1 min-w-[14rem]"><span className="sr-only">{ct(locale, 'search')}</span>
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3.5 h-4 w-4 text-[var(--muted)]" />
           <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] ps-10 pe-3 text-sm focus:outline-none focus-visible:ring-2" /></label>
-        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" className="h-5 w-5" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl bg-[var(--surface-soft)] px-4 text-xs font-bold"><input type="checkbox" checked={openOnly} onChange={e => setOpenOnly(e.target.checked)} style={{ accentColor: accent }} />{ct(locale, 'registrationOpen')}</label>
       </div>
       {failed && <div role="alert" className="mizan-surface flex items-center gap-3 p-5 text-sm text-[var(--danger)]"><WifiOff aria-hidden="true" className="h-5 w-5 shrink-0" />{ct(locale, 'discoverFailed')}</div>}
       {loading && <ul className="grid gap-4 sm:grid-cols-2" aria-hidden="true">{[0, 1, 2, 3].map(i => <li key={i} className="mizan-surface p-5 space-y-3"><div className="mz-skeleton h-5 w-2/3" /><div className="mz-skeleton h-3 w-1/2" /><div className="mz-skeleton h-3 w-full" /><div className="mz-skeleton h-9 w-28" /></li>)}</ul>}

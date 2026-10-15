@@ -53,7 +53,7 @@ export const AuditDayRibbon: React.FC<{ events: Ev[]; ar: boolean; maxDays?: num
           </div>
         ))}
       </div>
-      <div dir="ltr" className="mt-1 grid gap-[2px] text-[10px] font-bold text-[#656b67] sm:ms-[calc(3.5rem+0.75rem)] sm:me-[calc(8.5rem+0.75rem)]" style={{ gridTemplateColumns: 'repeat(24,minmax(0,1fr))' }} aria-hidden>{[0, 6, 12, 18, 23].map(h => <span key={h} className="text-center tabular-nums" style={{ gridColumn: `${h + 1} / span 1`, justifySelf: 'center' }}>{String(h).padStart(2, '0')}</span>)}</div>
+      <div dir="ltr" className="mt-1 grid gap-[2px] text-[11px] font-bold text-[#656b67] sm:ms-[calc(3.5rem+0.75rem)] sm:me-[calc(8.5rem+0.75rem)]" style={{ gridTemplateColumns: 'repeat(24,minmax(0,1fr))' }} aria-hidden>{[0, 6, 12, 18, 23].map(h => <span key={h} className="text-center tabular-nums" style={{ gridColumn: `${h + 1} / span 1`, justifySelf: 'center' }}>{String(h).padStart(2, '0')}</span>)}</div>
     </section>
   );
 };

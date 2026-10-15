@@ -565,7 +565,7 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||activeSession.questionPhase!=='RECITING')return;if(e.key.toLowerCase()==='z'){if(allowUndo)undoLastMark();return;}const action=judgeActions.find(a=>a.shortcut===e.key);if(action){e.preventDefault();recordJudgeEventWithEvidence(action.eventType)}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)},[judgeActions,activeSession.isLocked,activeSession.questionPhase]);
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
- if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[color:var(--muted)] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[10px] text-[color:var(--muted)] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[10px] text-[color:var(--muted)] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
+ if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[color:var(--muted)] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[11px] text-[color:var(--muted)] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[11px] text-[color:var(--muted)] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
  if(!participant) return <div className="max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
   <h1 className="text-3xl sm:text-4xl font-black mt-5">{nextQueued?(ar?'المتسابق التالي جاهز':'Next participant is ready'):rosterCounts.awaiting?(ar?'لا أحد في الطابور بعد':'Nobody in the queue yet'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
   {/* أرقام الكشف كانت سطرًا صغيرًا واحدًا بنقاط فاصلة؛ صارت بطاقات: رقم كبير وكلمة. */}
@@ -590,7 +590,7 @@ export const JudgeOS: React.FC = () => {
   </ul>
   <p className="mt-3 text-xs leading-6 text-[color:var(--muted)]">{ar?'الترتيب مُلزم — لا تخطّي. المتأخر يُستقبل من غرفة العمليات.':'Order is binding here and cannot be skipped. Admitting a late arrival happens in operations, not on this screen.'}</p>
   {!!awaitingArrival.length&&<p className="mt-1 text-xs leading-6 text-[color:var(--muted)]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
-  {committeeQueue.length>24&&<p className="mt-1.5 text-[10px] text-[color:var(--muted)]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
+  {committeeQueue.length>24&&<p className="mt-1.5 text-[11px] text-[color:var(--muted)]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
  </div>}
  {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[color:var(--muted)]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
@@ -673,7 +673,7 @@ export const JudgeOS: React.FC = () => {
         ?`فئته «${bilingualName(participantCategory,true)||'—'}»، ونطاقها هو ما يُسأل فيه — لا تخصّص هذه اللجنة. الموضع صحيح وإن بدا خارج ما اعتدتموه، والتقييم يكون بمسطرة فئته هو.`
         :`His category is “${bilingualName(participantCategory,false)||'—'}”, and its scope governs the questions. The passage is correct even if unfamiliar, and he is scored by his own rubric.`}
       </p>
-      <div className="text-[10px] text-[#8a7a62] mt-1.5">{ar?'اعتمده: ':'Approved by: '}{participant.crossCategoryException.approvedBy} · {participant.crossCategoryException.reason}</div>
+      <div className="text-[11px] text-[#8a7a62] mt-1.5">{ar?'اعتمده: ':'Approved by: '}{participant.crossCategoryException.approvedBy} · {participant.crossCategoryException.reason}</div>
      </div>
     </div>}
 
@@ -682,7 +682,7 @@ export const JudgeOS: React.FC = () => {
      {micGateApplies&&micRecording&&!micHeard&&!micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] px-3.5 py-2.5 text-[11px] font-bold leading-5 text-[#6b4f18] flex flex-wrap items-center gap-2"><Mic className="w-3.5 h-3.5 shrink-0"/><span className="flex-1 min-w-0">{ar?'التسجيل يعمل. ومؤشّر المستوى لم يتحرّك بعد — وقد يكون لأن التلاوة لم تبدأ، أو لأن هذا المتصفّح لا يعرض المستوى. إن كنت تسمع المتسابق فالجلسة تُسجَّل.':'Recording is running. The level meter has not moved yet — the recitation may not have started, or this browser may not report levels. If you can hear the participant, the session is being recorded.'}</span><Button size="sm" variant="outline" onClick={()=>void restartAudio()}>{ar?'إعادة الفحص':'Re-check'}</Button></div>}
      {micGateApplies&&micMeterUnavailable&&<div role="status" className="rounded-2xl border border-[#e2dfd5] bg-[#f8f6ef] px-3.5 py-2.5 text-[11px] font-bold leading-5 text-[#6f6a5c] flex items-center gap-2"><Mic className="w-3.5 h-3.5 shrink-0"/><span className="sr-only">{ar?'هذا المتصفّح لا يعرض مؤشّر مستوى الصوت، والتسجيل يعمل. لا شيء مطلوب منك هنا — تحقّق من وضوح الصوت بعد أول تلاوة.':'This browser does not show a live level meter, and recording is running. Nothing is required of you here — check the audio after the first recitation.'}</span><span aria-hidden="true" title={ar?'هذا المتصفّح لا يعرض مؤشّر مستوى الصوت، والتسجيل يعمل. لا شيء مطلوب منك هنا — تحقّق من وضوح الصوت بعد أول تلاوة.':'This browser does not show a live level meter, and recording is running. Nothing is required of you here — check the audio after the first recitation.'}>{ar?'لا مؤشّر مستوى — التسجيل يعمل':'No level meter — recording runs'}</span></div>}
      {secureError&&<div role="alert" className="rounded-2xl bg-[var(--danger-soft)] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5 flex items-start gap-2"><AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5"/><span>{secureMode?(ar?'تعذر الوصول الآمن إلى كبسولة السؤال. لن يعرض ميزان نسخة محلية بديلة.':'Secure question capsule unavailable. MIZAN will not fall back to local question plaintext.'):secureError}{secureMode&&<span className="opacity-60 font-mono ms-1">{secureError}</span>}</span></div>}
-     {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"><div><div className="text-[12px] font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[10px] text-[#806b4d] mt-0.5">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، وسؤالٌ واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required; only one question per session.'}</div></div><Button size="sm" variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على التبديل':'Approve replacement')}</Button></div>}
+     {secureMode&&questionRevealed&&['AUTHORIZED','PENDING_PANEL_QUORUM'].includes(secureRuntime?.emergencyReplacement.state||'')&&(secureRuntime?.emergencyReplacement.questionIndex===undefined||secureRuntime?.emergencyReplacement.questionIndex===activeSession.currentQuestionIndex)&&<div className="rounded-2xl border border-[#d7c39e] bg-[#F5EFE2] px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"><div><div className="text-[12px] font-black text-[#6f532d]">{ar?'تبديل طارئ مصرح — لهذا السؤال فقط':'Authorized emergency replacement — this question only'}</div><div className="text-[11px] text-[#806b4d] mt-0.5">{ar?'الإدارة سمحت بالتبديل. يحتاج موافقة اللجنة، وسؤالٌ واحد فقط في الجلسة.':'Administration authorized it. Panel quorum is required; only one question per session.'}</div></div><Button size="sm" variant="outline" disabled={replacementBusy} icon={<RotateCcw className="w-4 h-4"/>} onClick={()=>void approveReplacement()}>{replacementBusy?(ar?'جارٍ التحقق…':'Checking…'):(ar?'أوافق على التبديل':'Approve replacement')}</Button></div>}
     </div>
 
     {/* ── بوابة الميكروفون ────────────────────────────────────────────────── */}
@@ -716,7 +716,7 @@ export const JudgeOS: React.FC = () => {
      <div className="mt-5">{!participantPresent
       ?<Button icon={<UserCheck className="w-4 h-4"/>} onClick={()=>void confirmPresence()}>{ar?'المتسابق أمامي — تأكيد الحضور':'Participant is here — confirm presence'}</Button>
       :<Button disabled={approvedByMe} icon={<ShieldCheck className="w-4 h-4"/>} onClick={()=>void approveReveal()}>{approvedByMe?(ar?'تم تسجيل موافقتي':'My approval recorded'):(ar?'أوافق على فتح السؤال':'Approve question reveal')}</Button>}</div>
-     {participantPresent&&required>0&&<div className="mt-3 text-[10px] font-black tabular-nums text-[#5f6663]">{ar?`الموافقات: ${approved} من ${required}`:`Approvals: ${approved} of ${required}`}</div>}
+     {participantPresent&&required>0&&<div className="mt-3 text-[11px] font-black tabular-nums text-[#5f6663]">{ar?`الموافقات: ${approved} من ${required}`:`Approvals: ${approved} of ${required}`}</div>}
     </div>}
 
     {/* ── الموضع ─────────────────────────────────────────────────────────── */}
@@ -726,7 +726,7 @@ export const JudgeOS: React.FC = () => {
       {openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio(true)} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}
       {(alignmentConfigured||followReady)&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
       {(alignmentConfigured||followReady)&&shadowMicActive&&<Badge variant="emerald">{ar?'التتبع الحي يعمل':'Live tracking on'}</Badge>}
-      {secureMode&&secureRuntime?.diversityMetrics&&<span className="text-[10px] font-bold text-[color:var(--muted)]">{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`)}</span>}
+      {secureMode&&secureRuntime?.diversityMetrics&&<span className="text-[11px] font-bold text-[color:var(--muted)]">{secureRuntime.diversityMetrics.globalUniqueCoverageGuaranteed?(ar?'سعة فريدة كافية لكل المشاركين':'Unique capacity covers the full field'):(ar?`مواضع فريدة: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`:`Unique starts: ${secureRuntime.diversityMetrics.eligibleUniqueStartLoci}`)}</span>}
      </div>
     </>}
 
@@ -746,7 +746,7 @@ export const JudgeOS: React.FC = () => {
       <div className="mt-2 text-base font-black text-[color:var(--emerald)]">{ar?'تم اعتماد تقييمك وقفله':'Your assessment is locked'}</div>
       <div className="mt-1 text-sm text-[#5d6b64]">{ar?'تقييم بقية المحكمين يبقى مخفيًا.':'Other judge assessments remain hidden.'}</div>
      </div>
-     {reviewAvailable&&<div className="mt-2 text-[10px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
+     {reviewAvailable&&<div className="mt-2 text-[11px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
      {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
      {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
     </div>}
@@ -760,7 +760,7 @@ export const JudgeOS: React.FC = () => {
 
    <div className="mizan-judge-hud">
     <div className="m" data-loss="true" data-zero={deductions===0?'true':undefined}>
-     <b dir="ltr">{showRunningScore?`−${deductions.toFixed(2)}`:String(activeSession.events.filter(e=>!e.reversed).length)}</b>
+     <b dir="ltr">{showRunningScore?(deductions.toFixed(2)==='0.00'?'0.00':`−${deductions.toFixed(2)}`):String(activeSession.events.filter(e=>!e.reversed).length)}</b>
      <span>{showRunningScore?(ar?'الخصم':'Deducted'):(ar?'الملاحظات':'Marks')}</span>
     </div>
     <JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update}/>
@@ -801,12 +801,12 @@ export const JudgeOS: React.FC = () => {
        </div>}
 
       {directMode&&<div className="mizan-judge-direct">
-       <div className="text-[10px] font-black" style={{color:'var(--venue-faint)'}}>{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
+       <div className="text-[11px] font-black" style={{color:'var(--venue-faint)'}}>{ar?'درجات اختصاصك':'YOUR CRITERIA'}</div>
        {visibleCriteria.map(c=><label key={c.id} className="flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5" style={{border:'1px solid var(--venue-line)',background:'rgba(255,255,255,.022)'}}>
-        <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[10px] font-semibold" style={{color:'var(--venue-faint)'}}>{ar?'من':'of'} {c.maxScore}</span></span>
+        <span className="min-w-0"><span className="block truncate text-[13px] font-black">{bilingualName(c,ar)}</span><span className="text-[11px] font-semibold" style={{color:'var(--venue-faint)'}}>{ar?'من':'of'} {c.maxScore}</span></span>
         <input aria-label={bilingualName(c,ar)} type="number" min="0" max={c.maxScore} step={policy.judging.directScoreStep||.25} value={directScores[c.id]??c.maxScore} onChange={e=>setDirectScores(v=>({...v,[c.id]:Math.min(c.maxScore,Math.max(0,Number(e.target.value)))}))} className="w-20 min-h-11 shrink-0 rounded-xl px-2 text-center text-lg font-black" style={{border:'1px solid var(--venue-line)',background:'rgba(0,0,0,.25)',color:'var(--venue-ink)'}}/>
        </label>)}
-       <div className="text-[10px] leading-5" style={{color:'var(--venue-faint)'}}>{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
+       <div className="text-[11px] leading-5" style={{color:'var(--venue-faint)'}}>{ar?'تبقى هذه الدرجات مستقلة ولا يراها بقية المحكمين قبل القفل.':'These values remain an independent judge assessment until lock.'}</div>
       </div>}
 
       <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>

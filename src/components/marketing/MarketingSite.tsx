@@ -217,7 +217,7 @@ export const MarketingSite: React.FC = () => {
               <MizanMark className="w-9 h-9" decorative />
               <div>
                 <div className="font-display text-[17px] font-black leading-none">ميزان</div>
-                <div className="text-[10px] font-bold mizan-muted mt-1">منصّة مسابقات القرآن</div>
+                <div className="text-[11px] font-bold mizan-muted mt-1">منصّة مسابقات القرآن</div>
               </div>
             </div>
             <nav aria-label="أقسام الصفحة" className="hidden md:flex items-center gap-1 text-[13px] font-bold">

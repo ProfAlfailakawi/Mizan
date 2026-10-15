@@ -111,7 +111,7 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold truncate">{r.title}</span>
-                <span className="block text-[10px] text-[color:var(--muted)] mt-1">{r.meta}</span>
+                <span className="block text-[11px] text-[color:var(--muted)] mt-1">{r.meta}</span>
               </span>
             </button>
           )) : (

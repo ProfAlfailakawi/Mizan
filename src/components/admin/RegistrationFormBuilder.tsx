@@ -33,14 +33,14 @@ const ConditionEditor: React.FC<{ ar: boolean; title: string; value: Registratio
   return <fieldset className="rounded-xl border border-[#e5e3dc] p-3">
     <legend className="px-1 text-[11px] font-black text-[#606662]">{title}</legend>
     {list.map((c, i) => <div key={i} className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-      <select aria-label={ar ? 'الحقل' : 'Field'} className="mizan-input !min-h-9 max-w-[12rem] text-xs" value={c.field} onChange={e => set(i, { field: e.target.value })}>
+      <select aria-label={ar ? 'الحقل' : 'Field'} className="mizan-input !min-h-10 max-w-[12rem] text-xs" value={c.field} onChange={e => set(i, { field: e.target.value })}>
         <option value="age">{ar ? 'العمر (محسوب)' : 'Age (derived)'}</option>
         {fieldIds.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
       </select>
-      <select aria-label={ar ? 'العملية' : 'Operator'} className="mizan-input !min-h-9 max-w-[9rem] text-xs" value={c.operator} onChange={e => set(i, { operator: e.target.value as RegistrationFieldCondition['operator'], value: parseValue(e.target.value as RegistrationFieldCondition['operator'], String(Array.isArray(c.value) ? c.value.join(',') : c.value ?? '')) })}>
+      <select aria-label={ar ? 'العملية' : 'Operator'} className="mizan-input !min-h-10 max-w-[9rem] text-xs" value={c.operator} onChange={e => set(i, { operator: e.target.value as RegistrationFieldCondition['operator'], value: parseValue(e.target.value as RegistrationFieldCondition['operator'], String(Array.isArray(c.value) ? c.value.join(',') : c.value ?? '')) })}>
         {OPS.map(o => <option key={o} value={o}>{OP_LABEL[o][ar ? 0 : 1]}</option>)}
       </select>
-      {!['exists', 'not_exists'].includes(c.operator) && <input aria-label={ar ? 'القيمة' : 'Value'} className="mizan-input !min-h-9 max-w-[10rem] text-xs" value={Array.isArray(c.value) ? c.value.join(',') : String(c.value ?? '')} onChange={e => set(i, { value: parseValue(c.operator, e.target.value) })} />}
+      {!['exists', 'not_exists'].includes(c.operator) && <input aria-label={ar ? 'القيمة' : 'Value'} className="mizan-input !min-h-10 max-w-[10rem] text-xs" value={Array.isArray(c.value) ? c.value.join(',') : String(c.value ?? '')} onChange={e => set(i, { value: parseValue(c.operator, e.target.value) })} />}
       <button type="button" className="text-[color:var(--danger)] font-bold" onClick={() => { const next = list.filter((_, j) => j !== i); onChange(next.length ? next : undefined); }}>{ar ? 'حذف' : 'Remove'}</button>
     </div>)}
     <button type="button" className="text-xs font-bold text-[color:var(--emerald)] underline" onClick={() => onChange([...list, { field: 'age', operator: 'lt', value: 12 }])}>{ar ? '+ شرط' : '+ Condition'}</button>

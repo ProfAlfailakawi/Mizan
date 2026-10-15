@@ -308,7 +308,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
               <span className="tabular-nums" dir="ltr">{m.fullJuz.length + m.partialJuz.length}/30</span>
             </div>
             <DnaHeat className="mizan-juz-ribbon mt-2.5" cells={cells} max={1} columns={30} ariaLabel={ar ? `الأجزاء في نطاق الفئة: ${m.fullJuz.length} كامل و${m.partialJuz.length} جزئي من 30` : `Juz in range: ${m.fullJuz.length} full, ${m.partialJuz.length} partial of 30`} />
-            <div className="mt-1.5 flex justify-between text-[10px] font-medium tabular-nums text-[var(--muted)]" aria-hidden="true"><span>1</span><span>30</span></div>
+            <div className="mt-1.5 flex justify-between text-[11px] font-medium tabular-nums text-[var(--muted)]" aria-hidden="true"><span>1</span><span>30</span></div>
           </div>
         );
       })()}

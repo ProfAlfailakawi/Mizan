@@ -35,7 +35,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     return (
       <div className={`mizan-surface-soft p-3 min-w-0 ${className}`}>
         <div className="text-[11px] text-[#666b67]">{label}</div>
-        <div className="text-[10px] font-black mt-1 truncate">{value}</div>
+        <div className="text-[11px] font-black mt-1 truncate">{value}</div>
       </div>
     );
   }
@@ -43,7 +43,7 @@ export const Metric: React.FC<MetricProps> = ({ value, label, icon: Icon, varian
     return (
       <div className={`mizan-surface-soft p-3 ${className}`}>
         <div className="text-2xl font-black tabular-nums">{value}</div>
-        <div className="text-[10px] text-[color:var(--muted)] mt-1">{label}</div>
+        <div className="text-[11px] text-[color:var(--muted)] mt-1">{label}</div>
       </div>
     );
   }

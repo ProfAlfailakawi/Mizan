@@ -86,7 +86,7 @@ export const CertificateVerification: React.FC = () => {
         <div className="mt-3 flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--emerald-soft)] text-[var(--emerald-2)]"><ShieldCheck className="h-4 w-4"/></span>
           <div className="flex-1 space-y-1.5"><div className="h-2.5 w-2/3 rounded-full bg-[var(--line)]"/><div className="h-2 w-1/2 rounded-full bg-[var(--line)]/70"/></div>
-          <span className="rounded-full border border-[var(--line)] px-2.5 py-0.5 text-[10px] font-black text-[var(--muted)]">{ar?'أصيلة':'AUTHENTIC'}</span>
+          <span className="rounded-full border border-[var(--line)] px-2.5 py-0.5 text-[11px] font-black text-[var(--muted)]">{ar?'أصيلة':'AUTHENTIC'}</span>
         </div>
       </div>}
     </section>

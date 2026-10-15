@@ -64,7 +64,7 @@ export const ScopeSimulationStudio: React.FC<{
           <NumberDial label={arabic ? 'حجم البنك (نسبة)' : 'Pool size (ratio)'} value={Math.round(state.poolMultiplier * 100)} min={10} max={100} step={10}
             onChange={v => setState(s => ({ ...s, poolMultiplier: v / 100 }))} suffix="%" hint={arabic ? 'اخفضها لترى ماذا يحدث لو ضاق البنك.' : 'Lower it to see a thinner pool.'} />
           <label className="block min-w-0">
-            <span className="block text-[10px] font-black tracking-[.1em] text-[color:var(--muted)]">{arabic ? 'سياسة التكرار' : 'Repeat policy'}</span>
+            <span className="block text-[11px] font-black tracking-[.1em] text-[color:var(--muted)]">{arabic ? 'سياسة التكرار' : 'Repeat policy'}</span>
             <select value={state.repeatMode} onChange={e => setState(s => ({ ...s, repeatMode: e.target.value as WhatIfState['repeatMode'] }))} className="mizan-input mt-1 text-xs">
               <option value="strict_no_repeat">{arabic ? 'منع التكرار تمامًا' : 'Strict no repeat'}</option>
               <option value="repeat_when_necessary">{arabic ? 'السماح بالتكرار عند الضرورة' : 'Repeat only when necessary'}</option>
@@ -97,7 +97,7 @@ export const ScopeSimulationStudio: React.FC<{
                     ? (arabic ? 'لم تنجح أي سحبة — لا يوجد سؤال صالح لهذه النطاقات' : 'No draw succeeded — no eligible question for these ranges')
                     : (arabic ? 'رُصدت مخالفات تحتاج معالجة' : 'Violations were detected')}
               </h3>
-              <span className="text-[10px] font-bold text-[#656b67]">
+              <span className="text-[11px] font-bold text-[#656b67]">
                 {arabic ? `${latest.participantCount} متسابقًا · ${latest.draws} سحبة · ${latest.runtimeMs} مللي ثانية` : `${latest.participantCount} participants · ${latest.draws} draws · ${latest.runtimeMs} ms`}
               </span>
             </div>
@@ -189,20 +189,20 @@ const Violation: React.FC<{ label: string; value: number; arabic: boolean }> = (
 
 const Tile: React.FC<{ label: string; value: React.ReactNode; tone?: 'good' | 'warn' | 'quiet' }> = ({ label, value, tone }) => (
   <div className={`rounded-2xl border p-4 ${tone === 'warn' ? 'border-[#e6d9c2] bg-[#FBF7F0]' : tone === 'good' ? 'border-[#cddbd3] bg-[#F7FAF8]' : 'border-[#e4e2da] bg-white'}`}>
-    <div className="text-[10px] font-bold text-[#656b67]">{label}</div>
+    <div className="text-[11px] font-bold text-[#656b67]">{label}</div>
     <div className="mt-1 text-2xl font-black tabular-nums text-[#24302b]">{value ?? '—'}</div>
   </div>
 );
 
 const NumberDial: React.FC<{ label: string; value: number; min: number; max: number; step: number; suffix?: string; hint?: string; onChange: (value: number) => void }> = ({ label, value, min, max, step, suffix, hint, onChange }) => (
   <label className="block min-w-0">
-    <span className="block text-[10px] font-black tracking-[.1em] text-[color:var(--muted)]">{label}</span>
+    <span className="block text-[11px] font-black tracking-[.1em] text-[color:var(--muted)]">{label}</span>
     <div className="mizan-control mt-1 flex items-center gap-2">
       <button type="button" className="mizan-step-btn" aria-label="-" onClick={() => onChange(Math.max(min, value - step))}>−</button>
       <input type="number" inputMode="numeric" min={min} max={max} value={value}
         onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
         className="min-w-0 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
-      {suffix && <span className="text-[10px] font-bold text-[color:var(--muted)]">{suffix}</span>}
+      {suffix && <span className="text-[11px] font-bold text-[color:var(--muted)]">{suffix}</span>}
       <button type="button" className="mizan-step-btn" aria-label="+" onClick={() => onChange(Math.min(max, value + step))}>+</button>
     </div>
     {hint && <span className="mt-1 block text-[11px] leading-4 text-[color:var(--muted)]">{hint}</span>}

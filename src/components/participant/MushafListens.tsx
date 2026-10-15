@@ -1159,7 +1159,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
         <div>
           <div className="mizan-kicker">{ar ? 'اختبار ذكي' : 'SMART PRACTICE'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'اقرأ… والمصحف يتابعك' : 'Recite… the Mushaf follows'}</h2>
-          <p className="mt-1 max-w-xl text-[10px] leading-5 text-[#5f6663]">
+          <p className="mt-1 max-w-xl text-[11px] leading-5 text-[#5f6663]">
             {ar
               ? 'صفحة المصحف الحقيقية من روايتك، كما يراها المحكّم. اقرأها بصوتك؛ وبعد الانتهاء يعيد لك ميزان مواضع المراجعة بلا درجة ولا ازدحام.'
               : 'The real printed page for your reading, exactly as the judge sees it. Recite aloud; when you finish, MIZAN returns only the places worth reviewing — no score and no clutter.'}
@@ -1280,7 +1280,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           />
 
           {gateNote && (
-            <p className="text-center text-[10px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
+            <p className="text-center text-[11px] leading-5 text-[#6b716d]" data-judging-gate={gate?.word ?? 'UNKNOWN'}>{gateNote}</p>
           )}
 
           {stage === 'report' && (
@@ -1306,7 +1306,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
           )}
 
           {stage === 'report' && (
-            <p className="text-center text-[10px] leading-5 text-[#6b716d]">
+            <p className="text-center text-[11px] leading-5 text-[#6b716d]">
               {ar
                 ? 'وتاريخُ مراجعتك محفوظٌ في هذا الجهاز وحده — لا يُرفع ولا تُسأل عنه لجنة، ويذهب بمسح بيانات المتصفّح.'
                 : 'Your review history lives on this device only — never uploaded, and lost if you clear browser data.'}

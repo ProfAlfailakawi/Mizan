@@ -68,7 +68,7 @@ export const TrialSteps: React.FC<TrialStepsProps> = ({ ar, listening }) => {
             >
               <step.Icon className="h-4 w-4" />
             </span>
-            <span className={`text-[10px] font-black leading-4 ${step.muted ? 'text-[color:var(--muted)]' : 'text-[#39423d]'}`}>{step.label}</span>
+            <span className={`text-[11px] font-black leading-4 ${step.muted ? 'text-[color:var(--muted)]' : 'text-[#39423d]'}`}>{step.label}</span>
             <span className="sr-only">{step.hint}</span>
           </li>
         </React.Fragment>

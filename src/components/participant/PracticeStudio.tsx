@@ -60,7 +60,7 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
 
  return <section className="rounded-[26px] border border-[#dad7cd] bg-[#fdfbf5] overflow-hidden">
   <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e5e1d7] bg-[#f7f4ec]">
-   <div className="min-w-0"><div className="text-[10px] font-black truncate">{ar?'استوديو التدرّب':'PRACTICE STUDIO'}</div>
+   <div className="min-w-0"><div className="text-[11px] font-black truncate">{ar?'استوديو التدرّب':'PRACTICE STUDIO'}</div>
     <div className="text-[11px] text-[color:var(--muted)] truncate">{ar?'اسمع، تابع الكلمة، ثم سجّل نفسك':'Listen, follow the word, then record yourself'}</div></div>
    <Badge variant="emerald">{ar?'المصدر: مجمع الملك فهد':'KFGQPC SOURCE'}</Badge>
   </div>
@@ -75,7 +75,7 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
           : a.text}
         </span></React.Fragment>)}
       </div>
-    : <p className="text-center text-[10px] text-[color:var(--muted)] py-6">{ar?'جارٍ تحميل المقطع…':'Loading the passage…'}</p>}
+    : <p className="text-center text-[11px] text-[color:var(--muted)] py-6">{ar?'جارٍ تحميل المقطع…':'Loading the passage…'}</p>}
   </div>
 
   {passage&&<PassageAudio reading={reading} ayat={passage.ayat} ar={ar} onActive={setActive}/>}
@@ -91,10 +91,10 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
     {!recording
      ? <Button size="sm" onClick={()=>void start()} icon={<Mic className="w-4 h-4"/>}>{ar?'سجّل تلاوتك':'Record yourself'}</Button>
      : <Button size="sm" variant="outline" onClick={stop} icon={<Square className="w-4 h-4"/>}>{ar?'إيقاف التسجيل':'Stop recording'}</Button>}
-    {recording&&<span className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#9B3B2F]"><span className="w-2 h-2 rounded-full bg-[#9B3B2F] animate-pulse"/>{ar?'يسجّل…':'Recording…'}</span>}
+    {recording&&<span className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#9B3B2F]"><span className="w-2 h-2 rounded-full bg-[#9B3B2F] animate-pulse"/>{ar?'يسجّل…':'Recording…'}</span>}
     {selfUrl&&!recording&&<Button size="sm" variant="ghost" onClick={discard} icon={<Trash2 className="w-4 h-4"/>}>{ar?'حذف':'Discard'}</Button>}
    </div>
-   {micError&&<p className="mt-2 text-[10px] text-[#9B3B2F]">{micError}</p>}
+   {micError&&<p className="mt-2 text-[11px] text-[#9B3B2F]">{micError}</p>}
    {selfUrl&&<div className="mt-3">
     <div className="text-[11px] font-black text-[#59615c] mb-1.5">{ar?'تلاوتك':'Your recitation'}</div>
     <audio src={selfUrl} controls className="w-full"/>

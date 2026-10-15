@@ -40,7 +40,7 @@ export const QueueRibbon: React.FC<{
         const you = position === youIndex;
         return <span key={position} aria-hidden className={`mizan-queue-dot ${you ? 'is-you' : position === 1 && !youIndex ? 'is-next' : ''}`} />;
       })}
-      {hidden > 0 && <span aria-hidden className="text-[10px] font-black opacity-60 ms-1 tabular-nums">+{hidden}</span>}
+      {hidden > 0 && <span aria-hidden className="text-[11px] font-black opacity-60 ms-1 tabular-nums">+{hidden}</span>}
     </div>
   );
 };

@@ -153,11 +153,11 @@ export const TrialRun: React.FC<TrialRunProps> = ({ ar, scope, questionCount, mi
         <div className="min-w-0">
           <div className="mizan-kicker">{ar ? 'تجربة كاملة' : 'FULL TRIAL'}</div>
           <h2 className="mt-1 text-lg font-black">{ar ? 'جرّب يومك قبل يومك' : 'Rehearse your day before it comes'}</h2>
-          <p className="mt-1 text-[10px] leading-5 text-[color:var(--muted)]">
+          <p className="mt-1 text-[11px] leading-5 text-[color:var(--muted)]">
             {ar ? 'مواضع من نطاقك، مؤقّت كمؤقّت اللجنة، وميكروفونك مفتوح — بلا تسجيل وبلا درجة.' : 'Loci from your own range, the panel’s clock, your microphone open — no recording, no score.'}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--emerald-soft)] px-3 py-1.5 text-[10px] font-black text-[color:var(--emerald)]">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--emerald-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--emerald)]">
           <ShieldCheck className="h-3.5 w-3.5" />{ar ? 'تدريب لا يُحتسب' : 'Practice only'}
         </span>
       </header>
@@ -205,7 +205,7 @@ const TrialIntro: React.FC<{ ar: boolean; total: number; limit: number; listenin
     <button type="button" onClick={onStart} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-sm font-black text-white">
       <PlayCircle className="h-4.5 w-4.5" />{ar ? 'ابدأ التجربة' : 'Start the trial'}
     </button>
-    <p className="text-center text-[10px] leading-5 text-[color:var(--muted)]">
+    <p className="text-center text-[11px] leading-5 text-[color:var(--muted)]">
       {ar
         ? 'المواضع هنا تُسحب من نطاقك من جدول المصحف، ولا تمسّ خزنة السؤال المعتمدة. ما تراه هنا ليس ما ستُسأل عنه.'
         : 'These loci are drawn from your range in the canonical table, never from the certified question vault.'}
@@ -216,7 +216,7 @@ const TrialIntro: React.FC<{ ar: boolean; total: number; limit: number; listenin
 const Stat: React.FC<{ value: string; label: string }> = ({ value, label }) => (
   <div className="rounded-2xl bg-white/70 p-3 text-center ring-1 ring-[#e4e2da]">
     <div className="text-xl font-black tabular-nums">{value}</div>
-    <div className="mt-0.5 text-[10px] text-[color:var(--muted)]">{label}</div>
+    <div className="mt-0.5 text-[11px] text-[color:var(--muted)]">{label}</div>
   </div>
 );
 
@@ -440,7 +440,7 @@ const TrialQuestion: React.FC<{
           </span>
           <div>
             <div className={`text-2xl font-black tabular-nums leading-none ${urgent ? 'text-[#9B3B2F]' : ''}`}>{clock(Math.max(0, left))}</div>
-            <div className="mt-1 text-[10px] font-bold text-[#666a67]">{ar ? 'المتبقي لهذا الموضع' : 'left on this locus'}</div>
+            <div className="mt-1 text-[11px] font-bold text-[#666a67]">{ar ? 'المتبقي لهذا الموضع' : 'left on this locus'}</div>
           </div>
         </div>
         {listening && (
@@ -452,8 +452,8 @@ const TrialQuestion: React.FC<{
       </div>
 
       {listening
-        ? <p className="flex items-center justify-center gap-1.5 text-[10px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
-        : <p className="text-center text-[10px] font-bold text-[color:var(--muted)]">{ar ? 'التتبّع غير متاح الآن؛ الموضع والمؤقّت يعملان.' : 'Tracking is unavailable; the locus and clock still run.'}</p>}
+        ? <p className="flex items-center justify-center gap-1.5 text-[11px] font-black text-[color:var(--emerald-2)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--emerald-2)]" />{ar ? 'يستمع ويتابع موضعك — ولا يُسجَّل شيء' : 'Listening and following — nothing is stored'}</p>
+        : <p className="text-center text-[11px] font-bold text-[color:var(--muted)]">{ar ? 'التتبّع غير متاح الآن؛ الموضع والمؤقّت يعملان.' : 'Tracking is unavailable; the locus and clock still run.'}</p>}
 
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => close('self')} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--emerald)] px-5 text-sm font-black text-white">
@@ -523,13 +523,13 @@ const TrialReport: React.FC<{ ar: boolean; loci: TrialLocus[]; outcomes: TrialOu
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-xs font-black text-[#39423d]">{i + 1}. {locusLabel(locus, ar)}</div>
-                  <div className="mt-1 text-[10px] font-bold text-[color:var(--muted)]">
+                  <div className="mt-1 text-[11px] font-bold text-[color:var(--muted)]">
                     {!o ? (ar ? 'لم يُقرأ' : 'not read')
                       : o.ended === 'skipped' ? (ar ? 'تخطّيته' : 'skipped')
                       : `${clock(o.seconds)} · ${listened ? (o.heard ? (o.lost === 0 ? (ar ? 'تتبّعك بلا انقطاع' : 'tracked throughout') : ar ? `فقد أثرك ${countAr(o.lost)}${o.stumbles.length ? ` — أوّلها عند ${describeStumble(o.stumbles[0], true)}` : ''}` : `lost ${o.lost}×${o.stumbles.length ? ` — first at ${describeStumble(o.stumbles[0], false)}` : ''}`) : (ar ? 'لم يصل صوتٌ واضح' : 'no clear audio')) : (ar ? 'بلا تتبّع' : 'no tracking')}`}
                   </div>
                 </div>
-                {o?.reachedAyah && <span className="shrink-0 rounded-lg bg-[#f1efe9] px-2.5 py-1 text-[10px] font-black tabular-nums text-[#4b534e]">{ar ? `بلغت الآية ${o.reachedAyah}` : `ayah ${o.reachedAyah}`}</span>}
+                {o?.reachedAyah && <span className="shrink-0 rounded-lg bg-[#f1efe9] px-2.5 py-1 text-[11px] font-black tabular-nums text-[#4b534e]">{ar ? `بلغت الآية ${o.reachedAyah}` : `ayah ${o.reachedAyah}`}</span>}
               </div>
               <div className="mt-2.5 h-1.5 w-full rounded-full bg-[#f1efe9]"><span className="block h-1.5 rounded-full" style={{ width: `${width}%`, background: tone }} /></div>
             </li>

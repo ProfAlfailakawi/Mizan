@@ -194,7 +194,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
                 <td className={`py-1.5 text-end font-black tabular-nums ${row.gap === null ? 'text-[#5b6460]' : row.gap > 0 ? 'text-[#a2503f]' : 'text-[color:var(--emerald)]'}`}>
                   {row.gap === null ? (ar ? 'لم يُحسم' : 'undecided') : row.gap === 0 ? (ar ? 'صفر' : 'zero') : `+${row.gap}`}
                 </td>
-                <td className="py-1.5 text-end text-[10px] font-bold text-[#5b6460]">{STATUS_LABEL[row.status] || row.status}</td>
+                <td className="py-1.5 text-end text-[11px] font-bold text-[#5b6460]">{STATUS_LABEL[row.status] || row.status}</td>
               </tr>
             ))}
           </tbody>
@@ -243,7 +243,7 @@ const ExpertDetail: React.FC<{ ar: boolean; result: OracleBenchmarkResult }> = (
           {result.minMaxReuse.feasibility.certificates.slice(0, 4).map((certificate, index) => (
             <li key={`${certificate.kind}-${index}`} className="rounded-xl border border-[#e0c6c1] bg-[#F9F0EE] p-3 text-xs font-bold leading-6 text-[#7a3b31]">
               {ar ? certificate.ar : certificate.en}
-              <span className="mt-1 block text-[10px] font-medium text-[#7a3b31]">
+              <span className="mt-1 block text-[11px] font-medium text-[#7a3b31]">
                 {ar ? 'القيود الحابسة: ' : 'Binding constraints: '}{certificate.bindingConstraints.join('، ')}
               </span>
             </li>

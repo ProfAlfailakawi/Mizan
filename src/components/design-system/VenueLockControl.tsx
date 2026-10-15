@@ -41,7 +41,7 @@ const PinPad:React.FC<{value:string;onChange:(v:string)=>void;disabled?:boolean;
     {['1','2','3','4','5','6','7','8','9'].map(d=>
       <button key={d} type="button" disabled={disabled} onClick={()=>onChange((value+d).slice(0,8))}
         className="min-h-14 rounded-2xl bg-white/10 text-white text-lg font-black hover:bg-white/20 disabled:opacity-40 tabular-nums">{d}</button>)}
-    <button type="button" disabled={disabled} onClick={()=>onChange('')} className="min-h-14 rounded-2xl bg-white/5 text-white/70 text-[10px] font-black hover:bg-white/15 disabled:opacity-40">{ar?'مسح':'Clear'}</button>
+    <button type="button" disabled={disabled} onClick={()=>onChange('')} className="min-h-14 rounded-2xl bg-white/5 text-white/70 text-[11px] font-black hover:bg-white/15 disabled:opacity-40">{ar?'مسح':'Clear'}</button>
     <button type="button" disabled={disabled} onClick={()=>onChange((value+'0').slice(0,8))} className="min-h-14 rounded-2xl bg-white/10 text-white text-lg font-black hover:bg-white/20 disabled:opacity-40 tabular-nums">0</button>
     <button type="button" disabled={disabled} onClick={()=>onChange(value.slice(0,-1))} aria-label={ar?'حذف':'Backspace'} className="min-h-14 rounded-2xl bg-white/5 text-white/70 hover:bg-white/15 disabled:opacity-40 grid place-items-center"><X className="w-4 h-4"/></button>
   </div>
@@ -68,17 +68,17 @@ export const VenueLockButton:React.FC<{surface:string;ar:boolean;onLocked:(l:Ven
   };
   const current=step==='set'?pin:confirm;const setCurrent=step==='set'?setPin:setConfirm;
   return <>
-    <button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#101a16]/92 backdrop-blur-md text-white text-[10px] font-black shadow-[0_8px_24px_rgba(0,0,0,.35)] hover:bg-[#101a16] transition">
+    <button type="button" onClick={()=>setOpen(true)} className="min-h-11 px-3.5 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#101a16]/92 backdrop-blur-md text-white text-[11px] font-black shadow-[0_8px_24px_rgba(0,0,0,.35)] hover:bg-[#101a16] transition">
       <Lock className="w-3.5 h-3.5"/>{ar?'اقفل الجهاز':'Lock device'}
     </button>
     {open&&<div role="dialog" aria-modal="true" aria-label={ar?'قفل جهاز القاعة':'Lock venue device'} className="fixed inset-0 z-[100] bg-[#0d1512]/95 grid place-items-center p-5">
       <div className="w-full max-w-xs text-center">
         <LockKeyhole className="w-7 h-7 mx-auto text-white/80"/>
         <h2 className="text-white font-black mt-3">{step==='set'?(ar?'اختر رمز فتح الجهاز':'Choose the unlock code'):(ar?'أعد إدخال الرمز':'Re-enter the code')}</h2>
-        <p className="text-[10px] text-white/55 mt-2 leading-5">{ar?'بعد القفل تملأ الشاشة الجهاز. اضغط مطولًا على الزاوية العليا اليمنى ثم أدخل هذا الرمز للخروج.':'Once locked, the surface fills the device. Long-press the upper-right corner, then enter this code to leave.'}</p>
+        <p className="text-[11px] text-white/55 mt-2 leading-5">{ar?'بعد القفل تملأ الشاشة الجهاز. اضغط مطولًا على الزاوية العليا اليمنى ثم أدخل هذا الرمز للخروج.':'Once locked, the surface fills the device. Long-press the upper-right corner, then enter this code to leave.'}</p>
         <Dots n={current.length}/>
         <PinPad value={current} onChange={setCurrent} ar={ar}/>
-        {err&&<p className="text-[10px] text-[#f0b3aa] mt-3">{err}</p>}
+        {err&&<p className="text-[11px] text-[#f0b3aa] mt-3">{err}</p>}
         <div className="flex gap-2 mt-4">
           <button type="button" onClick={()=>{setOpen(false);setPin('');setConfirm('');setStep('set');setErr('')}} className="flex-1 min-h-11 rounded-xl bg-white/5 text-white/70 text-[11px] font-black">{ar?'إلغاء':'Cancel'}</button>
           <button type="button" onClick={()=>void submit()} className="flex-1 min-h-11 rounded-xl bg-[var(--emerald-2)] text-white text-[11px] font-black">{step==='set'?(ar?'متابعة':'Continue'):(ar?'اقفل':'Lock')}</button>
@@ -120,11 +120,11 @@ export const VenueUnlockGuard:React.FC<{lock:VenueLock;ar:boolean;onUnlocked:()=
       <div className="w-full max-w-xs text-center">
         <ShieldAlert className="w-7 h-7 mx-auto text-white/80"/>
         <h2 className="text-white font-black mt-3">{ar?'أدخل رمز فتح الجهاز':'Enter the unlock code'}</h2>
-        <p className="text-[10px] text-white/55 mt-2">{ar?`الشاشة المقفولة: ${lock.surface}`:`Locked surface: ${lock.surface}`}</p>
+        <p className="text-[11px] text-white/55 mt-2">{ar?`الشاشة المقفولة: ${lock.surface}`:`Locked surface: ${lock.surface}`}</p>
         <Dots n={pin.length}/>
         <PinPad value={pin} onChange={v=>{setPin(v);setErr('')}} disabled={blockedMs>0} ar={ar}/>
-        {err&&blockedMs<=0&&<p className="text-[10px] text-[#f0b3aa] mt-3">{err}</p>}
-        {blockedMs>0&&<p className="text-[10px] text-[#f0c9a0] mt-3">{ar?`محاولات خاطئة متتابعة — انتظر ${Math.ceil(blockedMs/1000)} ثانية.`:`Repeated wrong attempts — wait ${Math.ceil(blockedMs/1000)}s.`}</p>}
+        {err&&blockedMs<=0&&<p className="text-[11px] text-[#f0b3aa] mt-3">{err}</p>}
+        {blockedMs>0&&<p className="text-[11px] text-[#f0c9a0] mt-3">{ar?`محاولات خاطئة متتابعة — انتظر ${Math.ceil(blockedMs/1000)} ثانية.`:`Repeated wrong attempts — wait ${Math.ceil(blockedMs/1000)}s.`}</p>}
         <div className="flex gap-2 mt-4">
           <button type="button" onClick={()=>{setAsking(false);setPin('');setErr('')}} className="flex-1 min-h-11 rounded-xl bg-white/5 text-white/70 text-[11px] font-black">{ar?'رجوع':'Back'}</button>
           <button type="button" disabled={blockedMs>0} onClick={()=>void attempt()} className="flex-1 min-h-11 rounded-xl bg-[var(--emerald-2)] text-white text-[11px] font-black disabled:opacity-40">{ar?'افتح':'Unlock'}</button>

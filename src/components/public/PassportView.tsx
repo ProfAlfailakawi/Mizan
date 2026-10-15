@@ -115,7 +115,7 @@ export const PassportView: React.FC = () => {
     {error && <p role="alert" className="mb-4 rounded-xl bg-[var(--danger-soft)] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {!passport && <div className="mizan-surface space-y-4 p-5 sm:p-6">
       <div className="flex items-center gap-4"><MizanPictogram kind="pass" size="lg" tone="emerald" />
-        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[var(--muted)]">{[pl('أنشئ جوازك', 'Create it'), pl('أضف مشاركاتك', 'Add your entries'), pl('انشره إن شئت', 'Publish if you wish')].map((t, i) => <li key={t} className="inline-flex items-center gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--emerald-soft)] text-[10px] text-[var(--emerald)]">{i + 1}</span>{t}</li>)}</ol></div>
+        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-[var(--muted)]">{[pl('أنشئ جوازك', 'Create it'), pl('أضف مشاركاتك', 'Add your entries'), pl('انشره إن شئت', 'Publish if you wish')].map((t, i) => <li key={t} className="inline-flex items-center gap-1.5"><span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--emerald-soft)] text-[11px] text-[var(--emerald)]">{i + 1}</span>{t}</li>)}</ol></div>
       <label className="block text-xs font-bold">{pl('الاسم الظاهر (اختياري الآن)', 'Display name (optional for now)')}<input className="mizan-input mt-1" value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} /></label>
       <button type="button" disabled={busy} onClick={() => void create()} className="min-h-11 rounded-full bg-[var(--emerald)] px-5 text-sm font-bold text-white">{pl('أنشئ جوازي', 'Create my passport')}</button>
     </div>}

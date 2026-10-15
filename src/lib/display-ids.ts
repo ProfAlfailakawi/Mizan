@@ -59,3 +59,14 @@ export function authenticationLabel(method: string | undefined, assurance: strin
 export function secondsLabel(n: number, ar: boolean): string {
   return ar ? `${n} ث` : `${n}s`;
 }
+
+const ASSURANCE_AR: Record<string, string> = {
+  server_hash_chain: 'سلسلة تجزئة على الخادم', client_hash_chain: 'سلسلة تجزئة على الجهاز', external_worm: 'سجل خارجي لا يقبل التعديل',
+};
+const ASSURANCE_EN: Record<string, string> = {
+  server_hash_chain: 'Server hash chain', client_hash_chain: 'Device hash chain', external_worm: 'External write-once log',
+};
+export function assuranceLabel(v: string | undefined | null, ar: boolean): string {
+  const raw = String(v ?? '');
+  return (ar ? ASSURANCE_AR : ASSURANCE_EN)[raw] ?? raw;
+}
