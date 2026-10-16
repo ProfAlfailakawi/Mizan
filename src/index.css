@@ -1494,15 +1494,15 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 @media (min-width:1200px) and (max-height:949px){
   .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell{ padding:.6rem; gap:.3rem; }
   .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell > div:nth-child(2){ padding-block:.4rem; }
-  .mizan-venue-2 > .min-h-full{ padding:1.1rem 2rem 4.5rem; }
-  .mizan-venue-2 > .min-h-full > main{ padding-block:.9rem; }
-  .mizan-venue-2 > .min-h-full > footer .mz-bp-bstat{ padding-block:.5rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full{ padding:1.1rem 2rem 4.5rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > main{ padding-block:.9rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > footer .mz-bp-bstat{ padding-block:.5rem; }
 }
 @media (min-width:1200px) and (max-height:759px){
   .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell{ padding:.5rem; gap:.2rem; }
   .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell .mizan-board-code{ font-size:clamp(1.6rem, 21cqi, 9rem); }
-  .mizan-venue-2 > .min-h-full{ padding-top:.7rem; padding-bottom:4rem; }
-  .mizan-venue-2 > .min-h-full > main{ padding-block:.5rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full{ padding-top:.7rem; padding-bottom:4rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > main{ padding-block:.5rem; }
 }
 .mizan-board-cell{
   background:var(--venue-surface); border:1px solid var(--venue-line);
