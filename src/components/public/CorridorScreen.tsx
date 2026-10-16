@@ -336,7 +336,7 @@ const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board
       {/* ستّة أعمدة بعرض عمودين لكل بطاقة: ما يبقى في الصف الأخير يقف في الوسط بدل أن يتيم عند الطرف. */}
       <div className="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3 overflow-hidden sm:grid-cols-4 xl:grid-cols-6">
         {panels.slice(0, 12).map(slice => (
-          <article key={slice.committeeId} className="flex items-center gap-4 rounded-[22px] border border-white/10 bg-white/[.035] px-5 py-4 sm:col-span-2 max-xl:[&:nth-child(2n+1):last-child]:col-start-2 xl:[&:nth-child(3n+1):last-child]:col-start-3 xl:[&:nth-child(3n+1):nth-last-child(2)]:col-start-2">
+          <article key={slice.committeeId} className="flex items-center gap-4 rounded-[22px] border border-white/10 bg-white/[.035] px-5 py-4 sm:col-span-2 sm:max-xl:[&:nth-child(2n+1):last-child]:col-start-2 xl:[&:nth-child(3n+1):last-child]:col-start-3 xl:[&:nth-child(3n+1):nth-last-child(2)]:col-start-2">
             <span className="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl bg-white/10 px-2 text-sm font-black tabular-nums">{slice.code}</span>
             <div className="min-w-0 flex-1">
               <div className="text-base font-bold mizan-venue-muted">{ar ? 'الآن' : 'NOW'}</div>
