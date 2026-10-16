@@ -1933,6 +1933,14 @@ html[data-mizan-motion="reduced"] .mizan-done-mark{ animation:none !important; }
   /* تبويبٌ يلتفّ وحده إلى سطرٍ أخير كان يبدو يتيمًا؛ تتمدّد الحبّات لتملأ كلَّ سطر. */
   .mizan-tabs{ width:100% }
   .mizan-tabs > .mizan-tab{ flex:1 1 auto }
+  /* ثلاثة تبويبات بالضبط كانت تلتفّ ٢+١ (سطران): تصير ثلاثَ خانات متساويةً في سطرٍ واحد،
+     والعنوان الأطول يلتفّ داخل خانته بدل أن يدفع تبويبًا إلى سطرٍ يتيم. عرضٌ وتباعدٌ فقط. */
+  .mizan-tabs:not(.mizan-tabs-scroll):not(.mz-bp-tabgrid):has(> .mizan-tab:nth-child(3):last-child){
+    display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .mizan-tabs:not(.mizan-tabs-scroll):not(.mz-bp-tabgrid):has(> .mizan-tab:nth-child(3):last-child) > .mizan-tab{
+    min-width:0; padding:4px .35rem; gap:.3rem; white-space:normal; text-align:center; line-height:1.25; overflow-wrap:anywhere;
+  }
 }
 
 /* الأفقي القصير (هاتفٌ مُدار): شريط بيئة العرض يرقّ إلى 44px — قدرَ هدف اللمس لا أكثر —
