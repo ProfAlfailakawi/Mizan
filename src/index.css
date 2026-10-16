@@ -1486,6 +1486,24 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 @media (min-width:1700px){
   .mizan-board-grid:has(> :nth-child(11)){ grid-template-columns:repeat(6, minmax(0,1fr)); }
 }
+/* 1366×768 (حاسوب محمول على جدار أو لوح صغير): ثلاث أعمدة تعني أربعة صفوف وتمريرًا يُخفي لجانًا.
+   اثنتا عشرة لجنة تُوضع في صفّين بستة أعمدة كما في 1080p، ويضيق الحشو الرأسي لتبقى كلها وتذييلها في لقطة. */
+@media (min-width:1200px) and (max-height:1079px){
+  .mizan-board-grid:has(> :nth-child(11)){ grid-template-columns:repeat(6, minmax(0,1fr)); }
+}
+@media (min-width:1200px) and (max-height:949px){
+  .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell{ padding:.6rem; gap:.3rem; }
+  .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell > div:nth-child(2){ padding-block:.4rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full{ padding:1.1rem 2rem 4.5rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > main{ padding-block:.9rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > footer .mz-bp-bstat{ padding-block:.5rem; }
+}
+@media (min-width:1200px) and (max-height:759px){
+  .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell{ padding:.5rem; gap:.2rem; }
+  .mizan-board-grid:has(> :nth-child(11)) .mizan-board-cell .mizan-board-code{ font-size:clamp(1.6rem, 21cqi, 9rem); }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full{ padding-top:.7rem; padding-bottom:4rem; }
+  .mizan-venue-2.mizan-venue-zoom > .min-h-full > main{ padding-block:.5rem; }
+}
 .mizan-board-cell{
   background:var(--venue-surface); border:1px solid var(--venue-line);
   border-radius:var(--radius-md); padding:clamp(.85rem, 1.4vw, 1.35rem);
@@ -1505,7 +1523,8 @@ html[data-mizan-motion="reduced"] .mz-cer-item{ animation-delay:0ms !important; 
 }
 /* خليّة القاعة: سطران بدل سطرٍ مقصوص بـ«…» — الواقف يدلّه اسم فرعه كاملًا أو شبه كامل. */
 .mizan-board-tag.is-wrap{
-  white-space:normal; text-overflow:clip; line-height:1.45; border-radius:14px;
+  /* بلا حشوٍ رأسي: مع line-clamp يتسرّب جزءٌ من السطر الثالث داخل الحشو؛ والتنفّس من ارتفاع السطر. */
+  white-space:normal; text-overflow:clip; line-height:1.75; padding-block:0; border-radius:14px;
   display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2;
 }
 /*

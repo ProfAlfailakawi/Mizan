@@ -40,10 +40,10 @@ export const CeremonyView: React.FC<{onClose?:()=>void}> = ({onClose}) => {
  const request=async()=>{setBusy(true);try{await s.sealCeremonyVault()}finally{setBusy(false)}};
  const PrevIcon=ar?ChevronRight:ChevronLeft; const NextIcon=ar?ChevronLeft:ChevronRight;
 
- return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'وضع الحفل':'Ceremony mode'} className="fixed inset-0 z-50 mizan-venue-deep mz-bp-atmos mz-bp-stage text-white overflow-hidden flex flex-col p-5 sm:p-8">
+ return <div ref={venueRef} role={onClose?"dialog":undefined} aria-modal={onClose?true:undefined} aria-label={ar?'وضع الحفل':'Ceremony mode'} className="fixed inset-0 z-50 mizan-venue-deep mz-bp-atmos mz-bp-stage text-white overflow-x-hidden overflow-y-auto flex flex-col p-5 sm:p-8">
    <header className="flex items-center justify-between"><div className="flex items-center gap-3"><MizanLogo language={language} tone="inverse" compact showWordmark={false}/><div><div className="text-[11px] font-black tracking-[.18em] mizan-venue-muted">{ar?'حفل ميزان':'MIZAN CEREMONY'}</div><div className="text-sm font-bold mt-1">{bilingualName(competition,ar)}</div></div></div>{onClose&&<Button shape="square" variant="venue" onClick={onClose} aria-label={ar?'إغلاق':'Close'}><X className="w-5 h-5"/></Button>}</header>
 
-   <main className="flex-1 grid place-items-center px-3"><div className="w-full max-w-5xl text-center">
+   <main className="flex-1 grid place-items-center px-3 py-4"><div className="w-full max-w-5xl text-center">
     {!authorized?<div className="max-w-xl mx-auto">
       <Pictogram icon={LockKeyhole} size="lg" tone="ink" className="mz-bp-seal mx-auto !rounded-full !border-white/15 !bg-transparent [&>.mizan-pictogram-scene]:hidden [&>svg]:!text-[#d8e4dd]"/>
       <div className="text-[11px] font-black tracking-[.22em] text-[#b9cfc4] mt-6">{ar?'خزنة الحفل':'CEREMONY VAULT'}</div>
