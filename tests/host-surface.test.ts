@@ -13,9 +13,13 @@ test('mizan is the public marketing face, admin is the owner console', () => {
   assert.equal(hostSurface('admin.dr-alfailakawi.com'), 'admin');
 });
 
-test('the web.app sites map to the same two surfaces', () => {
-  assert.equal(hostSurface('mizan-kw.web.app'), 'marketing');
-  assert.equal(hostSurface('mizan-admin-kw.web.app'), 'admin');
+test('the web.app site maps to the marketing and admin surfaces', () => {
+  assert.equal(hostSurface('mizan-quran.web.app'), 'marketing');
+  // the owner console is a path on the marketing host, not a separate site
+  assert.equal(hostSurface('mizan-quran.web.app', '/admin'), 'admin');
+  assert.equal(hostSurface('mizan-quran.web.app', '/admin/tenants'), 'admin');
+  assert.equal(hostSurface('mizan-quran.web.app', '/administrators'), 'marketing');
+  assert.equal(hostSurface('mizan-quran.web.app', '/'), 'marketing');
   // the project default site stays the tenant application, as before
   assert.equal(hostSurface('mizan-f2ce3.web.app'), 'app');
 });
@@ -29,5 +33,5 @@ test('every other host is a tenant application, and localhost stays the app', ()
 test('a tenant cannot claim the reserved labels', () => {
   const store = fs.readFileSync('server/tenant-store.ts', 'utf8');
   const reserved = store.slice(store.indexOf('RESERVED_SUBDOMAINS'));
-  for (const label of ['mizan', 'admin', 'mizan-kw', 'mizan-admin-kw']) assert.match(reserved, new RegExp(`'${label}'`));
+  for (const label of ['mizan', 'admin', 'mizan-quran']) assert.match(reserved, new RegExp(`'${label}'`));
 });
