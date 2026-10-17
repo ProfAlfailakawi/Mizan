@@ -199,3 +199,21 @@ curl -s -X POST https://<مضيف>/api/enterprise/tenants/alfailakawi/suspend -H
 السجلّ القائم، ورقم الهوية، وتاريخ الميلاد صيغةً ومعقوليّة، والجنس قيمةً محصورة، والفئة
 بمعرّفها أو رمزها، والرواية — مُعلَنةً أو موروثةً من فئةٍ ذات روايةٍ واحدة أو مطلوبةً
 صراحةً من فئةٍ تتيح عدّة روايات. والأخطاء برقم السطر والعمود، والإدخال **الكل أو لا شيء**.
+
+## ١٫٦) النطاقات المجانية `web.app` (Firebase Hosting)
+
+مواقع Hosting في مشروع `mizan-f2ce3` تمرّر كل الطلبات (rewrite) إلى خدمة `mizan` في `me-central1`،
+وتصل ترويسة `x-forwarded-host` بالمضيف الأصلي فيقرؤها الخادم كما في الـWorker.
+
+| الموقع | الوجه |
+| --- | --- |
+| `mizan-kw.web.app` | الموقع التسويقي |
+| `mizan-admin-kw.web.app` | لوحة مالك المنصّة |
+| `mizan-f2ce3.web.app` | الموقع الافتراضي للمشروع (وجه التطبيق، كما كان) |
+
+الجهات تبقى تحت `*.dr-alfailakawi.com`؛ كل جهة تحتاج اسم مضيف خاصاً بها ولا يمكن أن يكون لكل جهة
+موقع `web.app`. فلا يُحذف سجل النطاق ولا الـWorker وإلا سقطت الجهات.
+
+التسمية: `src/lib/host-surface.ts`، والأسماء محجوزة في `RESERVED_SUBDOMAINS`. نشر إعداد Hosting
+(ثابت، يدوي، مرة واحدة): `firebase deploy --only hosting:mizan-kw,hosting:mizan-admin-kw --project mizan-f2ce3`.
+أي نطاق جديد يجب أن يُضاف إلى النطاقات المصرّح بها في Firebase Authentication.
