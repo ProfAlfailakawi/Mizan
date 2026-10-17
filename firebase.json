@@ -11,36 +11,21 @@
         "**/.*",
         "**/node_modules/**"
       ],
-      "rewrites": [
+      "redirects": [
         {
-          "source": "**",
-          "run": {
-            "serviceId": "mizan",
-            "region": "me-central1"
-          }
+          "source": "/:path*",
+          "destination": "https://mizan-quran.web.app/:path*",
+          "type": 302
+        },
+        {
+          "source": "/",
+          "destination": "https://mizan-quran.web.app/",
+          "type": 302
         }
       ]
     },
     {
-      "site": "mizan-kw",
-      "public": "firebase-hosting",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "run": {
-            "serviceId": "mizan",
-            "region": "me-central1"
-          }
-        }
-      ]
-    },
-    {
-      "site": "mizan-admin-kw",
+      "site": "mizan-quran",
       "public": "firebase-hosting",
       "ignore": [
         "firebase.json",

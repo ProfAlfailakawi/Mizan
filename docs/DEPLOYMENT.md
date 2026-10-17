@@ -37,6 +37,7 @@ node scripts/provision-deployment.mjs --out .env.production --data-root /var/lib
 | `FIREBASE_PROJECT_ID` | مشروع Firebase الذي يثبت هوية المستخدمين |
 | `FIRESTORE_DATABASE_ID` | اختياري؛ قاعدة Firestore، والافتراضي `(default)` |
 | `MIZAN_BASE_DOMAIN` | النطاق الأساسي الذي تتفرّع منه نطاقات الجهات |
+| `MIZAN_REDIRECT_RUN_APP_TO` | الموقع الرسمي؛ زيارة رابط run.app مباشرةً تُحوَّل إليه (فارغ = لا تحويل) |
 | `MIZAN_TENANTS` أو `MIZAN_TENANTS_FILE` | سجل الجهات ونطاقاتها |
 | `MIZAN_GEMINI_API_KEY` | لتوليد مقاطع عبارة الإيقاف **مرة واحدة** |
 

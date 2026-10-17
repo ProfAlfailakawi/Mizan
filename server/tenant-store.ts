@@ -14,7 +14,7 @@ import type { TenantRecord } from './tenant-registry';
 import {isArabicText,isDomain,isEmail,isLatinText,isPhone,isWebsiteUrl,normalizeDomain,normalizeEmail,normalizePhone,normalizeWebsiteUrl,toAsciiDigits} from '../shared/input-validation';
 
 /** أسماء لا تصلح نطاقًا لجهة: تتعارض مع مضيفات النظام أو تنتحل صفته. */
-export const RESERVED_SUBDOMAINS = ['www', 'api', 'admin', 'app', 'mail', 'ftp', 'cdn', 'static', 'assets', 'status', 'support', 'help', 'mizan', 'mizan-kw', 'mizan-admin-kw', 'root', 'localhost'];
+export const RESERVED_SUBDOMAINS = ['www', 'api', 'admin', 'app', 'mail', 'ftp', 'cdn', 'static', 'assets', 'status', 'support', 'help', 'mizan', 'mizan-quran', 'root', 'localhost'];
 
 const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const DOMAIN_RE = /^(?=.{4,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;

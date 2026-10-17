@@ -65,7 +65,9 @@ import { QuranIntelligenceService } from './server/quran-intelligence-service';
 import { AsrBenchmarkRepository, RecitationRecogniser } from './server/recitation-recogniser';
 import type { RecitationJudgingGate } from './server/recitation-asr-contract';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
-import { publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
+import { baseDomain, publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
+import { retiredHosts } from './server/retired-hosts';
+import { publicOriginOf } from './server/public-origin';
 import { parseAllowedOrgIds, resolveEnterpriseOrganization } from './server/enterprise-scope';
 import { TenantStore } from './server/tenant-store';
 import type { TenantRecord } from './server/tenant-registry';
@@ -128,6 +130,7 @@ async function startServer() {
   const PORT = Number(process.env.PORT) > 0 ? Number(process.env.PORT) : 3000;
   const isProd = process.env.NODE_ENV === 'production';
   app.disable('x-powered-by'); app.set('trust proxy', 1);
+  app.use(retiredHosts(() => baseDomain()));
   app.use((req,res,next)=>{
     const requestId=String(req.headers['x-request-id']||crypto.randomUUID()); res.setHeader('x-request-id',requestId);
     res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
@@ -865,7 +868,7 @@ async function startServer() {
       const shareToken=crypto.randomBytes(32).toString('base64url');const expiresAt=new Date(Date.now()+30*60_000).toISOString();
       const configuredOrigin=String(process.env.MIZAN_PUBLIC_APP_ORIGIN||'').trim();let origin='';
       if(configuredOrigin){const u=new URL(configuredOrigin);if(!['http:','https:'].includes(u.protocol))throw new Error('PASSWORD_RESET_LINK_UNAVAILABLE');origin=u.origin;}
-      else {const headerOrigin=String(req.headers.origin||'');if(headerOrigin){const u=new URL(headerOrigin);if(['http:','https:'].includes(u.protocol)&&u.hostname===req.hostname)origin=u.origin;}if(!origin)origin=`${req.protocol}://${req.get('host')}`;}
+      else {const headerOrigin=String(req.headers.origin||'');if(headerOrigin){const u=new URL(headerOrigin);if(['http:','https:'].includes(u.protocol)&&u.hostname===req.hostname)origin=u.origin;}if(!origin)origin=publicOriginOf(req);}
       const resetUrl=`${origin}/#reset-password?oobCode=${encodeURIComponent(generated.oobCode)}&rid=${encodeURIComponent(request.id)}&rt=${encodeURIComponent(shareToken)}`;
       const updated=identityGovernance.markPasswordResetIssued(actor,request.id,shareToken,expiresAt);
       return res.status(201).json({request:updated,resetUrl,expiresAt});
@@ -1141,7 +1144,7 @@ async function startServer() {
     if(!opsTelemetry||status<500)return;
     try{opsTelemetry.recordJob({id:`public_registration:${competitionId||'unknown'}:${code}`,competitionId:competitionId||undefined,jobType:'public_registration',status:'FAILED',errorCode:code})}catch{/* التتبّع لا يُفشل تسجيلًا ولا يُغيّر ردًّا */}
   };
-  const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return `${req.protocol}://${req.get('host')}`};
+  const requestOrigin=(req:Request)=>{const configured=String(process.env.APP_URL||'').trim();if(configured){try{return new URL(configured).origin}catch{/* fall through */}}return publicOriginOf(req)};
   /*
    * ثلاثةُ مسارات كانت تبني الردَّ نفسه بثلاث نسخ. فاجتمعت في واحدة — لا اختصارًا، بل
    * لأن الوثيقتين تُرسلان معه: ونسخةٌ تحملهما وأخرى لا تحملهما تجعل صفحةَ التسجيل
@@ -1537,7 +1540,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     }
     return res.json({invoice:inv,reminded:true});
   };
-  const publicOrigin=(req:Request)=>`${req.protocol}://${req.get('host')||''}`;
+  const publicOrigin=(req:Request)=>publicOriginOf(req);
   const startCheckout=async(req:Request,res:Response,repo:SaaSPlatformRepository)=>{
     if(!paymentGateway)return res.status(503).json({code:'PAYMENT_GATEWAY_NOT_CONFIGURED'});
     const actor=saasActor(req);
