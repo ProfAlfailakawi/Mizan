@@ -2,22 +2,60 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "hosting": {
-    "site": "mizan-f2ce3",
-    "public": "firebase-hosting",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "run": {
-          "serviceId": "mizan",
-          "region": "me-central1"
+  "hosting": [
+    {
+      "site": "mizan-f2ce3",
+      "public": "firebase-hosting",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "mizan",
+            "region": "me-central1"
+          }
         }
-      }
-    ]
-  }
+      ]
+    },
+    {
+      "site": "mizan-kw",
+      "public": "firebase-hosting",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "mizan",
+            "region": "me-central1"
+          }
+        }
+      ]
+    },
+    {
+      "site": "mizan-admin-kw",
+      "public": "firebase-hosting",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "run": {
+            "serviceId": "mizan",
+            "region": "me-central1"
+          }
+        }
+      ]
+    }
+  ]
 }
