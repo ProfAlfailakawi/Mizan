@@ -49,3 +49,19 @@ test('an activation refusal reaches the person as its Arabic sentence, not as a 
   const ui = fs.readFileSync('src/lib/ui-language.ts', 'utf8');
   for (const code of ['ACTIVATION_TOKEN_INVALID', 'ACTIVATION_EMAIL_MISMATCH', 'ACTIVATION_FAILED']) assert.match(ui, new RegExp(`${code}: '`));
 });
+
+test('the head judge cannot resolve an appeal without a reason or push a score outside its range', () => {
+  const inbox = fs.readFileSync('src/components/head-judge/HeadJudgeInbox.tsx', 'utf8');
+  assert.match(inbox, /const noteReady=appealNote\.trim\(\)\.length>=3/);
+  assert.match(inbox, /disabled=\{!noteReady\|\|deltaOutOfRange\}/);
+  assert.match(inbox, /store\.appealScoreRange\(currentAppeal\.id\)/);
+  const store = fs.readFileSync('src/lib/store.ts', 'utf8');
+  assert.match(store, /SCORE_CORRECTION_OUT_OF_RANGE/);
+  assert.match(store, /currentScore:targetResult\?\.finalScore,maxScore:targetMax/);
+});
+
+test('the exception desk reports a check-in only when one really happened, and offers it only to approved participants', () => {
+  const portals = fs.readFileSync('src/components/admin/RolePortals.tsx', 'utf8');
+  assert.match(portals, /disabled=\{p\.status!=='approved'\}/);
+  assert.match(portals, /const admitted=!!r&&p\.status==='approved'&&\['in_queue','checked_in'\]\.includes\(r\.status\)/);
+});

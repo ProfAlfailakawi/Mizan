@@ -207,9 +207,25 @@ service cloud.firestore {
           );
         allow delete: if platformAdmin();
 
+        /*
+         * مدير الوفد يرى ويكتب متسابقي وفده وحدهم.
+         *
+         * كانت القاعدة تمنحه قراءة كل متسابقي المسابقة وكتابتهم: هواتفُ وبريدُ وأرقام هويّة قاصرين من وفودٍ أخرى،
+         * وتعديلُ حالة أيّ متسابقٍ (يعتمد نفسه أو يُسقط غيره). والوفد يُعرَّف بـ`delegation-<uid>` (انظر
+         * src/lib/delegation-scope.ts) ولا يُنقل متسابقٌ من وفدٍ إلى آخر بتحديث.
+         */
+        function ownDelegation() {
+          return roleIs(['delegation_manager']) && present() && resource.data.get('delegationId', '') == ('delegation-' + request.auth.uid);
+        }
         match /participants/{participantId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','exception_host','delegation_manager']);
+          allow read: if readableScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','auditor']) || ownDelegation());
+          allow create: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','exception_host'])
+              || (roleIs(['delegation_manager']) && request.resource.data.delegationId == ('delegation-' + request.auth.uid)));
+          allow update: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','exception_host'])
+              || (present() && ownDelegation() && request.resource.data.delegationId == resource.data.delegationId));
           // The judge who ends a session may only move the participant forward to in-session /
           // tested, touching nothing but the status, its history and the timestamp.
           allow update: if present() && writeScope(orgId,competitionId) && roleIs(['judge'])

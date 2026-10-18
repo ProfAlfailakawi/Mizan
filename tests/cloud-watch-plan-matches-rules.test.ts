@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { COLLECTION_READERS, CONFIG_WRITER_ROLES, WATCHED_COLLECTIONS, watchPlanFor } from '../src/lib/cloud-sync';
+import { COLLECTION_READERS, CONFIG_WRITER_ROLES, WATCHED_COLLECTIONS, ownValueFor, watchPlanFor } from '../src/lib/cloud-sync';
 import type { Role } from '../src/types';
 
 /*
@@ -21,7 +21,9 @@ function readRoles(collection: string): { all: Set<string>; own: Set<string> } {
   const all = new Set<string>(), own = new Set<string>();
   for (const alternative of read![1].split('||')) {
     const roles = [...alternative.matchAll(/roleIs\(\[([^\]]*)\]\)/g)].flatMap(m => [...m[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]));
-    for (const r of roles) (alternative.includes('uploaderUid') ? own : all).add(r);
+    for (const r of roles) (/uploaderUid/.test(alternative) ? own : all).add(r);
+    // مدير الوفد يقرأ وفده وحده عبر دالة القاعدة `ownDelegation()` — دوره داخل الدالة لا في القائمة.
+    if (/ownDelegation\(\)/.test(alternative)) own.add('delegation_manager');
   }
   return { all, own };
 }
@@ -37,10 +39,13 @@ test('every watched collection lists exactly the roles the rules let read it', (
 
 test('a judge listens to its own submissions only, a contestant to its own appeals only', () => {
   const judge = watchPlanFor('judge');
-  assert.deepEqual(judge.find(p => p.collection === 'judge_submissions'), { collection: 'judge_submissions', ownOnly: true });
+  assert.deepEqual(judge.find(p => p.collection === 'judge_submissions'), { collection: 'judge_submissions', ownOnly: true, ownField: 'uploaderUid' });
   assert.ok(!judge.some(p => ['reviews', 'certificates', 'qualifications'].includes(p.collection)), 'a judge cannot read those, so it must not ask');
   const participant = watchPlanFor('participant');
-  assert.deepEqual(participant, [{ collection: 'appeals', ownOnly: true }]);
+  assert.deepEqual(participant, [{ collection: 'appeals', ownOnly: true, ownField: 'uploaderUid' }]);
+  const delegation = watchPlanFor('delegation_manager');
+  assert.deepEqual(delegation.find(p => p.collection === 'participants'), { collection: 'participants', ownOnly: true, ownField: 'delegationId' }, 'a delegation manager lists only its own delegation');
+  assert.equal(ownValueFor('delegationId', 'u1'), 'delegation-u1');
 });
 
 test('roles with no cloud read access open no listeners at all', () => {

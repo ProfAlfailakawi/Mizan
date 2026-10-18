@@ -378,7 +378,7 @@ async function buildCompetition(oi: number, ci: number, org: { id: string; arNam
       fullName: nm.en, fullNameArabic: nm.ar, email: `${slug}-p${i + 1}@qa.mizan.test`, phone: `${country[2]}5${String(1000000 + int(0, 8999999)).slice(0, 7)}`,
       country: country[0], nationality: country[3], nationalIdOrPassport: `${country[1]}${int(10000000, 99999999)}`, dateOfBirth: iso(NOW - age * 365.25 * DAY).slice(0, 10),
       gender: female ? 'female' : 'male', categoryId: cat.id, riwaya: 'حفص عن عاصم', institution: `${pick(['مركز', 'دار', 'معهد'])} ${pick(FAMILY)[0]} لتحفيظ القرآن`,
-      delegationId: `del-${slug}-${(i % 4) + 1}`, status: st, statusHistory: hist, createdAt: iso(created),
+      delegationId: `delegation-${staff.delegation_manager[i % staff.delegation_manager.length].uid}`, status: st, statusHistory: hist, createdAt: iso(created),
       ...(['checked_in', 'in_queue', 'in_session', 'tested', 'appealed', 'certified'].includes(st) ? { checkedInAt: iso(created + 25 * DAY), checkInMethod: 'kiosk_qr' as const, arrivalSlot: '08:30–09:00', assignedCommitteeId: committee.id, queueNumber: i + 1 } : {}),
       ...(i % 17 === 0 ? { specialNeeds: true } : {}),
     } as Participant;

@@ -96,6 +96,9 @@ export interface ScoreCorrectionRequest {
   policyAllowsScoreChange: boolean;
   /** من سجلّ الأختام: هل خُتمت نتيجةُ هذا المشارك؟ */
   resultSealed: boolean;
+  /** الدرجة الحالية والدرجة العظمى لفئة المشارك، كما يعرفها المصحِّح. تُستعملان لمنع تصحيحٍ يُخرج الدرجة عن مداها. */
+  currentScore?: number;
+  maxScore?: number;
 }
 
 export interface ScoreCorrectionAttested {
@@ -123,6 +126,16 @@ export function scoreCorrectionDecision(request: ScoreCorrectionRequest): Attest
   if (!request.policyAllowsScoreChange) return { code: 'SCORE_CORRECTION_FORBIDDEN_BY_POLICY' };
   if (request.resultSealed) return { code: 'SCORE_CORRECTION_ON_SEALED_RESULT_BLOCKED' };
   if (!Number.isFinite(request.delta) || request.delta === 0) return { code: 'SCORE_CORRECTION_DELTA_INVALID' };
+  /*
+   * التصحيح لا يُخرج الدرجة عن مداها. كان الخادم يشهد على أي رقم: تصحيحٌ بـ +500 رفع درجةً إلى 590 من 100 فصارت
+   * صاحبةَ المركز الأول وطُبعت في شهادة. المدى من الفئة (مجموع العظمى للمعايير)، ويبقى سقفٌ مطلق ١٠٠٠ حين لا يُعرف.
+   */
+  const max = Number.isFinite(request.maxScore) && (request.maxScore as number) > 0 ? (request.maxScore as number) : 1000;
+  if (Math.abs(request.delta) > max) return { code: 'SCORE_CORRECTION_DELTA_OUT_OF_RANGE' };
+  if (Number.isFinite(request.currentScore)) {
+    const next = (request.currentScore as number) + request.delta;
+    if (next < 0 || next > max + 1e-9) return { code: 'SCORE_CORRECTION_RESULT_OUT_OF_RANGE' };
+  }
   return {
     attested: true,
     participantId: request.participantId,

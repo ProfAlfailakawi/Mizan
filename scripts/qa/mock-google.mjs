@@ -56,7 +56,8 @@ const send = (res, obj) => { res.writeHead(200, { 'content-type': 'application/j
 const server = https.createServer({ key: fs.readFileSync(keys.tlsKey), cert: fs.readFileSync(keys.tlsCrt) }, (req, res) => {
   const host = String(req.headers.host || '').split(':')[0];
   if (host.startsWith('firestore.')) {
-    const p = http.request({ host: '127.0.0.1', port: FIRESTORE_PORT, path: req.url, method: req.method, headers: { ...req.headers, host: `127.0.0.1:${FIRESTORE_PORT}` } }, (r) => { res.writeHead(r.statusCode || 502, r.headers); r.pipe(res); });
+    if (req.method === 'OPTIONS') { res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-max-age': '600' }); return res.end(); }
+    const p = http.request({ host: '127.0.0.1', port: FIRESTORE_PORT, path: req.url, method: req.method, headers: { ...req.headers, host: `127.0.0.1:${FIRESTORE_PORT}` } }, (r) => { res.writeHead(r.statusCode || 502, { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-expose-headers': '*', ...r.headers }); r.pipe(res); });
     p.on('error', () => { try { res.writeHead(502); res.end(); } catch {} });
     res.on('close', () => p.destroy());
     req.pipe(p);

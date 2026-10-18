@@ -82,7 +82,7 @@ import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type Tel
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
 import type { WebhookEventType } from './server/commercial/types';
-import { CommunicationsService, InAppProvider, providersFromEnv, type Recipient } from './server/communications';
+import { CommunicationsService, InAppProvider, providersFromEnv, isBillingTrigger, BILLING_AUDIENCE_ROLES, type Recipient } from './server/communications';
 import { runParticipantReminders, type ReminderSource } from './server/participant-reminders';
 import { RegistrationReminderStore, runRegistrationReminders } from './server/registration-reminders';
 import { PassportStore, type CertificateCheck } from './server/passport';
@@ -442,7 +442,7 @@ async function startServer() {
    */
   const communicationsDir=saasDir?path.join(saasDir,'communications'):'';
   let communications:CommunicationsService|null=null;
-  try{if(communicationsDir)communications=new CommunicationsService(path.join(communicationsDir,'outbox.json'),providersFromEnv(process.env as Record<string,string|undefined>,notificationCenter?new InAppProvider(({organizationId,title,body})=>{notificationCenter!.system({title,body,priority:'important',target:{type:'organization',organizationId},dedupeKey:`comm:${organizationId}:${title}`})}):undefined))}catch(err){console.error('Communications disabled:',err)}
+  try{if(communicationsDir)communications=new CommunicationsService(path.join(communicationsDir,'outbox.json'),providersFromEnv(process.env as Record<string,string|undefined>,notificationCenter?new InAppProvider(({organizationId,title,body,trigger})=>{if(isBillingTrigger(trigger)){for(const role of BILLING_AUDIENCE_ROLES)notificationCenter!.system({title,body,priority:'important',target:{type:'role',role,organizationId},dedupeKey:`comm:${organizationId}:${role}:${title}`});return}notificationCenter!.system({title,body,priority:'important',target:{type:'organization',organizationId},dedupeKey:`comm:${organizationId}:${title}`})}):undefined))}catch(err){console.error('Communications disabled:',err)}
   const communicate=(trigger:Parameters<CommunicationsService['enqueue']>[0],subjectKey:string,recipients:Recipient[],vars:Record<string,string|number|undefined>)=>{try{communications?.enqueue(trigger,subjectKey,recipients,vars)}catch(err){console.warn('[communications] enqueue failed:',err instanceof Error?err.message:err)}};
   if(communications&&saasPlatform){
     const remind=()=>{try{const t=saasPlatform!.communicationTargets();for(const r of t.renewals)communicate('renewal_approaching',`${r.termId}:${r.window}`,[{channel:'in_app',address:r.organizationId,locale:'ar',organizationId:r.organizationId},...(r.email?[{channel:'email' as const,address:r.email,locale:'ar' as const,organizationId:r.organizationId}]:[])],{organization:r.name,date:r.endsAt.slice(0,10),days:r.daysLeft});for(const o of t.overdue)communicate('payment_failed',o.invoiceId,[{channel:'in_app',address:o.organizationId,locale:'ar',organizationId:o.organizationId},...(o.email?[{channel:'email' as const,address:o.email,locale:'ar' as const,organizationId:o.organizationId}]:[])],{invoice:o.invoiceNumber});void communications!.dispatch()}catch(err){console.error('[communications] reminder cycle failed:',err)}};
@@ -2088,6 +2088,7 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       appealId:String(b.appealId||''),delta:Number(b.delta),
       reason:b.reason?String(b.reason).slice(0,2000):undefined,
       policyAllowsScoreChange:b.policyAllowsScoreChange===true,resultSealed,
+      currentScore:b.currentScore===undefined?undefined:Number(b.currentScore),maxScore:b.maxScore===undefined?undefined:Number(b.maxScore),
     });
     if('code' in decision)return attestationFailed(res,decision);
     auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'SCORE_CORRECTED',entityType:'Result',entityId:participantId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});

@@ -113,10 +113,16 @@ export const WATCHED_COLLECTIONS = [
 ] as const;
 export type WatchedCollection = typeof WATCHED_COLLECTIONS[number];
 
+/** الحقل الذي تُقيَّد به قراءة «ما يخصّه»: `uploaderUid` لمن رفع، و`delegationId` لمدير الوفد. */
+export type OwnField = 'uploaderUid' | 'delegationId';
+export const COLLECTION_OWN_FIELD: Partial<Record<WatchedCollection, OwnField>> = { participants: 'delegationId' };
+/** قيمة الحقل لهذا المستخدم: معرّف الدخول، أو نطاق وفده (`delegation-<uid>`). */
+export const ownValueFor = (field: OwnField, uid: string) => (field === 'delegationId' ? `delegation-${uid}` : uid);
+
 export const COLLECTION_READERS: Record<WatchedCollection, { all: Role[]; own?: Role[] }> = {
   results: { all: [...ADMIN, 'head_judge', 'judge', 'auditor'] },
   judge_submissions: { all: [...ADMIN, 'head_judge', 'auditor'], own: ['judge'] },
-  participants: { all: [...ADMIN, ...BRANCH, 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'] },
+  participants: { all: [...ADMIN, ...BRANCH, 'head_judge', 'judge', 'ops_manager', 'exception_host', 'auditor'], own: ['delegation_manager'] },
   committees: { all: [...ADMIN, ...BRANCH, 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'] },
   certificates: { all: [...ADMIN, 'auditor'] },
   reviews: { all: [...ADMIN, 'head_judge', 'auditor'] },
@@ -129,12 +135,12 @@ export const COLLECTION_READERS: Record<WatchedCollection, { all: Role[]; own?: 
 };
 
 /** الاستماعات التي يفتحها هذا الدور: كل مجموعة يقرؤها، مع تقييد `own` حين لا يقرأ إلا ما رفعه. */
-export function watchPlanFor(role: Role): { collection: WatchedCollection; ownOnly: boolean }[] {
-  const plan: { collection: WatchedCollection; ownOnly: boolean }[] = [];
+export function watchPlanFor(role: Role): { collection: WatchedCollection; ownOnly: boolean; ownField?: OwnField }[] {
+  const plan: { collection: WatchedCollection; ownOnly: boolean; ownField?: OwnField }[] = [];
   for (const collection of WATCHED_COLLECTIONS) {
     const rule = COLLECTION_READERS[collection];
     if (rule.all.includes(role)) plan.push({ collection, ownOnly: false });
-    else if (rule.own?.includes(role)) plan.push({ collection, ownOnly: true });
+    else if (rule.own?.includes(role)) plan.push({ collection, ownOnly: true, ownField: COLLECTION_OWN_FIELD[collection] || 'uploaderUid' });
   }
   return plan;
 }

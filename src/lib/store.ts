@@ -14,7 +14,7 @@ import { enableDemoAuthority } from './demo-authority';
 import { sealResultOnServer, publishResultsOnServer, attestPolicyChangeOnServer, attestScoreCorrectionOnServer, attestReadingChangeOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
-import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, watchPlanFor, CONFIG_WRITER_ROLES, type CloudSyncErrorCode, type WatchedCollection } from './cloud-sync';
+import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, watchPlanFor, ownValueFor, CONFIG_WRITER_ROLES, type CloudSyncErrorCode, type OwnField, type WatchedCollection } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
 import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
 import type { PublishedLease } from './board-lease';
@@ -1393,17 +1393,17 @@ export function useAppStore() {
       // لا يُفتح إلا ما يقرؤه الدور (انظر watchPlanFor): ما عداه ترفضه القواعد فيملأ السجلّ أخطاءً بلا فائدة،
       // والمحكّم يقرأ إرساليّاته وحدها فلا بدّ أن يُقيَّد استعلامُه بها وإلا رُفض كلّه.
       if (typeof collectionFn === 'function') {
-        const plan = new Map(watchPlanFor(globalState.currentUser.role).map(p => [p.collection as string, p.ownOnly]));
+        const plan = new Map<string, OwnField | null>(watchPlanFor(globalState.currentUser.role).map(p => [p.collection as string, p.ownOnly ? (p.ownField || 'uploaderUid') : null]));
         const uid = auth.currentUser?.uid || '';
         const watch = (name: WatchedCollection, apply: (rows: any[]) => void) => {
           if (!plan.has(name)) return;
-          const ownOnly = plan.get(name) === true;
+          const ownField = plan.get(name) || null;
           void (async () => {
             let source: any = collectionFn(db, 'organizations', orgId, 'competitions', compId, name);
-            if (ownOnly) {
+            if (ownField) {
               if (!uid) return;
               const { query, where } = await import('firebase/firestore');
-              source = query(source, where('uploaderUid', '==', uid));
+              source = query(source, where(ownField, '==', ownValueFor(ownField, uid)));
             }
             if (cancelled) return;
             unsubscribers.push(onSnapshot(source, (snap: any) => {
@@ -2572,14 +2572,33 @@ export function useAppStore() {
    * ويشترط اعتراضًا مُسجَّلًا يُحال إليه، ويكتب `SCORE_CORRECTED` باسمه. وامتناعُه يترك
    * الاعتراضَ بلا تعديلِ درجة بدل أن يُعدَّل رقمٌ بلا سند.
    */
+  /** مدى التصحيح الممكن لاعتراضٍ ما: الدرجة الحالية والعظمى لفئته، أو null إن لم تُحسب له درجة بعد. */
+  const appealScoreRange = (appealId: string): { current: number; max: number; sealed: boolean } | null => {
+    const appeal = globalState.appeals.find(a => a.id === appealId && a.competitionId === globalState.competition.id);
+    const result = appeal && globalState.results.find(r => r.competitionId === globalState.competition.id && r.participantId === appeal.participantId);
+    if (!result) return null;
+    const max = (activeRuleSetForCategory(result.categoryId).criteria || []).reduce((sum, c) => sum + (Number(c.maxScore) || 0), 0) || 100;
+    return { current: result.finalScore, max, sealed: ['sealed', 'published'].includes(result.status) };
+  };
+
   const resolveAppeal = async (appealId: string, accepted: boolean, notes: string, scoreAdjustmentDelta = 0) => {
     const idx = globalState.appeals.findIndex(a => a.id === appealId && a.competitionId === globalState.competition.id);
     if (idx < 0) return false;
     const appeal=globalState.appeals[idx];
     const policy=getCompetitionPolicy(globalState.competition);
     let appliedDelta = accepted && policy.appeals.allowScoreChange ? Number(scoreAdjustmentDelta||0) : 0;
+    if(!Number.isFinite(appliedDelta))appliedDelta=0;
+    /* مدى الدرجة: من الفئة نفسها. تصحيحٌ يُخرج الدرجة عن (٠…العظمى) لا يُطبَّق ولا يُرسل إلى الخادم أصلًا. */
+    const targetResult=globalState.results.find(r=>r.competitionId===globalState.competition.id&&r.participantId===appeal.participantId);
+    const targetMax=targetResult?((activeRuleSetForCategory(targetResult.categoryId).criteria||[]).reduce((sum,c)=>sum+(Number(c.maxScore)||0),0)||100):100;
+    if(appliedDelta!==0&&targetResult&&(targetResult.finalScore+appliedDelta<0||targetResult.finalScore+appliedDelta>targetMax+1e-9)){
+      auditTrustAction('SCORE_CORRECTION_OUT_OF_RANGE','Result',appeal.participantId,
+        `رُفض تصحيح الدرجة (${appliedDelta>0?'+':''}${appliedDelta}) لأنه يُخرجها عن المدى 0–${targetMax}؛ حُسم الاعتراض بلا تعديل`,
+        `Score correction (${appliedDelta>0?'+':''}${appliedDelta}) refused: it would leave the 0–${targetMax} range; the appeal was resolved without a score change`);
+      appliedDelta=0;
+    }
     if(appliedDelta!==0){
-      const authority=await attestScoreCorrectionOnServer({competitionId:globalState.competition.id,participantId:appeal.participantId,appealId,delta:appliedDelta,policyAllowsScoreChange:policy.appeals.allowScoreChange,reason:notes});
+      const authority=await attestScoreCorrectionOnServer({competitionId:globalState.competition.id,participantId:appeal.participantId,appealId,delta:appliedDelta,policyAllowsScoreChange:policy.appeals.allowScoreChange,reason:notes,currentScore:targetResult?.finalScore,maxScore:targetMax});
       if('failure' in authority){
         auditTrustAction('SCORE_CORRECTION_AUTHORITY_UNAVAILABLE','Result',appeal.participantId,
           `تعذّر اعتمادُ تصحيح الدرجة على الخادم (${authority.code||authority.failure})؛ حُسم الاعتراض بلا تعديل`,
@@ -5007,7 +5026,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, sessionStartFailureCode, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
+    appealScoreRange, queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,

@@ -119,7 +119,7 @@ export function attestPolicyChangeOnServer(input: {
 /** تصحيحُ درجة. الخادم يرفضه على نتيجةٍ مختومة، ويشترط اعتراضًا مُسجَّلًا يُحال إليه. */
 export function attestScoreCorrectionOnServer(input: {
   competitionId: string; participantId: string; appealId: string; delta: number;
-  policyAllowsScoreChange: boolean; reason?: string;
+  policyAllowsScoreChange: boolean; reason?: string; currentScore?: number; maxScore?: number;
 }) {
   return call<AttestedView>('/api/results/score-correction', {method: 'POST', body: input});
 }

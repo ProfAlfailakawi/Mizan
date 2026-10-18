@@ -6,6 +6,7 @@ import { STORAGE_KEY, type AppStoreState } from './store-state';
 
 import { CONFIG_WRITER_ROLES } from './cloud-sync';
 const CONFIG_WRITERS: Role[] = CONFIG_WRITER_ROLES;
+const PUBLIC_PROJECTION_WRITERS: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
 
 export function readDurableLocalSnapshot(): AppStoreState | null {
   if (typeof localStorage === 'undefined') return null;
@@ -67,7 +68,8 @@ export async function persistDurableCompetitionSnapshot(
   await setDoc(ref, configuration, { merge: true });
 
   // Keep the anonymous registration projection aligned when registration has already been opened.
-  if (competitionId !== 'comp-pending-setup' && !['draft', 'configured'].includes(competition.status)) {
+  // (مدير الفرع يضبط المسابقة ولا ينشرها: قاعدة public_competitions تحصر الكتابة في من يملك النشر، فلا يُحاوَل ما سيُرفض.)
+  if (role && PUBLIC_PROJECTION_WRITERS.includes(role) && competitionId !== 'comp-pending-setup' && !['draft', 'configured'].includes(competition.status)) {
     await setDoc(doc(db, 'public_competitions', competitionId), {
       organizationId,
       competition,

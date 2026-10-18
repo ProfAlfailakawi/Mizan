@@ -85,13 +85,20 @@ export class HttpJsonProvider implements Provider {
   }
 }
 
+/**
+ * من يجب أن يرى إشعار الاشتراك والفوترة. كان كلُّ إشعارٍ داخل التطبيق يُرسل إلى الجهة كلّها، فيرى المحكّم وغرفة العمليات
+ * وفريق القاعة «تعذّر سداد فاتورة الاشتراك — قد تنتقل الجهة إلى وضع القراءة فقط» وهو شأنٌ لا يخصّهم ولا يملكون فيه إجراء.
+ */
+export const BILLING_AUDIENCE_ROLES = ['org_admin', 'billing_admin'] as const;
+export const isBillingTrigger = (trigger: Trigger) => trigger === 'renewal_approaching' || trigger === 'payment_failed';
+
 /** In-app delivery through the existing notification center. Always available. */
 export class InAppProvider implements Provider {
   channel: Channel = 'in_app'; name = 'mizan-notification-center'; configured = true;
-  constructor(private publish: (input: { organizationId: string; title: string; body: string }) => void) {}
+  constructor(private publish: (input: { organizationId: string; title: string; body: string; trigger: Trigger }) => void) {}
   async send(m: OutboxMessage) {
     if (!m.organizationId) return { ok: false, error: 'IN_APP_REQUIRES_ORGANIZATION' };
-    this.publish({ organizationId: m.organizationId, title: m.subject, body: m.body });
+    this.publish({ organizationId: m.organizationId, title: m.subject, body: m.body, trigger: m.trigger });
     return { ok: true };
   }
 }
