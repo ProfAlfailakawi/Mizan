@@ -131,12 +131,12 @@ const AR_AUDIT_ACTIONS:Record<string,string>={
 };
 const AR_AUDIT_ENTITIES:Record<string,string>={
   Participant:'متسابق', QuestionSet:'مجموعة أسئلة', TestSession:'جلسة اختبار', JudgeSubmission:'تقييم محكّم', Result:'نتيجة', Appeal:'تظلّم', Incident:'بلاغ',
-  ParticipantScope:'نطاق متسابق', JudgeProfile:'محكّم', Committee:'لجنة'
+  ParticipantScope:'نطاق متسابق', JudgeProfile:'محكّم', Committee:'لجنة', subscription_term:'فترة اشتراك'
 };
 /** نوع الكيان في دفتر التدقيق: بالعربية في الواجهة العربية، والرمز الخام يبقى في السجل. */
 export function auditEntityLabel(value:string|undefined|null, ar:boolean){
   if(!value)return '—';
-  return ar?(AR_AUDIT_ENTITIES[value]||value):value;
+  return ar?(AR_AUDIT_ENTITIES[value]||(value.includes('_')?value.replaceAll('_',' '):value)):value;
 }
 export function auditActionLabel(value:string|undefined|null, ar:boolean){
   if(!value)return '—';

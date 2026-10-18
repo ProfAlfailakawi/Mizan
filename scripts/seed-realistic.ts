@@ -127,6 +127,8 @@ async function main() {
   if (!args.has('--keep')) {
     // لا يُحذف مجلد data كله: خادمٌ يعمل يحتفظ بمجلداته (مؤقّتات التذكير تكتب فيها). تُحذف ملفات الزرع وحدها.
     fs.rmSync(path.join(qaDir, 'data', 'identity'), { recursive: true, force: true });
+    fs.rmSync(path.join(qaDir, 'data', 'notifications'), { recursive: true, force: true });
+    fs.rmSync(path.join(qaDir, 'data', 'saas', 'communications'), { recursive: true, force: true });
     const saasDir = path.join(qaDir, 'data', 'saas');
     for (const f of fs.existsSync(saasDir) ? fs.readdirSync(saasDir) : []) if (f.startsWith('saas-platform.json') || f === 'vault') fs.rmSync(path.join(saasDir, f), { recursive: true, force: true });
     // يمسح المحاكي كاملًا (نقطة المحاكي الرسمية) — لا تعمل إلا عليه.
