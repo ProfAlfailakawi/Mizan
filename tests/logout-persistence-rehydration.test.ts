@@ -29,7 +29,9 @@ test('a failed scope discovery never turns a valid identity into an access error
   const at=auth.indexOf('await prepareAuthenticatedCloudScope(');
   const tryAt=auth.lastIndexOf('try {',at);
   assert.ok(tryAt>0&&at-tryAt<260,'discovery sits inside its own try');
-  assert.match(auth,/cloud scope discovery failed; continuing with the verified identity/);
+  assert.match(auth,/cloud scope discovery failed \(attempt/);
+  assert.match(auth,/continuing with the verified identity/);
+  assert.match(auth,/attempt < 3 && !scopePreparation/,'a transient failure is retried before giving up');
 });
 
 test('auth applies cloud scope before rendering staff UI',()=>{

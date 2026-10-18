@@ -151,13 +151,17 @@ export function useMizanAuth(requireAuth: boolean) {
         /* اكتشاف مسابقات الجهة من السحابة تحسينٌ لا شرطُ دخول: فشلُه (شبكة، قاعدة قراءة، حصّة) لا يجوز أن يُظهر
            «تعذّر التحقق من صلاحية الحساب» لشخصٍ هويتُه سليمة. يدخل بما عنده، وتُعيد المزامنة المحاولة. */
         let scopePreparation: Awaited<ReturnType<typeof prepareAuthenticatedCloudScope>> = null;
-        try {
-          scopePreparation = await prepareAuthenticatedCloudScope(
-            { id: user.uid, role, organizationId, operatorId, competitionId },
-            appStore,
-          );
-        } catch (error) {
-          console.warn('MIZAN cloud scope discovery failed; continuing with the verified identity', error);
+        for (let attempt = 0; attempt < 3 && !scopePreparation; attempt++) {
+          try {
+            scopePreparation = await prepareAuthenticatedCloudScope(
+              { id: user.uid, role, organizationId, operatorId, competitionId },
+              appStore,
+            );
+            break;
+          } catch (error) {
+            console.warn(`MIZAN cloud scope discovery failed (attempt ${attempt + 1}/3); ${attempt < 2 ? 'retrying' : 'continuing with the verified identity'}`, error);
+            if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+          }
         }
         let effectiveCompetitionId = competitionId;
         // The discovered cloud competitions are handed to the store action itself (not spliced into

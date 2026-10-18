@@ -54,7 +54,7 @@
     "rig:down": "bash scripts/qa/down.sh",
     "rig:rebuild": "bash scripts/qa/rebuild.sh",
     "rig:sweep": "bash scripts/qa/sweep-all.sh",
-    "rig:api-probe": "NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/qa/api-probe.mjs",
+    "rig:api-probe": "node scripts/qa/api-probe.mjs",
     "rig:public-tour": "node scripts/qa/public-tour.mjs",
     "qa:public-registration": "firebase emulators:exec --only firestore --project mizan-qa-surface \"bash scripts/qa-public-registration.sh\"",
     "verify:legal-publication": "tsx scripts/verify-legal-publication.ts",

@@ -1,5 +1,5 @@
 // Cross-tenant / cross-role probes with real tokens. Each case states the expectation; failures are printed.
-// Usage: NODE_TLS_REJECT_UNAUTHORIZED=0 node scripts/qa/tenant-probe.mjs
+// Usage: node scripts/qa/tenant-probe.mjs
 import { tokenFor, users, BASE } from './api-probe.mjs';
 const by = (role, orgIdx = 0, n = 0) => { const orgs = [...new Set(users.filter((u) => u.role === role && u.orgId).map((u) => u.orgId))]; return users.filter((u) => u.role === role && u.orgId === orgs[orgIdx])[n]; };
 const call = async (u, method, path, body) => { const tok = await tokenFor(u); const r = await fetch(BASE + path, { method, headers: { authorization: `Bearer ${tok}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); let j = null; try { j = await r.json(); } catch {} return { status: r.status, body: j }; };

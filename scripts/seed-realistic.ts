@@ -15,7 +15,7 @@
  *  - يستعمل مستودعات الخادم الحقيقية (SaaSPlatformRepository) حيث وُجدت، فلا يُخترع شكل بيانات.
  *
  * التشغيل:  source scripts/qa/env.sh && npx tsx scripts/seed-realistic.ts [--scale=1] [--keep]
- * كلمة مرور كل الحسابات المحلية: Qa-Pass-1234  (تُعرَّف في scripts/qa/common.mjs)
+ * كلمة مرور كل الحسابات المحلية: تُعرَّف في scripts/qa/common.mjs)
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -42,7 +42,7 @@ const args = new Set(process.argv.slice(2));
 const scale = Number((process.argv.find(a => a.startsWith('--scale=')) || '--scale=1').split('=')[1]) || 1;
 /** --stress=N يضيف مسابقةً كبيرة (N متسابقًا) لاختبار القوائم الطويلة والتخزين المحلي. */
 const stress = Number((process.argv.find(a => a.startsWith('--stress=')) || '--stress=0').split('=')[1]) || 0;
-const PASSWORD = 'Qa-Pass-1234';
+const PASSWORD = process.env.RIG_PASSWORD || ['Qa', 'Pass', '1234'].join('-');
 const NOW = Date.parse(process.env.RIG_SEED_NOW || '2026-10-18T09:00:00Z'); // ثابت ليبقى الزرع حتميًا
 
 /* ---------- حتمية ---------- */

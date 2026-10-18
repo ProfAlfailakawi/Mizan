@@ -399,6 +399,7 @@ async function startServer() {
     getDocument:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');return firestoreRepository.get(docPath)},
     upsert:async(documents)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.commitAtomically({upserts:documents})},
     patch:async(docPath,fields)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.patchFields(docPath,fields)},
+    delete:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.delete(docPath)},
     getJourney:async(tokenHash)=>{
       if(firestoreRepository){
         try{
@@ -1207,10 +1208,10 @@ async function startServer() {
     try{
       const file=path.join(publicCompDir,`${cleanId}.json`);
       let owner='';
-      if(fs.existsSync(file)){try{owner=String(JSON.parse(fs.readFileSync(file,'utf8'))?.organizationId||'')}catch{owner=''}}
-      if(!owner&&firestoreRepository){try{owner=String((await firestoreRepository.get(`public_competitions/${cleanId}`))?.organizationId||'')}catch{owner=''}}
+      if(fs.existsSync(file)){owner=String(JSON.parse(fs.readFileSync(file,'utf8'))?.organizationId||'')}
+      if(!owner&&firestoreRepository){owner=String((await firestoreRepository.get(`public_competitions/${cleanId}`))?.organizationId||'')}
       if(owner&&owner!==bodyOrgId&&actor.role!=='super_admin')return res.status(409).json({code:'COMPETITION_ID_OWNED_BY_ANOTHER_ORGANIZATION'});
-    }catch{/* فحص الملكية لا يمنع النشر إذا تعذّرت القراءة؛ الكتابة أدناه تبقى مقيَّدة بنطاق الجهة */}
+    }catch{/* تعذّر التحقق من المالك: نغلق ولا نكتب فوق سجلٍّ قد تملكه جهة أخرى. */return res.status(503).json({code:'PUBLIC_OWNERSHIP_CHECK_UNAVAILABLE'})}
     try{
       const file=path.join(publicCompDir,`${cleanId}.json`);
       fs.writeFileSync(file,JSON.stringify({organizationId:bodyOrgId,competition:comp,updatedAt},null,2),'utf8');
@@ -1300,13 +1301,16 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
         const stored=asCompetition(existing.competition);
         if(stored&&stored.organizationId!==organizationId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
       }
+      /* لا يُحذف شيء قبل التأكد من الملكية؛ فشل القراءة يوقف العملية ولا يُعدّ «بلا مالك». */
+      let dropComp=false,dropBoard=false;
+      const ownedPublic=async(p:string)=>{const row=await firestoreRepository.get(p);const owner=String((row as any)?.organizationId||(row as any)?.competition?.organizationId||'');return !owner||owner===organizationId||actor.role==='super_admin'};
+      try{dropComp=await ownedPublic(`public_competitions/${competitionId}`);dropBoard=await ownedPublic(`public_boards/${competitionId}`)}catch{return res.status(503).json({code:'PUBLIC_OWNERSHIP_CHECK_UNAVAILABLE'})}
       await deleteFirestoreTree(root);
       /* المستندات العامة مفتاحها معرّف المسابقة وحده، وهو ظاهر في الروابط العامة. فحذفُ مسابقةٍ تحت جهتك كان
          يمسح أيضًا صفحة التسجيل والشاشة العامة لمسابقةٍ تحمل المعرّف نفسه عند جهةٍ أخرى. لا يُحذف عام إلا ما تملكه جهة الطالب. */
-      const ownedPublic=async(p:string)=>{const row=await firestoreRepository.get(p).catch(()=>null);const owner=String((row as any)?.organizationId||(row as any)?.competition?.organizationId||'');return !owner||owner===organizationId||actor.role==='super_admin'};
       const dropPublic:Promise<unknown>[]=[];
-      if(await ownedPublic(`public_competitions/${competitionId}`))dropPublic.push(firestoreRepository.delete(`public_competitions/${competitionId}`));
-      if(await ownedPublic(`public_boards/${competitionId}`))dropPublic.push(firestoreRepository.delete(`public_boards/${competitionId}`));
+      if(dropComp)dropPublic.push(firestoreRepository.delete(`public_competitions/${competitionId}`));
+      if(dropBoard)dropPublic.push(firestoreRepository.delete(`public_boards/${competitionId}`));
       await Promise.all(dropPublic);
       try{const f=path.join(publicCompDir,`${competitionId}.json`);let diskOwner='';try{diskOwner=String(JSON.parse(fs.readFileSync(f,'utf8'))?.organizationId||'')}catch{}if(!diskOwner||diskOwner===organizationId||actor.role==='super_admin')fs.rmSync(f,{force:true})}catch{/* Firestore remains authoritative. */}
       return res.json({ok:true,competitionId});
@@ -2068,7 +2072,33 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     return res.status(201).json(decision);
   });
 
-  app.post('/api/results/score-correction',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge']),(req,res)=>{
+  /* حدود التصحيح تُقرأ من النتيجة المخزَّنة وإعداد المسابقة على الخادم؛ ما يرسله العميل لا يُعتمد (حذفه أو تضخيمه كان يعطّل الفحص). */
+  const scoreCorrectionBasis=async(actor:ServerIdentity,b:any,competitionId:string,participantId:string):Promise<{currentScore:number;maxScore:number}|null>=>{
+    let basis:{currentScore:number;maxScore:number}|null=null;
+    try{
+      const basisOrg=actor.role==='super_admin'?String(b.organizationId||actor.organizationId||''):actor.organizationId;
+      if(firestoreRepository&&basisOrg&&competitionId&&participantId){
+        const root=`organizations/${basisOrg}/competitions/${competitionId}`;
+        const compDoc=await firestoreRepository.get(root) as any;
+        const comp=compDoc?.competition||{};
+        let found:any=null;
+        const paths=await firestoreRepository.listDocumentPaths(`${root}/results`,5000);
+        for(let i=0;i<paths.length&&!found;i+=40){
+          const rows=await Promise.all(paths.slice(i,i+40).map(pp=>firestoreRepository.get(pp)));
+          found=rows.find((r:any)=>r&&r.participantId===participantId)||null;
+        }
+        if(found){
+          const cat=(comp.categories||[]).find((c:any)=>c.id===found.categoryId);
+          const rs=(cat?.ruleSetId?(comp.ruleSets||[]).find((r:any)=>r.id===cat.ruleSetId):undefined)||comp.ruleSet;
+          const max=((rs?.criteria||[]) as any[]).reduce((sum,c)=>sum+(Number(c?.maxScore)||0),0);
+          const current=Number(found.finalScore);
+          if(Number.isFinite(current)&&max>0)basis={currentScore:current,maxScore:max};
+        }
+      }
+    }catch{basis=null}
+    return basis;
+  };
+  app.post('/api/results/score-correction',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge']),async(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
@@ -2083,12 +2113,14 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
      */
     if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
     const resultSealed=!!resultSealRegistry.latestFor(actor.organizationId,competitionId,participantId);
+    const basis=await scoreCorrectionBasis(actor,b,competitionId,participantId);
+    if(!basis)return res.status(503).json({code:'SCORE_CORRECTION_BASIS_UNAVAILABLE'});
     const decision=scoreCorrectionDecision({
       actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
       appealId:String(b.appealId||''),delta:Number(b.delta),
       reason:b.reason?String(b.reason).slice(0,2000):undefined,
       policyAllowsScoreChange:b.policyAllowsScoreChange===true,resultSealed,
-      currentScore:b.currentScore===undefined?undefined:Number(b.currentScore),maxScore:b.maxScore===undefined?undefined:Number(b.maxScore),
+      currentScore:basis.currentScore,maxScore:basis.maxScore
     });
     if('code' in decision)return attestationFailed(res,decision);
     auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'SCORE_CORRECTED',entityType:'Result',entityId:participantId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});

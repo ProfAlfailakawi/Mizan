@@ -9,11 +9,18 @@ import {describeScope} from '../src/lib/quran-scope';
 import {toAsciiDigits} from '../shared/input-validation';
 
 export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string;customAnswers?:Record<string,unknown>};
+const identityIndexPathOf=(competition:{id:string;organizationId:string},input:{nationalIdOrPassport?:string;email?:string;dateOfBirth?:string;fullNameArabic?:string})=>{
+  const identityDigits=toAsciiDigits(input.nationalIdOrPassport||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const identityKey=identityDigits.length>=4?`id:${identityDigits}`:`eml:${input.email||''}|${input.dateOfBirth||''}|${(input.fullNameArabic||'').replace(/\s+/g,' ').toLowerCase()}`;
+  return `organizations/${competition.organizationId}/competitions/${competition.id}/registration_index/${crypto.createHash('sha256').update(`${competition.id}|${identityKey}`).digest('hex')}`;
+};
 export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>;
   /** قراءة وثيقة مفردة وكتابة تحديثاتٍ ذرّية — لازمتان لتعديل التسجيل قبل الإغلاق. */
   getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;
   /** Field-masked update: only the listed fields change, so concurrent staff edits (status, check-in, payment) survive. */
-  patch?(path:string,fields:Record<string,unknown>):Promise<void>}
+  patch?(path:string,fields:Record<string,unknown>):Promise<void>;
+  /** Removes one document (used to retire a superseded duplicate-guard index when identity fields are edited). */
+  delete?(path:string):Promise<void>}
 
 /* أحرف التحكم والتوجيه الخفية تُنزع: U+202A–202E و U+2066–2069 تقلب عرض الاسم في جداول الإدارة (انتحال بصري)،
    و U+200B/U+FEFF تصنع أسماءً «مختلفة» تبدو متطابقة. أما ZWNJ/ZWJ فتبقى لأن أسماء بالفارسية والأردية تحتاجها. */
@@ -119,9 +126,7 @@ export class PublicRegistrationService{
      * إدخال بيانات أخيه. فينقسم أثرُه إلى متسابقَين برمزَين وطابورَين وبطاقتي رحلة، ويُحتسب مرتين على حصّة الجهة،
      * ويُحكَّم مرتين. والمفتاح رقمُ الهوية إن وُجد، وإلا البريدُ مع تاريخ الميلاد والاسم. ولا بيانَ شخصيًا في الفهرس: بصمةٌ فقط.
      */
-    const identityDigits=toAsciiDigits(input.nationalIdOrPassport).toUpperCase().replace(/[^A-Z0-9]/g,'');
-    const identityKey=identityDigits.length>=4?`id:${identityDigits}`:`eml:${input.email}|${input.dateOfBirth}|${input.fullNameArabic.replace(/\s+/g,' ').toLowerCase()}`;
-    const identityIndexPath=`organizations/${competition.organizationId}/competitions/${competition.id}/registration_index/${crypto.createHash('sha256').update(`${competition.id}|${identityKey}`).digest('hex')}`;
+    const identityIndexPath=identityIndexPathOf(competition,input);
     documents.push({path:identityIndexPath,data:{competitionId:competition.id,organizationId:competition.organizationId,participantId,createdAt}});
     /*
      * رمزُ المتسابق (A-1234567) هو ما تنادي به القاعةُ وتعرضه الشاشاتُ العامة، فلا يجوز أن يتكرّر داخل المسابقة.
@@ -184,7 +189,17 @@ export class PublicRegistrationService{
     /* يُكتب ما يملك المتسابق تعديله فقط، لا الوثيقة كاملة: حالةٌ اعتمدها المشرف أو حضورٌ سُجّل أو
        دفعٌ قُيّد بين القراءة والكتابة يبقى كما هو. */
     const editable=['fullNameArabic','fullName','email','phone','country','nationality','nationalIdOrPassport','dateOfBirth','gender','customAnswers','editHistory'] as const;
-    await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])));
+    /* فهرس منع التكرار يتبع هوية المتسابق: عند تغيير حقل هوية يُحجز المفتاح الجديد ذرّيًا (فإن كان لمسجَّل آخر رُفض التعديل)،
+       ثم يُحذف المفتاح القديم حتى لا يبقى الاسم أو الهوية القديمة محجوزة أمام تسجيل آخر. */
+    const oldIndex=identityIndexPathOf(competition,current as any),newIndex=identityIndexPathOf(competition,next as any);
+    const moveIndex=oldIndex!==newIndex;
+    if(moveIndex){
+      try{await this.store.create([{path:newIndex,data:{competitionId:competition.id,organizationId:competition.organizationId,participantId:current.id,createdAt:now.toISOString()}}])}
+      catch(err){if(err instanceof Error&&err.message==='FIRESTORE_CONFLICT')throw new Error('REGISTRATION_ALREADY_REGISTERED');throw err}
+    }
+    try{await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])))}
+    catch(err){if(moveIndex&&this.store.delete)await this.store.delete(newIndex).catch(()=>{});throw err}
+    if(moveIndex&&this.store.delete)await this.store.delete(oldIndex).catch(()=>{});
     return {participant:{id:next.id,code:next.code,status:next.status},changed};
   }
   /**

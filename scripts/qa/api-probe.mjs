@@ -3,16 +3,15 @@
 // 2xx/5xx where a refusal is expected is printed. Routes intentionally public are allow-listed below.
 import fs from 'node:fs';
 import { loadUsers } from './browser.mjs';
-import { MOCK_PORT, APP_PORT, QA_PASSWORD } from './common.mjs';
+import { APP_PORT, QA_PASSWORD, mockPost } from './common.mjs';
 const BASE = `http://127.0.0.1:${APP_PORT}`;
 const users = loadUsers();
 async function tokenFor(u) {
-  const r = await fetch(`https://127.0.0.1:${MOCK_PORT}/v1/accounts:signInWithPassword?key=x`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: u.email, password: QA_PASSWORD }), dispatcher: undefined });
+  const r = await mockPost('/v1/accounts:signInWithPassword?key=x', { email: u.email, password: QA_PASSWORD });
   return (await r.json()).idToken;
 }
 export { tokenFor, users, BASE };
 if (process.argv[1].endsWith('api-probe.mjs')) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   const src = fs.readFileSync(new URL('../../server.ts', import.meta.url), 'utf8');
   const routes = [...src.matchAll(/app\.(get|post|put|patch|delete)\('(\/api\/[^']*)'/g)].map((m) => [m[1].toUpperCase(), m[2]]);
   const publicOk = /^\/api\/(public|version|time|health|capabilities)|\/webhook|password-reset\/(request|validate|used)|invitation\/preview|\/payments\//;
