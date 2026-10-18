@@ -1283,7 +1283,7 @@ async function startServer() {
   }
 });
 
-app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
+app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     if(!competitionId||competitionId==='comp-pending-setup'||competitionId.replace(/[^a-zA-Z0-9_-]/g,'')!==competitionId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
     const actor=(req as any).mizanIdentity as ServerIdentity;
