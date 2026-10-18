@@ -49,7 +49,7 @@
     "r2:inventory": "tsx scripts/r2-inventory.ts",
     "test:ci": "tsx --test --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results.xml tests/*.test.ts",
     "qa:seed-public": "tsx scripts/seed-public-competition.ts",
-    "rig:seed": "bash -c 'source scripts/qa/env.sh && tsx scripts/seed-realistic.ts'",
+    "rig:seed": "bash -c 'source scripts/qa/env.sh && tsx scripts/seed-realistic.ts \"$@\"' --",
     "rig:up": "bash scripts/qa/up.sh",
     "rig:down": "bash scripts/qa/down.sh",
     "rig:rebuild": "bash scripts/qa/rebuild.sh",

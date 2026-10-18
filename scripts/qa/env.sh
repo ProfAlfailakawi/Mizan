@@ -42,5 +42,4 @@ export MIZAN_LEGAL_PRIVACY_EFFECTIVE="2026-01-01"
 export MIZAN_LEGAL_PRIVACY_URL="https://example.test/privacy"
 export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 # The rig drives many sessions from one IP; the per-IP API limiter is exercised separately.
-export RATE_LIMIT_MAX=1000000
 export MIZAN_OWNER_RATE_LIMIT_MAX=100000

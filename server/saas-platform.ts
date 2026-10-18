@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { StatCachedJson } from './stat-cache';
 import { lookup as dnsLookup } from 'dns/promises';
 import fs from 'fs';
 import path from 'path';
@@ -144,6 +145,9 @@ export class SaaSPlatformRepository{
  private tx<T>(actor:CommercialActor,fn:(ctx:engine.EngineCtx)=>T):T{return this.mutate(s=>fn(this.ctx(s,actor)))}
  private view<T>(fn:(s:State,at:number)=>T):T{return fn(this.read(),this.clock())}
  private empty():State{return {version:1,sequence:0,plans:[],operators:[],organizations:[],licenses:[],creditLedger:[],participantUsage:[],competitions:[],storageObjects:[],storageAccounts:[],storageMigrations:[],changeRequests:[],audit:[],subscriptions:[],invoices:[],planVersions:[],subscriptionTerms:[],operatorTiers:[],operatorAgreements:[],operatorWallets:[],walletLedger:[],idempotency:[],resalePrices:[],ownershipEvents:[],migrationReports:[],brandProfiles:[],customDomains:[],discoverListings:[],webhookEndpoints:[],webhookDeliveries:[],paymentGateways:[],registrationPaymentIntents:[]}}
+ private peekCache?:StatCachedJson<State>;
+ /** حالة مشتركة للقراءة فقط (مخزَّنة بحسب بصمة الملف)؛ لا تُعدَّل. */
+ private peek():State{try{if(!this.peekCache)this.peekCache=new StatCachedJson<State>(this.file,raw=>{const s=JSON.parse(raw) as State;const out={...this.empty(),...s};ensureCommercialCollections(out);return out});return this.peekCache.get()}catch{return this.empty()}}
  private read():State{try{const s=JSON.parse(fs.readFileSync(this.file,'utf8')) as State;const out={...this.empty(),...s};ensureCommercialCollections(out);return out}catch{return this.empty()}}
  private write(s:State){const tmp=`${this.file}.${process.pid}.tmp`;fs.writeFileSync(tmp,JSON.stringify(s,null,2),{mode:0o600});fs.renameSync(tmp,this.file);this.writeAnchor(s)}
  private get anchorFile(){return `${this.file}.audit-anchor.json`}
@@ -159,7 +163,7 @@ export class SaaSPlatformRepository{
  private orgScope(actor:CommercialActor,organizationId:string){if(actor.role==='super_admin')return;const org=this.read().organizations.find(x=>x.id===organizationId);if(!org)throw new Error('ORGANIZATION_NOT_FOUND');if(['operator_owner','operator_admin'].includes(actor.role)&&actor.operatorId&&org.operatorId===actor.operatorId)return;if(actor.organizationId!==organizationId)throw new Error('CROSS_TENANT_ACCESS_BLOCKED')}
  /** Read-only scope helpers used by identity and notification authorization. */
  operatorExists(operatorId:string){return this.read().operators.some(x=>x.id===operatorId&&x.status==='active')}
- operatorIdForOrganization(organizationId:string){return this.read().organizations.find(x=>x.id===organizationId)?.operatorId}
+ operatorIdForOrganization(organizationId:string){return this.peek().organizations.find(x=>x.id===organizationId)?.operatorId}
  operatorOrganizationIds(operatorId:string){return this.read().organizations.filter(x=>x.operatorId===operatorId&&x.status!=='archived').map(x=>x.id)}
  organizationBelongsToOperator(organizationId:string,operatorId:string){return this.read().organizations.some(x=>x.id===organizationId&&x.operatorId===operatorId&&x.status!=='archived')}
  operatorName(operatorId?:string){if(!operatorId)return undefined;return this.read().operators.find(x=>x.id===operatorId)?.name}
@@ -171,7 +175,7 @@ export class SaaSPlatformRepository{
   * إلى من بعده، ويُعلَن اسمُه هو.
   */
  legalChainFor(organizationId:string,at:number=Date.now()):LegalChainLink[]{
-  const state=this.read();
+  const state=this.peek();
   const organization=state.organizations.find(x=>x.id===organizationId);
   const chain:LegalChainLink[]=[];
   const license=organization?state.licenses.find(x=>x.organizationId===organization.id):undefined;

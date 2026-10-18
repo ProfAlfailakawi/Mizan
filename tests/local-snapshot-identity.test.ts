@@ -71,7 +71,7 @@ test('the derived field is stripped before any write to the server',()=>{
  assert.match(src,/LOCAL_ONLY_PARTICIPANT_FIELDS/);
  assert.match(src,/for\(const key of LOCAL_ONLY_PARTICIPANT_FIELDS\)delete payload\[key\]/);
  // The snapshot writer must go through the redactor, not write globalState directly.
- assert.match(src,/localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(redactStateForLocalSnapshot\(globalState\)\)\)/);
+ assert.match(src,/localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(compactStateForQuota\(redactStateForLocalSnapshot\(globalState\), level as SnapshotCompactionLevel\)\)\)/);
 });
 
 test('the exception desk still finds a participant by the last four characters',()=>{
