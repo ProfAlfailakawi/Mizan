@@ -48,3 +48,20 @@ test('server wiring: the limits are configurable and documented', () => {
   assert.match(env, /RATE_LIMIT_MAX/);
   assert.match(env, /RATE_LIMIT_MAX_AUTHENTICATED/);
 });
+
+test('review fix: a user bucket needs a provisioned MIZAN identity, and health telemetry resolves the viewer through governance', () => {
+  const server = fs.readFileSync('server.ts', 'utf8');
+  assert.match(server, /identityGovernance\.identityForUid\(id\.uid,/);
+  assert.match(server, /NOT_PROVISIONED/);
+  assert.match(server, /app\.get\('\/api\/health',healthRateLimit,/);
+  const at = server.indexOf('let platformViewer=false');
+  const seg = server.slice(at, at + 700);
+  assert.ok(seg.includes('identityGovernance.identityForUid(') && !seg.includes('verifyFirebaseIdToken('));
+});
+
+test('an unprovisioned account cannot buy a user bucket (limiter falls back to the IP bucket)', async () => {
+  const l = new GlobalRateLimiter({ windowMs: 60_000, anonymousMax: 2, authenticatedMax: 100, verify: async () => { throw new Error('NOT_PROVISIONED'); }, now: () => 1 });
+  const r = [];
+  for (let i = 0; i < 4; i++) r.push((await l.check(`Bearer ${'a'.repeat(30)}.acct${i}.${'b'.repeat(30)}`, '7.7.7.7')).allowed);
+  assert.deepEqual(r, [true, true, false, false]);
+});
