@@ -273,10 +273,23 @@ export function getEnabledJudgeActions(competition: Competition) {
   });
 }
 
+/** هل هذا اسمُ منطقةٍ زمنية IANA يعرفه المتصفح/الخادم؟ */
+export function isValidTimeZone(timeZone: string): boolean {
+  try { new Intl.DateTimeFormat('en-US', { timeZone }); return true; } catch { return false; }
+}
+
 export function getReadinessIssues(competition: Competition): { id: string; ar: string; en: string }[] {
   const p = getCompetitionPolicy(competition);
   const issues: { id: string; ar: string; en: string }[] = [];
+  /* تواريخ المسابقة ومنطقتها الزمنية حقولٌ حرّة، وكان يُقبل فيها نهايةٌ تسبق البداية ومنطقةٌ لا وجود لها («Mars/Olympus»):
+     فتنقلب مواعيد الجدول والتذكيرات (ولا يظهر شيء). تُعلَن هنا لتصل مدير المسابقة قبل أن يفتح التسجيل. */
+  if (competition.startDate && competition.endDate && competition.endDate < competition.startDate) issues.push({ id: 'dates', ar: 'تاريخ نهاية المسابقة يسبق بدايتها', en: 'The end date is before the start date' });
+  if (competition.registrationStartDate && competition.registrationEndDate && competition.registrationEndDate < competition.registrationStartDate) issues.push({ id: 'registration-dates', ar: 'إغلاق التسجيل يسبق فتحه', en: 'Registration closes before it opens' });
+  if (competition.timezone && !isValidTimeZone(competition.timezone)) issues.push({ id: 'timezone', ar: 'المنطقة الزمنية غير معروفة — اكتبها بصيغة مثل Asia/Riyadh', en: 'Unknown timezone — use a name such as Asia/Riyadh' });
   if (!competition.categories.length) issues.push({ id: 'categories', ar: 'أضف فئة واحدة على الأقل', en: 'Add at least one category' });
+  for (const category of competition.categories) {
+    if (category.minAge && category.maxAge && category.minAge > category.maxAge) issues.push({ id: `age-range:${category.id}`, ar: `فئة «${category.nameArabic || category.name}»: العمر الأدنى أكبر من الأعلى فلن يُقبل فيها أحد`, en: `Category “${category.name || category.nameArabic}”: minimum age is above the maximum, so nobody could register` });
+  }
   if (!competition.ruleSet.criteria.length) issues.push({ id: 'rules', ar: 'أكمل معايير التحكيم', en: 'Complete judging criteria' });
   if (p.judging.actions.filter(a => a.enabled).length === 0 && p.judging.scoreEntryMode !== 'direct_score') issues.push({ id: 'actions', ar: 'حدد أدوات المحكم', en: 'Define judge actions' });
   if (p.questions.questionsPerParticipant < 1) issues.push({ id: 'questions', ar: 'عدد الأسئلة غير صالح', en: 'Question count is invalid' });

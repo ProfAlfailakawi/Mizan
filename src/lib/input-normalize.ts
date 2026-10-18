@@ -83,3 +83,38 @@ export function normalizeFieldValue(fieldId: string, type: string, raw: string):
   // الافتراضي: لا نمنع، لكن نوحّد الأرقام إلى الإنجليزية دائمًا.
   return toWesternDigits(raw);
 }
+
+/*
+ * البحث بالعربية: يطابق ما يقصده الكاتب لا ما كتبه حرفًا.
+ *
+ * مربعات البحث كانت تقارن `toLowerCase().includes()` حرفيًا، فمن يكتب «احمد» لا يجد «أحمد»، ومن يكتب
+ * «محمد» لا يجد «مُحَمَّد» بالتشكيل، ومن يكتب «فاطمه» لا يجد «فاطمة»، ومن ينقل من الشاشة الرمز المعروض
+ * «A-2 920 655» لا يجد «A-2920655» (العرض يفصل الخانات بمسافات). والبحث عن متسابق هو أكثر ما يفعله
+ * مكتب الاستثناء والمنادي والإدارة يوم المسابقة.
+ */
+const SEARCH_MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭـ​-‏‪-‮⁦-⁩﻿]/g;
+
+/** صيغة موحّدة للمقارنة: صغيرة الأحرف، أرقام لاتينية، بلا تشكيل ولا تطويل، وهمزات الألف والياء والتاء المربوطة موحَّدة. */
+export function foldForSearch(input: unknown): string {
+  return toWesternDigits(String(input ?? ''))
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(SEARCH_MARKS, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ئ/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const COMPACT = /[\s\-_.·]/g;
+
+/** هل يطابق النصُّ الاستعلامَ؟ استعلام فارغ يطابق كل شيء. يُقبل كذلك مع إسقاط المسافات والشرطات (للرموز). */
+export function searchMatches(haystack: unknown, query: unknown): boolean {
+  const q = foldForSearch(query);
+  if (!q) return true;
+  const h = foldForSearch(haystack);
+  return h.includes(q) || h.replace(COMPACT, '').includes(q.replace(COMPACT, ''));
+}

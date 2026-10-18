@@ -4,7 +4,8 @@ import { configWriteAllowed } from './cloud-authority';
 import { auth, getFirestoreClient } from './firebase';
 import { STORAGE_KEY, type AppStoreState } from './store-state';
 
-const CONFIG_WRITERS: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
+import { CONFIG_WRITER_ROLES } from './cloud-sync';
+const CONFIG_WRITERS: Role[] = CONFIG_WRITER_ROLES;
 
 export function readDurableLocalSnapshot(): AppStoreState | null {
   if (typeof localStorage === 'undefined') return null;

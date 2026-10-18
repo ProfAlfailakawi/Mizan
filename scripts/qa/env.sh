@@ -1,6 +1,6 @@
 # Source me: environment for the local QA rig. Contains only throw-away local values.
-QA_DIR="${MIZAN_QA_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.mizan-data/qa}"
-export MIZAN_QA_DIR="$QA_DIR"
+QA_DIR="${RIG_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.mizan-data/qa}"
+export RIG_DIR="$QA_DIR"
 export NODE_ENV=development
 export PORT="${PORT:-4310}"
 export APP_URL="http://localhost:${PORT}"
@@ -40,3 +40,7 @@ export MIZAN_LEGAL_TERMS_URL="https://example.test/terms"
 export MIZAN_LEGAL_PRIVACY_VERSION="2026-01"
 export MIZAN_LEGAL_PRIVACY_EFFECTIVE="2026-01-01"
 export MIZAN_LEGAL_PRIVACY_URL="https://example.test/privacy"
+export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+# The rig drives many sessions from one IP; the per-IP API limiter is exercised separately.
+export RATE_LIMIT_MAX=1000000
+export MIZAN_OWNER_RATE_LIMIT_MAX=100000

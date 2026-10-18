@@ -51,8 +51,8 @@ const asGod = (fn: (db: Firestore) => Promise<unknown>) =>
 const CONTRACTS = [
   {
     collection: 'checkins',
-    readers: ['super_admin', 'org_admin', 'comp_admin', 'ops_manager', 'exception_host'],
-    writers: ['comp_admin', 'ops_manager', 'exception_host'],
+    readers: ['super_admin', 'org_admin', 'branch_admin', 'comp_admin', 'ops_manager', 'exception_host'],
+    writers: ['branch_admin', 'comp_admin', 'ops_manager', 'exception_host'],
     deniedReaders: ['judge', 'participant', 'guardian', 'broadcast_operator'],
     deniedWriters: ['judge', 'head_judge', 'participant', 'auditor'],
   },
@@ -65,8 +65,8 @@ const CONTRACTS = [
   },
   {
     collection: 'committees',
-    readers: ['super_admin', 'org_admin', 'comp_admin', 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'],
-    writers: ['super_admin', 'org_admin', 'comp_admin', 'ops_manager'],
+    readers: ['super_admin', 'org_admin', 'branch_admin', 'comp_admin', 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'],
+    writers: ['super_admin', 'org_admin', 'branch_admin', 'comp_admin', 'ops_manager'],
     deniedReaders: ['participant', 'guardian', 'support_agent'],
     deniedWriters: ['judge', 'head_judge', 'participant', 'auditor'],
   },

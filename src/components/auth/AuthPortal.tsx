@@ -81,7 +81,7 @@ export const AuthPortal:React.FC=()=>{
    if(code==='auth/multi-factor-auth-required'){
     try{const resolver=getMultiFactorResolver(auth,e as Parameters<typeof getMultiFactorResolver>[1]);if(!resolver.hints.some(h=>h.factorId===TotpMultiFactorGenerator.FACTOR_ID)){setMessage(ar?'الحساب يتطلب عامل تحقق غير مدعوم في هذه الشاشة.':'This account requires an unsupported second factor.');return;}setMfaResolver(resolver);setMfaCode('');setPassword('');setMessage('');return;}catch{setMessage(ar?'تعذر بدء التحقق بخطوتين. أعد المحاولة.':'Could not start two-step verification. Try again.');return;}
    }
-   {const serverCode=raw.includes(':')?String(raw.split(':').pop()||'').trim():'';setMessage(ar?(AUTH_AR[code]||(serverCode?serverErrorLabel(serverCode,true):'تعذّر تسجيل الدخول. تحقق من البيانات وحاول مرة أخرى.')):(AUTH_AR[code]||'Sign-in failed'));}
+   {const serverCode=raw.includes(':')?String(raw.split(':').pop()||'').trim():(/^[A-Z][A-Z0-9_]{3,}$/.test(raw)?raw:'');setMessage(ar?(AUTH_AR[code]||(serverCode?serverErrorLabel(serverCode,true):'تعذّر تسجيل الدخول. تحقق من البيانات وحاول مرة أخرى.')):(AUTH_AR[code]||'Sign-in failed'));}
   }finally{setBusy(false)}
  };
 
@@ -98,7 +98,7 @@ export const AuthPortal:React.FC=()=>{
    const raw=String((e as Error)?.message||'');
    if(created){try{await deleteUser(created)}catch{}}
    if(code==='auth/email-already-in-use')setExistingMode(true);
-   {const serverCode=raw.includes(':')?String(raw.split(':').pop()||'').trim():'';setMessage(ar?(AUTH_AR[code]||(serverCode?serverErrorLabel(serverCode,true):'تعذر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.')):(AUTH_AR[code]||'Could not create account'));}
+   {const serverCode=raw.includes(':')?String(raw.split(':').pop()||'').trim():(/^[A-Z][A-Z0-9_]{3,}$/.test(raw)?raw:'');setMessage(ar?(AUTH_AR[code]||(serverCode?serverErrorLabel(serverCode,true):'تعذر إنشاء الحساب. تحقق من البيانات وحاول مرة أخرى.')):(AUTH_AR[code]||'Could not create account'));}
   }finally{setBusy(false)}
  };
 

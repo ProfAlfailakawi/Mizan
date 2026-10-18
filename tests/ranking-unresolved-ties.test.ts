@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { rankResults, topPositionTie, type RankableResult } from '../src/lib/scoring-core';
+import { breakTie, rankResults, topPositionTie, type RankableResult } from '../src/lib/scoring-core';
 
 const result = (finalScore: number, over: Partial<RankableResult> & { id?: string } = {}) =>
   ({ finalScore, criterionScores: {}, penaltyCount: 0, ...over }) as RankableResult & { id?: string };
@@ -109,4 +109,34 @@ test('the store assigns ranks through rankResults, not by array position', async
   assert.equal(/rank:i\+1/.test(store), false, 'no ranking site may still use the array index as the rank');
   assert.ok(store.includes('rankResults('), 'ranking goes through the shared, tie-aware comparator');
   assert.equal((store.match(/outcome\.ranked\.forEach/g) || []).length, 2, 'both ranking sites were migrated');
+});
+
+/*
+ * معايير مدير المسابقة تُنشأ بمعرّفاتٍ مولَّدة (`criterion-1739…`) وتُنسب إلى الاختصاص بـ`assignedJudgeType`.
+ * وكانت «أولوية الحفظ/التجويد» تقرأ المفتاحين الحرفيين `memorization`/`tajweed` فقط، فتعيد صفرًا في كل
+ * مسابقةٍ أُنشئت من الواجهة: لا فصل بين متعادلَين مهما اختلف حفظهما.
+ */
+test('memorization priority works with generated criterion ids via the criterion specialty', async () => {
+  const { specialtyScoresOf } = await import('../src/lib/scoring-core');
+  const criteria = [
+    { id: 'criterion-1001', assignedJudgeType: 'memorization' },
+    { id: 'criterion-1002', assignedJudgeType: 'tajweed' },
+    { id: 'criterion-1003', assignedJudgeType: 'all' },
+  ];
+  const strong = { finalScore: 90, criterionScores: { 'criterion-1001': 60, 'criterion-1002': 25, 'criterion-1003': 5 } };
+  const weak = { finalScore: 90, criterionScores: { 'criterion-1001': 55, 'criterion-1002': 30, 'criterion-1003': 5 } };
+  const withSpecialty = (r: typeof strong) => ({ ...r, specialtyScores: specialtyScoresOf(r.criterionScores, criteria) });
+  assert.deepEqual(withSpecialty(strong).specialtyScores, { memorization: 60, tajweed: 25 });
+  const outcome = rankResults([withSpecialty(weak), withSpecialty(strong)].map((r, i) => ({ ...r, id: i ? 'strong' : 'weak' })), ['memorization_priority']);
+  assert.deepEqual(outcome.ranked.map(r => (r.result as { id?: string }).id), ['strong', 'weak']);
+  assert.deepEqual(outcome.unresolvedTies, [], 'the owner-declared rule decided it; nothing is left for a human');
+  const byTajweed = rankResults([withSpecialty(strong), withSpecialty(weak)].map((r, i) => ({ ...r, id: i ? 'weak' : 'strong' })), ['tajweed_priority']);
+  assert.equal((byTajweed.ranked[0].result as { id?: string }).id, 'weak');
+});
+
+test('standard criterion ids still resolve without an explicit specialty map', () => {
+  const a = { finalScore: 90, criterionScores: { 'crit-memorization': 60, 'crit-tajweed': 25 } };
+  const b = { finalScore: 90, criterionScores: { 'crit-memorization': 55, 'crit-tajweed': 30 } };
+  assert.ok(breakTie(a, b, ['memorization_priority']) < 0);
+  assert.ok(breakTie(a, b, ['tajweed_priority']) > 0);
 });

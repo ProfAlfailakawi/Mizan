@@ -23,6 +23,10 @@ export const SYNCED_COLLECTIONS = [
 export type SyncedCollection = typeof SYNCED_COLLECTIONS[number];
 
 const ADMIN: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
+/** مدير الفرع: عمليات المسابقات على مستوى الجهة — لا ختم ولا نشر ولا تحكيم (انظر قاعدة `branchAdmin` في firestore.rules). */
+const BRANCH: Role[] = ['branch_admin'];
+/** من يحقّ له كتابة وثيقة إعداد المسابقة نفسها (إنشاؤها وضبطها). نشرُ صفحة التسجيل العامة أضيق من هذا. */
+export const CONFIG_WRITER_ROLES: Role[] = [...ADMIN, ...BRANCH];
 const PANEL: Role[] = ['judge', 'head_judge'];
 
 /*
@@ -32,11 +36,11 @@ const PANEL: Role[] = ['judge', 'head_judge'];
  */
 const WRITERS: Record<SyncedCollection, Role[]> = {
   /* المحكّم يقدّم حالة المتسابق وحدها عند انتهاء الجلسة؛ القواعد تحصره في الحالة وسجلّها. */
-  participants: [...ADMIN, 'delegation_manager', 'exception_host', 'judge'],
-  committees: [...ADMIN, 'ops_manager'],
+  participants: [...ADMIN, ...BRANCH, 'delegation_manager', 'exception_host', 'judge'],
+  committees: [...ADMIN, ...BRANCH, 'ops_manager'],
   judge_submissions: ['judge'],
   judge_events: ['judge'],
-  checkins: ['comp_admin', 'ops_manager', 'exception_host'],
+  checkins: ['comp_admin', ...BRANCH, 'ops_manager', 'exception_host'],
   /* المتسابق يكتب اختياره ونسخته، والإدارة وحدها تعتمده أو ترفضه أو تقفله. */
   participant_scopes: [...ADMIN, 'delegation_manager', 'participant'],
   // النتيجة يكتبها من يملك ختم اللجنة، لا كل محكّم: أضيق صلاحية تُنجز العمل.
@@ -45,12 +49,12 @@ const WRITERS: Record<SyncedCollection, Role[]> = {
   reviews: ['head_judge'],
   appeals: [...ADMIN, 'head_judge', 'participant', 'guardian', 'support_agent'],
   support_sessions: [...ADMIN, 'support_agent'],
-  audit: [...ADMIN, ...PANEL, 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
+  audit: [...ADMIN, ...BRANCH, ...PANEL, 'auditor', 'ops_manager', 'delegation_manager', 'exception_host', 'support_agent', 'broadcast_operator'],
   quran_sources: ['super_admin'],
   session_checkpoints: [...ADMIN, ...PANEL, 'ops_manager'],
   /* المحكّم يعلن تضاربه بنفسه، ورئيس التحكيم والإدارة يقرّرون فيه؛ القواعد تحصر المحكّم في الإنشاء. */
   conflict_cases: [...ADMIN, ...PANEL],
-  schedule_plans: [...ADMIN, 'ops_manager'],
+  schedule_plans: [...ADMIN, ...BRANCH, 'ops_manager'],
   qualifications: [...ADMIN],
 };
 
@@ -90,4 +94,47 @@ export function classifyCloudError(err: unknown): CloudSyncErrorCode {
   if (message.includes('permission') || message.includes('insufficient')) return 'CLOUD_PERMISSION_DENIED';
   if (message.includes('too large') || message.includes('exceeds') || message.includes('maximum')) return 'CLOUD_PAYLOAD_TOO_LARGE';
   return 'CLOUD_WRITE_FAILED';
+}
+
+
+/*
+ * ما يستمع إليه كل دور من السحابة.
+ *
+ * كان المخزن يفتح اثني عشر مستمعًا لكل دور مهما كان. وقواعد Firestore ترفض القراءة على من لا يملكها، فيمتلئ
+ * سجلّ المتصفح بأخطاء «permission-denied» عند كل دخول (وتُحجَب خلفها الأخطاء الحقيقية)، والمحكّم خاصةً كان
+ * يطلب كل إرساليات اللجنة وقاعدته تسمح له بإرسالاته وحدها — فلا يصله شيء منها أبدًا.
+ *
+ * هذا الجدول يطابق قواعد القراءة في firestore.rules حرفًا بحرف، ويحرسه اختبارٌ يقرأ القواعد نفسها.
+ * `own`: يقرأ الدورُ ما رفعه هو فقط (`uploaderUid == auth.uid`) وعلى المستمع أن يطلبه مقيَّدًا بذلك.
+ */
+export const WATCHED_COLLECTIONS = [
+  'results', 'judge_submissions', 'participants', 'committees', 'certificates', 'reviews', 'appeals', 'tie_decisions',
+  'support_sessions', 'conflict_cases', 'schedule_plans', 'qualifications',
+] as const;
+export type WatchedCollection = typeof WATCHED_COLLECTIONS[number];
+
+export const COLLECTION_READERS: Record<WatchedCollection, { all: Role[]; own?: Role[] }> = {
+  results: { all: [...ADMIN, 'head_judge', 'judge', 'auditor'] },
+  judge_submissions: { all: [...ADMIN, 'head_judge', 'auditor'], own: ['judge'] },
+  participants: { all: [...ADMIN, ...BRANCH, 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'] },
+  committees: { all: [...ADMIN, ...BRANCH, 'head_judge', 'judge', 'ops_manager', 'exception_host', 'delegation_manager', 'auditor'] },
+  certificates: { all: [...ADMIN, 'auditor'] },
+  reviews: { all: [...ADMIN, 'head_judge', 'auditor'] },
+  appeals: { all: [...ADMIN, 'head_judge', 'auditor', 'support_agent'], own: ['participant', 'guardian'] },
+  tie_decisions: { all: [...ADMIN, 'head_judge', 'judge', 'ops_manager', 'auditor'] },
+  support_sessions: { all: [...ADMIN, 'support_agent', 'ops_manager', 'head_judge'] },
+  conflict_cases: { all: [...ADMIN, 'head_judge', 'judge', 'auditor'] },
+  schedule_plans: { all: [...ADMIN, ...BRANCH, 'ops_manager', 'head_judge', 'judge', 'auditor'] },
+  qualifications: { all: [...ADMIN, 'head_judge', 'auditor'] },
+};
+
+/** الاستماعات التي يفتحها هذا الدور: كل مجموعة يقرؤها، مع تقييد `own` حين لا يقرأ إلا ما رفعه. */
+export function watchPlanFor(role: Role): { collection: WatchedCollection; ownOnly: boolean }[] {
+  const plan: { collection: WatchedCollection; ownOnly: boolean }[] = [];
+  for (const collection of WATCHED_COLLECTIONS) {
+    const rule = COLLECTION_READERS[collection];
+    if (rule.all.includes(role)) plan.push({ collection, ownOnly: false });
+    else if (rule.own?.includes(role)) plan.push({ collection, ownOnly: true });
+  }
+  return plan;
 }

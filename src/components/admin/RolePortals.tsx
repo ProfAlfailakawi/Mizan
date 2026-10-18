@@ -31,6 +31,7 @@ import { BidiText } from '../design-system/BidiText';
 import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
 import { assuranceLabel, timezoneLabel, entityIdLabel, sessionIdLabel, authenticationLabel } from '../../lib/display-ids';
 import { isolateCodes } from '../design-system/BidiText';
+import { searchMatches } from '../../lib/input-normalize';
 
 const isAr=(l:string)=>l==='ar';
 
@@ -243,7 +244,7 @@ export const DelegationPortal: React.FC = () => {
  const delegationId=delegationScopeFor(currentUser);
  const tid=React.useId(); const tlabel=(key:string,ar_:string,en:string)=><label htmlFor={`${tid}-${key}`} className="mizan-field-label">{ar?ar_:en}</label>;
  const scoped=participants.filter(p=>p.competitionId===competition.id&&p.delegationId===delegationId);
- const list=scoped.filter(p=>`${p.fullName} ${p.fullNameArabic} ${p.code}`.toLowerCase().includes(q.toLowerCase()));
+ const list=scoped.filter(p=>searchMatches(`${p.fullName} ${p.fullNameArabic} ${p.code}`,q));
  const selected=scoped.find(p=>p.id===selectedId)||list[0]; const travel=selected?travelRecords.find(r=>r.participantId===selected.id):undefined; const claims=selected?federationAttestations.filter(a=>a.subjectRef===selected.id&&a.status==='valid'):[];
  const category=competition.categories.find(c=>c.id===form.categoryId); const readings=allowedReadingsFor(category);
  const set=(k:keyof DelegateForm,v:string)=>setForm(f=>k==='categoryId'?{...f,categoryId:v,riwaya:competition.categories.find(c=>c.id===v)?.riwaya||''}:{...f,[k]:v});
@@ -284,7 +285,7 @@ export const DelegationPortal: React.FC = () => {
 export const AuditorConsole: React.FC = () => {
  const store=useAppStore(); const {language,auditLogs,competition,identityAccounts,authSessions,passReissues,continuityIncidents,sessionRecoveries,auditLedgerSeals}=store; const ar=isAr(language); const [q,setQ]=useState(''); const [selectedId,setSelectedId]=useState(''); const [verifyMsg,setVerifyMsg]=useState(''); const [serverAudit,setServerAudit]=useState<{rows:any[];verification?:{valid:boolean;count:number;lastHash?:string}}|null>(null);
  useEffect(()=>{if(IS_DEMO_SESSION)return;const u=auth.currentUser;if(!u)return;void (async()=>{try{const token=await u.getIdToken();const r=await fetch('/api/identity/audit?limit=500',{headers:{authorization:`Bearer ${token}`}});if(r.ok)setServerAudit(await r.json())}catch{}})()},[]);
- const logs=auditLogs.filter(x=>`${auditActionLabel(x.action,ar)} ${x.actorName} ${roleLabel(x.actorRole,ar)} ${x.entityType} ${x.entityId} ${x.humanSummaryArabic} ${x.humanSummaryEnglish} ${x.reason||''} ${x.sessionId||''}`.toLowerCase().includes(q.toLowerCase())); const selected=auditLogs.find(x=>x.id===selectedId)||logs[0];
+ const logs=auditLogs.filter(x=>searchMatches(`${auditActionLabel(x.action,ar)} ${x.actorName} ${roleLabel(x.actorRole,ar)} ${x.entityType} ${x.entityId} ${x.humanSummaryArabic} ${x.humanSummaryEnglish} ${x.reason||''} ${x.sessionId||''}`,q)); const selected=auditLogs.find(x=>x.id===selectedId)||logs[0];
  const verify=async()=>{const r=await store.verifyAuditLedger();setVerifyMsg(r.valid?(ar?`السلسلة سليمة · ${arPlural(auditLogs.length, AR_NOUNS.event)} · ${String(r.headHash||'').slice(0,16)}…`:`Chain verified · ${auditLogs.length} events · ${String(r.headHash||'').slice(0,16)}…`):(ar?'فشل التحقق من سلسلة التدقيق.':'Audit chain verification failed.'))};
  return <PortalFrame kicker={ar?'التدقيق':'AUDIT'} title={ar?'دفتر الأدلة التشغيلي':'Operational evidence ledger'} subtitle={ar?'قراءة وتحقق فقط. ترى من فعل ماذا ومتى ومن أي جلسة، دون امتلاك صلاحية تعديل المسابقة من هذا المسار.':'Read and verify only. Trace who did what, when, and from which session without mutation authority.'}>
   <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 [&>*:last-child:nth-child(odd)]:col-span-2 lg:[&>*:last-child:nth-child(odd)]:col-span-1"><Metric countUp icon={FileSearch} value={auditLogs.length} label={ar?'حدث':'Events'}/><Metric countUp icon={UsersRound} value={identityAccounts.filter(x=>x.status==='ACTIVE').length} label={ar?'حساب نشط':'Active identities'}/><Metric countUp icon={KeyRound} value={authSessions.filter(x=>x.status==='ACTIVE').length} label={ar?'جلسة دخول':'Auth sessions'}/><Metric countUp icon={QrCode} value={passReissues.length} label={ar?'QR بديل':'Pass reissues'}/><Metric countUp icon={Activity} value={continuityIncidents.length} label={ar?'انقطاع جلسة':'Interruptions'}/></div>

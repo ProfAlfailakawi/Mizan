@@ -1130,7 +1130,7 @@ async function startServer() {
     return res.json(publicTenant(tenant));
   });
 
-  const PUBLIC_API_STATUS:Record<string,number>={COMPETITION_NOT_FOUND:404,COMPETITION_REGISTRATION_CLOSED:409,COMPETITION_ACCESS_CLOSED:410,REGISTRATION_REJECTED:400,REGISTRATION_FIELD_REQUIRED:400,REGISTRATION_IDENTITY_REQUIRED:400,REGISTRATION_EMAIL_INVALID:400,REGISTRATION_PHONE_INVALID:400,REGISTRATION_DATE_OF_BIRTH_INVALID:400,REGISTRATION_CATEGORY_INVALID:400,REGISTRATION_READING_INVALID:400,REGISTRATION_AGE_NOT_ELIGIBLE:422,REGISTRATION_GENDER_NOT_ELIGIBLE:422,REGISTRATION_CONSENT_REQUIRED:400,REGISTRATION_AUDIO_CONSENT_REQUIRED:400,REGISTRATION_GUARDIAN_REQUIRED:400,REGISTRATION_NOT_ELIGIBLE:422,REGISTRATION_POLICY_REQUIRES_REVIEW:422,JOURNEY_TOKEN_INVALID:400,JOURNEY_NOT_FOUND:404,JOURNEY_REVOKED:410,FIRESTORE_PERMISSION_DENIED:503,FIRESTORE_UNAVAILABLE:503,GOOGLE_OAUTH_CREDENTIALS_UNAVAILABLE:503,GOOGLE_OAUTH_TOKEN_FAILED:503};
+  const PUBLIC_API_STATUS:Record<string,number>={COMPETITION_NOT_FOUND:404,COMPETITION_REGISTRATION_CLOSED:409,COMPETITION_ACCESS_CLOSED:410,REGISTRATION_REJECTED:400,REGISTRATION_ALREADY_REGISTERED:409,REGISTRATION_CODE_UNAVAILABLE:503,REGISTRATION_FIELD_REQUIRED:400,REGISTRATION_IDENTITY_REQUIRED:400,REGISTRATION_EMAIL_INVALID:400,REGISTRATION_PHONE_INVALID:400,REGISTRATION_DATE_OF_BIRTH_INVALID:400,REGISTRATION_CATEGORY_INVALID:400,REGISTRATION_READING_INVALID:400,REGISTRATION_AGE_NOT_ELIGIBLE:422,REGISTRATION_GENDER_NOT_ELIGIBLE:422,REGISTRATION_CONSENT_REQUIRED:400,REGISTRATION_AUDIO_CONSENT_REQUIRED:400,REGISTRATION_GUARDIAN_REQUIRED:400,REGISTRATION_NOT_ELIGIBLE:422,REGISTRATION_POLICY_REQUIRES_REVIEW:422,JOURNEY_TOKEN_INVALID:400,JOURNEY_NOT_FOUND:404,JOURNEY_REVOKED:410,FIRESTORE_PERMISSION_DENIED:503,FIRESTORE_UNAVAILABLE:503,GOOGLE_OAUTH_CREDENTIALS_UNAVAILABLE:503,GOOGLE_OAUTH_TOKEN_FAILED:503};
   const publicApiStatus=(err:unknown)=>PUBLIC_API_STATUS[(err instanceof Error?err.message:'PUBLIC_API_FAILED').split(':')[0]]||500;
   const publicApiError=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PUBLIC_API_FAILED';const base=code.split(':')[0];return res.status(PUBLIC_API_STATUS[base]||500).json({code,category:base.startsWith('REGISTRATION_')?'validation':base.startsWith('JOURNEY_')?'access':base.startsWith('COMPETITION_')?'competition':base.startsWith('FIRESTORE_')||base.startsWith('GOOGLE_')?'server':'server'})};
   /*
@@ -1202,6 +1202,15 @@ async function startServer() {
     if(actor.role!=='super_admin'&&actor.organizationId!==bodyOrgId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
     if(actor.role==='comp_admin'&&actor.competitionId&&actor.competitionId!==cleanId)return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     const updatedAt=new Date().toISOString();
+    /* المعرّف يُنشئه المتصفح، وهو ظاهر في كل رابط عام. فمنشور جهةٍ على معرّف مسابقةٍ تملكها جهةٌ أخرى كان
+       يستبدل ملفَّها العام على القرص (والقرص هو المرجع حين لا يوجد مستند Firestore). لا تُكتب النسخة إلا لمالكها. */
+    try{
+      const file=path.join(publicCompDir,`${cleanId}.json`);
+      let owner='';
+      if(fs.existsSync(file)){try{owner=String(JSON.parse(fs.readFileSync(file,'utf8'))?.organizationId||'')}catch{owner=''}}
+      if(!owner&&firestoreRepository){try{owner=String((await firestoreRepository.get(`public_competitions/${cleanId}`))?.organizationId||'')}catch{owner=''}}
+      if(owner&&owner!==bodyOrgId&&actor.role!=='super_admin')return res.status(409).json({code:'COMPETITION_ID_OWNED_BY_ANOTHER_ORGANIZATION'});
+    }catch{/* فحص الملكية لا يمنع النشر إذا تعذّرت القراءة؛ الكتابة أدناه تبقى مقيَّدة بنطاق الجهة */}
     try{
       const file=path.join(publicCompDir,`${cleanId}.json`);
       fs.writeFileSync(file,JSON.stringify({organizationId:bodyOrgId,competition:comp,updatedAt},null,2),'utf8');
@@ -1292,8 +1301,14 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
         if(stored&&stored.organizationId!==organizationId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
       }
       await deleteFirestoreTree(root);
-      await Promise.all([firestoreRepository.delete(`public_competitions/${competitionId}`),firestoreRepository.delete(`public_boards/${competitionId}`)]);
-      try{fs.rmSync(path.join(publicCompDir,`${competitionId}.json`),{force:true})}catch{/* Firestore remains authoritative. */}
+      /* المستندات العامة مفتاحها معرّف المسابقة وحده، وهو ظاهر في الروابط العامة. فحذفُ مسابقةٍ تحت جهتك كان
+         يمسح أيضًا صفحة التسجيل والشاشة العامة لمسابقةٍ تحمل المعرّف نفسه عند جهةٍ أخرى. لا يُحذف عام إلا ما تملكه جهة الطالب. */
+      const ownedPublic=async(p:string)=>{const row=await firestoreRepository.get(p).catch(()=>null);const owner=String((row as any)?.organizationId||(row as any)?.competition?.organizationId||'');return !owner||owner===organizationId||actor.role==='super_admin'};
+      const dropPublic:Promise<unknown>[]=[];
+      if(await ownedPublic(`public_competitions/${competitionId}`))dropPublic.push(firestoreRepository.delete(`public_competitions/${competitionId}`));
+      if(await ownedPublic(`public_boards/${competitionId}`))dropPublic.push(firestoreRepository.delete(`public_boards/${competitionId}`));
+      await Promise.all(dropPublic);
+      try{const f=path.join(publicCompDir,`${competitionId}.json`);let diskOwner='';try{diskOwner=String(JSON.parse(fs.readFileSync(f,'utf8'))?.organizationId||'')}catch{}if(!diskOwner||diskOwner===organizationId||actor.role==='super_admin')fs.rmSync(f,{force:true})}catch{/* Firestore remains authoritative. */}
       return res.json({ok:true,competitionId});
     }catch(err){
       const code=err instanceof Error?err.message:'COMPETITION_DELETE_FAILED';
@@ -2963,6 +2978,16 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       res.setHeader('Cache-Control','no-cache, must-revalidate');
       res.sendFile(path.join(distPath,'index.html'));
     })}
+  /* آخر معالج للأخطاء: جسمٌ JSON تالف أو أكبر من الحدّ كان يُردّ بصفحة HTML من express، فيتعثّر العميل الذي ينتظر
+     `{code}` ويرى صاحبُ الربط الآلي صفحةً لا يفهمها. الردُّ هنا بالصيغة التي يتكلمها باقي الواجهة، بلا تسريب تفاصيل. */
+  app.use((err:any,req:any,res:any,next:any)=>{
+    if(res.headersSent)return next(err);
+    const rawStatus=Number(err?.status||err?.statusCode);
+    const status=rawStatus>=400&&rawStatus<600?rawStatus:500;
+    const code=err?.type==='entity.parse.failed'?'INVALID_JSON':err?.type==='entity.too.large'?'PAYLOAD_TOO_LARGE':status>=500?'INTERNAL_ERROR':'REQUEST_REJECTED';
+    if(status>=500)console.error('[unhandled-route-error]',req?.method,String(req?.path||'').slice(0,120),err instanceof Error?err.message:err);
+    res.status(status).json({code});
+  });
   app.listen(PORT,'0.0.0.0',()=>console.log(`MIZAN running on :${PORT}`));
 }
 startServer().catch(err=>{console.error(err);process.exit(1)});

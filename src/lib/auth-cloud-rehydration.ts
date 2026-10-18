@@ -2,8 +2,10 @@ import type { Competition, Role } from '../types';
 import { auth, getFirestoreClient } from './firebase';
 import { persistDurableCompetitionSnapshot } from './cloud-session-durability';
 import type { AppStoreState } from './store-state';
+import { isOperatorStaffRole } from './permissions';
 
-const CONFIG_WRITERS: Role[] = ['super_admin', 'org_admin', 'comp_admin'];
+import { CONFIG_WRITER_ROLES } from './cloud-sync';
+const CONFIG_WRITERS: Role[] = CONFIG_WRITER_ROLES;
 
 export interface AuthScopeIdentity {
   id: string;
@@ -39,7 +41,7 @@ export async function prepareAuthenticatedCloudScope(
   identity: AuthScopeIdentity,
   liveState: AppStoreState,
 ): Promise<PreparedCloudScope | null> {
-  if (!auth.currentUser || identity.operatorId || identity.role === 'super_admin' || !identity.organizationId) return null;
+  if (!auth.currentUser || isOperatorStaffRole(identity.role) || identity.role === 'super_admin' || !identity.organizationId) return null;
 
   const { db, doc, getDoc, collection } = await getFirestoreClient();
   const cloudRows: CloudCompetition[] = [];
@@ -52,7 +54,7 @@ export async function prepareAuthenticatedCloudScope(
         cloudRows.push({ competition: data.competition, updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined });
       }
     }
-  } else if (identity.role === 'org_admin') {
+  } else if (identity.role === 'org_admin' || identity.role === 'branch_admin') {
     const { getDocs } = await import('firebase/firestore');
     const snap = await getDocs(collection(db, 'organizations', identity.organizationId, 'competitions'));
     snap.forEach((row) => {

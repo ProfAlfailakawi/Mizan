@@ -849,6 +849,8 @@ export interface ResultRecord {
   rank: number;
   /** Aggregated per-criterion score (points) — retained for deterministic tie-breaking. */
   criterionScores?: Record<string, number>;
+  /** مجموع الدرجات حسب اختصاص المعيار — يقرؤه كسر التعادل (أولوية الحفظ/التجويد) مهما كانت معرّفات المعايير. */
+  specialtyScores?: Record<string, number>;
   /** Total non-reversed penalty events for the participant — used by the fewest_penalties tie-break. */
   penaltyCount?: number;
   status: 'calculated' | 'quality_checked' | 'approved' | 'sealed' | 'published';

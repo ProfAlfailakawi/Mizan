@@ -24,6 +24,8 @@ import { FirestoreRestRepository } from '../server/firestore-rest';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from '../server/saas-platform';
 import { fullQuranScope, scopeFromJuz, scopeFromJuzRange, scopeSignature } from '../src/lib/quran-scope';
 import { getCompetitionPolicy } from '../src/lib/competition-config';
+import { categoryDistribution, categoryScopeOf, resolveQuestionCount } from '../src/lib/scope-engine';
+import { describeScope } from '../src/lib/quran-scope';
 import type {
   AppealRecord, AuditEvent, Category, Certificate, Committee, Competition, JudgeProfile, JudgeSubmission,
   Participant, ResultRecord, ReviewCase, RuleSet, Role, RegistrationStatus,
@@ -35,11 +37,13 @@ if (!emulator) {
   process.exit(2);
 }
 const projectId = String(process.env.FIREBASE_PROJECT_ID || 'mizan-qa').trim();
-const qaDir = path.resolve(process.env.MIZAN_QA_DIR || path.join(process.cwd(), '.mizan-data', 'qa'));
+const qaDir = path.resolve(process.env.RIG_DIR || path.join(process.cwd(), '.mizan-data', 'qa'));
 const args = new Set(process.argv.slice(2));
 const scale = Number((process.argv.find(a => a.startsWith('--scale=')) || '--scale=1').split('=')[1]) || 1;
+/** --stress=N يضيف مسابقةً كبيرة (N متسابقًا) لاختبار القوائم الطويلة والتخزين المحلي. */
+const stress = Number((process.argv.find(a => a.startsWith('--stress=')) || '--stress=0').split('=')[1]) || 0;
 const PASSWORD = 'Qa-Pass-1234';
-const NOW = Date.parse(process.env.MIZAN_SEED_NOW || '2026-10-18T09:00:00Z'); // ثابت ليبقى الزرع حتميًا
+const NOW = Date.parse(process.env.RIG_SEED_NOW || '2026-10-18T09:00:00Z'); // ثابت ليبقى الزرع حتميًا
 
 /* ---------- حتمية ---------- */
 function rngFrom(seed: string) {
@@ -111,7 +115,9 @@ type CompBundle = {
   submissions: (JudgeSubmission & Record<string, unknown>)[]; results: ResultRecord[]; certificates: Certificate[];
   reviews: ReviewCase[]; appeals: (AppealRecord & { uploaderUid?: string })[]; audit: AuditEvent[]; checkins: Record<string, unknown>[];
   scopes: Record<string, unknown>[]; staff: Record<string, UserRow[]>;
+  journeys: { path: string; data: Record<string, unknown> }[];
 };
+const journeyLinks: { participantId: string; competitionId: string; code: string; journeyToken: string; guardianToken: string }[] = [];
 const bundles: CompBundle[] = [];
 const identityGrants: { user: UserRow; role: Role; orgId: string; competitionId?: string; operatorId?: string }[] = [];
 const summary: Record<string, number> = {};
@@ -190,7 +196,7 @@ async function main() {
     const storage = addUser('storage_admin', `${oSlug}-storage`, `${nameOf(false).ar} (مدير التخزين)`, { orgId: org.id });
     const branches = [addUser('branch_admin', `${oSlug}-branch1`, `${nameOf(false).ar} (مدير الفرع)`, { orgId: org.id }), addUser('branch_admin', `${oSlug}-branch2`, `${nameOf(true).ar} (مديرة الفرع)`, { orgId: org.id })];
     const auditor = addUser('auditor', `${oSlug}-auditor`, `${nameOf(false).ar} (مدقق)`, { orgId: org.id });
-    for (const u of [...orgAdmins, billing, storage, ...branches, auditor]) identityGrants.push({ user: u, role: u.role, orgId: org.id, operatorId: org.operatorId });
+    for (const u of [...orgAdmins, billing, storage, ...branches, auditor]) identityGrants.push({ user: u, role: u.role, orgId: org.id });
     // اشتراك وفواتير
     const sub: any = platform.createSubscription(ownerActor, { subjectType: 'organization', subjectId: org.id, planId: org.planId, startsAt: iso(NOW - 120 * DAY), channelOverrideReason: 'زرع بيانات فحص' } as any);
     const statuses = ['paid', 'paid', 'open', oi % 3 === 0 ? 'overdue' : 'open'] as const;
@@ -212,6 +218,7 @@ async function main() {
         for (const p of b.participants.slice(0, 20)) platform.recordParticipant(ownerActor, { organizationId: org.id, competitionId: b.doc.id, participantId: p.id });
       } catch (e) { /* حدود الباقة تُسجَّل ولا توقف الزرع */ bump('commercialLimitHits'); }
     }
+    if (stress && oi === 0) bundles.push(await buildCompetition(oi, 0, org, 'live', { orgAdmins, auditor }, stress));
     // سجلات تخزين واقعية
     for (let f = 0; f < 4; f++) {
       try {
@@ -246,6 +253,7 @@ async function main() {
     for (const a of b.appeals) put('appeals', a.id, a as any);
     for (const a of b.audit) put('audit', a.id, { ...a, uploaderUid: users.find(u => u.competitionId === b.doc.id && u.role === a.actorRole)?.uid || owner.uid });
     for (const c of b.checkins) put('checkins', String(c.participantId), c);
+    for (const j of b.journeys) ops.push(j);
     for (const s of b.scopes) put('participant_scopes', String(s.id), s);
     if (b.doc.status !== 'draft') {
       ops.push({ path: `public_competitions/${b.doc.id}`, data: { organizationId: b.doc.organizationId, competition: b.doc as any, updatedAt } });
@@ -260,6 +268,7 @@ async function main() {
   /* ===== الهويات على الخادم (سجل حوكمة الهوية) + جدول الحسابات للمحاكي ===== */
   writeIdentityState();
   fs.writeFileSync(path.join(qaDir, 'users.json'), JSON.stringify(users, null, 1));
+  fs.writeFileSync(path.join(qaDir, 'journeys.json'), JSON.stringify(journeyLinks, null, 1));
   fs.writeFileSync(path.join(qaDir, 'seed-summary.json'), JSON.stringify({ users: users.length, byRole: countBy(users.map(u => u.role)), ...summary, password: PASSWORD }, null, 2));
   console.log('تم الزرع الواقعي:');
   console.log(`  الحسابات: ${users.length}`);
@@ -289,8 +298,8 @@ function writeIdentityState() {
 }
 const owner0 = () => users[0].uid;
 
-async function buildCompetition(oi: number, ci: number, org: { id: string; arName: string; enName: string; operatorId?: string }, status: Competition['status'], ctx: { orgAdmins: UserRow[]; auditor: UserRow }): Promise<CompBundle> {
-  const seq = oi * 10 + ci + 1;
+async function buildCompetition(oi: number, ci: number, org: { id: string; arName: string; enName: string; operatorId?: string }, status: Competition['status'], ctx: { orgAdmins: UserRow[]; auditor: UserRow }, size?: number): Promise<CompBundle> {
+  const seq = size ? 900 + oi : oi * 10 + ci + 1;
   const compId = `comp-${String(seq).padStart(3, '0')}-${2026 + ci}`;
   const slug = `c${seq}`;
   const ruleSet = RULESET(`rule-${slug}`);
@@ -319,15 +328,15 @@ async function buildCompetition(oi: number, ci: number, org: { id: string; arNam
     staff[role] = [];
     for (let i = 0; i < n; i++) {
       const nm = nameOf(female ?? (i % 5 === 4));
-      const u = addUser(role, `${slug}-${role.replace(/_/g, '-')}-${i + 1}`, `${nm.ar} (${label})`, { orgId: org.id, competitionId: compId, operatorId: org.operatorId });
+      const u = addUser(role, `${slug}-${role.replace(/_/g, '-')}-${i + 1}`, `${nm.ar} (${label})`, { orgId: org.id, competitionId: compId });
       staff[role].push(u);
-      identityGrants.push({ user: u, role, orgId: org.id, competitionId: compId, operatorId: org.operatorId });
+      identityGrants.push({ user: u, role, orgId: org.id, competitionId: compId });
     }
   };
   mk('comp_admin', 1, 'مدير المسابقة', false); mk('head_judge', 2, 'رئيس تحكيم', false); mk('judge', 8, 'محكّم');
   mk('ops_manager', 2, 'مدير تشغيل', false); mk('exception_host', 2, 'مكتب الاستثناء'); mk('delegation_manager', 4, 'مدير وفد', false); mk('broadcast_operator', 1, 'البث والحفل', false);
   // المدقق على مستوى الجهة يعمل على كل مسابقاتها: منحة بنطاق المسابقة
-  identityGrants.push({ user: ctx.auditor, role: 'auditor', orgId: org.id, competitionId: compId, operatorId: org.operatorId });
+  identityGrants.push({ user: ctx.auditor, role: 'auditor', orgId: org.id, competitionId: compId });
 
   /* اللجان والمحكّمون */
   const committees: Committee[] = []; const judges: JudgeProfile[] = [];
@@ -343,7 +352,7 @@ async function buildCompetition(oi: number, ci: number, org: { id: string; arNam
   }
 
   /* المتسابقون */
-  const N = Math.max(8, Math.round(48 * Math.min(scale, 1)));
+  const N = size || Math.max(8, Math.round(48 * Math.min(scale, 1)));
   const participants: Participant[] = []; const guardians: UserRow[] = [];
   const statusDist = (i: number): RegistrationStatus => {
     if (status === 'draft') return i % 4 === 0 ? 'draft' : 'submitted';
@@ -374,8 +383,8 @@ async function buildCompetition(oi: number, ci: number, org: { id: string; arNam
       ...(i % 17 === 0 ? { specialNeeds: true } : {}),
     } as Participant;
     participants.push(p);
-    const pu = addUser('participant', `${slug}-p${i + 1}`, nm.ar, { orgId: org.id, competitionId: compId, operatorId: org.operatorId });
-    if (minor) { const g = addUser('guardian', `${slug}-g${i + 1}`, `${nameOf(i % 3 === 0).ar} (ولي أمر ${nm.given})`, { orgId: org.id, competitionId: compId, operatorId: org.operatorId }); guardians.push(g); }
+    const pu = addUser('participant', `${slug}-p${i + 1}`, nm.ar, { orgId: org.id, competitionId: compId });
+    if (minor) { const g = addUser('guardian', `${slug}-g${i + 1}`, `${nameOf(i % 3 === 0).ar} (ولي أمر ${nm.given})`, { orgId: org.id, competitionId: compId }); guardians.push(g); }
     void pu;
   }
   doc.totalRegistered = participants.filter(p => p.status !== 'draft').length;
@@ -459,7 +468,21 @@ async function buildCompetition(oi: number, ci: number, org: { id: string; arNam
   });
   committees.forEach(c => { c.completedCount = participants.filter(p => p.assignedCommitteeId === c.id && ['tested', 'appealed', 'certified'].includes(p.status)).length; });
 
-  return { doc, participants, committees, judges, submissions, results, certificates, reviews, appeals, audit, checkins, scopes, staff };
+  /* بطاقات الرحلة العامة: المتسابق وولي أمره يدخلان برابطٍ خاص لا بحساب. كلُّ متسابقٍ مزروع له رابطان صالحان. */
+  const journeys: { path: string; data: Record<string, unknown> }[] = [];
+  for (const p of participants) {
+    const cat = categories.find(c => c.id === p.categoryId)!;
+    const scope = categoryScopeOf(cat), questionCount = resolveQuestionCount(cat, doc.policy!), distribution = categoryDistribution(cat, questionCount);
+    const mkToken = (aud: string) => `mz_${aud}_${crypto.createHash('sha256').update(`seed|${p.id}|${aud}`).digest('base64url').slice(0, 43)}`;
+    const jt = mkToken('journey'), gt = mkToken('guardian');
+    const res = results.find(r => r.participantId === p.id);
+    const base = { organizationId: org.id, competitionId: compId, participantId: p.id, competitionName: doc.name, competitionNameArabic: doc.nameArabic, participantCode: p.code, participantName: p.fullName, participantNameArabic: p.fullNameArabic, status: p.status, arrivalSlot: p.arrivalSlot ?? null, queueNumber: p.queueNumber ?? null, venueName: doc.venueName, committee: p.assignedCommitteeId ? { code: committees.find(c => c.id === p.assignedCommitteeId)?.code, hall: committees.find(c => c.id === p.assignedCommitteeId)?.venueHall } : null, result: null, certificate: null, preparation: { scopeTextArabic: describeScope(scope, true), scopeTextEnglish: describeScope(scope, false), scope, riwaya: p.riwaya, spreadAcrossZones: distribution.mode !== 'free' && distribution.zones.length > 1, questionCount, minutesPerQuestion: Math.max(1, Math.round((cat.targetDurationMinutes || questionCount * 5) / Math.max(1, questionCount))) }, revoked: false, updatedAt: iso(NOW - DAY) };
+    void res;
+    p.journeyAccessTokenHash = sha(jt); p.guardianAccessTokenHash = sha(gt); p.journeyTokenCustody = 'holder_only';
+    journeys.push({ path: `public_journeys/${sha(jt)}`, data: { ...base, audience: 'participant', tokenHashVersion: 'sha256-v1' } }, { path: `public_journeys/${sha(gt)}`, data: { ...base, audience: 'guardian', tokenHashVersion: 'sha256-v1' } });
+    journeyLinks.push({ participantId: p.id, competitionId: compId, code: p.code, journeyToken: jt, guardianToken: gt });
+  }
+  return { doc, participants, committees, judges, submissions, results, certificates, reviews, appeals, audit, checkins, scopes, staff, journeys };
 }
 
 main().catch(err => { console.error(`SEED_FAILED: ${err instanceof Error ? err.stack : String(err)}`); process.exit(1); });

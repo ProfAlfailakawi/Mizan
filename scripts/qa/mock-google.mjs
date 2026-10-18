@@ -23,20 +23,26 @@ function users() {
 }
 // Runtime-registered accounts (sign-ups performed in the browser).
 const runtime = new Map();
+// Custom claims written by the app server through the Admin SDK (Auth-emulator protocol on :9099).
+const claimOverrides = new Map();
 const findByEmail = (e) => users().byEmail.get(String(e).toLowerCase()) || runtime.get(String(e).toLowerCase());
 const findByUid = (u) => users().byUid.get(u) || [...runtime.values()].find((x) => x.uid === u);
 
 export function mintToken(u, ttl = 3600) {
   const now = Math.floor(Date.now() / 1000);
+  const ov = claimOverrides.get(u.uid);
   const payload = {
     iss: `https://securetoken.google.com/${PROJECT_ID}`, aud: PROJECT_ID, auth_time: now, user_id: u.uid, sub: u.uid, iat: now, exp: now + ttl,
     email: u.email, email_verified: true, name: u.name,
     firebase: { identities: { email: [u.email] }, sign_in_provider: 'password', ...(u.mfa ? { sign_in_second_factor: 'totp' } : {}) },
   };
-  if (u.role) payload.role = u.role;
-  if (u.orgId) payload.org_id = u.orgId;
-  if (u.competitionId) payload.competition_id = u.competitionId;
-  if (u.operatorId) payload.operator_id = u.operatorId;
+  if (ov !== undefined) { if (ov) Object.assign(payload, ov); }
+  else {
+    if (u.role) payload.role = u.role;
+    if (u.orgId) payload.org_id = u.orgId;
+    if (u.competitionId) payload.competition_id = u.competitionId;
+    if (u.operatorId) payload.operator_id = u.operatorId;
+  }
   const head = b64({ alg: 'RS256', kid: KID, typ: 'JWT' });
   const body = b64(payload);
   const sig = crypto.sign('RSA-SHA256', Buffer.from(`${head}.${body}`), privateKey).toString('base64url');
@@ -103,3 +109,30 @@ const server = https.createServer({ key: fs.readFileSync(keys.tlsKey), cert: fs.
   });
 });
 server.listen(MOCK_PORT, '127.0.0.1', () => console.log(`mock-google listening on https://127.0.0.1:${MOCK_PORT}`));
+
+// Admin SDK (setCustomUserClaims) speaks the Auth-emulator protocol when FIREBASE_AUTH_EMULATOR_HOST is set.
+const adminServer = http.createServer((req, res) => {
+  let raw = '';
+  req.on('data', (c) => { raw += c; });
+  req.on('end', () => {
+    let body = {};
+    try { body = JSON.parse(raw || '{}'); } catch { /* */ }
+    const json = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (req.url.includes('accounts:update')) {
+      const uid = body.localId;
+      if (!findByUid(uid)) return json(400, { error: { code: 400, message: 'USER_NOT_FOUND' } });
+      if (body.customAttributes !== undefined) {
+        try { const c = JSON.parse(body.customAttributes || '{}'); claimOverrides.set(uid, Object.keys(c).length ? c : null); } catch { return json(400, { error: { code: 400, message: 'INVALID_CLAIMS' } }); }
+      }
+      return json(200, { localId: uid });
+    }
+    if (req.url.includes('accounts:lookup')) {
+      const uid = (body.localId || [])[0];
+      const u = uid && findByUid(uid);
+      if (!u) return json(200, {});
+      return json(200, { users: [lookupUser(u)] });
+    }
+    return json(404, { error: { code: 404, message: 'NOT_FOUND' } });
+  });
+});
+adminServer.listen(Number(process.env.RIG_ADMIN_PORT || 9099), '127.0.0.1', () => console.log('mock admin (auth emulator protocol) on :9099'));

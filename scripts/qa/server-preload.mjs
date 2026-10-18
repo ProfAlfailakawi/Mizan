@@ -2,7 +2,7 @@
 // the REAL token verification code runs against rig-minted tokens. Nothing else is altered.
 import fs from 'node:fs';
 import path from 'node:path';
-const dir = process.env.MIZAN_QA_DIR || path.join(process.cwd(), '.mizan-data', 'qa');
+const dir = process.env.RIG_DIR || path.join(process.cwd(), '.mizan-data', 'qa');
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input?.url || String(input);

@@ -41,7 +41,7 @@ export const RegistrationFlow: React.FC<{onSuccess?:(participant:Participant)=>v
  const [custom,setCustom]=useState<Answers>(()=>readDraft()?.custom||{});
  const [draftRestored]=useState(()=>!!readDraft());
  const initialCategory=competition.categories.find(c=>c.id===requestedCategory)||competition.categories[0];
- const [form,setForm]=useState(()=>({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'2010-01-01',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:'',...(readDraft()?.form||{})}));
+ const [form,setForm]=useState(()=>({fullNameArabic:'',fullName:'',email:'',phone:'',country:'Kuwait (الكويت)',nationality:'كويتي',nationalIdOrPassport:'',dateOfBirth:'',gender:'male' as 'male'|'female',categoryId:initialCategory?.id||'',riwaya:'',...(readDraft()?.form||{})}));
  useEffect(()=>{if(submitted)return;const t=window.setTimeout(()=>{try{window.localStorage.setItem(draftKey,JSON.stringify({form,custom,savedAt:new Date().toISOString()}))}catch{/* التخزين المحلي غير متاح: النموذج يعمل بلا مسودة */}},600);return()=>window.clearTimeout(t)},[form,custom,submitted,draftKey]);
 
  useEffect(()=>{
@@ -152,6 +152,7 @@ const registrationError=(code:string,ar:boolean)=>{const [key,extra]=code.split(
  REGISTRATION_CLOSED:['التسجيل مغلق لهذه المسابقة.','Registration is closed for this competition.'],
  REGISTRATION_REJECTED:['لم يُقبل الطلب وفق شروط هذه المسابقة. تواصل مع الجهة المنظِّمة.','The application was not accepted under this competition’s rules. Contact the organizer.'],
  REGISTRATION_NOT_CONFIGURED:['خدمة التسجيل غير مهيأة على الخادم.','Registration service is not configured.'],
+ REGISTRATION_ALREADY_REGISTERED:['سُجّلت بهذه البيانات مسبقًا في هذه المسابقة. افتح رابط رحلتك الذي وصلك بعد التسجيل، أو تواصل مع الجهة المنظِّمة إن فقدته.','You are already registered in this competition with these details. Open the journey link you received, or contact the organizer if you lost it.'],
  DUPLICATE_ID:['هذا الرقم مسجّل مسبقًا في هذه المسابقة.','This ID is already registered in this competition.']};if(labels[key])return pl(...(labels[key] as [string, string]));if(code==='Failed to fetch'||code.startsWith('HTTP_'))return pl('تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.', 'Could not reach the server. Check your connection and retry.');return pl('حدث خطأ في الخادم ولم يُسجل الطلب. أعد المحاولة.', 'A server error occurred and the application was not saved.')};
 const Input=({label,value,onChange,type='text',dir}:{label:string;value:string;onChange:(v:string)=>void;type?:string;dir?:'rtl'|'ltr'})=><label className="block"><span className="block text-base font-black text-[#3f4642] mb-2">{label}</span><input type={type} dir={dir} value={value} onChange={e=>onChange(e.target.value)} className="mizan-input text-base min-h-14"/></label>;
 

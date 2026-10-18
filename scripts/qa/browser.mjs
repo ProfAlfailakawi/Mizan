@@ -3,20 +3,20 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import { MOCK_PORT, APP_PORT, QA_PASSWORD, USERS_FILE } from './common.mjs';
 
-export const BASE = process.env.MIZAN_QA_BASE || `http://localhost:${APP_PORT}`;
+export const BASE = process.env.RIG_BASE || `http://localhost:${APP_PORT}`;
 export const loadUsers = () => JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM || ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium/chrome-linux/chrome'].find((p) => fs.existsSync(p));
 
 export async function launch() {
   return chromium.launch({
     executablePath: chromiumPath,
-    args: ['--no-sandbox', `--host-resolver-rules=MAP *.googleapis.com 127.0.0.1:${MOCK_PORT}, MAP firebaseinstallations.googleapis.com 127.0.0.1:${MOCK_PORT}`, '--ignore-certificate-errors', '--no-proxy-server'],
+    args: ['--no-sandbox', `--host-resolver-rules=MAP *.googleapis.com 127.0.0.1:${MOCK_PORT}, MAP firebaseinstallations.googleapis.com 127.0.0.1:${MOCK_PORT}`, '--ignore-certificate-errors', '--no-proxy-server', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   });
 }
 
 /** Opens a fresh context for a viewport and wires problem collectors. */
 export async function newSession(browser, { width = 1280, height = 900, locale = 'ar' } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, locale: locale === 'ar' ? 'ar-KW' : 'en-US', ignoreHTTPSErrors: true });
+  const context = await browser.newContext({ viewport: { width, height }, locale: locale === 'ar' ? 'ar-KW' : 'en-US', ignoreHTTPSErrors: true, permissions: ['microphone', 'camera'] });
   const page = await context.newPage();
   const problems = { console: [], pageerrors: [], http: [], requestfailed: [] };
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) problems.console.push(`${m.type()}: ${m.text().slice(0, 300)}`); });

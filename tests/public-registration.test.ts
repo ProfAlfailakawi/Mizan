@@ -67,3 +67,67 @@ test('public registration permits registration while competition is live',async(
   const res=await liveService.register(SEED_COMPETITION.id,input,'https://mizan.example');
   assert.equal(res.participant.status,'under_review');
 });
+
+test('the same person cannot register twice in one competition (double submit, retry after a lost reply, second tab)',async()=>{
+  const store=new MemoryStore(),service=serviceFor(store);
+  await service.register(SEED_COMPETITION.id,input,'https://mizan.example');
+  await assert.rejects(()=>service.register(SEED_COMPETITION.id,input,'https://mizan.example'),/REGISTRATION_ALREADY_REGISTERED/);
+  /* الأرقام العربية والمسافات والشرطات والحالة لا تُنتج هويةً جديدة. */
+  await assert.rejects(()=>service.register(SEED_COMPETITION.id,{...input,nationalIdOrPassport:'p-123 456',email:'other@example.com'},'https://mizan.example'),/REGISTRATION_ALREADY_REGISTERED/);
+  await assert.rejects(()=>service.register(SEED_COMPETITION.id,{...input,nationalIdOrPassport:'٢٩٩٠١٤٥٢٠٣',email:'a@example.com'},'https://mizan.example').then(()=>service.register(SEED_COMPETITION.id,{...input,nationalIdOrPassport:'2990145203',email:'b@example.com'},'https://mizan.example')),/REGISTRATION_ALREADY_REGISTERED/);
+  const participants=[...store.documents.keys()].filter(p=>/\/participants\//.test(p));
+  assert.equal(participants.length,2,'only the first attempt of each identity created a participant');
+});
+
+test('a different person (own ID) and a sibling with a distinct ID register normally; the index stores no personal data',async()=>{
+  const store=new MemoryStore(),service=serviceFor(store);
+  await service.register(SEED_COMPETITION.id,input,'https://mizan.example');
+  await service.register(SEED_COMPETITION.id,{...input,nationalIdOrPassport:'P777888',fullNameArabic:'يوسف محمد',fullName:'Yusuf Mohammed'},'https://mizan.example');
+  const index=[...store.documents.entries()].filter(([p])=>/\/registration_index\//.test(p));
+  assert.equal(index.length,2);
+  const serialized=JSON.stringify(index.map(([,d])=>d));
+  assert.doesNotMatch(serialized,/P123456|ahmad@example\.com|أحمد/);
+});
+
+test('with an ID too short to identify anyone, the duplicate key falls back to e-mail + date of birth + name',async()=>{
+  const store=new MemoryStore(),service=serviceFor(store);
+  const noId={...input,nationalIdOrPassport:'A1'};
+  await service.register(SEED_COMPETITION.id,noId,'https://mizan.example');
+  await assert.rejects(()=>service.register(SEED_COMPETITION.id,noId,'https://mizan.example'),/REGISTRATION_ALREADY_REGISTERED/);
+  await service.register(SEED_COMPETITION.id,{...noId,fullNameArabic:'أخوه الصغير',dateOfBirth:'2012-05-05'},'https://mizan.example');
+});
+
+class CollidingStore extends MemoryStore{
+  attempts=0;constructor(private collisions:number,competition?:Competition|null){super(competition)}
+  async create(documents:{path:string;data:Record<string,unknown>}[]){if(this.attempts++<this.collisions)throw new Error('FIRESTORE_CONFLICT');return super.create(documents)}
+  async getDocument(path:string){return this.documents.get(path)||null}
+}
+
+test('a participant-code collision draws a new code instead of failing or sharing a code',async()=>{
+  const store=new CollidingStore(3),service=serviceFor(store);
+  const result=await service.register(SEED_COMPETITION.id,input,'https://mizan.example');
+  assert.equal(store.attempts,4,'three collisions, then success');
+  const stored=[...store.documents.entries()];
+  const participant=stored.find(([p])=>/\/participants\//.test(p))![1] as {code:string};
+  assert.equal(participant.code,result.participant.code);
+  const journeys=stored.filter(([p])=>p.startsWith('public_journeys/')).map(([,d])=>(d as {participantCode:string}).participantCode);
+  assert.deepEqual(journeys,[participant.code,participant.code],'the public journey cards carry the final code, not a discarded one');
+  assert.ok(stored.some(([p])=>p.endsWith(`/participant_codes/${participant.code}`)),'the code is reserved by an index document');
+});
+
+test('a registration that can never obtain a free code fails with a clear code, not a hang',async()=>{
+  const store=new CollidingStore(1000),service=serviceFor(store);
+  await assert.rejects(()=>service.register(SEED_COMPETITION.id,input,'https://mizan.example'),/REGISTRATION_CODE_UNAVAILABLE/);
+  assert.ok(store.attempts<=8);
+});
+
+test('hidden bidi-override and zero-width characters are stripped from submitted names, ZWNJ is kept',async()=>{
+  const store=new MemoryStore(),service=serviceFor(store);
+  const dirty='‮يوسف​ محمد⁦﻿';
+  await service.register(SEED_COMPETITION.id,{...input,fullNameArabic:dirty,fullName:'Yu‮suf​ M'},'https://mizan.example');
+  const participant=[...store.documents.entries()].find(([p])=>/\/participants\//.test(p))![1] as {fullNameArabic:string;fullName:string};
+  assert.equal(participant.fullNameArabic,'يوسف محمد');
+  assert.equal(participant.fullName,'Yusuf M');
+  const persian=await serviceFor(new MemoryStore()).register(SEED_COMPETITION.id,{...input,fullNameArabic:'می‌خواهم'},'https://mizan.example');
+  assert.ok(persian.participant.fullNameArabic.includes('‌'),'the Persian half-space survives');
+});

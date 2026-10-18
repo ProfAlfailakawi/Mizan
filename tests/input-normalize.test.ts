@@ -38,3 +38,17 @@ test('normalizeFieldValue routes by field/type', () => {
   assert.equal(normalizeFieldValue('email', 'email', ' A@B.com '), 'A@B.com');
   assert.equal(normalizeFieldValue('dateOfBirth', 'date', '٢٠١٠-٠١-٠١'), '2010-01-01');
 });
+
+test('search folds Arabic spelling variants, diacritics, digits and spaced codes', async () => {
+  const { searchMatches, foldForSearch } = await import('../src/lib/input-normalize');
+  assert.ok(searchMatches('أحمد بن عبد الله', 'احمد'), 'alef with hamza matches bare alef');
+  assert.ok(searchMatches('مُحَمَّد يوسف', 'محمد'), 'tashkeel is ignored');
+  assert.ok(searchMatches('فاطمة الزهراء', 'فاطمه'), 'ta marbuta matches ha');
+  assert.ok(searchMatches('عيسى موسى', 'عيسي'), 'alef maqsura matches ya');
+  assert.ok(searchMatches('A-2920655 · أحمد', 'A-2 920 655'), 'a code copied from the spaced display still matches');
+  assert.ok(searchMatches('A-104', 'a104'), 'case and dash are forgiven for codes');
+  assert.ok(searchMatches('A-٢٠٤', 'a-204'), 'Arabic-Indic digits match Western digits');
+  assert.ok(searchMatches('anything', '   '), 'an empty query matches everything');
+  assert.equal(searchMatches('يوسف', 'ابراهيم'), false, 'and unrelated text still does not match');
+  assert.equal(foldForSearch('ـمُـحَـمَّـد'), 'محمد', 'tatweel and marks are stripped');
+});

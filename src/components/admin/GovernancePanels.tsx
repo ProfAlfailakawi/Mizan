@@ -9,6 +9,7 @@ import { Pin } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { caseVerification, type ConflictDecision, type ConflictKind, type ConflictRelation } from '../../lib/conflict-of-interest';
 import { hierarchyOf } from '../../lib/qualification';
+import { searchMatches } from '../../lib/input-normalize';
 
 const L = (ar: boolean, a: string, e: string) => (ar ? a : e);
 const input = 'mizan-input text-sm';
@@ -163,7 +164,7 @@ export const RegistrationPaymentsPanel: React.FC = () => {
   const [q, setQ] = useState('');
   const [refs, setRefs] = useState<Record<string, string>>({});
   const [result, setResult] = useState<{ ok: boolean; code?: string } | null>(null);
-  const rows = s.participants.filter(p => p.competitionId === s.competition.id && p.registrationPayment && `${p.code} ${p.fullName} ${p.fullNameArabic}`.toLowerCase().includes(q.toLowerCase()));
+  const rows = s.participants.filter(p => p.competitionId === s.competition.id && p.registrationPayment && searchMatches(`${p.code} ${p.fullName} ${p.fullNameArabic}`,q));
   const money = (m: number, c: string) => `${Math.floor(m / 100)}.${String(m % 100).padStart(2, '0')} ${c}`;
   const STATUS: Record<string, [string, string]> = { pending: ['معلّق', 'Pending'], paid: ['مدفوع', 'Paid'], refunded: ['مسترد', 'Refunded'], waived: ['معفى', 'Waived'], not_required: ['غير مطلوب', 'Not required'] };
   if (!rows.length && !q) return null;

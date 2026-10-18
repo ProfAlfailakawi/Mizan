@@ -31,3 +31,12 @@ export const GOVERNED_ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
 
 export function can(role: Role, permission: Permission) { return ROLE_PERMISSIONS[role]?.includes(permission) ?? false; }
 export function permissionsFor(role: Role) { return ROLE_PERMISSIONS[role] ?? []; }
+
+/**
+ * هل هذا الدور موظّف مشغّل (لا موظّف جهةٍ يملكها مشغّل)؟
+ *
+ * الخادم يُلحق `operatorId` بكل هويةٍ داخل جهةٍ يملكها مشغّل ليحسب النطاق التجاري، فوجودُ
+ * `operatorId` وحده لا يعني أن صاحبه موظّف مشغّل. وكان العميل يعامل وجودَه كذلك، فمدير جهةٍ
+ * أعاد المشغّل بيعها لا يجد مسابقاتِه ولا جهتَه ويرى «مسابقة قيد الإعداد» وهو يملك مسابقتين.
+ */
+export const isOperatorStaffRole = (role: Role | string | undefined) => role === 'operator_owner' || role === 'operator_admin';

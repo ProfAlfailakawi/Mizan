@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Start the local QA rig: Firestore emulator, mock Google identity/Firestore proxy, app server.
-# Usage: scripts/qa/up.sh   (logs in $MIZAN_QA_DIR/logs, pids in $MIZAN_QA_DIR/pids)
+# Usage: scripts/qa/up.sh   (logs in $RIG_DIR/logs, pids in $RIG_DIR/pids)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/qa/env.sh

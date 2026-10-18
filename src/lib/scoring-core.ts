@@ -70,7 +70,46 @@ export function panelPenaltyCount(submissions: ScoringSubmission[], sessionEvent
   return Math.max(0, ...submissions.map((s) => s.sessionPenaltyCount || 0), sessionEventCount);
 }
 
-export interface RankableResult { finalScore: number; criterionScores?: Record<string, number>; penaltyCount?: number }
+export interface RankableResult {
+  finalScore: number;
+  criterionScores?: Record<string, number>;
+  /** مجموع الدرجات حسب اختصاص المعيار (الحفظ/التجويد/…): ما تقرؤه قواعد أولوية الحفظ والتجويد. */
+  specialtyScores?: Record<string, number>;
+  penaltyCount?: number;
+}
+
+/**
+ * مجموع الدرجات حسب اختصاص المعيار.
+ *
+ * قاعدتا «أولوية الحفظ» و«أولوية التجويد» كانتا تقرآن `criterionScores['memorization']` حرفيًا، لكن المعايير
+ * التي يُنشئها مدير المسابقة تحمل معرّفات مولَّدة (`criterion-1739…`) وتُنسب إلى الاختصاص عبر
+ * `assignedJudgeType`. فكانت القاعدتان تعيدان صفرًا لكل متسابق فلا تفصلان بين أحد: يتعادل من لا ينبغي أن
+ * يتعادل، ويُحسم التعادل بقاعدةٍ لاحقة أو بقرارٍ يدوي، والمالك أعلن أولوية الحفظ.
+ */
+export function specialtyScoresOf(
+  criterionScores: Record<string, number> | undefined,
+  criteria: readonly { id: string; assignedJudgeType?: string }[] = [],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of criteria) {
+    const type = c.assignedJudgeType;
+    if (!type || type === 'all') continue;
+    const v = criterionScores?.[c.id];
+    if (typeof v === 'number' && Number.isFinite(v)) out[type] = (out[type] || 0) + v;
+  }
+  return out;
+}
+
+/** درجة الاختصاص: المحسوبة صراحةً، وإلا معرّفات المعايير المعيارية (`memorization`، `crit-memorization`). */
+function specialtyScore(r: RankableResult, specialty: string): number {
+  const explicit = r.specialtyScores?.[specialty];
+  if (typeof explicit === 'number') return explicit;
+  let total = 0;
+  for (const [id, v] of Object.entries(r.criterionScores || {})) {
+    if ((id === specialty || id === `crit-${specialty}` || id.endsWith(`-${specialty}`)) && typeof v === 'number') total += v;
+  }
+  return total;
+}
 
 /**
  * ترتيب حاسم عند تساوي الدرجة، بترتيب قواعد الرُبريك.
@@ -79,10 +118,10 @@ export interface RankableResult { finalScore: number; criterionScores?: Record<s
 export function breakTie(a: RankableResult, b: RankableResult, rules: readonly string[] = []): number {
   for (const rule of rules) {
     if (rule === 'memorization_priority') {
-      const d = (b.criterionScores?.['memorization'] || 0) - (a.criterionScores?.['memorization'] || 0);
+      const d = specialtyScore(b, 'memorization') - specialtyScore(a, 'memorization');
       if (Math.abs(d) > 1e-9) return d;
     } else if (rule === 'tajweed_priority') {
-      const d = (b.criterionScores?.['tajweed'] || 0) - (a.criterionScores?.['tajweed'] || 0);
+      const d = specialtyScore(b, 'tajweed') - specialtyScore(a, 'tajweed');
       if (Math.abs(d) > 1e-9) return d;
     } else if (rule === 'fewest_penalties') {
       const d = (a.penaltyCount || 0) - (b.penaltyCount || 0);

@@ -64,6 +64,8 @@ export interface AwardCandidate {
   maxScore: number;
   /** درجاتُ المعايير — بها تعمل قواعدُ كسر التعادل المعلنة. بدونها لا تفصل قاعدة. */
   criterionScores?: Record<string, number>;
+  /** مجموع الدرجات حسب اختصاص المعيار — بها تعمل أولويةُ الحفظ/التجويد مهما كانت معرّفات المعايير. */
+  specialtyScores?: Record<string, number>;
   /** عددُ المخالفات — لقاعدة `fewest_penalties`. */
   penaltyCount?: number;
 }

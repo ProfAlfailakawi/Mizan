@@ -9,12 +9,13 @@ import {Pictogram} from '../design-system/Pictogram';
 import {resolveReading} from '../../lib/scientific-core';
 import {qiraahLabel,rawiLabel} from '../../lib/arabic-labels';
 import {uiToken, serverErrorLabel} from '../../lib/ui-language';
+import {searchMatches} from '../../lib/input-normalize';
 
 const ALLOWED=new Set(['head_judge','comp_admin','org_admin']);
 export const EmergencyQuestionAuthorization:React.FC=()=>{
  const s=useAppStore(),ar=s.language==='ar';const [participantId,setParticipantId]=useState(s.participants.find(x=>['checked_in','in_session'].includes(x.status))?.id||s.participants[0]?.id||'');const [runtime,setRuntime]=useState<SecureQuestionRuntimeState|null>(null);const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const [pQuery,setPQuery]=useState('');const [pOpen,setPOpen]=useState(false);
  const selectedParticipant=s.participants.find(p=>p.id===participantId);
- const participantMatches=s.participants.filter(p=>`${p.code} ${p.fullName} ${p.fullNameArabic}`.toLowerCase().includes(pQuery.trim().toLowerCase()));
+ const participantMatches=s.participants.filter(p=>searchMatches(`${p.code} ${p.fullName} ${p.fullNameArabic}`,pQuery));
  if(!ALLOWED.has(s.currentUser.role))return null;
  const lookup=async()=>{if(!participantId)return;setBusy(true);setMessage('');try{setRuntime(await findSecureRuntimeForParticipant(s.competition.id,participantId))}catch(e){setRuntime(null);setMessage(serverErrorLabel(e instanceof Error?e.message:'RUNTIME_NOT_FOUND',ar))}finally{setBusy(false)}};
  const authorize=async()=>{if(!runtime||reason.trim().length<8)return;setBusy(true);setMessage('');try{const next=await authorizeEmergencyQuestionReplacement(runtime.sessionId,reason.trim(),10);setRuntime(next);setReason('');setMessage(ar?'تم السماح بتبديل سؤال واحد فقط. القرار النهائي يحتاج موافقة اللجنة.':'One-question replacement authorized. The assigned judging panel still must approve it.')}catch(e){setMessage(serverErrorLabel(e instanceof Error?e.message:'AUTHORIZATION_FAILED',ar))}finally{setBusy(false)}};
