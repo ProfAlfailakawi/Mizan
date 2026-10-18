@@ -51,3 +51,10 @@ test('review fix: score-correction bounds come from stored state, never from the
   assert.equal(/b\.currentScore|b\.maxScore/.test(route), false, 'the client cannot supply the bounds');
   assert.ok(route.includes('SCORE_CORRECTION_BASIS_UNAVAILABLE'), 'no basis means refuse');
 });
+
+test('score-change policy comes from the stored competition, not the request', () => {
+  const at = server.indexOf("app.post('/api/results/score-correction'");
+  const route = server.slice(at, at + 2400);
+  assert.equal(/b\.policyAllowsScoreChange/.test(route), false);
+  assert.ok(route.includes('policyAllowsScoreChange:basis.allowScoreChange'));
+});

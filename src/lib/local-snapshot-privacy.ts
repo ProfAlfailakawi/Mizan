@@ -83,3 +83,25 @@ export function redactStateForLocalSnapshot<T extends { participants: Participan
       : {}),
   };
 }
+
+/*
+ * تقليص اللقطة المحلية بدل فقدها عند ضيق حصّة التخزين (≈5 ميغابايت للمتصفح، واللقطة ≈ 2.6 كيلوبايت للمتسابق).
+ * المصدر الحقيقي للبيانات هو السحابة، واللقطة نسخة احتياطية للاتصال المنقطع؛ فيتدرّج التقليص من الأخفّ إلى الأشدّ
+ * ولا يبلغ إفراغ المتسابقين إلا حين لا يبقى غيره، وتبقى الحالة الحية كاملة في الذاكرة.
+ *   1: حذف التاريخ الثقيل داخل كل متسابق (سجلّ الحالات والتعديلات والإجابات المخصّصة) مع إبقاء آخر خمسة.
+ *   2: وإبقاء آخر 200 حدث تدقيق محليًا فقط.
+ *   3: وإفراغ مصفوفة المتسابقين من اللقطة (تعود من السحابة عند الاتصال).
+ */
+export type SnapshotCompactionLevel = 0 | 1 | 2 | 3;
+export function compactStateForQuota<T extends { participants: Participant[]; auditLogs?: unknown[] }>(state: T, level: SnapshotCompactionLevel): T {
+  if (level === 0) return state;
+  const lean = (p: Participant): Participant => {
+    const { customAnswers, statusHistory, editHistory, ...rest } = p as Participant & { customAnswers?: unknown; statusHistory?: unknown[]; editHistory?: unknown[] };
+    return { ...rest, ...(statusHistory ? { statusHistory: statusHistory.slice(-5) } : {}), ...(editHistory ? { editHistory: editHistory.slice(-5) } : {}) } as unknown as Participant;
+  };
+  return {
+    ...state,
+    participants: level >= 3 ? [] : state.participants.map(lean),
+    ...(level >= 2 && Array.isArray(state.auditLogs) ? { auditLogs: state.auditLogs.slice(-200) } : {}),
+  };
+}

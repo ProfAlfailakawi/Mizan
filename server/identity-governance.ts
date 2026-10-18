@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { StatCachedJson } from './stat-cache';
 
 /** Active identity roles. Legacy persisted authority is handled only by the migration guard below. */
 export type GovernanceRole=
@@ -65,6 +66,9 @@ export class IdentityGovernanceRepository{
   }
 
   private auditFile(organizationId:string){return path.join(this.dir,`identity-audit-${safeSegment(organizationId)}.jsonl`)}
+  private cache?:StatCachedJson<State>;
+  /** حالة مشتركة للقراءة فقط؛ لا تُعدَّل. */
+  private peek():State{if(!this.cache)this.cache=new StatCachedJson<State>(this.file,raw=>JSON.parse(raw) as State);try{const s=this.cache.get();if(s.grants.some(g=>isRetiredIdentityRole((g as unknown as {role?:unknown}).role)&&g.status!=='REVOKED'))return this.read();return s}catch{throw new Error('IDENTITY_REPOSITORY_CORRUPT')}}
   private read():State{try{
     const state=JSON.parse(fs.readFileSync(this.file,'utf8')) as State;let changed=false;const revokedAt=new Date().toISOString();
     // Compatibility only: preserve old rows and audit history while removing all live authority.
@@ -98,7 +102,17 @@ export class IdentityGovernanceRepository{
   private activeGrantFor(s:State,accountId:string,competitionId?:string){return s.grants.find(g=>g.accountId===accountId&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!competitionId||g.competitionId===competitionId))}
   private visibleGrantFor(s:State,accountId:string,competitionId?:string){return s.grants.find(g=>g.accountId===accountId&&['ACTIVE','SUSPENDED'].includes(g.status)&&!isRetiredIdentityRole(g.role)&&(!competitionId||g.competitionId===competitionId))}
   private passwordResets(s:State){return s.passwordResetRequests||(s.passwordResetRequests=[]);}
-  private cleanup(s:State){const now=Date.now();for(const x of s.invitations)if(['READY','PENDING_APPROVAL'].includes(x.status)&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of s.sessions)if(x.status==='ACTIVE'&&new Date(x.expiresAt).getTime()<=now)x.status='EXPIRED';for(const x of this.passwordResets(s)){if(x.status==='PENDING'&&new Date(x.requestExpiresAt).getTime()<=now)x.status='EXPIRED';if(x.status==='ISSUED'&&(!x.linkExpiresAt||new Date(x.linkExpiresAt).getTime()<=now)){x.status='EXPIRED';delete x.shareTokenHash;}}}
+  /** يعيد true إن غيّر شيئًا، ليُكتب الملف عند التغيير فقط: كان يُعاد كتابته كاملًا مع كل طلب موثَّق (آلاف الحسابات)، فيختنق الخادم تحت حمل قاعة. */
+  private cleanup(s:State):boolean{
+    let changed=false;const now=Date.now();
+    for(const x of s.invitations)if(['READY','PENDING_APPROVAL'].includes(x.status)&&new Date(x.expiresAt).getTime()<=now){x.status='EXPIRED';changed=true}
+    for(const x of s.sessions)if(x.status==='ACTIVE'&&new Date(x.expiresAt).getTime()<=now){x.status='EXPIRED';changed=true}
+    for(const x of this.passwordResets(s)){
+      if(x.status==='PENDING'&&new Date(x.requestExpiresAt).getTime()<=now){x.status='EXPIRED';changed=true}
+      if(x.status==='ISSUED'&&(!x.linkExpiresAt||new Date(x.linkExpiresAt).getTime()<=now)){x.status='EXPIRED';delete x.shareTokenHash;changed=true}
+    }
+    return changed;
+  }
   private closures(s:State){return s.competitionClosures||(s.competitionClosures=[]);}
   private isCompetitionClosed(s:State,organizationId:string,competitionId?:string){return Boolean(competitionId&&this.closures(s).some(x=>x.organizationId===organizationId&&x.competitionId===competitionId&&['completed','archived'].includes(x.status)));}
   private assertCompetitionOpen(s:State,organizationId:string,competitionId: string|undefined,role?:GovernanceRole){if(this.isCompetitionClosed(s,organizationId,competitionId)&&(!role||!ARCHIVE_VISIBILITY_ROLES.has(role)))throw new Error('COMPETITION_ACCESS_CLOSED');}
@@ -162,7 +176,7 @@ export class IdentityGovernanceRepository{
   }
 
   notificationRecipients(actor:ServerIdentity){
-    const s=this.read();this.cleanup(s);this.write(s);
+    const s=this.read();if(this.cleanup(s))this.write(s);
     const visibleGrant=(g:Grant)=>{
       if(g.status!=='ACTIVE'||isRetiredIdentityRole(g.role))return false;
       if(actor.role==='super_admin'||actor.role==='support_agent')return true;
@@ -183,7 +197,7 @@ export class IdentityGovernanceRepository{
   }
 
   list(actor:ServerIdentity,requestedOrganizationId?:string,requestedCompetitionId?:string,requestedOperatorId?:string){
-    const s=this.read();this.cleanup(s);this.write(s);
+    const s=this.read();if(this.cleanup(s))this.write(s);
     if(isOperatorRole(actor.role)&&requestedOrganizationId&&!requestedOperatorId){
       if(!this.operatorCanReachOrganization(actor,requestedOrganizationId))throw new Error('CROSS_OPERATOR_ORGANIZATION_BLOCKED');
       const scopedGrants=s.grants.filter(g=>g.organizationId===requestedOrganizationId&&!g.operatorId&&g.role==='org_admin'&&g.status!=='REVOKED');
@@ -260,7 +274,7 @@ export class IdentityGovernanceRepository{
   }
 
   previewInvitation(token:string){
-    const s=this.read();this.cleanup(s);this.write(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
+    const s=this.read();if(this.cleanup(s))this.write(s);const tokenHash=hash(String(token||''));const inv=s.invitations.find(x=>x.status==='READY'&&x.activationTokenHash===tokenHash);
     if(!inv)throw new Error('ACTIVATION_TOKEN_INVALID');
     if(this.isCompetitionClosed(s,inv.organizationId,inv.competitionId)&&!ARCHIVE_VISIBILITY_ROLES.has(inv.requestedRole))throw new Error('COMPETITION_ACCESS_CLOSED');
     if(NON_PROVISIONABLE_SELF_SERVICE_ROLES.has(String(inv.requestedRole)))throw new Error('SELF_SERVICE_ROLE_NOT_PROVISIONABLE');
@@ -354,7 +368,8 @@ export class IdentityGovernanceRepository{
   }
 
   identityForUid(uid:string,competitionId?:string){
-    const s=this.read();this.cleanup(s);this.write(s);const account=s.accounts.find(a=>a.uid===uid&&a.status==='ACTIVE');if(!account)return null;
+    /* قراءة بلا تعديل في الحالة الغالبة: نسخة مخزَّنة بحسب بصمة الملف، ولا كتابة إلا إن انتهت صلاحية شيء فعلًا. */
+    let s=this.peek();if(this.cleanup(s)){s=this.read();this.cleanup(s);this.write(s)}const account=s.accounts.find(a=>a.uid===uid&&a.status==='ACTIVE');if(!account)return null;
     let grants=s.grants.filter(g=>g.accountId===account.id&&g.status==='ACTIVE'&&!isRetiredIdentityRole(g.role)&&(!this.isCompetitionClosed(s,g.organizationId,g.competitionId)||ARCHIVE_VISIBILITY_ROLES.has(g.role)));if(competitionId){const exact=grants.filter(g=>g.competitionId===competitionId);if(exact.length)grants=exact;else grants=grants.filter(g=>!g.competitionId);}
     if(!grants.length)return null;
     const rank:GovernanceRole[]=['super_admin','operator_owner','operator_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent','guardian','participant'];
@@ -546,7 +561,7 @@ export class IdentityGovernanceRepository{
   }
 
   validatePasswordResetShare(id:string,shareToken:string){
-    const s=this.read();this.cleanup(s);this.write(s);const request=this.passwordResets(s).find(x=>x.id===id&&x.status==='ISSUED');if(!request||!request.shareTokenHash||!request.linkExpiresAt||new Date(request.linkExpiresAt).getTime()<=Date.now())throw new Error('PASSWORD_RESET_TOKEN_INVALID');
+    const s=this.read();if(this.cleanup(s))this.write(s);const request=this.passwordResets(s).find(x=>x.id===id&&x.status==='ISSUED');if(!request||!request.shareTokenHash||!request.linkExpiresAt||new Date(request.linkExpiresAt).getTime()<=Date.now())throw new Error('PASSWORD_RESET_TOKEN_INVALID');
     const candidate=hash(String(shareToken||''));const a=Buffer.from(candidate);const b=Buffer.from(request.shareTokenHash);if(a.length!==b.length||!crypto.timingSafeEqual(a,b))throw new Error('PASSWORD_RESET_TOKEN_INVALID');
     return {valid:true,requestId:request.id,displayName:request.displayName,expiresAt:request.linkExpiresAt};
   }

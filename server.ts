@@ -7,6 +7,8 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import { QuestionEscrowRepository } from './server/question-escrow';
+import { getCompetitionPolicy } from './src/lib/competition-config';
+import { GlobalRateLimiter } from './server/global-rate-limit';
 import { firebaseSecondFactorPresent, verifyFirebaseBaseIdToken, verifyFirebaseIdToken } from './server/firebase-auth';
 import { claimsFromGrant, writeIdentityClaims, claimsWritable, claimsWritability } from './server/firebase-claims';
 import { ALL_GOVERNANCE_ROLES, IdentityGovernanceRepository, operatorIdentityOrganizationId, type GovernanceRole, type ServerIdentity } from './server/identity-governance';
@@ -154,25 +156,29 @@ async function startServer() {
   // goes through a single hook: set MIZAN_RATE_LIMIT_BACKEND=external and front MIZAN with the
   // platform limiter, or replace `hitRateWindow` with a shared-store implementation.
   const rateWindowMs=Number(process.env.RATE_LIMIT_WINDOW_MS||60_000);
-  const rateMax=Number(process.env.RATE_LIMIT_MAX||600);
+  /* حدّ المجهول لكل IP، وحدّ الموثَّق لكل مستخدم: قاعة بمئات الأجهزة خلف IP واحد لا تحجب بعضها. */
+  const rateMax=Number(process.env.RATE_LIMIT_MAX||3000);
+  const rateMaxAuthenticated=Number(process.env.RATE_LIMIT_MAX_AUTHENTICATED||1500);
   const rateLimiterIsGlobal=process.env.MIZAN_RATE_LIMIT_BACKEND==='external';
-  const buckets=new Map<string,{count:number;resetAt:number}>();
-  const hitRateWindow=(key:string,now:number)=>{const current=buckets.get(key);if(!current||current.resetAt<now){const fresh={count:1,resetAt:now+rateWindowMs};buckets.set(key,fresh);return fresh}current.count++;return current};
-  // Opportunistic sweep so the map cannot grow unbounded across long-lived instances.
-  let lastRateSweep=Date.now();
-  app.use('/api',(req,res,next)=>{
+  const globalLimiter=new GlobalRateLimiter({windowMs:rateWindowMs,anonymousMax:rateMax,authenticatedMax:rateMaxAuthenticated,verify:process.env.FIREBASE_PROJECT_ID?async(t)=>{
+    const projectId=String(process.env.FIREBASE_PROJECT_ID);
+    const id=await verifyFirebaseBaseIdToken(t,projectId);
+    /* حصّة المستخدم لا تُمنح لمجرد توقيع صالح (التسجيل الذاتي في Firebase مفتوح لأي أحد): يجب أن يكون الحساب هويةً فعّالة في ميزان،
+       وإلا بقي الطلب محسوبًا على حصّة العنوان فلا يُتحايل بتدوير حسابات جديدة. */
+    if(identityGovernance){if(!identityGovernance.identityForUid(id.uid,id.raw.competition_id?String(id.raw.competition_id):undefined))throw new Error('NOT_PROVISIONED')}
+    else await verifyFirebaseIdToken(t,projectId);
+    return {uid:id.uid,exp:Number((id.raw as any)?.exp)||undefined};
+  }:undefined});
+  app.use('/api',async(req,res,next)=>{
     if(rateLimiterIsGlobal)return next();
     // Static asset delivery, fonts, layouts, and public caches must not consume transactional API quotas
     if(req.path.startsWith('/public/kfgqpc/')||req.path.startsWith('/public/brand-assets/')||req.path==='/health'||req.path==='/capabilities')return next();
-    const key=String(req.ip||'unknown');const now=Date.now();
-    if(now-lastRateSweep>rateWindowMs){for(const [k,v] of buckets)if(v.resetAt<now)buckets.delete(k);lastRateSweep=now}
-    const window=hitRateWindow(key,now);
-    const remaining=Math.max(0,rateMax-window.count);
-    res.setHeader('X-RateLimit-Limit',String(rateMax));
-    res.setHeader('X-RateLimit-Remaining',String(remaining));
-    res.setHeader('X-RateLimit-Reset',String(Math.ceil(window.resetAt/1000)));
-    res.setHeader('X-RateLimit-Scope','per-instance');
-    if(window.count>rateMax){res.setHeader('Retry-After',String(Math.max(1,Math.ceil((window.resetAt-now)/1000))));return res.status(429).json({code:'RATE_LIMITED'})}
+    let d;try{d=await globalLimiter.check(req.headers.authorization,String(req.ip||'unknown'))}catch{return next()}
+    res.setHeader('X-RateLimit-Limit',String(d.limit));
+    res.setHeader('X-RateLimit-Remaining',String(d.remaining));
+    res.setHeader('X-RateLimit-Reset',String(Math.ceil(d.resetAt/1000)));
+    res.setHeader('X-RateLimit-Scope',d.scope==='user'?'per-user':'per-ip');
+    if(!d.allowed){res.setHeader('Retry-After',String(Math.max(1,Math.ceil((d.resetAt-Date.now())/1000))));return res.status(429).json({code:'RATE_LIMITED'})}
     next();
   });
 
@@ -669,8 +675,12 @@ async function startServer() {
     },
     message:{code:'RATE_LIMITED'},
   });
-  const publicRegistrationRateLimit:RequestHandler=rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
-  const journeyResolveRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_RATE_LIMIT_MAX||240),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  const publicRegistrationRateLimit:RequestHandler=rateLimit({windowMs:5*60_000,limit:Number(process.env.MIZAN_PUBLIC_REGISTRATION_RATE_LIMIT_MAX||600),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  const journeyResolveRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_RATE_LIMIT_MAX||2400),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
+  /* سقف لكل رابط رحلة (مفتاحه بصمة الرمز) فوق سقف العنوان: جهازٌ يعيد الطلب بلا توقف لا يستهلك حصة القاعة كلها. */
+  const journeyResolveKeyRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_JOURNEY_RESOLVE_KEY_RATE_LIMIT_MAX||120),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>'k:'+crypto.createHash('sha256').update(String(req.body?.key||'')).digest('hex'),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal,validate:{keyGeneratorIpFallback:false}});
+  /* /api/health مستثنى من الحدّ العام لأن أدوات النشر تستطلعه؛ له سقفه الخاص الواسع لكل عنوان. */
+  const healthRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_HEALTH_RATE_LIMIT_MAX||1200),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>ipKeyGenerator(req.ip||''),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   const competitionPublishRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_COMPETITION_PUBLISH_RATE_LIMIT_MAX||60),standardHeaders:'draft-7',legacyHeaders:false,keyGenerator:(req)=>String((req as any).mizanIdentity?.uid||ipKeyGenerator(req.ip||'')),message:{code:'RATE_LIMITED'},skip:()=>rateLimiterIsGlobal});
   /* إشعار بوابة الدفع عام بلا هوية مستخدم، وثقته من توقيعه وحده. يُخنق بحدّ خاص يتّسع
      لدفعات التسوية المشروعة ويمنع إغراق نقطة عامة بمحاولات توقيع فاشلة. */
@@ -696,7 +706,7 @@ async function startServer() {
    * بمعدّل معلوم، ويبقى واسعًا عمدًا: قاعةٌ كاملة خلف عنوان واحد قد تحمل عشرات الأجهزة،
    * فالحدّ يمنع الإغراق ولا يمسّ تشغيلًا حقيقيًا.
    */
-  const telemetryHeartbeatRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_TELEMETRY_HEARTBEAT_RATE_LIMIT_MAX||600),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
+  const telemetryHeartbeatRateLimit:RequestHandler=rateLimit({windowMs:60_000,limit:Number(process.env.MIZAN_TELEMETRY_HEARTBEAT_RATE_LIMIT_MAX||3000),standardHeaders:'draft-7',legacyHeaders:false,message:{code:'RATE_LIMITED'}});
   const platformOwnerOrganizationId='__platform__';
   /* نسخة ثانية من قائمة الأدوار كانت هنا. القائمة الواحدة أسلم: النسخ هو ما أسقط خمسة أدوار. */
   const governanceRoles=new Set<string>(ALL_GOVERNANCE_ROLES);
@@ -802,11 +812,11 @@ async function startServer() {
    * زرُّ إصلاحٍ في أي شاشة — والعلّة في النشر لا في الحساب. فلا تُترك مسكوتًا عنها في
    * تقرير الصحة: تُسأل هنا مرةً ويُقرأ جوابها في شاشة التشخيص.
    */
-  app.get('/api/health',async(_req,res)=>{
+  app.get('/api/health',healthRateLimit,async(_req,res)=>{
     /* «غير معلوم» يُنقل كما هو (null) ولا يُسوّى بـ«لا يستطيع»: عطلٌ عارض ليس سوءَ تهيئة،
        واتهام نشرٍ سليم به يُرسل صاحبه إلى إصلاح ما ليس معطوبًا. */
     const claimsState=await claimsWritability().catch(()=>'UNKNOWN' as const);
-    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null,questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,quranPracticeListenerConfigured:journeyListeningReady('hafs'),quranPracticeListener:_req.query?.listener==='1'?await practiceListenerHealth():practiceListenerHealthCached(),quranMuaalem:_req.query?.listener==='1'?await muaalemHealth():muaalemHealthCached(),secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
+    const identityClaimsWritable=claimsState==='UNKNOWN'?null:claimsState==='WRITABLE';const notificationProviderConfigured=['EMAIL','SMS','WHATSAPP','PUSH'].some(c=>!!process.env[`MIZAN_${c}_PROVIDER_URL`])||!!process.env.MIZAN_NOTIFICATION_PROVIDER;const telemetry=opsTelemetry?.summary({providerConfigured:notificationProviderConfigured});/* أعداد المتصلين والمهام الخلفية لا تُعطى لمجهول: تُظهر حجم الاستخدام الحي. تُعطى لإدارة المنصة المصادَق عليها فقط. */let platformViewer=false;try{const tok=/^Bearer\s+(\S{20,4096})$/.exec(String(_req.headers.authorization||''))?.[1];if(tok&&firebaseProjectId&&identityGovernance){const base=await verifyFirebaseBaseIdToken(tok,firebaseProjectId);const who=identityGovernance.identityForUid(base.uid,base.raw.competition_id?String(base.raw.competition_id):undefined);platformViewer=!!who&&['super_admin','operator_owner','operator_admin'].includes(who.grant.role)}}catch{platformViewer=false}res.json({status:'ok',system:'MIZAN',version:'5.0.0',aiCriticalPath:false,quranSourcePolicy:'approved-vault-only',backendAvailable:true,buildIdKnown:!!currentBuildId(),firebaseProjectConfigured:!!firebaseProjectId,identityClaimsWritable,enterpriseApiConfigured:!!process.env.MIZAN_ENTERPRISE_API_KEY,passSigningConfigured:!!process.env.MIZAN_PASS_SIGNING_SECRET,certificateSigningConfigured:!!process.env.MIZAN_CERT_SIGNING_SECRET,trustSigningConfigured:!!trustSigner(),edgeRelayConfigured:!!process.env.MIZAN_EDGE_DATA_DIR,notificationProviderConfigured,backgroundJobsConfigured:!!opsTelemetry,liveCompetitionTelemetryConfigured:!!opsTelemetry,opsTelemetryConfigured:!!opsTelemetry,...(platformViewer?{connectedUsers:telemetry?.connectedUsers??null,connectedDevices:telemetry?.connectedDevices??null,liveCompetitions:telemetry?.liveCompetitions??null,backgroundJobs:telemetry?.backgroundJobs??null,notificationTelemetry:telemetry?.notifications??null}:{}),questionEscrowConfigured,identityGovernanceConfigured:!!identityGovernance,integrityAuthorityConfigured:!!integrityAuthority,integrityAuthorityStatus:integrityAuthority?'ENABLED':'code' in authorityDurability?authorityDurability.code:'ERROR',serverAuditLedgerConfigured:!!serverAuditLedger||!!durableAuditLedger,auditLedgerDurability:auditLedgerDurability(),auditAppendFailures,serverQuranSourceVaultConfigured:!!serverQuranSources,quranIntelligenceConfigured:!!quranIntelligence,tenantSelfServiceConfigured:!!tenantStore&&!process.env.MIZAN_TENANTS,tenantCount:tenantRegistry().length,controlTowerConfigured:!!controlTower,quranAlignmentShadowConfigured:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,quranPracticeListenerConfigured:journeyListeningReady('hafs'),quranPracticeListener:_req.query?.listener==='1'?await practiceListenerHealth():practiceListenerHealthCached(),quranMuaalem:_req.query?.listener==='1'?await muaalemHealth():muaalemHealthCached(),secureQuestionRuntimeConfigured,time:new Date().toISOString()})});
   app.get('/api/capabilities',(_req,res)=>res.json({judging:{humanAuthority:true,aiCanAffectScore:false},quran:{sourceOfTruth:'approved-vault-only',intelligenceMode:quranIntelligence?'KFGQPC_FAIL_CLOSED':'NOT_CONFIGURED',alignmentMode:'SHADOW_ONLY'},deployment:['cloud','private-cloud','sovereign-on-premise'],externalDependencies:{identity:!!process.env.FIREBASE_PROJECT_ID,enterpriseApi:!!process.env.MIZAN_ENTERPRISE_API_KEY,copilot:!!process.env.MIZAN_COPILOT_URL,integrityAI:!!process.env.MIZAN_AI_INTEGRITY_URL,trustSigning:!!trustSigner(),edgeRelay:!!process.env.MIZAN_EDGE_DATA_DIR,questionEscrow:questionEscrowConfigured,identityGovernance:!!identityGovernance,serverAuditLedger:!!serverAuditLedger,serverQuranSourceVault:!!serverQuranSources,quranIntelligence:!!quranIntelligence,quranAlignmentShadowBackend:!!process.env.MIZAN_QURAN_ALIGNMENT_URL,serverFairDraw:secureQuestionRuntimeConfigured,serverQuranResolution:secureQuestionRuntimeConfigured,silentQuestionCapsule:secureQuestionRuntimeConfigured,officialMushafPageAssets:!!kfgqpcPageImageRoot,officialQuranFonts:!!kfgqpcFontRoot,measuredWordTimingRecordings:wordTimings?wordTimings.recordings():[],witnessMode:!!witnessMode,serverQuorumAuthority:!!integrityAuthority,serverFairDrawCommitReveal:!!integrityAuthority,coldVault:!!coldVault,exposureRadius:secureQuestionRuntimeConfigured,questionLeakageCanary:questionEscrowConfigured}}));
 
   // Organization/competition logos use the already-configured private R2 bucket. Only the bytes are public; writes remain Firebase-authorized and tenant-scoped.
@@ -1376,7 +1386,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
       return res.status(201).json({paymentUrl:out.paymentUrl});
     }catch(err){const code=err instanceof Error?err.message:'';if(code==='PAYMENT_GATEWAY_NOT_CONFIGURED')return res.status(409).json({code});if(/^PAYMENT_GATEWAY_/.test(code))return res.status(502).json({code:'PAYMENT_GATEWAY_UNAVAILABLE'});return publicApiError(res,err)}
   });
-  app.post('/api/public/journeys/resolve',journeyResolveRateLimit,async(req,res)=>{
+  app.post('/api/public/journeys/resolve',journeyResolveRateLimit,journeyResolveKeyRateLimit,async(req,res)=>{
     if(!publicRegistration)return res.status(503).json({code:'PUBLIC_REGISTRATION_NOT_CONFIGURED',category:'server'});
     const audience=req.body?.audience==='guardian'?'guardian':'participant';
     try{const journey=await publicRegistration.resolve(String(req.body?.competitionId||''),audience,String(req.body?.key||''));res.setHeader('Cache-Control','private, no-store');return res.json({journey})}catch(err){return publicApiError(res,err)}
@@ -2073,8 +2083,8 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
   });
 
   /* حدود التصحيح تُقرأ من النتيجة المخزَّنة وإعداد المسابقة على الخادم؛ ما يرسله العميل لا يُعتمد (حذفه أو تضخيمه كان يعطّل الفحص). */
-  const scoreCorrectionBasis=async(actor:ServerIdentity,b:any,competitionId:string,participantId:string):Promise<{currentScore:number;maxScore:number}|null>=>{
-    let basis:{currentScore:number;maxScore:number}|null=null;
+  const scoreCorrectionBasis=async(actor:ServerIdentity,b:any,competitionId:string,participantId:string):Promise<{currentScore:number;maxScore:number;allowScoreChange:boolean}|null>=>{
+    let basis:{currentScore:number;maxScore:number;allowScoreChange:boolean}|null=null;
     try{
       const basisOrg=actor.role==='super_admin'?String(b.organizationId||actor.organizationId||''):actor.organizationId;
       if(firestoreRepository&&basisOrg&&competitionId&&participantId){
@@ -2092,7 +2102,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
           const rs=(cat?.ruleSetId?(comp.ruleSets||[]).find((r:any)=>r.id===cat.ruleSetId):undefined)||comp.ruleSet;
           const max=((rs?.criteria||[]) as any[]).reduce((sum,c)=>sum+(Number(c?.maxScore)||0),0);
           const current=Number(found.finalScore);
-          if(Number.isFinite(current)&&max>0)basis={currentScore:current,maxScore:max};
+          if(Number.isFinite(current)&&max>0)basis={currentScore:current,maxScore:max,allowScoreChange:getCompetitionPolicy(comp).appeals.allowScoreChange===true};
         }
       }
     }catch{basis=null}
@@ -2119,7 +2129,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
       actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
       appealId:String(b.appealId||''),delta:Number(b.delta),
       reason:b.reason?String(b.reason).slice(0,2000):undefined,
-      policyAllowsScoreChange:b.policyAllowsScoreChange===true,resultSealed,
+      policyAllowsScoreChange:basis.allowScoreChange,resultSealed,
       currentScore:basis.currentScore,maxScore:basis.maxScore
     });
     if('code' in decision)return attestationFailed(res,decision);

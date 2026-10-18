@@ -55,7 +55,7 @@ import {
 import { buildDeliveryQuestionPool } from './delivery-question-pool';
 import { SupportedLanguage, LANGUAGE_META } from './i18n';
 import { calibrateJudges } from '../../server/judge-calibration';
-import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenHeldByHolderOnly, journeyTokenWithheldLocally, redactStateForLocalSnapshot } from './local-snapshot-privacy';
+import { LOCAL_ONLY_PARTICIPANT_FIELDS, journeyTokenHeldByHolderOnly, journeyTokenWithheldLocally, redactStateForLocalSnapshot, compactStateForQuota, type SnapshotCompactionLevel } from './local-snapshot-privacy';
 import { certificateVerifyUrl, publishCertificateToRegistry, revokeCertificateInRegistry } from './certificate-verification';
 import { buildBlindLiftProof, resolveBlindness, verifyBlindLiftProof } from './blind-chamber';
 import { cloneCompetitionConfiguration, type ClonePart } from './competition-clone';
@@ -1296,6 +1296,7 @@ async function finalizeAuditChain(){
 // Central local-snapshot writer. A quota overflow or write failure must never be swallowed:
 // the participant scores would appear saved in the UI while nothing reached storage, and the
 // next refresh would silently roll back hours of work. Instead we record a surfaced error flag.
+let snapshotCompaction: SnapshotCompactionLevel = 0;
 function persistLocalSnapshot(): boolean {
   try {
     if (IS_DEMO_SESSION) {
@@ -1306,7 +1307,20 @@ function persistLocalSnapshot(): boolean {
       if (globalState.persistenceError && !globalState.persistenceError.code.startsWith('CLOUD_')) globalState.persistenceError = null;
       return true;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(redactStateForLocalSnapshot(globalState)));
+    /* عند ضيق الحصّة تُقلَّص اللقطة تدريجيًا بدل أن تفشل (انظر compactStateForQuota)؛ والمستوى الذي نجح يُحفظ لبقية الجلسة. */
+    let wrote = false, lastError: unknown = null;
+    for (let level = snapshotCompaction; level <= 3 && !wrote; level++) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForQuota(redactStateForLocalSnapshot(globalState), level as SnapshotCompactionLevel)));
+        wrote = true;
+        if (level > snapshotCompaction) { snapshotCompaction = level as SnapshotCompactionLevel; console.warn(`MIZAN local snapshot compacted to level ${level} (storage quota); the cloud remains the source of truth.`); }
+      } catch (e) {
+        lastError = e;
+        const quotaErr = e instanceof DOMException && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+        if (!quotaErr) throw e;
+      }
+    }
+    if (!wrote) throw lastError;
     /*
      * كتابةٌ محلية ناجحة تمسح أعطال الكتابة المحلية وحدها.
      *
