@@ -82,7 +82,7 @@ import { OpsTelemetryRepository, type CompetitionState, type JobStatus, type Tel
 import { generateIdentityPlatformPasswordReset } from './server/google-oauth';
 import { SaaSPlatformRepository, SecretVault, type CommercialActor } from './server/saas-platform';
 import type { WebhookEventType } from './server/commercial/types';
-import { CommunicationsService, InAppProvider, providersFromEnv, type Recipient } from './server/communications';
+import { CommunicationsService, InAppProvider, providersFromEnv, isBillingTrigger, BILLING_AUDIENCE_ROLES, type Recipient } from './server/communications';
 import { runParticipantReminders, type ReminderSource } from './server/participant-reminders';
 import { RegistrationReminderStore, runRegistrationReminders } from './server/registration-reminders';
 import { PassportStore, type CertificateCheck } from './server/passport';
@@ -399,6 +399,7 @@ async function startServer() {
     getDocument:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');return firestoreRepository.get(docPath)},
     upsert:async(documents)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.commitAtomically({upserts:documents})},
     patch:async(docPath,fields)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.patchFields(docPath,fields)},
+    delete:async(docPath)=>{if(!firestoreRepository)throw new Error('FIRESTORE_UNAVAILABLE');await firestoreRepository.delete(docPath)},
     getJourney:async(tokenHash)=>{
       if(firestoreRepository){
         try{
@@ -442,7 +443,7 @@ async function startServer() {
    */
   const communicationsDir=saasDir?path.join(saasDir,'communications'):'';
   let communications:CommunicationsService|null=null;
-  try{if(communicationsDir)communications=new CommunicationsService(path.join(communicationsDir,'outbox.json'),providersFromEnv(process.env as Record<string,string|undefined>,notificationCenter?new InAppProvider(({organizationId,title,body})=>{notificationCenter!.system({title,body,priority:'important',target:{type:'organization',organizationId},dedupeKey:`comm:${organizationId}:${title}`})}):undefined))}catch(err){console.error('Communications disabled:',err)}
+  try{if(communicationsDir)communications=new CommunicationsService(path.join(communicationsDir,'outbox.json'),providersFromEnv(process.env as Record<string,string|undefined>,notificationCenter?new InAppProvider(({organizationId,title,body,trigger})=>{if(isBillingTrigger(trigger)){for(const role of BILLING_AUDIENCE_ROLES)notificationCenter!.system({title,body,priority:'important',target:{type:'role',role,organizationId},dedupeKey:`comm:${organizationId}:${role}:${title}`});return}notificationCenter!.system({title,body,priority:'important',target:{type:'organization',organizationId},dedupeKey:`comm:${organizationId}:${title}`})}):undefined))}catch(err){console.error('Communications disabled:',err)}
   const communicate=(trigger:Parameters<CommunicationsService['enqueue']>[0],subjectKey:string,recipients:Recipient[],vars:Record<string,string|number|undefined>)=>{try{communications?.enqueue(trigger,subjectKey,recipients,vars)}catch(err){console.warn('[communications] enqueue failed:',err instanceof Error?err.message:err)}};
   if(communications&&saasPlatform){
     const remind=()=>{try{const t=saasPlatform!.communicationTargets();for(const r of t.renewals)communicate('renewal_approaching',`${r.termId}:${r.window}`,[{channel:'in_app',address:r.organizationId,locale:'ar',organizationId:r.organizationId},...(r.email?[{channel:'email' as const,address:r.email,locale:'ar' as const,organizationId:r.organizationId}]:[])],{organization:r.name,date:r.endsAt.slice(0,10),days:r.daysLeft});for(const o of t.overdue)communicate('payment_failed',o.invoiceId,[{channel:'in_app',address:o.organizationId,locale:'ar',organizationId:o.organizationId},...(o.email?[{channel:'email' as const,address:o.email,locale:'ar' as const,organizationId:o.organizationId}]:[])],{invoice:o.invoiceNumber});void communications!.dispatch()}catch(err){console.error('[communications] reminder cycle failed:',err)}};
@@ -1130,7 +1131,7 @@ async function startServer() {
     return res.json(publicTenant(tenant));
   });
 
-  const PUBLIC_API_STATUS:Record<string,number>={COMPETITION_NOT_FOUND:404,COMPETITION_REGISTRATION_CLOSED:409,COMPETITION_ACCESS_CLOSED:410,REGISTRATION_REJECTED:400,REGISTRATION_FIELD_REQUIRED:400,REGISTRATION_IDENTITY_REQUIRED:400,REGISTRATION_EMAIL_INVALID:400,REGISTRATION_PHONE_INVALID:400,REGISTRATION_DATE_OF_BIRTH_INVALID:400,REGISTRATION_CATEGORY_INVALID:400,REGISTRATION_READING_INVALID:400,REGISTRATION_AGE_NOT_ELIGIBLE:422,REGISTRATION_GENDER_NOT_ELIGIBLE:422,REGISTRATION_CONSENT_REQUIRED:400,REGISTRATION_AUDIO_CONSENT_REQUIRED:400,REGISTRATION_GUARDIAN_REQUIRED:400,REGISTRATION_NOT_ELIGIBLE:422,REGISTRATION_POLICY_REQUIRES_REVIEW:422,JOURNEY_TOKEN_INVALID:400,JOURNEY_NOT_FOUND:404,JOURNEY_REVOKED:410,FIRESTORE_PERMISSION_DENIED:503,FIRESTORE_UNAVAILABLE:503,GOOGLE_OAUTH_CREDENTIALS_UNAVAILABLE:503,GOOGLE_OAUTH_TOKEN_FAILED:503};
+  const PUBLIC_API_STATUS:Record<string,number>={COMPETITION_NOT_FOUND:404,COMPETITION_REGISTRATION_CLOSED:409,COMPETITION_ACCESS_CLOSED:410,REGISTRATION_REJECTED:400,REGISTRATION_ALREADY_REGISTERED:409,REGISTRATION_CODE_UNAVAILABLE:503,REGISTRATION_FIELD_REQUIRED:400,REGISTRATION_IDENTITY_REQUIRED:400,REGISTRATION_EMAIL_INVALID:400,REGISTRATION_PHONE_INVALID:400,REGISTRATION_DATE_OF_BIRTH_INVALID:400,REGISTRATION_CATEGORY_INVALID:400,REGISTRATION_READING_INVALID:400,REGISTRATION_AGE_NOT_ELIGIBLE:422,REGISTRATION_GENDER_NOT_ELIGIBLE:422,REGISTRATION_CONSENT_REQUIRED:400,REGISTRATION_AUDIO_CONSENT_REQUIRED:400,REGISTRATION_GUARDIAN_REQUIRED:400,REGISTRATION_NOT_ELIGIBLE:422,REGISTRATION_POLICY_REQUIRES_REVIEW:422,JOURNEY_TOKEN_INVALID:400,JOURNEY_NOT_FOUND:404,JOURNEY_REVOKED:410,FIRESTORE_PERMISSION_DENIED:503,FIRESTORE_UNAVAILABLE:503,GOOGLE_OAUTH_CREDENTIALS_UNAVAILABLE:503,GOOGLE_OAUTH_TOKEN_FAILED:503};
   const publicApiStatus=(err:unknown)=>PUBLIC_API_STATUS[(err instanceof Error?err.message:'PUBLIC_API_FAILED').split(':')[0]]||500;
   const publicApiError=(res:Response,err:unknown)=>{const code=err instanceof Error?err.message:'PUBLIC_API_FAILED';const base=code.split(':')[0];return res.status(PUBLIC_API_STATUS[base]||500).json({code,category:base.startsWith('REGISTRATION_')?'validation':base.startsWith('JOURNEY_')?'access':base.startsWith('COMPETITION_')?'competition':base.startsWith('FIRESTORE_')||base.startsWith('GOOGLE_')?'server':'server'})};
   /*
@@ -1202,6 +1203,15 @@ async function startServer() {
     if(actor.role!=='super_admin'&&actor.organizationId!==bodyOrgId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
     if(actor.role==='comp_admin'&&actor.competitionId&&actor.competitionId!==cleanId)return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     const updatedAt=new Date().toISOString();
+    /* المعرّف يُنشئه المتصفح، وهو ظاهر في كل رابط عام. فمنشور جهةٍ على معرّف مسابقةٍ تملكها جهةٌ أخرى كان
+       يستبدل ملفَّها العام على القرص (والقرص هو المرجع حين لا يوجد مستند Firestore). لا تُكتب النسخة إلا لمالكها. */
+    try{
+      const file=path.join(publicCompDir,`${cleanId}.json`);
+      let owner='';
+      if(fs.existsSync(file)){owner=String(JSON.parse(fs.readFileSync(file,'utf8'))?.organizationId||'')}
+      if(!owner&&firestoreRepository){owner=String((await firestoreRepository.get(`public_competitions/${cleanId}`))?.organizationId||'')}
+      if(owner&&owner!==bodyOrgId&&actor.role!=='super_admin')return res.status(409).json({code:'COMPETITION_ID_OWNED_BY_ANOTHER_ORGANIZATION'});
+    }catch{/* تعذّر التحقق من المالك: نغلق ولا نكتب فوق سجلٍّ قد تملكه جهة أخرى. */return res.status(503).json({code:'PUBLIC_OWNERSHIP_CHECK_UNAVAILABLE'})}
     try{
       const file=path.join(publicCompDir,`${cleanId}.json`);
       fs.writeFileSync(file,JSON.stringify({organizationId:bodyOrgId,competition:comp,updatedAt},null,2),'utf8');
@@ -1273,7 +1283,7 @@ async function startServer() {
   }
 });
 
-app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
+app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin']),async(req,res)=>{
     const competitionId=String(req.params.competitionId||'').trim().slice(0,120);
     if(!competitionId||competitionId==='comp-pending-setup'||competitionId.replace(/[^a-zA-Z0-9_-]/g,'')!==competitionId)return res.status(400).json({code:'INVALID_COMPETITION_ID'});
     const actor=(req as any).mizanIdentity as ServerIdentity;
@@ -1291,9 +1301,18 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
         const stored=asCompetition(existing.competition);
         if(stored&&stored.organizationId!==organizationId)return res.status(403).json({code:'ORGANIZATION_SCOPE_MISMATCH'});
       }
+      /* لا يُحذف شيء قبل التأكد من الملكية؛ فشل القراءة يوقف العملية ولا يُعدّ «بلا مالك». */
+      let dropComp=false,dropBoard=false;
+      const ownedPublic=async(p:string)=>{const row=await firestoreRepository.get(p);const owner=String((row as any)?.organizationId||(row as any)?.competition?.organizationId||'');return !owner||owner===organizationId||actor.role==='super_admin'};
+      try{dropComp=await ownedPublic(`public_competitions/${competitionId}`);dropBoard=await ownedPublic(`public_boards/${competitionId}`)}catch{return res.status(503).json({code:'PUBLIC_OWNERSHIP_CHECK_UNAVAILABLE'})}
       await deleteFirestoreTree(root);
-      await Promise.all([firestoreRepository.delete(`public_competitions/${competitionId}`),firestoreRepository.delete(`public_boards/${competitionId}`)]);
-      try{fs.rmSync(path.join(publicCompDir,`${competitionId}.json`),{force:true})}catch{/* Firestore remains authoritative. */}
+      /* المستندات العامة مفتاحها معرّف المسابقة وحده، وهو ظاهر في الروابط العامة. فحذفُ مسابقةٍ تحت جهتك كان
+         يمسح أيضًا صفحة التسجيل والشاشة العامة لمسابقةٍ تحمل المعرّف نفسه عند جهةٍ أخرى. لا يُحذف عام إلا ما تملكه جهة الطالب. */
+      const dropPublic:Promise<unknown>[]=[];
+      if(dropComp)dropPublic.push(firestoreRepository.delete(`public_competitions/${competitionId}`));
+      if(dropBoard)dropPublic.push(firestoreRepository.delete(`public_boards/${competitionId}`));
+      await Promise.all(dropPublic);
+      try{const f=path.join(publicCompDir,`${competitionId}.json`);let diskOwner='';try{diskOwner=String(JSON.parse(fs.readFileSync(f,'utf8'))?.organizationId||'')}catch{}if(!diskOwner||diskOwner===organizationId||actor.role==='super_admin')fs.rmSync(f,{force:true})}catch{/* Firestore remains authoritative. */}
       return res.json({ok:true,competitionId});
     }catch(err){
       const code=err instanceof Error?err.message:'COMPETITION_DELETE_FAILED';
@@ -2053,7 +2072,33 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
     return res.status(201).json(decision);
   });
 
-  app.post('/api/results/score-correction',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge']),(req,res)=>{
+  /* حدود التصحيح تُقرأ من النتيجة المخزَّنة وإعداد المسابقة على الخادم؛ ما يرسله العميل لا يُعتمد (حذفه أو تضخيمه كان يعطّل الفحص). */
+  const scoreCorrectionBasis=async(actor:ServerIdentity,b:any,competitionId:string,participantId:string):Promise<{currentScore:number;maxScore:number}|null>=>{
+    let basis:{currentScore:number;maxScore:number}|null=null;
+    try{
+      const basisOrg=actor.role==='super_admin'?String(b.organizationId||actor.organizationId||''):actor.organizationId;
+      if(firestoreRepository&&basisOrg&&competitionId&&participantId){
+        const root=`organizations/${basisOrg}/competitions/${competitionId}`;
+        const compDoc=await firestoreRepository.get(root) as any;
+        const comp=compDoc?.competition||{};
+        let found:any=null;
+        const paths=await firestoreRepository.listDocumentPaths(`${root}/results`,5000);
+        for(let i=0;i<paths.length&&!found;i+=40){
+          const rows=await Promise.all(paths.slice(i,i+40).map(pp=>firestoreRepository.get(pp)));
+          found=rows.find((r:any)=>r&&r.participantId===participantId)||null;
+        }
+        if(found){
+          const cat=(comp.categories||[]).find((c:any)=>c.id===found.categoryId);
+          const rs=(cat?.ruleSetId?(comp.ruleSets||[]).find((r:any)=>r.id===cat.ruleSetId):undefined)||comp.ruleSet;
+          const max=((rs?.criteria||[]) as any[]).reduce((sum,c)=>sum+(Number(c?.maxScore)||0),0);
+          const current=Number(found.finalScore);
+          if(Number.isFinite(current)&&max>0)basis={currentScore:current,maxScore:max};
+        }
+      }
+    }catch{basis=null}
+    return basis;
+  };
+  app.post('/api/results/score-correction',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin','head_judge']),async(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
@@ -2068,11 +2113,14 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
      */
     if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
     const resultSealed=!!resultSealRegistry.latestFor(actor.organizationId,competitionId,participantId);
+    const basis=await scoreCorrectionBasis(actor,b,competitionId,participantId);
+    if(!basis)return res.status(503).json({code:'SCORE_CORRECTION_BASIS_UNAVAILABLE'});
     const decision=scoreCorrectionDecision({
       actorUid:String(actor.uid||''),actorRole:actor.role,competitionId,participantId,
       appealId:String(b.appealId||''),delta:Number(b.delta),
       reason:b.reason?String(b.reason).slice(0,2000):undefined,
       policyAllowsScoreChange:b.policyAllowsScoreChange===true,resultSealed,
+      currentScore:basis.currentScore,maxScore:basis.maxScore
     });
     if('code' in decision)return attestationFailed(res,decision);
     auditAppend(actor,{eventId:String(req.headers['x-request-id']||crypto.randomUUID()),organizationId:actor.organizationId,competitionId,action:'SCORE_CORRECTED',entityType:'Result',entityId:participantId,reason:`${decision.summary}${b.reason?` · ${String(b.reason).slice(0,400)}`:''}`,requestId:String(req.headers['x-request-id']||'')});
@@ -2963,6 +3011,16 @@ app.delete('/api/competitions/:competitionId',requireGovernanceRoles(['super_adm
       res.setHeader('Cache-Control','no-cache, must-revalidate');
       res.sendFile(path.join(distPath,'index.html'));
     })}
+  /* آخر معالج للأخطاء: جسمٌ JSON تالف أو أكبر من الحدّ كان يُردّ بصفحة HTML من express، فيتعثّر العميل الذي ينتظر
+     `{code}` ويرى صاحبُ الربط الآلي صفحةً لا يفهمها. الردُّ هنا بالصيغة التي يتكلمها باقي الواجهة، بلا تسريب تفاصيل. */
+  app.use((err:any,req:any,res:any,next:any)=>{
+    if(res.headersSent)return next(err);
+    const rawStatus=Number(err?.status||err?.statusCode);
+    const status=rawStatus>=400&&rawStatus<600?rawStatus:500;
+    const code=err?.type==='entity.parse.failed'?'INVALID_JSON':err?.type==='entity.too.large'?'PAYLOAD_TOO_LARGE':status>=500?'INTERNAL_ERROR':'REQUEST_REJECTED';
+    if(status>=500)console.error('[unhandled-route-error]',req?.method,String(req?.path||'').slice(0,120),err instanceof Error?err.message:err);
+    res.status(status).json({code});
+  });
   app.listen(PORT,'0.0.0.0',()=>console.log(`MIZAN running on :${PORT}`));
 }
 startServer().catch(err=>{console.error(err);process.exit(1)});

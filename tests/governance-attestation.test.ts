@@ -233,3 +233,14 @@ test('a refused score correction resolves the appeal without moving the score', 
   assert.equal(/SCORE_CORRECTION_AUTHORITY_UNAVAILABLE[\s\S]{0,200}return false/.test(body), false,
     'a refused correction must not abandon the human decision');
 });
+
+/* تصحيحُ درجةٍ لا يُخرجها عن مداها: +500 على درجةٍ من ١٠٠ كان يُشهَد عليه فتصير ٥٩٠ وتتصدّر. */
+test('a score correction that leaves the score range is refused by the server', () => {
+  const within = scoreCorrectionDecision({ ...scoreBase, delta: 2, currentScore: 88, maxScore: 100 });
+  assert.equal((within as { attested?: boolean }).attested, true);
+  assert.equal(refused(scoreCorrectionDecision({ ...scoreBase, delta: 500, currentScore: 90, maxScore: 100 })), 'SCORE_CORRECTION_DELTA_OUT_OF_RANGE');
+  assert.equal(refused(scoreCorrectionDecision({ ...scoreBase, delta: 15, currentScore: 90, maxScore: 100 })), 'SCORE_CORRECTION_RESULT_OUT_OF_RANGE');
+  assert.equal(refused(scoreCorrectionDecision({ ...scoreBase, delta: -95, currentScore: 90, maxScore: 100 })), 'SCORE_CORRECTION_RESULT_OUT_OF_RANGE');
+  assert.equal(refused(scoreCorrectionDecision({ ...scoreBase, delta: 5000 })), 'SCORE_CORRECTION_DELTA_OUT_OF_RANGE', 'without a known range a hard ceiling still applies');
+  assert.equal(refused(scoreCorrectionDecision({ ...scoreBase, delta: Number.NaN, currentScore: 90, maxScore: 100 })), 'SCORE_CORRECTION_DELTA_INVALID');
+});

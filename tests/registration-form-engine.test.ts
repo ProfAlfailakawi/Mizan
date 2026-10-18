@@ -128,3 +128,22 @@ test('review fix: an edit only writes participant-editable fields, preserving co
   assert.equal(after.status, 'approved', 'staff approval survives');
   assert.equal(after.registrationPayment.status, 'paid', 'payment record survives');
 });
+
+class GuardedStore extends Store {
+  async create(d: { path: string; data: Record<string, unknown> }[]) { for (const x of d) if (this.docs.has(x.path)) throw new Error('FIRESTORE_CONFLICT'); return super.create(d); }
+  async delete(p: string) { this.docs.delete(p); }
+}
+
+test('review fix: editing identity fields moves the duplicate-guard index (no stale lock, no collision with another registrant)', async () => {
+  const store = new GuardedStore(adultCategory(competitionWith([mode, juz])));
+  const service = new PublicRegistrationService(store, () => now, LEGAL_ENV);
+  const a = await service.register(store.competition.id, { ...base(), customAnswers: { mode: 'online', juz: 3 } }, 'https://x');
+  const b = await service.register(store.competition.id, { ...base(), email: 'b@example.com', customAnswers: { mode: 'online', juz: 3 } }, 'https://x');
+  // B cannot take A's identity by editing
+  await assert.rejects(() => service.editRegistration(store.competition.id, b.journeyAccessToken, { email: 'a@example.com' }), /REGISTRATION_ALREADY_REGISTERED/);
+  // A changes email; the old identity is released, so someone else may now register with it
+  await service.editRegistration(store.competition.id, a.journeyAccessToken, { email: 'a2@example.com' });
+  await service.register(store.competition.id, { ...base(), customAnswers: { mode: 'online', juz: 3 } }, 'https://x');
+  // ...and A's new identity is now protected
+  await assert.rejects(() => service.register(store.competition.id, { ...base(), email: 'a2@example.com', customAnswers: { mode: 'online', juz: 3 } }, 'https://x'), /REGISTRATION_ALREADY_REGISTERED/);
+});

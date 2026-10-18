@@ -8,6 +8,7 @@ import {serverErrorLabel,bilingualName} from '../../lib/ui-language';
 import {Modal} from '../design-system/Modal';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
+import { searchMatches } from '../../lib/input-normalize';
 
 type Category='admin'|'system'|'competition'|'identity'|'support';
 type Priority='normal'|'important'|'urgent';
@@ -49,12 +50,12 @@ export const NotificationCenter:React.FC=()=>{
  const contexts=useMemo(()=>{const map=new Map<string,{key:string;label:string;unread:number;count:number}>();for(const n of rows){const key=n.contextKey||'platform';const current=map.get(key)||{key,label:n.contextLabel||key,unread:0,count:0};current.count++;if(!n.readAt)current.unread++;if(!current.label&&n.contextLabel)current.label=n.contextLabel;map.set(key,current)}return [...map.values()].sort((a,b)=>b.unread-a.unread||a.label.localeCompare(b.label,ar?'ar':'en'))},[rows,ar]);
  useEffect(()=>{if(!contexts.length){setContextKey('');return}if(contextKey&&contexts.some(x=>x.key===contextKey))return;const preferred=currentUser.competitionId?`competition:${currentUser.competitionId}`:currentUser.operatorId?`operator:${currentUser.operatorId}`:(currentUser.organizationId&&!String(currentUser.organizationId).startsWith('__'))?`organization:${currentUser.organizationId}`:'platform';const next=contexts.find(x=>x.key===preferred)||contexts.find(x=>x.unread>0)||contexts[0];setContextKey(next.key)},[contexts,contextKey,currentUser.competitionId,currentUser.operatorId,currentUser.organizationId]);
  const scopedRows=useMemo(()=>contextKey?rows.filter(n=>(n.contextKey||'platform')===contextKey):rows,[rows,contextKey]);
- const filtered=useMemo(()=>scopedRows.filter(n=>{if(tab==='unread'&&n.readAt)return false;if(tab!=='all'&&tab!=='unread'&&n.category!==tab)return false;const q=query.trim().toLowerCase();return !q||`${n.title} ${n.body} ${n.senderName||''}`.toLowerCase().includes(q)}),[scopedRows,tab,query]);
+ const filtered=useMemo(()=>scopedRows.filter(n=>{if(tab==='unread'&&n.readAt)return false;if(tab!=='all'&&tab!=='unread'&&n.category!==tab)return false;const q=query.trim().toLowerCase();return !q||searchMatches(`${n.title} ${n.body} ${n.senderName||''}`,q)}),[scopedRows,tab,query]);
  const scopedUnread=scopedRows.filter(n=>!n.readAt).length;
  const allowedTargets=useMemo<TargetType[]>(()=>{if(['super_admin','support_agent'].includes(currentUser.role))return ['all','operator','organization','competition','role','user','users'];if(['operator_owner','operator_admin'].includes(currentUser.role))return ['operator','organization','role','user','users'];if(currentUser.role==='org_admin')return ['organization','competition','role','user','users'];return ['competition','role','user','users']},[currentUser.role]);
  useEffect(()=>{if(!allowedTargets.includes(targetType))setTargetType(allowedTargets[0])},[allowedTargets,targetType]);
  const targetLabel=(type:TargetType)=>({all:ar?'كل مستخدمي ميزان':'Everyone',operator:ar?'المشغّل كاملًا':'Operator',organization:ar?'جهة':'Organization',competition:ar?'مسابقة':'Competition',role:ar?'دور محدد':'Role',user:ar?'مستخدم واحد':'One user',users:ar?'مجموعة مستخدمين':'User group'} as Record<TargetType,string>)[type];
- const recipientMatches=useMemo(()=>{const q=recipientQuery.trim().toLowerCase();if(!q)return recipients;return recipients.filter(r=>`${r.displayName} ${r.email} ${(r.roles||[]).join(' ')} ${r.organizationName||''} ${r.operatorName||''}`.toLowerCase().includes(q))},[recipients,recipientQuery]);
+ const recipientMatches=useMemo(()=>{const q=recipientQuery.trim().toLowerCase();if(!q)return recipients;return recipients.filter(r=>searchMatches(`${r.displayName} ${r.email} ${(r.roles||[]).join(' ')} ${r.organizationName||''} ${r.operatorName||''}`,q))},[recipients,recipientQuery]);
  const recipientById=useMemo(()=>new Map(recipients.map(r=>[r.userId,r])),[recipients]);
  const resetCompose=()=>{setTitle('');setBody('');setTargetValue('');setRecipientQuery('');setSelectedUserIds([]);setReplyingTo(null)};
  const beginCompose=()=>{resetCompose();setComposeStep('to');setComposeOpen(true)};

@@ -55,7 +55,7 @@ service cloud.firestore {
     // Once closed, all operational identities lose both read and write access.
     // Only platform/organization administration and the independent auditor keep archive visibility.
     function archiveReader(orgId, competitionId) {
-      return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','auditor']);
+      return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','branch_admin','auditor']);
     }
     function readableScope(orgId, competitionId) {
       return scoped(orgId, competitionId) && (competitionOpen(orgId, competitionId) || archiveReader(orgId, competitionId));
@@ -65,6 +65,12 @@ service cloud.firestore {
     }
     function admin(orgId, competitionId) {
       return scoped(orgId, competitionId) && roleIs(['super_admin','org_admin','comp_admin']);
+    }
+    // مدير الفرع (branch_admin): دورٌ على مستوى الجهة لإدارة عمليات المسابقات — إنشاؤها وضبطها ومتسابقوها ولجانها
+    // وحضورها وجدولها (انظر permissions.ts و SAAS_PLATFORM.md). لا ينشر ولا يختم ولا يحكّم ولا يدير الهويات.
+    // وكان غائبًا عن القواعد كلها، فيدخل ولا يرى مسابقات جهته ولا يحفظ شيئًا.
+    function branchAdmin(orgId, competitionId) {
+      return scoped(orgId, competitionId) && roleIs(['branch_admin']);
     }
     // Append-only status history: the old entries unchanged, plus exactly one entry whose
     // status is the new status. An empty prefix is checked by size, not by slicing to [0:0].
@@ -191,19 +197,35 @@ service cloud.firestore {
 
       match /competitions/{competitionId} {
         allow read: if readableScope(orgId, competitionId);
-        allow create: if admin(orgId, competitionId);
+        allow create: if admin(orgId, competitionId) || branchAdmin(orgId, competitionId);
         // Org admin may perform the one-way closure. Competition staff cannot close themselves,
         // and after closure only the platform owner may change the root document (for exceptional recovery).
-        allow update: if admin(orgId, competitionId)
+        allow update: if (admin(orgId, competitionId) || branchAdmin(orgId, competitionId))
           && (
             (competitionOpen(orgId, competitionId) && (!closingTransition() || roleIs(['super_admin','org_admin'])))
             || platformAdmin()
           );
         allow delete: if platformAdmin();
 
+        /*
+         * مدير الوفد يرى ويكتب متسابقي وفده وحدهم.
+         *
+         * كانت القاعدة تمنحه قراءة كل متسابقي المسابقة وكتابتهم: هواتفُ وبريدُ وأرقام هويّة قاصرين من وفودٍ أخرى،
+         * وتعديلُ حالة أيّ متسابقٍ (يعتمد نفسه أو يُسقط غيره). والوفد يُعرَّف بـ`delegation-<uid>` (انظر
+         * src/lib/delegation-scope.ts) ولا يُنقل متسابقٌ من وفدٍ إلى آخر بتحديث.
+         */
+        function ownDelegation() {
+          return roleIs(['delegation_manager']) && present() && resource.data.get('delegationId', '') == ('delegation-' + request.auth.uid);
+        }
         match /participants/{participantId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','exception_host','delegation_manager']);
+          allow read: if readableScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','auditor']) || ownDelegation());
+          allow create: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','exception_host'])
+              || (roleIs(['delegation_manager']) && request.resource.data.delegationId == ('delegation-' + request.auth.uid)));
+          allow update: if writeScope(orgId,competitionId)
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','exception_host'])
+              || (present() && ownDelegation() && request.resource.data.delegationId == resource.data.delegationId));
           // The judge who ends a session may only move the participant forward to in-session /
           // tested, touching nothing but the status, its history and the timestamp.
           allow update: if present() && writeScope(orgId,competitionId) && roleIs(['judge'])
@@ -233,8 +255,8 @@ service cloud.firestore {
           allow delete: if false;
         }
         match /checkins/{participantId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','exception_host']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['comp_admin','ops_manager','exception_host']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','ops_manager','exception_host']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['branch_admin','comp_admin','ops_manager','exception_host']);
           allow delete: if false;
         }
         match /reviews/{reviewId} {
@@ -283,9 +305,9 @@ service cloud.firestore {
           allow update, delete: if false;
         }
         match /committees/{committeeId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
-          allow delete: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','ops_manager']);
+          allow delete: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','ops_manager']);
         }
         match /appeals/{appealId} {
           allow read: if readableScope(orgId,competitionId)
@@ -324,8 +346,8 @@ service cloud.firestore {
         }
         // الجدول الزمني: تكتبه الإدارة والعمليات، ويقرؤه من يدير اليوم.
         match /schedule_plans/{planId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager','head_judge','judge','auditor']);
-          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','ops_manager']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','ops_manager','head_judge','judge','auditor']);
+          allow create, update: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','ops_manager']);
           allow delete: if false;
         }
         // علاقات التأهّل وسجلّاته بين المراحل. الإدارة وحدها تكتبها، ولا يُحذف تأهّلٌ (يُلغى بسبب).
@@ -344,7 +366,7 @@ service cloud.firestore {
         // القراءة مفتوحة لمن يدير المسابقة ويحكّمها ويدقّقها، لا للعموم.
         match /participant_scopes/{scopeId} {
           allow read: if readableScope(orgId,competitionId)
-            && (roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','delegation_manager','auditor'])
+            && (roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','delegation_manager','auditor'])
               || (present() && roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','delegation_manager'])
@@ -368,9 +390,9 @@ service cloud.firestore {
           allow delete: if false;
         }
         match /audit/{eventId} {
-          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor']);
+          allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','auditor']);
           allow create: if writeScope(orgId,competitionId)
-            && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
+            && roleIs(['super_admin','org_admin','branch_admin','comp_admin','head_judge','judge','ops_manager','exception_host','delegation_manager','broadcast_operator','auditor','support_agent'])
             && request.resource.data.uploaderUid == request.auth.uid;
           allow update, delete: if false;
         }

@@ -64,7 +64,10 @@ export function normalizeMizanActivationToken(raw: string): string {
 
 export function activationTokenFromLocation(): string {
   if (typeof window === 'undefined') return '';
-  return normalizeMizanActivationToken(window.location.hash);
+  /* الرابط وحده لا يصير رمزَ تفعيل إلا بصيغته (#a=…). كان أيُّ تجزئةٍ أخرى (#trust-verify، #manage-competition…)
+     تُعامَل رمزًا خامًا فتُرسل للخادم معاينةً (400 عند كل فتح) وتُقلب شاشة الحساب غير المفوّض إلى «تمت قراءة QR». */
+  const hash = window.location.hash || '';
+  return hash.startsWith('#a=') ? normalizeMizanActivationToken(hash) : '';
 }
 
 async function resolveServerIdentity(
@@ -145,25 +148,31 @@ export function useMizanAuth(requireAuth: boolean) {
         const mfaRequired = (role === 'super_admin' && ownerMfaRequired) || (staffMfaRequired && OPTIONAL_STAFF_MFA_ROLES.includes(role));
         if (mfaRequired && !secondFactor) { setAccessError('MFA_REQUIRED'); setSignedIn(false); setAuthReady(true); return; }
 
-        const scopePreparation = await prepareAuthenticatedCloudScope(
-          { id: user.uid, role, organizationId, operatorId, competitionId },
-          appStore,
-        );
-        let effectiveCompetitionId = competitionId;
-        if (scopePreparation) {
-          const otherOrganizations = appStore.competitions.filter(c => c.organizationId !== organizationId);
-          // The store exposes its current arrays by reference. Updating this array before
-          // applyAuthenticatedIdentity lets that authoritative action select the cloud competition
-          // without creating a second browser-storage writer or a reload loop.
-          appStore.competitions.splice(0, appStore.competitions.length, ...scopePreparation.competitions, ...otherOrganizations);
-          effectiveCompetitionId ||= scopePreparation.selectedCompetitionId;
+        /* اكتشاف مسابقات الجهة من السحابة تحسينٌ لا شرطُ دخول: فشلُه (شبكة، قاعدة قراءة، حصّة) لا يجوز أن يُظهر
+           «تعذّر التحقق من صلاحية الحساب» لشخصٍ هويتُه سليمة. يدخل بما عنده، وتُعيد المزامنة المحاولة. */
+        let scopePreparation: Awaited<ReturnType<typeof prepareAuthenticatedCloudScope>> = null;
+        for (let attempt = 0; attempt < 3 && !scopePreparation; attempt++) {
+          try {
+            scopePreparation = await prepareAuthenticatedCloudScope(
+              { id: user.uid, role, organizationId, operatorId, competitionId },
+              appStore,
+            );
+            break;
+          } catch (error) {
+            console.warn(`MIZAN cloud scope discovery failed (attempt ${attempt + 1}/3); ${attempt < 2 ? 'retrying' : 'continuing with the verified identity'}`, error);
+            if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+          }
         }
+        let effectiveCompetitionId = competitionId;
+        // The discovered cloud competitions are handed to the store action itself (not spliced into
+        // an array captured by this effect's first-render closure, which may no longer be the live one).
+        if (scopePreparation) effectiveCompetitionId ||= scopePreparation.selectedCompetitionId;
 
         applyAuthenticatedIdentity({
           id: user.uid, email: user.email || '', name: user.displayName || user.email || user.uid,
           role, organizationId, operatorId, competitionId: effectiveCompetitionId, mfaEnabled: secondFactor,
           identityAssurance: serverManaged ? 'firebase_managed' : 'firebase',
-        });
+        }, scopePreparation?.competitions);
         setAccessError(''); setSignedIn(true);
       } catch { setAccessError('IDENTITY_TOKEN_ERROR'); setSignedIn(false); }
       finally { setAuthReady(true); }

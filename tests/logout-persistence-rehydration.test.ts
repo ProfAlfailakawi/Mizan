@@ -25,13 +25,24 @@ test('authenticated scope is discovered from Firestore instead of browser memory
 });
 
 
+test('a failed scope discovery never turns a valid identity into an access error',()=>{
+  const at=auth.indexOf('await prepareAuthenticatedCloudScope(');
+  const tryAt=auth.lastIndexOf('try {',at);
+  assert.ok(tryAt>0&&at-tryAt<260,'discovery sits inside its own try');
+  assert.match(auth,/cloud scope discovery failed \(attempt/);
+  assert.match(auth,/continuing with the verified identity/);
+  assert.match(auth,/attempt < 3 && !scopePreparation/,'a transient failure is retried before giving up');
+});
+
 test('auth applies cloud scope before rendering staff UI',()=>{
   const prepareAt=auth.indexOf('await prepareAuthenticatedCloudScope(');
-  const spliceAt=auth.indexOf('appStore.competitions.splice(',prepareAt);
   const applyAt=auth.indexOf('applyAuthenticatedIdentity({',prepareAt);
   const signedInAt=auth.indexOf("setAccessError(''); setSignedIn(true);",applyAt);
-  assert.ok(prepareAt>=0&&spliceAt>prepareAt&&applyAt>spliceAt&&signedInAt>applyAt,
-    'cloud scope must be inserted before applying identity and marking the session signed in');
+  assert.ok(prepareAt>=0&&applyAt>prepareAt&&signedInAt>applyAt,
+    'cloud scope must be prepared before applying identity and marking the session signed in');
+  assert.match(auth,/scopePreparation\?\.competitions\);/,
+    'discovered competitions must be passed to the store action, not spliced into a stale first-render array');
+  assert.doesNotMatch(auth,/appStore\.competitions\.splice\(/,'a closure-captured array must never be mutated to carry cloud scope');
   assert.match(auth,/effectiveCompetitionId \|\|= scopePreparation\.selectedCompetitionId/,
     'an organization admin without a competition claim must select the discovered cloud competition');
 });

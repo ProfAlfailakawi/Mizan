@@ -6,15 +6,25 @@ import {isPlausibleEmail} from '../shared/email-shape';
 import {persistableCustomAnswers,validateAnswers,CORE_FIELD_IDS,type Answers} from '../src/lib/registration-form';
 import {categoryDistribution,categoryScopeOf,resolveQuestionCount} from '../src/lib/scope-engine';
 import {describeScope} from '../src/lib/quran-scope';
+import {toAsciiDigits} from '../shared/input-validation';
 
 export type PublicRegistrationInput={fullNameArabic:string;fullName:string;email:string;phone:string;country:string;nationality:string;nationalIdOrPassport:string;dateOfBirth:string;gender:'male'|'female';categoryId:string;riwaya:string;guardianName?:string;consents?:{terms?:boolean;privacy?:boolean;guardian?:boolean;audioRecording?:boolean;aiProcessing?:boolean};website?:string;customAnswers?:Record<string,unknown>};
+const identityIndexPathOf=(competition:{id:string;organizationId:string},input:{nationalIdOrPassport?:string;email?:string;dateOfBirth?:string;fullNameArabic?:string})=>{
+  const identityDigits=toAsciiDigits(input.nationalIdOrPassport||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const identityKey=identityDigits.length>=4?`id:${identityDigits}`:`eml:${input.email||''}|${input.dateOfBirth||''}|${(input.fullNameArabic||'').replace(/\s+/g,' ').toLowerCase()}`;
+  return `organizations/${competition.organizationId}/competitions/${competition.id}/registration_index/${crypto.createHash('sha256').update(`${competition.id}|${identityKey}`).digest('hex')}`;
+};
 export interface PublicRegistrationStore{getCompetition(id:string):Promise<Competition|null>;create(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;getJourney(tokenHash:string):Promise<Record<string,unknown>|null>;
   /** قراءة وثيقة مفردة وكتابة تحديثاتٍ ذرّية — لازمتان لتعديل التسجيل قبل الإغلاق. */
   getDocument?(path:string):Promise<Record<string,unknown>|null>;upsert?(documents:{path:string;data:Record<string,unknown>}[]):Promise<void>;
   /** Field-masked update: only the listed fields change, so concurrent staff edits (status, check-in, payment) survive. */
-  patch?(path:string,fields:Record<string,unknown>):Promise<void>}
+  patch?(path:string,fields:Record<string,unknown>):Promise<void>;
+  /** Removes one document (used to retire a superseded duplicate-guard index when identity fields are edited). */
+  delete?(path:string):Promise<void>}
 
-const clean=(value:unknown,max=160)=>String(value??'').trim().replace(/[\u0000-\u001f\u007f]/g,'').slice(0,max);
+/* أحرف التحكم والتوجيه الخفية تُنزع: U+202A–202E و U+2066–2069 تقلب عرض الاسم في جداول الإدارة (انتحال بصري)،
+   و U+200B/U+FEFF تصنع أسماءً «مختلفة» تبدو متطابقة. أما ZWNJ/ZWJ فتبقى لأن أسماء بالفارسية والأردية تحتاجها. */
+const clean=(value:unknown,max=160)=>String(value??'').replace(/[\u0000-\u001f\u007f\u200b\u202a-\u202e\u2066-\u2069\ufeff]/g,'').trim().slice(0,max);
 const emailOk=(value:string)=>isPlausibleEmail(value);
 const ageOn=(dob:string,now:Date)=>{const birth=new Date(`${dob}T00:00:00Z`);if(!Number.isFinite(birth.getTime())||birth>now)return NaN;let age=now.getUTCFullYear()-birth.getUTCFullYear();const before=now.getUTCMonth()<birth.getUTCMonth()||(now.getUTCMonth()===birth.getUTCMonth()&&now.getUTCDate()<birth.getUTCDate());if(before)age--;return age};
 const compare=(actual:unknown,condition:EligibilityCondition)=>{const expected=condition.value;switch(condition.operator){case'eq':return String(actual)===String(expected);case'neq':return String(actual)!==String(expected);case'lte':return Number(actual)<=Number(expected);case'gte':return Number(actual)>=Number(expected);case'in':return Array.isArray(expected)&&expected.map(String).includes(String(actual));case'not_in':return Array.isArray(expected)&&!expected.map(String).includes(String(actual));case'exists':return condition.value?actual!==undefined&&actual!==null&&actual!=='':actual===undefined||actual===null||actual==='';default:return false}};
@@ -109,7 +119,34 @@ export class PublicRegistrationService{
     };
     const consentKinds=['terms','privacy',...(policy.judging.requireAudioRecording&&input.consents.audioRecording?['audio_recording']:[]),...(policy.privacy.allowAiProcessing&&input.consents.aiProcessing?['ai_processing']:[]),...(guardianRequired?['guardian']:[])];
     for(const kind of consentKinds){const id=`consent-${crypto.randomUUID()}`;documents.push({path:`organizations/${competition.organizationId}/competitions/${competition.id}/consents/${id}`,data:{id,participantId,competitionId:competition.id,kind,...consentProvenance(kind),accepted:true,acceptedAt:createdAt,...(kind==='guardian'?{guardianName:input.guardianName}: {})}})}
-    await this.store.create(documents);
+    /*
+     * منعُ التسجيل المكرَّر — بوثيقة فهرسٍ يُنشئها الطلبُ نفسه ذرّيًا مع المتسابق.
+     *
+     * لم يكن شيءٌ يمنع أن يُسجَّل الشخص نفسه مرتين: ضغطتان من تبويبين، أو إعادةُ محاولةٍ بعد ضياع الرد، أو أخٌ يعيد
+     * إدخال بيانات أخيه. فينقسم أثرُه إلى متسابقَين برمزَين وطابورَين وبطاقتي رحلة، ويُحتسب مرتين على حصّة الجهة،
+     * ويُحكَّم مرتين. والمفتاح رقمُ الهوية إن وُجد، وإلا البريدُ مع تاريخ الميلاد والاسم. ولا بيانَ شخصيًا في الفهرس: بصمةٌ فقط.
+     */
+    const identityIndexPath=identityIndexPathOf(competition,input);
+    documents.push({path:identityIndexPath,data:{competitionId:competition.id,organizationId:competition.organizationId,participantId,createdAt}});
+    /*
+     * رمزُ المتسابق (A-1234567) هو ما تنادي به القاعةُ وتعرضه الشاشاتُ العامة، فلا يجوز أن يتكرّر داخل المسابقة.
+     * الرمز عشوائي من سبعة أرقام، وتصادمُه ليس نادرًا كما يُظنّ: مع ألفي متسابق يبلغ احتمالُ أن يتشارك اثنان رمزًا
+     * نحو ١٨٪ (مفارقة أعياد الميلاد). فيُحجز الرمز بوثيقةٍ تُنشأ ذرّيًا مع المتسابق؛ وعند التصادم يُولَّد رمزٌ جديد.
+     * والتمييزُ بين «التصادم على الرمز» و«المسجَّل مسبقًا» بقراءة فهرس الهوية بعد التعارض.
+     */
+    const codeIndexPath=(c:string)=>`organizations/${competition.organizationId}/competitions/${competition.id}/participant_codes/${c}`;
+    let codeAttempts=0;
+    for(;;){
+      try{await this.store.create([...documents,{path:codeIndexPath(participant.code),data:{participantId,competitionId:competition.id,organizationId:competition.organizationId,createdAt}}]);break}
+      catch(err){
+        if(!(err instanceof Error&&err.message==='FIRESTORE_CONFLICT'))throw err;
+        const alreadyRegistered=this.store.getDocument?await this.store.getDocument(identityIndexPath).catch(()=>null):{};
+        if(alreadyRegistered)throw new Error('REGISTRATION_ALREADY_REGISTERED');
+        if(++codeAttempts>=8)throw new Error('REGISTRATION_CODE_UNAVAILABLE');
+        const fresh=`A-${crypto.randomBytes(4).readUInt32BE(0).toString().slice(0,7).padStart(7,'0')}`;
+        participant.code=fresh;for(const d of documents.slice(1,3))d.data={...d.data,participantCode:fresh};
+      }
+    }
     const base=origin.replace(/\/$/,'');return {participant:{id:participant.id,code:participant.code,status:participant.status,competitionId:participant.competitionId,fullName:participant.fullName,fullNameArabic:participant.fullNameArabic},journeyUrl:`${base}/#journey?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(journeyToken)}`,guardianUrl:`${base}/#guardian?comp=${encodeURIComponent(competition.id)}&key=${encodeURIComponent(guardianToken)}`,journeyAccessToken:journeyToken,guardianAccessToken:guardianToken};
   }
   private answersOf(fields:{id:string;custom?:boolean}[],input:PublicRegistrationInput,custom:unknown):Answers{
@@ -152,7 +189,17 @@ export class PublicRegistrationService{
     /* يُكتب ما يملك المتسابق تعديله فقط، لا الوثيقة كاملة: حالةٌ اعتمدها المشرف أو حضورٌ سُجّل أو
        دفعٌ قُيّد بين القراءة والكتابة يبقى كما هو. */
     const editable=['fullNameArabic','fullName','email','phone','country','nationality','nationalIdOrPassport','dateOfBirth','gender','customAnswers','editHistory'] as const;
-    await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])));
+    /* فهرس منع التكرار يتبع هوية المتسابق: عند تغيير حقل هوية يُحجز المفتاح الجديد ذرّيًا (فإن كان لمسجَّل آخر رُفض التعديل)،
+       ثم يُحذف المفتاح القديم حتى لا يبقى الاسم أو الهوية القديمة محجوزة أمام تسجيل آخر. */
+    const oldIndex=identityIndexPathOf(competition,current as any),newIndex=identityIndexPathOf(competition,next as any);
+    const moveIndex=oldIndex!==newIndex;
+    if(moveIndex){
+      try{await this.store.create([{path:newIndex,data:{competitionId:competition.id,organizationId:competition.organizationId,participantId:current.id,createdAt:now.toISOString()}}])}
+      catch(err){if(err instanceof Error&&err.message==='FIRESTORE_CONFLICT')throw new Error('REGISTRATION_ALREADY_REGISTERED');throw err}
+    }
+    try{await this.store.patch(path,Object.fromEntries(editable.map(k=>[k,(next as any)[k]??null])))}
+    catch(err){if(moveIndex&&this.store.delete)await this.store.delete(newIndex).catch(()=>{});throw err}
+    if(moveIndex&&this.store.delete)await this.store.delete(oldIndex).catch(()=>{});
     return {participant:{id:next.id,code:next.code,status:next.status},changed};
   }
   /**

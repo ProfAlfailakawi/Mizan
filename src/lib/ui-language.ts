@@ -131,12 +131,12 @@ const AR_AUDIT_ACTIONS:Record<string,string>={
 };
 const AR_AUDIT_ENTITIES:Record<string,string>={
   Participant:'متسابق', QuestionSet:'مجموعة أسئلة', TestSession:'جلسة اختبار', JudgeSubmission:'تقييم محكّم', Result:'نتيجة', Appeal:'تظلّم', Incident:'بلاغ',
-  ParticipantScope:'نطاق متسابق', JudgeProfile:'محكّم', Committee:'لجنة'
+  ParticipantScope:'نطاق متسابق', JudgeProfile:'محكّم', Committee:'لجنة', subscription_term:'فترة اشتراك'
 };
 /** نوع الكيان في دفتر التدقيق: بالعربية في الواجهة العربية، والرمز الخام يبقى في السجل. */
 export function auditEntityLabel(value:string|undefined|null, ar:boolean){
   if(!value)return '—';
-  return ar?(AR_AUDIT_ENTITIES[value]||value):value;
+  return ar?(AR_AUDIT_ENTITIES[value]||(value.includes('_')?value.replaceAll('_',' '):value)):value;
 }
 export function auditActionLabel(value:string|undefined|null, ar:boolean){
   if(!value)return '—';
@@ -209,6 +209,10 @@ const SERVER_ERROR_AR: Record<string, string> = {
   REVOKE_FAILED: 'تعذّر سحب الإذن.',
   SECURE_RUNTIME_UNAVAILABLE: 'تعذّر الوصول إلى خادم الأسئلة الآمن (غير متاح في وضع العرض).',
   ACCOUNT_ALREADY_ACTIVE_IN_COMPETITION: 'هذا الحساب مفعّل بالفعل في هذه المسابقة.',
+  CROSS_TENANT_IDENTITY_BLOCKED: 'هذا الحساب مرتبط بجهة أخرى في ميزان. استخدم بريدًا آخر لهذه الجهة أو اطلب من الإدارة المساعدة.',
+  IDENTITY_BINDING_CONFLICT: 'هذا البريد مرتبط بحسابين مختلفين. تواصل مع مدير جهتك لتوحيدهما.',
+  SELF_SERVICE_ROLE_NOT_PROVISIONABLE: 'هذا الدور لا يُفعَّل بدعوة؛ المتسابق وولي الأمر يدخلان من رابط رحلتهما.',
+  VERIFIED_EMAIL_REQUIRED: 'يلزم حسابٌ ببريد إلكتروني لإتمام التفعيل.',
   INVITATION_ALREADY_PENDING: 'توجد دعوة تفعيل سارية لهذا الحساب بالفعل.',
   INVITATION_FIELDS_REQUIRED: 'أكمل الاسم والبريد وسبب إضافة المستخدم.',
   INVITATION_NOT_FOUND: 'دعوة التفعيل غير موجودة أو لم تعد متاحة.',
@@ -264,6 +268,10 @@ const SERVER_ERROR_EN: Record<string, string> = {
   NOTIFICATION_RECIPIENTS_FAILED: 'The recipient list could not be loaded. Try again shortly.',
   NOTIFICATION_UPDATE_FAILED: 'The notification could not be updated. Try again shortly.',
   NOTIFICATION_SEND_FAILED: 'The notification could not be sent. Check the connection and try again.',
+  CROSS_TENANT_IDENTITY_BLOCKED: 'This account belongs to another organization in MIZAN. Use a different e-mail for this one, or ask the administrators.',
+  IDENTITY_BINDING_CONFLICT: 'This e-mail is linked to two different accounts. Ask your administrator to merge them.',
+  SELF_SERVICE_ROLE_NOT_PROVISIONABLE: 'This role is not activated by invitation; contestants and guardians use their journey link.',
+  VERIFIED_EMAIL_REQUIRED: 'An account with an e-mail address is required to complete activation.',
 };
 export function serverErrorLabel(code: string, ar: boolean): string {
   const map = ar ? SERVER_ERROR_AR : SERVER_ERROR_EN;

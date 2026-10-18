@@ -75,10 +75,13 @@ test('audit documents upload once each, never re-uploaded as forbidden updates',
   assert.match(store, /if\(scopeKey\(scope\)==='audit'\)return;/);
 });
 
-test('index.html carries an inline boot watchdog that survives a dead bundle', () => {
-  // داخل الغلاف لا داخل الحزمة: يعمل حتى حين لا تعمل الحزمة.
-  assert.match(indexHtml, /window\.__MIZAN_BOOTED/);
-  assert.match(indexHtml, /sessionStorage\.getItem\(K\)/); // مرة واحدة، لا حلقة إعادة تحميل
-  assert.match(indexHtml, /getRegistrations/);
+test('index.html loads an external boot watchdog that survives a dead bundle (CSP forbids inline scripts)', () => {
+  // في الغلاف لا في الحزمة: يعمل حتى حين لا تعمل الحزمة. وخارجيٌّ لأن CSP تمنع المضمَّن.
+  const guard = fs.readFileSync(new URL('../public/boot-guard.js', import.meta.url), 'utf8');
+  assert.match(indexHtml, /<script src="\/boot-guard\.js"><\/script>/);
+  assert.doesNotMatch(indexHtml, /<script>\s*setTimeout/); // لا سكربت مضمَّن: تحجبه CSP
+  assert.match(guard, /window\.__MIZAN_BOOTED/);
+  assert.match(guard, /sessionStorage\.getItem\(K\)/); // مرة واحدة، لا حلقة إعادة تحميل
+  assert.match(guard, /getRegistrations/);
   assert.match(mainTsx, /__MIZAN_BOOTED = true/);
 });

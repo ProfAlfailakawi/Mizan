@@ -7,14 +7,14 @@
      * لا قفلٌ يمنع التصحيح.
      */
 import { useState, useEffect } from 'react';
-import { computePanelScore, panelPenaltyCount, rankResults, breakTie as coreBreakTie } from './scoring-core';
+import { computePanelScore, panelPenaltyCount, rankResults, specialtyScoresOf, breakTie as coreBreakTie } from './scoring-core';
 import { normalizeAwardPolicy, resolveAwards, type AwardPlace } from './award-places';
 import { tieDecision, type TieDecision, type TieGroup } from './tie-resolution';
 import { enableDemoAuthority } from './demo-authority';
 import { sealResultOnServer, publishResultsOnServer, attestPolicyChangeOnServer, attestScoreCorrectionOnServer, attestReadingChangeOnServer, requestQuorum, approveQuorum, succeeded, authorityFailureText, type SealedResultView } from './integrity-authority-client';
 import { isRetiredSeedResidue, isLaunchDeployment, toLaunchState } from './launch-state';
 import { uiToken, capabilityLabel, bilingualName } from './ui-language';
-import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, type CloudSyncErrorCode } from './cloud-sync';
+import { canWriteSyncedCollection, classifyCloudError, exceedsSafeDocumentSize, watchPlanFor, ownValueFor, CONFIG_WRITER_ROLES, type CloudSyncErrorCode, type OwnField, type WatchedCollection } from './cloud-sync';
 import { decideArrival, findByIdOrCode } from './arrival-core';
 import { buildDisplayBoard, parseDisplayBoard, PANEL_NEXT_DEPTH, type DisplayBoard } from './display-board';
 import type { PublishedLease } from './board-lease';
@@ -86,7 +86,7 @@ import { aggregateFairness } from './model-fairness';
 import { enqueueOfflineEvent, drainOfflineEvents } from './offline-queue';
 import { buildMerkleTree, canonicalStringify, finishMinutes, hashCanonical, merkleProofForIndex, quorumSatisfied, verifyMerkleProof } from './trust-protocol';
 import { createBrowserBroadcastMesh, MeshTransportAdapter, MeshWireEnvelope } from './mesh-transport';
-import { can } from './permissions';
+import { can, isOperatorStaffRole } from './permissions';
 import { nextParticipantCodes, planParticipantImport } from './participant-import';
 import { recordCompetitionState, recordParticipantBatchUsage, recordParticipantUsage } from './entitlements-client';
 import { TEN_QIRAAT_GRAPH, computeQuranPackageHash, immutableSourceUpdateAllowed, canPromoteQuranSource, certificationReleaseGate, aiCapabilityState, sourceUsableForCompetition, certifiedCapabilityFor, resolveReading, resolveReadings, isReadingDelivered, detectModelChange, explicitConsentGranted } from './scientific-core';
@@ -564,6 +564,7 @@ function markCompetitionConfigChanged(){
   schedulePublicCompetitionProjectionSync();
   return now;
 }
+const PUBLIC_PROJECTION_ROLES:Role[]=['super_admin','org_admin','comp_admin'];
 let browserMeshAdapter: MeshTransportAdapter | null = null;
 const productionMode = import.meta.env.PROD === true;
 
@@ -811,7 +812,7 @@ async function persistScopedDocument(collectionName:string,id:string,data:Record
 type CompetitionConfigurationPersistResult = 'written' | 'stale' | 'failed';
 
 async function persistCompetitionConfiguration(updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString()): Promise<CompetitionConfigurationPersistResult>{
-  if(!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role))return 'failed';
+  if(!CONFIG_WRITER_ROLES.includes(globalState.currentUser.role))return 'failed';
   if(cloudSessionLost()){reportLostCloudSession('competition');return 'failed';}
   if(globalState.isOffline||!auth.currentUser)return 'failed';
   const configuration={competition:globalState.competition,judges:globalState.judges,emergencyFrozen:globalState.emergencyFrozen,updatedAt};
@@ -1241,7 +1242,7 @@ function syncToFirestore() {
     catch (err) { console.error('MIZAN pending upload flush failed', err); reportCloudError(classifyCloudError(err), 'competition'); }
     try { await syncPublicJourneys(); }
     catch (err) { console.error('MIZAN journey sync failed', err); }
-    if (!['super_admin','org_admin','comp_admin'].includes(globalState.currentUser.role)) return;
+    if (!CONFIG_WRITER_ROLES.includes(globalState.currentUser.role)) return;
     try {
       const { db, doc, setDoc } = await getFirestoreClient();
       const updatedAt=globalState.competitionConfigUpdatedAt||new Date().toISOString();
@@ -1249,7 +1250,8 @@ function syncToFirestore() {
       if(configPersistResult!=='written')return;
       // النسخة العامة لا تُنشأ للمسودات. نشرُها مرتبط بحالة مسابقة حقيقية لا بوجود شاشة في الكود.
       // نبقي completed منشورة لصفحة «انتهت المسابقة» والتحقق العام، لكن التسجيل/الرحلة يُغلقان.
-      if(!launchPlaceholderActive()&&!['draft','configured'].includes(globalState.competition.status)){
+      /* النشر العام لمن يملك `competition.publish` فقط؛ مدير الفرع يضبط المسابقة ولا ينشرها (قاعدة public_competitions). */
+      if(PUBLIC_PROJECTION_ROLES.includes(globalState.currentUser.role)&&!launchPlaceholderActive()&&!['draft','configured'].includes(globalState.competition.status)){
         const publicRef=doc(db,'public_competitions',globalState.competition.id);
         await setDoc(publicRef,{organizationId:globalState.competition.organizationId,competition:globalState.competition,updatedAt},{merge:true});
       }
@@ -1357,7 +1359,9 @@ export function useAppStore() {
     const unsubscribers: (() => void)[] = [];
     let cancelled = false;
     try {
-      if (!auth.currentUser) return () => { listeners.delete(listener); };
+      /* لا اشتراك سحابيًا على هوية لم تُطبَّق بعد ولا على مسابقة-نائبٍ لا وثيقة لها: القواعد ترفض قراءتهما
+         فتمتلئ وحدة التحكم بأخطاء «permission-denied» عند كل دخول وتُحجب الأخطاء الحقيقية خلفها. */
+      if (!auth.currentUser || syncUserId === 'unauthenticated' || syncCompetitionId === 'comp-pending-setup') return () => { listeners.delete(listener); };
       /* عملٌ نجا من إغلاق التبويب بلا شبكة يُستأنف رفعه فور توفّر جلسة سحابية، لا عند
          أوّل تغييرٍ يصادف أن يحدث بعده. */
       if (pendingCloudWriteCount() > 0) syncToFirestore();
@@ -1386,12 +1390,27 @@ export function useAppStore() {
       }));
 
       // 2) السجلات من مجموعاتها الفرعية. الدمج بالسلطة يبقى: المختوم لا يتراجع.
+      // لا يُفتح إلا ما يقرؤه الدور (انظر watchPlanFor): ما عداه ترفضه القواعد فيملأ السجلّ أخطاءً بلا فائدة،
+      // والمحكّم يقرأ إرساليّاته وحدها فلا بدّ أن يُقيَّد استعلامُه بها وإلا رُفض كلّه.
       if (typeof collectionFn === 'function') {
-        const watch = (name: string, apply: (rows: any[]) => void) => {
-          unsubscribers.push(onSnapshot(collectionFn(db, 'organizations', orgId, 'competitions', compId, name), (snap: any) => {
-            const rows: any[] = []; snap.forEach((d: any) => rows.push(d.data()));
-            apply(rows); notify();
-          }));
+        const plan = new Map<string, OwnField | null>(watchPlanFor(globalState.currentUser.role).map(p => [p.collection as string, p.ownOnly ? (p.ownField || 'uploaderUid') : null]));
+        const uid = auth.currentUser?.uid || '';
+        const watch = (name: WatchedCollection, apply: (rows: any[]) => void) => {
+          if (!plan.has(name)) return;
+          const ownField = plan.get(name) || null;
+          void (async () => {
+            let source: any = collectionFn(db, 'organizations', orgId, 'competitions', compId, name);
+            if (ownField) {
+              if (!uid) return;
+              const { query, where } = await import('firebase/firestore');
+              source = query(source, where(ownField, '==', ownValueFor(ownField, uid)));
+            }
+            if (cancelled) return;
+            unsubscribers.push(onSnapshot(source, (snap: any) => {
+              const rows: any[] = []; snap.forEach((d: any) => rows.push(d.data()));
+              apply(rows); notify();
+            }, (err: unknown) => { console.warn(`MIZAN cloud listener stopped for ${name}`, err); }));
+          })();
         };
         watch('results', rows => { globalState.results = mergeResultsByAuthority(globalState.results, rows as ResultRecord[]); });
         watch('judge_submissions', rows => { globalState.judgeSubmissions = mergeJudgeSubmissions(globalState.judgeSubmissions, rows as JudgeSubmission[]); });
@@ -1431,9 +1450,13 @@ export function useAppStore() {
     notify();
   };
 
-  const applyAuthenticatedIdentity = (identity:{id:string;email:string;name:string;role:Role;organizationId:string;operatorId?:string;competitionId?:string;mfaEnabled?:boolean;identityAssurance?:User['identityAssurance']}) => {
+  const applyAuthenticatedIdentity = (identity:{id:string;email:string;name:string;role:Role;organizationId:string;operatorId?:string;competitionId?:string;mfaEnabled?:boolean;identityAssurance?:User['identityAssurance']}, cloudCompetitions?:Competition[]) => {
+    /* مسابقات الجهة المكتشفة من السحابة تدخل هنا، في المخزن نفسه. كان المستدعي يعدّل مصفوفةً أخذها
+       من نسخةٍ قديمة للمخزن (الإغلاق الذي التقطه مؤثّر المصادقة في أول رسم)، فإذا استُبدلت
+       `globalState.competitions` بعدها ضاعت المسابقات المكتشفة بصمت ورأى مدير الجهة «مسابقة قيد الإعداد». */
+    if(cloudCompetitions?.length)globalState.competitions=[...cloudCompetitions,...globalState.competitions.filter(c=>c.organizationId!==identity.organizationId&&!cloudCompetitions.some(x=>x.id===c.id))];
     globalState.currentUser={id:identity.id,email:identity.email,name:identity.name,nameArabic:identity.name,role:identity.role,organizationId:identity.organizationId,operatorId:identity.operatorId,competitionId:identity.competitionId,mfaEnabled:!!identity.mfaEnabled,accountStatus:'active',lastAuthenticatedAt:new Date().toISOString(),identityAssurance:identity.identityAssurance||'firebase'};
-    if(!identity.operatorId&&identity.role!=='super_admin'){
+    if(!isOperatorStaffRole(identity.role)&&identity.role!=='super_admin'){
       const existingOrg=globalState.organizations.find(o=>o.id===identity.organizationId);
       /* لا يُزرع اسم الشخص ولا معرّف النظام كعلامة للجهة: العلامة تأتي من سجل الجهة على الخادم،
          ويبقى الاسم فارغًا حتى تُحمّل، فلا يتسرّب اسم مسؤول إلى واجهة عامة أو شهادة. */
@@ -2000,7 +2023,7 @@ export function useAppStore() {
         }
         refreshQueueNotifications();
       }
-      const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||category?.nameArabic||'', categoryNameArabic:category?.nameArabic||category?.name||'', finalScore, criterionScores:aggregatedCriterionScores, penaltyCount:sessionPenaltyCount, rank:0, status:'calculated' };
+      const result: ResultRecord = { id:existing>=0?globalState.results[existing].id:newId('res'), competitionId:globalState.competition.id, participantId:participant.id, participantCode:participant.code, participantName:participant.fullName, participantNameArabic:participant.fullNameArabic, country:participant.country, categoryId:participant.categoryId, categoryName:category?.name||category?.nameArabic||'', categoryNameArabic:category?.nameArabic||category?.name||'', finalScore, criterionScores:aggregatedCriterionScores, specialtyScores:specialtyScoresOf(aggregatedCriterionScores,sessionRuleSet.criteria||[]), penaltyCount:sessionPenaltyCount, rank:0, status:'calculated' };
       if(existing>=0) globalState.results[existing]=result; else globalState.results=[...globalState.results,result];
       // المتعادلون يتشاركون الرتبة (١، ١، ٣) ولا تُفضّ بترتيب المصفوفة — انظر `rankResults`.
       const outcome=rankResults(globalState.results.filter(r=>r.competitionId===globalState.competition.id&&r.categoryId===participant.categoryId),sessionRuleSet.tieBreakRules as readonly string[]);
@@ -2549,14 +2572,33 @@ export function useAppStore() {
    * ويشترط اعتراضًا مُسجَّلًا يُحال إليه، ويكتب `SCORE_CORRECTED` باسمه. وامتناعُه يترك
    * الاعتراضَ بلا تعديلِ درجة بدل أن يُعدَّل رقمٌ بلا سند.
    */
+  /** مدى التصحيح الممكن لاعتراضٍ ما: الدرجة الحالية والعظمى لفئته، أو null إن لم تُحسب له درجة بعد. */
+  const appealScoreRange = (appealId: string): { current: number; max: number; sealed: boolean } | null => {
+    const appeal = globalState.appeals.find(a => a.id === appealId && a.competitionId === globalState.competition.id);
+    const result = appeal && globalState.results.find(r => r.competitionId === globalState.competition.id && r.participantId === appeal.participantId);
+    if (!result) return null;
+    const max = (activeRuleSetForCategory(result.categoryId).criteria || []).reduce((sum, c) => sum + (Number(c.maxScore) || 0), 0) || 100;
+    return { current: result.finalScore, max, sealed: ['sealed', 'published'].includes(result.status) };
+  };
+
   const resolveAppeal = async (appealId: string, accepted: boolean, notes: string, scoreAdjustmentDelta = 0) => {
     const idx = globalState.appeals.findIndex(a => a.id === appealId && a.competitionId === globalState.competition.id);
     if (idx < 0) return false;
     const appeal=globalState.appeals[idx];
     const policy=getCompetitionPolicy(globalState.competition);
     let appliedDelta = accepted && policy.appeals.allowScoreChange ? Number(scoreAdjustmentDelta||0) : 0;
+    if(!Number.isFinite(appliedDelta))appliedDelta=0;
+    /* مدى الدرجة: من الفئة نفسها. تصحيحٌ يُخرج الدرجة عن (٠…العظمى) لا يُطبَّق ولا يُرسل إلى الخادم أصلًا. */
+    const targetResult=globalState.results.find(r=>r.competitionId===globalState.competition.id&&r.participantId===appeal.participantId);
+    const targetMax=targetResult?((activeRuleSetForCategory(targetResult.categoryId).criteria||[]).reduce((sum,c)=>sum+(Number(c.maxScore)||0),0)||100):100;
+    if(appliedDelta!==0&&targetResult&&(targetResult.finalScore+appliedDelta<0||targetResult.finalScore+appliedDelta>targetMax+1e-9)){
+      auditTrustAction('SCORE_CORRECTION_OUT_OF_RANGE','Result',appeal.participantId,
+        `رُفض تصحيح الدرجة (${appliedDelta>0?'+':''}${appliedDelta}) لأنه يُخرجها عن المدى 0–${targetMax}؛ حُسم الاعتراض بلا تعديل`,
+        `Score correction (${appliedDelta>0?'+':''}${appliedDelta}) refused: it would leave the 0–${targetMax} range; the appeal was resolved without a score change`);
+      appliedDelta=0;
+    }
     if(appliedDelta!==0){
-      const authority=await attestScoreCorrectionOnServer({competitionId:globalState.competition.id,participantId:appeal.participantId,appealId,delta:appliedDelta,policyAllowsScoreChange:policy.appeals.allowScoreChange,reason:notes});
+      const authority=await attestScoreCorrectionOnServer({competitionId:globalState.competition.id,participantId:appeal.participantId,appealId,delta:appliedDelta,policyAllowsScoreChange:policy.appeals.allowScoreChange,reason:notes,currentScore:targetResult?.finalScore,maxScore:targetMax});
       if('failure' in authority){
         auditTrustAction('SCORE_CORRECTION_AUTHORITY_UNAVAILABLE','Result',appeal.participantId,
           `تعذّر اعتمادُ تصحيح الدرجة على الخادم (${authority.code||authority.failure})؛ حُسم الاعتراض بلا تعديل`,
@@ -2611,7 +2653,7 @@ export function useAppStore() {
         tieDecisions: globalState.tieDecisions.filter(d => d.competitionId === competitionId && d.categoryId === category.id),
         candidates: members.map(r => ({
           participantId: r.participantId, participantCode: r.participantCode, finalScore: r.finalScore, maxScore,
-          criterionScores: r.criterionScores, penaltyCount: r.penaltyCount,
+          criterionScores: r.criterionScores, specialtyScores: r.specialtyScores, penaltyCount: r.penaltyCount,
         })),
       });
       for (const entry of outcome.contested) {
@@ -4984,7 +5026,7 @@ globalState.competition=next;globalState.competitions=globalState.competitions.m
     publishCompetition,
     setScientificReviewersRequired,
     startSessionForParticipant, sessionStartFailureCode, ensureQuestionRevealGate, verifyParticipantPresenceForQuestion, approveQuestionReveal, markOpeningAudioPlayed, finishCurrentQuestionSegment,
-    queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
+    appealScoreRange, queueNotification, retryNotification, configureIntegration, addWebhook, registerDevice, updateDeviceStatus, updateDevice, revokeDevice, upsertTravelRecord, recordConsent, createImportJob, importParticipantsCsv, startShadowRun, completeShadowRun, addParticipantPassportEntry, addJudgePassportEntry, completeJudgeCalibration, createTrainingRun, completeTrainingRun, createBackup, restoreBackup, scheduleRetention, requestSupportSession, approveSupportSession, endSupportSession, runRemoteCheck, cloneCompetition, declareJudgeConflict, resolveJudgeConflict, setRegistrationPayment, generateSchedule, overrideScheduleSlot, publishSchedule, linkQualifierTo, computeQualifications, setQualificationStatus, exportCompetitionSnapshot, restoreCompetitionSnapshot,
     optimizeArrivalSlots, getFairnessReceipt, getIntegrityAnalytics,
     runSimulation,
     runTimeMachine, runInvariantChecks, recordInvariantBlock,
