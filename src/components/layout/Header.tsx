@@ -18,7 +18,7 @@ export const Header: React.FC = () => {
  const superAdmin=currentUser.role==='super_admin';
  // في البيئة التجريبية لا توجد جلسة هوية تُنهى؛ الخروج يمحو الصندوق التجريبي وحده.
  const logout=()=>{ if(IS_DEMO_SESSION){exitDemoSession();return;} signOutAndReload() };
- return <header className="sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[var(--canvas)]/92 backdrop-blur-md">
+ return <header className="mz-el-header sticky top-0 z-30 border-b border-[#DFDED7]/90 bg-[var(--canvas)]/92 backdrop-blur-md">
   <div className="max-w-[1500px] mx-auto h-16 px-4 max-[340px]:px-2 sm:px-6 flex items-center justify-between gap-3 max-[340px]:gap-2">
     <div className="flex items-center gap-3 min-w-0 overflow-hidden">
       <MizanLogo language={language} compact className="mizan-header-logo"/>
