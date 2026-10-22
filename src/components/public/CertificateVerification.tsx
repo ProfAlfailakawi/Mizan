@@ -73,7 +73,7 @@ export const CertificateVerification: React.FC = () => {
     UNREACHABLE:{ar:'تعذّر التحقق الآن',en:'VERIFICATION UNAVAILABLE',variant:'amber'}
   };
 
-  return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
+  return <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
     <section className="mizan-surface p-6 sm:p-8 text-center">
       <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
       <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
@@ -153,7 +153,7 @@ export const CertificateVerification: React.FC = () => {
           </div>
         </>:<div className="mt-6"><p className="text-sm font-bold">{verification==='REVOKED'?(ar?'هذه الشهادة أُلغيت من الجهة المصدرة.':'This certificate has been revoked by its issuer.'):(ar?'فشل التحقق من الدليل المشفّر المرتبط بالشهادة.':'The cryptographic evidence linked to this certificate did not verify.')}</p><p className="text-xs text-[color:var(--muted)] mt-2">{ar?'لا تُعرض أي تفاصيل إضافية حفاظًا على الخصوصية.':'No additional private details are exposed.'}</p></div>}
     </VerdictShell>}
-  </div>;
+  </main>;
 };
 
 /* حالتا «تعذّر التحقق» و«غير موجودة» كانتا قالبين متطابقين حرفًا بحرف إلا في الجملة. */

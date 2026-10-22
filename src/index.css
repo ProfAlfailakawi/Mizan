@@ -76,8 +76,10 @@
   button, input, select { min-height: 44px; }
   button:disabled { cursor: not-allowed; }
   input, textarea, select { cursor: text; }
-  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-    outline: 3px solid rgba(47,101,85,.22);
+  /* حلقة التركيز: لونٌ صلب (≈٦:١ على القماش) لا شفافية ٢٢٪ — كانت أقلّ من ٣:١ المطلوبة لمؤشّر لوحة المفاتيح. */
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible,
+  summary:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible, [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 3px solid var(--emerald-2);
     outline-offset: 2px;
   }
   ::selection { background: #dce7e1; }
@@ -203,7 +205,7 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 @media (max-width:639px), (max-height:500px){
   label:has(> input[type="checkbox"]){ min-width:40px; min-height:40px }
 }
-.mizan-field-label { display:block; color:#686f6b; font-size:12px; font-weight:800; margin:0 0 6px; }
+.mizan-field-label { display:block; color:#5f6661; font-size:12px; font-weight:800; margin:0 0 6px; }
 /* نظام التبويب الموحد: شريط حبات واحد لكل أقسام المنصة، بحركة هادئة تحترم تفضيل تقليل الحركة. */
 /* الحبّة النشطة كانت تُسقط ظلًّا خارج إطار الشريط فتبدو مقصوصةً عند حافته؛ الشريط الآن
    يحتوي ظلَّها (overflow) والظل صار داخليًّا لا يتجاوز حدود الحبّة نفسها. */

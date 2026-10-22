@@ -302,13 +302,13 @@ const boardParams = (h: string): BoardParams => {
  * الفرق بين ما يرى وما يرى الناس، في موضع الوهم نفسه لا في شاشةٍ أخرى.
  */
 const CompetitionNotFound: React.FC = () => (
-  <div className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5">
+  <main className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5">
     <div className="mizan-surface p-8 max-w-md text-center">
       <div className="mizan-kicker">رابط المسابقة</div>
       <h1 className="text-xl font-black mt-2">هذه المسابقة غير متاحة</h1>
       <p className="text-xs text-[color:var(--muted)] mt-3 leading-6">الرابط يشير إلى مسابقة غير موجودة أو أُغلق تسجيلها. تأكد من الرابط الذي شاركته جهة المسابقة.</p>
     </div>
-  </div>
+  </main>
 );
 
 const TenantSuspendedScreen:React.FC<{language:string}>=({language})=>{const ar=language==='ar';return <div className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5" dir={ar?'rtl':'ltr'}><div className="mizan-surface max-w-lg p-8 sm:p-10 text-center"><div className="flex justify-center"><MizanLogo language={ar?'ar':'en'} compact/></div><div className="mizan-kicker mt-6">{ar?'حالة الجهة':'ORGANIZATION STATUS'}</div><h1 className="text-2xl font-black mt-2">{ar?'تم إيقاف وصول هذه الجهة مؤقتًا':'Organization access is temporarily suspended'}</h1><p className="text-sm text-[color:var(--muted)] leading-7 mt-4">{ar?'بيانات الجهة ومسابقاتها محفوظة بالكامل، لكن الوصول التشغيلي متوقف حاليًا. يرجى التواصل مع إدارة المنصة.':'All organization data remains preserved; operational access is temporarily unavailable. Please contact the platform administrator.'}</p></div></div>};

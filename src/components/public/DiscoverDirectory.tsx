@@ -66,14 +66,14 @@ export const DiscoverDirectory: React.FC = () => {
     <div className="min-h-screen" style={{ background: 'var(--canvas)' }} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
     {/* Same frame idea as #verify: the logo and a way out. Under a white-label directory the
         MIZAN mark appears only if the operator chose «powered by», as the header note says. */}
-    <div className="border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
+    <header className="border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
         {(!brand || brand.showPoweredByMizan)
           ? <a href="#" className="inline-flex min-h-11 items-center rounded-xl" aria-label={ct(locale, 'discoverBack')}><MizanLogo language={locale} compact /></a>
           : <span />}
         <a href="#" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-bold text-[color:var(--emerald)] hover:underline"><BackArrow aria-hidden="true" className="h-4 w-4" />{ct(locale, 'discoverBack')}</a>
       </div>
-    </div>
+    </header>
     <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
       <header className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-4 px-5 py-6 sm:px-8 sm:py-8">
         {brand?.logoUrl && <img src={brand.logoUrl} alt="" className="h-12 w-auto" />}

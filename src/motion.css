@@ -58,11 +58,11 @@
   }
 
   /* ── انتقال محتوى التبويب (أقسام الإدارة الهادئة؛ لا «النتائج» ولا «التحكيم») ── */
-  html:not([data-mizan-motion="reduced"]) main[data-mz-view]:not([data-mz-view="results"]):not([data-mz-view="judging"]) [role="tablist"] ~ :is(section, div):not(:has(.font-quran)):not(table) {
+  html:not([data-mizan-motion="reduced"]) [data-mz-view]:not([data-mz-view="results"]):not([data-mz-view="judging"]) [role="tablist"] ~ :is(section, div):not(:has(.font-quran)):not(table) {
     animation: mzMFade var(--mz-d3) var(--mz-ease) backwards;
   }
   /* تبديل القسم نفسه (نظرة / هوية / نطاق / مشاركون / تشغيل / متقدّم). */
-  html:not([data-mizan-motion="reduced"]) main[data-mz-view]:is([data-mz-view="overview"], [data-mz-view="design"], [data-mz-view="engine"], [data-mz-view="participants"], [data-mz-view="operations"], [data-mz-view="enterprise"]) > :is(section, div):not(.mizan-surface):not(:has(.font-quran)) {
+  html:not([data-mizan-motion="reduced"]) [data-mz-view]:is([data-mz-view="overview"], [data-mz-view="design"], [data-mz-view="engine"], [data-mz-view="participants"], [data-mz-view="operations"], [data-mz-view="enterprise"]) > :is(section, div):not(.mizan-surface):not(:has(.font-quran)) {
     animation: mzMFade var(--mz-d3) var(--mz-ease) backwards;
   }
 

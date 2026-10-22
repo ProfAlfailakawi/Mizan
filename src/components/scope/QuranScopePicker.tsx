@@ -443,12 +443,12 @@ export const ScopeSummary: React.FC<{ scope: QuranScope; arabic: boolean; compac
       <p className="text-sm font-black text-[color:var(--emerald)]">{describeScope(scope, arabic)}</p>
       <dl className="mt-3 grid grid-cols-2 gap-3">
         {tiles.map(([label, value, Icon]) => (
-          <div key={label} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--emerald)] text-white"><Icon className="h-6 w-6" /></span>
-            <div className="min-w-0">
-              <dd className={`${compact ? 'text-2xl' : 'text-2xl sm:text-3xl'} font-black leading-none tabular-nums text-[color:var(--emerald)]`}>{value}</dd>
-              <dt className="mt-1 text-xs font-bold text-[#5b6460]">{label}</dt>
-            </div>
+          <div key={label} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-2xl bg-white px-3 py-3 shadow-sm">
+            <dt className="contents">
+              <span aria-hidden="true" className="col-start-1 row-span-2 row-start-1 grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--emerald)] text-white"><Icon className="h-6 w-6" /></span>
+              <span className="col-start-2 row-start-2 mt-1 min-w-0 self-start text-xs font-bold text-[#5b6460]">{label}</span>
+            </dt>
+            <dd className={`col-start-2 row-start-1 min-w-0 self-end ${compact ? 'text-2xl' : 'text-2xl sm:text-3xl'} font-black leading-none tabular-nums text-[color:var(--emerald)]`}>{value}</dd>
           </div>
         ))}
       </dl>

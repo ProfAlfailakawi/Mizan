@@ -96,13 +96,16 @@ export const QuestionEngineWorkspace: React.FC = () => {
       ) : (
         <>
           <CategoryStrip store={store} ar={ar} selectedId={category?.id || ''} onSelect={setSelectedId} policy={policy} />
+          {/* زرّ «متقدم» ليس تبويبًا: يبقى خارج tablist كي لا يحمل القائمةَ ما ليس role="tab". */}
+          <div className="flex flex-wrap items-center gap-2">
           <div className="mizan-tabs" role="tablist">
             {tabs.map(([id, Icon, label]) => (
               <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`mizan-tab ${tab === id ? 'is-active' : ''}`}>
                 <Icon className="h-4 w-4" />{label}
               </button>
             ))}
-            <button type="button" aria-expanded={showAdvanced} onClick={() => setAdvancedOpen(v => !v)} className={`mizan-tab ${advancedActive ? 'is-active' : ''}`}>
+          </div>
+            <button type="button" aria-expanded={showAdvanced} onClick={() => setAdvancedOpen(v => !v)} className={`mizan-tab rounded-[14px] border border-[#e2e0d8] ${advancedActive ? 'is-active' : ''}`}>
               <Settings2 className="h-4 w-4" />{ar ? 'متقدم' : 'Advanced'}
               <ChevronLeft className={`h-4 w-4 transition ${showAdvanced ? '-rotate-90' : ''}`} />
             </button>
