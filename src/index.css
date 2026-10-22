@@ -112,10 +112,15 @@
 
 .bg-pattern-light { background: var(--canvas); }
 
-::-webkit-scrollbar { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbc9c1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #aaa89f; }
+/* شريط التمرير الرفيع للمؤشّر الدقيق فقط: على شاشة اللمس يحجز شريطُ الوثيقة المخصَّص ٨px من عرض
+   الإطار فيصير عرضُ التخطيط ٣٢٨px على شاشةٍ عرضها ٣٢٠px (يُرى في صفحاتٍ قصيرة مثل #register و#board)،
+   والهاتف يرسم شريطه الشفاف أصلًا. */
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbc9c1; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #aaa89f; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -212,6 +217,14 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 /* شريط تبويب فرعي داخل قسم: أخفّ وزنًا كي لا ينافس الشريط الرئيسي فوقه. */
 .mizan-tabs-sub { background:transparent; border-color:#e7e5de; }
 .mizan-tabs-sub .mizan-tab.is-active { background:#E7EEE9; color:#214C40; box-shadow:inset 0 0 0 1px rgba(33,76,64,.18); }
+/* على الأجهزة اللمسية العريضة (٧٦٨ و١٠٢٤) كانت التبويبات الصغيرة ٤٠px؛ تُرفع إلى ٤٤px كما على الهاتف (وكذلك زرّ إغلاق النافذة بعد قاعدته أدناه). */
+@media (min-width:640px) and (pointer:coarse){
+  .mizan-tab,.mizan-tabs-sm .mizan-tab{ min-height:44px }
+}
+/* شريط تبويبات أسماؤه طويلة (أسماء الفئات): يملأ عرض حاويته وتتساوى خاناته ويلتفّ النصّ داخل الخانة،
+   فلا يُقصّ تبويبٌ أطول من الشاشة على الهاتف ولا يبقى تبويبٌ يتيم في سطرٍ أخير على الحاسوب. */
+.mizan-tabs.mizan-tabs-fill { width:100%; }
+.mizan-tabs.mizan-tabs-fill > .mizan-tab { flex:1 1 9rem; min-width:0; white-space:normal; text-align:center; line-height:1.3; padding-block:.4rem; overflow-wrap:anywhere; }
 @media (max-width:639px){
   .mizan-tabs-scroll { flex-wrap:nowrap; width:100%; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding-inline-end:28px; }
   .mizan-tabs-scroll::-webkit-scrollbar { display:none; }
@@ -1221,6 +1234,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
 .mizan-dialog-close{ width:40px; height:40px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
   color:var(--muted); transition:background .15s ease, color .15s ease; }
 .mizan-dialog-close:hover{ background:#eceae3; color:var(--ink); }
+@media (min-width:640px) and (pointer:coarse){ .mizan-dialog-close{ width:44px; height:44px } }
 /* min-height:0 is what actually lets a flex child scroll instead of forcing the parent taller. */
 .mizan-dialog-body{ padding:1.4rem; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
 
