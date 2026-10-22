@@ -225,6 +225,18 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
    فلا يُقصّ تبويبٌ أطول من الشاشة على الهاتف ولا يبقى تبويبٌ يتيم في سطرٍ أخير على الحاسوب. */
 .mizan-tabs.mizan-tabs-fill { width:100%; }
 .mizan-tabs.mizan-tabs-fill > .mizan-tab { flex:1 1 9rem; min-width:0; white-space:normal; text-align:center; line-height:1.3; padding-block:.4rem; overflow-wrap:anywhere; }
+/* شريط تبويبات التجارة (ثمانية تبويبات): كان يلتفّ بصفوفٍ غير متوازنة (٥+٣ عند ٧٦٨، ٧+١ عند ١٠٢٤
+   وتبويبٌ يتيم)، ومن ١٢٨٠px يتّسع كلّه في صفٍّ واحد. دون ١٢٨٠px شبكةٌ بأعمدةٍ متساوية يحدّدها عددُ
+   الأعمدة لا عرضُ المحتوى: ٤+٤ من ٦٤٠px وعمودان (٢×٤) تحتها، ويلتفّ العنوانُ الطويل داخل خانته.
+   من ١٢٨٠px لا تُطبَّق القاعدةُ فيبقى السلوك الحالي. عرضٌ فقط، ولا يمسّ بقية الأشرطة. */
+@media (max-width:1279px){
+  .mizan-tabs.mizan-tabs-balance { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+  .mizan-tabs.mizan-tabs-balance > .mizan-tab { min-width:0; white-space:normal; text-align:center; line-height:1.3; padding:.4rem .35rem; overflow-wrap:break-word; }
+}
+@media (min-width:640px) and (max-width:1279px){
+  .mizan-tabs.mizan-tabs-balance { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .mizan-tabs.mizan-tabs-balance > .mizan-tab { padding-inline:.6rem; }
+}
 @media (max-width:639px){
   .mizan-tabs-scroll { flex-wrap:nowrap; width:100%; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding-inline-end:28px; }
   .mizan-tabs-scroll::-webkit-scrollbar { display:none; }
