@@ -110,7 +110,7 @@ export const CommitteeIntegrityNote: React.FC<{ ar: boolean }> = ({ ar }) => {
                     ? `فارق متوسط الخصم بين الوفود داخل هذه اللجنة ${c.regionalPenaltyGap} درجة.`
                     : `Mean deduction differs by ${c.regionalPenaltyGap} points across delegations in this committee.`}</div>
                 )}
-                <div className="text-[11px] text-[#8a7857]">{ar ? `عيّنة ${c.sampleCount} تسليمًا` : `${c.sampleCount} submissions sampled`}</div>
+                <div className="text-[11px] text-[#6d5d40]">{ar ? `عيّنة ${c.sampleCount} تسليمًا` : `${c.sampleCount} submissions sampled`}</div>
               </div>
             </div>
           ))}
