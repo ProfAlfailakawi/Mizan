@@ -200,7 +200,7 @@ const NumberDial: React.FC<{ label: string; value: number; min: number; max: num
     <span className="block text-[11px] font-black tracking-[.1em] text-[color:var(--muted)]">{label}</span>
     <div className="mizan-control mt-1 flex items-center gap-2">
       <button type="button" className="mizan-step-btn" aria-label="-" onClick={() => onChange(Math.max(min, value - step))}>−</button>
-      <input type="number" inputMode="numeric" min={min} max={max} value={value}
+      <input type="number" inputMode="numeric" min={min} max={max} value={value} aria-label={label}
         onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
         className="min-w-0 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
       {suffix && <span className="text-[11px] font-bold text-[color:var(--muted)]">{suffix}</span>}
