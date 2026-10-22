@@ -17,7 +17,7 @@ export const EmptyState: React.FC<{
   action?: React.ReactNode;
   className?: string;
 }> = ({ icon: Icon, title, hint, action, className = '' }) => (
-  <div className={`px-6 py-12 text-center ${className}`}>
+  <div data-empty-state="" className={`px-6 py-12 text-center ${className}`}>
     <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#eef1ec] text-[#4b5a53]">
       <Icon className="h-5 w-5" />
     </span>
