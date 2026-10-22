@@ -141,8 +141,8 @@ const CategoryStrip: React.FC<{ store: Store; ar: boolean; selectedId: string; o
       return (
         <button key={category.id} type="button" onClick={() => onSelect(category.id)} aria-pressed={selectedId === category.id}
           className={`min-w-[200px] max-w-[85%] shrink-0 lg:min-w-0 lg:max-w-none rounded-2xl border p-3.5 text-start transition ${selectedId === category.id ? 'border-[color:var(--emerald)] bg-[var(--emerald-soft)]' : 'border-[#dcdad2] bg-white hover:bg-[var(--canvas)]'}`}>
-          <div className="flex items-start justify-between gap-2">
-            <span className="min-w-0 truncate text-sm font-black text-[#24302b]">{bilingualName(category, ar)}</span>
+          <div className="flex flex-col items-start gap-1.5">
+            <span title={bilingualName(category, ar)} className="min-w-0 max-w-full text-sm font-black leading-5 text-[#24302b] line-clamp-3 [overflow-wrap:anywhere]">{bilingualName(category, ar)}</span>
             {needsScope
               ? <Badge variant="amber">{ar ? 'بلا نطاق' : 'No range'}</Badge>
               : <Badge>{ar ? 'ثابت للفئة' : 'Category range'}</Badge>}
@@ -634,7 +634,7 @@ const ModeCard: React.FC<{ active: boolean; ar: boolean; title: string; body: st
 );
 
 const NumberBox: React.FC<{ ar: boolean; label: string; value: number; min: number; max: number; step?: number; hint?: string; compact?: boolean; onChange: (value: number) => void }> = ({ label, value, min, max, step = 1, hint, compact, onChange }) => (
-  <label className={`block min-w-0 ${compact ? 'w-28' : ''}`}>
+  <label className={`block min-w-0 ${compact ? 'w-36' : ''}`}>
     <span className="block text-sm font-black text-[#3f4642]">{label}</span>
     <div className="mizan-control mt-1 flex items-center">
       <button type="button" className="mizan-step-btn" aria-label="-" onClick={() => onChange(Math.max(min, value - step))}>−</button>
