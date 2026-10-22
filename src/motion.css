@@ -1,0 +1,115 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   الحركة الهادئة — طبقة عرض فقط، تُحمَّل أخيرًا بعد elevation.css
+
+   رموزٌ واحدة (منحنى + ثلاث مدد) ثم قواعد قليلة على «غلاف» الواجهة فقط:
+   ترقيم بطاقات الأرقام، وانتقال محتوى التبويب، ورفع البطاقة عند المرور، وضغط الزر،
+   ومؤشّر التنقّل. لا شيء هنا يتحرك إلا transform / opacity، وكل حركة مرّة واحدة،
+   ونهايتها هي التصميم الساكن نفسه (الإطار الأخير غير مكتوب فيعود العنصر إلى قيمته).
+
+   ممنوع بالتصميم: نصّ القرآن، الدرجات، نتائج القرعة، المؤقّتات، لوحات التحكيم
+   (أدوار judge / head_judge / participant / guardian / broadcast / ops / exception لا تتحرك
+   فيها البطاقات)، وكذا أي عنصر يحوي .font-quran. وفي «النتائج» لا حركة محتوى.
+   كل شيء داخل prefers-reduced-motion: no-preference، ويُطفأ بمفتاح التطبيق
+   html[data-mizan-motion="reduced"]. وبدون الشيفرة/الأنماط يبقى المحتوى ظاهرًا.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --mz-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --mz-d1: 120ms;
+  --mz-d2: 180ms;
+  --mz-d3: 260ms;
+  --mz-step: 40ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes mzMRise { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes mzMFade { from { opacity: 0; transform: translateY(6px); } }
+  @keyframes mzMScrim { from { opacity: 0; } }
+
+  /* ── الأدوار الإدارية الهادئة فقط ───────────────────────────────────── */
+  html:not([data-mizan-motion="reduced"]) main.mizan-shell-main:is(
+      [data-mz-role="comp_admin"], [data-mz-role="org_admin"], [data-mz-role="branch_admin"],
+      [data-mz-role="super_admin"], [data-mz-role="operator_owner"], [data-mz-role="operator_admin"],
+      [data-mz-role="storage_admin"], [data-mz-role="billing_admin"], [data-mz-role="support_agent"],
+      [data-mz-role="delegation_manager"], [data-mz-role="auditor"]) {
+
+    /* بطاقات الأرقام: صعود متدرّج مرّة واحدة (حتى ثمانٍ، خطوة ٤٠ms). */
+    & .mz-bp-metric:not(:has(.font-quran)) {
+      animation: mzMRise var(--mz-d3) var(--mz-ease) calc(var(--mz-i, 0) * var(--mz-step)) backwards;
+    }
+    & .mz-bp-metric:nth-child(2) { --mz-i: 1; }
+    & .mz-bp-metric:nth-child(3) { --mz-i: 2; }
+    & .mz-bp-metric:nth-child(4) { --mz-i: 3; }
+    & .mz-bp-metric:nth-child(5) { --mz-i: 4; }
+    & .mz-bp-metric:nth-child(6) { --mz-i: 5; }
+    & .mz-bp-metric:nth-child(7) { --mz-i: 6; }
+    & .mz-bp-metric:nth-child(n+8) { --mz-i: 7; }
+
+    /* رفع البطاقة عند المرور — للبطاقات القابلة للضغط فقط. */
+    & :is(a, button).mizan-surface:not(:has(.font-quran)),
+    & .mz-bp-metric {
+      transition: transform var(--mz-d2) var(--mz-ease), box-shadow var(--mz-d2) var(--mz-ease);
+    }
+    & :is(a, button).mizan-surface:not(:has(.font-quran)):hover,
+    & .mz-bp-metric:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px -16px rgba(14, 44, 47, 0.35);
+    }
+  }
+
+  /* ── انتقال محتوى التبويب (أقسام الإدارة الهادئة؛ لا «النتائج» ولا «التحكيم») ── */
+  html:not([data-mizan-motion="reduced"]) main[data-mz-view]:not([data-mz-view="results"]):not([data-mz-view="judging"]) [role="tablist"] ~ :is(section, div):not(:has(.font-quran)):not(table) {
+    animation: mzMFade var(--mz-d3) var(--mz-ease) backwards;
+  }
+  /* تبديل القسم نفسه (نظرة / هوية / نطاق / مشاركون / تشغيل / متقدّم). */
+  html:not([data-mizan-motion="reduced"]) main[data-mz-view]:is([data-mz-view="overview"], [data-mz-view="design"], [data-mz-view="engine"], [data-mz-view="participants"], [data-mz-view="operations"], [data-mz-view="enterprise"]) > :is(section, div):not(.mizan-surface):not(:has(.font-quran)) {
+    animation: mzMFade var(--mz-d3) var(--mz-ease) backwards;
+  }
+
+  /* ── ضغط الزر (ليس في شاشات المحكّمين) ───────────────────────────────── */
+  html:not([data-mizan-motion="reduced"]) main.mizan-shell-main:not([data-mz-role="judge"]):not([data-mz-role="head_judge"]) .mizan-btn {
+    transition: transform var(--mz-d1) var(--mz-ease), box-shadow var(--mz-d2) var(--mz-ease), background-color var(--mz-d2) ease;
+  }
+  html:not([data-mizan-motion="reduced"]) main.mizan-shell-main:not([data-mz-role="judge"]):not([data-mz-role="head_judge"]) .mizan-btn:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  /* ── التنقّل: الأيقونة ترتفع قليلًا عند المرور، والضغط يخفّ (لا حركة على الحالة النشطة) ── */
+  html:not([data-mizan-motion="reduced"]) .mz-el-nav > svg { transition: transform var(--mz-d2) var(--mz-ease); }
+  html:not([data-mizan-motion="reduced"]) .mz-el-nav:hover:not(.is-active) > svg { transform: translateY(-1px) scale(1.06); }
+  html:not([data-mizan-motion="reduced"]) .mz-el-mnav button { transition: transform var(--mz-d1) var(--mz-ease), background-color var(--mz-d2) ease; }
+  html:not([data-mizan-motion="reduced"]) .mz-el-mnav button:active { transform: scale(0.97); }
+
+  /* ── التبويبات: ضغطٌ خفيف ─────────────────────────────────────────────── */
+  html:not([data-mizan-motion="reduced"]) .mizan-tab { transition: transform var(--mz-d1) var(--mz-ease), background-color var(--mz-d2) ease, color var(--mz-d2) ease; }
+  html:not([data-mizan-motion="reduced"]) .mizan-tab:active { transform: scale(0.98); }
+
+  /* ── الحوارات: الستار يتلاشى (الحوار نفسه يدخل بحركته القائمة) ───────── */
+  html:not([data-mizan-motion="reduced"]) .mizan-overlay-scrim { animation: mzMScrim var(--mz-d2) ease backwards; }
+  html:not([data-mizan-motion="reduced"]) [role="dialog"][aria-modal="true"].backdrop-blur-sm { animation: mzMScrim var(--mz-d2) ease backwards; }
+
+  /* ── الحالات الفارغة: ظهور هادئ ───────────────────────────────────────── */
+  html:not([data-mizan-motion="reduced"]) .mizan-shell-main:not([data-mz-role="judge"]):not([data-mz-role="head_judge"]) :is(.mizan-empty, [data-empty-state]) {
+    animation: mzMFade var(--mz-d3) var(--mz-ease) backwards;
+  }
+
+  /* ── تصفّح عام: بطاقات الدليل والمسابقة ───────────────────────────────── */
+  html:not([data-mizan-motion="reduced"]) :is(a, button).mizan-surface:not(:has(.font-quran)):not(main.mizan-shell-main *) {
+    transition: transform var(--mz-d2) var(--mz-ease), box-shadow var(--mz-d2) var(--mz-ease);
+  }
+  html:not([data-mizan-motion="reduced"]) :is(a, button).mizan-surface:not(:has(.font-quran)):not(main.mizan-shell-main *):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -16px rgba(14, 44, 47, 0.35);
+  }
+}
+
+/* حماية: مهما كان الشرط أعلاه، لا حركة داخل أي عنصر فيه نصّ قرآني. */
+.font-quran, .font-quran * { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mz-bp-metric, .mizan-tab, .mz-el-nav, .mz-el-mnav button,
+  .mizan-overlay-scrim, [role="dialog"][aria-modal="true"].backdrop-blur-sm, .mizan-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}
