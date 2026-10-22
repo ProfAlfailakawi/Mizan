@@ -141,7 +141,7 @@ async function startServer() {
     /* مصادقة Firebase تحمّل مساعدها من apis.google.com وتفتح إطارًا على نطاق المشروع،
        وتسجيل العامل الثاني يحمّل reCAPTCHA من google/gstatic. وسياسة تسمح بـ'self' وحدها
        تمنعها كلها بصمت: يرى المستخدم رفضًا بلا سبب، ويرى المطوّر رفض CSP بلا ربط. */
-    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com https://orbitq8.web.app; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     next();
   });
   /* توقيع الـwebhook يُحسب على الجسم الخام كما وصل: أي إعادة ترميز تُبطل التحقق. */

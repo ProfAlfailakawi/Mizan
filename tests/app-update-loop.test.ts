@@ -43,3 +43,12 @@ test('the CSP allows the proxy-injected analytics script so it never errors at a
   const csp = server.slice(server.indexOf('Content-Security-Policy'));
   assert.match(csp, /static\.cloudflareinsights\.com/);
 });
+
+test('the CSP connect-src allows the ORBIT sensor origin and the sensor is self-hosted', () => {
+  const server = fs.readFileSync('server.ts', 'utf8');
+  const csp = server.slice(server.indexOf('Content-Security-Policy'));
+  const connect = csp.match(/connect-src ([^;]*);/)![1];
+  assert.match(connect, /(^| )https:\/\/orbitq8\.web\.app( |$)/);
+  assert.doesNotMatch(csp.match(/script-src ([^;]*);/)![1], /orbitq8/);
+  assert.match(fs.readFileSync('index.html', 'utf8'), /<script src="\/orbit-sensor\.js" async><\/script>/);
+});
