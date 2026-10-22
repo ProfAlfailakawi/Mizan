@@ -55,6 +55,8 @@ export const DemoBar: React.FC = () => {
       className="mizan-demo-bar relative z-[220] min-h-14 border-t sm:fixed sm:inset-x-0 sm:bottom-0 sm:min-h-0 border-[#d8b86a] bg-[#faf3e2]/97 shadow-[0_-10px_30px_rgba(25,39,33,.10)] backdrop-blur"
       style={{ ['--demo-bar-h' as string]: DEMO_BAR_SHELL_PADDING }}
       dir={ar ? 'rtl' : 'ltr'}
+      role="region"
+      aria-label={ar ? 'شريط البيئة التجريبية' : 'Demo environment bar'}
     >
       <div className="mizan-demo-bar-row mx-auto flex min-h-14 sm:h-[var(--demo-bar-h)] max-w-7xl min-w-0 items-center gap-2 px-3 sm:px-5">
         <span

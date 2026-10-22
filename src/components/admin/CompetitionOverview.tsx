@@ -102,7 +102,7 @@ export const CompetitionOverview: React.FC = () => {
  const nav=[{id:'overview' as const,icon:LayoutDashboard,ar:'نظرة عامة',short:'نظرة',en:'Overview'},{id:'design' as const,icon:Settings2,ar:'هوية المسابقة',short:'الهوية',en:'Competition DNA'},{id:'engine' as const,icon:BookMarked,ar:'النطاق والأسئلة',short:'الأسئلة',en:'Scope & questions'},{id:'participants' as const,icon:UsersRound,ar:'المشاركون',en:'Participants'},{id:'operations' as const,icon:RadioTower,ar:'التشغيل',en:'Operations'},{id:'judging' as const,icon:Gavel,ar:'التحكيم',en:'Judging'},{id:'results' as const,icon:Award,ar:'النتائج',en:'Results'},{id:'enterprise' as const,icon:ShieldCheck,ar:'متقدّم',short:'متقدّم',en:'Advanced'}];
  return <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-5 sm:py-7"><div className="flex gap-6">
   <aside className="mz-el-aside hidden lg:block w-52 shrink-0 pt-1"><div className="sticky top-24 space-y-1"><div className="px-3 mb-4"><div className="text-xs font-black tracking-[.16em] text-[#666a67]">{competition.edition}</div><div className="mt-1 text-sm font-extrabold text-[#303733] line-clamp-2">{bilingualName(competition,ar)}</div></div>{nav.map(n=><NavButton key={n.id} active={view===n.id} onClick={()=>setView(n.id)} icon={n.icon} label={ar?n.ar:n.en}/>)}</div></aside>
-  <main className="min-w-0 flex-1" data-mz-view={view}>
+  <div className="min-w-0 flex-1" data-mz-view={view}>
    {orgManager&&<div className="mb-4"><Button size="sm" variant="ghost" onClick={leaveCompetition} icon={<ArrowRight className="w-4 h-4"/>}>{ar?'العودة إلى مسابقات الجهة':'Back to organization competitions'}</Button></div>}
    <nav aria-label={ar?'أقسام المسابقة':'Competition sections'} className="mz-el-mnav lg:hidden mb-4"><div className="grid grid-cols-4 gap-1.5">{nav.map(n=><button key={n.id} type="button" aria-current={view===n.id?'page':undefined} onClick={()=>setView(n.id)} className={`flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 transition ${view===n.id?'border-[color:var(--emerald)] bg-[var(--emerald)] text-white shadow-sm':'border-[#e2e0d8] bg-white text-[color:var(--emerald)]'}`}><n.icon className="h-5 w-5"/><span className="w-full truncate text-center text-[12px] font-black leading-tight">{ar?n.short??n.ar:n.en}</span></button>)}</div></nav>
    <SurfaceBoundary ar={ar} label={ar?'هذا القسم':'This section'}>
@@ -115,7 +115,7 @@ export const CompetitionOverview: React.FC = () => {
    {view==='results'&&<ResultsView store={store} ar={ar}/>} 
    {view==='enterprise'&&<EnterpriseWorkspace/>} 
    </SurfaceBoundary>
-  </main>
+  </div>
  </div></div>;
 };
 
@@ -329,7 +329,7 @@ const IdentitySection=({store,ar,focus}:{store:Store;ar:boolean;focus:Focus})=>{
    :code==='LOGO_TYPE_UNSUPPORTED'?(ar?'اختر ملف PNG أو JPG أو WebP أو SVG.':'Choose a PNG, JPG, WebP or SVG file.')
    :serverErrorLabel(code,ar))}finally{setLogoBusy(false)}};
  const removeLogo=async()=>{if(logoBusy)return;setLogoError('');setLogoBusy(true);try{if(isManagedBrandLogoUrl(c.logoUrl))await deleteCompetitionLogo(c.organizationId,c.id);patch({logoUrl:undefined})}catch{setLogoError(ar?'تعذّر حذف ملف الشعار من التخزين. أعد المحاولة بعد قليل.':'Could not remove the stored logo. Try again shortly.')}finally{setLogoBusy(false)}};
- return <div className="space-y-6"><div className="flex flex-wrap items-start justify-between gap-3"><SectionTitle title={ar?'هوية المسابقة':'Competition identity'} subtitle={ar?'اسم المسابقة وفئاتها.':'Competition details are above; categories are added and saved independently below.'}/><SaveState store={store} ar={ar}/></div>
+ return <div className="space-y-6"><div className="flex flex-wrap items-start justify-between gap-3"><SectionTitle top title={ar?'هوية المسابقة':'Competition identity'} subtitle={ar?'اسم المسابقة وفئاتها.':'Competition details are above; categories are added and saved independently below.'}/><SaveState store={store} ar={ar}/></div>
   {logoError&&<div role="alert" className="rounded-xl bg-[#f7ece9] px-4 py-3 text-xs font-bold text-[#874b43] mb-3">{logoError}</div>}
   {/* تسعة حقول هوية كانت تسبق إدارة الفئات في عمود واحد؛ التبويب يجعل كل مهمة شاشة. */}
   <div role="tablist" ref={identityTabAnchor} aria-label={ar?'أقسام الهوية':'Identity sections'} className="mizan-tabs">
@@ -940,7 +940,7 @@ const Chip=({active=false,amber=false,onClick,children}:{active?:boolean;amber?:
 const NavButton=({active,onClick,icon:Icon,label}:{active:boolean;onClick:()=>void;icon:React.ComponentType<{className?:string}>;label:string})=><button onClick={onClick} className={`mz-el-nav ${active?'is-active':''} w-full min-h-12 flex items-center gap-3 px-3.5 py-3 rounded-xl text-[15px] font-bold transition ${active?'bg-[var(--emerald)] text-white':'text-[#626a65] hover:bg-[#efede7] hover:text-[#303733]'}`}><Icon className="w-5 h-5 shrink-0"/><span>{label}</span></button>;
 const TinySelect=({value,onChange,children}:{value:string;onChange:(v:string)=>void;children:React.ReactNode})=><select value={value} onChange={e=>onChange(e.target.value)} className="mizan-input text-sm font-semibold text-[#303733]">{children}</select>;
 /* الوصف تحت العنوان صار خلف أيقونة (i): النص كما هو، ويُفتح بطلب المستخدم. */
-const SectionTitle=({title,subtitle}:{title:string;subtitle:string})=>{const ar=useAppStore().language==='ar';return <div><h2 className="flex items-center gap-2 text-xl font-black text-[#202622]">{title}{subtitle&&<Hint ar={ar} text={subtitle}/>}</h2></div>};
+const SectionTitle=({title,subtitle,top}:{title:string;subtitle:string;top?:boolean})=>{const ar=useAppStore().language==='ar';const H=top?'h1':'h2';return <div><H className="flex items-center gap-2 text-xl font-black text-[#202622]">{title}{subtitle&&<Hint ar={ar} text={subtitle}/>}</H></div>};
 const Control=({label,children,hint}:{label:string;children:React.ReactNode;hint?:React.ReactNode})=><label className="block"><span className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-black text-[#686f6a]">{label}{hint}</span>{children}</label>;
 const TextControl=({label,value,onChange,type='text',kind,min,error}:{label:string;value:string;onChange:(v:string)=>void;type?:string;kind?:'arabic'|'latin';min?:string;error?:string})=><Control label={label}><input type={type} min={min} aria-invalid={error?true:undefined} value={value} onChange={e=>onChange(e.target.value)} lang={kind==='arabic'?'ar':kind==='latin'?'en':undefined} data-mizan-kind={kind} dir={kind==='latin'||type==='email'?'ltr':undefined} className="mizan-input text-sm font-semibold"/>{error&&<span role="alert" data-no-localize="true" className="mt-1 block text-[11px] font-bold text-[color:var(--danger)]">{error}</span>}</Control>;
 /*

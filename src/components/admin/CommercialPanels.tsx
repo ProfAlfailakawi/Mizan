@@ -253,7 +253,7 @@ const OperatorCustomers: React.FC<{ data: any; reload: () => Promise<void>; onEr
       </div>
       <div className="mizan-panel hidden overflow-x-auto p-4 sm:block">
         <table className="w-full min-w-[720px] text-start text-xs [&_td]:px-2.5 [&_th]:px-2.5">
-          <thead><tr className="text-[color:var(--muted)]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col" /></tr></thead>
+          <thead><tr className="text-[color:var(--muted)]">{(['customers', 'currentPlan', 'term', 'participantsUsed', 'renewalDate', 'status', 'walletCost', 'customDomain'] as CommercialKey[]).map(k => <th key={k} scope="col" className="py-2">{ct(locale, k)}</th>)}<th scope="col"><span className="sr-only">{locale === 'ar' ? 'إجراءات' : 'Actions'}</span></th></tr></thead>
           <tbody>{data.customers.map((c: any) => <tr key={c.organizationId} className="border-t border-[#ebe9e2]">
             <td className="py-2 font-bold">{c.officialName}</td><td>{c.planName || '—'}</td>
             <td>{c.term ? `#${c.term.termIndex}` : '—'}</td><td dir="ltr"><div>{c.participantsUsed} / {c.participantAllowance}</div>{c.participantAllowance > 0 && <div className="mt-1 h-1.5 w-24 rounded-full bg-[#ebe9e2]"><div className="h-1.5 rounded-full bg-[#1f6f4a]" style={{ width: `${Math.min(100, Math.round((c.participantsUsed / c.participantAllowance) * 100))}%` }} /></div>}</td>

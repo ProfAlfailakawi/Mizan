@@ -294,6 +294,7 @@ export const MizanLogo: React.FC<LogoProps> = ({
   return (
     <span
       className={`mizan-logo ${stacked ? 'is-stacked' : ''} ${className}`}
+      role="img"
       aria-label={ar ? brandInfo.ar : brandInfo.en}
     >
       {showMark && (

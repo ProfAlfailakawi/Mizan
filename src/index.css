@@ -76,8 +76,10 @@
   button, input, select { min-height: 44px; }
   button:disabled { cursor: not-allowed; }
   input, textarea, select { cursor: text; }
-  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-    outline: 3px solid rgba(47,101,85,.22);
+  /* حلقة التركيز: لونٌ صلب (≈٦:١ على القماش) لا شفافية ٢٢٪ — كانت أقلّ من ٣:١ المطلوبة لمؤشّر لوحة المفاتيح. */
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible,
+  summary:focus-visible, [role="button"]:focus-visible, [role="tab"]:focus-visible, [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 3px solid var(--emerald-2);
     outline-offset: 2px;
   }
   ::selection { background: #dce7e1; }
