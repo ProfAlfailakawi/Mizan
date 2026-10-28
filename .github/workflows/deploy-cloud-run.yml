@@ -1,16 +1,14 @@
 name: نشر ميزان إلى Cloud Run
 
-# النشر مملوك للمستودع نفسه، لكنه لا يعمل إلا بعد نجاح CI على push إلى main.
-# لا يوجد workflow_dispatch متجاوز للحارس، ولا checkout لـSHA مأخوذ من workflow_run.
+# النشر يدويٌّ فقط (زر Run workflow) — لا يُبنى ميزان مع كل دفعة، فكلُّ بناءٍ مدفوع.
+# والحارسُ باقٍ كما هو: لا نشر إلا لـmain، ولا لـcommit لم يجتز CI بنجاح.
 on:
-  workflow_run:
-    workflows:
-      - فحص ميزان — لا نشر فوق فحص أحمر
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+  actions: read
 
 concurrency:
   group: mizan-production-deploy
@@ -25,20 +23,15 @@ env:
 
 jobs:
   deploy:
-    # workflow_run يستطيع أن يكون ذا صلاحيات مرتفعة، لذلك نسمح فقط بنتيجة CI ناجحة
-    # ناتجة من push إلى main. PRs والفروع الجانبية لا تدخل هذا المسار.
-    if: >-
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
+    # main وحده؛ الفروع الجانبية لا تدخل هذا المسار.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      # مهم أمنيًا: لا نستخدم workflow_run.head_sha كـref للـcheckout في workflow مميز.
-      # نأخذ main الموثوق فقط، ثم نثبت أنه ما زال نفس الـSHA الذي اجتاز CI.
+      # نأخذ main الموثوق فقط، ثم نثبت أن هذا الـSHA نفسه اجتاز CI.
       - name: جلب main الموثوق
         uses: actions/checkout@v5
         with:
@@ -65,22 +58,17 @@ jobs:
       - name: تثبيت من ملف القفل (قبل الاعتمادات)
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: إثبات أن main الحالي هو الـcommit الذي اجتاز CI
+      - name: إثبات أن main الحالي اجتاز CI
         id: source
         shell: bash
         env:
-          CI_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ ! "$CI_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Invalid CI SHA" >&2
-            exit 1
-          fi
           checked_sha="$(git rev-parse HEAD)"
-          if [[ "$checked_sha" != "$CI_SHA" ]]; then
-            echo "main moved after this CI run; refusing a stale privileged deployment." >&2
-            echo "CI SHA:      $CI_SHA" >&2
-            echo "current main: $checked_sha" >&2
+          green="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${checked_sha}&event=push&status=success&per_page=1" --jq '.total_count')"
+          if [[ "${green:-0}" -lt 1 ]]; then
+            echo "main ${checked_sha} has no successful CI run on push; refusing to deploy." >&2
             exit 1
           fi
           echo "sha=$checked_sha" >> "$GITHUB_OUTPUT"
