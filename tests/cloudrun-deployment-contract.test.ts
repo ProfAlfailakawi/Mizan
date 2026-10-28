@@ -4,19 +4,22 @@ import fs from 'node:fs';
 
 const read=(path:string)=>fs.readFileSync(path,'utf8');
 
-test('production deployment is repository-owned and gated by green main CI',()=>{
+test('production deployment is repository-owned, manual-only and gated by green main CI',()=>{
   const deploy=read('.github/workflows/deploy-cloud-run.yml');
   const ci=read('.github/workflows/ci.yml');
 
-  assert.match(deploy,/workflow_run:/);
-  assert.match(deploy,/workflow_run\.event == 'push'/);
-  assert.match(deploy,/workflow_run\.conclusion == 'success'/);
-  assert.match(deploy,/workflow_run\.head_branch == 'main'/);
-  assert.doesNotMatch(deploy,/workflow_dispatch:/);
+  // النشر يدويٌّ فقط (كلُّ بناءٍ مدفوع): لا يُشغَّل مع كل دفعة ولا بعد كل CI.
+  assert.match(deploy,/^on:\s*\n\s+workflow_dispatch:/m);
+  assert.doesNotMatch(deploy,/workflow_run:/);
+  assert.doesNotMatch(deploy,/^\s+push:/m);
+  // والحارس باقٍ: main وحده، ولا commit لم يجتز CI على push.
+  assert.match(deploy,/if: github\.ref == 'refs\/heads\/main'/);
   assert.match(deploy,/ref:\s*refs\/heads\/main/);
   assert.doesNotMatch(deploy,/ref:\s*\$\{\{\s*steps\.source\.outputs\.sha\s*\}\}/);
   assert.match(deploy,/checked_sha="\$\(git rev-parse HEAD\)"/);
-  assert.match(deploy,/"\$checked_sha" != "\$CI_SHA"/);
+  assert.match(deploy,/actions\/workflows\/ci\.yml\/runs\?head_sha=\$\{checked_sha\}&event=push&status=success/);
+  assert.match(deploy,/if \[\[ "\$\{green:-0\}" -lt 1 \]\]; then/);
+  assert.match(deploy,/actions:\s*read/);
   assert.match(deploy,/id-token:\s*write/);
   assert.match(deploy,/google-github-actions\/auth@v3/);
   assert.match(deploy,/google-github-actions\/setup-gcloud@v3/);
