@@ -35,3 +35,16 @@ test('the hall map close button has a name', () => {
   const at = s.indexOf('onClick={onClose}');
   assert.match(s.slice(at - 40, at + 200), /aria-label=/);
 });
+
+test('a pasted journey link (or message line) yields the code inside it', async () => {
+  const { journeyCodeFromInput } = await import('../src/lib/journey-code');
+  const looksLikeJourneyToken = (v: string) => /^mz_(journey|guardian)_[A-Za-z0-9_-]+$/.test(v.trim());
+  assert.match(read('src/components/public/JourneyAccess.tsx'), /const clean = journeyCodeFromInput\(input\);/, 'manual entry goes through the extractor');
+  const code = 'mz_journey_AbC-12_xyZ';
+  assert.equal(journeyCodeFromInput(`  ${code} `), code);
+  assert.equal(journeyCodeFromInput(`https://mizan.example/#journey?comp=c1&key=${code}`), code);
+  assert.equal(journeyCodeFromInput(`رمز رحلتك: ${code}\nلا تشاركه`), code);
+  assert.equal(journeyCodeFromInput('mz_guardian_Q9'), 'mz_guardian_Q9');
+  assert.equal(journeyCodeFromInput(' A-104 '), 'A-104', 'anything else is passed through, trimmed');
+  assert.ok(looksLikeJourneyToken(journeyCodeFromInput(`https://x/#j?key=${code}`)));
+});

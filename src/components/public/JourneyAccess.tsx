@@ -11,6 +11,7 @@ import { TestCompletePanel } from '../participant/CompletionSeal';
 import { JOURNEY_ORDER, displayParticipantName, formatParticipantCode, journeyStepIndex } from '../../lib/journey-progress';
 import { pl, plf, usePublicLocale } from '../../lib/public-i18n';
 import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
+import { journeyCodeFromInput } from '../../lib/journey-code';
 
 type Audience = 'participant' | 'guardian';
 type PublicJourney = {
@@ -125,7 +126,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   /* المسابقة قد تتغير في رابط عام داخل نفس الجلسة؛ لا نسمح لبطاقة مسابقة سابقة بالتسرّب. */
   /* الإدخال اليدوي يُفحص شكله أولًا، فلا يُرسل رقم متسابق إلى الخادم ليعود بخطأ عامّ. */
   const submit = useCallback(() => {
-    const clean = input.trim();
+    const clean = journeyCodeFromInput(input);
     if (!clean) return;
     if (!looksLikeJourneyToken(clean) && looksLikeParticipantCode(clean)) {
       setJourney(null);
