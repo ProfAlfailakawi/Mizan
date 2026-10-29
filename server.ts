@@ -69,6 +69,7 @@ import type { RecitationJudgingGate } from './server/recitation-asr-contract';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
 import { baseDomain, publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
 import { retiredHosts } from './server/retired-hosts';
+import { staticCompression } from './server/static-compression';
 import { publicOriginOf } from './server/public-origin';
 import { parseAllowedOrgIds, resolveEnterpriseOrganization } from './server/enterprise-scope';
 import { TenantStore } from './server/tenant-store';
@@ -2999,6 +3000,10 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
      * impossible by construction.
      */
     const isHashedAsset=(p:string)=>/[.-][A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|avif|svg)$/.test(p);
+    /* Gzip/brotli for the built client and the HTML shell only. Every API, webhook, legal-page and
+       health route is registered above, so none of them reaches this middleware; its filter also
+       refuses /api, /internal, webhook paths and text/event-stream (server/static-compression.ts). */
+    app.use(staticCompression());
     app.use(express.static(distPath,{etag:true,setHeaders(res,filePath){
       if(filePath.endsWith('.html')||filePath.endsWith('sw.js')) res.setHeader('Cache-Control','no-cache, must-revalidate');
       else if(isHashedAsset(filePath)) res.setHeader('Cache-Control','public, max-age=31536000, immutable');
