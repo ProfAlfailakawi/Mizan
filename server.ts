@@ -92,6 +92,7 @@ import { PassportStore, type CertificateCheck } from './server/passport';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
+import { competitionScopeMismatch } from './server/competition-scope';
 import type { Competition } from './src/types';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
@@ -1992,6 +1993,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
      * والنشرُ أدناه يردّ 503 في الحال نفسها منذ البداية. فيُسوَّى البابان: ما لا يُسجَّل
      * لا يُختم.
      */
+    if(competitionScopeMismatch(actor,String(body.competitionId||'')))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
     try{
       const outcome=sealResult({
@@ -2041,6 +2043,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const actor=(req as any).mizanIdentity as ServerIdentity;
     const competitionId=String(req.body?.competitionId||actor.competitionId||'');
     if(!competitionId)return res.status(400).json({code:'COMPETITION_REQUIRED'});
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     if(!resultSealRegistry||!resultPublications)return res.status(503).json({code:'RESULT_PUBLICATION_NOT_CONFIGURED'});
     res.setHeader('Cache-Control','no-store');
     try{
@@ -2069,6 +2072,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
   app.post('/api/governance/policy-change',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
     const competitionId=String(b.competitionId||actor.competitionId||'');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     res.setHeader('Cache-Control','no-store');
     // عددُ الأختام يُقرأ من سجلّ الأختام الذي كتبه الخادم، لا من حقلٍ يرسله العميل.
     const sealedResultCount=resultSealRegistry?resultSealRegistry.countFor(actor.organizationId,competitionId):0;
@@ -2114,6 +2118,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
     res.setHeader('Cache-Control','no-store');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     /*
      * «هل خُتمت؟» تُقرأ من سجلّ الأختام لا من الطلب — وإلا أعلن المصحّحُ أنها لم تُختم.
      *
@@ -2143,6 +2148,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
     res.setHeader('Cache-Control','no-store');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     /*
      * «هل سُحب سؤال؟» تُقرأ من محرّك الأسئلة الخادميّ. وغيابُ المحرّك لا يُقرأ «لم يُسحب»:
      * ذلك يفتح البابَ الذي بُني ليُغلق، فيُعدّ مسحوبًا حتى يُثبت المحرّكُ خلافه.
@@ -2306,7 +2312,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
   app.post('/api/enterprise/quran/intelligence/waqf/derive/:reading',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({derived:true,...quranIntelligence.deriveOfficialWaqf(String(req.params.reading))})}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/enterprise/quran/intelligence/tajweed',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({registered:true,summary:quranIntelligence.registerTajweed(req.body)})}catch(err){return quranIntelligenceFailure(res,err)}});
   app.post('/api/enterprise/quran/alignment/benchmark',requireEnterpriseKey,(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});try{return res.status(201).json({registered:true,result:quranIntelligence.registerBenchmark(req.body)})}catch(err){return quranIntelligenceFailure(res,err)}});
-  app.post('/api/quran/alignment/shadow/audio',alignmentAudioIpRateLimit,requireGovernanceRoles(['judge','head_judge',]),alignmentAudioRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:actor.uid,sessionId:soleParam(req.query.sessionId,'sessionId'),reading:soleParam(req.query.reading,'reading'),surah:soleParam(req.query.surah,'surah'),startAyah:soleParam(req.query.startAyah,'startAyah'),endAyah:soleParam(req.query.endAyah,'endAyah'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return quranIntelligenceFailure(res,err)}});
+  app.post('/api/quran/alignment/shadow/audio',alignmentAudioIpRateLimit,requireGovernanceRoles(['judge','head_judge',]),alignmentAudioRateLimit,express.raw({type:['audio/*','application/octet-stream'],limit:'2mb'}),async(req,res)=>{if(!quranIntelligence)return res.status(503).json({code:'QURAN_INTELLIGENCE_NOT_CONFIGURED'});const actor=(req as any).mizanIdentity as ServerIdentity;try{const bytes:Buffer=Buffer.isBuffer(req.body)?req.body:Buffer.alloc(0);const out=await quranIntelligence.processAlignmentChunk({actorId:actor.uid,sessionId:soleParam(req.query.sessionId,'sessionId'),reading:soleParam(req.query.reading,'reading'),surah:soleParam(req.query.surah,'surah'),startAyah:soleParam(req.query.startAyah,'startAyah'),endAyah:soleParam(req.query.endAyah,'endAyah'),sourcePackageId:soleParam(req.query.sourcePackageId,'sourcePackageId'),contentType:soleParam(req.headers['content-type'],'content-type')||'application/octet-stream',bytes,headBytes:Number(soleParam(req.headers['x-mizan-head-bytes'],'x-mizan-head-bytes')||0)});res.setHeader('Cache-Control','no-store');return res.json(out)}catch(err){return quranIntelligenceFailure(res,err)}});
   /*
    * تدريب المتسابق قبل دوره.
    *
@@ -2900,7 +2906,8 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const identity=(req as any).mizanIdentity;const body=req.body||{};
     if(String(body.organizationId||'')!==identity.organizationId)return res.status(403).json({code:'CERTIFICATE_TENANT_MISMATCH'});
-    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED'})}
+    if(competitionScopeMismatch(identity,String(body.competitionId||'')))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
+    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED';return res.status(code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
   });
   app.post('/api/certificates/:number/revoke',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});

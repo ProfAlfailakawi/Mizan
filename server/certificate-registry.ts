@@ -73,6 +73,9 @@ export class PublicCertificateRegistry{
     const existing=this.read(number);
     /* إبطال الشهادة لا يُمحى بإعادة نشرها: من يعيد النشر بعد الإبطال لا يستطيع إحياءها من هنا. */
     if(existing&&existing.revocationState==='REVOKED')throw new Error('CERTIFICATE_ALREADY_REVOKED');
+    /* رقمٌ تملكه مؤسسةٌ أخرى لا يُعاد نشره من هنا — كما لا يُبطَل (`revoke`). كان النشرُ يقارن معرّفَ
+       الشهادة وحده، فمن عرفه من مؤسسةٍ أخرى كتب فوق شهادةٍ ليست له. */
+    if(existing&&existing.organizationId!==input.organizationId)throw new Error('CERTIFICATE_TENANT_MISMATCH');
     if(existing&&existing.certificateId!==input.certificateId)throw new Error('CERTIFICATE_NUMBER_CONFLICT');
     const rec:PublicCertificateRecord={...input,certificateNumber:number,revocationState:'ACTIVE',publishedAt:new Date().toISOString()};
     this.write(rec);return rec;

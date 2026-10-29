@@ -24,6 +24,7 @@ import { deliveryReadingKeyFor } from '../judge/OfficialMushafSurface';
 import { practiceReadingFor } from '../../lib/quran-intelligence';
 import { deriveJourneyStage, displayParticipantName, formatParticipantCode } from '../../lib/journey-progress';
 import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
+import { useDialogBehavior } from '../../lib/useDialogBehavior';
 
 // Shared so the visible labels and the spoken ones can never drift apart.
 const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Approve'},{ar:'الحضور',en:'Arrive'},{ar:'الاختبار',en:'Recite'},{ar:'الشهادة',en:'Certificate'}];
@@ -64,6 +65,10 @@ export const ParticipantDashboard: React.FC = () => {
   */
  const [tab,setTab]=useState<Tab>('journey');
  const [showRegistration,setShowRegistration]=useState(false); const [showAppeal,setShowAppeal]=useState(false); const [appealText,setAppealText]=useState(''); const [showCert,setShowCert]=useState(false); const [showReceipt,setShowReceipt]=useState(false); const [showResult,setShowResult]=useState(false); const resultRef=useRef<HTMLElement|null>(null);
+ /* نافذةُ الاعتراض كانت بلا لوحة مفاتيح: لا يدخلها التركيز، ولا يغلقها Escape، ويخرج منها Tab إلى الصفحة خلفها.
+    فتأخذ سلوكَ النوافذ المشترك، ويقع التركيزُ على حقل السبب مباشرة. */
+ const appealRef=useRef<HTMLDivElement|null>(null);
+ useDialogBehavior(showAppeal,()=>setShowAppeal(false),appealRef);
  const policy=getCompetitionPolicy(competition);
  const result=results.find(r=>r.competitionId===competition.id&&r.participantId===participant?.id);
  const cert=certificates.find(c=>c.competitionId===competition.id&&c.participantId===participant?.id);
@@ -205,7 +210,7 @@ export const ParticipantDashboard: React.FC = () => {
    {cert&&<section className="mizan-surface p-6 flex items-center gap-4"><span className="w-12 h-12 rounded-2xl bg-[var(--amber-soft)] text-[#89673a] grid place-items-center"><Award className="w-6 h-6"/></span><div className="flex-1"><div className="font-black">{ar?'الشهادة جاهزة':'Certificate ready'}</div><div className="text-[11px] text-[color:var(--muted)] mt-1">{cert.certificateNumber}</div></div><Button variant="outline" onClick={()=>setShowCert(true)} icon={<FileText className="w-4 h-4"/>}>{ar?'فتح':'Open'}</Button></section>}
   </>}
 
-  {showAppeal&&<div role="dialog" aria-modal="true" aria-label={ar?'اعتراض':'Appeal'} className="fixed inset-0 z-50 bg-black/25 backdrop-blur-sm grid place-items-center p-4"><div className="mizan-surface p-6 w-full max-w-lg"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'اعتراض':'APPEAL'}</div><h3 className="text-xl font-black mt-1">{ar?'طلب مراجعة علمية':'Scientific review request'}</h3></div><button onClick={()=>setShowAppeal(false)} className="text-xs text-[#777]">{ar?'إغلاق':'Close'}</button></div><textarea value={appealText} onChange={e=>setAppealText(e.target.value)} className="mizan-textarea mt-5 min-h-32 text-sm resize-none" placeholder={ar?'اذكر الموضع أو سبب طلب المراجعة باختصار':'Briefly state the segment or reason for review'}/><div className="mt-4 flex justify-end"><Button disabled={!appealText.trim()} onClick={()=>{store.submitAppeal(participant.id,'scoring_miscalculation',appealText);setShowAppeal(false);setAppealText('')}}>{ar?'إرسال':'Submit'}</Button></div></div></div>}
+  {showAppeal&&<div role="dialog" aria-modal="true" aria-label={ar?'اعتراض':'Appeal'} className="fixed inset-0 z-50 bg-black/25 backdrop-blur-sm grid place-items-center p-4"><div ref={appealRef} className="mizan-surface p-6 w-full max-w-lg"><div className="flex items-center justify-between gap-4"><div><div className="mizan-kicker">{ar?'اعتراض':'APPEAL'}</div><h3 className="text-xl font-black mt-1">{ar?'طلب مراجعة علمية':'Scientific review request'}</h3></div><button type="button" onClick={()=>setShowAppeal(false)} className="min-h-11 rounded-xl px-3 text-xs font-bold text-[#5f6662] hover:bg-black/5">{ar?'إغلاق':'Close'}</button></div><textarea value={appealText} onChange={e=>setAppealText(e.target.value)} aria-label={ar?'سبب طلب المراجعة':'Reason for review'} className="mizan-textarea mt-5 min-h-32 text-sm resize-none" placeholder={ar?'اذكر الموضع أو سبب طلب المراجعة باختصار':'Briefly state the segment or reason for review'}/><div className="mt-4 flex justify-end"><Button disabled={!appealText.trim()} onClick={()=>{store.submitAppeal(participant.id,'scoring_miscalculation',appealText);setShowAppeal(false);setAppealText('')}}>{ar?'إرسال':'Submit'}</Button></div></div></div>}
   {/* الشهادة نفسها كما تُطبع — لا بطاقةُ رقمٍ تحت اسم. */}
   {showReceipt&&(()=>{const receipt=store.getFairnessReceipt(participant.id);return receipt?<FairnessReceipt receipt={receipt} ar={ar} participantName={displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)} competitionName={ar?competition.nameArabic||competition.name:competition.name} onClose={()=>setShowReceipt(false)}/>:null})()}
   {showCert&&cert&&<CertificateModal cert={cert} ar={ar} showScore={getCompetitionPolicy(competition).certificates.showScore} onClose={()=>setShowCert(false)}/>}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Ear, Mic, RotateCcw, Square, Timer, Wind } from 'lucide-react';
 import { fetchJourneyPracticeContext, submitPracticeAlignmentChunk, type JourneyPracticeAuth, type JourneyPracticeContext, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
 import { MushafListens } from './MushafListens';
+import { framedChunk, microphoneErrorNote } from '../../lib/microphone-capture';
 import { IS_DEMO_SESSION } from '../../lib/store';
 
 /*
@@ -298,8 +299,11 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const wasLost = useRef(false);
+  /* رقمُ المحاولة: إذنٌ يصل بعد الإيقاف أو مغادرة الباب لا يفتح ميكروفونًا لا يُغلقه أحد. */
+  const attempt = useRef(0);
 
   const stop = () => {
+    attempt.current += 1;
     recorderRef.current?.state === 'recording' && recorderRef.current.stop();
     streamRef.current?.getTracks().forEach(t => t.stop());
     recorderRef.current = null; streamRef.current = null;
@@ -316,17 +320,29 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
       return;
     }
     setState('asking');
+    const mine = ++attempt.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      if (mine !== attempt.current) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg'].find(m => MediaRecorder.isTypeSupported(m));
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       recorderRef.current = recorder;
+      /* ترويسةُ التسجيل (المقطعُ الأوّل): ما بعدها لا يُفكّ وحده، فيُسبق بها كلُّ مقطع. */
+      let head: Blob | null = null;
+      /* الردودُ قد تعود بغير ترتيب المقاطع: ردٌّ أقدم لا يكتب فوق أحدث، ولا يُعدّ انقطاعًا لم يقع. */
+      let sent = 0, applied = 0;
       recorder.ondataavailable = async e => {
         if (!e.data.size) return;
+        if (!head) head = e.data;
+        const { blob, headBytes } = framedChunk(head, e.data);
+        const order = ++sent;
         try {
-          const out = await submitPracticeAlignmentChunk({ blob: e.data, reading: passage.reading, sourcePackageId: passage.sourcePackageId, surah: passage.surah, startAyah: passage.startAyah, endAyah: passage.endAyah });
-          setLast(out); setHeard(n => n + 1);
+          const out = await submitPracticeAlignmentChunk({ blob, headBytes, reading: passage.reading, sourcePackageId: passage.sourcePackageId, surah: passage.surah, startAyah: passage.startAyah, endAyah: passage.endAyah });
+          setHeard(n => n + 1);
+          if (order < applied) return;
+          applied = order;
+          setLast(out);
           const nowLost = out.alignmentState === 'LOST';
           if (nowLost && !wasLost.current) setLost(n => n + 1);
           wasLost.current = nowLost;
@@ -338,9 +354,14 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
       };
       recorder.start(2000);
       setState('live');
-    } catch {
-      setState('blocked');
-      setNote(ar ? 'لم يُسمح بالميكروفون. اسمح به من إعدادات المتصفح ثم أعد المحاولة.' : 'Microphone permission was denied.');
+    } catch (err) {
+      if (mine !== attempt.current) return;
+      /*
+       * «blocked» كان يُعطّل زرَّ البدء، والملاحظةُ تقول «أعد المحاولة» — فلا محاولة بلا إعادة تحميل.
+       * تعذّرُ الميكروفون يُصلَح من خارج الصفحة، فيبقى الزرُّ قائمًا.
+       */
+      setState('idle');
+      setNote(microphoneErrorNote(err, ar));
     }
   };
 

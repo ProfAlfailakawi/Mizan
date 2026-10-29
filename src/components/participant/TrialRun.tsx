@@ -6,6 +6,7 @@ import { surahAyahCount } from '../../lib/mushaf-map';
 import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { fetchDeliveryPassage } from '../../lib/kfgqpc-library';
 import { submitPracticeAlignmentChunk, type QuranAlignmentResult, type QuranReadingId } from '../../lib/quran-intelligence';
+import { framedChunk, microphoneErrorNote } from '../../lib/microphone-capture';
 import { IS_DEMO_SESSION } from '../../lib/store';
 import { describeStumble, emptyStumbleState, observeAlignment, type TrialPosition } from '../../lib/trial-stumbles';
 
@@ -236,8 +237,14 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
   const streamRef = useRef<MediaStream | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const frame = useRef<number | null>(null);
+  /*
+   * رقمُ المحاولة: «إلغاء» أثناء نافذة الإذن كان يُغلق البوابة، ثم يصل الإذنُ بعدها فيُفتح
+   * ميكروفونٌ وحلقةُ رسمٍ لا يُغلقهما أحد. فكلُّ إغلاقٍ يُبطل المحاولةَ الجارية.
+   */
+  const attempt = useRef(0);
 
   const stop = useCallback(() => {
+    attempt.current += 1;
     if (frame.current) cancelAnimationFrame(frame.current);
     frame.current = null;
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -253,8 +260,10 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
       setState('blocked'); setError(ar ? 'هذا المتصفّح لا يتيح الميكروفون. جرّب متصفحًا آخر أو هاتفك.' : 'This browser cannot open a microphone.'); return;
     }
     setState('asking');
+    const mine = ++attempt.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (mine !== attempt.current) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       const Ctx: typeof AudioContext | undefined = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (Ctx) {
@@ -276,8 +285,10 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
         setPeak(1);
       }
       setState('live');
-    } catch {
-      setState('blocked'); setError(ar ? 'لم يُسمح بالميكروفون. اسمح به من إعدادات المتصفّح ثم أعد المحاولة.' : 'Microphone permission was denied.');
+    } catch (err) {
+      if (mine !== attempt.current) return;
+      // «blocked» هنا يعيد زرَّ الفتح نفسه (يُعطَّل في «asking» وحدها)، فتُعاد المحاولة بعد الإصلاح.
+      setState('blocked'); setError(microphoneErrorNote(err, ar));
     }
   };
 
@@ -306,7 +317,7 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
         {state === 'live' ? (proven ? (ar ? 'صوتك يصل بوضوح' : 'Your voice is arriving') : (ar ? 'أسمِعنا صوتك…' : 'Say something…')) : state === 'asking' ? (ar ? 'جارٍ طلب الإذن…' : 'Asking…') : ' '}
       </p>
 
-      {error && <p className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-start text-[11px] font-bold leading-6 text-[#6b4f18]">{error}</p>}
+      {error && <p role="alert" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-start text-[11px] font-bold leading-6 text-[#6b4f18]">{error}</p>}
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         {state !== 'live'
@@ -350,6 +361,14 @@ const TrialQuestion: React.FC<{
     let live = true;
     void (async () => {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return;
+      /* ترويسةُ التسجيل (المقطعُ الأوّل): ما بعدها لا يُفكّ وحده، فيُسبق بها كلُّ مقطع. */
+      let head: Blob | null = null;
+      /*
+       * المقاطعُ تُرفع متوازية، والردودُ قد تعود بغير ترتيبها. ردٌّ قديمٌ يصل بعد أحدث منه كان
+       * يُرجع الموضعَ إلى الوراء ويُقرأ في `observeAlignment` انقطاعًا أو عودةً لم تقع — فيزيد
+       * عدّ «فقد أثرك» بلا سبب. فلا يُطبَّق إلا الأحدث.
+       */
+      let sent = 0, applied = 0;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         if (!live) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -359,11 +378,17 @@ const TrialQuestion: React.FC<{
         recorderRef.current = recorder;
         recorder.ondataavailable = async e => {
           if (!e.data.size || !listening) return;
+          if (!head) head = e.data;
+          const { blob, headBytes } = framedChunk(head, e.data);
+          const order = ++sent;
           try {
-            const out = await submitPracticeAlignmentChunk({ blob: e.data, reading: listening.reading, sourcePackageId: listening.sourcePackageId, surah: locus.surah, startAyah: locus.startAyah, endAyah: locus.endAyah });
+            const out = await submitPracticeAlignmentChunk({ blob, headBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId, surah: locus.surah, startAyah: locus.startAyah, endAyah: locus.endAyah });
             if (!live) return;
-            setLast(out); setHeard(n => n + 1);
+            setHeard(n => n + 1);
             if (out.backendEvidence?.acousticQuality !== undefined) setClarity(xs => [...xs, out.backendEvidence!.acousticQuality!]);
+            if (order < applied) return;
+            applied = order;
+            setLast(out);
             /* العدُّ والموضعُ من مصدرٍ واحد — وإلا افترقا: عددٌ يقول ٣ ومواضعُ تقول ٢. */
             setStumbleState(prev => observeAlignment(prev, out));
           } catch (err) {
