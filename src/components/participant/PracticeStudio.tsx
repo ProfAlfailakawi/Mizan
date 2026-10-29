@@ -100,7 +100,7 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
     {recording&&<span className="inline-flex items-center gap-1.5 text-[11px] font-black text-[#9B3B2F]"><span className="w-2 h-2 rounded-full bg-[#9B3B2F] motion-safe:animate-pulse"/>{ar?'يسجّل…':'Recording…'}</span>}
     {selfUrl&&!recording&&<Button size="sm" variant="ghost" onClick={discard} icon={<Trash2 className="w-4 h-4"/>}>{ar?'حذف':'Discard'}</Button>}
    </div>
-   {micError&&<p className="mt-2 text-[11px] text-[#9B3B2F]">{micError}</p>}
+   {micError&&<p role="alert" className="mt-2 text-[11px] text-[#9B3B2F]">{micError}</p>}
    {selfUrl&&<div className="mt-3">
     <div className="text-[11px] font-black text-[#59615c] mb-1.5">{ar?'تلاوتك':'Your recitation'}</div>
     <audio src={selfUrl} controls className="w-full"/>

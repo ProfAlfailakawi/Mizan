@@ -41,3 +41,8 @@ test('the practice surfaces frame their chunks and name the real microphone fail
   }
   assert.match(fs.readFileSync('src/components/participant/PracticeStudio.tsx', 'utf8'), /microphoneErrorNote\(/);
 });
+
+test('a microphone failure is announced, not only painted', () => {
+  assert.match(fs.readFileSync('src/components/participant/PracticeStudio.tsx', 'utf8'), /micError&&<p role="alert"/);
+  assert.match(fs.readFileSync('src/components/participant/TrialRun.tsx', 'utf8'), /\{error && <p role="alert"/);
+});

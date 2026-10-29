@@ -317,7 +317,7 @@ const MicGate: React.FC<{ ar: boolean; onReady: () => void; onCancel: () => void
         {state === 'live' ? (proven ? (ar ? 'صوتك يصل بوضوح' : 'Your voice is arriving') : (ar ? 'أسمِعنا صوتك…' : 'Say something…')) : state === 'asking' ? (ar ? 'جارٍ طلب الإذن…' : 'Asking…') : ' '}
       </p>
 
-      {error && <p className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-start text-[11px] font-bold leading-6 text-[#6b4f18]">{error}</p>}
+      {error && <p role="alert" className="rounded-2xl border border-[#e8d6b8] bg-[#fdf6e8] p-3.5 text-start text-[11px] font-bold leading-6 text-[#6b4f18]">{error}</p>}
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         {state !== 'live'
