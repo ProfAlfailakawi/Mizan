@@ -74,3 +74,11 @@ test('the judge microphone gate names the actual failure', () => {
   assert.match(judge, /catch\(err\)\{setShadowMicActive\(false\);setMicFailure\(err\);setAudioState\('failed'\)\}/);
   assert.match(judge, /audioState==='failed'&&micFailure!==null&&<p role="alert"[^>]*>\{microphoneErrorNote\(micFailure,ar\)\}/);
 });
+
+test('practice studio: a permission that arrives after leaving does not open a microphone', () => {
+  const s = fs.readFileSync('src/components/participant/PracticeStudio.tsx', 'utf8');
+  const got = s.indexOf('await navigator.mediaDevices.getUserMedia');
+  assert.ok(got > 0);
+  assert.match(s.slice(got, got + 200), /if\(!mounted\.current\)\{stream\.getTracks\(\)\.forEach\(t=>t\.stop\(\)\);return\}/);
+  assert.match(s, /if\(opening\.current\|\|recRef\.current\?\.state==='recording'\)return;/, 'a second press while opening is ignored');
+});

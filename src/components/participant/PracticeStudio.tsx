@@ -45,6 +45,9 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
 
  /* ضغطتان سريعتان كانتا تفتحان ميكروفونين، فيُكتب الثاني فوق الأوّل ويبقى الأوّلُ مفتوحًا بلا إغلاق. */
  const opening=useRef(false);
+ /* مغادرةُ الاستوديو أثناء نافذة الإذن: الإذنُ الذي يصل بعدها لا يفتح ميكروفونًا لا يُغلقه أحد. */
+ const mounted=useRef(true);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[]);
  const start=async()=>{
   if(opening.current||recRef.current?.state==='recording')return;
   setMicError('');
@@ -52,7 +55,9 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
    setMicError(ar?'التسجيل غير مدعوم في هذا المتصفّح.':'Recording is not supported in this browser.');return;}
   opening.current=true;
   try{
-   const stream=await navigator.mediaDevices.getUserMedia({audio:true});streamRef.current=stream;
+   const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+   if(!mounted.current){stream.getTracks().forEach(t=>t.stop());return}
+   streamRef.current=stream;
    const rec=new MediaRecorder(stream);recRef.current=rec;chunksRef.current=[];
    rec.ondataavailable=e=>{if(e.data.size)chunksRef.current.push(e.data)};
    rec.onstop=()=>{const blob=new Blob(chunksRef.current,{type:rec.mimeType||'audio/webm'});
