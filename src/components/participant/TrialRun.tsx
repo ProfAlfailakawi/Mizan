@@ -363,6 +363,12 @@ const TrialQuestion: React.FC<{
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return;
       /* ترويسةُ التسجيل (المقطعُ الأوّل): ما بعدها لا يُفكّ وحده، فيُسبق بها كلُّ مقطع. */
       let head: Blob | null = null;
+      /*
+       * المقاطعُ تُرفع متوازية، والردودُ قد تعود بغير ترتيبها. ردٌّ قديمٌ يصل بعد أحدث منه كان
+       * يُرجع الموضعَ إلى الوراء ويُقرأ في `observeAlignment` انقطاعًا أو عودةً لم تقع — فيزيد
+       * عدّ «فقد أثرك» بلا سبب. فلا يُطبَّق إلا الأحدث.
+       */
+      let sent = 0, applied = 0;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         if (!live) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -374,11 +380,15 @@ const TrialQuestion: React.FC<{
           if (!e.data.size || !listening) return;
           if (!head) head = e.data;
           const { blob, headBytes } = framedChunk(head, e.data);
+          const order = ++sent;
           try {
             const out = await submitPracticeAlignmentChunk({ blob, headBytes, reading: listening.reading, sourcePackageId: listening.sourcePackageId, surah: locus.surah, startAyah: locus.startAyah, endAyah: locus.endAyah });
             if (!live) return;
-            setLast(out); setHeard(n => n + 1);
+            setHeard(n => n + 1);
             if (out.backendEvidence?.acousticQuality !== undefined) setClarity(xs => [...xs, out.backendEvidence!.acousticQuality!]);
+            if (order < applied) return;
+            applied = order;
+            setLast(out);
             /* العدُّ والموضعُ من مصدرٍ واحد — وإلا افترقا: عددٌ يقول ٣ ومواضعُ تقول ٢. */
             setStumbleState(prev => observeAlignment(prev, out));
           } catch (err) {

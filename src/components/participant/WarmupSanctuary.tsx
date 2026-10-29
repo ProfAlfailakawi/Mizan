@@ -330,13 +330,19 @@ const ListenDoor: React.FC<{ ar: boolean; passage?: PracticePassage }> = ({ ar, 
       recorderRef.current = recorder;
       /* ترويسةُ التسجيل (المقطعُ الأوّل): ما بعدها لا يُفكّ وحده، فيُسبق بها كلُّ مقطع. */
       let head: Blob | null = null;
+      /* الردودُ قد تعود بغير ترتيب المقاطع: ردٌّ أقدم لا يكتب فوق أحدث، ولا يُعدّ انقطاعًا لم يقع. */
+      let sent = 0, applied = 0;
       recorder.ondataavailable = async e => {
         if (!e.data.size) return;
         if (!head) head = e.data;
         const { blob, headBytes } = framedChunk(head, e.data);
+        const order = ++sent;
         try {
           const out = await submitPracticeAlignmentChunk({ blob, headBytes, reading: passage.reading, sourcePackageId: passage.sourcePackageId, surah: passage.surah, startAyah: passage.startAyah, endAyah: passage.endAyah });
-          setLast(out); setHeard(n => n + 1);
+          setHeard(n => n + 1);
+          if (order < applied) return;
+          applied = order;
+          setLast(out);
           const nowLost = out.alignmentState === 'LOST';
           if (nowLost && !wasLost.current) setLost(n => n + 1);
           wasLost.current = nowLost;

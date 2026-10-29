@@ -57,3 +57,14 @@ test('the judge shadow listener receives framed chunks and the server forwards t
   const route = server.slice(server.indexOf("app.post('/api/quran/alignment/shadow/audio'"));
   assert.match(route.slice(0, route.indexOf('\n')), /headBytes:Number\(soleParam\(req\.headers\['x-mizan-head-bytes'\]/);
 });
+
+test('a late reply for an older chunk never overwrites the newer position', () => {
+  for (const file of ['src/components/participant/TrialRun.tsx', 'src/components/participant/WarmupSanctuary.tsx']) {
+    const source = fs.readFileSync(file, 'utf8');
+    const at = source.indexOf('const order = ++sent;');
+    assert.ok(at > 0, `${file}: each upload takes its order before it is sent`);
+    const after = source.slice(at);
+    const guard = after.indexOf('if (order < applied) return;');
+    assert.ok(guard > 0 && guard < after.indexOf('setLast(out)'), `${file}: the stale reply is dropped before the position is written`);
+  }
+});
