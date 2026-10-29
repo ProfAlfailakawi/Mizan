@@ -48,3 +48,11 @@ test('a pasted journey link (or message line) yields the code inside it', async 
   assert.equal(journeyCodeFromInput(' A-104 '), 'A-104', 'anything else is passed through, trimmed');
   assert.ok(looksLikeJourneyToken(journeyCodeFromInput(`https://x/#j?key=${code}`)));
 });
+
+test('the appeal dialog behaves like every other dialog: focus in, Escape out, a real close target', () => {
+  const s = read('src/components/participant/ParticipantDashboard.tsx');
+  assert.match(s, /useDialogBehavior\(showAppeal,\(\)=>setShowAppeal\(false\),appealRef\)/);
+  const dialog = s.slice(s.indexOf('{showAppeal&&<div role="dialog"'));
+  assert.match(dialog.slice(0, 400), /<div ref=\{appealRef\}/);
+  assert.match(dialog.slice(0, 900), /<button type="button" onClick=\{\(\)=>setShowAppeal\(false\)\} className="min-h-11/);
+});
