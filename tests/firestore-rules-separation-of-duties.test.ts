@@ -104,6 +104,46 @@ test('firestore rules: فصل المهامّ عند نشر النتائج', { sk
     await assertSucceeds(updateDoc(doc(sealer, resultPath('r-republished')), { publishedAt: '2026-05-01T10:00:00.000Z', uploaderUid: SEALER_UID }));
   });
 
+  await t.test('الخاتمُ لا يتحايل بكتابتين: لا يعيد نسبةَ الختم لغيره في كتابةٍ ليست نشرًا', async () => {
+    await asGod(db => setDoc(doc(db, resultPath('r-two-step')), sealed()));
+    const sealer = ctx('head_judge', SEALER_UID);
+    // الخطوة الأولى (ليست نشرًا): يكتب هويةَ خاتمٍ آخر.
+    await assertFails(updateDoc(doc(sealer, resultPath('r-two-step')), {
+      sealMetadata: { ...sealed().sealMetadata, sealedByUid: PUBLISHER_UID }, uploaderUid: SEALER_UID,
+    }));
+    // ولا يمحوها ليبدأ من جديد.
+    await assertFails(updateDoc(doc(sealer, resultPath('r-two-step')), { sealMetadata: null, uploaderUid: SEALER_UID }));
+    // فتبقى الخطوة الثانية (النشر) مرفوضة.
+    await assertFails(updateDoc(doc(sealer, resultPath('r-two-step')), { status: 'published', uploaderUid: SEALER_UID }));
+  });
+
+  await t.test('ولا يزرع هويةَ خاتمٍ لغيره على نتيجةٍ لم تُختم بعد', async () => {
+    await asGod(db => setDoc(doc(db, resultPath('r-plant')), sealed({ status: 'draft', sealMetadata: null })));
+    const hj = ctx('head_judge', SEALER_UID);
+    await assertFails(updateDoc(doc(hj, resultPath('r-plant')), {
+      status: 'sealed', uploaderUid: SEALER_UID,
+      sealMetadata: { ...sealed().sealMetadata, sealedByUid: PUBLISHER_UID },
+    }));
+    await assertFails(setDoc(doc(hj, resultPath('r-plant-new')), sealed({ sealMetadata: { ...sealed().sealMetadata, sealedByUid: PUBLISHER_UID } })));
+  });
+
+  await t.test('مسارُ الختم المشروع يبقى: الكاتب يختم باسمه، وإعادةُ المزامنة بلا تغيير تمرّ', async () => {
+    await asGod(db => setDoc(doc(db, resultPath('r-legit')), sealed({ status: 'draft', sealMetadata: null })));
+    const hj = ctx('head_judge', SEALER_UID);
+    await assertSucceeds(updateDoc(doc(hj, resultPath('r-legit')), {
+      status: 'sealed', uploaderUid: SEALER_UID, sealMetadata: sealed().sealMetadata,
+    }));
+    await assertSucceeds(setDoc(doc(hj, resultPath('r-legit-new')), sealed()));
+    // جهازٌ آخر يعيد رفع الوثيقة كما هي: هويةُ الختم لم تتغيّر فلا يُمنع.
+    const other = ctx('comp_admin', PUBLISHER_UID);
+    await assertSucceeds(setDoc(doc(other, resultPath('r-legit')), { ...sealed(), uploaderUid: PUBLISHER_UID, updatedAt: '2026-05-01T09:30:00.000Z' }, { merge: true }));
+    // وإعادةُ الختم باسم الكاتب نفسه مشروعة (ختمٌ يُعلن ما نسخه).
+    await assertSucceeds(updateDoc(doc(other, resultPath('r-legit')), {
+      status: 'sealed', uploaderUid: PUBLISHER_UID,
+      sealMetadata: { ...sealed().sealMetadata, sealedById: 'usr-publisher', sealedByUid: PUBLISHER_UID, cryptographicChecksum: 'SHA256:def' },
+    }));
+  });
+
   await t.test('ودورٌ لا يملك النشر يُردّ قبل أن يُسأل عن فصل المهامّ', async () => {
     await asGod(db => setDoc(doc(db, resultPath('r-judge')), sealed()));
     const judge = ctx('judge', 'uid-judge');

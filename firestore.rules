@@ -291,11 +291,29 @@ service cloud.firestore {
             && request.resource.data.uploaderUid == request.auth.uid
             && request.resource.data.sealMetadata == resource.data.sealMetadata;
         }
+        /*
+         * هويةُ الختم لا تُكتب إلا في كتابة الختم نفسها، وباسم كاتبها.
+         *
+         * كان فحصُ «الخاتم ≠ الناشر» يمنع تغيير `sealMetadata` في كتابة النشر وحدها، فيكتب
+         * رئيسُ تحكيمٍ واحد `sealedByUid` لغيره في كتابةٍ أولى ليست نشرًا، ثم ينشر في الثانية.
+         * فصارت `sealMetadata` ثابتةً متى وُجدت، ولا تُكتب (أوّل مرّة أو بإعادة ختم) إلا في
+         * كتابةٍ تجعل الحالة `sealed` وتسمّي الكاتبَ نفسَه خاتمًا. ولا تُمحى بعد وجودها.
+         */
+        function sealMetadataUnchanged() {
+          return present() && request.resource.data.get('sealMetadata', null) == resource.data.get('sealMetadata', null);
+        }
+        function sealWrittenBySelf() {
+          return request.resource.data.get('status', '') == 'sealed'
+            && request.resource.data.get('sealMetadata', null) is map
+            && request.resource.data.sealMetadata.get('sealedByUid', '') == request.auth.uid;
+        }
         match /results/{resultId} {
           allow read: if readableScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge','judge','auditor']);
-          allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge']);
+          allow create: if writeScope(orgId,competitionId) && roleIs(['super_admin','org_admin','comp_admin','head_judge'])
+            && (request.resource.data.get('sealMetadata', null) == null || sealWrittenBySelf());
           allow update: if writeScope(orgId,competitionId)
             && roleIs(['super_admin','org_admin','comp_admin','head_judge'])
+            && (sealMetadataUnchanged() || sealWrittenBySelf())
             && (!publishTransition() || publisherIsNotSealer());
           allow delete: if false;
         }
@@ -313,16 +331,23 @@ service cloud.firestore {
           allow read: if readableScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','auditor','support_agent'])
               || (present() && roleIs(['participant','guardian']) && resource.data.uploaderUid == request.auth.uid));
+          // المتسابق ووليّه يُنشئان اعتراضًا «مقدَّمًا» فقط: لا يقرّران فيه ولا يعدّلان درجة.
           allow create: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge','support_agent'])
-              || (roleIs(['participant','guardian']) && request.resource.data.uploaderUid == request.auth.uid));
+              || (roleIs(['participant','guardian']) && request.resource.data.uploaderUid == request.auth.uid
+                && request.resource.data.get('status', 'submitted') == 'submitted'
+                && !request.resource.data.keys().hasAny(['resolvedBy','resolvedAt','resolutionNotes','scoreAdjustmentDelta'])));
           // The client re-syncs every record its role owns, so a filer's own appeal is
           // rewritten under the same doc id; without this clause every re-sync is denied.
+          // But the filer touches only the filing itself — never the status, the resolution
+          // or a score adjustment, which belong to the administration.
           allow update: if writeScope(orgId,competitionId)
             && (roleIs(['super_admin','org_admin','comp_admin','head_judge'])
               || (present() && roleIs(['participant','guardian','support_agent'])
                 && resource.data.uploaderUid == request.auth.uid
-                && request.resource.data.uploaderUid == request.auth.uid));
+                && request.resource.data.uploaderUid == request.auth.uid
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['grounds','reasonText','participantCode','categoryName','updatedAt','uploaderUid'])));
           allow delete: if false;
         }
         // قرارُ الإدارة في تعادلٍ على مركز. الكتابةُ للإدارة وحدها: اللجنة تُقيّم ولا تُرتّب،
@@ -376,7 +401,11 @@ service cloud.firestore {
               || (present() && roleIs(['participant'])
                 && resource.data.uploaderUid == request.auth.uid
                 && request.resource.data.uploaderUid == request.auth.uid
-                && resource.data.status in ['draft','submitted','rejected']));
+                && resource.data.status in ['draft','submitted','rejected']
+                // المتسابق يعدّل اختياره ويقدّمه، ولا يعتمده ولا يقفله ولا يمسّ قرار الإدارة.
+                && (request.resource.data.status == resource.data.status || request.resource.data.status in ['draft','submitted'])
+                && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasOnly(['selection','scope','scopeSignature','selectionRuleVersion','status','submittedAt','changeReason','updatedAt','uploaderUid'])));
           allow delete: if false;
         }
         match /session_checkpoints/{checkpointId} {
