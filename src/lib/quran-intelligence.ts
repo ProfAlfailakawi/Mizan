@@ -82,9 +82,12 @@ async function bearer(){const u=auth.currentUser;if(!u)throw new Error('IDENTITY
 async function getJson<T>(url:string):Promise<T>{const token=await bearer();const r=await fetch(url,{headers:{authorization:`Bearer ${token}`,accept:'application/json'},cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as T}
 export async function fetchQuranIntelligenceCapabilities(){return getJson<{streamingAlignment:{mode:'SHADOW_ONLY';backendConfigured:boolean;scoreAuthority:'HUMAN_ONLY';canAffectScore:false}} & Record<string,unknown>>('/api/quran/intelligence/capabilities')}
 export async function fetchQuranPassageIntelligence(reading:QuranReadingId,surah:number,startAyah:number,endAyah:number){return getJson<QuranPassageIntelligence>(`/api/quran/passage/${encodeURIComponent(reading)}/${surah}/${startAyah}/${endAyah}`)}
-export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:string;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string}){
+export async function submitQuranAlignmentChunk(input:{blob:Blob;sessionId:string;reading:QuranReadingId;surah:number;startAyah:number;endAyah:number;sourcePackageId:string;headBytes?:number}){
   const token=await bearer();const qs=new URLSearchParams({sessionId:input.sessionId,reading:input.reading,surah:String(input.surah),startAyah:String(input.startAyah),endAyah:String(input.endAyah),sourcePackageId:input.sourcePackageId});
-  const r=await fetch(`/api/quran/alignment/shadow/audio?${qs.toString()}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'},body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult;
+  const headers:Record<string,string>={authorization:`Bearer ${token}`,'content-type':input.blob.type||'application/octet-stream'};
+  /* الترويسةُ (أوّلُ مقطعٍ في التسجيل) تسبق المقطعَ ليُفكّ؛ وحجمُها يُعلَن فلا تُعدّ كلماتُها موضعَ القارئ الآن. */
+  if(input.headBytes)headers['x-mizan-head-bytes']=String(input.headBytes);
+  const r=await fetch(`/api/quran/alignment/shadow/audio?${qs.toString()}`,{method:'POST',headers,body:input.blob,cache:'no-store'});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body.code||`HTTP_${r.status}`));return body as QuranAlignmentResult;
 }
 /*
  * تدريب المتسابق: نفس المحرّك، بلا دفتر أدلّة.

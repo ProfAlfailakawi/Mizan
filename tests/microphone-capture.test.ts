@@ -46,3 +46,14 @@ test('a microphone failure is announced, not only painted', () => {
   assert.match(fs.readFileSync('src/components/participant/PracticeStudio.tsx', 'utf8'), /micError&&<p role="alert"/);
   assert.match(fs.readFileSync('src/components/participant/TrialRun.tsx', 'utf8'), /\{error && <p role="alert"/);
 });
+
+test('the judge shadow listener receives framed chunks and the server forwards the header size', () => {
+  const judge = fs.readFileSync('src/components/judge/JudgeOS.tsx', 'utf8');
+  const send = judge.slice(judge.indexOf('const sendAlignmentChunk='), judge.indexOf('const sendAlignmentChunk=') + 600);
+  assert.match(send, /framedChunk\(head,blob\)/);
+  assert.match(send, /headBytes:framed\.headBytes/);
+  assert.match(fs.readFileSync('src/lib/quran-intelligence.ts', 'utf8'), /submitQuranAlignmentChunk[\s\S]{0,700}x-mizan-head-bytes/);
+  const server = fs.readFileSync('server.ts', 'utf8');
+  const route = server.slice(server.indexOf("app.post('/api/quran/alignment/shadow/audio'"));
+  assert.match(route.slice(0, route.indexOf('\n')), /headBytes:Number\(soleParam\(req\.headers\['x-mizan-head-bytes'\]/);
+});

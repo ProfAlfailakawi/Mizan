@@ -23,6 +23,7 @@ import { Badge } from '../design-system/Badge';
 import { QuranIntelligenceDock } from './QuranIntelligenceDock';
 import { RecitationReplay, type ReplayMark } from './RecitationReplay';
 import { fetchJudgeFollowStatus, fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetchQuranReadingGuard, fetchQuranSessionEvidence, postQuranHumanMarker, quranReadingIdForPackage, resetQuranAlignment, submitJudgeFollowChunk, submitQuranAlignmentChunk, type QuranAlignmentResult, type QuranPassageIntelligence, type QuranReadingGuard, type QuranReadingId, type QuranSessionEvidence } from '../../lib/quran-intelligence';
+import { framedChunk } from '../../lib/microphone-capture';
 
 // Arabic counts do not pluralise the way English does: 1 takes the singular, 2 takes the
 // dual, 3-10 take the plural, and 11+ return to the singular. "4 مرة" is simply wrong.
@@ -382,7 +383,9 @@ export const JudgeOS: React.FC = () => {
    /* مقطعٌ واحدٌ بلا تطابق (نَفَسٌ أو وقف) لا يُطفئ المؤشّر؛ ثلاثةٌ متتالية تقول «يُعاد التحديد». */
    else if(++followMissRef.current>=3)setAlignmentResult(r=>r?{...r,alignmentState:'REACQUIRING'}:r);
   }).catch(()=>{}).finally(()=>{followBusyRef.current=false})};
- const sendAlignmentChunk=(blob:Blob)=>{const context=alignmentContextRef.current;if(!context||alignmentBusyRef.current||!blob.size)return;alignmentBusyRef.current=true;void submitQuranAlignmentChunk({blob,...context}).then(x=>{setAlignmentResult(x);
+ /* مقاطعُ المسجّل بعد الأولى بلا ترويسة ملف، فلا يفكّها محرّكُ الظلّ وحدها: كان يسمع أوّلَ ثانيةٍ ونصف ثم يصمت.
+    فتُسبق بالأولى ويُعلَن حجمُها — كما يفعل مسارُ المتابعة أعلاه. */
+ const sendAlignmentChunk=(blob:Blob)=>{const context=alignmentContextRef.current;const head=headBlobRef.current;if(!context||alignmentBusyRef.current||!blob.size||!head)return;alignmentBusyRef.current=true;const framed=framedChunk(head,blob);void submitQuranAlignmentChunk({blob:framed.blob,headBytes:framed.headBytes,...context}).then(x=>{setAlignmentResult(x);
   /* الإزاحة من لحظة بدء المسجّل، تُقرأ من الـref لا من حالة مُلتقَطة: هذا المُعالِج يُسنَد مرة
      واحدة عند تجهيز الصوت، فأي قيمة مُغلَقة عليه تبقى قيمة تلك اللحظة إلى آخر الجلسة. */
   const startedAt=audioStartedAt.current;
