@@ -33,6 +33,35 @@ export function poolItemToCandidate(item:QuestionPoolItem,reading?:ReadingContex
  };
 }
 function secureSeed(){const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('')}
+
+/*
+ * مخطّطُ بذرة السحب الحيّ في القاعة — مُرقَّم.
+ *
+ * كانت بذرةُ بنك مصحف التسليم وبذرةُ المحرّك كلتاهما `${competitionId}:${participantId}`،
+ * والبذرةُ العشوائية المُلتزَم بها لا تدخل الاختيار في وضع النطاق. فيحسب المتسابقُ بنكَه
+ * (ومعه أسئلته) قبل السحب من المعرّفين ومن نقطة السحب العامة غير المصادَق عليها.
+ *
+ * المخطّط الثاني يضمّ البذرةَ السرّية المولَّدة لحظةَ السحب إلى الأساس. والتحقّق بعدها
+ * باقٍ: البذرة تُكشف في الإيصال (`seedReveal`) وبصمتُها (`seedCommitmentHash`) داخل الالتزام
+ * العام، فيُعاد بناءُ البنك والمحرّك منها ومن المعرّفين.
+ *
+ * والسحوبُ السابقة لا تحمل `drawSeedScheme`، فتُقرأ بالمخطّط الأوّل حرفًا بحرف كما كانت.
+ */
+export const FAIRDRAW_SEED_SCHEME_V2='MIZAN-DRAW-SEED-2' as const;
+export type FairDrawSeedScheme=typeof FAIRDRAW_SEED_SCHEME_V2;
+/** بذرةٌ سرّية جديدة لسحبٍ واحد (٢٥٦ بت). */
+export function newDrawSecret():string{return secureSeed()}
+/**
+ * أساسُ البذرة لبنك مصحف التسليم ولمحرّك التخصيص في السحب الحيّ.
+ * بلا مخطّط ⇒ المخطّط الأوّل (السحوب السابقة). المخطّط الثاني يستلزم البذرة المكشوفة.
+ */
+export function liveDrawSeedBase(input:{competitionId:string;participantId:string;drawSeedScheme?:string;seedReveal?:string}):string{
+ const legacy=`${input.competitionId}:${input.participantId}`;
+ if(!input.drawSeedScheme)return legacy;
+ if(input.drawSeedScheme!==FAIRDRAW_SEED_SCHEME_V2)throw new Error('FAIRDRAW_SEED_SCHEME_UNKNOWN');
+ if(!input.seedReveal)throw new Error('FAIRDRAW_SEED_NOT_REVEALED');
+ return `${legacy}:${input.seedReveal}`;
+}
 async function tieValue(seed:string,id:string){return parseInt((await sha256(`${seed}|${id}`)).slice(0,13),16)/0x1fffffffffffff}
 
 async function selectWithSeed(args:{pool:QuestionPoolItem[];participant:{riwaya:string};policy:CompetitionPolicy;seed:string;maxJuz?:number;excludedIds?:string[]}){

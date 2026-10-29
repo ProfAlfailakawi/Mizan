@@ -91,6 +91,7 @@ import { RegistrationReminderStore, runRegistrationReminders } from './server/re
 import { PassportStore, type CertificateCheck } from './server/passport';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
+import { sealInputsFromStore } from './server/seal-inputs';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
 import { competitionScopeMismatch } from './server/competition-scope';
 import type { Competition } from './src/types';
@@ -1978,9 +1979,8 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
    * ختم النتيجة: الخادم يؤلّف الرقم من إرسالات المحكمين ثم يختمه. لا يقبل درجةً من العميل
    * أصلًا، فلا مجال لأن يُختم رقم لم يُحسب هنا.
    */
-  app.post('/api/results/seal',requireGovernanceRoles(['comp_admin','org_admin','head_judge',]),(req,res)=>{
+  app.post('/api/results/seal',requireGovernanceRoles(['comp_admin','org_admin','head_judge',]),async(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const body=req.body||{};
-    const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n:undefined};
     const sealSigner=trustSigner();
     /*
      * بلا سجلٍّ لا ختم — ويُقال صراحةً.
@@ -1995,21 +1995,44 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
      */
     if(competitionScopeMismatch(actor,String(body.competitionId||'')))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
+    /*
+     * الدرجاتُ من المخزَّن لا من الطلب: ما يرسله العميل من إرسالاتٍ ومعاييرَ ونمطٍ يُهمَل.
+     * كان الجسمُ مصدرَها، فينال رئيسُ التحكيم أو مديرُ المسابقة ختمًا موقَّعًا على أيّ أرقامٍ
+     * يكتبها. فإن لم يكن للخادم ما يقرأ منه رُفض الطلب بسببٍ صريح، ولا يُرجع إلى الجسم.
+     */
+    if(!firestoreRepository)return res.status(503).json({code:'RESULT_SEAL_SUBMISSIONS_UNAVAILABLE'});
+    const sealCompetitionId=String(body.competitionId||actor.competitionId||'');
+    const sealParticipantId=String(body.participantId||'');
+    if(!sealCompetitionId||!sealParticipantId||!actor.organizationId)return res.status(400).json({code:'RESULT_SEAL_IDENTITY_REQUIRED'});
+    let stored:ReturnType<typeof sealInputsFromStore>;
+    try{
+      const root=`organizations/${actor.organizationId}/competitions/${sealCompetitionId}`;
+      const compDoc=await firestoreRepository.get(root);
+      const paths=await firestoreRepository.listDocumentPaths(`${root}/judge_submissions`,5000);
+      const rows:unknown[]=[];
+      for(let i=0;i<paths.length;i+=40)rows.push(...await Promise.all(paths.slice(i,i+40).map(pp=>firestoreRepository.get(pp))));
+      stored=sealInputsFromStore(compDoc,rows,sealParticipantId);
+    }catch{return res.status(503).json({code:'RESULT_SEAL_SUBMISSIONS_UNAVAILABLE'})}
+    if('code' in stored)return res.status(422).json({code:stored.code});
+    const storedInputs=stored.inputs;
+    const previousSeal=resultSealRegistry.latestFor(actor.organizationId,sealCompetitionId,sealParticipantId);
     try{
       const outcome=sealResult({
-        competitionId:String(body.competitionId||actor.competitionId||''),
-        participantId:String(body.participantId||''),
-        sessionId:String(body.sessionId||''),
+        competitionId:sealCompetitionId,
+        participantId:sealParticipantId,
+        sessionId:storedInputs.sessionId,
         categoryId:body.categoryId?String(body.categoryId):undefined,
-        submissions:Array.isArray(body.submissions)?body.submissions.slice(0,64):[],
-        criteria:Array.isArray(body.criteria)?body.criteria.slice(0,64):[],
-        mode:String(body.mode||'all_judges_all_criteria'),
-        dropExtremes:!!body.dropExtremes,
-        sessionEventCount:num(body.sessionEventCount)||0,
+        submissions:storedInputs.submissions,
+        criteria:storedInputs.criteria,
+        mode:storedInputs.mode,
+        dropExtremes:storedInputs.dropExtremes,
+        // العميلُ الوحيد يرسل صفرًا؛ والعدُّ المعتمد يأتي من الإرسالات المخزَّنة نفسها.
+        sessionEventCount:0,
         // الخاتم هو الهوية المُصدَّقة للطلب، لا اسمًا يرسله العميل عن نفسه.
         sealedBy:String(actor.uid||actor.email||''),
-        previousSealSha256:body.previousSealSha256?String(body.previousSealSha256):undefined,
-        previousFinalScore:num(body.previousFinalScore),
+        // الختمُ السابق من سجلّ الأختام لا من الطلب، فلا يُعلَن فرقٌ لم يقع.
+        previousSealSha256:previousSeal?.sealSha256,
+        previousFinalScore:previousSeal?previousSeal.finalScore:undefined,
         // مفتاح خادمي حين يكون مهيّأً. غيابه لا يمنع الختم لكنه يُعلَن في `assurance` بدل ادّعاء توقيع.
         signer:sealSigner?{keyId:sealSigner.keyId,publicKeySpki:sealSigner.spki,sign:(material:string)=>crypto.sign(null,Buffer.from(material),sealSigner.privateKey).toString('base64url')}:undefined,
       });

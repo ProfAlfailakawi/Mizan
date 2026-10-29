@@ -66,7 +66,7 @@ import { createRelationship, computeQualifiers, mergeQualifications, transitionQ
 import type { SchedulePlanRecord } from './store-state';
 import { applyTemplate as applyCompetitionTemplate, getCompetitionPolicy, getEnabledJudgeActions, getReadinessIssues } from './competition-config';
 import { newId, sha256 } from './crypto';
-import { generateFairDraw, verifyFairDrawSelection, verifyFairDrawPublicProof, poolItemToCandidate, validateScopedSelection } from './fairdraw';
+import { generateFairDraw, verifyFairDrawSelection, verifyFairDrawPublicProof, poolItemToCandidate, validateScopedSelection, FAIRDRAW_SEED_SCHEME_V2, liveDrawSeedBase, newDrawSecret } from './fairdraw';
 import { describeScope, derivedLegacyJuzCount, derivedLegacyMaxJuz, fullQuranScope, normalizeScope, scopeAyahCount, scopeContainsRange, scopeSignature, validateScope, type QuranScope } from './quran-scope';
 import { buildParticipantScopeRecord, nextScopeVersion, selectionIsValid, validateParticipantSelection, type ParticipantScopeRecord, type ParticipantScopeSelectionRule } from './participant-scope';
 import { type QuestionDistributionPlan } from './question-zones';
@@ -3698,6 +3698,10 @@ const prepareJourneyAccessBatch=async()=>{
      * وإلا فمصحف التسليم هو المصدر، لا «نسخة تطوير».
      */
     let sourceMode:'CERTIFIED_SOURCE'|'DELIVERY_MUSHAF'=source&&content&&pool.length?'CERTIFIED_SOURCE':'DELIVERY_MUSHAF';
+    /* البذرة السرّية تُولَّد الآن، لحظةَ السحب، وتدخل أساسَ البنك والمحرّك معًا: لا يُحسب
+       ما يُسحب للمتسابق من معرّفه قبل السحب. وتُكشف في الإيصال فيبقى السحب قابلًا للتحقّق. */
+    const drawSecret=newDrawSecret();
+    const drawSeedBase=liveDrawSeedBase({competitionId:globalState.competition.id,participantId:participant.id,drawSeedScheme:FAIRDRAW_SEED_SCHEME_V2,seedReveal:drawSecret});
     if(sourceMode==='DELIVERY_MUSHAF'){
       /* No certified vault mounted. Rather than drawing from a handful of fixtures whose text is a
          placeholder sentence, generate the pool from the delivery Mushaf for this exact narration:
@@ -3706,7 +3710,7 @@ const prepareJourneyAccessBatch=async()=>{
       /* مقدار الموضع من الوجه ⇒ مدى تقريبي لعدد الآيات. الوجه يظهر كاملًا على سطح المصحف،
          والتظليل يقع على هذا المقدار وحده. تقريبي لأن أطوال الآيات تتفاوت بين السور. */
       const passageSpan=categoryPassageAyahRange(category);
-      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:Math.max(14,resolveQuestionCount(category,policy)*6),seedBase:`${globalState.competition.id}:${participant.id}`,scope:effectiveScope,minAyahCount:passageSpan.minAyahCount,maxAyahCount:passageSpan.maxAyahCount,pageQuarterUnits:categoryPageQuarterUnits(category)});
+      const generated=await buildDeliveryQuestionPool(participant.riwaya,{size:Math.max(14,resolveQuestionCount(category,policy)*6),seedBase:drawSeedBase,scope:effectiveScope,minAyahCount:passageSpan.minAyahCount,maxAyahCount:passageSpan.maxAyahCount,pageQuarterUnits:categoryPageQuarterUnits(category)});
       /* تعذّر التسليم لا يعني السحب من خارج النطاق: تُسقَط مواضع المصحف البنيوية داخله. */
       const structural=generated.length?[]:buildCandidatePool({scope:effectiveScope,category,reading:readingContextOf({riwaya:participant.riwaya})})
         .slice(0,60)
@@ -3721,7 +3725,7 @@ const prepareJourneyAccessBatch=async()=>{
     const allocation=planAllocation({category,policy:effPolicy,effectiveScope,candidates:pool.map(item=>poolItemToCandidate(item))});
     const drawEngine=new QuestionAllocationEngine({
       policy:categoryRepeatPolicy(category,policy),
-      seed:`${globalState.competition.id}:${participant.id}`,
+      seed:drawSeedBase,
       requireReviewedDifficulty:!!category?.requireReviewedDifficulty,
       defaultTargetDifficulty:policy.questions.targetDifficulty,
       /* ما سُمع في القاعات قبل الآن يدخل المفاضلة: الموضع المنكشف يُؤخَّر لا يُمنع أعمى. */
@@ -3761,8 +3765,9 @@ const prepareJourneyAccessBatch=async()=>{
       }
     }
     try {
-      const selection = await generateFairDraw({ pool, participant, policy:effPolicy, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DELIVERY_MUSHAF',
+      const selection = await generateFairDraw({ pool, participant, policy:effPolicy, seed:drawSecret, poolVersion:sourceMode==='CERTIFIED_SOURCE'?source!.packageHash:undefined,quranSourceManifestId:sourceMode==='CERTIFIED_SOURCE'?source!.id:undefined,qiraah:reading?.qiraah,rawi:reading?.rawi,tariq:source?.tariq,variantLocusVersion:sourceMode==='CERTIFIED_SOURCE'?'SOURCE_BOUND':undefined,difficultyMetadataVersion:sourceMode==='CERTIFIED_SOURCE'?`QG:${source!.packageHash}`:'DELIVERY_MUSHAF',
         scoped:{ scope:effectiveScope, participantScopeVersion:scopeResolution.version, slots:allocation.slots, engine:drawEngine, reading:readingContextOf({riwaya:participant.riwaya}), sequencePosition:globalState.questionModels.length, hallId:committee.id, preGenerated, excludedLocusKeys:heldElsewhere } });
+      selection.drawSeedScheme=FAIRDRAW_SEED_SCHEME_V2;
       selection.sourceMode=sourceMode;selection.quranSourceVersion=source?.sourceVersion||source?.version;selection.quranSourcePackageHash=source?.packageHash;
       const sessionId=newId('sess');
       /* نموذج المتسابق يُحفظ كيانًا مستقلًا: عليه تقوم العدالة والتدقيق وإبطال ما بُني على نطاق قديم. */
@@ -3784,7 +3789,7 @@ const prepareJourneyAccessBatch=async()=>{
         relaxations:[...new Set((selection.selectionReasons||[]).flatMap(r=>r.relaxedPreferences))],
         fairness:selection.fairness||{score:0,difficultyParity:0,scopeCoverage:0,repeatPressure:0,diversity:0,similarity:0,exposure:0,zoneCompliance:0,notesArabic:[],notesEnglish:[]},
         generationMode:'just_in_time',engineVersion:selection.engineVersion||'MIZAN-FAIRDRAW-2.0',
-        seedCommitmentHash:selection.seedCommitmentHash,status:'sealed',createdAt:new Date().toISOString(),sealedAt:new Date().toISOString(),
+        seedCommitmentHash:selection.seedCommitmentHash,drawSeedScheme:selection.drawSeedScheme,status:'sealed',createdAt:new Date().toISOString(),sealedAt:new Date().toISOString(),
       };
       if(preGenerated){
         /* النموذج المختوم لا يُستنسخ: يُعلَّم مستهلَكًا ويُربط بالجلسة، فيبقى كيانًا واحدًا له تاريخ واحد. */
