@@ -68,3 +68,9 @@ test('a late reply for an older chunk never overwrites the newer position', () =
     assert.ok(guard > 0 && guard < after.indexOf('setLast(out)'), `${file}: the stale reply is dropped before the position is written`);
   }
 });
+
+test('the judge microphone gate names the actual failure', () => {
+  const judge = fs.readFileSync('src/components/judge/JudgeOS.tsx', 'utf8');
+  assert.match(judge, /catch\(err\)\{setShadowMicActive\(false\);setMicFailure\(err\);setAudioState\('failed'\)\}/);
+  assert.match(judge, /audioState==='failed'&&micFailure!==null&&<p role="alert"[^>]*>\{microphoneErrorNote\(micFailure,ar\)\}/);
+});
