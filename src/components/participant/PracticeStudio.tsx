@@ -7,6 +7,7 @@ import {splitAyahWords} from '../../lib/word-timing';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
 import {WaqfGuide} from './WaqfGuide';
+import {microphoneErrorNote} from '../../lib/microphone-capture';
 
 /*
  * استوديو التدرّب — للمتسابق قبل يوم المسابقة.
@@ -42,10 +43,14 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
  const stopTracks=()=>{streamRef.current?.getTracks().forEach(t=>t.stop());streamRef.current=null};
  useEffect(()=>()=>{stopTracks();if(selfUrl)URL.revokeObjectURL(selfUrl)},[selfUrl]);
 
+ /* ضغطتان سريعتان كانتا تفتحان ميكروفونين، فيُكتب الثاني فوق الأوّل ويبقى الأوّلُ مفتوحًا بلا إغلاق. */
+ const opening=useRef(false);
  const start=async()=>{
+  if(opening.current||recRef.current?.state==='recording')return;
   setMicError('');
   if(typeof navigator==='undefined'||!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==='undefined'){
    setMicError(ar?'التسجيل غير مدعوم في هذا المتصفّح.':'Recording is not supported in this browser.');return;}
+  opening.current=true;
   try{
    const stream=await navigator.mediaDevices.getUserMedia({audio:true});streamRef.current=stream;
    const rec=new MediaRecorder(stream);recRef.current=rec;chunksRef.current=[];
@@ -53,7 +58,8 @@ export const PracticeStudio:React.FC<{reading:string;surah:number;startAyah:numb
    rec.onstop=()=>{const blob=new Blob(chunksRef.current,{type:rec.mimeType||'audio/webm'});
     setSelfUrl(prev=>{if(prev)URL.revokeObjectURL(prev);return URL.createObjectURL(blob)});stopTracks()};
    rec.start();setRecording(true);
-  }catch{setMicError(ar?'تعذّر الوصول إلى الميكروفون. تحقّق من إذن المتصفّح.':'Microphone access was refused. Check the browser permission.');stopTracks()}
+  }catch(err){setMicError(microphoneErrorNote(err,ar));stopTracks()}
+  finally{opening.current=false}
  };
  const stop=()=>{recRef.current?.state==='recording'&&recRef.current.stop();setRecording(false)};
  const discard=()=>{setSelfUrl(prev=>{if(prev)URL.revokeObjectURL(prev);return null})};
