@@ -2906,7 +2906,8 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});
     const identity=(req as any).mizanIdentity;const body=req.body||{};
     if(String(body.organizationId||'')!==identity.organizationId)return res.status(403).json({code:'CERTIFICATE_TENANT_MISMATCH'});
-    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED'})}
+    if(competitionScopeMismatch(identity,String(body.competitionId||'')))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
+    try{return res.status(201).json({certificate:certificateRegistry.publish(body)})}catch(err){const code=err instanceof Error?err.message:'CERTIFICATE_PUBLISH_FAILED';return res.status(code==='CERTIFICATE_TENANT_MISMATCH'?403:400).json({code})}
   });
   app.post('/api/certificates/:number/revoke',certificatePublishRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     if(!certificateRegistry)return res.status(503).json({code:'CERTIFICATE_REGISTRY_NOT_CONFIGURED'});

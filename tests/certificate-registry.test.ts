@@ -168,3 +168,12 @@ test('publication never breaks issuance and never leaks beyond the certificate',
   for(const secret of ['judge','criterion','audio','email','phone','nationalId'])assert.ok(!sent.includes(secret),`published payload must not carry ${secret}`);
  }finally{g.fetch=realFetch}
 });
+
+test('another organisation cannot republish over a certificate it does not own',withRegistry(r=>{
+ r.publish(record('MZN-2026-KW-OWNED'));
+ assert.throws(()=>r.publish({...record('MZN-2026-KW-OWNED'),organizationId:'org-2',organizationName:'جهة أخرى'}),/CERTIFICATE_TENANT_MISMATCH/);
+ assert.equal(r.verify('MZN-2026-KW-OWNED').state,'AUTHENTIC');
+ assert.equal((r.verify('MZN-2026-KW-OWNED') as any).certificate.organizationName,'دار القرآن','the owner\'s record is untouched');
+ // The owner can still republish its own number (same certificate id).
+ assert.doesNotThrow(()=>r.publish(record('MZN-2026-KW-OWNED')));
+}));
