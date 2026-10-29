@@ -13,13 +13,25 @@
  * محاولة واحدة تركنا الخطأ ظاهرًا ليُعالَج بوصفه عطلًا حقيقيًا لا نسخة قديمة.
  */
 
+import { serverAnswers, showUpdatingNotice } from './updating-notice';
+
 const FLAG = 'mizan-shell-reloaded';
+let waitingForServer = false;
 
 function looksLikeStaleChunk(message: string) {
   return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Unexpected token '<'|MIME type/i.test(message);
 }
 
 async function recover() {
+  /* أثناء النشر تتعثّر الحزمةُ لأن الخادم يتبدّل لا لأن الغلاف قديم. المسحُ حينها يُسقط العاملَ
+     الذي يحمل صفحةَ «نُحدّث البرنامج» ويستهلك المحاولةَ الوحيدة. فيُسأل الخادمُ أولًا: إن لم
+     يُجب ظهر الشريطُ الهادئ وانتظرناه، ثم أعدنا التحميل بلا مسح. */
+  if (waitingForServer) return;
+  if (!(await serverAnswers())) {
+    waitingForServer = true;
+    showUpdatingNotice(serverAnswers, () => { window.location.reload(); });
+    return;
+  }
   try {
     if (sessionStorage.getItem(FLAG)) return; // حاولنا مرة؛ لا ندخل في دوّامة
     sessionStorage.setItem(FLAG, '1');
