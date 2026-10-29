@@ -92,6 +92,7 @@ import { PassportStore, type CertificateCheck } from './server/passport';
 import { SsoConfigRepository, suggestRole } from './server/sso';
 import { FirestoreRestRepository } from './server/firestore-rest';
 import { PublicRegistrationService, type PublicRegistrationInput } from './server/public-registration';
+import { competitionScopeMismatch } from './server/competition-scope';
 import type { Competition } from './src/types';
 
 const b64=(x:string|Uint8Array)=>Buffer.from(x).toString('base64url');
@@ -1992,6 +1993,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
      * والنشرُ أدناه يردّ 503 في الحال نفسها منذ البداية. فيُسوَّى البابان: ما لا يُسجَّل
      * لا يُختم.
      */
+    if(competitionScopeMismatch(actor,String(body.competitionId||'')))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     if(!resultSealRegistry)return res.status(503).json({code:'RESULT_SEAL_REGISTRY_NOT_CONFIGURED'});
     try{
       const outcome=sealResult({
@@ -2041,6 +2043,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const actor=(req as any).mizanIdentity as ServerIdentity;
     const competitionId=String(req.body?.competitionId||actor.competitionId||'');
     if(!competitionId)return res.status(400).json({code:'COMPETITION_REQUIRED'});
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     if(!resultSealRegistry||!resultPublications)return res.status(503).json({code:'RESULT_PUBLICATION_NOT_CONFIGURED'});
     res.setHeader('Cache-Control','no-store');
     try{
@@ -2069,6 +2072,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
   app.post('/api/governance/policy-change',auditRateLimit,requireGovernanceRoles(['super_admin','org_admin','comp_admin']),(req,res)=>{
     const actor=(req as any).mizanIdentity as ServerIdentity;const b=req.body||{};
     const competitionId=String(b.competitionId||actor.competitionId||'');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     res.setHeader('Cache-Control','no-store');
     // عددُ الأختام يُقرأ من سجلّ الأختام الذي كتبه الخادم، لا من حقلٍ يرسله العميل.
     const sealedResultCount=resultSealRegistry?resultSealRegistry.countFor(actor.organizationId,competitionId):0;
@@ -2114,6 +2118,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
     res.setHeader('Cache-Control','no-store');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     /*
      * «هل خُتمت؟» تُقرأ من سجلّ الأختام لا من الطلب — وإلا أعلن المصحّحُ أنها لم تُختم.
      *
@@ -2143,6 +2148,7 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     const competitionId=String(b.competitionId||actor.competitionId||'');
     const participantId=String(b.participantId||'');
     res.setHeader('Cache-Control','no-store');
+    if(competitionScopeMismatch(actor,competitionId))return res.status(403).json({code:'COMPETITION_SCOPE_MISMATCH'});
     /*
      * «هل سُحب سؤال؟» تُقرأ من محرّك الأسئلة الخادميّ. وغيابُ المحرّك لا يُقرأ «لم يُسحب»:
      * ذلك يفتح البابَ الذي بُني ليُغلق، فيُعدّ مسحوبًا حتى يُثبت المحرّكُ خلافه.
