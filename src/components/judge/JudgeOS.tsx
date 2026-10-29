@@ -335,6 +335,9 @@ export const JudgeOS: React.FC = () => {
    ?`تعذّر بدء الجلسة لهذا المتسابق: ${reason||'راجع غرفة العمليات أو وزّعه على لجنة أخرى.'}`
    :`Could not start this participant.${code?` (${code})`:''}`)};
  const recorderRef=useRef<MediaRecorder|null>(null); const streamRef=useRef<MediaStream|null>(null); const chunksRef=useRef<Blob[]>([]); const audioStartedAt=useRef<string>(''); const promptAudioRef=useRef<HTMLAudioElement|null>(null); const transitionAudioRef=useRef<HTMLAudioElement|null>(null); const openingPlayedKeyRef=useRef('');
+ /* مغادرةُ سطح التحكيم (تبديل العرض أو الخروج) كانت تُبقي المسجّلَ والميكروفونَ يعملان: مؤشّرُ الميكروفون
+    مضاءٌ والمقاطعُ تتراكم في الذاكرة بلا جلسة. فيُغلقان عند الخروج من السطح، كما يُغلقان عند تبدّل الجلسة. */
+ useEffect(()=>()=>{const recorder=recorderRef.current;if(recorder&&recorder.state!=='inactive')try{recorder.stop()}catch{/* أُغلق مسبقًا */}streamRef.current?.getTracks().forEach(t=>t.stop());recorderRef.current=null;streamRef.current=null},[]);
  /* ذاكرةُ عبارة الإنهاء على هذا الجهاز: آخرُ ما قيل، وما قيل قبل أن يبدأ المتسابقُ الحاضر —
     فلا يسمع المتسابقُ التالي في أوّل موضعه ما سمعه سابقُه في آخر موضعه. تبقى بعد إعادة
     التحميل؛ وإن غابت فالترتيبُ لكلّ متسابقٍ صحيحٌ بلا تكرار، ويسقط هذا الشرطُ وحده. */
