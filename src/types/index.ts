@@ -300,6 +300,8 @@ export interface QuestionModelRecord {
   engineVersion: string;
   seed?: string;
   seedCommitmentHash?: string;
+  /** مخطّط بذرة السحب الحيّ؛ غيابه = المخطّط الأوّل (سحوبٌ سابقة لهذا الحقل). */
+  drawSeedScheme?: 'MIZAN-DRAW-SEED-2';
   status: 'draft' | 'sealed' | 'consumed' | 'invalidated';
   createdAt: string;
   sealedAt?: string;
@@ -709,6 +711,8 @@ export interface QuestionSelection {
   fairnessToleranceDelta: number;
   generatedAt: string;
   algorithmVersion?:string; poolVersion?:string; poolSnapshotHash?:string; ruleVersion?:string; constraintHash?:string; publicCommitmentHash?:string; seedReveal?:string; quranSourceManifestId?:string; quranSourceVersion?:string; quranSourcePackageHash?:string; sourceMode?:'CERTIFIED_SOURCE'|'DELIVERY_MUSHAF'; qiraah?:string; rawi?:string; tariq?:string; variantLocusVersion?:string; difficultyMetadataVersion?:string;
+  /** مخطّط بذرة السحب الحيّ (انظر `liveDrawSeedBase`)؛ غيابه = المخطّط الأوّل `${competitionId}:${participantId}`. */
+  drawSeedScheme?:'MIZAN-DRAW-SEED-2';
   /* ---- وضع النطاق (MIZAN-FAIRDRAW-SCOPE-1) ----
      يُملأ حين يقود محرك النطاق السحب. القرعة القديمة تترك هذه الحقول فارغة، وإثباتاتها
      تُتحقَّق بالفرع الموروث كما هي. */

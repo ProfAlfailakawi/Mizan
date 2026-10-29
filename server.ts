@@ -2013,18 +2013,19 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
       for(let i=0;i<paths.length;i+=40)rows.push(...await Promise.all(paths.slice(i,i+40).map(pp=>firestoreRepository.get(pp))));
       stored=sealInputsFromStore(compDoc,rows,sealParticipantId);
     }catch{return res.status(503).json({code:'RESULT_SEAL_SUBMISSIONS_UNAVAILABLE'})}
-    if(!stored.ok)return res.status(422).json({code:stored.code});
+    if('code' in stored)return res.status(422).json({code:stored.code});
+    const storedInputs=stored.inputs;
     const previousSeal=resultSealRegistry.latestFor(actor.organizationId,sealCompetitionId,sealParticipantId);
     try{
       const outcome=sealResult({
         competitionId:sealCompetitionId,
         participantId:sealParticipantId,
-        sessionId:stored.inputs.sessionId,
+        sessionId:storedInputs.sessionId,
         categoryId:body.categoryId?String(body.categoryId):undefined,
-        submissions:stored.inputs.submissions,
-        criteria:stored.inputs.criteria,
-        mode:stored.inputs.mode,
-        dropExtremes:stored.inputs.dropExtremes,
+        submissions:storedInputs.submissions,
+        criteria:storedInputs.criteria,
+        mode:storedInputs.mode,
+        dropExtremes:storedInputs.dropExtremes,
         // العميلُ الوحيد يرسل صفرًا؛ والعدُّ المعتمد يأتي من الإرسالات المخزَّنة نفسها.
         sessionEventCount:0,
         // الخاتم هو الهوية المُصدَّقة للطلب، لا اسمًا يرسله العميل عن نفسه.
