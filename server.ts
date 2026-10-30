@@ -70,6 +70,7 @@ import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tt
 import { baseDomain, publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
 import { retiredHosts } from './server/retired-hosts';
 import { staticCompression } from './server/static-compression';
+import { UPDATING_PAGE_PATH, updatingPageCsp } from './server/updating-page';
 import { publicOriginOf } from './server/public-origin';
 import { parseAllowedOrgIds, resolveEnterpriseOrganization } from './server/enterprise-scope';
 import { TenantStore } from './server/tenant-store';
@@ -3033,6 +3034,10 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
     /* Gzip/brotli for the built client and the HTML shell only. Every API, webhook, legal-page and
        health route is registered above, so none of them reaches this middleware; its filter also
        refuses /api, /internal, webhook paths and text/event-stream (server/static-compression.ts). */
+    /* صفحة «نُحدّث البرنامج» مفتوحةً من الخادم مباشرة: سياسةٌ أضيق تسمح بسكربتها المضمَّن ببصمته
+       وحدها (server/updating-page.ts). عاملُ الخدمة يقدّمها أثناء النشر من ذاكرته، لا من هنا. */
+    const updatingPage=(()=>{try{const html=fs.readFileSync(path.join(distPath,'updating.html'),'utf8');const csp=updatingPageCsp(html);return csp?{html,csp}:null}catch{return null}})();
+    app.get(UPDATING_PAGE_PATH,(_req,res,next)=>{if(!updatingPage)return next();res.setHeader('Content-Security-Policy',updatingPage.csp);res.setHeader('Cache-Control','no-cache, must-revalidate');res.type('html').send(updatingPage.html)});
     app.use(staticCompression());
     app.use(express.static(distPath,{etag:true,setHeaders(res,filePath){
       if(filePath.endsWith('.html')||filePath.endsWith('sw.js')) res.setHeader('Cache-Control','no-cache, must-revalidate');

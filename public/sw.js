@@ -29,7 +29,29 @@ async function putAsset(cache,request,response){
  }
 }
 
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).catch(()=>{}));self.skipWaiting();});
+/*
+ * «نُحدّث البرنامج» بدل صفحة Google الإنجليزية.
+ *
+ * أثناء النشر يتبدّل الخادم، فتجيب واجهةُ Google الأمامية عن التنقّل بصفحة
+ * «Error: Server Error … try again in 30 seconds» لا يكتبها خادمُ ميزان. الصفحةُ البديلة
+ * (/updating.html) تُحفظ عند التثبيت في ذاكرة هذا الإصدار نفسها، وتُقدَّم للتنقّل وحده —
+ * لا لـ/api ولا لغير GET ولا لجوابٍ ناجح — حين يعود 500/502/503/504. ولا يُحفظ جوابُ
+ * 5xx في أيّ ذاكرة هنا أبدًا.
+ *
+ * والانقطاعُ لا يُعامَل معاملةَ النشر: جهازُ القاعة قد يكون «متّصلًا» بشبكةٍ لا تبلغ
+ * الإنترنت، والتحكيمُ يستمرّ دون اتصال. فالانقطاعُ يفتح الغلافَ المحفوظ كما كان، ولا
+ * تُقدَّم صفحةُ التحديث له إلا حين لا غلافَ محفوظًا والجهازُ يقول إنه متّصل.
+ */
+const UPDATING_PAGE='/updating.html';
+const isUpdatingStatus=s=>s===500||s===502||s===503||s===504;
+const storeUpdatingPage=()=>fetch(UPDATING_PAGE,{cache:'no-store',credentials:'same-origin'}).then(r=>{
+ if(r.ok&&(r.headers.get('content-type')||'').includes('text/html'))return caches.open(CACHE).then(c=>c.put(UPDATING_PAGE,r));
+}).catch(()=>{});
+/* مُسحت الذاكرةُ (تعافٍ أو تحديث)؟ تُعاد بعد أول تنقّلٍ ناجح، ولا يُنتظر ذلك. */
+const refillUpdatingPage=()=>caches.open(CACHE).then(c=>c.match(UPDATING_PAGE)).then(hit=>hit?undefined:storeUpdatingPage()).catch(()=>{});
+const updatingResponse=()=>caches.open(CACHE).then(c=>c.match(UPDATING_PAGE)).then(page=>page?page.text().then(body=>new Response(body,{status:503,statusText:'Service Unavailable',headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Retry-After':'5','X-Mizan-Updating':'1'}})):null).catch(()=>null);
+
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).catch(()=>{}).then(storeUpdatingPage));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>!KEEP.includes(k)).map(k=>caches.delete(k)))));self.clients.claim();});
 
 self.addEventListener('fetch',e=>{
@@ -37,9 +59,15 @@ self.addEventListener('fetch',e=>{
  /* طلبات التنقل (HTML) دائمًا من الشبكة وبـ cache:"no-store": الغلاف المخزّن يسمّي حزمًا
     حذفها النشر التالي. الكاش احتياط لانقطاع الاتصال لا غير. */
  if(req.mode==='navigate'){
+  /* صفحةُ التحديث نفسها لا تُحفظ غلافًا للتطبيق، وتنقّلُ /api (تنزيلُ ملفٍّ مثلًا) لا يُبدَّل جوابُه. */
+  const path=new URL(req.url).pathname,own=path===UPDATING_PAGE,api=path.indexOf('/api/')===0;
   e.respondWith(fetch(req.url,{cache:'no-store',credentials:'same-origin',redirect:'follow'})
-   .then(r=>{if(r&&r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put('/index.html',copy))}return r})
-   .catch(()=>caches.match('/index.html')));
+   .then(r=>{
+    if(r&&!api&&isUpdatingStatus(r.status))return updatingResponse().then(page=>page||r);
+    if(r&&r.ok&&!own){const copy=r.clone();caches.open(CACHE).then(c=>c.put('/index.html',copy));void refillUpdatingPage()}
+    return r;
+   })
+   .catch(()=>caches.match('/index.html').then(shell=>shell||(api||(self.navigator&&self.navigator.onLine===false)?undefined:updatingResponse().then(page=>page||undefined)))));
   return;
  }
  const url=new URL(req.url);
@@ -51,5 +79,6 @@ self.addEventListener('fetch',e=>{
   return;
  }
  // بقية أصول نفس الأصل: الشبكة أولًا، والكاش احتياطًا عند انقطاع الاتصال.
- e.respondWith(fetch(req).then(r=>{if(r.ok&&url.pathname.indexOf('/api/')!==0){const copy=r.clone();caches.open(CACHE).then(c=>c.put(req,copy))}return r}).catch(()=>caches.match(req)));
+ // وخطٌّ أو أيقونةٌ طُلبت أثناء النشر فجاءت صفحةُ خطأ المنصّة: النسخةُ المحفوظة أفضل. و/api يبقى كما جاء.
+ e.respondWith(fetch(req).then(r=>{if(r.ok&&url.pathname.indexOf('/api/')!==0){const copy=r.clone();caches.open(CACHE).then(c=>c.put(req,copy))}else if(isUpdatingStatus(r.status)&&url.pathname.indexOf('/api/')!==0)return caches.match(req).then(hit=>hit||r);return r}).catch(()=>caches.match(req)));
 });

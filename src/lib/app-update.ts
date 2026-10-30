@@ -20,6 +20,8 @@
  * المستخدم المخزّنة (تفضيلاته وجلسته) — نمسح الكاش وعامل الخدمة فقط.
  */
 
+import { SERVER_BACK_EVENT } from './updating-notice';
+
 declare const __BUILD_ID__: string;
 
 /** بصمة الحزمة التي يعمل بها هذا التبويب الآن. */
@@ -337,6 +339,9 @@ export function installAppUpdate(options: { chunkRecovery?: boolean } = {}): voi
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) void checkForUpdate();
   });
+
+  // عاد الخادم من نشر (updating-notice): قد يكون هذا التبويب على البناء القديم الآن.
+  window.addEventListener(SERVER_BACK_EVENT, () => { void checkForUpdate(); });
 
   // شبكة أمان بطيئة للتبويب المتروك مفتوحًا أيامًا.
   window.setInterval(() => { void checkForUpdate(); }, POLL_MS);

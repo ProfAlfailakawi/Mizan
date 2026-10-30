@@ -13,6 +13,10 @@ import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-reco
 import {installAppUpdate} from './lib/app-update';
 import {installInputNormalization} from './lib/input-validation';
 import { loadHostBrand } from './lib/host-brand';
+import {installUpdatingWatch} from './lib/updating-notice';
+/* أثناء النشر تجيب المنصّةُ /api بصفحة خطأ HTML: شريطٌ هادئ «نُحدّث البرنامج» بدل حيرةٍ في الشاشات.
+   يُركَّب قبل أي طلب، ويراقب فقط ولا يغيّر جوابًا. */
+installUpdatingWatch();
 /* علامة المضيف تُجلب قبل أول رسم، فلا تومض «ميزان» على نطاق مشغّلٍ بعلامة بيضاء. */
 loadHostBrand();
 
