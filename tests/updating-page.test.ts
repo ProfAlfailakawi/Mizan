@@ -1,7 +1,7 @@
 /*
  * «نُحدّث البرنامج» بدل صفحة Google الإنجليزية أثناء النشر.
  *
- *   U1) sw.js: تنقّلٌ يعود 500/502/503/504 ← صفحةُ التحديث (503، no-store)؛ والنجاحُ والتحويلُ يمرّان.
+ *   U1) sw.js: تنقّلٌ يعود 500/502/503/504 ← صفحةُ «نضبط الميزان» (503، no-store)؛ والنجاحُ والتحويلُ يمرّان.
  *   U2) لا يمسّ /api (طلبًا ولا تنقّلًا) ولا غيرَ GET، ولا يحفظ جوابَ 5xx، ولا يحفظ صفحةَ التحديث غلافًا؛
  *       والانقطاعُ يفتح الغلافَ المحفوظ كما كان (القاعة تعمل دون اتصال)، وصفحةُ التحديث له حين لا غلاف.
  *   U3) التثبيتُ يحفظها في ذاكرة الإصدار؛ والتنقّلُ الناجح يعيد حفظها؛ وختمُ البناء باقٍ.
@@ -85,7 +85,7 @@ const deploying = (status: number | 'drop'): Net => async pathname => {
 };
 const isUpdatingPage = async (response: Response | null | undefined) =>
   Boolean(response) && response!.status === 503 && response!.headers.get('cache-control') === 'no-store'
-  && /text\/html/.test(response!.headers.get('content-type') || '') && (await response!.clone().text()).includes('نُحدّث البرنامج الآن');
+  && /text\/html/.test(response!.headers.get('content-type') || '') && (await response!.clone().text()).includes('<h1 id="title">نضبط الميزان</h1>');
 
 test('U1 a 5xx navigation gets the updating page; success and redirects pass through', async () => {
   for (const status of [500, 502, 503, 504]) {
@@ -182,8 +182,10 @@ test('U4 the page is standalone, RTL, light/dark, polls /api/health with backoff
   assert.match(PAGE, /<html lang="ar" dir="rtl">/);
   assert.match(PAGE, /prefers-color-scheme:dark/);
   assert.match(PAGE, /prefers-reduced-motion/);
-  assert.match(PAGE, /<title>نُحدّث البرنامج · ميزان<\/title>/);
-  for (const text of ['نُحدّث البرنامج الآن ✨', 'لحظاتٍ ونعود', 'أعد المحاولة الآن']) assert.ok(PAGE.includes(text), text);
+  assert.match(PAGE, /<title>نضبط الميزان · ميزان<\/title>/);
+  for (const text of ['نضبط الميزان', 'تعود الصفحة التي طلبتها وحدها', 'افتح الصفحة الآن']) assert.ok(PAGE.includes(text), text);
+  assert.match(PAGE, /id="note" role="status" aria-live="polite"/);
+  assert.doesNotMatch(PAGE, /✨/);
 
   const script = inlineScriptOf(PAGE) || '';
   const run = (options: { health: boolean[]; recent?: number[]; pathname?: string; online?: boolean }) => {
@@ -236,7 +238,7 @@ test('U4 the page is standalone, RTL, light/dark, polls /api/health with backoff
     const page = run({ health: [true], online: false });
     await page.step();
     assert.equal(page.asked.length, 0);
-    assert.match(page.nodes.title.textContent, /لا اتصال/);
+    assert.match(page.nodes.title.textContent, /غير متّصل/);
   }
 });
 
@@ -258,7 +260,7 @@ test('U6 the app shows one calm bar for a platform 5xx and hands the response ba
   assert.equal(isPlatformUpdating(503, 'application/json; charset=utf-8'), false, 'our own JSON errors stay ours');
   assert.equal(isPlatformUpdating(502, ''), false, 'a bodiless 502 from a binary route stays ours');
   assert.equal(isPlatformUpdating(404, 'text/html'), false);
-  assert.ok(UPDATING_MESSAGE.includes('نُحدّث البرنامج'));
+  assert.ok(UPDATING_MESSAGE.includes('نضبط الميزان'));
 
   const timers: Array<() => void> = [];
   const appended: any[] = [];
