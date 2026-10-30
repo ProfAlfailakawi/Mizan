@@ -1,11 +1,14 @@
 <!doctype html>
 <!--
-  صفحة «نُحدّث البرنامج».
+  صفحة «نضبط الميزان»: ما يراه الزائر أثناء نشر إصدارٍ جديد.
 
   أثناء النشر يتبدّل الخادم، فتجيب واجهةُ Google الأماميّة عن التنقّل بصفحة خطأٍ
   إنجليزية لا يكتبها خادمُ ميزان أصلًا. عاملُ الخدمة (public/sw.js) يحفظ هذه الصفحة
   عند تثبيته، ويقدّمها بدلًا من أيّ جوابٍ 500/502/503/504 أو انقطاعٍ للتنقّل —
   والرابطُ في شريط العنوان يبقى ما طلبه الزائر، فإعادةُ التحميل تفتحه هو نفسه.
+
+  الرسم: كفّتا ميزانٍ كبيرتان يميل عاتقُهما قليلًا ثم يستقرّ مستويًا، فوق نقشٍ هندسيّ
+  خافت من نجومٍ ثمانية (خاتم سليمان). كلّه SVG مضمَّن، بلا صورٍ ولا طلباتٍ خارجية.
 
   مستقلّةٌ تمامًا: لا طلبَ خارجيًا، والخطُّ خطُّ ميزان إن كان محفوظًا وإلا خطُّ النظام.
   تسأل /api/health كل ثلاث ثوانٍ (وتتباطأ تدريجيًا)، فإذا أجاب أعادت فتح الصفحة
@@ -23,109 +26,174 @@
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f7f5ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#101a16" media="(prefers-color-scheme: dark)">
-<title>نُحدّث البرنامج · ميزان</title>
+<title>نضبط الميزان · ميزان</title>
 <style>
 @font-face{font-family:"Mizan Plex";font-weight:400;font-display:swap;src:local("IBM Plex Sans Arabic"),url("/fonts/284d2adce0.woff2") format("woff2")}
 @font-face{font-family:"Mizan Plex";font-weight:600;font-display:swap;src:local("IBM Plex Sans Arabic SemiBold"),url("/fonts/bdba2ef564.woff2") format("woff2")}
 @font-face{font-family:"Mizan Display";font-weight:600;font-display:swap;src:local("Alexandria SemiBold"),url("/fonts/313baf6f04.woff2") format("woff2")}
 :root{
-  --bg:#f7f5ef;--ink:#171b18;--muted:#565c57;--line:rgb(23 27 24 / .10);
-  --accent:#214c40;--glow:rgba(185,139,78,.14);--scan:#2f6555;--gold:#b98b4e;--leaf:#2f6555;
-  --button:#fffefb;--button-line:rgb(23 27 24 / .14);--shadow:rgba(18,63,53,.22);--tile-line:rgba(185,139,78,.38);
+  --bg:#f7f5ef;--bg-2:#efece2;--ink:#171b18;--muted:#565c57;
+  --emerald:#214c40;--emerald-2:#2f6555;--gold:#b98b4e;--gold-2:#9b7542;
+  --frame:#214c40;--frame-soft:#2f6555;--pan:#fffefb;--pan-line:#d8b172;
+  --star:rgb(155 117 66 / .14);--rule:rgb(185 139 78 / .55);
+  --btn:#214c40;--btn-ink:#fffefb;--btn-hover:#1a3d33;--focus:#9b7542;
+  --shade:rgb(18 63 53 / .10);
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --bg:#101a16;--ink:#f4f1e8;--muted:#a9b6ae;--line:rgb(255 255 255 / .10);
-    --accent:#d8b172;--glow:rgba(216,177,114,.16);--scan:#e8cb93;--gold:#e8cb93;--leaf:#8fbfae;
-    --button:#16241f;--button-line:rgb(255 255 255 / .14);--shadow:rgba(0,0,0,.6);--tile-line:rgba(232,203,147,.30);
+    --bg:#101a16;--bg-2:#16241f;--ink:#f4f1e8;--muted:#a9b6ae;
+    --emerald:#8fbfae;--emerald-2:#8fbfae;--gold:#e8cb93;--gold-2:#d8b172;
+    --frame:#d8b172;--frame-soft:#8fbfae;--pan:#16241f;--pan-line:#e8cb93;
+    --star:rgb(232 203 147 / .10);--rule:rgb(232 203 147 / .45);
+    --btn:#e8cb93;--btn-ink:#101a16;--btn-hover:#f1dbb0;--focus:#e8cb93;
+    --shade:rgb(0 0 0 / .35);
     color-scheme:dark;
   }
 }
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0;min-height:100%;display:grid;place-items:center;
-  padding:max(24px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));
-  background:radial-gradient(circle at 50% 40%,var(--glow),transparent 46%),var(--bg);
+  margin:0;min-height:100%;overflow-x:hidden;
+  background:linear-gradient(180deg,var(--bg) 0%,var(--bg) 52%,var(--bg-2) 100%);
   color:var(--ink);
   font-family:"Mizan Plex",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Arabic",Tahoma,sans-serif;
-  font-synthesis:none;-webkit-font-smoothing:antialiased;text-align:center;
+  font-synthesis:none;-webkit-font-smoothing:antialiased;
 }
-main{display:grid;justify-items:center;gap:0;max-width:420px;width:100%}
-.stage{position:relative;width:132px;height:132px;display:grid;place-items:center;margin-bottom:30px}
-.halo{position:absolute;inset:0;width:100%;height:100%;animation:turn 3.6s linear infinite}
-.halo circle{fill:none;stroke-width:2;stroke-linecap:round}
-.halo .track{stroke:var(--line)}
-.halo .arc{stroke:var(--accent);stroke-dasharray:96 400;opacity:.85}
-.mark{width:84px;height:84px;display:block;filter:drop-shadow(0 18px 30px var(--shadow))}
-.mark .tile-line{stroke:var(--tile-line)}
-.mark .needle{transform-box:view-box;transform-origin:60px 42px;animation:weigh 2.4s cubic-bezier(.45,0,.25,1) infinite}
-.mark .finial{animation:settle 2.4s cubic-bezier(.16,1,.3,1) infinite}
-.spark{position:absolute;fill:var(--gold);animation:twinkle 2.4s ease-in-out infinite}
-.spark.one{width:20px;height:20px;top:6px;inset-inline-start:8px}
-.spark.two{width:12px;height:12px;bottom:14px;inset-inline-end:6px;fill:var(--leaf);animation-delay:1.2s}
-h1{margin:0;font-family:"Mizan Display","Mizan Plex",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Arabic",Tahoma,sans-serif;font-size:clamp(22px,5.6vw,27px);font-weight:600;line-height:1.5;letter-spacing:0}
-.lead{margin:6px 0 0;font-size:16px;line-height:1.7;color:var(--muted)}
-.pulse{width:132px;height:2px;margin:26px 0 28px;border-radius:99px;background:var(--line);overflow:hidden}
-.pulse i{display:block;width:36%;height:100%;border-radius:inherit;background:linear-gradient(90deg,transparent,var(--scan),transparent);animation:scan 1.5s ease-in-out infinite}
+.ground{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+.ground .star{fill:none;stroke:var(--star);stroke-width:1}
+main{
+  position:relative;min-height:100%;
+  display:grid;align-content:center;
+  width:min(100%,640px);margin:0 auto;
+  padding:max(28px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));
+}
+/* الميزانُ إلى طرف السطر الأيسر، والكلامُ تحته منزاحٌ إلى اليمين: لا تراصّ في المنتصف. */
+.scale{display:block;justify-self:end;width:min(100%,430px);height:auto;margin-inline-end:-6px;overflow:visible}
+.scale .post,.scale .beam-bar{stroke:var(--frame)}
+.scale .post{stroke-width:5;stroke-linecap:round}
+.scale .foot{fill:var(--frame)}
+.scale .foot-line{fill:none;stroke:var(--gold);stroke-width:1.4}
+.scale .beam-bar{stroke-width:5.5;stroke-linecap:round;fill:none}
+.scale .knob{fill:var(--gold)}
+.scale .pivot{fill:var(--gold);stroke:var(--frame);stroke-width:2}
+.scale .tongue{fill:var(--gold)}
+.scale .gauge{fill:none;stroke:var(--frame-soft);stroke-width:2;stroke-linecap:round}
+.scale .gauge-mark{stroke:var(--gold-2);stroke-width:2;stroke-linecap:round}
+.scale .chain{stroke:var(--frame-soft);stroke-width:1.5;fill:none}
+.scale .pan{fill:var(--pan);stroke:var(--pan-line);stroke-width:2;stroke-linejoin:round}
+.scale .pan-rim{fill:none;stroke:var(--frame);stroke-width:2.4;stroke-linecap:round}
+.scale .finial{fill:var(--gold)}
+.scale .shadow{fill:var(--shade)}
+.scale .beam,.scale .hang{transform-box:view-box}
+.scale .beam{transform-origin:200px 86px;animation:weigh 9s cubic-bezier(.45,.05,.3,1) infinite}
+.scale .hang.r{transform-origin:62px 86px;animation:hang 9s cubic-bezier(.45,.05,.3,1) infinite}
+.scale .hang.l{transform-origin:338px 86px;animation:hang 9s cubic-bezier(.45,.05,.3,1) infinite}
+@keyframes weigh{
+  0%{transform:rotate(0)}
+  12%{transform:rotate(-6.5deg)}
+  25%{transform:rotate(3.6deg)}
+  37%{transform:rotate(-1.8deg)}
+  47%{transform:rotate(.8deg)}
+  55%{transform:rotate(-.3deg)}
+  62%,100%{transform:rotate(0)}
+}
+@keyframes hang{
+  0%{transform:rotate(0)}
+  12%{transform:rotate(6.5deg)}
+  25%{transform:rotate(-3.6deg)}
+  37%{transform:rotate(1.8deg)}
+  47%{transform:rotate(-.8deg)}
+  55%{transform:rotate(.3deg)}
+  62%,100%{transform:rotate(0)}
+}
+.words{
+  justify-self:start;max-width:23rem;
+  margin:4px 0 0;margin-inline-start:clamp(4px,5vw,44px);
+  padding-inline-start:18px;border-inline-start:2px solid var(--rule);
+}
+.kicker{margin:0 0 6px;font-size:13px;font-weight:600;line-height:1.6;color:var(--gold-2)}
+h1{margin:0;font-family:"Mizan Display","Mizan Plex",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Arabic",Tahoma,sans-serif;font-size:clamp(28px,8vw,40px);font-weight:600;line-height:1.35;letter-spacing:0;color:var(--emerald)}
+.lead{margin:10px 0 0;font-size:16px;line-height:1.85;color:var(--ink)}
+.act{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-top:22px}
 button{
-  min-height:44px;padding:0 22px;border-radius:12px;cursor:pointer;
-  border:1px solid var(--button-line);background:var(--button);color:var(--ink);
+  min-height:44px;padding:0 20px;border-radius:12px;cursor:pointer;
+  border:0;background:var(--btn);color:var(--btn-ink);
   font:inherit;font-size:14px;font-weight:600;
-  transition:border-color .2s ease,transform .2s ease;
+  box-shadow:0 1px 2px rgb(23 27 24 / .06),0 8px 18px var(--shade);
+  transition:background-color .2s ease,transform .2s ease;
 }
-button:hover{border-color:var(--accent)}
+button:hover{background:var(--btn-hover)}
 button:active{transform:scale(.98)}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.note{min-height:20px;margin:14px 0 0;font-size:12.5px;line-height:1.6;color:var(--muted)}
-@keyframes turn{to{transform:rotate(360deg)}}
-@keyframes weigh{0%,100%{transform:rotate(0)}30%{transform:rotate(3.2deg)}65%{transform:rotate(-2deg)}}
-@keyframes settle{0%{transform:translateY(-3px);opacity:.6}45%,100%{transform:none;opacity:1}}
-@keyframes twinkle{0%,100%{opacity:.25;transform:scale(.7) rotate(0)}50%{opacity:1;transform:scale(1) rotate(20deg)}}
-@keyframes scan{0%{transform:translateX(130%)}100%{transform:translateX(-360%)}}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.note{margin:0;font-size:13px;line-height:1.6;color:var(--muted)}
+@media (min-width:720px){
+  .words{margin-top:-18px}
+}
 @media (prefers-reduced-motion:reduce){
-  .halo,.mark .needle,.mark .finial,.spark,.pulse i{animation:none}
-  .spark{opacity:.8}
+  .scale .beam,.scale .hang.r,.scale .hang.l{animation:none}
 }
 </style>
 </head>
 <body>
-<main>
-  <div class="stage" aria-hidden="true">
-    <svg class="halo" viewBox="0 0 132 132" focusable="false"><circle class="track" cx="66" cy="66" r="63"/><circle class="arc" cx="66" cy="66" r="63"/></svg>
-    <!-- علامة ميزان كما في public/brand/mizan-mark.svg، والإبرة وحدها تتحرّك. -->
-    <svg class="mark" viewBox="0 0 120 120" focusable="false">
-      <defs>
-        <linearGradient id="mz-a" x1="26" y1="30" x2="94" y2="96" gradientUnits="userSpaceOnUse"><stop stop-color="#123F35"/><stop offset="1" stop-color="#2C6656"/></linearGradient>
-        <linearGradient id="mz-g" x1="60" y1="30" x2="60" y2="104" gradientUnits="userSpaceOnUse"><stop stop-color="#E8CB93"/><stop offset=".55" stop-color="#B98B4E"/><stop offset="1" stop-color="#E8CB93"/></linearGradient>
-        <linearGradient id="mz-p" x1="60" y1="58" x2="78" y2="98" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFDF6"/><stop offset="1" stop-color="#F3E8D2"/></linearGradient>
-      </defs>
-      <rect width="120" height="120" rx="26" fill="#F7F5EF"/>
-      <rect class="tile-line" x="1" y="1" width="118" height="118" rx="25" fill="none" stroke-width="1.4"/>
-      <g transform="translate(0 3)">
-        <path class="finial" d="M60 2.5 64.6 8.6 60.9 13.2V34h-1.8V13.2L55.4 8.6Z" fill="url(#mz-g)"/>
-        <path d="M22 41H98" fill="none" stroke="url(#mz-a)" stroke-width="4.6" stroke-linecap="round"/>
-        <path d="M22 41 21 60.5M22 41 44 64.5M98 41 99 60.5M98 41 76 64.5" fill="none" stroke="url(#mz-a)" stroke-width="1.8" stroke-linecap="round"/>
-        <path d="M60 96c-12-8.5-26.5-11-40-9-.5 6 4 11.5 11.5 13.5 13.5 0 22.5 2 28.5 5.5Z" fill="url(#mz-a)"/>
-        <path d="M60 96c12-8.5 26.5-11 40-9 .5 6-4 11.5-11.5 13.5-13.5 0-22.5 2-28.5 5.5Z" fill="url(#mz-a)"/>
-        <path d="M60 71c-13.5-9.5-27-13.5-40-11.5 2 8.5 2 19 0 27.5 13.5-2 28 .5 40 9Z" fill="url(#mz-p)" stroke="#D8B172" stroke-width="1.5" stroke-linejoin="round"/>
-        <path d="M60 71c13.5-9.5 27-13.5 40-11.5-2 8.5-2 19 0 27.5-13.5-2-28 .5-40 9Z" fill="url(#mz-p)" stroke="#D8B172" stroke-width="1.5" stroke-linejoin="round"/>
-        <g class="needle">
-          <path d="M60 43c.85 0 1.35 2.2 1.5 9.4l.55 33.6c.08 6.2-.7 11.4-2.05 15.5-1.35-4.1-2.13-9.3-2.05-15.5l.55-33.6c.15-7.2.65-9.4 1.5-9.4Z" fill="url(#mz-g)"/>
-          <circle cx="60" cy="39" r="5.4" fill="url(#mz-g)"/>
-          <circle cx="58.3" cy="37.2" r="1.9" fill="#FFF6E4" opacity=".55"/>
-        </g>
+<!-- نقشٌ هندسيّ خافت: نجمةٌ ثمانية من مربّعين متراكبين، تخفت نحو الأطراف. -->
+<svg class="ground" aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid slice" viewBox="0 0 400 800">
+  <defs>
+    <pattern id="khatam" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="translate(-10 4)">
+      <g class="star">
+        <rect x="14" y="14" width="28" height="28"/>
+        <rect x="14" y="14" width="28" height="28" transform="rotate(45 28 28)"/>
+        <path d="M0 28H8M48 28H56M28 0V8M28 48V56"/>
       </g>
-    </svg>
-    <svg class="spark one" viewBox="0 0 24 24" focusable="false"><path d="M12 0c.7 6.4 5.6 11.3 12 12-6.4.7-11.3 5.6-12 12-.7-6.4-5.6-11.3-12-12C6.4 11.3 11.3 6.4 12 0z"/></svg>
-    <svg class="spark two" viewBox="0 0 24 24" focusable="false"><path d="M12 0c.7 6.4 5.6 11.3 12 12-6.4.7-11.3 5.6-12 12-.7-6.4-5.6-11.3-12-12C6.4 11.3 11.3 6.4 12 0z"/></svg>
-  </div>
-  <h1 id="title">نُحدّث البرنامج الآن ✨</h1>
-  <p class="lead" id="lead">لحظاتٍ ونعود</p>
-  <div class="pulse" aria-hidden="true"><i></i></div>
-  <button type="button" id="retry">أعد المحاولة الآن</button>
-  <p class="note" id="note" role="status" aria-live="polite">ستُفتح الصفحة التي طلبتها تلقائيًا حين نعود.</p>
+    </pattern>
+    <radialGradient id="fade" cx="62%" cy="34%" r="70%">
+      <stop offset="0" stop-color="#fff" stop-opacity="1"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="fade-mask"><rect width="400" height="800" fill="url(#fade)"/></mask>
+  </defs>
+  <rect width="400" height="800" fill="url(#khatam)" mask="url(#fade-mask)"/>
+</svg>
+<main>
+  <!-- الميزان: العاتقُ يدور حول محوره، وكلُّ كفّةٍ تدور عكسه حول معلاقها فتبقى معلّقةً قائمة. -->
+  <svg class="scale" viewBox="0 0 400 330" aria-hidden="true" focusable="false">
+    <ellipse class="shadow" cx="200" cy="316" rx="120" ry="7"/>
+    <path class="finial" d="M200 26l4.6 6.4L200 44l-4.6-11.6Z"/>
+    <path class="post" d="M200 46V296"/>
+    <path class="foot" d="M160 296h80c8 0 14 6 14 12v2H146v-2c0-6 6-12 14-12Z"/>
+    <path class="foot-line" d="M170 303h60"/>
+    <g class="gauge-wrap">
+      <path class="gauge" d="M182 60a22 22 0 0 1 36 0"/>
+      <path class="gauge-mark" d="M200 50v6"/>
+    </g>
+    <g class="beam">
+      <path class="tongue" d="M200 52l3 30h-6Z"/>
+      <path class="beam-bar" d="M62 86C120 80 160 80 200 80S280 80 338 86"/>
+      <circle class="knob" cx="62" cy="86" r="5"/>
+      <circle class="knob" cx="338" cy="86" r="5"/>
+      <g class="hang r">
+        <path class="chain" d="M62 90 22 214M62 90 62 214M62 90 102 214"/>
+        <path class="pan" d="M12 214h100c-6 26-26 40-50 40s-44-14-50-40Z"/>
+        <path class="pan-rim" d="M10 214h104"/>
+      </g>
+      <g class="hang l">
+        <path class="chain" d="M338 90 298 214M338 90 338 214M338 90 378 214"/>
+        <path class="pan" d="M288 214h100c-6 26-26 40-50 40s-44-14-50-40Z"/>
+        <path class="pan-rim" d="M286 214h104"/>
+      </g>
+      <circle class="pivot" cx="200" cy="86" r="7"/>
+    </g>
+  </svg>
+  <section class="words">
+    <p class="kicker">ميزان · تحديث</p>
+    <h1 id="title">نضبط الميزان</h1>
+    <p class="lead" id="lead">يجري على ميزان تحديثٌ قصير، وتعود الصفحة التي طلبتها وحدها حين يستقرّ.</p>
+    <div class="act">
+      <button type="button" id="retry">افتح الصفحة الآن</button>
+      <p class="note" id="note" role="status" aria-live="polite">نتحقّق كل بضع ثوانٍ.</p>
+    </div>
+  </section>
 </main>
 <script>
 (function () {
@@ -159,17 +227,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
   function describe() {
     if (navigator.onLine === false) {
-      title.textContent = "لا اتصال بالإنترنت الآن";
-      lead.textContent = "سنعود تلقائيًا حين يعود الاتصال";
+      title.textContent = "الجهاز غير متّصل بالشبكة";
+      lead.textContent = "متى رجع الاتصال رجعت الصفحة التي طلبتها، دون أن تفعل شيئًا.";
       note.textContent = "";
     } else if (stuck()) {
-      title.textContent = "نُحدّث البرنامج الآن ✨";
-      lead.textContent = "يستغرق ذلك وقتًا أطول من المعتاد";
-      note.textContent = "سنحاول مرّةً كل نصف دقيقة، ويمكنك المحاولة الآن.";
+      title.textContent = "نضبط الميزان";
+      lead.textContent = "يأخذ الضبط هذه المرّة وقتًا أطول من المعتاد، والصفحة تعود وحدها حين يستقرّ.";
+      note.textContent = "نتحقّق مرّةً كل نصف دقيقة.";
     } else {
-      title.textContent = "نُحدّث البرنامج الآن ✨";
-      lead.textContent = "لحظاتٍ ونعود";
-      note.textContent = "ستُفتح الصفحة التي طلبتها تلقائيًا حين نعود.";
+      title.textContent = "نضبط الميزان";
+      lead.textContent = "يجري على ميزان تحديثٌ قصير، وتعود الصفحة التي طلبتها وحدها حين يستقرّ.";
+      note.textContent = "نتحقّق كل بضع ثوانٍ.";
     }
   }
 

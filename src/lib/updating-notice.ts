@@ -1,11 +1,11 @@
 /*
- * «نُحدّث البرنامج» داخل التطبيق.
+ * «نضبط الميزان» داخل التطبيق.
  *
  * أثناء النشر تجيب واجهةُ Google الأمامية طلباتِ /api بصفحة HTML إنجليزية (500/502/503/504)
  * لا يكتبها خادمُ ميزان — خادمُنا يجيب /api بـJSON دائمًا، أو بجسمٍ فارغ لأصلٍ ثنائيّ. فكانت
  * الشاشات تقرأ صفحةَ الخطأ كأنها عطلٌ في البرنامج.
  *
- * هنا يُعرف ذلك الجواب، ويظهر شريطٌ هادئ واحد أسفل الشاشة، ويسأل /api/health كل ثلاث
+ * هنا يُعرف ذلك الجواب، ويظهر شريطٌ هادئ واحد ممتدّ على حافة الشاشة السفلى (على هيئة شريط البيئة التجريبية)، ويسأل /api/health كل ثلاث
  * ثوانٍ (ويتباطأ إلى خمس عشرة) حتى يعود الخادم فيختفي ويُطلَق حدثُ SERVER_BACK_EVENT.
  *
  * المراقبةُ لا تغيّر شيئًا: الجوابُ نفسه يعود إلى من طلبه كما جاء، فلا يتبدّل سلوكُ أيّ شاشة
@@ -14,8 +14,8 @@
 
 const UPDATING_STATUSES = new Set([500, 502, 503, 504]);
 
-export const UPDATING_MESSAGE = 'نُحدّث البرنامج الآن ✨ لحظاتٍ ونعود.';
-export const UPDATING_MESSAGE_EN = 'Updating MIZAN ✨ back in a moment.';
+export const UPDATING_MESSAGE = 'نضبط الميزان بتحديثٍ قصير، وتكمل من حيث توقّفت حين يستقرّ.';
+export const UPDATING_MESSAGE_EN = 'MIZAN is settling a short update; you will pick up where you left off.';
 /** يُطلق على window حين يعود الخادم. */
 export const SERVER_BACK_EVENT = 'mizan:server-back';
 export const HEALTH_URL = '/api/health';
@@ -47,10 +47,10 @@ export function showUpdatingNotice(probe: () => Promise<boolean>, onBack?: () =>
   bar.dir = ar ? 'rtl' : 'ltr';
   bar.textContent = ar ? UPDATING_MESSAGE : UPDATING_MESSAGE_EN;
   bar.style.cssText = [
-    'position:fixed', 'inset-inline:0', 'bottom:max(18px,env(safe-area-inset-bottom))', 'margin:0 auto', 'width:max-content', 'max-width:calc(100vw - 32px)',
-    'z-index:2147483000', 'padding:11px 18px', 'border-radius:14px', 'font-family:var(--font-arabic,inherit)', 'font-size:14px', 'font-weight:600', 'line-height:1.6',
-    'background:var(--surface,#fffefb)', 'color:var(--ink,#171b18)', 'border:1px solid var(--line,#dfded7)',
-    'box-shadow:0 14px 36px rgb(18 63 53 / .16)', 'text-align:center', 'pointer-events:none',
+    'position:fixed', 'inset-inline:0', 'bottom:0', 'z-index:2147483000',
+    'padding:12px 20px calc(12px + env(safe-area-inset-bottom))', 'font-family:var(--font-arabic,inherit)', 'font-size:14px', 'font-weight:600', 'line-height:1.6',
+    'background:var(--emerald,#214c40)', 'color:#fffefb', 'border-top:2px solid var(--gold,#b98b4e)',
+    'box-shadow:0 -10px 30px rgba(25,39,33,.12)', 'text-align:start', 'pointer-events:none',
   ].join(';');
   document.body.appendChild(bar);
   notice = bar;
