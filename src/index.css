@@ -2139,3 +2139,16 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
+
+
+/* iPhone Duo folded postures only. Unsupported/disabled Safari preview features
+   leave the existing site styles unchanged on every other device and posture. */
+@media (device-posture: folded) and (horizontal-viewport-segments: 2) {
+  html, body, #root { min-width: 0; max-width: 100%; }
+}
+@media (device-posture: folded) and (vertical-viewport-segments: 2) {
+  html, body, #root { min-width: 0; max-width: 100%; }
+}
+@media (device-posture: folded) and (orientation: landscape) and (max-height: 520px) {
+  html { scroll-padding-block: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-bottom)); }
+}
