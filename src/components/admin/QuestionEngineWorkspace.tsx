@@ -640,11 +640,11 @@ const NumberBox: React.FC<{ ar: boolean; label: string; value: number; min: numb
   <label className={`block min-w-0 ${compact ? 'w-36' : ''}`}>
     <span className="block text-sm font-black text-[#3f4642]">{label}</span>
     <div className="mizan-control mt-1 flex items-center">
-      <button type="button" className="mizan-step-btn" aria-label={`${ar ? 'إنقاص' : 'Decrease'} ${label}`} onClick={() => onChange(Math.max(min, value - step))}>−</button>
+      <button type="button" className="mizan-step-btn" aria-label={`إنقاص ${label}`} onClick={() => onChange(Math.max(min, value - step))}>−</button>
       <input type="number" inputMode="numeric" min={min} max={max} value={value} aria-label={label}
         onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
         className="min-w-0 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
-      <button type="button" className="mizan-step-btn" aria-label={`${ar ? 'زيادة' : 'Increase'} ${label}`} onClick={() => onChange(Math.min(max, value + step))}>+</button>
+      <button type="button" className="mizan-step-btn" aria-label={`زيادة ${label}`} onClick={() => onChange(Math.min(max, value + step))}>+</button>
     </div>
     {hint && <span className="mt-1 block text-xs leading-5 text-[color:var(--muted)]">{hint}</span>}
   </label>
