@@ -89,7 +89,7 @@ export const SmartSchedulePanel: React.FC = () => {
       <input type="time" aria-label={L(ar, 'من', 'From')} className={`${input} max-w-[8rem]`} value={r.start} onChange={e => set(list.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} />
       <input type="time" aria-label={L(ar, 'إلى', 'To')} className={`${input} max-w-[8rem]`} value={r.end} onChange={e => set(list.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} />
       <button type="button" className="text-xs font-bold text-[color:var(--danger)]" onClick={() => set(list.filter((_, j) => j !== i))}>{L(ar, 'حذف', 'Remove')}</button></div>)}
-    <button type="button" className={btn2} onClick={() => set([...list, { date: '', start: '09:00', end: '09:15' }])}>+</button></fieldset>;
+    <button type="button" aria-label={L(ar, 'إضافة فترة زمنية', 'Add time window')} className={btn2} onClick={() => set([...list, { date: '', start: '09:00', end: '09:15' }])}>+</button></fieldset>;
   const UNSCHED: Record<string, [string, string]> = { NO_COMMITTEE_FOR_CATEGORY: ['لا لجنة لفئته', 'No panel for the category'], ALL_COMMITTEES_CONFLICTED: ['كل اللجان عليها تضارب مصالح', 'Every panel is conflicted'], NO_CAPACITY: ['لا سعة في الأيام المحددة', 'No capacity in the given days'], PIN_INVALID: ['تثبيت يدوي غير صالح', 'Invalid manual pin'] };
   return <section className="space-y-4">
     <h2 className="text-base font-black">{L(ar, 'الجدولة الذكية', 'Smart scheduler')}</h2>
