@@ -839,8 +839,14 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) auto;
   overflow:hidden; background:var(--venue-deep); color:var(--venue-ink);
 }
+/* ورقةٌ ولوحةٌ جنبًا إلى جنب من ٦٠٠px لا ١٠٢٤: المطويّ المفتوح (٦٦٩ و٩٥١) وSplit الواسع وآيفون عرضي
+   كانت تأخذ تخطيط الهاتف المكدّس فتنضغط الورقة — وهي ما يُقرأ — إلى شريطٍ رفيع تحت لوحةٍ تمتدّ بعرض
+   الشاشة. والعرض هو المعيار لا نوع الجهاز، فيلتقط كل ما اتّسع التخطيط نفسه. */
+@media (min-width:600px){
+  .mizan-judge-os{ grid-template-columns:minmax(0,1fr) clamp(248px,34vw,344px); grid-template-rows:minmax(0,1fr) }
+}
 @media (min-width:1024px){
-  .mizan-judge-os{ grid-template-columns:minmax(0,1fr) clamp(272px,27vw,344px); grid-template-rows:minmax(0,1fr) }
+  .mizan-judge-os{ grid-template-columns:minmax(0,1fr) clamp(272px,27vw,344px) }
 }
 
 /* ── الورقة: سطح القراءة، لا بطاقة ولا شريط يقتطع منها ───────────────── */
@@ -853,7 +859,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
   box-shadow:inset 0 -18px 34px rgba(42,36,20,.06);
 }
-@media (min-width:1024px){ .mizan-judge-page::after{ box-shadow:inset -20px 0 40px rgba(42,36,20,.06) } }
+@media (min-width:600px){ .mizan-judge-page::after{ box-shadow:inset -20px 0 40px rgba(42,36,20,.06) } }
 .mizan-judge-paper{
   position:relative; z-index:1; height:100%; min-height:0; overflow:hidden;
   display:flex; flex-direction:column; padding:.85rem .95rem 1rem;
@@ -872,6 +878,7 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 .mizan-judge-os[data-peek="true"] .mizan-judge-strip{ transform:none; opacity:1; pointer-events:auto }
 /* على الآيباد الأفقي والحاسوب يبقى الشريط فوق الورقة وحدها: كان يمتدّ فوق اللوحة الجانبية
    فيحجب زمن الجلسة والخصم في أول ثوانيها. */
+@media (min-width:600px){ .mizan-judge-strip{ inset-inline-end:clamp(248px,34vw,344px) } }
 @media (min-width:1024px){ .mizan-judge-strip{ inset-inline-end:clamp(272px,27vw,344px) } }
 .mizan-judge-strip .js-who{ font-family:var(--font-display); font-size:calc(16px * var(--mizan-text-scale)); font-weight:800; letter-spacing:-.01em; min-width:0 }
 .mizan-judge-strip .js-fact{ font-size:calc(12px * var(--mizan-text-scale)); font-weight:600; color:var(--venue-muted); white-space:nowrap }
@@ -900,12 +907,14 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
   border-top:1px solid var(--venue-line);
   padding:.8rem .75rem calc(.8rem + env(safe-area-inset-bottom));
 }
-@media (max-width:1023px){
+@media (max-width:599.98px){
   .mizan-judge-deck{ max-height:52dvh }
+}
+@media (max-width:1023px){
   /* لا مؤشّر على الهاتف ولا لوحة مفاتيح: الإبهام وحده، فيرتفع المفتاح عن أرضيته. */
   .mizan-judge-action{ min-height:60px }
 }
-@media (min-width:1024px){ .mizan-judge-deck{ border-top:0; border-inline-start:1px solid rgba(0,0,0,.45) } }
+@media (min-width:600px){ .mizan-judge-deck{ border-top:0; border-inline-start:1px solid rgba(0,0,0,.45) } }
 /* الوسطى وحدها تتمدّد: المفاتيح تأخذ ضعف ما تأخذه الدرجات المباشرة حين يجتمعان،
    وكلٌّ منهما يأخذ المتاح كلّه حين ينفرد. */
 .mizan-judge-mid{ min-height:0; display:flex; flex-direction:column; gap:.5rem }
@@ -983,15 +992,46 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
 
 /* هاتفٌ قصير (360×640 وأمثاله): ثلاثة مفاتيح في الصف بدل اثنين، فتنزل اللوحة صفًّا كاملًا
    ويأخذ سطح المصحف ما كان يضيع في الأسفل. والورقة تُمرَّر إن ضاقت، فلا يُحشر النصّ في شريطٍ رفيع. */
-@media (max-width:1023px) and (max-height:720px){
+@media (max-width:599.98px) and (max-height:720px){
   .mizan-judge-pad{ grid-template-columns:repeat(3,minmax(0,1fr)) }
   .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:auto }
   .mizan-judge-pad > :last-child:nth-child(3n+1){ grid-column:1 / -1 }
-  .mizan-judge-action{ padding-inline:.6rem }
+  .mizan-judge-action{ padding-inline:.6rem; min-height:52px }
+  /* المطويّ (382×580): الحصيلة سطرٌ واحد والذيل أنحف، فتتّسع الورقة لنصّ القرآن بدل أن يغيب تحت اللوحة */
+  .mizan-judge-deck{ gap:.4rem; padding-block:.55rem calc(.55rem + env(safe-area-inset-bottom)); max-height:46dvh }
+  .mizan-judge-hud{ padding-bottom:.35rem }
+  .mizan-judge-hud b{ font-size:calc(22px * var(--mizan-text-scale)) }
+  .mizan-judge-finish,.mizan-judge-undo{ min-height:48px }
+  .mizan-judge-undo{ width:48px }
+}
+@media (max-width:1023px) and (max-height:720px){
   .mizan-judge-paper{ overflow-y:auto; overscroll-behavior:contain; padding:.7rem .85rem .85rem }
   .mizan-judge-quran{ min-height:19rem }
   .mizan-judge-os .mizan-mushaf-bar{ padding-block:.5rem }
   .mizan-judge-os .mizan-mushaf-tools{ min-height:40px; padding-block:.3rem }
+}
+
+/* بوابات الاستقبال (ميكروفون/حضور/موافقة): محتواها قد يزيد على الارتفاع المتاح في المطويّ (٣٨٢×٥٨٠).
+   `place-content:center` وحدها تُخرج الفائض فوق وتحت معًا فتركب الأيقونةُ على مسار البوابات؛
+   `safe` تُبقي المحتوى من أعلاه وتترك الفائض يُمرَّر. */
+.mizan-judge-gate{ align-content:safe center; justify-content:safe center; flex:1 0 auto; padding-block:.5rem }
+@media (min-width:600px) and (min-height:560px){ .mizan-judge-gate{ flex:1 1 0; min-height:0 } }
+
+/* ارتفاعٌ قصير مع عرضٍ يتّسع للّوحتين (مطويّ عرضي ~٦٠٠×٣٥٠، آيفون عرضي): كانت صفوف المفاتيح تنهار إلى
+   صفر فتتراكب. الصفّ الآن لا ينزل عن ٤٨px (أرضية اللمس)، والفائض يُمرَّر داخل المفاتيح لا فوقها. */
+@media (min-width:600px) and (max-height:480px){
+  .mizan-judge-deck{ gap:.35rem; padding-block:.45rem calc(.45rem + env(safe-area-inset-bottom)) }
+  .mizan-judge-hud{ padding-bottom:.3rem }
+  .mizan-judge-hud b{ font-size:calc(20px * var(--mizan-text-scale)) }
+  .mizan-judge-pad{ grid-auto-rows:minmax(48px,1fr) }
+  .mizan-judge-action{ min-height:48px; padding-block:.4rem }
+  .mizan-judge-finish,.mizan-judge-undo{ min-height:46px }
+  .mizan-judge-undo{ width:46px }
+}
+/* المطويّ (٣٨٢×٥٨٠): تنبيهات الورقة وسِرب البوابات أنحف ليصعد نصّ القرآن إلى النظر. */
+@media (max-width:599.98px) and (max-height:720px){
+  .mizan-judge-notes > div{ padding:.4rem .65rem !important }
+  .mizan-judge-gates{ margin-bottom:.4rem !important }
 }
 
 /* ── الذيل: الإنهاء، وبجانبه التراجع صامتًا ──────────────────────────── */
@@ -2064,6 +2104,10 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   html { scroll-padding-block: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-bottom)); }
 }
 
+/* قائمة «المزيد» مغلقة: بعض محرّكات WebKit تحسب لها صندوقًا خارج الشاشة (يسار -16px عند ٣٢٠) فيُعدّ فيضًا أفقيًّا.
+   `display:none` وهي مغلقة لا يغيّر شيئًا مرئيًّا ولا يمسّ سلوك الفتح. */
+.mizan-more:not([open]) > div{ display:none }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
@@ -2153,3 +2197,4 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
+

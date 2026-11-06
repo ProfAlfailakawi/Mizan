@@ -694,7 +694,7 @@ export const JudgeOS: React.FC = () => {
     </div>
 
     {/* ── بوابة الميكروفون ────────────────────────────────────────────────── */}
-    {micGateApplies&&!micRecording&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
+    {micGateApplies&&!micRecording&&<div className="mizan-judge-gate flex-1 min-h-0 grid place-content-center text-center px-4">
      <div className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${audioState==='failed'?'bg-[var(--danger-soft)] text-[color:var(--danger)]':'bg-[#EEF2EF] text-[color:var(--emerald)]'}`}>{audioState==='failed'?<MicOff className="h-6 w-6"/>:<Mic className="h-6 w-6"/>}</div>
      <h2 className="mt-4 text-base font-black text-[#20241f]">{audioState==='failed'?(ar?'تعذّر تشغيل الميكروفون':'Microphone unavailable'):(ar?'تأكيد الميكروفون قبل بدء الأسئلة':'Confirm the microphone first')}</h2>
      <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[color:var(--muted)]">{audioState==='failed'?(ar?'لا تبدأ التلاوة بلا تسجيل، فسياسة هذه المسابقة تُلزم به. راجع توصيل الميكروفون وأذونات المتصفح ثم أعد المحاولة.':'Recording is required by this competition policy. Check the microphone and browser permission, then retry.'):(ar?'سياسة هذه المسابقة تُلزم بتسجيل الجلسة، ولا يُفتح الموضع قبل تشغيل الميكروفون.':'This competition requires session recording; the passage stays sealed until the microphone is running.')}</p>
@@ -716,7 +716,7 @@ export const JudgeOS: React.FC = () => {
       * فبقي المطلوبُ الآنَ وحده: جملةٌ تصف الخطوة، وزرُّها. وعدّادُ الموافقات يظهر بعد
       * تأكيد الحضور فقط، لأنه قبلها ليس خطوةً يملكها هذا المحكّم.
       */}
-    {!questionRevealed&&!activeSession.isLocked&&micRecording&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
+    {!questionRevealed&&!activeSession.isLocked&&micRecording&&<div className="mizan-judge-gate flex-1 min-h-0 grid place-content-center text-center px-4">
      <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#f0eee7] text-[#313a35]"><LockKeyhole className="h-6 w-6"/></div>
      <h2 className="mt-4 text-base font-black">{ar?'الموضع مستورٌ حتى يُؤذَن':'The passage stays sealed'}</h2>
      <p className="mx-auto mt-2 max-w-sm text-[11px] leading-6 text-[color:var(--muted)]">{!participantPresent
@@ -740,7 +740,7 @@ export const JudgeOS: React.FC = () => {
     </>}
 
     {/* ── بين موضعين، وبعد القفل ─────────────────────────────────────────── */}
-    {micRecording&&questionRevealed&&!activeSession.isLocked&&activeSession.questionPhase==='TRANSITION'&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
+    {micRecording&&questionRevealed&&!activeSession.isLocked&&activeSession.questionPhase==='TRANSITION'&&<div className="mizan-judge-gate flex-1 min-h-0 grid place-content-center text-center px-4">
      <Square className="mx-auto h-6 w-6 text-[color:var(--emerald)]"/>
      <div className="mt-3 text-sm font-black">{isLastQuestion?(ar?'انتهى آخر موضع. اعتمد تقييمك عندما تكون جاهزًا.':'Final passage ended. Submit when ready.'):(ar?'تم إيقاف الموضع. انتقل إلى السؤال التالي.':'Passage stopped. Move to the next question.')}</div>
      <div className="mt-4">{isLastQuestion
@@ -748,7 +748,7 @@ export const JudgeOS: React.FC = () => {
       :<Button onClick={()=>nextQuestion()} icon={<SkipForward className="w-4 h-4"/>}>{ar?'السؤال التالي':'Next question'}</Button>}</div>
     </div>}
 
-    {activeSession.isLocked&&<div className="flex-1 min-h-0 grid place-content-center text-center px-4">
+    {activeSession.isLocked&&<div className="mizan-judge-gate flex-1 min-h-0 grid place-content-center text-center px-4">
      <div role="status" aria-live="polite">
       <CompletionSeal size="md"/>
       <div className="mt-4 text-3xl font-black text-[#17352D]">{ar?'انتهت الجلسة':'Session complete'}</div>
