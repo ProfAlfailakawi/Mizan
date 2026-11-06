@@ -26,8 +26,13 @@
  * ولا صلة لهذا بمفتاح زرع البيانات التجريبية في الإنتاج: ذاك زرعُ بيانات تجريبية في المخزن الحقيقي ويظلّ
  * محجوبًا في الإنتاج (`production-config-guard.ts`). الصندوق هنا لا يزرع شيئًا في أي مخزن.
  */
-import { randomBytes } from 'node:crypto';
-import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import crypto from 'crypto';
+import type { RequestHandler } from 'express';
+
+/* حزمة أنواع express غير مثبّتة في هذا المشروع (stubs.d.ts)، فالأنواع هنا أدنى ما يلزم. */
+type Request = any;
+type Response = any;
+type NextFunction = () => void;
 
 export const DEMO_HEADER = 'x-mizan-demo';
 export const DEMO_ID_PATTERN = /^demo_[0-9a-f]{64}$/;
@@ -88,7 +93,7 @@ export class DemoSandboxRegistry {
       hit.count += 1;
     } else this.enterHits.set(ip, { windowStart: t, count: 1 });
     if (this.boxes.size >= this.opts.maxSandboxes) return { ok: false, reason: 'CAPACITY' };
-    const id = `demo_${randomBytes(32).toString('hex')}`;
+    const id = `demo_${crypto.randomBytes(32).toString('hex')}`;
     this.boxes.set(id, { createdAt: t, expiresAt: t + this.opts.ttlMs, requests: 0 });
     return { ok: true, id, ttlMs: this.opts.ttlMs };
   }
@@ -150,11 +155,12 @@ export function createDemoRoutes(registry: DemoSandboxRegistry, isEnabled: () =>
   const enter: RequestHandler = (req, res) => {
     if (!isEnabled()) return void res.status(404).json({ code: 'DEMO_DISABLED' });
     const out = registry.create(String(req.ip || 'unknown'));
-    if (!out.ok) {
-      return void res.status(out.reason === 'RATE_LIMITED' ? 429 : 503).json({ code: out.reason === 'RATE_LIMITED' ? 'DEMO_RATE_LIMITED' : 'DEMO_CAPACITY' });
+    if (out.ok === false) {
+      const limited = (out as { reason: string }).reason === 'RATE_LIMITED';
+      return void res.status(limited ? 429 : 503).json({ code: limited ? 'DEMO_RATE_LIMITED' : 'DEMO_CAPACITY' });
     }
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ ok: true, demo: true, sessionId: out.id, ttlMs: out.ttlMs });
+    res.json({ ok: true, demo: true, sessionId: (out as { id: string }).id, ttlMs: (out as { ttlMs: number }).ttlMs });
   };
   const reset: RequestHandler = (req, res) => {
     if (!isEnabled()) return void res.status(404).json({ code: 'DEMO_DISABLED' });

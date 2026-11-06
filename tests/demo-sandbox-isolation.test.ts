@@ -89,18 +89,19 @@ test('sandbox cap, per-IP entry rate limit and per-sandbox request budget', asyn
   assert.equal(reg.create('1.1.1.1').ok, true);
   assert.equal(reg.create('1.1.1.1').ok, true);
   const capped = reg.create('1.1.1.1');
-  assert.deepEqual(capped.ok ? null : capped.reason, 'CAPACITY');
+  assert.deepEqual((capped as { reason?: string }).reason, 'CAPACITY');
   const reg2 = new DemoSandboxRegistry({ ttlMs: 60000, maxSandboxes: 100, enterPerIpPerMin: 2, maxRequests: 3 });
   reg2.create('2.2.2.2'); reg2.create('2.2.2.2');
   const limited = reg2.create('2.2.2.2');
-  assert.deepEqual(limited.ok ? null : limited.reason, 'RATE_LIMITED');
+  assert.deepEqual((limited as { reason?: string }).reason, 'RATE_LIMITED');
   assert.equal(reg2.create('3.3.3.3').ok, true, 'another IP is unaffected');
   const made = reg2.create('4.4.4.4'); assert.ok(made.ok);
-  if (made.ok) {
-    assert.equal(reg2.touch(made.id), 'OK'); assert.equal(reg2.touch(made.id), 'OK'); assert.equal(reg2.touch(made.id), 'OK');
-    assert.equal(reg2.touch(made.id), 'BUDGET');
-    assert.equal(reg2.reset(made.id), true);
-    assert.equal(reg2.touch(made.id), 'OK');
+  const madeId = (made as { id: string }).id;
+  {
+    assert.equal(reg2.touch(madeId), 'OK'); assert.equal(reg2.touch(madeId), 'OK'); assert.equal(reg2.touch(madeId), 'OK');
+    assert.equal(reg2.touch(madeId), 'BUDGET');
+    assert.equal(reg2.reset(madeId), true);
+    assert.equal(reg2.touch(madeId), 'OK');
   }
 });
 
