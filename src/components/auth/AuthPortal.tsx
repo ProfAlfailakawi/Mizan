@@ -3,12 +3,37 @@ import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, sig
 import { FlaskConical, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
-import { useAppStore, enterDemoSession, DEMO_AVAILABLE } from '../../lib/store';
+import { useAppStore, enterDemoSessionIsolated, DEMO_AVAILABLE } from '../../lib/store';
 import { Button } from '../design-system/Button';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { serverErrorLabel } from '../../lib/ui-language';
 
 type InvitationPreview={email:string;displayName:string;requestedRole:string;organizationId:string;competitionId?:string;expiresAt:string;existingAccount?:boolean};
+
+/*
+ * مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
+ * يطلب صندوقًا من الخادم (الجدار في server/demo-sandbox.ts) ثم يفتح العرض المحلي. زرٌّ بنصٍّ
+ * واضح، ويظهر في كل فروع شاشة الدخول: الدخول العادي، والدعوة، والتحقق بخطوتين.
+ */
+const DemoEntry:React.FC<{ar:boolean}>=({ar})=>{
+ const [busy,setBusy]=useState(false);const [note,setNote]=useState('');
+ const go=async()=>{
+  if(busy)return;setBusy(true);setNote('');
+  const result=await enterDemoSessionIsolated();
+  if(result==='disabled')setNote(ar?'النسخة التجريبية غير متاحة في هذا النشر.':'The demo is not available on this deployment.');
+  else if(result==='busy')setNote(ar?'النسخة التجريبية مشغولة الآن. حاول بعد دقيقة.':'The demo is busy right now. Try again in a minute.');
+  setBusy(false);
+ };
+ return <div className="mt-5 pt-4 border-t border-[#e4e0d5]" data-testid="demo-entry">
+  <button type="button" disabled={busy} onClick={()=>void go()}
+   className="w-full min-h-14 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-[#d8b86a] bg-gradient-to-b from-[#fdf7e8] to-[#f6e8c6] px-5 text-base font-black text-[#6b5314] shadow-[0_6px_18px_rgba(138,106,28,.14)] transition hover:from-[#faf0d8] hover:to-[#f0dcae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8a6a1c] disabled:opacity-60">
+   <FlaskConical className="w-5 h-5" aria-hidden="true"/>
+   <span>{busy?'…':ar?'جرّب النسخة التجريبية':'Try the demo'}</span>
+  </button>
+  <p className="mt-2 text-center text-xs font-bold text-[#6b5f45]">{ar?'بيانات مصطنعة — لا تتصل بأي مسابقة حقيقية':'Synthetic data — not connected to any real competition'}</p>
+  {note&&<p role="status" className="mt-2 text-center text-xs font-bold text-[#8a2f2f]">{note}</p>}
+ </div>;
+};
 
 export const AuthPortal:React.FC=()=>{
  const {language}=useAppStore();const ar=language==='ar';
@@ -106,7 +131,7 @@ export const AuthPortal:React.FC=()=>{
 
  const reset=async()=>{if(!email.trim())return setMessage(ar?'أدخل البريد الإلكتروني أولًا':'Enter your email first');setBusy(true);setMessage('');try{const r=await fetch('/api/identity/password-reset/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:email.trim()})});if(!r.ok&&r.status!==202)throw new Error('REQUEST_FAILED');setMessage(ar?'تم إرسال طلب تعيين كلمة مرور جديدة إلى المدير المسؤول. لن يُرسل النظام بريد استعادة تلقائيًا؛ سيصلك رابط آمن أو QR من مدير الجهة بعد اعتماده.':'Your password reset request was sent to the responsible administrator. No automatic recovery email is sent.');}catch{setMessage(ar?'تعذر إرسال الطلب الآن. تحقق من الاتصال وحاول مرة أخرى.':'Could not submit the reset request. Try again.');}finally{setBusy(false)}};
 
- if(mfaResolver)return <main className="mz-bp-login min-h-screen bg-[#F8F5ED] grid place-items-center p-5" dir={ar?'rtl':'ltr'}><div className="w-full max-w-md"><div className="text-center"><div className="mz-bp-login-brand flex justify-center"><MizanLogo language={language}/></div><div className="mizan-kicker mt-7">{ar?'تحقق بخطوتين':'TWO-STEP VERIFICATION'}</div><h1 className="text-3xl font-black mt-2 text-[#17352D]">{ar?'رمز التطبيق':'Authenticator code'}</h1><p className="text-xs text-[color:var(--muted)] mt-2 leading-6">{ar?'افتح تطبيق المصادقة في جوالك (مثل Google Authenticator) واكتب الأرقام الستة الظاهرة فيه.':'Open Google Authenticator and enter the current 6-digit code.'}</p></div><div className="mizan-surface mz-bp-login-card p-6 mt-7"><label className="block"><span className="text-sm font-black text-[#3f4642]">{ar?'رمز التحقق':'Verification code'}</span><div className="relative mt-2"><KeyRound className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#6a6f6c] pointer-events-none"/><input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e=>e.key==='Enter'&&void finishMfaSignIn()} className="mizan-input mizan-input-icon-start text-center tracking-[0.3em] font-black" dir="ltr"/></div></label>{message&&<div className="mt-4 rounded-xl bg-[#f3f1eb] px-3 py-2.5 text-xs font-semibold">{message}</div>}<Button size="lg" className="mz-bp-cta w-full mt-6 min-h-14" disabled={busy||mfaCode.length!==6} onClick={()=>void finishMfaSignIn()} icon={<ShieldCheck className="w-4 h-4"/>}>{busy?'…':ar?'تحقق وادخل':'Verify & sign in'}</Button><button type="button" onClick={()=>{setMfaResolver(null);setMfaCode('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{ar?'العودة لتسجيل الدخول':'Back to sign in'}</button></div></div></main>;
+ if(mfaResolver)return <main className="mz-bp-login min-h-screen bg-[#F8F5ED] grid place-items-center p-5" dir={ar?'rtl':'ltr'}><div className="w-full max-w-md"><div className="text-center"><div className="mz-bp-login-brand flex justify-center"><MizanLogo language={language}/></div><div className="mizan-kicker mt-7">{ar?'تحقق بخطوتين':'TWO-STEP VERIFICATION'}</div><h1 className="text-3xl font-black mt-2 text-[#17352D]">{ar?'رمز التطبيق':'Authenticator code'}</h1><p className="text-xs text-[color:var(--muted)] mt-2 leading-6">{ar?'افتح تطبيق المصادقة في جوالك (مثل Google Authenticator) واكتب الأرقام الستة الظاهرة فيه.':'Open Google Authenticator and enter the current 6-digit code.'}</p></div><div className="mizan-surface mz-bp-login-card p-6 mt-7"><label className="block"><span className="text-sm font-black text-[#3f4642]">{ar?'رمز التحقق':'Verification code'}</span><div className="relative mt-2"><KeyRound className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[#6a6f6c] pointer-events-none"/><input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e=>e.key==='Enter'&&void finishMfaSignIn()} className="mizan-input mizan-input-icon-start text-center tracking-[0.3em] font-black" dir="ltr"/></div></label>{message&&<div className="mt-4 rounded-xl bg-[#f3f1eb] px-3 py-2.5 text-xs font-semibold">{message}</div>}<Button size="lg" className="mz-bp-cta w-full mt-6 min-h-14" disabled={busy||mfaCode.length!==6} onClick={()=>void finishMfaSignIn()} icon={<ShieldCheck className="w-4 h-4"/>}>{busy?'…':ar?'تحقق وادخل':'Verify & sign in'}</Button><button type="button" onClick={()=>{setMfaResolver(null);setMfaCode('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{ar?'العودة لتسجيل الدخول':'Back to sign in'}</button>{DEMO_AVAILABLE&&<DemoEntry ar={ar}/>}</div></div></main>;
 
  const activating=Boolean(activationToken&&preview);
  const title=activating?(ar?'فعّل حسابك':'Activate your account'):(ar?'تسجيل الدخول':'Sign in');
@@ -127,20 +152,7 @@ export const AuthPortal:React.FC=()=>{
     {sso&&<Button size="lg" variant="secondary" className="w-full mt-3 min-h-14" disabled={busy} onClick={()=>void signInWithSso()}>{ar?`الدخول عبر ${sso.displayName}`:`Sign in with ${sso.displayName}`}</Button>}
     {activating&&<button onClick={()=>{setExistingMode(v=>!v);setPassword('');setConfirmPassword('');setMessage('')}} className="w-full min-h-11 mt-3 text-xs font-bold text-[#45675b]">{existingMode?(ar?'هذا أول حساب لي — اختر كلمة مرور جديدة':'This is my first account — choose a new password'):(ar?'لدي حساب بهذا البريد':'I already have an account with this email')}</button>}
     {(!activating||existingMode)&&<button onClick={reset} className="w-full min-h-12 mt-2 text-sm font-bold text-[#45675b]">{ar?'نسيت كلمة المرور؟':'Forgot password?'}</button>}
-    {/* مدخل العرض: بيئة معزولة ببيانات مصطنعة، بلا حساب ولا اتصال بأي مسابقة حقيقية.
-        تُفتح بضغطةٍ صريحة فقط، ولها مفتاح تخزينها الخاص داخل هذا التبويب. */}
-    {/* زرٌّ مسمّى واضح: التجربة بابُ التعريف بالمنتج، والأيقونة وحدها لم يفهمها أحد. */}
-    {DEMO_AVAILABLE&&!activating&&<div className="mt-5 pt-4 border-t border-[#e4e0d5]">
-     <button
-      type="button"
-      onClick={()=>enterDemoSession()}
-            className="w-full min-h-14 inline-flex items-center justify-center gap-2.5 rounded-2xl border-2 border-[#d8b86a] bg-gradient-to-b from-[#fdf7e8] to-[#f6e8c6] px-5 text-base font-black text-[#6b5314] shadow-[0_6px_18px_rgba(138,106,28,.14)] transition hover:from-[#faf0d8] hover:to-[#f0dcae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8a6a1c]"
-     >
-      <FlaskConical className="w-5 h-5" aria-hidden="true"/>
-      <span>{ar?'جرّب النسخة التجريبية':'Try the demo'}</span>
-     </button>
-     <p className="mt-2 text-center text-xs font-bold text-[#6b5f45]">{ar?'بيانات مصطنعة — لا تتصل بأي مسابقة حقيقية':'Synthetic data — not connected to any real competition'}</p>
-    </div>}
+    {DEMO_AVAILABLE&&<DemoEntry ar={ar}/>}
    </>}
   </div>
  </div></main>

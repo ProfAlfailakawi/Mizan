@@ -322,7 +322,8 @@ export default function App() {
  useEffect(()=>{warmViews()},[]);
  const requireAuth=true; // MIZAN is production-only: authentication is always enforced for staff runtime.
  /* mizan.<domain> وجهٌ تسويقي عام: لا يمرّ ببوابة الدخول ولا بهوية جهة. */
- const marketing=hostSurface()==='marketing';
+ /* الرابط المباشر للعرض (/demo) على مضيف التسويق يفتح التطبيق التجريبي لا الصفحة التسويقية. */
+ const marketing=hostSurface()==='marketing'&&!IS_DEMO_SESSION;
  const {signedIn,authReady,accessError,activationToken,setActivationToken,activationFromQr,activationMessage,activateAccount,takeoverSession}=useMizanAuth(requireAuth);
  const idleWarnSeconds=useIdleSignOut(requireAuth&&signedIn);
  /* جهازٌ واحد مصرَّح ينشر ما تعرضه كل شاشات القاعة، فتبقى الشاشات بلا حساب ولا امتياز.
