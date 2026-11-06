@@ -348,8 +348,11 @@ html[data-mizan-motion="reduced"] .mz-bp-scanline { animation: none; }
     display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
     line-height: 1.45; font-size: 11px;
   }
-  /* the mushaf leads; transient hints (mic level etc.) sit after it so the text is the first thing seen */
-  .mizan-judge-notes { order: 5; margin-top: 0.4rem; margin-bottom: 0 !important; }
+  /* the mushaf leads. ONLY the informational microphone hints (role=status) follow it; alerts and the
+     emergency-replacement panel (approve button) stay above the passage where the judge must see them. */
+  .mizan-judge-notes { display: contents; }
+  .mizan-judge-notes > * { margin-top: 0 !important; margin-bottom: 0.4rem; }
+  .mizan-judge-notes > [role="status"] { order: 5; margin-top: 0.4rem !important; margin-bottom: 0; }
   .mizan-judge-quran { min-height: 19rem; }
   .mizan-judge-deck { max-height: 42dvh; }
   .mizan-judge-pad { gap: 0.3rem; }
