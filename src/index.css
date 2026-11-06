@@ -500,14 +500,20 @@ html[lang="ar"] .mizan-wordmark-name{ font-family:var(--font-arabic); }
    but the swap must not move anything. Reserving each line's box on the em-independent
    side (fixed line-height plus a min-height derived from it) means the substituted face
    changes glyph shapes only; the lockup stays put. */
-.mizan-splash-word{ animation:mzLift .72s var(--ease-brand) 1.16s both; }
+.mizan-splash-word{ animation:mzLift .72s var(--ease-brand) 1.0s both; }
 .mizan-splash-word .mizan-wordmark-name{
   line-height:1.05; min-height:calc(1.05em); font-synthesis-weight:none;
 }
 .mizan-splash-word .mizan-wordmark-rule{ min-height:1.4em; }
-.mizan-splash-word .mizan-wordmark-tagline{ line-height:1.6; min-height:1.6em; }
-.mizan-splash-word .mizan-wordmark-rule{ animation:mzLift .6s var(--ease-brand) 1.34s both; }
-.mizan-splash-word .mizan-wordmark-tagline{ animation:mzLift .6s var(--ease-brand) 1.46s both; }
+/* The subtitle used to finish fading in at ~2.06s and the splash left at 2.45s, so it was
+   mid-fade or gone for most of the hold, and at 12px grey it never read as a deliberate line.
+   It now arrives earlier (the hold below is lengthened too), is larger and darker. */
+.mizan-splash-word .mizan-wordmark-tagline{
+  line-height:1.6; min-height:1.6em;
+  font-size:clamp(15px,calc(13px + .9vmin),19px); font-weight:600; letter-spacing:.02em; color:#3d4741;
+}
+.mizan-splash-word .mizan-wordmark-rule{ animation:mzLift .6s var(--ease-brand) 1.2s both; }
+.mizan-splash-word .mizan-wordmark-tagline{ animation:mzLift .6s var(--ease-brand) 1.3s both; }
 
 /* Progress hairline — the only chrome on the screen. */
 .mizan-splash-track{

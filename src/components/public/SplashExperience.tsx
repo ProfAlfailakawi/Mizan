@@ -14,7 +14,7 @@ import {MizanMark, MizanWordmark} from '../design-system/MizanLogo';
  * static frame under prefers-reduced-motion.
  */
 
-const HOLD_MS = 2450;
+const HOLD_MS = 3100;
 const EXIT_MS = 340;
 // Reduced motion gets a finished still frame, not a shortened one: it must be held long
 // enough to read as a deliberate title card rather than a flash between routes.
