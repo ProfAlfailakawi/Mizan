@@ -103,6 +103,7 @@ import { buildDisasterPack, generateEncryptionKey, encryptJson, privacySafeBench
 import { AppStoreState, STORAGE_KEY, type TieDecisionRecord } from './store-state';
 import { revokeMatchingSessions, grantReissueInvitations } from './demo-identity';
 import { arPlural, AR_NOUNS } from './arabic-plural';
+import { forgetDemoSessionId, requestServerSandbox, resetServerSandbox, type DemoEnterResult } from './demo-transport';
 
 const RETIRED_IDENTITY_ROLE='scientific_admin' as const;
 const isRetiredIdentityRole=(role:unknown)=>String(role||'')===RETIRED_IDENTITY_ROLE;
@@ -276,11 +277,24 @@ export function enterDemoSession(): boolean {
   return true;
 }
 
+/**
+ * مدخل العرض المعتمد: يطلب صندوقًا معزولًا من الخادم أولًا، ثم يرفع الراية ويعيد التحميل.
+ * رفض الخادم (مفتاح الإطفاء أو سقف الصناديق) يمنع الدخول ويعيد السبب للواجهة.
+ * وانقطاع الخادم يُبقي العرض المحلي الصرف ممكنًا — فهو لا يلمس الخادم أصلًا.
+ */
+export async function enterDemoSessionIsolated(): Promise<DemoEnterResult> {
+  if (!DEMO_AVAILABLE) return 'disabled';
+  const result = await requestServerSandbox();
+  if (result === 'ok' || result === 'offline') { if (!enterDemoSession()) return 'disabled'; }
+  return result;
+}
+
 /** يخرج منها ويمحو كل ما كتبته في هذا التبويب. */
 export function exitDemoSession(): boolean {
   // كان فشلُ التخزين يُرجع قبل إعادة التحميل فيبدو زرّ الخروج معطّلًا، وكان الدور
   // التجريبي المختار يبقى فيعود به الزائر في المرة التالية. الخروج يحدث دائمًا الآن.
   let cleared = true;
+  forgetDemoSessionId();
   for (const key of [DEMO_FLAG_KEY, DEMO_STATE_KEY, 'mizan_demo_role_v1', 'mizan_demo_quorum_v1']) {
     try { window.sessionStorage.removeItem(key); } catch { cleared = false; }
   }
@@ -298,6 +312,7 @@ export function resetDemoSession(): boolean {
   } catch {
     return false;
   }
+  resetServerSandbox();
   window.location.reload();
   return true;
 }

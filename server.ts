@@ -69,6 +69,7 @@ import type { RecitationJudgingGate } from './server/recitation-asr-contract';
 import { cueTextAllowed, cueTtsConfigured, synthesizeCue } from './server/cue-tts';
 import { baseDomain, publicTenant, resolveTenantAny, resetTenantRegistry, tenantRegistry, tenantByOrganizationId } from './server/tenant-registry';
 import { retiredHosts } from './server/retired-hosts';
+import { DemoSandboxRegistry, createDemoGate, createDemoRoutes, demoEnabled, DEMO_LANDING_HTML } from './server/demo-sandbox';
 import { staticCompression } from './server/static-compression';
 import { UPDATING_PAGE_PATH, updatingPageCsp } from './server/updating-page';
 import { publicOriginOf } from './server/public-origin';
@@ -149,6 +150,19 @@ async function startServer() {
     next();
   });
   /* توقيع الـwebhook يُحسب على الجسم الخام كما وصل: أي إعادة ترميز تُبطل التحقق. */
+  /*
+   * الصندوق التجريبي المعزول (server/demo-sandbox.ts) — أول ما يُركَّب على /api، قبل قارئ JSON
+   * والمحدِّد العام وكل مسار. طلبٌ يحمل معرّف صندوق لا يبلغ أي مخزن حقيقي: ما ليس في قائمة
+   * التمرير الضيّقة يُرفض 403. وبلا الترويسة لا يتغيّر شيء لأي مستخدم حقيقي.
+   */
+  const demoRegistry=new DemoSandboxRegistry();
+  const demoRoutes=createDemoRoutes(demoRegistry);
+  app.use('/api',createDemoGate(demoRegistry));
+  app.get('/api/demo/config',demoRoutes.config);
+  app.post('/api/demo/enter',demoRoutes.enter);
+  app.post('/api/demo/reset',demoRoutes.reset);
+  /* الرابط المباشر للمختبِرين: صفحةٌ صغيرة تنشئ الصندوق ثم تدخل التطبيق. مُطفأ ⇒ يعود الزائر إلى الجذر. */
+  app.get('/demo',(_req,res)=>{if(!demoEnabled())return res.redirect(302,'/');res.setHeader('Cache-Control','no-store');res.type('html').send(DEMO_LANDING_HTML)});
   app.use(express.json({ limit: '1mb', verify:(req,_res,buf)=>{(req as any).rawBody=Buffer.from(buf)} }));
 
   // Per-instance fixed-window rate limiter.

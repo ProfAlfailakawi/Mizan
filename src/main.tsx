@@ -1,3 +1,5 @@
+/* أولًا: يُركَّب نقل معرّف الصندوق التجريبي قبل أي التقاطٍ لـ window.fetch (انظر lib/demo-transport.ts). */
+import './lib/demo-transport';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "npm run verify:pwa && vite build && node scripts/copy-legal-documents.mjs && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "npm run verify:pwa && npm run verify:demo-entry && vite build && node scripts/copy-legal-documents.mjs && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "prestart": "NODE_ENV=production npm run config:validate",
     "start": "NODE_ENV=production node dist/server.cjs",
     "preview": "vite preview",
@@ -23,6 +23,7 @@
     "quran:verify-r2": "tsx scripts/quran-verify-r2.ts",
     "quran:crosswalk:quranws": "tsx scripts/quran-crosswalk-quranws.ts",
     "verify:pwa": "node scripts/verify-pwa.mjs",
+    "verify:demo-entry": "node scripts/verify-demo-entry.mjs",
     "preflight": "node scripts/go-live-preflight.mjs",
     "load:rehearsal": "tsx scripts/load-rehearsal.ts",
     "drill:failure": "tsx scripts/failure-drill.ts",
