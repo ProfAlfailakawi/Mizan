@@ -20,7 +20,7 @@
       if (!b) return;
       if (!b.sessionId || !PATTERN.test(b.sessionId)) throw new Error('id');
       sessionStorage.setItem(ID_KEY, b.sessionId);
-      sessionStorage.setItem(FLAG_KEY, 'true');
+      sessionStorage.setItem(FLAG_KEY, 'true'); /* بناءٌ أُطفئ فيه العرض: store.ts يتجاهل الراية، وdemo-transport يمحو المعرّف اليتيم عند الإقلاع. */
       sessionStorage.removeItem(STATE_KEY);
       window.location.replace('/');
     })

@@ -19,8 +19,15 @@ export const DEMO_ID_STORAGE_KEY = 'mizan_demo_server_id_v1';
 export const DEMO_FLAG_STORAGE_KEY = 'mizan_demo_active_v1';
 const DEMO_ID_PATTERN = /^demo_[0-9a-f]{64}$/;
 
+/* بناءٌ أُطفئ فيه العرض (VITE_DISABLE_DEMO_MODE) لا يحمل معرّفًا ولا يرسله — نفس قراءة store.ts المباشرة. */
+function buildAllowsDemo(): boolean {
+  try { return import.meta.env.VITE_DISABLE_DEMO_MODE !== 'true'; } catch { return true; }
+}
+
 export function readDemoSessionId(): string {
   try {
+    /* المعرّف لا يُرسل إلا ما دامت راية العرض مرفوعة في هذا اللسان وبناءُ الواجهة يسمح بالعرض. */
+    if (!buildAllowsDemo() || window.sessionStorage.getItem(DEMO_FLAG_STORAGE_KEY) !== 'true') return '';
     const value = String(window.sessionStorage.getItem(DEMO_ID_STORAGE_KEY) || '').trim();
     return DEMO_ID_PATTERN.test(value) ? value : '';
   } catch {
@@ -63,6 +70,10 @@ export function installDemoTransport(): void {
   if (installed) return;
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
   installed = true;
+  /* معرّفٌ يتيم (راية غائبة أو العرض مُطفأ في هذا البناء) يُمحى عند الإقلاع فلا يلاحق طلبات حقيقية. */
+  try {
+    if ((!buildAllowsDemo() || window.sessionStorage.getItem(DEMO_FLAG_STORAGE_KEY) !== 'true') && window.sessionStorage.getItem(DEMO_ID_STORAGE_KEY)) forgetDemoSessionId();
+  } catch { /* لا يمنع */ }
   const original = window.fetch.bind(window);
   window.fetch = function mizanDemoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     let sessionId = '';
