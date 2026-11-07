@@ -410,3 +410,9 @@ html[data-mizan-motion="reduced"] .mz-bp-scanline { animation: none; }
   .mz-portal-actions { width: 100%; }
   .mz-portal-actions > button { width: 100%; }
 }
+
+/* Org-admin stat row: with the "new competition" action now in the heading, the three metrics span the
+   full row instead of leaving the start side empty on wide canvases. */
+@media (min-width: 640px) {
+  .grid.mz-org-metrics { max-width: none; }
+}
