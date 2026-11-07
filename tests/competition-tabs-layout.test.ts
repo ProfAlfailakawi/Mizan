@@ -35,7 +35,7 @@ test('the judging tab is a judging screen, not the operations screen again', () 
     'no stylesheet may hide a judging section by its position in the tree');
   assert.match(operations, /mode==='operations'\s*\n?\s*\?[\s\S]{0,400}'يوم المسابقة'/,
     'the event-day heading belongs to operations only');
-  assert.match(operations, /:\s*<div className="flex justify-end"><Button[^>]*onClick=\{\(\)=>store\.addCommittee\(\)\}/,
+  assert.match(operations, /:\s*<div className="flex justify-end(?: mz-judging-new)?"><Button[^>]*onClick=\{\(\)=>store\.addCommittee\(\)\}/,
     'judging keeps the create-panel action — it is where panels are built');
   assert.match(operations, /mode==='operations'&&store\.committees\.length>0&&<div className="grid xl:grid-cols/,
     'the capacity simulation belongs to operations only');
