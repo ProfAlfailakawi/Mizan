@@ -365,6 +365,11 @@ html[data-mizan-motion="reduced"] *::after { animation-duration:.01ms !important
 html[lang="ar"] .mizan-ticket-label{letter-spacing:0}
 /* Arabic letters are joined: Tailwind tracking utilities pull them apart. */
 html[lang="ar"] :is(.tracking-wide,.tracking-wider,.tracking-widest):not([lang="en"]):not([dir="ltr"]){letter-spacing:0}
+/* The same holds for every other tracking utility: arbitrary eyebrow values (tracking-[.14em] … [.22em])
+   and negative display tracking (tracking-tight, tracking-[-.03em]) both break Arabic joins. The English
+   copy of each label keeps its tracking because html[lang] is "en" there. LTR codes (TOTP digits) are exempt. */
+html[lang="ar"] [class*="tracking-"]:not([lang="en"]):not([dir="ltr"]){letter-spacing:0}
+html[lang="ar"] :is(.mizan-stat-label,.mzo-eyebrow,.mizan-splash-word .mizan-wordmark-tagline){letter-spacing:0}
 .mizan-ticket-number{font-size:54px;line-height:1;font-weight:950;letter-spacing:-.05em;color:#202924;margin-top:9px;font-variant-numeric:tabular-nums}
 .mizan-ticket-meta{font-size:12px;font-weight:800;color:#5f6862;margin-top:12px}
 .mizan-ticket-machine-compact{height:205px;width:230px}.mizan-ticket-machine-compact .mizan-ticket-paper{width:170px;height:135px;padding-top:27px}.mizan-ticket-machine-compact .mizan-ticket-number{font-size:44px}.mizan-ticket-machine-compact .mizan-ticket-meta{margin-top:8px}
