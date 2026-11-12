@@ -2114,6 +2114,31 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
    `display:none` وهي مغلقة لا يغيّر شيئًا مرئيًّا ولا يمسّ سلوك الفتح. */
 .mizan-more:not([open]) > div{ display:none }
 
+/* iOS يكبّر الصفحة كلّها عند لمس حقلٍ خطُّه دون 16px، ثم لا يعيدها — فتنزاح الترويسة وتُقصّ
+   الأزرار. يُرفع خطّ الحقول إلى 16px على أجهزة اللمس (`pointer:coarse`: الهاتف واللوح) وحدها،
+   فلا يتغيّر شيءٌ على الحاسوب بالفأرة، ولا يُمسّ نصّ المصحف (ليس في حقل إدخال). */
+@media (pointer:coarse){
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select, textarea{ font-size:max(16px,1em) }
+}
+
+/* شاشة البثّ: شريطها المثبّت (الدور والخروج واللغة، App.tsx) يعلو ترويسة الحفل، فكان يقع فوق
+   الشعار واسم المسابقة. يُفسح له رأسُ السطح مكانه — للدور وحده، لا لوضع الحفل المفتوح من الإدارة. */
+.mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{
+  padding-top:calc(4.25rem + env(safe-area-inset-top,0px));
+}
+/* وعلى الهاتف في البيئة التجريبية: السطح كلّه مثبّت فلا تدفّق تحته، فكان شريط العرض «الجاري في
+   التدفّق» يطفو أعلى الشاشة فوق أزرار البثّ ويحجب اللغة والخروج. يُثبَّت أسفلها كما على الحاسوب،
+   ويقف السطح فوقه. */
+@media (max-width:639.98px){
+  body:has(.mizan-shell-main[data-mz-role="broadcast_operator"]) .mizan-demo-bar{
+    position:fixed; inset-inline:0; bottom:0; padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  html[data-demo-bar="on"] .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{
+    bottom:calc(3.5rem + env(safe-area-inset-bottom,0px));
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
@@ -2205,29 +2230,3 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
 
 
-/* iOS يكبّر الصفحة كلّها عند لمس حقلٍ خطُّه دون 16px، ثم لا يعيدها — فتنزاح الترويسة وتُقصّ
-   الأزرار. يُرفع الخطّ إلى 16px على أجهزة اللمس من عائلة iOS وحدها (`-webkit-touch-callout`)،
-   فلا يتغيّر شيءٌ على سطح المكتب ولا أندرويد، ولا يُمسّ نصّ المصحف (ليس في حقل إدخال). */
-@supports (-webkit-touch-callout:none){
-  @media (pointer:coarse){
-    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
-    select, textarea{ font-size:max(16px,1em) }
-  }
-}
-
-/* شاشة البثّ: شريطها المثبّت (الدور والخروج واللغة، App.tsx) يعلو ترويسة الحفل، فكان يقع فوق
-   الشعار واسم المسابقة. يُفسح له رأسُ السطح مكانه — للدور وحده، لا لوضع الحفل المفتوح من الإدارة. */
-.mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{
-  padding-top:calc(4.25rem + env(safe-area-inset-top,0px));
-}
-/* وعلى الهاتف في البيئة التجريبية: السطح كلّه مثبّت فلا تدفّق تحته، فكان شريط العرض «الجاري في
-   التدفّق» يطفو أعلى الشاشة فوق أزرار البثّ ويحجب اللغة والخروج. يُثبَّت أسفلها كما على الحاسوب،
-   ويقف السطح فوقه. */
-@media (max-width:639.98px){
-  body:has(.mizan-shell-main[data-mz-role="broadcast_operator"]) .mizan-demo-bar{
-    position:fixed; inset-inline:0; bottom:0; padding-bottom:env(safe-area-inset-bottom,0px);
-  }
-  html[data-demo-bar="on"] .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{
-    bottom:calc(3.5rem + env(safe-area-inset-bottom,0px));
-  }
-}
