@@ -100,7 +100,7 @@ export const GuardianLiveLink: React.FC<{ child: Participant }> = ({ child }) =>
 
       {/* Live headline */}
       <div data-mz-flash={headlineFlash ? 'light' : undefined} className="mt-4 rounded-2xl bg-gradient-to-b from-[#20493d] to-[#17362b] text-white p-5">
-        <div className="text-[11px] text-white/50 font-black">{ar ? child.fullNameArabic : child.fullName} · {child.code}</div>
+        <div className="text-[11px] mizan-venue-faint font-black">{ar ? child.fullNameArabic : child.fullName} · {child.code}</div>
         <div className="text-2xl sm:text-3xl font-black mt-1 leading-snug">
           {stage === 'in_committee' ? (ar ? `${firstName} الآن أمام ${committee?.code || 'اللجنة'}` : `${firstName} is now with ${committee?.code || 'the panel'}`)
             : stage === 'queued' ? (ar ? `الترتيب في الطابور: ${position || '—'}` : `Queue position: ${position || '—'}`)

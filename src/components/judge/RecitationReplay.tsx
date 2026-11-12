@@ -104,8 +104,8 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
      <button type="button" onClick={()=>seek(0)} aria-label={ar?'من البداية':'Restart'} className="w-11 h-11 rounded-xl border border-[#dcdad2] grid place-items-center text-[#59615c]"><RotateCcw className="w-4 h-4"/></button>
     </div>
     <div className="flex items-center gap-1.5">
-     <button type="button" onClick={()=>step(-1)} disabled={!notable.length} aria-label={ar?'العلامة السابقة':'Previous marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1"><ChevronRight className="w-3.5 h-3.5"/>{ar?'السابقة':'Prev'}</button>
-     <button type="button" onClick={()=>step(1)} disabled={!notable.length} aria-label={ar?'العلامة التالية':'Next marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1">{ar?'التالية':'Next'}<ChevronLeft className="w-3.5 h-3.5"/></button>
+     <button type="button" onClick={()=>step(-1)} disabled={!notable.length} aria-label={ar?'العلامة السابقة':'Previous marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1"><ChevronRight className="w-3.5 h-3.5 ltr:rotate-180"/>{ar?'السابقة':'Prev'}</button>
+     <button type="button" onClick={()=>step(1)} disabled={!notable.length} aria-label={ar?'العلامة التالية':'Next marker'} className="min-h-11 px-3 rounded-xl border border-[#dcdad2] text-[11px] font-black text-[#59615c] disabled:opacity-40 inline-flex items-center gap-1">{ar?'التالية':'Next'}<ChevronLeft className="w-3.5 h-3.5 ltr:rotate-180"/></button>
     </div>
    </div>
    {!notable.length&&<p className="mt-2 text-[11px] text-[color:var(--muted)]">{ar?'لا توجد لحظات مُعلَّمة في هذه الجلسة.':'No flagged moments in this session.'}</p>}

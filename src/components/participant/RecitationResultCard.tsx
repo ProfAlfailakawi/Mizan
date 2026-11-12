@@ -50,7 +50,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
 
       <div className="mt-6">
         <h2 className="text-2xl font-black leading-tight sm:text-[28px]">{participantName}</h2>
-        <p className="mt-1.5 text-[11px] font-bold text-white/45">
+        <p className="mt-1.5 text-[11px] font-bold mizan-venue-faint">
           {[categoryName, riwaya].filter(Boolean).join(' · ') || (ar ? 'مسابقة ميزان' : 'MIZAN competition')}
         </p>
       </div>
@@ -74,7 +74,7 @@ export const RecitationResultCard: React.FC<RecitationResultCardProps> = ({
         * يُشكِّك فيه من يقرؤه.
         */}
 
-      <p className="mt-5 text-center text-[11px] leading-5 text-white/35">
+      <p className="mt-5 text-center text-[11px] leading-5 mizan-venue-faint">
         {ar
           ? 'حكمُ المحكّمين وحدهم.'
           : 'Scoring is human. Nothing unpublished appears here, and no other participant’s data is included.'}
