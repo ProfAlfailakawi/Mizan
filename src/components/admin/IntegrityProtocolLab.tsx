@@ -63,7 +63,7 @@ const Appeal=()=>{const s=useAppStore(),ar=s.language==='ar';const [aid,setAid]=
    {last.withheldNoteArabic&&<p className="text-[13px] leading-6 text-[#5f6862]">{last.withheldNoteArabic}</p>}
    <div className="mizan-proof-code rounded-xl bg-[#202924] p-3 text-white/65">{last.capsuleHash}</div>
    <Button variant="outline" onClick={async()=>setCheck(await s.verifyAppealCapsuleRecord(last.id))}>{ar?'تحقّق مستقل من الكبسولة':'Verify capsule independently'}</Button>
-   {check&&<div className={`rounded-xl p-3 text-[13px] font-bold ${VERDICT[check.state]?.tone||''}`}>{VERDICT[check.state]?.text||check.state}{!!check.reasons.length&&<ul className="mt-2 list-disc space-y-1 pr-4 font-normal">{check.reasons.map((r,i)=><li key={i}>{r}</li>)}</ul>}</div>}
+   {check&&<div className={`rounded-xl p-3 text-[13px] font-bold ${VERDICT[check.state]?.tone||''}`}>{VERDICT[check.state]?.text||check.state}{!!check.reasons.length&&<ul className="mt-2 list-disc space-y-1 ps-4 font-normal">{check.reasons.map((r,i)=><li key={i}>{r}</li>)}</ul>}</div>}
   </div>}
  </div>}
 
