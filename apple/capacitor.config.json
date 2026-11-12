@@ -1,0 +1,30 @@
+{
+  "appId": "com.dralfailakawi.mizan",
+  "appName": "Mizan",
+  "webDir": "www",
+  "server": {
+    "url": "https://mizan-quran.web.app",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "mizan-quran.web.app",
+      "mizan-f2ce3.firebaseapp.com",
+      "*.googleapis.com",
+      "everyayah.com"
+    ]
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#F7F5EF",
+    "scheme": "Mizan",
+    "limitsNavigationsToAppBoundDomains": false,
+    "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#F7F5EF",
+      "showSpinner": false
+    }
+  }
+}

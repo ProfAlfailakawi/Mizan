@@ -1,0 +1,25 @@
+{
+  "repo": "Mizan",
+  "appId": "com.dralfailakawi.mizan",
+  "nameAr": "ميزان",
+  "nameEn": "Mizan",
+  "displayName": "ميزان",
+  "url": "https://mizan-quran.web.app",
+  "allowNavigation": [
+    "mizan-f2ce3.firebaseapp.com",
+    "*.googleapis.com",
+    "everyayah.com"
+  ],
+  "icon": "public/brand/mizan-icon-maskable.svg",
+  "background": "#F7F5EF",
+  "backgroundDark": "#0F1A16",
+  "accent": "#214C40",
+  "lsCategory": "public.app-category.education",
+  "microphone": true,
+  "micReason": "يُستخدم الميكروفون لتسجيل تلاوة المتسابق أثناء جلسة التحكيم فقط وبطلب منك.",
+  "backgroundModes": [
+    "audio"
+  ],
+  "version": "1.0.0",
+  "build": 1
+}
