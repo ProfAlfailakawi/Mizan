@@ -154,7 +154,7 @@ export const CorridorScreen: React.FC<{
               <span className="relative h-1.5 overflow-hidden rounded-full bg-white/20 transition-all duration-500" style={{ width: i === index ? 56 : 10 }}>
                 {i === index && <span key={`${p}-${index}`} className="absolute inset-y-0 start-0 rounded-full bg-[#c49a5d]" style={{ animation: `mizan-corridor-fill ${step}s linear forwards` }} />}
               </span>
-              <span className={`text-[11px] font-black ${i === index ? 'text-[#e0c894]' : 'text-white/35'}`}>{ar ? CORRIDOR_PANEL_LABEL[p] : p}</span>
+              <span className={`text-[11px] font-black ${i === index ? 'text-[#e0c894]' : 'mizan-venue-faint'}`}>{ar ? CORRIDOR_PANEL_LABEL[p] : p}</span>
             </span>)}
             <style>{'@keyframes mizan-corridor-fill{from{width:0}to{width:100%}}'}</style>
           </footer>
@@ -233,7 +233,7 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
                 <Tile value={String(page)} label={ar ? 'الصفحة' : 'page'} />
                 <Tile value={String(pageToJuz(page))} label={ar ? 'الجزء' : 'juz'} />
               </div>
-              <p className="mt-6 text-[11px] text-white/40">{ar ? 'يظهر نصّ الموضع حين تتصل الشاشة بمكتبة المصحف المعتمدة.' : 'The passage text appears once the screen reaches the approved Mushaf library.'}</p>
+              <p className="mt-6 text-[11px] mizan-venue-faint">{ar ? 'يظهر نصّ الموضع حين تتصل الشاشة بمكتبة المصحف المعتمدة.' : 'The passage text appears once the screen reaches the approved Mushaf library.'}</p>
             </div>
             : <p className="mt-10 text-sm mizan-venue-muted">{ar ? 'جارٍ تحميل الموضع…' : 'Loading…'}</p>}
       </div>
@@ -247,7 +247,7 @@ const MushafPanel: React.FC<{ ar: boolean; board?: DisplayBoard; reading: string
       </div>
 
       {/* يُقال من أين جاءت، فلا يظنّها أحد تلاوةً جارية الآن. */}
-      <p className="mt-4 text-[11px] leading-5 text-white/35">
+      <p className="mt-4 text-[11px] leading-5 mizan-venue-faint">
         {locus.fromToday
           ? (ar ? 'موضع من الصفحات التي تلتها هذه القاعة اليوم. ليست تلاوة جارية، ولا تخصّ متسابقًا بعينه.' : 'A passage from pages this hall recited today — not a live session and not tied to any participant.')
           : (ar ? 'موضع من المصحف. ليست تلاوة جارية، ولا تخصّ متسابقًا بعينه.' : 'A passage from the Mushaf — not a live session and not tied to any participant.')}
@@ -286,7 +286,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
           <p className="mt-3 text-sm text-white/55">{ar ? 'ختمة كاملة أتمّتها هذه القاعة اليوم' : 'complete recitations of the whole Quran today'}</p>
         </div>
         <div>
-          <div className="mb-2 flex items-center justify-between text-[11px] text-white/50"><span>{ar ? 'نحو الختمة التالية' : 'Toward next'}</span><span className="font-black text-[#d9c193]" dir="ltr">{toward}%</span></div>
+          <div className="mb-2 flex items-center justify-between text-[11px] mizan-venue-faint"><span>{ar ? 'نحو الختمة التالية' : 'Toward next'}</span><span className="font-black text-[#d9c193]" dir="ltr">{toward}%</span></div>
           <div ref={motion.bar.ref} className="h-2.5 overflow-hidden rounded-full bg-white/10"><span data-draw={motion.bar.phase ?? undefined} className="dna-drawx block h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, toward)}%` }} /></div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Tile value={`${percent}%`} label={ar ? 'من المصحف' : 'of the Mushaf'} />
@@ -306,7 +306,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
             <span key={i} className="dna-pageglow aspect-square rounded-[2.5px] transition-colors duration-700" data-rose={motion.rose(i) ? '' : undefined} style={{ background: pageGlow(count, max) }} />
           ))}
         </div>
-        <p className="mt-3 text-[11px] leading-5 text-white/35">
+        <p className="mt-3 text-[11px] leading-5 mizan-venue-faint">
           {ar ? 'تجميع على مستوى الصفحة لما تُلي اليوم. لا يُربط بمتسابق ولا يقول من قرأ ماذا.' : 'Page-level aggregate of today’s recitation. Never linked to a participant.'}
         </p>
       </div>
@@ -317,7 +317,7 @@ const KhatmahPanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, boa
 const Tile: React.FC<{ value: string; label: string }> = ({ value, label }) => (
   <div className="rounded-2xl bg-white/[.06] p-3 text-center">
     <div className="text-xl min-[112.5rem]:text-3xl font-black tabular-nums" dir="ltr">{value}</div>
-    <div className="mt-1 text-base text-white/45">{label}</div>
+    <div className="mt-1 text-base mizan-venue-faint">{label}</div>
   </div>
 );
 
@@ -345,7 +345,7 @@ const QueuePanel: React.FC<{ ar: boolean; board?: DisplayBoard }> = ({ ar, board
             <div className="shrink-0 text-end">
               <div className="text-base font-bold mizan-venue-muted">{ar ? 'التالي' : 'NEXT'}</div>
               <div className="text-sm min-[112.5rem]:text-xl font-black tabular-nums text-white/75" dir="ltr">{slice.next[0]?.code || '—'}</div>
-              <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-white/45"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
+              <div className="mt-1 inline-flex items-center gap-1 text-[11px] mizan-venue-faint"><UsersRound className="h-3 w-3" />{slice.waitingCount}</div>
             </div>
           </article>
         ))}

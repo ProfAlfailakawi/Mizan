@@ -73,7 +73,7 @@ export const HallRecitationMap: React.FC<{ variant?: 'screen' | 'panel'; onClose
             <div className="text-sm text-white/55 mt-2">{ar ? `أتمت القاعة تلاوة القرآن كاملًا ${toArabicOrdinal(agg.khatmatCompleted, ar)}` : `Complete recitations of the whole Quran`}</div>
           </div>
           <div>
-            <div className="flex items-center justify-between text-[11px] text-white/50 mb-2"><span>{ar ? 'نحو الختمة التالية' : 'Toward next khatmah'}</span><span className="font-black text-[#d9c193]">{Math.round(agg.partialKhatmahPct * 100)}%</span></div>
+            <div className="flex items-center justify-between text-[11px] mizan-venue-faint mb-2"><span>{ar ? 'نحو الختمة التالية' : 'Toward next khatmah'}</span><span className="font-black text-[#d9c193]">{Math.round(agg.partialKhatmahPct * 100)}%</span></div>
             <div ref={motion.bar.ref} className="h-2.5 rounded-full bg-white/10 overflow-hidden"><div data-draw={motion.bar.phase ?? undefined} className="dna-drawx h-full rounded-full bg-gradient-to-r from-[var(--emerald-2)] to-[#c49a5d]" style={{ width: `${Math.max(2, agg.partialKhatmahPct * 100)}%` }} /></div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Stat n={`${Math.round(agg.coveragePct * 100)}%`} t={ar ? 'من المصحف' : 'of the Mushaf'} />
