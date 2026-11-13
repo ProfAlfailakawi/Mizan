@@ -2145,6 +2145,93 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   iPhone Duo — الامتداد الكامل والتكيّف (جولة 2026-11-13). عرضٌ فقط.
+   القرار من مساحة النافذة لا من نوع الجهاز. ولا يمسّ نصّ المصحف ولا الدرجات ولا القرعة.
+   التوثيق: docs/IPHONE-DUO-ADAPTIVE-QUALITY.md
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1) ارتفاع الشاشة: `100vh` في Safari هو الارتفاع الأكبر (شريط العنوان مطويّ)، فكان كل
+   `min-h-screen` يزيد على المرئيّ بقدر شريط Safari ويُحدث تمريرًا فارغًا. `100dvh` يتبع
+   المرئيّ فعلًا. والمتصفّح الذي لا يعرفها يبقى على `100vh`. */
+@supports (height:100dvh){
+  body{ min-height:100dvh }
+  .min-h-screen{ min-height:100dvh }
+  .h-screen{ height:100dvh }
+}
+
+/* 2) مضغوطٌ عموديًّا (مطويّ عرضي ~594×368، مفتوح عرضي مع لوحة مثبّتة 951×350، آيفون عرضي):
+   الترويسة اللاصقة كانت تأكل 98–110px من 350–368 (قرابة الثلث) طوال التمرير. كما في
+   size classes لدى آبل: حين يقصر الارتفاع تنسحب الأشرطة، فتجري الترويسة مع الصفحة وتعود
+   بالتمرير إلى أعلى. قمرة المحكّم تقيس موضعها من أعلى المستند (JudgeOS `measureTop`)
+   فلا يتغيّر ارتفاعها. */
+@media (orientation:landscape) and (max-height:480px){
+  .mz-el-header{ position:relative }
+}
+/* وشريط أقسام المسابقة (8 أقسام) كان كتلة 4×2 بارتفاع ~215px قبل أول سطرٍ من المحتوى؛
+   في العرض المتّسع القصير يصير صفًّا واحدًا بثمانية أعمدة متساوية (عدد زوجي كما في HIG). */
+@media (min-width:560px) and (max-width:759.98px) and (max-height:480px){
+  .mz-el-mnav{ margin-bottom:.75rem }
+  .mz-el-mnav > .grid{ grid-template-columns:repeat(8,minmax(0,1fr)); gap:.3rem }
+  .mz-el-mnav button{ min-height:48px; padding-inline:2px }
+}
+
+/* 3) وضع الكتاب (مطويّ جزئيًّا، الطيّ عمودي): تحسينٌ تدريجي فقط. Safari 27.1 يُبقي
+   Viewport Segments خلف علم، فهذه الكتل لا تُطبَّق إلا حين يعلن المتصفّح جزأين، ودونه
+   لا يتغيّر بكسل. الهدف: لا زرّ ولا حقل ولا سطر قرآنٍ على خطّ الطيّ. */
+@media (horizontal-viewport-segments:2){
+  /* الدخول: البطاقة كاملةً في الجزء الأيمن (بداية القراءة بالعربية)، لا عبر المفصل. */
+  .mz-bp-login{
+    padding-left:calc(env(viewport-segment-left 1 0) + 1.25rem);
+    padding-right:1.25rem;
+  }
+  /* قمرة المحكّم: الورقة في جزء واللوحة في الآخر، والفاصل بينهما هو المفصل بالضبط. */
+  .mizan-judge-os{
+    grid-template-columns:env(viewport-segment-width 1 0) env(viewport-segment-width 0 0);
+    column-gap:calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0));
+  }
+  [dir="ltr"] .mizan-judge-os{
+    grid-template-columns:env(viewport-segment-width 0 0) env(viewport-segment-width 1 0);
+  }
+  .mizan-judge-strip{ inset-inline-end:calc(100% - env(viewport-segment-width 1 0)) }
+  [dir="ltr"] .mizan-judge-strip{ inset-inline-end:calc(100% - env(viewport-segment-width 0 0)) }
+  /* مقبض بيانات الجلسة كان في منتصف القمرة كلّها — أي على المفصل؛ صار في منتصف الورقة. */
+  .mizan-judge-handle{ left:calc(env(viewport-segment-left 1 0) + env(viewport-segment-width 1 0) / 2) }
+  [dir="ltr"] .mizan-judge-handle{ left:calc(env(viewport-segment-width 0 0) / 2) }
+  /* شاشة انتظار المحكّم: زرّ «ابدأ مع المتسابق التالي» كان في المنتصف على المفصل. */
+  /* عرضٌ بقدر الجزء الأيمن ناقصًا الحواف، ومحاذاةٌ إلى اليمين في الاتجاهين — لا هامش أيسر
+     صريح، لأن RTL يُسقط الهامش الأيسر حين تزيد القيود على عرض الحاوية. */
+  .mizan-judge-wait{
+    max-width:none;
+    width:calc(env(viewport-segment-width 1 0) - 2.5rem);
+    margin-left:auto;
+    margin-right:0;
+  }
+}
+
+/* 4) وضع الطاولة (الطيّ أفقي): الورقة — وفيها نصّ المصحف — فوق المفصل، ولوحة المفاتيح تحته
+   على النصف المسنود. الأعمدة تصير صفوفًا مقاسةً بالجزأين. */
+@media (vertical-viewport-segments:2){
+  .mizan-judge-os{
+    grid-template-columns:minmax(0,1fr);
+    grid-template-rows:
+      max(0px, calc(env(viewport-segment-height 0 0) - var(--mizan-judge-top, 64px)))
+      minmax(0,1fr);
+    row-gap:calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0));
+  }
+  .mizan-judge-strip{ inset-inline-end:0 }
+  .mizan-judge-deck{ border-inline-start:0; border-top:1px solid rgba(0,0,0,.45);
+    gap:.35rem; padding-block:.45rem calc(.45rem + env(safe-area-inset-bottom)) }
+  /* اللوحة هنا نصف الارتفاع (~280–335px) لكنها بعرض الشاشة كلّه: ثلاثة مفاتيح في الصف بدل اثنين،
+     وأرضية 48px للصف كما في النافذة القصيرة، فيُمرَّر الفائض داخل اللوحة ولا تتراكب المفاتيح. */
+  .mizan-judge-pad{ grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:minmax(48px,1fr) }
+  .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:auto }
+  .mizan-judge-pad > :last-child:nth-child(3n+1){ grid-column:1 / -1 }
+  .mizan-judge-action{ min-height:48px; padding-block:.4rem }
+  .mizan-judge-hud{ padding-bottom:.3rem }
+  .mizan-judge-finish,.mizan-judge-undo{ min-height:46px }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2233,5 +2320,3 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
-
-
