@@ -56,6 +56,32 @@ function isOwnApiRequest(input: RequestInfo | URL): boolean {
   }
 }
 
+/*
+ * قراءاتٌ عامةٌ يطلبها هيكلُ التطبيق عند كل إقلاع (العلامة، والجهة، والمسابقة المنشورة)، وهي
+ * تقرأ بيانات جهاتٍ حقيقية فيرفضها جدارُ الخادم على الصندوق دائمًا بـ403 `DEMO_SANDBOX_ISOLATED`
+ * (server/demo-sandbox.ts). فكان كلُّ زائرٍ للعرض يرسلها ويتلقّى الرفضَ نفسَه في سجلّ المتصفّح.
+ * يُجاب عنها هنا بالجواب نفسه بلا رحلةٍ إلى الشبكة: الحكمُ لا يتغيّر (الجدارُ يبقى في الخادم،
+ * والمستدعون يرون 403 كما كانوا)، ويغيب الضجيج. ويثبت `tests/demo-transport-isolated-reads.test.ts`
+ * أن الخادم يرفض كلَّ ما يُطابق هنا، فلا يُحجب محليًّا ما كان الخادمُ سيسمح به.
+ */
+const DEMO_ISOLATED_PUBLIC_READS: RegExp[] = [
+  /^\/api\/public\/brand$/,
+  /^\/api\/public\/tenant$/,
+  /^\/api\/public\/competitions\/[^/]+$/,
+];
+
+export function isDemoIsolatedPublicRead(method: string, path: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  return DEMO_ISOLATED_PUBLIC_READS.some((re) => re.test(path));
+}
+
+function requestMethodAndPath(input: RequestInfo | URL, init?: RequestInit): { method: string; path: string } {
+  const isRequest = typeof Request !== 'undefined' && input instanceof Request;
+  const raw = isRequest ? (input as Request).url : String(input);
+  const method = String(init?.method || (isRequest ? (input as Request).method : 'GET')).toUpperCase();
+  return { method, path: new URL(raw, window.location.href).pathname };
+}
+
 /** انتهى الصندوق على الخادم (مهلة أو إعادة تشغيل): يُترك العرض بدل شاشاتٍ ملأى بالأخطاء. */
 function leaveExpiredSandbox(): void {
   try {
@@ -79,6 +105,12 @@ export function installDemoTransport(): void {
     let sessionId = '';
     try { sessionId = readDemoSessionId(); } catch { /* يمضي الطلب كما هو */ }
     if (!sessionId || !isOwnApiRequest(input)) return original(input, init);
+    try {
+      const { method, path } = requestMethodAndPath(input, init);
+      if (isDemoIsolatedPublicRead(method, path)) {
+        return Promise.resolve(new Response(JSON.stringify({ code: 'DEMO_SANDBOX_ISOLATED' }), { status: 403, headers: { 'content-type': 'application/json' } }));
+      }
+    } catch { /* يمضي الطلب إلى الخادم، وجدارُه يحكم */ }
     try {
       let call: Promise<Response>;
       if (typeof Request !== 'undefined' && input instanceof Request && !init) {

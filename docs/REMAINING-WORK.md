@@ -767,7 +767,7 @@ duri-abi-amr · susi-abi-amr)، وبمعرّفاتٍ تخالف المعرّفا
 **في كل دفعة** (`.github/workflows/ci.yml`): `npm ci` · `lint` · `test` · عقد المنفذ ·
 `qa:firestore-rules` على المحاكي · `source-audit` · `arabic-ui-audit` · `build` · بناء صورة Cloud Run.
 
-**أسبوعيًّا وعند كل وسم إصدار** (`.github/workflows/heavy-fairness.yml`): `oracle:benchmark` ·
+**شهريًّا وعند كل وسم إصدار** (`.github/workflows/heavy-fairness.yml`): `oracle:benchmark` ·
 `fairness:lab` · `fairness:adversarial` · `fairness:gate` · `load:rehearsal` · `drill:failure` ·
 `check:model`.
 
@@ -810,10 +810,10 @@ Chromium حقيقيّ:
 | `quran:readiness` | ✅ يعمل — ويذكر المعلَّق بالاسم (`PENDING_OFFICIAL_MASTER` وأخواتها) |
 
 **ثم جُدوِلت.** تشغيلٌ يدويٌّ على رأسٍ بعينه ليس جدولة، فصار لها
-`.github/workflows/scheduled-qa.yml`: يوميًّا في الخامسة صباحًا (UTC)، وعند كل دفعٍ إلى
+`.github/workflows/scheduled-qa.yml`: أسبوعيًّا كل أحدٍ في الخامسة صباحًا (UTC)، وعند كل دفعٍ إلى
 `main`، وعند الطلب — في ثلاث وظائف بحسب ما تحتاجه (بلا متصفّح · بمتصفّحٍ بلا خادم ·
-بمتصفّحٍ وخادمِ معاينة). وانتظارُ الخادم بالاستجابة لا بعددِ ثوانٍ ثابت، ويفشل باسمه
-(`PREVIEW_DID_NOT_START`). واللقطاتُ تُحفظ عند الفشل وحده.
+بمتصفّحٍ وخادمٍ حقيقيٍّ على محاكي Firestore). وانتظارُ الخادم بالاستجابة لا بعددِ ثوانٍ ثابت، ويفشل باسمه
+(`SERVER_DID_NOT_START`). واللقطاتُ تُحفظ عند الفشل وحده.
 
 **وكشفت الجدولةُ ثامنًا لم تذكره هذه الوثيقة أصلًا:** `qa:phone-overflow` — يقيس تمدّدَ
 الشاشات على عرض هاتفٍ ٣٩٠ بكسل، ولم يكن يعمل في أيّ مكان. شُغِّل فنجح (٨ شاشات، ولا

@@ -17,8 +17,8 @@
   reports them as unconfigured until a real adapter and credentials pass the
   connection probe. See `SAAS_PLATFORM.md`.
 
-## Current local build
-This repository implements the end-to-end product skeleton and executable workflows locally. It is **not deployed** and nothing in this package was uploaded to a cloud environment as part of this revision.
+## Deployment
+MIZAN is **deployed**: the app runs on Cloud Run (`mizan`, `me-central1`, GCP project `mizan-f2ce3`) behind Firebase Hosting at https://mizan-quran.web.app, with the practice listener (`mizan-quran-listener`) and the muaalem (`mizan-quran-muaalem`) as separate Cloud Run services that scale to zero. Production deploys are started by hand from `main` (`workflow_dispatch` on `.github/workflows/deploy-cloud-run.yml`, which runs `cloudbuild.yaml` after CI has passed); live state is visible at `/api/health`.
 
 ### Implemented in code
 - Quiet Authority design system with role-specific experiences and no cross-role mega navigation.

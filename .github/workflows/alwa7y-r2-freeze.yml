@@ -5,9 +5,6 @@
 name: alwa7y-r2-freeze
 
 on:
-  push:
-    branches: [claude/clever-turing-gy1d9j]
-    paths: [.github/workflows/alwa7y-r2-freeze.yml]
   workflow_dispatch:
 
 permissions:

@@ -108,3 +108,12 @@ test('المستثنى يُطبع في الفحصين كليهما — واست�
       `${file}: كان يُبتلع هنا بلا ذكر`);
   }
 });
+
+test('صوتُ التنبيه بلا مفتاح نطقٍ يُستثنى بحالته وعنوانه معًا — لا غيرُهما', () => {
+  const unconfigured = 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)';
+  assert.equal(classifyConsoleError({ text: unconfigured, url: at('/api/public/cue-audio?text=%D8%AD') }).suppressed, true);
+  // فشلُ التركيب 502 عطبٌ لا غياب، و503 على مسارٍ آخر عطبٌ كذلك.
+  assert.equal(classifyConsoleError({ text: unconfigured.replace('503 (Service Unavailable)', '502 (Bad Gateway)'), url: at('/api/public/cue-audio?text=x') }).suppressed, false);
+  assert.equal(classifyConsoleError({ text: unconfigured, url: at('/api/public/competitions/x') }).suppressed, false);
+  assert.equal(classifyConsoleError({ text: unconfigured, url: at('/api/public/cue-audio-other') }).suppressed, false);
+});

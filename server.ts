@@ -146,7 +146,7 @@ async function startServer() {
     /* مصادقة Firebase تحمّل مساعدها من apis.google.com وتفتح إطارًا على نطاق المشروع،
        وتسجيل العامل الثاني يحمّل reCAPTCHA من google/gstatic. وسياسة تسمح بـ'self' وحدها
        تمنعها كلها بصمت: يرى المستخدم رفضًا بلا سبب، ويرى المطوّر رفض CSP بلا ربط. */
-    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; media-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com https://orbitq8.web.app; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if(isProd) res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://apis.google.com https://www.google.com https://www.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.gstatic.com; media-src 'self' blob:; connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com https://orbitq8.web.app; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
     next();
   });
   /* توقيع الـwebhook يُحسب على الجسم الخام كما وصل: أي إعادة ترميز تُبطل التحقق. */
@@ -2669,7 +2669,17 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
       const body=await r.json().catch(()=>({})) as any;
       const state=String(body?.status||'').toUpperCase();
       value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null,analysis:typeof body?.analysis==='string'?body.analysis.slice(0,40):null};
-    }catch{/* يبقى UNREACHABLE */}
+    }catch(error){
+      /*
+       * مهلةٌ لا جواب: المعلّمُ ينام إلى الصفر (min 0) ويحمّل نموذجَه عند الإقلاع في نحو ٢٠ ثانية،
+       * فيتجاوز أربعَ ثوانٍ. فهو «يستيقظ» لا «لا يُبلَغ» — كالمستمع أعلاه — والطلبُ نفسُه يوقظه.
+       * ولا يُخبَّأ هذا الحال، فالسؤالُ التالي يرى الجاهزيةَ حين تقع. وما سوى المهلة يبقى UNREACHABLE.
+       */
+      if((error as any)?.name==='TimeoutError'||(error as any)?.name==='AbortError'){
+        const waking:MuaalemHealth={state:'WAKING',model:null};const gate=muaalemMode(waking);
+        return {...waking,mode:gate.mode,modeReason:gate.reason};
+      }
+    }
     const gate=muaalemMode(value);value={...value,mode:gate.mode,modeReason:gate.reason};
     muaalemHealthCache={at:Date.now(),value};
     return value;
