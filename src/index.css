@@ -2219,7 +2219,16 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
     row-gap:calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0));
   }
   .mizan-judge-strip{ inset-inline-end:0 }
-  .mizan-judge-deck{ border-inline-start:0; border-top:1px solid rgba(0,0,0,.45) }
+  .mizan-judge-deck{ border-inline-start:0; border-top:1px solid rgba(0,0,0,.45);
+    gap:.35rem; padding-block:.45rem calc(.45rem + env(safe-area-inset-bottom)) }
+  /* اللوحة هنا نصف الارتفاع (~280–335px) لكنها بعرض الشاشة كلّه: ثلاثة مفاتيح في الصف بدل اثنين،
+     وأرضية 48px للصف كما في النافذة القصيرة، فيُمرَّر الفائض داخل اللوحة ولا تتراكب المفاتيح. */
+  .mizan-judge-pad{ grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:minmax(48px,1fr) }
+  .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:auto }
+  .mizan-judge-pad > :last-child:nth-child(3n+1){ grid-column:1 / -1 }
+  .mizan-judge-action{ min-height:48px; padding-block:.4rem }
+  .mizan-judge-hud{ padding-bottom:.3rem }
+  .mizan-judge-finish,.mizan-judge-undo{ min-height:46px }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
