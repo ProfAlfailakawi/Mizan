@@ -84,8 +84,8 @@ test('a browser gate waits for the server to answer, never for a fixed number of
    * التشغيل — وذلك تدريبٌ على تجاهل الأحمر. والانتظارُ بالاستجابة حتميّ.
    */
   const scheduled = workflows.find(w => w.name === 'scheduled-qa.yml')!;
-  assert.ok(/curl -fsS http:\/\/127\.0\.0\.1:4173\//.test(scheduled.body), 'it must poll the preview until it answers');
-  assert.ok(/PREVIEW_DID_NOT_START/.test(scheduled.body), 'and fail by name when it never does');
+  assert.ok(/curl -fsS http:\/\/127\.0\.0\.1:4173\//.test(scheduled.body), 'it must poll the server until it answers');
+  assert.ok(/SERVER_DID_NOT_START/.test(scheduled.body), 'and fail by name when it never does');
   assert.equal(/sleep 30\b|sleep 60\b/.test(scheduled.body), false, 'no blind fixed wait for the server');
 });
 

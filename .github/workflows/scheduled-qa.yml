@@ -146,11 +146,21 @@ jobs:
           path: dist/scope-visual-qa
           if-no-files-found: ignore
 
-  # ── ما يحتاج متصفّحًا وخادمَ معاينة ─────────────────────────────────────────
+  # ── ما يحتاج متصفّحًا وخادمًا حقيقيًّا ──────────────────────────────────────
+  #
+  # كانت هذه الوظيفةُ تقود خادمَ معاينةٍ ساكنًا (`vite preview`). ومنذ الصندوق المعزول
+  # (#408) صار دخولُ العرض يطلب `POST /api/demo/enter` أوّلًا، والخادمُ الساكن يردّ 404 —
+  # والواجهةُ تقرأ 404 «العرضُ مُطفأ في هذا النشر» عن حقّ، فلا تدخل. فسقطت الفحوصُ الثلاثة
+  # قبل أن تبلغ شاشةً واحدة. والإصلاحُ في البيئة لا في المنتج: يُشغَّل الخادمُ الحقيقيّ
+  # (`dist/server.cjs`) على محاكي Firestore بمسابقةٍ مزروعة — كما في `qa-public-registration.sh`
+  # — فيعمل الدخولُ، ويعمل قسمُ التسجيل بدل أن يُتخطّى. ولا يلمس شيءٌ هنا Firestore حقيقيًّا.
   product-surface:
     name: سطحُ المنتج ويومُ المسابقة في متصفّح
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      FIREBASE_PROJECT_ID: mizan-qa-surface
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -161,32 +171,45 @@ jobs:
         run: npm ci
       - name: تثبيت Chromium
         run: npx playwright install --with-deps chromium
+      - name: جافا للمحاكي
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: البناء
         run: npm run build
 
       # الانتظارُ بالاستجابة لا بالتوقيت: رقمٌ ثابت يمرّ أحيانًا ويسقط أحيانًا.
-      - name: تشغيل خادم المعاينة
+      - name: محاكي Firestore ومسابقةٌ مزروعة
         run: |
-          npx vite preview --port 4173 --host 127.0.0.1 &
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then echo "المعاينة جاهزة بعد ${i}ث"; exit 0; fi
+          npx firebase emulators:start --only firestore --project "$FIREBASE_PROJECT_ID" > /tmp/mizan-qa-emulator.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS "http://$FIRESTORE_EMULATOR_HOST/" > /dev/null 2>&1; then echo "المحاكي جاهز بعد ${i}ث"; break; fi
             sleep 1
           done
-          echo "PREVIEW_DID_NOT_START: الخادم لم يستجب خلال ٦٠ ثانية"; exit 1
+          curl -fsS "http://$FIRESTORE_EMULATOR_HOST/" > /dev/null || { echo "EMULATOR_DID_NOT_START"; tail -30 /tmp/mizan-qa-emulator.log; exit 1; }
+          npm run -s qa:seed-public
 
-      # هذان يقودان المنتجَ المبنيَّ في متصفّحٍ حقيقيّ. وقسمُ التسجيل في الأول يُتخطّى
-      # باسمه هنا: رابطُ التسجيل يجلب من الخادم دائمًا، ولا واجهة `/api/public` في المعاينة.
+      - name: تشغيل الخادم الحقيقيّ
+        run: |
+          PORT=4173 node dist/server.cjs > /tmp/mizan-qa-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4173/api/health > /dev/null; then echo "الخادم جاهز بعد ${i}ث"; exit 0; fi
+            sleep 1
+          done
+          echo "SERVER_DID_NOT_START: الخادم لم يستجب خلال ٦٠ ثانية"; tail -30 /tmp/mizan-qa-server.log; exit 1
+
       - name: سطحُ النطاق والأسئلة في ثلاثة مقاسات
-        run: npm run qa:scope-visual
+        run: npm run qa:scope-visual -- --base=http://127.0.0.1:4173 --comp=comp-qa-surface
       - name: يومُ المسابقة من الموضع الأول إلى قفل التقييم
-        run: npm run qa:competition-day
+        run: npm run qa:competition-day -- --base=http://127.0.0.1:4173
       # وثامنٌ لم يكن في القائمة أصلًا: كشفه الحارسُ حين اشتُقّت القائمةُ من
       # `package.json` بدل أن تُكتب بيد. ويقيس ما لا يقيسه غيرُه: تمدّدَ الشاشات على
       # عرض هاتفٍ ٣٩٠ بكسل.
       - name: لا تمدّد أفقيّ على الهاتف
-        run: npm run qa:phone-overflow
+        run: npm run qa:phone-overflow -- --base=http://127.0.0.1:4173
 
-      - name: احفظ اللقطات عند الفشل
+      - name: احفظ اللقطات وسجلَّ الخادم عند الفشل
         if: failure()
         uses: actions/upload-artifact@v5
         with:
@@ -194,6 +217,7 @@ jobs:
           path: |
             dist/scope-visual-qa
             dist/competition-day-qa
+            /tmp/mizan-qa-server.log
           if-no-files-found: ignore
 
   # تاسعٌ، وهو الوحيدُ الذي يقيس **سلوكًا زمنيًّا**: شاشةُ «المصحفُ يسمعك» تُشغَّل
