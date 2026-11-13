@@ -245,9 +245,23 @@ steps:
         set -eu
         # توجيهٌ يدويٌّ إلى مستمع GPU (deploy-listener-gpu.yml بـroute=gpu) لا يمحوه نشرٌ دوريّ:
         # لولا هذا لأعاده كلُّ دمجٍ إلى CPU بصمت. والرجوعُ عنه صريحٌ بـroute=cpu وحده.
+        #
+        # لكنّ الربطَ يُبقى **ما دامت خدمةُ GPU قائمة** فقط. حُذفت مرّةً والربطُ باقٍ عليها، فظلّ
+        # «يسمعك» يُرسل إلى عنوانٍ ميّت حتى رُدَّ إلى CPU باليد. فيُبحث عن إقليمها (لا يُحفظ إقليمُ
+        # GPU في المستودع؛ هو مُدخَلُ deploy-listener-gpu.yml) ثم يُتحقّق بـdescribe فيه. فإن لم
+        # تُوجد رُبط مستمعُ CPU — المنشورُ في هذه الدفعة، أو القائمُ إن لم يُنشر. ولا يُنشأ شيء.
         if gcloud run services describe mizan --region me-central1 --format='yaml(spec.template.spec.containers[0].env)' 2>/dev/null | grep -q 'mizan-quran-listener-gpu-'; then
-          echo 'listener is routed to the GPU service; keeping that binding'
-          rm -f /workspace/mizan-quran-listener-url
+          gpu_region="$(gcloud run services list --filter='metadata.name=mizan-quran-listener-gpu' --format='value(metadata.labels."cloud.googleapis.com/location")' 2>/dev/null | head -n1 || true)"
+          if [ -n "$gpu_region" ] && gcloud run services describe mizan-quran-listener-gpu --region "$gpu_region" --format='value(status.url)' >/dev/null 2>&1; then
+            echo "listener is routed to the GPU service in $gpu_region; keeping that binding"
+            rm -f /workspace/mizan-quran-listener-url
+          else
+            echo 'listener is bound to a GPU service that no longer exists; rebinding the CPU listener'
+            if [ ! -s /workspace/mizan-quran-listener-url ]; then
+              cpu_url="$(gcloud run services describe mizan-quran-listener --region me-central1 --format='value(status.url)' 2>/dev/null || true)"
+              if [ -n "$cpu_url" ]; then printf '%s' "$cpu_url/listen" > /workspace/mizan-quran-listener-url; fi
+            fi
+          fi
         fi
         # ما لم يُنشر في هذه الدفعة يبقى ربطُه السابق كما هو، ولا يسقط النشر.
         vars=''

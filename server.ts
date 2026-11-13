@@ -2669,7 +2669,17 @@ app.delete('/api/competitions/:competitionId',auditRateLimit,requireGovernanceRo
       const body=await r.json().catch(()=>({})) as any;
       const state=String(body?.status||'').toUpperCase();
       value={state:['OK','LOADING','RETRYING'].includes(state)?(state==='OK'?'READY':state):`HTTP_${r.status}`,model:typeof body?.model==='string'?body.model.slice(0,80):null,analysis:typeof body?.analysis==='string'?body.analysis.slice(0,40):null};
-    }catch{/* يبقى UNREACHABLE */}
+    }catch(error){
+      /*
+       * مهلةٌ لا جواب: المعلّمُ ينام إلى الصفر (min 0) ويحمّل نموذجَه عند الإقلاع في نحو ٢٠ ثانية،
+       * فيتجاوز أربعَ ثوانٍ. فهو «يستيقظ» لا «لا يُبلَغ» — كالمستمع أعلاه — والطلبُ نفسُه يوقظه.
+       * ولا يُخبَّأ هذا الحال، فالسؤالُ التالي يرى الجاهزيةَ حين تقع. وما سوى المهلة يبقى UNREACHABLE.
+       */
+      if((error as any)?.name==='TimeoutError'||(error as any)?.name==='AbortError'){
+        const waking:MuaalemHealth={state:'WAKING',model:null};const gate=muaalemMode(waking);
+        return {...waking,mode:gate.mode,modeReason:gate.reason};
+      }
+    }
     const gate=muaalemMode(value);value={...value,mode:gate.mode,modeReason:gate.reason};
     muaalemHealthCache={at:Date.now(),value};
     return value;

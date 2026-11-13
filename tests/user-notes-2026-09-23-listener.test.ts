@@ -94,8 +94,15 @@ test('the GPU listener deploys from Cloud Build (the runner can only read Cloud 
   assert.ok(w('*" on cuda "*)') < w('"_ROUTE=gpu,'), 'no routing to the GPU before its boot line says on cuda');
   assert.match(workflow, /--order=desc --limit=400/, 'the tail of the build log, where the error is');
   assert.match(workflow, /resource\.labels\.service_name=\\"\$GPU_SERVICE\\"/, 'a CUDA failure at boot is printed from the service log');
-  // ونشرُ ميزان الدوريّ لا يمحو توجيهًا إلى GPU.
-  assert.match(read('cloudbuild.yaml'), /grep -q 'mizan-quran-listener-gpu-'; then\n[^\n]*\n\s*rm -f \/workspace\/mizan-quran-listener-url/);
+  // ونشرُ ميزان الدوريّ لا يمحو توجيهًا إلى GPU — ما دامت خدمةُ GPU قائمةً فعلًا.
+  const build = read('cloudbuild.yaml');
+  const bind = build.slice(build.indexOf("grep -q 'mizan-quran-listener-gpu-'"), build.indexOf('vars=\'\''));
+  const keep = bind.indexOf('rm -f /workspace/mizan-quran-listener-url');
+  const describe = bind.indexOf('gcloud run services describe mizan-quran-listener-gpu --region "$gpu_region"');
+  assert.ok(describe >= 0 && keep > describe, 'the GPU binding is kept only after the GPU service is described in its region');
+  assert.match(bind, /else\n[^\n]*rebinding the CPU listener/, 'a deleted GPU service falls back to the CPU listener');
+  assert.match(bind, /gcloud run services describe mizan-quran-listener --region me-central1 --format='value\(status\.url\)'/, 'even when the CPU listener was not redeployed in this build');
+  assert.doesNotMatch(bind, /run deploy|--gpu/, 'the fallback never creates a GPU service');
 });
 
 test('the listener says where its model came from and which build runs — so an undeployed fix is never taken for deployed', () => {
@@ -107,6 +114,13 @@ test('the listener says where its model came from and which build runs — so an
   const deploy = read('.github/workflows/deploy-cloud-run.yml');
   assert.match(deploy, /quranPracticeListener\.source/);
   assert.match(deploy, /quranPracticeListener\.build/);
+});
+
+test('a health probe that times out on a sleeping muaalem is WAKING, not UNREACHABLE', () => {
+  const server = read('server.ts');
+  const health = server.slice(server.indexOf('const muaalemHealth=async'), server.indexOf('const muaalemHealthCached='));
+  assert.match(health, /name==='TimeoutError'\|\|\(error as any\)\?\.name==='AbortError'\)\{\n\s*const waking:MuaalemHealth=\{state:'WAKING',model:null\}/);
+  assert.ok(health.indexOf("state:'WAKING'") < health.indexOf('muaalemHealthCache={'), 'and it is returned before the cache is written');
 });
 
 test('a health probe that times out on a booting listener is WAKING, not UNREACHABLE — the page keeps waiting', () => {
