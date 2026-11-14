@@ -4,6 +4,7 @@
  *  - إدارة لصاحبه: الرمز السرّي محفوظ على هذا الجهاز وحده. يضيف مشاركاته برابط رحلته، ويختار
  *    الاسم واللغات والظهور، ويحذف ما يشاء، أو يمحو الجواز كله.
  */
+import { Spread } from '../layout/Spread';
 import React, { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useAppStore } from '../../lib/store';
@@ -101,17 +102,17 @@ export const PassportView: React.FC = () => {
   const [confirmErase, setConfirmErase] = useState(false);
   const erase = () => run(async () => { await post('/api/public/passports/me/erase', { token }); writeToken(''); setToken(''); setPassport(null); setConfirmErase(false); });
 
-  const header = <div className="mb-6 flex items-start justify-between gap-3"><div>{!ar && <div className="mizan-kicker">MIZAN PASSPORT</div>}<h1 className="font-display mt-1 text-2xl sm:text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div><PublicLanguageSwitcher /></div>;
+  const header = <div data-duo="aside" className="mb-6 flex items-start justify-between gap-3"><div>{!ar && <div className="mizan-kicker">MIZAN PASSPORT</div>}<h1 className="font-display mt-1 text-2xl sm:text-3xl font-black">{pl('جواز ميزان', 'MIZAN Passport')}</h1></div><PublicLanguageSwitcher /></div>;
 
-  if (publicId) return <main className="mx-auto max-w-2xl px-4 py-8">{header}
+  if (publicId) return <Spread as="main" className="mx-auto max-w-2xl px-4 py-8">{header}
     {error && <p role="alert" className="rounded-xl bg-[var(--danger-soft)] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {passport && <><div className="mizan-surface p-5"><div className="text-2xl font-black">{passport.displayName}</div>{!!passport.languages.length && <div className="mt-1 text-xs text-[color:var(--muted)]" dir="ltr">{passport.languages.join(' · ')}</div>}
       <p className="mt-2 text-[11px] text-[color:var(--muted)]">{pl('كل شهادة هنا يُعاد التحقق منها من سجل الشهادات العام لحظة العرض.', 'Every certificate here is re-verified against the public certificate registry as you view it.')}</p></div>
       <ul className="mt-4 space-y-3">{passport.entries.map(e => <EntryCard key={e.id} e={e} ar={ar} />)}</ul></>}
-  </main>;
+  </Spread>;
 
-  return <main className="mx-auto max-w-2xl px-4 py-8">{header}
-    <p className="mb-4 text-sm leading-7 text-[color:var(--muted)]">{pl('سجلّ اختياري لمشاركاتك وشهاداتك الموثّقة. خاصّ بك حتى تختار نشره، ويُحفظ مفتاحه على هذا الجهاز فقط — احتفظ برابط هذه الصفحة.', 'An optional record of your verified participations and certificates. Private until you publish it; its key is kept on this device only.')}</p>
+  return <Spread as="main" className="mx-auto max-w-2xl px-4 py-8">{header}
+    <p data-duo="aside" className="mb-4 text-sm leading-7 text-[color:var(--muted)]">{pl('سجلّ اختياري لمشاركاتك وشهاداتك الموثّقة. خاصّ بك حتى تختار نشره، ويُحفظ مفتاحه على هذا الجهاز فقط — احتفظ برابط هذه الصفحة.', 'An optional record of your verified participations and certificates. Private until you publish it; its key is kept on this device only.')}</p>
     {error && <p role="alert" className="mb-4 rounded-xl bg-[var(--danger-soft)] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {!passport && <div className="mizan-surface space-y-4 p-5 sm:p-6">
       <div className="flex items-center gap-4"><MizanPictogram kind="pass" size="lg" tone="emerald" />
@@ -151,7 +152,7 @@ export const PassportView: React.FC = () => {
             <button type="button" className="font-bold" onClick={() => setConfirmErase(false)}>{pl('تراجع', 'Cancel')}</button></span>}
       </section>
     </div>}
-  </main>;
+  </Spread>;
 };
 
 export default PassportView;

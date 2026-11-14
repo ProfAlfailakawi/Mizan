@@ -1,3 +1,4 @@
+import { Spread } from '../layout/Spread';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTabAnchor } from '../../lib/use-tab-anchor';
 import { Ratio } from '../design-system/Ratio';
@@ -62,8 +63,8 @@ export const CommandCenter: React.FC = () => {
  const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);
  /* 1450px تترك صفوف «عنوان … زر» ممتدّةً على عرض الشاشة، فيسافر النظر ألف بكسل بين شيئين
    مرتبطين. العرض هنا يطابق بقيّة البوابات (1250) فتبقى العلاقة بين الطرفين مقروءة. */
- return <div className="max-w-[1250px] mx-auto px-4 sm:px-6 py-7 space-y-4">
-  <section className="mizan-surface p-6 sm:p-8"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5"><div className="flex items-center gap-4"><Pictogram icon={alerts.length?AlertTriangle:BadgeCheck} size="lg" tone={alerts.length?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز العمليات':'MIZAN COMMAND'}</div><h1 className="text-2xl sm:text-4xl font-black mt-1">{alerts.length?(ar?`${arCount(alerts.length,{one:'حالة واحدة تحتاجك',two:'حالتان تحتاجانك',plural:n=>`${n} حالات تحتاجك`,many:n=>`${n} حالة تحتاجك`})}`:`${alerts.length} exception${alerts.length===1?'':'s'} need you`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h1><p className="text-xs text-[color:var(--muted)] mt-2">{alerts.length?(ar?'الروتين يعمل وحده. ركّز هنا.':'Routine is automated. Focus here.'):(ar?'لا تدخل مطلوب.':'No intervention required.')}</p></div></div><Button variant="outline" onClick={()=>setExpanded(v=>!v)} icon={<ChevronDown className={`w-4 h-4 transition ${expanded?'rotate-180':''}`}/>}>{ar?'التدفق':'Flow'}</Button></div></section>
+ return <Spread className="max-w-[1250px] mx-auto px-4 sm:px-6 py-7 space-y-4">
+  <section data-duo="aside" className="mizan-surface p-6 sm:p-8"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5"><div className="flex items-center gap-4"><Pictogram icon={alerts.length?AlertTriangle:BadgeCheck} size="lg" tone={alerts.length?'amber':'emerald'}/><div><div className="mizan-kicker">{ar?'مركز العمليات':'MIZAN COMMAND'}</div><h1 className="text-2xl sm:text-4xl font-black mt-1">{alerts.length?(ar?`${arCount(alerts.length,{one:'حالة واحدة تحتاجك',two:'حالتان تحتاجانك',plural:n=>`${n} حالات تحتاجك`,many:n=>`${n} حالة تحتاجك`})}`:`${alerts.length} exception${alerts.length===1?'':'s'} need you`):(ar?'كل شيء يعمل طبيعيًا':'Everything is operating normally')}</h1><p className="text-xs text-[color:var(--muted)] mt-2">{alerts.length?(ar?'الروتين يعمل وحده. ركّز هنا.':'Routine is automated. Focus here.'):(ar?'لا تدخل مطلوب.':'No intervention required.')}</p></div></div><Button variant="outline" onClick={()=>setExpanded(v=>!v)} icon={<ChevronDown className={`w-4 h-4 transition ${expanded?'rotate-180':''}`}/>}>{ar?'التدفق':'Flow'}</Button></div></section>
 
   <ExceptionBoard items={alerts} ar={ar} severityLabel={v=>uiToken(v,ar)}/>
 
@@ -106,6 +107,6 @@ export const CommandCenter: React.FC = () => {
    <GlobalSynchronizedRound/>
    </>}
   </>}
- </div>
+ </Spread>
 }
 const Health=({icon:Icon,label,state,note,ar}:{icon:React.ComponentType<{className?:string}>;label:string;state:'ok'|'warn'|'unknown';note?:string;ar:boolean})=><div className="rounded-xl bg-[var(--canvas)] border border-[var(--line)] p-3 flex items-center gap-3"><DnaIconTile icon={<Icon className="w-4 h-4"/>} size="sm" tone={state==='ok'?'accent':state==='warn'?'danger':'neutral'}/><div><div className="text-xs font-bold">{label}</div><div className="text-xs text-[var(--muted)] mt-0.5">{note||(state==='unknown'?(ar?'بانتظار الفحص':'Awaiting check'):state==='warn'?(ar?'يحتاج انتباه':'Needs attention'):(ar?'يعمل':'Working'))}</div></div></div>;

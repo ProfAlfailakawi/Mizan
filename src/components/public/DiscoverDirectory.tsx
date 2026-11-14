@@ -5,6 +5,7 @@
  * كل صفّ بعلم نشره. والصفحة تعرض اسم الدليل وعلامته كما أعادها الخادم: تحت علامة بيضاء
  * كاملة لا يظهر اسم ميزان إلا إن اختار المشغّل إظهار «يعمل بميزان».
  */
+import { Spread } from '../layout/Spread';
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, CalendarDays, MapPin, Search, WifiOff } from 'lucide-react';
 import { useAppStore, IS_DEMO_SESSION } from '../../lib/store';
@@ -74,15 +75,15 @@ export const DiscoverDirectory: React.FC = () => {
         <a href="#" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-sm font-bold text-[color:var(--emerald)] hover:underline"><BackArrow aria-hidden="true" className="h-4 w-4" />{ct(locale, 'discoverBack')}</a>
       </div>
     </header>
-    <main className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
-      <header className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-4 px-5 py-6 sm:px-8 sm:py-8">
+    <Spread as="main" className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-12">
+      <header data-duo="aside" className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-4 px-5 py-6 sm:px-8 sm:py-8">
         {brand?.logoUrl && <img src={brand.logoUrl} alt="" className="h-12 w-auto" />}
         <div className="min-w-0">
           <div className="mizan-kicker">{ct(locale, 'discover')}</div>
           <h1 className="font-display mt-1 text-2xl sm:text-3xl font-black leading-snug" style={{ color: accent }}>{brand ? ((locale === 'ar' && brand.directoryNameArabic) || brand.directoryName) : ct(locale, 'discoverTitle')}</h1>
         </div>
       </header>
-      <div className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-3 p-3" style={{ ['--i' as string]: 1 }}>
+      <div data-duo="aside" className="mizan-surface mz-enter mb-6 flex flex-wrap items-center gap-3 p-3" style={{ ['--i' as string]: 1 }}>
         <label className="relative flex-1 min-w-[14rem]"><span className="sr-only">{ct(locale, 'search')}</span>
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3.5 h-4 w-4 text-[var(--muted)]" />
           <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder={ct(locale, 'search')} className="w-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] ps-10 pe-3 text-sm focus:outline-none focus-visible:ring-2" /></label>
@@ -110,7 +111,7 @@ export const DiscoverDirectory: React.FC = () => {
             : <a href="#" className="inline-flex min-h-11 items-center rounded-full px-5 text-xs font-bold text-white" style={{ background: accent }}>{ct(locale, 'discoverBack')}</a>} /></div>;
       })()}
       {brand?.showPoweredByMizan && <footer className="mt-10 text-center text-[11px] text-[var(--muted)]">{ct(locale, 'poweredByMizan')}</footer>}
-    </main>
+    </Spread>
     </div>
   );
 };

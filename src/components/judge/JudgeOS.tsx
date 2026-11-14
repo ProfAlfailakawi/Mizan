@@ -1,3 +1,4 @@
+import { Spread } from '../layout/Spread';
 import { ConflictOfInterestPanel } from '../admin/GovernancePanels';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DnaStepper } from '../dna/DnaKit';
@@ -574,7 +575,7 @@ export const JudgeOS: React.FC = () => {
  useEffect(()=>{if(!certifiedPosition)return;const handler=(event:Event)=>{const detail=(event as CustomEvent<{sessionId?:string;questionIndex?:number;validationId?:string}>).detail;if(detail?.sessionId!==activeSession.sessionId||detail.questionIndex!==activeSession.currentQuestionIndex||detail.validationId!==certifiedPosition.id)return;speakTransition()};window.addEventListener('mizan:certified-passage-end',handler);return()=>window.removeEventListener('mizan:certified-passage-end',handler)},[certifiedPosition?.id,activeSession.sessionId,activeSession.currentQuestionIndex,isLastQuestion]);
 
  if(calibrationBlocked) return <div className="max-w-2xl mx-auto px-4 py-20" {...judgeMode.attrs}><div className="mizan-surface p-7 text-center"><div className="mizan-kicker">{ar?'جاهزية المحكم':'JUDGE READINESS'}</div><h1 className="text-2xl font-black mt-2">{ar?'المعايرة قبل التحكيم':'Calibrate before judging'}</h1><p className="text-xs text-[color:var(--muted)] mt-3">{ar?'هذه المسابقة تشترط معايرة المحكم. التدريب لا يغيّر أي درجة؛ إنه فحص جاهزية فقط.':'This competition requires judge calibration. Training never alters contestant scores; it is a readiness gate only.'}</p><div className="mt-5 rounded-2xl bg-[#f3f1eb] p-4"><div className="text-3xl font-black">{judge?.calibrationScore||0}%</div><div className="text-[11px] text-[color:var(--muted)] mt-1">{ar?'التوافق الحالي':'Current agreement'}</div></div><Button className="mt-5" onClick={()=>store.completeJudgeCalibration(judge!.id,92)}>{ar?'تشغيل تدريب المعايرة':'Run calibration training'}</Button><div className="text-[11px] text-[color:var(--muted)] mt-3">{ar?'تُستخدم تلاوات مرجعية من مصدر المصحف المعتمد.':'Reference recitations come from the approved Mushaf source.'}</div></div></div>;
- if(!participant) return <div className="mizan-judge-wait max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
+ if(!participant) return <Spread className="mizan-judge-wait max-w-3xl mx-auto px-4 py-10 sm:py-14" {...judgeMode.attrs}><div className="flex justify-end"><JudgeModeControl ar={ar} prefs={judgeMode.prefs} onChange={judgeMode.update} className="is-light"/></div><div className="text-center"><HeadphonesEmpty/>
   <h1 className="text-3xl sm:text-4xl font-black mt-5">{nextQueued?(ar?'المتسابق التالي جاهز':'Next participant is ready'):rosterCounts.awaiting?(ar?'لا أحد في الطابور بعد':'Nobody in the queue yet'):(ar?'لا توجد جلسة الآن':'No active session')}</h1>
   {/* أرقام الكشف كانت سطرًا صغيرًا واحدًا بنقاط فاصلة؛ صارت بطاقات: رقم كبير وكلمة. */}
   <div className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 max-w-md mx-auto" aria-label={ar?'حالة الكشوف':'Roster status'}>
@@ -585,7 +586,7 @@ export const JudgeOS: React.FC = () => {
   {nextQueued&&<Button size="xl" className="mt-7 min-h-16 min-w-64" icon={<UserCheck className="w-6 h-6"/>} disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'ابدأ مع المتسابق التالي':'Start with the next participant')}</Button>}
   {startError&&<div role="alert" className="mt-4 mx-auto max-w-md rounded-xl bg-[var(--danger-soft)] text-[#88473f] px-4 py-3 text-sm font-bold leading-6">{startError}</div>}
  </div>
- {!!committeeQueue.length&&<div className="mizan-surface mt-8 p-5 text-start">
+ {!!committeeQueue.length&&<div data-duo="aside" className="mizan-surface mt-8 p-5 text-start">
   <h2 className="text-lg font-black">{ar?'من ينتظر دوره':'Who is waiting'}</h2>
   <ul className="mt-4 divide-y divide-[#eceae3] rounded-2xl border border-[#e5e3dc] bg-white">
    {committeeQueue.slice(0,24).map((p,i)=>{const turn=i===0;return <li key={p.id} className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 ${turn?'bg-[#F7FAF8]':'opacity-60'}`}>
@@ -600,11 +601,11 @@ export const JudgeOS: React.FC = () => {
   {!!awaitingArrival.length&&<p className="mt-1 text-xs leading-6 text-[color:var(--muted)]">{ar?`${awaitingArrival.length} متسابقًا لم يدخلوا الطابور بعد. استقبالهم من غرفة العمليات.`:`${awaitingArrival.length} not in the queue yet — admitted from operations.`}</p>}
   {committeeQueue.length>24&&<p className="mt-1.5 text-[11px] text-[color:var(--muted)]">{ar?`و${committeeQueue.length-24} غيرهم في الطابور.`:`And ${committeeQueue.length-24} more in the queue.`}</p>}
  </div>}
- {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[color:var(--muted)]">
+ {!nextQueued&&!awaitingArrival.length&&!!rosterCounts.pending&&<div data-duo="aside" className="mizan-surface mt-7 p-5 text-center text-xs leading-6 text-[color:var(--muted)]">
   {ar?`لا يوجد متسابق معتمد بعد: ${rosterCounts.pending} طلبًا ما زال تحت المراجعة. الاعتماد يتم من شاشة «المتسابقون» في الإدارة.`:`No approved participant yet: ${rosterCounts.pending} applications are still under review. Approval happens in the admin Participants screen.`}
  </div>}
- <details className="group mizan-surface mt-7 text-start"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 [&::-webkit-details-marker]:hidden"><span className="inline-flex items-center gap-2 text-sm font-black"><ShieldCheck className="w-4 h-4 text-[color:var(--muted)]" aria-hidden="true"/>{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="px-5 pb-5"><ConflictOfInterestPanel mode="judge"/></div></details>
- </div>;
+ <details data-duo="aside" className="group mizan-surface mt-7 text-start"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 [&::-webkit-details-marker]:hidden"><span className="inline-flex items-center gap-2 text-sm font-black"><ShieldCheck className="w-4 h-4 text-[color:var(--muted)]" aria-hidden="true"/>{ar?'إعلان تضارب مصالح أو تنحٍّ':'Declare a conflict or recuse'}</span><ChevronDown className="w-4 h-4 transition group-open:rotate-180" aria-hidden="true"/></summary><div className="px-5 pb-5"><ConflictOfInterestPanel mode="judge"/></div></details>
+ </Spread>;
 
  /*
   * قمرة المحكّم.

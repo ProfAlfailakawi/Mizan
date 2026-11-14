@@ -64,12 +64,12 @@ export const CommandPalette: React.FC<{ open?: boolean; onOpenChange?: (v: boole
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[220] bg-[rgba(18,32,27,.28)] p-4 sm:p-12" onMouseDown={() => setOpen(false)}>
+    <div className="mz-palette-scrim fixed inset-0 z-[220] bg-[rgba(18,32,27,.28)] p-4 sm:p-12" onMouseDown={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={ar ? 'بحث سريع' : 'Quick search'}
-        className="mx-auto max-w-xl mizan-surface overflow-hidden flex flex-col max-h-[85dvh]"
+        className="mz-palette mx-auto max-w-xl mizan-surface overflow-hidden flex flex-col max-h-[85dvh]"
         onMouseDown={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-[#e5e3dc] px-4 shrink-0">
