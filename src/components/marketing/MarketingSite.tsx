@@ -8,6 +8,7 @@ import { DnaStepper } from '../dna/DnaKit';
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
 import { toWesternDigits } from '../../lib/input-normalize';
+import { isAppleNativeShell } from '../../lib/appleNativeShell';
 import { GOVERNED_ROLES } from '../../lib/permissions';
 import {
   LiveJudgingSimulator,
@@ -247,6 +248,8 @@ export const MarketingSite: React.FC = () => {
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <a href="#tawasul" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black text-white" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>اطلب عرضًا تجريبيًّا</a>
               <a href="#kayf" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>كيف تعمل؟</a>
+              {/* داخل تطبيق iOS فقط: مدخل العرض التجريبي المعزول (/demo)، إذ لا تسجيل دخول في هذه الصفحة. */}
+              {isAppleNativeShell() && <a href="/demo" data-testid="ios-demo-entry" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '2px solid var(--emerald)', background: 'var(--surface)', color: 'var(--emerald)' }}>جرّب العرض التجريبي</a>}
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[12px] font-bold mizan-muted">
               <span className="inline-flex items-center gap-1.5"><Check size={14} style={{ color: 'var(--emerald)' }} /> عربيةٌ أولًا</span>
