@@ -373,6 +373,10 @@
   color: var(--dna-muted);
   overflow-wrap: anywhere;
 }
+/* 320px: ست محطات في ~270px — «الشهادات» بحجمها المعتاد تنكسر حرفًا في سطر. */
+@media (max-width: 359px) {
+  .dna-steps:not([data-size='xs']) .dna-lbl { font-size: 11px; letter-spacing: 0; }
+}
 .dna-stepi[data-state='done'] .dna-lbl,
 .dna-stepi[data-state='current'] .dna-lbl {
   color: var(--dna-ink);

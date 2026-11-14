@@ -82,7 +82,7 @@ export const StatStrip: React.FC<{ items: { icon: Icon; value: React.ReactNode; 
           <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${tones[it.tone || 'green']}`}><it.icon className="h-5 w-5" /></span>
           <span className="min-w-0">
             <span className="block text-2xl font-black leading-none tabular-nums text-[#17352D]">{it.value}</span>
-            <span className="mt-1 block truncate text-xs font-bold text-[color:var(--muted)]">{it.label}</span>
+            <span className="mt-1 block text-xs font-bold leading-4 text-[color:var(--muted)] sm:truncate">{it.label}</span>
           </span>
         </div>
       ))}
@@ -133,7 +133,7 @@ export const SetupPath: React.FC<{ ar: boolean; steps: SetupStep[]; playKey?: st
     <section aria-label={ar ? 'خطوات إعداد المسابقة' : 'Competition setup steps'} className="mizan-surface p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-4">
         <span ref={ringReveal.ref} className="inline-flex"><DnaRing value={ringValue} max={steps.length} size={64} stroke={6} tone="accent" label={allDone ? <Check className="h-6 w-6" /> : <span className="text-base font-black tabular-nums"><Ratio value={doneCount} of={steps.length} /></span>} ariaLabel={ar ? `${doneCount} من ${arPlural(steps.length,{one:'خطوة واحدة',two:'خطوتان',few:'{n} خطوات',many:'{n} خطوة',other:'{n} خطوة'})}` : `${doneCount} of ${steps.length} steps`} /></span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[min(100%,9rem)] flex-1">
           <div className="mizan-kicker">{ar ? 'ابدأ من هنا' : 'START HERE'}</div>
           <h2 className="mt-0.5 text-lg font-black">{allDone ? (ar ? 'الإعداد مكتمل' : 'Setup complete') : (ar ? 'خطوات إعداد مسابقتك' : 'Set up your competition')}</h2>
         </div>
