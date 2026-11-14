@@ -2235,17 +2235,16 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   html[data-demo-bar="on"] .mz-el-mnav{ bottom:var(--mizan-demo-bar-h,3.5rem) }
 }
 
-/* 3) صفحتا الكتاب: الشاشة الداخلية مفتوحةً (جولة 2026-11-14). Safari لا يُعلن المفصل، فالقرار
-   من مساحة النافذة: عرض 640–720 طوليًّا (الآيباد الأصغر 744 خارجه) (كتاب طولي 669×867، ونصفه القصير 669×520)، أو عرض
-   640–1000 عرضيًّا بارتفاع 520–720 (كتاب عرضي 951×585). الآيباد (768×1024 و1024×768)
-   والهاتف والحاسوب خارج الشرط فلا يتغيّر فيها شيء.
+/* 3) صفحتا الكتاب: الشاشة الداخلية مفتوحةً وهي عرضية فقط (الجولة 2). Safari لا يُعلن المفصل،
+   فالقرار من مساحة النافذة: عرض 721–1000 وارتفاع 520–960 والاتجاه أفقي (كتاب عرضي 951×585…669).
+   **الطولي (669×867) ليس كتابًا**: صفحةٌ واحدة بعمود واحد بعرض 669 كجهازٍ لوحيّ صغير، بلا كعب ولا
+   نصفين. الآيباد (744 طوليًّا، 1024 عرضيًّا) والهاتف (ارتفاع < 520) والحاسوب خارج الشرط فلا يتغيّر فيها شيء.
    الفكرة: صفحتان لا صفحةٌ ممدودة. كعبٌ هادئ في المنتصف (28–36px) بظلّ طيٍّ خفيف وخطٍّ شعري،
    والخلفية متّصلة من الحافة إلى الحافة. ورقة العمل يمنى (بداية القراءة)، وورقة السياق يسرى.
    ولا نصّ ولا حقل ولا زرّ يقع على الكعب: كل ورقة تنتهي قبله بهامش. الأوراق تأتي من `Spread`
    (src/components/layout/Spread.tsx) أو من صنفٍ على الصفحة نفسها، والتخطيط هنا CSS خالص:
    تغيّر المقاس لا يُعيد تركيب أي مكوّن، فالتسجيل والتشغيل والحقول تبقى كما هي. */
-@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px),
-       screen and (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){
   :root{
     --duo-spine:clamp(28px,3.6vw,36px);
     --duo-gutter:clamp(14px,2.4vw,24px);
@@ -2388,14 +2387,14 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mizan-judge-handle{ left:calc(75% + var(--duo-spine) / 4) }
   [dir="ltr"] .mizan-judge-handle{ left:calc(25% - var(--duo-spine) / 4) }
 }
-/* الورقة الضيّقة (كتاب طولي: ~290px لكل ورقة). مكوّنات الصفحات تبدّل تخطيطها بعرض الشاشة
-   (`sm:` من 640px)، فترى 669 «شاشةً واسعة» وهي في ورقةٍ بعرض هاتف، فتصطفّ الأزرار صفًّا يعبر
-   إلى الكعب. داخل الأوراق وحدها، وفي مقاس الكتاب وحده، يعود صفّ «عمودي على الهاتف، أفقي من sm»
-   إلى عموديّته، وتعود الشبكات إلى أعمدة الهاتف، ويخفّ الحشو. خارج الأوراق لا يُطبَّق شيء.
+/* الورقة الضيّقة (~460px في الكتاب العرضي). مكوّنات الصفحات تبدّل تخطيطها بعرض الشاشة
+   (`sm:` من 640px، و`md:` من 768px)، فترى 951 «شاشةً واسعة» وهي في ورقةٍ بعرض نصفها، فتصطفّ
+   الأزرار صفًّا يعبر إلى الكعب وتنضغط البطاقات. داخل الأوراق وحدها، وفي مقاس الكتاب وحده، يعود صفّ
+   «عمودي على الهاتف، أفقي من sm» إلى عموديّته، وتعود الشبكات إلى أعمدة الهاتف، ويخفّ الحشو.
+   خارج الأوراق لا يُطبَّق شيء.
    (استعلام الحاوية كان أدقّ، لكن تبدّل احتواء الأوراق عند الخروج من الكتاب كان يعيد موضع التمرير
    إلى الأعلى في WebKit باللمس، فالشرط هنا مقاس النافذة نفسه.) */
-@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px),
-       screen and (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){
   :is(.mz-leaf, .mz-spread-index > *) .flex-col.sm\:flex-row{ flex-direction:column }
   :is(.mz-leaf, .mz-spread-index > *) .flex-col-reverse.sm\:flex-row{ flex-direction:column-reverse }
   :is(.mz-leaf, .mz-spread-index > *) .flex-wrap.sm\:flex-nowrap{ flex-wrap:wrap }
@@ -2415,11 +2414,50 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   /* صفٌّ يلتفّ («ابدأ من هنا»: حلقة + نصّ + زرّ): النصّ المرن لا ينضغط كلمةً في سطر، بل ينزل الزرّ. */
   :is(.mz-leaf, .mz-spread-index > *) .flex.flex-wrap > .min-w-0.flex-1{ min-width:min(100%, 9rem) }
 }
-/* الورقة الأضيق (~290px، كتاب طولي): بطاقات الأرقام الثلاث والمبالغ التي لا تلتفّ تصطفّ عمودًا. */
-@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px){
-  :is(.mz-leaf, .mz-spread-index > *) .grid-cols-3:has(> .mz-bp-metric){ grid-template-columns:minmax(0,1fr) }
-  :is(.mz-leaf, .mz-spread-index > *) .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap){ grid-template-columns:minmax(0,1fr) }
-  :is(.mz-leaf, .mz-spread-index > *) .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap) > *{ grid-column:1 / -1 }
+/* 3ب) منطقة الودجت: التطبيق المثبَّت (display-mode:standalone) على الشاشة الداخلية يطفو فوق زاويته
+   العليا اليمنى (الفعلية، لا بداية الاتجاه) ودجتُ نظامٍ بعرض ~55–80px، ينزل من الحافة العليا إلى
+   ~y=125. لا نعرف صندوقه بالضبط، فنحجز زاويةً سخيّة 116×116 (`--duo-cutout-*`) لا يقع فيها نصٌّ
+   ولا زرّ: شريط الترويسة صار بارتفاعها ويُزاح شعاره/عنوانه إلى الداخل بعرضها (يمين فيزيائي، سواء
+   كانت الصفحة RTL أو LTR)، فتبدأ الصفحة تحتها. الخلفية تبقى حافةً لحافة خلف الودجت. وفي الكتاب
+   الزاوية لليمنى وحدها (الودجت عند الحافة اليمنى الفيزيائية)، فنصف الترويسة اليسرى لا يتأثر.
+   لا يُطبَّق على الهواتف العادية (بنتوء الشاشة لا ودجت) ولا على المطويّ الخارجي 367×740: لا يمكن
+   تمييزه عن آيفون، فلا نخمّن. أما بلا standalone (تبويب المتصفّح) فالمتصفّح نفسه يتجنّب الودجت. */
+@media screen and (display-mode:standalone) and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),
+       screen and (display-mode:standalone) and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){
+  :root{ --duo-cutout-w:116px; --duo-cutout-h:116px; --duo-pin-top:calc(var(--duo-cutout-h) + 1rem) }
+  /* الترويسات تمشي مع الصفحة بدل أن تلصق (116px لاصقة تأكل خُمس 585px) وبارتفاع المنطقة */
+  header:is(.mz-el-header, .sticky){ position:relative }
+  header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child{ height:var(--duo-cutout-h); min-height:var(--duo-cutout-h); box-sizing:border-box }
+  [dir="rtl"] :is(header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child) > :first-child,
+  [dir="ltr"] :is(header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child) > :last-child{ margin-right:var(--duo-cutout-w) }
+  /* شريطٌ علويٌّ ثابت: الدور والخروج (شاشة البثّ) وتنبيه الخمول والاستمرارية */
+  div.mz-topbar{ padding-right:var(--duo-cutout-w) }
+  /* الدخول وصفحات البطاقة الواحدة: البطاقة تبدأ تحت المنطقة */
+  .mz-bp-login{ padding-top:var(--duo-cutout-h); padding-bottom:.5rem }
+  .mz-bp-login .mz-bp-login-card{ padding:1.1rem 1.25rem }
+  .mz-onepage{ margin-top:var(--duo-cutout-h) }
+  /* النوافذ والبحث السريع: تبدأ تحت المنطقة (وتقصر بقدرها) فلا يقع عنوانها أو زرّ إغلاقها تحت الودجت */
+  .mizan-overlay{ align-items:flex-start; padding-top:calc(var(--duo-cutout-h) + .5rem) }
+  .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-cutout-h) - 1.25rem) }
+  .mz-palette-scrim{ padding-top:calc(var(--duo-cutout-h) + .5rem) }
+  /* شاشة البثّ: المشهد كله تحت المنطقة */
+  .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{ padding-top:calc(var(--duo-cutout-h) + .25rem) }
+  div.mz-topnote{ padding-right:calc(var(--duo-cutout-w) + 1rem) }
+}
+
+/* الطولي المثبَّت: الشعار مزاحٌ بعرض الزاوية فيضيق المكان، فيُقصّ اسم الجهة («جائزة ميزان الت…»). البحث والشرح
+   ينتقلان إلى قائمة «المزيد» كما في الكتاب (وتنفتح على اليسار بعيدًا عن الزاوية). */
+@media screen and (display-mode:standalone) and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){
+  .mz-el-header .mz-hd-wide{ display:none }
+  .mz-el-header .mizan-more{ display:block }
+  .mz-el-header .mizan-more > div{ inset-inline-start:auto; inset-inline-end:1rem; top:calc(var(--duo-cutout-h) - .5rem) }
+}
+
+/* الطولي على الشاشة الداخلية (669×867) صفحةٌ واحدة، لكن جدولًا عريضًا داخل حاوية تمرير (`min-w-[720px]`) كان يمدّ
+   الصفحة كلها 64px جانبًا بعد الانتقال من العرضي إلى الطولي: نصّه المخفيّ للقارئ الآلي مطلق الموضع ومرجعه
+   الصفحة لا الحاوية. تصير الحاوية المُمرَّرة مرجعه، كما في الكتاب. */
+@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){
+  :where(.overflow-x-auto,.overflow-auto):not(.absolute):not(.fixed):not(.sticky){ position:relative }
 }
 
 /* 4) وضع الكتاب مع مفصلٍ يُعلنه المتصفّح (مطويّ جزئيًّا، الطيّ عمودي): تحسينٌ تدريجي فقط. Safari 27.1 يُبقي
