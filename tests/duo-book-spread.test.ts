@@ -11,8 +11,26 @@ const spread = readFileSync(new URL('../src/components/layout/Spread.tsx', impor
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
 
 test('the inner-screen spread is one media query that leaves iPad and desktop untouched', () => {
-  assert.match(css, /@media \(min-width:640px\) and \(max-width:759\.98px\) and \(min-height:520px\),\s*\(orientation:landscape\) and \(min-width:640px\) and \(max-width:1000px\) and \(min-height:520px\) and \(max-height:720px\)\{/);
+  assert.match(css, /@media screen and \(min-width:640px\) and \(max-width:720px\) and \(min-height:520px\),\s*screen and \(orientation:landscape\) and \(min-width:640px\) and \(max-width:1000px\) and \(min-height:520px\) and \(max-height:720px\)\{/);
   assert.match(css, /--duo-spine:clamp\(28px,3\.6vw,36px\)/);
+});
+
+test('Duo != iPad: every book query is screen-scoped, portrait <= 720px wide, landscape <= 1000px wide', () => {
+  const queries = css.match(/@media[^{]*min-width:640px[^{]*min-height:520px[^{]*\{/g) ?? [];
+  assert.ok(queries.length >= 3, 'the three book queries exist');
+  for (const q of queries) {
+    for (const alt of q.replace(/^@media\s*/, '').replace(/\{$/, '').split(',')) {
+      assert.match(alt.trim(), /^screen and /, `not screen-scoped: ${alt}`);
+      const max = Number(/max-width:([\d.]+)px/.exec(alt)?.[1]);
+      const landscape = /orientation:landscape/.test(alt);
+      assert.ok(max <= (landscape ? 1000 : 720), `book query allows an iPad width (${max}px): ${alt}`);
+    }
+  }
+  // iPad probe sizes never reach the portrait/landscape ranges
+  const duo = (w: number, h: number) => (w >= 640 && w <= 720 && h >= 520) || (w > h && w >= 640 && w <= 1000 && h >= 520 && h <= 720);
+  for (const [w, h] of [[744,1133],[768,1024],[810,1080],[820,1180],[834,1112],[834,1194],[1024,1366],[1133,744],[1024,768],[1080,810],[1180,820],[1112,834],[1194,834],[1366,1024],
+    [744,1040],[768,920],[768,950],[810,990],[820,1090],[834,1020],[1024,690],[1133,660],[1180,735]]) assert.equal(duo(w, h), false, `${w}x${h}`);
+  for (const [w, h] of [[669,867],[669,520],[660,800],[700,900],[720,900],[951,585],[880,585],[1000,600]]) assert.equal(duo(w, h), true, `${w}x${h}`);
 });
 
 test('Spread decides nothing from the viewport in JavaScript', () => {

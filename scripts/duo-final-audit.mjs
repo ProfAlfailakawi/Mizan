@@ -32,6 +32,8 @@ const OUT = arg('out', 'docs/iphone-duo-final/audit-report.json');
 const SHOTS = arg('shots', '');
 const ONLY = arg('only', 'matrix,live,stress,subscreens').split(',');
 const SCREENS_ONLY = arg('screens', '');
+/* --sizes=744x1133,768x1024 : مقاسات مخصّصة بدل مصفوفة الوضعيات (فحص «دوو ≠ آيباد»). */
+const CUSTOM_SIZES = arg('sizes', '');
 const SHOT_SIZES = arg('shot-sizes', '669x867,951x585').split(',');
 
 /* الوضعيات A–J كما في docs/IPHONE-DUO-FINAL-ACCEPTANCE.md */
@@ -47,7 +49,7 @@ const POSES = {
   S: [[320, 350], [320, 600], [320, 900], [470, 350], [470, 600], [470, 900], [620, 350], [620, 600], [620, 900]],
 };
 /* الشاشة الداخلية: نفس شرط CSS في src/index.css (القسم 3). */
-const isInner = (w, h) => (w >= 640 && w < 760 && h >= 520) || (w > h && w >= 640 && w <= 1000 && h >= 520 && h <= 720);
+const isInner = (w, h) => (w >= 640 && w <= 720 && h >= 520) || (w > h && w >= 640 && w <= 1000 && h >= 520 && h <= 720);
 
 const report = { generatedAt: new Date().toISOString(), engine: 'webkit', base: BASE, matrix: [], live: null, stress: [], notes: [] };
 
@@ -226,13 +228,24 @@ const measure = (p, inner) => p.evaluate(({ inner }) => {
     }
   }
   const leaves = [...document.querySelectorAll('.mz-leaf, .mz-spread-index > *')].map(l => { const r = l.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; });
-  return { vw, vh, overflowX, offscreen, clipped, tiny, spine, crossing, leafEscape, leaves, spread: !!document.querySelector('.mz-spread,.mz-login-book'), consoleErrors: 0 };
+  /* علامات وضع الكتاب/الحاسوب المحمول كما تحسبها الصفحة (للتحقق أنها خامدة على الآيباد). */
+  const q = (s, f) => { const e = document.querySelector(s); return e ? f(getComputedStyle(e)) : null; };
+  const markers = {
+    spine: (() => { const c = getComputedStyle(document.body, '::after').content; return c && c !== 'none' && c !== 'normal'; })(),
+    spreadDisplay: q('.mz-spread', c => c.display), spreadCols: q('.mz-spread', c => c.gridTemplateColumns),
+    loginBook: q('.mz-login-book', c => c.display), judgeCols: q('.mizan-judge-os', c => c.gridTemplateColumns),
+    mnav: q('.mz-el-mnav', c => c.position), tabs: q('.mz-leaf-b > .mizan-tabs', c => c.position),
+    aside: q('[data-duo="aside"]', c => c.position),
+  };
+  return { markers, vw, vh, overflowX, offscreen, clipped, tiny, spine, crossing, leafEscape, leaves, spread: !!document.querySelector('.mz-spread,.mz-login-book'), consoleErrors: 0 };
 }, { inner });
 
 const cap = (arr, n = 6) => ({ count: arr.length, samples: arr.slice(0, n) });
 
 async function runMatrix() {
-  const sizes = Object.entries(POSES).flatMap(([pose, list]) => list.map(([w, h]) => ({ pose, w, h })));
+  const sizes = CUSTOM_SIZES
+    ? CUSTOM_SIZES.split(',').map(t => { const [w, h] = t.split('x').map(Number); return { pose: 'X', w, h }; })
+    : Object.entries(POSES).flatMap(([pose, list]) => list.map(([w, h]) => ({ pose, w, h })));
   const screens = SCREENS.filter(s => !SCREENS_ONLY || SCREENS_ONLY.split(',').includes(s.id));
   const demoCtx = await browser.newContext({ locale: 'ar', deviceScaleFactor: 1, hasTouch: true, viewport: { width: 951, height: 585 } });
   await quiet(demoCtx);
@@ -249,7 +262,7 @@ async function runMatrix() {
       const m = await measure(p, inner);
       report.matrix.push({ screen: screen.id, label: screen.label, pose, size: `${w}x${h}`, inner, spread: m.spread,
         overflowX: m.overflowX, offscreen: cap(m.offscreen), clipped: cap(m.clipped), tiny: cap(m.tiny),
-        spine: m.spine, crossing: cap(m.crossing, 10), leafEscape: cap(m.leafEscape), leaves: m.leaves });
+        markers: m.markers, spine: m.spine, crossing: cap(m.crossing, 10), leafEscape: cap(m.leafEscape), leaves: m.leaves });
       if (SHOTS && SHOT_SIZES.includes(`${w}x${h}`)) {
         await p.screenshot({ path: path.join(SHOTS, `after-${screen.id}-${w}x${h}.png`) });
       }
