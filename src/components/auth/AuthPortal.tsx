@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
-import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, signInWithEmailAndPassword, signInWithPopup, SAMLAuthProvider, OAuthProvider, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser, getMultiFactorResolver, signInWithEmailAndPassword, SAMLAuthProvider, OAuthProvider, TotpMultiFactorGenerator, type MultiFactorResolver, type User } from 'firebase/auth';
 import { FlaskConical, KeyRound, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
+import { signInWithProvider } from '../../lib/sso-signin';
 import { auth } from '../../lib/firebase';
 import { activationTokenFromLocation } from '../../lib/useMizanAuth';
 import { useAppStore, enterDemoSessionIsolated, DEMO_AVAILABLE } from '../../lib/store';
@@ -90,7 +91,7 @@ export const AuthPortal:React.FC=()=>{
  useEffect(()=>{const domain=email.split('@')[1]||'';if(!/\./.test(domain)){setSso(null);return}const t=window.setTimeout(()=>{fetch(`/api/public/sso/discover?email=${encodeURIComponent(email)}`).then(r=>r.ok?r.json():null).then(b=>setSso(b?.provider||null)).catch(()=>setSso(null))},400);return()=>window.clearTimeout(t)},[email]);
  const signInWithSso=async()=>{
   if(!sso)return;setBusy(true);setMessage('');
-  try{const provider=sso.protocol==='saml'?new SAMLAuthProvider(sso.providerId):new OAuthProvider(sso.providerId);const cred=await signInWithPopup(auth,provider);if(activationToken)await finishActivation(cred.user)}
+  try{const provider=sso.protocol==='saml'?new SAMLAuthProvider(sso.providerId):new OAuthProvider(sso.providerId);const cred=await signInWithProvider(provider);if(cred&&activationToken)await finishActivation(cred.user)}
   catch(e){setMessage(ar?'تعذّر الدخول الموحّد. تأكد أن حسابك في جهتك مفعّل، أو ادخل بكلمة المرور.':'Organization sign-in failed. Check your organization account or use your password.')}
   finally{setBusy(false)}
  };

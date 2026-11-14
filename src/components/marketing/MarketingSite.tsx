@@ -2,13 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ShieldCheck, Scale, Mic, WifiOff, QrCode, BadgeCheck, Users, Building2,
   Fingerprint, FileCheck2, Radio, Accessibility, Trophy, BookOpen, Layers,
-  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity, ArrowLeft,
+  Clock, Globe, Mail, Check, Gauge, Sparkles, Activity, ArrowLeft, Play, FlaskConical, UserCheck, Database,
 } from 'lucide-react';
 import { DnaStepper } from '../dna/DnaKit';
 import { MizanMark } from '../design-system/MizanLogo';
 import { HERO_BAND, MOMENTS } from './photos';
 import { toWesternDigits } from '../../lib/input-normalize';
-import { isAppleNativeShell } from '../../lib/appleNativeShell';
 import { GOVERNED_ROLES } from '../../lib/permissions';
 import {
   LiveJudgingSimulator,
@@ -40,6 +39,13 @@ function useReveal<T extends HTMLElement>() {
   }, []);
   return { ref, style: { opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateY(14px)', transition: 'opacity .7s var(--ease-brand), transform .7s var(--ease-brand)' } as React.CSSProperties };
 }
+
+/*
+ * مدخل العرض التجريبي المعزول. رابطٌ عادي إلى /demo لا زرٌّ يستدعي دالة: الخادم هو من
+ * يُنشئ الصندوق المعزول (GET /demo ثم /demo-entry.js ثم POST /api/demo/enter)، فيعمل
+ * الرابط في كل متصفح وفي غلاف iOS، ويُفتح بنقرةٍ وسطى وبلوحة المفاتيح. لا سعر ولا شراء هنا.
+ */
+const DEMO_HREF = '/demo';
 
 const NAV_LINKS = [
   { href: '#kayf', label: 'كيف تعمل' },
@@ -224,7 +230,12 @@ export const MarketingSite: React.FC = () => {
             <nav aria-label="أقسام الصفحة" className="hidden md:flex items-center gap-1 text-[13px] font-bold">
               {NAV_LINKS.map(l => <a key={l.href} href={l.href} className="inline-flex min-h-11 items-center rounded-xl px-3 hover:bg-[var(--surface-soft)]">{l.label}</a>)}
             </nav>
-            <a href="#tawasul" className="rounded-xl px-4 h-11 grid place-items-center text-[12px] font-black text-white" style={{ background: 'var(--emerald)' }}>تواصل معنا</a>
+            <div className="flex items-center gap-2">
+              <a href="#tawasul" className="hidden sm:grid rounded-xl px-4 h-11 place-items-center text-[12px] font-black" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>تواصل معنا</a>
+              <a href={DEMO_HREF} data-testid="header-demo-entry" className="rounded-xl px-4 h-11 inline-flex items-center gap-1.5 text-[12px] font-black text-white whitespace-nowrap" style={{ background: 'var(--emerald)' }}>
+                <Play size={14} aria-hidden="true" /> جرّب ميزان الآن
+              </a>
+            </div>
           </div>
           <nav aria-label="أقسام الصفحة" className="md:hidden -mx-4 flex gap-1 overflow-x-auto px-4 pb-2 text-[12px] font-bold">
             {NAV_LINKS.map(l => <a key={l.href} href={l.href} className="inline-flex min-h-11 shrink-0 items-center rounded-xl px-3" style={{ background: 'var(--surface-soft)' }}>{l.label}</a>)}
@@ -248,8 +259,7 @@ export const MarketingSite: React.FC = () => {
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <a href="#tawasul" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black text-white" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>اطلب عرضًا تجريبيًّا</a>
               <a href="#kayf" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '1px solid var(--line)', background: 'var(--surface)' }}>كيف تعمل؟</a>
-              {/* داخل تطبيق iOS فقط: مدخل العرض التجريبي المعزول (/demo)، إذ لا تسجيل دخول في هذه الصفحة. */}
-              {isAppleNativeShell() && <a href="/demo" data-testid="ios-demo-entry" className="rounded-2xl px-6 h-12 grid place-items-center text-[13px] font-black" style={{ border: '2px solid var(--emerald)', background: 'var(--surface)', color: 'var(--emerald)' }}>جرّب العرض التجريبي</a>}
+              <a href={DEMO_HREF} data-testid="hero-demo-entry" className="rounded-2xl px-6 h-12 inline-flex items-center justify-center gap-2 text-[13px] font-black" style={{ border: '2px solid var(--emerald)', background: 'var(--surface)', color: 'var(--emerald)' }}><Play size={15} aria-hidden="true" /> جرّب العرض التجريبي</a>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[12px] font-bold mizan-muted">
               <span className="inline-flex items-center gap-1.5"><Check size={14} style={{ color: 'var(--emerald)' }} /> عربيةٌ أولًا</span>
@@ -265,6 +275,34 @@ export const MarketingSite: React.FC = () => {
             <img src="/marketing/hero-mushaf.png" alt="المصحف الرسمي في شاشة التحكيم: البقرة ١٤٢–١٤٤ بنص مجمع الملك فهد" loading="eager" width={945} height={1180}
               className="w-full rounded-[26px] max-lg:h-[360px] max-lg:object-cover max-lg:object-top" style={{ border: '1px solid var(--line)', boxShadow: 'var(--shadow-4)' }} />
           </div>
+        </div>
+      </Section>
+
+      {/* ══ ١٫٥) جرّب ميزان الآن: مدخل العرض التجريبي المعزول ══ */}
+      <Section id="jarreb" className="scroll-mt-32">
+        <div className="rounded-[28px] p-6 sm:p-9 grid gap-6 md:grid-cols-[1.2fr_1fr] items-center" style={{ background: 'var(--emerald-soft)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-2)' }}>
+          <div>
+            <Kicker>العرض التجريبي</Kicker>
+            <h2 className="font-display text-[clamp(24px,3.8vw,38px)] font-black mt-3 leading-[1.2] mizan-title">جرّب ميزان الآن</h2>
+            <p className="mt-3 text-[14px] leading-8 mizan-muted max-w-[46ch]">
+              صندوقٌ تجريبي معزول يفتح لك المنصّة كاملةً بنقرة واحدة.
+              <br />بلا حساب، وببياناتٍ وهمية لا تمسّ أي بيانات حقيقية.
+            </p>
+            <a href={DEMO_HREF} data-testid="section-demo-entry" className="mt-6 inline-flex items-center justify-center gap-2.5 rounded-2xl px-8 h-14 text-[15px] font-black text-white w-full sm:w-auto" style={{ background: 'var(--emerald)', boxShadow: 'var(--shadow-3)' }}>
+              <Play size={18} aria-hidden="true" /> ابدأ العرض التجريبي
+            </a>
+          </div>
+          <ul className="grid gap-3 text-[13px] font-bold" aria-label="ما يميّز العرض التجريبي">
+            {[
+              { icon: FlaskConical, t: 'صندوقٌ معزول لكل زائر' },
+              { icon: UserCheck, t: 'لا تسجيل ولا حساب' },
+              { icon: Database, t: 'بياناتٌ وهمية، لا حقيقية' },
+            ].map(i => (
+              <li key={i.t} className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                <i.icon size={18} strokeWidth={1.7} aria-hidden="true" style={{ color: 'var(--emerald)' }} /> {i.t}
+              </li>
+            ))}
+          </ul>
         </div>
       </Section>
 
