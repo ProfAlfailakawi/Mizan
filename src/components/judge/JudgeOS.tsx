@@ -64,6 +64,7 @@ const notesAr=(n:number)=> n===0?'لا ملاحظات' : n===1?'ملاحظة و�
 // Criterion names were only ever available in English, inside an Arabic-first surface.
 import type { RegistrationStatus } from '../../types';
 import { calculateCategoryPassageRange, categoryPageQuarterUnits, pageQuarterLabel } from '../../lib/scope-engine';
+import { WordMarkMenu, type WordMarkTarget } from './WordMarkMenu';
 
 const CRITERION_AR:Record<string,string>={memorization:'حفظ',tajweed:'تجويد',waqf_ibtida:'وقف وابتداء',performance:'أداء',custom:'خاص'};
 /*
@@ -245,6 +246,8 @@ export const JudgeOS: React.FC = () => {
  // screen-reader user needs the same fact spoken. Both are driven from here.
  const [markedAction,setMarkedAction]=useState<string|null>(null);
  const [markAnnounce,setMarkAnnounce]=useState('');
+ /* الكلمة التي ضغط عليها المحكّم مطوّلًا وتنتظر اختيار نوع الخطأ. */
+ const [wordTarget,setWordTarget]=useState<WordMarkTarget|null>(null);
  /*
   * شريط البيانات: يُقرأ مرةً عند الاستقبال، فلا يأخذ مكانًا دائمًا أمام عينٍ على المصحف.
   *
@@ -398,16 +401,17 @@ export const JudgeOS: React.FC = () => {
  // Marks already logged for one action, from the same source the evidence timeline
  // uses, so the two can never disagree. Reversed marks are excluded, as elsewhere.
  const countFor=(eventType:any)=>activeSession.events.filter(e=>!e.reversed&&e.type===eventType).length;
- const recordJudgeEventWithEvidence=(eventType:any,action?:{id:string;shortArabic:string;shortEnglish:string;penalty:number})=>{
+ const recordJudgeEventWithEvidence=(eventType:any,action?:{id:string;shortArabic:string;shortEnglish:string;penalty:number},locus?:{surah:number;ayah:number;word:number;text?:string})=>{
   // Read the tally *before* recording: recordJudgeEvent mutates the store synchronously,
   // so counting afterwards and adding one announced a number one too high.
   const tally=countFor(eventType)+1;
-  recordJudgeEvent(eventType);
+  recordJudgeEvent(eventType,locus);
   if(action){
    setMarkedAction(action.id);
    window.setTimeout(()=>setMarkedAction(cur=>cur===action.id?null:cur),520);
    const label=ar?action.shortArabic:action.shortEnglish;
-   setMarkAnnounce(ar?`سُجِّل ${label}. ${marksAr(tally)}. الخصم ${action.penalty}.`:`${label} recorded. ${tally} time${tally===1?'':'s'}. Penalty ${action.penalty}.`);
+   const onWord=locus?.text?(ar?` على كلمة «${locus.text}»`:` on the word “${locus.text}”`):'';
+   setMarkAnnounce(ar?`سُجِّل ${label}${onWord}. ${marksAr(tally)}. الخصم ${action.penalty}.`:`${label} recorded${onWord}. ${tally} time${tally===1?'':'s'}. Penalty ${action.penalty}.`);
   }
   if(alignmentConfigured)void postQuranHumanMarker(activeSession.sessionId,String(eventType)).then(setSessionEvidence).catch(()=>{})};
  /*
@@ -493,6 +497,13 @@ export const JudgeOS: React.FC = () => {
  const masked=maskParticipantForJudge(participant,blindness,ar);
  const displayName=masked.displayName;
  const judgeActions=actions.filter(a=>{const criterion=ruleSet.criteria.find(c=>c.id===a.criterion);return a.criterion==='custom'||!criterion||judgeCanScore(effectiveJudge,criterion.assignedJudgeType,policy.judging.mode)});
+ /*
+  * الضغطة المطوّلة على كلمة تُسجّل خطأً، فلا تُفعَّل إلا حيث يجوز التسجيل بالأزرار نفسها:
+  * وضع الإدخال بالعلامات (لا درجةٌ مباشرة)، والمتسابق يتلو الآن، والجلسة غير مقفلة.
+  */
+ const canMarkWords=policy.judging.scoreEntryMode!=='direct_score'&&activeSession.questionPhase==='RECITING'&&!activeSession.isLocked&&judgeActions.length>0;
+ const wordMarks=useMemo(()=>activeSession.events.filter(e=>!e.reversed&&e.locus&&e.questionIndex===activeSession.currentQuestionIndex).map(e=>({ayah:e.locus!.ayah,word:e.locus!.word,tone:(e.penalty>=1?'major':'minor') as 'major'|'minor'})),[activeSession.events,activeSession.currentQuestionIndex]);
+ useEffect(()=>{if(!canMarkWords)setWordTarget(null)},[canMarkWords]);
  const directMode=policy.judging.scoreEntryMode==='direct_score'||policy.judging.scoreEntryMode==='hybrid';
  // كل مسابقة حسب سياستها: إظهار مجموع الخصم الجاري للمحكم، والسماح بالتراجع عن آخر ملاحظة.
  const showRunningScore=policy.judging.showRunningScoreToJudge!==false;
@@ -731,7 +742,7 @@ export const JudgeOS: React.FC = () => {
 
     {/* ── الموضع ─────────────────────────────────────────────────────────── */}
     {micRecording&&questionRevealed&&q&&!activeSession.isLocked&&!(activeSession.questionPhase==='TRANSITION'&&isLastQuestion)&&<>
-     <div className="mizan-judge-quran min-h-0 flex-1 flex flex-col"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult}/></div>
+     <div className="mizan-judge-quran min-h-0 flex-1 flex flex-col"><OfficialMushafSurface question={q as any} ar={ar} tracking={alignmentResult} onWordLongPress={canMarkWords?(hit=>setWordTarget(hit)):undefined} wordMarks={wordMarks}/></div>
      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 shrink-0">
       {openingAudioState!=='unavailable'&&<Button size="sm" variant="outline" icon={<Volume2 className="w-4 h-4"/>} onClick={()=>void playOpeningAudio(true)} disabled={openingAudioState==='playing'}>{openingAudioState==='playing'?(ar?'تلاوة أول آية…':'Playing first ayah…'):(ar?'تلاوة أول آية':'First ayah')}</Button>}
       {(alignmentConfigured||followReady)&&!shadowMicActive&&<Button size="sm" variant="outline" icon={<Mic className="w-4 h-4"/>} onClick={()=>void prepareAudio()} disabled={audioState==='requesting'}>{audioState==='requesting'?'…':(ar?'تشغيل التتبع الحي':'Start live tracking')}</Button>}
@@ -820,6 +831,7 @@ export const JudgeOS: React.FC = () => {
       </div>}
 
       <div className="sr-only" role="status" aria-live="polite">{markAnnounce}</div>
+      {wordTarget&&canMarkWords&&<WordMarkMenu ar={ar} target={wordTarget} actions={judgeActions as any} onClose={()=>setWordTarget(null)} onPick={a=>{recordJudgeEventWithEvidence(a.eventType,a,wordTarget);setWordTarget(null)}}/>}
      </div>
 
      {/* الذيل: آخرُ ما تقع عليه العين، وهو آخرُ ما يُفعل. ولا يغيب مهما ضاقت الشاشة. */}

@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Award, Download, FileText, Link2, Printer } from 'lucide-react';
 import type { Certificate, Competition, Organization, ResultRecord } from '../../types';
 import { buildCategoryResultsReport, buildParticipantResultsReport, categoryResultsCsv, participantResultsCsv, resultsFileName, REPORTABLE_RESULT_STATUSES } from '../../lib/results-report';
+import { finalReportCsv, finalReportFileName, type FinalReport } from '../../lib/final-report';
+import { FinalReportBody } from './FinalReportBody';
 import { createQrMatrix } from '../design-system/RealQRCode';
 import { Modal } from '../design-system/Modal';
 import { Button } from '../design-system/Button';
@@ -59,9 +61,9 @@ const escapeHtml = (v: string) => v.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<'
 
 /* ── الكشوف ─────────────────────────────────────────────────────────────── */
 
-export type SheetKind = 'participants' | 'categories' | 'official';
+export type SheetKind = 'participants' | 'categories' | 'official' | 'final';
 
-interface SheetInput { competition: Competition; organization: Organization; results: ResultRecord[]; ar: boolean; generatedBy: string }
+interface SheetInput { competition: Competition; organization: Organization; results: ResultRecord[]; ar: boolean; generatedBy: string; /** يُبنى عند فتح «التقرير الختامي» فقط. */ finalReport?: FinalReport }
 
 const th: React.CSSProperties = { background: GREEN, color: '#fff', fontWeight: 700, fontSize: 11, padding: '8px 10px', textAlign: 'start', whiteSpace: 'nowrap' };
 const td: React.CSSProperties = { borderBottom: `1px solid ${LINE}`, fontSize: 11.5, padding: '7px 10px', verticalAlign: 'middle' };
@@ -158,18 +160,21 @@ const Kpis: React.FC<{ input: SheetInput }> = ({ input }) => {
   </div>;
 };
 
+
 export const ResultsSheet: React.FC<{ kind: SheetKind; input: SheetInput }> = ({ kind, input }) => {
   const { ar } = input;
   const excluded = input.results.filter(r => !REPORTABLE_RESULT_STATUSES.includes(r.status)).length;
   const title = kind === 'participants' ? (ar ? 'كشف نتائج المتسابقين' : 'Participant results sheet')
-    : kind === 'categories' ? (ar ? 'كشف نتائج الفئات' : 'Category results sheet') : (ar ? 'النتائج الرسمية' : 'Official results');
+    : kind === 'categories' ? (ar ? 'كشف نتائج الفئات' : 'Category results sheet') : kind === 'final' ? (ar ? 'التقرير الختامي' : 'Final report') : (ar ? 'النتائج الرسمية' : 'Official results');
   const subtitle = kind === 'participants' ? (ar ? 'مرتّبًا بالمركز داخل كل فئة' : 'Ranked within each category')
     : kind === 'categories' ? (ar ? 'ملخّص كل فئة: عددها وأعلى درجاتها ومتوسّطها وصاحب مركزها الأول' : 'Per-category summary')
+    : kind === 'final' ? (ar ? 'الحضور والنتائج وما وقع في اليوم' : 'Attendance, results and what happened on the day')
     : (ar ? 'ملخّص الفئات ثم نتائج كل فئة على حدة' : 'Category summary, then each category in full');
   const categories = input.competition.categories.filter(c => input.results.some(r => r.categoryId === c.id && REPORTABLE_RESULT_STATUSES.includes(r.status)));
   return <div style={{ fontFamily: FONT, color: INK, background: '#fff', padding: 4 }} dir={ar ? 'rtl' : 'ltr'}>
     <SheetHeader input={input} title={title} subtitle={subtitle} />
-    {kind !== 'participants' && <Kpis input={input} />}
+    {kind !== 'participants' && kind !== 'final' && <Kpis input={input} />}
+    {kind === 'final' && <FinalReportBody ar={ar} report={input.finalReport} />}
     {kind === 'participants' && <ParticipantsTable input={input} />}
     {kind === 'categories' && <CategoriesTable input={input} />}
     {kind === 'official' && <>
@@ -186,9 +191,10 @@ export const ResultsSheet: React.FC<{ kind: SheetKind; input: SheetInput }> = ({
 export const ResultsSheetModal: React.FC<{ kind: SheetKind | null; input: SheetInput; onClose: () => void }> = ({ kind, input, onClose }) => {
   const { ar } = input;
   if (!kind) return null;
-  const title = kind === 'participants' ? (ar ? 'كشف المتسابقين' : 'Participant sheet') : kind === 'categories' ? (ar ? 'كشف الفئات' : 'Category sheet') : (ar ? 'طباعة النتائج الرسمية' : 'Print official results');
+  const title = kind === 'participants' ? (ar ? 'كشف المتسابقين' : 'Participant sheet') : kind === 'categories' ? (ar ? 'كشف الفئات' : 'Category sheet') : kind === 'final' ? (ar ? 'التقرير الختامي' : 'Final report') : (ar ? 'طباعة النتائج الرسمية' : 'Print official results');
   const print = () => printDocument(documentShell(title, renderToStaticMarkup(<ResultsSheet kind={kind} input={input} />), ar));
   const csv = () => {
+    if (kind === 'final') { if (input.finalReport) downloadFile(finalReportFileName(input.competition, ar), finalReportCsv(input.finalReport, ar), 'text/csv;charset=utf-8'); return; }
     const data = { competition: input.competition, results: input.results, categories: input.competition.categories };
     const k = kind === 'categories' ? 'categories' : 'participants';
     downloadFile(resultsFileName(input.competition, k, ar), k === 'participants' ? participantResultsCsv(data, { arabic: ar }) : categoryResultsCsv(data, { arabic: ar }), 'text/csv;charset=utf-8');

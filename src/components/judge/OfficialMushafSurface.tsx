@@ -76,7 +76,7 @@ export interface MushafSurfaceQuestion{
  riwaya?:string;qiraah?:string;tariq?:string
 }
 
-export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:boolean;tracking?:QuranAlignmentResult|null}>=({question:q,ar,tracking})=>{
+export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:boolean;tracking?:QuranAlignmentResult|null;onWordLongPress?:(hit:{surah:number;ayah:number;word:number;text:string})=>void;wordMarks?:{ayah:number;word:number;tone:'minor'|'major'}[]}>=({question:q,ar,tracking,onWordLongPress,wordMarks})=>{
  const rawiText=q.rawi||q.riwaya;
  const reading=resolveReading({qiraah:q.qiraah,rawi:rawiText,riwaya:rawiText});const readingText=reading?`${qiraahLabel(reading,ar)} · ${rawiLabel(reading,ar)}${q.tariq?` · ${tariqLabel(q.tariq,ar)}`:''}`:[rawiText,q.qiraah,q.tariq].filter(Boolean).join(' · ');
  const readingKey=DELIVERY_READING_BY_RAWI[reading?.rawiId||'']||DELIVERY_READING_BY_NAME[readingNameKey(rawiText)]||'';
@@ -180,7 +180,8 @@ export const OfficialMushafSurface:React.FC<{question:MushafSurfaceQuestion;ar:b
     activeAyah={sheetFocus?.ayah??null} activeWords={activeWords} activeWordIndex={sheetFocus?.word??-1} tone={sheetFocus?.tone}
     tajweedOn={tajweedOn} onToggleTajweed={()=>setTajweedOn(v=>!v)} tajweedScopeNote={delivery?.tajweedScopeNote}
     sourceLabel={surfaceAuthorityLabel} loaded={checked}
-    frame={inCockpit?{pageAspect,pages:Math.max(1,loadedLoci.length||loci.length)}:null}/>}
+    frame={inCockpit?{pageAspect,pages:Math.max(1,loadedLoci.length||loci.length)}:null}
+    surah={delivery?.surah} onWordLongPress={onWordLongPress} wordMarks={wordMarks}/>}
   {!delivery&&!hasOfficialPage&&checked&&<DemoQuranNotice ar={ar} what="page" className="!my-2 !py-3"/>}
   {delivery&&audioOpen&&<div className="mizan-mushaf-drawer"><PassageAudio reading={readingKey} ayat={delivery.ayat} ar={ar} onActive={setActive}/></div>}
   {delivery&&divergenceOpen&&<div className="mizan-mushaf-drawer"><DivergenceRadar reading={readingKey} surah={delivery.surah} startAyah={delivery.startAyah} endAyah={delivery.endAyah} ar={ar}/></div>}
