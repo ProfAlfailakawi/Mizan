@@ -2236,7 +2236,7 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 }
 
 /* 3) صفحتا الكتاب: الشاشة الداخلية مفتوحةً (جولة 2026-11-14). Safari لا يُعلن المفصل، فالقرار
-   من مساحة النافذة: عرض 640–760 طوليًّا (كتاب طولي 669×867، ونصفه القصير 669×520)، أو عرض
+   من مساحة النافذة: عرض 640–720 طوليًّا (الآيباد الأصغر 744 خارجه) (كتاب طولي 669×867، ونصفه القصير 669×520)، أو عرض
    640–1000 عرضيًّا بارتفاع 520–720 (كتاب عرضي 951×585). الآيباد (768×1024 و1024×768)
    والهاتف والحاسوب خارج الشرط فلا يتغيّر فيها شيء.
    الفكرة: صفحتان لا صفحةٌ ممدودة. كعبٌ هادئ في المنتصف (28–36px) بظلّ طيٍّ خفيف وخطٍّ شعري،
@@ -2244,8 +2244,8 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
    ولا نصّ ولا حقل ولا زرّ يقع على الكعب: كل ورقة تنتهي قبله بهامش. الأوراق تأتي من `Spread`
    (src/components/layout/Spread.tsx) أو من صنفٍ على الصفحة نفسها، والتخطيط هنا CSS خالص:
    تغيّر المقاس لا يُعيد تركيب أي مكوّن، فالتسجيل والتشغيل والحقول تبقى كما هي. */
-@media (min-width:640px) and (max-width:759.98px) and (min-height:520px),
-       (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
+@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px),
+       screen and (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
   :root{
     --duo-spine:clamp(28px,3.6vw,36px);
     --duo-gutter:clamp(14px,2.4vw,24px);
@@ -2394,8 +2394,8 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
    إلى عموديّته، وتعود الشبكات إلى أعمدة الهاتف، ويخفّ الحشو. خارج الأوراق لا يُطبَّق شيء.
    (استعلام الحاوية كان أدقّ، لكن تبدّل احتواء الأوراق عند الخروج من الكتاب كان يعيد موضع التمرير
    إلى الأعلى في WebKit باللمس، فالشرط هنا مقاس النافذة نفسه.) */
-@media (min-width:640px) and (max-width:759.98px) and (min-height:520px),
-       (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
+@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px),
+       screen and (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
   :is(.mz-leaf, .mz-spread-index > *) .flex-col.sm\:flex-row{ flex-direction:column }
   :is(.mz-leaf, .mz-spread-index > *) .flex-col-reverse.sm\:flex-row{ flex-direction:column-reverse }
   :is(.mz-leaf, .mz-spread-index > *) .flex-wrap.sm\:flex-nowrap{ flex-wrap:wrap }
@@ -2416,7 +2416,7 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   :is(.mz-leaf, .mz-spread-index > *) .flex.flex-wrap > .min-w-0.flex-1{ min-width:min(100%, 9rem) }
 }
 /* الورقة الأضيق (~290px، كتاب طولي): بطاقات الأرقام الثلاث والمبالغ التي لا تلتفّ تصطفّ عمودًا. */
-@media (min-width:640px) and (max-width:759.98px) and (min-height:520px){
+@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px){
   :is(.mz-leaf, .mz-spread-index > *) .grid-cols-3:has(> .mz-bp-metric){ grid-template-columns:minmax(0,1fr) }
   :is(.mz-leaf, .mz-spread-index > *) .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap){ grid-template-columns:minmax(0,1fr) }
   :is(.mz-leaf, .mz-spread-index > *) .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap) > *{ grid-column:1 / -1 }
