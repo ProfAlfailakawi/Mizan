@@ -114,7 +114,8 @@ export const SuperAdminConsole: React.FC = () => {
  const [govTab,setGovTab]=useState<'identity'|'surface'|'modules'>('identity');
  return <PortalFrame kicker={ar?'غرفة القيادة':'MIZAN CONTROL TOWER'} title={ar?'غرفة قيادة ميزان':'MIZAN Control Tower'} subtitle={ar?'صحة المنصة، الإنقاذ، الدعم، والتشخيص من الخادم. كل ما يمس النتائج أو النزاهة يبقى محميًا بلا تجاوز صامت.':'Server-side health, rescue, support and diagnostics. Results and integrity surfaces stay protected without silent override.'}>
    {/* إحدى عشرة بطاقة كاملة العرض كانت تتراص في عمود واحد بلا مخرج؛ التبويب هنا يفصل ثلاث مهام لا تُمارَس معًا: مراقبة الصحة، وإدارة الاشتراكات، والحوكمة، مع إبقاء المكتبة الرسمية حصرًا للسوبر أدمن. */}
-   <div data-duo="aside" role="tablist" ref={consoleTabAnchor} aria-label={ar?'أقسام غرفة القيادة':'Control tower sections'} className="mizan-tabs">
+   <div data-duo="aside" ref={consoleTabAnchor} className="mz-tab-anchor" aria-hidden="true"/>
+   <div data-duo="aside" role="tablist" aria-label={ar?'أقسام غرفة القيادة':'Control tower sections'} className="mizan-tabs">
     {([['health',ar?'الصحة والتنبيهات':'Health & alerts'],['commerce',ar?'التجارة والاشتراكات':'Commerce & plans'],['governance',ar?'الحوكمة والأمان':'Governance & security'],['library',ar?'المكتبة الرسمية':'Official library']] as const).map(([id,label])=><button key={id} type="button" role="tab" aria-selected={consoleTab===id} onClick={()=>setConsoleTab(id)} className={`mizan-tab ${consoleTab===id?'is-active':''}`}>{React.createElement(({health:Activity,commerce:WalletCards,governance:ShieldCheck,library:BookCopy} as const)[id],{className:'w-4 h-4 shrink-0','aria-hidden':true})}{label}</button>)}
    </div>
    {consoleTab==='health'&&<>
