@@ -49,5 +49,9 @@ must(/جرّب النسخة التجريبية/.test(portal), 'Arabic demo butto
 must(!/!activating&&<div className="mt-5 pt-4/.test(portal), 'demo entry must not be hidden during invitation activation');
 must(/enterDemoSessionIsolated/.test(portal), 'portal must use the isolated entry');
 
+// الصفحة التسويقية العامة: مدخلٌ ظاهر إلى /demo في الشريط والبطل والقسم.
+const marketing = read('src/components/marketing/MarketingSite.tsx');
+must(/const DEMO_HREF = '\/demo'/.test(marketing) && (marketing.match(/href=\{DEMO_HREF\}/g) || []).length >= 3, 'marketing page must link to /demo from header, hero and its demo section');
+
 if (fail.length) { console.error('verify-demo-entry FAILED:\n - ' + fail.join('\n - ')); process.exit(1); }
 console.log('verify-demo-entry: ok');
