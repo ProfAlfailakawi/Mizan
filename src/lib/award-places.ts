@@ -33,6 +33,9 @@ export interface AwardPlace {
   seats: number;
   /** حين لا يبلغ العتبةَ أحد: يُحجب المركز، أو يُمنح لأعلى المتقدّمين. */
   whenUnmet: 'withhold' | 'award_anyway';
+  /** نصّ الجائزة المعلن للجمهور (مثل «٥٠٠ د.ك ودرع»). اختياريّ: غيابه = لا جائزة تُعلن لهذا المركز. */
+  prizeArabic?: string;
+  prizeEnglish?: string;
 }
 
 export interface AwardPolicy {
@@ -97,6 +100,16 @@ export const scorePercentage = (score: number, maxScore: number) => {
   return Number(Math.max(0, Math.min(100, (Number(score) || 0) / max * 100)).toFixed(2));
 };
 
+/** نصّ الجائزة يُعرض للعموم: يُنظَّف من أحرف التحكم والتوجيه الخفية ويُقصَّر. */
+const cleanPrize = (v: unknown) => String(v ?? '').replace(/[\u0000-\u001f\u007f\u200b\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim().slice(0, 80);
+
+/** الجوائز المعلنة فقط، بترتيب المراكز. */
+export function publicPrizes(policy?: Partial<AwardPolicy> | null, arabic = true): { rank: number; title: string; prize: string }[] {
+  return normalizeAwardPolicy(policy).places
+    .map(p => ({ rank: p.rank, title: (arabic ? p.titleArabic : p.titleEnglish) || p.titleArabic, prize: (arabic ? p.prizeArabic || p.prizeEnglish : p.prizeEnglish || p.prizeArabic) || '' }))
+    .filter(p => p.prize);
+}
+
 export function normalizeAwardPolicy(policy?: Partial<AwardPolicy> | null): AwardPolicy {
   const places = (policy?.places?.length ? policy.places : DEFAULT_AWARD_POLICY.places)
     .map((place, index) => ({
@@ -106,6 +119,8 @@ export function normalizeAwardPolicy(policy?: Partial<AwardPolicy> | null): Awar
       minimumPercentage: Math.max(0, Math.min(100, Number(place.minimumPercentage) || 0)),
       seats: Math.max(1, Math.round(Number(place.seats) || 1)),
       whenUnmet: place.whenUnmet === 'award_anyway' ? 'award_anyway' as const : 'withhold' as const,
+      ...(cleanPrize(place.prizeArabic) ? { prizeArabic: cleanPrize(place.prizeArabic) } : {}),
+      ...(cleanPrize(place.prizeEnglish) ? { prizeEnglish: cleanPrize(place.prizeEnglish) } : {}),
     }))
     .sort((a, b) => a.rank - b.rank);
   return {

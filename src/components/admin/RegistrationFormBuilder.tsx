@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import type { RegistrationFieldCondition, RegistrationFieldDefinition, RegistrationPolicy } from '../../types';
 import { validateFormSchema } from '../../lib/registration-form';
+import { PREFERRED_DAY_FIELD_ID, preferredDayField } from '../../lib/registration-form-templates';
 
 const TYPES: RegistrationFieldDefinition['type'][] = ['text', 'long_text', 'number', 'date', 'email', 'phone', 'select', 'multi_select', 'country', 'checkbox', 'consent', 'file', 'section'];
 const TYPE_LABEL: Record<string, [string, string]> = {
@@ -47,8 +48,10 @@ const ConditionEditor: React.FC<{ ar: boolean; title: string; value: Registratio
   </fieldset>;
 };
 
-export const RegistrationFormBuilder: React.FC<{ ar: boolean; registration: RegistrationPolicy; onChange: (mutate: (r: RegistrationPolicy) => void) => void }> = ({ ar, registration, onChange }) => {
+export const RegistrationFormBuilder: React.FC<{ ar: boolean; registration: RegistrationPolicy; onChange: (mutate: (r: RegistrationPolicy) => void) => void; /** أيام المسابقة: بها يُبنى حقل «اليوم المفضّل» الجاهز. */ competitionDays?: { startDate: string; endDate: string } }> = ({ ar, registration, onChange, competitionDays }) => {
   const [openId, setOpenId] = useState('');
+  const dayField = competitionDays ? preferredDayField(competitionDays.startDate, competitionDays.endDate) : null;
+  const hasDayField = registration.fields.some(f => f.id === PREFERRED_DAY_FIELD_ID);
   const customs = registration.fields.filter(f => f.custom);
   const refs = registration.fields.filter(f => f.type !== 'section').map(f => ({ id: f.id, label: ar ? f.labelArabic : f.labelEnglish }));
   const problems = validateFormSchema(registration.fields);
@@ -57,6 +60,7 @@ export const RegistrationFormBuilder: React.FC<{ ar: boolean; registration: Regi
   return <div className="space-y-3">
     <div className="flex items-center justify-between"><div className="text-xs font-black text-[#606662]">{ar ? 'حقول مخصّصة وشروط' : 'Custom fields & conditions'}</div>
       <button type="button" className="rounded-full border border-[color:var(--emerald)]/25 px-3 py-1.5 text-xs font-bold text-[color:var(--emerald)]" onClick={() => { const f = newField(customs.length); onChange(r => { r.fields.push(f); }); setOpenId(f.id); }}>{ar ? '+ إضافة حقل' : '+ Add field'}</button></div>
+    {dayField && !hasDayField && <div className="rounded-xl border border-dashed border-[#d9d4c6] p-3 text-xs"><div className="font-bold">{ar ? 'مسابقتك متعدّدة الأيام: دع المتسابق يطلب يومه المفضّل.' : 'Your competition spans several days: let participants request a preferred day.'}</div><button type="button" className="mt-2 rounded-full border border-[color:var(--emerald)]/25 px-3 py-1.5 font-bold text-[color:var(--emerald)]" onClick={() => { onChange(r => { if (!r.fields.some(f => f.id === PREFERRED_DAY_FIELD_ID)) r.fields.push(dayField); }); setOpenId(PREFERRED_DAY_FIELD_ID); }}>{ar ? '+ إضافة حقل «اليوم المفضّل»' : '+ Add “Preferred day” field'}</button></div>}
     {problems.length > 0 && <div role="alert" className="rounded-xl bg-[var(--danger-soft)] p-2 text-[11px] font-bold text-[#87483f]">{problems.join(' · ')}</div>}
     <ul className="space-y-2">{customs.map(f => <li key={f.id} className="rounded-xl border border-[#e5e3dc] bg-white">
       <div className="flex flex-wrap items-center gap-2 p-3">

@@ -51,6 +51,8 @@ const stepLabel = (index: number, ar: boolean) => {
   return pl(arLabels[index], enLabels[index]);
 };
 
+import { readFamily, upsertFamily, type FamilyMember } from '../../lib/guardian-family';
+
 export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) => {
   const { competition, language, participants, results, certificates, committees } = useAppStore();
   const { arabicData: ar, rtl, bcp47 } = usePublicLocale(language);
@@ -61,6 +63,9 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   const [journey, setJourney] = useState<PublicJourney | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  /* أبناءُ ولي الأمر المحفوظون على هذا الجهاز: كل رابطٍ فتحه يبقى، فيرى أبناءه معًا. */
+  const familyKey = `mizan_public_guardian_family_${competition.id}`;
+  const [family, setFamily] = useState<FamilyMember[]>([]);
 
   /*
    * انتهاء المسابقة ليس إلغاءً لرحلة المتسابق. النتيجة والشهادة والحفل تقع بعد التحكيم،
@@ -111,6 +116,17 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
       setToken(clean);
       setError('');
       localStorage.setItem(storageKey, clean);
+      if (audience === 'guardian') {
+        try {
+          const next = upsertFamily(readFamily(localStorage.getItem(familyKey)), {
+            token: clean, participantId: data.participantId,
+            name: (ar ? data.participantNameArabic || data.participantName : data.participantName || data.participantNameArabic) || '',
+            code: data.participantCode || '',
+          });
+          localStorage.setItem(familyKey, JSON.stringify(next));
+          setFamily(next);
+        } catch { /* تخزينٌ غير متاح: تعمل الصفحة لابنٍ واحد كما كانت */ }
+      }
     } catch (e) {
       const code = e instanceof Error ? e.message : 'SERVER_ERROR';
       const terminal = ['JOURNEY_TOKEN_INVALID', 'JOURNEY_NOT_FOUND', 'JOURNEY_REVOKED', 'COMPETITION_NOT_FOUND'].includes(code.split(':')[0]);
@@ -121,7 +137,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [ar, audience, competition.id, storageKey]);
+  }, [ar, audience, competition.id, storageKey, familyKey]);
 
   /* المسابقة قد تتغير في رابط عام داخل نفس الجلسة؛ لا نسمح لبطاقة مسابقة سابقة بالتسرّب. */
   /* الإدخال اليدوي يُفحص شكله أولًا، فلا يُرسل رقم متسابق إلى الخادم ليعود بخطأ عامّ. */
@@ -140,13 +156,14 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
   useEffect(() => {
     const fromHash = tokenFromHash();
     const remembered = localStorage.getItem(storageKey) || '';
+    if (audience === 'guardian') { try { setFamily(readFamily(localStorage.getItem(familyKey))); } catch { setFamily([]); } } else setFamily([]);
     const next = fromHash || remembered;
     setJourney(null);
     setError('');
     setToken(next);
     setInput(fromHash || next);
     if (next) void load(next);
-  }, [competition.id, audience, storageKey, load]);
+  }, [competition.id, audience, storageKey, familyKey, load]);
 
   /*
    * الرحلة شاشة حيّة، لا لقطةً عند الفتح. تحديث صامت يلتقط الاستدعاء للجنة والنتيجة
@@ -216,6 +233,18 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         {error && <div role="alert" className="mt-4 rounded-xl bg-[var(--danger-soft)] text-[#87483f] p-3 text-xs font-bold">{error}</div>}
         <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#68706b]"><LockKeyhole className="w-4 h-4" />{pl('رمزٌ خاص وآمن.', 'The opaque code can be revoked and replaced by the organizer.')}</div>
       </section> : <div className="space-y-4">
+        {audience === 'guardian' && family.length > 0 && <nav aria-label={pl('أبنائي', 'My children')} className="mizan-surface p-3 sm:p-4" data-guardian-family>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black text-[color:var(--muted)]">{pl('أبنائي', 'My children')}</span>
+            {family.length > 1 && family.map(m => <button key={m.participantId} type="button" aria-pressed={m.participantId === journey.participantId}
+              onClick={() => { if (m.participantId !== journey.participantId) void load(m.token); }}
+              className={`min-h-11 rounded-xl border px-3 text-sm font-black ${m.participantId === journey.participantId ? 'border-[color:var(--emerald)] bg-[var(--emerald-soft)] text-[color:var(--emerald)]' : 'border-[#d9d4c6] bg-white text-[#2c322e]'}`}>
+              {m.name || m.code}
+            </button>)}
+            <button type="button" onClick={() => { setJourney(null); setToken(''); setInput(''); setError(''); localStorage.removeItem(storageKey); }}
+              className="min-h-11 rounded-xl px-3 text-xs font-black text-[color:var(--emerald)]">{pl('+ إضافة ابن آخر', '+ Add another child')}</button>
+          </div>
+        </nav>}
         <section className="mizan-surface p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5"><div><div className="mizan-kicker">{audience === 'guardian' ? (pl('متابعة ولي الأمر', 'GUARDIAN VIEW')) : (pl('رحلتي في المسابقة', 'MY JOURNEY'))}</div><h1 className="font-display text-3xl sm:text-4xl font-black mt-2">{displayParticipantName(ar ? journey.participantNameArabic || journey.participantName : journey.participantName || journey.participantNameArabic, journey.participantCode, ar)}</h1><div className="text-base text-[#4f5752] mt-2"><span className="font-black tabular-nums" dir="ltr">{formatParticipantCode(journey.participantCode)}</span> · {ar ? journey.competitionNameArabic : journey.competitionName}</div></div><Badge variant="emerald" className="text-sm">{stepLabel(idx, ar)}</Badge></div>
           {next && !finished && <div className="mt-6 rounded-2xl bg-[var(--emerald-soft)] text-[color:var(--emerald)] p-5 flex items-center gap-4"><Arrow className="w-8 h-8 shrink-0" aria-hidden="true" /><div><div className="text-sm font-black">{pl('الخطوة التالية', 'Next')}</div><div className="text-xl font-black mt-1">{next}</div></div></div>}
@@ -230,7 +259,7 @@ export const JourneyAccess: React.FC<{ audience: Audience }> = ({ audience }) =>
         {journey.committee && !finished && <section className="mizan-surface p-5"><div className="text-sm font-black text-[color:var(--muted)]">{pl('اللجنة', 'PANEL')}</div><div className="text-xl font-black mt-1">{journey.committee.code} · {ar ? journey.committee.nameArabic : journey.committee.name}</div></section>}
         {journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface mz-enter p-6 sm:p-8 text-center border-t-4 border-t-[var(--gold)]"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[var(--emerald-soft)]"><ShieldCheck className="w-6 h-6 text-[var(--emerald-2)]" /></span><div className="mizan-kicker mt-3">{pl('النتيجة المعتمدة', 'PUBLISHED RESULT')}</div><div className="font-display text-5xl font-black mt-2 tabular-nums text-[var(--emerald)]">{journey.result.score}</div><div className="mt-3 inline-flex rounded-full bg-[var(--amber-soft)] px-4 py-1.5 text-base font-black text-[var(--amber)]">{pl('الترتيب', 'Rank')} #{journey.result.rank}</div>{journey.certificate && <button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[color:var(--emerald)]">{pl('التحقق من الشهادة', 'Verify certificate')}</button>}</section>}
         {journey.certificate && !journey.result && (showResult || !finished) && <section ref={resultRef} className="mizan-surface p-6 text-center"><Award className="w-7 h-7 text-[color:var(--emerald-2)] mx-auto" /><div className="mizan-kicker mt-3">{pl('الشهادة جاهزة', 'CERTIFICATE READY')}</div><div className="text-sm font-black mt-2" dir="ltr">{journey.certificate.number}</div><button onClick={verifyCertificate} className="mt-5 min-h-14 px-6 rounded-2xl border border-[#d9dfdb] text-base font-black text-[color:var(--emerald)]">{pl('التحقق من الشهادة', 'Verify certificate')}</button></section>}
-        <div className="text-center"><button onClick={() => { localStorage.removeItem(storageKey); setJourney(null); setToken(''); setInput(''); setError(''); }} className="min-h-11 px-4 text-xs font-bold text-[#6b716d]">{pl('استخدام بطاقة رحلة أخرى', 'Use another journey pass')}</button></div>
+        <div className="text-center"><button onClick={() => { localStorage.removeItem(storageKey); localStorage.removeItem(familyKey); setFamily([]); setJourney(null); setToken(''); setInput(''); setError(''); }} className="min-h-11 px-4 text-xs font-bold text-[#6b716d]">{pl('استخدام بطاقة رحلة أخرى', 'Use another journey pass')}</button></div>
       </div>}
     </main>
   </div>;

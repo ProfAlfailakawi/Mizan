@@ -745,6 +745,13 @@ export interface JudgeEvent {
   penalty: number;
   reversed?: boolean;
   notes?: string;
+  /**
+   * الكلمة التي وقع عندها الخطأ، إن حدّدها المحكّم بالضغط المطوّل على نصّ المصحف.
+   * `word` من 1 داخل الآية بتقسيم `splitAyahWords`، و`text` نصّها كما عُرضت — فيقرأ
+   * رئيسُ المحكّمين والمعترِضُ السجلَّ بذاته دون إعادة بناء الصفحة. وغيابه عاديّ: العلامة
+   * العامة بالأزرار تبقى كما كانت.
+   */
+  locus?: { surah: number; ayah: number; word: number; text?: string };
 }
 
 export interface JudgeSubmission {

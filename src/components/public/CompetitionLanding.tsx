@@ -7,6 +7,7 @@ import {
   FileText, Gavel, Award, Check, KeyRound, Hourglass, DoorOpen, Lock, Radio, Sparkles, BadgeCheck, Building2, Star, Moon, Feather, Gem
 } from 'lucide-react';
 import { buildWinnersArchive } from '../../lib/winners-archive';
+import { publicPrizes } from '../../lib/award-places';
 import { useAppStore } from '../../lib/store';
 import { MizanLogo } from '../design-system/MizanLogo';
 import { useJourneyReveal } from '../dna/useJourneyReveal';
@@ -90,6 +91,8 @@ export const CompetitionLanding: React.FC = () => {
   const period = periodText(competition.startDate, competition.endDate, ar);
   const venue = (competition.venueName || '').trim();
   const categories = competition.categories || [];
+  /* الجوائز المعلنة فقط: مركزٌ بلا نصّ جائزةٍ لا يُعرض، ومسابقةٌ بلا جوائز لا تظهر لها خانة فارغة. */
+  const prizes = useMemo(() => publicPrizes(competition.policy?.results?.awards, ar), [competition.policy?.results?.awards, ar]);
   const status = competition.status;
 
   /* هوية الجهة: ما وُجد فعلًا فقط. شعار المسابقة يتقدّم على شعار الجهة. */
@@ -270,6 +273,21 @@ export const CompetitionLanding: React.FC = () => {
             )}
           </div>
         </section>
+
+        {prizes.length > 0 && (
+          <section className="mt-16" data-competition-prizes>
+            <div className="text-[11px] font-black tracking-[.16em] text-[#6f6a5c]">{ar ? 'الجوائز' : 'PRIZES'}</div>
+            <h2 className="text-2xl sm:text-3xl font-black mt-1.5">{ar ? 'ما ينتظر المتميّزين' : 'What awaits the winners'}</h2>
+            <ol className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {prizes.map(p => (
+                <li key={p.rank} className="rounded-2xl border border-[#e3ddcf] bg-white px-5 py-4">
+                  <div className="text-[11px] font-black text-[#6f6a5c]">{p.title}</div>
+                  <div className="mt-1 text-lg font-black leading-7 text-[#17221e]">{p.prize}</div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         {/* ── الفروع ─────────────────────────────────────────────────────────
             بطاقةٌ لا تعرض حقلًا فارغًا: الرواية ونطاق الحفظ والعمر تظهر إن وُجدت. */}

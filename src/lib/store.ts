@@ -1857,10 +1857,15 @@ export function useAppStore() {
   };
 
   // JudgeOS Actions
-  const recordJudgeEvent = (type: JudgeEventType) => {
+  const recordJudgeEvent = (type: JudgeEventType, locus?: JudgeEvent['locus']) => {
     if (globalState.activeSession.isLocked || globalState.activeSession.questionPhase!=='RECITING') return;
     const action = getEnabledJudgeActions(globalState.competition).find(a => a.eventType === type);
     if (!action) return;
+    /* موضعٌ غير سليم يُسقَط ولا يُخمَّن: العلامة تُسجَّل عامّةً بدل أن تُنسب إلى كلمةٍ غير مقصودة. */
+    const validLocus = locus && Number.isInteger(locus.surah) && locus.surah >= 1 && locus.surah <= 114
+      && Number.isInteger(locus.ayah) && locus.ayah >= 1 && Number.isInteger(locus.word) && locus.word >= 1
+      ? { surah: locus.surah, ayah: locus.ayah, word: locus.word, ...(locus.text ? { text: String(locus.text).slice(0, 64) } : {}) }
+      : undefined;
 
     const newEvent: JudgeEvent = {
       id: newId('ev'),
@@ -1872,7 +1877,8 @@ export function useAppStore() {
       relativeSeconds: sessionElapsedSeconds(),
       type,
       criterion: action.criterion === 'custom' ? 'performance' : action.criterion,
-      penalty: action.penalty
+      penalty: action.penalty,
+      ...(validLocus ? { locus: validLocus } : {})
     };
 
     globalState.activeSession.events = [...globalState.activeSession.events, newEvent];
