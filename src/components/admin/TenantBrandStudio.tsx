@@ -690,7 +690,7 @@ export const TenantBrandStudio: React.FC<TenantBrandStudioProps> = ({
 
             {/* معاينة تباين الشعار وخلفياته */}
             <div className="pt-2 border-t border-[#EAE8E1]">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <span className="text-[13px] font-bold text-[color:var(--muted)]">{ar ? 'فحص الشفافية والتباين على أسطح النظام:' : 'Contrast & transparency test:'}</span>
                 <div className="flex gap-1 text-xs font-bold">
                   {([

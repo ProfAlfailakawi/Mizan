@@ -152,7 +152,7 @@ const Kpis: React.FC<{ input: SheetInput }> = ({ input }) => {
     [scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2) : '—', ar ? 'متوسط الدرجات' : 'average score'],
     [String(reportable.filter(r => r.status === 'sealed' || r.status === 'published').length), ar ? 'مختومة' : 'sealed'],
   ];
-  return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 16 }}>
+  return <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(76px,1fr))', gap: 8, marginBottom: 16 }}>
     {tiles.map(([v, l]) => <div key={l} style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: '10px 8px', textAlign: 'center', background: '#fbf9f3' }}>
       <div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{v}</div><div style={{ fontSize: 10, color: MUTED }}>{l}</div></div>)}
   </div>;
