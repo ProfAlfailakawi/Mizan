@@ -27,7 +27,7 @@ test('portrait on the inner screen is NOT split: no book branch for portrait, in
       const at = css.indexOf(alt);
       const body = css.slice(at, css.indexOf('\n}', at));
       // portrait is single-column: the only non-standalone portrait rule allowed is the scroller-containment fix
-      if (!/:where\(\.overflow-x-auto/.test(body)) assert.match(alt, /display-mode:standalone/, `a portrait 640-720 branch outside the widget keep-out: ${alt}`);
+      if (!/:where\(\.overflow-x-auto/.test(body)) assert.match(body, /--duo-cutout-w|mz-hd-wide/, `a portrait 640-720 branch outside the widget keep-out: ${alt}`);
     }
   }
   assert.doesNotMatch(css, /@media[^{]*min-width:640px\) and \(max-width:720px\) and \(min-height:520px\)\s*[,{]/, 'the old portrait book query is gone');
@@ -43,14 +43,14 @@ test('Duo != iPad: the book is landscape, 721-1000 wide, 520-960 tall; iPad, pho
   for (const [w, h] of [[951,585],[951,669],[951,600],[880,585],[1000,600],[800,560],[722,521],[951,850]]) assert.equal(book(w, h), true, `${w}x${h}`);
 });
 
-test('the widget keep-out is defined once, only for the standalone inner screen, and reserves a 116px corner', () => {
+test('the widget keep-out is defined once, for the inner screen in a tab and when installed, and reserves a 116px corner', () => {
   assert.equal((css.match(/--duo-cutout-w:116px/g) ?? []).length, 1);
   assert.equal((css.match(/--duo-cutout-h:116px/g) ?? []).length, 1);
   const head = css.lastIndexOf('@media', css.indexOf('--duo-cutout-w:116px'));
   const cond = css.slice(head, css.indexOf('{', head));
   const alts = cond.replace(/^@media\s*/, '').split(',');
   assert.equal(alts.length, 2);
-  for (const a of alts) assert.match(a, /^\s*screen and \(display-mode:standalone\) and /);
+  for (const a of alts) assert.match(a, /^\s*screen and \(min-width:/);
   assert.match(alts[0], /min-width:721px\) and \(max-width:1000px\) and \(min-height:520px\) and \(max-height:960px\) and \(orientation:landscape\)/);
   assert.match(alts[1], /min-width:640px\) and \(max-width:720px\) and \(min-height:520px\) and \(max-height:960px\) and \(orientation:portrait\)/);
   // physical right, whatever the direction
@@ -58,6 +58,40 @@ test('the widget keep-out is defined once, only for the standalone inner screen,
   // the top bars of the shell avoid it too
   assert.match(read('App.tsx'), /mz-topnote fixed inset-x-0 top-0/);
   assert.match(read('App.tsx'), /mz-topbar fixed top-3/);
+});
+
+/* يقيّم شرط @media الحقيقي (من CSS) على مقاسٍ معيّن: min/max-width/height وorientation وscreen فقط، وأي ميزة أخرى تُفشل الاختبار. */
+function matches(query: string, w: number, h: number, mode?: string): boolean {
+  return query.replace(/^@media\s*/, '').replace(/\{$/, '').split(',').some(alt => alt.trim().split(/\s+and\s+/).every(term => {
+    const t = term.trim();
+    if (t === 'screen') return true;
+    const m = /^\((min|max)-(width|height):(\d+)px\)$/.exec(t);
+    if (m) { const v = m[2] === 'width' ? w : h; return m[1] === 'min' ? v >= +m[3] : v <= +m[3]; }
+    if (t === '(orientation:landscape)') return w > h;
+    if (t === '(orientation:portrait)') return w <= h;
+    if (t === `(display-mode:${mode})`) return true;
+    throw new Error(`unsupported media term: ${t}`);
+  }));
+}
+
+test('the keep-out matches the Duo inner screen only, whatever the display mode', () => {
+  const head = css.lastIndexOf('@media', css.indexOf('--duo-cutout-w:116px'));
+  const cond = css.slice(head, css.indexOf('{', head));
+  assert.doesNotMatch(cond, /display-mode/, 'no display-mode in the keep-out condition');
+  const portraitOnly = css.slice(css.indexOf('/* الطولي: الشعار'), css.indexOf('/* الطولي: الشعار') + 700).match(/@media[^{]*\{/)![0];
+  assert.doesNotMatch(portraitOnly, /display-mode/);
+  for (const [w, h] of [[951,669],[951,585],[669,867],[720,900],[640,700],[721,520],[1000,960],[951,850]]) {
+    assert.equal(matches(cond, w, h), true, `${w}x${h} keeps out`);
+    assert.equal(matches(cond, w, h, 'standalone'), true, `${w}x${h} keeps out when installed`);
+  }
+  for (const [w, h] of [[390,844],[844,390],[932,430],[430,932],[744,1024],[820,1180],[1024,768],[1180,820],[1280,800],[1440,900],[1366,1024],[367,740],[951,350],[600,350],[669,500],[641,961],[1001,700]]) {
+    assert.equal(matches(cond, w, h), false, `${w}x${h} must not keep out`);
+    assert.equal(matches(cond, w, h, 'standalone'), false, `${w}x${h} must not keep out when installed`);
+  }
+  assert.equal(matches(portraitOnly, 669, 867), true);
+  assert.equal(matches(portraitOnly, 951, 585), false);
+  assert.equal(matches(portraitOnly, 744, 1024), false);
+  for (const f of ['components/layout/Spread.tsx', 'App.tsx']) assert.doesNotMatch(read(f), /matchMedia\([^)]*standalone/, f);
 });
 
 test('Spread decides nothing from the viewport in JavaScript', () => {
