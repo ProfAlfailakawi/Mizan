@@ -91,6 +91,14 @@ const SCREENS = [
     await settle(p, 1500);
     await clickText(p, /متابعة بلا ميكروفون/);
   } },
+  { id: 'judge-cockpit-approval', label: 'المحكّم: القمرة — بوابة الموافقة', go: async p => {
+    await asRole(p, 'judge'); await clickText(p, /ابدأ مع المتسابق التالي/); await settle(p, 1500);
+    await clickText(p, /متابعة بلا ميكروفون/); await clickText(p, /المتسابق أمامي/);
+  } },
+  { id: 'judge-cockpit-open', label: 'المحكّم: القمرة — الموضع مفتوح (بيئة العرض، في الذاكرة)', go: async p => {
+    await asRole(p, 'judge'); await clickText(p, /ابدأ مع المتسابق التالي/); await settle(p, 1500);
+    await clickText(p, /متابعة بلا ميكروفون/); await clickText(p, /المتسابق أمامي/); await clickText(p, /أوافق على فتح السؤال/);
+  } },
   { id: 'participant', label: 'المتسابق', go: p => asRole(p, 'participant') },
   { id: 'comp-overview', label: 'مدير المسابقة: نظرة', go: p => asRole(p, 'comp_admin') },
   { id: 'comp-participants', label: 'مدير المسابقة: المشاركون', go: async p => { await asRole(p, 'comp_admin'); await clickText(p, /^المشاركون$/); } },
@@ -264,6 +272,7 @@ async function runLive() {
 
   /* (1) مدير المسابقة: بحثٌ مكتوب في «المشاركون» + موضع التمرير + القسم المختار */
   await asRole(p, 'comp_admin'); await clickText(p, /^المشاركون$/);
+  await p.waitForSelector('[data-mz-view="participants"] input[placeholder="اسم أو كود"]', { timeout: 15000 }).catch(() => {});
   const search = p.locator('[data-mz-view] input[placeholder="اسم أو كود"], input[type="search"], input[placeholder*="بحث"], input[placeholder*="ابحث"]').first();
   const typed = 'A-10';
   const hasSearch = await search.count();
@@ -341,12 +350,15 @@ async function runStress() {
     { id: 'reduced-motion', sizes: [[669, 867], [951, 585]], reducedMotion: 'reduce' },
     { id: 'safe-area-asym', sizes: [[669, 867], [951, 585], [382, 580]], css: 'body{padding:47px 0 34px 0 !important} .mizan-shell-main{padding-left:12px !important;padding-right:44px !important} .mz-el-header{padding-top:47px !important}' },
   ];
-  const screens = ['judge-wait', 'participant', 'comp-overview', 'org'];
+  const screens = ['login', 'judge-wait', 'judge-cockpit', 'participant', 'comp-overview', 'head-judge', 'ops', 'org'];
   for (const c of cases) {
     const ctx = await browser.newContext({ locale: 'ar', deviceScaleFactor: 1, hasTouch: true, viewport: { width: 951, height: 585 }, colorScheme: c.colorScheme || 'light', reducedMotion: c.reducedMotion || 'no-preference' });
-    await quiet(ctx); const p = await ctx.newPage();
+    await quiet(ctx); const shared = await ctx.newPage();
     for (const id of screens) {
-      const s = SCREENS.find(x => x.id === id); await s.go(p);
+      const s = SCREENS.find(x => x.id === id);
+      /* شاشةٌ تبدأ من صفحةٍ نظيفة (الدخول) لا تُفتح في جلسة العرض المشتركة. */
+      const p = s.fresh ? await ctx.newPage() : shared;
+      await s.go(p);
       if (c.css) await p.addStyleTag({ content: c.css });
       for (const [w, h] of c.sizes) {
         await p.setViewportSize({ width: w, height: h }); await settle(p, 400);
@@ -355,6 +367,7 @@ async function runStress() {
         report.stress.push({ case: c.id, screen: id, size: `${w}x${h}`, overflowX: m.overflowX, offscreen: cap(m.offscreen), clipped: cap(m.clipped), crossing: cap(m.crossing, 8), leafEscape: cap(m.leafEscape), infiniteAnimations: motion });
       }
       if (c.css) await p.evaluate(() => document.querySelectorAll('style').forEach(st => { if (/200%|47px 0 34px/.test(st.textContent)) st.remove(); }));
+      if (s.fresh) await p.close();
     }
     await ctx.close();
   }
@@ -435,10 +448,11 @@ async function runSubscreens() {
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
-if (ONLY.includes('matrix')) { console.log('matrix'); await runMatrix(); }
-if (ONLY.includes('live')) { console.log('live'); await runLive(); }
-if (ONLY.includes('stress')) { console.log('stress'); await runStress(); }
-if (ONLY.includes('subscreens')) { console.log('subscreens'); await runSubscreens(); }
+const phase = async (name, fn) => { try { await fn(); } catch (e) { report.notes.push(`${name} aborted: ${String(e.message || e).slice(0, 200)}`); console.log(`  ${name} aborted`); } };
+if (ONLY.includes('matrix')) { console.log('matrix'); await phase('matrix', runMatrix); }
+if (ONLY.includes('live')) { console.log('live'); await phase('live', runLive); }
+if (ONLY.includes('stress')) { console.log('stress'); await phase('stress', runStress); }
+if (ONLY.includes('subscreens')) { console.log('subscreens'); await phase('subscreens', runSubscreens); }
 await browser.close();
 
 /* ملخّص يُقرأ بلا فتح الملف */
