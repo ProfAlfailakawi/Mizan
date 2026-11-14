@@ -24,10 +24,11 @@ test('isAppleNativeShell is true only for native iOS', () => {
   withWindow({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'ios' } }, () => assert.equal(isAppleNativeShell(), true));
 });
 
-test('marketing page renders the /demo link only behind isAppleNativeShell()', () => {
+test('marketing page demo entry is a plain /demo link (web and iOS shell alike), with no price or purchase UI', () => {
   const src = fs.readFileSync('src/components/marketing/MarketingSite.tsx', 'utf8');
-  const matches = src.match(/href="\/demo"/g) || [];
-  assert.equal(matches.length, 1);
-  assert.match(src, /isAppleNativeShell\(\) && <a href="\/demo"/);
+  assert.match(src, /const DEMO_HREF = '\/demo';/);
+  assert.equal((src.match(/href="\/demo"/g) || []).length, 0, 'literal hrefs go through DEMO_HREF');
   assert.match(src, /جرّب العرض التجريبي/);
+  // the iOS build must never gain a price/purchase surface through the marketing page
+  assert.doesNotMatch(src, /(\bSAR\b|\bUSD\b|\$\s?\d|StoreKit|اشترِ|اشتر الآن|الأسعار)/);
 });

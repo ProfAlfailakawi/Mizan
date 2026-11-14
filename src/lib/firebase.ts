@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { resolveAuthDomain } from './auth-domain';
 import rawConfig from '../../firebase-applet-config.json';
 
 /*
@@ -26,7 +27,8 @@ if(!apiKey) throw new Error('VITE_FIREBASE_API_KEY is required. MIZAN has no una
 
 const firebaseConfig = {
   apiKey,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain || undefined,
+  /* مضيف الخدمة نفسه إن كان في القائمة الصريحة (يمنع تقسيم التخزين في Safari)، وإلا الإعداد الأصلي. */
+  authDomain: resolveAuthDomain(env.VITE_FIREBASE_AUTH_DOMAIN || config.authDomain || undefined, undefined),
   projectId: env.VITE_FIREBASE_PROJECT_ID || config.projectId,
   storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || config.storageBucket || undefined,
   messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || config.messagingSenderId || undefined,

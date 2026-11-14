@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getIdTokenResult, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
+import { completeRedirectSignIn } from './sso-signin';
 import { useAppStore } from './store';
 import { prepareAuthenticatedCloudScope } from './auth-cloud-rehydration';
 import { Role } from '../types';
@@ -116,6 +117,8 @@ export function useMizanAuth(requireAuth: boolean) {
 
   useEffect(() => {
     if (!requireAuth) return;
+    /* يُنهي دخولًا بدأ بتحويل الصفحة (احتياط النافذة المحجوبة على iPhone)؛ الحالة تصل بعدها عبر onAuthStateChanged. */
+    void completeRedirectSignIn();
     return onAuthStateChanged(auth, async (user) => {
       if (!user) { setSignedIn(false); setAuthReady(true); return; }
       try {
