@@ -378,7 +378,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <input value={zone.nameArabic || zone.name} onChange={e => patchZone(index, { nameArabic: e.target.value, name: e.target.value })}
                     aria-label={ar ? `اسم المنطقة ${index + 1}` : `Zone ${index + 1} name`}
-                    className="min-w-0 flex-1 border-0 bg-transparent text-sm font-black text-[#24302b] outline-none" />
+                    className="min-w-11 flex-1 border-0 bg-transparent text-sm font-black text-[#24302b] outline-none" />
                   <div className="flex items-center gap-2">
                     <NumberBox ar={ar} compact label={ar ? 'أسئلة' : 'Questions'} value={zone.requiredQuestionCount} min={0} max={20} onChange={v => patchZone(index, { requiredQuestionCount: v })} />
                     <Button size="sm" shape="square" variant="ghost" aria-label={ar ? 'حذف المنطقة' : 'Remove zone'} icon={<Trash2 className="h-4 w-4" />} onClick={() => setPlan(asCommitteeZones({ ...draft, zones: draft.zones.filter((_, i) => i !== index) }))} />
@@ -386,7 +386,7 @@ const DistributionTab: React.FC<{ store: Store; ar: boolean; category?: Category
                 </div>
                 <p className="mt-1 text-xs font-bold text-[#5b6460]">{describeZone(zone, ar)}</p>
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs font-black text-[color:var(--emerald-2)]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
+                  <summary className="flex min-h-11 cursor-pointer items-center text-xs font-black text-[color:var(--emerald-2)]">{ar ? 'تعديل نطاق هذه المنطقة' : 'Edit this zone range'}</summary>
                   <div className="mt-3"><QuranScopePicker value={zone.scope} onChange={next => patchZone(index, { scope: next })} arabic={ar} parentScope={scope} idPrefix={`zone-${zone.id}`} /></div>
                 </details>
               </li>
@@ -643,7 +643,7 @@ const NumberBox: React.FC<{ ar: boolean; label: string; value: number; min: numb
       <button type="button" className="mizan-step-btn" aria-label={`إنقاص ${label}`} onClick={() => onChange(Math.max(min, value - step))}>−</button>
       <input type="number" inputMode="numeric" min={min} max={max} value={value} aria-label={label}
         onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || min)))}
-        className="min-w-0 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
+        className="min-w-11 flex-1 border-0 bg-transparent text-center text-sm font-black tabular-nums outline-none" />
       <button type="button" className="mizan-step-btn" aria-label={`زيادة ${label}`} onClick={() => onChange(Math.min(max, value + step))}>+</button>
     </div>
     {hint && <span className="mt-1 block text-xs leading-5 text-[color:var(--muted)]">{hint}</span>}

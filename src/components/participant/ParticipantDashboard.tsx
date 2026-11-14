@@ -1,3 +1,4 @@
+import { Spread } from '../layout/Spread';
 import { displayTime, displayNumber } from '../../lib/display-format';
 import React, { useMemo, useRef, useState } from 'react';
 import { DnaRing, DnaStepper } from '../dna/DnaKit';
@@ -125,10 +126,10 @@ export const ParticipantDashboard: React.FC = () => {
   * بينما الاختبار الذكي نفسه يستطيع أن يحمل الصفحة والتلاوة والتغذية الراجعة. */
  const practiceEngine=practiceReadingFor(practiceReading);
 
- return <div className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
-  <section className="mizan-surface mz-pt-hero p-6 sm:p-8"><div className="flex flex-col-reverse items-start gap-y-2 sm:flex-row sm:flex-wrap-reverse sm:justify-between sm:gap-x-4"><div className="min-w-[12rem] max-w-full flex-1"><div className="mizan-code whitespace-nowrap" dir="ltr">{formatParticipantCode(participant.code)}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="font-display text-3xl sm:text-4xl font-black mt-2 [overflow-wrap:anywhere]">{displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)}</h1><p className="text-xs text-[color:var(--muted)] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(status,ar)}</Badge></div><DnaStepper className="!mt-7" size="md" reveal={step<5} playKey={`dash:${participant.id}`} ariaLabel={ar?'مراحل رحلتك':'Your journey'} stateText={ar?{current:'أنت هنا',pending:'لاحقًا'}:{done:'done',current:'you are here',pending:'upcoming',returned:'returned',blocked:'blocked'}} steps={[1,2,3,4,5].map(n=>({key:String(n),label:ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en,state:n<step?'done':n===step?'current':'pending'}))}/></section>
+ return <Spread className="max-w-3xl mx-auto px-4 sm:px-6 py-7 space-y-4">
+  <section data-duo="aside" className="mizan-surface mz-pt-hero p-6 sm:p-8"><div className="flex flex-col-reverse items-start gap-y-2 sm:flex-row sm:flex-wrap-reverse sm:justify-between sm:gap-x-4"><div className="min-w-[12rem] max-w-full flex-1"><div className="mizan-code whitespace-nowrap" dir="ltr">{formatParticipantCode(participant.code)}<small>{ar?'رقم وصولك':'your arrival code'}</small></div><h1 className="font-display text-3xl sm:text-4xl font-black mt-2 [overflow-wrap:anywhere]">{displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)}</h1><p className="text-xs text-[color:var(--muted)] mt-1">{localizedCountry(participant.country,ar)} · {participant.riwaya}</p></div><Badge>{statusText(status,ar)}</Badge></div><DnaStepper className="!mt-7" size="md" reveal={step<5} playKey={`dash:${participant.id}`} ariaLabel={ar?'مراحل رحلتك':'Your journey'} stateText={ar?{current:'أنت هنا',pending:'لاحقًا'}:{done:'done',current:'you are here',pending:'upcoming',returned:'returned',blocked:'blocked'}} steps={[1,2,3,4,5].map(n=>({key:String(n),label:ar?STEP_LABELS[n-1].ar:STEP_LABELS[n-1].en,state:n<step?'done':n===step?'current':'pending'}))}/></section>
 
-  {(canPrepare||hasRecord)&&<div className="mizan-tabs" role="tablist" aria-label={ar?'أقسام صفحتك':'Your sections'}>
+  {(canPrepare||hasRecord)&&<div data-duo="aside" className="mizan-tabs" role="tablist" aria-label={ar?'أقسام صفحتك':'Your sections'}>
    <TabButton active={activeTab==='journey'} onClick={()=>setTab('journey')} icon={MapPin} label={ar?'دورك':'Your turn'}/>
    {canPrepare&&<TabButton active={activeTab==='prepare'} onClick={()=>setTab('prepare')} icon={Sparkles} label={ar?'استعدادك':'Prepare'}/>}
    {hasRecord&&<TabButton active={activeTab==='record'} onClick={()=>setTab('record')} icon={Award} label={ar?'سجلّك':'Your record'}/>}
@@ -215,7 +216,7 @@ export const ParticipantDashboard: React.FC = () => {
   {showReceipt&&(()=>{const receipt=store.getFairnessReceipt(participant.id);return receipt?<FairnessReceipt receipt={receipt} ar={ar} participantName={displayParticipantName(ar?participant.fullNameArabic||participant.fullName:participant.fullName||participant.fullNameArabic,participant.code,ar)} competitionName={ar?competition.nameArabic||competition.name:competition.name} onClose={()=>setShowReceipt(false)}/>:null})()}
   {showCert&&cert&&<CertificateModal cert={cert} ar={ar} showScore={getCompetitionPolicy(competition).certificates.showScore} onClose={()=>setShowCert(false)}/>}
 
- </div>
+ </Spread>
 }
 const TabButton=({active,onClick,icon:Icon,label}:{active:boolean;onClick:()=>void;icon:React.ComponentType<{className?:string}>;label:string})=><button type="button" role="tab" aria-selected={active} onClick={onClick} className={`mizan-tab ${active?'is-active':''}`}><Icon className="w-4 h-4"/>{label}</button>;
 const statusStep=(s:string)=>s==='draft'||s==='submitted'||s==='under_review'?1:s==='approved'?2:s==='checked_in'||s==='in_queue'?3:s==='in_session'?4:5;

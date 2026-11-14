@@ -662,8 +662,8 @@ export const SsoSettingsPanel: React.FC = () => {
       {form.roleMapping.map((m: any, i: number) => <div key={i} className="mb-2 flex flex-wrap gap-2">
         <input aria-label={ar ? 'المجموعة' : 'Group'} className={`${inputCls} max-w-xs`} dir="ltr" value={m.group} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, group: e.target.value } : x) })} />
         <select aria-label={ar ? 'الدور' : 'Role'} className={`${inputCls} max-w-[12rem]`} value={m.role} onChange={e => setForm({ ...form, roleMapping: form.roleMapping.map((x: any, j: number) => j === i ? { ...x, role: e.target.value } : x) })}>{SSO_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
-        <button type="button" className="text-xs font-bold text-[color:var(--danger)]" onClick={() => setForm({ ...form, roleMapping: form.roleMapping.filter((_: any, j: number) => j !== i) })}>{ar ? 'حذف' : 'Remove'}</button></div>)}
-      <button type="button" aria-label={ar ? 'إضافة ربط مجموعة بدور' : 'Add group-to-role mapping'} className="text-xs font-bold text-[color:var(--emerald)] underline" onClick={() => setForm({ ...form, roleMapping: [...form.roleMapping, { group: '', role: 'judge' }] })}>+</button>
+        <button type="button" className="min-w-11 min-h-11 px-2 text-xs font-bold text-[color:var(--danger)]" onClick={() => setForm({ ...form, roleMapping: form.roleMapping.filter((_: any, j: number) => j !== i) })}>{ar ? 'حذف' : 'Remove'}</button></div>)}
+      <button type="button" aria-label={ar ? 'إضافة ربط مجموعة بدور' : 'Add group-to-role mapping'} className="min-w-11 min-h-11 px-2 text-xs font-bold text-[color:var(--emerald)] underline" onClick={() => setForm({ ...form, roleMapping: [...form.roleMapping, { group: '', role: 'judge' }] })}>+</button>
     </fieldset>
     <Button onClick={() => void save()}>{ct(locale, 'save')}</Button>
     <div className="flex flex-wrap items-end gap-2 rounded-xl border border-[#e5e3dc] p-3">

@@ -207,7 +207,7 @@ export const MarketingSite: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen font-arabic overflow-x-clip" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
+    <div className="mz-mk min-h-screen font-arabic overflow-x-clip" style={{ background: 'var(--canvas)', color: 'var(--ink)' }}>
 
       {/* ══ شريط علوي: العلامة وحدها. لا دخول — كل جهة تدخل من نطاقها ══ */}
       <header className="sticky top-0 z-40 backdrop-blur" style={{ background: 'rgba(247,245,239,.86)', borderBottom: '1px solid var(--line)' }}>

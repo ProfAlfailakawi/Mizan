@@ -21,7 +21,7 @@ const Frame: React.FC<{ children: React.ReactNode; rtl: boolean; language: strin
         </div>
       </header>
       <div className="relative z-10 flex-1">{children}</div>
-      <footer className="no-print relative z-10 border-t border-[var(--line)] px-4 py-6 text-center text-[11px] text-[var(--muted)]">
+      <footer className="mz-public-foot no-print relative z-10 border-t border-[var(--line)] px-4 py-6 text-center text-[11px] text-[var(--muted)]">
         {t('ميزان — منظومة المسابقات القرآنية', 'MIZAN — Quran competition platform')}
       </footer>
     </div>

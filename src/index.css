@@ -1296,7 +1296,7 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   padding:1.1rem 1.4rem; border-bottom:1px solid var(--line); background:var(--surface-soft); }
 .mizan-dialog-title{ font-size:calc(17px * var(--mizan-text-scale)); font-weight:700; color:var(--ink); }
 .mizan-dialog-sub{ font-size:calc(12px * var(--mizan-text-scale)); color:var(--muted); margin-top:.15rem; }
-.mizan-dialog-close{ width:40px; height:40px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
+.mizan-dialog-close{ width:44px; height:44px; border-radius:999px; display:grid; place-items:center; flex:0 0 auto;
   color:var(--muted); transition:background .15s ease, color .15s ease; }
 .mizan-dialog-close:hover{ background:#eceae3; color:var(--ink); }
 @media (min-width:640px) and (pointer:coarse){ .mizan-dialog-close{ width:44px; height:44px } }
@@ -2098,6 +2098,22 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover, input[type="date"]:
   html[data-demo-bar="on"] .mizan-venue-lock-dock{ bottom:calc(var(--mizan-demo-bar-h,3.5rem) + 1rem); }
 }
 
+/* مصطلحات «اشرح لي هذه الواجهة»: كان سطر العنوان القابل للفتح بارتفاع 16px. هدف لمسٍ كامل. */
+.mz-guide-sheet summary{ min-height:44px; padding-block:.8rem }
+
+/* أزرار الروايات في «الفئات» (`min-h-10` = 40px): أرضية اللمس 44px في كل مقاس. */
+button.min-h-10{ min-height:44px }
+
+/* زرٌّ في عمود شبكة (أزرار بطاقة الجهة/المشغّل): كان `nowrap` يجعل عرض العمود بطول التسمية
+   فتخرج الأزرار من البطاقة في الهاتف والورقة الضيّقة. التسمية تلتفّ سطرين بدل أن تخرج. */
+/* زرٌّ لا يتجاوز حاويته أبدًا: التسمية الطويلة تُختصر داخل الزرّ (`truncate`) بدل أن يخرج الزرّ
+   من البطاقة إلى خارج الشاشة (إضافة مستخدم في 320px). */
+.mizan-btn{ max-width:100% }
+.grid > .mizan-btn{ min-width:0; white-space:normal }
+/* وبطاقةٌ في شبكةٍ بلا أعمدة صريحة (قائمة الجهات/المشغّلين) لا يمدّها أطولُ سطرٍ فيها خارج الشاشة. */
+.grid > .mizan-panel{ min-width:0 }
+.grid > .mizan-btn > .truncate{ white-space:normal }
+
 /* A checkbox's label is its hit area: at least 44px on every viewport. */
 label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min-width:44px; }
 
@@ -2174,16 +2190,241 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mz-el-mnav > .grid{ grid-template-columns:repeat(8,minmax(0,1fr)); gap:.3rem }
   .mz-el-mnav button{ min-height:48px; padding-inline:2px }
 }
+/* وضع الحاسوب المحمول (النصف السفلي مسنود: 951×350، 600×350، 594×368): المحتوى فوق، وأدوات
+   التنقّل تحت اليد. شريط الأقسام الثمانية يثبت أسفل الشاشة صفًّا واحدًا، ويُحجز له مكانه أسفل
+   الصفحة فلا يغطّي سطرًا. وفي بيئة العرض يقف فوق شريطها المثبّت (من 640px). */
+@media (orientation:landscape) and (min-width:560px) and (max-width:1023.98px) and (max-height:480px){
+  body:has(.mz-el-mnav){ padding-bottom:calc(3.6rem + env(safe-area-inset-bottom,0px)) }
+  .mz-el-mnav{
+    position:fixed; z-index:45; inset-inline:0; bottom:0; margin:0;
+    padding:.4rem max(.75rem, env(safe-area-inset-left,0px)) calc(.4rem + env(safe-area-inset-bottom,0px)) max(.75rem, env(safe-area-inset-right,0px));
+    background:color-mix(in srgb, var(--canvas) 94%, transparent); border-top:1px solid var(--line);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  .mz-el-mnav > .grid{ grid-template-columns:repeat(8,minmax(0,1fr)); gap:.3rem; max-width:1100px; margin-inline:auto }
+  /* شريطٌ نحيف: أيقونة صغيرة وتسمية، 46px للّمس، فيبقى للمحتوى أكثر من ثلثي الارتفاع. */
+  nav.mz-el-mnav button{ min-height:46px; padding:3px 2px; gap:1px }
+  nav.mz-el-mnav button svg{ width:18px; height:18px }
+}
+/* وبالمنطق نفسه: تبويبات الصفحة الرئيسة (المتسابق، رئيس التحكيم، غرفة القيادة) — وهي على ورقة
+   السياق — تصير الشريط السفلي، وبطاقة هوية المتسابق تنضغط فيبقى للحالة نفسها مكانٌ فوق. */
+@media (orientation:landscape) and (min-width:560px) and (max-width:1023.98px) and (max-height:480px){
+  body:has(.mz-leaf-b > .mizan-tabs){ padding-bottom:calc(3.75rem + env(safe-area-inset-bottom,0px)) }
+  .mz-leaf-b > .mizan-tabs{
+    position:fixed; z-index:45; inset-inline:0; bottom:0; margin:0; width:auto; max-width:none;
+    display:flex; flex-wrap:nowrap; gap:.3rem; border-radius:0; border-width:1px 0 0;
+    padding:.35rem max(.75rem, env(safe-area-inset-left,0px)) calc(.35rem + env(safe-area-inset-bottom,0px)) max(.75rem, env(safe-area-inset-right,0px));
+    background:color-mix(in srgb, var(--canvas) 94%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  }
+  div.mz-leaf-b > .mizan-tabs > *{ flex:1 1 0; min-width:0; min-height:46px; justify-content:center; text-align:center; white-space:normal; overflow-wrap:normal; word-break:normal; font-size:12px; line-height:1.2; padding-inline:.35rem }
+  .mizan-surface.mz-pt-hero{ padding:.85rem 1.25rem }
+  .mizan-surface.mz-pt-hero h1{ font-size:1.6rem }
+}
+@media (orientation:landscape) and (min-width:640px) and (max-width:1023.98px) and (max-height:480px){
+  html[data-demo-bar="on"] .mz-leaf-b > .mizan-tabs{ bottom:var(--mizan-demo-bar-h,3.5rem) }
+}
+@media (orientation:landscape) and (min-width:800px) and (max-width:1023.98px) and (max-height:480px){
+  nav.mz-el-mnav button{ flex-direction:row; gap:.4rem }
+}
+@media (orientation:landscape) and (min-width:640px) and (max-width:1023.98px) and (max-height:480px){
+  html[data-demo-bar="on"] .mz-el-mnav{ bottom:var(--mizan-demo-bar-h,3.5rem) }
+}
 
-/* 3) وضع الكتاب (مطويّ جزئيًّا، الطيّ عمودي): تحسينٌ تدريجي فقط. Safari 27.1 يُبقي
+/* 3) صفحتا الكتاب: الشاشة الداخلية مفتوحةً (جولة 2026-11-14). Safari لا يُعلن المفصل، فالقرار
+   من مساحة النافذة: عرض 640–760 طوليًّا (كتاب طولي 669×867، ونصفه القصير 669×520)، أو عرض
+   640–1000 عرضيًّا بارتفاع 520–720 (كتاب عرضي 951×585). الآيباد (768×1024 و1024×768)
+   والهاتف والحاسوب خارج الشرط فلا يتغيّر فيها شيء.
+   الفكرة: صفحتان لا صفحةٌ ممدودة. كعبٌ هادئ في المنتصف (28–36px) بظلّ طيٍّ خفيف وخطٍّ شعري،
+   والخلفية متّصلة من الحافة إلى الحافة. ورقة العمل يمنى (بداية القراءة)، وورقة السياق يسرى.
+   ولا نصّ ولا حقل ولا زرّ يقع على الكعب: كل ورقة تنتهي قبله بهامش. الأوراق تأتي من `Spread`
+   (src/components/layout/Spread.tsx) أو من صنفٍ على الصفحة نفسها، والتخطيط هنا CSS خالص:
+   تغيّر المقاس لا يُعيد تركيب أي مكوّن، فالتسجيل والتشغيل والحقول تبقى كما هي. */
+@media (min-width:640px) and (max-width:759.98px) and (min-height:520px),
+       (orientation:landscape) and (min-width:640px) and (max-width:1000px) and (min-height:520px) and (max-height:720px){
+  :root{
+    --duo-spine:clamp(28px,3.6vw,36px);
+    --duo-gutter:clamp(14px,2.4vw,24px);
+    /* المسافة بين الورقتين = الكعب + هامش كل ورقة من جهته */
+    --duo-gap:calc(var(--duo-spine) + 2 * var(--duo-gutter));
+    --duo-pin-top:calc(4rem + 1rem);
+  }
+
+  /* الكعب: يُرسم حين تكون على الشاشة صفحةٌ بورقتين فقط، فلا يمرّ فوق صفحةٍ لم تُقسَم. */
+  body:has(.mz-spread,.mz-login-book,.mz-onepage,.mz-mk)::after{
+    content:""; position:fixed; z-index:1; top:0; bottom:0; left:50%;
+    width:var(--duo-spine); transform:translateX(-50%); pointer-events:none;
+    background:
+      linear-gradient(90deg, transparent, rgba(14,44,47,.14) 50%, transparent) 50% 0 / 1px 100% no-repeat,
+      linear-gradient(90deg, rgba(14,44,47,0) 0%, rgba(14,44,47,.035) 30%, rgba(14,44,47,.075) 50%, rgba(14,44,47,.035) 70%, rgba(14,44,47,0) 100%);
+  }
+
+  /* الورقتان: عمودان متساويان بينهما الكعب. الأولى في المصدر هي اليمنى في العربية. */
+  .mz-spread{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+    align-items:start; max-width:none; margin-inline:0; padding-inline:var(--duo-gutter);
+  }
+  .mz-spread > .mz-leaf{ grid-row:1; min-width:0; margin:0 }
+  .mz-spread > .mz-leaf-a{ grid-column:1 }
+  .mz-spread > .mz-leaf-b{ grid-column:2; position:sticky; top:var(--duo-pin-top) }
+  .mz-leaf:empty{ display:none }
+  /* عنوان البوابة على ورقة السياق: صفحة افتتاح بخطٍّ ذهبيٍّ رفيع تحته، لا سطرٌ معلّق. */
+  .mz-leaf-b > .mz-portal-head{ padding-bottom:1rem; border-bottom:1px solid color-mix(in srgb, var(--amber) 32%, transparent) }
+  /* تبويبات في ورقة السياق: شريطٌ بعرض الورقة، الخانات متساوية، لا التفافٌ إلى سطرين. */
+  .mz-leaf > .mizan-tabs:not(.mz-bp-tabgrid){ display:flex; flex-wrap:nowrap; width:100% }
+  .mz-leaf > .mizan-tabs:not(.mz-bp-tabgrid) > *{ flex:1 1 0; min-width:0; justify-content:center; padding-inline:.5rem }
+  /* جدولٌ يُمرَّر داخل ورقة: نصّه المخفيّ للقارئ الآلي (`sr-only`، مطلق الموضع) كان يحسب موضعه
+     من خارج الحاوية فيمدّ الصفحة كلها جانبًا. الحاوية المُمرَّرة صارت مرجعه. */
+  .mz-leaf :is(.overflow-x-auto,.overflow-auto){ position:relative }
+  /* أول بطاقة في كل ورقة تبدأ من رأسها، فتتقابل الورقتان سطرًا بسطر. */
+  .mz-leaf > :first-child{ margin-top:0 }
+  /* كل ورقة حاويةٌ تُقاس بعرضها هي لا بعرض الشاشة (انظر القاعدة بعد هذا القسم). */
+  .mz-leaf, .mz-spread-index > *{ container:mz-leaf / inline-size }
+
+  /* الترويسة: نصفان لا شريطٌ واحد. العلامة والاسم على اليمنى، والأدوات على اليسرى، والبحث
+     والشرح ينتقلان إلى قائمة «المزيد» كما في الهاتف حتى لا تصل الأدوات إلى الكعب. */
+  .mz-el-header > div:first-child{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+    max-width:none; padding-inline:var(--duo-gutter);
+  }
+  .mz-el-header > div:first-child > :last-child{ justify-self:end; min-width:0 }
+  .mz-el-header .mz-hd-wide{ display:none }
+  .mz-el-header .mizan-more{ display:block }
+  /* قائمة «المزيد» تنفتح على ورقة زرّها (اليسرى) لا على الورقة المقابلة. */
+  .mz-el-header .mizan-more > div{ inset-inline-start:auto; inset-inline-end:var(--duo-gutter); max-width:calc(50% - var(--duo-spine) / 2 - 2 * var(--duo-gutter)) }
+
+  /* الدخول: البطاقة على اليمنى، والعلامة والعنوان على اليسرى تحت محور الميزان. */
+  .mz-bp-login{ padding-inline:var(--duo-gutter) }
+  .mz-login-book{
+    max-width:none; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+    align-items:center; justify-items:center;
+  }
+  .mz-login-book > *{ grid-row:1; grid-column:1; width:min(100%, 26rem); margin-top:0 }
+  .mz-login-book > .mz-login-head{ grid-column:2 }
+
+  /* صفحةٌ ببطاقةٍ واحدة (رابط مسابقة غير متاح): البطاقة على اليمنى كاملةً، لا على الكعب. */
+  .mz-onepage{ justify-self:start; width:calc(50vw - var(--duo-spine) / 2 - var(--duo-gutter) - 1.25rem); max-width:26rem }
+
+  /* «اشرح لي هذه الواجهة»: الدليل ورقةٌ تُوضع فوق الصفحة اليسرى بعرضها، لا لوحٌ يعبر الكعب. */
+  .mz-guide-sheet{ max-width:calc(50% - var(--duo-spine) / 2) }
+
+  /* شاشة البثّ (الحفل): المشهد على الصفحة اليمنى، والترويسة والتذييل نصفان، وكعبٌ خافت
+     على الخلفية الداكنة نفسها. */
+  .mz-bp-stage > :is(header,footer){
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+  }
+  .mz-bp-stage > :is(header,footer) > *{ min-width:0 }
+  .mz-bp-stage > :is(header,footer) > :last-child:not(:first-child){ justify-self:end }
+  .mz-bp-stage > main{ justify-items:start; padding-inline:0 }
+  .mz-bp-stage > :is(header,main,footer){
+    background:
+      linear-gradient(90deg, transparent, rgba(255,255,255,.12) 50%, transparent) 50% 0 / 1px 100% no-repeat,
+      linear-gradient(90deg, transparent, rgba(0,0,0,.18) 50%, transparent) 50% 0 / var(--duo-spine) 100% no-repeat;
+  }
+  .mz-bp-stage > main > div{ width:calc(50% - var(--duo-spine) / 2 - var(--duo-gutter)) }
+
+  /* انتظار المحكّم: البداية («ابدأ مع المتسابق التالي») على اليمنى وتبقى في متناوله،
+     والطابور وتفاصيل الكشف على اليسرى. */
+  .mizan-judge-wait.mz-spread{ padding-block:2.5rem }
+  .mizan-judge-wait > .mz-leaf-a{ position:sticky; top:var(--duo-pin-top) }
+  .mizan-judge-wait > .mz-leaf-b{ position:static }
+
+  /* إدارة المسابقة: القسم المفتوح على اليمنى، وفهرس الأقسام الثمانية على اليسرى عمودًا واحدًا
+     كفهرس كتاب، يبقى ظاهرًا أثناء التمرير. */
+  .mz-spread-host{ max-width:none; padding-inline:0 }
+  .mz-spread-index > *{ grid-column:1; min-width:0 }
+  .mz-spread-index > .mz-el-mnav{ grid-column:2; grid-row:1 / span 3; position:sticky; top:var(--duo-pin-top); margin:0 }
+  .mz-spread-index .mz-el-mnav > .grid{ grid-template-columns:minmax(0,1fr); gap:.4rem }
+  .mz-spread-index .mz-el-mnav button{
+    flex-direction:row; justify-content:flex-start; gap:.75rem; min-height:48px; padding-inline:1rem;
+  }
+  .mz-spread-index .mz-el-mnav button > span{ text-align:start; font-size:14px }
+
+  /* النوافذ (Modal: الإشعارات، التأكيد، النماذج) والبحث السريع: نافذةٌ على الصفحة اليمنى بعرضها،
+     لا لوحٌ في المنتصف يقسمه الكعب. الستار يبقى على الشاشتين. */
+  .mizan-overlay{ justify-content:flex-start; padding-inline:var(--duo-gutter) }
+  .mizan-dialog{ width:calc(50vw - var(--duo-spine) / 2 - 2 * var(--duo-gutter)); max-width:none }
+  .mz-palette-scrim{ padding-inline:var(--duo-gutter) }
+  .mz-palette{ margin-inline:0 auto; width:calc(50vw - var(--duo-spine) / 2 - 2 * var(--duo-gutter)); max-width:none }
+
+  /* الأزرار داخل الورقة لا تخرج منها: صفّ الأزرار يلتفّ، والتسمية الطويلة تنكسر سطرين. */
+  .mz-leaf .flex:has(> .mizan-btn), .mz-spread-index > * .flex:has(> .mizan-btn){ flex-wrap:wrap }
+  .mz-leaf .mizan-btn, .mz-spread-index > * .mizan-btn{ max-width:100%; white-space:normal }
+  .mz-leaf .mizan-btn > .truncate, .mz-spread-index > * .mizan-btn > .truncate{ white-space:normal; overflow:visible }
+
+  /* تذييل الصفحات العامة: سطره على الصفحة اليمنى، والخطّ الفاصل يبقى ممتدًّا. */
+  .mz-public-foot{ padding-inline:var(--duo-gutter) calc(50% + var(--duo-spine) / 2 + var(--duo-gutter)) }
+  /* اسم الجهة في الترويسة يُختصر داخل نصفه، لا يمتدّ إلى الكعب. */
+  .mz-el-header .mizan-header-logo{ flex-shrink:1; min-width:0; overflow:hidden }
+  .mz-el-header .mizan-header-logo .mizan-wordmark-name{ overflow:hidden; text-overflow:ellipsis }
+
+  /* الواجهة التسويقية: كل قسمٍ صفحتان. العنوان والتمهيد على اليمنى، والشبكات عمودان بينهما
+     الكعب (الصورة مقابل النص، البطاقات زوجًا زوجًا)، وروابط الأقسام اثنان في كل صفحة. */
+  .mz-mk .mizan-page{ padding-inline:var(--duo-gutter) }
+  .mz-mk header nav.md\:flex{ display:none }
+  .mz-mk header nav.md\:hidden{
+    display:grid; grid-template-columns:1fr 1fr var(--duo-gap) 1fr 1fr; gap:0 .35rem;
+    margin-inline:0; padding-inline:0; overflow:visible;
+  }
+  .mz-mk header nav.md\:hidden > a{ justify-content:center }
+  .mz-mk header nav.md\:hidden > a:nth-child(3){ grid-column:4 }
+  .mz-mk header nav.md\:hidden > a:nth-child(4){ grid-column:5 }
+  .mz-mk section.mizan-page > .grid,
+  .mz-mk section.mizan-page > div > .grid:is(.sm\:grid-cols-2,.sm\:grid-cols-4,.md\:grid-cols-2,.md\:grid-cols-3,.lg\:grid-cols-2),
+  .mz-mk section.mizan-page > div > div > .grid:is(.sm\:grid-cols-2,.sm\:grid-cols-4,.md\:grid-cols-2,.md\:grid-cols-3,.lg\:grid-cols-2){
+    grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+  }
+  .mz-mk section.mizan-page > :is(h1,h2,p,div):not(.grid):not(:has(.grid)){ max-width:calc(50% - var(--duo-gap) / 2) }
+  /* محاكي التحكيم: كلمات الآية لا تقع على الطيّ — نصفها على كل صفحة. */
+  .mz-mk .mz-mk-words{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap); justify-items:center }
+
+  /* قمرة المحكّم: الورقة (المصحف) تملأ الصفحة اليمنى، واللوحة اليسرى، والكعب بينهما؛
+     فلا يقع سطر قرآنٍ ولا مفتاحٌ على الطيّ. وإن أعلن المتصفّح المفصل فقواعد القسم 4 تأخذ مقاسه. */
+  .mizan-judge-os{ grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-spine) }
+  .mizan-judge-strip{ inset-inline-end:calc(50% + var(--duo-spine) / 2) }
+  .mizan-judge-handle{ left:calc(75% + var(--duo-spine) / 4) }
+  [dir="ltr"] .mizan-judge-handle{ left:calc(25% - var(--duo-spine) / 4) }
+}
+/* الورقة الضيّقة (كتاب طولي: ~290px لكل ورقة). مكوّنات الصفحات تبدّل تخطيطها بعرض الشاشة
+   (`sm:` من 640px)، فترى 669 «شاشةً واسعة» وهي في ورقةٍ بعرض هاتف، فتصطفّ الأزرار صفًّا يعبر
+   إلى الكعب. داخل الورقة الضيّقة وحدها يعود صفّ «عمودي على الهاتف، أفقي من sm» إلى عموديّته،
+   وتعود الشبكات إلى أعمدة الهاتف، ويخفّ الحشو. خارج الأوراق لا يُطبَّق شيء. */
+@container mz-leaf (max-width:440px){
+  .flex-col.sm\:flex-row{ flex-direction:column }
+  .flex-col-reverse.sm\:flex-row{ flex-direction:column-reverse }
+  .flex-wrap.sm\:flex-nowrap{ flex-wrap:wrap }
+  .w-full.sm\:w-auto{ width:100% }
+  .sm\:grid-cols-2:not([class*=" grid-cols-"]):not([class^="grid-cols-"]),
+  .sm\:grid-cols-3:not([class*=" grid-cols-"]):not([class^="grid-cols-"]),
+  .sm\:grid-cols-4:not([class*=" grid-cols-"]):not([class^="grid-cols-"]),
+  .grid-cols-1.sm\:grid-cols-2, .grid-cols-1.sm\:grid-cols-3{ grid-template-columns:minmax(0,1fr) }
+  .grid-cols-2.sm\:grid-cols-3, .grid-cols-2.sm\:grid-cols-4{ grid-template-columns:repeat(2,minmax(0,1fr)) }
+  /* خانةٌ تمتدّ عمودين من sm كانت تخلق عمودًا ضمنيًّا ثانيًا في شبكةٍ عادت عمودًا واحدًا. */
+  .sm\:col-span-2, .sm\:col-span-3, .sm\:col-span-4{ grid-column:1 / -1 }
+  /* مرشّحات بجانب بعضها من sm (النتائج): تعود شبكة الهاتف بعمودين داخل الورقة. */
+  .grid.grid-cols-2.sm\:flex{ display:grid }
+  [class*="sm:grid-cols-["]:not([class*=" grid-cols-"]){ grid-template-columns:minmax(0,1fr) }
+  /* شبكة الأجزاء الثلاثين: ستّة أعمدة من sm تُضيّق المفتاح دون 44px في ورقةٍ بعرض هاتف. */
+  .grid-cols-5.sm\:grid-cols-6{ grid-template-columns:repeat(5,minmax(0,1fr)) }
+  .sm\:p-8, .sm\:p-7{ padding:1.25rem }
+  .sm\:px-10, .sm\:px-8{ padding-inline:1.25rem }
+  :is(h1,h2,div).sm\:text-4xl{ font-size:1.75rem; line-height:1.25 }
+  /* صفٌّ يلتفّ («ابدأ من هنا»: حلقة + نصّ + زرّ): النصّ المرن لا ينضغط كلمةً في سطر، بل ينزل الزرّ. */
+  .flex.flex-wrap > .min-w-0.flex-1{ min-width:min(100%, 9rem) }
+}
+/* الورقة الأضيق (~290px، كتاب طولي): بطاقات الأرقام الثلاث والمبالغ التي لا تلتفّ تصطفّ عمودًا. */
+@container mz-leaf (max-width:340px){
+  .grid-cols-3:has(> .mz-bp-metric){ grid-template-columns:minmax(0,1fr) }
+  .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap){ grid-template-columns:minmax(0,1fr) }
+  .grid-cols-2.lg\:grid-cols-4:has(.whitespace-nowrap) > *{ grid-column:1 / -1 }
+}
+
+/* 4) وضع الكتاب مع مفصلٍ يُعلنه المتصفّح (مطويّ جزئيًّا، الطيّ عمودي): تحسينٌ تدريجي فقط. Safari 27.1 يُبقي
    Viewport Segments خلف علم، فهذه الكتل لا تُطبَّق إلا حين يعلن المتصفّح جزأين، ودونه
    لا يتغيّر بكسل. الهدف: لا زرّ ولا حقل ولا سطر قرآنٍ على خطّ الطيّ. */
 @media (horizontal-viewport-segments:2){
-  /* الدخول: البطاقة كاملةً في الجزء الأيمن (بداية القراءة بالعربية)، لا عبر المفصل. */
-  .mz-bp-login{
-    padding-left:calc(env(viewport-segment-left 1 0) + 1.25rem);
-    padding-right:1.25rem;
-  }
+  /* الكعب بعرض المفصل الحقيقي إن كان أعرض من الكعب المرسوم (القسم 3). الدخول وشاشة انتظار
+     المحكّم صارتا صفحتين في القسم 3، فلا تحتاجان هنا قاعدةً خاصة. */
+  :root{ --duo-spine:max(28px, calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0))) }
   /* قمرة المحكّم: الورقة في جزء واللوحة في الآخر، والفاصل بينهما هو المفصل بالضبط. */
   .mizan-judge-os{
     grid-template-columns:env(viewport-segment-width 1 0) env(viewport-segment-width 0 0);
@@ -2197,18 +2438,9 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   /* مقبض بيانات الجلسة كان في منتصف القمرة كلّها — أي على المفصل؛ صار في منتصف الورقة. */
   .mizan-judge-handle{ left:calc(env(viewport-segment-left 1 0) + env(viewport-segment-width 1 0) / 2) }
   [dir="ltr"] .mizan-judge-handle{ left:calc(env(viewport-segment-width 0 0) / 2) }
-  /* شاشة انتظار المحكّم: زرّ «ابدأ مع المتسابق التالي» كان في المنتصف على المفصل. */
-  /* عرضٌ بقدر الجزء الأيمن ناقصًا الحواف، ومحاذاةٌ إلى اليمين في الاتجاهين — لا هامش أيسر
-     صريح، لأن RTL يُسقط الهامش الأيسر حين تزيد القيود على عرض الحاوية. */
-  .mizan-judge-wait{
-    max-width:none;
-    width:calc(env(viewport-segment-width 1 0) - 2.5rem);
-    margin-left:auto;
-    margin-right:0;
-  }
 }
 
-/* 4) وضع الطاولة (الطيّ أفقي): الورقة — وفيها نصّ المصحف — فوق المفصل، ولوحة المفاتيح تحته
+/* 5) وضع الطاولة (الطيّ أفقي): الورقة — وفيها نصّ المصحف — فوق المفصل، ولوحة المفاتيح تحته
    على النصف المسنود. الأعمدة تصير صفوفًا مقاسةً بالجزأين. */
 @media (vertical-viewport-segments:2){
   .mizan-judge-os{

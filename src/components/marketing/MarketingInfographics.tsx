@@ -94,7 +94,7 @@ export const LiveJudgingSimulator: React.FC = () => {
           <span style={{ color: 'var(--amber)' }}>رواية حفص عن عاصم</span>
         </div>
 
-        <div className="p-4 rounded-2xl flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-quran text-2xl sm:text-3xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }} dir="rtl">
+        <div className="mz-mk-words p-4 rounded-2xl flex flex-wrap items-center justify-center gap-3 sm:gap-4 font-quran text-2xl sm:text-3xl" style={{ background: 'var(--canvas)', border: '1px solid var(--line)' }} dir="rtl">
           {tokens.map((t, idx) => {
             const isActive = idx === activeToken;
             const isDone = idx < activeToken;

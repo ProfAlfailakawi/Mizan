@@ -303,7 +303,7 @@ const boardParams = (h: string): BoardParams => {
  */
 const CompetitionNotFound: React.FC = () => (
   <main className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5">
-    <div className="mizan-surface p-8 max-w-md text-center">
+    <div className="mz-onepage mizan-surface p-8 max-w-md text-center">
       <div className="mizan-kicker">رابط المسابقة</div>
       <h1 className="text-xl font-black mt-2">هذه المسابقة غير متاحة</h1>
       <p className="text-xs text-[color:var(--muted)] mt-3 leading-6">الرابط يشير إلى مسابقة غير موجودة أو أُغلق تسجيلها. تأكد من الرابط الذي شاركته جهة المسابقة.</p>
