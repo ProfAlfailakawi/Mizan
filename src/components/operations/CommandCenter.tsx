@@ -22,6 +22,7 @@ import { GlobalSynchronizedRound } from '../admin/GlobalSynchronizedRound';
 import type { QuestionCustodyCorridorSnapshot } from '../../types';
 import { Metric } from '../design-system/Metric';
 import { arPlural, AR_NOUNS } from '../../lib/arabic-plural';
+import { overrunningSessions } from '../../lib/session-overrun';
 
 // The alert kind was rendered raw, so an Arabic-first screen printed "review",
 // "incident" and "device" in English. It also carried no severity, so a hardware
@@ -30,6 +31,7 @@ const ALERT_KIND:Record<string,{ar:string;en:string}>={
  incident:{ar:'حادثة',en:'Incident'},
  review:{ar:'مراجعة',en:'Review'},
  device:{ar:'جهاز',en:'Device'},
+ overrun:{ar:'جلسة طالت',en:'Long session'},
 };
 
 export const CommandCenter: React.FC = () => {
@@ -55,9 +57,14 @@ export const CommandCenter: React.FC = () => {
   * سطرٍ كهذا شيئًا. وما يلزم للقرار: ما هي، وأين، ومتى، وكم شدّتها.
   */
  const committeeCode=(id?:string)=>committees.find(c=>c.id===id)?.code||'';
+ /* ساعةٌ تتحرك كل نصف دقيقة: جلسةٌ تتجاوز العتبة تظهر وحدها دون أن يعيد أحدٌ تحميل الشاشة. */
+ const [nowMs,setNowMs]=useState(()=>Date.now());
+ useEffect(()=>{const t=window.setInterval(()=>setNowMs(Date.now()),30_000);return()=>window.clearInterval(t)},[]);
+ const overruns=useMemo(()=>overrunningSessions({participants,committees,now:nowMs}),[participants,committees,nowMs]);
  const alerts=[
   ...incidents.filter(i=>i.status!=='resolved').map(i=>({id:i.id,kind:'incident' as const,title:incidentTitle(i,ar),where:ar?INCIDENT_TYPE_ARABIC[i.type]:i.type,at:i.lastOccurredAt||i.reportedAt,severity:i.severity})),
   ...reviewCases.filter(r=>r.status==='pending').map(r=>({id:r.id,kind:'review' as const,title:(()=>{const p=participants.find(x=>x.id===r.participantId);const name=p?(ar?p.fullNameArabic||p.fullName:p.fullName||p.fullNameArabic):(ar?'متسابق':'A participant');return `${name} — ${reviewReasonLabel(r.reason,ar)}`})(),where:committeeCode(r.committeeId),at:undefined,severity:r.severity})),
+  ...overruns.map(o=>({id:o.participantId,kind:'overrun' as const,title:ar?`${o.participantCode} — ${arPlural(o.minutes,AR_NOUNS.minute)} في الجلسة`:`${o.participantCode} — ${o.minutes} min in session`,where:o.committeeCode||'',at:o.startedAt,severity:o.minutes>=30?'critical':'moderate'})),
   ...devices.filter(d=>d.status==='offline'||d.status==='degraded').map(d=>({id:d.id,kind:'device' as const,title:d.name,where:d.zone||committeeCode(d.committeeId),at:d.lastSeenAt,severity:d.status==='offline'?'critical':'moderate'})),
  ];
  const elastic=s.elasticityRecommendations.find(x=>x.competitionId===competition.id);

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AlertTriangle, Gavel, MonitorX } from 'lucide-react';
+import { AlertTriangle, Gavel, MonitorX, Timer } from 'lucide-react';
 
 /*
  * الحالات الاستثنائية — لوحةٌ تُقرأ بنظرة، لا قائمةُ سطور.
@@ -13,7 +13,7 @@ import { AlertTriangle, Gavel, MonitorX } from 'lucide-react';
  * صوت» بلا قاعةٍ ولا وقتٍ لا يُعمل به.
  */
 
-export type ExceptionKind = 'incident' | 'review' | 'device';
+export type ExceptionKind = 'incident' | 'review' | 'device' | 'overrun';
 
 export interface ExceptionItem {
   id: string;
@@ -31,6 +31,7 @@ const KIND_STYLE: Record<ExceptionKind, { icon: React.ComponentType<{ className?
   incident: { icon: AlertTriangle, dot: '#A34D43', tint: '#FBF1EF', border: '#e8d3ce', ar: 'حادث', en: 'Incident' },
   review: { icon: Gavel, dot: '#9B7542', tint: '#FAF4E9', border: '#e7d9bd', ar: 'مراجعة تحكيم', en: 'Review' },
   device: { icon: MonitorX, dot: '#496477', tint: '#EFF3F6', border: '#cfd9e1', ar: 'جهاز', en: 'Device' },
+  overrun: { icon: Timer, dot: '#8A5A2B', tint: '#FBF3EA', border: '#ead8c2', ar: 'جلسة طالت', en: 'Long session' },
 };
 
 const clockOf = (at?: string) => {
@@ -55,6 +56,7 @@ export const ExceptionBoard: React.FC<{ items: ExceptionItem[]; ar: boolean; sev
     incident: items.filter(x => x.kind === 'incident').length,
     review: items.filter(x => x.kind === 'review').length,
     device: items.filter(x => x.kind === 'device').length,
+    overrun: items.filter(x => x.kind === 'overrun').length,
   }), [items]);
   if (!items.length) return null;
 
