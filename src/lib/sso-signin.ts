@@ -1,6 +1,6 @@
 import { getRedirectResult, signInWithPopup, signInWithRedirect, type AuthProvider, type UserCredential } from 'firebase/auth';
 import { auth } from './firebase';
-import { shouldFallbackToRedirect } from './auth-domain';
+import { shouldFallbackToRedirect } from './sso-fallback';
 
 /*
  * الدخول الموحّد: نافذةٌ منبثقة أولًا، وتحويلُ الصفحة حين لا تصلح النافذة.
