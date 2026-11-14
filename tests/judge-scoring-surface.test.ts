@@ -60,7 +60,8 @@ test('the tally is read before the store mutates', () => {
   // recordJudgeEvent updates the store synchronously; counting afterwards and adding one
   // announced a number one too high.
   const tally = judge.indexOf('const tally=countFor(eventType)+1;');
-  const record = judge.indexOf('recordJudgeEvent(eventType);');
+  /* قد يحمل الاستدعاءُ موضعَ الكلمة (`locus`) حين تُسجَّل العلامة بالضغط المطوّل؛ والشرطُ هو الترتيب لا صورةُ الاستدعاء. */
+  const record = judge.search(/recordJudgeEvent\(eventType(?:,locus)?\);/);
   assert.ok(tally > -1 && record > -1);
   assert.ok(tally < record, 'tally must be computed before recordJudgeEvent');
 });

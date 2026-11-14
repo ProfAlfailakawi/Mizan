@@ -2505,6 +2505,12 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mizan-judge-finish,.mizan-judge-undo{ min-height:46px }
 }
 
+/* كلمةٌ سُجّل عندها خطأ بالضغط المطوّل (CSS Custom Highlight): لونٌ بلا حشوة فلا ينكسر سطر.
+   الثقيل أحمر دافئ والخفيف ذهبيّ، والعلامةُ لا تعتمد على اللون وحده: تُعلَن وتُسرَد في القائمة. */
+::highlight(mizan-mark-major){ background-color: rgba(176, 74, 58, .30); text-decoration: underline wavy rgba(176, 74, 58, .85); }
+::highlight(mizan-mark-minor){ background-color: rgba(226, 180, 92, .38); text-decoration: underline rgba(154, 100, 32, .75); }
+.mizan-mushaf-sheet__text[data-word-marking="on"]{ touch-action: pan-y; cursor: pointer; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    وضع المحكّم وسماته — كلّه مقيّدٌ بسماتٍ على جذر قمرة المحكّم.
    الافتراضي لا يحمل سمةً، فلا يتغيّر شيءٌ في الشاشة كما كانت ولا خارجها.

@@ -3,6 +3,8 @@ import { Highlighter } from 'lucide-react';
 import { AyahMark, arabicIndicDigits } from './AyahMark';
 import { TajweedAyah, TajweedAyahWords, TajweedLegend, type TajweedSpan } from './TajweedText';
 import { splitAyahWords } from '../../lib/word-timing';
+import { useWordLongPress, type LongPressWordHit } from '../../lib/use-word-long-press';
+import { rangeForOffsets } from '../../lib/word-hit';
 
 /*
  * عرضُ النصّ حين لا يُتاح أصلُ الصفحة.
@@ -46,7 +48,17 @@ export interface MushafSheetProps {
   frame?: { pageAspect: number; pages: number } | null;
   /** لونُ التظليل: تلاوةٌ مرجعيّة تُسمع، أو قارئٌ حيٌّ يُتبَع، أو موضعٌ ممسوكٌ حتى يُستعاد. */
   tone?: 'audio' | 'track' | 'held';
+  /** رقم سورة المقطع: لازمٌ لتسجيل الخطأ على كلمة. بدونه لا تُصغي الورقةُ للضغطة المطوّلة. */
+  surah?: number;
+  /** ضغطةٌ مطوّلة على كلمة. وجودُه يُفعّل الإصغاء ويمنع تحديد النص في الورقة. */
+  onWordLongPress?: (hit: LongPressWordHit) => void;
+  /** كلماتٌ سُجّل عندها خطأ (رقمها من 1)، لتُلوَّن: `major` لخصمٍ ثقيل، `minor` لخفيف. */
+  wordMarks?: { ayah: number; word: number; tone: 'minor' | 'major' }[];
 }
+
+/* التلوين بواجهة التمييز المخصّصة (CSS Custom Highlight): لا تلمس بنية الصفحة، فلا ينكسر
+   سطرٌ ولا ينفصل حرفٌ عن تشكيله. وحيث لا تُدعم تبقى العلامة مسجّلةً ومُعلَنة بلا تلوين. */
+const canHighlight = () => typeof CSS !== 'undefined' && 'highlights' in CSS && typeof (globalThis as { Highlight?: unknown }).Highlight === 'function';
 
 /* ألوانُ التظليل هي ألوانُ عدسة الصفحة نفسها، فلا يتعلّم المحكّمُ لونين لمعنى واحد. */
 const TONE: Record<'audio' | 'track' | 'held', { ayah: string; word: string }> = {
@@ -162,6 +174,7 @@ export const MushafSheet: React.FC<MushafSheetProps> = ({
   ar, surahName, startAyah, endAyah, loci = [], ayat, fallbackText = '',
   officialFont = false, activeAyah = null, activeWords = [], activeWordIndex = -1,
   tajweedOn, onToggleTajweed, tajweedScopeNote, loaded, frame = null, tone = 'audio',
+  surah, onWordLongPress, wordMarks,
 }) => {
   const allTajweed = ayat ? ayat.flatMap(a => a.tajweed || []) : [];
   const range = ar
@@ -177,6 +190,31 @@ export const MushafSheet: React.FC<MushafSheetProps> = ({
   /* المقطعُ القصير لا يملأ الوجه ولو بأكبر خطّ: يُوسَّط، فالضبطُ على العرض يفرّق كلماته. */
   const short = size !== null && size >= MAX_FONT - 0.5;
   const colors = TONE[tone];
+  const listening = !!onWordLongPress && !!surah && !!ayat?.length;
+  const press = useWordLongPress({
+    enabled: listening,
+    surah,
+    ayahText: ayah => ayat?.find(a => a.ayah === ayah)?.text,
+    onHit: hit => onWordLongPress?.(hit),
+  });
+  const marksKey = (wordMarks || []).map(m => `${m.ayah}:${m.word}:${m.tone}`).join('|');
+  useEffect(() => {
+    const root = textRef.current;
+    if (!root || !ayat || !canHighlight()) return;
+    const H = (globalThis as unknown as { Highlight: new (...r: Range[]) => unknown }).Highlight;
+    const registry = (CSS as unknown as { highlights: Map<string, unknown> }).highlights;
+    const ranges: Record<'minor' | 'major', Range[]> = { minor: [], major: [] };
+    for (const m of wordMarks || []) {
+      const a = ayat.find(x => x.ayah === m.ayah);
+      const el = root.querySelector(`[data-ayah="${m.ayah}"]`);
+      const w = a ? splitAyahWords(a.text)[m.word - 1] : undefined;
+      const r = el && w ? rangeForOffsets(el, w.start, w.end) : null;
+      if (r) ranges[m.tone].push(r);
+    }
+    registry.set('mizan-mark-minor', new H(...ranges.minor));
+    registry.set('mizan-mark-major', new H(...ranges.major));
+    return () => { registry.delete('mizan-mark-minor'); registry.delete('mizan-mark-major'); };
+  }, [marksKey, ayat, textKey, tajweedOn, officialFont, size]);
 
   const text = (
     <div
@@ -185,7 +223,12 @@ export const MushafSheet: React.FC<MushafSheetProps> = ({
       className={framed
         ? 'mizan-mushaf-sheet__text font-quran text-[#202622]'
         : 'font-quran text-center text-[1.7rem] sm:text-[2.45rem] leading-[2.5] text-[#202622]'}
-      style={officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : undefined}
+      style={{
+        ...(officialFont ? { fontFamily: '"MIZAN KFGQPC Official"' } : {}),
+        ...(listening ? { userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties : {}),
+      }}
+      data-word-marking={listening ? 'on' : undefined}
+      {...(listening ? press : {})}
     >
       {ayat
         ? ayat.map((a, i) => (
