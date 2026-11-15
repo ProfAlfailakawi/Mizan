@@ -70,3 +70,9 @@ test('laptop posture keeps controls at the bottom with space reserved for them',
   assert.match(css, /body:has\(\.mz-el-mnav\)\{ padding-bottom:calc\(3\.6rem/);
   assert.match(css, /body:has\(\.mz-leaf-b > \.mizan-tabs\)\{ padding-bottom:calc\(3\.75rem/);
 });
+
+test('the widget gate still protects the book sizes earlier rounds covered (720x900 portrait, 951x669/951x960 landscape)', () => {
+  const gate = css.slice(css.indexOf('@media screen and (orientation:portrait) and (max-width:720px) and (min-height:360px)'));
+  assert.match(gate.slice(0, 600), /\(orientation:portrait\) and \(max-width:720px\) and \(min-height:360px\)/);
+  assert.match(gate.slice(0, 600), /\(min-width:540px\) and \(max-width:1000px\) and \(min-height:300px\) and \(max-height:960px\)/);
+});

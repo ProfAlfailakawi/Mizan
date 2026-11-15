@@ -117,6 +117,20 @@ const SCENARIOS = [
   { id: 'ops', label: 'مركز العمليات', go: p => asRole(p, 'ops_manager') },
   { id: 'org', label: 'مدير الجهة', go: p => asRole(p, 'org_admin') },
   { id: 'broadcast', label: 'شاشة البثّ (شريط علوي ثابت)', go: p => asRole(p, 'broadcast_operator') },
+  { id: 'venue-lock-set', label: 'قفل الجهاز: اختيار الرمز', reach: [/^(متابعة|Continue)$/, 'pad-last'], go: async p => {
+    await asRole(p, 'broadcast_operator');
+    await p.getByRole('button', { name: /اقفل الجهاز|Lock device/ }).first().click({ timeout: 6000 }).catch(() => {}); await settle(p, 700);
+  } },
+  { id: 'venue-unlock', label: 'قفل الجهاز: نافذة الفتح', reach: [/^(افتح|Unlock)$/, 'pad-last'], go: async p => {
+    await asRole(p, 'broadcast_operator');
+    await p.getByRole('button', { name: /اقفل الجهاز|Lock device/ }).first().click({ timeout: 6000 }).catch(() => {}); await settle(p, 700);
+    const digits = async () => { for (const d of ['2', '5', '8', '0']) await p.locator('[role="dialog"] [role="group"] button', { hasText: new RegExp(`^${d}$`) }).first().click().catch(() => {}); };
+    await digits(); await p.getByRole('button', { name: /^(متابعة|Continue)$/ }).first().click().catch(() => {}); await settle(p, 400);
+    await digits(); await p.getByRole('button', { name: /^(اقفل|Lock)$/ }).first().click().catch(() => {}); await settle(p, 900);
+    const box = await p.locator('.mz-venue-corner').first().boundingBox();
+    if (box) { await p.mouse.move(box.x + 10, box.y + 10); await p.mouse.down(); await p.waitForTimeout(3400); await p.mouse.up(); }
+    await settle(p, 700);
+  } },
 ];
 
 /* القياس كلّه داخل الصفحة. */
@@ -210,7 +224,7 @@ const newCtx = async (browser, kind) => {
   return ctx;
 };
 /* ارتفاعات التطبيق الكاملة (بلا أشرطة المتصفّح): أطول من Safari، فلا يصحّ أن يعتمد الكشف على ارتفاعٍ ضيّق. */
-const EXTRA = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700], [457, 678], [457, 760]];
+const EXTRA = [[382, 780], [382, 844], [470, 900], [669, 1000], [951, 700], [457, 678], [457, 760], [720, 900], [951, 669], [951, 800], [951, 960]];
 
 async function main() {
   if (SERVE) await startServer();
@@ -241,6 +255,22 @@ async function main() {
             if (!m.W || !m.H) report.inactive.push({ ...cell, W: m.W, H: m.H });
             else { report.zoneH = report.zoneH || { min: 1e9, max: 0 }; report.zoneH.min = Math.min(report.zoneH.min, m.H); report.zoneH.max = Math.max(report.zoneH.max, m.H); if (Math.abs(m.W - 96) > 0.5) report.inactive.push({ ...cell, W: m.W, H: m.H, note: 'unexpected width' }); }
             if (m.overflowX > 1) report.violations.push({ ...cell, advisory: scale === 200, overflowX: m.overflowX, hits: ['overflow-x', ...m.wide] });
+            if (sc.reach) {
+              const bad2 = await p.evaluate(reach => {
+                const d = document.querySelector('[role="dialog"]'); if (!d) return ['no dialog open'];
+                const out = [];
+                for (const r of reach) {
+                  const el = r === 'pad-last' ? [...d.querySelectorAll('[role="group"] button')].pop() : [...d.querySelectorAll('button')].find(b => new RegExp(r.source).test((b.textContent || '').trim()));
+                  if (!el) { out.push(`missing ${r === 'pad-last' ? r : r.source}`); continue; }
+                  el.scrollIntoView({ block: 'end' });
+                  const b = el.getBoundingClientRect();
+                  if (!(b.top >= -1 && b.bottom <= window.innerHeight + 1 && b.left >= -1 && b.right <= window.innerWidth + 1)) out.push(`unreachable ${r === 'pad-last' ? r : r.source} [y ${Math.round(b.top)}–${Math.round(b.bottom)} of ${window.innerHeight}]`);
+                }
+                return out;
+              }, sc.reach.map(r => (r instanceof RegExp ? { source: r.source } : r)));
+              if (bad2.length) report.violations.push({ ...cell, hits: ['dialog-unreachable', ...bad2] });
+              await p.evaluate(() => window.scrollTo(0, 0));
+            }
             if (m.off.length) report.violations.push({ ...cell, advisory: scale === 200, hits: ['offscreen', ...m.off.slice(0, 4)] });
             if (m.hits.length) { bad++; report.violations.push({ ...cell, zone: `x≥${m.vw - m.W}, y≤${Math.round(m.H)}`, hits: m.hits.slice(0, 8), count: m.hits.length }); }
             for (const e of m.exempt) report.exemptions[e] = (report.exemptions[e] || 0) + 1;

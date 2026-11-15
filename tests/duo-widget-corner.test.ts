@@ -46,9 +46,9 @@ test('physical right, never inline-end, and no new !important', () => {
 });
 
 test('the condition is generic (no exact widths) and covers 457x678, the inferred in-app viewport', () => {
-  for (const [w, h] of [[382,580],[470,780],[594,368],[669,867],[951,585],[580,382],[780,470],[368,594],[867,669],[585,951],[669,520],[457,678],[457,760],[440,660],[480,720],[430,932],[382,844],[951,700],[360,640]]) assert.equal(matches(cond, w, h), true, `${w}x${h}`);
+  for (const [w, h] of [[382,580],[470,780],[594,368],[669,867],[951,585],[580,382],[780,470],[368,594],[867,669],[585,951],[669,520],[457,678],[457,760],[440,660],[480,720],[430,932],[382,844],[951,700],[360,640],[720,900],[951,669],[951,800],[951,960],[700,900]]) assert.equal(matches(cond, w, h), true, `${w}x${h}`);
   // iPad, wide landscape and desktop stay out
-  for (const [w, h] of [[744,1133],[768,1024],[820,1180],[1024,768],[1180,820],[1280,800],[1440,900],[1366,1024],[1001,700]]) assert.equal(matches(cond, w, h), false, `${w}x${h}`);
+  for (const [w, h] of [[744,1133],[768,1024],[820,1180],[1024,768],[1180,820],[1280,800],[1440,900],[1366,1024],[1001,700],[744,1024],[834,1194],[1024,1366],[951,961]]) assert.equal(matches(cond, w, h), false, `${w}x${h}`);
   assert.doesNotMatch(cond, /min-width:(382|470|457)|max-width:(382|470|457)/, 'no exact Duo widths');
 });
 

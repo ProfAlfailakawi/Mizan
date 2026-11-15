@@ -2430,15 +2430,15 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
    خارج الجهاز الثلاثة 0 (التعريف الافتراضي في أول الملف)، فكل قاعدةٍ تقرؤها لا أثر لها هناك.
    المعايرة على الجهاز: `?duo-debug=1&duo-w=110&duo-h=270` تُبدّل القيمتين مباشرةً (src/lib/duo-debug.ts).
    الكشف عامٌّ بلا عروض مضبوطة (فمقاس التطبيق الفعلي ~457×678 ليس من «المقاسات المعروفة»):
-     • طولي بعرض ≤ 700 وارتفاع ≥ 360 (أيّ ارتفاع: التطبيق أطول من Safari)،
-     • عرضي 540–1000 بارتفاع 300–800 (594×368، 951×585، 780×470، 867×669، 669×520…)،
+     • طولي بعرض ≤ 720 وارتفاع ≥ 360 (يشمل الكتاب الطولي 720×900 الذي حُمي سابقًا) (أيّ ارتفاع: التطبيق أطول من Safari)،
+     • عرضي 540–1000 بارتفاع 300–960 (يشمل الكتاب العرضي القائم 951×669 و951×960؛ 594×368، 951×585، 780×470، 867×669، 669×520…)،
      • وأيّ مفصلٍ يُعلنه المتصفّح (`horizontal/vertical-viewport-segments:2`).
    يُطبَّق على اليمين الفيزيائي (`right`/`padding-right`) لا `inline-end`، فلا يتبدّل بتبدّل الاتجاه.
    الشرطان يلتقطان أيضًا الهواتف العادية طوليًّا وعرضيًّا (الاحتياط الآمن المطلوب)؛ وهندسة العرضي لم
    تُتحقَّق على جهازٍ حقيقي. الأثر الصحيح لكل سطح مفصّلٌ في docs/IPHONE-DUO-FINAL-ACCEPTANCE.md («ركن الودجت»).
    الخلفيات والزجاج تبقى حافةً لحافة خلف الودجت؛ يُزاح المحتوى المهمّ وحده. */
-@media screen and (orientation:portrait) and (max-width:700px) and (min-height:360px),
-       screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:800px),
+@media screen and (orientation:portrait) and (max-width:720px) and (min-height:360px),
+       screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:960px),
        (horizontal-viewport-segments:2), (vertical-viewport-segments:2){
   :root{
     --duo-widget-w:96px; --duo-widget-gap:8px; --duo-widget-h:clamp(64px,31vh,270px);
@@ -2455,7 +2455,7 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   }
   /* أدوات الترويسة: يضيق السطر بعرض المنطقة (382 ← ~258px) فلا تتّسع ستّة أزرار بحجم اللمس، فتلتفّ على سطرين
      داخل ارتفاع المنطقة بدل أن تُقصّ أو تدفع الصفحة جانبًا. */
-  @media (max-width:700px){
+  @media (max-width:720px){
     .mz-el-header > .h-16 > :first-child{ flex:0 0 auto }
     .mz-el-header > .h-16 > :last-child{ flex:1 1 0; min-width:0; flex-wrap:wrap; justify-content:flex-end; row-gap:.25rem }
   }
@@ -2478,6 +2478,9 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mizan-splash{ padding-top:var(--duo-widget-h) }
   /* كل سطحٍ مثبّت بملء الشاشة يُمرَّر أو يوسِّط محتواه (نوافذ الإدارة، الإيصال، لوحات القاعة، التحميل) */
   .fixed.inset-0:is(.overflow-y-auto, .overflow-auto, .grid){ padding-top:calc(var(--duo-widget-h) + .5rem) }
+  /* الحشوة العلوية تُنقص ارتفاع المحتوى (حتى 270px): النوافذ الموسَّطة الطويلة (قفل الجهاز/فتحه، لوحة الأرقام) تُمرَّر عموديًّا
+     بدل أن يسقط زرّها السفلي خارج الشاشة، والمحتوى يبقى موسَّطًا ما دام يتّسع. */
+  .fixed.inset-0.grid{ overflow-y:auto; overscroll-behavior:contain; grid-template-rows:minmax(min-content,1fr) }
   /* قائمة «المزيد»: مثبّتةٌ على اليسار الفيزيائي وتحت المنطقة (لا على بداية السطر، ولا فوق الودجت، ولا خارج الشاشة) */
   .mz-el-header .mizan-more > div{ position:fixed; inset-inline:auto; right:auto; left:.5rem; top:calc(var(--duo-widget-h) + .25rem); max-width:calc(100vw - 1rem) }
   /* مقبض قفل الجهاز الخفيّ: كان في الزاوية اليمنى العليا تحت الودجت تمامًا، فينتقل إلى اليسرى */
@@ -2487,7 +2490,7 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mz-corner-l{ display:inline }
 }
 /* الطولي من 640: البحث والشرح ينتقلان إلى قائمة «المزيد» كما في الكتاب، ليتّسع الشعار لاسم الجهة. */
-@media screen and (min-width:640px) and (max-width:700px) and (orientation:portrait){
+@media screen and (min-width:640px) and (max-width:720px) and (orientation:portrait){
   .mz-el-header .mz-hd-wide{ display:none }
   .mz-el-header .mizan-more{ display:block }
 }
