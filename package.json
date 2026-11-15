@@ -48,6 +48,7 @@
     "qa:print-document": "node scripts/print-document-qa.mjs",
     "quran:crosswalk-coverage": "tsx scripts/quran-crosswalk-coverage-generate.ts",
     "r2:inventory": "tsx scripts/r2-inventory.ts",
+    "test:duo-widget": "node tests/duo-widget-corner.guard.mjs --serve --out=docs/iphone-duo-widget-corner/guard-report.json",
     "test:ci": "tsx --test --test-reporter=tap --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results.xml tests/*.test.ts",
     "qa:seed-public": "tsx scripts/seed-public-competition.ts",
     "rig:seed": "bash -c 'source scripts/qa/env.sh && tsx scripts/seed-realistic.ts \"$@\"' --",

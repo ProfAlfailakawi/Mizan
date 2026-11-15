@@ -48,3 +48,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) { window.addEventListe
 // The shell mounted and the entry chunks resolved: clear the one-shot recovery flag so the next
 // deploy can heal the same way.
 window.addEventListener('load',()=>markShellHealthy());
+
+/* تشخيص ركن الودجت (iPhone Duo): يُحمَّل فقط حين يوجد `?duo-debug=1`، فلا يدخل في الحزمة الرئيسية. */
+if (/[?&]duo-debug=1\b/.test(window.location.search)) void import('./lib/duo-debug').then(m => m.mountDuoDebug());
