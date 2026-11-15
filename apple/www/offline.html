@@ -26,6 +26,11 @@
   }
   button:active { opacity: .7; }
   @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s; } }
+/* ركن الودجت (iPhone Duo): نفس شرط وقيم src/index.css «ركن الودجت» — لا شيء مهمّ تحت عنصر النظام في أعلى اليمين. */
+@media screen and (orientation:portrait) and (max-width:700px) and (min-height:360px),
+       screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:800px){
+  body{ padding-top:max(24px, clamp(64px,31vh,270px)) }
+}
 </style>
 </head>
 <body>

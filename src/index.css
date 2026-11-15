@@ -2,6 +2,8 @@
 
 @layer base {
   :root {
+    /* ركن الودجت (iPhone Duo): 0 خارج الجهاز؛ القيم الفعلية في كتلة «ركن الودجت» أسفل الملف. */
+    --duo-widget-w: 0px; --duo-widget-gap: 0px; --duo-widget-h: 0px;
     /* Kept in sync with the Google Fonts request in index.html. */
     --font-arabic: "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
     --font-display: "Alexandria", "IBM Plex Sans Arabic", system-ui, sans-serif;
@@ -2414,43 +2416,72 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   /* صفٌّ يلتفّ («ابدأ من هنا»: حلقة + نصّ + زرّ): النصّ المرن لا ينضغط كلمةً في سطر، بل ينزل الزرّ. */
   :is(.mz-leaf, .mz-spread-index > *) .flex.flex-wrap > .min-w-0.flex-1{ min-width:min(100%, 9rem) }
 }
-/* 3ب) منطقة الودجت: على الشاشة الداخلية (تبويب المتصفّح والتطبيق المثبَّت معًا) يطفو فوق زاويته
-   العليا اليمنى (الفعلية، لا بداية الاتجاه) ودجتُ نظامٍ بعرض ~55–80px، ينزل من الحافة العليا إلى
-   ~y=125. لا نعرف صندوقه بالضبط، فنحجز زاويةً سخيّة 116×116 (`--duo-cutout-*`) لا يقع فيها نصٌّ
-   ولا زرّ: شريط الترويسة صار بارتفاعها ويُزاح شعاره/عنوانه إلى الداخل بعرضها (يمين فيزيائي، سواء
-   كانت الصفحة RTL أو LTR)، فتبدأ الصفحة تحتها. الخلفية تبقى حافةً لحافة خلف الودجت. وفي الكتاب
-   الزاوية لليمنى وحدها (الودجت عند الحافة اليمنى الفيزيائية)، فنصف الترويسة اليسرى لا يتأثر.
-   لا يُطبَّق على الهواتف العادية (بنتوء الشاشة لا ودجت) ولا على المطويّ الخارجي 367×740: لا يمكن
-   تمييزه عن آيفون، فلا نخمّن. ولا يُشترط التثبيت: لقطات المالك أظهرت الودجت فوق المحتوى في تبويب Safari أيضًا. */
-@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape),
-       screen and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){
-  :root{ --duo-cutout-w:116px; --duo-cutout-h:116px; --duo-pin-top:calc(var(--duo-cutout-h) + 1rem) }
-  /* الترويسات تمشي مع الصفحة بدل أن تلصق (116px لاصقة تأكل خُمس 585px) وبارتفاع المنطقة */
+/* 3ب) ركن الودجت — منطقةٌ محجوزة واحدة، ومصدرها الوحيد هذه الكتلة.
+   على iPhone Duo يطفو فوق الزاوية العليا اليمنى **الفيزيائية** عنصرُ نظامٍ لا يدخل في safe-area (كبسولة
+   المصباح + الحساب/الموقع + الوقت + البطارية). **تقدير من لقطات المالك داخل التطبيق لا قياسُ جهاز** (انظر
+   docs/IPHONE-DUO-FINAL-ACCEPTANCE.md §14.1): عرض ~54pt يبدأ ~20pt من الحافة، من y≈20 إلى ≈166pt؛ وقياسٌ مستقلّ
+   يقترح ~80px عرضًا بين 30 و110 من الحافة ويصل y≈268. فالمدى غير مؤكَّد: 84–112px عرضًا و174–270px ارتفاعًا.
+     --duo-widget-w   96px                       العرض من الحافة اليمنى (يغطّي القياسين مع فسحة)
+     --duo-widget-gap  8px                       فسحة بين المحتوى والمنطقة
+     --duo-widget-h   clamp(64px, 31vh, 270px)   الارتفاع
+   خارج الجهاز الثلاثة 0 (التعريف الافتراضي في أول الملف)، فكل قاعدةٍ تقرؤها لا أثر لها هناك.
+   المعايرة على الجهاز: `?duo-debug=1&duo-w=110&duo-h=270` تُبدّل القيمتين مباشرةً (src/lib/duo-debug.ts).
+   الكشف عامٌّ بلا عروض مضبوطة (فمقاس التطبيق الفعلي ~457×678 ليس من «المقاسات المعروفة»):
+     • طولي بعرض ≤ 700 وارتفاع ≥ 360 (أيّ ارتفاع: التطبيق أطول من Safari)،
+     • عرضي 540–1000 بارتفاع 300–800 (594×368، 951×585، 780×470، 867×669، 669×520…)،
+     • وأيّ مفصلٍ يُعلنه المتصفّح (`horizontal/vertical-viewport-segments:2`).
+   يُطبَّق على اليمين الفيزيائي (`right`/`padding-right`) لا `inline-end`، فلا يتبدّل بتبدّل الاتجاه.
+   الشرطان يلتقطان أيضًا الهواتف العادية طوليًّا وعرضيًّا (الاحتياط الآمن المطلوب)؛ وهندسة العرضي لم
+   تُتحقَّق على جهازٍ حقيقي. الأثر الصحيح لكل سطح مفصّلٌ في docs/IPHONE-DUO-FINAL-ACCEPTANCE.md («ركن الودجت»).
+   الخلفيات والزجاج تبقى حافةً لحافة خلف الودجت؛ يُزاح المحتوى المهمّ وحده. */
+@media screen and (orientation:portrait) and (max-width:700px) and (min-height:360px),
+       screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:800px),
+       (horizontal-viewport-segments:2), (vertical-viewport-segments:2){
+  :root{
+    --duo-widget-w:96px; --duo-widget-gap:8px; --duo-widget-h:clamp(64px,31vh,270px);
+    --duo-pin-top:calc(var(--duo-widget-h) + 1rem);
+  }
+  /* الترويسات تمشي مع الصفحة بدل أن تلصق (ترويسة بارتفاع المنطقة تأكل خُمس الشاشة) */
   header:is(.mz-el-header, .sticky){ position:relative }
-  header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child{ height:var(--duo-cutout-h); min-height:var(--duo-cutout-h); box-sizing:border-box }
-  [dir="rtl"] :is(header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child) > :first-child,
-  [dir="ltr"] :is(header > :is(.h-16, .min-h-16), header > .mizan-page > .h-16, .mz-el-header > div:first-child) > :last-child{ margin-right:var(--duo-cutout-w) }
-  /* شريطٌ علويٌّ ثابت: الدور والخروج (شاشة البثّ) وتنبيه الخمول والاستمرارية */
-  div.mz-topbar{ padding-right:var(--duo-cutout-w) }
+  /* صفّ الترويسة: بارتفاع المنطقة، ومحتواه كله يسار المنطقة (حشوة يمين فيزيائية، لا بداية السطر).
+     `.mz-el-header > div:first-child` مذكورٌ صراحةً: قاعدة الكتاب (أعلاه) بالخصوصية نفسها وتضبط `padding-inline`، وكانت تُسقط
+     هذه الحشوة في 951×585 فيبقى الشعار تحت الودجت (هذا هو المصدر الحقيقي للعطل في الكتاب، لا الشرط). */
+  header > .h-16, header > * > .h-16, header > .min-h-16, .mz-el-header > div:first-child{
+    box-sizing:border-box; height:var(--duo-widget-h); min-height:var(--duo-widget-h);
+    padding-right:calc(1rem + var(--duo-widget-w) + var(--duo-widget-gap));
+  }
+  /* أدوات الترويسة: يضيق السطر بعرض المنطقة (382 ← ~258px) فلا تتّسع ستّة أزرار بحجم اللمس، فتلتفّ على سطرين
+     داخل ارتفاع المنطقة بدل أن تُقصّ أو تدفع الصفحة جانبًا. */
+  @media (max-width:700px){
+    .mz-el-header > .h-16 > :first-child{ flex:0 0 auto }
+    .mz-el-header > .h-16 > :last-child{ flex:1 1 0; min-width:0; flex-wrap:wrap; justify-content:flex-end; row-gap:.25rem }
+  }
+  /* شريطٌ علويٌّ ثابت: الدور والخروج (شاشة البثّ)، وتنبيه الخمول والاستمرارية */
+  div.mz-topbar{ padding-right:calc(var(--duo-widget-w) + var(--duo-widget-gap)) }
+  div.mz-topnote{ padding-right:calc(1rem + var(--duo-widget-w) + var(--duo-widget-gap)) }
   /* الدخول وصفحات البطاقة الواحدة: البطاقة تبدأ تحت المنطقة */
-  .mz-bp-login{ padding-top:var(--duo-cutout-h); padding-bottom:.5rem }
+  .mz-bp-login{ padding-top:calc(var(--duo-widget-h) + .5rem); padding-bottom:.5rem }
   .mz-bp-login .mz-bp-login-card{ padding:1.1rem 1.25rem }
-  .mz-onepage{ margin-top:var(--duo-cutout-h) }
-  /* النوافذ والبحث السريع: تبدأ تحت المنطقة (وتقصر بقدرها) فلا يقع عنوانها أو زرّ إغلاقها تحت الودجت */
-  .mizan-overlay{ align-items:flex-start; padding-top:calc(var(--duo-cutout-h) + .5rem) }
-  .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-cutout-h) - 1.25rem) }
-  .mz-palette-scrim{ padding-top:calc(var(--duo-cutout-h) + .5rem) }
-  /* شاشة البثّ: المشهد كله تحت المنطقة */
-  .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{ padding-top:calc(var(--duo-cutout-h) + .25rem) }
-  div.mz-topnote{ padding-right:calc(var(--duo-cutout-w) + 1rem) }
+  .mz-onepage{ margin-top:var(--duo-widget-h) }
+  /* النوافذ والدُّرج والبحث السريع: تبدأ تحت المنطقة (وتقصر بقدرها) فلا يقع عنوانها أو زرّ إغلاقها تحتها */
+  .mizan-overlay{ align-items:flex-start; padding-top:calc(var(--duo-widget-h) + .5rem) }
+  .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-widget-h) - 1.25rem) }
+  .mz-palette-scrim{ padding-top:calc(var(--duo-widget-h) + .5rem) }
+  aside.mz-guide-sheet{ padding-top:calc(var(--duo-widget-h) + .5rem) }
+  /* شاشة البثّ والعروض المثبّتة بملء الشاشة: المشهد كله تحت المنطقة */
+  .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{ padding-top:calc(var(--duo-widget-h) + .25rem) }
+  .mizan-splash{ padding-top:var(--duo-widget-h) }
+  /* كل سطحٍ مثبّت بملء الشاشة يُمرَّر أو يوسِّط محتواه (نوافذ الإدارة، الإيصال، لوحات القاعة، التحميل) */
+  .fixed.inset-0:is(.overflow-y-auto, .overflow-auto, .grid){ padding-top:calc(var(--duo-widget-h) + .5rem) }
+  /* قائمة «المزيد»: مثبّتةٌ على اليسار الفيزيائي وتحت المنطقة (لا على بداية السطر، ولا فوق الودجت، ولا خارج الشاشة) */
+  .mz-el-header .mizan-more > div{ position:fixed; inset-inline:auto; right:auto; left:.5rem; top:calc(var(--duo-widget-h) + .25rem); max-width:calc(100vw - 1rem) }
+  /* مقبض قفل الجهاز الخفيّ: كان في الزاوية اليمنى العليا تحت الودجت تمامًا، فينتقل إلى اليسرى */
+  .mz-venue-corner{ right:auto; left:0 }
 }
-
-/* الطولي: الشعار مزاحٌ بعرض الزاوية فيضيق المكان، فيُقصّ اسم الجهة («جائزة ميزان الت…»). البحث والشرح
-   ينتقلان إلى قائمة «المزيد» كما في الكتاب (وتنفتح على اليسار بعيدًا عن الزاوية). */
-@media screen and (min-width:640px) and (max-width:720px) and (min-height:520px) and (max-height:960px) and (orientation:portrait){
+/* الطولي من 640: البحث والشرح ينتقلان إلى قائمة «المزيد» كما في الكتاب، ليتّسع الشعار لاسم الجهة. */
+@media screen and (min-width:640px) and (max-width:700px) and (orientation:portrait){
   .mz-el-header .mz-hd-wide{ display:none }
   .mz-el-header .mizan-more{ display:block }
-  .mz-el-header .mizan-more > div{ inset-inline-start:auto; inset-inline-end:1rem; top:calc(var(--duo-cutout-h) - .5rem) }
 }
 
 /* الطولي على الشاشة الداخلية (669×867) صفحةٌ واحدة، لكن جدولًا عريضًا داخل حاوية تمرير (`min-w-[720px]`) كان يمدّ

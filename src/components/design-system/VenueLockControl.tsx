@@ -115,7 +115,7 @@ export const VenueUnlockGuard:React.FC<{lock:VenueLock;ar:boolean;onUnlocked:()=
   return <>
     {/* الإيماءة الخفية: الزاوية العليا اليمنى فقط، وتعمل للمس والماوس. */}
     <div aria-hidden onPointerDown={begin} onPointerUp={cancel} onPointerLeave={cancel} onPointerCancel={cancel}
-      className="fixed top-0 right-0 h-24 w-24 z-[90]" style={{touchAction:'none'}}/>
+      className="mz-venue-corner fixed top-0 right-0 h-24 w-24 z-[90]" style={{touchAction:'none'}}/>
     {asking&&<div role="dialog" aria-modal="true" aria-label={ar?'فتح قفل الجهاز':'Unlock venue device'} className="fixed inset-0 z-[100] bg-[#0d1512]/96 grid place-items-center p-5">
       <div className="w-full max-w-xs text-center">
         <ShieldAlert className="w-7 h-7 mx-auto text-white/80"/>
