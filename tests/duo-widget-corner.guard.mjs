@@ -124,8 +124,14 @@ const measure = p => p.evaluate(assume => {
   const doc = document.documentElement;
   const vw = doc.clientWidth, vh = window.innerHeight;
   const rootCs = getComputedStyle(doc);
+  /* clamp(...) لا يُقرأ بـparseFloat (NaN): تُحلّ القيم بعنصر مسبار يأخذ var() فعلًا. */
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;top:0;left:0;width:var(--duo-widget-w);height:var(--duo-widget-h)';
+  document.body.append(probe);
+  const pr = probe.getBoundingClientRect();
+  probe.remove();
   const num = n => parseFloat(rootCs.getPropertyValue(n)) || 0;
-  let W = num('--duo-widget-w'), H = num('--duo-widget-h');
+  let W = pr.width, H = pr.height;
   if (assume && !W) { W = 96; H = Math.min(270, Math.max(64, window.innerHeight * 0.31)); }
   const zone = { left: vw - W, top: 0, right: vw, bottom: H };
   const sel = el => {
@@ -188,7 +194,7 @@ const measure = p => p.evaluate(assume => {
     for (const r of range.getClientRects()) test(el, r, 'text');
   }
   const wide = overflow => overflow > 1 ? [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > vw + 1 && !hidden(e)).slice(0, 3).map(sel) : [];
-  return { off, wide: wide(doc.scrollWidth - doc.clientWidth), vw, vh, W, H, gap: num('--duo-widget-gap'), overflowX: doc.scrollWidth - doc.clientWidth, hits: [...hits], exempt: [...exempt] };
+  return { off, wide: wide(doc.scrollWidth - doc.clientWidth), vw, vh, W, H, gap: num('--duo-widget-gap'), Hraw: rootCs.getPropertyValue('--duo-widget-h').trim(), overflowX: doc.scrollWidth - doc.clientWidth, hits: [...hits], exempt: [...exempt] };
 }, ASSUME);
 
 /* سياق «التطبيق»: غلاف Capacitor (WKWebView) كما يراه الموقع. مُحاكى في WebKit سطح المكتب — ليس جهازًا ولا WKWebView حقيقيًّا. */
@@ -229,10 +235,11 @@ async function main() {
             if (extra && scheme === 'dark') continue;
             await p.setViewportSize({ width: w, height: h }); await settle(p, 350);
             let m = await measure(p);
-            if (!m.W) { await settle(p, 600); m = await measure(p); }
+            if (!m.W || !m.H) { await settle(p, 600); m = await measure(p); }
             n++; report.cells++;
             const cell = { ctx: kind, scenario: sc.id, size: `${w}x${h}`, scheme, scale };
-            if (!m.W) report.inactive.push(cell);
+            if (!m.W || !m.H) report.inactive.push({ ...cell, W: m.W, H: m.H });
+            else { report.zoneH = report.zoneH || { min: 1e9, max: 0 }; report.zoneH.min = Math.min(report.zoneH.min, m.H); report.zoneH.max = Math.max(report.zoneH.max, m.H); if (Math.abs(m.W - 96) > 0.5) report.inactive.push({ ...cell, W: m.W, H: m.H, note: 'unexpected width' }); }
             if (m.overflowX > 1) report.violations.push({ ...cell, advisory: scale === 200, overflowX: m.overflowX, hits: ['overflow-x', ...m.wide] });
             if (m.off.length) report.violations.push({ ...cell, advisory: scale === 200, hits: ['offscreen', ...m.off.slice(0, 4)] });
             if (m.hits.length) { bad++; report.violations.push({ ...cell, zone: `x≥${m.vw - m.W}, y≤${Math.round(m.H)}`, hits: m.hits.slice(0, 8), count: m.hits.length }); }
@@ -260,6 +267,7 @@ async function main() {
   console.log(`engine=${ENGINE} ${report.version} · cells=${report.cells} · inactive=${report.inactive.length} · violating cells=${report.violations.length} ${JSON.stringify(byCtx)} · elements in zone=${nViol} · exemptions=${Object.keys(report.exemptions).length}`);
   for (const v of report.violations.slice(0, 25)) console.log(`  ✗ [${v.ctx}] ${v.scenario} ${v.size || ''} ${v.scheme || ''} ${v.scale || ''}% :: ${(v.hits || [v.error]).slice(0, 3).join(' | ')}`);
   const hard = report.violations.filter(v => !v.advisory);
+  console.log(`zone W=96 · H range ${report.zoneH ? Math.round(report.zoneH.min) + '–' + Math.round(report.zoneH.max) : 'n/a'}px`);
   console.log(`hard violations=${hard.length} · advisory (200% text overflow, present on the base too)=${report.violations.length - hard.length}`);
   if (hard.length || report.inactive.length) process.exit(1);
 }

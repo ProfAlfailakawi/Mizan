@@ -2416,6 +2416,9 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   /* صفٌّ يلتفّ («ابدأ من هنا»: حلقة + نصّ + زرّ): النصّ المرن لا ينضغط كلمةً في سطر، بل ينزل الزرّ. */
   :is(.mz-leaf, .mz-spread-index > *) .flex.flex-wrap > .min-w-0.flex-1{ min-width:min(100%, 9rem) }
 }
+/* ركن الودجت — نصّ تعليمات قفل الجهاز: الزاوية اليمنى افتراضيًّا، واليسرى داخل المنطقة (أسفل). */
+.mz-corner-l{ display:none }
+
 /* 3ب) ركن الودجت — منطقةٌ محجوزة واحدة، ومصدرها الوحيد هذه الكتلة.
    على iPhone Duo يطفو فوق الزاوية العليا اليمنى **الفيزيائية** عنصرُ نظامٍ لا يدخل في safe-area (كبسولة
    المصباح + الحساب/الموقع + الوقت + البطارية). **تقدير من لقطات المالك داخل التطبيق لا قياسُ جهاز** (انظر
@@ -2463,6 +2466,8 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mz-bp-login{ padding-top:calc(var(--duo-widget-h) + .5rem); padding-bottom:.5rem }
   .mz-bp-login .mz-bp-login-card{ padding:1.1rem 1.25rem }
   .mz-onepage{ margin-top:var(--duo-widget-h) }
+  /* صفحات بلا ترويسة تُوسَّط محتواها (استعادة كلمة المرور): تبدأ تحت المنطقة */
+  .mz-duo-top{ padding-top:calc(var(--duo-widget-h) + .5rem) }
   /* النوافذ والدُّرج والبحث السريع: تبدأ تحت المنطقة (وتقصر بقدرها) فلا يقع عنوانها أو زرّ إغلاقها تحتها */
   .mizan-overlay{ align-items:flex-start; padding-top:calc(var(--duo-widget-h) + .5rem) }
   .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-widget-h) - 1.25rem) }
@@ -2477,6 +2482,9 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
   .mz-el-header .mizan-more > div{ position:fixed; inset-inline:auto; right:auto; left:.5rem; top:calc(var(--duo-widget-h) + .25rem); max-width:calc(100vw - 1rem) }
   /* مقبض قفل الجهاز الخفيّ: كان في الزاوية اليمنى العليا تحت الودجت تمامًا، فينتقل إلى اليسرى */
   .mz-venue-corner{ right:auto; left:0 }
+  /* ونصّ تعليمات القفل يتبع مكانه */
+  .mz-corner-r{ display:none }
+  .mz-corner-l{ display:inline }
 }
 /* الطولي من 640: البحث والشرح ينتقلان إلى قائمة «المزيد» كما في الكتاب، ليتّسع الشعار لاسم الجهة. */
 @media screen and (min-width:640px) and (max-width:700px) and (orientation:portrait){

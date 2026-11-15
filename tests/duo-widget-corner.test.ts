@@ -53,7 +53,7 @@ test('the condition is generic (no exact widths) and covers 457x678, the inferre
 });
 
 test('the surfaces that are not in the header reserve it too', () => {
-  for (const s of ['div.mz-topbar', 'div.mz-topnote', '.mz-bp-login', '.mizan-overlay', '.mz-palette-scrim', 'aside.mz-guide-sheet', '.mz-venue-corner']) assert.ok(block.includes(s), s);
+  for (const s of ['div.mz-topbar', 'div.mz-topnote', '.mz-bp-login', '.mizan-overlay', '.mz-palette-scrim', 'aside.mz-guide-sheet', '.mz-venue-corner', '.mz-duo-top']) assert.ok(block.includes(s), s);
   assert.match(read('components/design-system/VenueLockControl.tsx'), /mz-venue-corner fixed top-0 right-0/);
   assert.match(read('App.tsx'), /mz-topnote fixed inset-x-0 top-0/);
 });
