@@ -1141,6 +1141,11 @@ html[data-mizan-touch="xl"] .mizan-judge-action{ min-height:120px }
   border-radius:10px;
   background:rgba(255,253,246,.48);
 }
+/* In narrow Split View the Mushaf toolbar must wrap before its final control leaves the page. */
+@media (max-width:360px){
+  .mizan-judge-os .mizan-mushaf-tools{ flex-wrap:wrap; justify-content:flex-start; gap:.35rem; padding-inline:.6rem; }
+  .mizan-judge-os .mizan-mushaf-tool{ min-width:0; max-width:100%; white-space:normal; }
+}
 /*
  * الدُّرجُ يُرسى تحت الصفحة ولا يطفو فوقها.
  *

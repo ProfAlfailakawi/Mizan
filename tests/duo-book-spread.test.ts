@@ -66,6 +66,17 @@ test('the judge cockpit splits at the spine, and a real hinge still wins', () =>
   assert.match(css, /\.mizan-judge-os\{ grid-template-columns:repeat\(2,minmax\(0,1fr\)\); column-gap:var\(--duo-spine\) \}/);
 });
 
+test('the Mushaf toolbar wraps its controls in a 320px Split View', () => {
+  const start = css.indexOf('/* In narrow Split View the Mushaf toolbar');
+  const end = css.indexOf('\n}', start);
+  const rule = css.slice(start, end);
+  assert.ok(start > 0, 'narrow toolbar rule exists');
+  assert.match(rule, /@media\s*\(max-width:360px\)/);
+  assert.match(rule, /\.mizan-mushaf-tools\{[^}]*flex-wrap:wrap/);
+  assert.match(rule, /\.mizan-mushaf-tool\{[^}]*max-width:100%/);
+  assert.match(read('components/judge/OfficialMushafSurface.tsx'), /className="mizan-mushaf-tools/);
+});
+
 test('laptop posture keeps controls at the bottom with space reserved for them', () => {
   assert.match(css, /body:has\(\.mz-el-mnav\)\{ padding-bottom:calc\(3\.6rem/);
   assert.match(css, /body:has\(\.mz-leaf-b > \.mizan-tabs\)\{ padding-bottom:calc\(3\.75rem/);
