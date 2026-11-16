@@ -347,9 +347,9 @@ html[data-mizan-touch="xl"] [role="button"] { min-height: 52px; }
    preserve the larger accessibility profile and let taller controls keep their size. */
 @media (pointer: coarse) and (max-width:700px){
   .mizan-demo-bar select,
-  .mizan-shell-main select { min-height:44px; }
+  .mizan-shell-main select.mizan-input { min-height:44px; height:44px; }
   html[data-mizan-touch="xl"] .mizan-demo-bar select,
-  html[data-mizan-touch="xl"] .mizan-shell-main select { min-height:52px; }
+  html[data-mizan-touch="xl"] .mizan-shell-main select.mizan-input { min-height:52px; height:52px; }
 }
 html[data-mizan-contrast="high"] { --muted:#4f5651; --line:#c8c8c0; }
 html[data-mizan-contrast="high"] .mizan-surface { border-color:#c6c6be; }
