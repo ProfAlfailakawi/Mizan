@@ -86,7 +86,6 @@
   }
   ::selection { background: #dce7e1; }
 }
-
 .font-quran { font-family: var(--font-quran); }
 .font-arabic { font-family: var(--font-arabic); }
 .font-sans-en { font-family: var(--font-sans); }
@@ -344,6 +343,14 @@ html[data-mizan-touch="xl"] button,
 html[data-mizan-touch="xl"] input,
 html[data-mizan-touch="xl"] select,
 html[data-mizan-touch="xl"] [role="button"] { min-height: 52px; }
+/* Duo-width selects: generated min-height utilities must not shrink touch targets;
+   preserve the larger accessibility profile and let taller controls keep their size. */
+@media (pointer: coarse) and (max-width:700px){
+  .mizan-demo-bar select,
+  .mizan-shell-main select { min-height:44px; }
+  html[data-mizan-touch="xl"] .mizan-demo-bar select,
+  html[data-mizan-touch="xl"] .mizan-shell-main select { min-height:52px; }
+}
 html[data-mizan-contrast="high"] { --muted:#4f5651; --line:#c8c8c0; }
 html[data-mizan-contrast="high"] .mizan-surface { border-color:#c6c6be; }
 html[data-mizan-motion="reduced"] *,
@@ -2644,3 +2651,5 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
+
+
