@@ -2644,3 +2644,12 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 
 /* الترويسة من 640px: اسم العلامة سطرٌ واحد لا يلتفّ على ثلاثة؛ ما يضيق هو الاسم والمسابقة المقتطعان بجواره (Header.tsx). */
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
+
+
+/* iPhone Duo/small touch viewports: utility size tokens such as min-h-11
+   can compile below the shared 44px control contract. Keep native selects
+   and compact action controls genuinely tappable without changing their
+   colors, labels, or behavior. */
+@media (pointer: coarse) and (max-width: 700px) {
+  button, input, select { min-height: 44px !important; }
+}
