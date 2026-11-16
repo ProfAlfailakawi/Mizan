@@ -86,6 +86,16 @@
   }
   ::selection { background: #dce7e1; }
 }
+  /* Duo-width touch selects: later Tailwind utilities can otherwise shrink the global 44px minimum. */
+  @layer utilities {
+    @media (pointer: coarse) and (max-width: 700px) {
+      .mizan-demo-bar select,
+      .mizan-shell-main select {
+        min-height: 44px !important;
+        height: 44px !important;
+      }
+    }
+  }
 
 .font-quran { font-family: var(--font-quran); }
 .font-arabic { font-family: var(--font-arabic); }
@@ -2646,15 +2656,3 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 @media (min-width:640px){.mizan-header-logo{flex-shrink:0}.mizan-header-logo .mizan-wordmark-name{white-space:nowrap}}
 
 
-/* iPhone Duo/small touch viewports: generated height utilities override
-   the global 44px control minimum on native filter and role selects. Keep
-   these high-frequency controls tappable without changing labels or behavior. */
-@layer utilities {
-  @media (pointer: coarse) and (max-width: 700px) {
-    .mizan-demo-bar select,
-    .mizan-shell-main select {
-      min-height: 44px !important;
-      height: 44px !important;
-    }
-  }
-}
