@@ -1,5 +1,6 @@
 /* أولًا: يُركَّب نقل معرّف الصندوق التجريبي قبل أي التقاطٍ لـ window.fetch (انظر lib/demo-transport.ts). */
 import './lib/demo-transport';
+import {installDuoMarkers} from './lib/duo-markers';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
@@ -9,6 +10,7 @@ import './mushaf-participant-polish.css';
 import './beauty-pass.css';
 import './elevation.css';
 import './motion.css';
+import './duo-pattern.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
@@ -19,6 +21,8 @@ import {installUpdatingWatch} from './lib/updating-notice';
 /* أثناء النشر تجيب المنصّةُ /api بصفحة خطأ HTML: شريطٌ هادئ «نُحدّث البرنامج» بدل حيرةٍ في الشاشات.
    يُركَّب قبل أي طلب، ويراقب فقط ولا يغيّر جوابًا. */
 installUpdatingWatch();
+/* علامات iPhone Duo قبل أول رسم، فلا يومض تخطيط الهاتف ثم يتبدّل. */
+installDuoMarkers();
 /* علامة المضيف تُجلب قبل أول رسم، فلا تومض «ميزان» على نطاق مشغّلٍ بعلامة بيضاء. */
 loadHostBrand();
 

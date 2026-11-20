@@ -1,0 +1,169 @@
+/*
+ * iPhone Duo — النمط المعتمد (2026-11-19) لكل الصفحات والصفحات الداخلية والنوافذ.
+ *
+ * كل قاعدةٍ هنا تحت `html[data-device="duo"]` (العلامة من src/lib/duo-markers.ts): الهاتف العادي وiPad
+ * والحاسوب لا يتغيّر فيها بكسل. والحجز القديم الثابت لركن الودجت (96px × 31vh في src/index.css) صار
+ * لغير الدوو وحده؛ هنا تُحجز المنطقة بما يبلغه iOS نفسه (`env(safe-area-inset-*)`):
+ *   - Safari: الساعة في شريط Safari، فلا حجز في الصفحة (الحدود صفر) ولا شريط فارغ.
+ *   - التطبيق: الخارجية عمودٌ جانبي (~84pt)، والداخلية الطولية شريطٌ علوي (~82pt).
+ * الخلفيات تمتدّ حافةً لحافة تحت الساعة وأزرار Safari؛ المحتوى وحده يقف قبلها.
+ * الحدود تُكتب فيزيائيًّا (يمين/يسار) لا بداية/نهاية السطر، فلا تتبدّل بتبدّل اللغة.
+ */
+
+html[data-device="duo"]{
+  --duo-widget-w:env(safe-area-inset-right,0px);
+  --duo-widget-h:env(safe-area-inset-top,0px);
+  --duo-widget-gap:0px;
+  --duo-pin-top:calc(3.5rem + 1rem + env(safe-area-inset-top,0px));
+  --duo-safe-t:env(safe-area-inset-top,0px);
+  --duo-safe-r:env(safe-area-inset-right,0px);
+  --duo-safe-b:env(safe-area-inset-bottom,0px);
+  --duo-safe-l:env(safe-area-inset-left,0px);
+  --duo-row-h:3.6rem;
+  --duo-glass:color-mix(in srgb, var(--surface, #fff) 72%, transparent);
+  --duo-glass-line:color-mix(in srgb, var(--line, #dfded7) 80%, transparent);
+  --duo-glass-shadow:0 10px 30px rgba(20,36,30,.14);
+}
+
+/* ── 1) الترويسة: شريطٌ علوي بعرض الصفحة، مضغوط، بارتفاعه الطبيعي ───────────────────────── */
+html[data-device="duo"] header.mz-el-header{ position:sticky; top:0; padding-top:var(--duo-safe-t) }
+html[data-device="duo"] .mz-el-header > .h-16{ height:3.5rem; min-height:3.5rem; padding-right:max(.75rem, var(--duo-safe-r)); padding-left:max(.75rem, var(--duo-safe-l)) }
+html[data-device="duo"] .mz-el-header > .sm\:hidden.border-t{ padding-block:.25rem }
+/* القصير (الخارجية عرضيًّا): الترويسة تجري مع الصفحة كما في الهاتف، فلا تأكل ربع الارتفاع طوال التمرير. */
+@media (max-height:520px){ html[data-device="duo"] header.mz-el-header{ position:relative } }
+/* قائمة «المزيد» تُفتح تحت الترويسة وداخل الشاشة، بعيدًا عن جهة الساعة. */
+html[data-device="duo"] .mz-el-header .mizan-more > div{ top:calc(3.6rem + var(--duo-safe-t)); max-width:calc(100vw - 1rem - var(--duo-safe-l) - var(--duo-safe-r)) }
+html[data-device="duo"][data-widget-side="right"] .mz-el-header .mizan-more > div{ inset-inline:auto; left:max(.5rem, var(--duo-safe-l)); right:auto }
+html[data-device="duo"][data-widget-side="left"] .mz-el-header .mizan-more > div{ inset-inline:auto; right:max(.5rem, var(--duo-safe-r)); left:auto }
+
+/* ── 2) عناوين الصفحات مضغوطة: الشاشة صغيرة، والعنوان سطرٌ لا لوحة ─────────────────────────── */
+html[data-device="duo"] .mizan-shell-main :is(h1.text-3xl, h1.text-4xl, h1.sm\:text-4xl, h1.sm\:text-3xl, h1.text-2xl){
+  font-size:1.4rem; line-height:1.3; margin-top:.15rem;
+}
+html[data-device="duo"] .mizan-shell-main .mizan-hero,
+html[data-device="duo"] .mizan-shell-main .mizan-surface.mz-pt-hero{ padding:1rem 1.1rem }
+html[data-device="duo"] .mizan-shell-main .mz-portal-head p{ margin-top:.25rem; font-size:.8rem }
+/* الشاشة الخارجية: العنوان سطرٌ واحد. */
+@media (max-width:520px), (max-height:520px){
+  html[data-device="duo"] .mizan-shell-main :is(h1.text-3xl, h1.text-4xl, h1.sm\:text-4xl, h1.sm\:text-3xl, h1.text-2xl){
+    font-size:1.2rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+  }
+}
+
+/* ── 3) شريط التنقّل: صفٌّ واحد أسفل الشاشة بلون الصفحة ────────────────────────────────────
+   أقسام المسابقة (`.mz-el-mnav`) وتبويبات الصفحة الرئيسة (`.mz-leaf-b > .mizan-tabs`) — في الطولي
+   (الشاشتان) والعرضي الخارجي. الكتاب العرضي له قسمه (5). */
+@media (orientation:portrait), (max-height:520px){
+  html[data-device="duo"] body:has(.mz-el-mnav),
+  html[data-device="duo"] body:has(.mz-leaf-b > .mizan-tabs){ padding-bottom:calc(var(--duo-row-h) + var(--duo-safe-b)) }
+  html[data-device="duo"] .mizan-shell-main nav.mz-el-mnav,
+  html[data-device="duo"] .mizan-shell-main .mz-leaf-b > .mizan-tabs{
+    position:fixed; z-index:45; left:0; right:0; bottom:0; margin:0; width:auto; max-width:none; border-radius:0;
+    display:flex; flex-wrap:nowrap; gap:.3rem; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none;
+    padding:.35rem max(.6rem, var(--duo-safe-r)) calc(.35rem + var(--duo-safe-b)) max(.6rem, var(--duo-safe-l));
+    background:var(--canvas); border:0; border-top:1px solid var(--line);
+  }
+  html[data-device="duo"] .mizan-shell-main nav.mz-el-mnav > .grid{ display:flex; flex-wrap:nowrap; gap:.3rem; width:100%; max-width:none }
+  html[data-device="duo"] .mizan-shell-main nav.mz-el-mnav button{ flex:1 1 0; min-width:0; min-height:46px; padding:3px 1px; gap:1px }
+  html[data-device="duo"] .mizan-shell-main nav.mz-el-mnav button span{ font-size:10px; line-height:1.15 }
+  html[data-device="duo"] .mizan-shell-main nav.mz-el-mnav button svg{ width:18px; height:18px }
+  html[data-device="duo"] .mizan-shell-main .mz-leaf-b > .mizan-tabs > *{
+    flex:1 0 auto; min-width:4.5rem; min-height:46px; justify-content:center; text-align:center; white-space:nowrap; font-size:12px; padding-inline:.5rem;
+  }
+  /* بيئة العرض: شريطها الأصفر ثابتٌ أسفل الشاشة من 640px (3.5rem، DEMO_BAR_HEIGHT_REM)، فيقف الصفّ فوقه. */
+  html[data-device="duo"] body:has(.mizan-demo-bar) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ bottom:calc(3.5rem + var(--duo-safe-b)) }
+}
+@media (max-width:639.98px){
+  /* تحت 640 شريط العرض جزءٌ من الصفحة لا مثبّت: الصفّ يبقى على الحافة السفلى. */
+  html[data-device="duo"] body:has(.mizan-demo-bar) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ bottom:0 }
+}
+
+/* ── 4) التطبيق: المحتوى يقف قبل عمود الساعة أو شريطها، والتنقّل كبسولاتٌ زجاجية ──────────── */
+/* Safari أيضًا: أزراره العائمة في العرضي الخارجي تبلغ safe-area-inset-left، فالمحتوى يقف قبلها. */
+html[data-device="duo"] body{ padding-left:var(--duo-safe-l); padding-right:var(--duo-safe-r) }
+html[data-device="duo"][data-shell="app"] .mz-el-header > .h-16{ padding-inline:.75rem }
+
+/* 4أ) الخارجية (العمود جانبي): كبسولة التنقّل في عمود الساعة تحت الساعة، وتتبع جهته بعد التدوير. */
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mz-el-mnav),
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mz-leaf-b > .mizan-tabs){ padding-bottom:var(--duo-safe-b) }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
+  position:fixed; z-index:45; top:5.5rem; bottom:auto; margin:0; border-radius:1.6rem; width:4.5rem;
+  display:flex; flex-direction:column; flex-wrap:nowrap; gap:.2rem; overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
+  max-height:calc(100dvh - 6.5rem - var(--duo-safe-b)); padding:.3rem; border:1px solid var(--duo-glass-line);
+  background:var(--duo-glass); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
+  box-shadow:var(--duo-glass-shadow);
+}
+html[data-device="duo"][data-shell="app"][data-widget-side="right"] .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ right:max(.25rem, calc((var(--duo-safe-r) - 4.5rem) / 2)); left:auto }
+html[data-device="duo"][data-shell="app"][data-widget-side="left"] .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ left:max(.25rem, calc((var(--duo-safe-l) - 4.5rem) / 2)); right:auto }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main nav.mz-el-mnav > .grid{ display:flex; flex-direction:column; gap:.2rem }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main nav.mz-el-mnav button{ flex:0 0 auto; min-height:44px; border-radius:1.2rem; padding:4px 0; border-color:transparent }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main nav.mz-el-mnav button span{ font-size:9px; line-height:1.1 }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main .mz-leaf-b > .mizan-tabs > *{
+  flex:0 0 auto; min-width:0; min-height:44px; padding:.3rem .2rem; border-radius:1.2rem; white-space:normal; font-size:10.5px; line-height:1.2; text-align:center; justify-content:center;
+  flex-direction:column; align-items:center; gap:2px; overflow-wrap:normal; word-break:normal;
+}
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main .mz-leaf-b > .mizan-tabs > * *{ overflow-wrap:normal; word-break:normal; white-space:normal }
+/* مقبض قفل الجهاز الخفيّ يبتعد عن عمود الساعة. */
+html[data-device="duo"][data-shell="app"][data-widget-side="right"] .mz-venue-corner{ right:auto; left:0 }
+
+/* 4ب) الداخلية الطولية (شريطٌ علوي): الترويسة تحت الشريط، والتنقّل شريطٌ زجاجي عائم. */
+@media (orientation:portrait) and (min-width:600px){
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
+    left:1rem; right:1rem; bottom:calc(.75rem + var(--duo-safe-b)); border-radius:1.6rem; padding:.35rem;
+    border:1px solid var(--duo-glass-line); background:var(--duo-glass);
+    backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); box-shadow:var(--duo-glass-shadow);
+  }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] body:has(.mizan-demo-bar) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ bottom:calc(3.5rem + .5rem + var(--duo-safe-b)) }
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] body:has(.mz-el-mnav),
+  html[data-device="duo"][data-shell="app"][data-widget-side="none"] body:has(.mz-leaf-b > .mizan-tabs){ padding-bottom:calc(var(--duo-row-h) + 1.5rem + var(--duo-safe-b)) }
+}
+
+/* ── 5) الكتاب العرضي (الداخلية): صفحتان والكعب على المفصل ─────────────────────────────────
+   الورقة اليمنى (ملوّنة) للسياق: العنوان والحالة والتبويبات والملخّص؛ واليسرى للقائمة نفسها، تُمرَّر
+   وحدها. */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] .mz-spread > .mz-leaf-b{ grid-column:1; grid-row:1 }
+  html[data-device="duo"] .mz-spread > .mz-leaf-a{ grid-column:2; grid-row:1 }
+  html[data-device="duo"] .mz-spread > .mz-leaf-b:not(:empty){
+    background:color-mix(in srgb, var(--emerald, #214c40) 5%, var(--canvas)); border-radius:1.25rem; padding:.85rem;
+    max-height:calc(100dvh - var(--duo-pin-top) - 1rem - var(--duo-safe-b)); overflow-y:auto; scrollbar-width:thin;
+  }
+  /* ورقةٌ فارغة لا تبقى: إن لم يكن للسياق شيء، تأخذ القائمة الصفحتين بعمودين يلتقيان عند الكعب. */
+  html[data-device="duo"] .mz-spread:not(.mz-spread-index):has(> .mz-leaf-b:empty) > .mz-leaf-a{ grid-column:1 / -1; column-count:2; column-gap:var(--duo-gap) }
+  html[data-device="duo"] .mz-spread:not(.mz-spread-index):has(> .mz-leaf-b:empty) > .mz-leaf-a > *{ break-inside:avoid }
+  /* إدارة المسابقة: فهرس الأقسام الثمانية هو «المرشّح» على الورقة اليمنى الملوّنة، والقسم المفتوح يملأ اليسرى
+     (لو عام الفهرس شريطًا لبقيت إحدى الورقتين فارغة). */
+  html[data-device="duo"] .mz-spread-index > *{ grid-column:2 }
+  html[data-device="duo"] .mz-spread-index > .mz-el-mnav{
+    grid-column:1; background:color-mix(in srgb, var(--emerald, #214c40) 5%, var(--canvas)); border-radius:1.25rem; padding:.85rem;
+  }
+}
+
+/* ── 6) النوافذ والأدراج والقوائم والبحث وشاشات القاعة ─────────────────────────────────────
+   كل سطحٍ مثبّت بملء الشاشة: خلفيته حافةً لحافة، ومحتواه داخل حدود النظام. */
+html[data-device="duo"] .fixed.inset-0:not(.pointer-events-none):not(.mz-ovt-veil),
+html[data-device="duo"] .mizan-overlay,
+html[data-device="duo"] .mz-palette-scrim{
+  padding-top:max(.75rem, calc(var(--duo-safe-t) + .5rem));
+  padding-right:max(.75rem, calc(var(--duo-safe-r) + .5rem));
+  padding-bottom:max(.75rem, calc(var(--duo-safe-b) + .5rem));
+  padding-left:max(.75rem, calc(var(--duo-safe-l) + .5rem));
+}
+html[data-device="duo"] .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-safe-t) - var(--duo-safe-b) - 1.5rem) }
+html[data-device="duo"] aside.mz-guide-sheet{ padding-top:calc(var(--duo-safe-t) + .75rem); padding-bottom:calc(var(--duo-safe-b) + .75rem); max-height:100dvh; overflow-y:auto }
+html[data-device="duo"][data-shell="app"][data-widget-side="right"] aside.mz-guide-sheet{ padding-right:calc(var(--duo-safe-r) + .5rem) }
+html[data-device="duo"][data-shell="app"][data-widget-side="left"] aside.mz-guide-sheet{ padding-left:calc(var(--duo-safe-l) + .5rem) }
+/* الأشرطة الثابتة: العلوية (شاشة البثّ، تنبيه الخمول) والسفلية (قفل القاعة، شريط العرض). */
+html[data-device="duo"] div.mz-topbar{ top:calc(.75rem + var(--duo-safe-t)); left:calc(.75rem + var(--duo-safe-l)); right:calc(.75rem + var(--duo-safe-r)) }
+html[data-device="duo"] div.mz-topnote{ padding-top:calc(.5rem + var(--duo-safe-t)); padding-right:calc(1rem + var(--duo-safe-r)); padding-left:calc(1rem + var(--duo-safe-l)) }
+html[data-device="duo"] .mizan-venue-lock-dock{ bottom:calc(1rem + var(--duo-safe-b)); padding-right:calc(1rem + var(--duo-safe-r)); padding-left:calc(1rem + var(--duo-safe-l)) }
+html[data-device="duo"] .mizan-demo-bar-row{ padding-right:max(.75rem, var(--duo-safe-r)); padding-left:max(.75rem, var(--duo-safe-l)) }
+html[data-device="duo"] .mizan-demo-bar{ padding-bottom:var(--duo-safe-b) }
+html[data-device="duo"] .mizan-splash{ padding-top:var(--duo-safe-t) }
+/* الدخول وصفحات البطاقة الواحدة: البطاقة داخل الحدود، والخلفية تحتها. */
+html[data-device="duo"] .mz-bp-login{ padding-top:calc(var(--duo-safe-t) + .75rem); padding-bottom:calc(var(--duo-safe-b) + .75rem); padding-right:calc(var(--duo-safe-r) + .75rem); padding-left:calc(var(--duo-safe-l) + .75rem) }
+html[data-device="duo"] .mz-duo-top{ padding-top:calc(var(--duo-safe-t) + .75rem) }
+
+/* جدولٌ عريض في حاوية تمرير (`min-w-[720px]`): نصّه المخفيّ للقارئ الآلي مطلق الموضع ومرجعه الصفحة لا الحاوية،
+   فكان يمدّ الصفحة كلها جانبًا (733px في عرضي الخارجية). تصير الحاوية المُمرَّرة مرجعه. */
+html[data-device="duo"] :where(.overflow-x-auto,.overflow-auto):not(.absolute):not(.fixed):not(.sticky){ position:relative }
