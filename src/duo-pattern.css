@@ -167,3 +167,60 @@ html[data-device="duo"] .mz-duo-top{ padding-top:calc(var(--duo-safe-t) + .75rem
 /* جدولٌ عريض في حاوية تمرير (`min-w-[720px]`): نصّه المخفيّ للقارئ الآلي مطلق الموضع ومرجعه الصفحة لا الحاوية،
    فكان يمدّ الصفحة كلها جانبًا (733px في عرضي الخارجية). تصير الحاوية المُمرَّرة مرجعه. */
 html[data-device="duo"] :where(.overflow-x-auto,.overflow-auto):not(.absolute):not(.fixed):not(.sticky){ position:relative }
+
+/* ── 7) مساحة العمل المتكاملة: الداخلية طولًا والمفصل أفقي ────────────────────────────────────
+   الشاشتان عملٌ واحد: العليا تعرض ما يُعمل عليه، والسفلى أدوات التحكّم المرتبطة به، وما يُسجَّل في السفلى
+   يظهر فورًا في العليا. Safari لا يعلن موضع المفصل، فيُقدَّر من نسبة الشاشة: بعد شريط Safari ≈ 42٪ من
+   نافذة العرض، وفي التطبيق 50٪. حزامٌ هادئ بعرض --duo-hinge-band حول المفصل لا يعبره شيء. عرضٌ فقط. */
+@media screen and (orientation:portrait) and (min-width:600px) and (max-width:820px) and (min-height:700px){
+  html[data-device="duo"]{ --duo-hinge-y:42dvh; --duo-hinge-band:28px }
+  html[data-device="duo"][data-shell="app"]{ --duo-hinge-y:50dvh }
+
+  /* قمرة المحكّم: الموضع من المصحف وحده في العليا حتى المفصل (أو بوابة الجلسة قبل فتحه)، وكل ما يُفعل
+     في السفلى: مسار البوابات والتنبيهات وزرّ «تلاوة أول آية» ثم لوحة التسجيل بعرض الشاشة. ما يُسجَّل من
+     مفاتيح السفلى يُعلَّم على كلمات المصحف في العليا. الورقة تُفرَد في شبكة القمرة (display:contents)
+     فيأخذ كل جزءٍ منها نصفه دون نقلٍ في الشجرة ولا تغييرٍ في ترتيب القراءة. */
+  html[data-device="duo"] .mizan-judge-os{
+    --duo-judge-top-h:max(9rem, calc(var(--duo-hinge-y) - var(--mizan-judge-top, 64px) - var(--duo-hinge-band) / 2));
+    /* القمرة لا تُحبس في ارتفاع الشاشة هنا: العليا مثبّتة حتى المفصل، والسفلى تجري تحت حزامه إن طالت. */
+    height:auto; min-height:calc(100dvh - var(--mizan-judge-top, 64px) - var(--mizan-shell-pb, 0px)); overflow:visible;
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"top" "band" "gates" "alert" "notes" "act" "deck";
+    grid-template-rows:var(--duo-judge-top-h) var(--duo-hinge-band) auto auto auto auto minmax(0,1fr);
+    row-gap:0;
+    /* الحزام يأخذ لون الصفحة: فاصلٌ هادئ بين المصحف وما تحته، لا شريطٌ داكن يُقرأ جزءًا من اللوحة. */
+    background:var(--canvas, #f7f5ef);
+  }
+  html[data-device="duo"] .mizan-judge-os > .mizan-judge-page,
+  html[data-device="duo"] .mizan-judge-os .mizan-judge-paper{ display:contents }
+  html[data-device="duo"] .mizan-judge-os > .mizan-judge-page::after{ display:none }
+  html[data-device="duo"] .mizan-judge-paper > :is(.mizan-judge-quran, .mizan-judge-gate){
+    grid-area:top; position:sticky; top:var(--mizan-judge-top, 64px); z-index:15;
+    height:var(--duo-judge-top-h); box-sizing:border-box; min-height:0; overflow:hidden; padding:.5rem .85rem .6rem;
+    background:radial-gradient(ellipse at 50% 42%, rgba(255,255,255,.24), transparent 58%), var(--jc-paper);
+    /* حزام المفصل يُرسم تحت العليا بلون الصفحة: ما يُمرَّر من السفلى لا يظهر فيه. */
+    box-shadow:inset 0 -14px 26px rgba(42,36,20,.07), 0 calc(var(--duo-hinge-band) + 1px) 0 var(--canvas, #f7f5ef);
+  }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-gate{ overflow-y:auto; overscroll-behavior:contain }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-gates{ grid-area:gates; margin:0 !important; padding:0 .85rem .4rem }
+  html[data-device="duo"] .mizan-judge-paper > [role="alert"]{ grid-area:alert; margin:0 .85rem .45rem }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-notes{ grid-area:notes; margin:0; padding:0 .85rem .45rem }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-quran + div{ grid-area:act; margin:0; padding:0 .85rem .5rem }
+  html[data-device="duo"] .mizan-judge-os > .mizan-judge-deck{ grid-area:deck }
+  html[data-device="duo"] .mizan-judge-deck{
+    border-inline-start:0; border-top:0; border-radius:1.1rem 1.1rem 0 0; max-height:none; min-height:0; grid-template-rows:auto auto auto;
+    gap:.45rem; padding-block:.6rem calc(.6rem + var(--duo-safe-b, 0px));
+  }
+  /* اللوحة بعرض الشاشة: ثلاثة مفاتيح في الصف بدل اثنين، فتتّسع السفلى للمفاتيح والذيل دون تمرير. */
+  html[data-device="duo"] .mizan-judge-pad{ grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:minmax(52px,1fr) }
+  html[data-device="duo"] .mizan-judge-pad > :last-child:nth-child(odd){ grid-column:auto }
+  html[data-device="duo"] .mizan-judge-pad > :last-child:nth-child(3n+1){ grid-column:1 / -1 }
+  html[data-device="duo"] .mizan-judge-action{ min-height:52px }
+}
+
+/* الكتاب العرضي: اسم الجهة يظهر كاملًا في نصف الترويسة، والسطر المرافق (المحكّم · المسابقة) هو الذي يُختصر. */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] .mz-el-header .mizan-header-logo{ flex-shrink:0; overflow:visible }
+  html[data-device="duo"] .mz-el-header .mizan-header-logo .mizan-wordmark-name{ overflow:visible; text-overflow:clip; white-space:nowrap }
+  html[data-device="duo"] .mz-el-header > div:first-child > :first-child > .min-w-0{ flex:1 1 0; overflow:hidden }
+}
