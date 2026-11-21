@@ -2431,73 +2431,10 @@ label:has(> input[type="checkbox"]:not(.mizan-chip-input)){ min-height:44px; min
 /* ركن الودجت — نصّ تعليمات قفل الجهاز: الزاوية اليمنى افتراضيًّا، واليسرى داخل المنطقة (أسفل). */
 .mz-corner-l{ display:none }
 
-/* 3ب) ركن الودجت — منطقةٌ محجوزة واحدة، ومصدرها الوحيد هذه الكتلة.
-   على iPhone Duo يطفو فوق الزاوية العليا اليمنى **الفيزيائية** عنصرُ نظامٍ لا يدخل في safe-area (كبسولة
-   المصباح + الحساب/الموقع + الوقت + البطارية). **تقدير من لقطات المالك داخل التطبيق لا قياسُ جهاز** (انظر
-   docs/IPHONE-DUO-FINAL-ACCEPTANCE.md §14.1): عرض ~54pt يبدأ ~20pt من الحافة، من y≈20 إلى ≈166pt؛ وقياسٌ مستقلّ
-   يقترح ~80px عرضًا بين 30 و110 من الحافة ويصل y≈268. فالمدى غير مؤكَّد: 84–112px عرضًا و174–270px ارتفاعًا.
-     --duo-widget-w   96px                       العرض من الحافة اليمنى (يغطّي القياسين مع فسحة)
-     --duo-widget-gap  8px                       فسحة بين المحتوى والمنطقة
-     --duo-widget-h   clamp(64px, 31vh, 270px)   الارتفاع
-   خارج الجهاز الثلاثة 0 (التعريف الافتراضي في أول الملف)، فكل قاعدةٍ تقرؤها لا أثر لها هناك.
-   المعايرة على الجهاز: `?duo-debug=1&duo-w=110&duo-h=270` تُبدّل القيمتين مباشرةً (src/lib/duo-debug.ts).
-   الكشف عامٌّ بلا عروض مضبوطة (فمقاس التطبيق الفعلي ~457×678 ليس من «المقاسات المعروفة»):
-     • طولي بعرض ≤ 700 وارتفاع ≥ 360 (أيّ ارتفاع: التطبيق أطول من Safari)،
-     • عرضي 540–1000 بارتفاع 300–800 (594×368، 951×585، 780×470، 867×669، 669×520…)،
-     • وأيّ مفصلٍ يُعلنه المتصفّح (`horizontal/vertical-viewport-segments:2`).
-   يُطبَّق على اليمين الفيزيائي (`right`/`padding-right`) لا `inline-end`، فلا يتبدّل بتبدّل الاتجاه.
-   الشرطان يلتقطان أيضًا الهواتف العادية طوليًّا وعرضيًّا (الاحتياط الآمن المطلوب)؛ وهندسة العرضي لم
-   تُتحقَّق على جهازٍ حقيقي. الأثر الصحيح لكل سطح مفصّلٌ في docs/IPHONE-DUO-FINAL-ACCEPTANCE.md («ركن الودجت»).
-   الخلفيات والزجاج تبقى حافةً لحافة خلف الودجت؛ يُزاح المحتوى المهمّ وحده. */
-@media screen and (orientation:portrait) and (max-width:700px) and (min-height:360px),
-       screen and (orientation:landscape) and (min-width:540px) and (max-width:1000px) and (min-height:300px) and (max-height:800px),
-       (horizontal-viewport-segments:2), (vertical-viewport-segments:2){
-  :root:not([data-device="duo"]){
-    --duo-widget-w:96px; --duo-widget-gap:8px; --duo-widget-h:clamp(64px,31vh,270px);
-    --duo-pin-top:calc(var(--duo-widget-h) + 1rem);
-  }
-  /* الترويسات تمشي مع الصفحة بدل أن تلصق (ترويسة بارتفاع المنطقة تأكل خُمس الشاشة) */
-  :where(html:not([data-device="duo"])) header:is(.mz-el-header, .sticky){ position:relative }
-  /* صفّ الترويسة: بارتفاع المنطقة، ومحتواه كله يسار المنطقة (حشوة يمين فيزيائية، لا بداية السطر).
-     `.mz-el-header > div:first-child` مذكورٌ صراحةً: قاعدة الكتاب (أعلاه) بالخصوصية نفسها وتضبط `padding-inline`، وكانت تُسقط
-     هذه الحشوة في 951×585 فيبقى الشعار تحت الودجت (هذا هو المصدر الحقيقي للعطل في الكتاب، لا الشرط). */
-  :where(html:not([data-device="duo"])) header > .h-16, :where(html:not([data-device="duo"])) header > * > .h-16, :where(html:not([data-device="duo"])) header > .min-h-16, :where(html:not([data-device="duo"])) .mz-el-header > div:first-child{
-    box-sizing:border-box; height:var(--duo-widget-h); min-height:var(--duo-widget-h);
-    padding-right:calc(1rem + var(--duo-widget-w) + var(--duo-widget-gap));
-  }
-  /* أدوات الترويسة: يضيق السطر بعرض المنطقة (382 ← ~258px) فلا تتّسع ستّة أزرار بحجم اللمس، فتلتفّ على سطرين
-     داخل ارتفاع المنطقة بدل أن تُقصّ أو تدفع الصفحة جانبًا. */
-  @media (max-width:700px){
-    :where(html:not([data-device="duo"])) .mz-el-header > .h-16 > :first-child{ flex:0 0 auto }
-    :where(html:not([data-device="duo"])) .mz-el-header > .h-16 > :last-child{ flex:1 1 0; min-width:0; flex-wrap:wrap; justify-content:flex-end; row-gap:.25rem }
-  }
-  /* شريطٌ علويٌّ ثابت: الدور والخروج (شاشة البثّ)، وتنبيه الخمول والاستمرارية */
-  :where(html:not([data-device="duo"])) div.mz-topbar{ padding-right:calc(var(--duo-widget-w) + var(--duo-widget-gap)) }
-  :where(html:not([data-device="duo"])) div.mz-topnote{ padding-right:calc(1rem + var(--duo-widget-w) + var(--duo-widget-gap)) }
-  /* الدخول وصفحات البطاقة الواحدة: البطاقة تبدأ تحت المنطقة */
-  :where(html:not([data-device="duo"])) .mz-bp-login{ padding-top:calc(var(--duo-widget-h) + .5rem); padding-bottom:.5rem }
-  :where(html:not([data-device="duo"])) .mz-bp-login .mz-bp-login-card{ padding:1.1rem 1.25rem }
-  :where(html:not([data-device="duo"])) .mz-onepage{ margin-top:var(--duo-widget-h) }
-  /* صفحات بلا ترويسة تُوسَّط محتواها (استعادة كلمة المرور): تبدأ تحت المنطقة */
-  :where(html:not([data-device="duo"])) .mz-duo-top{ padding-top:calc(var(--duo-widget-h) + .5rem) }
-  /* النوافذ والدُّرج والبحث السريع: تبدأ تحت المنطقة (وتقصر بقدرها) فلا يقع عنوانها أو زرّ إغلاقها تحتها */
-  :where(html:not([data-device="duo"])) .mizan-overlay{ align-items:flex-start; padding-top:calc(var(--duo-widget-h) + .5rem) }
-  :where(html:not([data-device="duo"])) .mizan-overlay .mizan-dialog{ max-height:calc(100dvh - var(--duo-widget-h) - 1.25rem) }
-  :where(html:not([data-device="duo"])) .mz-palette-scrim{ padding-top:calc(var(--duo-widget-h) + .5rem) }
-  :where(html:not([data-device="duo"])) aside.mz-guide-sheet{ padding-top:calc(var(--duo-widget-h) + .5rem) }
-  /* شاشة البثّ والعروض المثبّتة بملء الشاشة: المشهد كله تحت المنطقة */
-  :where(html:not([data-device="duo"])) .mizan-shell-main[data-mz-role="broadcast_operator"] .fixed.inset-0.mizan-venue-deep{ padding-top:calc(var(--duo-widget-h) + .25rem) }
-  :where(html:not([data-device="duo"])) .mizan-splash{ padding-top:var(--duo-widget-h) }
-  /* كل سطحٍ مثبّت بملء الشاشة يُمرَّر أو يوسِّط محتواه (نوافذ الإدارة، الإيصال، لوحات القاعة، التحميل) */
-  :where(html:not([data-device="duo"])) .fixed.inset-0:is(.overflow-y-auto, .overflow-auto, .grid){ padding-top:calc(var(--duo-widget-h) + .5rem) }
-  /* قائمة «المزيد»: مثبّتةٌ على اليسار الفيزيائي وتحت المنطقة (لا على بداية السطر، ولا فوق الودجت، ولا خارج الشاشة) */
-  :where(html:not([data-device="duo"])) .mz-el-header .mizan-more > div{ position:fixed; inset-inline:auto; right:auto; left:.5rem; top:calc(var(--duo-widget-h) + .25rem); max-width:calc(100vw - 1rem) }
-  /* مقبض قفل الجهاز الخفيّ: كان في الزاوية اليمنى العليا تحت الودجت تمامًا، فينتقل إلى اليسرى */
-  :where(html:not([data-device="duo"])) .mz-venue-corner{ right:auto; left:0 }
-  /* ونصّ تعليمات القفل يتبع مكانه */
-  :where(html:not([data-device="duo"])) .mz-corner-r{ display:none }
-  :where(html:not([data-device="duo"])) .mz-corner-l{ display:inline }
-}
+/* 3ب) ركن الودجت الثابت (96px × 31vh) أُزيل. كان يُفعَّل بالمقاس وحده لكل شاشةٍ ليست Duo، فيلتقط كل iPhone طولي
+   (390/402/430) ونوافذ iPad والحاسوب الضيقة: ترويسةٌ بارتفاع ~300px وشريطٌ فارغ يمينها. على iPhone Duo تُحجز المنطقة
+   في src/duo-pattern.css بما يبلغه iOS نفسه (`env(safe-area-inset-*)`)، فلا حجز ثابت خارجه. المتغيّرات تبقى 0
+   خارج الدوو (التعريف في أول الملف)، والقيم المضمّنة التي يكتبها التطبيق الأصلي من مناطق النظام الحقيقية تبقى غالبة. */
 /* الطولي من 640: البحث والشرح ينتقلان إلى قائمة «المزيد» كما في الكتاب، ليتّسع الشعار لاسم الجهة. */
 @media screen and (min-width:640px) and (max-width:700px) and (orientation:portrait){
   :where(html:not([data-device="duo"])) .mz-el-header .mz-hd-wide{ display:none }
