@@ -20,6 +20,8 @@ html[data-device="duo"]{
   --duo-safe-b:env(safe-area-inset-bottom,0px);
   --duo-safe-l:env(safe-area-inset-left,0px);
   --duo-row-h:3.6rem;
+  /* بداية عمود الكبسولات: تحت مربع الساعة والبطارية (يبلغ نحو 165px من الأعلى) لا داخله. */
+  --duo-col-top:10.75rem;
   --duo-glass:color-mix(in srgb, var(--surface, #fff) 72%, transparent);
   --duo-glass-line:color-mix(in srgb, var(--line, #dfded7) 80%, transparent);
   --duo-glass-shadow:0 10px 30px rgba(20,36,30,.14);
@@ -87,9 +89,9 @@ html[data-device="duo"][data-shell="app"] .mz-el-header > .h-16{ padding-inline:
 html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mz-el-mnav),
 html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mz-leaf-b > .mizan-tabs){ padding-bottom:var(--duo-safe-b) }
 html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
-  position:fixed; z-index:45; top:5.5rem; bottom:auto; margin:0; border-radius:1.6rem; width:4.5rem;
+  position:fixed; z-index:45; top:var(--duo-col-top); bottom:auto; margin:0; border-radius:1.6rem; width:4.5rem;
   display:flex; flex-direction:column; flex-wrap:nowrap; gap:.2rem; overflow-y:auto; overflow-x:hidden; scrollbar-width:none;
-  max-height:calc(100dvh - 6.5rem - var(--duo-safe-b)); padding:.3rem; border:1px solid var(--duo-glass-line);
+  max-height:calc(100dvh - var(--duo-col-top) - 1rem - var(--duo-safe-b)); padding:.3rem; border:1px solid var(--duo-glass-line);
   background:var(--duo-glass); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4);
   box-shadow:var(--duo-glass-shadow);
 }
