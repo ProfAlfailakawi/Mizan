@@ -88,6 +88,8 @@ html[data-device="duo"] body{ padding-left:var(--duo-safe-l); padding-right:var(
 html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section){ margin-left:calc(-1 * var(--duo-safe-l)); margin-right:calc(-1 * var(--duo-safe-r)); border-left:var(--duo-safe-l) solid transparent; border-right:var(--duo-safe-r) solid transparent; background-origin:border-box; overflow:visible }
 html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section)::before,
 html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section)::after{ right:calc(-1 * var(--duo-safe-r)); left:calc(-1 * var(--duo-safe-l)) }
+/* الصفحة التسويقية تقصّ هالاتها الزخرفية أفقيًّا (overflow-x-clip)؛ قاعدة الجذر الممتدّ أعلاه تعيد overflow:visible فتعود هالتها تمريرًا أفقيًّا. */
+html[data-device="duo"][data-shell="app"] body > div > div.mz-mk{ overflow-x:clip }
 html[data-device="duo"][data-shell="app"] .mz-el-header > .h-16{ padding-inline:.75rem }
 
 /* 4أ) الخارجية (العمود جانبي): كبسولة التنقّل في عمود الساعة تحت الساعة، وتتبع جهته بعد التدوير. */
@@ -167,8 +169,12 @@ html[data-device="duo"] .mizan-venue-lock-dock{ bottom:calc(1rem + var(--duo-saf
 html[data-device="duo"] .mizan-demo-bar-row{ padding-right:max(.75rem, var(--duo-safe-r)); padding-left:max(.75rem, var(--duo-safe-l)) }
 html[data-device="duo"] .mizan-demo-bar{ padding-bottom:var(--duo-safe-b) }
 html[data-device="duo"] .mizan-splash{ padding-top:var(--duo-safe-t) }
-/* الدخول وصفحات البطاقة الواحدة: البطاقة داخل الحدود، والخلفية تحتها. */
-html[data-device="duo"] .mz-bp-login{ padding-top:calc(var(--duo-safe-t) + .75rem); padding-bottom:calc(var(--duo-safe-b) + .75rem); padding-right:calc(var(--duo-safe-r) + .75rem); padding-left:calc(var(--duo-safe-l) + .75rem) }
+/* الدخول وصفحات البطاقة الواحدة: البطاقة داخل الحدود، والخلفية تحتها. الحدّ الجانبي يضعه حشو الجسم (أو الجذر الممتدّ في التطبيق) فلا يُكرَّر هنا. */
+html[data-device="duo"] .mz-bp-login{ padding-top:calc(var(--duo-safe-t) + .75rem); padding-bottom:calc(var(--duo-safe-b) + .75rem); padding-right:.75rem; padding-left:.75rem }
+/* هالة الشعار تتجاوز عرض الصندوق بـ46px من كل جهة فتولّد تمريرًا أفقيًّا: تبقى داخل حدوده. */
+html[data-device="duo"] .mz-bp-login-brand::before{ inset:-26px 0 }
+/* شاشة البثّ (بلا زرّ إغلاق): شريطها العلوي ثابت، فرأس الحفل ينزل تحته بدل أن يتراكب عليه. */
+html[data-device="duo"] div.fixed.inset-0.mz-bp-stage[aria-label="وضع الحفل"]:not([role="dialog"]):not(.pointer-events-none):not(.mz-ovt-veil){ padding-top:calc(3.5rem + var(--duo-safe-t)) }
 html[data-device="duo"] .mz-duo-top{ padding-top:calc(var(--duo-safe-t) + .75rem) }
 
 /* جدولٌ عريض في حاوية تمرير (`min-w-[720px]`): نصّه المخفيّ للقارئ الآلي مطلق الموضع ومرجعه الصفحة لا الحاوية،
