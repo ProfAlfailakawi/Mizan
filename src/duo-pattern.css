@@ -83,6 +83,11 @@ html[data-device="duo"] .mizan-shell-main .mz-portal-head p{ margin-top:.25rem; 
 /* ── 4) التطبيق: المحتوى يقف قبل عمود الساعة أو شريطها، والتنقّل كبسولاتٌ زجاجية ──────────── */
 /* Safari أيضًا: أزراره العائمة في العرضي الخارجي تبلغ safe-area-inset-left، فالمحتوى يقف قبلها. */
 html[data-device="duo"] body{ padding-left:var(--duo-safe-l); padding-right:var(--duo-safe-r) }
+/* الخلفية والزخرفة تمتدّان تحت عمود الساعة حتى الحافة؛ المحتوى وحده يقف قبله.
+   جذر كل صفحة (يأتي مباشرة تحت حاوية التطبيق) يتجاوز حشوة الجسم ويستعيدها حدًّا شفافًا يرسم تحته خلفيته. */
+html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section){ margin-left:calc(-1 * var(--duo-safe-l)); margin-right:calc(-1 * var(--duo-safe-r)); border-left:var(--duo-safe-l) solid transparent; border-right:var(--duo-safe-r) solid transparent; background-origin:border-box; overflow:visible }
+html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section)::before,
+html[data-device="duo"][data-shell="app"] body > div > :is(main,div,section)::after{ right:calc(-1 * var(--duo-safe-r)); left:calc(-1 * var(--duo-safe-l)) }
 html[data-device="duo"][data-shell="app"] .mz-el-header > .h-16{ padding-inline:.75rem }
 
 /* 4أ) الخارجية (العمود جانبي): كبسولة التنقّل في عمود الساعة تحت الساعة، وتتبع جهته بعد التدوير. */
