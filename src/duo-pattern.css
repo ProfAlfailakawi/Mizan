@@ -146,6 +146,11 @@ html[data-device="duo"][data-shell="app"][data-widget-side="right"] .mz-venue-co
   html[data-device="duo"] .mz-spread-index > .mz-el-mnav{
     grid-column:1; background:color-mix(in srgb, var(--emerald, #214c40) 5%, var(--canvas)); border-radius:1.25rem; padding:.85rem;
   }
+  /* التطبيق: فهرس الأقسام كبسولاتٌ في عمود الساعة (ثابتة)، فتبقى الورقة اليمنى (الفهرس) فارغةً والقسم في اليسرى وحدها.
+     الصفحةُ كلها تصير ورقةً واحدةً بعرضٍ كامل، ولا كعب يمرّ فوق نصّها. */
+  html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mz-spread-index{ grid-template-columns:minmax(0,1fr) }
+  html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mz-spread-index > *{ grid-column:1 }
+  html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mz-spread-index)::after{ display:none }
 }
 
 /* ── 6) النوافذ والأدراج والقوائم والبحث وشاشات القاعة ─────────────────────────────────────
