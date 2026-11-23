@@ -12,6 +12,8 @@ import { JOURNEY_ORDER, displayParticipantName, formatParticipantCode, journeySt
 import { pl, plf, usePublicLocale } from '../../lib/public-i18n';
 import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
 import { journeyCodeFromInput } from '../../lib/journey-code';
+import { isAppleNativeShell } from '../../lib/appleNativeShell';
+import { onlinePaymentOffered } from '../../lib/onlinePaymentOffered';
 
 type Audience = 'participant' | 'guardian';
 type PublicJourney = {
@@ -304,6 +306,9 @@ const Info = ({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
  * رسوم التسجيل: تظهر فقط حين تكون مستحقة. الدفع يتم في صفحة بوابة الجهة نفسها، ثم يعود
  * المتسابق هنا فيسأل الخادمُ البوابةَ عن النتيجة — الواجهة لا تقرّر أن الدفع تم.
  */
+/** نصّ محايد داخل تطبيق iOS: لا يذكر الدفع خارج التطبيق ولا يوجّه إليه. */
+export const NATIVE_FEE_NOTICE = 'رسوم التسجيل تُرتَّب مع الجهة المنظِّمة للمسابقة.';
+
 const RegistrationFeePanel: React.FC<{ ar: boolean; competitionId: string; token: string }> = ({ ar, competitionId, token }) => {
   const [payment, setPayment] = useState<{ status: string; amountMinor: number; currency: string; online: { available: boolean; displayName?: string } } | null>(null);
   const [state, setState] = useState<{ kind: 'idle' | 'busy' | 'error'; text?: string }>({ kind: 'idle' });
@@ -320,8 +325,12 @@ const RegistrationFeePanel: React.FC<{ ar: boolean; competitionId: string; token
     return () => { alive = false; };
   }, [competitionId, token]);
   if (!payment || payment.status === 'not_required') return null;
+  // داخل تطبيق iOS لا تُعرض بوابة الدفع الخارجية ولا يُوجَّه المستخدم للدفع في مكان آخر (3.1.1).
+  const native = isAppleNativeShell();
+  const onlineOk = onlinePaymentOffered(payment.online.available, native);
   const amount = `${Math.floor(payment.amountMinor / 100)}.${String(payment.amountMinor % 100).padStart(2, '0')} ${payment.currency}`;
   const pay = async () => {
+    if (!onlineOk) return;
     setState({ kind: 'busy' });
     try {
       const r = await fetch(`/api/public/competitions/${encodeURIComponent(competitionId)}/registration/payment/checkout`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: token }) });
@@ -339,9 +348,10 @@ const RegistrationFeePanel: React.FC<{ ar: boolean; competitionId: string; token
     <div className="text-sm font-black text-[color:var(--muted)]">{pl('رسوم التسجيل', 'Registration fee')}</div>
     <div className="mt-1 text-xl font-black" dir="ltr">{amount}</div>
     <div className="mt-1 text-sm font-bold">{pl(...((STATUS[payment.status] || [payment.status, payment.status]) as [string, string]))}</div>
-    {payment.status === 'pending' && returned === 'return' && <p role="status" className="mt-2 text-xs text-[color:var(--muted)]">{pl('لم يصلنا تأكيد البوابة بعد. إن أتممت الدفع فسيظهر هنا خلال دقائق.', 'The gateway has not confirmed yet. If you paid, it will show here within minutes.')}</p>}
-    {payment.status === 'pending' && returned === 'failed' && <p role="alert" className="mt-2 text-xs font-bold text-[color:var(--danger)]">{pl('لم تكتمل عملية الدفع. يمكنك المحاولة مرة أخرى.', 'The payment was not completed. You can try again.')}</p>}
-    {payment.status === 'pending' && (payment.online.available
+    {payment.status === 'pending' && !native && returned === 'return' && <p role="status" className="mt-2 text-xs text-[color:var(--muted)]">{pl('لم يصلنا تأكيد البوابة بعد. إن أتممت الدفع فسيظهر هنا خلال دقائق.', 'The gateway has not confirmed yet. If you paid, it will show here within minutes.')}</p>}
+    {payment.status === 'pending' && !native && returned === 'failed' && <p role="alert" className="mt-2 text-xs font-bold text-[color:var(--danger)]">{pl('لم تكتمل عملية الدفع. يمكنك المحاولة مرة أخرى.', 'The payment was not completed. You can try again.')}</p>}
+    {payment.status === 'pending' && native && <p role="note" data-testid="native-fee-notice" className="mt-2 text-xs text-[color:var(--muted)]">{NATIVE_FEE_NOTICE}</p>}
+    {payment.status === 'pending' && !native && (onlineOk
       ? <button type="button" disabled={state.kind === 'busy'} onClick={() => void pay()} className="mt-3 min-h-11 rounded-full bg-[var(--emerald)] px-5 text-sm font-bold text-white">{payment.online.displayName ? plf('ادفع الآن عبر {{g}}', 'Pay now with {{g}}', { g: payment.online.displayName }) : pl('ادفع الآن', 'Pay now')}</button>
       : <p className="mt-2 text-xs text-[color:var(--muted)]">{pl('تُسدَّد الرسوم لدى الجهة المنظمة حسب تعليماتها.', 'Pay the fee to the organizer as instructed.')}</p>)}
     {state.text && <p role="alert" className="mt-2 text-xs font-bold text-[color:var(--danger)]">{state.text}</p>}
