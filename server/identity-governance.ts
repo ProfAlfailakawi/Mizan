@@ -20,7 +20,7 @@ export const ALL_GOVERNANCE_ROLES:GovernanceRole[]=[
 export type ServerIdentity={uid:string;email?:string;role:GovernanceRole;organizationId:string;operatorId?:string;competitionId?:string;operatorOrganizationIds?:string[]};
 
 type Invitation={id:string;organizationId:string;operatorId?:string;competitionId?:string;committeeId?:string;email:string;displayName:string;requestedRole:GovernanceRole;reason:string;status:'PENDING_APPROVAL'|'READY'|'ACTIVATED'|'EXPIRED'|'REVOKED';createdAt:string;createdBy:string;approvedAt?:string;approvedBy?:string;expiresAt:string;activationTokenHash?:string};
-type Account={id:string;uid:string;organizationId:string;operatorId?:string;email:string;displayName:string;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;activatedFromInvitationId:string;suspendedAt?:string;suspendedBy?:string;suspensionReason?:string};
+type Account={id:string;uid:string;organizationId:string;operatorId?:string;email:string;displayName:string;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;activatedFromInvitationId:string;suspendedAt?:string;suspendedBy?:string;suspensionReason?:string;deletedAt?:string};
 type Grant={id:string;accountId:string;organizationId:string;operatorId?:string;competitionId?:string;committeeId?:string;role:GovernanceRole;status:'ACTIVE'|'SUSPENDED'|'REVOKED';createdAt:string;createdBy:string;approvedBy?:string};
 type AuthSession={id:string;uid:string;accountId:string;organizationId:string;operatorId?:string;competitionId?:string;role:GovernanceRole;deviceId:string;deviceName?:string;authenticationAssurance:'MFA'|'SINGLE_FACTOR';openedAt:string;lastSeenAt:string;expiresAt:string;status:'ACTIVE'|'REVOKED'|'EXPIRED'|'CONFLICT_BLOCKED';revokedAt?:string;revokedBy?:string;revocationReason?:string};
 type CompetitionClosure={organizationId:string;competitionId:string;status:'completed'|'archived';closedAt:string;closedBy:string;reason:string};
@@ -476,6 +476,38 @@ export class IdentityGovernanceRepository{
     for(const g of s.grants)if(g.accountId===account.id&&['ACTIVE','SUSPENDED'].includes(g.status))g.status='REVOKED';
     for(const x of s.sessions)if(x.accountId===account.id&&x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=new Date().toISOString();x.revokedBy=actor.uid;x.revocationReason='Account removed from tenant'}
     this.write(s);this.appendAudit({...actor,organizationId:account.organizationId},'IDENTITY_ACCOUNT_REMOVED','Account',account.id,reason);return {removed:true,accountId:account.id};
+  }
+
+  /**
+   * حذف الحساب بطلب صاحبه (App Store 5.1.1(v)).
+   *
+   * يمحو البيانات الشخصية (البريد والاسم وأسماء الأجهزة وطلبات كلمة المرور والدعوات المرتبطة
+   * بالبريد) ويسحب كل تخويل وجلسة فورًا. أما سجل التدقيق المتسلسل وسجلات المسابقة (تحكيم،
+   * نتائج، اعتراضات) فلا تُحذف لأنها أدلة نزاهة تملكها الجهة المنظِّمة؛ تبقى بمعرّف مبهم لا
+   * يدل على اسم أو بريد بعد هذا المحو.
+   * لا يُسمح بحذف حساب مالك المنصة ولا آخر مدير جهة فعّال، لئلا تبقى جهة بلا من يديرها.
+   */
+  selfDelete(uid:string){
+    if(!uid)throw new Error('UID_REQUIRED');
+    const s=this.read();const accounts=s.accounts.filter(a=>a.uid===uid&&!a.deletedAt);
+    for(const a of accounts){
+      if(this.isSuperAdminAccount(s,a.id))throw new Error('PLATFORM_OWNER_SELF_DELETE_BLOCKED');
+      for(const g of s.grants.filter(g=>g.accountId===a.id&&g.role==='org_admin'&&g.status==='ACTIVE'))this.assertOrgAdminContinuity(s,g);
+    }
+    const at=new Date().toISOString();const tomb=`deleted-${hash(uid).slice(0,16)}`;const tombEmail=`${tomb}@deleted.invalid`;const tombName='حساب محذوف';
+    const ids=new Set(accounts.map(a=>a.id));const emails=new Set(accounts.map(a=>normalizeEmail(a.email)));
+    const audits:{organizationId:string;role:string;accountId:string}[]=[];
+    for(const a of accounts){
+      const role=s.grants.find(g=>g.accountId===a.id)?.role||'participant';audits.push({organizationId:a.organizationId,role,accountId:a.id});
+      a.status='REVOKED';a.email=tombEmail;a.displayName=tombName;a.deletedAt=at;a.suspendedAt=at;a.suspendedBy=uid;a.suspensionReason='Deleted by account holder';
+    }
+    for(const g of s.grants)if(ids.has(g.accountId)&&g.status!=='REVOKED')g.status='REVOKED';
+    for(const x of s.sessions)if(x.uid===uid||ids.has(x.accountId)){if(x.status==='ACTIVE'){x.status='REVOKED';x.revokedAt=at;x.revokedBy=uid;x.revocationReason='Account deleted by holder'}delete x.deviceName}
+    for(const inv of s.invitations)if(emails.has(normalizeEmail(inv.email))){inv.email=tombEmail;inv.displayName=tombName;delete inv.activationTokenHash;if(['READY','PENDING_APPROVAL'].includes(inv.status))inv.status='REVOKED'}
+    s.passwordResetRequests=this.passwordResets(s).filter(r=>r.uid!==uid&&!ids.has(r.accountId));
+    this.write(s);
+    for(const x of audits)this.appendAudit({uid,role:x.role,organizationId:x.organizationId},'IDENTITY_ACCOUNT_SELF_DELETED','Account',x.accountId,'Personal data erased at the holder\'s request; audit and competition records retained without personal identifiers');
+    return {accounts:accounts.length};
   }
 
   openSession(identity:ServerIdentity,deviceId:string,deviceName='',authenticationAssurance:'MFA'|'SINGLE_FACTOR'='MFA'){

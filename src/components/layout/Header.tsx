@@ -11,6 +11,7 @@ import { Modal } from '../design-system/Modal';
 import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
 import { NotificationCenter } from './NotificationCenter';
 import { Button } from '../design-system/Button';
+import { AccountButton } from '../auth/AccountDeletion';
 
 export const Header: React.FC = () => {
  const {language,competition,isOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
@@ -56,6 +57,7 @@ export const Header: React.FC = () => {
           الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}
       <NotificationCenter/>
       <LanguageSwitcher compact/>
+      <AccountButton/>
       <button onClick={logout} title={language==='ar'?'تسجيل الخروج':'Sign out'} aria-label={language==='ar'?'تسجيل الخروج':'Sign out'} className="ms-1 max-[340px]:ms-0 w-11 h-11 grid place-items-center rounded-xl border border-[#e3cfca] bg-[#F9F0EE] hover:bg-[var(--danger-soft)] text-[#8a4f45] shrink-0"><LogOut className="w-4 h-4"/></button>
     </div>
   </div>

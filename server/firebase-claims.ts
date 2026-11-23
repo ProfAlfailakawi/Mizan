@@ -40,6 +40,7 @@ export type ClaimSyncOutcome =
 
 type AdminAuth = {
   setCustomUserClaims(uid: string, claims: Record<string, unknown> | null): Promise<void>;
+  deleteUser?(uid: string): Promise<void>;
 };
 
 let authPromise: Promise<AdminAuth | null> | null = null;
@@ -232,4 +233,27 @@ export function claimsFromGrant(grant: { role: GovernanceRole; organizationId: s
     ...(grant.competitionId ? { competition_id: grant.competitionId } : {}),
     ...(grant.competitionIds?.length ? { competition_ids: grant.competitionIds } : {}),
   };
+}
+
+export type AuthUserDeletion = 'DELETED' | 'NOT_CONFIGURED' | 'FAILED';
+
+/**
+ * حذف حساب الدخول نفسه من Firebase Authentication بطلب صاحبه.
+ *
+ * يُنفَّذ من الخادم بالاعتماد الافتراضي لبيئة التشغيل، فلا يحتاج المتصفح إلى «دخول حديث».
+ * وإن لم يتوفر الاعتماد (تطوير محلي) عاد NOT_CONFIGURED، فيحذفه العميل بنفسه بعد إعادة المصادقة.
+ * وغياب الحساب أصلًا نجاحٌ: المطلوب ألا يبقى.
+ */
+export async function deleteFirebaseAuthUser(uid: string, injected?: AdminAuth | null): Promise<AuthUserDeletion> {
+  if (!uid) return 'FAILED';
+  const auth = injected === undefined ? await adminAuth() : injected;
+  if (!auth?.deleteUser) return 'NOT_CONFIGURED';
+  try {
+    await auth.deleteUser(uid);
+    return 'DELETED';
+  } catch (err) {
+    if (errorCode(err) === 'auth/user-not-found') return 'DELETED';
+    console.error('MIZAN account deletion: auth delete failed', { uid, code: errorCode(err) });
+    return 'FAILED';
+  }
 }

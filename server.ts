@@ -9,8 +9,8 @@ import fs from 'fs';
 import { QuestionEscrowRepository } from './server/question-escrow';
 import { getCompetitionPolicy } from './src/lib/competition-config';
 import { GlobalRateLimiter } from './server/global-rate-limit';
-import { firebaseSecondFactorPresent, verifyFirebaseBaseIdToken, verifyFirebaseIdToken } from './server/firebase-auth';
-import { claimsFromGrant, writeIdentityClaims, claimsWritable, claimsWritability } from './server/firebase-claims';
+import { accountDeletionRecent, firebaseSecondFactorPresent, verifyFirebaseBaseIdToken, verifyFirebaseIdToken } from './server/firebase-auth';
+import { claimsFromGrant, writeIdentityClaims, claimsWritable, claimsWritability, deleteFirebaseAuthUser } from './server/firebase-claims';
 import { ALL_GOVERNANCE_ROLES, IdentityGovernanceRepository, operatorIdentityOrganizationId, type GovernanceRole, type ServerIdentity } from './server/identity-governance';
 import { NotificationCenterRepository, type NotificationTarget } from './server/notification-center';
 import { ServerAuditLedgerRepository, type ServerAuditActor, type ServerAuditInput } from './server/audit-ledger';
@@ -914,6 +914,9 @@ async function startServer() {
   });
 
   app.post('/api/identity/invitation/preview',sensitiveIdentityRateLimit,(req,res)=>{if(!identityGovernance)return res.status(503).json({code:'IDENTITY_GOVERNANCE_NOT_CONFIGURED'});try{return res.json({invitation:identityGovernance.previewInvitation(String(req.body?.activationToken||''))})}catch(err){return res.status(400).json({code:err instanceof Error?err.message:'ACTIVATION_TOKEN_INVALID'})}});
+  /* حذف الحساب بطلب صاحبه (App Store 5.1.1(v)). يشترط دخولًا خلال خمس دقائق، فيُطلب من الواجهة إعادة كلمة المرور قبله.
+     يمحو البيانات الشخصية من سجل الهويات والإشعارات ثم يحذف حساب الدخول؛ ويبقى سجل التدقيق وسجلات المسابقة بلا معرّفات شخصية. */
+  app.post('/api/identity/me/delete',sensitiveIdentityRateLimit,requireFirebaseBase,async(req,res)=>{const base=(req as any).firebaseBase as {uid:string;raw:Record<string,unknown>};if(!accountDeletionRecent(base.raw))return res.status(401).json({code:'REQUIRES_RECENT_LOGIN'});if(String(req.body?.confirm||'')!=='DELETE_MY_ACCOUNT')return res.status(400).json({code:'CONFIRMATION_REQUIRED'});let accounts=0;if(identityGovernance){try{accounts=identityGovernance.selfDelete(base.uid).accounts}catch(err){return res.status(409).json({code:err instanceof Error?err.message:'ACCOUNT_DELETE_FAILED'})}}try{notificationCenter?.purgeUser(base.uid)}catch(err){console.error('MIZAN account deletion: notification purge failed',err instanceof Error?err.message:err)}const auth=await deleteFirebaseAuthUser(base.uid);return res.json({deleted:true,accounts,authDeleted:auth==='DELETED',auth})});
   app.get('/api/identity/me',requireFirebaseBase,(req,res)=>{const base=(req as any).firebaseBase as {uid:string;email?:string;raw:Record<string,unknown>};const managed=identityGovernance?.identityForUid(base.uid)||null;const identity=identityFromBase(base);if(!identity)return res.status(404).json({code:'ACCOUNT_NOT_PROVISIONED'});if(!mfaSatisfied(base,identity.role))return res.status(403).json({code:'MFA_REQUIRED'});let session:any=undefined;if(identityGovernance&&managed){const deviceId=String(req.headers['x-mizan-device-id']||'');if(deviceId){try{session=identityGovernance.openSession(identity,deviceId,String(req.headers['x-mizan-device-name']||''),firebaseSecondFactorPresent(base.raw)?'MFA':'SINGLE_FACTOR')}catch(err){const code=err instanceof Error?err.message:'SESSION_FAILED';if(code==='PRIVILEGED_SESSION_CONFLICT')return res.status(409).json({code});return res.status(400).json({code})}}}res.json({identity,session,managed:!!managed});});
   /*
    * مزامنة مطالبات Firestore بعد كل تغيير في التخويل.
