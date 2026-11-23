@@ -13,6 +13,7 @@ import { useOpsHeartbeat } from './lib/ops-heartbeat';
 import { useBoardPublisher } from './lib/use-board-publisher';
 import { AuthPortal } from './components/auth/AuthPortal';
 import { TotpSecurity } from './components/auth/TotpSecurity';
+import { AccountButton } from './components/auth/AccountDeletion';
 import { auth } from './lib/firebase';
 import { OnboardingExperience, onboardingWasSeen } from './components/public/OnboardingExperience';
 import { fetchTenant } from './lib/tenant';
@@ -469,7 +470,7 @@ export default function App() {
   {!isBroadcast&&<Header/>}
   {isBroadcast&&<div className="mz-topbar fixed top-3 inset-x-3 z-[190] flex items-center justify-between gap-2 pointer-events-none">
    <span className="pointer-events-auto rounded-xl bg-[#101a16]/85 backdrop-blur px-3 py-2 text-[11px] font-black text-white/80">{language==='ar'?'شاشة البثّ':'Broadcast surface'}</span>
-   <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<button onClick={()=>{if(IS_DEMO_SESSION){exitDemoSession();return}signOutAndReload()}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
+   <span className="pointer-events-auto flex items-center gap-2"><LanguageSwitcher compact/>{requireAuth&&<AccountButton className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-white/85 flex items-center" label/>}{requireAuth&&<button onClick={()=>{if(IS_DEMO_SESSION){exitDemoSession();return}signOutAndReload()}} className="min-h-11 px-3 rounded-xl bg-[#101a16]/85 backdrop-blur text-[11px] font-black text-white/85">{language==='ar'?'خروج':'Sign out'}</button>}</span>
   </div>}
   {/* مساحةٌ محجوزة أسفل الصفحة في البيئة التجريبية: الشريط ثابتٌ فوق المحتوى،
       وبدونها كان يغطّي آخر صفٍّ في الجداول الطويلة. */}
