@@ -242,3 +242,37 @@ html[data-device="duo"] :where(.overflow-x-auto,.overflow-auto):not(.absolute):n
   html[data-device="duo"] .mz-el-header .mizan-header-logo .mizan-wordmark-name{ overflow:visible; text-overflow:clip; white-space:nowrap }
   html[data-device="duo"] .mz-el-header > div:first-child > :first-child > .min-w-0{ flex:1 1 0; overflow:hidden }
 }
+
+/* ── 8) الصفحات العامة (بلا دخول): التحقق، الجواز، الدليل، رابط المسابقة ───────────────────────
+   ترويستها تقف تحت شريط الساعة في الداخلية الطولية (التطبيق)، لا تحته. */
+html[data-device="duo"] .mz-public-head{ padding-top:var(--duo-safe-t) }
+/* رابط مسابقة غير متاح في الكتاب العرضي: البطاقة على الورقة اليمنى وعلامة ميزان على اليسرى، والعمودان
+   يُقاسان من عرض الشاشة نفسها فيقع الكعب بينهما تمامًا (في التطبيق تُطرح جهة الساعة من الورقة اليمنى). */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] main:has(> .mz-onepage){
+    grid-template-columns:calc(50vw - var(--duo-spine) / 2 - var(--duo-safe-r)) calc(50vw - var(--duo-spine) / 2 - var(--duo-safe-l));
+    column-gap:var(--duo-spine); padding-inline:0; justify-content:start;
+  }
+  html[data-device="duo"] main > .mz-onepage-mark{ display:grid; grid-row:1; grid-column:2; place-items:center; transform:scale(1.5) }
+  html[data-device="duo"] main:has(> .mz-onepage) > .mz-onepage{ grid-row:1; grid-column:1; justify-self:center; width:calc(100% - 2 * var(--duo-gutter)); max-width:26rem }
+}
+/* الموقع التسويقي في التطبيق (الداخلية الطولية): الترويسة اللاصقة تبدأ تحت شريط الساعة، وخلفيتها تمتدّ تحته. */
+html[data-device="duo"] .mz-mk > header.sticky{ padding-top:var(--duo-safe-t) }
+/* الخارجية عرضًا (التطبيق): مربع الساعة أقصر (~112px)، فيبدأ عمود الكبسولات تحته مباشرةً لا عند 172px،
+   وشريط بيئة العرض الثابت (3.5rem، من 640px) لا يغطّي أسفل العمود: الارتفاع المتاح يُطرح منه. */
+@media (orientation:landscape) and (max-height:520px){
+  html[data-device="duo"][data-shell="app"]{ --duo-col-top:7.5rem }
+}
+@media (min-width:640px){
+  html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mizan-demo-bar) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
+    max-height:calc(100dvh - var(--duo-col-top) - 1rem - 3.5rem - var(--duo-safe-b));
+  }
+}
+/* شاشة البثّ في الكتاب العرضي (التطبيق): الحشوة تُحجز من جهة الساعة وحدها فكان الكعب المرسوم في منتصف
+   المحتوى ينزاح ~40px عن المفصل. حشوةٌ متناظرة تعيد منتصف المشهد إلى منتصف الشاشة. */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"][data-shell="app"] div.fixed.inset-0.mz-bp-stage:not(.pointer-events-none){
+    padding-left:max(.75rem, calc(var(--duo-safe-r) + .5rem), calc(var(--duo-safe-l) + .5rem));
+    padding-right:max(.75rem, calc(var(--duo-safe-r) + .5rem), calc(var(--duo-safe-l) + .5rem));
+  }
+}

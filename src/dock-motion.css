@@ -1,0 +1,77 @@
+/* ==========================================================================
+   حركة شريط التنقّل (src/lib/dock-motion.ts) — بصرية فقط، على الهاتف والدوو.
+   شريطان رئيسان: أقسام المسابقة (`nav.mz-el-mnav`) وتبويبات الصفحة الرئيسة على ورقة السياق
+   (`.mz-leaf-b > .mizan-tabs`: المتسابق، رئيس التحكيم، غرفة القيادة).
+   المؤشّر عنصرٌ واحد (.dm-ind) ينزلق تحت الوجهة النشطة بدل خلفيةٍ تقفز من زرّ إلى زرّ،
+   ولونه لون الزرّ النشط السابق نفسه (الحبر الأخضر الداكن ولسانه النحاسي). الموضع والحجم والترتيب كما هي.
+   ========================================================================== */
+
+/* مرجعٌ للمؤشّر حين لا يكون الشريط مُموضَعًا أصلًا؛ أدنى أولوية فلا يغلب «fixed/sticky» في أي صفحة. */
+:where(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ position:relative }
+
+nav.mz-el-mnav[data-dm-ready],
+.mz-leaf-b > .mizan-tabs[data-dm-ready]{
+  --dm-ind-bg:var(--teal-ink, #0e2c2f);
+  transition:transform .32s cubic-bezier(.32,.72,0,1), opacity .22s ease;
+}
+nav.mz-el-mnav[data-dm-ready]{ --dm-ind-shadow:inset 0 -3px 0 var(--brass-light, #c9a45c) }
+.mz-leaf-b > .mizan-tabs[data-dm-ready]{ --dm-ind-shadow:inset 0 -3px 0 var(--brass, #a67a2d), inset 0 1px 0 rgba(255,255,255,.08) }
+
+/* المؤشّر لا يأخذ شيئًا من قواعد «كل ابن» في الشريط (الحدّ الأدنى للّمس، الحشو، المرونة). */
+html nav.mz-el-mnav > .dm-ind,
+html .mz-leaf-b > .mizan-tabs > .dm-ind{
+  position:absolute; z-index:0; pointer-events:none; opacity:0; display:block;
+  min-width:0 !important; min-height:0 !important; max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; flex:none !important;
+  border-radius:var(--dm-ind-radius, var(--dm-auto-radius, 12px)); background:var(--dm-ind-bg); box-shadow:var(--dm-ind-shadow);
+  transition:transform .26s cubic-bezier(.34,1.56,.64,1), opacity .2s ease;
+}
+html nav.mz-el-mnav > .dm-ind.dm-press,
+html .mz-leaf-b > .mizan-tabs > .dm-ind.dm-press{ transform:scale(.94); transition-duration:.09s; transition-timing-function:ease-out }
+
+/* بلاطات أقسام المسابقة لها خلفية ورقية: البلاطة نفسها تبقى غير مُموضَعة فيُرسم المؤشّر فوق خلفيات البلاطات
+   الأخرى أثناء انزلاقه، وأيقونتها وتسميتها فوقه. */
+html nav.mz-el-mnav[data-dm-ready] button{ position:static; -webkit-tap-highlight-color:transparent }
+html nav.mz-el-mnav[data-dm-ready] button > *{ position:relative; z-index:1 }
+html .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab{ position:relative; z-index:1; -webkit-tap-highlight-color:transparent }
+
+/* الخلفية النشطة صار يرسمها المؤشّر المنزلق؛ وظلّ :active صار الضغطة نفسها. */
+html body nav.mz-el-mnav[data-dm-ready] button[aria-current="page"],
+html body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab.is-active{ background:transparent; border-color:transparent; box-shadow:none }
+
+html:not([data-mizan-motion="reduced"]) body nav.mz-el-mnav[data-dm-ready] button,
+html:not([data-mizan-motion="reduced"]) body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab{
+  transition:transform .26s cubic-bezier(.34,1.56,.64,1), color .2s ease;
+}
+html body nav.mz-el-mnav[data-dm-ready] button.dm-press,
+html body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab.dm-press{ transform:scale(.9); transition-duration:.09s; transition-timing-function:ease-out }
+html body nav.mz-el-mnav[data-dm-ready] button:active:not(.dm-press),
+html body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab:active:not(.dm-press){ transform:none }
+
+/* الأيقونة التي صارت نشطة تتنفّس مرّةً واحدة، فيُفهم الانتقال دون لونٍ وحده. */
+html:not([data-mizan-motion="reduced"]) nav.mz-el-mnav[data-dm-ready] button[aria-current="page"] > svg,
+html:not([data-mizan-motion="reduced"]) .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab.is-active > svg{ animation:dm-pop .38s cubic-bezier(.32,.72,0,1) }
+@keyframes dm-pop{ 0%{ transform:scale(.84) } 55%{ transform:scale(1.07) } 100%{ transform:none } }
+nav.mz-el-mnav[data-dm-ready] button:focus-visible,
+.mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab:focus-visible{ outline:2px solid var(--teal-ink, #0e2c2f); outline-offset:2px }
+
+/* لوحة المفاتيح: الشريط المثبّت يتنحّى ويعود حين تُغلق. */
+html body nav.mz-el-mnav.dm-kb,
+html body .mz-leaf-b > .mizan-tabs.dm-kb{ transform:translateY(calc(100% + 28px)); opacity:0; pointer-events:none }
+
+/* رأس التحكيم تحت 260px: الصفّ الأخير الفرد يأخذ العرض كله — المؤشّر صار الابن الأول فتنقلب الزوجية. */
+@media (max-width:259px){
+  .mz-bp-tabgrid:has(> .dm-ind) > .mizan-tab:last-child:nth-child(even){ grid-column:1 / -1 }
+}
+
+@media (prefers-reduced-motion:reduce){
+  html body nav.mz-el-mnav[data-dm-ready], html body nav.mz-el-mnav > .dm-ind, html body nav.mz-el-mnav[data-dm-ready] button,
+  html body .mz-leaf-b > .mizan-tabs[data-dm-ready], html body .mz-leaf-b > .mizan-tabs > .dm-ind, html body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab{ transition:none }
+  html body nav.mz-el-mnav[data-dm-ready] button.dm-press,
+  html body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab.dm-press{ transform:scale(.96) }
+  nav.mz-el-mnav[data-dm-ready] button > svg, .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab > svg{ animation:none }
+}
+html[data-mizan-motion="reduced"] body nav.mz-el-mnav[data-dm-ready] button.dm-press,
+html[data-mizan-motion="reduced"] body .mz-leaf-b > .mizan-tabs[data-dm-ready] > .mizan-tab.dm-press{ transform:scale(.96); transition:none }
+@media (prefers-contrast:more){
+  nav.mz-el-mnav > .dm-ind, .mz-leaf-b > .mizan-tabs > .dm-ind{ outline:2px solid var(--brass, #a67a2d); outline-offset:-2px }
+}

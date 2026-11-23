@@ -303,6 +303,8 @@ const boardParams = (h: string): BoardParams => {
  */
 const CompetitionNotFound: React.FC = () => (
   <main className="min-h-screen grid place-items-center bg-[var(--canvas)] p-5">
+    {/* علامة ميزان على الصفحة اليسرى في كتاب الدوو العرضي وحده (مخفية في غيره)، فلا تبقى ورقةٌ فارغة. */}
+    <div className="mz-onepage-mark hidden" aria-hidden="true"><MizanLogo language="ar" compact/></div>
     <div className="mz-onepage mizan-surface p-8 max-w-md text-center">
       <div className="mizan-kicker">رابط المسابقة</div>
       <h1 className="text-xl font-black mt-2">هذه المسابقة غير متاحة</h1>
