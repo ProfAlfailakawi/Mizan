@@ -1,0 +1,27 @@
+{
+  "appId": "kw.edu.mizan.app",
+  "appName": "ميزان",
+  "webDir": "www",
+  "server": {
+    "url": "https://mizan-quran.web.app",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "mizan-quran.web.app",
+      "mizan-f2ce3.firebaseapp.com",
+      "*.googleapis.com",
+      "everyayah.com"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#F7F5EF",
+      "showSpinner": false
+    }
+  },
+  "android": {
+    "backgroundColor": "#F7F5EF",
+    "allowMixedContent": false
+  }
+}
