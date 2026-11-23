@@ -20,6 +20,7 @@ import { fetchTenant } from './lib/tenant';
 import { MizanLogo } from './components/design-system/MizanLogo';
 import { SplashExperience, splashWasSeen } from './components/public/SplashExperience';
 import { hostSurface } from './lib/host-surface';
+import { installNativePushNavigation } from './lib/nativePush';
 import { parsePanelKeys, type DisplayBoard } from './lib/display-board';
 
 /*
@@ -323,6 +324,7 @@ export default function App() {
  useEffect(()=>{const p=accessibilityProfiles.find(x=>x.userId===currentUser.id)||ensureAccessibilityProfile();const el=document.documentElement;el.dataset.mizanText=p.textScale;el.dataset.mizanTouch=p.touchScale;el.dataset.mizanContrast=p.contrast;el.dataset.mizanMotion=p.motion;},[currentUser.id,accessibilityProfiles.length]);
  useEffect(()=>{document.documentElement.lang=language;document.documentElement.dir=language==='ar'?'rtl':'ltr';},[language]);
  useEffect(()=>{warmViews()},[]);
+ useEffect(()=>{installNativePushNavigation()},[]);
  const requireAuth=true; // MIZAN is production-only: authentication is always enforced for staff runtime.
  /* mizan.<domain> وجهٌ تسويقي عام: لا يمرّ ببوابة الدخول ولا بهوية جهة. */
  /* الرابط المباشر للعرض (/demo) على مضيف التسويق يفتح التطبيق التجريبي لا الصفحة التسويقية. */

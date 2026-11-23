@@ -9,6 +9,7 @@ import {Modal} from '../design-system/Modal';
 import {Button} from '../design-system/Button';
 import {Badge} from '../design-system/Badge';
 import { searchMatches } from '../../lib/input-normalize';
+import { NativePushSwitch } from './NativePushSwitch';
 
 type Category='admin'|'system'|'competition'|'identity'|'support';
 type Priority='normal'|'important'|'urgent';
@@ -76,6 +77,7 @@ export const NotificationCenter:React.FC=()=>{
   </button>
   <Modal isOpen={open} onClose={()=>setOpen(false)} title={ar?'الإشعارات':'Notifications'} subtitle={ar?'كل سياق في صندوقه.':'One inbox per context.'} maxWidth="3xl">
    <div className="space-y-4">
+    {!IS_DEMO_SESSION&&<NativePushSwitch api={api} ar={ar}/>}
     <div className="flex flex-wrap items-center gap-2">{scopedUnread>0&&<Badge variant="amber">{scopedUnread} {ar?'غير مقروء':'unread'}</Badge>}<div className="ms-auto flex flex-wrap gap-2">{canSend&&<Button size="sm" icon={<Mail className="h-4 w-4"/>} onClick={()=>composeOpen?setComposeOpen(false):beginCompose()}>{ar?'إرسال':'Send'}</Button>}<Button size="sm" variant="outline" disabled={!scopedUnread} icon={<CheckCircle2 className="h-4 w-4"/>} onClick={()=>void readAll()}>{ar?'تعليم الكل':'Mark all read'}</Button></div></div>
     {composeOpen&&<div ref={composeRef} className="rounded-3xl border border-[#d4ded8] bg-[#F7FAF8] p-4 sm:p-5">
      <div className="mb-4 flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[var(--emerald)] text-white"><Mail className="h-4 w-4"/></div><div><div className="font-black">{replyingTo?(ar?'رد على الإشعار':'Reply to notification'):(ar?'رسالة جديدة':'New message')}</div><p className="mt-1 text-[11px] leading-5 text-[#606762]">{replyingTo?(ar?`سيصل الرد مباشرة إلى ${replyingTo.senderName||roleName(replyingTo.createdByRole||'',ar)} مع الحفاظ على سياق الإشعار.`:`The reply goes directly back to the sender in the same notification context.`):(ar?'لن تصل الرسالة إلا للنطاق الذي تسمح به صلاحيتك.':'The server enforces your operator, organization and competition scope.')}</p></div></div>
