@@ -57,6 +57,9 @@ export const notificationContextKey=(context?:NotificationContext,target?:Notifi
 
 export class NotificationCenterRepository{
  private file:string;
+ private listeners:((n:NotificationRecord)=>void)[]=[];
+ /** يُستدعى لكل إشعار جديد (لا المكرر)، بعد حفظه. خطأ المستمع لا يُفشل النشر. */
+ onPublished(fn:(n:NotificationRecord)=>void){this.listeners.push(fn)}
  constructor(private dir:string){
   if(!dir)throw new Error('NOTIFICATION_CENTER_DIR_REQUIRED');
   fs.mkdirSync(dir,{recursive:true,mode:0o700});this.file=path.join(dir,'notification-center.json');
@@ -104,7 +107,7 @@ export class NotificationCenterRepository{
   const s=this.read();const dedupeKey=clean(input.dedupeKey,180)||undefined;const context=cleanContext(input.context);
   if(dedupeKey){const existing=s.notifications.find(n=>n.dedupeKey===dedupeKey&&JSON.stringify(n.target)===JSON.stringify(target)&&Date.now()-Date.parse(n.createdAt)<15*60_000);if(existing)return {notification:existing,deduplicated:true}}
   const notification:NotificationRecord={id:crypto.randomUUID(),title,body,category,priority,target,senderName:clean(input.senderName,120)||undefined,createdBy:actor.uid,createdByRole:actor.role,createdAt:now(),actionHref:clean(input.actionHref,500)||undefined,actionLabel:clean(input.actionLabel,100)||undefined,context,dedupeKey,expiresAt:input.expiresAt&&Number.isFinite(Date.parse(input.expiresAt))?new Date(input.expiresAt).toISOString():undefined};
-  s.notifications.unshift(notification);if(s.notifications.length>5000){const keep=new Set(s.notifications.slice(0,5000).map(x=>x.id));s.notifications=s.notifications.slice(0,5000);s.userStates=s.userStates.filter(x=>keep.has(x.notificationId))}this.write(s);return {notification,deduplicated:false};
+  s.notifications.unshift(notification);if(s.notifications.length>5000){const keep=new Set(s.notifications.slice(0,5000).map(x=>x.id));s.notifications=s.notifications.slice(0,5000);s.userStates=s.userStates.filter(x=>keep.has(x.notificationId))}this.write(s);for(const fn of this.listeners){try{fn(notification)}catch{/* التنبيه الإضافي لا يُفشل النشر */}}return {notification,deduplicated:false};
  }
  system(input:Omit<Parameters<NotificationCenterRepository['publish']>[1],'category'> & {category?:NotificationCategory}){return this.publish({uid:'MIZAN_SYSTEM',role:'system'},{...input,category:input.category||'system'})}
  /** حذف الحساب: تُمحى إشعارات الشخص المباشرة وحالات قراءته، ويُزال من قوائم المستلمين. */
