@@ -14,7 +14,7 @@ const Frame: React.FC<{ children: React.ReactNode; rtl: boolean; language: strin
   return (
     <div className="relative flex min-h-screen flex-col" style={{ background: 'var(--canvas)' }} dir={rtl ? 'rtl' : 'ltr'}>
       <div aria-hidden="true" className="mz-arabesque no-print pointer-events-none absolute inset-x-0 top-0 h-[28rem]" style={{ opacity: .07, backgroundColor: 'var(--emerald)', WebkitMaskSize: '100% 100%, 88px 88px', maskSize: '100% 100%, 88px 88px' }} />
-      <header className="no-print relative z-10 border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
+      <header className="mz-public-head no-print relative z-10 border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <a href="#" className="inline-flex min-h-11 items-center rounded-xl" aria-label={t('ميزان — الصفحة الرئيسية', 'MIZAN — home')}><MizanLogo language={language} compact /></a>
           <span className="mizan-kicker hidden sm:inline">{t('صفحة عامة — لا تحتاج دخولًا', 'Public page — no sign-in needed')}</span>

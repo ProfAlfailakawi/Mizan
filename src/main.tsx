@@ -1,6 +1,7 @@
 /* أولًا: يُركَّب نقل معرّف الصندوق التجريبي قبل أي التقاطٍ لـ window.fetch (انظر lib/demo-transport.ts). */
 import './lib/demo-transport';
 import {installDuoMarkers} from './lib/duo-markers';
+import {installDockMotion} from './lib/dock-motion';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
@@ -11,6 +12,7 @@ import './beauty-pass.css';
 import './elevation.css';
 import './motion.css';
 import './duo-pattern.css';
+import './dock-motion.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
@@ -46,6 +48,12 @@ createRoot(document.getElementById('root')!).render(
     </AppErrorBoundary>
   </StrictMode>,
 );
+
+/* حركة شريطي التنقّل الرئيسين (بصرية فقط): مؤشّرٌ منزلق وضغطةٌ فورية، على الهاتف والدوو.
+   إعداد «حركة أقلّ» داخل ميزان يعمل كتفضيل النظام. */
+const mizanReduced = () => document.documentElement.dataset.mizanMotion === 'reduced';
+installDockMotion({dock:'nav.mz-el-mnav', link:'button', active:'button[aria-current="page"]', reducedWhen:mizanReduced});
+installDockMotion({dock:'.mz-leaf-b > .mizan-tabs', link:'.mizan-tab', active:'.mizan-tab.is-active', reducedWhen:mizanReduced});
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) { window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 

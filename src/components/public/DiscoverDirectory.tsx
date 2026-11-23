@@ -67,7 +67,7 @@ export const DiscoverDirectory: React.FC = () => {
     <div className="min-h-screen" style={{ background: 'var(--canvas)' }} dir={locale === 'ar' ? 'rtl' : 'ltr'}>
     {/* Same frame idea as #verify: the logo and a way out. Under a white-label directory the
         MIZAN mark appears only if the operator chose «powered by», as the header note says. */}
-    <header className="border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
+    <header className="mz-public-head border-b border-[var(--line)] bg-[var(--canvas)]/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
         {(!brand || brand.showPoweredByMizan)
           ? <a href="#" className="inline-flex min-h-11 items-center rounded-xl" aria-label={ct(locale, 'discoverBack')}><MizanLogo language={locale} compact /></a>
