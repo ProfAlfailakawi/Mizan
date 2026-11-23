@@ -5,6 +5,8 @@ import { Field } from '../design-system/Field';
 import {Activity,AlertTriangle,BadgeCheck,Building2,Check,ChevronLeft,Database,FileSearch,Globe2,HardDrive,KeyRound,Layers3,Pencil,Plus,Search,ShieldCheck,Trash2,UsersRound,WalletCards,X} from 'lucide-react';
 import {auth} from '../../lib/firebase';
 import {IS_DEMO_SESSION, useAppStore} from '../../lib/store';
+import {isAppleNativeShell} from '../../lib/appleNativeShell';
+import {onlinePaymentOffered} from '../../lib/onlinePaymentOffered';
 import {Badge} from '../design-system/Badge';
 import {Button} from '../design-system/Button';
 import {EmptyState} from '../design-system/EmptyState';
@@ -140,7 +142,8 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine,gateway}:{billing:a
  const act=async(path:string,body?:any)=>{setBusy(path);setError('');try{await api(path,{method:'POST',body:body?JSON.stringify(body):undefined});onDone()}catch(e){setError((e as Error).message)}finally{setBusy('')}};
  /* تُفتح النافذة أثناء النقرة نفسها: فتحها بعد انتظار الشبكة يُعدّ نافذة غير مطلوبة فيحجبها المتصفح،
     فتُنشأ الفاتورة عند البوابة ولا يصل إليها الدافع. وإن حُجبت رغم ذلك ننتقل بالتبويب الحالي. */
- const payOnline=async(invoiceId:string)=>{const path=`${base}/invoices/${encodeURIComponent(invoiceId)}/checkout`;
+ const onlineOk=onlinePaymentOffered(!!gateway?.configured,isAppleNativeShell());
+ const payOnline=async(invoiceId:string)=>{const path=`${base}/invoices/${encodeURIComponent(invoiceId)}/checkout`;if(!onlineOk)return;
   /* العرض: لا بوابة دفع حقيقية — يُحاكى نجاحُ الدفع الإلكتروني فتُسجَّل الفاتورة مدفوعة بلا نافذةٍ خارجية. */
   if(IS_DEMO_SESSION){setBusy(path);setError('');try{await api(`${base}/invoices/${encodeURIComponent(invoiceId)}/pay`,{method:'POST',body:JSON.stringify({method:'online'})});onDone()}catch(e){setError((e as Error).message)}finally{setBusy('')}return}
   const win=window.open('','_blank','noopener');setBusy(path);setError('');
@@ -206,7 +209,7 @@ const BillingPanel=({billing,subjects,plans,base,onDone,mine,gateway}:{billing:a
      <div className="min-w-0"><div className="font-bold truncate text-sm">{x.subjectName}</div><div className="mt-1 text-xs text-[#6c726e]">{x.subjectType==='operator'?'مشغّل':'جهة'} · صدرت {date(x.issuedAt)}{x.dueAt?` · تستحق ${date(x.dueAt)}`:''}{x.paidAt?` · دُفعت ${date(x.paidAt)}`:''}</div>{(x.lines||[]).length>1&&<ul className="mt-2 space-y-1 border-s-2 border-[#e5e3dc] ps-3 text-xs text-[#5f6862]">{x.lines.map((l:any,i:number)=><li key={i} className="flex justify-between gap-3"><span>{l.description}</span><span dir="ltr" className="tabular-nums">{money(l.amountMinor,x.currency)}</span></li>)}</ul>}</div>
      <span className="font-black tabular-nums" dir="ltr">{money(x.amountMinor,x.currency)}</span>
      <Badge variant={x.overdue?'rose':invTone(x.status)}>{x.overdue?`متأخرة ${arPlural(x.daysOverdue, AR_NOUNS.dayN)}`:(INV_AR[x.status]||x.status)}</Badge>
-     <div className="flex flex-wrap gap-2">{x.status==='open'&&<>{gateway?.configured&&<Button size="sm" disabled={!!busy} icon={<WalletCards className="h-4 w-4"/>} onClick={()=>void payOnline(x.id)}>{busy.endsWith(`${x.id}/checkout`)?'جارٍ فتح الدفع…':'ادفع إلكترونيًا'}</Button>}<Button size="sm" variant={gateway?.configured?'outline':undefined} disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/pay`,{method:'manual'})}>تسجيل السداد</Button><Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/remind`)}>تذكير</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/void`)}>إلغاء</Button></>}</div>
+     <div className="flex flex-wrap gap-2">{x.status==='open'&&<>{onlineOk&&<Button size="sm" disabled={!!busy} icon={<WalletCards className="h-4 w-4"/>} onClick={()=>void payOnline(x.id)}>{busy.endsWith(`${x.id}/checkout`)?'جارٍ فتح الدفع…':'ادفع إلكترونيًا'}</Button>}<Button size="sm" variant={onlineOk?'outline':undefined} disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/pay`,{method:'manual'})}>تسجيل السداد</Button><Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/remind`)}>تذكير</Button><Button size="sm" variant="ghost" disabled={!!busy} onClick={()=>void act(`${base}/invoices/${encodeURIComponent(x.id)}/void`)}>إلغاء</Button></>}</div>
     </div>)}
     {!shown.length&&<EmptyState icon={FileSearch} title="لا توجد فواتير" hint="أصدر فاتورة لاشتراك قائم أو مبلغ لمرة واحدة."/>}
    </div>
