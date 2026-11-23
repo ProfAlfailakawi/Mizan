@@ -126,7 +126,29 @@ const enterRole = async (label) => {
    منها كما يمرّ المحكّم: يضغط، ثم يؤكّد. */
 const GATES = ['المتسابق أمامي — تأكيد الحضور', 'أوافق على فتح السؤال', 'تجهيز الميكروفون', 'إنهاء الموضع', 'إنهاء آخر موضع', 'تأكيد الإنهاء', 'السؤال التالي', 'اعتماد وقفل'];
 
-async function walkSession(maxTicks = 24) {
+/*
+ * الانتظار بالظهور لا بالتوقيت.
+ *
+ * كان المحرّك يقف عند أول دورةٍ لا يجد فيها زرَّ بوابة، والشاشة بين بوابتين تخلو من الأزرار
+ * لحظةً (كشفٌ يُكتب، صوتُ افتتاحٍ يبدأ). فإن طالت اللحظة على خادمٍ بطيء قيل «البوابات لم
+ * تُبلَغ» عن طريقٍ سليم، ونجح الفحص نفسه في التشغيلة التالية. فيُمهَل الطريق حتى تظهر
+ * البوابة التالية، ولا يُحكم بانقطاعه إلا إذا بقيت الشاشة بلا بوابة المهلةَ كلَّها.
+ */
+const GATE_PATIENCE_MS = 12000;
+const waitForText = async (pattern, timeoutMs) => {
+  const deadline = Date.now() + timeoutMs;
+  let text = await body();
+  while (!pattern.test(text) && Date.now() < deadline) { await page.waitForTimeout(500); text = await body(); }
+  return text;
+};
+const anyGateVisible = async () => {
+  for (const gate of GATES) {
+    if (await page.locator('button:visible', { hasText: gate }).count()) return true;
+  }
+  return false;
+};
+
+async function walkSession(maxTicks = 40) {
   const seen = new Set();
   let sealedTextLeaked = false;
   for (let tick = 0; tick < maxTicks; tick++) {
@@ -137,7 +159,16 @@ async function walkSession(maxTicks = 24) {
     for (const gate of GATES) {
       if (await clickIf(gate)) { clicked = gate; break; }
     }
-    if (!clicked) break;
+    if (!clicked) {
+      const deadline = Date.now() + GATE_PATIENCE_MS;
+      let appeared = false;
+      while (Date.now() < deadline) {
+        await page.waitForTimeout(500);
+        if (await anyGateVisible()) { appeared = true; break; }
+      }
+      if (appeared) continue;
+      break;
+    }
     seen.add(clicked);
     if (clicked === 'اعتماد وقفل') { await page.waitForTimeout(2200); break; }
   }
@@ -153,7 +184,7 @@ if (await enterRole('المحكم')) {
    */
   let first = await body();
   if (!/الموضع\s*1\/\d+/.test(first)) {
-    if (await clickIf('المتسابق التالي')) { await page.waitForTimeout(3000); first = await body(); }
+    if (await clickIf('المتسابق التالي')) first = await waitForText(/الموضع\s*1\/\d+|تعذّر بدء الجلسة/, 20000);
   }
   if (!/الموضع\s*1\/\d+/.test(first)) {
     const why = first.match(/تعذّر بدء الجلسة[^\n]*/);
@@ -167,7 +198,7 @@ if (await enterRole('المحكم')) {
   for (const gate of ['المتسابق أمامي — تأكيد الحضور', 'أوافق على فتح السؤال', 'إنهاء آخر موضع', 'اعتماد وقفل']) {
     if (!walk.seen.has(gate)) note(`البوابة «${gate}» لم تُبلَغ في هذا المسار`);
   }
-  const locked = await body();
+  const locked = await waitForText(/تم اعتماد تقييمك/, 10000);
   if (!/تم اعتماد تقييمك/.test(locked)) note('التقييم لم يُقفل بعد اجتياز البوابات');
   else ok('التقييم اعتُمد وقُفل، وتقييم بقية المحكمين بقي مخفيًا');
   await page.screenshot({ path: path.join(OUT, 'judge-locked.png'), fullPage: true });
@@ -179,8 +210,7 @@ if (await enterRole('المحكم')) {
    * لا فشل: الحاجز صمد. فيُميَّز الرفضان: رفضُ الحاجز يُعدّ نجاحًا، وأي رفض آخر ملاحظة.
    */
   if (await clickIf('المتسابق التالي')) {
-    await page.waitForTimeout(3000);
-    const next = await body();
+    const next = await waitForText(/الموضع\s*1\/\d+|تعذّر بدء الجلسة|لا يوجد متسابق/, 20000);
     const blocker = await page.evaluate(() => {
       try {
         const state = JSON.parse(localStorage.getItem('mizan_os_store_v1') || '{}');
