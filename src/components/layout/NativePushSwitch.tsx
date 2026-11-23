@@ -55,8 +55,10 @@ export const NativePushSwitch: React.FC<{ api: Api; ar: boolean }> = ({ api, ar 
         <div className="text-sm font-black">{ar ? 'فعّل التنبيهات' : 'Turn on notifications'}</div>
         <div className="mt-0.5 text-[11px] text-[#606762]">{ar ? 'تصلك الإشعارات الموجّهة إليك على هذا الجهاز.' : 'Messages addressed to you arrive on this device.'}</div>
       </div>
-      <button type="button" role="switch" aria-checked={on} aria-label={ar ? 'فعّل التنبيهات' : 'Turn on notifications'} disabled={busy} onClick={() => void toggle()} className={`relative h-8 w-14 shrink-0 rounded-full transition ${on ? 'bg-[var(--emerald)]' : 'bg-[#cfd3d0]'}`}>
-        <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? 'start-7' : 'start-1'}`} />
+      <button type="button" role="switch" aria-checked={on} aria-label={ar ? 'فعّل التنبيهات' : 'Turn on notifications'} disabled={busy} onClick={() => void toggle()} className="grid h-11 w-16 shrink-0 place-items-center">
+        <span aria-hidden="true" className={`relative block h-8 w-14 rounded-full transition ${on ? 'bg-[var(--emerald)]' : 'bg-[#cfd3d0]'}`}>
+          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? 'start-7' : 'start-1'}`} />
+        </span>
       </button>
     </div>
     {note && <p role="status" className="mt-2 text-[11px] font-bold text-[color:var(--muted)]">{note}</p>}
