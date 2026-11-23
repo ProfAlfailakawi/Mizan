@@ -1,3 +1,5 @@
+import { isAppleNativeShell } from '../../lib/appleNativeShell';
+import { printInPage } from '../../lib/printInPage';
 import { displayDateTime } from '../../lib/display-format';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -28,6 +30,7 @@ const FONT = "'Noto Naskh Arabic','Amiri','Tajawal','Segoe UI',Tahoma,serif";
 
 /** يفتح نافذة الطباعة على وثيقةٍ مستقلة (إطارٌ خفيّ) — فتُطبع الوثيقة وحدها، لا الصفحة. */
 export function printDocument(html: string): void {
+  if (isAppleNativeShell()) { printInPage(html); return; }
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   Object.assign(frame.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
