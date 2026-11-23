@@ -8,7 +8,8 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import type { Express, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
+type AppLike = { post: (path: string, ...handlers: RequestHandler[]) => unknown };
 import { APNS_TOKEN_PATTERN, type ApnsSender } from './apns-push';
 import type { NotificationRecord } from './notification-center';
 
@@ -76,7 +77,7 @@ export function createNativePush(store: NativePushTokenStore, sender: ApnsSender
 export type NativePush = ReturnType<typeof createNativePush>;
 
 /** المسارات: تسجيل توكن الجهاز وإلغاؤه للمستخدم الداخل. */
-export function registerNativePushRoutes(app: Express, deps: { requireUser: RequestHandler; store: () => NativePushTokenStore | null }) {
+export function registerNativePushRoutes(app: AppLike, deps: { requireUser: RequestHandler; store: () => NativePushTokenStore | null }) {
   const uidOf = (req: any) => String(req.mizanIdentity?.uid || '');
   app.post('/api/push/subscribe-native', deps.requireUser, (req, res) => {
     const store = deps.store();
