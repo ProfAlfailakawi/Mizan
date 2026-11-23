@@ -8,3 +8,6 @@ export const POPUP_FALLBACK_CODES: readonly string[] = [
 
 export const shouldFallbackToRedirect = (e: unknown): boolean =>
   POPUP_FALLBACK_CODES.includes(String((e as { code?: unknown } | null)?.code || ''));
+
+/** الدخول الموحّد (نافذة/تحويل) يُعرض في الموقع فقط؛ داخل تطبيق iOS يبقى البريد وكلمة المرور. */
+export const ssoOffered = (native: boolean): boolean => !native;
