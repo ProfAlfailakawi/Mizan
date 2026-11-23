@@ -73,7 +73,7 @@ export const CertificateVerification: React.FC = () => {
     UNREACHABLE:{ar:'تعذّر التحقق الآن',en:'VERIFICATION UNAVAILABLE',variant:'amber'}
   };
 
-  return <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
+  return <main className="mz-verify max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
     <section className="mizan-surface p-6 sm:p-8 text-center">
       <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
       <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
@@ -83,7 +83,7 @@ export const CertificateVerification: React.FC = () => {
         <div className="relative flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)]"/><input value={searchCode} onChange={e=>setSearchCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void verify()} aria-label={ar?'رقم الشهادة':'Certificate number'} dir="ltr" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="MZN-…" className="w-full rounded-xl border border-[#dcdad2] bg-white ps-10 pe-3 py-3 text-sm font-mono"/></div>
         <Button variant={searchCode.trim()?'primary':'outline'} className="mz-btn-idle" disabled={!searchCode.trim()} onClick={()=>void verify()}>{ar?'تحقق':'Verify'}</Button>
       </div>}
-      {policy.certificates.publicVerification&&!submittedCode&&<div aria-hidden="true" className="max-w-md mx-auto mt-6 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-soft)]/60 p-4 text-start select-none">
+      {policy.certificates.publicVerification&&!submittedCode&&<div aria-hidden="true" className="mz-verify-preview max-w-md mx-auto mt-6 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--surface-soft)]/60 p-4 text-start select-none">
         <div className="mizan-kicker">{ar?'هكذا تبدو النتيجة':'WHAT A RESULT LOOKS LIKE'}</div>
         <div className="mt-3 flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--emerald-soft)] text-[var(--emerald-2)]"><ShieldCheck className="h-4 w-4"/></span>

@@ -276,3 +276,61 @@ html[data-device="duo"] .mz-mk > header.sticky{ padding-top:var(--duo-safe-t) }
     padding-right:max(.75rem, calc(var(--duo-safe-r) + .5rem), calc(var(--duo-safe-l) + .5rem));
   }
 }
+
+/* ── التحقق من الشهادة في الكتاب العرضي ──────────────────────────────────────────────────────
+   كانت بطاقة التحقق عمودًا واحدًا بعرض ~720px يقع المفصل في وسطه. صارت ورقتين: بحثٌ على اليمنى، والمعاينة
+   ثم الحكم على اليسرى، والعمودان يُقاسان من عرض الشاشة نفسها فيقع الكعب بينهما تمامًا (في التطبيق تُطرح
+   جهة الساعة من الورقة اليمنى). ترتيب المصدر لا يتغيّر؛ المعاينة زخرفية (aria-hidden) وتُوضع بصريًّا
+   على الورقة اليسرى بإزاحة مطلقة بمحاذاة بطاقة البحث. عرضٌ فقط. */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] body:has(main.mz-verify)::after{
+    content:""; position:fixed; z-index:1; top:0; bottom:0; left:50%;
+    width:var(--duo-spine); transform:translateX(-50%); pointer-events:none;
+    background:
+      linear-gradient(90deg, transparent, rgba(14,44,47,.14) 50%, transparent) 50% 0 / 1px 100% no-repeat,
+      linear-gradient(90deg, rgba(14,44,47,0) 0%, rgba(14,44,47,.035) 30%, rgba(14,44,47,.075) 50%, rgba(14,44,47,.035) 70%, rgba(14,44,47,0) 100%);
+  }
+  html[data-device="duo"] main.mz-verify{
+    max-width:none; margin:0; padding-inline:0; padding-block:2rem;
+    display:grid; align-items:start; align-content:center; justify-content:start; row-gap:1.25rem;
+    min-height:calc(100dvh - 9rem - var(--duo-safe-b));
+    grid-template-columns:calc(50vw - var(--duo-spine) / 2 - var(--duo-safe-r)) calc(50vw - var(--duo-spine) / 2 - var(--duo-safe-l));
+    column-gap:var(--duo-spine);
+  }
+  html[data-device="duo"] main.mz-verify > *{ margin:0 var(--duo-gutter); grid-column:2; min-width:0 }
+  html[data-device="duo"] main.mz-verify > :first-child{ grid-column:1; grid-row:1; position:relative }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview{
+    position:absolute; top:0; bottom:0; right:calc(100% + var(--duo-gap)); margin:0; max-width:none;
+    width:calc(50vw - var(--duo-spine) / 2 - var(--duo-safe-l) - 2 * var(--duo-gutter));
+    display:flex; flex-direction:column; justify-content:center; gap:.25rem; padding:1.5rem 1.75rem;
+  }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .mizan-kicker{ text-align:start; font-size:13px }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .mt-3{ margin-top:1rem; gap:1rem }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .h-9{ height:3rem; width:3rem }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .h-9 svg{ height:1.35rem; width:1.35rem }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .h-2\.5{ height:.8rem }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview .h-2{ height:.6rem }
+  html[data-device="duo"] main.mz-verify > :first-child > .mz-verify-preview span.rounded-full:last-child{ font-size:13px; padding:.2rem .8rem }
+  html[data-device="duo"] main.mz-verify > :first-child h1{ font-size:1.5rem; line-height:1.3; text-wrap:balance }
+  html[data-device="duo"] main.mz-verify > section:first-child{ padding:1.75rem 1.25rem }
+  /* بطاقة الحكم داخل ورقة اليسار: الحشوة أضيق، والرمز ونصّه يلتفّان بدل أن يتجاوزا العرض. */
+  html[data-device="duo"] main.mz-verify > [data-mizan-print]{ padding:1.5rem 1.25rem }
+  html[data-device="duo"] main.mz-verify > [data-mizan-print] .flex-col.sm\:flex-row{ flex-wrap:wrap }
+}
+
+/* ── شاشة البثّ «مختومة» في الكتاب العرضي ────────────────────────────────────────────────────
+   كانت كل الخزنة في الورقة اليمنى واليسرى خاليةً. صارت ورقتين متوازنتين حول المفصل: اليمنى القفل والعنوان
+   (وعدّاد الموافقات إن وُجد)، واليسرى مفاتيح الاعتماد وما يلزم بعدها من نصّ أو زرّ. الحشوة متناظرة في
+   التطبيق فمنتصف المحتوى هو المفصل نفسه. عرضٌ فقط، ولا يتغيّر ترتيب العناصر في المصدر. */
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] .mz-bp-stage > main > div:has(> .mz-cer-sealed){ width:100%; max-width:none }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed{
+    max-width:none; margin:0; display:grid; align-items:center; justify-items:center;
+    grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:var(--duo-gap);
+  }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed > *{ min-width:0; max-width:100%; width:100% }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-a{ grid-column:1 }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-b{ grid-column:2 }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-b > :first-child{ margin-top:0 !important }
+  html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-b .mizan-dna-venue{ justify-content:center }
+}
