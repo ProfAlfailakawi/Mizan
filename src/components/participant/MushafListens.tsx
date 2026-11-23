@@ -39,6 +39,7 @@ import { playReferenceWord, spokenPosition } from '../../lib/reference-word';
 import { EMPTY_TASHKEEL, TASHKEEL_HAFS_ONLY_NOTE, TashkeelReport, tashkeelFailureNote, unclearReason, type TashkeelRetake, type TashkeelState } from './TashkeelReport';
 import type { QuranScope } from '../../lib/quran-scope';
 import { extendHint, hintsLeft, spanEnd, type HintSpan } from '../../lib/hint-reveal';
+import { micUnavailableNote } from '../../lib/micUnavailableNote';
 
 /*
  * «المصحفُ يسمعك» — أن يراجع الطالبُ بصفحته كما يراجع في مصحفه، والصفحةُ تردّ عليه.
@@ -580,9 +581,7 @@ export const MushafListens: React.FC<MushafListensProps> = ({ ar, scope, deliver
     if (!listening || !faceSupportsListening(face)) { setStage('ready'); return; }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setStage('ready');
-      setNote(ar
-        ? 'الميكروفون غير متاح في هذا المتصفّح أو في اتصال غير آمن. افتح البطاقة عبر HTTPS في Safari أو Chrome ثم أعد المحاولة.'
-        : 'Microphone access is unavailable in this browser or insecure context. Open the journey over HTTPS in Safari or Chrome and try again.');
+      setNote(micUnavailableNote(ar));
       return;
     }
     try {
