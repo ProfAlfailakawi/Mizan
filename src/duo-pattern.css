@@ -20,8 +20,10 @@ html[data-device="duo"]{
   --duo-safe-b:env(safe-area-inset-bottom,0px);
   --duo-safe-l:env(safe-area-inset-left,0px);
   --duo-row-h:3.6rem;
-  /* بداية عمود الكبسولات: تحت مربع الساعة والبطارية (يبلغ نحو 165px من الأعلى) لا داخله. */
-  --duo-col-top:10.75rem;
+  /* بداية عمود الكبسولات: تحت مربع الساعة والبطارية لا داخله. على الجهاز الحقيقي يمتدّ المربع على الشاشة الخارجية
+     من الحبّة العليا إلى حلقة البطارية (≈235px، لقطة المالك 2026-11-26؛ نحو 165px في المحاكاة)، فيبدأ العمود بعد 244px،
+     أو بعد ارتفاع الودجت الذي يكتبه الغلاف الأصلي (--duo-widget-h) إن كان أكبر. */
+  --duo-col-top:max(244px, calc(var(--duo-widget-h, 0px) + 8px));
   --duo-glass:color-mix(in srgb, var(--surface, #fff) 72%, transparent);
   --duo-glass-line:color-mix(in srgb, var(--line, #dfded7) 80%, transparent);
   --duo-glass-shadow:0 10px 30px rgba(20,36,30,.14);
@@ -258,10 +260,11 @@ html[data-device="duo"] .mz-public-head{ padding-top:var(--duo-safe-t) }
 }
 /* الموقع التسويقي في التطبيق (الداخلية الطولية): الترويسة اللاصقة تبدأ تحت شريط الساعة، وخلفيتها تمتدّ تحته. */
 html[data-device="duo"] .mz-mk > header.sticky{ padding-top:var(--duo-safe-t) }
-/* الخارجية عرضًا (التطبيق): مربع الساعة أقصر (~112px)، فيبدأ عمود الكبسولات تحته مباشرةً لا عند 172px،
-   وشريط بيئة العرض الثابت (3.5rem، من 640px) لا يغطّي أسفل العمود: الارتفاع المتاح يُطرح منه. */
-@media (orientation:landscape) and (max-height:520px){
-  html[data-device="duo"][data-shell="app"]{ --duo-col-top:7.5rem }
+/* الخارجية عرضًا (التطبيق): المربع نفسه في ركن العمود، فيبدأ عمود الكبسولات بعد 244px كالطولي ويتمرّر داخله؛
+   وشريط بيئة العرض الثابت (3.5rem، من 640px) لا يغطّي أسفل العمود: الارتفاع المتاح يُطرح منه.
+   الداخلية عرضًا: ركن الساعة أقصر، فيبقى العمود عند 172px. */
+@media (orientation:landscape) and (min-height:521px){
+  html[data-device="duo"][data-shell="app"]{ --duo-col-top:10.75rem }
 }
 @media (min-width:640px){
   html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) body:has(.mizan-demo-bar) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
