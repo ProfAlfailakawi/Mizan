@@ -12,6 +12,7 @@ import { MizanLogo, useBrandInfo } from '../design-system/MizanLogo';
 import { NotificationCenter } from './NotificationCenter';
 import { Button } from '../design-system/Button';
 import { AccountButton } from '../auth/AccountDeletion';
+import { AccessibilityButton, MihrabToggle } from './AccessibilityButton';
 
 export const Header: React.FC = () => {
  const {language,competition,isOffline,emergencyFrozen,currentUser}=useAppStore(); const [searchOpen,setSearchOpen]=useState(false); const [helpOpen,setHelpOpen]=useState(false);
@@ -49,12 +50,16 @@ export const Header: React.FC = () => {
         <div className="fixed start-2 top-16 z-50 w-56 max-w-[calc(100vw-16px)] rounded-2xl border border-[#e2e0d8] bg-white p-1.5 shadow-[0_18px_45px_rgba(25,39,33,.16)]">
           <button onClick={()=>setSearchOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><Search className="w-4 h-4 text-[color:var(--muted)]"/>{language==='ar'?'بحث سريع':'Quick search'}</button>
           {!superAdmin&&<button onClick={()=>setHelpOpen(true)} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-bold text-[#3f4742] hover:bg-[#f2f0ea] text-start"><CircleHelp className="w-4 h-4 text-[color:var(--muted)]"/>{language==='ar'?'اشرح لي هذه الواجهة':'Explain this screen'}</button>}
+          {/* الإتاحة والمظهر (ومنه وضع المحراب) على الجوال من «المزيد»: صفّ الترويسة لا يتّسع لزرّ ثامن. */}
+          <AccessibilityButton variant="menu"/>
         </div>
       </details>
       {!superAdmin&&<span role="status" aria-live="polite" className={`w-11 max-[340px]:w-8 h-11 grid place-items-center rounded-xl ${isOffline?'bg-[var(--amber-soft)] text-[#8a6738]':'text-[color:var(--muted)]'}`} title={isOffline?(language==='ar'?'استمرارية دون إنترنت — يعمل ميزان محليًا':'Offline continuity — MIZAN is running locally'):(language==='ar'?'متصل':'Online')} aria-label={isOffline?(language==='ar'?'الحالة: استمرارية دون إنترنت':'Status: offline continuity'):(language==='ar'?'الحالة: متصل':'Status: online')}>{isOffline?<WifiOff className="w-4 h-4"/>:<Wifi className="w-4 h-4"/>}</span>}
       {/* شارة البيئة التجريبية وأدواتها انتقلت إلى `DemoBar` على مستوى التطبيق:
           الترويسة لا تُعرض لدور «مشغّل البثّ» أصلًا، فلا يصحّ أن يسكن فيها المخرج
           الوحيد من البيئة. وتكرارها هنا ضجيجٌ لا فائدة فيه. */}
+      <MihrabToggle ar={language==='ar'} className="mz-hd-wide hidden sm:inline-flex"/>
+      <AccessibilityButton className="mz-hd-wide hidden sm:inline-flex"/>
       <NotificationCenter/>
       <LanguageSwitcher compact/>
       <AccountButton/>

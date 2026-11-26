@@ -11,6 +11,7 @@ import {
   HALL_NEXT_DEPTH, HALL_PAGE_CAPACITY, HALL_PAGE_SECONDS, boardAge, buildDisplayBoard, categoryLine, describeAge, describeWait, paginatePanels, venueClock,
   type CommitteeBoardSlice, type DisplayBoard,
 } from '../../lib/display-board';
+import { HallCallSpotlight } from './HallCallSpotlight';
 
 /*
  * شاشة القاعة.
@@ -118,6 +119,9 @@ export const WaitingBoard: React.FC<{ board?: DisplayBoard; onClose?: () => void
               </div>}
             </>
           : <div className="py-16 text-center mizan-venue-faint text-sm">{ar ? 'لا توجد لجان في هذه المسابقة بعد.' : 'This competition has no panels yet.'}</div>}
+
+        {/* «النداء»: الكود الجديد ملء الشاشة ثلاث ثوانٍ ثم إلى خانة لجنته. */}
+        <HallCallSpotlight committees={board.committees} ar={ar} />
 
         {/* النداء نصًّا لقارئ الشاشة: الوميض وحده لا يصل الكفيف. */}
         <p aria-live="polite" className="sr-only">

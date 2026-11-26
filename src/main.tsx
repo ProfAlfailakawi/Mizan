@@ -1,6 +1,7 @@
 /* أولًا: يُركَّب نقل معرّف الصندوق التجريبي قبل أي التقاطٍ لـ window.fetch (انظر lib/demo-transport.ts). */
 import './lib/demo-transport';
 import {installDuoMarkers} from './lib/duo-markers';
+import {installTheme} from './lib/mihrab-theme';
 import {installDockMotion} from './lib/dock-motion';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -13,6 +14,7 @@ import './elevation.css';
 import './motion.css';
 import './duo-pattern.css';
 import './dock-motion.css';
+import './visual-wave.css';
 import {ArabicInterfaceGuard} from './components/design-system/ArabicInterfaceGuard';
 import {AppErrorBoundary} from './components/design-system/AppErrorBoundary';
 import {installStaleShellRecovery,markShellHealthy} from './lib/stale-shell-recovery';
@@ -25,6 +27,8 @@ import {installUpdatingWatch} from './lib/updating-notice';
 installUpdatingWatch();
 /* علامات iPhone Duo قبل أول رسم، فلا يومض تخطيط الهاتف ثم يتبدّل. */
 installDuoMarkers();
+/* «وضع المحراب» قبل أول رسم، فلا تومض السمة الفاتحة ثم تنقلب. */
+installTheme();
 /* علامة المضيف تُجلب قبل أول رسم، فلا تومض «ميزان» على نطاق مشغّلٍ بعلامة بيضاء. */
 loadHostBrand();
 

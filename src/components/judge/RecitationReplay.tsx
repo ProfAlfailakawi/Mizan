@@ -24,19 +24,23 @@ export interface ReplayMark {
   alignmentState?: string;
   confidence?: number;
   kind: 'ALIGNMENT' | 'HUMAN_MARKER';
+  /** لون العلامة إن أراد المستدعي تلوينها بمعيارها (شريط الجلسة). غيابه يُبقي اللون الافتراضي. */
+  tone?: string;
+  /** تسمية العلامة إن كانت أدقّ من «علامة الحَكَم». */
+  label?: string;
 }
 
 /** اللحظات التي تستحق قفزة: فقدُ الموضع واستعادته، وعلامة الحَكَم اليدوية. */
 const NOTABLE=(m:ReplayMark)=>m.kind==='HUMAN_MARKER'||m.alignmentState==='LOST'||m.alignmentState==='REACQUIRING'||m.alignmentState==='REACQUIRED';
-const markTone=(m:ReplayMark)=>m.kind==='HUMAN_MARKER'?'#214C40':m.alignmentState==='LOST'?'#9B3B2F':'#8A5A2B';
-const markLabel=(m:ReplayMark,ar:boolean)=>m.kind==='HUMAN_MARKER'?(ar?'علامة الحَكَم':'Judge marker')
+const markTone=(m:ReplayMark)=>m.tone?m.tone:m.kind==='HUMAN_MARKER'?'#214C40':m.alignmentState==='LOST'?'#9B3B2F':'#8A5A2B';
+const markLabel=(m:ReplayMark,ar:boolean)=>m.label?m.label:m.kind==='HUMAN_MARKER'?(ar?'علامة الحَكَم':'Judge marker')
  :m.alignmentState==='LOST'?(ar?'فقد الموضع':'Position lost')
  :m.alignmentState==='REACQUIRING'?(ar?'إعادة تحديد':'Reacquiring')
  :m.alignmentState==='REACQUIRED'?(ar?'استعاد الموضع':'Reacquired'):(ar?'تتبّع':'Tracking');
 
 const mmss=(ms:number)=>{const t=Math.max(0,Math.floor(ms/1000));return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`};
 
-export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;text:string}[];trail:ReplayMark[];ar:boolean}>=({recordingUrl,ayat,trail,ar})=>{
+export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;text:string}[];trail:ReplayMark[];ar:boolean;playOnMark?:boolean}>=({recordingUrl,ayat,trail,ar,playOnMark})=>{
  const elRef=useRef<HTMLAudioElement|null>(null);
  const [playing,setPlaying]=useState(false);const [posMs,setPosMs]=useState(0);const [durMs,setDurMs]=useState(0);
  const marks=useMemo(()=>[...trail].sort((a,b)=>a.offsetMs-b.offsetMs),[trail]);
@@ -90,7 +94,7 @@ export const RecitationReplay:React.FC<{recordingUrl:string;ayat:{ayah:number;te
      aria-label={ar?'موضع التشغيل':'Playback position'}
      className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent cursor-pointer"/>
     <div aria-hidden className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-[#e3ded1] overflow-hidden"><div className="h-full bg-[var(--emerald)]" style={{width:`${progress*100}%`}}/></div>
-    {durMs>0&&notable.map((m,i)=><button key={i} type="button" onClick={()=>seek(m.offsetMs)}
+    {durMs>0&&notable.map((m,i)=><button key={i} type="button" onClick={()=>{seek(m.offsetMs);if(playOnMark)setPlaying(true)}}
       title={`${markLabel(m,ar)} · ${mmss(m.offsetMs)}`} aria-label={`${markLabel(m,ar)} ${mmss(m.offsetMs)}`}
       className="absolute top-0 h-full w-3 -translate-x-1/2 grid place-items-center"
       style={{insetInlineStart:`${Math.min(100,(m.offsetMs/durMs)*100)}%`}}>

@@ -9,6 +9,7 @@ import { surahNameArabic } from '../judge/OfficialMushafSurface';
 import { HALL_NEXT_DEPTH, boardAge, buildDisplayBoard, describeAge, venueClock, type DisplayBoard } from '../../lib/display-board';
 import { DnaCountUp } from '../dna/DnaKit';
 import { useHallMotion } from './useHallMotion';
+import { HallJuzBar } from './HallJuzBar';
 
 /*
  * شاشة الممرّ.
@@ -145,6 +146,9 @@ export const CorridorScreen: React.FC<{
           {panel === 'khatmah' && <KhatmahPanel ar={ar} board={board} />}
           {panel === 'queue' && <QueuePanel ar={ar} board={board} />}
         </main>
+
+        {/* «ختمة القاعة الحيّة»: ثلاثون جزءًا من التجميع نفسه، ظاهرةٌ تحت كل لوحة. لا كود ولا اسم. */}
+        {!!board.recitation?.totalRecitations && <HallJuzBar ar={ar} pages={board.recitation.pages || []} khatmatCompleted={board.recitation.khatmatCompleted || 0} />}
 
         {/* نقاطٌ تقول أين نحن من الدورة، فلا يبدو تبدّل الشاشة عطلًا — ومعها اسم كل لوحة وشريطُ
             ما بقي من وقت اللوحة الحاضرة. */}

@@ -4,6 +4,7 @@ import { BadgeCheck, Printer, ShieldCheck, X } from 'lucide-react';
 import type { buildParticipantFairnessEvidence } from '../../lib/judging-integrity';
 import { formatParticipantCode } from '../../lib/journey-progress';
 import { RevealGateExplainer } from './RevealGateExplainer';
+import { ReceiptJourney } from './ReceiptJourney';
 
 /*
  * «إيصال النزاهة» كان ملف JSON يُنزَّل — لا يفتحه المتسابق ولا يفهمه أهله. صار ورقةً
@@ -55,6 +56,8 @@ export const FairnessReceipt: React.FC<{ receipt: Receipt; ar: boolean; particip
         <p className="mt-3 text-xl font-black">{participantName}</p>
         <p className="text-lg font-black tabular-nums text-[#555d58]" dir="ltr">{formatParticipantCode(receipt.participantCode)}</p>
       </header>
+
+      <ReceiptJourney receipt={receipt} ar={ar} />
 
       <h3 className="mt-6 text-lg font-black text-[color:var(--emerald)]">{ar ? 'دورك' : 'Your turn'}</h3>
       <dl>
