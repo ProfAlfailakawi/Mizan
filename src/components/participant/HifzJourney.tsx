@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { BookMarked, Flame, Target } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BookMarked, Flame, Grid3x3, Sparkles, Target } from 'lucide-react';
+import { HifzSky } from './HifzSky';
 import { arabicIndicDigits } from '../judge/AyahMark';
 import { surahNameArabic } from '../../lib/quran-canon';
 import type { FaceAttempt, AttemptWordKind } from '../../lib/face-memory';
@@ -59,6 +60,8 @@ export const HifzJourney: React.FC<{
   const tallies = useMemo(() => Object.fromEntries([...memory].map(([page, m]) => [String(page), m.attempts])), [memory]);
   const justPractised = useChangedKeys(tallies, 'rise');
   const streakShown = useRiseCount(summary.streak);
+  /* «سماء المصحف» عرضٌ بديل للخريطة نفسها؛ الخريطة تبقى الافتراض وهي موضع الضغط للتلاوة. */
+  const [view, setView] = useState<'map' | 'sky'>('map');
   if (!attempts.length && !Object.keys(ledger?.pages ?? {}).length) return null;
 
   const neediest = neediestPage(attempts, now, practisable, current, ledger);
@@ -91,6 +94,12 @@ export const HifzJourney: React.FC<{
           </button>
         )}
 
+        <div className="mz-vw-viewtoggle" role="group" aria-label={ar ? 'طريقة العرض' : 'View'}>
+          <button type="button" aria-pressed={view === 'map'} onClick={() => setView('map')}><Grid3x3 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'الخريطة' : 'Map'}</button>
+          <button type="button" aria-pressed={view === 'sky'} onClick={() => setView('sky')}><Sparkles className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'سماء المصحف' : 'Mushaf sky'}</button>
+        </div>
+
+        {view === 'sky' ? <HifzSky ar={ar} memory={memory} current={current} /> : <>
         <div className="mizan-journey__map" aria-label={ar ? 'خريطة المصحف: كلّ سطرٍ جزء، وكلّ مربّعٍ صفحة' : 'Mushaf map: each row a juz, each square a page'}>
           {JUZ_START_PAGES.map((start, k) => {
             const end = k + 1 < JUZ_START_PAGES.length ? JUZ_START_PAGES[k + 1] - 1 : 604;
@@ -121,6 +130,7 @@ export const HifzJourney: React.FC<{
         <p className="mizan-journey__hint">
           {ar ? 'اضغط صفحةً من نطاقك لتتلوها الآن. والخريطةُ من تلاواتك في هذا الجهاز وحده.' : 'Tap a page in your range to recite it now. Built from this device only.'}
         </p>
+        </>}
 
         {hard.length > 0 && (
           <section className="mizan-journey__hard" data-hard-words={hard.length}>

@@ -13,6 +13,8 @@ import { useAppStore } from '../../lib/store';
 import { searchMatches } from '../../lib/input-normalize';
 import { JOURNEY_ORDER, deriveJourneyStage, normalizeJourneyStage } from '../../lib/journey-progress';
 import { PanelConstellation } from './PanelConstellation';
+import { HallFromAbove } from './HallFromAbove';
+import { HALL_NEXT_DEPTH, buildDisplayBoard } from '../../lib/display-board';
 import { SurfaceBoundary } from '../design-system/SurfaceBoundary';
 import { FIXED_END_PHRASE, getCompetitionPolicy, isValidTimeZone } from '../../lib/competition-config';
 import { Category, Competition, CompetitionPolicy, IncidentRecord, RegistrationFieldDefinition } from '../../types';
@@ -705,6 +707,8 @@ const OperationsView=({mode,store,ar,sim,simCount,setSimCount,attention,focus}:{
   <ToolTile ar={ar} icon={MonitorDot} title={ar?'شاشة اللجنة':'Committee display'} hint={ar?'المتسابق الحالي والتالي':'Current and next participant'} reason={!active?(ar?'بعد فتح المسابقة':'After opening'):(ar?'أنشئ لجنة أولًا':'Create a panel first')} disabled={!active||!hasPanels} onClick={()=>open('committeeBoard')}/>
   <ToolTile ar={ar} icon={MapPin} title={ar?'خريطة القاعة':'Hall map'} hint={ar?'تشغيل اللجان ومتابعتها':'Run and watch the panels'} reason={!active?(ar?'بعد فتح المسابقة':'After opening'):(ar?'أنشئ لجنة أولًا':'Create a panel first')} disabled={!active||!hasPanels} onClick={()=>open('hallMap')}/>
  </div></section>}
+ {/* «القاعة من فوق»: الإسقاط نفسه الذي تقرؤه شاشة الانتظار — أعدادٌ ورموز لجان فقط. */}
+ {mode==='operations'&&store.committees.some(c=>c.competitionId===store.competition.id)&&(()=>{const board=buildDisplayBoard({competitionId:store.competition.id,competitionName:store.competition.name,competitionNameArabic:store.competition.nameArabic,participants:store.participants,committees:store.committees,categories:store.competition.categories||[],fallbackSessionMinutes:store.competition.ruleSet?.questionDurationMinutes,elapsedSecondsByCommittee:store.activeSession.committee?{[store.activeSession.committee.id]:store.sessionElapsedSeconds()}:undefined,nextDepth:HALL_NEXT_DEPTH,ar,now:new Date()});return <HallFromAbove ar={ar} committees={board.committees} unassignedWaiting={board.unassignedWaiting}/>})()}
  {/* «مختبر ذكاء التحكيم» و«البث والتغطية» لم يعودا بابين هنا. كل ما كان خلفهما انتقل إلى
      موضعه من العمل: تكافؤ القرعة في قسم السحب أعلاه، رادار المتشابهات عند رئيس التحكيم،
      نزاهة اللجان عند المدقق، شرح الوقف في استوديو تدرّب المتسابق، ومتابعة الكلمة على

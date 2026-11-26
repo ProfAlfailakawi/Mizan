@@ -8,6 +8,7 @@ declare module 'lucide-react' {
  export const Gem: any;
  export const Feather: any;
  export const Moon: any;
+ export const Sun: any;
  export const Star: any;
  export const Pin: any;
  export const Languages: any;

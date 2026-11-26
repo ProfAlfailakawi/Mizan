@@ -1,0 +1,221 @@
+/*
+ * الموجة البصرية الأولى — تسعة أفكار عرضٍ فقط (لا سلوك).
+ * كل حركة هنا transform/opacity/stroke، ولكلٍّ حالةٌ ساكنة كاملة تحت تقليل الحركة
+ * (`prefers-reduced-motion` و`html[data-mizan-motion="reduced"]`).
+ */
+
+/* ── 1) لحظة الميزان (الحفل) ───────────────────────────────────────────── */
+.mz-vw-scales{ width:max-content; margin-bottom:1rem }
+.mz-vw-scales .mz-arch,
+.mz-vw-scales .mz-chains,
+.mz-vw-scales .mz-book{
+  transform-box:view-box; transform-origin:60px 44px;
+  animation: mzVwSwing 1.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+@keyframes mzVwSwing{
+  0%  { transform:rotate(0deg) }
+  18% { transform:rotate(-9deg) }
+  40% { transform:rotate(6deg) }
+  62% { transform:rotate(-3deg) }
+  82% { transform:rotate(1.2deg) }
+  100%{ transform:rotate(0deg) }
+}
+/* عناصر الكشف تبدأ بعد أن تستقرّ الكفّتان. */
+.mz-vw-moment .mz-cer-item{ animation-delay: calc(var(--mzd,0ms) + 1400ms) }
+.mz-vw-halo{ position:relative; isolation:isolate }
+.mz-vw-halo::after{
+  content:""; position:absolute; inset:-.35em -.6em; z-index:-1; border-radius:999px;
+  background: radial-gradient(closest-side, rgba(232,203,147,.34), rgba(185,139,78,.12) 60%, transparent);
+  animation: mzVwHalo 1.8s ease-out calc(var(--mzd,0ms) + 1900ms) both;
+}
+@keyframes mzVwHalo{ from{ opacity:0; transform:scale(.7) } 55%{ opacity:1 } to{ opacity:.75; transform:scale(1) } }
+
+/* ── 2) سماء المصحف ─────────────────────────────────────────────────── */
+.mz-vw-viewtoggle{ display:inline-flex; gap:4px; padding:3px; border-radius:12px; background:var(--surface-soft); border:1px solid var(--line); margin-block:.5rem }
+.mz-vw-viewtoggle button{ display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 12px; border-radius:9px; font-size:12px; font-weight:900; color:var(--muted) }
+.mz-vw-viewtoggle button[aria-pressed="true"]{ background:var(--surface); color:var(--emerald); box-shadow:var(--shadow-1) }
+.mz-vw-sky svg{ background: radial-gradient(120% 90% at 50% 0%, #1b3029, var(--venue-deep)); border-radius:18px }
+.mz-vw-star{ fill:rgba(244,241,232,.16) }
+.mz-vw-star.is-strong{ fill:#f4f1e8; filter: drop-shadow(0 0 2.5px rgba(244,241,232,.75)); animation: mzVwTwinkle 4.2s ease-in-out calc(var(--mz-vw-i,0) * -.37s) infinite }
+.mz-vw-star.is-review{ fill:#a9b6ae }
+.mz-vw-star.is-weak{ fill:#d88a6e }
+.mz-vw-star.is-current{ stroke:#e8cb93; stroke-width:1.2 }
+.mz-vw-sky-line{ fill:none; stroke:rgba(169,182,174,.32); stroke-width:.7; stroke-linejoin:round }
+.mz-vw-constellation.is-complete .mz-vw-sky-line{ stroke:#e8cb93; stroke-width:1 }
+.mz-vw-constellation.is-complete .mz-vw-star.is-strong{ fill:#e8cb93 }
+.mz-vw-sky-juz{ font-size:9px; font-weight:800; fill:rgba(169,182,174,.55); font-family:var(--font-arabic) }
+.mz-vw-constellation.is-complete .mz-vw-sky-juz{ fill:#e8cb93 }
+@keyframes mzVwTwinkle{ 0%,100%{ opacity:1 } 50%{ opacity:.62 } }
+
+/* ── 3) ختمة القاعة الحيّة ───────────────────────────────────────────── */
+.mz-vw-juzbar__track{ display:grid; grid-template-columns:repeat(30,minmax(0,1fr)); gap:3px; height:34px }
+.mz-vw-juzbar__cell{ position:relative; overflow:hidden; border-radius:4px; background:rgba(255,255,255,.07) }
+.mz-vw-juzbar__cell > i{ position:absolute; inset-inline:0; bottom:0; background:linear-gradient(to top,#b98b4e,#e8cb93); transition:height .9s var(--ease-brand); border-radius:inherit }
+.mz-vw-juzbar__cell.is-done{ box-shadow:0 0 0 1px rgba(232,203,147,.55) }
+.mz-vw-juzbar__cell[data-pulse]{ animation: mzVwPulse 1.2s ease-out 2 }
+@keyframes mzVwPulse{ 0%{ box-shadow:0 0 0 0 rgba(232,203,147,.75) } 100%{ box-shadow:0 0 0 10px rgba(232,203,147,0) } }
+
+/* ── 5) رحلة سؤالك ──────────────────────────────────────────────────── */
+.mz-vw-journey__path{ position:absolute; inset-inline:0; top:12px; width:100%; height:20px; overflow:visible }
+.mz-vw-journey__path .is-track{ stroke:#e3dfd3; stroke-width:3; stroke-linecap:round }
+.mz-vw-journey__path .is-drawn{ stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-dasharray:100; animation: mzVwDraw 1.6s var(--ease-brand) .2s both }
+@keyframes mzVwDraw{ from{ stroke-dashoffset:100 } to{ stroke-dashoffset:0 } }
+.mz-vw-journey__stop{ position:relative; display:grid; place-items:center; width:44px; height:44px; border-radius:999px; border:2px solid #cfd8d2; background:var(--surface); color:var(--muted);
+  animation: mzVwStop .5s var(--ease-brand) calc(.25s + var(--mz-vw-i,0) * .38s) both }
+.mz-vw-journey__stop.is-done{ border-color:var(--emerald); color:var(--emerald); background:var(--emerald-soft) }
+.mz-vw-journey__stop.is-open{ box-shadow:0 0 0 4px rgba(185,139,78,.25) }
+@keyframes mzVwStop{ from{ opacity:0; transform:scale(.6) } to{ opacity:1; transform:none } }
+
+/* ── 4) شريط الجلسة ─────────────────────────────────────────────────── */
+.mz-vw-strip{ min-width:min(100%, 36rem) }
+
+/* ── 6) النداء ──────────────────────────────────────────────────────── */
+.mz-vw-call{ position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:1.5rem;
+  background:radial-gradient(70% 60% at 50% 45%, rgba(33,76,64,.96), rgba(16,26,22,.97)); animation: mzVwCallIn .45s ease-out both }
+.mz-vw-call__card{ text-align:center; animation: mzVwCallCode .6s cubic-bezier(.16,1,.3,1) both }
+.mz-vw-call__code{ display:block; margin-top:.75rem; font-size:clamp(5rem,22vw,16rem); line-height:1; font-weight:900; letter-spacing:.02em; color:#e8cb93; text-shadow:0 0 60px rgba(232,203,147,.25) }
+.mz-vw-call[data-phase="leave"]{ animation: mzVwCallOut .65s ease-in both }
+.mz-vw-call[data-phase="leave"] .mz-vw-call__card{ animation: mzVwCallShrink .65s cubic-bezier(.6,0,.8,.4) both }
+@keyframes mzVwCallIn{ from{ opacity:0 } to{ opacity:1 } }
+@keyframes mzVwCallOut{ from{ opacity:1 } to{ opacity:0 } }
+@keyframes mzVwCallCode{ from{ opacity:0; transform:scale(.6) } to{ opacity:1; transform:none } }
+@keyframes mzVwCallShrink{ to{ opacity:0; transform:translateY(18vh) scale(.18) } }
+html[data-demo-bar="on"] .mz-vw-call{ bottom:var(--demo-bar-h, 0px) }
+
+/* ── 7) القاعة من فوق ───────────────────────────────────────────────── */
+.mz-vw-above__lane{ fill:none; stroke:rgba(255,255,255,.08); stroke-width:1.5; stroke-dasharray:3 5 }
+.mz-vw-above__dot{ fill:#e8cb93; animation: mzVwFlow 2.8s linear infinite }
+@keyframes mzVwFlow{ 0%{ transform:translate(0,0); opacity:.35 } 50%{ opacity:1 } 100%{ transform:translate(var(--mz-vw-dx,0),var(--mz-vw-dy,0)); opacity:.35 } }
+.mz-vw-above__land{ fill:#214c40; stroke:rgba(134,198,168,.45); stroke-width:1.2 }
+.mz-vw-above__island.is-offline .mz-vw-above__land{ fill:#2a332f; stroke:rgba(255,255,255,.15) }
+.mz-vw-above__glow{ fill:rgba(217,154,61,.30); filter:blur(6px); animation: mzVwGlow 2.4s ease-in-out infinite }
+.mz-vw-above__island.is-congested .mz-vw-above__land{ stroke:#d99a3d; stroke-width:2 }
+@keyframes mzVwGlow{ 0%,100%{ opacity:.55 } 50%{ opacity:1 } }
+.mz-vw-above__code{ fill:#f4f1e8; font-size:15px; font-weight:900; font-family:var(--font-sans) }
+.mz-vw-above__count{ fill:#a9b6ae; font-size:10px; font-weight:700; font-family:var(--font-arabic) }
+.mz-vw-above__live{ fill:#86c6a8 }
+.mz-vw-above__gate{ fill:rgba(255,255,255,.08); stroke:rgba(255,255,255,.18) }
+.mz-vw-above__gate.is-congested{ stroke:#d99a3d }
+.mz-vw-above__gate-text{ fill:#f4f1e8; font-size:10px; font-weight:800; font-family:var(--font-arabic) }
+
+/* ── 8) دفتر الأختام ─────────────────────────────────────────────────── */
+.mz-vw-stampbook{ background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(33,76,64,.05) 27px 28px) }
+.mz-vw-stamp{ display:flex; flex-direction:column; align-items:center; animation: mzVwPress .7s cubic-bezier(.2,1.4,.4,1) calc(var(--mz-vw-i,0) * .18s) both }
+.mz-vw-stamp__seal{ width:100%; max-width:120px; transform:rotate(var(--mz-vw-tilt,0deg)); color:var(--emerald); mix-blend-mode:multiply }
+.mz-vw-stamp__rim{ fill:none; stroke:currentColor; stroke-width:3; opacity:.85 }
+.mz-vw-stamp__rim.is-inner{ stroke-width:1.4; stroke-dasharray:2 2.5 }
+.mz-vw-stamp__ring{ fill:currentColor; font-size:9.5px; font-weight:800; font-family:var(--font-arabic) }
+.mz-vw-stamp__mark{ fill:var(--gold); font-size:22px; font-weight:900; font-family:var(--font-display) }
+.mz-vw-stamp__year{ fill:currentColor; font-size:9px; font-weight:800; font-family:var(--font-sans) }
+.mz-vw-stamp.is-void .mz-vw-stamp__seal{ color:var(--danger); opacity:.45; filter:grayscale(.6) }
+@keyframes mzVwPress{ 0%{ opacity:0; transform:scale(1.7) rotate(-8deg) } 60%{ opacity:1; transform:scale(.94) } 100%{ transform:none } }
+
+/* ── 9) زرّ الإتاحة والمحراب ─────────────────────────────────────────── */
+.mz-vw-iconbtn:focus-visible{ outline:2px solid var(--gold); outline-offset:2px }
+
+/* ── تقليل الحركة: الحالة الساكنة كاملة ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .mz-vw-scales .mz-arch, .mz-vw-scales .mz-chains, .mz-vw-scales .mz-book,
+  .mz-vw-halo::after, .mz-vw-star.is-strong, .mz-vw-juzbar__cell[data-pulse], .mz-vw-journey__path .is-drawn,
+  .mz-vw-journey__stop, .mz-vw-call, .mz-vw-call__card, .mz-vw-above__dot, .mz-vw-above__glow, .mz-vw-stamp{ animation:none !important }
+  .mz-vw-moment .mz-cer-item{ animation-delay:0ms !important }
+  .mz-vw-juzbar__cell > i{ transition:none }
+}
+html[data-mizan-motion="reduced"] :is(.mz-vw-scales .mz-arch, .mz-vw-scales .mz-chains, .mz-vw-scales .mz-book,
+  .mz-vw-star.is-strong, .mz-vw-juzbar__cell[data-pulse], .mz-vw-journey__path .is-drawn,
+  .mz-vw-journey__stop, .mz-vw-call, .mz-vw-call__card, .mz-vw-above__dot, .mz-vw-above__glow, .mz-vw-stamp){ animation:none !important }
+html[data-mizan-motion="reduced"] .mz-vw-halo::after{ animation:none !important }
+html[data-mizan-motion="reduced"] .mz-vw-moment .mz-cer-item{ animation-delay:0ms !important }
+
+/* ── 9) وضع المحراب — سمةٌ داكنة من ألوان القاعة ─────────────────────────────
+   تفضيلٌ لكل جهاز (`src/lib/mihrab-theme.ts`). الرموز تُعاد تعريفها، ثم تُترجَم الألوان
+   الفاتحة المكتوبة في الأصناف إلى نظائرها الداكنة. وتُستثنى أسطح لها ألوانها المقصودة:
+   شاشات القاعة (داكنة أصلًا)، وقمرة المحكّم (لها سماتها)، وأسطح المصحف وورقته، وشريط
+   البيئة التجريبية، وكل ما يُطبع. لا نصّ يتغيّر، الألوان وحدها. */
+/* `:root:root` لأن elevation.css يعرّف رموزه بهذه الخصوصية. */
+:root:root[data-mizan-theme="mihrab"]{
+  color-scheme: dark;
+  --ruled: rgba(255,255,255,.025);
+  --brass-text:#e8cb93;
+  --canvas:#101a16; --canvas-warm:#101a16;
+  --surface:#16241f; --surface-soft:#11211b;
+  --ink:#f4f1e8; --muted:#a9b6ae; --line:rgba(255,255,255,.10);
+  --emerald-soft:rgba(134,198,168,.13);
+  --amber:#e8cb93; --amber-soft:rgba(232,203,147,.12);
+  --danger:#e08b7d; --danger-soft:rgba(224,139,125,.14);
+  --blue:#9ab8cc; --blue-soft:rgba(154,184,204,.13);
+  --shadow-1:0 1px 2px rgba(0,0,0,.35);
+  --shadow-2:0 2px 10px rgba(0,0,0,.30);
+  --shadow-3:0 10px 30px rgba(0,0,0,.40);
+  --shadow-4:0 30px 80px rgba(0,0,0,.50);
+}
+html[data-mizan-theme="mihrab"] body{ background:var(--canvas); color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mz-el-header{ background:color-mix(in srgb, var(--venue-2) 92%, transparent) !important; border-color:var(--line) !important }
+
+/* الأسطح المشتركة */
+html[data-mizan-theme="mihrab"] :is(.mizan-surface, .mizan-dialog){ background:var(--surface); border-color:var(--line); box-shadow:var(--shadow-2) }
+html[data-mizan-theme="mihrab"] .mizan-surface-soft{ background:var(--surface-soft); border-color:var(--line) }
+html[data-mizan-theme="mihrab"] :is(.mizan-input, .mizan-textarea, select.mizan-input){ background:#0f1915; border-color:rgba(255,255,255,.14); color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mizan-tabs{ background:rgba(255,255,255,.04); border-color:var(--line) }
+html[data-mizan-theme="mihrab"] .mizan-tab{ color:var(--muted) }
+html[data-mizan-theme="mihrab"] .mizan-tab:hover{ background:rgba(255,255,255,.06) }
+html[data-mizan-theme="mihrab"] .mizan-tab.is-active{ background:rgba(232,203,147,.16); color:var(--ink); box-shadow:inset 0 0 0 1px rgba(232,203,147,.30) }
+
+/* التنقّل والأزرار الثانوية (elevation.css تلوّنها بحبر البنية الداكن) */
+html[data-mizan-theme="mihrab"] .mz-el-nav{ color:var(--muted) }
+html[data-mizan-theme="mihrab"] .mz-el-nav:hover{ background:rgba(255,255,255,.06); color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mz-el-nav.is-active{ background:rgba(232,203,147,.14); color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mz-el-mnav button{ color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mz-el-mnav button[aria-current="page"]{ background:rgba(232,203,147,.16); border-color:rgba(232,203,147,.35) }
+html[data-mizan-theme="mihrab"] :is(.mizan-btn-secondary, .mizan-tabs-sub .mizan-tab.is-active){ background:rgba(134,198,168,.14); color:var(--ink) }
+html[data-mizan-theme="mihrab"] .mizan-btn-outline{ background:transparent; border-color:rgba(255,255,255,.18); color:var(--ink) }
+
+/* ترجمة الأصناف المكتوبة بألوانها، خارج الأسطح المستثناة */
+html[data-mizan-theme="mihrab"] :is([class~="bg-white"], [class*="bg-white/"], [class*="bg-[#f"], [class*="bg-[#F"], [class*="bg-[#e"], [class*="bg-[#E"], [class*="bg-[#fffefb]"], [class*="bg-[var(--surface)]"], [class*="bg-[var(--canvas)]"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mz-vw-stamp, .mizan-receipt-sheet) *):not([class*="mizan-mushaf"]){ background-color:var(--surface-soft) !important }
+html[data-mizan-theme="mihrab"] :is([class*="text-[#1"], [class*="text-[#2"], [class*="text-[#3"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *){ color:var(--ink) !important }
+html[data-mizan-theme="mihrab"] :is([class*="text-[#4"], [class*="text-[#5"], [class*="text-[#6"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *){ color:var(--muted) !important }
+html[data-mizan-theme="mihrab"] :is([class*="text-[#7"], [class*="text-[#8"], [class*="text-[#9b7"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *){ color:#e8cb93 !important }
+html[data-mizan-theme="mihrab"] :is([class*="text-[#87"], [class*="text-[#88"], [class*="text-[#8a4"], [class*="text-[#7A2"], [class*="text-[#7a2"], [class*="text-[#9B3"], [class*="text-[#9b3"], [class*="text-[#A"], [class*="text-[#a"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *):not([class*="text-[#a9"]){ color:#f0b5a8 !important }
+html[data-mizan-theme="mihrab"] :is([class*="text-[color:var(--emerald"], [class*="text-[var(--emerald"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *){ color:#86c6a8 !important }
+html[data-mizan-theme="mihrab"] :is([class*="border-[#"], [class*="border-[var(--line)"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os, .mizan-demo-bar, [class*="mizan-mushaf"], .mizan-receipt-sheet) *){ border-color:var(--line) !important }
+html[data-mizan-theme="mihrab"] :is([class*="hover:bg-[#"]):not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os) *):hover{ background-color:rgba(255,255,255,.06) !important }
+/* العناصر الممتلئة بالزمرّدي تبقى بنصّها الأبيض. */
+html[data-mizan-theme="mihrab"] :is([class*="bg-[var(--emerald)]"], [class*="bg-[#214C40]"], [class*="bg-[#214c40]"], [class*="bg-[#202924]"]){ color:#fff }
+
+/* ما يُطبع يبقى ورقًا أبيض. */
+@media print{
+  :root:root[data-mizan-theme="mihrab"]{ color-scheme:light; --canvas:#f7f5ef; --surface:#fffefb; --surface-soft:#f1efe8; --ink:#171b18; --muted:#656b66; --line:#dfded7 }
+}
+html[data-mizan-theme="mihrab"] .mizan-journey{ background:var(--surface); border-color:var(--line) }
+html[data-mizan-theme="mihrab"] .mz-vw-viewtoggle button[aria-pressed="true"]{ color:#e8cb93; background:rgba(232,203,147,.12) }
+html[data-mizan-theme="mihrab"] .mz-vw-stamp__seal{ color:#86c6a8; mix-blend-mode:normal }
+
+/* أسطحٌ مسمّاة بخلفيةٍ فاتحة في ملفات الأنماط: تُظلَّل ليبقى نصّها مقروءًا. (القائمة مستخرجة من
+   index.css وbeauty-pass.css وelevation.css وما معها؛ أسطح المصحف والتشكيل مستثناة.) */
+html[data-mizan-theme="mihrab"] .mizan-advisory,
+html[data-mizan-theme="mihrab"] .mizan-control,
+html[data-mizan-theme="mihrab"] .mizan-journey,
+html[data-mizan-theme="mihrab"] .mizan-journey__go,
+html[data-mizan-theme="mihrab"] .mizan-journey__hard li,
+html[data-mizan-theme="mihrab"] .mizan-journey__stats > span,
+html[data-mizan-theme="mihrab"] .mizan-journey__stats > span[data-streak],
+html[data-mizan-theme="mihrab"] .mizan-journey__weak,
+html[data-mizan-theme="mihrab"] .mizan-panel,
+html[data-mizan-theme="mihrab"] .mizan-slip-card,
+html[data-mizan-theme="mihrab"] .mizan-slip-card__icon,
+html[data-mizan-theme="mihrab"] .mizan-slip-card__shared,
+html[data-mizan-theme="mihrab"] .mizan-ticket-paper,
+html[data-mizan-theme="mihrab"] .mz-bp-hero-tile,
+html[data-mizan-theme="mihrab"] .mzo-chip,
+html[data-mizan-theme="mihrab"] .mzo-proof,
+html[data-mizan-theme="mihrab"] .mzo-seal,
+html[data-mizan-theme="mihrab"] .mzo-step,
+html[data-mizan-theme="mihrab"] .mzo-tile{ background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--ink) }
+/* بعض الأسطح تُضاء بتدرّجٍ فاتح مضمَّن (style) فوق .mizan-surface: يُطفأ في المحراب. */
+html[data-mizan-theme="mihrab"] .mizan-surface:not(:is(.mizan-venue, .mizan-venue-2, .mizan-venue-deep, .mizan-judge-os) *){ background-color:var(--surface) !important; background-image:none !important }
+/* إيصال النزاهة ورقةٌ تُقرأ وتُطبع: تبقى ورقًا فاتحًا داخل المحراب. */
+html[data-mizan-theme="mihrab"] .mizan-receipt-sheet{
+  color-scheme:light; color:#171b18;
+  --surface:#fffefb; --surface-soft:#f1efe8; --ink:#171b18; --muted:#656b66; --line:#dfded7;
+  --emerald-soft:#e7eee9; --amber-soft:#f2eadc; --danger:#a34d43; --danger-soft:#f4e6e3;
+}

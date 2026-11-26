@@ -22,7 +22,8 @@ import { OfficialMushafSurface, deliveryReadingKeyFor, surahNumberFromName } fro
 import { fetchDeliveryPassage, fetchOfficialAyahAudio } from '../../lib/kfgqpc-library';
 import { Badge } from '../design-system/Badge';
 import { QuranIntelligenceDock } from './QuranIntelligenceDock';
-import { RecitationReplay, type ReplayMark } from './RecitationReplay';
+import { type ReplayMark } from './RecitationReplay';
+import { SessionStrip } from './SessionStrip';
 import { fetchJudgeFollowStatus, fetchQuranIntelligenceCapabilities, fetchQuranPassageIntelligence, fetchQuranReadingGuard, fetchQuranSessionEvidence, postQuranHumanMarker, quranReadingIdForPackage, resetQuranAlignment, submitJudgeFollowChunk, submitQuranAlignmentChunk, type QuranAlignmentResult, type QuranPassageIntelligence, type QuranReadingGuard, type QuranReadingId, type QuranSessionEvidence } from '../../lib/quran-intelligence';
 import { framedChunk, microphoneErrorNote } from '../../lib/microphone-capture';
 
@@ -517,6 +518,8 @@ export const JudgeOS: React.FC = () => {
  /* أثر التتبّع كان يُستبدل عند كل مقطع فيضيع: تُحفظ الرصدات مع إزاحتها من بداية التسجيل حتى
     تستطيع إعادة التشغيل أن تُري لجنةَ المراجعة أين وقعت كل ملاحظة في النص. */
  const [replayTrail,setReplayTrail]=useState<ReplayMark[]>([]);
+ /* «شريط الجلسة»: نبرة المعيار نفسها التي تلوّن مفاتيح اللوحة. */
+ const stripTone=useCallback((criterion:string)=>criterionTone(criterion,ruleSet),[ruleSet]);
  useEffect(()=>{setReplayTrail([])},[activeSession.sessionId,activeSession.currentQuestionIndex]);
  /* نص المقطع لإعادة التشغيل يُجلب من نفس حزمة التسليم التي يعرضها سطح المصحف، فلا يتفرّع نصّان. */
  const [replayAyat,setReplayAyat]=useState<{ayah:number;text:string}[]>([]);
@@ -770,6 +773,8 @@ export const JudgeOS: React.FC = () => {
      {reviewAvailable&&<div className="mt-2 text-[11px] font-black tracking-[.14em] text-[#7a6134]">{ar?'مراجعة متاحة':'REVIEW AVAILABLE'}</div>}
      {/* وهذا أكثر المخارج استعمالًا: يُعتمد التقييم ثم يُنادى التالي. فهو أولى الأزرار بأن يقول إنه يعمل. */}
      {nextQueued&&<div className="mt-4"><Button disabled={!!startingId} onClick={()=>void callParticipant(nextQueued.id)}>{startingId?(ar?'جارٍ تجهيز الجلسة…':'Preparing the session…'):(ar?'المتسابق التالي':'Next participant')}</Button></div>}
+     {/* مراجعةٌ بعد القفل فقط، وبشرط تسجيلٍ مكتمل محفوظ لهذه الجلسة — لا تكتب شيئًا ولا تغيّر درجة. */}
+     {sessionRecording?.localObjectUrl&&<SessionStrip ar={ar} recordingUrl={sessionRecording.localObjectUrl} recordingStartedAt={sessionRecording.startedAt} events={activeSession.events} currentQuestionIndex={activeSession.currentQuestionIndex} trail={replayTrail} ayat={replayAyat} toneFor={stripTone}/>}
     </div>}
 
     {startError&&<div role="alert" className="mt-3 shrink-0 rounded-xl bg-[var(--danger-soft)] text-[#88473f] px-3.5 py-2.5 text-[11px] font-bold leading-5">{startError}</div>}

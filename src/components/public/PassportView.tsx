@@ -11,6 +11,7 @@ import { useAppStore } from '../../lib/store';
 import { pl, usePublicLocale } from '../../lib/public-i18n';
 import { MizanPictogram } from '../design-system/MizanPictogram';
 import { PublicLanguageSwitcher } from './PublicLanguageSwitcher';
+import { PassportStampBook } from './PassportStampBook';
 
 type Entry = { id: string; competitionId: string; competitionName: string; competitionNameArabic?: string; organizationName?: string; year?: number; categoryName?: string; riwaya?: string; kind: 'certificate' | 'participation'; certificateNumber?: string; rank?: number; finalScore?: number; verification?: string };
 type Passport = { id: string; displayName: string; languages: string[]; visibility?: 'private' | 'public'; entries: Entry[] };
@@ -108,6 +109,7 @@ export const PassportView: React.FC = () => {
     {error && <p role="alert" className="rounded-xl bg-[var(--danger-soft)] p-3 text-xs font-bold text-[#87483f]">{errText(error, ar)}</p>}
     {passport && <><div className="mizan-surface p-5"><div className="text-2xl font-black">{passport.displayName}</div>{!!passport.languages.length && <div className="mt-1 text-xs text-[color:var(--muted)]" dir="ltr">{passport.languages.join(' · ')}</div>}
       <p className="mt-2 text-[11px] text-[color:var(--muted)]">{pl('كل شهادة هنا يُعاد التحقق منها من سجل الشهادات العام لحظة العرض.', 'Every certificate here is re-verified against the public certificate registry as you view it.')}</p></div>
+      <PassportStampBook entries={passport.entries} ar={ar} />
       <ul className="mt-4 space-y-3">{passport.entries.map(e => <EntryCard key={e.id} e={e} ar={ar} />)}</ul></>}
   </Spread>;
 
@@ -144,6 +146,7 @@ export const PassportView: React.FC = () => {
         <input aria-label={pl('رابط الرحلة', 'Journey link')} className="mizan-input" dir="ltr" value={journeyLink} onChange={e => setJourneyLink(e.target.value)} />
         <button type="button" disabled={busy || !journeyLink} onClick={() => void addEntry()} className="min-h-11 rounded-full bg-[var(--emerald)] px-5 text-sm font-bold text-white">{pl('إضافة', 'Add')}</button>
       </section>
+      <PassportStampBook entries={passport.entries} ar={ar} />
       <ul className="space-y-3">{passport.entries.map(e => <EntryCard key={e.id} e={e} ar={ar} onRemove={() => void remove(e.id)} />)}</ul>
       <section className="rounded-2xl border border-[#e5c9c4] p-4 text-xs">
         {!confirmErase ? <button type="button" className="font-bold text-[color:var(--danger)]" onClick={() => setConfirmErase(true)}>{pl('محو الجواز نهائيًا', 'Erase passport permanently')}</button>
