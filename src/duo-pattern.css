@@ -391,3 +391,50 @@ html[data-device="duo"] .mz-mk > header.sticky{ padding-top:var(--duo-safe-t) }
   html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools > div > .mizan-mushaf-tool{ background:rgba(255,253,246,.82) }
   html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools > span.shrink-0{ align-self:center; order:-1 }
 }
+
+/* ── 10) الكبسولة الداكنة تحت الساعة (2026-11-26) ────────────────────────────────────────────────
+   المرجع: كبسولة مِراس المصقولة. في كل وضعيةٍ فيها عمود ساعة داخل التطبيق (الخارجية طولًا وعرضًا بجهتيها،
+   والداخلية عرضًا بحدٍّ 84 أو صفر) يصير شريطا التنقّل نفساهما — «أقسام المسابقة» وتبويبات الصفحة الرئيسة
+   (المتسابق، رئيس التحكيم) — كبسولةً زجاجية داكنة من حبر ميزان الأخضر: عرضها 58px وطرفاها دائريان،
+   أيقونات 22px بيضاء ناعمة في أهداف 44px بإيقاعٍ متساوٍ، خطٌّ رفيع فاتح وظلٌّ خفيف، وتبدأ تحت الساعة بفجوةٍ
+   صغيرة فوق كل البطاقات. النشط دائرةٌ فاتحة هادئة هي المؤشّر المنزلق نفسه (dock-motion.css)؛ و«تقليل الحركة»
+   كما هو هناك. التسمية تبقى اسمًا للزرّ لقارئ الشاشة، والعدد شارةٌ صغيرة في ركنه. الوجهات نفسها بلا زيادة ولا
+   حذف؛ الداخلية طولًا وSafari والهاتف كما هي. عرضٌ فقط. */
+html[data-device="duo"][data-shell="app"]{ --mz-cap:58px; --mz-cap-bg:rgb(16 44 38 / .9); --mz-cap-solid:rgb(16 44 38) }
+@media screen and (orientation:portrait) and (max-width:559px){
+  html[data-device="duo"][data-shell="app"]{ --duo-col-top:212px }
+}
+@media screen and (orientation:landscape){
+  html[data-device="duo"][data-shell="app"]{ --duo-col-top:120px }
+}
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){
+  z-index:60; width:var(--mz-cap); min-width:0; max-width:var(--mz-cap); padding:6px; gap:2px; border-radius:999px; align-items:center;
+  background:var(--mz-cap-bg); border:1px solid rgb(255 255 255 / .16);
+  box-shadow:0 1px 0 rgb(255 255 255 / .1) inset, 0 10px 28px rgb(8 30 26 / .22), 0 2px 6px rgb(8 30 26 / .12);
+  backdrop-filter:blur(20px) saturate(1.5); -webkit-backdrop-filter:blur(20px) saturate(1.5);
+  --dm-ind-bg:rgb(255 255 255 / .16); --dm-ind-shadow:none; --dm-ind-radius:999px;
+}
+html[data-device="duo"][data-shell="app"][data-widget-side="right"] .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ right:calc((var(--duo-safe-r) - var(--mz-cap)) / 2) }
+html[data-device="duo"][data-shell="app"][data-widget-side="left"] .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ left:calc((var(--duo-safe-l) - var(--mz-cap)) / 2) }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main nav.mz-el-mnav > .grid{ align-items:center; gap:2px }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav button, .mz-leaf-b > .mizan-tabs > .mizan-tab){
+  flex:none; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; margin:0; gap:0; border:0; border-radius:50%;
+  display:grid; place-items:center; font-size:0; line-height:0; background:transparent; box-shadow:none; color:rgb(255 255 255 / .78);
+}
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav button[aria-current="page"], .mz-leaf-b > .mizan-tabs > .mizan-tab.is-active){ color:#fff }
+/* بلا المؤشّر المنزلق (قبل جاهزيته) تُرسم الدائرة على الزرّ النشط نفسه. */
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav:not([data-dm-ready]) button[aria-current="page"], .mz-leaf-b > .mizan-tabs:not([data-dm-ready]) > .mizan-tab.is-active){ background:rgb(255 255 255 / .16) }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav button, .mz-leaf-b > .mizan-tabs > .mizan-tab) > svg{ grid-area:1 / 1; width:22px; height:22px; stroke-width:1.9 }
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main nav.mz-el-mnav button > span{
+  position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+}
+/* عدد التبويب (المراجعات، الاعتراضات) شارةٌ صغيرة في الركن بحلقةٍ بلون الكبسولة. */
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main .mz-leaf-b > .mizan-tabs > .mizan-tab > span{
+  position:absolute; top:0; right:-2px; z-index:2; min-width:16px; height:16px; margin:0; padding:0 4px; border-radius:999px;
+  display:grid; place-items:center; font-size:10px; line-height:1; font-weight:900;
+  background:var(--brass-light, #c9a45c); color:var(--mz-cap-solid); box-shadow:0 0 0 2px var(--mz-cap-solid);
+}
+html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav button, .mz-leaf-b > .mizan-tabs > .mizan-tab):focus-visible{ outline:2px solid rgb(255 255 255 / .85); outline-offset:-2px }
+@media (prefers-contrast:more){
+  html[data-device="duo"][data-shell="app"]:is([data-widget-side="right"],[data-widget-side="left"]) .mizan-shell-main :is(nav.mz-el-mnav, .mz-leaf-b > .mizan-tabs){ background:var(--mz-cap-solid); border-color:#fff }
+}
