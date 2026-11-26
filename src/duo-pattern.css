@@ -334,3 +334,60 @@ html[data-device="duo"] .mz-mk > header.sticky{ padding-top:var(--duo-safe-t) }
   html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-b > :first-child{ margin-top:0 !important }
   html[data-device="duo"] .mz-bp-stage .mz-cer-sealed-b .mizan-dna-venue{ justify-content:center }
 }
+
+/* ── 9) ملاحظات المالك 2026-11-26 ─────────────────────────────────────────────────────────────────
+   · الشاشة الكاملة ليست كتابًا: لا خطّ كعبٍ ولا ظلّ في المنتصف؛ يعود الخطّ حين يعلن المتصفّح المفصل وحده.
+   · الداخلية عرضًا داخل التطبيق: قد يبلغ iOS حدًّا أيمن صفريًّا والساعة في الركن (duo-markers.ts يعدّ الجهة «يمين»):
+     حدّ الساعة لا يقلّ عن 84.
+   · المصحف في قمرة المحكّم: الصفحات هي محتوى اللوح، فتأخذ ارتفاعه بدل صورٍ مصغّرة؛ وصفّ أدواته سطرٌ واحد مرتّب
+     («صفحة كاملة» شارةٌ هادئة في طرفه)؛ والقمرة تقف فوق شريط البيئة التجريبية فلا يُقصّ «تلاوة أول آية» تحته. عرضٌ فقط. */
+@media screen and (orientation:landscape) and (min-width:860px) and (max-width:1000px) and (min-height:500px) and (max-height:760px){
+  html[data-device="duo"][data-shell="app"][data-widget-side="right"]{ --duo-safe-r:max(env(safe-area-inset-right,0px), 84px) }
+}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (max-height:960px) and (orientation:landscape){
+  html[data-device="duo"] body:is(:has(.mz-spread,.mz-login-book,.mz-onepage,.mz-mk), :has(main.mz-verify))::after{ display:none }
+  html[data-device="duo"] .mz-bp-stage > :is(header,main,footer){ background:none }
+}
+@media (horizontal-viewport-segments:2){
+  html[data-device="duo"] body:is(:has(.mz-spread,.mz-login-book,.mz-onepage,.mz-mk), :has(main.mz-verify))::after{ display:block }
+}
+@media screen and (min-width:640px){
+  html[data-device="duo"] body:has(.mizan-demo-bar) .mizan-judge-os{ --mizan-shell-pb:calc(3.5rem + var(--duo-safe-b, 0px)) }
+}
+/* صفّ أدوات المصحف سطرٌ واحد حيث اتّسعت الورقة (الداخلية)؛ الخارجية الضيّقة تبقى كما هي. */
+@media screen and (min-width:600px) and (min-height:600px){
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tools{ flex-wrap:nowrap; gap:.5rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tools > div{ flex-wrap:nowrap; gap:.35rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tool{ min-height:34px; padding-inline:.5rem; gap:.3rem; white-space:nowrap }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tool > svg:last-child{ display:none }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tools{ padding-inline:.6rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tools > span.shrink-0{
+    padding:.2rem .6rem; border-radius:999px; background:rgba(60,61,48,.07); color:#5d625e; font-size:11px; line-height:1.5; white-space:nowrap;
+  }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface > .mizan-mushaf-bar:first-child{ padding-block:.35rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-body{ padding:.35rem }
+}
+@media screen and (min-width:721px) and (max-width:1000px) and (min-height:520px) and (orientation:landscape){
+  html[data-device="duo"] .mizan-judge-paper{ padding:.5rem .8rem .55rem }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-gates{ margin-bottom:.45rem !important }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-quran{ flex:1 1 auto; min-height:max(17rem, 52dvh) }
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-quran + div{ margin-top:.5rem }
+}
+@media screen and (min-width:640px){
+  html[data-device="duo"] body:has(.mizan-demo-bar) .mizan-shell-main:has(.mizan-judge-os){ padding-bottom:calc(3.5rem + var(--duo-safe-b, 0px)) !important }
+}
+@media screen and (orientation:portrait) and (min-width:600px) and (max-width:820px) and (min-height:700px){
+  html[data-device="duo"] .mizan-judge-paper > .mizan-judge-quran{ padding:.35rem .6rem .4rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface > .mizan-mushaf-bar:first-child{ padding-block:.2rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface > .mizan-mushaf-bar:first-child > div:first-child > span:first-child{ display:none }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface > .mizan-mushaf-bar:first-child > div:first-child > .min-w-0{ display:flex; align-items:baseline; gap:.5rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-tools{ min-height:0; padding-block:.25rem }
+  /* The page is narrow in the wide top screen: its tools stand in a column beside it, so the page takes the row they held. */
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools{
+    position:absolute; z-index:6; bottom:.6rem; inset-inline-end:.6rem; flex-direction:column; align-items:flex-end; gap:.4rem;
+    padding:0; border:0; background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none;
+  }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools > div{ flex-direction:column; align-items:stretch; gap:.4rem }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools > div > .mizan-mushaf-tool{ background:rgba(255,253,246,.82) }
+  html[data-device="duo"] .mizan-judge-os .mizan-mushaf-surface:not(:has(.mizan-mushaf-drawer)) > .mizan-mushaf-tools > span.shrink-0{ align-self:center; order:-1 }
+}
