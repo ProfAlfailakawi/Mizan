@@ -64,7 +64,7 @@ export async function registerNativePushToken(timeoutMs = 15000): Promise<string
       })();
     });
   } finally {
-    await Promise.all(handles.map(h => h.remove().catch(() => undefined)));
+    await Promise.all(handles.map(h => Promise.resolve().then(() => h?.remove?.()).catch(() => undefined)));
   }
 }
 
@@ -89,8 +89,12 @@ export function installNativePushNavigation(): void {
   const plugin = getPlugin();
   if (!plugin || installed) return;
   installed = true;
-  void plugin.addListener('pushNotificationActionPerformed', (event: any) => {
-    const data = event?.notification?.data || {};
-    navigateToPushUrl(data.url);
-  }).catch(() => { installed = false; });
+  /* بعض جسور iOS تعيد مقبضاً لا وعداً، فكان `.catch` يُسقط الواجهة كلها عند الإقلاع:
+     نلفّ الناتج بـ Promise.resolve ونلتقط الخطأ المتزامن أيضاً. */
+  try {
+    Promise.resolve(plugin.addListener('pushNotificationActionPerformed', (event: any) => {
+      const data = event?.notification?.data || {};
+      navigateToPushUrl(data.url);
+    })).catch(() => { installed = false; });
+  } catch { installed = false; }
 }
