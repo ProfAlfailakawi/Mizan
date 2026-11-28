@@ -73,13 +73,13 @@ export const CertificateVerification: React.FC = () => {
     UNREACHABLE:{ar:'تعذّر التحقق الآن',en:'VERIFICATION UNAVAILABLE',variant:'amber'}
   };
 
-  return <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
-    <section className="mizan-surface p-6 sm:p-8 text-center">
-      <div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
+  return <main className="mz-verify max-w-3xl mx-auto px-4 sm:px-6 py-10 space-y-5">
+    <section className="mz-vc mizan-surface p-6 sm:p-8 text-center">
+      <div className="mz-vc-intro contents"><div className="mx-auto w-fit"><MizanPictogram kind="certificate" size="lg" tone="emerald"/></div>
       <div className="mizan-kicker mt-5">{ar?'تحقق ميزان':'MIZAN VERIFY'}</div>
       <h1 className="font-display text-2xl sm:text-3xl font-black mt-1">{ar?'تحقق مستقل من الشهادة':'Certificate verification'}</h1>
-      <p className="text-xs text-[color:var(--muted)] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p>
-      {policy.certificates.publicVerification&&<div className="max-w-md mx-auto flex gap-2 mt-6">
+      <p className="text-xs text-[color:var(--muted)] mt-2">{policy.certificates.publicVerification?(ar?'رقم واحد. إثبات واحد. بلا كشف بيانات غير لازمة.':'One number. One proof. No unnecessary data exposure.'):(ar?'التحقق العام غير مفعل لهذه المسابقة.':'Public verification is disabled for this competition.')}</p></div>
+      <div className="mz-vc-act contents">{policy.certificates.publicVerification&&<div className="max-w-md mx-auto flex gap-2 mt-6">
         <div className="relative flex-1"><Search className="w-4 h-4 absolute start-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)]"/><input value={searchCode} onChange={e=>setSearchCode(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void verify()} aria-label={ar?'رقم الشهادة':'Certificate number'} dir="ltr" autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="MZN-…" className="w-full rounded-xl border border-[#dcdad2] bg-white ps-10 pe-3 py-3 text-sm font-mono"/></div>
         <Button variant={searchCode.trim()?'primary':'outline'} className="mz-btn-idle" disabled={!searchCode.trim()} onClick={()=>void verify()}>{ar?'تحقق':'Verify'}</Button>
       </div>}
@@ -90,7 +90,7 @@ export const CertificateVerification: React.FC = () => {
           <div className="flex-1 space-y-1.5"><div className="h-2.5 w-2/3 rounded-full bg-[var(--line)]"/><div className="h-2 w-1/2 rounded-full bg-[var(--line)]/70"/></div>
           <span className="rounded-full border border-[var(--line)] px-2.5 py-0.5 text-[11px] font-black text-[var(--muted)]">{ar?'أصيلة':'AUTHENTIC'}</span>
         </div>
-      </div>}
+      </div>}</div>
     </section>
 
     {/* أثناء الفحص يظهر إطار الحكم نفسه (VerdictShell) بمحتوى محايد: رقم الشهادة الحقيقي،
