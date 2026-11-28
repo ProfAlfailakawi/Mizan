@@ -58,7 +58,8 @@ test('the judge cockpit fills the screen exactly once and never scrolls as a pag
    * تقتسم ما بقي بعد الرأس والذيل، فمهما زاد عددها أو قصرت الشاشة بقي زرّ الإنهاء ظاهرًا.
    * وقد كانت تحتاج على آيباد أفقي 646px ولديها 560px، فيختفي الإنهاء تحت الطيّ.
    */
-  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-body\{[\s\S]{0,200}?overflow:auto/, 'the Mushaf scrolls inside its own box');
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-body\{[\s\S]{0,200}?overflow:hidden/, 'the whole Mushaf page fits without a nested scroll');
+  assert.match(css, /\.mizan-judge-os \.mizan-mushaf-page\{[^}]*height:100%[^}]*object-fit:contain/, 'the source page scales down into the available cockpit space');
   assert.match(css, /\.mizan-judge-deck\{[\s\S]{0,300}?grid-template-rows:auto minmax\(0,1fr\) auto/, 'the deck gives its middle row all the slack');
   assert.match(css, /\.mizan-judge-pad\{[\s\S]{0,260}?grid-auto-rows:minmax\(0,1fr\)/, 'and the keys divide it evenly instead of overflowing');
 });
@@ -202,6 +203,33 @@ test('the page actually measures its bands and hands them to every lens', () => 
   const wired = surface.match(/<FocusLens [^>]*bands=\{bands\}/g) || [];
   assert.ok(lenses.length >= 3);
   assert.equal(wired.length, lenses.length, 'a lens without bands falls back to the constant estimate silently');
+});
+
+test('the delivered passage geometry wins over stale question geometry', () => {
+  const surface = read('src/components/judge/OfficialMushafSurface.tsx');
+  assert.ok(surface.indexOf('if(delivery?.loci?.length)') < surface.indexOf('if(q.pageLoci?.length)'));
+});
+
+test('technical source labels are absent from the judge surface', () => {
+  const surface = read('src/components/judge/OfficialMushafSurface.tsx');
+  assert.doesNotMatch(surface, /صفحة المصدر \+ عدسة منفصلة/);
+  assert.doesNotMatch(surface, /quranSourcePackageHash\?`SHA-256/);
+  assert.doesNotMatch(surface, /المصدر: \$\{surfaceAuthorityLabel\}/);
+});
+
+test('the divergence radar stays visible as a compact judge overlay', () => {
+  const css = read('src/index.css');
+  const surface = read('src/components/judge/OfficialMushafSurface.tsx');
+  assert.match(css, /\.mizan-judge-os \.mizan-divergence-radar\{[\s\S]{0,160}?position:absolute/);
+  assert.match(surface, /<DivergenceRadar className="m-3"/);
+});
+
+test('participant preparation renders one focused mode at a time', () => {
+  const dashboard = read('src/components/participant/ParticipantDashboard.tsx');
+  assert.match(dashboard, /type PrepareMode='listen'\|'trial'\|'calm'/);
+  assert.match(dashboard, /prepareMode==='listen'.*<MushafListens/);
+  assert.match(dashboard, /prepareMode==='trial'.*<TrialRun/);
+  assert.match(dashboard, /prepareMode==='calm'.*<WarmupSanctuary/);
 });
 
 /* ── ٣ — شاشة المحكّم بلا أدوات مراجعة ────────────────────────────────── */

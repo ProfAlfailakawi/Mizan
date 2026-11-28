@@ -31,7 +31,6 @@ const sheet = (over: Record<string, unknown> = {}) => renderToStaticMarkup(
     ayat: AYAT,
     tajweedOn: false,
     onToggleTajweed: () => {},
-    sourceLabel: 'KFGQPC',
     loaded: true,
     ...over,
   } as never),

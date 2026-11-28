@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { localizedCountry } from '../../lib/ui-language';
-import { Award, BadgeCheck, CalendarClock, Check, FileText, MapPin, QrCode, ShieldCheck, Sparkles, ArrowLeftRight} from 'lucide-react';
+import { Award, AudioLines, BadgeCheck, BookOpen, CalendarClock, Check, FileText, MapPin, QrCode, ShieldCheck, Sparkles, ArrowLeftRight} from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getCompetitionPolicy } from '../../lib/competition-config';
 import { surahAyahCount } from '../../lib/mushaf-map';
@@ -37,6 +37,7 @@ const STEP_LABELS=[{ar:'التسجيل',en:'Register'},{ar:'القبول',en:'Ap
  * قبل أول شهادة. تبويبٌ فارغ زحمة مثل القسم الفارغ تمامًا.
  */
 type Tab='journey'|'prepare'|'record';
+type PrepareMode='listen'|'trial'|'calm';
 
 export const ParticipantDashboard: React.FC = () => {
  const store=useAppStore(); const {language,currentUser,participants,results,certificates,participantPassport,competition,checkInParticipant}=store; const ar=language==='ar';
@@ -66,6 +67,7 @@ export const ParticipantDashboard: React.FC = () => {
  },[category?.id,category?.distribution,competition.id]);
  const scopeSurahs=useMemo(()=>(scopeResolution&&!scopeResolution.blocked?scopeMetrics(scopeResolution.scope).surahs:[]),[scopeResolution?.signature]);
  const [tab,setTab]=useState<Tab>('journey');
+ const [prepareMode,setPrepareMode]=useState<PrepareMode>('listen');
  const [pSurah,setPSurah]=useState(0); const [pStart,setPStart]=useState(1); const [pCount,setPCount]=useState(4);
  const [showRegistration,setShowRegistration]=useState(false); const [showAppeal,setShowAppeal]=useState(false); const [appealText,setAppealText]=useState(''); const [showCert,setShowCert]=useState(false);
  const policy=getCompetitionPolicy(competition);
@@ -184,12 +186,17 @@ export const ParticipantDashboard: React.FC = () => {
   </>}
 
   {activeTab==='prepare'&&<>
+   <div className="mizan-prepare-switch" role="tablist" aria-label={ar?'طريقة الاستعداد':'Preparation mode'}>
+    <PrepareButton active={prepareMode==='listen'} onClick={()=>setPrepareMode('listen')} icon={AudioLines} label={ar?'المصحف يسمعك':'Mushaf listens'}/>
+    <PrepareButton active={prepareMode==='trial'} onClick={()=>setPrepareMode('trial')} icon={BookOpen} label={ar?'تجربة الاختبار':'Trial run'}/>
+    <PrepareButton active={prepareMode==='calm'} onClick={()=>setPrepareMode('calm')} icon={Sparkles} label={ar?'تهيئة هادئة':'Settle in'}/>
+   </div>
    {/* التهيئة قبل الدخول فقط: بمجرد أن يصير المتسابق داخل اللجنة يختفي التبويب كله. */}
    {/*
      التجربة الكاملة أولًا: هي الجواب عن «كيف تجري اللحظة؟»، والتهيئة والاستوديو بعدها
      لمن أراد أن يهدّئ نفَسه أو يسمع المقطع. ولا تُعرض بلا نطاق معتمد: مواضعها تُسحب منه.
     */}
-   {scopeResolution&&!scopeResolution.blocked&&<TrialRun ar={ar}
+   {prepareMode==='trial'&&scopeResolution&&!scopeResolution.blocked&&<TrialRun ar={ar}
     scope={scopeResolution.scope}
     questionCount={resolveQuestionCount(category,policy)}
     minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}
@@ -201,19 +208,19 @@ export const ParticipantDashboard: React.FC = () => {
      إلى حيث تعثّر. وهي مراجعةٌ لا اختبار: لا درجةَ فيها، ولا يُسجَّل صوته، وتاريخُها
      في جهازه وحده.
     */}
-   {scopeResolution&&!scopeResolution.blocked&&<MushafListens ar={ar}
+   {prepareMode==='listen'&&scopeResolution&&!scopeResolution.blocked&&<MushafListens ar={ar}
     scope={scopeResolution.scope}
     deliveryReading={practiceReading}
     listening={practiceEngine}
     owner={participant.id}/>}
-   <WarmupSanctuary ar={ar}
+   {prepareMode==='calm'&&<WarmupSanctuary ar={ar}
     scopeText={scopeResolution&&!scopeResolution.blocked?describeScope(scopeResolution.scope,ar):undefined}
     spreadAcrossZones={warmupSpreadAcrossZones}
     questionCount={resolveQuestionCount(category,policy)}
     practicePassage={practicePassage}
-    minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>
+    minutesPerQuestion={competition.ruleSet?.questionDurationMinutes}/>}
    {/* بلا نطاق معتمد لا يُفتح الاستوديو: التدرّب على ما لن يُسأل فيه أسوأ من ألا يتدرّب. */}
-   {practiceReading&&scopeSurahs.length?<section className="space-y-3">
+   {prepareMode==='listen'&&(practiceReading&&scopeSurahs.length?<section className="space-y-3">
     <div className="flex flex-wrap items-end justify-between gap-3">
      <div><div className="mizan-kicker">{ar?'قبل دورك':'BEFORE YOUR TURN'}</div>
       <h2 className="text-lg font-black mt-1">{ar?'تدرّب على المصحف نفسه':'Practise on the same Mushaf'}</h2>
@@ -232,7 +239,7 @@ export const ParticipantDashboard: React.FC = () => {
     <PracticeStudio reading={practiceReading} surah={surah} startAyah={startAyah} endAyah={startAyah+count-1} ar={ar}/>
    </section>:<p className="mizan-surface p-6 text-center text-xs text-[#656b66]">{!practiceReading
      ?(ar?'لا تتوفّر حزمة تسليم معتمدة لروايتك بعد، فلا يُفتح الاستوديو على نصّ غير معتمد.':'No certified delivery package for your reading yet — the studio will not open on unofficial text.')
-     :(ar?'نطاق حفظك لم يُعتمد بعد، فلا يُفتح الاستوديو على مقطع قد لا يُسأل فيه. راجع إدارة المسابقة.':'Your range is not approved yet, so the studio will not open on a passage you may never be asked. Contact the organisers.')}</p>}
+     :(ar?'نطاق حفظك لم يُعتمد بعد، فلا يُفتح الاستوديو على مقطع قد لا يُسأل فيه. راجع إدارة المسابقة.':'Your range is not approved yet, so the studio will not open on a passage you may never be asked. Contact the organisers.')}</p>)}
   </>}
 
   {activeTab==='record'&&<>
@@ -246,5 +253,6 @@ export const ParticipantDashboard: React.FC = () => {
  </div>
 }
 const TabButton=({active,onClick,icon:Icon,label}:{active:boolean;onClick:()=>void;icon:React.ComponentType<{className?:string}>;label:string})=><button type="button" role="tab" aria-selected={active} onClick={onClick} className={`mizan-tab ${active?'is-active':''}`}><Icon className="w-4 h-4"/>{label}</button>;
+const PrepareButton=({active,onClick,icon:Icon,label}:{active:boolean;onClick:()=>void;icon:React.ComponentType<{className?:string}>;label:string})=><button type="button" role="tab" aria-selected={active} onClick={onClick} className="mizan-prepare-option" data-active={active||undefined}><Icon className="w-4 h-4"/>{label}</button>;
 const statusStep=(s:string)=>s==='draft'||s==='submitted'||s==='under_review'?1:s==='approved'?2:s==='checked_in'||s==='in_queue'?3:s==='in_session'?4:5;
 const statusText=(s:string,ar:boolean)=>({submitted:ar?'قيد الاستلام':'Submitted',under_review:ar?'قيد المراجعة':'Under review',approved:ar?'مقبول':'Approved',checked_in:ar?'تم الحضور':'Checked in',in_queue:ar?'بالانتظار':'Waiting',in_session:ar?'داخل اللجنة':'In session',tested:ar?'اكتمل الاختبار':'Completed',certified:ar?'معتمد':'Certified',appealed:ar?'اعتراض':'Appeal'} as Record<string,string>)[s]||s;

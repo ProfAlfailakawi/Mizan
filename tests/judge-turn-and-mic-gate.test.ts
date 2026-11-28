@@ -65,6 +65,13 @@ test('the microphone gate stands on recording, never on a level meter that may n
   assert.match(judge, /ctx\.resume\?\.\(\)/, 'the audio context is resumed for mobile Safari');
 });
 
+test('the microphone is prepared once, then later contestants start recording automatically', () => {
+  const judge = read('src/components/judge/JudgeOS.tsx');
+  assert.match(judge, /const micPreparedOnceRef=useRef\(false\)/);
+  assert.match(judge, /micPreparedOnceRef\.current=true/);
+  assert.match(judge, /if\(!activeSession\.sessionId\|\|activeSession\.isLocked\|\|!micPreparedOnceRef\.current\)return;void prepareAudio\(\)/);
+});
+
 test('releasing a stranded session moved to the exception desk, it was not dropped', () => {
   const portals = read('src/components/admin/RolePortals.tsx');
   assert.match(portals, /releaseStrandedSession/, 'the exception desk can release a stranded session');

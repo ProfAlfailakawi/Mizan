@@ -22,7 +22,7 @@ const Bar:React.FC<{label:string;value:number}>=({label,value})=>(
   <span className="h-1 flex-1 rounded-full bg-[#e7e3d9] overflow-hidden"><span className="block h-full rounded-full bg-[#2F6555]/70" style={{width:`${Math.round(Math.max(0,Math.min(1,value))*100)}%`}}/></span>
  </div>);
 
-export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:number;endAyah:number;ar:boolean}>=({reading,surah,startAyah,endAyah,ar})=>{
+export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:number;endAyah:number;ar:boolean;className?:string}>=({reading,surah,startAyah,endAyah,ar,className=''})=>{
  const [points,setPoints]=useState<DivergencePoint[]>([]);
  const [difficulty,setDifficulty]=useState<DifficultyVector|null>(null);
  const [open,setOpen]=useState(false);
@@ -41,7 +41,7 @@ export const DivergenceRadar:React.FC<{reading:string;surah:number;startAyah:num
 
  if(!points.length&&!difficulty)return null;
 
- return <div className="mt-3 rounded-[26px] border border-[#e2ded4] bg-[#fdfcf8] overflow-hidden">
+ return <div className={`mizan-divergence-radar rounded-[20px] border border-[#e2ded4] bg-[#fdfcf8] overflow-hidden shadow-[0_10px_30px_rgba(28,38,33,.08)] ${className}`}>
   <button type="button" onClick={()=>setOpen(o=>!o)} aria-expanded={open}
    className="w-full min-h-11 px-4 sm:px-5 py-3 flex items-center justify-between gap-3 text-start">
    <span className="flex items-center gap-2.5 min-w-0">

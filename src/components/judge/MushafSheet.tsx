@@ -36,14 +36,13 @@ export interface MushafSheetProps {
   tajweedOn: boolean;
   onToggleTajweed: () => void;
   tajweedScopeNote?: string;
-  sourceLabel: string;
   loaded: boolean;
 }
 
 export const MushafSheet: React.FC<MushafSheetProps> = ({
   ar, surahName, startAyah, endAyah, loci = [], ayat, fallbackText = '',
   officialFont = false, activeAyah = null, activeWords = [], activeWordIndex = -1,
-  tajweedOn, onToggleTajweed, tajweedScopeNote, sourceLabel, loaded,
+  tajweedOn, onToggleTajweed, tajweedScopeNote, loaded,
 }) => {
   const allTajweed = ayat ? ayat.flatMap(a => a.tajweed || []) : [];
   const range = ar
@@ -111,7 +110,7 @@ export const MushafSheet: React.FC<MushafSheetProps> = ({
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-[#2F6555]" />
             {loaded
-              ? (ar ? `النص من المصدر المسجّل: ${sourceLabel}.` : `Text from registered source: ${sourceLabel}.`)
+              ? (ar ? 'النص مطابق لحزمة المصحف المعتمدة.' : 'Text verified against the approved Mushaf package.')
               : (ar ? 'جارٍ تحميل أصل الصفحة…' : 'Loading the page master…')}
           </span>
           {place && <span className="font-black text-[#8A7438]" dir={ar ? 'rtl' : 'ltr'}>{place}</span>}
