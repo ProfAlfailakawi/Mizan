@@ -35,6 +35,8 @@
 	<string>public.app-category.education</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>يُستخدم عند اختيارك التقاط صورة أو مسح رمز داخل التطبيق فقط.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>يُستخدم الميكروفون لتسجيل تلاوة المتسابق أثناء جلسة التحكيم فقط وبطلب منك.</string>
 	<key>UIApplicationSceneManifest</key>
